@@ -44,7 +44,7 @@ struct SubnetRegistryActorStorage {
     /// The subnet actor ownership facet functions selectors
     bytes4[] subnetActorOwnershipSelectors;
     /// The validator reward facet functions selectors
-    bytes4[] validatorRewardSelectors;
+    bytes4[] subnetActorActivitySelectors;
     /// @notice Mapping that tracks the deployed subnet actors per user.
     /// Key is the hash of Subnet ID, values are addresses.
     /// mapping owner => nonce => subnet

@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import {SubnetID, IPCAddress} from "./Subnet.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {CompressedActivityRollup} from "../activities/Activity.sol";
+import {CompressedActivityRollup} from "../structs/Activity.sol";
 
 uint64 constant MAX_MSGS_PER_BATCH = 10;
 uint256 constant BATCH_PERIOD = 100;
@@ -30,8 +30,8 @@ struct BottomUpCheckpoint {
     uint64 nextConfigurationNumber;
     /// @dev Batch of messages to execute.
     IpcEnvelope[] msgs;
-    /// @dev The activity summary from child subnet to parent subnet
-    CompressedActivityRollup activities;
+    /// @dev The activity rollup from child subnet to parent subnet.
+    CompressedActivityRollup activity;
 }
 
 /// @notice A batch of bottom-up messages for execution.

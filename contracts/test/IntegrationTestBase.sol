@@ -46,9 +46,9 @@ import {GatewayFacetsHelper} from "./helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "./helpers/SubnetActorFacetsHelper.sol";
 import {DiamondFacetsHelper} from "./helpers/DiamondFacetsHelper.sol";
 
-import {FullActivityRollup, CompressedActivityRollup, Consensus} from "../contracts/activities/Activity.sol";
+import {FullActivityRollup, CompressedActivityRollup, Consensus} from "../contracts/structs/Activity.sol";
 import {ValidatorRewarderMap} from "../contracts/examples/ValidatorRewarderMap.sol";
-import {ValidatorRewardFacet} from "../contracts/activities/ValidatorRewardFacet.sol";
+import {SubnetActorActivityFacet} from "../contracts/subnet/SubnetActorActivityFacet.sol";
 
 struct TestSubnetDefinition {
     GatewayDiamond gateway;
@@ -167,7 +167,7 @@ contract TestSubnetActor is Test, TestParams {
     bytes4[] saCutterSelectors;
     bytes4[] saLouperSelectors;
     bytes4[] saOwnershipSelectors;
-    bytes4[] validatorRewardSelectors;
+    bytes4[] saActivitySelectors;
 
     SubnetActorDiamond saDiamond;
     SubnetActorMock saMock;
@@ -182,7 +182,7 @@ contract TestSubnetActor is Test, TestParams {
         saCutterSelectors = SelectorLibrary.resolveSelectors("DiamondCutFacet");
         saLouperSelectors = SelectorLibrary.resolveSelectors("DiamondLoupeFacet");
         saOwnershipSelectors = SelectorLibrary.resolveSelectors("OwnershipFacet");
-        validatorRewardSelectors = SelectorLibrary.resolveSelectors("ValidatorRewardFacet");
+        saActivitySelectors = SelectorLibrary.resolveSelectors("SubnetActorActivityFacet");
     }
 
     function defaultSubnetActorParamsWith(
@@ -499,7 +499,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         DiamondLoupeFacet louper = new DiamondLoupeFacet();
         DiamondCutFacet cutter = new DiamondCutFacet();
         OwnershipFacet ownership = new OwnershipFacet();
-        ValidatorRewardFacet validatorReward = new ValidatorRewardFacet();
+        SubnetActorActivityFacet activity = new SubnetActorActivityFacet();
 
         IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](9);
 
@@ -569,9 +569,9 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
 
         diamondCut[8] = (
             IDiamond.FacetCut({
-                facetAddress: address(validatorReward),
+                facetAddress: address(activity),
                 action: IDiamond.FacetCutAction.Add,
-                functionSelectors: validatorRewardSelectors
+                functionSelectors: saActivitySelectors
             })
         );
         SubnetActorDiamond diamond = new SubnetActorDiamond(diamondCut, params, address(this));
@@ -934,7 +934,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             blockHash: keccak256(abi.encode(h)),
             nextConfigurationNumber: nextConfigNum - 1,
             msgs: new IpcEnvelope[](0),
-            activities: CompressedActivityRollup({
+            activity: CompressedActivityRollup({
                 consensus: Consensus.CompressedSummary({
                     stats: Consensus.AggregatedStats({
                         totalActiveValidators: uint64(validators.length),
@@ -977,7 +977,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             blockHash: keccak256(abi.encode(h)),
             nextConfigurationNumber: nextConfigNum - 1,
             msgs: new IpcEnvelope[](0),
-            activities: activities
+            activity: activities
         });
 
         vm.deal(address(saDiamond), 100 ether);

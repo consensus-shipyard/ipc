@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {IValidatorRewarder} from "../activities/IValidatorRewarder.sol";
-import {Consensus} from "../activities/Activity.sol";
+import {IValidatorRewarder} from "../interfaces/IValidatorRewarder.sol";
+import {Consensus} from "../structs/Activity.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -20,7 +20,7 @@ contract ValidatorRewarderMap is IValidatorRewarder, Ownable {
         subnetId = id;
     }
 
-    function disburseRewards(SubnetID calldata id, Consensus.ValidatorData calldata detail) external {
+    function notifyValidClaim(SubnetID calldata id, Consensus.ValidatorData calldata detail) external {
         require(keccak256(abi.encode(id)) == keccak256(abi.encode(subnetId)), "not my subnet");
 
         address actor = id.route[id.route.length - 1];

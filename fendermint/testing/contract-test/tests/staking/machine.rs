@@ -286,7 +286,7 @@ impl StateMachine for StakingMachine {
                     block_hash: *block_hash,
                     next_configuration_number: *next_configuration_number,
                     msgs: Vec::new(),
-                    activities: Default::default(),
+                    activity: Default::default(),
                 };
                 let checkpoint_hash = checkpoint.clone().abi_hash();
 

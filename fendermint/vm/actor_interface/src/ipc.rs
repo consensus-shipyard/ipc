@@ -119,8 +119,9 @@ lazy_static! {
                             abi: ia::ownership_facet::OWNERSHIPFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "ValidatorRewardFacet",
-                            abi: ia::validator_reward_facet::VALIDATORREWARDFACET_ABI.to_owned(),
+                            name: "SubnetActorActivityFacet",
+                            abi: ia::subnet_actor_activity_facet::SUBNETACTORACTIVITYFACET_ABI
+                                .to_owned(),
                         },
                         // ========== IF YOU WANT TO ADD FACET FOR SUBNET, APPEND HERE ==========
                         // The registry has its own facets:
@@ -475,7 +476,7 @@ pub mod registry {
         pub diamond_cut_facet: Address,
         pub diamond_loupe_facet: Address,
         pub ownership_facet: Address,
-        pub validator_reward_facet: Address,
+        pub activity_facet: Address,
         pub subnet_getter_selectors: Vec<FunctionSelector>,
         pub subnet_manager_selectors: Vec<FunctionSelector>,
         pub subnet_rewarder_selectors: Vec<FunctionSelector>,
@@ -484,7 +485,7 @@ pub mod registry {
         pub subnet_actor_diamond_cut_selectors: Vec<FunctionSelector>,
         pub subnet_actor_diamond_loupe_selectors: Vec<FunctionSelector>,
         pub subnet_actor_ownership_selectors: Vec<FunctionSelector>,
-        pub validator_reward_selectors: Vec<FunctionSelector>,
+        pub subnet_actor_activity_selectors: Vec<FunctionSelector>,
         pub creation_privileges: u8, // 0 = Unrestricted, 1 = Owner.
     }
 }
@@ -541,7 +542,7 @@ pub mod subnet {
                 ],
                 next_configuration_number: 1,
                 msgs: vec![],
-                activities: Default::default(),
+                activity: Default::default(),
             };
 
             let param_type = BottomUpCheckpoint::param_type();

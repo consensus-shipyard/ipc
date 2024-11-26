@@ -45,7 +45,7 @@ import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
 
 import "forge-std/console.sol";
 
-import {FullActivityRollup, Consensus} from "../../contracts/activities/Activity.sol";
+import {FullActivityRollup, Consensus} from "../../contracts/structs/Activity.sol";
 import {ActivityHelper} from "../helpers/ActivityHelper.sol";
 
 contract MultiSubnetTest is Test, IntegrationTestBase {
@@ -1352,11 +1352,16 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: batch.msgs,
-            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
+            activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        checkpointer.createBottomUpCheckpoint(checkpoint, membershipRoot, weights[0] + weights[1] + weights[2]);
+        checkpointer.createBottomUpCheckpoint(
+            checkpoint,
+            membershipRoot,
+            weights[0] + weights[1] + weights[2],
+            ActivityHelper.dummyActivityRollup()
+        );
         vm.stopPrank();
 
         return checkpoint;
@@ -1382,11 +1387,16 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: msgs,
-            activities: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
+            activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        checkpointer.createBottomUpCheckpoint(checkpoint, membershipRoot, weights[0] + weights[1] + weights[2]);
+        checkpointer.createBottomUpCheckpoint(
+            checkpoint,
+            membershipRoot,
+            weights[0] + weights[1] + weights[2],
+            ActivityHelper.dummyActivityRollup()
+        );
         vm.stopPrank();
 
         return checkpoint;

@@ -83,7 +83,7 @@ contract RegisterSubnetFacet is ReentrancyGuard {
         diamondCut[8] = IDiamond.FacetCut({
             facetAddress: s.VALIDATOR_REWARD_FACET,
             action: IDiamond.FacetCutAction.Add,
-            functionSelectors: s.validatorRewardSelectors
+            functionSelectors: s.subnetActorActivitySelectors
         });
 
         // slither-disable-next-line reentrancy-benign

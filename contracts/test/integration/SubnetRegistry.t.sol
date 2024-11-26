@@ -18,6 +18,7 @@ import {SubnetActorPauseFacet} from "../../contracts/subnet/SubnetActorPauseFace
 import {SubnetActorCheckpointingFacet} from "../../contracts/subnet/SubnetActorCheckpointingFacet.sol";
 import {SubnetActorRewardFacet} from "../../contracts/subnet/SubnetActorRewardFacet.sol";
 import {SubnetActorDiamond} from "../../contracts/SubnetActorDiamond.sol";
+import {SubnetActorActivityFacet} from "../../contracts/subnet/SubnetActorActivityFacet.sol";
 import {SubnetID, PermissionMode, SubnetCreationPrivileges} from "../../contracts/structs/Subnet.sol";
 import {SubnetRegistryDiamond} from "../../contracts/SubnetRegistryDiamond.sol";
 
@@ -29,7 +30,6 @@ import {OwnershipFacet} from "../../contracts/OwnershipFacet.sol";
 import {AssetHelper} from "../../contracts/lib/AssetHelper.sol";
 import {RegistryFacetsHelper} from "../helpers/RegistryFacetsHelper.sol";
 import {DiamondFacetsHelper} from "../helpers/DiamondFacetsHelper.sol";
-import {ValidatorRewardFacet} from "../../contracts/activities/ValidatorRewardFacet.sol";
 import {ValidatorRewarderMap} from "../../contracts/examples/ValidatorRewarderMap.sol";
 
 import {SelectorLibrary} from "../helpers/SelectorLibrary.sol";
@@ -68,7 +68,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         params.diamondCutFacet = address(new DiamondCutFacet());
         params.diamondLoupeFacet = address(new DiamondLoupeFacet());
         params.ownershipFacet = address(new OwnershipFacet());
-        params.validatorRewardFacet = address(new ValidatorRewardFacet());
+        params.activityFacet = address(new SubnetActorActivityFacet());
 
         params.subnetActorGetterSelectors = mockedSelectors;
         params.subnetActorManagerSelectors = mockedSelectors2;
@@ -78,7 +78,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         params.subnetActorDiamondCutSelectors = SelectorLibrary.resolveSelectors("DiamondCutFacet");
         params.subnetActorDiamondLoupeSelectors = SelectorLibrary.resolveSelectors("DiamondLoupeFacet");
         params.subnetActorOwnershipSelectors = SelectorLibrary.resolveSelectors("OwnershipFacet");
-        params.validatorRewardSelectors = SelectorLibrary.resolveSelectors("ValidatorRewardFacet");
+        params.subnetActorActivitySelectors = SelectorLibrary.resolveSelectors("SubnetActorActivityFacet");
 
         params.creationPrivileges = SubnetCreationPrivileges.Unrestricted;
 
@@ -174,7 +174,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         new SubnetRegistryDiamond(diamondCut, params);
 
         params.ownershipFacet = address(8);
-        params.validatorRewardFacet = address(9);
+        params.activityFacet = address(9);
         new SubnetRegistryDiamond(diamondCut, params);
     }
 
