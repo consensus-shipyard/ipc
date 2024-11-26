@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import "../activities/IValidatorRewarder.sol";
+import {IValidatorRewarder} from "../activities/IValidatorRewarder.sol";
 import {Consensus, CompressedActivityRollup} from "../activities/Activity.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
