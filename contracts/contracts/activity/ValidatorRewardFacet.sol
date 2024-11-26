@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {Consensus} from "./Activity.sol";
+import {Consensus} from "../structs/Activity.sol";
 import {LibActivity} from "../lib/LibActivity.sol";
 import {LibDiamond} from "../lib/LibDiamond.sol";
 import {NotAuthorized} from "../errors/IPCErrors.sol";

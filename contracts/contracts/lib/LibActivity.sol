@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {IValidatorRewarder} from "../interfaces/IValidatorRewarder.sol";
-import {Consensus, CompressedActivityRollup} from "../activities/Activity.sol";
+import {Consensus, CompressedActivityRollup} from "../structs/Activity.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {SubnetID} from "../structs/Subnet.sol";

@@ -17,7 +17,7 @@ import {CrossMsgHelper} from "../../lib/CrossMsgHelper.sol";
 import {IpcEnvelope, SubnetID} from "../../structs/CrossNet.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
 
-import {ActivityRollupRecorded, FullActivityRollup} from "../../activities/Activity.sol";
+import {ActivityRollupRecorded, FullActivityRollup} from "../../structs/Activity.sol";
 
 contract CheckpointingFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;

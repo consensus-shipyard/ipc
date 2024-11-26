@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {IValidatorRewarder} from "../interfaces/IValidatorRewarder.sol";
-import {Consensus} from "../activities/Activity.sol";
+import {Consensus} from "../structs/Activity.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
