@@ -9,6 +9,7 @@ import {TestUtils} from "@ipc/test/helpers/TestUtils.sol";
 import {MerkleTreeHelper} from "@ipc/test/helpers/MerkleTreeHelper.sol";
 import {GatewayFacetsHelper} from "@ipc/test/helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "@ipc/test/helpers/SubnetActorFacetsHelper.sol";
+import {ActivityHelper} from "@ipc/test/helpers/ActivityHelper.sol";
 import {LinkedTokenController} from "../contracts/LinkedTokenController.sol";
 import {LinkedTokenReplica} from "../contracts/LinkedTokenReplica.sol";
 
@@ -28,7 +29,7 @@ import {GatewayGetterFacet} from "@ipc/contracts/gateway/GatewayGetterFacet.sol"
 import {SubnetActorCheckpointingFacet} from "@ipc/contracts/subnet/SubnetActorCheckpointingFacet.sol";
 import {CheckpointingFacet} from "@ipc/contracts/gateway/router/CheckpointingFacet.sol";
 import {FvmAddressHelper} from "@ipc/contracts/lib/FvmAddressHelper.sol";
-import {Consensus, CompressedActivityRollup} from "@ipc/contracts/activities/Activity.sol";
+import {Consensus, CompressedActivityRollup} from "@ipc/contracts/structs/Activity.sol";
 import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind, ResultMsg, CallMsg} from "@ipc/contracts/structs/CrossNet.sol";
 import {SubnetIDHelper} from "@ipc/contracts/lib/SubnetIDHelper.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -385,7 +386,7 @@ contract MultiSubnetTest is IntegrationTestBase {
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
             msgs: batch.msgs,
-            activities: CompressedActivityRollup({
+            activity: CompressedActivityRollup({
                 consensus: Consensus.CompressedSummary({
                 stats: Consensus.AggregatedStats({
                     totalActiveValidators: 1,
@@ -397,7 +398,7 @@ contract MultiSubnetTest is IntegrationTestBase {
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        checkpointer.createBottomUpCheckpoint(checkpoint, membershipRoot, weights[0] + weights[1] + weights[2]);
+        checkpointer.createBottomUpCheckpoint(checkpoint, membershipRoot, weights[0] + weights[1] + weights[2], ActivityHelper.dummyActivityRollup());
         vm.stopPrank();
 
         return checkpoint;

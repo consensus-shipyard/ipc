@@ -102,7 +102,7 @@ task('deploy-registry')
             subnetActorDiamondCutSelectors: selectors(subnetActorFacets.contracts['DiamondCutFacet']),
             subnetActorDiamondLoupeSelectors: selectors(subnetActorFacets.contracts['DiamondLoupeFacet']),
             subnetActorOwnershipSelectors: selectors(subnetActorFacets.contracts['OwnershipFacet']),
-            activityFacetSelectors: selectors(subnetActorFacets.contracts['SubnetActorActivityFacet']),
+            subnetActorActivitySelectors: selectors(subnetActorFacets.contracts['SubnetActorActivityFacet']),
 
             creationPrivileges: Number(mode),
         }
