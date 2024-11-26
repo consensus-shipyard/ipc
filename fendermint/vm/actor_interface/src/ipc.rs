@@ -119,8 +119,9 @@ lazy_static! {
                             abi: ia::ownership_facet::OWNERSHIPFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "ValidatorRewardFacet",
-                            abi: ia::validator_reward_facet::VALIDATORREWARDFACET_ABI.to_owned(),
+                            name: "SubnetActorActivityFacet",
+                            abi: ia::subnet_actor_activity_facet::SUBNETACTORACTIVITYFACET_ABI
+                                .to_owned(),
                         },
                         // ========== IF YOU WANT TO ADD FACET FOR SUBNET, APPEND HERE ==========
                         // The registry has its own facets:

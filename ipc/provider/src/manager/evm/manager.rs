@@ -11,7 +11,7 @@ use ipc_actors_abis::{
     checkpointing_facet, gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
     lib_gateway, lib_quorum, lib_staking_change_log, register_subnet_facet,
     subnet_actor_checkpointing_facet, subnet_actor_getter_facet, subnet_actor_manager_facet,
-    subnet_actor_reward_facet, validator_reward_facet,
+    subnet_actor_reward_facet, subnet_actor_activity_facet,
 };
 use ipc_api::evm::{fil_to_eth_amount, payload_to_evm_address, subnet_id_to_evm_addresses};
 use ipc_api::validator::from_contract_validators;
@@ -43,7 +43,7 @@ use ethers::types::{BlockId, Eip1559TransactionRequest, ValueOrArray, H256, I256
 use ethers::middleware::Middleware;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
-use ipc_actors_abis::validator_reward_facet::ValidatorClaim;
+use ipc_actors_abis::subnet_actor_activity_facet::ValidatorClaim;
 use ipc_api::checkpoint::{
     consensus::ValidatorData, BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent,
     Signature,
@@ -1410,7 +1410,7 @@ impl ValidatorRewarder for EthSubnetManager {
         claims: Vec<(u64, ValidatorClaim)>,
     ) -> Result<()> {
         let signer = Arc::new(self.get_signer(submitter)?);
-        let contract = validator_reward_facet::ValidatorRewardFacet::new(
+        let contract = subnet_actor_activity_facet::SubnetActorActivityFacet::new(
             contract_address_from_subnet(reward_claim_subnet)?,
             signer.clone(),
         );

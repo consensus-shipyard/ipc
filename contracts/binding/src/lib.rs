@@ -30,6 +30,8 @@ pub mod ownership_facet;
 #[allow(clippy::all)]
 pub mod register_subnet_facet;
 #[allow(clippy::all)]
+pub mod subnet_actor_activity_facet;
+#[allow(clippy::all)]
 pub mod subnet_actor_checkpointing_facet;
 #[allow(clippy::all)]
 pub mod subnet_actor_diamond;
@@ -47,8 +49,6 @@ pub mod subnet_getter_facet;
 pub mod subnet_registry_diamond;
 #[allow(clippy::all)]
 pub mod top_down_finality_facet;
-#[allow(clippy::all)]
-pub mod validator_reward_facet;
 #[allow(clippy::all)]
 pub mod xnet_messaging_facet;
 
