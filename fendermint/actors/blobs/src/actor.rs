@@ -22,7 +22,9 @@ use fil_actors_runtime::{
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::econ::TokenAmount;
+use fvm_shared::error::ExitCode;
 use fvm_shared::{address::Address, MethodNum, METHOD_SEND};
+use num_traits::Zero;
 
 use crate::{ConstructorParams, State, BLOBS_ACTOR_NAME};
 
@@ -166,7 +168,17 @@ impl BlobsActor {
         params: GetCreditAllowanceParams,
     ) -> Result<TokenAmount, ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let to = resolve_external_non_machine(rt, params.to)?;
+        let to = match resolve_external_non_machine(rt, params.to) {
+            Ok(to) => to,
+            Err(e) => {
+                return if e.exit_code() == ExitCode::USR_FORBIDDEN {
+                    // Disallowed actor type (this is called by all txns so we can't error)
+                    Ok(TokenAmount::zero())
+                } else {
+                    Err(e)
+                };
+            }
+        };
         let sponsor = if let Some(sponsor) = params.sponsor {
             Some(resolve_external_non_machine(rt, sponsor)?)
         } else {
@@ -374,8 +386,6 @@ mod tests {
     };
     use fvm_shared::bigint::BigInt;
     use fvm_shared::clock::ChainEpoch;
-    use fvm_shared::error::ExitCode;
-    use num_traits::Zero;
     use rand::RngCore;
 
     pub fn new_hash(size: usize) -> (Hash, u64) {

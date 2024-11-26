@@ -19,8 +19,6 @@ use fvm_shared::{address::Address, error::ExitCode, sys::SendFlags, MethodNum};
 use num_traits::Zero;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-mod ext;
-
 /// Params for creating a machine.
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ConstructorParams {
@@ -133,30 +131,6 @@ pub fn resolve_external(
         .get_actor_code_cid(&actor_id)
         .expect("failed to lookup caller code");
     match rt.resolve_builtin_actor_type(&code_cid) {
-        Some(Type::Account) => {
-            let result = rt
-                .send(
-                    &address,
-                    ext::account::PUBKEY_ADDRESS_METHOD,
-                    None,
-                    Zero::zero(),
-                    None,
-                    SendFlags::READ_ONLY,
-                )
-                .context_code(
-                    ExitCode::USR_ASSERTION_FAILED,
-                    "account failed to return its key address",
-                )?;
-            if !result.exit_code.is_success() {
-                return Err(ActorError::checked(
-                    result.exit_code,
-                    "failed to retrieve account robust address".to_string(),
-                    None,
-                ));
-            }
-            let robust_addr: Address = deserialize_block(result.return_data)?;
-            Ok((robust_addr, ActorType::Account))
-        }
         Some(t) => match t {
             Type::Placeholder | Type::EVM | Type::EthAccount => {
                 let delegated_addr =
