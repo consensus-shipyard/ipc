@@ -101,4 +101,6 @@ pub struct ListObjectsReturn {
     pub objects: Vec<(Vec<u8>, Option<Object>)>,
     /// When a delimiter is used in the list query, this contains common key prefixes.
     pub common_prefixes: Vec<Vec<u8>>,
+    /// True when there are more objects to list.
+    pub has_more: bool,
 }

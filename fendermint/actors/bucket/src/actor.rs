@@ -114,7 +114,7 @@ impl Actor {
         let mut objects = Vec::new();
         let state = rt.state::<State>()?;
         let owner = state.owner;
-        let prefixes = state.list(
+        let (prefixes, has_more) = state.list(
             rt.store(),
             params.prefix,
             params.delimiter,
@@ -133,6 +133,7 @@ impl Actor {
         )?;
         Ok(ListObjectsReturn {
             objects,
+            has_more,
             common_prefixes: prefixes,
         })
     }
