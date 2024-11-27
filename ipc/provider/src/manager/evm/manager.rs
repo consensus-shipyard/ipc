@@ -1592,11 +1592,13 @@ impl TryFrom<gateway_getter_facet::Subnet> for SubnetInfo {
 
 #[cfg(test)]
 mod tests {
-    use crate::manager::evm::manager::{contract_address_from_subnet, gen_merkle_tree};
+    use crate::manager::evm::manager::contract_address_from_subnet;
     use ethers::core::rand::prelude::SliceRandom;
     use ethers::core::rand::{random, thread_rng};
     use fvm_shared::address::Address;
     use ipc_actors_abis::checkpointing_facet::{checkpointing_facet, ValidatorData};
+    use ipc_api::checkpoint::VALIDATOR_REWARD_FIELDS;
+    use ipc_api::merkle::MerkleGen;
     use ipc_api::subnet_id::SubnetID;
     use std::str::FromStr;
 
@@ -1659,9 +1661,13 @@ mod tests {
         ];
         random_validator_data.shuffle(&mut thread_rng());
 
-        let root = gen_merkle_tree(&random_validator_data, pack_validator_data)
-            .unwrap()
-            .root();
+        let root = MerkleGen::new(
+            pack_validator_data,
+            &random_validator_data,
+            &VALIDATOR_REWARD_FIELDS,
+        )
+        .unwrap()
+        .root();
         assert_eq!(
             hex::encode(root.0),
             "5519955f33109df3338490473cb14458640efdccd4df05998c4c439738280ab0"
@@ -1682,20 +1688,32 @@ mod tests {
             .collect::<Vec<_>>();
 
         random_validator_data.shuffle(&mut thread_rng());
-        let root = gen_merkle_tree(&random_validator_data, pack_validator_data)
-            .unwrap()
-            .root();
+        let root = MerkleGen::new(
+            pack_validator_data,
+            &random_validator_data,
+            &VALIDATOR_REWARD_FIELDS,
+        )
+        .unwrap()
+        .root();
 
         random_validator_data.shuffle(&mut thread_rng());
-        let new_root = gen_merkle_tree(&random_validator_data, pack_validator_data)
-            .unwrap()
-            .root();
+        let new_root = MerkleGen::new(
+            pack_validator_data,
+            &random_validator_data,
+            &VALIDATOR_REWARD_FIELDS,
+        )
+        .unwrap()
+        .root();
         assert_eq!(new_root, root);
 
         random_validator_data.shuffle(&mut thread_rng());
-        let new_root = gen_merkle_tree(&random_validator_data, pack_validator_data)
-            .unwrap()
-            .root();
+        let new_root = MerkleGen::new(
+            pack_validator_data,
+            &random_validator_data,
+            &VALIDATOR_REWARD_FIELDS,
+        )
+        .unwrap()
+        .root();
         assert_eq!(new_root, root);
     }
 }
