@@ -443,7 +443,7 @@ mod tests {
     }
 
     #[test]
-    fn test_list_more_than_limit() {
+    fn test_list_more_than_max_limit() {
         let store = MemoryBlockstore::default();
         let mut state = State::new(
             &store,
@@ -473,6 +473,33 @@ mod tests {
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.0.len(), 10);
+        assert!(!result.2);
+    }
+
+    #[test]
+    fn test_list_at_max_limit() {
+        let store = MemoryBlockstore::default();
+        let mut state = State::new(
+            &store,
+            Address::new_id(100),
+            WriteAccess::OnlyOwner,
+            HashMap::new(),
+        )
+        .unwrap();
+
+        for i in 0..MAX_LIST_LIMIT {
+            let key = BytesKey(format!("{}.txt", i).as_bytes().to_vec());
+            let object = object_one();
+            state
+                .add(&store, key.clone(), object.hash, object.metadata, false)
+                .unwrap();
+        }
+
+        // List all keys
+        let result = list(&state, &store, vec![], vec![], 0, 0);
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert_eq!(result.0.len(), MAX_LIST_LIMIT);
         assert!(!result.2);
     }
 
