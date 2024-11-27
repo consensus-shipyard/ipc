@@ -8,8 +8,8 @@ use std::time::Duration;
 
 use ethers_contract::{ContractError, EthLogDecode, LogMeta};
 use ipc_actors_abis::{
-    checkpointing_facet, gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
-    lib_gateway, lib_quorum, lib_staking_change_log, register_subnet_facet,
+    checkpointing_facet, gateway_getter_facet, gateway_manager_facet, lib_gateway, lib_quorum,
+    lib_staking_change_log, register_subnet_facet, subnet_actor_activity_facet,
     subnet_actor_checkpointing_facet, subnet_actor_getter_facet, subnet_actor_manager_facet,
     subnet_actor_reward_facet,
 };
