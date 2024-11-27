@@ -147,7 +147,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
         if (subnet.circSupply < totalAmount) {
             revert NotEnoughSubnetCircSupply();
         }
-    
+
         subnet.circSupply -= totalAmount;
 
         // execute cross-messages

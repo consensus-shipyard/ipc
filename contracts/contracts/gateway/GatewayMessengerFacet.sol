@@ -25,16 +25,16 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
     using CrossMsgHelper for IpcEnvelope;
 
     /**
-    * @dev Sends a general-purpose cross-message from the local subnet to the destination subnet.
-    * IMPORTANT: Native tokens via msg.value are treated as a contribution toward gas costs associated with message propagation.
-    * There is no strict enforcement of the exact gas cost, and any msg.value provided will be accepted.
-    *
-    * IMPORTANT: Only smart contracts are allowed to trigger these cross-net messages. User wallets can send funds
-    * from their address to the destination subnet and then run the transaction in the destination normally.
-    *
-    * @param envelope - the original envelope, which will be validated, stamped, and committed during the send.
-    * @return committed envelope.
-    */
+     * @dev Sends a general-purpose cross-message from the local subnet to the destination subnet.
+     * IMPORTANT: Native tokens via msg.value are treated as a contribution toward gas costs associated with message propagation.
+     * There is no strict enforcement of the exact gas cost, and any msg.value provided will be accepted.
+     *
+     * IMPORTANT: Only smart contracts are allowed to trigger these cross-net messages. User wallets can send funds
+     * from their address to the destination subnet and then run the transaction in the destination normally.
+     *
+     * @param envelope - the original envelope, which will be validated, stamped, and committed during the send.
+     * @return committed envelope.
+     */
     function sendContractXnetMessage(
         IpcEnvelope memory envelope
     ) external payable returns (IpcEnvelope memory committed) {
