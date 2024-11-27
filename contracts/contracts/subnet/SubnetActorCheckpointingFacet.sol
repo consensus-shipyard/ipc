@@ -43,10 +43,6 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
 
         s.lastBottomUpCheckpointHeight = checkpoint.blockHeight;
 
-        // TODO(rewarder): if we have a non-zero validator rewarder at this level, queue the commitment for processing in storage (add to pending and presentable summaries).
-        //   If we have a zero validator rewarder at this level, and we are the L1, discard the incoming commitments.
-        //   If we have a zero validator rewarder at this level, and we are not the L1, relay the commitments upwards (add to pending summaries).
-
         // Commit in gateway to distribute rewards
         IGateway(s.ipcGatewayAddr).commitCheckpoint(checkpoint);
 

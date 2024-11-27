@@ -11,7 +11,7 @@ struct SubnetRegistryActorStorage {
     address SUBNET_ACTOR_GETTER_FACET;
     // solhint-disable-next-line var-name-mixedcase
     address SUBNET_ACTOR_MANAGER_FACET;
-    /// TODO: this should be removed as it's for collateral withdraw only, not rewarder
+    /// TODO: see https://github.com/consensus-shipyard/ipc/issues/1217
     // solhint-disable-next-line var-name-mixedcase
     address SUBNET_ACTOR_REWARD_FACET;
     // solhint-disable-next-line var-name-mixedcase
@@ -31,7 +31,7 @@ struct SubnetRegistryActorStorage {
     /// The subnet actor manager facet functions selectors
     bytes4[] subnetActorManagerSelectors;
     /// The subnet actor reward facet functions selectors
-    /// TODO: this should be removed as it's for collateral withdraw only, not rewarder
+    /// TODO: see https://github.com/consensus-shipyard/ipc/issues/1217
     bytes4[] subnetActorRewarderSelectors;
     /// The subnet actor checkpointing facet functions selectors
     bytes4[] subnetActorCheckpointerSelectors;

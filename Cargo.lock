@@ -5146,6 +5146,7 @@ dependencies = [
  "ipc_actors_abis",
  "lazy_static",
  "log",
+ "merkle-tree-rs",
  "num-traits",
  "num_enum",
  "serde",

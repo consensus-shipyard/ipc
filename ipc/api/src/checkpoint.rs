@@ -25,6 +25,8 @@ lazy_static! {
     // for storing the cid of an inaccessible HAMT.
     pub static ref CHECKPOINT_GENESIS_CID: Cid =
         Cid::new_v1(DAG_CBOR, Code::Blake2b256.digest("genesis".as_bytes()));
+    /// ABI types of the Merkle tree which contains validator addresses and their voting power.
+    pub static ref VALIDATOR_REWARD_FIELDS: Vec<String> = vec!["address".to_owned(), "uint64".to_owned()];
 }
 
 pub type Signature = Vec<u8>;

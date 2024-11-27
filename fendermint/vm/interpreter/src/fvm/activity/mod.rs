@@ -5,15 +5,15 @@
 //! needed.
 
 pub mod actor;
-mod merkle;
 
-use crate::fvm::activity::merkle::MerkleProofGen;
 use fendermint_crypto::PublicKey;
 use ipc_actors_abis::checkpointing_facet::{
     AggregatedStats, CompressedActivityRollup, CompressedSummary, FullActivityRollup, FullSummary,
     ValidatorData,
 };
+use ipc_api::checkpoint::VALIDATOR_REWARD_FIELDS;
 use ipc_api::evm::payload_to_evm_address;
+use ipc_api::merkle::MerkleGen;
 
 /// Wrapper for FullActivityRollup with some utility functions
 pub struct FullActivity(FullActivityRollup);
@@ -49,13 +49,8 @@ impl TryFrom<fendermint_actor_activity_tracker::types::FullActivityRollup> for F
                 Ok(data)
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
-        let consensus = FullSummary {
-            stats,
-            data,
-        };
-        let f = FullActivityRollup {
-            consensus,
-        };
+        let consensus = FullSummary { stats, data };
+        let f = FullActivityRollup { consensus };
         Ok(Self::new(f))
     }
 }
@@ -75,7 +70,11 @@ impl FullActivity {
     }
 
     pub fn compressed(&self) -> anyhow::Result<CompressedActivityRollup> {
-        let gen = MerkleProofGen::new(self.0.consensus.data.as_slice())?;
+        let gen = MerkleGen::new(
+            |v| vec![format!("{:?}", v.validator), v.blocks_committed.to_string()],
+            self.0.consensus.data.as_slice(),
+            &VALIDATOR_REWARD_FIELDS,
+        )?;
         Ok(CompressedActivityRollup {
             consensus: CompressedSummary {
                 stats: self.0.consensus.stats.clone(),

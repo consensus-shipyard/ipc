@@ -137,12 +137,7 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         Ok(self
             .checkpointing
             .call_with_return(state, |c| {
-                c.create_bottom_up_checkpoint(
-                    checkpoint,
-                    tree.root_hash().0,
-                    total_power,
-                    activity,
-                )
+                c.create_bottom_up_checkpoint(checkpoint, tree.root_hash().0, total_power, activity)
             })?
             .into_return())
     }

@@ -9,23 +9,15 @@ library ActivityHelper {
         uint64 totalNumBlocksCommitted,
         bytes32 detailsRootCommitment
     ) internal pure returns (CompressedActivityRollup memory compressed) {
-        Consensus.CompressedSummary memory summary = newCompressedSummary(
-            totalActiveValidators,
-            totalNumBlocksCommitted,
-            detailsRootCommitment
-        );
+        Consensus.CompressedSummary memory summary = Consensus.CompressedSummary({
+            stats: Consensus.AggregatedStats({
+                totalActiveValidators: totalActiveValidators,
+                totalNumBlocksCommitted: totalNumBlocksCommitted
+            }),
+            dataRootCommitment: Consensus.MerkleHash.wrap(detailsRootCommitment)
+        });
         compressed.consensus = summary;
         return compressed;
-    }
-
-    function newCompressedSummary(
-        uint64 totalActiveValidators,
-        uint64 totalNumBlocksCommitted,
-        bytes32 detailsRootCommitment
-    ) internal pure returns (Consensus.CompressedSummary memory summary) {
-        summary.stats.totalActiveValidators = totalActiveValidators;
-        summary.stats.totalNumBlocksCommitted = totalNumBlocksCommitted;
-        summary.dataRootCommitment = Consensus.MerkleHash.wrap(detailsRootCommitment);
     }
 
     function wrapBytes32Array(bytes32[] memory data) internal pure returns (Consensus.MerkleHash[] memory wrapped) {

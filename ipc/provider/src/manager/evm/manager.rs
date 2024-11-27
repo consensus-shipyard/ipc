@@ -10,8 +10,8 @@ use ethers_contract::{ContractError, EthLogDecode, LogMeta};
 use ipc_actors_abis::{
     checkpointing_facet, gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
     lib_gateway, lib_quorum, lib_staking_change_log, register_subnet_facet,
-    subnet_actor_checkpointing_facet, subnet_actor_getter_facet, subnet_actor_manager_facet,
-    subnet_actor_reward_facet, subnet_actor_activity_facet,
+    subnet_actor_activity_facet, subnet_actor_checkpointing_facet, subnet_actor_getter_facet,
+    subnet_actor_manager_facet, subnet_actor_reward_facet,
 };
 use ipc_api::evm::{fil_to_eth_amount, payload_to_evm_address, subnet_id_to_evm_addresses};
 use ipc_api::validator::from_contract_validators;
@@ -48,16 +48,15 @@ use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_actors_abis::subnet_actor_activity_facet::ValidatorClaim;
 use ipc_api::checkpoint::{
     consensus::ValidatorData, BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent,
-    Signature,
+    Signature, VALIDATOR_REWARD_FIELDS,
 };
 use ipc_api::cross::IpcEnvelope;
+use ipc_api::merkle::MerkleGen;
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo, ValidatorStakingInfo};
 use ipc_api::subnet::ConstructParams;
 use ipc_api::subnet_id::SubnetID;
 use ipc_observability::lazy_static;
 use ipc_wallet::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
-use merkle_tree_rs::format::Raw;
-use merkle_tree_rs::standard::{LeafType, StandardMerkleTree};
 use num_traits::ToPrimitive;
 use std::result;
 
@@ -1439,22 +1438,10 @@ fn gen_merkle_proof(
         vec![format!("{:?}", v.validator), v.blocks_committed.to_string()]
     };
 
-    let tree = gen_merkle_tree(validator_data, pack_validator_data)?;
+    let leaves = order_validator_data(validator_data)?;
+    let tree = MerkleGen::new(pack_validator_data, &leaves, &VALIDATOR_REWARD_FIELDS)?;
 
-    let leaf = pack_validator_data(validator);
-    tree.get_proof(LeafType::LeafBytes(leaf))
-}
-
-fn gen_merkle_tree<F: Fn(&checkpointing_facet::ValidatorData) -> Vec<String>>(
-    validator_data: &[checkpointing_facet::ValidatorData],
-    pack_validator_data: F,
-) -> anyhow::Result<StandardMerkleTree<Raw>> {
-    let leaves = order_validator_data(validator_data)?
-        .iter()
-        .map(pack_validator_data)
-        .collect::<Vec<_>>();
-    StandardMerkleTree::<Raw>::of(&leaves, &VALIDATOR_SUMMARY_FIELDS)
-        .context("failed to construct Merkle tree")
+    tree.get_proof(validator)
 }
 
 fn order_validator_data(

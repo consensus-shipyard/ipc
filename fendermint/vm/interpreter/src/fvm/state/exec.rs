@@ -196,6 +196,16 @@ where
         self.execute_message(msg, ApplyKind::Implicit)
     }
 
+    /// Execute message implicitly but ensures the execution is successful and returns only the ApplyRet.
+    pub fn execute_implicit_ok(&mut self, msg: Message) -> ExecResult {
+        let r = self.execute_implicit(msg)?;
+        if let Some(err) = &r.0.failure_info {
+            anyhow::bail!("failed to apply message: {}", err)
+        } else {
+            Ok(r)
+        }
+    }
+
     /// Execute message explicitly.
     pub fn execute_explicit(&mut self, msg: Message) -> ExecResult {
         self.execute_message(msg, ApplyKind::Explicit)
