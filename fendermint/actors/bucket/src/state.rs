@@ -181,10 +181,7 @@ impl State {
         let mut collected: usize = 0;
         let mut has_more = false;
 
-        let mut iter = hamt.iter();
-        loop {
-            let Some(pair) = iter.next() else { break };
-
+        for pair in &hamt {
             if collected == MAX_LIST_LIMIT {
                 has_more = true;
                 break;
