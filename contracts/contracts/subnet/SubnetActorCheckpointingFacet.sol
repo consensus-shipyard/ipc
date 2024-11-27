@@ -13,7 +13,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {LibSubnetActor} from "../lib/LibSubnetActor.sol";
 import {Pausable} from "../lib/LibPausable.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
-import {LibValidatorReward} from "../activities/ValidatorRewardFacet.sol";
+import {LibActivity} from "../lib/LibActivity.sol";
 
 contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard, Pausable {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -43,19 +43,10 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
 
         s.lastBottomUpCheckpointHeight = checkpoint.blockHeight;
 
-        // TODO(rewarder): if we have a non-zero validator rewarder at this level, queue the commitment for processing in storage (add to pending and presentable summaries).
-        //   If we have a zero validator rewarder at this level, and we are the L1, discard the incoming commitments.
-        //   If we have a zero validator rewarder at this level, and we are not the L1, relay the commitments upwards (add to pending summaries).
-
         // Commit in gateway to distribute rewards
         IGateway(s.ipcGatewayAddr).commitCheckpoint(checkpoint);
 
-        LibValidatorReward.initNewDistribution(
-            checkpoint.subnetID,
-            uint64(checkpoint.blockHeight),
-            checkpoint.activities.commitment,
-            checkpoint.activities.totalActiveValidators
-        );
+        LibActivity.recordActivityRollup(checkpoint.subnetID, uint64(checkpoint.blockHeight), checkpoint.activity);
 
         // confirming the changes in membership in the child
         LibStaking.confirmChange(checkpoint.nextConfigurationNumber);

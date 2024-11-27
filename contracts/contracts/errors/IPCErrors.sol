@@ -80,10 +80,9 @@ error InvalidFederationPayload();
 error DuplicatedGenesisValidator();
 error NotEnoughGenesisValidators();
 error ValidatorPowerChangeDenied();
-error CommitmentAlreadyInitialized();
-error SubnetNoTargetCommitment();
+error MissingActivityCommitment();
 error ValidatorAlreadyClaimed();
-error InvalidProof();
+error InvalidActivityProof();
 error NotOwner();
 
 enum InvalidXnetMessageReason {

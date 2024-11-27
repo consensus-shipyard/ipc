@@ -25,6 +25,8 @@ lazy_static! {
     // for storing the cid of an inaccessible HAMT.
     pub static ref CHECKPOINT_GENESIS_CID: Cid =
         Cid::new_v1(DAG_CBOR, Code::Blake2b256.digest("genesis".as_bytes()));
+    /// ABI types of the Merkle tree which contains validator addresses and their voting power.
+    pub static ref VALIDATOR_REWARD_FIELDS: Vec<String> = vec!["address".to_owned(), "uint64".to_owned()];
 }
 
 pub type Signature = Vec<u8>;
@@ -76,40 +78,52 @@ pub struct BottomUpMsgBatch {
     pub msgs: Vec<IpcEnvelope>,
 }
 
-/// The commitments for the child subnet activities that should be submitted to the parent subnet
-/// together with a bottom up checkpoint
+/// Compressed representation of the activity summary that can be embedded in checkpoints to propagate up the hierarchy.
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
-pub struct ValidatorSummary {
-    /// The checkpoint height in the child subnet
-    pub checkpoint_height: u64,
-    /// The validator address
-    pub validator: Address,
-    /// The number of blocks mined
-    pub blocks_committed: u64,
-    /// The extra metadata attached to the validator
-    pub metadata: Vec<u8>,
+pub struct CompressedActivityRollup {
+    pub consensus: consensus::CompressedSummary,
 }
 
-#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
-pub struct BatchClaimProofs {
-    pub subnet_id: SubnetID,
-    pub proofs: Vec<ValidatorClaimProof>,
-}
+/// Namespace for consensus-level activity summaries.
+/// XYZ(raulk) move to activity module
+pub mod consensus {
+    use fvm_shared::address::Address;
+    use serde::{Deserialize, Serialize};
 
-#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
-pub struct ValidatorClaimProof {
-    pub summary: ValidatorSummary,
-    pub proof: Vec<[u8; 32]>,
-}
+    /// Aggregated stats for consensus-level activity.
+    #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+    pub struct AggregatedStats {
+        /// The total number of unique validators that have mined within this period.
+        pub total_active_validators: u64,
+        /// The total number of blocks committed by all validators during this period.
+        pub total_num_blocks_committed: u64,
+    }
 
-#[serde_as]
-#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
-pub struct ActivitySummary {
-    pub total_active_validators: u64,
-    /// The activity summary for validators
-    #[serde_as(as = "HumanReadable")]
-    pub commitment: Vec<u8>,
-    // TODO: add relayed activity commitment
+    /// The commitments for the child subnet activities that should be submitted to the parent subnet
+    /// together with a bottom up checkpoint
+    #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+    pub struct ValidatorData {
+        /// The validator address
+        pub validator: Address,
+        /// The number of blocks mined
+        pub blocks_committed: u64,
+    }
+
+    // The full activity summary for consensus-level activity.
+    #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+    pub struct FullSummary {
+        pub stats: AggregatedStats,
+        /// The breakdown of activity per validator.
+        pub data: Vec<ValidatorData>,
+    }
+
+    /// The compresed representation of the activity summary for consensus-level activity suitable for embedding in a checkpoint.
+    #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+    pub struct CompressedSummary {
+        pub stats: AggregatedStats,
+        /// The commitment for the validator details, so that we don't have to transmit them in full.
+        pub data_root_commitment: Vec<u8>,
+    }
 }
 
 #[serde_as]
@@ -131,7 +145,7 @@ pub struct BottomUpCheckpoint {
     /// The list of messages for execution
     pub msgs: Vec<IpcEnvelope>,
     /// The activity commitment from child subnet to parent subnet
-    pub activities: ActivitySummary,
+    pub activity_rollup: CompressedActivityRollup,
 }
 
 pub fn serialize_vec_bytes_to_vec_hex<T: AsRef<[u8]>, S>(

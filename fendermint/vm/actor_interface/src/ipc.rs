@@ -118,6 +118,12 @@ lazy_static! {
                             name: "OwnershipFacet",
                             abi: ia::ownership_facet::OWNERSHIPFACET_ABI.to_owned(),
                         },
+                        EthFacet {
+                            name: "SubnetActorActivityFacet",
+                            abi: ia::subnet_actor_activity_facet::SUBNETACTORACTIVITYFACET_ABI
+                                .to_owned(),
+                        },
+                        // ========== IF YOU WANT TO ADD FACET FOR SUBNET, APPEND HERE ==========
                         // The registry has its own facets:
                         // https://github.com/consensus-shipyard/ipc-solidity-actors/blob/b01a2dffe367745f55111a65536a3f6fea9165f5/scripts/deploy-registry.template.ts#L58-L67
                         EthFacet {
@@ -128,10 +134,6 @@ lazy_static! {
                         EthFacet {
                             name: "SubnetGetterFacet",
                             abi: ia::subnet_getter_facet::SUBNETGETTERFACET_ABI.to_owned(),
-                        },
-                        EthFacet {
-                            name: "ValidatorRewardFacet",
-                            abi: ia::validator_reward_facet::VALIDATORREWARDFACET_ABI.to_owned(),
                         },
                     ],
                 },
@@ -474,7 +476,7 @@ pub mod registry {
         pub diamond_cut_facet: Address,
         pub diamond_loupe_facet: Address,
         pub ownership_facet: Address,
-        pub validator_reward_facet: Address,
+        pub activity_facet: Address,
         pub subnet_getter_selectors: Vec<FunctionSelector>,
         pub subnet_manager_selectors: Vec<FunctionSelector>,
         pub subnet_rewarder_selectors: Vec<FunctionSelector>,
@@ -483,7 +485,7 @@ pub mod registry {
         pub subnet_actor_diamond_cut_selectors: Vec<FunctionSelector>,
         pub subnet_actor_diamond_loupe_selectors: Vec<FunctionSelector>,
         pub subnet_actor_ownership_selectors: Vec<FunctionSelector>,
-        pub validator_reward_selectors: Vec<FunctionSelector>,
+        pub subnet_actor_activity_selectors: Vec<FunctionSelector>,
         pub creation_privileges: u8, // 0 = Unrestricted, 1 = Owner.
     }
 }
@@ -540,13 +542,13 @@ pub mod subnet {
                 ],
                 next_configuration_number: 1,
                 msgs: vec![],
-                activities: Default::default(),
+                activity: Default::default(),
             };
 
             let param_type = BottomUpCheckpoint::param_type();
 
             // Captured value of `abi.encode` in Solidity.
-            let expected_abi: Bytes = "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000156b736f342ab34d9afe4234a92bdb190c35b2e8d822d9601b00b9d7089b190f0100000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000140000000000000000000000000000000000000000000000000abc8e314f58b4de5000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000020000000000000000000000007b11cf9ca8ccee13bb3d003c97af5c18434067a90000000000000000000000003d9019b8bf3bfd5e979ddc3b2761be54af867c470000000000000000000000000000000000000000000000000000000000000000".parse().unwrap();
+            let expected_abi: Bytes = "0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000156b736f342ab34d9afe4234a92bdb190c35b2e8d822d9601b00b9d7089b190f01000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000001a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000abc8e314f58b4de5000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000020000000000000000000000007b11cf9ca8ccee13bb3d003c97af5c18434067a90000000000000000000000003d9019b8bf3bfd5e979ddc3b2761be54af867c470000000000000000000000000000000000000000000000000000000000000000".parse().unwrap();
 
             // XXX: It doesn't work with `decode_whole`.
             let expected_tokens =

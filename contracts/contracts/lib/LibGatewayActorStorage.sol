@@ -102,20 +102,3 @@ contract GatewayActorModifiers {
         _;
     }
 }
-
-contract SystemContract {
-    using FilAddress for address;
-    using FilAddress for address payable;
-    using AccountHelper for address;
-
-    function _systemActorOnly() private view {
-        if (!msg.sender.isSystemActor()) {
-            revert NotSystemActor();
-        }
-    }
-
-    modifier systemActorOnly() {
-        _systemActorOnly();
-        _;
-    }
-}

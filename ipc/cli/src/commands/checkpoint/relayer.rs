@@ -32,13 +32,6 @@ impl CommandLineHandler for BottomUpRelayer {
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
         log::debug!("start bottom up relayer with args: {:?}", arguments);
 
-        // TODO(rewards): enable the relayer to watch multiple subnets at once.
-
-        // TODO(rewards): add a new flag --process-summaries to activate processing summaries on all subnets.
-        //  Enabling this mode makes the relayer watch for ActivitySummaryCommitted events, and stores the summaries in a database.
-        //  It then tracks which summaries have been committed to the root (right now we only support submitting to the L1), to chase
-        //  after those and present them via SubnetActor#submitSummary in order to trigger reward payout.
-
         // Prometheus metrics
         match &arguments.metrics_address {
             Some(addr) => {

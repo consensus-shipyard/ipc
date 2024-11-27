@@ -4,12 +4,12 @@ pragma solidity ^0.8.23;
 import {SubnetActorManagerFacet} from "../../contracts/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorPauseFacet} from "../../contracts/subnet/SubnetActorPauseFacet.sol";
 import {SubnetActorCheckpointingFacet} from "../../contracts/subnet/SubnetActorCheckpointingFacet.sol";
+import {SubnetActorActivityFacet} from "../../contracts/subnet/SubnetActorActivityFacet.sol";
 import {SubnetActorRewardFacet} from "../../contracts/subnet/SubnetActorRewardFacet.sol";
 import {SubnetActorGetterFacet} from "../../contracts/subnet/SubnetActorGetterFacet.sol";
 import {SubnetActorDiamond} from "../../contracts/SubnetActorDiamond.sol";
 import {DiamondLoupeFacet} from "../../contracts/diamond/DiamondLoupeFacet.sol";
 import {DiamondCutFacet} from "../../contracts/diamond/DiamondCutFacet.sol";
-import {ValidatorRewardFacet} from "../../contracts/activities/ValidatorRewardFacet.sol";
 
 library SubnetActorFacetsHelper {
     function manager(address sa) internal pure returns (SubnetActorManagerFacet) {
@@ -47,10 +47,8 @@ library SubnetActorFacetsHelper {
         return facet;
     }
 
-    //
-
-    function validatorReward(SubnetActorDiamond sa) internal pure returns (ValidatorRewardFacet) {
-        ValidatorRewardFacet facet = ValidatorRewardFacet(address(sa));
+    function activity(SubnetActorDiamond sa) internal pure returns (SubnetActorActivityFacet) {
+        SubnetActorActivityFacet facet = SubnetActorActivityFacet(address(sa));
         return facet;
     }
 

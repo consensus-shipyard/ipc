@@ -123,28 +123,7 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         state: &mut FvmExecState<DB>,
         checkpoint: checkpointing_facet::BottomUpCheckpoint,
         power_table: &[Validator<Power>],
-    ) -> anyhow::Result<()> {
-        // Construct a Merkle tree from the power table, which we can use to validate validator set membership
-        // when the signatures are submitted in transactions for accumulation.
-        let tree =
-            ValidatorMerkleTree::new(power_table).context("failed to create validator tree")?;
-
-        let total_power = power_table.iter().fold(et::U256::zero(), |p, v| {
-            p.saturating_add(et::U256::from(v.power.0))
-        });
-
-        self.checkpointing.call(state, |c| {
-            c.create_bottom_up_checkpoint(checkpoint, tree.root_hash().0, total_power)
-        })
-    }
-
-    /// Insert a new checkpoint at the period boundary.
-    pub fn create_bu_ckpt_with_activities(
-        &self,
-        state: &mut FvmExecState<DB>,
-        checkpoint: checkpointing_facet::BottomUpCheckpoint,
-        power_table: &[Validator<Power>],
-        activities: checkpointing_facet::ActivityReport,
+        activity: checkpointing_facet::FullActivityRollup,
     ) -> anyhow::Result<FvmApplyRet> {
         // Construct a Merkle tree from the power table, which we can use to validate validator set membership
         // when the signatures are submitted in transactions for accumulation.
@@ -158,12 +137,7 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         Ok(self
             .checkpointing
             .call_with_return(state, |c| {
-                c.create_bu_chpt_with_activities(
-                    checkpoint,
-                    tree.root_hash().0,
-                    total_power,
-                    activities,
-                )
+                c.create_bottom_up_checkpoint(checkpoint, tree.root_hash().0, total_power, activity)
             })?
             .into_return())
     }

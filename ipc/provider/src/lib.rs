@@ -9,9 +9,8 @@ use config::Config;
 use fvm_shared::{
     address::Address, clock::ChainEpoch, crypto::signature::SignatureType, econ::TokenAmount,
 };
-use ipc_api::checkpoint::{
-    BatchClaimProofs, BottomUpCheckpointBundle, QuorumReachedEvent, ValidatorSummary,
-};
+use ipc_api::checkpoint::consensus::ValidatorData;
+use ipc_api::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
 use ipc_api::evm::payload_to_evm_address;
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo};
 use ipc_api::subnet::{Asset, PermissionMode};
@@ -754,48 +753,34 @@ impl IpcProvider {
         validator: &Address,
         from: ChainEpoch,
         to: ChainEpoch,
-    ) -> anyhow::Result<Vec<ValidatorSummary>> {
+    ) -> anyhow::Result<Vec<(u64, ValidatorData)>> {
         let conn = self.get_connection(subnet)?;
         conn.manager()
-            .get_validator_activities(validator, from, to)
+            .query_validator_rewards(validator, from, to)
             .await
     }
 
-    pub async fn batch_claim(
+    pub async fn batch_subnet_claim(
         &self,
         reward_claim_subnet: &SubnetID,
-        reward_source_subnets: &[SubnetID],
+        reward_source_subnet: &SubnetID, // TODO(review): eventually support multiple source subnets
         from: ChainEpoch,
         to: ChainEpoch,
         validator: &Address,
     ) -> anyhow::Result<()> {
-        let mut batch_proofs = vec![];
-        for source_subnet in reward_source_subnets {
-            let conn = self.get_connection(source_subnet)?;
+        let conn = self.get_connection(reward_source_subnet)?;
 
-            let proofs = conn
-                .manager()
-                .get_validator_claim_proofs(validator, from, to)
-                .await?;
-            if proofs.is_empty() {
-                return Err(anyhow!(
-                    "address {} has no reward to claim",
-                    validator.to_string()
-                ));
-            }
-
-            batch_proofs.push(BatchClaimProofs {
-                subnet_id: source_subnet.clone(),
-                proofs,
-            });
-        }
+        let claims = conn
+            .manager()
+            .query_reward_claims(validator, from, to)
+            .await?;
 
         let parent = reward_claim_subnet
             .parent()
             .ok_or_else(|| anyhow!("no parent found"))?;
         let conn = self.get_connection(&parent)?;
         conn.manager()
-            .batch_claim(validator, reward_claim_subnet, batch_proofs)
+            .batch_subnet_claim(validator, reward_claim_subnet, reward_source_subnet, claims)
             .await
     }
 }
