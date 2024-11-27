@@ -712,7 +712,12 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        checkpointer.createBottomUpCheckpoint(checkpoint, membershipRoot, weights[0] + weights[1] + weights[2], ActivityHelper.dummyActivityRollup());
+        checkpointer.createBottomUpCheckpoint(
+            checkpoint,
+            membershipRoot,
+            weights[0] + weights[1] + weights[2],
+            ActivityHelper.dummyActivityRollup()
+        );
         vm.stopPrank();
 
         return checkpoint;
@@ -741,7 +746,12 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        checkpointer.createBottomUpCheckpoint(checkpoint, membershipRoot, weights[0] + weights[1] + weights[2], ActivityHelper.dummyActivityRollup());
+        checkpointer.createBottomUpCheckpoint(
+            checkpoint,
+            membershipRoot,
+            weights[0] + weights[1] + weights[2],
+            ActivityHelper.dummyActivityRollup()
+        );
         vm.stopPrank();
 
         return checkpoint;
