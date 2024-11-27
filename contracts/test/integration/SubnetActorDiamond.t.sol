@@ -45,7 +45,7 @@ import {SubnetValidatorGater} from "../../contracts/examples/SubnetValidatorGate
 
 import {FullActivityRollup, Consensus} from "../../contracts/structs/Activity.sol";
 import {ValidatorRewarderMap} from "../../contracts/examples/ValidatorRewarderMap.sol";
-import {ValidatorRewarder} from "../../contracts/examples/ValidatorRewarder.sol";
+import {MintingValidatorRewarder} from "../../contracts/examples/MintingValidatorRewarder.sol";
 import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
 import {ActivityHelper} from "../helpers/ActivityHelper.sol";
 
@@ -2580,7 +2580,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testGatewayDiamond_ValidatorBatchClaimERC20Reward_Works() public {
-        ValidatorRewarder m = new ValidatorRewarder();
+        MintingValidatorRewarder m = new MintingValidatorRewarder();
         {
             gatewayAddress = address(gatewayDiamond);
 
@@ -2621,13 +2621,12 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         // hardcode storageReward and uptimeReward to avoid stack too deep issues
         metadata[0] = abi.encode(uint256(100), uint256(10));
 
-        blocksMined[0] = 1;
-        blocksMined[1] = 2;
+        blocksMined[0] = 11; // the first validator mined 11 blocks per checkpoint
+        blocksMined[1] = 2; // the second validator mined 2 blocks per checkpoint
 
-        (bytes32 activityRoot1, bytes32[][] memory proofs1) = MerkleTreeHelper.createMerkleProofsForActivities(
+        (bytes32 activityRoot1, bytes32[][] memory proofs1) = MerkleTreeHelper.createMerkleProofsForConsensusActivity(
             addrs,
-            blocksMined,
-            metadata
+            blocksMined
         );
 
         (bytes32 activityRoot2, bytes32[][] memory proofs2) = MerkleTreeHelper.createMerkleProofsForConsensusActivity(
@@ -2635,30 +2634,47 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blocksMined
         );
 
+        // two checkpoints
         confirmChange(addrs, privKeys, ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot1));
         confirmChange(addrs, privKeys, ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot2));
-
-        vm.startPrank(addrs[0]);
-        vm.deal(addrs[0], 1 ether);
 
         Consensus.ValidatorClaim[] memory claimProofs = new Consensus.ValidatorClaim[](2);
         uint64[] memory heights = new uint64[](2);
 
         heights[0] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod());
-        heights[1] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod());
+        heights[1] = uint64(gatewayDiamond.getter().bottomUpCheckPeriod() * 2);
 
+        // Validator 0 claims 11 blocks per checkpoint = 22 tokens
         claimProofs[0] = Consensus.ValidatorClaim({
             data: Consensus.ValidatorData({validator: addrs[0], blocksCommitted: blocksMined[0]}),
             proof: ActivityHelper.wrapBytes32Array(proofs1[0])
-        }); claimProofs[1] = Consensus.ValidatorClaim({
-        data: Consensus.ValidatorData({validator: addrs[0], blocksCommitted: blocksMined[0]}),
-        proof: ActivityHelper.wrapBytes32Array(proofs2[0])
-    });
+        });
+        claimProofs[1] = Consensus.ValidatorClaim({
+            data: Consensus.ValidatorData({validator: addrs[0], blocksCommitted: blocksMined[0]}),
+            proof: ActivityHelper.wrapBytes32Array(proofs2[0])
+        });
 
+        vm.startPrank(addrs[0]);
+        vm.deal(addrs[0], 1 ether);
         saDiamond.activity().batchSubnetClaim(subnetId, heights, claimProofs);
 
-        // check
-        assert(m.token().balanceOf(addrs[0]) == 2 * (blocksMined[0] + 100 + 10));
+        // Validator 1 claims 2 blocks per checkpoint = 4 tokens
+        claimProofs[0] = Consensus.ValidatorClaim({
+            data: Consensus.ValidatorData({validator: addrs[1], blocksCommitted: blocksMined[1]}),
+            proof: ActivityHelper.wrapBytes32Array(proofs1[1])
+        });
+        claimProofs[1] = Consensus.ValidatorClaim({
+            data: Consensus.ValidatorData({validator: addrs[1], blocksCommitted: blocksMined[1]}),
+            proof: ActivityHelper.wrapBytes32Array(proofs2[1])
+        });
+
+        vm.startPrank(addrs[1]);
+        vm.deal(addrs[1], 1 ether);
+        saDiamond.activity().batchSubnetClaim(subnetId, heights, claimProofs);
+
+        // Assert
+        assert(m.token().balanceOf(addrs[0]) == 22);
+        assert(m.token().balanceOf(addrs[1]) == 4);
     }
 
     // -----------------------------------------------------------------------------------------------------------------
