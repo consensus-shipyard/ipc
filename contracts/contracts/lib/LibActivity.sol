@@ -146,7 +146,7 @@ library LibActivity {
         }
 
         // Notify the validator rewarder of a valid claim.
-        IValidatorRewarder(s.validatorRewarder).notifyValidClaim(subnet, data);
+        IValidatorRewarder(s.validatorRewarder).notifyValidClaim(subnet, checkpointHeight, data);
 
         // Prune state for this height if all validators have claimed.
         if (pending.claimed.length() == pending.summary.stats.totalActiveValidators) {

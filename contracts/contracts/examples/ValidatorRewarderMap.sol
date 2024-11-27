@@ -20,12 +20,16 @@ contract ValidatorRewarderMap is IValidatorRewarder, Ownable {
         subnetId = id;
     }
 
-    function notifyValidClaim(SubnetID calldata id, Consensus.ValidatorData calldata detail) external {
+    function notifyValidClaim(
+        SubnetID calldata id,
+        uint64 checkpointHeight,
+        Consensus.ValidatorData calldata data
+    ) external {
         require(keccak256(abi.encode(id)) == keccak256(abi.encode(subnetId)), "not my subnet");
 
         address actor = id.route[id.route.length - 1];
         require(actor == msg.sender, "not from subnet");
 
-        blocksCommitted[detail.validator] += detail.blocksCommitted;
+        blocksCommitted[data.validator] += data.blocksCommitted;
     }
 }

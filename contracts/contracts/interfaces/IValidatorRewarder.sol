@@ -13,8 +13,12 @@ import {Consensus} from "../structs/Activity.sol";
 /// This interface will be called by the subnet actor when a validator presents a _valid_ proof of consensus activity,
 /// via the SubnetActivityActivityFacet#claim method.
 interface IValidatorRewarder {
-    /// @notice Called by the subnet manager contract to instruct the rewarder to process the subnet summary and
-    /// disburse any relevant rewards.
-    /// @dev This method should revert if the summary is invalid; this will cause the
-    function notifyValidClaim(SubnetID calldata id, Consensus.ValidatorData calldata validatedData) external;
+    /// Called by the subnet actor when a validator presents a _valid_ proof of consensus activity, via
+    /// SubnetActorActivityFacet#claim() or its batch equivalents.
+    /// @dev This method should revert if the summary is invalid; this will cause the claim submission to be rejected.
+    function notifyValidClaim(
+        SubnetID calldata id,
+        uint64 checkpointHeight,
+        Consensus.ValidatorData calldata validatedData
+    ) external;
 }
