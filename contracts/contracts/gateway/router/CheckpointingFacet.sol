@@ -14,7 +14,7 @@ import {NotRegisteredSubnet, SubnetNotActive, SubnetNotFound, InvalidSubnet, Che
 import {BatchNotCreated, InvalidBatchEpoch, BatchAlreadyExists, NotEnoughSubnetCircSupply, InvalidCheckpointEpoch} from "../../errors/IPCErrors.sol";
 
 import {CrossMsgHelper} from "../../lib/CrossMsgHelper.sol";
-import {IpcEnvelope, SubnetID} from "../../structs/CrossNet.sol";
+import {IpcEnvelope, SubnetID, IpcMsgKind} from "../../structs/CrossNet.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
 
 import {ActivityRollupRecorded, FullActivityRollup} from "../../structs/Activity.sol";
@@ -134,7 +134,9 @@ contract CheckpointingFacet is GatewayActorModifiers {
         uint256 crossMsgLength = msgs.length;
 
         for (uint256 i; i < crossMsgLength; ) {
-            totalValue += msgs[i].value;
+            if (msgs[i].kind == IpcMsgKind.Transfer) {
+                totalValue += msgs[i].value;
+            }
             unchecked {
                 ++i;
             }
@@ -145,7 +147,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
         if (subnet.circSupply < totalAmount) {
             revert NotEnoughSubnetCircSupply();
         }
-
+    
         subnet.circSupply -= totalAmount;
 
         // execute cross-messages
