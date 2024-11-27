@@ -9,7 +9,7 @@ use std::{future::Future, sync::Arc};
 
 use fendermint_crypto::PublicKey;
 use fendermint_vm_genesis::Genesis;
-use fendermint_vm_interpreter::fvm::{BlockGasLimit, PowerUpdates};
+use fendermint_vm_interpreter::fvm::EndBlockOutput;
 use fendermint_vm_interpreter::genesis::{create_test_genesis_state, GenesisOutput};
 use fendermint_vm_interpreter::{
     fvm::{
@@ -67,7 +67,7 @@ where
         Message = FvmMessage,
         BeginOutput = FvmApplyRet,
         DeliverOutput = FvmApplyRet,
-        EndOutput = (PowerUpdates, BlockGasLimit),
+        EndOutput = EndBlockOutput,
     >,
 {
     pub async fn new(interpreter: I, genesis: Genesis) -> anyhow::Result<Self> {
@@ -142,8 +142,7 @@ where
 
         let _res = self
             .modify_exec_state(|s| self.interpreter.begin(s))
-            .await
-            .unwrap();
+            .await?;
 
         Ok(())
     }
