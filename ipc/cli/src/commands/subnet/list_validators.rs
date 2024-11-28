@@ -34,7 +34,7 @@ impl CommandLineHandler for ListValidators {
 #[derive(Debug, Args)]
 #[command(
     name = "list validators",
-    about = "List all child subnets registered in the gateway (i.e. that have provided enough collateral)"
+    about = "List the info of all the validators in the subnet"
 )]
 pub(crate) struct ListValidatorsArgs {
     #[arg(long, help = "The target subnet to perform query")]
