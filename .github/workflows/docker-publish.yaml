@@ -2,6 +2,7 @@ name: Fendermint CI - Publish
 
 # This workflow is triggered from the main CI workflow.
 on:
+  workflow_dispatch:
   workflow_call:
 
 env:
