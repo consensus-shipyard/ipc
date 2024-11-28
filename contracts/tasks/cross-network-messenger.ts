@@ -35,7 +35,6 @@ task('cross-network-send')
     .setAction(async (args: TaskArguments, hre: HardhatRuntimeEnvironment) => {
         await hre.run('compile')
 
-        // only L2 for now
         const subnetId = { root: args.root, route: args.route.split(",") }
         console.log('sending to subnet', subnetId)
 
