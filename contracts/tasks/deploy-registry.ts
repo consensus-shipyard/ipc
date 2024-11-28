@@ -37,10 +37,17 @@ task('deploy-registry')
             },
             { name: 'SubnetActorPauseFacet' },
             { name: 'SubnetActorRewardFacet' },
-            { name: 'SubnetActorCheckpointingFacet' },
+            {
+                name: 'SubnetActorCheckpointingFacet',
+                libraries: ['SubnetIDHelper'],
+            },
             { name: 'DiamondCutFacet' },
             { name: 'DiamondLoupeFacet' },
             { name: 'OwnershipFacet' },
+            {
+                name: 'SubnetActorActivityFacet',
+                libraries: ['SubnetIDHelper'],
+            },
         )
 
         const registryFacets = await Deployments.deploy(
@@ -85,6 +92,7 @@ task('deploy-registry')
             diamondCutFacet: subnetActorFacets.addresses['DiamondCutFacet'],
             diamondLoupeFacet: subnetActorFacets.addresses['DiamondLoupeFacet'],
             ownershipFacet: subnetActorFacets.addresses['OwnershipFacet'],
+            activityFacet: subnetActorFacets.addresses['SubnetActorActivityFacet'],
 
             subnetActorGetterSelectors: selectors(subnetActorFacets.contracts['SubnetActorGetterFacet']),
             subnetActorManagerSelectors: selectors(subnetActorFacets.contracts['SubnetActorManagerFacet']),
@@ -94,15 +102,13 @@ task('deploy-registry')
             subnetActorDiamondCutSelectors: selectors(subnetActorFacets.contracts['DiamondCutFacet']),
             subnetActorDiamondLoupeSelectors: selectors(subnetActorFacets.contracts['DiamondLoupeFacet']),
             subnetActorOwnershipSelectors: selectors(subnetActorFacets.contracts['OwnershipFacet']),
+            subnetActorActivitySelectors: selectors(subnetActorFacets.contracts['SubnetActorActivityFacet']),
+
             creationPrivileges: Number(mode),
         }
 
-        console.log(`Deploying SubnetRegistryDiamond...`)
-        const registry = await hre.deployments.deploy('SubnetRegistryDiamond', {
-            from: deployer,
+        return await Deployments.deploy(hre, deployer, {
+            name: 'SubnetRegistryDiamond',
             args: [registryFacets.asFacetCuts(), registryConstructorParams],
-            log: true,
-            waitConfirmations: 1,
         })
-        console.log(`SubnetRegistryDiamond deployed at ${registry.address}`)
     })

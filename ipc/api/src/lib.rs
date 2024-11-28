@@ -19,6 +19,7 @@ pub mod subnet_id;
 pub mod validator;
 
 pub mod evm;
+pub mod merkle;
 pub mod staking;
 
 /// Converts an ethers::U256 TokenAmount into a FIL amount.
@@ -116,5 +117,34 @@ impl<'de> serde_with::DeserializeAs<'de, Vec<u8>> for HumanReadable {
         } else {
             Vec::<u8>::deserialize(deserializer)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::HumanReadable;
+    use serde::{Deserialize, Serialize};
+    use serde_with::serde_as;
+
+    #[test]
+    fn test_human_readable() {
+        #[serde_as]
+        #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
+        struct T {
+            #[serde_as(as = "HumanReadable")]
+            bytes: Vec<u8>,
+        }
+
+        let t = T {
+            bytes: vec![1, 2, 3, 4],
+        };
+
+        let serialized_t = serde_json::to_vec(&t).unwrap();
+        let dserialized_t = serde_json::from_slice(&serialized_t).unwrap();
+        assert_eq!(t, dserialized_t);
+
+        let serialized_t = fvm_ipld_encoding::to_vec(&t).unwrap();
+        let dserialized_t = fvm_ipld_encoding::from_slice(&serialized_t).unwrap();
+        assert_eq!(t, dserialized_t);
     }
 }

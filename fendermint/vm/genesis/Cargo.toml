@@ -34,6 +34,7 @@ fendermint_vm_encoding = { path = "../encoding" }
 quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }
 serde_json = { workspace = true }
+ipc-types = {workspace = true}
 
 # Enable arb on self for tests.
 fendermint_vm_genesis = { path = ".", features = ["arb"] }
