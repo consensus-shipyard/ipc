@@ -75,6 +75,9 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         require(saDiamond.getter().bottomUpCheckPeriod() == params.bottomUpCheckPeriod, "unexpected bottom-up period");
         require(saDiamond.getter().majorityPercentage() == params.majorityPercentage, "unexpected majority percentage");
         require(saDiamond.getter().getParent().toHash() == _parentId.toHash(), "unexpected parent subnetID hash");
+        require(saDiamond.getter().genesisValidators().length == 0, "unexpected genesis validators");
+        require(saDiamond.getter().getActiveValidators().length == 0, "unexpected active validators");
+        require(saDiamond.getter().getWaitingValidators().length == 0, "unexpected waiting validators");
     }
 
     function testSubnetActorDiamondReal_LoupeFunction() public view {
@@ -131,7 +134,10 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         TestUtils.ensureBytesEqual(v.metadata, publicKey1);
         require(saDiamond.getter().bootstrapped(), "subnet not bootstrapped");
         require(!saDiamond.getter().killed(), "subnet killed");
-        require(saDiamond.getter().genesisValidators().length == 1, "not one validator in genesis");
+        require(saDiamond.getter().genesisValidators().length == 1, "not 1 genesis validator");
+        require(saDiamond.getter().getActiveValidators().length == 1, "not 1 active validator");
+        require(saDiamond.getter().getWaitingValidators().length == 0, "not 0 waiting validator");
+
 
         (uint64 nextConfigNum, uint64 startConfigNum) = saDiamond.getter().getConfigurationNumbers();
         require(nextConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER, "next config num not 1");
@@ -177,6 +183,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         require(!saDiamond.getter().isWaitingValidator(validator1), "waiting validator1");
         require(saDiamond.getter().isActiveValidator(validator2), "not active validator2");
         require(!saDiamond.getter().isWaitingValidator(validator2), "waiting validator2");
+        require(saDiamond.getter().getActiveValidators().length == 2, "not 2 active validators");
+        require(saDiamond.getter().getWaitingValidators().length == 0, "not 0 waiting validators");
 
         (nextConfigNum, startConfigNum) = saDiamond.getter().getConfigurationNumbers();
         require(

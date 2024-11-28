@@ -1,8 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 
-use std::collections::{BTreeMap, HashMap};
-
 use anyhow::Result;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
@@ -15,6 +13,7 @@ use ipc_api::staking::{StakingChangeRequest, ValidatorInfo};
 use ipc_api::subnet::{Asset, ConstructParams, PermissionMode};
 use ipc_api::subnet_id::SubnetID;
 use ipc_api::validator::Validator;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::lotus::message::ipc::SubnetInfo;
 
@@ -188,6 +187,9 @@ pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpoint
         subnet: &SubnetID,
         validator: &Address,
     ) -> Result<ValidatorInfo>;
+
+    /// Lists all the validators
+    async fn list_validators(&self, subnet: &SubnetID) -> Result<Vec<(Address, ValidatorInfo)>>;
 
     async fn set_federated_power(
         &self,

@@ -877,6 +877,50 @@ impl SubnetManager for EthSubnetManager {
         })
     }
 
+    async fn list_validators(&self, subnet: &SubnetID) -> Result<Vec<(Address, ValidatorInfo)>> {
+        let address = contract_address_from_subnet(subnet)?;
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+
+        let mut addresses: Vec<Address> = vec![];
+        let mut validators: Vec<ValidatorInfo> = vec![];
+
+        let active = contract.get_active_validators().call().await?;
+        addresses.extend(
+            active
+                .iter()
+                .map(ethers_address_to_fil_address)
+                .collect::<Result<Vec<_>, _>>()?
+        );
+        for addr in active {
+            let info = contract.get_validator(addr).call().await?;
+            validators.push(ValidatorInfo {
+                staking: ValidatorStakingInfo::try_from(info)?,
+                is_active: true,
+                is_waiting: false,
+            });
+        }
+        let waiting = contract.get_waiting_validators().call().await?;
+        addresses.extend(
+            waiting
+                .iter()
+                .map(ethers_address_to_fil_address)
+                .collect::<Result<Vec<_>, _>>()?
+        );
+        for addr in waiting {
+            let info = contract.get_validator(addr).call().await?;
+            validators.push(ValidatorInfo {
+                staking: ValidatorStakingInfo::try_from(info)?,
+                is_active: false,
+                is_waiting: true,
+            });
+        }
+
+        Ok(addresses.into_iter().zip(validators).collect())
+    }
+
     async fn set_federated_power(
         &self,
         from: &Address,
