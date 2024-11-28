@@ -9,25 +9,28 @@ pub mod store;
 mod tally;
 
 use crate::observation::{CertifiedObservation, Observation};
-use crate::sync::TopDownSyncEvent;
+use crate::syncer::TopDownSyncEvent;
 use crate::vote::gossip::GossipClient;
 use crate::vote::operation::{OperationMetrics, OperationStateMachine};
 use crate::vote::payload::{PowerUpdates, Vote, VoteTallyState};
 use crate::vote::store::VoteStore;
 use crate::vote::tally::VoteTally;
 use crate::BlockHeight;
+use anyhow::anyhow;
 use error::Error;
+use fendermint_crypto::quorum::ECDSACertificate;
 use fendermint_crypto::SecretKey;
 use fendermint_vm_genesis::ValidatorKey;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc, oneshot};
 
 pub type Weight = u64;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Config {
+#[derive(Deserialize, Debug, Clone)]
+pub struct VoteConfig {
     /// The reactor request channel buffer size
     pub req_channel_buffer_size: usize,
     /// The number of requests the reactor should process per run before handling other tasks
@@ -35,16 +38,65 @@ pub struct Config {
     /// The number of vote recording requests the reactor should process per run before handling other tasks
     pub gossip_req_processing_size: usize,
     /// The time to sleep for voting loop if nothing happens
-    pub voting_sleep_interval_sec: u64,
+    pub voting_sleep_interval_millis: u64,
 }
 
 /// The client to interact with the vote reactor
+#[derive(Clone)]
 pub struct VoteReactorClient {
     tx: mpsc::Sender<VoteReactorRequest>,
 }
 
+impl VoteReactorClient {
+    pub fn new(req_channel_buffer_size: usize) -> (Self, mpsc::Receiver<VoteReactorRequest>) {
+        let (tx, rx) = mpsc::channel(req_channel_buffer_size);
+        (Self { tx }, rx)
+    }
+
+    pub fn start_reactor<
+        G: GossipClient + Send + Sync + 'static,
+        V: VoteStore + Send + Sync + 'static,
+    >(
+        rx: mpsc::Receiver<VoteReactorRequest>,
+        params: StartVoteReactorParams<G, V>,
+    ) -> anyhow::Result<()> {
+        let config = params.config;
+        let vote_tally = VoteTally::new(
+            params.power_table,
+            params.last_finalized_height,
+            params.vote_store,
+        )?;
+
+        let validator_key = params.validator_key;
+        let internal_event_listener = params.internal_event_listener;
+        let latest_child_block = params.latest_child_block;
+        let gossip = params.gossip;
+
+        tokio::spawn(async move {
+            let sleep = Duration::from_millis(config.voting_sleep_interval_millis);
+
+            let inner = VotingHandler {
+                validator_key,
+                req_rx: rx,
+                internal_event_listener,
+                vote_tally,
+                latest_child_block,
+                config,
+                gossip,
+            };
+            let mut machine = OperationStateMachine::new(inner);
+            loop {
+                machine = machine.step().await;
+                tokio::time::sleep(sleep).await;
+            }
+        });
+
+        Ok(())
+    }
+}
+
 pub struct StartVoteReactorParams<G, V> {
-    pub config: Config,
+    pub config: VoteConfig,
     pub validator_key: SecretKey,
     pub power_table: PowerUpdates,
     pub last_finalized_height: BlockHeight,
@@ -52,47 +104,6 @@ pub struct StartVoteReactorParams<G, V> {
     pub gossip: G,
     pub vote_store: V,
     pub internal_event_listener: broadcast::Receiver<TopDownSyncEvent>,
-}
-
-pub fn start_vote_reactor<
-    G: GossipClient + Send + Sync + 'static,
-    V: VoteStore + Send + Sync + 'static,
->(
-    params: StartVoteReactorParams<G, V>,
-) -> anyhow::Result<VoteReactorClient> {
-    let config = params.config;
-    let (tx, rx) = mpsc::channel(config.req_channel_buffer_size);
-    let vote_tally = VoteTally::new(
-        params.power_table,
-        params.last_finalized_height,
-        params.vote_store,
-    )?;
-
-    let validator_key = params.validator_key;
-    let internal_event_listener = params.internal_event_listener;
-    let latest_child_block = params.latest_child_block;
-    let gossip = params.gossip;
-
-    tokio::spawn(async move {
-        let sleep = Duration::new(config.voting_sleep_interval_sec, 0);
-
-        let inner = VotingHandler {
-            validator_key,
-            req_rx: rx,
-            internal_event_listener,
-            vote_tally,
-            latest_child_block,
-            config,
-            gossip,
-        };
-        let mut machine = OperationStateMachine::new(inner);
-        loop {
-            machine = machine.step().await;
-            tokio::time::sleep(sleep).await;
-        }
-    });
-
-    Ok(VoteReactorClient { tx })
 }
 
 impl VoteReactorClient {
@@ -121,7 +132,7 @@ impl VoteReactorClient {
     }
 
     /// Queries the vote tally to see if there are new quorum formed
-    pub async fn find_quorum(&self) -> anyhow::Result<Option<Observation>> {
+    pub async fn find_quorum(&self) -> anyhow::Result<Option<ECDSACertificate<Observation>>> {
         self.request(VoteReactorRequest::FindQuorum).await
     }
 
@@ -165,9 +176,22 @@ impl VoteReactorClient {
             .await?;
         Ok(())
     }
+
+    pub async fn check_quorum_cert(
+        &self,
+        cert: Box<ECDSACertificate<Observation>>,
+    ) -> anyhow::Result<()> {
+        let is_reached = self
+            .request(|tx| VoteReactorRequest::CheckQuorumCert { tx, cert })
+            .await?;
+        if !is_reached {
+            return Err(anyhow!("quorum not reached"));
+        }
+        Ok(())
+    }
 }
 
-enum VoteReactorRequest {
+pub enum VoteReactorRequest {
     /// A new child subnet block is mined, this is the fendermint block
     NewLocalBlockMined(BlockHeight),
     /// Query the current operation mode of the vote tally state machine
@@ -182,8 +206,12 @@ enum VoteReactorRequest {
     DumpAllVotes(oneshot::Sender<Result<HashMap<BlockHeight, Vec<Vote>>, Error>>),
     /// Get the current vote tally state variables in vote tally
     QueryState(oneshot::Sender<VoteTallyState>),
+    CheckQuorumCert {
+        cert: Box<ECDSACertificate<Observation>>,
+        tx: oneshot::Sender<bool>,
+    },
     /// Queries the vote tally to see if there are new quorum formed
-    FindQuorum(oneshot::Sender<Option<Observation>>),
+    FindQuorum(oneshot::Sender<Option<ECDSACertificate<Observation>>>),
     /// Update power of some validators. If the weight is zero, the validator is removed
     /// from the power table.
     UpdatePowerTable {
@@ -214,7 +242,7 @@ struct VotingHandler<Gossip, VoteStore> {
     internal_event_listener: broadcast::Receiver<TopDownSyncEvent>,
     vote_tally: VoteTally<VoteStore>,
     latest_child_block: BlockHeight,
-    config: Config,
+    config: VoteConfig,
 }
 
 impl<G, V> VotingHandler<G, V>
@@ -262,6 +290,22 @@ where
             }
             VoteReactorRequest::NewLocalBlockMined(n) => {
                 self.latest_child_block = n;
+            }
+            VoteReactorRequest::CheckQuorumCert { cert, tx } => {
+                if !self.vote_tally.check_quorum_cert(cert.borrow()) {
+                    let _ = tx.send(false);
+                } else {
+                    let is_future = self.vote_tally.last_finalized_height()
+                        < cert.payload().parent_subnet_height;
+                    if !is_future {
+                        tracing::error!(
+                            finalized = self.vote_tally.last_finalized_height(),
+                            cert = cert.payload().parent_subnet_height,
+                            "cert block number lower than latest finalized height"
+                        );
+                    }
+                    let _ = tx.send(is_future);
+                }
             }
         }
     }

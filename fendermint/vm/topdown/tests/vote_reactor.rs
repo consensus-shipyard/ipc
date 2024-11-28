@@ -9,14 +9,12 @@ use async_trait::async_trait;
 use fendermint_crypto::SecretKey;
 use fendermint_vm_genesis::ValidatorKey;
 use fendermint_vm_topdown::observation::Observation;
-use fendermint_vm_topdown::sync::TopDownSyncEvent;
+use fendermint_vm_topdown::syncer::TopDownSyncEvent;
 use fendermint_vm_topdown::vote::error::Error;
 use fendermint_vm_topdown::vote::gossip::GossipClient;
 use fendermint_vm_topdown::vote::payload::{PowerUpdates, Vote};
 use fendermint_vm_topdown::vote::store::InMemoryVoteStore;
-use fendermint_vm_topdown::vote::{
-    start_vote_reactor, Config, StartVoteReactorParams, VoteReactorClient, Weight,
-};
+use fendermint_vm_topdown::vote::{StartVoteReactorParams, VoteConfig, VoteReactorClient, Weight};
 use fendermint_vm_topdown::BlockHeight;
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::error::TryRecvError;
@@ -57,12 +55,12 @@ impl GossipClient for ChannelGossipClient {
     }
 }
 
-fn default_config() -> Config {
-    Config {
+fn default_config() -> VoteConfig {
+    VoteConfig {
         req_channel_buffer_size: 1024,
         req_batch_processing_size: 10,
         gossip_req_processing_size: 10,
-        voting_sleep_interval_sec: 1,
+        voting_sleep_interval_millis: 1,
     }
 }
 
@@ -130,16 +128,20 @@ async fn simple_lifecycle() {
 
     let (internal_event_tx, _) = broadcast::channel(validators.len() + 1);
 
-    let client = start_vote_reactor(StartVoteReactorParams {
-        config: config.clone(),
-        validator_key: validators[0].sk.clone(),
-        power_table: power_updates.clone(),
-        last_finalized_height: initial_finalized_height,
-        latest_child_block: 100,
-        gossip: gossips.pop().unwrap(),
-        vote_store: InMemoryVoteStore::default(),
-        internal_event_listener: internal_event_tx.subscribe(),
-    })
+    let (client, rx) = VoteReactorClient::new(1024);
+    VoteReactorClient::start_reactor(
+        rx,
+        StartVoteReactorParams {
+            config: config.clone(),
+            validator_key: validators[0].sk.clone(),
+            power_table: power_updates.clone(),
+            last_finalized_height: initial_finalized_height,
+            latest_child_block: 100,
+            gossip: gossips.pop().unwrap(),
+            vote_store: InMemoryVoteStore::default(),
+            internal_event_listener: internal_event_tx.subscribe(),
+        },
+    )
     .unwrap();
 
     assert_eq!(client.find_quorum().await.unwrap(), None);
@@ -155,7 +157,7 @@ async fn simple_lifecycle() {
     while client.find_quorum().await.unwrap().is_none() {}
 
     let r = client.find_quorum().await.unwrap().unwrap();
-    assert_eq!(r.parent_height(), parent_height);
+    assert_eq!(r.payload().parent_height(), parent_height);
 
     let r = client.query_votes(parent_height).await.unwrap().unwrap();
     assert_eq!(r.len(), 1);
@@ -179,7 +181,7 @@ async fn simple_lifecycle() {
     let votes = client.query_votes(parent_height2).await.unwrap().unwrap();
     assert_eq!(votes.len(), 1);
     let r = client.find_quorum().await.unwrap().unwrap();
-    assert_eq!(r.parent_height(), parent_height2);
+    assert_eq!(r.payload().parent_height(), parent_height2);
 
     client
         .set_quorum_finalized(parent_height2)
@@ -208,16 +210,20 @@ async fn waiting_for_quorum() {
     for i in 0..validators.len() {
         let (internal_event_tx, _) = broadcast::channel(validators.len() + 1);
 
-        let client = start_vote_reactor(StartVoteReactorParams {
-            config: config.clone(),
-            validator_key: validators[i].sk.clone(),
-            power_table: power_updates.clone(),
-            last_finalized_height: initial_finalized_height,
-            latest_child_block: 100,
-            gossip: gossips.pop().unwrap(),
-            vote_store: InMemoryVoteStore::default(),
-            internal_event_listener: internal_event_tx.subscribe(),
-        })
+        let (client, rx) = VoteReactorClient::new(1024);
+        VoteReactorClient::start_reactor(
+            rx,
+            StartVoteReactorParams {
+                config: config.clone(),
+                validator_key: validators[i].sk.clone(),
+                power_table: power_updates.clone(),
+                last_finalized_height: initial_finalized_height,
+                latest_child_block: 100,
+                gossip: gossips.pop().unwrap(),
+                vote_store: InMemoryVoteStore::default(),
+                internal_event_listener: internal_event_tx.subscribe(),
+            },
+        )
         .unwrap();
 
         clients.push(client);
@@ -283,7 +289,11 @@ async fn waiting_for_quorum() {
 
     for client in &clients {
         let r = client.find_quorum().await.unwrap().unwrap();
-        assert_eq!(r.parent_height(), parent_height3, "should have quorum");
+        assert_eq!(
+            r.payload().parent_height(),
+            parent_height3,
+            "should have quorum"
+        );
     }
 
     // make observation on previous heights
@@ -301,7 +311,7 @@ async fn waiting_for_quorum() {
     for client in &clients {
         let r = client.find_quorum().await.unwrap().unwrap();
         assert_eq!(
-            r.parent_height(),
+            r.payload().parent_height(),
             parent_height3,
             "should have formed quorum on larger height"
         );
@@ -334,16 +344,20 @@ async fn all_validator_in_sync() {
 
     let mut node_clients = vec![];
     for validator in &validators {
-        let r = start_vote_reactor(StartVoteReactorParams {
-            config: config.clone(),
-            validator_key: validator.sk.clone(),
-            power_table: power_updates.clone(),
-            last_finalized_height: initial_finalized_height,
-            latest_child_block: 100,
-            gossip: gossips.pop().unwrap(),
-            vote_store: InMemoryVoteStore::default(),
-            internal_event_listener: internal_event_tx.subscribe(),
-        })
+        let (r, rx) = VoteReactorClient::new(1024);
+        VoteReactorClient::start_reactor(
+            rx,
+            StartVoteReactorParams {
+                config: config.clone(),
+                validator_key: validator.sk.clone(),
+                power_table: power_updates.clone(),
+                last_finalized_height: initial_finalized_height,
+                latest_child_block: 100,
+                gossip: gossips.pop().unwrap(),
+                vote_store: InMemoryVoteStore::default(),
+                internal_event_listener: internal_event_tx.subscribe(),
+            },
+        )
         .unwrap();
 
         node_clients.push(r);
@@ -359,6 +373,6 @@ async fn all_validator_in_sync() {
         while n.find_quorum().await.unwrap().is_none() {}
 
         let r = n.find_quorum().await.unwrap().unwrap();
-        assert_eq!(r.parent_height(), parent_height)
+        assert_eq!(r.payload().parent_height(), parent_height)
     }
 }
