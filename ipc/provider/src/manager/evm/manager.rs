@@ -892,7 +892,7 @@ impl SubnetManager for EthSubnetManager {
             active
                 .iter()
                 .map(ethers_address_to_fil_address)
-                .collect::<Result<Vec<_>, _>>()?
+                .collect::<Result<Vec<_>, _>>()?,
         );
         for addr in active {
             let info = contract.get_validator(addr).call().await?;
@@ -907,7 +907,7 @@ impl SubnetManager for EthSubnetManager {
             waiting
                 .iter()
                 .map(ethers_address_to_fil_address)
-                .collect::<Result<Vec<_>, _>>()?
+                .collect::<Result<Vec<_>, _>>()?,
         );
         for addr in waiting {
             let info = contract.get_validator(addr).call().await?;
