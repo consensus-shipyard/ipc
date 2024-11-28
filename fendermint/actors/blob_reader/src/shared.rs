@@ -59,7 +59,6 @@ pub enum Method {
     GetOpenReadRequests = frc42_dispatch::method_hash!("GetOpenReadRequests"),
     OpenReadRequest = frc42_dispatch::method_hash!("OpenReadRequest"),
     SetReadRequestPending = frc42_dispatch::method_hash!("SetReadRequestPending"),
-    ReceiveReadRequest = frc42_dispatch::method_hash!("ReceiveReadRequest"),
 }
 
 /// Params for adding a read request.

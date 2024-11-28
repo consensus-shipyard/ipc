@@ -1060,36 +1060,7 @@ where
                 }
                 IpcMessage::ReadRequestPending(read_request) => {
                     // Set the read request to "pending" state
-                    let from = system::SYSTEM_ACTOR_ADDR;
-                    let to = blob_reader::BLOB_READER_ACTOR_ADDR;
-                    let method_num = SetReadRequestPending as u64;
-                    let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
-                    let params = SetReadRequestPendingParams(
-                        fendermint_actor_blobs_shared::state::Hash(*read_request.id.as_bytes()),
-                    );
-                    let params = RawBytes::serialize(params)?;
-                    let msg = Message {
-                        version: Default::default(),
-                        from,
-                        to,
-                        sequence: 0,
-                        value: Default::default(),
-                        method_num,
-                        params,
-                        gas_limit,
-                        gas_fee_cap: Default::default(),
-                        gas_premium: Default::default(),
-                    };
-                    let (apply_ret, emitters) = state.execute_implicit(msg)?;
-                    let ret = FvmApplyRet {
-                        apply_ret,
-                        from,
-                        to,
-                        method_num,
-                        gas_limit,
-                        emitters,
-                    };
-
+                    let ret = set_read_request_pending(&mut state, read_request.id)?;
                     // Add the read request to the pool
                     atomically(|| {
                         env.read_request_pool.add(ReadRequestPoolItem {
@@ -1404,6 +1375,22 @@ fn messages_selection<DB: Blockstore + Clone + 'static>(
     Ok(user_msgs.into_iter().map(ChainMessage::Signed).collect())
 }
 
+/// Creates a standard implicit message with default values
+fn create_implicit_message(to: Address, method_num: u64, params: RawBytes) -> Message {
+    Message {
+        version: Default::default(),
+        from: system::SYSTEM_ACTOR_ADDR,
+        to,
+        sequence: 0,
+        value: Default::default(),
+        method_num,
+        params,
+        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
+        gas_fee_cap: Default::default(),
+        gas_premium: Default::default(),
+    }
+}
+
 fn get_open_read_requests<DB>(
     state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
     size: u32,
@@ -1411,33 +1398,21 @@ fn get_open_read_requests<DB>(
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    let params = GetOpenReadRequestsParams(size);
-    let params = RawBytes::serialize(params)?;
-    let msg = FvmMessage {
-        from: system::SYSTEM_ACTOR_ADDR,
-        to: blob_reader::BLOB_READER_ACTOR_ADDR,
-        sequence: 0,
-        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
-        method_num: GetOpenReadRequests as u64,
+    let params = RawBytes::serialize(GetOpenReadRequestsParams(size))?;
+    let msg = create_implicit_message(
+        blob_reader::BLOB_READER_ACTOR_ADDR,
+        GetOpenReadRequests as u64,
         params,
-        value: Default::default(),
-        version: Default::default(),
-        gas_fee_cap: Default::default(),
-        gas_premium: Default::default(),
-    };
+    );
 
-    let (apply_ret, _emitters) = state.execute_implicit(msg)?;
+    let (apply_ret, _) = state.execute_implicit(msg)?;
     if let Some(err) = apply_ret.failure_info {
         anyhow::bail!("failed to apply get read requests blob message: {}", err);
-    } else {
-        tracing::info!("get read requests blob message applied successfully");
     }
 
     let return_data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
-    let read_requests =
-        fvm_ipld_encoding::from_slice::<Vec<OpenReadRequestItem>>(&return_data).unwrap();
-
-    Ok(read_requests)
+    fvm_ipld_encoding::from_slice::<Vec<OpenReadRequestItem>>(&return_data)
+        .map_err(|e| anyhow!("error parsing read requests: {e}"))
 }
 
 fn read_request_callback<DB>(
@@ -1447,7 +1422,6 @@ fn read_request_callback<DB>(
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    let from = system::SYSTEM_ACTOR_ADDR;
     let ClosedReadRequest {
         id,
         blob_hash,
@@ -1456,21 +1430,11 @@ where
         callback: (to, method_num),
         response,
     } = read_request.clone();
-    // if request failed, we will send an empty vector back
-    let msg = Message {
-        version: Default::default(),
-        from,
-        to,
-        sequence: 0,
-        value: Default::default(),
-        method_num,
-        params: RawBytes::serialize(response)?,
-        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
-        gas_fee_cap: Default::default(),
-        gas_premium: Default::default(),
-    };
 
-    let (apply_ret, _emitters) = state.execute_implicit(msg)?;
+    let params = RawBytes::serialize(response)?;
+    let msg = create_implicit_message(to, method_num, params);
+    let (apply_ret, _) = state.execute_implicit(msg)?;
+
     let info = apply_ret
         .failure_info
         .clone()
@@ -1479,7 +1443,7 @@ where
 
     tracing::info!(
         exit_code = apply_ret.msg_receipt.exit_code.value(),
-        from = from.to_string(),
+        from = system::SYSTEM_ACTOR_ADDR.to_string(),
         to = to.to_string(),
         method_num = method_num,
         read_request_id = id.to_string(),
@@ -1499,36 +1463,24 @@ fn close_read_request<DB>(state: &mut FvmExecState<DB>, id: Hash) -> anyhow::Res
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    let from = system::SYSTEM_ACTOR_ADDR;
-    let to = blob_reader::BLOB_READER_ACTOR_ADDR;
-    let method_num = CloseReadRequest as u64;
-    let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
     let params = RawBytes::serialize(CloseReadRequestParams(
         fendermint_actor_blobs_shared::state::Hash(*id.as_bytes()),
     ))?;
-    let msg = Message {
-        version: Default::default(),
-        from,
-        to,
-        sequence: 0,
-        value: Default::default(),
-        method_num,
+    let msg = create_implicit_message(
+        blob_reader::BLOB_READER_ACTOR_ADDR,
+        CloseReadRequest as u64,
         params,
-        gas_limit,
-        gas_fee_cap: Default::default(),
-        gas_premium: Default::default(),
-    };
+    );
 
     let (apply_ret, emitters) = state.execute_implicit(msg)?;
-    let ret = FvmApplyRet {
+    Ok(FvmApplyRet {
         apply_ret,
-        from,
-        to,
-        method_num,
-        gas_limit,
+        from: system::SYSTEM_ACTOR_ADDR,
+        to: blob_reader::BLOB_READER_ACTOR_ADDR,
+        method_num: CloseReadRequest as u64,
+        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
         emitters,
-    };
-    Ok(ret)
+    })
 }
 
 fn get_read_request_status<DB>(
@@ -1539,23 +1491,45 @@ where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
     let request_id = fendermint_actor_blobs_shared::state::Hash(*id.as_bytes());
-    let msg = FvmMessage {
-        from: system::SYSTEM_ACTOR_ADDR,
-        to: blob_reader::BLOB_READER_ACTOR_ADDR,
-        sequence: 0,
-        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
-        method_num: GetReadRequestStatus as u64,
-        params: RawBytes::serialize(GetReadRequestStatusParams(request_id))?,
-        value: Default::default(),
-        version: Default::default(),
-        gas_fee_cap: Default::default(),
-        gas_premium: Default::default(),
-    };
+    let params = RawBytes::serialize(GetReadRequestStatusParams(request_id))?;
+    let msg = create_implicit_message(
+        blob_reader::BLOB_READER_ACTOR_ADDR,
+        GetReadRequestStatus as u64,
+        params,
+    );
 
-    let (apply_ret, _emitters) = state.execute_implicit(msg)?;
+    let (apply_ret, _) = state.execute_implicit(msg)?;
     let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
     fvm_ipld_encoding::from_slice::<Option<ReadRequestStatus>>(&data)
         .map_err(|e| anyhow!("error parsing as Option<ReadRequestStatus>: {e}"))
+}
+
+fn set_read_request_pending<DB>(
+    state: &mut FvmExecState<DB>,
+    id: Hash,
+) -> anyhow::Result<FvmApplyRet>
+where
+    DB: Blockstore + Clone + 'static + Send + Sync,
+{
+    let params = RawBytes::serialize(SetReadRequestPendingParams(
+        fendermint_actor_blobs_shared::state::Hash(*id.as_bytes()),
+    ))?;
+
+    let msg = create_implicit_message(
+        blob_reader::BLOB_READER_ACTOR_ADDR,
+        SetReadRequestPending as u64,
+        params,
+    );
+
+    let (apply_ret, emitters) = state.execute_implicit(msg)?;
+    Ok(FvmApplyRet {
+        apply_ret,
+        from: system::SYSTEM_ACTOR_ADDR,
+        to: blob_reader::BLOB_READER_ACTOR_ADDR,
+        method_num: SetReadRequestPending as u64,
+        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
+        emitters,
+    })
 }
 
 fn with_state_transaction<F, R, DB>(
