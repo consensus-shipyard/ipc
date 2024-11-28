@@ -2,6 +2,12 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::shared::{
+    CloseReadRequestParams, GetOpenReadRequestsParams, GetReadRequestStatusParams, Method,
+    OpenReadRequestParams, ReadRequestStatus, SetReadRequestPendingParams, State,
+    BLOB_READER_ACTOR_NAME,
+};
+use fendermint_actor_blobs_shared::state::Hash;
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
     runtime::{ActorCode, Runtime},
@@ -10,12 +16,6 @@ use fil_actors_runtime::{
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::address::Address;
 use fvm_shared::MethodNum;
-
-use crate::shared::{
-    CloseReadRequestParams, GetOpenReadRequestsParams, GetReadRequestStatusParams, Hash, Method,
-    OpenReadRequestParams, ReadRequestStatus, SetReadRequestPendingParams, State,
-    READREQ_ACTOR_NAME,
-};
 
 type OpenReadRequestTuple = (Hash, Hash, u32, u32, Address, u64);
 
@@ -69,7 +69,6 @@ impl ReadReqActor {
         params: CloseReadRequestParams,
     ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        log::info!("closing read request id: {:?}", params.0);
         rt.transaction(|st: &mut State, _| st.close_read_request(params.0))
     }
 
@@ -79,6 +78,12 @@ impl ReadReqActor {
     ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         rt.transaction(|st: &mut State, _| st.set_read_request_pending(params.0))
+    }
+
+    fn receive_read_request(rt: &impl Runtime, params: Vec<u8>) -> Result<(), ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+        log::info!("====>>>> received read request: {:?}", params.len());
+        Ok(())
     }
 
     /// Fallback method for unimplemented method numbers.
@@ -100,7 +105,7 @@ impl ActorCode for ReadReqActor {
     type Methods = Method;
 
     fn name() -> &'static str {
-        READREQ_ACTOR_NAME
+        BLOB_READER_ACTOR_NAME
     }
 
     actor_dispatch! {
@@ -110,6 +115,7 @@ impl ActorCode for ReadReqActor {
         GetReadRequestStatus => get_read_request_status,
         CloseReadRequest => close_read_request,
         SetReadRequestPending => set_read_request_pending,
+        ReceiveReadRequest => receive_read_request,
         _ => fallback,
     }
 }

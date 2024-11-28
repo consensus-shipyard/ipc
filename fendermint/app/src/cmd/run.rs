@@ -175,7 +175,7 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
         NamespaceBlockstore::new(db.clone(), ns.state_store).context("error creating state DB")?;
 
     let checkpoint_pool = CheckpointPool::new();
-    let iroh_pin_pool = BlobPool::new();
+    let blob_pool = BlobPool::new();
     let read_request_pool = ReadRequestPool::new();
     let parent_finality_votes = VoteTally::empty();
 
@@ -246,13 +246,13 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
             // Blob resolver
             let iroh_resolver = IrohResolver::new(
                 client.clone(),
-                iroh_pin_pool.queue(),
+                blob_pool.queue(),
                 settings.resolver.retry_delay,
                 parent_finality_votes.clone(),
                 key.clone(),
                 own_subnet_id.clone(),
                 |hash, success| AppVote::BlobFinality(IPCBlobFinality::new(hash, success)),
-                iroh_pin_pool.results(),
+                blob_pool.results(),
             );
 
             info!("starting the iroh Resolver...");
@@ -369,7 +369,7 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
             checkpoint_pool,
             parent_finality_provider: parent_finality_provider.clone(),
             parent_finality_votes: parent_finality_votes.clone(),
-            blob_pool: iroh_pin_pool,
+            blob_pool,
             blob_concurrency: settings.blob_concurrency,
             read_request_pool,
             read_request_concurrency: settings.read_request_concurrency,
@@ -628,9 +628,9 @@ async fn dispatch_vote(
                     );
                 }
                 Err(
-                    e @ (VoteError::Uninitialized
-                    | VoteError::UnpoweredValidator(_)
-                    | VoteError::UnexpectedBlock(_, _)),
+                    e @ (VoteError::Uninitialized // early vote, we're not ready yet
+                    | VoteError::UnpoweredValidator(_) // maybe arrived too early or too late, or spam
+                    | VoteError::UnexpectedBlock(_, _)), // won't happen here
                 ) => {
                     debug!(
                         error = e.to_string(),
@@ -666,9 +666,9 @@ async fn dispatch_vote(
                     warn!(error = e.to_string(), "failed to handle blob finality vote");
                 }
                 Err(
-                    e @ (VoteError::Uninitialized
-                    | VoteError::UnpoweredValidator(_)
-                    | VoteError::UnexpectedBlock(_, _)),
+                    e @ (VoteError::Uninitialized // early vote, we're not ready yet
+                    | VoteError::UnpoweredValidator(_) // maybe arrived too early or too late, or spam
+                    | VoteError::UnexpectedBlock(_, _)), // won't happen here
                 ) => {
                     debug!(error = e.to_string(), "failed to handle blob finality vote");
                 }
@@ -698,9 +698,9 @@ async fn dispatch_vote(
                     );
                 }
                 Err(
-                    e @ (VoteError::Uninitialized
-                    | VoteError::UnpoweredValidator(_)
-                    | VoteError::UnexpectedBlock(_, _)),
+                    e @ (VoteError::Uninitialized // early vote, we're not ready yet
+                    | VoteError::UnpoweredValidator(_) // maybe arrived too early or too late, or spam
+                    | VoteError::UnexpectedBlock(_, _)), // won't happen here
                 ) => {
                     debug!(
                         error = e.to_string(),

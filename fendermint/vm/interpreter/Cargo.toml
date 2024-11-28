@@ -55,7 +55,7 @@ fendermint_actor_bucket = { path = "../../actors/bucket" }
 fendermint_actor_chainmetadata = { path = "../../actors/chainmetadata" }
 fendermint_actor_gas_market_eip1559 = { path = "../../actors/gas_market/eip1559" }
 fendermint_actor_eam = { path = "../../actors/eam" }
-fendermint_actor_readreq = { path = "../../actors/readreq" }
+fendermint_actor_blob_reader = { path = "../../actors/blob_reader" }
 fendermint_actor_timehub = { path = "../../actors/timehub" }
 fendermint_actors = { path = "../../actors" }
 fendermint_crypto = { path = "../../crypto" }

@@ -3,36 +3,16 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 pub use crate::state::State;
+use fendermint_actor_blobs_shared::state::Hash;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::{address::Address, ActorID, MethodNum, METHOD_CONSTRUCTOR};
 use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-pub const READREQ_ACTOR_NAME: &str = "readreq";
-pub const READREQ_ACTOR_ID: ActorID = 67;
-pub const READREQ_ACTOR_ADDR: Address = Address::new_id(READREQ_ACTOR_ID);
-
-/// Blob blake3 hash.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, Ord, PartialOrd, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct Hash(pub [u8; 32]);
-
-/// Source https://github.com/n0-computer/iroh/blob/main/iroh-base/src/hash.rs
-impl fmt::Display for Hash {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // the result will be 52 bytes
-        let mut res = [b'b'; 52];
-        // write the encoded bytes
-        data_encoding::BASE32_NOPAD.encode_mut(self.0.as_slice(), &mut res);
-        // convert to string, this is guaranteed to succeed
-        let t = std::str::from_utf8_mut(res.as_mut()).unwrap();
-        // hack since data_encoding doesn't have BASE32LOWER_NOPAD as a const
-        t.make_ascii_lowercase();
-        // write the str, no allocations
-        f.write_str(t)
-    }
-}
+pub const BLOB_READER_ACTOR_NAME: &str = "blob_reader";
+pub const BLOB_READER_ACTOR_ID: ActorID = 67;
+pub const BLOB_READER_ACTOR_ADDR: Address = Address::new_id(BLOB_READER_ACTOR_ID);
 
 /// The status of a read request.
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
@@ -79,6 +59,7 @@ pub enum Method {
     GetOpenReadRequests = frc42_dispatch::method_hash!("GetOpenReadRequests"),
     OpenReadRequest = frc42_dispatch::method_hash!("OpenReadRequest"),
     SetReadRequestPending = frc42_dispatch::method_hash!("SetReadRequestPending"),
+    ReceiveReadRequest = frc42_dispatch::method_hash!("ReceiveReadRequest"),
 }
 
 /// Params for adding a read request.

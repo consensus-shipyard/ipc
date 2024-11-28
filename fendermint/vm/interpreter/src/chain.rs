@@ -17,6 +17,11 @@ use crate::{
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically;
 use async_trait::async_trait;
+use fendermint_actor_blob_reader::{
+    CloseReadRequestParams, GetOpenReadRequestsParams, GetReadRequestStatusParams,
+    Method::{CloseReadRequest, GetOpenReadRequests, GetReadRequestStatus, SetReadRequestPending},
+    ReadRequestStatus, SetReadRequestPendingParams,
+};
 use fendermint_actor_blobs_shared::{
     params::{
         FinalizeBlobParams, GetAddedBlobsParams, GetBlobStatusParams, GetStatsReturn,
@@ -25,13 +30,8 @@ use fendermint_actor_blobs_shared::{
     state::{BlobStatus, SubscriptionId},
     Method::{DebitAccounts, FinalizeBlob, GetAddedBlobs, GetBlobStatus, GetStats, SetBlobPending},
 };
-use fendermint_actor_readreq::{
-    CloseReadRequestParams, GetOpenReadRequestsParams, GetReadRequestStatusParams,
-    Method::{CloseReadRequest, GetOpenReadRequests, GetReadRequestStatus, SetReadRequestPending},
-    ReadRequestStatus, SetReadRequestPendingParams,
-};
 use fendermint_tracing::emit;
-use fendermint_vm_actor_interface::{blobs, ipc, readreq, system};
+use fendermint_vm_actor_interface::{blob_reader, blobs, ipc, system};
 use fendermint_vm_event::ParentFinalityMissingQuorum;
 use fendermint_vm_iroh_resolver::observe::{
     BlobsFinalityAddedBlobs, BlobsFinalityAddedBytes, BlobsFinalityPendingBlobs,
@@ -365,7 +365,7 @@ where
             msgs.extend(blobs);
         }
 
-        // Get pending read requests from the readreq actor
+        // Get pending read requests from the blob_reader actor
         let open_requests = with_state_transaction(&mut state, |state| {
             let requests = get_open_read_requests(state, chain_env.read_request_concurrency)?;
             tracing::debug!(size = requests.len(), "read requests fetched from chain");
@@ -1061,12 +1061,12 @@ where
                 IpcMessage::ReadRequestPending(read_request) => {
                     // Set the read request to "pending" state
                     let from = system::SYSTEM_ACTOR_ADDR;
-                    let to = readreq::READREQ_ACTOR_ADDR;
+                    let to = blob_reader::BLOB_READER_ACTOR_ADDR;
                     let method_num = SetReadRequestPending as u64;
                     let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
-                    let params = SetReadRequestPendingParams(fendermint_actor_readreq::Hash(
-                        *read_request.id.as_bytes(),
-                    ));
+                    let params = SetReadRequestPendingParams(
+                        fendermint_actor_blobs_shared::state::Hash(*read_request.id.as_bytes()),
+                    );
                     let params = RawBytes::serialize(params)?;
                     let msg = Message {
                         version: Default::default(),
@@ -1415,7 +1415,7 @@ where
     let params = RawBytes::serialize(params)?;
     let msg = FvmMessage {
         from: system::SYSTEM_ACTOR_ADDR,
-        to: readreq::READREQ_ACTOR_ADDR,
+        to: blob_reader::BLOB_READER_ACTOR_ADDR,
         sequence: 0,
         gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
         method_num: GetOpenReadRequests as u64,
@@ -1495,34 +1495,17 @@ where
     Ok(())
 }
 
-fn with_state_transaction<F, R, DB>(
-    state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
-    f: F,
-) -> anyhow::Result<R>
-where
-    F: FnOnce(&mut FvmExecState<ReadOnlyBlockstore<DB>>) -> anyhow::Result<R>,
-    DB: Blockstore + Clone + 'static + Send + Sync,
-{
-    state.state_tree_mut().begin_transaction();
-    let result = f(state);
-    state
-        .state_tree_mut()
-        .end_transaction(true)
-        .expect("we just started a transaction");
-    result
-}
-
 fn close_read_request<DB>(state: &mut FvmExecState<DB>, id: Hash) -> anyhow::Result<FvmApplyRet>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
     let from = system::SYSTEM_ACTOR_ADDR;
-    let to = readreq::READREQ_ACTOR_ADDR;
+    let to = blob_reader::BLOB_READER_ACTOR_ADDR;
     let method_num = CloseReadRequest as u64;
     let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
-    let params = RawBytes::serialize(CloseReadRequestParams(fendermint_actor_readreq::Hash(
-        *id.as_bytes(),
-    )))?;
+    let params = RawBytes::serialize(CloseReadRequestParams(
+        fendermint_actor_blobs_shared::state::Hash(*id.as_bytes()),
+    ))?;
     let msg = Message {
         version: Default::default(),
         from,
@@ -1555,10 +1538,10 @@ fn get_read_request_status<DB>(
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    let request_id = fendermint_actor_readreq::Hash(*id.as_bytes());
+    let request_id = fendermint_actor_blobs_shared::state::Hash(*id.as_bytes());
     let msg = FvmMessage {
         from: system::SYSTEM_ACTOR_ADDR,
-        to: readreq::READREQ_ACTOR_ADDR,
+        to: blob_reader::BLOB_READER_ACTOR_ADDR,
         sequence: 0,
         gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
         method_num: GetReadRequestStatus as u64,
@@ -1573,4 +1556,21 @@ where
     let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
     fvm_ipld_encoding::from_slice::<Option<ReadRequestStatus>>(&data)
         .map_err(|e| anyhow!("error parsing as Option<ReadRequestStatus>: {e}"))
+}
+
+fn with_state_transaction<F, R, DB>(
+    state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
+    f: F,
+) -> anyhow::Result<R>
+where
+    F: FnOnce(&mut FvmExecState<ReadOnlyBlockstore<DB>>) -> anyhow::Result<R>,
+    DB: Blockstore + Clone + 'static + Send + Sync,
+{
+    state.state_tree_mut().begin_transaction();
+    let result = f(state);
+    state
+        .state_tree_mut()
+        .end_transaction(true)
+        .expect("we just started a transaction");
+    result
 }

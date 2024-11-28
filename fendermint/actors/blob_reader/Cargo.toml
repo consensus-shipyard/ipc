@@ -1,6 +1,6 @@
 [package]
-name = "fendermint_actor_readreq"
-description = "Actor for read request management"
+name = "fendermint_actor_blob_reader"
+description = "Actor for reading blob bytes"
 license.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -25,6 +25,8 @@ num-derive = { workspace = true }
 sha2 = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_tuple = { workspace = true }
+
+fendermint_actor_blobs_shared = { path = "../blobs/shared" }
 
 
 [dev-dependencies]

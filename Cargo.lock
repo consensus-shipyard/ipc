@@ -3101,6 +3101,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_actor_blob_reader"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "data-encoding",
+ "fendermint_actor_blobs_shared",
+ "fil_actors_evm_shared",
+ "fil_actors_runtime",
+ "frc42_dispatch",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "hex-literal 0.4.1",
+ "iroh-base",
+ "log",
+ "num-derive 0.3.3",
+ "num-traits",
+ "rand",
+ "serde",
+ "serde_tuple",
+ "sha2 0.10.8",
+]
+
+[[package]]
 name = "fendermint_actor_blobs"
 version = "0.1.0"
 dependencies = [
@@ -3249,29 +3273,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fendermint_actor_readreq"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "data-encoding",
- "fil_actors_evm_shared",
- "fil_actors_runtime",
- "frc42_dispatch",
- "fvm_ipld_blockstore",
- "fvm_ipld_encoding",
- "fvm_shared",
- "hex-literal 0.4.1",
- "iroh-base",
- "log",
- "num-derive 0.3.3",
- "num-traits",
- "rand",
- "serde",
- "serde_tuple",
- "sha2 0.10.8",
-]
-
-[[package]]
 name = "fendermint_actor_timehub"
 version = "0.1.0"
 dependencies = [
@@ -3299,12 +3300,12 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid",
+ "fendermint_actor_blob_reader",
  "fendermint_actor_blobs",
  "fendermint_actor_bucket",
  "fendermint_actor_chainmetadata",
  "fendermint_actor_eam",
  "fendermint_actor_gas_market_eip1559",
- "fendermint_actor_readreq",
  "fendermint_actor_timehub",
  "fil_actor_bundler",
  "fil_actors_runtime",
@@ -3830,13 +3831,13 @@ dependencies = [
  "blobs_syscall",
  "cid",
  "ethers",
+ "fendermint_actor_blob_reader",
  "fendermint_actor_blobs",
  "fendermint_actor_blobs_shared",
  "fendermint_actor_bucket",
  "fendermint_actor_chainmetadata",
  "fendermint_actor_eam",
  "fendermint_actor_gas_market_eip1559",
- "fendermint_actor_readreq",
  "fendermint_actor_timehub",
  "fendermint_actors",
  "fendermint_actors_api",

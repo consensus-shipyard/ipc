@@ -61,4 +61,4 @@ pub mod placeholder;
 pub mod reward;
 pub mod system;
 pub mod timehub;
-pub mod readreq;
+pub mod blob_reader;

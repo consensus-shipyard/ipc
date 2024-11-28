@@ -20,7 +20,7 @@ use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use fendermint_vm_actor_interface::{
-    account, adm, blobs, burntfunds, chainmetadata, cron, eam, gas_market, init, ipc, readreq,
+    account, adm, blob_reader, blobs, burntfunds, chainmetadata, cron, eam, gas_market, init, ipc,
     reward, system, EMPTY_ARR,
 };
 use fendermint_vm_core::{chainid, Timestamp};
@@ -470,16 +470,16 @@ impl GenesisBuilder {
             )
             .context("failed to create blobs actor")?;
 
-        // Initialize the readreq actor.
+        // Initialize the blob reader actor.
         state
             .create_custom_actor(
-                fendermint_actor_readreq::READREQ_ACTOR_NAME,
-                readreq::READREQ_ACTOR_ID,
-                &fendermint_actor_readreq::State::new(),
+                fendermint_actor_blob_reader::BLOB_READER_ACTOR_NAME,
+                blob_reader::BLOB_READER_ACTOR_ID,
+                &fendermint_actor_blob_reader::State::new(),
                 TokenAmount::zero(),
                 None,
             )
-            .context("failed to create readreq actor")?;
+            .context("failed to create blob reader actor")?;
 
         let eam_state = fendermint_actor_eam::State::new(
             state.store(),

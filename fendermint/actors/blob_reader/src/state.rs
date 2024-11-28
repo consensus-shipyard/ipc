@@ -9,7 +9,8 @@ use log::info;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 
-use crate::shared::{Hash, ReadRequest, ReadRequestStatus};
+use crate::shared::{ReadRequest, ReadRequestStatus};
+use fendermint_actor_blobs_shared::state::Hash;
 
 const MAX_READ_REQUEST_LEN: u32 = 1024 * 1024; // 1MB
 
@@ -75,7 +76,7 @@ impl State {
 
     pub fn close_read_request(&mut self, request_id: Hash) -> Result<(), ActorError> {
         if self.get_read_request_status(request_id).is_none() {
-            return Err(ActorError::illegal_state(
+            return Err(ActorError::not_found(
                 "cannot close read request, it does not exist".to_string(),
             ));
         }

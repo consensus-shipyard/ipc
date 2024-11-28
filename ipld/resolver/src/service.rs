@@ -52,7 +52,7 @@ pub type ResolveReadRequestResult = anyhow::Result<bytes::Bytes>;
 type ResponseChannel = Sender<ResolveResult>;
 
 /// Channel to complete the read request with.
-type ReadRequestResponseChannel = Sender<anyhow::Result<bytes::Bytes>>;
+type ReadRequestResponseChannel = Sender<ResolveReadRequestResult>;
 
 /// State of a query. The fallback peers can be used
 /// if the current attempt fails.
