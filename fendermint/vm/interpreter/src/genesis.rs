@@ -19,7 +19,8 @@ use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use fendermint_vm_actor_interface::{
-    account, burntfunds, chainmetadata, cron, eam, init, ipc, reward, system, EMPTY_ARR,
+    account, activity, burntfunds, chainmetadata, cron, eam, gas_market, init, ipc, reward, system,
+    EMPTY_ARR,
 };
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Collateral, Genesis, Power, PowerScale, Validator};
@@ -430,6 +431,39 @@ impl GenesisBuilder {
             )
             .context("failed to replace built in eam actor")?;
 
+        // Currently hardcoded for now, once genesis V2 is implemented, should be taken
+        // from genesis parameters.
+        //
+        // Default initial base fee equals minimum base fee in Filecoin.
+        let initial_base_fee = TokenAmount::from_atto(100);
+        // We construct the actor state here for simplicity, but for better decoupling we should
+        // be invoking the constructor instead.
+        let gas_market_state = fendermint_actor_gas_market_eip1559::State {
+            base_fee: initial_base_fee,
+            // If you need to customize the gas market constants, you can do so here.
+            constants: fendermint_actor_gas_market_eip1559::Constants::default(),
+        };
+        state
+            .create_custom_actor(
+                fendermint_actor_gas_market_eip1559::ACTOR_NAME,
+                gas_market::GAS_MARKET_ACTOR_ID,
+                &gas_market_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create default eip1559 gas market actor")?;
+
+        let tracker_state = fendermint_actor_activity_tracker::State::new(state.store())?;
+        state
+            .create_custom_actor(
+                fendermint_actor_activity_tracker::IPC_ACTIVITY_TRACKER_ACTOR_NAME,
+                activity::ACTIVITY_TRACKER_ACTOR_ID,
+                &tracker_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create activity tracker actor")?;
+
         // STAGE 2: Create non-builtin accounts which do not have a fixed ID.
 
         // The next ID is going to be _after_ the accounts, which have already been assigned an ID by the `Init` actor.
@@ -560,6 +594,7 @@ fn deploy_contracts(
         let diamond_loupe_facet = facets.remove(0);
         let diamond_cut_facet = facets.remove(0);
         let ownership_facet = facets.remove(0);
+        let activity_facet = facets.remove(0);
 
         debug_assert_eq!(facets.len(), 2, "SubnetRegistry has 2 facets of its own");
 
@@ -573,6 +608,7 @@ fn deploy_contracts(
             diamond_cut_facet: diamond_cut_facet.facet_address,
             diamond_loupe_facet: diamond_loupe_facet.facet_address,
             ownership_facet: ownership_facet.facet_address,
+            activity_facet: activity_facet.facet_address,
             subnet_getter_selectors: getter_facet.function_selectors,
             subnet_manager_selectors: manager_facet.function_selectors,
             subnet_rewarder_selectors: rewarder_facet.function_selectors,
@@ -581,6 +617,7 @@ fn deploy_contracts(
             subnet_actor_diamond_cut_selectors: diamond_cut_facet.function_selectors,
             subnet_actor_diamond_loupe_selectors: diamond_loupe_facet.function_selectors,
             subnet_actor_ownership_selectors: ownership_facet.function_selectors,
+            subnet_actor_activity_selectors: activity_facet.function_selectors,
             creation_privileges: 0,
         };
 

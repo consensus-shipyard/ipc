@@ -10,8 +10,8 @@ use ethers_contract::{ContractError, EthLogDecode, LogMeta};
 use ipc_actors_abis::{
     checkpointing_facet, gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
     lib_gateway, lib_quorum, lib_staking_change_log, register_subnet_facet,
-    subnet_actor_checkpointing_facet, subnet_actor_getter_facet, subnet_actor_manager_facet,
-    subnet_actor_reward_facet,
+    subnet_actor_activity_facet, subnet_actor_checkpointing_facet, subnet_actor_getter_facet,
+    subnet_actor_manager_facet, subnet_actor_reward_facet,
 };
 use ipc_api::evm::{fil_to_eth_amount, payload_to_evm_address, subnet_id_to_evm_addresses};
 use ipc_api::validator::from_contract_validators;
@@ -27,8 +27,9 @@ use crate::config::Subnet;
 use crate::lotus::message::ipc::SubnetInfo;
 use crate::manager::subnet::{
     BottomUpCheckpointRelayer, GetBlockHashResult, SubnetGenesisInfo, TopDownFinalityQuery,
-    TopDownQueryPayload,
+    TopDownQueryPayload, ValidatorRewarder,
 };
+
 use crate::manager::{EthManager, SubnetManager};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
@@ -36,24 +37,31 @@ use ethers::abi::Tokenizable;
 use ethers::contract::abigen;
 use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::{Signer, SignerMiddleware};
-use ethers::providers::{Authorization, Http, Middleware, Provider};
+use ethers::providers::{Authorization, Http, Provider};
 use ethers::signers::{LocalWallet, Wallet};
-use ethers::types::{BlockId, Eip1559TransactionRequest, ValueOrArray, I256, U256};
+use ethers::types::{Eip1559TransactionRequest, ValueOrArray, H256, U256};
 
+use super::gas_estimator_middleware::Eip1559GasEstimatorMiddleware;
+use ethers::middleware::Middleware;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
+use ipc_actors_abis::subnet_actor_activity_facet::ValidatorClaim;
 use ipc_api::checkpoint::{
-    BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent, Signature,
+    consensus::ValidatorData, BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent,
+    Signature, VALIDATOR_REWARD_FIELDS,
 };
 use ipc_api::cross::IpcEnvelope;
+use ipc_api::merkle::MerkleGen;
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo, ValidatorStakingInfo};
 use ipc_api::subnet::ConstructParams;
 use ipc_api::subnet_id::SubnetID;
+use ipc_observability::lazy_static;
 use ipc_wallet::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
 use num_traits::ToPrimitive;
 use std::result;
 
-pub type DefaultSignerMiddleware = SignerMiddleware<Provider<Http>, Wallet<SigningKey>>;
+pub type SignerWithFeeEstimatorMiddleware =
+    Eip1559GasEstimatorMiddleware<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>;
 
 /// Default polling time used by the Ethers provider to check for pending
 /// transactions and events. Default is 7, and for our child subnets we
@@ -278,19 +286,20 @@ impl SubnetManager for EthSubnetManager {
             supply_source: register_subnet_facet::Asset::try_from(params.supply_source)?,
             collateral_source: register_subnet_facet::Asset::try_from(params.collateral_source)?,
             validator_gater: payload_to_evm_address(params.validator_gater.payload())?,
+            validator_rewarder: payload_to_evm_address(params.validator_rewarder.payload())?,
         };
 
         tracing::info!("creating subnet on evm with params: {params:?}");
 
-        let signer = self.get_signer(&from)?;
+        let signer = self.get_signer_with_fee_estimator(&from)?;
         let signer = Arc::new(signer);
         let registry_contract = register_subnet_facet::RegisterSubnetFacet::new(
             self.ipc_contract_info.registry_addr,
             signer.clone(),
         );
 
-        let call = call_with_premium_estimation(signer, registry_contract.new_subnet_actor(params))
-            .await?;
+        let call =
+            extend_call_with_pending_block(registry_contract.new_subnet_actor(params)).await?;
         // TODO: Edit call to get estimate premium
         let pending_tx = call.send().await?;
         // We need the retry to parse the deployment event. At the time of this writing, it's a bug
@@ -341,17 +350,14 @@ impl SubnetManager for EthSubnetManager {
             "interacting with evm subnet contract: {address:} with collateral: {collateral:}"
         );
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
         let mut txn = contract.join(ethers::types::Bytes::from(pub_key), U256::from(collateral));
         txn = self.handle_txn_token(&subnet, txn, collateral, 0).await?;
 
-        let txn = call_with_premium_estimation(signer, txn).await?;
-
-        // Use the pending state to get the nonce because there could have been a pre-fund. Best would be to use this for everything.
-        let txn = txn.block(BlockId::Number(ethers::types::BlockNumber::Pending));
+        let txn = extend_call_with_pending_block(txn).await?;
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -367,14 +373,14 @@ impl SubnetManager for EthSubnetManager {
         let address = contract_address_from_subnet(&subnet)?;
         tracing::info!("interacting with evm subnet contract: {address:} with balance: {balance:}");
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
         let mut txn = contract.pre_fund(U256::from(balance));
         txn = self.handle_txn_token(&subnet, txn, 0, balance).await?;
 
-        let txn = call_with_premium_estimation(signer, txn).await?;
+        let txn = extend_call_with_pending_block(txn).await?;
 
         txn.send().await?;
         Ok(())
@@ -394,11 +400,11 @@ impl SubnetManager for EthSubnetManager {
             .to_u128()
             .ok_or_else(|| anyhow!("invalid pre-release amount"))?;
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
-        call_with_premium_estimation(signer, contract.pre_release(amount.into()))
+        extend_call_with_pending_block(contract.pre_release(amount.into()))
             .await?
             .send()
             .await?
@@ -418,14 +424,14 @@ impl SubnetManager for EthSubnetManager {
             "interacting with evm subnet contract: {address:} with collateral: {collateral:}"
         );
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
         let mut txn = contract.stake(U256::from(collateral));
         txn = self.handle_txn_token(&subnet, txn, collateral, 0).await?;
 
-        let txn = call_with_premium_estimation(signer, txn).await?;
+        let txn = extend_call_with_pending_block(txn).await?;
 
         txn.send().await?.await?;
 
@@ -448,11 +454,11 @@ impl SubnetManager for EthSubnetManager {
             "interacting with evm subnet contract: {address:} with collateral: {collateral:}"
         );
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
-        let txn = call_with_premium_estimation(signer, contract.unstake(collateral.into())).await?;
+        let txn = extend_call_with_pending_block(contract.unstake(collateral.into())).await?;
         txn.send().await?.await?;
 
         Ok(())
@@ -462,11 +468,11 @@ impl SubnetManager for EthSubnetManager {
         let address = contract_address_from_subnet(&subnet)?;
         tracing::info!("leaving evm subnet: {subnet:} at contract: {address:}");
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
-        call_with_premium_estimation(signer, contract.leave())
+        extend_call_with_pending_block(contract.leave())
             .await?
             .send()
             .await?
@@ -479,11 +485,11 @@ impl SubnetManager for EthSubnetManager {
         let address = contract_address_from_subnet(&subnet)?;
         tracing::info!("kill evm subnet: {subnet:} at contract: {address:}");
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
-        call_with_premium_estimation(signer, contract.kill())
+        extend_call_with_pending_block(contract.kill())
             .await?
             .send()
             .await?
@@ -520,11 +526,11 @@ impl SubnetManager for EthSubnetManager {
         let address = contract_address_from_subnet(&subnet)?;
         tracing::info!("claim collateral evm subnet: {subnet:} at contract: {address:}");
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let contract =
             subnet_actor_reward_facet::SubnetActorRewardFacet::new(address, signer.clone());
 
-        call_with_premium_estimation(signer, contract.claim())
+        extend_call_with_pending_block(contract.claim())
             .await?
             .send()
             .await?
@@ -553,7 +559,7 @@ impl SubnetManager for EthSubnetManager {
         let evm_subnet_id = gateway_manager_facet::SubnetID::try_from(&subnet)?;
         tracing::debug!("evm subnet id to fund: {evm_subnet_id:?}");
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let gateway_contract = gateway_manager_facet::GatewayManagerFacet::new(
             self.ipc_contract_info.gateway_addr,
             signer.clone(),
@@ -564,7 +570,7 @@ impl SubnetManager for EthSubnetManager {
             gateway_manager_facet::FvmAddress::try_from(to)?,
         );
         txn.tx.set_value(value);
-        let txn = call_with_premium_estimation(signer, txn).await?;
+        let txn = extend_call_with_pending_block(txn).await?;
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -582,7 +588,7 @@ impl SubnetManager for EthSubnetManager {
 
         let value = fil_amount_to_eth_amount(&amount)?;
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
 
         let subnet_supply_source = self.get_subnet_supply_source(&subnet).await?;
         if subnet_supply_source.kind != AssetKind::ERC20 {
@@ -598,7 +604,7 @@ impl SubnetManager for EthSubnetManager {
         let token_contract = IERC20::new(token_address, signer.clone());
 
         let txn = token_contract.approve(self.ipc_contract_info.gateway_addr, value);
-        let txn = call_with_premium_estimation(signer, txn).await?;
+        let txn = extend_call_with_pending_block(txn).await?;
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -619,7 +625,7 @@ impl SubnetManager for EthSubnetManager {
         let value = fil_amount_to_eth_amount(&amount)?;
         let evm_subnet_id = gateway_manager_facet::SubnetID::try_from(&subnet)?;
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let gateway_contract = gateway_manager_facet::GatewayManagerFacet::new(
             self.ipc_contract_info.gateway_addr,
             signer.clone(),
@@ -630,7 +636,7 @@ impl SubnetManager for EthSubnetManager {
             gateway_manager_facet::FvmAddress::try_from(to)?,
             value,
         );
-        let txn = call_with_premium_estimation(signer, txn).await?;
+        let txn = extend_call_with_pending_block(txn).await?;
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -653,14 +659,14 @@ impl SubnetManager for EthSubnetManager {
 
         tracing::info!("release with evm gateway contract: {gateway_addr:} with value: {value:}");
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let gateway_contract = gateway_manager_facet::GatewayManagerFacet::new(
             self.ipc_contract_info.gateway_addr,
             signer.clone(),
         );
         let mut txn = gateway_contract.release(gateway_manager_facet::FvmAddress::try_from(to)?);
         txn.tx.set_value(value);
-        let txn = call_with_premium_estimation(signer, txn).await?;
+        let txn = extend_call_with_pending_block(txn).await?;
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -686,7 +692,7 @@ impl SubnetManager for EthSubnetManager {
 
         tracing::info!("propagate postbox evm gateway contract: {gateway_addr:} with message key: {postbox_msg_key:?}");
 
-        let signer = Arc::new(self.get_signer(&from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let gateway_contract = gateway_messenger_facet::GatewayMessengerFacet::new(
             self.ipc_contract_info.gateway_addr,
             signer.clone(),
@@ -695,7 +701,7 @@ impl SubnetManager for EthSubnetManager {
         let mut key = [0u8; 32];
         key.copy_from_slice(&postbox_msg_key);
 
-        call_with_premium_estimation(signer, gateway_contract.propagate(key))
+        extend_call_with_pending_block(gateway_contract.propagate(key))
             .await?
             .send()
             .await?;
@@ -705,13 +711,10 @@ impl SubnetManager for EthSubnetManager {
 
     /// Send value between two addresses in a subnet
     async fn send_value(&self, from: Address, to: Address, amount: TokenAmount) -> Result<()> {
-        let signer = Arc::new(self.get_signer(&from)?);
-        let (fee, fee_cap) = premium_estimation(signer.clone()).await?;
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
         let tx = Eip1559TransactionRequest::new()
             .to(payload_to_evm_address(to.payload())?)
-            .value(fil_to_eth_amount(&amount)?)
-            .max_priority_fee_per_gas(fee)
-            .max_fee_per_gas(fee_cap);
+            .value(fil_to_eth_amount(&amount)?);
 
         let tx_pending = signer.send_transaction(tx, None).await?;
 
@@ -771,7 +774,7 @@ impl SubnetManager for EthSubnetManager {
             address,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
-        let raw = contract.collateral_source().call().await?;
+        let raw = contract.supply_source().call().await?;
         Ok(Asset::try_from(raw)?)
     }
 
@@ -830,11 +833,11 @@ impl SubnetManager for EthSubnetManager {
             return Err(anyhow!("wrong format for bootstrap endpoint"));
         }
 
-        let signer = Arc::new(self.get_signer(from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(from)?);
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
-        call_with_premium_estimation(signer, contract.add_bootstrap_node(endpoint))
+        extend_call_with_pending_block(contract.add_bootstrap_node(endpoint))
             .await?
             .send()
             .await?
@@ -886,7 +889,7 @@ impl SubnetManager for EthSubnetManager {
         let address = contract_address_from_subnet(subnet)?;
         tracing::info!("interacting with evm subnet contract: {address:}");
 
-        let signer = Arc::new(self.get_signer(from)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(from)?);
         let contract =
             subnet_actor_manager_facet::SubnetActorManagerFacet::new(address, signer.clone());
 
@@ -911,7 +914,7 @@ impl SubnetManager for EthSubnetManager {
         tracing::debug!("from address: {:?}", from);
 
         let call = contract.set_federated_power(addresses, pubkeys, power_u256);
-        let txn = call_with_premium_estimation(signer, call).await?;
+        let txn = extend_call_with_pending_block(call).await?;
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
         block_number_from_receipt(receipt)
@@ -1081,7 +1084,10 @@ impl EthSubnetManager {
     /// Get the ethers singer instance.
     /// We use filecoin addresses throughout our whole code-base
     /// and translate them to evm addresses when relevant.
-    fn get_signer(&self, addr: &Address) -> Result<DefaultSignerMiddleware> {
+    fn get_signer_with_fee_estimator(
+        &self,
+        addr: &Address,
+    ) -> Result<SignerWithFeeEstimatorMiddleware> {
         // convert to its underlying eth address
         let addr = payload_to_evm_address(addr.payload())?;
         let keystore = self.keystore()?;
@@ -1092,10 +1098,10 @@ impl EthSubnetManager {
         let wallet = LocalWallet::from_bytes(private_key.private_key())?
             .with_chain_id(self.ipc_contract_info.chain_id);
 
-        Ok(SignerMiddleware::new(
-            self.ipc_contract_info.provider.clone(),
-            wallet,
-        ))
+        use super::gas_estimator_middleware::Eip1559GasEstimatorMiddleware;
+
+        let signer = SignerMiddleware::new(self.ipc_contract_info.provider.clone(), wallet);
+        Ok(Eip1559GasEstimatorMiddleware::new(signer))
     }
 
     pub fn from_subnet_with_wallet_store(
@@ -1172,13 +1178,13 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
         let checkpoint =
             subnet_actor_checkpointing_facet::BottomUpCheckpoint::try_from(checkpoint)?;
 
-        let signer = Arc::new(self.get_signer(submitter)?);
+        let signer = Arc::new(self.get_signer_with_fee_estimator(submitter)?);
         let contract = subnet_actor_checkpointing_facet::SubnetActorCheckpointingFacet::new(
             address,
             signer.clone(),
         );
         let call = contract.submit_checkpoint(checkpoint, signatories, signatures);
-        let call = call_with_premium_estimation(signer, call).await?;
+        let call = extend_call_with_pending_block(call).await?;
 
         let pending_tx = call.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
@@ -1278,122 +1284,207 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
     }
 }
 
-/// Receives an input `FunctionCall` and returns a new instance
-/// after estimating an optimal `gas_premium` for the transaction
-pub(crate) async fn call_with_premium_estimation<B, D, M>(
-    signer: Arc<DefaultSignerMiddleware>,
+lazy_static!(
+    /// ABI types of the Merkle tree which contains validator addresses and their committed block count.
+    pub static ref VALIDATOR_SUMMARY_FIELDS: Vec<String> = vec!["address".to_owned(), "uint64".to_owned()];
+);
+
+#[async_trait]
+impl ValidatorRewarder for EthSubnetManager {
+    /// Query validator claims, indexed by checkpoint height, to batch claim rewards.
+    async fn query_reward_claims(
+        &self,
+        validator_addr: &Address,
+        from_checkpoint: ChainEpoch,
+        to_checkpoint: ChainEpoch,
+    ) -> Result<Vec<(u64, ValidatorClaim)>> {
+        let contract = checkpointing_facet::CheckpointingFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+
+        let ev = contract
+            .event::<checkpointing_facet::ActivityRollupRecordedFilter>()
+            .from_block(from_checkpoint as u64)
+            .to_block(to_checkpoint as u64)
+            .address(ValueOrArray::Value(contract.address()));
+
+        let validator_eth_addr = payload_to_evm_address(validator_addr.payload())?;
+
+        let mut claims = vec![];
+        for (event, meta) in query_with_meta(ev, contract.client()).await? {
+            tracing::debug!(
+                "found activity bundle published at height: {}",
+                meta.block_number
+            );
+
+            // Check if we have claims for this validator in this block.
+            let our_data = event
+                .rollup
+                .consensus
+                .data
+                .iter()
+                .find(|v| v.validator == validator_eth_addr);
+
+            // If we don't, skip this block.
+            let Some(data) = our_data else {
+                tracing::info!(
+                    "target validator address has no reward claims in epoch {}",
+                    meta.block_number
+                );
+                continue;
+            };
+
+            let proof = gen_merkle_proof(&event.rollup.consensus.data, data)?;
+
+            // Construct the claim and add it to the list.
+            let claim = ValidatorClaim {
+                // Even though it's the same struct but still need to do a mapping due to
+                // different crate from ethers-rs
+                data: subnet_actor_activity_facet::ValidatorData {
+                    validator: data.validator,
+                    blocks_committed: data.blocks_committed,
+                },
+                proof: proof.into_iter().map(|v| v.into()).collect(),
+            };
+            claims.push((event.checkpoint_height, claim));
+        }
+
+        Ok(claims)
+    }
+
+    /// Query validator rewards in the current subnet, without obtaining proofs.
+    async fn query_validator_rewards(
+        &self,
+        validator_addr: &Address,
+        from_checkpoint: ChainEpoch,
+        to_checkpoint: ChainEpoch,
+    ) -> Result<Vec<(u64, ValidatorData)>> {
+        let contract = checkpointing_facet::CheckpointingFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+
+        let ev = contract
+            .event::<checkpointing_facet::ActivityRollupRecordedFilter>()
+            .from_block(from_checkpoint as u64)
+            .to_block(to_checkpoint as u64)
+            .address(ValueOrArray::Value(contract.address()));
+
+        let mut rewards = vec![];
+        let validator_eth_addr = payload_to_evm_address(validator_addr.payload())?;
+
+        for (event, meta) in query_with_meta(ev, contract.client()).await? {
+            tracing::debug!(
+                "found activity bundle published at height: {}",
+                meta.block_number
+            );
+
+            // Check if we have rewards for this validator in this block.
+            if let Some(data) = event
+                .rollup
+                .consensus
+                .data
+                .iter()
+                .find(|v| v.validator == validator_eth_addr)
+            {
+                // TODO type conversion.
+                let data = ValidatorData {
+                    validator: *validator_addr,
+                    blocks_committed: data.blocks_committed,
+                };
+                rewards.push((meta.block_number.as_u64(), data));
+            }
+        }
+
+        Ok(rewards)
+    }
+
+    /// Claim validator rewards in a batch for the specified subnet.
+    async fn batch_subnet_claim(
+        &self,
+        submitter: &Address,
+        reward_claim_subnet: &SubnetID,
+        reward_origin_subnet: &SubnetID,
+        claims: Vec<(u64, ValidatorClaim)>,
+    ) -> Result<()> {
+        let signer = Arc::new(self.get_signer_with_fee_estimator(submitter)?);
+        let contract = subnet_actor_activity_facet::SubnetActorActivityFacet::new(
+            contract_address_from_subnet(reward_claim_subnet)?,
+            signer.clone(),
+        );
+
+        // separate the Vec of tuples claims into two Vecs of Height and Claim
+        let (heights, claims): (Vec<u64>, Vec<ValidatorClaim>) = claims.into_iter().unzip();
+
+        let call = {
+            let call =
+                contract.batch_subnet_claim(reward_origin_subnet.try_into()?, heights, claims);
+            extend_call_with_pending_block(call).await?
+        };
+
+        call.send().await?;
+
+        Ok(())
+    }
+}
+
+fn gen_merkle_proof(
+    validator_data: &[checkpointing_facet::ValidatorData],
+    validator: &checkpointing_facet::ValidatorData,
+) -> anyhow::Result<Vec<H256>> {
+    // Utilty function to pack validator data into a vector of strings for proof generation.
+    let pack_validator_data = |v: &checkpointing_facet::ValidatorData| {
+        vec![format!("{:?}", v.validator), v.blocks_committed.to_string()]
+    };
+
+    let leaves = order_validator_data(validator_data)?;
+    let tree = MerkleGen::new(pack_validator_data, &leaves, &VALIDATOR_REWARD_FIELDS)?;
+
+    tree.get_proof(validator)
+}
+
+fn order_validator_data(
+    validator_data: &[checkpointing_facet::ValidatorData],
+) -> anyhow::Result<Vec<checkpointing_facet::ValidatorData>> {
+    let mut mapped = validator_data
+        .iter()
+        .map(|a| ethers_address_to_fil_address(&a.validator).map(|v| (v, a.blocks_committed)))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    mapped.sort_by(|a, b| {
+        let cmp = a.0.cmp(&b.0);
+        if cmp.is_eq() {
+            // Address will be unique, do this just in case equal
+            a.1.cmp(&b.1)
+        } else {
+            cmp
+        }
+    });
+
+    let back_to_eth = |(fvm_addr, blocks): (Address, u64)| {
+        payload_to_evm_address(fvm_addr.payload()).map(|v| checkpointing_facet::ValidatorData {
+            validator: v,
+            blocks_committed: blocks,
+        })
+    };
+    mapped
+        .into_iter()
+        .map(back_to_eth)
+        .collect::<Result<Vec<_>, _>>()
+}
+
+/// Takes a `FunctionCall` input and returns a new instance with an estimated optimal `gas_premium`.
+/// The function also uses the pending block number to help retrieve the latest nonce
+/// via `get_transaction_count` with the `pending` parameter.
+pub(crate) async fn extend_call_with_pending_block<B, D, M>(
     call: ethers_contract::FunctionCall<B, D, M>,
 ) -> Result<ethers_contract::FunctionCall<B, D, M>>
 where
     B: std::borrow::Borrow<D>,
     M: ethers::abi::Detokenize,
 {
-    let (max_priority_fee_per_gas, _) = premium_estimation(signer).await?;
-    Ok(call.gas_price(max_priority_fee_per_gas))
-}
-
-/// Returns an estimation of an optimal `gas_premium` and `gas_fee_cap`
-/// for a transaction considering the average premium, base_fee and reward percentile from
-/// past blocks
-/// This is adaptation of ethers' `eip1559_default_estimator`:
-/// https://github.com/gakonst/ethers-rs/blob/5dcd3b7e754174448f9a8cbfc0523896609629f9/ethers-core/src/utils/mod.rs#L476
-async fn premium_estimation(
-    signer: Arc<DefaultSignerMiddleware>,
-) -> Result<(ethers::types::U256, ethers::types::U256)> {
-    let base_fee_per_gas = signer
-        .get_block(ethers::types::BlockNumber::Latest)
-        .await?
-        .ok_or_else(|| anyhow!("Latest block not found"))?
-        .base_fee_per_gas
-        .ok_or_else(|| anyhow!("EIP-1559 not activated"))?;
-
-    let fee_history = signer
-        .fee_history(
-            ethers::utils::EIP1559_FEE_ESTIMATION_PAST_BLOCKS,
-            ethers::types::BlockNumber::Latest,
-            &[ethers::utils::EIP1559_FEE_ESTIMATION_REWARD_PERCENTILE],
-        )
-        .await?;
-
-    let max_priority_fee_per_gas = estimate_priority_fee(fee_history.reward); //overestimate?
-    let potential_max_fee = base_fee_surged(base_fee_per_gas);
-    let max_fee_per_gas = if max_priority_fee_per_gas > potential_max_fee {
-        max_priority_fee_per_gas + potential_max_fee
-    } else {
-        potential_max_fee
-    };
-
-    Ok((max_priority_fee_per_gas, max_fee_per_gas))
-}
-
-/// Implementation borrowed from
-/// https://github.com/gakonst/ethers-rs/blob/ethers-v2.0.8/ethers-core/src/utils/mod.rs#L582
-/// Refer to the implementation for unit tests
-fn base_fee_surged(base_fee_per_gas: U256) -> U256 {
-    if base_fee_per_gas <= U256::from(40_000_000_000u64) {
-        base_fee_per_gas * 2
-    } else if base_fee_per_gas <= U256::from(100_000_000_000u64) {
-        base_fee_per_gas * 16 / 10
-    } else if base_fee_per_gas <= U256::from(200_000_000_000u64) {
-        base_fee_per_gas * 14 / 10
-    } else {
-        base_fee_per_gas * 12 / 10
-    }
-}
-
-/// Implementation borrowed from
-/// https://github.com/gakonst/ethers-rs/blob/ethers-v2.0.8/ethers-core/src/utils/mod.rs#L536
-/// Refer to the implementation for unit tests
-fn estimate_priority_fee(rewards: Vec<Vec<U256>>) -> U256 {
-    let mut rewards: Vec<U256> = rewards
-        .iter()
-        .map(|r| r[0])
-        .filter(|r| *r > U256::zero())
-        .collect();
-    if rewards.is_empty() {
-        return U256::zero();
-    }
-    if rewards.len() == 1 {
-        return rewards[0];
-    }
-    // Sort the rewards as we will eventually take the median.
-    rewards.sort();
-
-    // A copy of the same vector is created for convenience to calculate percentage change
-    // between subsequent fee values.
-    let mut rewards_copy = rewards.clone();
-    rewards_copy.rotate_left(1);
-
-    let mut percentage_change: Vec<I256> = rewards
-        .iter()
-        .zip(rewards_copy.iter())
-        .map(|(a, b)| {
-            let a = I256::try_from(*a).expect("priority fee overflow");
-            let b = I256::try_from(*b).expect("priority fee overflow");
-            ((b - a) * 100) / a
-        })
-        .collect();
-    percentage_change.pop();
-
-    // Fetch the max of the percentage change, and that element's index.
-    let max_change = percentage_change.iter().max().unwrap();
-    let max_change_index = percentage_change
-        .iter()
-        .position(|&c| c == *max_change)
-        .unwrap();
-
-    // If we encountered a big change in fees at a certain position, then consider only
-    // the values >= it.
-    let values = if *max_change >= ethers::utils::EIP1559_FEE_ESTIMATION_THRESHOLD_MAX_CHANGE.into()
-        && (max_change_index >= (rewards.len() / 2))
-    {
-        rewards[max_change_index..].to_vec()
-    } else {
-        rewards
-    };
-
-    // Return the median.
-    values[values.len() / 2]
+    Ok(call.block(ethers::types::BlockNumber::Pending))
 }
 
 /// Get the block number from the transaction receipt
@@ -1502,7 +1593,12 @@ impl TryFrom<gateway_getter_facet::Subnet> for SubnetInfo {
 #[cfg(test)]
 mod tests {
     use crate::manager::evm::manager::contract_address_from_subnet;
+    use ethers::core::rand::prelude::SliceRandom;
+    use ethers::core::rand::{random, thread_rng};
     use fvm_shared::address::Address;
+    use ipc_actors_abis::checkpointing_facet::{checkpointing_facet, ValidatorData};
+    use ipc_api::checkpoint::VALIDATOR_REWARD_FIELDS;
+    use ipc_api::merkle::MerkleGen;
     use ipc_api::subnet_id::SubnetID;
     use std::str::FromStr;
 
@@ -1516,5 +1612,108 @@ mod tests {
             format!("{eth:?}"),
             "0x2e714a3c385ea88a09998ed74db265dae9853667"
         );
+    }
+
+    /// test case that makes sure the commitment created for various addresses and blocks committed
+    /// are consistent
+    #[test]
+    fn test_validator_rewarder_claim_commitment() {
+        let pack_validator_data = |v: &checkpointing_facet::ValidatorData| {
+            vec![format!("{:?}", v.validator), v.blocks_committed.to_string()]
+        };
+
+        let mut random_validator_data = vec![
+            ValidatorData {
+                validator: ethers::types::Address::from_str(
+                    "0xB29C00299756135ec5d6A140CA54Ec77790a99d6",
+                )
+                .unwrap(),
+                blocks_committed: 1,
+            },
+            ValidatorData {
+                validator: ethers::types::Address::from_str(
+                    "0x1A79385eAd0e873FE0C441C034636D3Edf7014cC",
+                )
+                .unwrap(),
+                blocks_committed: 10,
+            },
+            ValidatorData {
+                validator: ethers::types::Address::from_str(
+                    "0x28345a43c2fBae4412f0AbadFa06Bd8BA3f58867",
+                )
+                .unwrap(),
+                blocks_committed: 2,
+            },
+            ValidatorData {
+                validator: ethers::types::Address::from_str(
+                    "0x3c5cc76b07cb02a372e647887bD6780513659527",
+                )
+                .unwrap(),
+                blocks_committed: 3,
+            },
+            ValidatorData {
+                validator: ethers::types::Address::from_str(
+                    "0x76B9d5a35C46B1fFEb37aadf929f1CA63a26A829",
+                )
+                .unwrap(),
+                blocks_committed: 4,
+            },
+        ];
+        random_validator_data.shuffle(&mut thread_rng());
+
+        let root = MerkleGen::new(
+            pack_validator_data,
+            &random_validator_data,
+            &VALIDATOR_REWARD_FIELDS,
+        )
+        .unwrap()
+        .root();
+        assert_eq!(
+            hex::encode(root.0),
+            "5519955f33109df3338490473cb14458640efdccd4df05998c4c439738280ab0"
+        );
+    }
+
+    #[test]
+    fn test_validator_rewarder_claim_commitment_ii() {
+        let pack_validator_data = |v: &checkpointing_facet::ValidatorData| {
+            vec![format!("{:?}", v.validator), v.blocks_committed.to_string()]
+        };
+
+        let mut random_validator_data = (0..100)
+            .map(|_| ValidatorData {
+                validator: ethers::types::Address::random(),
+                blocks_committed: random::<u64>(),
+            })
+            .collect::<Vec<_>>();
+
+        random_validator_data.shuffle(&mut thread_rng());
+        let root = MerkleGen::new(
+            pack_validator_data,
+            &random_validator_data,
+            &VALIDATOR_REWARD_FIELDS,
+        )
+        .unwrap()
+        .root();
+
+        random_validator_data.shuffle(&mut thread_rng());
+        let new_root = MerkleGen::new(
+            pack_validator_data,
+            &random_validator_data,
+            &VALIDATOR_REWARD_FIELDS,
+        )
+        .unwrap()
+        .root();
+        assert_eq!(new_root, root);
+
+        random_validator_data.shuffle(&mut thread_rng());
+        let new_root = MerkleGen::new(
+            pack_validator_data,
+            &random_validator_data,
+            &VALIDATOR_REWARD_FIELDS,
+        )
+        .unwrap()
+        .root();
+        assert_eq!(new_root, root);
     }
 }
