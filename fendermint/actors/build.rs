@@ -1,14 +1,37 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use anyhow::anyhow;
 use fil_actor_bundler::Bundler;
 use std::error::Error;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::thread;
+use toml::Value;
 
-const ACTORS: &[&str] = &["chainmetadata", "eam"];
+fn parse_dependencies_for_wasm32() -> anyhow::Result<Vec<(String, String)>> {
+    let manifest = std::fs::read_to_string("Cargo.toml")?;
+    let document = manifest.parse::<Value>()?;
+
+    let dependencies = document
+        .get("target")
+        .and_then(|t| t.get(r#"cfg(target_arch = "wasm32")"#))
+        .and_then(|t| t.get("dependencies"))
+        .and_then(Value::as_table)
+        .ok_or_else(|| anyhow!("could not find wasm32 dependencies"))?;
+
+    let mut ret = Vec::with_capacity(dependencies.len());
+    for (name, details) in dependencies.iter() {
+        let path = details
+            .get("path")
+            .and_then(Value::as_str)
+            .ok_or_else(|| anyhow!("could not find path for a wasm32 dependency"))?;
+        ret.push((name.clone(), path.to_string()));
+    }
+
+    Ok(ret)
+}
 
 const FILES_TO_WATCH: &[&str] = &["Cargo.toml", "src"];
 
@@ -27,18 +50,20 @@ fn main() -> Result<(), Box<dyn Error>> {
         Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR unset"))
             .join("Cargo.toml");
 
-    for file in [FILES_TO_WATCH, ACTORS].concat() {
+    let actors = parse_dependencies_for_wasm32()?;
+    let actor_files = actors
+        .iter()
+        .map(|(name, _)| name.as_str())
+        .collect::<Vec<_>>();
+
+    for file in [FILES_TO_WATCH, actor_files.as_slice()].concat() {
         println!("cargo:rerun-if-changed={}", file);
     }
 
     // Cargo build command for all test_actors at once.
     let mut cmd = Command::new(cargo);
     cmd.arg("build")
-        .args(
-            ACTORS
-                .iter()
-                .map(|pkg| "-p=fendermint_actor_".to_owned() + pkg),
-        )
+        .args(actors.iter().map(|(pkg, _)| "-p=".to_owned() + pkg))
         .arg("--target=wasm32-unknown-unknown")
         .arg("--profile=wasm")
         .arg("--features=fil-actor")
@@ -88,17 +113,25 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let dst = Path::new("output/custom_actors_bundle.car");
     let mut bundler = Bundler::new(dst);
-    for (&pkg, id) in ACTORS.iter().zip(1u32..) {
+    for (pkg, id) in actors.iter().map(|(pkg, _)| pkg).zip(1u32..) {
         let bytecode_path = Path::new(&out_dir)
             .join("wasm32-unknown-unknown/wasm")
-            .join(format!("fendermint_actor_{}.wasm", pkg));
+            .join(format!("{}.wasm", pkg));
 
         // This actor version doesn't force synthetic CIDs; it uses genuine
         // content-addressed CIDs.
         let forced_cid = None;
 
+        let actor_name = pkg
+            .to_owned()
+            .strip_prefix("fendermint_actor_")
+            .ok_or_else(|| {
+                format!("expected fendermint_actor_ prefix in actor package name; got: {pkg}")
+            })?
+            .to_owned();
+
         let cid = bundler
-            .add_from_file(id, pkg.to_owned(), forced_cid, &bytecode_path)
+            .add_from_file(id, actor_name, forced_cid, &bytecode_path)
             .unwrap_or_else(|err| {
                 panic!(
                     "failed to add file {:?} to bundle for actor {}: {}",

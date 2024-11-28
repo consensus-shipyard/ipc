@@ -6,3 +6,4 @@ fs_permissions = [{ access = "read-write", path = "./out"}]
 remappings = [
     "@consensus-shipyard/=node_modules/@consensus-shipyard/"
 ]
+allow_paths = ["../../contracts"]
