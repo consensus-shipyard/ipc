@@ -802,7 +802,7 @@ mod tests {
             "info": "",
             "index": "0",
             "key": "",
-            "value": "mKASGE0YpBhjGGMYaRhkGFgYJAEYcBIYIBilGGgY5AQY2BjqGNoY7BiSGFoYwxi8GBsYNhglGJwPGG0YcAANGHIYnBjZGBgYxBhqGIMYbxhJGHYYVxhkGHMYaRh6GGUGGGgYchhlGHMYbxhsGHYYZRhkGPUYaBhtGGUYdBhhGGQYYRh0GGEYoRhlGF8YcxhpGHoYZRhhGDYYMBiiGNgYbhg6GEsKBxhtGGUYcxhzGGEYZxhlEg0KBBhmGHIYbxhtEgMYdBgwGDAYGAESGDEKAhh0GG8SGCkYdBgyGHcYdRhoGHEYNxh0GGEYMxgzGGUYdxgzGGMYMhhuGGQYbRhnGGIYbBg3GDcYNxh6GDUYeBg0GGQYbBh5GGYYbhhtGHkYbBhqGGkYaBhxGBgB",
+            "value": "mQEIEhizARiFGJgYIBgYGNcYGBhJGBgYgRgYGO8YGBinCgwYGBiICxgYGI0YGBiMGBgYGRgYGIUYGBjQGBgYdRgYGNsYGBjLGBgY9hgYGHkYGBi5GBgYmhgYGF8YGBiZFBgYGOUYGBiqGBgY+RgYGGsYGBiDGBgYGhgYGJ4YGBgkGJgYIBgYGOwYGBhRGBgYoBgYGNEYGBhyGBgY2RgYGOcYGBhlGBgYpxgYGDMYGBjKExgYGOsYGBgYGBgY8hgYGN0YGBjNGBgYbRgYGMwYGBhOGBgYKhgYGPcYGBgoGBgYixgYGBgYGBjJGBgYXRgYGDQYGBiJABgYGIcYGBj3CxgZFRg2GKIYYxhmGG8YbxhjGGIYYRhyGGwYYxhvGG4YdBhlGG4YdBgtGHQYeRhwGGUYeBgYGGEYcBhwGGwYaRhjGGEYdBhpGG8YbhgvGG8YYxh0GGUYdBgtGHMYdBhyGGUYYRhtGDAYzBjgGL8CGDoYSwoHGG0YZRhzGHMYYRhnGGUSDQoEGGYYchhvGG0SAxh0GDAYMBgYARIYMQoCGHQYbxIYKRh0GDIYZxhvGGMYcBhuGGwYcRhpGGwYeBh5GG0Ydhh3GDQYdhhuGGwYaBg0GG4YcBhuGGQYeRh4GGoYYxhsGDMYMxh5GGgYdRhjGHQYaRhjGGkYGAE=",
             "proof": null,
             "height": "6017",
             "codespace": ""
@@ -1244,7 +1244,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn test_handle_object_download_head() {
         let matcher = MockRequestMethodMatcher::default().map(
             Method::AbciQuery,
