@@ -27,6 +27,7 @@ abstract contract IpcExchangeUpgradeable is Initializable, IIpcHandler, OwnableU
         _disableInitializers();
     }
 
+    // solhint-disable-next-line func-name-mixedcase
     function __IpcExchangeUpgradeable_init(address gatewayAddr_) public onlyInitializing {
         gatewayAddr = gatewayAddr_;
         __Ownable_init(msg.sender);

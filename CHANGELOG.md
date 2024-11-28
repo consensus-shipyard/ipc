@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+## [axon-r06] - 2024-10-18
+
+### 🚀 Features
+
+- *(node)* Separate tracing and logging files (#1090)
+- Ipc cli util command to convert f4 to eth address (#1168)
+- Prefix metrics with "ipc" (#1172)
+- Customizable gas markets (with EIP-1559 default), base fee oscillation, premium distribution (#1173)
+
+### 🐛 Bug Fixes
+
+- Correct link to identify protocol (#1159)
+- Tracing deserialization (#1163)
+- *(cli)* Subnet get-validator: add support for 0x Eth addrs. (#1164)
+- Incorrect function call (#1171)
+
+### 🚜 Refactor
+
+- Replace LogLevel type with String (#1167)
+
+### 📚 Documentation
+
+- Move bottom up spec location (#1154)
+- Add docs for gas markets. (#1174)
+
+### Spec
+
+- Bottom up interaction (#899)
+
 ## [axon-r05] - 2024-09-24
 
 _Full changelog below._

@@ -221,7 +221,8 @@ cargo run -p fendermint_app --release -- \
     seal-genesis \
       --builtin-actors-path fendermint/builtin-actors/output/bundle.car \
       --custom-actors-path fendermint/actors/output/custom_actors_bundle.car \
-      --output-path test-network/sealed.car
+      --output-path test-network/sealed.car \ 
+      --artifacts-path contracts/out
 ```
 
 ### Configure CometBFT
