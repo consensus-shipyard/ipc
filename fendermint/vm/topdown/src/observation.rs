@@ -32,13 +32,13 @@ pub struct ObservationConfig {
 /// The content that validators gossip among each other.
 #[derive(Serialize, Deserialize, Hash, Debug, Clone, Eq, PartialEq, Arbitrary)]
 pub struct Observation {
-    pub(crate) parent_height: u64,
+    pub(crate) parent_subnet_height: u64,
     /// The hash of the chain unit at that height. Usually a block hash, but could
     /// be another entity (e.g. tipset CID), depending on the parent chain
     /// and our interface to it. For example, if the parent is a Filecoin network,
     /// this would be a tipset CID coerced into a block hash if queried through
     /// the Eth API, or the tipset CID as-is if accessed through the Filecoin API.
-    pub(crate) parent_hash: Bytes,
+    pub(crate) parent_subnet_hash: Bytes,
     /// A rolling/cumulative commitment to topdown effects since the beginning of
     /// time, including the ones in this block.
     pub(crate) cumulative_effects_comm: Bytes,
@@ -100,7 +100,7 @@ pub fn deduce_new_observation<S: ParentViewStore>(
 
     let observation = agg.into_observation()?;
     tracing::info!(
-        height = observation.parent_height,
+        height = observation.parent_subnet_height,
         "new observation derived"
     );
 
@@ -118,6 +118,10 @@ impl TryFrom<&[u8]> for CertifiedObservation {
 impl CertifiedObservation {
     pub fn observation(&self) -> &Observation {
         &self.observation
+    }
+
+    pub fn observation_signature(&self) -> &RecoverableECDSASignature {
+        &self.observation_signature
     }
 
     pub fn ensure_valid(&self) -> anyhow::Result<ValidatorKey> {
@@ -163,8 +167,8 @@ impl CertifiedObservation {
 impl Observation {
     pub fn new(parent_height: BlockHeight, parent_hash: Bytes, commitment: Bytes) -> Self {
         Self {
-            parent_height,
-            parent_hash,
+            parent_subnet_height: parent_height,
+            parent_subnet_hash: parent_hash,
             cumulative_effects_comm: commitment,
         }
     }
@@ -175,8 +179,8 @@ impl Display for Observation {
         write!(
             f,
             "Observation(parent_height={}, parent_hash={}, commitment={})",
-            self.parent_height,
-            hex::encode(&self.parent_hash),
+            self.parent_subnet_height,
+            hex::encode(&self.parent_subnet_hash),
             hex::encode(&self.cumulative_effects_comm),
         )
     }
@@ -184,7 +188,7 @@ impl Display for Observation {
 
 impl Observation {
     pub fn parent_height(&self) -> BlockHeight {
-        self.parent_height
+        self.parent_subnet_height
     }
 }
 
@@ -195,7 +199,7 @@ impl ObservationConfig {
     }
 }
 
-struct LinearizedParentBlockView {
+pub(crate) struct LinearizedParentBlockView {
     parent_height: u64,
     parent_hash: Option<BlockHash>,
     cumulative_effects_comm: Bytes,
@@ -211,13 +215,23 @@ impl From<&Checkpoint> for LinearizedParentBlockView {
     }
 }
 
+impl From<&Observation> for LinearizedParentBlockView {
+    fn from(value: &Observation) -> Self {
+        LinearizedParentBlockView {
+            parent_height: value.parent_subnet_height,
+            parent_hash: Some(value.parent_subnet_hash.clone()),
+            cumulative_effects_comm: value.cumulative_effects_comm.clone(),
+        }
+    }
+}
+
 impl LinearizedParentBlockView {
     fn new_commitment(&mut self, to_append: Bytes) {
         let bytes = [
             self.cumulative_effects_comm.as_slice(),
             to_append.as_slice(),
         ]
-        .concat();
+            .concat();
         let cid = Cid::new_v1(DAG_CBOR, Code::Blake2b256.digest(&bytes));
         self.cumulative_effects_comm = cid.to_bytes();
     }
@@ -238,7 +252,7 @@ impl LinearizedParentBlockView {
         Ok(())
     }
 
-    fn into_observation(self) -> Result<Observation, Error> {
+    pub fn into_observation(self) -> Result<Observation, Error> {
         let Some(hash) = self.parent_hash else {
             return Err(Error::CannotCommitObservationAtNullBlock(
                 self.parent_height,

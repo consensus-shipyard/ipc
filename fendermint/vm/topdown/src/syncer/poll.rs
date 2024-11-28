@@ -7,16 +7,18 @@ use crate::proxy::ParentQueryProxy;
 use crate::syncer::error::Error;
 use crate::syncer::payload::ParentBlockView;
 use crate::syncer::store::ParentViewStore;
-use crate::syncer::{ParentSyncerConfig, TopDownSyncEvent};
+use crate::syncer::{ParentPoller, ParentSyncerConfig, TopDownSyncEvent};
 use crate::{is_null_round_str, BlockHash, BlockHeight, Checkpoint};
 use anyhow::anyhow;
+use async_trait::async_trait;
 use ipc_observability::emit;
 use ipc_observability::serde::HexEncodableBlockHash;
 use libp2p::futures::TryFutureExt;
 use tokio::sync::broadcast;
+use tokio::sync::broadcast::Receiver;
 use tracing::instrument;
 
-pub(crate) struct ParentPoll<P, S> {
+pub struct ParentPoll<P, S> {
     config: ParentSyncerConfig,
     parent_proxy: P,
     store: S,
@@ -24,71 +26,44 @@ pub(crate) struct ParentPoll<P, S> {
     last_finalized: Checkpoint,
 }
 
-impl<P, S> ParentPoll<P, S>
-where
-    S: ParentViewStore + Send + Sync + 'static,
-    P: Send + Sync + 'static + ParentQueryProxy,
+#[async_trait]
+impl<P, S> ParentPoller for ParentPoll<P, S>
+    where
+        S: ParentViewStore + Send + Sync + 'static + Clone,
+        P: Send + Sync + 'static + ParentQueryProxy,
 {
-    pub fn new(config: ParentSyncerConfig, proxy: P, store: S, last_finalized: Checkpoint) -> Self {
-        let (tx, _) = broadcast::channel(config.broadcast_channel_size);
-        Self {
-            config,
-            parent_proxy: proxy,
-            store,
-            event_broadcast: tx,
-            last_finalized,
-        }
+    type Store = S;
+
+    fn subscribe(&self) -> Receiver<TopDownSyncEvent> {
+        self.event_broadcast.subscribe()
+    }
+
+    fn store(&self) -> Self::Store {
+        self.store.clone()
     }
 
     /// The target block height is finalized, purge all the parent view before the target height
-    pub fn finalize(&mut self, checkpoint: Checkpoint) -> Result<(), Error> {
+    fn finalize(&mut self, checkpoint: Checkpoint) -> anyhow::Result<()> {
         let Some(min_height) = self.store.min_parent_view_height()? else {
             return Ok(());
         };
         for h in min_height..=checkpoint.target_height() {
             self.store.purge(h)?;
         }
+
+        self.last_finalized = checkpoint;
+
         Ok(())
     }
 
-    /// Get the latest non null block data stored
-    async fn latest_nonnull_data(&self) -> anyhow::Result<(BlockHeight, BlockHash)> {
-        let Some(latest_height) = self.store.max_parent_view_height()? else {
-            return Ok((
-                self.last_finalized.target_height(),
-                self.last_finalized.target_hash().clone(),
-            ));
-        };
-
-        let start = self.last_finalized.target_height() + 1;
-        for h in (start..=latest_height).rev() {
-            let Some(p) = self.store.get(h)? else {
-                continue;
-            };
-
-            // if parent hash of the proposal is null, it means the
-            let Some(p) = p.payload else {
-                continue;
-            };
-
-            return Ok((h, p.parent_hash));
-        }
-
-        // this means the votes stored are all null blocks, return last committed finality
-        Ok((
-            self.last_finalized.target_height(),
-            self.last_finalized.target_hash().clone(),
-        ))
-    }
-
     /// Insert the height into cache when we see a new non null block
-    pub async fn try_poll(&mut self) -> anyhow::Result<()> {
+    async fn try_poll(&mut self) -> anyhow::Result<()> {
         let Some(chain_head) = self.finalized_chain_head().await? else {
             return Ok(());
         };
 
         let (mut latest_height_fetched, mut first_non_null_parent_hash) =
-            self.latest_nonnull_data().await?;
+            self.latest_nonnull_data()?;
         tracing::debug!(chain_head, latest_height_fetched, "syncing heights");
 
         if latest_height_fetched > chain_head {
@@ -139,6 +114,53 @@ where
         }
 
         Ok(())
+    }
+}
+
+impl<P, S> ParentPoll<P, S>
+    where
+        S: ParentViewStore + Send + Sync + 'static,
+        P: Send + Sync + 'static + ParentQueryProxy,
+{
+    pub fn new(config: ParentSyncerConfig, proxy: P, store: S, last_finalized: Checkpoint) -> Self {
+        let (tx, _) = broadcast::channel(config.broadcast_channel_size);
+        Self {
+            config,
+            parent_proxy: proxy,
+            store,
+            event_broadcast: tx,
+            last_finalized,
+        }
+    }
+
+    /// Get the latest non null block data stored
+    fn latest_nonnull_data(&self) -> anyhow::Result<(BlockHeight, BlockHash)> {
+        let Some(latest_height) = self.store.max_parent_view_height()? else {
+            return Ok((
+                self.last_finalized.target_height(),
+                self.last_finalized.target_hash().clone(),
+            ));
+        };
+
+        let start = self.last_finalized.target_height() + 1;
+        for h in (start..=latest_height).rev() {
+            let Some(p) = self.store.get(h)? else {
+                continue;
+            };
+
+            // if parent hash of the proposal is null, it means the
+            let Some(p) = p.payload else {
+                continue;
+            };
+
+            return Ok((h, p.parent_hash));
+        }
+
+        // this means the votes stored are all null blocks, return last committed finality
+        Ok((
+            self.last_finalized.target_height(),
+            self.last_finalized.target_hash().clone(),
+        ))
     }
 
     fn store_full(&self) -> anyhow::Result<bool> {
@@ -251,8 +273,8 @@ async fn fetch_data<P>(
     height: BlockHeight,
     block_hash: BlockHash,
 ) -> Result<ParentBlockView, Error>
-where
-    P: ParentQueryProxy + Send + Sync + 'static,
+    where
+        P: ParentQueryProxy + Send + Sync + 'static,
 {
     let changes_res = parent_proxy
         .get_validator_changes(height)
