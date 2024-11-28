@@ -13,19 +13,18 @@ use fendermint_actor_blobs_shared::params::{
 use fendermint_actor_blobs_shared::state::{
     Account, Blob, BlobStatus, CreditApproval, Hash, PublicKey, Subscription, SubscriptionId,
 };
+
+use crate::{ConstructorParams, State, BLOBS_ACTOR_NAME};
 use fendermint_actor_blobs_shared::Method;
+use fendermint_actor_machine::{resolve_external, resolve_external_non_machine};
 use fil_actors_runtime::{
-    actor_dispatch, actor_error, deserialize_block, extract_send_result,
-    runtime::{builtins::Type, ActorCode, Runtime},
-    ActorError, AsActorError, FIRST_EXPORTED_METHOD_NUMBER, SYSTEM_ACTOR_ADDR,
+    actor_dispatch, actor_error, extract_send_result,
+    runtime::{ActorCode, Runtime},
+    ActorError, FIRST_EXPORTED_METHOD_NUMBER, SYSTEM_ACTOR_ADDR,
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::address::Address;
-use fvm_shared::sys::SendFlags;
-use fvm_shared::{error::ExitCode, MethodNum, METHOD_SEND};
-use num_traits::Zero;
-
-use crate::{ext, ConstructorParams, State, BLOBS_ACTOR_NAME};
+use fvm_shared::{MethodNum, METHOD_SEND};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(BlobsActor);
@@ -332,118 +331,6 @@ impl ActorCode for BlobsActor {
     }
 }
 
-enum ActorType {
-    Account,
-    EthAccount,
-    Evm,
-    Machine,
-}
-
-/// Resolve robust address and ensure it is not a Machine actor type.
-/// See `resolve_external`.
-fn resolve_external_non_machine(
-    rt: &impl Runtime,
-    address: Address,
-) -> Result<Address, ActorError> {
-    let (address, actor_type) = resolve_external(rt, address)?;
-    if matches!(actor_type, ActorType::Machine) {
-        Err(ActorError::illegal_argument(format!(
-            "address {} cannot be a machine",
-            address
-        )))
-    } else {
-        Ok(address)
-    }
-}
-
-/// Resolves robust address of an actor.
-fn resolve_external(
-    rt: &impl Runtime,
-    address: Address,
-) -> Result<(Address, ActorType), ActorError> {
-    let actor_id = rt
-        .resolve_address(&address)
-        .ok_or(ActorError::not_found(format!(
-            "actor {} not found",
-            address
-        )))?;
-    let code_cid = rt
-        .get_actor_code_cid(&actor_id)
-        .expect("failed to lookup caller code");
-    match rt.resolve_builtin_actor_type(&code_cid) {
-        Some(Type::Account) => {
-            let result = rt
-                .send(
-                    &address,
-                    ext::account::PUBKEY_ADDRESS_METHOD,
-                    None,
-                    Zero::zero(),
-                    None,
-                    SendFlags::READ_ONLY,
-                )
-                .context_code(
-                    ExitCode::USR_ASSERTION_FAILED,
-                    "account failed to return its key address",
-                )?;
-            if !result.exit_code.is_success() {
-                return Err(ActorError::checked(
-                    result.exit_code,
-                    "failed to retrieve account robust address".to_string(),
-                    None,
-                ));
-            }
-            let robust_addr: Address = deserialize_block(result.return_data)?;
-            Ok((robust_addr, ActorType::Account))
-        }
-        Some(Type::EthAccount) => {
-            let delegated_addr =
-                rt.lookup_delegated_address(actor_id)
-                    .ok_or(ActorError::forbidden(format!(
-                        "actor {} does not have delegated address",
-                        actor_id
-                    )))?;
-            Ok((delegated_addr, ActorType::EthAccount))
-        }
-        Some(Type::EVM) => {
-            let delegated_addr =
-                rt.lookup_delegated_address(actor_id)
-                    .ok_or(ActorError::forbidden(format!(
-                        "actor {} does not have delegated address",
-                        actor_id
-                    )))?;
-            Ok((delegated_addr, ActorType::Evm))
-        }
-        Some(t) => Err(ActorError::forbidden(format!(
-            "disallowed caller type {} for address {}",
-            t.name(),
-            address
-        ))),
-        None => {
-            // The caller might be a machine
-            let result = rt
-                .send(
-                    &address,
-                    fendermint_actor_machine::GET_ADDRESS_METHOD,
-                    None,
-                    Zero::zero(),
-                    None,
-                    SendFlags::READ_ONLY,
-                )
-                .context_code(
-                    ExitCode::USR_ASSERTION_FAILED,
-                    "machine failed to return its key address",
-                )?;
-            if !result.exit_code.is_success() {
-                return Err(ActorError::forbidden(format!(
-                    "disallowed caller code {code_cid}"
-                )));
-            }
-            let robust_addr: Address = deserialize_block(result.return_data)?;
-            Ok((robust_addr, ActorType::Machine))
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -459,6 +346,8 @@ mod tests {
     use fvm_shared::bigint::BigInt;
     use fvm_shared::clock::ChainEpoch;
     use fvm_shared::econ::TokenAmount;
+    use fvm_shared::{error::ExitCode, METHOD_SEND};
+    use num_traits::Zero;
     use rand::RngCore;
 
     pub fn new_hash(size: usize) -> (Hash, u64) {

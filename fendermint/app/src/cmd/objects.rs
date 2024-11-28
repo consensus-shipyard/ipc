@@ -26,6 +26,7 @@ use iroh::blobs::Hash;
 use iroh::client::blobs::BlobStatus;
 use iroh::net::NodeAddr;
 use lazy_static::lazy_static;
+use num_traits::Zero;
 use prometheus::register_histogram;
 use prometheus::register_int_counter;
 use prometheus::Histogram;
@@ -45,7 +46,8 @@ use crate::cmd;
 use crate::options::objects::{ObjectsArgs, ObjectsCommands};
 
 const MAX_OBJECT_LENGTH: u64 = 1024 * 1024 * 1024;
-/// The alpha parameter for alpha entanglement determines the number of parity blob to generate for the original blob.
+/// The alpha parameter for alpha entanglement determines the number of parity blobs to generate
+/// for the original blob.
 const ENTANGLER_ALPHA: u8 = 3;
 /// The s parameter for alpha entanglement determines the number of horizontal strands in the grid.
 const ENTANGLER_S: u8 = 5;
@@ -487,7 +489,7 @@ fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ObjectsError
     if range.len() != 2 {
         return Err(ObjectsError::RangeHeaderInvalid);
     }
-    let (first, last): (u64, u64) = match (!range[0].is_empty(), !range[1].is_empty()) {
+    let (first, mut last): (u64, u64) = match (!range[0].is_empty(), !range[1].is_empty()) {
         (true, true) => (range[0].parse::<u64>()?, range[1].parse::<u64>()?),
         (true, false) => (range[0].parse::<u64>()?, size - 1),
         (false, true) => {
@@ -500,8 +502,11 @@ fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ObjectsError
         }
         (false, false) => (0, size - 1),
     };
-    if first > last || last >= size {
+    if first >= last {
         return Err(ObjectsError::RangeHeaderInvalid);
+    }
+    if last >= size {
+        last = size - 1;
     }
     Ok((first, last))
 }
@@ -546,11 +551,16 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                 })
             })?;
             let BlobStatus::Complete { size } = status else {
-                // TODO: handle partial state if the range is in that
                 return Err(Rejection::from(BadRequest {
                     message: format!("object {} is not available", hash),
                 }));
             };
+            // Sanity check size
+            if size.is_zero() {
+                return Err(Rejection::from(BadRequest {
+                    message: format!("object {} has zero size", hash),
+                }));
+            }
 
             let ent = new_entangler(iroh).map_err(|e| {
                 Rejection::from(BadRequest {
@@ -561,7 +571,11 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
 
             let object_range = match range {
                 Some(range) => {
-                    let (first_byte, last_byte) = get_range_params(range, size).unwrap();
+                    let (first_byte, last_byte) = get_range_params(range, size).map_err(|e| {
+                        Rejection::from(BadRequest {
+                            message: e.to_string(),
+                        })
+                    })?;
                     let len = (last_byte - first_byte) + 1;
 
                     let first_chunk = first_byte / CHUNK_SIZE;
@@ -1264,5 +1278,37 @@ mod tests {
         let response = result.unwrap().into_response();
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(response.headers().get("Content-Length").unwrap(), "11");
+    }
+
+    #[test]
+    fn test_get_range_params() {
+        // bad formats
+        let _ = get_range_params("bytes=0,50".into(), 100).is_err();
+        let _ = get_range_params("bytes=-0-50".into(), 100).is_err();
+        let _ = get_range_params("bytes=-50-".into(), 100).is_err();
+        // first > last
+        let _ = get_range_params("bytes=50-0".into(), 100).is_err();
+        // first == last
+        let _ = get_range_params("bytes=0-0".into(), 100).is_err();
+        // exact range given
+        let (first, last) = get_range_params("bytes=0-50".into(), 100).unwrap();
+        assert_eq!(first, 0);
+        assert_eq!(last, 50);
+        // only end given, this means "give me last 50 bytes"
+        let (first, last) = get_range_params("bytes=-50".into(), 100).unwrap();
+        assert_eq!(first, 50);
+        assert_eq!(last, 99);
+        // only start given, this means "give me everything but the first 50 bytes"
+        let (first, last) = get_range_params("bytes=50-".into(), 100).unwrap();
+        assert_eq!(first, 50);
+        assert_eq!(last, 99);
+        // neither given, this means "give me everything"
+        let (first, last) = get_range_params("bytes=-".into(), 100).unwrap();
+        assert_eq!(first, 0);
+        assert_eq!(last, 99);
+        // last >= size
+        let (first, last) = get_range_params("bytes=50-100".into(), 100).unwrap();
+        assert_eq!(first, 50);
+        assert_eq!(last, 99);
     }
 }

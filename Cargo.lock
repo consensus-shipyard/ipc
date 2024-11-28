@@ -2507,7 +2507,7 @@ dependencies = [
 [[package]]
 name = "entangler"
 version = "0.1.0"
-source = "git+ssh://git@github.com/hokunet/entanglement.git?rev=dc93353e97a438a800a4a22ed46fe75e77eca200#dc93353e97a438a800a4a22ed46fe75e77eca200"
+source = "git+ssh://git@github.com/hokunet/entanglement.git?rev=fbc33c4cc8f183825fc920a40ab09e90d1a647e3#fbc33c4cc8f183825fc920a40ab09e90d1a647e3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3133,6 +3133,7 @@ dependencies = [
  "anyhow",
  "blake3",
  "data-encoding",
+ "fendermint_actor_machine",
  "fil_actors_runtime",
  "frc42_dispatch",
  "fvm_ipld_encoding",
@@ -3242,6 +3243,7 @@ dependencies = [
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
  "fvm_shared",
+ "num-traits",
  "serde",
  "serde_tuple",
 ]
@@ -3275,6 +3277,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid",
+ "fendermint_actor_blobs_shared",
  "fendermint_actor_machine",
  "fil_actors_runtime",
  "frc42_dispatch",
@@ -11043,7 +11046,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 [[package]]
 name = "storage"
 version = "0.1.0"
-source = "git+ssh://git@github.com/hokunet/entanglement.git?rev=dc93353e97a438a800a4a22ed46fe75e77eca200#dc93353e97a438a800a4a22ed46fe75e77eca200"
+source = "git+ssh://git@github.com/hokunet/entanglement.git?rev=fbc33c4cc8f183825fc920a40ab09e90d1a647e3#fbc33c4cc8f183825fc920a40ab09e90d1a647e3"
 dependencies = [
  "anyhow",
  "async-trait",
