@@ -48,7 +48,6 @@ library GatewayFacetsHelper {
         return facet;
     }
 
-    //
     function ownership(GatewayDiamond gw) internal pure returns (OwnershipFacet) {
         OwnershipFacet facet = OwnershipFacet(address(gw));
         return facet;
