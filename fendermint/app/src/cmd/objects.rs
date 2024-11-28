@@ -599,11 +599,17 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
 
                     let bytes_stream = bytes_stream.enumerate().map(move |(i, chunk)| {
                         let chunk = chunk?;
-                        let result = if i == 0 {
+                        let result = if first_chunk == last_chunk {
+                            // Single chunk case - slice with both offsets
+                            chunk.slice(offset..end_offset)
+                        } else if i == 0 {
+                            // First of multiple chunks
                             chunk.slice(offset..)
                         } else if i == (last_chunk - first_chunk) as usize {
+                            // Last of multiple chunks
                             chunk.slice(..end_offset)
                         } else {
+                            // Middle chunks
                             chunk
                         };
                         Ok::<_, anyhow::Error>(result)
