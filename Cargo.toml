@@ -80,8 +80,8 @@ data-encoding = { version = "2.3.3" }
 dirs = "5.0"
 dircpy = "0.3.19"
 either = "1.10"
-entangler = { git = "ssh://git@github.com/hokunet/entanglement.git", rev = "7119617e0778472c5f490b5ee5763203fe356633" }
-entangler_storage = { package = "storage", git = "ssh://git@github.com/hokunet/entanglement.git", rev = "7119617e0778472c5f490b5ee5763203fe356633" }
+entangler = { git = "ssh://git@github.com/hokunet/entanglement.git", rev = "fbc33c4cc8f183825fc920a40ab09e90d1a647e3" }
+entangler_storage = { package = "storage", git = "ssh://git@github.com/hokunet/entanglement.git", rev = "fbc33c4cc8f183825fc920a40ab09e90d1a647e3" }
 env_logger = "0.10"
 erased-serde = "0.3"
 ethers = { version = "2.0.13", features = ["abigen", "ws"] }
