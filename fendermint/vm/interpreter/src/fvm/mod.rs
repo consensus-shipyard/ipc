@@ -15,12 +15,13 @@ pub mod upgrades;
 #[cfg(any(test, feature = "bundle"))]
 pub mod bundle;
 
+pub mod activity;
 pub(crate) mod gas;
 pub(crate) mod topdown;
 
 pub use check::FvmCheckRet;
 pub use checkpoint::PowerUpdates;
-pub use exec::FvmApplyRet;
+pub use exec::{EndBlockOutput, FvmApplyRet};
 use fendermint_crypto::{PublicKey, SecretKey};
 pub use fendermint_vm_message::query::FvmQuery;
 use fvm_ipld_blockstore::Blockstore;

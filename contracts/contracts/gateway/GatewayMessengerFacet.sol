@@ -26,12 +26,13 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
 
     /**
      * @dev Sends a general-purpose cross-message from the local subnet to the destination subnet.
-     * Any value in msg.value will be forwarded in the call.
+     * IMPORTANT: Native tokens via msg.value are treated as a contribution toward gas costs associated with message propagation.
+     * There is no strict enforcement of the exact gas cost, and any msg.value provided will be accepted.
      *
      * IMPORTANT: Only smart contracts are allowed to trigger these cross-net messages. User wallets can send funds
      * from their address to the destination subnet and then run the transaction in the destination normally.
      *
-     * @param envelope - the original envelope, which will be validated, stamped and committed during the send.
+     * @param envelope - the original envelope, which will be validated, stamped, and committed during the send.
      * @return committed envelope.
      */
     function sendContractXnetMessage(
@@ -46,10 +47,6 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
             revert InvalidXnetMessage(InvalidXnetMessageReason.Sender);
         }
 
-        if (envelope.value != msg.value) {
-            revert InvalidXnetMessage(InvalidXnetMessageReason.Value);
-        }
-
         if (envelope.kind != IpcMsgKind.Call) {
             revert InvalidXnetMessage(InvalidXnetMessageReason.Kind);
         }
@@ -61,7 +58,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
             kind: IpcMsgKind.Call,
             from: IPCAddress({subnetId: s.networkName, rawAddress: FvmAddressHelper.from(msg.sender)}),
             to: envelope.to,
-            value: msg.value,
+            value: envelope.value,
             message: envelope.message,
             nonce: 0 // nonce will be updated by LibGateway.commitCrossMessage
         });

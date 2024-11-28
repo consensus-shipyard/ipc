@@ -14,8 +14,10 @@ import {NotRegisteredSubnet, SubnetNotActive, SubnetNotFound, InvalidSubnet, Che
 import {BatchNotCreated, InvalidBatchEpoch, BatchAlreadyExists, NotEnoughSubnetCircSupply, InvalidCheckpointEpoch} from "../../errors/IPCErrors.sol";
 
 import {CrossMsgHelper} from "../../lib/CrossMsgHelper.sol";
-import {IpcEnvelope, SubnetID} from "../../structs/CrossNet.sol";
+import {IpcEnvelope, SubnetID, IpcMsgKind} from "../../structs/CrossNet.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
+
+import {ActivityRollupRecorded, FullActivityRollup} from "../../structs/Activity.sol";
 
 contract CheckpointingFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
@@ -52,10 +54,12 @@ contract CheckpointingFacet is GatewayActorModifiers {
     /// @param checkpoint - a bottom-up checkpoint
     /// @param membershipRootHash - a root hash of the Merkle tree built from the validator public keys and their weight
     /// @param membershipWeight - the total weight of the membership
+    /// @param activity - the full activity rollup
     function createBottomUpCheckpoint(
         BottomUpCheckpoint calldata checkpoint,
         bytes32 membershipRootHash,
-        uint256 membershipWeight
+        uint256 membershipWeight,
+        FullActivityRollup calldata activity
     ) external systemActorOnly {
         if (LibGateway.bottomUpCheckpointExists(checkpoint.blockHeight)) {
             revert CheckpointAlreadyExists();
@@ -69,7 +73,10 @@ contract CheckpointingFacet is GatewayActorModifiers {
             membershipWeight: membershipWeight,
             majorityPercentage: s.majorityPercentage
         });
+
         LibGateway.storeBottomUpCheckpoint(checkpoint);
+
+        emit ActivityRollupRecorded(uint64(checkpoint.blockHeight), activity);
     }
 
     /// @notice Set a new checkpoint retention height and garbage collect all checkpoints in range [`retentionHeight`, `newRetentionHeight`)
@@ -127,7 +134,9 @@ contract CheckpointingFacet is GatewayActorModifiers {
         uint256 crossMsgLength = msgs.length;
 
         for (uint256 i; i < crossMsgLength; ) {
-            totalValue += msgs[i].value;
+            if (msgs[i].kind == IpcMsgKind.Transfer) {
+                totalValue += msgs[i].value;
+            }
             unchecked {
                 ++i;
             }

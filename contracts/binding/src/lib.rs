@@ -30,6 +30,8 @@ pub mod ownership_facet;
 #[allow(clippy::all)]
 pub mod register_subnet_facet;
 #[allow(clippy::all)]
+pub mod subnet_actor_activity_facet;
+#[allow(clippy::all)]
 pub mod subnet_actor_checkpointing_facet;
 #[allow(clippy::all)]
 pub mod subnet_actor_diamond;
@@ -58,6 +60,7 @@ fvm_address_conversion!(gateway_messenger_facet);
 fvm_address_conversion!(subnet_actor_checkpointing_facet);
 fvm_address_conversion!(subnet_actor_getter_facet);
 fvm_address_conversion!(lib_gateway);
+fvm_address_conversion!(checkpointing_facet);
 
 // The list of contracts that need to convert common types between each other
 common_type_conversion!(subnet_actor_getter_facet, checkpointing_facet);
