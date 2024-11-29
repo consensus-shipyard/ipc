@@ -1,10 +1,9 @@
 import { task } from 'hardhat/config'
 import { HardhatRuntimeEnvironment, TaskArguments } from 'hardhat/types'
 import { Deployments } from './lib'
-import { artifacts } from 'hardhat'
 
 // step 1. deploy the cross network messenger util contract
-// sample command: pnpm exec hardhat cross-network-messenger-deploy --network calibrationnet
+// sample command: pnpm exec hardhat cross-network-messenger-deploy --network calibrationnet <SUBNET ETH ADDRESS>
 task('cross-network-messenger-deploy')
     .addPositionalParam('subnetAddress', 'the address of the subnet actor contract')
     .setDescription('Deploy example cross network messenger util contract')
@@ -17,9 +16,14 @@ task('cross-network-messenger-deploy')
             `Deploying cross network messenger contract with account: ${deployer} and balance: ${hre.ethers.utils.formatEther(balance.toString())}`,
         )
 
+        const artifact = await hre.artifacts.readArtifact("SubnetActorGetterFacet")
+        const contract = new hre.ethers.Contract(args.subnetAddress, artifact.abi, hre.ethers.provider);
+        const gateway = await contract.ipcGatewayAddr();
+        console.log("queried ipc gateway", gateway);
+
         await Deployments.deploy(hre, deployer, {
             name: 'CrossMessengeCaller',
-            args: [args.subnetAddress],
+            args: [args.subnetAddress, gateway],
             libraries: ['SubnetIDHelper'],
         })
     })
