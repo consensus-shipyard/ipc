@@ -9,6 +9,7 @@ use async_trait::async_trait;
 use cid::Cid;
 use fendermint_abci::util::take_until_max_size;
 use fendermint_abci::{AbciResult, Application};
+use fendermint_crypto::PublicKey;
 use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
 };
@@ -46,14 +47,13 @@ use tendermint::consensus::params::{
     Params as TendermintConsensusParams, ValidatorParams as TendermintValidatorParams,
 };
 use tendermint::evidence::{Duration as TendermintDuration, Params as TendermintEvidenceParams};
-
 use tracing::instrument;
 
 use crate::observe::{
     BlockCommitted, BlockProposalEvaluated, BlockProposalReceived, BlockProposalSent, Message,
     MpoolReceived,
 };
-use crate::validators::ValidatorTracker;
+use crate::validators::ValidatorCache;
 use crate::AppExitCode;
 use crate::BlockHeight;
 use crate::{tmconv::*, VERSION};
@@ -186,8 +186,8 @@ where
     ///
     /// Zero means unlimited.
     state_hist_size: u64,
-    /// Tracks the validator
-    validators: ValidatorTracker,
+    /// Caches the validators.
+    validators_cache: Arc<tokio::sync::Mutex<Option<ValidatorCache>>>,
 }
 
 impl<DB, SS, S, I> App<DB, SS, S, I>
@@ -221,7 +221,7 @@ where
             snapshots,
             exec_state: Arc::new(tokio::sync::Mutex::new(None)),
             check_state: Arc::new(tokio::sync::Mutex::new(None)),
-            validators: ValidatorTracker::new(),
+            validators_cache: Arc::new(tokio::sync::Mutex::new(None)),
         };
         app.init_committed_state()?;
         Ok(app)
@@ -433,6 +433,37 @@ where
             _ => Err(anyhow!("invalid app state json")),
         }
     }
+
+    /// Replaces the current validators cache with a new one.
+    async fn replace_validators_cache(&self) -> Result<()> {
+        let mut state = self
+            .read_only_view(None)?
+            .ok_or_else(|| anyhow!("exec state should be present"))?;
+
+        let mut cache = self.validators_cache.lock().await;
+        *cache = Some(ValidatorCache::new_from_state(&mut state)?);
+        Ok(())
+    }
+
+    /// Retrieves a validator from the cache, initializing it if necessary.
+    async fn get_validator_from_cache(&self, id: &tendermint::account::Id) -> Result<PublicKey> {
+        let mut cache = self.validators_cache.lock().await;
+
+        // If cache is not initialized, update it from the state
+        if cache.is_none() {
+            let mut state = self
+                .read_only_view(None)?
+                .ok_or_else(|| anyhow!("exec state should be present"))?;
+
+            *cache = Some(ValidatorCache::new_from_state(&mut state)?);
+        }
+
+        // Retrieve the validator from the cache
+        cache
+            .as_ref()
+            .context("Validator cache is not available")?
+            .get_validator(id)
+    }
 }
 
 // NOTE: The `Application` interface doesn't allow failures at the moment. The protobuf
@@ -499,11 +530,6 @@ where
         tracing::info!(genesis_hash = genesis_hash.to_string(), "genesis");
 
         let (validators, state_params) = read_genesis_car(genesis_bytes, &self.state_store).await?;
-
-        let validators_keys = validators.iter().map(|v| v.public_key.clone()).collect();
-
-        // Set the initial validator set to validators cache.
-        self.validators.set_validators(validators_keys)?;
 
         let validators =
             to_validator_updates(validators).context("failed to convert validators")?;
@@ -774,8 +800,8 @@ where
         state_params.timestamp = to_timestamp(request.header.time);
 
         let validator = self
-            .validators
-            .get_public_key(&request.header.proposer_address)?;
+            .get_validator_from_cache(&request.header.proposer_address)
+            .await?;
 
         let state = FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
             .context("error creating new state")?
@@ -848,7 +874,10 @@ where
         let validator_updates =
             to_validator_updates(power_updates.0).context("failed to convert validator updates")?;
 
-        self.validators.set_validators(current_validators)?;
+        // Replace the validator cache if the validator set has changed.
+        if !validator_updates.is_empty() {
+            self.replace_validators_cache().await?;
+        }
 
         let consensus_param_updates = self
             .update_block_gas_limit(new_block_gas_limit as i64)

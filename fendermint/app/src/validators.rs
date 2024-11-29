@@ -3,53 +3,50 @@
 
 //! Tracks the validator ID from Tendermint to their corresponding public key.
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Ok, Result};
 use fendermint_crypto::PublicKey;
-use fendermint_vm_genesis::ValidatorKey;
+use fendermint_vm_genesis::{Power, Validator};
+use fendermint_vm_interpreter::fvm::state::ipc::GatewayCaller;
+use fendermint_vm_interpreter::fvm::state::FvmExecState;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+
+use tendermint::account::Id as TendermintId;
+use tendermint::PublicKey as TendermintPubKey;
+
+use fvm_ipld_blockstore::Blockstore;
 
 #[derive(Clone)]
-pub(crate) struct ValidatorTracker {
-    validator_mapping: Arc<RwLock<HashMap<tendermint::account::Id, PublicKey>>>,
+pub(crate) struct ValidatorCache {
+    map: HashMap<TendermintId, PublicKey>,
 }
 
-impl ValidatorTracker {
-    pub fn new() -> Self {
-        Self {
-            validator_mapping: Arc::new(RwLock::new(HashMap::new())),
-        }
+impl ValidatorCache {
+    pub fn new_from_state<SS>(state: &mut FvmExecState<SS>) -> Result<Self>
+    where
+        SS: Blockstore + Clone + 'static,
+    {
+        let gateway = GatewayCaller::default();
+        let (_, validators) = gateway.current_power_table(state)?;
+
+        let map = validators
+            .iter()
+            .map(validator_to_map_entry)
+            .collect::<Result<HashMap<_, _>, _>>()?;
+
+        Ok(Self { map })
     }
 
-    /// Get the public key of the validator by ID.
-    /// Note that the ID is expected to be a validator.
-    pub fn get_public_key(&self, id: &tendermint::account::Id) -> Result<PublicKey> {
-        let keys = self
-            .validator_mapping
-            .read()
-            .map_err(|_| anyhow!("Failed to acquire read lock"))?;
-
-        keys.get(id)
-            .copied()
-            .ok_or_else(|| anyhow!("Validator not found: {:?}", id))
+    pub fn get_validator(&self, id: &tendermint::account::Id) -> Result<PublicKey> {
+        self.map
+            .get(id)
+            .cloned()
+            .ok_or_else(|| anyhow!("validator not found"))
     }
+}
 
-    /// Sets the validator keys mapping.
-    pub fn set_validators(&self, validators: Vec<ValidatorKey>) -> Result<()> {
-        let mut cache = self
-            .validator_mapping
-            .write()
-            .map_err(|_| anyhow!("Failed to acquire write lock to update validators"))?;
-
-        cache.clear();
-
-        validators.into_iter().try_for_each(|validator_key| {
-            let tendermint_pub_key = tendermint::PublicKey::try_from(validator_key.clone())
-                .map_err(|_| anyhow!("Failed to convert ValidatorKey to Tendermint public key"))?;
-
-            let tendermint_id = tendermint::account::Id::from(tendermint_pub_key);
-            cache.insert(tendermint_id, *validator_key.public_key());
-            Ok(())
-        })
-    }
+fn validator_to_map_entry(v: &Validator<Power>) -> Result<(TendermintId, PublicKey)> {
+    let tendermint_pub_key: TendermintPubKey = TendermintPubKey::try_from(v.public_key.clone())?;
+    let id = TendermintId::from(tendermint_pub_key);
+    let key = *v.public_key.public_key();
+    Ok((id, key))
 }
