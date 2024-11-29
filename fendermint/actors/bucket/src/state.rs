@@ -16,7 +16,7 @@ use fvm_shared::address::Address;
 use serde::{Deserialize, Serialize};
 
 const BIT_WIDTH: u32 = 8;
-const MAX_LIST_LIMIT: usize = 100;
+const MAX_LIST_LIMIT: usize = 50;
 
 fn state_error(e: fvm_ipld_hamt::Error) -> ActorError {
     ActorError::illegal_state(e.to_string())
@@ -162,10 +162,10 @@ impl State {
         store: &BS,
         prefix: Vec<u8>,
         delimiter: Vec<u8>,
-        offset: u64,
+        start_key: Option<&BytesKey>,
         limit: u64,
         mut collector: F,
-    ) -> anyhow::Result<(Vec<Vec<u8>>, bool), ActorError>
+    ) -> anyhow::Result<(Vec<Vec<u8>>, Option<BytesKey>), ActorError>
     where
         F: FnMut(Vec<u8>, ObjectState) -> anyhow::Result<(), ActorError>,
     {
@@ -177,45 +177,32 @@ impl State {
         } else {
             (limit as usize).min(MAX_LIST_LIMIT)
         };
-        let mut count = 0;
-        let mut collected: usize = 0;
-        let mut has_more = false;
 
-        for pair in &hamt {
-            if collected == MAX_LIST_LIMIT {
-                has_more = true;
-                break;
-            }
-
-            if collected >= limit {
-                break;
-            }
-
-            let (k, v) = pair.map_err(state_error)?;
-            let key = k.0.clone();
-            if !prefix.is_empty() && !key.starts_with(&prefix) {
-                continue;
-            }
-            if !delimiter.is_empty() {
-                let utf8_prefix = String::from_utf8(prefix.clone()).map_err(utf8_error)?;
-                let prefix_length = utf8_prefix.len();
-                let utf8_key = String::from_utf8(key.clone()).map_err(utf8_error)?;
-                let utf8_delimiter = String::from_utf8(delimiter.clone()).map_err(utf8_error)?;
-                if let Some(index) = utf8_key[prefix_length..].find(&utf8_delimiter) {
-                    let subset = utf8_key[..=(index + prefix_length)].as_bytes().to_owned();
-                    common_prefixes.insert(subset);
-                    continue;
+        let (_, next_key) = hamt
+            .for_each_ranged(start_key, Some(limit), |k, v| {
+                let key = k.0.clone();
+                if !prefix.is_empty() && !key.starts_with(&prefix) {
+                    return Ok(());
                 }
-            }
-            count += 1;
-            if count <= offset {
-                continue;
-            }
-            collector(key, v.to_owned())?;
-            collected += 1;
-        }
+                if !delimiter.is_empty() {
+                    let utf8_prefix = String::from_utf8(prefix.clone()).map_err(utf8_error)?;
+                    let prefix_length = utf8_prefix.len();
+                    let utf8_key = String::from_utf8(key.clone()).map_err(utf8_error)?;
+                    let utf8_delimiter =
+                        String::from_utf8(delimiter.clone()).map_err(utf8_error)?;
+                    if let Some(index) = utf8_key[prefix_length..].find(&utf8_delimiter) {
+                        let subset = utf8_key[..=(index + prefix_length)].as_bytes().to_owned();
+                        common_prefixes.insert(subset);
+                        return Ok(());
+                    }
+                }
+                collector(key, v.to_owned())?;
+                Ok(())
+            })
+            .map_err(state_error)?;
+
         let common_prefixes = common_prefixes.into_iter().collect();
-        Ok((common_prefixes, has_more))
+        Ok((common_prefixes, next_key))
     }
 }
 
@@ -293,22 +280,23 @@ mod tests {
         store: &BS,
         prefix: Vec<u8>,
         delimiter: Vec<u8>,
-        offset: u64,
+        start_key: Option<&BytesKey>,
         limit: u64,
-    ) -> anyhow::Result<(Vec<(Vec<u8>, ObjectState)>, Vec<Vec<u8>>, bool), ActorError> {
+    ) -> anyhow::Result<(Vec<(Vec<u8>, ObjectState)>, Vec<Vec<u8>>, Option<BytesKey>), ActorError>
+    {
         let mut objects = Vec::new();
-        let (prefixes, has_more) = state.list(
+        let (prefixes, next_key) = state.list(
             store,
             prefix,
             delimiter,
-            offset,
+            start_key,
             limit,
             |key: Vec<u8>, object: ObjectState| -> anyhow::Result<(), ActorError> {
                 objects.push((key, object));
                 Ok(())
             },
         )?;
-        Ok((objects, prefixes, has_more))
+        Ok((objects, prefixes, next_key))
     }
 
     #[test]
@@ -434,12 +422,12 @@ mod tests {
         let (baz_key, _, _) = create_and_put_objects(&mut state, &store).unwrap();
 
         // List all keys with a limit
-        let result = list(&state, &store, vec![], vec![], 0, 0);
+        let result = list(&state, &store, vec![], vec![], None, 0);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.0.len(), 4);
         assert_eq!(result.0.first(), Some(&(baz_key.0, object_one())));
-        assert!(!result.2);
+        assert_eq!(result.2, None);
     }
 
     #[test]
@@ -462,18 +450,20 @@ mod tests {
         }
 
         // List all keys but has more
-        let result = list(&state, &store, vec![], vec![], 0, 0);
+        let result = list(&state, &store, vec![], vec![], None, 0);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.0.len(), MAX_LIST_LIMIT);
-        assert!(result.2);
+        assert_eq!(result.2, Some(BytesKey::from("17.txt")));
+
+        let next_key = result.2.unwrap();
 
         // List remaining objects
-        let result = list(&state, &store, vec![], vec![], result.0.len() as u64, 0);
+        let result = list(&state, &store, vec![], vec![], Some(&next_key), 0);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.0.len(), 10);
-        assert!(!result.2);
+        assert_eq!(result.2, None);
     }
 
     #[test]
@@ -496,11 +486,11 @@ mod tests {
         }
 
         // List all keys
-        let result = list(&state, &store, vec![], vec![], 0, 0);
+        let result = list(&state, &store, vec![], vec![], None, 0);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.0.len(), MAX_LIST_LIMIT);
-        assert!(!result.2);
+        assert_eq!(result.2, None);
     }
 
     #[test]
@@ -517,7 +507,7 @@ mod tests {
         let (baz_key, bar_key, _) = create_and_put_objects(&mut state, &store).unwrap();
 
         let foo_key = BytesKey("foo".as_bytes().to_vec());
-        let result = list(&state, &store, foo_key.0.clone(), vec![], 0, 0);
+        let result = list(&state, &store, foo_key.0.clone(), vec![], None, 0);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.0.len(), 3);
@@ -546,8 +536,8 @@ mod tests {
             &store,
             foo_key.0.clone(),
             delimiter_key.0.clone(),
-            0,
-            3,
+            None,
+            4,
         );
         assert!(result.is_ok());
         let result = result.unwrap();
@@ -609,7 +599,7 @@ mod tests {
             &store,
             bin_key.0.clone(),
             delimiter_key.0.clone(),
-            0,
+            None,
             0,
         );
         assert!(result.is_ok());
@@ -620,7 +610,7 @@ mod tests {
     }
 
     #[test]
-    fn test_list_with_offset_and_limit() {
+    fn test_list_with_start_key_and_limit() {
         let store = MemoryBlockstore::default();
         let mut state = State::new(
             &store,
@@ -632,17 +622,17 @@ mod tests {
 
         let (_, bar_key, _) = create_and_put_objects(&mut state, &store).unwrap();
 
-        // List all keys with a limit and offset
-        let result = list(&state, &store, vec![], vec![], 1, 1);
+        // List all keys with a limit and start key
+        let result = list(&state, &store, vec![], vec![], Some(&bar_key), 1);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.0.len(), 1);
-        // Note that baz is listed first in order, so an offset of 1 will return bar
+        // Note that baz is listed first in order
         assert_eq!(result.0.first(), Some(&(bar_key.0, object_two())));
     }
 
     #[test]
-    fn test_list_with_prefix_delimiter_and_offset_and_limit() {
+    fn test_list_with_prefix_delimiter_and_start_key_and_limit() {
         let store = MemoryBlockstore::default();
         let mut state = State::new(
             &store,
@@ -675,17 +665,17 @@ mod tests {
             )
             .unwrap();
 
-        // List all keys with a limit and offset
+        // List all keys with a limit and start key
         let result = list(
             &state,
             &store,
             "hello/".as_bytes().to_vec(),
             "/".as_bytes().to_vec(),
-            2,
+            Some(&two),
             0,
         );
         assert!(result.is_ok());
         let result = result.unwrap();
-        assert_eq!(result.0.len(), 0);
+        assert_eq!(result.0.len(), 1);
     }
 }

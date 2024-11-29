@@ -73,8 +73,8 @@ pub struct ListParams {
     /// The delimiter used to define object hierarchy.
     #[serde(with = "strict_bytes")]
     pub delimiter: Vec<u8>,
-    /// The offset to start listing objects from.
-    pub offset: u64,
+    /// The key to start listing objects from.
+    pub start_key: Option<Vec<u8>>,
     /// The maximum number of objects to list.
     pub limit: u64,
 }
@@ -101,6 +101,6 @@ pub struct ListObjectsReturn {
     pub objects: Vec<(Vec<u8>, Option<Object>)>,
     /// When a delimiter is used in the list query, this contains common key prefixes.
     pub common_prefixes: Vec<Vec<u8>>,
-    /// True when there are more objects to list.
-    pub has_more: bool,
+    /// Next key to use for paginating when there are more objects to list.
+    pub next_key: Option<Vec<u8>>,
 }
