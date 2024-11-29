@@ -16,10 +16,10 @@ task('cross-network-messenger-deploy')
             `Deploying cross network messenger contract with account: ${deployer} and balance: ${hre.ethers.utils.formatEther(balance.toString())}`,
         )
 
-        const artifact = await hre.artifacts.readArtifact("SubnetActorGetterFacet")
-        const contract = new hre.ethers.Contract(args.subnetAddress, artifact.abi, hre.ethers.provider);
-        const gateway = await contract.ipcGatewayAddr();
-        console.log("queried ipc gateway", gateway);
+        const artifact = await hre.artifacts.readArtifact('SubnetActorGetterFacet')
+        const contract = new hre.ethers.Contract(args.subnetAddress, artifact.abi, hre.ethers.provider)
+        const gateway = await contract.ipcGatewayAddr()
+        console.log('queried ipc gateway', gateway)
 
         await Deployments.deploy(hre, deployer, {
             name: 'CrossMessengerCaller',
@@ -54,20 +54,20 @@ task('cross-network-send')
 // sample command: pnpm exec hardhat cross-network-scan --network calibrationnet
 task('cross-network-scan')
     .setDescription('Scan cross network send in the target subnet')
-.setAction(async (args: TaskArguments, hre: HardhatRuntimeEnvironment) => {
-    await hre.run('compile')
+    .setAction(async (args: TaskArguments, hre: HardhatRuntimeEnvironment) => {
+        await hre.run('compile')
 
-    const subnetId = { root: args.root, route: args.route.split(',') }
-    console.log('sending to subnet', subnetId)
+        const subnetId = { root: args.root, route: args.route.split(',') }
+        console.log('sending to subnet', subnetId)
 
-    const amount = hre.ethers.utils.parseEther(args.value)
-    console.log('sending to address', args.recipient, 'with amount', amount)
+        const amount = hre.ethers.utils.parseEther(args.value)
+        console.log('sending to address', args.recipient, 'with amount', amount)
 
-    const contracts = await Deployments.resolve(hre, 'CrossMessengerCaller')
-    const contract = contracts.contracts.CrossMessengerCaller
-    const received = contract.filters.CallReceived()
-    const events = await contract.queryFilter(received)
-    for (const event of events) {
-        console.log(event);
-    }
-})
+        const contracts = await Deployments.resolve(hre, 'CrossMessengerCaller')
+        const contract = contracts.contracts.CrossMessengerCaller
+        const received = contract.filters.CallReceived()
+        const events = await contract.queryFilter(received)
+        for (const event of events) {
+            console.log(event)
+        }
+    })
