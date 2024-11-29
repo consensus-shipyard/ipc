@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use crate::fvm::state::ipc::GatewayCaller;
 use crate::fvm::store::ReadOnlyBlockstore;
-use crate::fvm::{topdown, BlockGasLimit, CurrentValidators, FvmApplyRet, PowerUpdates};
+use crate::fvm::{topdown, BlockGasLimit, FvmApplyRet, PowerUpdates};
 use crate::selector::{GasLimitSelector, MessageSelector};
 use crate::{
     fvm::state::FvmExecState,
@@ -246,7 +246,7 @@ where
         Message = VerifiableMessage,
         DeliverOutput = SignedMessageApplyRes,
         State = FvmExecState<DB>,
-        EndOutput = (PowerUpdates, BlockGasLimit, CurrentValidators),
+        EndOutput = (PowerUpdates, BlockGasLimit),
     >,
 {
     // The state consists of the resolver pool, which this interpreter needs, and the rest of the
