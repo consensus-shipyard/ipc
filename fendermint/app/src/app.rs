@@ -3,12 +3,21 @@
 use std::future::Future;
 use std::sync::Arc;
 
+use crate::observe::{
+    BlockCommitted, BlockProposalEvaluated, BlockProposalReceived, BlockProposalSent, Message,
+    MpoolReceived,
+};
+use crate::validators::ValidatorCache;
+use crate::AppExitCode;
+use crate::BlockHeight;
+use crate::{tmconv::*, VERSION};
 use anyhow::{anyhow, Context, Result};
 use async_stm::{atomically, atomically_or_err};
 use async_trait::async_trait;
 use cid::Cid;
 use fendermint_abci::util::take_until_max_size;
 use fendermint_abci::{AbciResult, Application};
+use fendermint_actors_api::gas_market::Reading;
 use fendermint_crypto::PublicKey;
 use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
@@ -42,21 +51,8 @@ use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
-use tendermint::block::Size as TendermintBlockSize;
-use tendermint::consensus::params::{
-    Params as TendermintConsensusParams, ValidatorParams as TendermintValidatorParams,
-};
-use tendermint::evidence::{Duration as TendermintDuration, Params as TendermintEvidenceParams};
+use tendermint::consensus::params::Params as TendermintConsensusParams;
 use tracing::instrument;
-
-use crate::observe::{
-    BlockCommitted, BlockProposalEvaluated, BlockProposalReceived, BlockProposalSent, Message,
-    MpoolReceived,
-};
-use crate::validators::ValidatorCache;
-use crate::AppExitCode;
-use crate::BlockHeight;
-use crate::{tmconv::*, VERSION};
 #[derive(Serialize)]
 #[repr(u8)]
 pub enum AppStoreKey {
@@ -87,7 +83,7 @@ pub struct AppState {
     /// Last committed version of the evolving state of the FVM.
     state_params: FvmStateParams,
     /// Tendermint consensus params.
-    consensus_params: TendermintConsensusParams,
+    consensus_params: Option<TendermintConsensusParams>,
 }
 
 impl AppState {
@@ -107,25 +103,6 @@ impl AppState {
     /// so the height of the state itself as a "post-state" is one higher than the block which we executed to create it.
     pub fn state_height(&self) -> BlockHeight {
         self.block_height + 1
-    }
-}
-
-fn default_consensus_params() -> TendermintConsensusParams {
-    TendermintConsensusParams {
-        block: TendermintBlockSize {
-            max_bytes: 0,
-            max_gas: 0,
-            time_iota_ms: 0,
-        },
-        evidence: TendermintEvidenceParams {
-            max_age_num_blocks: 0,
-            max_age_duration: TendermintDuration(core::time::Duration::ZERO),
-            max_bytes: 0,
-        },
-        validator: TendermintValidatorParams {
-            pub_key_types: vec![],
-        },
-        version: None,
     }
 }
 
@@ -263,7 +240,7 @@ where
                     power_scale: 0,
                     app_version: 0,
                 },
-                consensus_params: default_consensus_params(),
+                consensus_params: None,
             };
             self.set_committed_state(state)?;
         }
@@ -313,21 +290,28 @@ where
             .context("commit failed")
     }
 
-    /// Update the consensus params block gas limit. Return the updated params if changed.
-    fn update_block_gas_limit(
+    /// Diff our current consensus params with new values, and return Some with the final params
+    /// if they differ (and therefore a consensus layer update is necessary).
+    fn maybe_update_app_state(
         &self,
-        new_block_gas_limit: i64,
+        gas_market: &Reading,
     ) -> Result<Option<TendermintConsensusParams>> {
         let mut state = self.committed_state()?;
-        if state.consensus_params.block.max_gas != new_block_gas_limit {
-            state.consensus_params.block.max_gas = new_block_gas_limit;
-            let updated_params = state.consensus_params.clone();
+        let current = state
+            .consensus_params
+            .ok_or_else(|| anyhow!("no current consensus params in state"))?;
 
-            self.set_committed_state(state)?;
-            Ok(Some(updated_params))
-        } else {
-            Ok(None)
+        if current.block.max_gas == gas_market.block_gas_limit as i64 {
+            return Ok(None); // No update necessary.
         }
+
+        // Proceeding with update.
+        let mut updated = current;
+        updated.block.max_gas = gas_market.block_gas_limit as i64;
+        state.consensus_params = Some(updated.clone());
+        self.set_committed_state(state)?;
+
+        Ok(Some(updated))
     }
 
     /// Put the execution state during block execution. Has to be empty.
@@ -552,11 +536,11 @@ where
             block_height: height,
             oldest_state_height: height,
             state_params,
-            consensus_params: request.consensus_params,
+            consensus_params: Some(request.consensus_params),
         };
 
         let response = response::InitChain {
-            consensus_params: None,
+            consensus_params: None, // not updating the proposed consensus params
             validators,
             app_hash: app_state.app_hash(),
         };
@@ -863,7 +847,7 @@ where
         // End the interpreter for this block.
         let EndBlockOutput {
             power_updates,
-            block_gas_limit: new_block_gas_limit,
+            gas_market,
             events,
         } = self
             .modify_exec_state(|s| self.interpreter.end(s))
@@ -879,8 +863,9 @@ where
             self.replace_validators_cache().await?;
         }
 
+        // Maybe update the app state with the new block gas limit.
         let consensus_param_updates = self
-            .update_block_gas_limit(new_block_gas_limit as i64)
+            .maybe_update_app_state(&gas_market)
             .context("failed to update block gas limit")?;
 
         let ret = response::EndBlock {
