@@ -2,6 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {BottomUpCheckpoint, BottomUpMsgBatch, IpcEnvelope, ParentFinality} from "../structs/CrossNet.sol";
+import {FullActivityRollup} from "../structs/Activity.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 
@@ -71,6 +72,7 @@ interface IGateway {
     function createBottomUpCheckpoint(
         BottomUpCheckpoint calldata checkpoint,
         bytes32 membershipRootHash,
-        uint256 membershipWeight
+        uint256 membershipWeight,
+        FullActivityRollup calldata activity
     ) external;
 }

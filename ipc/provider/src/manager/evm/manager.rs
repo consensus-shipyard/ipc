@@ -10,8 +10,8 @@ use ethers_contract::{ContractError, EthLogDecode, LogMeta};
 use ipc_actors_abis::{
     checkpointing_facet, gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
     lib_gateway, lib_quorum, lib_staking_change_log, register_subnet_facet,
-    subnet_actor_checkpointing_facet, subnet_actor_getter_facet, subnet_actor_manager_facet,
-    subnet_actor_reward_facet,
+    subnet_actor_activity_facet, subnet_actor_checkpointing_facet, subnet_actor_getter_facet,
+    subnet_actor_manager_facet, subnet_actor_reward_facet,
 };
 use ipc_api::evm::{fil_to_eth_amount, payload_to_evm_address, subnet_id_to_evm_addresses};
 use ipc_api::validator::from_contract_validators;
@@ -27,7 +27,7 @@ use crate::config::Subnet;
 use crate::lotus::message::ipc::SubnetInfo;
 use crate::manager::subnet::{
     BottomUpCheckpointRelayer, GetBlockHashResult, SubnetGenesisInfo, TopDownFinalityQuery,
-    TopDownQueryPayload,
+    TopDownQueryPayload, ValidatorRewarder,
 };
 
 use crate::manager::{EthManager, SubnetManager};
@@ -37,20 +37,25 @@ use ethers::abi::Tokenizable;
 use ethers::contract::abigen;
 use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::{Signer, SignerMiddleware};
-use ethers::providers::{Authorization, Http, Middleware, Provider};
+use ethers::providers::{Authorization, Http, Provider};
 use ethers::signers::{LocalWallet, Wallet};
-use ethers::types::{Eip1559TransactionRequest, ValueOrArray, U256};
+use ethers::types::{Eip1559TransactionRequest, ValueOrArray, H256, U256};
 
 use super::gas_estimator_middleware::Eip1559GasEstimatorMiddleware;
+use ethers::middleware::Middleware;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
+use ipc_actors_abis::subnet_actor_activity_facet::ValidatorClaim;
 use ipc_api::checkpoint::{
-    BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent, Signature,
+    consensus::ValidatorData, BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent,
+    Signature, VALIDATOR_REWARD_FIELDS,
 };
 use ipc_api::cross::IpcEnvelope;
+use ipc_api::merkle::MerkleGen;
 use ipc_api::staking::{StakingChangeRequest, ValidatorInfo, ValidatorStakingInfo};
 use ipc_api::subnet::ConstructParams;
 use ipc_api::subnet_id::SubnetID;
+use ipc_observability::lazy_static;
 use ipc_wallet::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
 use num_traits::ToPrimitive;
 use std::result;
@@ -281,6 +286,7 @@ impl SubnetManager for EthSubnetManager {
             supply_source: register_subnet_facet::Asset::try_from(params.supply_source)?,
             collateral_source: register_subnet_facet::Asset::try_from(params.collateral_source)?,
             validator_gater: payload_to_evm_address(params.validator_gater.payload())?,
+            validator_rewarder: payload_to_evm_address(params.validator_rewarder.payload())?,
         };
 
         tracing::info!("creating subnet on evm with params: {params:?}");
@@ -1277,6 +1283,197 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
         Ok(epoch as ChainEpoch)
     }
 }
+
+lazy_static!(
+    /// ABI types of the Merkle tree which contains validator addresses and their committed block count.
+    pub static ref VALIDATOR_SUMMARY_FIELDS: Vec<String> = vec!["address".to_owned(), "uint64".to_owned()];
+);
+
+#[async_trait]
+impl ValidatorRewarder for EthSubnetManager {
+    /// Query validator claims, indexed by checkpoint height, to batch claim rewards.
+    async fn query_reward_claims(
+        &self,
+        validator_addr: &Address,
+        from_checkpoint: ChainEpoch,
+        to_checkpoint: ChainEpoch,
+    ) -> Result<Vec<(u64, ValidatorClaim)>> {
+        let contract = checkpointing_facet::CheckpointingFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+
+        let ev = contract
+            .event::<checkpointing_facet::ActivityRollupRecordedFilter>()
+            .from_block(from_checkpoint as u64)
+            .to_block(to_checkpoint as u64)
+            .address(ValueOrArray::Value(contract.address()));
+
+        let validator_eth_addr = payload_to_evm_address(validator_addr.payload())?;
+
+        let mut claims = vec![];
+        for (event, meta) in query_with_meta(ev, contract.client()).await? {
+            tracing::debug!(
+                "found activity bundle published at height: {}",
+                meta.block_number
+            );
+
+            // Check if we have claims for this validator in this block.
+            let our_data = event
+                .rollup
+                .consensus
+                .data
+                .iter()
+                .find(|v| v.validator == validator_eth_addr);
+
+            // If we don't, skip this block.
+            let Some(data) = our_data else {
+                tracing::info!(
+                    "target validator address has no reward claims in epoch {}",
+                    meta.block_number
+                );
+                continue;
+            };
+
+            let proof = gen_merkle_proof(&event.rollup.consensus.data, data)?;
+
+            // Construct the claim and add it to the list.
+            let claim = ValidatorClaim {
+                // Even though it's the same struct but still need to do a mapping due to
+                // different crate from ethers-rs
+                data: subnet_actor_activity_facet::ValidatorData {
+                    validator: data.validator,
+                    blocks_committed: data.blocks_committed,
+                },
+                proof: proof.into_iter().map(|v| v.into()).collect(),
+            };
+            claims.push((event.checkpoint_height, claim));
+        }
+
+        Ok(claims)
+    }
+
+    /// Query validator rewards in the current subnet, without obtaining proofs.
+    async fn query_validator_rewards(
+        &self,
+        validator_addr: &Address,
+        from_checkpoint: ChainEpoch,
+        to_checkpoint: ChainEpoch,
+    ) -> Result<Vec<(u64, ValidatorData)>> {
+        let contract = checkpointing_facet::CheckpointingFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+
+        let ev = contract
+            .event::<checkpointing_facet::ActivityRollupRecordedFilter>()
+            .from_block(from_checkpoint as u64)
+            .to_block(to_checkpoint as u64)
+            .address(ValueOrArray::Value(contract.address()));
+
+        let mut rewards = vec![];
+        let validator_eth_addr = payload_to_evm_address(validator_addr.payload())?;
+
+        for (event, meta) in query_with_meta(ev, contract.client()).await? {
+            tracing::debug!(
+                "found activity bundle published at height: {}",
+                meta.block_number
+            );
+
+            // Check if we have rewards for this validator in this block.
+            if let Some(data) = event
+                .rollup
+                .consensus
+                .data
+                .iter()
+                .find(|v| v.validator == validator_eth_addr)
+            {
+                // TODO type conversion.
+                let data = ValidatorData {
+                    validator: *validator_addr,
+                    blocks_committed: data.blocks_committed,
+                };
+                rewards.push((meta.block_number.as_u64(), data));
+            }
+        }
+
+        Ok(rewards)
+    }
+
+    /// Claim validator rewards in a batch for the specified subnet.
+    async fn batch_subnet_claim(
+        &self,
+        submitter: &Address,
+        reward_claim_subnet: &SubnetID,
+        reward_origin_subnet: &SubnetID,
+        claims: Vec<(u64, ValidatorClaim)>,
+    ) -> Result<()> {
+        let signer = Arc::new(self.get_signer_with_fee_estimator(submitter)?);
+        let contract = subnet_actor_activity_facet::SubnetActorActivityFacet::new(
+            contract_address_from_subnet(reward_claim_subnet)?,
+            signer.clone(),
+        );
+
+        // separate the Vec of tuples claims into two Vecs of Height and Claim
+        let (heights, claims): (Vec<u64>, Vec<ValidatorClaim>) = claims.into_iter().unzip();
+
+        let call = {
+            let call =
+                contract.batch_subnet_claim(reward_origin_subnet.try_into()?, heights, claims);
+            extend_call_with_pending_block(call).await?
+        };
+
+        call.send().await?;
+
+        Ok(())
+    }
+}
+
+fn gen_merkle_proof(
+    validator_data: &[checkpointing_facet::ValidatorData],
+    validator: &checkpointing_facet::ValidatorData,
+) -> anyhow::Result<Vec<H256>> {
+    // Utilty function to pack validator data into a vector of strings for proof generation.
+    let pack_validator_data = |v: &checkpointing_facet::ValidatorData| {
+        vec![format!("{:?}", v.validator), v.blocks_committed.to_string()]
+    };
+
+    let leaves = order_validator_data(validator_data)?;
+    let tree = MerkleGen::new(pack_validator_data, &leaves, &VALIDATOR_REWARD_FIELDS)?;
+
+    tree.get_proof(validator)
+}
+
+fn order_validator_data(
+    validator_data: &[checkpointing_facet::ValidatorData],
+) -> anyhow::Result<Vec<checkpointing_facet::ValidatorData>> {
+    let mut mapped = validator_data
+        .iter()
+        .map(|a| ethers_address_to_fil_address(&a.validator).map(|v| (v, a.blocks_committed)))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    mapped.sort_by(|a, b| {
+        let cmp = a.0.cmp(&b.0);
+        if cmp.is_eq() {
+            // Address will be unique, do this just in case equal
+            a.1.cmp(&b.1)
+        } else {
+            cmp
+        }
+    });
+
+    let back_to_eth = |(fvm_addr, blocks): (Address, u64)| {
+        payload_to_evm_address(fvm_addr.payload()).map(|v| checkpointing_facet::ValidatorData {
+            validator: v,
+            blocks_committed: blocks,
+        })
+    };
+    mapped
+        .into_iter()
+        .map(back_to_eth)
+        .collect::<Result<Vec<_>, _>>()
+}
+
 /// Takes a `FunctionCall` input and returns a new instance with an estimated optimal `gas_premium`.
 /// The function also uses the pending block number to help retrieve the latest nonce
 /// via `get_transaction_count` with the `pending` parameter.
@@ -1396,7 +1593,12 @@ impl TryFrom<gateway_getter_facet::Subnet> for SubnetInfo {
 #[cfg(test)]
 mod tests {
     use crate::manager::evm::manager::contract_address_from_subnet;
+    use ethers::core::rand::prelude::SliceRandom;
+    use ethers::core::rand::{random, thread_rng};
     use fvm_shared::address::Address;
+    use ipc_actors_abis::checkpointing_facet::{checkpointing_facet, ValidatorData};
+    use ipc_api::checkpoint::VALIDATOR_REWARD_FIELDS;
+    use ipc_api::merkle::MerkleGen;
     use ipc_api::subnet_id::SubnetID;
     use std::str::FromStr;
 
@@ -1410,5 +1612,108 @@ mod tests {
             format!("{eth:?}"),
             "0x2e714a3c385ea88a09998ed74db265dae9853667"
         );
+    }
+
+    /// test case that makes sure the commitment created for various addresses and blocks committed
+    /// are consistent
+    #[test]
+    fn test_validator_rewarder_claim_commitment() {
+        let pack_validator_data = |v: &checkpointing_facet::ValidatorData| {
+            vec![format!("{:?}", v.validator), v.blocks_committed.to_string()]
+        };
+
+        let mut random_validator_data = vec![
+            ValidatorData {
+                validator: ethers::types::Address::from_str(
+                    "0xB29C00299756135ec5d6A140CA54Ec77790a99d6",
+                )
+                .unwrap(),
+                blocks_committed: 1,
+            },
+            ValidatorData {
+                validator: ethers::types::Address::from_str(
+                    "0x1A79385eAd0e873FE0C441C034636D3Edf7014cC",
+                )
+                .unwrap(),
+                blocks_committed: 10,
+            },
+            ValidatorData {
+                validator: ethers::types::Address::from_str(
+                    "0x28345a43c2fBae4412f0AbadFa06Bd8BA3f58867",
+                )
+                .unwrap(),
+                blocks_committed: 2,
+            },
+            ValidatorData {
+                validator: ethers::types::Address::from_str(
+                    "0x3c5cc76b07cb02a372e647887bD6780513659527",
+                )
+                .unwrap(),
+                blocks_committed: 3,
+            },
+            ValidatorData {
+                validator: ethers::types::Address::from_str(
+                    "0x76B9d5a35C46B1fFEb37aadf929f1CA63a26A829",
+                )
+                .unwrap(),
+                blocks_committed: 4,
+            },
+        ];
+        random_validator_data.shuffle(&mut thread_rng());
+
+        let root = MerkleGen::new(
+            pack_validator_data,
+            &random_validator_data,
+            &VALIDATOR_REWARD_FIELDS,
+        )
+        .unwrap()
+        .root();
+        assert_eq!(
+            hex::encode(root.0),
+            "5519955f33109df3338490473cb14458640efdccd4df05998c4c439738280ab0"
+        );
+    }
+
+    #[test]
+    fn test_validator_rewarder_claim_commitment_ii() {
+        let pack_validator_data = |v: &checkpointing_facet::ValidatorData| {
+            vec![format!("{:?}", v.validator), v.blocks_committed.to_string()]
+        };
+
+        let mut random_validator_data = (0..100)
+            .map(|_| ValidatorData {
+                validator: ethers::types::Address::random(),
+                blocks_committed: random::<u64>(),
+            })
+            .collect::<Vec<_>>();
+
+        random_validator_data.shuffle(&mut thread_rng());
+        let root = MerkleGen::new(
+            pack_validator_data,
+            &random_validator_data,
+            &VALIDATOR_REWARD_FIELDS,
+        )
+        .unwrap()
+        .root();
+
+        random_validator_data.shuffle(&mut thread_rng());
+        let new_root = MerkleGen::new(
+            pack_validator_data,
+            &random_validator_data,
+            &VALIDATOR_REWARD_FIELDS,
+        )
+        .unwrap()
+        .root();
+        assert_eq!(new_root, root);
+
+        random_validator_data.shuffle(&mut thread_rng());
+        let new_root = MerkleGen::new(
+            pack_validator_data,
+            &random_validator_data,
+            &VALIDATOR_REWARD_FIELDS,
+        )
+        .unwrap()
+        .root();
+        assert_eq!(new_root, root);
     }
 }

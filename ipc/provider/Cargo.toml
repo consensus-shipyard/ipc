@@ -42,7 +42,9 @@ zeroize = { workspace = true }
 
 fil_actors_runtime = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
-fvm_shared = { workspace = true }
+fvm_shared = { workspace = true, features  = ["crypto"] }
+
+merkle-tree-rs = { path = "../../ext/merkle-tree-rs" }
 
 ipc-types = { workspace = true }
 ipc-wallet = { workspace = true, features = ["with-ethers"] }

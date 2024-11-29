@@ -80,6 +80,10 @@ error InvalidFederationPayload();
 error DuplicatedGenesisValidator();
 error NotEnoughGenesisValidators();
 error ValidatorPowerChangeDenied();
+error MissingActivityCommitment();
+error ValidatorAlreadyClaimed();
+error InvalidActivityProof();
+error NotOwner();
 
 enum InvalidXnetMessageReason {
     Sender,

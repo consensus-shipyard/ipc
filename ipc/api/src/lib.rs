@@ -19,6 +19,7 @@ pub mod subnet_id;
 pub mod validator;
 
 pub mod evm;
+pub mod merkle;
 pub mod staking;
 
 /// Converts an ethers::U256 TokenAmount into a FIL amount.

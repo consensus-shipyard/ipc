@@ -15,6 +15,8 @@ import {SubnetIDHelper} from "./lib/SubnetIDHelper.sol";
 import {LibStaking} from "./lib/LibStaking.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AssetHelper} from "./lib/AssetHelper.sol";
+import {LibActivity} from "./lib/LibActivity.sol";
+
 error FunctionNotFound(bytes4 _functionSelector);
 
 contract SubnetActorDiamond {
@@ -37,6 +39,7 @@ contract SubnetActorDiamond {
         Asset collateralSource;
         SubnetID parentId;
         address validatorGater;
+        address validatorRewarder;
     }
 
     constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params, address owner) {
@@ -101,6 +104,10 @@ contract SubnetActorDiamond {
 
         if (params.validatorGater != address(0)) {
             s.validatorGater = params.validatorGater;
+        }
+
+        if (params.validatorRewarder != address(0)) {
+            LibActivity.setRewarder(params.validatorRewarder);
         }
     }
 

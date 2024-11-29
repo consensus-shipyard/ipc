@@ -123,7 +123,8 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         state: &mut FvmExecState<DB>,
         checkpoint: checkpointing_facet::BottomUpCheckpoint,
         power_table: &[Validator<Power>],
-    ) -> anyhow::Result<()> {
+        activity: checkpointing_facet::FullActivityRollup,
+    ) -> anyhow::Result<FvmApplyRet> {
         // Construct a Merkle tree from the power table, which we can use to validate validator set membership
         // when the signatures are submitted in transactions for accumulation.
         let tree =
@@ -133,9 +134,12 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
             p.saturating_add(et::U256::from(v.power.0))
         });
 
-        self.checkpointing.call(state, |c| {
-            c.create_bottom_up_checkpoint(checkpoint, tree.root_hash().0, total_power)
-        })
+        Ok(self
+            .checkpointing
+            .call_with_return(state, |c| {
+                c.create_bottom_up_checkpoint(checkpoint, tree.root_hash().0, total_power, activity)
+            })?
+            .into_return())
     }
 
     /// Retrieve checkpoints which have not reached a quorum.

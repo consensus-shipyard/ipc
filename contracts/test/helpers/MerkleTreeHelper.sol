@@ -31,4 +31,33 @@ library MerkleTreeHelper {
 
         return (root, proofs);
     }
+
+    function createMerkleProofsForConsensusActivity(
+        address[] memory addrs,
+        uint64[] memory blocksMined
+    ) internal returns (bytes32, bytes32[][] memory) {
+        Merkle merkleTree = new Merkle();
+
+        if (addrs.length != blocksMined.length) {
+            revert("different array lengths btw blocks mined and addrs");
+        }
+
+        uint256 len = addrs.length;
+
+        bytes32 root;
+        bytes32[][] memory proofs = new bytes32[][](len);
+        bytes32[] memory data = new bytes32[](len);
+        for (uint256 i = 0; i < len; i++) {
+            data[i] = keccak256(bytes.concat(keccak256(abi.encode(addrs[i], blocksMined[i]))));
+        }
+
+        root = merkleTree.getRoot(data);
+        // get proof
+        for (uint256 i = 0; i < len; i++) {
+            bytes32[] memory proof = merkleTree.getProof(data, i);
+            proofs[i] = proof;
+        }
+
+        return (root, proofs);
+    }
 }

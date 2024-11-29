@@ -15,7 +15,7 @@ base64 = { workspace = true }
 blake2b_simd = { workspace = true }
 bls-signatures = { version = "0.13.0", default-features = false, features = ["blst"] }
 ethers = { workspace = true, optional = true }
-fvm_shared = { workspace = true }
+fvm_shared = { workspace = true, features = ["crypto"] }
 hex = { workspace = true }
 libc = "0.2"
 libsecp256k1 = { workspace = true }

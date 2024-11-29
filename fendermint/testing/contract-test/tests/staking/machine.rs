@@ -120,6 +120,7 @@ impl StateMachine for StakingMachine {
                 token_address: ethers::types::Address::zero(),
             },
             validator_gater: EthAddress::from(ethers::types::Address::zero()).into(),
+            validator_rewarder: Default::default(),
         };
 
         eprintln!("\n> PARENT IPC: {parent_ipc:?}");
@@ -285,6 +286,7 @@ impl StateMachine for StakingMachine {
                     block_hash: *block_hash,
                     next_configuration_number: *next_configuration_number,
                     msgs: Vec::new(),
+                    activity: Default::default(),
                 };
                 let checkpoint_hash = checkpoint.clone().abi_hash();
 

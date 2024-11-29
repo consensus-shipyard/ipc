@@ -16,6 +16,7 @@ remappings = [
     "murky/=lib/murky/src/",
 ]
 allow_paths = ["../node_modules"]
+solc = "0.8.23"
 
 [fuzz]
 runs = 512
