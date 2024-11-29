@@ -22,7 +22,7 @@ task('cross-network-messenger-deploy')
         console.log("queried ipc gateway", gateway);
 
         await Deployments.deploy(hre, deployer, {
-            name: 'CrossMessengeCaller',
+            name: 'CrossMessengerCaller',
             args: [args.subnetAddress, gateway],
             libraries: ['SubnetIDHelper'],
         })
@@ -45,13 +45,13 @@ task('cross-network-send')
         const amount = hre.ethers.utils.parseEther(args.value)
         console.log('sending to address', args.recipient, 'with amount', amount)
 
-        const contracts = await Deployments.resolve(hre, 'CrossMessengeCaller')
-        const contract = contracts.contracts.CrossMessengeCaller
+        const contracts = await Deployments.resolve(hre, 'CrossMessengerCaller')
+        const contract = contracts.contracts.CrossMessengerCaller
         await contract.invokeSendMessage(subnetId, args.recipient, amount, { value: Number(amount) })
     })
 
 // step 3. check result
-// sample command: pnpm exec hardhat cross-network-scan --network calibrationnet 314159
+// sample command: pnpm exec hardhat cross-network-scan --network calibrationnet
 task('cross-network-scan')
     .setDescription('Scan cross network send in the target subnet')
 .setAction(async (args: TaskArguments, hre: HardhatRuntimeEnvironment) => {
@@ -63,8 +63,8 @@ task('cross-network-scan')
     const amount = hre.ethers.utils.parseEther(args.value)
     console.log('sending to address', args.recipient, 'with amount', amount)
 
-    const contracts = await Deployments.resolve(hre, 'CrossMessengeCaller')
-    const contract = contracts.contracts.CrossMessengeCaller
+    const contracts = await Deployments.resolve(hre, 'CrossMessengerCaller')
+    const contract = contracts.contracts.CrossMessengerCaller
     const received = contract.filters.CallReceived()
     const events = await contract.queryFilter(received)
     for (const event of events) {

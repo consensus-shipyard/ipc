@@ -16,7 +16,7 @@ interface ISubnetGetter {
 }
 
 /// This is a simple example contract to invoke cross messages between subnets from different levels
-contract CrossMessengeCaller is IpcExchange {
+contract CrossMessengerCaller is IpcExchange {
     event CallReceived(IPCAddress from, CallMsg msg);
     event ResultReceived(IpcEnvelope original, ResultMsg result);
 
