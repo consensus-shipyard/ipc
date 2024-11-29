@@ -25,7 +25,7 @@ task('cross-network-messenger-deploy')
     })
 
 // step 2. invoke a cross network send message
-// sample command: pnpm exec hardhat validator-gater-set-subnet --network calibrationnet 314159 <YOUR SUBNET ETH ROUTE>
+// sample command: pnpm exec hardhat cross-network-send --network calibrationnet 314159 <YOUR SUBNET ETH ROUTE> <RECIPIENT> <VALUE>
 task('cross-network-send')
     .addPositionalParam('root', 'the chain id of root subnet')
     .addPositionalParam('route', 'the addresses of the subnet routes, use "," to separate the addresses')
@@ -35,7 +35,7 @@ task('cross-network-send')
     .setAction(async (args: TaskArguments, hre: HardhatRuntimeEnvironment) => {
         await hre.run('compile')
 
-        const subnetId = { root: args.root, route: args.route.split(",") }
+        const subnetId = { root: args.root, route: args.route.split(',') }
         console.log('sending to subnet', subnetId)
 
         const amount = hre.ethers.utils.parseEther(args.value)
@@ -43,5 +43,5 @@ task('cross-network-send')
 
         const contracts = await Deployments.resolve(hre, 'CrossMessengeCaller')
         const contract = contracts.contracts.CrossMessengeCaller
-        await contract.invokeSendMessage(subnetId, args.recipient, amount)
+        await contract.invokeSendMessage(subnetId, args.recipient, amount, { value: Number(amount) })
     })
