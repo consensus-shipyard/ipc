@@ -30,7 +30,13 @@ impl ValidatorCache {
 
         let map = validators
             .iter()
-            .map(validator_to_map_entry)
+            .map(|v| {
+                let tendermint_pub_key: TendermintPubKey =
+                    TendermintPubKey::try_from(v.public_key.clone())?;
+                let id = TendermintId::from(tendermint_pub_key);
+                let key = *v.public_key.public_key();
+                Ok((id, key))
+            })
             .collect::<Result<HashMap<_, _>, _>>()?;
 
         Ok(Self { map })
@@ -42,11 +48,4 @@ impl ValidatorCache {
             .cloned()
             .ok_or_else(|| anyhow!("validator not found"))
     }
-}
-
-fn validator_to_map_entry(v: &Validator<Power>) -> Result<(TendermintId, PublicKey)> {
-    let tendermint_pub_key: TendermintPubKey = TendermintPubKey::try_from(v.public_key.clone())?;
-    let id = TendermintId::from(tendermint_pub_key);
-    let key = *v.public_key.public_key();
-    Ok((id, key))
 }
