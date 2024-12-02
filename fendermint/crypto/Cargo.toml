@@ -14,4 +14,3 @@ anyhow = { workspace = true }
 base64 = { workspace = true }
 rand = { workspace = true }
 zeroize = { workspace = true }
-tendermint = { workspace = true }
