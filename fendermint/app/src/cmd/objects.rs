@@ -599,11 +599,17 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
 
                     let bytes_stream = bytes_stream.enumerate().map(move |(i, chunk)| {
                         let chunk = chunk?;
-                        let result = if i == 0 {
+                        let result = if first_chunk == last_chunk {
+                            // Single chunk case - slice with both offsets
+                            chunk.slice(offset..end_offset)
+                        } else if i == 0 {
+                            // First of multiple chunks
                             chunk.slice(offset..)
                         } else if i == (last_chunk - first_chunk) as usize {
+                            // Last of multiple chunks
                             chunk.slice(..end_offset)
                         } else {
+                            // Middle chunks
                             chunk
                         };
                         Ok::<_, anyhow::Error>(result)
@@ -802,7 +808,7 @@ mod tests {
             "info": "",
             "index": "0",
             "key": "",
-            "value": "mKASGE0YpBhjGGMYaRhkGFgYJAEYcBIYIBilGGgY5AQY2BjqGNoY7BiSGFoYwxi8GBsYNhglGJwPGG0YcAANGHIYnBjZGBgYxBhqGIMYbxhJGHYYVxhkGHMYaRh6GGUGGGgYchhlGHMYbxhsGHYYZRhkGPUYaBhtGGUYdBhhGGQYYRh0GGEYoRhlGF8YcxhpGHoYZRhhGDYYMBiiGNgYbhg6GEsKBxhtGGUYcxhzGGEYZxhlEg0KBBhmGHIYbxhtEgMYdBgwGDAYGAESGDEKAhh0GG8SGCkYdBgyGHcYdRhoGHEYNxh0GGEYMxgzGGUYdxgzGGMYMhhuGGQYbRhnGGIYbBg3GDcYNxh6GDUYeBg0GGQYbBh5GGYYbhhtGHkYbBhqGGkYaBhxGBgB",
+            "value": "mQEIEhizARiFGJgYIBgYGNcYGBhJGBgYgRgYGO8YGBinCgwYGBiICxgYGI0YGBiMGBgYGRgYGIUYGBjQGBgYdRgYGNsYGBjLGBgY9hgYGHkYGBi5GBgYmhgYGF8YGBiZFBgYGOUYGBiqGBgY+RgYGGsYGBiDGBgYGhgYGJ4YGBgkGJgYIBgYGOwYGBhRGBgYoBgYGNEYGBhyGBgY2RgYGOcYGBhlGBgYpxgYGDMYGBjKExgYGOsYGBgYGBgY8hgYGN0YGBjNGBgYbRgYGMwYGBhOGBgYKhgYGPcYGBgoGBgYixgYGBgYGBjJGBgYXRgYGDQYGBiJABgYGIcYGBj3CxgZFRg2GKIYYxhmGG8YbxhjGGIYYRhyGGwYYxhvGG4YdBhlGG4YdBgtGHQYeRhwGGUYeBgYGGEYcBhwGGwYaRhjGGEYdBhpGG8YbhgvGG8YYxh0GGUYdBgtGHMYdBhyGGUYYRhtGDAYzBjgGL8CGDoYSwoHGG0YZRhzGHMYYRhnGGUSDQoEGGYYchhvGG0SAxh0GDAYMBgYARIYMQoCGHQYbxIYKRh0GDIYZxhvGGMYcBhuGGwYcRhpGGwYeBh5GG0Ydhh3GDQYdhhuGGwYaBg0GG4YcBhuGGQYeRh4GGoYYxhsGDMYMxh5GGgYdRhjGHQYaRhjGGkYGAE=",
             "proof": null,
             "height": "6017",
             "codespace": ""
@@ -1157,7 +1163,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn test_handle_object_download_get() {
         let matcher = MockRequestMethodMatcher::default().map(
             Method::AbciQuery,
@@ -1205,7 +1210,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn test_handle_object_download_with_range() {
         let matcher = MockRequestMethodMatcher::default().map(
             Method::AbciQuery,
@@ -1244,7 +1248,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn test_handle_object_download_head() {
         let matcher = MockRequestMethodMatcher::default().map(
             Method::AbciQuery,
