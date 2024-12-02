@@ -54,14 +54,8 @@ task('cross-network-send')
 // sample command: pnpm exec hardhat cross-network-scan --network calibrationnet
 task('cross-network-scan')
     .setDescription('Scan cross network send in the target subnet')
-    .setAction(async (args: TaskArguments, hre: HardhatRuntimeEnvironment) => {
+    .setAction(async (_args: TaskArguments, hre: HardhatRuntimeEnvironment) => {
         await hre.run('compile')
-
-        const subnetId = { root: args.root, route: args.route.split(',') }
-        console.log('sending to subnet', subnetId)
-
-        const amount = hre.ethers.utils.parseEther(args.value)
-        console.log('sending to address', args.recipient, 'with amount', amount)
 
         const contracts = await Deployments.resolve(hre, 'CrossMessengerCaller')
         const contract = contracts.contracts.CrossMessengerCaller
@@ -71,3 +65,24 @@ task('cross-network-scan')
             console.log(event)
         }
     })
+
+// scan postbox
+// sample command: pnpm exec hardhat cross-network-postbox-scan --network calibrationnet <GATEWAY ADDRESS>
+task('cross-network-postbox-scan')
+.addPositionalParam('gateway', 'the gateway address')
+.setDescription('Scan to check if cross network message is inserted into postbox')
+.setAction(async (args: TaskArguments, hre: HardhatRuntimeEnvironment) => {
+    await hre.run('compile')
+
+    const subnetId = { root: args.gateway, route: args.route.split(',') }
+    console.log('sending to subnet', subnetId)
+
+    const artifact = await hre.artifacts.readArtifact('CheckpointingFacet')
+    const contract = new hre.ethers.Contract(args.gateway, artifact.abi, hre.ethers.provider)
+
+    const received = contract.filters.MessageStoredInPostbox()
+    const events = await contract.queryFilter(received)
+    for (const event of events) {
+        console.log(event)
+    }
+})
