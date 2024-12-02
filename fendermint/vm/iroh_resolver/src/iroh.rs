@@ -250,16 +250,6 @@ where
             match res {
                 Ok(added) => {
                     if added {
-                        // Emit the vote event locally
-                        if resolved {
-                            emit(BlobsFinalityVotingSuccess {
-                                blob_hash: Some(vote_hash.into()),
-                            });
-                        } else {
-                            emit(BlobsFinalityVotingFailure {
-                                blob_hash: Some(vote_hash.into()),
-                            });
-                        }
                         // Send our own vote to peers
                         if let Err(e) = client.publish_vote(vote) {
                             tracing::error!(error = e.to_string(), "failed to publish vote");
