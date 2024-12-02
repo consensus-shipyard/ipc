@@ -161,6 +161,24 @@ impl Display for IPCBlobFinality {
     }
 }
 
+/// The finality view for a read request at certain height.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct IPCReadRequestClosed {
+    pub hash: Hash,
+}
+
+impl IPCReadRequestClosed {
+    pub fn new(hash: Hash) -> Self {
+        Self { hash }
+    }
+}
+
+impl Display for IPCReadRequestClosed {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "IPCReadRequestClosed(hash: {})", self.hash)
+    }
+}
+
 #[async_trait]
 pub trait ParentViewProvider {
     /// Obtain the genesis epoch of the current subnet in the parent

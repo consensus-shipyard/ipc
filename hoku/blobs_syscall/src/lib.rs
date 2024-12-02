@@ -5,6 +5,7 @@
 use std::fmt::Display;
 use std::sync::Arc;
 
+use crate::hoku_kernel::HokuOps;
 use fvm::kernel::{ExecutionError, Result, SyscallError};
 use fvm::syscalls::Context;
 use fvm_shared::error::ErrorNumber;
@@ -12,10 +13,7 @@ use iroh::blobs::Hash;
 use maybe_iroh::MaybeIroh;
 use num_traits::FromPrimitive;
 use once_cell::sync::Lazy;
-use tokio::spawn;
-use tokio::sync::Mutex;
-
-use crate::hoku_kernel::HokuOps;
+use tokio::{spawn, sync::Mutex};
 
 pub mod hoku_kernel;
 

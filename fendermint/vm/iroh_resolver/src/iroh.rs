@@ -4,18 +4,21 @@
 
 use std::time::Duration;
 
-use crate::observe::{BlobsFinalityVotingFailure, BlobsFinalityVotingSuccess};
+use crate::observe::{
+    BlobsFinalityVotingFailure, BlobsFinalityVotingSuccess, ReadRequestsCloseVoting,
+};
 use async_stm::{atomically, atomically_or_err, queues::TQueueLike};
 use fendermint_vm_topdown::voting::VoteTally;
 use ipc_api::subnet_id::SubnetID;
-use ipc_ipld_resolver::{Client, ResolverIroh, ValidatorKey, VoteRecord};
+use ipc_ipld_resolver::{Client, ResolverIroh, ResolverIrohReadRequest, ValidatorKey, VoteRecord};
 use ipc_observability::emit;
+
 use iroh::blobs::Hash;
 use libp2p::identity::Keypair;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use crate::pool::{ResolveQueue, ResolveTask};
+use crate::pool::{ResolveKey, ResolveQueue, ResolveResults, ResolveTask, TaskType};
 
 /// The iroh Resolver takes resolution tasks from the [ResolvePool] and
 /// uses the [ipc_ipld_resolver] to fetch the content from the local iroh node.
@@ -27,12 +30,14 @@ pub struct IrohResolver<V> {
     key: Keypair,
     subnet_id: SubnetID,
     to_vote: fn(Hash, bool) -> V,
+    results: ResolveResults,
 }
 
 impl<V> IrohResolver<V>
 where
     V: Clone + Send + Sync + Serialize + DeserializeOwned + 'static,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         client: Client<V>,
         queue: ResolveQueue,
@@ -41,6 +46,7 @@ where
         key: Keypair,
         subnet_id: SubnetID,
         to_vote: fn(Hash, bool) -> V,
+        results: ResolveResults,
     ) -> Self {
         Self {
             client,
@@ -50,6 +56,7 @@ where
             key,
             subnet_id,
             to_vote,
+            results,
         }
     }
 
@@ -71,6 +78,7 @@ where
                 self.key.clone(),
                 self.subnet_id.clone(),
                 self.to_vote,
+                self.results.clone(),
             );
         }
     }
@@ -88,78 +96,152 @@ fn start_resolve<V>(
     key: Keypair,
     subnet_id: SubnetID,
     to_vote: fn(Hash, bool) -> V,
+    results: ResolveResults,
 ) where
     V: Clone + Send + Sync + Serialize + DeserializeOwned + 'static,
 {
     tokio::spawn(async move {
         tracing::debug!(hash = ?task.hash(), "starting iroh blob resolve");
-        let res = client.resolve_iroh(task.hash(), task.node_addr()).await;
-
-        let err = match res {
-            Err(e) => {
-                tracing::error!(
-                    error = e.to_string(),
-                    "failed to submit iroh resolution task"
-                );
-                // The service is no longer listening, we might as well stop taking new tasks from the queue.
-                // By not quitting, we should see this error every time there is a new task, which is at least a constant reminder.
-                return;
+        match task.task_type() {
+            TaskType::ResolveBlob { source } => {
+                match client.resolve_iroh(task.hash(), source.id.into()).await {
+                    Err(e) => {
+                        tracing::error!(
+                            error = e.to_string(),
+                            "failed to submit iroh resolution task"
+                        );
+                        // The service is no longer listening, we might as well stop taking new tasks from the queue.
+                        // By not quitting, we should see this error every time there is a new task, which is at least a constant reminder.
+                    }
+                    Ok(Ok(())) => {
+                        tracing::debug!(hash = ?task.hash(), "iroh blob resolved");
+                        atomically(|| task.set_resolved()).await;
+                        if add_own_vote(
+                            task.hash(),
+                            client,
+                            vote_tally,
+                            key,
+                            subnet_id,
+                            true,
+                            to_vote,
+                        )
+                        .await
+                        {
+                            emit(BlobsFinalityVotingSuccess {
+                                blob_hash: Some(task.hash().into()),
+                            });
+                        }
+                    }
+                    Ok(Err(e)) => {
+                        tracing::error!(
+                            hash = ?task.hash(),
+                            error = e.to_string(),
+                            "iroh blob resolution failed, attempting retry"
+                        );
+                        // If we fail to re-enqueue the task, cast a "failure" vote.
+                        // And emit a failure event.
+                        if !reenqueue(task.clone(), queue, retry_delay).await {
+                            if add_own_vote(
+                                task.hash(),
+                                client,
+                                vote_tally,
+                                key,
+                                subnet_id,
+                                false,
+                                to_vote,
+                            )
+                            .await
+                            {
+                                emit(BlobsFinalityVotingFailure {
+                                    blob_hash: Some(task.hash().into()),
+                                });
+                            }
+                        }
+                    }
+                };
             }
-            Ok(Ok(())) => None,
-            Ok(Err(e)) => Some(e),
+            TaskType::CloseReadRequest {
+                blob_hash,
+                offset,
+                len,
+            } => {
+                match client.close_read_request(blob_hash, offset, len).await {
+                    Err(e) => {
+                        tracing::error!(
+                            error = e.to_string(),
+                            "failed to submit iroh resolution task"
+                        );
+                        // The service is no longer listening, we might as well stop taking new tasks from the queue.
+                        // By not quitting, we should see this error every time there is a new task, which is at least a constant reminder.
+                    }
+                    Ok(Ok(response)) => {
+                        let hash = task.hash();
+                        tracing::debug!(hash = ?hash, "iroh read request resolved");
+
+                        atomically(|| task.set_resolved()).await;
+                        atomically(|| {
+                            results.update(|mut results| {
+                                results.insert(ResolveKey { hash }, response.to_vec());
+                                results
+                            })
+                        })
+                        .await;
+
+                        // Extend task hash with response data to use as the vote hash.
+                        // This ensures that the all validators are voting
+                        // on the same response from IROH.
+                        let mut task_id = task.hash().as_bytes().to_vec();
+                        task_id.extend(response.to_vec());
+                        let vote_hash = Hash::new(task_id);
+                        if add_own_vote(
+                            vote_hash, client, vote_tally, key, subnet_id, true, to_vote,
+                        )
+                        .await
+                        {
+                            emit(ReadRequestsCloseVoting {
+                                read_request_id: Some(vote_hash.into()),
+                            });
+                        }
+                    }
+                    Ok(Err(e)) => {
+                        tracing::error!(
+                            hash = ?task.hash(),
+                            error = e.to_string(),
+                            "iroh read request failed"
+                        );
+                        if !reenqueue(task.clone(), queue, retry_delay).await {
+                            tracing::error!(
+                                hash = ?task.hash(),
+                                "failed to re-enqueue read request"
+                            );
+                        }
+                    }
+                };
+            }
         };
-
-        match err {
-            None => {
-                tracing::debug!(hash = ?task.hash(), "iroh blob resolved");
-
-                atomically(|| task.set_resolved()).await;
-                add_own_vote(task, client, vote_tally, key, subnet_id, true, to_vote).await;
-            }
-            Some(e) => {
-                let retryable = atomically(|| task.add_attempt()).await;
-                if retryable {
-                    tracing::error!(
-                        hash = ?task.hash(),
-                        error = e.to_string(),
-                        "iroh blob resolution failed; retrying later"
-                    );
-
-                    schedule_retry(task, queue, retry_delay).await;
-                } else {
-                    tracing::error!(
-                        hash = ?task.hash(),
-                        error = e.to_string(),
-                        "iroh blob resolution failed; no attempts remaining"
-                    );
-
-                    atomically(|| task.add_failure()).await;
-                    add_own_vote(task, client, vote_tally, key, subnet_id, false, to_vote).await;
-                }
-            }
-        }
     });
 }
 
 async fn add_own_vote<V>(
-    task: ResolveTask,
+    vote_hash: Hash,
     client: Client<V>,
     vote_tally: VoteTally,
     key: Keypair,
     subnet_id: SubnetID,
     resolved: bool,
     to_vote: fn(Hash, bool) -> V,
-) where
+) -> bool
+where
     V: Clone + Send + Sync + Serialize + DeserializeOwned + 'static,
 {
-    let vote = to_vote(task.hash(), resolved);
+    let vote = to_vote(vote_hash, resolved);
     match VoteRecord::signed(&key, subnet_id, vote) {
         Ok(vote) => {
             let validator_key = ValidatorKey::from(key.public());
             let res = atomically_or_err(|| {
                 vote_tally.add_blob_vote(
                     validator_key.clone(),
-                    task.hash().as_bytes().to_vec(),
+                    vote_hash.as_bytes().to_vec(),
                     resolved,
                 )
             })
@@ -168,30 +250,42 @@ async fn add_own_vote<V>(
             match res {
                 Ok(added) => {
                     if added {
-                        // Emit the vote event locally
-                        if resolved {
-                            emit(BlobsFinalityVotingSuccess {
-                                blob_hash: Some(task.hash().into()),
-                            });
-                        } else {
-                            emit(BlobsFinalityVotingFailure {
-                                blob_hash: Some(task.hash().into()),
-                            });
-                        }
                         // Send our own vote to peers
                         if let Err(e) = client.publish_vote(vote) {
                             tracing::error!(error = e.to_string(), "failed to publish vote");
+                            return false;
                         }
                     }
+                    true
                 }
                 Err(e) => {
                     tracing::error!(error = e.to_string(), "failed to handle own vote");
+                    false
                 }
             }
         }
         Err(e) => {
             tracing::error!(error = e.to_string(), "failed to sign vote");
+            false
         }
+    }
+}
+
+async fn reenqueue(task: ResolveTask, queue: ResolveQueue, retry_delay: Duration) -> bool {
+    if atomically(|| task.add_attempt()).await {
+        tracing::error!(
+            hash = ?task.hash(),
+            "iroh blob resolution failed; retrying later"
+        );
+        schedule_retry(task, queue, retry_delay).await;
+        true
+    } else {
+        tracing::error!(
+            hash = ?task.hash(),
+            "iroh blob resolution failed; no attempts remaining"
+        );
+        atomically(|| task.add_failure()).await;
+        false
     }
 }
 

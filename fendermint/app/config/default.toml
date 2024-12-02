@@ -33,6 +33,9 @@ halt_height = 0
 # Number of pending blobs to process in parallel
 blob_concurrency = 1024
 
+# Number of pending read requests to process in parallel
+read_request_concurrency = 10
+
 [abci]
 # Number of concurrent requests allowed to be _submitted_ to the application.
 # Because message handling is asynhronous, this doesn't make any difference

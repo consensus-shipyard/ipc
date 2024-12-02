@@ -8,6 +8,7 @@ use anyhow::anyhow;
 use bloom::{BloomFilter, ASMS};
 use ipc_api::subnet_id::SubnetID;
 use iroh::blobs::Hash;
+use iroh::client::blobs::ReadAtLen;
 use iroh::client::Iroh;
 use iroh::net::NodeAddr;
 use libipld::store::StoreParams;
@@ -44,8 +45,14 @@ use crate::vote_record::{SignedVoteRecord, VoteRecord};
 /// Result of attempting to resolve a CID.
 pub type ResolveResult = anyhow::Result<()>;
 
+/// Result of attempting to resolve a read request.
+pub type ResolveReadRequestResult = anyhow::Result<bytes::Bytes>;
+
 /// Channel to complete the results with.
 type ResponseChannel = Sender<ResolveResult>;
+
+/// Channel to complete the read request with.
+type ReadRequestResponseChannel = Sender<ResolveReadRequestResult>;
 
 /// State of a query. The fallback peers can be used
 /// if the current attempt fails.
@@ -112,6 +119,7 @@ pub(crate) enum Request<V> {
     UnpinSubnet(SubnetID),
     Resolve(Cid, SubnetID, ResponseChannel),
     ResolveIroh(Hash, NodeAddr, ResponseChannel),
+    ResolveIrohRead(Hash, u32, u32, ReadRequestResponseChannel),
     RateLimitUsed(PeerId, usize),
     UpdateRateLimit(u32),
 }
@@ -489,6 +497,9 @@ where
             Request::ResolveIroh(hash, node_addr, response_channel) => {
                 self.start_iroh_query(hash, node_addr, response_channel)
             }
+            Request::ResolveIrohRead(hash, offset, len, response_channel) => {
+                self.start_iroh_read_query(hash, offset, len, response_channel)
+            }
             Request::RateLimitUsed(peer_id, bytes) => {
                 self.content_mut().rate_limit_used(peer_id, bytes)
             }
@@ -551,6 +562,32 @@ where
                 }
                 Err(e) => warn!(
                     "cannot resolve {}; failed to create iroh client ({})",
+                    hash, e
+                ),
+            }
+        });
+    }
+
+    /// Start a read request resolution using iorh.
+    fn start_iroh_read_query(
+        &mut self,
+        hash: Hash,
+        offset: u32,
+        len: u32,
+        response_channel: ReadRequestResponseChannel,
+    ) {
+        let mut iroh = self.iroh.clone();
+        tokio::spawn(async move {
+            match iroh.client().await {
+                Ok(client) => {
+                    let res = read_blob(client, hash, offset, len).await;
+                    match res {
+                        Ok(bytes) => send_read_request_result(response_channel, Ok(bytes)),
+                        Err(e) => send_read_request_result(response_channel, Err(anyhow!(e))),
+                    }
+                }
+                Err(e) => warn!(
+                    "cannot resolve read request {}; failed to create iroh client ({})",
                     hash, e
                 ),
             }
@@ -622,6 +659,15 @@ fn send_resolve_result(tx: Sender<ResolveResult>, res: ResolveResult) {
     }
 }
 
+fn send_read_request_result(
+    tx: Sender<anyhow::Result<bytes::Bytes>>,
+    res: anyhow::Result<bytes::Bytes>,
+) {
+    if tx.send(res).is_err() {
+        error!("error sending read request result; listener closed")
+    }
+}
+
 /// Builds the transport stack that libp2p will communicate over.
 ///
 /// Based on the equivalent in Forest.
@@ -675,4 +721,14 @@ async fn download_blob(iroh: Iroh, hash: Hash, node_addr: NodeAddr) -> anyhow::R
     iroh.tags().delete(tag).await.ok();
 
     Ok(())
+}
+
+async fn read_blob(iroh: Iroh, hash: Hash, offset: u32, len: u32) -> anyhow::Result<bytes::Bytes> {
+    let len = ReadAtLen::AtMost(len as u64);
+    let res = iroh
+        .blobs()
+        .read_at_to_bytes(hash, offset as u64, len)
+        .await?;
+    debug!("read blob {}: {:?}", hash, res);
+    Ok(res)
 }
