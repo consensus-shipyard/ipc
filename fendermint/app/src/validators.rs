@@ -5,7 +5,6 @@
 
 use anyhow::{anyhow, Ok, Result};
 use fendermint_crypto::PublicKey;
-use fendermint_vm_genesis::{Power, Validator};
 use fendermint_vm_interpreter::fvm::state::ipc::GatewayCaller;
 use fendermint_vm_interpreter::fvm::state::FvmExecState;
 use std::collections::HashMap;
