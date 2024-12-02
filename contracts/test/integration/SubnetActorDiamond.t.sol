@@ -138,7 +138,6 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         require(saDiamond.getter().getActiveValidators().length == 1, "not 1 active validator");
         require(saDiamond.getter().getWaitingValidators().length == 0, "not 0 waiting validator");
 
-
         (uint64 nextConfigNum, uint64 startConfigNum) = saDiamond.getter().getConfigurationNumbers();
         require(nextConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER, "next config num not 1");
         require(startConfigNum == LibStaking.INITIAL_CONFIGURATION_NUMBER, "start config num not 1");
