@@ -361,6 +361,20 @@ impl State {
         Ok(allowance)
     }
 
+    pub fn set_credit_sponsor(
+        &mut self,
+        to: Address,
+        sponsor: Option<Address>,
+    ) -> anyhow::Result<(), ActorError> {
+        let account = self
+            .accounts
+            .get_mut(&to)
+            .ok_or(ActorError::not_found(format!("account {} not found", to)))?;
+        account.credit_sponsor = sponsor;
+        debug!("set credit sponsor for {} to {:?}", to, sponsor);
+        Ok(())
+    }
+
     #[allow(clippy::type_complexity)]
     pub fn debit_accounts(
         &mut self,

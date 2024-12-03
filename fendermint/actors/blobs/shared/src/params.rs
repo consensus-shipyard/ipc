@@ -60,6 +60,11 @@ pub struct RevokeCreditParams {
     pub for_caller: Option<Address>,
 }
 
+/// Params for setting credit sponsor.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SetCreditSponsorParams(pub Option<Address>);
+
 /// Params for getting an account.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]

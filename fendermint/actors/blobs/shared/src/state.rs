@@ -21,6 +21,8 @@ pub struct Account {
     pub credit_free: BigInt,
     /// Current committed credit in byte-blocks that will be used for debits.
     pub credit_committed: BigInt,
+    /// Optional sponsor account address.
+    pub credit_sponsor: Option<Address>,
     /// The chain epoch of the last debit.
     pub last_debit_epoch: ChainEpoch,
     /// Credit approvals to other accounts, keyed by receiver, keyed by caller,
@@ -39,6 +41,7 @@ impl Account {
             capacity_used: Default::default(),
             credit_free,
             credit_committed: Default::default(),
+            credit_sponsor: None,
             last_debit_epoch: current_epoch,
             approvals: Default::default(),
         }

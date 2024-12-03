@@ -31,6 +31,7 @@ pub enum Method {
     UpdateCredit = frc42_dispatch::method_hash!("UpdateCredit"),
     ApproveCredit = frc42_dispatch::method_hash!("ApproveCredit"),
     RevokeCredit = frc42_dispatch::method_hash!("RevokeCredit"),
+    SetCreditSponsor = frc42_dispatch::method_hash!("SetCreditSponsor"),
     GetAccount = frc42_dispatch::method_hash!("GetAccount"),
     GetCreditApproval = frc42_dispatch::method_hash!("GetCreditApproval"),
     GetCreditAllowance = frc42_dispatch::method_hash!("GetCreditAllowance"),

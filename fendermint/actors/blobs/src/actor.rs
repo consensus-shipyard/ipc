@@ -8,7 +8,7 @@ use fendermint_actor_blobs_shared::params::{
     AddBlobParams, ApproveCreditParams, BuyCreditParams, DeleteBlobParams, FinalizeBlobParams,
     GetAccountParams, GetAddedBlobsParams, GetBlobParams, GetBlobStatusParams,
     GetCreditAllowanceParams, GetCreditApprovalParams, GetPendingBlobsParams, GetStatsReturn,
-    RevokeCreditParams, SetBlobPendingParams, UpdateCreditParams,
+    RevokeCreditParams, SetBlobPendingParams, SetCreditSponsorParams, UpdateCreditParams,
 };
 use fendermint_actor_blobs_shared::state::{
     Account, Blob, BlobStatus, CreditApproval, Hash, PublicKey, Subscription, SubscriptionId,
@@ -141,6 +141,20 @@ impl BlobsActor {
             None
         };
         rt.transaction(|st: &mut State, _| st.revoke_credit(from, to, for_caller))
+    }
+
+    fn set_credit_sponsor(
+        rt: &impl Runtime,
+        params: SetCreditSponsorParams,
+    ) -> Result<(), ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+        let (origin, _) = resolve_external(rt, rt.message().origin())?;
+        let sponsor = if let Some(sponsor) = params.0 {
+            Some(resolve_external_non_machine(rt, sponsor)?)
+        } else {
+            None
+        };
+        rt.transaction(|st: &mut State, _| st.set_credit_sponsor(origin, sponsor))
     }
 
     fn get_account(
@@ -359,6 +373,7 @@ impl ActorCode for BlobsActor {
         UpdateCredit => update_credit,
         ApproveCredit => approve_credit,
         RevokeCredit => revoke_credit,
+        SetCreditSponsor => set_credit_sponsor,
         GetAccount => get_account,
         GetCreditApproval => get_credit_approval,
         GetCreditAllowance => get_credit_allowance,
