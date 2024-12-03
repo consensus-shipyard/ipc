@@ -605,6 +605,16 @@ impl IpcProvider {
         conn.manager().get_validator_info(subnet, validator).await
     }
 
+    pub async fn list_validators(
+        &self,
+        subnet: &SubnetID,
+    ) -> anyhow::Result<Vec<(Address, ValidatorInfo)>> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = self.get_connection(&parent)?;
+
+        conn.manager().list_validators(subnet).await
+    }
+
     /// Get the changes in subnet validators. This is fetched from parent.
     pub async fn get_validator_changeset(
         &self,
