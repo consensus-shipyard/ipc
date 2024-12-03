@@ -45,7 +45,8 @@ use warp::{
 use crate::cmd;
 use crate::options::objects::{ObjectsArgs, ObjectsCommands};
 
-const MAX_OBJECT_LENGTH: u64 = 5_000_000_000; // 5GB
+/// Maximum size of the multipart form used for object upload.
+const MAX_FORM_LENGTH: u64 = 1024 * 1024;
 /// The alpha parameter for alpha entanglement determines the number of parity blobs to generate
 /// for the original blob.
 const ENTANGLER_ALPHA: u8 = 3;
@@ -92,7 +93,8 @@ cmd! {
                 .and(warp::post())
                 .and(with_client(client.clone()))
                 .and(with_iroh(iroh_client.clone()))
-                .and(warp::multipart::form().max_length(MAX_OBJECT_LENGTH))
+                .and(warp::multipart::form().max_length(MAX_FORM_LENGTH))
+                .and(with_max_size(settings.max_object_size))
                 .and_then(handle_object_upload);
 
                 let objects_download = warp::path!("v1" / "objects" / Address / ..)
@@ -136,6 +138,10 @@ fn with_iroh(
     client: iroh::client::Iroh,
 ) -> impl Filter<Extract = (iroh::client::Iroh,), Error = Infallible> + Clone {
     warp::any().map(move || client.clone())
+}
+
+fn with_max_size(max_size: u64) -> impl Filter<Extract = (u64,), Error = Infallible> + Clone {
+    warp::any().map(move || max_size)
 }
 
 #[derive(Serialize, Deserialize)]
@@ -348,6 +354,7 @@ async fn handle_object_upload<F: QueryClient>(
     client: F,
     iroh: iroh::client::Iroh,
     form_parts: warp::multipart::FormData,
+    max_size: u64,
 ) -> Result<impl Reply, Rejection> {
     let start_time = Instant::now();
     let parser = ObjectParser::read_form(form_parts).await.map_err(|e| {
@@ -397,6 +404,11 @@ async fn handle_object_upload<F: QueryClient>(
             }))
         }
     };
+    if size > max_size {
+        return Err(Rejection::from(BadRequest {
+            message: format!("blob size exceeds maximum of {}", max_size),
+        }));
+    }
     let source = match parser.source {
         Some(source) => source,
         None => {
@@ -433,6 +445,15 @@ async fn handle_object_upload<F: QueryClient>(
             message: format!("failed to fetch blob {}: {}", hash, e),
         })
     })?;
+    let outcome_size = outcome.local_size + outcome.downloaded_size;
+    if outcome_size != size {
+        return Err(Rejection::from(BadRequest {
+            message: format!(
+                "blob size and given size do not match (expected {}, got {})",
+                size, outcome_size
+            ),
+        }));
+    }
 
     let ent = new_entangler(iroh).map_err(|e| {
         Rejection::from(BadRequest {
@@ -961,7 +982,7 @@ mod tests {
         let multipart_form =
             multipart_form(&serialized_signed_message_b64, hash, client_node_addr, size).await;
 
-        let reply = handle_object_upload(client, iroh.client().clone(), multipart_form)
+        let reply = handle_object_upload(client, iroh.client().clone(), multipart_form, 1000)
             .await
             .unwrap();
         let response = reply.into_response();
@@ -1054,7 +1075,7 @@ mod tests {
         let multipart_form =
             multipart_form(&serialized_eth_tx_b64, hash, client_node_addr, size).await;
 
-        let reply = handle_object_upload(client, iroh.client().clone(), multipart_form)
+        let reply = handle_object_upload(client, iroh.client().clone(), multipart_form, 1000)
             .await
             .unwrap();
         let response = reply.into_response();
@@ -1143,7 +1164,8 @@ mod tests {
         let multipart_form =
             multipart_form(&serialized_eth_tx_b64, hash, client_node_addr, size).await;
 
-        let result = handle_object_upload(client, iroh.client().clone(), multipart_form).await;
+        let result =
+            handle_object_upload(client, iroh.client().clone(), multipart_form, 1000).await;
         match result {
             Ok(_) => panic!("expected an error for legacy transaction"),
             Err(rejection) => {

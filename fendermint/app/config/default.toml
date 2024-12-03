@@ -184,6 +184,7 @@ enabled = false
 
 # Object API facade
 [objects]
+max_object_size = 5000000000
 
 [objects.listen]
 # Only accept local connections by default.
