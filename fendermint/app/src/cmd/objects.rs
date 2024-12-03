@@ -45,7 +45,7 @@ use warp::{
 use crate::cmd;
 use crate::options::objects::{ObjectsArgs, ObjectsCommands};
 
-const MAX_OBJECT_LENGTH: u64 = 1024 * 1024 * 1024;
+const MAX_OBJECT_LENGTH: u64 = 5_000_000_000; // 5GB
 /// The alpha parameter for alpha entanglement determines the number of parity blobs to generate
 /// for the original blob.
 const ENTANGLER_ALPHA: u8 = 3;
