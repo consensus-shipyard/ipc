@@ -20,17 +20,12 @@ contract CrossMessengerCaller is IpcExchange {
     event CallReceived(IPCAddress from, CallMsg msg);
     event ResultReceived(IpcEnvelope original, ResultMsg result);
 
-    address public subnetActor;
+    uint256 public callsReceived;
+    uint256 public resultsReceived;
 
-    constructor(address _subnetActor, address gateway) IpcExchange(gateway) {
-        subnetActor = _subnetActor;
-    }
-
-    function subnetId() public view returns (SubnetID memory id) {
-        address actor = subnetActor;
-
-        SubnetID memory parent = ISubnetGetter(actor).getParent();
-        return SubnetIDHelper.createSubnetId(parent, actor);
+    constructor(address gatewayAddr_) IpcExchange(gatewayAddr_) {
+        callsReceived = 0;
+        resultsReceived = 0;
     }
 
     function _handleIpcCall(
@@ -38,6 +33,7 @@ contract CrossMessengerCaller is IpcExchange {
         CallMsg memory callMsg
     ) internal override returns (bytes memory) {
         emit CallReceived(envelope.from, callMsg);
+        callsReceived += 1;
         return EMPTY_BYTES;
     }
 
@@ -46,6 +42,7 @@ contract CrossMessengerCaller is IpcExchange {
         IpcEnvelope memory,
         ResultMsg memory resultMsg
     ) internal override {
+        resultsReceived += 1;
         emit ResultReceived(original, resultMsg);
     }
 
@@ -57,7 +54,8 @@ contract CrossMessengerCaller is IpcExchange {
     }
 
     function invokeCrossMessage(IPCAddress memory to, CallMsg memory callMsg, uint256 value) internal {
-        IPCAddress memory from = IPCAddress({subnetId: subnetId(), rawAddress: FvmAddressHelper.from(address(this))});
+        // "sendContractXnetMessage" will handle the `from`
+        IPCAddress memory from;
 
         IpcEnvelope memory envelope = IpcEnvelope({
             kind: IpcMsgKind.Call,
@@ -68,6 +66,6 @@ contract CrossMessengerCaller is IpcExchange {
             nonce: 0
         });
 
-        IGateway(ISubnetGetter(subnetActor).ipcGatewayAddr()).sendContractXnetMessage(envelope);
+        IGateway(gatewayAddr).sendContractXnetMessage(envelope);
     }
 }
