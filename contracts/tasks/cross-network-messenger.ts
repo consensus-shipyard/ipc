@@ -74,9 +74,6 @@ task('cross-network-postbox-scan')
 .setAction(async (args: TaskArguments, hre: HardhatRuntimeEnvironment) => {
     await hre.run('compile')
 
-    const subnetId = { root: args.gateway, route: args.route.split(',') }
-    console.log('sending to subnet', subnetId)
-
     const artifact = await hre.artifacts.readArtifact('CheckpointingFacet')
     const contract = new hre.ethers.Contract(args.gateway, artifact.abi, hre.ethers.provider)
 
