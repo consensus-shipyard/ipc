@@ -114,11 +114,12 @@ impl Actor {
         let mut objects = Vec::new();
         let state = rt.state::<State>()?;
         let owner = state.owner;
-        let (prefixes, has_more) = state.list(
+        let start_key = params.start_key.map(BytesKey::from);
+        let (prefixes, next_key) = state.list(
             rt.store(),
             params.prefix,
             params.delimiter,
-            params.offset,
+            start_key.as_ref(),
             params.limit,
             |key: Vec<u8>, object_state: ObjectState| -> anyhow::Result<(), ActorError> {
                 if let Some(blob) = get_blob(rt, object_state.hash)? {
@@ -131,9 +132,10 @@ impl Actor {
                 Ok(())
             },
         )?;
+        let next_key = next_key.map(|key| key.0);
         Ok(ListObjectsReturn {
             objects,
-            has_more,
+            next_key,
             common_prefixes: prefixes,
         })
     }
