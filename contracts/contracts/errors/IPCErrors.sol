@@ -92,7 +92,9 @@ enum InvalidXnetMessageReason {
     DstSubnet,
     Nonce,
     Value,
-    Kind
+    Kind,
+    CannotSendToItself,
+    CommonParentNotExist
 }
 
 string constant ERR_PERMISSIONED_AND_BOOTSTRAPPED = "Method not allowed if permissioned is enabled and subnet bootstrapped";
