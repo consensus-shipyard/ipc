@@ -976,15 +976,13 @@ where
                 for ((tx_idx, tx_result), tx) in tx_results.iter().enumerate().zip(block.data()) {
                     let emitters = from_tm::collect_emitters(&tx_result.events);
 
-                    // Filter by address and make sure there is intersection with eimitters
-                    if !addrs.is_empty() && addrs.intersection(&emitters).next().is_none() {
-                        continue;
-                    }
+                    let no_intersection =
+                        !addrs.is_empty() && addrs.intersection(&emitters).next().is_none();
 
                     match to_chain_message(tx) {
                         Ok(ChainMessage::Signed(msg)) => {
                             // Filter by sender and recipient addresses.
-                            if !addrs.is_empty()
+                            if no_intersection
                                 && !addrs.contains(&msg.message().from)
                                 && !addrs.contains(&msg.message().to)
                             {
@@ -993,6 +991,9 @@ where
                         }
                         Ok(ChainMessage::Ipc(_)) => {
                             // ipc messages are system messages, no need to check from and to
+                            if no_intersection {
+                                continue;
+                            }
                         }
                         _ => continue,
                     };
