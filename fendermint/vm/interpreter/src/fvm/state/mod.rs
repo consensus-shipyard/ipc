@@ -8,6 +8,7 @@ pub mod snapshot;
 mod check;
 mod exec;
 mod genesis;
+mod priority;
 mod query;
 
 use std::sync::Arc;

@@ -397,6 +397,40 @@ where
             _ => Err(anyhow!("invalid app state json")),
         }
     }
+
+    fn create_check_state(&self) -> anyhow::Result<FvmExecState<ReadOnlyBlockstore<SS>>> {
+        let db = self.state_store_clone();
+        let state = self.committed_state()?;
+
+        // This would create a partial state, but some client scenarios need the full one.
+        // FvmCheckState::new(db, state.state_root(), state.chain_id())
+        //     .context("error creating check state")?
+
+        let mut state = FvmExecState::new(
+            ReadOnlyBlockstore::new(db),
+            self.multi_engine.as_ref(),
+            state.block_height.try_into()?,
+            state.state_params,
+        )
+        .context("error creating check state")?;
+
+        // load txn priority calculator
+        let end = state.block_height() as u64;
+        let start = end
+            .saturating_sub(state.txn_priority_calculator().len() as u64)
+            .max(1);
+        for h in start..=end {
+            let Ok((state_params, _)) = self.state_params_at_height(FvmQueryHeight::Height(h))
+            else {
+                continue;
+            };
+            state
+                .txn_priority_calculator_mut()
+                .base_fee_updated(state_params.base_fee);
+        }
+
+        Ok(state)
+    }
 }
 
 // NOTE: The `Application` interface doesn't allow failures at the moment. The protobuf
@@ -561,22 +595,7 @@ where
 
         let state = match guard.take() {
             Some(state) => state,
-            None => {
-                let db = self.state_store_clone();
-                let state = self.committed_state()?;
-
-                // This would create a partial state, but some client scenarios need the full one.
-                // FvmCheckState::new(db, state.state_root(), state.chain_id())
-                //     .context("error creating check state")?
-
-                FvmExecState::new(
-                    ReadOnlyBlockstore::new(db),
-                    self.multi_engine.as_ref(),
-                    state.block_height.try_into()?,
-                    state.state_params,
-                )
-                .context("error creating check state")?
-            }
+            None => self.create_check_state()?,
         };
 
         let (state, result) = self
@@ -589,9 +608,6 @@ where
             .await
             .context("error running check")?;
 
-        // Update the check state.
-        *guard = Some(state);
-
         let mut mpool_received_trace = MpoolReceived::default();
 
         let response = match result {
@@ -601,10 +617,17 @@ where
                 Ok(Err(InvalidSignature(d))) => invalid_check_tx(AppError::InvalidSignature, d),
                 Ok(Ok(ret)) => {
                     mpool_received_trace.message = Some(Message::from(&ret.message));
-                    to_check_tx(ret)
+
+                    let priority = state.txn_priority_calculator().priority(&ret.message);
+                    let mut t = to_check_tx(ret);
+                    t.priority = priority;
+                    t
                 }
             },
         };
+
+        // Update the check state.
+        *guard = Some(state);
 
         mpool_received_trace.accept = response.code.is_ok();
         if !mpool_received_trace.accept {
