@@ -16,7 +16,7 @@ use fvm_shared::address::Address;
 use serde::{Deserialize, Serialize};
 
 const BIT_WIDTH: u32 = 8;
-const MAX_LIST_LIMIT: usize = 50;
+const MAX_LIST_LIMIT: usize = 1000;
 
 fn state_error(e: fvm_ipld_hamt::Error) -> ActorError {
     ActorError::illegal_state(e.to_string())
@@ -96,6 +96,8 @@ impl MachineState for State {
 pub struct ObjectState {
     /// The object blake3 hash.
     pub hash: Hash,
+    /// The object size.
+    pub size: u64,
     /// User-defined object metadata (e.g., last modified timestamp, etc.).
     pub metadata: HashMap<String, String>,
 }
@@ -115,12 +117,17 @@ impl State {
         store: &BS,
         key: BytesKey,
         hash: Hash,
+        size: u64,
         metadata: HashMap<String, String>,
         overwrite: bool,
     ) -> anyhow::Result<Cid, ActorError> {
         let mut hamt = Hamt::<_, ObjectState>::load_with_bit_width(&self.root, store, BIT_WIDTH)
             .map_err(state_error)?;
-        let object = ObjectState { hash, metadata };
+        let object = ObjectState {
+            hash,
+            size,
+            metadata,
+        };
         if overwrite {
             hamt.set(key, object).map_err(state_error)?;
         } else {
@@ -231,6 +238,7 @@ mod tests {
             let hash = new_hash(u16::arbitrary(g) as usize);
             ObjectState {
                 hash: hash.0,
+                size: u64::arbitrary(g),
                 metadata: HashMap::arbitrary(g),
             }
         }
@@ -244,11 +252,12 @@ mod tests {
         metadata.insert("_modified".to_string(), String::from("1718464345"));
         ObjectState {
             hash: Hash(*hash.as_bytes()),
+            size: data.len() as u64,
             metadata,
         }
     }
 
-    const OBJECT_ONE_CID: &str = "bafy2bzacecywsmknwmizkt3yamzqfvik65diqjepqla4e6qlhigblhobtunx4";
+    const OBJECT_ONE_CID: &str = "bafy2bzaceae4nfmqeqjqkx4hymxvldrgzaabbp3tffrxbmhzb7kod4sgy22xe";
 
     fn object_two() -> ObjectState {
         let data = [6, 7, 8, 9, 10, 11];
@@ -258,6 +267,7 @@ mod tests {
         metadata.insert("_modified".to_string(), String::from("1718480987"));
         ObjectState {
             hash: Hash(*hash.as_bytes()),
+            size: data.len() as u64,
             metadata,
         }
     }
@@ -270,6 +280,7 @@ mod tests {
         metadata.insert("_modified".to_string(), String::from("1718512346"));
         ObjectState {
             hash: Hash(*hash.as_bytes()),
+            size: data.len() as u64,
             metadata,
         }
     }
@@ -297,6 +308,23 @@ mod tests {
             },
         )?;
         Ok((objects, prefixes, next_key))
+    }
+
+    fn get_lex_sequence(start: Vec<u8>, count: usize) -> Vec<Vec<u8>> {
+        let mut current = start;
+        let mut sequence = Vec::with_capacity(count);
+        for _ in 0..count {
+            sequence.push(current.clone());
+            for i in (0..current.len()).rev() {
+                if current[i] < 255 {
+                    current[i] += 1;
+                    break;
+                } else {
+                    current[i] = 0; // Reset this byte to 0 and carry to the next byte
+                }
+            }
+        }
+        sequence
     }
 
     #[test]
@@ -332,6 +360,7 @@ mod tests {
                 &store,
                 BytesKey(vec![1, 2, 3]),
                 object.hash,
+                object.size,
                 object.metadata,
                 true
             )
@@ -352,7 +381,14 @@ mod tests {
         .unwrap();
         let key = BytesKey(vec![1, 2, 3]);
         state
-            .add(&store, key.clone(), object.hash, object.metadata, true)
+            .add(
+                &store,
+                key.clone(),
+                object.hash,
+                object.size,
+                object.metadata,
+                true,
+            )
             .unwrap();
         assert!(state.delete(&store, &key).is_ok());
 
@@ -374,7 +410,7 @@ mod tests {
         let key = BytesKey(vec![1, 2, 3]);
         let md = object.metadata.clone();
         state
-            .add(&store, key.clone(), object.hash, md, true)
+            .add(&store, key.clone(), object.hash, object.size, md, true)
             .unwrap();
         let result = state.get(&store, &key);
 
@@ -388,10 +424,24 @@ mod tests {
     ) -> anyhow::Result<(BytesKey, BytesKey, BytesKey)> {
         let baz_key = BytesKey("foo/baz.png".as_bytes().to_vec()); // index 0
         let object = object_one();
-        state.add(store, baz_key.clone(), object.hash, object.metadata, false)?;
+        state.add(
+            store,
+            baz_key.clone(),
+            object.hash,
+            object.size,
+            object.metadata,
+            false,
+        )?;
         let bar_key = BytesKey("foo/bar.png".as_bytes().to_vec()); // index 1
         let object = object_two();
-        state.add(store, bar_key.clone(), object.hash, object.metadata, false)?;
+        state.add(
+            store,
+            bar_key.clone(),
+            object.hash,
+            object.size,
+            object.metadata,
+            false,
+        )?;
         // We'll mostly ignore this one
         let other_key = BytesKey("zzzz/image.png".as_bytes().to_vec()); // index 2
         let hash = new_hash(256);
@@ -399,12 +449,20 @@ mod tests {
             &store,
             other_key.clone(),
             hash.0,
+            8,
             HashMap::<String, String>::new(),
             false,
         )?;
         let jpeg_key = BytesKey("foo.jpeg".as_bytes().to_vec()); // index 3
         let object = object_three();
-        state.add(store, jpeg_key.clone(), object.hash, object.metadata, false)?;
+        state.add(
+            store,
+            jpeg_key.clone(),
+            object.hash,
+            object.size,
+            object.metadata,
+            false,
+        )?;
         Ok((baz_key, bar_key, jpeg_key))
     }
 
@@ -441,11 +499,19 @@ mod tests {
         )
         .unwrap();
 
-        for i in 0..MAX_LIST_LIMIT + 10 {
-            let key = BytesKey(format!("{}.txt", i).as_bytes().to_vec());
+        let sequence = get_lex_sequence(vec![0, 0, 0], MAX_LIST_LIMIT + 10);
+        for key in sequence {
+            let key = BytesKey(key);
             let object = object_one();
             state
-                .add(&store, key.clone(), object.hash, object.metadata, false)
+                .add(
+                    &store,
+                    key.clone(),
+                    object.hash,
+                    object.size,
+                    object.metadata,
+                    false,
+                )
                 .unwrap();
         }
 
@@ -454,7 +520,9 @@ mod tests {
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.0.len(), MAX_LIST_LIMIT);
-        assert_eq!(result.2, Some(BytesKey::from("17.txt")));
+        // Note: This isn't the element at MAX_LIST_LIMIT + 1 as one might expect.
+        // The ordering is deterministic but depends on the HAMT structure.
+        assert_eq!(result.2, Some(BytesKey(vec![0, 3, 86])));
 
         let next_key = result.2.unwrap();
 
@@ -481,7 +549,14 @@ mod tests {
             let key = BytesKey(format!("{}.txt", i).as_bytes().to_vec());
             let object = object_one();
             state
-                .add(&store, key.clone(), object.hash, object.metadata, false)
+                .add(
+                    &store,
+                    key.clone(),
+                    object.hash,
+                    object.size,
+                    object.metadata,
+                    false,
+                )
                 .unwrap();
         }
 
@@ -564,6 +639,7 @@ mod tests {
                 &store,
                 jpeg_key.clone(),
                 hash.0,
+                8,
                 HashMap::<String, String>::new(),
                 false,
             )
@@ -575,6 +651,7 @@ mod tests {
                 &store,
                 bar_key.clone(),
                 hash.0,
+                8,
                 HashMap::<String, String>::new(),
                 false,
             )
@@ -586,6 +663,7 @@ mod tests {
                 &store,
                 baz_key.clone(),
                 hash.0,
+                8,
                 HashMap::<String, String>::new(),
                 false,
             )
@@ -649,6 +727,7 @@ mod tests {
                 &store,
                 one.clone(),
                 hash.0,
+                8,
                 HashMap::<String, String>::new(),
                 false,
             )
@@ -660,6 +739,7 @@ mod tests {
                 &store,
                 two.clone(),
                 hash.0,
+                8,
                 HashMap::<String, String>::new(),
                 false,
             )

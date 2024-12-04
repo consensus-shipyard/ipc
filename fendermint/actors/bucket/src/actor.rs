@@ -26,8 +26,6 @@ pub struct Actor;
 
 impl Actor {
     fn add_object(rt: &impl Runtime, params: AddParams) -> Result<Object, ActorError> {
-        // TODO: Remove object store access control
-        // Self::ensure_write_allowed(rt)?;
         rt.validate_immediate_caller_accept_any()?;
         let state = rt.state::<State>()?;
         let key = BytesKey(params.key.clone());
@@ -43,7 +41,7 @@ impl Actor {
                 ));
             }
         }
-        // Add blob for object
+        // Add blob for the object
         let sub = add_blob(
             rt,
             Some(state.owner),
@@ -60,6 +58,7 @@ impl Actor {
                 rt.store(),
                 key,
                 params.hash,
+                params.size,
                 params.metadata,
                 params.overwrite,
             )
@@ -74,7 +73,6 @@ impl Actor {
     }
 
     fn delete_object(rt: &impl Runtime, params: DeleteParams) -> Result<(), ActorError> {
-        // Self::ensure_write_allowed(rt)?;
         rt.validate_immediate_caller_accept_any()?;
         let state = rt.state::<State>()?;
         let key = BytesKey(params.0.clone());
@@ -113,7 +111,6 @@ impl Actor {
         rt.validate_immediate_caller_accept_any()?;
         let mut objects = Vec::new();
         let state = rt.state::<State>()?;
-        let owner = state.owner;
         let start_key = params.start_key.map(BytesKey::from);
         let (prefixes, next_key) = state.list(
             rt.store(),
@@ -122,13 +119,7 @@ impl Actor {
             start_key.as_ref(),
             params.limit,
             |key: Vec<u8>, object_state: ObjectState| -> anyhow::Result<(), ActorError> {
-                if let Some(blob) = get_blob(rt, object_state.hash)? {
-                    if let Some(object) = build_object(&blob, &object_state, key.clone(), owner)? {
-                        objects.push((key, Some(object)));
-                    }
-                } else {
-                    objects.push((key, None));
-                }
+                objects.push((key, object_state));
                 Ok(())
             },
         )?;
