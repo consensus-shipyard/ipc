@@ -449,7 +449,11 @@ library LibGateway {
         if (!crossMsg.to.subnetId.equals(s.networkName)) {
             CrossMessageValidationOutcome outcome = validateCrossMessage(crossMsg);
             if (outcome != CrossMessageValidationOutcome.Valid) {
-                sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encode(outcome));
+                sendReceipt(
+                    crossMsg,
+                    OutcomeType.SystemErr,
+                    abi.encodeWithSelector(InvalidXnetMessage.selector, validationOutcomeToInvalidXnetMsgReason(outcome))
+                );
                 return;
             }
 
@@ -602,6 +606,19 @@ library LibGateway {
         }
 
         return CrossMessageValidationOutcome.Valid;
+    }
+
+     // Function to map CrossMessageValidationOutcome to InvalidXnetMessageReason
+    function validationOutcomeToInvalidXnetMsgReason(CrossMessageValidationOutcome outcome) internal pure returns (InvalidXnetMessageReason) {
+        if (outcome == CrossMessageValidationOutcome.InvalidDstSubnet) {
+            return InvalidXnetMessageReason.DstSubnet;
+        } else if (outcome == CrossMessageValidationOutcome.CannotSendToItself) {
+            return InvalidXnetMessageReason.CannotSendToItself;
+        } else if (outcome == CrossMessageValidationOutcome.CommonParentNotExist) {
+            return InvalidXnetMessageReason.CommonParentNotExist;
+        }
+
+        revert("Unhandled CrossMessageValidationOutcome");
     }
     
      /**
