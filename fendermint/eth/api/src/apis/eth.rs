@@ -974,21 +974,28 @@ where
 
                 let mut log_index_start = 0usize;
                 for ((tx_idx, tx_result), tx) in tx_results.iter().enumerate().zip(block.data()) {
-                    let msg = match to_chain_message(tx) {
-                        Ok(ChainMessage::Signed(msg)) => msg,
-                        _ => continue,
-                    };
-
                     let emitters = from_tm::collect_emitters(&tx_result.events);
 
-                    // Filter by address.
-                    if !addrs.is_empty()
-                        && !addrs.contains(&msg.message().from)
-                        && !addrs.contains(&msg.message().to)
-                        && addrs.intersection(&emitters).next().is_none()
-                    {
+                    // Filter by address and make sure there is intersection with eimitters
+                    if !addrs.is_empty() && addrs.intersection(&emitters).next().is_none() {
                         continue;
                     }
+
+                    match to_chain_message(tx) {
+                        Ok(ChainMessage::Signed(msg)) => {
+                            // Filter by sender and recipient addresses.
+                            if !addrs.is_empty()
+                                && !addrs.contains(&msg.message().from)
+                                && !addrs.contains(&msg.message().to)
+                            {
+                                continue;
+                            }
+                        }
+                        Ok(ChainMessage::Ipc(_)) => {
+                            // ipc messages are system messages, no need to check from and to
+                        }
+                        _ => continue,
+                    };
 
                     let tx_hash = msg_hash(&tx_result.events, tx);
                     let tx_idx = et::U64::from(tx_idx);
