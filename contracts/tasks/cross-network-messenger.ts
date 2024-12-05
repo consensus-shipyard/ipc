@@ -44,37 +44,3 @@ task('cross-network-send')
         const contract = contracts.contracts.CrossMessengerCaller
         await contract.invokeSendMessage(subnetId, args.recipient, amount, { value: Number(amount) })
     })
-
-// step 3. check result
-// sample command: pnpm exec hardhat cross-network-scan --network calibrationnet
-task('cross-network-scan')
-    .setDescription('Scan cross network send in the target subnet')
-    .setAction(async (_args: TaskArguments, hre: HardhatRuntimeEnvironment) => {
-        await hre.run('compile')
-
-        const contracts = await Deployments.resolve(hre, 'CrossMessengerCaller')
-        const contract = contracts.contracts.CrossMessengerCaller
-        const received = contract.filters.CallReceived()
-        const events = await contract.queryFilter(received)
-        for (const event of events) {
-            console.log(event)
-        }
-    })
-
-// scan postbox
-// sample command: pnpm exec hardhat cross-network-postbox-scan --network calibrationnet <GATEWAY ADDRESS>
-task('cross-network-postbox-scan')
-.addPositionalParam('gateway', 'the gateway address')
-.setDescription('Scan to check if cross network message is inserted into postbox')
-.setAction(async (args: TaskArguments, hre: HardhatRuntimeEnvironment) => {
-    await hre.run('compile')
-
-    const artifact = await hre.artifacts.readArtifact('CheckpointingFacet')
-    const contract = new hre.ethers.Contract(args.gateway, artifact.abi, hre.ethers.provider)
-
-    const received = contract.filters.MessageStoredInPostbox()
-    const events = await contract.queryFilter(received)
-    for (const event of events) {
-        console.log(event)
-    }
-})
