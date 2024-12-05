@@ -21,6 +21,8 @@ num-traits = { workspace = true }
 serde = { workspace = true }
 frc42_dispatch = { workspace = true }
 
+fendermint_actor_machine = { path = "../machine" }
+
 [dev-dependencies]
 fil_actors_runtime = { workspace = true, features = ["test_utils"] }
 

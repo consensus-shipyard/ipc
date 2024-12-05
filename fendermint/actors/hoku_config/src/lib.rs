@@ -1,6 +1,7 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use fendermint_actor_machine::resolve_external;
 use fil_actors_runtime::actor_error;
 use fil_actors_runtime::runtime::{ActorCode, Runtime};
 use fil_actors_runtime::SYSTEM_ACTOR_ADDR;
@@ -9,11 +10,16 @@ use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
 use fvm_shared::METHOD_CONSTRUCTOR;
 use num_derive::FromPrimitive;
+use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
 
 pub const ACTOR_NAME: &str = "hoku_config";
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct SetAdminParams(pub Address);
 
 pub type SetConfigParams = Config;
 
@@ -42,6 +48,7 @@ pub struct Actor {}
 #[repr(u64)]
 pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
+    SetAdmin = frc42_dispatch::method_hash!("SetAdmin"),
     SetConfig = frc42_dispatch::method_hash!("SetConfig"),
     GetConfig = frc42_dispatch::method_hash!("GetConfig"),
 }
@@ -50,7 +57,6 @@ impl Actor {
     /// Creates the actor
     pub fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-
         let st = State {
             admin: None,
             config: Config {
@@ -58,14 +64,31 @@ impl Actor {
                 blob_credit_debit_rate: params.initial_blob_credit_debit_rate,
             },
         };
-
         rt.create(&st)
     }
 
-    fn set_config(rt: &impl Runtime, params: SetConfigParams) -> Result<(), ActorError> {
-        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-
+    fn set_admin(rt: &impl Runtime, params: SetAdminParams) -> Result<(), ActorError> {
+        Self::ensure_update_allowed(rt)?;
+        let (new_admin, _) = resolve_external(rt, params.0)?;
         rt.transaction(|st: &mut State, _rt| {
+            st.admin = Some(new_admin);
+            Ok(())
+        })
+    }
+
+    fn set_config(rt: &impl Runtime, params: SetConfigParams) -> Result<(), ActorError> {
+        let admin_exists = Self::ensure_update_allowed(rt)?;
+        let new_admin = if !admin_exists {
+            // The first caller becomes admin
+            let (new_admin, _) = resolve_external(rt, rt.message().caller())?;
+            Some(new_admin)
+        } else {
+            None
+        };
+        rt.transaction(|st: &mut State, _rt| {
+            if let Some(new_admin) = new_admin {
+                st.admin = Some(new_admin);
+            }
             st.config = params;
             Ok(())
         })?;
@@ -76,6 +99,28 @@ impl Actor {
     fn get_config(rt: &impl Runtime) -> Result<Config, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         rt.state::<State>().map(|s| s.config)
+    }
+
+    /// Ensures that immediate caller is allowed to update the config.
+    /// Returns whether the admin exists.
+    fn ensure_update_allowed(rt: &impl Runtime) -> Result<bool, ActorError> {
+        let st = rt.state::<State>()?;
+        let admin_exists = if let Some(admin) = st.admin {
+            if let Some(admin_id) = rt.resolve_address(&admin) {
+                rt.validate_immediate_caller_is(std::iter::once(&Address::new_id(admin_id)))?
+            } else {
+                // This should not happen.
+                return Err(ActorError::forbidden(String::from(
+                    "failed to resolve config admin id",
+                )));
+            }
+            true
+        } else {
+            // The first caller becomes the admin
+            rt.validate_immediate_caller_accept_any()?;
+            false
+        };
+        Ok(admin_exists)
     }
 }
 
@@ -88,35 +133,6 @@ impl Default for Config {
     }
 }
 
-impl State {
-    // fn next_base_fee(&self, gas_used: Gas) -> TokenAmount {
-    //     let base_fee = self.base_fee.clone();
-    //     let gas_target = self.constants.block_gas_limit / self.constants.elasticity_multiplier;
-    //
-    //     match gas_used.cmp(&gas_target) {
-    //         Ordering::Equal => base_fee,
-    //         Ordering::Less => {
-    //             let base_fee_delta = base_fee.atto() * (gas_target - gas_used)
-    //                 / gas_target
-    //                 / self.constants.base_fee_max_change_denominator;
-    //             let base_fee_delta = TokenAmount::from_atto(base_fee_delta);
-    //             if base_fee_delta >= base_fee {
-    //                 self.constants.minimal_base_fee.clone()
-    //             } else {
-    //                 base_fee - base_fee_delta
-    //             }
-    //         }
-    //         Ordering::Greater => {
-    //             let gas_used_delta = gas_used - gas_target;
-    //             let delta = base_fee.atto() * gas_used_delta
-    //                 / gas_target
-    //                 / self.constants.base_fee_max_change_denominator;
-    //             base_fee + TokenAmount::from_atto(delta).max(TokenAmount::from_atto(1))
-    //         }
-    //     }
-    // }
-}
-
 impl ActorCode for Actor {
     type Methods = Method;
 
@@ -126,6 +142,7 @@ impl ActorCode for Actor {
 
     actor_dispatch! {
         Constructor => constructor,
+        SetAdmin => set_admin,
         SetConfig => set_config,
         GetConfig => get_config,
     }
