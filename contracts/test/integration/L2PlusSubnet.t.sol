@@ -402,7 +402,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             to: FvmAddressHelper.from(params.callerAddr),
             value: params.amount
         });
-        
+
         // 0 is default but we set it explicitly here to make it clear
         fundCrossMessage.nonce = 0;
 
@@ -413,8 +413,11 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             message: fundCrossMessage,
             id: fundCrossMessage.toDeterministicHash()
         });
-    
-        params.root.gateway.manager().fund{value: params.amount}(params.subnet.id, FvmAddressHelper.from(params.callerAddr));
+
+        params.root.gateway.manager().fund{value: params.amount}(
+            params.subnet.id,
+            FvmAddressHelper.from(params.callerAddr)
+        );
 
         IpcEnvelope memory callCrossMessage = TestUtils.newXnetCallMsg(
             IPCAddress({subnetId: params.root.id, rawAddress: FvmAddressHelper.from(params.callerAddr)}),
@@ -439,7 +442,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         IpcEnvelope[] memory msgsForL2 = new IpcEnvelope[](2);
         msgsForL2[0] = fundCrossMessage;
         msgsForL2[1] = callCrossMessage;
-        
+
         // the expected nonce for the top down message for L3 subnet is 0 because no previous message was sent
         // from L2 to L3
         msgsForL2[1].nonce = 0;
@@ -450,7 +453,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             message: callCrossMessage,
             id: callCrossMessage.toDeterministicHash()
         });
-        
+
         // nonce needs to be 1 because of the fund message.
         msgsForL2[1].nonce = 1;
         params.subnet.gateway.xnetMessenger().applyCrossMessages(msgsForL2);
@@ -478,7 +481,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             to: FvmAddressHelper.from(params.callerAddr),
             value: params.amount
         });
-        
+
         // nonce should be 1 because this is the first cross message from L1 to L3
         fundCrossMessageL3.nonce = 1;
 
@@ -489,8 +492,11 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             message: fundCrossMessageL3,
             id: fundCrossMessageL3.toDeterministicHash()
         });
-    
-        params.subnet.gateway.manager().fund{value: params.amount}(params.subnetL3.id, FvmAddressHelper.from(params.callerAddr));
+
+        params.subnet.gateway.manager().fund{value: params.amount}(
+            params.subnetL3.id,
+            FvmAddressHelper.from(params.callerAddr)
+        );
 
         uint64 subnetL3AppliedTopDownNonceAfterFund = params.subnetL3.gateway.getter().appliedTopDownNonce();
         assertEq(subnetL3AppliedTopDownNonceAfterFund, 1, "wrong L3 subnet applied top down nonce");

@@ -617,7 +617,7 @@ library LibGateway {
             return InvalidXnetMessageReason.CommonParentNotExist;
         }
 
-        revert("Unhandled CrossMessageValidationOutcome");
+        revert("Unhandled validation outcome");
     }
     
      /**
