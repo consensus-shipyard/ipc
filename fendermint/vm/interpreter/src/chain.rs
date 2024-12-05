@@ -9,8 +9,7 @@ use crate::{
     fvm::state::ipc::GatewayCaller,
     fvm::state::FvmExecState,
     fvm::store::ReadOnlyBlockstore,
-    fvm::FvmMessage,
-    fvm::{topdown, BlockGasLimit, FvmApplyRet, PowerUpdates},
+    fvm::{topdown, EndBlockOutput, FvmApplyRet, FvmMessage},
     signed::{SignedMessageApplyRes, SignedMessageCheckRes, SyntheticMessage, VerifiableMessage},
     CheckInterpreter, ExecInterpreter, ProposalInterpreter, QueryInterpreter,
 };
@@ -669,7 +668,7 @@ where
         Message = VerifiableMessage,
         DeliverOutput = SignedMessageApplyRes,
         State = FvmExecState<DB>,
-        EndOutput = (PowerUpdates, BlockGasLimit),
+        EndOutput = EndBlockOutput,
     >,
 {
     // The state consists of the resolver pool, which this interpreter needs, and the rest of the
@@ -1086,10 +1085,10 @@ where
         let (mut state, out) = self.inner.end(state).await?;
 
         // Update any component that needs to know about changes in the power table.
-        if !out.0 .0.is_empty() {
+        if !out.power_updates.0.is_empty() {
             let power_updates = out
+                .power_updates
                 .0
-                 .0
                 .iter()
                 .map(|v| {
                     let vk = ValidatorKey::from(v.public_key.0);

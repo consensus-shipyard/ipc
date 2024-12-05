@@ -141,6 +141,21 @@ pub mod checkpointing_facet {
                                                     ),
                                                 ),
                                             ),
+                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                ::std::vec![
+                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                        ::std::vec![
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                ],
+                                                            ),
+                                                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                                        ],
+                                                    ),
+                                                ],
+                                            ),
                                         ],
                                     ),
                                     internal_type: ::core::option::Option::Some(
@@ -233,6 +248,21 @@ pub mod checkpointing_facet {
                                                     ),
                                                 ),
                                             ),
+                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                ::std::vec![
+                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                        ::std::vec![
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                ],
+                                                            ),
+                                                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                                        ],
+                                                    ),
+                                                ],
+                                            ),
                                         ],
                                     ),
                                     internal_type: ::core::option::Option::Some(
@@ -259,6 +289,38 @@ pub mod checkpointing_facet {
                                     ),
                                     internal_type: ::core::option::Option::Some(
                                         ::std::borrow::ToOwned::to_owned("uint256"),
+                                    ),
+                                },
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("activity"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                        ::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                ::std::vec![
+                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                        ::std::vec![
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                        ],
+                                                    ),
+                                                    ::ethers::core::abi::ethabi::ParamType::Array(
+                                                        ::std::boxed::Box::new(
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                ],
+                                                            ),
+                                                        ),
+                                                    ),
+                                                ],
+                                            ),
+                                        ],
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned(
+                                            "struct FullActivityRollup",
+                                        ),
                                     ),
                                 },
                             ],
@@ -296,6 +358,52 @@ pub mod checkpointing_facet {
                 ),
             ]),
             events: ::core::convert::From::from([
+                (
+                    ::std::borrow::ToOwned::to_owned("ActivityRollupRecorded"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "ActivityRollupRecorded",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("checkpointHeight"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    indexed: false,
+                                },
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("rollup"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                        ::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                ::std::vec![
+                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                        ::std::vec![
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                        ],
+                                                    ),
+                                                    ::ethers::core::abi::ethabi::ParamType::Array(
+                                                        ::std::boxed::Box::new(
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                ],
+                                                            ),
+                                                        ),
+                                                    ),
+                                                ],
+                                            ),
+                                        ],
+                                    ),
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
+                ),
                 (
                     ::std::borrow::ToOwned::to_owned("NewBottomUpMsgBatch"),
                     ::std::vec![
@@ -772,26 +880,32 @@ pub mod checkpointing_facet {
                 )
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `commitCheckpoint` (0xfba0fa4d) function
+        ///Calls the contract's `commitCheckpoint` (0xa0316672) function
         pub fn commit_checkpoint(
             &self,
             checkpoint: BottomUpCheckpoint,
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
-                .method_hash([251, 160, 250, 77], (checkpoint,))
+                .method_hash([160, 49, 102, 114], (checkpoint,))
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `createBottomUpCheckpoint` (0xdc749b05) function
+        ///Calls the contract's `createBottomUpCheckpoint` (0xd8b46025) function
         pub fn create_bottom_up_checkpoint(
             &self,
             checkpoint: BottomUpCheckpoint,
             membership_root_hash: [u8; 32],
             membership_weight: ::ethers::core::types::U256,
+            activity: FullActivityRollup,
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash(
-                    [220, 116, 155, 5],
-                    (checkpoint, membership_root_hash, membership_weight),
+                    [216, 180, 96, 37],
+                    (
+                        checkpoint,
+                        membership_root_hash,
+                        membership_weight,
+                        activity,
+                    ),
                 )
                 .expect("method not found (this should never happen)")
         }
@@ -803,6 +917,13 @@ pub mod checkpointing_facet {
             self.0
                 .method_hash([172, 129, 131, 121], new_retention_height)
                 .expect("method not found (this should never happen)")
+        }
+        ///Gets the contract's `ActivityRollupRecorded` event
+        pub fn activity_rollup_recorded_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ActivityRollupRecordedFilter>
+        {
+            self.0.event()
         }
         ///Gets the contract's `NewBottomUpMsgBatch` event
         pub fn new_bottom_up_msg_batch_filter(
@@ -1610,6 +1731,24 @@ pub mod checkpointing_facet {
         Eq,
         Hash,
     )]
+    #[ethevent(
+        name = "ActivityRollupRecorded",
+        abi = "ActivityRollupRecorded(uint64,(((uint64,uint64),(address,uint64)[])))"
+    )]
+    pub struct ActivityRollupRecordedFilter {
+        pub checkpoint_height: u64,
+        pub rollup: FullActivityRollup,
+    }
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
     #[ethevent(name = "NewBottomUpMsgBatch", abi = "NewBottomUpMsgBatch(uint256)")]
     pub struct NewBottomUpMsgBatchFilter {
         #[ethevent(indexed)]
@@ -1677,6 +1816,7 @@ pub mod checkpointing_facet {
     ///Container type for all of the contract's events
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum CheckpointingFacetEvents {
+        ActivityRollupRecordedFilter(ActivityRollupRecordedFilter),
         NewBottomUpMsgBatchFilter(NewBottomUpMsgBatchFilter),
         NewTopDownMessageFilter(NewTopDownMessageFilter),
         QuorumReachedFilter(QuorumReachedFilter),
@@ -1686,6 +1826,11 @@ pub mod checkpointing_facet {
         fn decode_log(
             log: &::ethers::core::abi::RawLog,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
+            if let Ok(decoded) = ActivityRollupRecordedFilter::decode_log(log) {
+                return Ok(CheckpointingFacetEvents::ActivityRollupRecordedFilter(
+                    decoded,
+                ));
+            }
             if let Ok(decoded) = NewBottomUpMsgBatchFilter::decode_log(log) {
                 return Ok(CheckpointingFacetEvents::NewBottomUpMsgBatchFilter(decoded));
             }
@@ -1704,11 +1849,19 @@ pub mod checkpointing_facet {
     impl ::core::fmt::Display for CheckpointingFacetEvents {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
+                Self::ActivityRollupRecordedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::NewBottomUpMsgBatchFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NewTopDownMessageFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::QuorumReachedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::QuorumWeightUpdatedFilter(element) => ::core::fmt::Display::fmt(element, f),
             }
+        }
+    }
+    impl ::core::convert::From<ActivityRollupRecordedFilter> for CheckpointingFacetEvents {
+        fn from(value: ActivityRollupRecordedFilter) -> Self {
+            Self::ActivityRollupRecordedFilter(value)
         }
     }
     impl ::core::convert::From<NewBottomUpMsgBatchFilter> for CheckpointingFacetEvents {
@@ -1752,7 +1905,7 @@ pub mod checkpointing_facet {
         pub weight: ::ethers::core::types::U256,
         pub signature: ::ethers::core::types::Bytes,
     }
-    ///Container type for all input parameters for the `commitCheckpoint` function with signature `commitCheckpoint(((uint64,address[]),uint256,bytes32,uint64,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)[]))` and selector `0xfba0fa4d`
+    ///Container type for all input parameters for the `commitCheckpoint` function with signature `commitCheckpoint(((uint64,address[]),uint256,bytes32,uint64,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)[],(((uint64,uint64),bytes32))))` and selector `0xa0316672`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -1765,12 +1918,12 @@ pub mod checkpointing_facet {
     )]
     #[ethcall(
         name = "commitCheckpoint",
-        abi = "commitCheckpoint(((uint64,address[]),uint256,bytes32,uint64,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)[]))"
+        abi = "commitCheckpoint(((uint64,address[]),uint256,bytes32,uint64,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)[],(((uint64,uint64),bytes32))))"
     )]
     pub struct CommitCheckpointCall {
         pub checkpoint: BottomUpCheckpoint,
     }
-    ///Container type for all input parameters for the `createBottomUpCheckpoint` function with signature `createBottomUpCheckpoint(((uint64,address[]),uint256,bytes32,uint64,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)[]),bytes32,uint256)` and selector `0xdc749b05`
+    ///Container type for all input parameters for the `createBottomUpCheckpoint` function with signature `createBottomUpCheckpoint(((uint64,address[]),uint256,bytes32,uint64,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)[],(((uint64,uint64),bytes32))),bytes32,uint256,(((uint64,uint64),(address,uint64)[])))` and selector `0xd8b46025`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -1783,12 +1936,13 @@ pub mod checkpointing_facet {
     )]
     #[ethcall(
         name = "createBottomUpCheckpoint",
-        abi = "createBottomUpCheckpoint(((uint64,address[]),uint256,bytes32,uint64,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)[]),bytes32,uint256)"
+        abi = "createBottomUpCheckpoint(((uint64,address[]),uint256,bytes32,uint64,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)[],(((uint64,uint64),bytes32))),bytes32,uint256,(((uint64,uint64),(address,uint64)[])))"
     )]
     pub struct CreateBottomUpCheckpointCall {
         pub checkpoint: BottomUpCheckpoint,
         pub membership_root_hash: [u8; 32],
         pub membership_weight: ::ethers::core::types::U256,
+        pub activity: FullActivityRollup,
     }
     ///Container type for all input parameters for the `pruneBottomUpCheckpoints` function with signature `pruneBottomUpCheckpoints(uint256)` and selector `0xac818379`
     #[derive(
@@ -1890,7 +2044,7 @@ pub mod checkpointing_facet {
             Self::PruneBottomUpCheckpoints(value)
         }
     }
-    ///`BottomUpCheckpoint((uint64,address[]),uint256,bytes32,uint64,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)[])`
+    ///`BottomUpCheckpoint((uint64,address[]),uint256,bytes32,uint64,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)[],(((uint64,uint64),bytes32)))`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -1907,6 +2061,95 @@ pub mod checkpointing_facet {
         pub block_hash: [u8; 32],
         pub next_configuration_number: u64,
         pub msgs: ::std::vec::Vec<IpcEnvelope>,
+        pub activity: CompressedActivityRollup,
+    }
+    ///`CompressedActivityRollup(((uint64,uint64),bytes32))`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct CompressedActivityRollup {
+        pub consensus: CompressedSummary,
+    }
+    ///`AggregatedStats(uint64,uint64)`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct AggregatedStats {
+        pub total_active_validators: u64,
+        pub total_num_blocks_committed: u64,
+    }
+    ///`CompressedSummary((uint64,uint64),bytes32)`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct CompressedSummary {
+        pub stats: AggregatedStats,
+        pub data_root_commitment: [u8; 32],
+    }
+    ///`FullSummary((uint64,uint64),(address,uint64)[])`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct FullSummary {
+        pub stats: AggregatedStats,
+        pub data: ::std::vec::Vec<ValidatorData>,
+    }
+    ///`ValidatorData(address,uint64)`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct ValidatorData {
+        pub validator: ::ethers::core::types::Address,
+        pub blocks_committed: u64,
+    }
+    ///`FullActivityRollup(((uint64,uint64),(address,uint64)[]))`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct FullActivityRollup {
+        pub consensus: FullSummary,
     }
     ///`FvmAddress(uint8,bytes)`
     #[derive(
