@@ -1,6 +1,6 @@
 [package]
 name = "fendermint_actor_blob_reader"
-description = "Actor for reading blob bytes"
+description = "Singleton actor for reading blob bytes"
 license.workspace = true
 edition.workspace = true
 authors.workspace = true

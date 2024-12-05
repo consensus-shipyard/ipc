@@ -21,7 +21,7 @@ use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use fendermint_vm_actor_interface::{
     account, activity, adm, blob_reader, blobs, burntfunds, chainmetadata, cron, eam, gas_market,
-    init, ipc, reward, system, EMPTY_ARR,
+    hoku_config, init, ipc, reward, system, EMPTY_ARR,
 };
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Collateral, Genesis, Power, PowerScale, Validator};
@@ -448,6 +448,21 @@ impl GenesisBuilder {
                 None,
             )
             .context("failed to create chainmetadata actor")?;
+
+        // Initialize the hoku config actor.
+        let hoku_config_state = fendermint_actor_hoku_config::State {
+            admin: None,
+            config: fendermint_actor_hoku_config::Config::default(),
+        };
+        state
+            .create_custom_actor(
+                fendermint_actor_hoku_config::ACTOR_NAME,
+                hoku_config::HOKU_CONFIG_ACTOR_ID,
+                &hoku_config_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create hoku config actor")?;
 
         // Initialize the blob actor.
         let blobs_state = fendermint_actor_blobs::State::new(

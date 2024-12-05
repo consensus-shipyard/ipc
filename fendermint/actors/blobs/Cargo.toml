@@ -1,6 +1,6 @@
 [package]
 name = "fendermint_actor_blobs"
-description = "Actor for blob management"
+description = "Singleton actor for blob management"
 license.workspace = true
 edition.workspace = true
 authors.workspace = true

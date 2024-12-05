@@ -39,6 +39,7 @@ members = [
     "fendermint/actors/blobs",
     "fendermint/actors/blobs/shared",
     "fendermint/actors/bucket",
+    "fendermint/actors/hoku_config",
     "fendermint/actors/machine",
     "fendermint/actors/timehub",
     "hoku/actor_sdk",
