@@ -531,7 +531,6 @@ library LibGateway {
         // If the directionality is top-down, or if we're inverting the direction
         // because we're the LCA, commit a top-down message.
         if (applyType == IPCMsgType.TopDown || isLCA) {
-            ++s.appliedTopDownNonce;
             (, SubnetID memory subnetId) = to.down(s.networkName);
             (, Subnet storage subnet) = getSubnet(subnetId);
             LibGateway.commitTopDownMsg(subnet, crossMessage);

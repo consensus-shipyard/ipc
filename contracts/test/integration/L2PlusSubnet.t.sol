@@ -372,6 +372,130 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         sendCrossMessageFromParentToChildWithResult(params);
     }
 
+    function testL2PlusSubnet_ParentToChildTopDownNoncePropagatedCorrectly() public {
+        MockIpcContractResult caller = new MockIpcContractResult();
+        Params memory params = Params({
+            root: rootNetwork,
+            subnet: nativeL2Subnet,
+            subnetL3: nativeL3Subnets[0],
+            caller: caller,
+            callerAddr: address(caller),
+            recipientAddr: address(new MockIpcContractPayable()),
+            amount: 3,
+            expectedAmount: 3,
+            expectedOutcome: OutcomeType.Ok,
+            expectedRet: abi.encode(EMPTY_BYTES),
+            callerAmount: 1 ether,
+            fundAmount: 100000
+        });
+
+        // register L2 into root network
+        registerSubnet(params.subnet.subnetActorAddr, params.root.gateway);
+        // register L3 into L2 subnet
+        registerSubnet(params.subnetL3.subnetActorAddr, params.subnet.gateway);
+
+        vm.deal(params.callerAddr, params.callerAmount);
+
+        IpcEnvelope memory fundCrossMessage = CrossMsgHelper.createFundMsg({
+            subnet: params.subnet.id,
+            signer: params.callerAddr,
+            to: FvmAddressHelper.from(params.callerAddr),
+            value: params.amount
+        });
+        
+        // 0 is default but we set it explicitly here to make it clear
+        fundCrossMessage.nonce = 0;
+
+        vm.prank(params.callerAddr);
+        vm.expectEmit(true, true, true, true, params.root.gatewayAddr);
+        emit LibGateway.NewTopDownMessage({
+            subnet: params.subnet.subnetActorAddr,
+            message: fundCrossMessage,
+            id: fundCrossMessage.toDeterministicHash()
+        });
+    
+        params.root.gateway.manager().fund{value: params.amount}(params.subnet.id, FvmAddressHelper.from(params.callerAddr));
+
+        IpcEnvelope memory callCrossMessage = TestUtils.newXnetCallMsg(
+            IPCAddress({subnetId: params.root.id, rawAddress: FvmAddressHelper.from(params.callerAddr)}),
+            IPCAddress({subnetId: params.subnetL3.id, rawAddress: FvmAddressHelper.from(params.recipientAddr)}),
+            params.amount,
+            1
+        );
+
+        // send the cross message from the root network to the L3 subnet
+        vm.prank(params.callerAddr);
+        vm.expectEmit(true, true, true, true, params.root.gatewayAddr);
+        emit LibGateway.NewTopDownMessage({
+            subnet: params.subnet.subnetActorAddr,
+            message: callCrossMessage,
+            id: callCrossMessage.toDeterministicHash()
+        });
+
+        params.root.gateway.messenger().sendContractXnetMessage{value: params.amount}(callCrossMessage);
+        (, uint64 rootTopDownNonce) = params.root.gateway.getter().getTopDownNonce(params.subnet.id);
+        assertEq(rootTopDownNonce, 2, "wrong root top down nonce");
+
+        IpcEnvelope[] memory msgsForL2 = new IpcEnvelope[](2);
+        msgsForL2[0] = fundCrossMessage;
+        msgsForL2[1] = callCrossMessage;
+        
+        // the expected nonce for the top down message for L3 subnet is 0 because no previous message was sent
+        // from L2 to L3
+        msgsForL2[1].nonce = 0;
+        vm.prank(FilAddress.SYSTEM_ACTOR);
+        vm.expectEmit(true, true, true, true, params.subnet.gatewayAddr);
+        emit LibGateway.NewTopDownMessage({
+            subnet: params.subnetL3.subnetActorAddr,
+            message: callCrossMessage,
+            id: callCrossMessage.toDeterministicHash()
+        });
+        
+        // nonce needs to be 1 because of the fund message.
+        msgsForL2[1].nonce = 1;
+        params.subnet.gateway.xnetMessenger().applyCrossMessages(msgsForL2);
+
+        uint64 subnetAppliedTopDownNonce = params.subnet.gateway.getter().appliedTopDownNonce();
+        assertEq(subnetAppliedTopDownNonce, 2, "wrong L2 subnet applied top down nonce");
+
+        IpcEnvelope[] memory msgsForL3 = new IpcEnvelope[](1);
+        msgsForL3[0] = callCrossMessage;
+
+        vm.prank(FilAddress.SYSTEM_ACTOR);
+        // nonce is zero because this is a first message touching the L3 subnet
+        msgsForL3[0].nonce = 0;
+        params.subnetL3.gateway.xnetMessenger().applyCrossMessages(msgsForL3);
+
+        uint64 subnetL3AppliedTopDownNonce = params.subnetL3.gateway.getter().appliedTopDownNonce();
+        assertEq(subnetL3AppliedTopDownNonce, 1, "wrong L3 subnet applied top down nonce");
+
+        // now fund from L2 to L3 to check to nonce propagation
+        vm.deal(params.callerAddr, params.callerAmount);
+
+        IpcEnvelope memory fundCrossMessageL3 = CrossMsgHelper.createFundMsg({
+            subnet: params.subnetL3.id,
+            signer: params.callerAddr,
+            to: FvmAddressHelper.from(params.callerAddr),
+            value: params.amount
+        });
+        
+        // nonce should be 1 because this is the first cross message from L1 to L3
+        fundCrossMessageL3.nonce = 1;
+
+        vm.prank(params.callerAddr);
+        vm.expectEmit(true, true, true, true, params.subnet.gatewayAddr);
+        emit LibGateway.NewTopDownMessage({
+            subnet: params.subnetL3.subnetActorAddr,
+            message: fundCrossMessageL3,
+            id: fundCrossMessageL3.toDeterministicHash()
+        });
+    
+        params.subnet.gateway.manager().fund{value: params.amount}(params.subnetL3.id, FvmAddressHelper.from(params.callerAddr));
+
+        uint64 subnetL3AppliedTopDownNonceAfterFund = params.subnetL3.gateway.getter().appliedTopDownNonce();
+        assertEq(subnetL3AppliedTopDownNonceAfterFund, 1, "wrong L3 subnet applied top down nonce");
+    }
+
     function fundSubnet(
         GatewayDiamond gateway,
         TestSubnetDefinition memory subnet,

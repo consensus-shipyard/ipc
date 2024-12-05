@@ -60,7 +60,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
             to: envelope.to,
             value: envelope.value,
             message: envelope.message,
-            nonce: 0 // nonce will be updated by LibGateway.commitCrossMessage
+            nonce: 0 // nonce will be updated by LibGateway.commitValidatedCrossMessage
         });
 
         CrossMessageValidationOutcome outcome = committed.validateCrossMessage();
