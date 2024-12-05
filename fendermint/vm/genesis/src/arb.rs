@@ -116,8 +116,6 @@ impl Arbitrary for Genesis {
                 None
             },
             credit_debit_interval: ChainEpoch::arbitrary(g),
-            blob_storage_capacity: u64::arbitrary(g),
-            blob_debit_rate: u64::arbitrary(g),
         }
     }
 }

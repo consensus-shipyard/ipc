@@ -7,12 +7,16 @@ use fvm_ipld_encoding::tuple::*;
 pub use crate::state::State;
 
 pub const BLOBS_ACTOR_NAME: &str = "blobs";
+/// The default total storage capacity of the subnet.
+pub const DEFAULT_BLOB_CAPACITY: u64 = 0;
+/// The default byte-blocks per atto token rate.
+pub const DEFAULT_BLOB_CREDIT_DEBIT_RATE: u64 = 1;
 
 /// Params for actor construction.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ConstructorParams {
-    // The total storage capacity of the subnet.
-    pub capacity: u64,
+    /// The total storage capacity of the subnet.
+    pub blob_capacity: u64,
     /// The byte-blocks per atto token rate.
-    pub debit_rate: u64,
+    pub blob_credit_debit_rate: u64,
 }

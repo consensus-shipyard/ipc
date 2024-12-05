@@ -79,8 +79,6 @@ async fn tester_with_upgrader(
         eam_permission_mode: PermissionMode::Unrestricted,
         ipc: None,
         credit_debit_interval: 3600,
-        blob_storage_capacity: 4294967296,
-        blob_debit_rate: 1,
     };
     (Tester::new(interpreter, genesis).await.unwrap(), validator)
 }

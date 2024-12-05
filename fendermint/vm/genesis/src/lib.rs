@@ -22,11 +22,6 @@ mod arb;
 /// Power conversion decimal points, e.g. 3 decimals means 1 power per milliFIL.
 pub type PowerScale = i8;
 
-/// FIXME SU Temporary fix
-fn default_blob_storage_capacity() -> u64 {
-    4294967296
-}
-
 /// The genesis data structure we serialize to JSON and start the chain with.
 #[serde_as]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -54,11 +49,6 @@ pub struct Genesis {
     pub ipc: Option<ipc::IpcParams>,
     /// Block interval at which to debit all credit accounts.
     pub credit_debit_interval: ChainEpoch,
-    /// Subnet capacity
-    #[serde(default = "default_blob_storage_capacity")]
-    pub blob_storage_capacity: u64,
-    /// Subnet debit rate
-    pub blob_debit_rate: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

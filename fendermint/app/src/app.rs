@@ -245,8 +245,6 @@ where
                     power_scale: 0,
                     app_version: 0,
                     credit_debit_interval: 0,
-                    blob_storage_capacity: 4_294_967_296,
-                    blob_debit_rate: 1,
                 },
             };
             self.set_committed_state(state)?;
@@ -858,8 +856,6 @@ where
                 circ_supply,
                 power_scale,
                 credit_debit_interval,
-                blob_storage_capacity,
-                blob_debit_rate,
             },
             _,
         ) = exec_state.commit().context("failed to commit FVM")?;
@@ -870,8 +866,6 @@ where
         state.state_params.circ_supply = circ_supply;
         state.state_params.power_scale = power_scale;
         state.state_params.credit_debit_interval = credit_debit_interval;
-        state.state_params.blob_storage_capacity = blob_storage_capacity;
-        state.state_params.blob_debit_rate = blob_debit_rate;
 
         let app_hash = state.app_hash();
         let block_height = state.block_height;

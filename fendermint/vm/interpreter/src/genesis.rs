@@ -66,8 +66,6 @@ impl GenesisMetadata {
             power_scale: out.power_scale,
             app_version: 0,
             credit_debit_interval: out.credit_debit_interval,
-            blob_storage_capacity: out.blob_storage_capacity,
-            blob_debit_rate: out.blob_debit_rate,
         };
 
         GenesisMetadata {
@@ -160,8 +158,6 @@ pub struct GenesisOutput {
     pub circ_supply: TokenAmount,
     pub validators: Vec<Validator<Power>>,
     pub credit_debit_interval: ChainEpoch,
-    pub blob_storage_capacity: u64,
-    pub blob_debit_rate: u64,
 }
 
 pub struct GenesisBuilder {
@@ -308,8 +304,6 @@ impl GenesisBuilder {
             power_scale: genesis.power_scale,
             validators,
             credit_debit_interval: genesis.credit_debit_interval,
-            blob_storage_capacity: genesis.blob_storage_capacity,
-            blob_debit_rate: genesis.blob_debit_rate,
         };
 
         // STAGE 0: Declare the built-in EVM contracts we'll have to deploy.
@@ -457,8 +451,8 @@ impl GenesisBuilder {
 
         // Initialize the blob actor.
         let blobs_state = fendermint_actor_blobs::State::new(
-            genesis.blob_storage_capacity,
-            genesis.blob_debit_rate,
+            fendermint_actor_blobs::DEFAULT_BLOB_CAPACITY,
+            fendermint_actor_blobs::DEFAULT_BLOB_CREDIT_DEBIT_RATE,
         );
         state
             .create_custom_actor(
@@ -563,8 +557,6 @@ impl GenesisBuilder {
                 out.chain_id.into(),
                 out.power_scale,
                 out.credit_debit_interval,
-                out.blob_storage_capacity,
-                out.blob_debit_rate,
             )
             .context("failed to init exec state")?;
 

@@ -588,8 +588,6 @@ impl arbitrary::Arbitrary<'_> for StakingState {
             eam_permission_mode: PermissionMode::Unrestricted,
             ipc: Some(parent_ipc),
             credit_debit_interval: ChainEpoch::arbitrary(u)?,
-            blob_storage_capacity: u64::arbitrary(u)?,
-            blob_debit_rate: u64::arbitrary(u)?,
         };
 
         let child_ipc = IpcParams {
@@ -612,8 +610,6 @@ impl arbitrary::Arbitrary<'_> for StakingState {
             eam_permission_mode: PermissionMode::Unrestricted,
             ipc: Some(child_ipc),
             credit_debit_interval: ChainEpoch::arbitrary(u)?,
-            blob_storage_capacity: u64::arbitrary(u)?,
-            blob_debit_rate: u64::arbitrary(u)?,
         };
 
         Ok(StakingState::new(accounts, parent_genesis, child_genesis))

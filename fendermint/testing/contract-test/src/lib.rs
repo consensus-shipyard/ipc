@@ -86,8 +86,6 @@ where
             power_scale: out.power_scale,
             app_version: 0,
             credit_debit_interval: out.credit_debit_interval,
-            blob_storage_capacity: out.blob_storage_capacity,
-            blob_debit_rate: out.blob_debit_rate,
         };
 
         Ok(Self {
@@ -186,8 +184,6 @@ where
                 circ_supply,
                 power_scale,
                 credit_debit_interval,
-                blob_storage_capacity,
-                blob_debit_rate,
             },
             _,
         ) = exec_state.commit().context("failed to commit FVM")?;
@@ -198,8 +194,6 @@ where
         self.state_params.circ_supply = circ_supply;
         self.state_params.power_scale = power_scale;
         self.state_params.credit_debit_interval = credit_debit_interval;
-        self.state_params.blob_storage_capacity = blob_storage_capacity;
-        self.state_params.blob_debit_rate = blob_debit_rate;
 
         eprintln!("self.state_params: {:?}", self.state_params);
 
