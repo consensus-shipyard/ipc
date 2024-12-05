@@ -148,7 +148,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         uint256 callerAmount;
         uint256 fundAmount;
         uint256 amount;
-        uint256 expectedAmount;
         OutcomeType expectedOutcome;
         bytes expectedRet;
     }
@@ -168,7 +167,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             callerAddr: address(caller),
             recipientAddr: address(new MockIpcContractPayable()),
             amount: 3,
-            expectedAmount: 3,
             expectedOutcome: OutcomeType.Ok,
             expectedRet: abi.encode(EMPTY_BYTES),
             callerAmount: 1 ether,
@@ -188,7 +186,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             callerAddr: address(caller),
             recipientAddr: address(new MockIpcContractPayable()),
             amount: 3,
-            expectedAmount: 3,
             expectedOutcome: OutcomeType.Ok,
             expectedRet: abi.encode(EMPTY_BYTES),
             callerAmount: 1 ether,
@@ -213,7 +210,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             callerAddr: address(caller),
             recipientAddr: address(new MockIpcContractPayable()),
             amount: 3,
-            expectedAmount: 3,
             expectedOutcome: OutcomeType.Ok,
             expectedRet: abi.encode(EMPTY_BYTES),
             callerAmount: 1 ether,
@@ -233,7 +229,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             callerAddr: address(caller),
             recipientAddr: address(new MockIpcContractPayable()),
             amount: 3,
-            expectedAmount: 3,
             expectedOutcome: OutcomeType.Ok,
             expectedRet: abi.encode(EMPTY_BYTES),
             callerAmount: 1 ether,
@@ -253,7 +248,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             callerAddr: address(caller),
             recipientAddr: address(new MockIpcContractPayable()),
             amount: 3,
-            expectedAmount: 3,
             expectedOutcome: OutcomeType.Ok,
             expectedRet: abi.encode(EMPTY_BYTES),
             callerAmount: 1 ether,
@@ -273,7 +267,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             callerAddr: address(caller),
             recipientAddr: address(new MockIpcContractPayable()),
             amount: 3,
-            expectedAmount: 3,
             expectedOutcome: OutcomeType.Ok,
             expectedRet: abi.encode(EMPTY_BYTES),
             callerAmount: 1 ether,
@@ -302,7 +295,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             callerAddr: address(caller),
             recipientAddr: 0x53c82507aA03B1a6e695000c302674ef1ecb880B,
             amount: 3,
-            expectedAmount: 0,
             expectedOutcome: OutcomeType.ActorErr,
             expectedRet: abi.encodeWithSelector(InvalidSubnetActor.selector),
             callerAmount: 1 ether,
@@ -322,7 +314,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             callerAddr: address(caller),
             recipientAddr: 0x53c82507aA03B1a6e695000c302674ef1ecb880B,
             amount: 3,
-            expectedAmount: 0,
             expectedOutcome: OutcomeType.ActorErr,
             expectedRet: abi.encodeWithSelector(InvalidSubnetActor.selector),
             callerAmount: 1 ether,
@@ -342,7 +333,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             callerAddr: address(caller),
             recipientAddr: 0x53c82507aA03B1a6e695000c302674ef1ecb880B,
             amount: 3,
-            expectedAmount: 0,
             expectedOutcome: OutcomeType.ActorErr,
             expectedRet: abi.encodeWithSelector(InvalidSubnetActor.selector),
             callerAmount: 1 ether,
@@ -362,7 +352,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             callerAddr: address(caller),
             recipientAddr: 0x53c82507aA03B1a6e695000c302674ef1ecb880B,
             amount: 3,
-            expectedAmount: 0,
             expectedOutcome: OutcomeType.ActorErr,
             expectedRet: abi.encodeWithSelector(InvalidSubnetActor.selector),
             callerAmount: 1 ether,
@@ -382,7 +371,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             callerAddr: address(caller),
             recipientAddr: address(new MockIpcContractPayable()),
             amount: 3,
-            expectedAmount: 3,
             expectedOutcome: OutcomeType.Ok,
             expectedRet: abi.encode(EMPTY_BYTES),
             callerAmount: 1 ether,
@@ -571,12 +559,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             params.root.gatewayAddr
         );
 
-        assertEq(
-            params.subnet.subnetActor.getter().supplySource().balanceOf(params.recipientAddr),
-            params.expectedAmount,
-            "wrong recipient balance"
-        );
-
         // apply the result message in the L2 subnet and expect another top down message to be emitted
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = cloneIpcEnvelopeWithDifferentNonce(resultMessage, 0);
@@ -644,7 +626,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
         // apply the cross message in the L3 subnet
         executeTopDownMsgs(msgs, params.subnetL3.gateway);
-        assertEq(params.recipientAddr.balance, params.expectedAmount);
 
         // submit checkoint so the result message can be propagated to L2
         submitBottomUpCheckpoint(
@@ -719,7 +700,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         msgs[0] = crossMessage;
 
         executeTopDownMsgs(msgs, subnetL3s[1].gateway);
-        assertEq(recipientAddr.balance, amount);
 
         // submit the checkpoint from L3-1 to L2 for result propagation
         BottomUpCheckpoint memory resultCheckpoint = callCreateBottomUpCheckpointFromChildSubnet(

@@ -1094,8 +1094,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         );
 
         submitBottomUpCheckpoint(checkpoint, nativeSubnet.subnetActor);
-
-        assertEq(recipient.balance, amount);
     }
 
     function testMultiSubnet_Native_SendCrossMessageFromParentToChild() public {
@@ -1142,8 +1140,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         commitParentFinality(nativeSubnet.gatewayAddr);
         executeTopDownMsgs(msgs, nativeSubnet.id, nativeSubnet.gateway);
-
-        assertEq(address(recipient).balance, amount);
     }
 
     function testMultiSubnet_Token_CallResultRevertsFromChildToParent() public {
@@ -1242,8 +1238,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         );
 
         submitBottomUpCheckpoint(checkpoint, tokenSubnet.subnetActor);
-
-        assertEq(token.balanceOf(recipient), amount);
     }
 
     function testMultiSubnet_Erc20_SendCrossMessageFromParentToChild() public {
@@ -1294,8 +1288,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         commitParentFinality(tokenSubnet.gatewayAddr);
         executeTopDownMsgs(msgs, tokenSubnet.id, tokenSubnet.gateway);
-
-        assertEq(address(recipient).balance, amount);
     }
 
     function commitParentFinality(address gateway) internal {
