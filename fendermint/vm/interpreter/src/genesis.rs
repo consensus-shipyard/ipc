@@ -20,8 +20,8 @@ use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use fendermint_vm_actor_interface::{
-    account, adm, blob_reader, blobs, burntfunds, chainmetadata, cron, eam, gas_market, init, ipc,
-    reward, system, EMPTY_ARR,
+    account, activity, adm, blob_reader, blobs, burntfunds, chainmetadata, cron, eam, gas_market,
+    init, ipc, reward, system, EMPTY_ARR,
 };
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Collateral, Genesis, Power, PowerScale, Validator};
@@ -518,6 +518,17 @@ impl GenesisBuilder {
             )
             .context("failed to create default eip1559 gas market actor")?;
 
+        let tracker_state = fendermint_actor_activity_tracker::State::new(state.store())?;
+        state
+            .create_custom_actor(
+                fendermint_actor_activity_tracker::IPC_ACTIVITY_TRACKER_ACTOR_NAME,
+                activity::ACTIVITY_TRACKER_ACTOR_ID,
+                &tracker_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create activity tracker actor")?;
+
         // STAGE 2: Create non-builtin accounts which do not have a fixed ID.
 
         // The next ID is going to be _after_ the accounts, which have already been assigned an ID by the `Init` actor.
@@ -651,6 +662,7 @@ fn deploy_contracts(
         let diamond_loupe_facet = facets.remove(0);
         let diamond_cut_facet = facets.remove(0);
         let ownership_facet = facets.remove(0);
+        let activity_facet = facets.remove(0);
 
         debug_assert_eq!(facets.len(), 2, "SubnetRegistry has 2 facets of its own");
 
@@ -664,6 +676,7 @@ fn deploy_contracts(
             diamond_cut_facet: diamond_cut_facet.facet_address,
             diamond_loupe_facet: diamond_loupe_facet.facet_address,
             ownership_facet: ownership_facet.facet_address,
+            activity_facet: activity_facet.facet_address,
             subnet_getter_selectors: getter_facet.function_selectors,
             subnet_manager_selectors: manager_facet.function_selectors,
             subnet_rewarder_selectors: rewarder_facet.function_selectors,
@@ -672,6 +685,7 @@ fn deploy_contracts(
             subnet_actor_diamond_cut_selectors: diamond_cut_facet.function_selectors,
             subnet_actor_diamond_loupe_selectors: diamond_loupe_facet.function_selectors,
             subnet_actor_ownership_selectors: ownership_facet.function_selectors,
+            subnet_actor_activity_selectors: activity_facet.function_selectors,
             creation_privileges: 0,
         };
 

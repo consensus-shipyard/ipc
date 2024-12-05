@@ -4,9 +4,17 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use crate::behaviour::{
+    content, discovery, membership, Behaviour, BehaviourEvent, ConfigError, ContentConfig,
+    DiscoveryConfig, MembershipConfig, NetworkConfig,
+};
+use crate::client::Client;
+use crate::observe;
+use crate::vote_record::{SignedVoteRecord, VoteRecord};
 use anyhow::anyhow;
 use bloom::{BloomFilter, ASMS};
 use ipc_api::subnet_id::SubnetID;
+use ipc_observability::emit;
 use iroh::blobs::Hash;
 use iroh::client::blobs::ReadAtLen;
 use iroh::client::Iroh;
@@ -23,7 +31,7 @@ use libp2p::{
 use libp2p::{identify, ping};
 use libp2p_bitswap::{BitswapResponse, BitswapStore};
 use libp2p_mplex::MplexConfig;
-use log::{debug, error, info, trace, warn};
+use log::{debug, error, info, warn};
 use maybe_iroh::MaybeIroh;
 use prometheus::Registry;
 use rand::seq::SliceRandom;
@@ -33,14 +41,6 @@ use tokio::select;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot::Sender;
-
-use crate::behaviour::{
-    content, discovery, membership, Behaviour, BehaviourEvent, ConfigError, ContentConfig,
-    DiscoveryConfig, MembershipConfig, NetworkConfig,
-};
-use crate::client::Client;
-use crate::stats;
-use crate::vote_record::{SignedVoteRecord, VoteRecord};
 
 /// Result of attempting to resolve a CID.
 pub type ResolveResult = anyhow::Result<()>;
@@ -63,17 +63,8 @@ struct Query {
     response_channel: ResponseChannel,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct QueryId(pub u64);
-
-impl std::fmt::Display for QueryId {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
 /// Keeps track of where to send query responses to.
-type QueryMap = HashMap<QueryId, Query>;
+type QueryMap = HashMap<content::QueryId, Query>;
 
 /// Error returned when we tried to get a CID from a subnet for
 /// which we currently have no peers to contact
@@ -286,7 +277,7 @@ where
     /// Register Prometheus metrics.
     pub fn register_metrics(&mut self, registry: &Registry) -> anyhow::Result<()> {
         self.content_mut().register_metrics(registry)?;
-        stats::register_metrics(registry)?;
+        observe::register_metrics(registry)?;
         Ok(())
     }
 
@@ -335,27 +326,12 @@ where
     fn handle_ping_event(&mut self, event: ping::Event) {
         let peer_id = event.peer.to_base58();
         match event.result {
-            Ok(rtt) => {
-                stats::PING_SUCCESS.inc();
-                stats::PING_RTT.observe(rtt.as_millis() as f64);
-                trace!(
-                    "PingSuccess::Ping rtt to {} from {} is {} ms",
-                    peer_id,
-                    self.peer_id,
-                    rtt.as_millis()
-                );
-            }
-            Err(ping::Failure::Timeout) => {
-                stats::PING_TIMEOUT.inc();
-                debug!("PingFailure::Timeout from {peer_id} to {}", self.peer_id);
-            }
-            Err(ping::Failure::Other { error }) => {
-                stats::PING_FAILURE.inc();
-                warn!(
-                    "PingFailure::Other from {peer_id} to {}: {error}",
-                    self.peer_id
-                );
-            }
+            Ok(rtt) => emit(observe::PingEvent::Success(event.peer, rtt)),
+            Err(ping::Failure::Timeout) => emit(observe::PingFailureEvent::Timeout(event.peer)),
+            Err(ping::Failure::Other { error }) => emit(observe::PingFailureEvent::Failure(
+                event.peer,
+                error.to_string(),
+            )),
             Err(ping::Failure::Unsupported) => {
                 warn!("Should ban peer {peer_id} due to protocol error");
                 // TODO: How do we ban peers in 0.53 ?
@@ -367,10 +343,12 @@ where
 
     fn handle_identify_event(&mut self, event: identify::Event) {
         if let identify::Event::Error { peer_id, error } = event {
-            stats::IDENTIFY_FAILURE.inc();
-            warn!("Error identifying {peer_id}: {error}")
+            emit(observe::IdentifyFailureEvent::Failure(
+                peer_id,
+                error.to_string(),
+            ));
         } else if let identify::Event::Received { peer_id, info } = event {
-            stats::IDENTIFY_RECEIVED.inc();
+            emit(observe::IdentifyEvent::Received(peer_id));
             debug!("protocols supported by {peer_id}: {:?}", info.protocols);
             debug!("adding identified address of {peer_id} to {}", self.peer_id);
             self.discovery_mut().add_identified(&peer_id, info);
@@ -511,10 +489,10 @@ where
     fn start_query(&mut self, cid: Cid, subnet_id: SubnetID, response_channel: ResponseChannel) {
         let mut peers = self.membership_mut().providers_of_subnet(&subnet_id);
 
-        stats::CONTENT_RESOLVE_PEERS.observe(peers.len() as f64);
+        emit(observe::ResolveEvent::Peers(peers.len()));
 
         if peers.is_empty() {
-            stats::CONTENT_RESOLVE_NO_PEERS.inc();
+            emit(observe::ResolveEvent::NoPeers);
             send_resolve_result(response_channel, Err(anyhow!(NoKnownPeers(subnet_id))));
         } else {
             // Connect to them in a random order, so as not to overwhelm any specific peer.
@@ -525,7 +503,7 @@ where
                 .into_iter()
                 .partition::<Vec<_>, _>(|id| self.swarm.is_connected(id));
 
-            stats::CONTENT_CONNECTED_PEERS.observe(connected.len() as f64);
+            emit(observe::ResolveEvent::ConnectedPeers(connected.len()));
 
             let peers = [connected, known].into_iter().flatten().collect();
             let (peers, fallback) = self.split_peers_for_query(peers);
@@ -602,15 +580,15 @@ where
     fn resolve_query(&mut self, mut query: Query, result: ResolveResult) {
         match result {
             Ok(_) => {
-                stats::CONTENT_RESOLVE_SUCCESS.inc();
+                emit(observe::ResolveEvent::Success(query.cid));
                 send_resolve_result(query.response_channel, result)
             }
             Err(_) if query.fallback_peer_ids.is_empty() => {
-                stats::CONTENT_RESOLVE_FAILURE.inc();
+                emit(observe::ResolveFailureEvent::Failure(query.cid));
                 send_resolve_result(query.response_channel, result)
             }
             Err(e) => {
-                stats::CONTENT_RESOLVE_FALLBACK.inc();
+                emit(observe::ResolveFailureEvent::Fallback(query.cid));
                 debug!(
                     "resolving {} from {} failed with {}, but there are {} fallback peers to try",
                     query.cid,

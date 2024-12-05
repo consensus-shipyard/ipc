@@ -37,6 +37,8 @@ fvm_shared = { workspace = true }
 fvm_ipld_blockstore = { workspace = true, optional = true }
 
 ipc-api = { path = "../../ipc/api", default-features = false }
+ipc-observability = { workspace = true }
+
 maybe_iroh = { path = "../../hoku/maybe_iroh" }
 
 [dev-dependencies]

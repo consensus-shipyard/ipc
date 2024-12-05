@@ -49,6 +49,29 @@ This is achieved through the use of the `ipc-observability` crate/library, which
 - `ipc_topdown_parent_finality_voting_quorum_height` (IntGauge): Sets the height of the parent finality quorum.
 - `ipc_topdown_parent_finality_voting_quorum_weight` (IntGauge): Sets the weight of the parent finality quorum.
 - `ipc_topdown_parent_finality_committed_height` (IntGauge): Sets the height of the committed parent finality.
+- `ipld_resolver_ping_rtt` (Histogram): Records a ping roundtrip time.
+- `ipld_resolver_ping_timeouts` (IntCounter): Incremented when a ping timed out.
+- `ipld_resolver_ping_failure` (IntCounter): Incremented when a ping failed.
+- `ipld_resolver_ping_success` (IntCounter): Incremented when a ping succeeded.
+- `ipld_resolver_identify_failure` (IntCounter): Incremented when an identify failed.
+- `ipld_resolver_identify_received` (IntCounter): Incremented when an identify info received.
+- `ipld_resolver_discovery_background_lookup` (IntCounter): Incremented when a discovery background lookup started.
+- `ipld_resolver_discovery_connected_peers` (IntGauge): Sets the number of discovery connected peers.
+- `ipld_resolver_membership_skipped_peers` (IntCounter): Incremented when a membership provider skipped.
+- `ipld_resolver_membership_routable_peers` (IntGauge): Sets the number of routable peers.
+- `ipld_resolver_membership_provider_peers` (IntGauge): Sets the number of unique peers.
+- `ipld_resolver_membership_unknown_topic` (IntCounter): Incremented when a membership of unknown topic received.
+- `ipld_resolver_membership_invalid_message` (IntCounter): Incremented when a membership with invalid message received.
+- `ipld_resolver_membership_publish_total` (IntCounter): Incremented when a membership published.
+- `ipld_resolver_membership_publish_failure` (IntCounter): Incremented when a membership publish failed.
+- `ipld_resolver_content_resolve_running` (IntGauge): Sets the number currently running content resolutions.
+- `ipld_resolver_content_resolve_no_peers` (IntCounter): Incremented when a resolution had no peer.
+- `ipld_resolver_content_resolve_success` (IntCounter): Incremented when a resolution succeeded.
+- `ipld_resolver_content_resolve_failure` (IntCounter): Incremented when a resolution failed.
+- `ipld_resolver_content_resolve_fallback` (IntCounter): Incremented when a resolution had a fallback.
+- `ipld_resolver_content_resolve_peers` (Histogram): Records the number of peers found for a resolution from a subnet.
+- `ipld_resolver_content_connected_peers` (Histogram): Records the number connected peers in a resolution.
+- `ipld_resolver_content_rate_limited` (IntCounter): Incremented when a resolution was rate limited.
 - `ipc_tracing_errors` (IntCounterVec): Increments the count of tracing errors for the affected event.
 
 ## Events and corresponding metrics
@@ -289,6 +312,76 @@ Represents the commitment of parent finality.
 **Affects metrics:**
 
 - `ipc_topdown_parent_finality_committed_height`
+
+### PingEvent
+
+**Variants and affected metrics:**
+
+- `Success(PeerId, Duration)`: `ipld_resolver_ping_rtt`,`ipld_resolver_ping_success`
+
+### PingFailureEvent
+
+**Variants and affected metrics:**
+
+- `Timeout(PeerId)`: `ipld_resolver_ping_timeouts`
+- `Failure(PeerId, Duration)`: `ipld_resolver_ping_failure`
+
+### IdentifyEvent
+
+**Variants and affected metrics:**
+
+- `Received(PeerId)`: `ipld_resolver_identify_received`
+
+### IdentifyFailureEvent
+
+**Variants and affected metrics:**
+
+- `Failure(PeerId, String)`: `ipld_resolver_identify_failure`
+
+### DiscoveryEvent
+
+**Variants and affected metrics:**
+
+- `BackgroundLookup(PeerId)`: `ipld_resolver_discovery_background_lookup`
+- `ConnectionEstablished(PeerId)`: `ipld_resolver_discovery_connected_peers`
+- `ConnectionClosed(PeerId)`: `ipld_resolver_discovery_connected_peers`
+
+### MembershipEvent
+
+**Variants and affected metrics:**
+
+- `Added(PeerId)`: `ipld_resolver_membership_provider_peers`
+- `Removed(PeerId)`: `ipld_resolver_membership_provider_peers`
+- `Skipped(PeerId)`: `ipld_resolver_membership_skipped_peers`
+- `PublishSuccess`: `ipld_resolver_membership_publish_total`
+- `RoutablePeers(i64)`: `ipld_resolver_membership_routable_peers`
+
+### MembershipFailureEvent
+
+**Variants and affected metrics:**
+
+- `PublishFailure(String)`: `ipld_resolver_membership_publish_failure`
+- `GossipInvalidProviderRecord(Option<PeerId>, String)`: `ipld_resolver_membership_invalid_message`
+- `GossipInvalidVoteRecord(Option<PeerId>, String)`: `ipld_resolver_membership_invalid_message`
+- `GossipUnknownTopic(Option<PeerId>, TopicHash)`: `ipld_resolver_membership_unknown_topic`
+
+### ResolveEvent
+
+**Variants and affected metrics:**
+
+- `Started(Cid)`: `ipld_resolver_content_resolve_running`
+- `Success(Cid)`: `ipld_resolver_content_resolve_success`
+- `Completed`: `ipld_resolver_content_resolve_running`
+- `Peers(usize)`: `ipld_resolver_content_resolve_peers`
+- `NoPeers`: `ipld_resolver_content_resolve_no_peers`
+- `ConnectedPeers(usize)`: `ipld_resolver_content_connected_peers`
+
+### ResolveFailureEvent
+
+**Variants and affected metrics:**
+
+- `Failure(Cid)`: `ipld_resolver_content_resolve_failure`
+- `Fallback(Cid)`: `ipld_resolver_content_resolve_fallback`
 
 ### TracingError
 

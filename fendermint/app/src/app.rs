@@ -22,7 +22,7 @@ use fendermint_vm_interpreter::fvm::state::{
     FvmUpdatableParams,
 };
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
-use fendermint_vm_interpreter::fvm::{BlockGasLimit, FvmApplyRet, PowerUpdates};
+use fendermint_vm_interpreter::fvm::{EndBlockOutput, FvmApplyRet};
 use fendermint_vm_interpreter::genesis::{read_genesis_car, GenesisAppState};
 use fendermint_vm_interpreter::signed::InvalidSignature;
 use fendermint_vm_interpreter::{
@@ -427,7 +427,7 @@ where
         Message = Vec<u8>,
         BeginOutput = FvmApplyRet,
         DeliverOutput = BytesMessageApplyRes,
-        EndOutput = (PowerUpdates, BlockGasLimit),
+        EndOutput = EndBlockOutput,
     >,
     I: CheckInterpreter<
         State = FvmExecState<ReadOnlyBlockstore<SS>>,
@@ -799,7 +799,11 @@ where
         tracing::debug!(height = request.height, "end block");
 
         // End the interpreter for this block.
-        let (power_updates, new_block_gas_limit) = self
+        let EndBlockOutput {
+            power_updates,
+            block_gas_limit: new_block_gas_limit,
+            events,
+        } = self
             .modify_exec_state(|s| self.interpreter.end(s))
             .await
             .context("end failed")?;
@@ -828,7 +832,10 @@ where
         let ret = response::EndBlock {
             validator_updates,
             consensus_param_updates,
-            events: Vec::new(), // TODO: Return events from epoch transitions.
+            events: events
+                .into_iter()
+                .flat_map(|(stamped, emitters)| to_events("event", stamped, emitters))
+                .collect::<Vec<_>>(),
         };
 
         Ok(ret)

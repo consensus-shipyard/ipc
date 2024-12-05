@@ -176,6 +176,21 @@ pub mod subnet_actor_getter_facet {
                                                     ),
                                                 ),
                                             ),
+                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                ::std::vec![
+                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                        ::std::vec![
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                ],
+                                                            ),
+                                                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                                        ],
+                                                    ),
+                                                ],
+                                            ),
                                         ],
                                     ),
                                     internal_type: ::core::option::Option::Some(
@@ -2589,7 +2604,7 @@ pub mod subnet_actor_getter_facet {
         pub kind: u8,
         pub token_address: ::ethers::core::types::Address,
     }
-    ///`BottomUpCheckpoint((uint64,address[]),uint256,bytes32,uint64,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)[])`
+    ///`BottomUpCheckpoint((uint64,address[]),uint256,bytes32,uint64,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)[],(((uint64,uint64),bytes32)))`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -2606,6 +2621,51 @@ pub mod subnet_actor_getter_facet {
         pub block_hash: [u8; 32],
         pub next_configuration_number: u64,
         pub msgs: ::std::vec::Vec<IpcEnvelope>,
+        pub activity: CompressedActivityRollup,
+    }
+    ///`CompressedActivityRollup(((uint64,uint64),bytes32))`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct CompressedActivityRollup {
+        pub consensus: CompressedSummary,
+    }
+    ///`AggregatedStats(uint64,uint64)`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct AggregatedStats {
+        pub total_active_validators: u64,
+        pub total_num_blocks_committed: u64,
+    }
+    ///`CompressedSummary((uint64,uint64),bytes32)`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct CompressedSummary {
+        pub stats: AggregatedStats,
+        pub data_root_commitment: [u8; 32],
     }
     ///`FvmAddress(uint8,bytes)`
     #[derive(

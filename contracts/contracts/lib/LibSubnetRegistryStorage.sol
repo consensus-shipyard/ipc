@@ -11,6 +11,7 @@ struct SubnetRegistryActorStorage {
     address SUBNET_ACTOR_GETTER_FACET;
     // solhint-disable-next-line var-name-mixedcase
     address SUBNET_ACTOR_MANAGER_FACET;
+    /// TODO: see https://github.com/consensus-shipyard/ipc/issues/1217
     // solhint-disable-next-line var-name-mixedcase
     address SUBNET_ACTOR_REWARD_FACET;
     // solhint-disable-next-line var-name-mixedcase
@@ -23,11 +24,14 @@ struct SubnetRegistryActorStorage {
     address SUBNET_ACTOR_LOUPE_FACET;
     // solhint-disable-next-line var-name-mixedcase
     address SUBNET_ACTOR_OWNERSHIP_FACET;
+    // solhint-disable-next-line var-name-mixedcase
+    address VALIDATOR_REWARD_FACET;
     /// The subnet actor getter facet functions selectors
     bytes4[] subnetActorGetterSelectors;
     /// The subnet actor manager facet functions selectors
     bytes4[] subnetActorManagerSelectors;
     /// The subnet actor reward facet functions selectors
+    /// TODO: see https://github.com/consensus-shipyard/ipc/issues/1217
     bytes4[] subnetActorRewarderSelectors;
     /// The subnet actor checkpointing facet functions selectors
     bytes4[] subnetActorCheckpointerSelectors;
@@ -39,6 +43,8 @@ struct SubnetRegistryActorStorage {
     bytes4[] subnetActorDiamondLoupeSelectors;
     /// The subnet actor ownership facet functions selectors
     bytes4[] subnetActorOwnershipSelectors;
+    /// The validator reward facet functions selectors
+    bytes4[] subnetActorActivitySelectors;
     /// @notice Mapping that tracks the deployed subnet actors per user.
     /// Key is the hash of Subnet ID, values are addresses.
     /// mapping owner => nonce => subnet

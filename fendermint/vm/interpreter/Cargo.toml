@@ -49,6 +49,7 @@ tracing = { workspace = true }
 
 blobs_syscall = { path = "../../../hoku/blobs_syscall" }
 fendermint_actors_api = { workspace = true }
+fendermint_actor_activity_tracker = { path = "../../actors/activity-tracker" }
 fendermint_actor_blobs = { path = "../../actors/blobs" }
 fendermint_actor_blobs_shared = { path = "../../actors/blobs/shared" }
 fendermint_actor_bucket = { path = "../../actors/bucket" }
@@ -73,8 +74,11 @@ fendermint_vm_message = { path = "../message" }
 fendermint_vm_resolver = { path = "../resolver" }
 fendermint_vm_topdown = { path = "../topdown" }
 
+merkle-tree-rs = { path = "../../../ext/merkle-tree-rs" }
+
 [dev-dependencies]
 fvm = { workspace = true, features = ["arb", "testing"] }
+hex = { workspace = true }
 multihash = { workspace = true }
 quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }
@@ -82,8 +86,8 @@ tempfile = { workspace = true }
 
 fendermint_testing = { path = "../../testing", features = ["golden"] }
 fendermint_vm_genesis = { path = "../genesis", features = ["arb"] }
-fendermint_vm_message = { path = "../message", features = ["arb"] }
 fendermint_vm_interpreter = { path = ".", features = ["arb"] }
+fendermint_vm_message = { path = "../message", features = ["arb"] }
 
 [features]
 default = []

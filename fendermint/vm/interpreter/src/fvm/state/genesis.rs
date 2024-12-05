@@ -286,6 +286,23 @@ where
         self.create_actor_internal(code_cid, id, state, balance, delegated_address)
     }
 
+    pub fn construct_custom_actor(
+        &mut self,
+        name: &str,
+        id: ActorID,
+        state: &impl Serialize,
+        balance: TokenAmount,
+        delegated_address: Option<Address>,
+    ) -> anyhow::Result<()> {
+        // Retrieve the CID of the actor code by the numeric ID.
+        let code_cid = *self
+            .custom_actor_manifest
+            .code_by_name(name)
+            .ok_or_else(|| anyhow!("can't find actor: {name} in the custom actor manifest"))?;
+
+        self.create_actor_internal(code_cid, id, state, balance, delegated_address)
+    }
+
     /// Creates an actor using code specified in the manifest.
     fn create_actor_internal(
         &mut self,

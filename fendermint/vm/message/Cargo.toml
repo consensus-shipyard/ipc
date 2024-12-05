@@ -22,7 +22,7 @@ serde_tuple = { workspace = true }
 serde_with = { workspace = true }
 thiserror = { workspace = true }
 
-fvm_shared = { workspace = true }
+fvm_shared = { workspace = true, features = ["crypto"] }
 fvm_ipld_encoding = { workspace = true }
 ipc-api = { workspace = true }
 
