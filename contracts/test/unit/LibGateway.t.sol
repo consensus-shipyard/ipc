@@ -103,7 +103,7 @@ contract LibGatewayTest is Test {
 
         ResultMsg memory message = ResultMsg({
             outcome: OutcomeType.Ok,
-            id: crossMsg.toHash(),
+            id: crossMsg.toDeterministicHash(),
             ret: abi.encode(EMPTY_BYTES)
         });
         IpcEnvelope memory expected = IpcEnvelope({
@@ -116,7 +116,7 @@ contract LibGatewayTest is Test {
         });
 
         vm.expectEmit(address(t));
-        emit LibGateway.NewTopDownMessage(childSubnetActor, expected);
+        emit LibGateway.NewTopDownMessage(childSubnetActor, expected, expected.toDeterministicHash());
 
         t.applyMsg(childSubnet, crossMsg);
     }
@@ -157,7 +157,7 @@ contract LibGatewayTest is Test {
 
         ResultMsg memory message = ResultMsg({
             outcome: OutcomeType.Ok,
-            id: crossMsg.toHash(),
+            id: crossMsg.toDeterministicHash(),
             ret: abi.encode(EMPTY_BYTES)
         });
         IpcEnvelope memory expected = IpcEnvelope({
@@ -212,14 +212,14 @@ contract LibGatewayTest is Test {
 
         ResultMsg memory message = ResultMsg({
             outcome: OutcomeType.SystemErr,
-            id: crossMsg.toHash(),
+            id: crossMsg.toDeterministicHash(),
             ret: abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Nonce)
         });
         IpcEnvelope memory expected = IpcEnvelope({
             kind: IpcMsgKind.Result,
             from: crossMsg.to,
             to: crossMsg.from,
-            value: crossMsg.value,
+            value: 0,
             message: abi.encode(message),
             nonce: 0
         });
@@ -266,7 +266,11 @@ contract LibGatewayTest is Test {
         });
         crossMsg.nonce = 0;
 
-        ResultMsg memory message = ResultMsg({outcome: OutcomeType.ActorErr, id: crossMsg.toHash(), ret: new bytes(0)});
+        ResultMsg memory message = ResultMsg({
+            outcome: OutcomeType.ActorErr,
+            id: crossMsg.toDeterministicHash(),
+            ret: new bytes(0)
+        });
         IpcEnvelope memory expected = IpcEnvelope({
             kind: IpcMsgKind.Result,
             from: crossMsg.to,
@@ -283,43 +287,6 @@ contract LibGatewayTest is Test {
         IpcEnvelope memory stored = batch.msgs[0];
 
         require(stored.toHash() == expected.toHash(), "receipt hash not matching");
-    }
-
-    function test_applyMsg_bottomUpNotRegistered() public {
-        LibGatewayMock t = new LibGatewayMock();
-
-        address callingContract = address(new GatewayDummyContract());
-
-        address childSubnetActor = address(new SubnetActorGetterFacet());
-
-        address[] memory parentRoute = new address[](1);
-        parentRoute[0] = address(1);
-
-        address[] memory childRoute = new address[](2);
-        childRoute[0] = address(1);
-        childRoute[1] = childSubnetActor;
-
-        SubnetID memory parentSubnet = SubnetID({root: 1, route: parentRoute});
-        SubnetID memory childSubnet = SubnetID({root: 1, route: childRoute});
-
-        t.setSubnet(parentSubnet, 1);
-
-        address fromRaw = address(1000);
-        address toRaw = callingContract;
-
-        IPCAddress memory from = IPCAddress({subnetId: childSubnet, rawAddress: FvmAddressHelper.from(fromRaw)});
-        IPCAddress memory to = IPCAddress({subnetId: parentSubnet, rawAddress: FvmAddressHelper.from(toRaw)});
-
-        IpcEnvelope memory crossMsg = CrossMsgHelper.createCallMsg({
-            from: from,
-            to: to,
-            value: 0,
-            method: GatewayDummyContract.reverts.selector,
-            params: new bytes(0)
-        });
-        crossMsg.nonce = 0;
-
-        t.applyMsg(childSubnet, crossMsg);
     }
 
     function test_applyMsg_bottomUpInvalidNonce() public {
@@ -358,20 +325,20 @@ contract LibGatewayTest is Test {
 
         ResultMsg memory message = ResultMsg({
             outcome: OutcomeType.SystemErr,
-            id: crossMsg.toHash(),
+            id: crossMsg.toDeterministicHash(),
             ret: abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Nonce)
         });
         IpcEnvelope memory expected = IpcEnvelope({
             kind: IpcMsgKind.Result,
             from: crossMsg.to,
             to: crossMsg.from,
-            value: crossMsg.value,
+            value: 0,
             message: abi.encode(message),
             nonce: 0
         });
 
         vm.expectEmit(address(t));
-        emit LibGateway.NewTopDownMessage(childSubnetActor, expected);
+        emit LibGateway.NewTopDownMessage(childSubnetActor, expected, expected.toDeterministicHash());
 
         t.applyMsg(childSubnet, crossMsg);
     }
@@ -410,19 +377,23 @@ contract LibGatewayTest is Test {
         });
         crossMsg.nonce = 0;
 
-        ResultMsg memory message = ResultMsg({outcome: OutcomeType.ActorErr, id: crossMsg.toHash(), ret: new bytes(0)});
+        ResultMsg memory message = ResultMsg({
+            outcome: OutcomeType.ActorErr,
+            id: crossMsg.toDeterministicHash(),
+            ret: new bytes(0)
+        });
         IpcEnvelope memory expected = IpcEnvelope({
             kind: IpcMsgKind.Result,
             from: crossMsg.to,
             to: crossMsg.from,
-            value: crossMsg.value,
+            value: 0,
             message: abi.encode(message),
             nonce: 0
         });
 
         vm.deal(address(t), 1 ether);
         vm.expectEmit(address(t));
-        emit LibGateway.NewTopDownMessage(childSubnetActor, expected);
+        emit LibGateway.NewTopDownMessage(childSubnetActor, expected, expected.toDeterministicHash());
 
         t.applyMsg(childSubnet, crossMsg);
     }

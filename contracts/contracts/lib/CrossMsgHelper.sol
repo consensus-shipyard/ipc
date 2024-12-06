@@ -7,6 +7,7 @@ import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {SubnetID, IPCAddress} from "../structs/Subnet.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
+import {LibGateway, CrossMessageValidationOutcome} from "../lib/LibGateway.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
@@ -66,11 +67,13 @@ library CrossMsgHelper {
         OutcomeType outcome,
         bytes memory ret
     ) public pure returns (IpcEnvelope memory) {
-        ResultMsg memory message = ResultMsg({id: toHash(crossMsg), outcome: outcome, ret: ret});
+        ResultMsg memory message = ResultMsg({id: toDeterministicHash(crossMsg), outcome: outcome, ret: ret});
+
         uint256 value = crossMsg.value;
-        if (outcome == OutcomeType.Ok) {
-            // if the message was executed successfully, the value stayed
-            // in the subnet and there's no need to return it.
+        // if the message was executed successfully, the value stayed
+        // in the subnet and there's no need to return it.
+        // or if the message is a call, the value is always 0 because transfers for calls are not allowed
+        if (outcome == OutcomeType.Ok || crossMsg.kind == IpcMsgKind.Call) {
             value = 0;
         }
         return
@@ -84,6 +87,7 @@ library CrossMsgHelper {
             });
     }
 
+    // creates transfer message from the child subnet to the parent subnet
     function createReleaseMsg(
         SubnetID calldata subnet,
         address signer,
@@ -98,6 +102,7 @@ library CrossMsgHelper {
             );
     }
 
+    // creates transfer message from the parent subnet to the child subnet
     function createFundMsg(
         SubnetID calldata subnet,
         address signer,
@@ -130,6 +135,22 @@ library CrossMsgHelper {
     function toHash(IpcEnvelope memory crossMsg) internal pure returns (bytes32) {
         return keccak256(abi.encode(crossMsg));
     }
+
+    /// @notice Returns a deterministic hash for the given cross message. The hash remains the same accross different networks
+    /// because it doesn't include the network-specific nonce.
+    function toDeterministicHash(IpcEnvelope memory crossMsg) internal pure returns (bytes32) {
+        return keccak256(
+            // solhint-disable-next-line func-named-parameters
+            abi.encode(
+                crossMsg.kind,
+                crossMsg.to,
+                crossMsg.from,
+                crossMsg.value,
+                crossMsg.message
+            )
+        );
+    }
+
 
     function toHash(IpcEnvelope[] memory crossMsgs) public pure returns (bytes32) {
         return keccak256(abi.encode(crossMsgs));
@@ -164,6 +185,9 @@ library CrossMsgHelper {
         if (crossMsg.kind == IpcMsgKind.Transfer) {
             return supplySource.transferFunds({recipient: payable(recipient), value: crossMsg.value});
         } else if (crossMsg.kind == IpcMsgKind.Call || crossMsg.kind == IpcMsgKind.Result) {
+            // transferring funds is not allowed for Call messages
+            uint256 value = crossMsg.kind == IpcMsgKind.Call ? 0 : crossMsg.value;
+
             // send the envelope directly to the entrypoint
             // use supplySource so the tokens in the message are handled successfully
             // and by the right supply source
@@ -171,7 +195,7 @@ library CrossMsgHelper {
                 supplySource.performCall(
                     payable(recipient),
                     abi.encodeCall(IIpcHandler.handleIpcMessage, (crossMsg)),
-                    crossMsg.value
+                    value
                 );
         }
         return (false, EMPTY_BYTES);
@@ -198,5 +222,9 @@ library CrossMsgHelper {
         }
 
         return true;
+    }
+
+    function validateCrossMessage(IpcEnvelope memory crossMsg) internal view returns (CrossMessageValidationOutcome)  {
+        return LibGateway.validateCrossMessage(crossMsg);
     }
 }

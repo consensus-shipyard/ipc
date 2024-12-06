@@ -9,6 +9,7 @@ import {Asset, AssetKind} from "../../contracts/structs/Subnet.sol";
 import {AssetHelper} from "../../contracts/lib/AssetHelper.sol";
 
 import {AssetHelperMock} from "../mocks/AssetHelperMock.sol";
+import {MockFallbackContract} from "../helpers/TestUtils.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
@@ -61,6 +62,7 @@ contract AssetHelperTest is Test {
         uint256 balance = 1_000_000;
         uint256 value = 100;
         AssetHelperMock mock = new AssetHelperMock();
+        MockFallbackContract actor = new MockFallbackContract();
 
         IERC20 token = new ERC20PresetFixedSupply("TestToken", "TEST", balance, address(mock));
 
@@ -68,27 +70,29 @@ contract AssetHelperTest is Test {
 
         bytes memory params = bytes("hello");
 
-        mock.performCall(source, payable(address(1)), params, value);
+        mock.performCall(source, payable(address(actor)), params, value);
 
         require(token.balanceOf(address(mock)) == balance - value, "invalid balance");
-        require(token.balanceOf(address(1)) == value, "invalid user balance");
+        require(token.balanceOf(address(actor)) == value, "invalid user balance");
     }
 
     function test_call_with_native_zero_balance_ok() public {
         uint256 value = 0;
         AssetHelperMock mock = new AssetHelperMock();
+        MockFallbackContract actor = new MockFallbackContract();
 
         Asset memory source = Asset({kind: AssetKind.Native, tokenAddress: address(0)});
 
         bytes memory params = bytes("hello");
 
-        mock.performCall(source, payable(address(1)), params, value);
-        require(address(1).balance == 0, "invalid user balance");
+        mock.performCall(source, payable(address(actor)), params, value);
+        require(address(actor).balance == 0, "invalid user balance");
     }
 
     function test_call_with_native_ok() public {
         uint256 value = 10;
         AssetHelperMock mock = new AssetHelperMock();
+        MockFallbackContract actor = new MockFallbackContract();
 
         vm.deal(address(mock), 1 ether);
 
@@ -96,8 +100,10 @@ contract AssetHelperTest is Test {
 
         bytes memory params = bytes("hello");
 
-        mock.performCall(source, payable(address(1)), params, value);
-        require(address(1).balance == value, "invalid user balance");
+        mock.performCall(source, payable(address(actor)), params, value);
+
+        console.log("actor balance", address(actor).balance);
+        require(address(actor).balance == value, "invalid user balance");
     }
 
     function test_call_with_native_reverts() public {
