@@ -75,6 +75,32 @@ pub const GET_ADDRESS_METHOD: MethodNum = frc42_dispatch::method_hash!("GetAddre
 /// Get machine metadata method number.
 pub const GET_METADATA_METHOD: MethodNum = frc42_dispatch::method_hash!("GetMetadata");
 
+/// Returns an error if the address does not match the message origin or caller.
+pub fn ensure_addr_is_origin_or_caller(
+    rt: &impl Runtime,
+    address: Address,
+) -> Result<(), ActorError> {
+    if rt.message().origin() == rt.message().caller() {
+        let (origin, _) = resolve_external(rt, rt.message().origin())?;
+        if address == origin {
+            return Ok(());
+        }
+    } else {
+        let (origin, _) = resolve_external(rt, rt.message().origin())?;
+        if address == origin {
+            return Ok(());
+        }
+        let (caller, _) = resolve_external(rt, rt.message().caller())?;
+        if address == caller {
+            return Ok(());
+        }
+    }
+    Err(ActorError::illegal_argument(format!(
+        "address {} does not match origin or caller",
+        address
+    )))
+}
+
 /// Actor type that includes Hoku Machines.
 pub enum ActorType {
     Account,

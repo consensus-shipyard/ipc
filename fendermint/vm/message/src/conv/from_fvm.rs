@@ -106,7 +106,6 @@ pub fn to_eth_transaction_request(
         version: _,
         from,
         to,
-        sponsor,
         sequence,
         value,
         method_num: _,

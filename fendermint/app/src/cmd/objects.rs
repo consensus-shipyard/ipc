@@ -923,7 +923,6 @@ mod tests {
             version: Default::default(),
             from: to_fvm_address(from_address),
             to: store,
-            sponsor: None,
             sequence: 0,
             value: TokenAmount::from_atto(0),
             method_num: fendermint_actor_bucket::Method::AddObject as u64,

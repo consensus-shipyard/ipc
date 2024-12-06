@@ -414,7 +414,6 @@ where
             version: Default::default(),
             from: system::SYSTEM_ACTOR_ADDR,
             to: to_fvm_address(address),
-            sponsor: None,
             sequence: 0,
             value: TokenAmount::from_atto(0),
             method_num,

@@ -22,7 +22,7 @@ pub struct Account {
     pub credit_free: BigInt,
     /// Current committed credit in byte-blocks that will be used for debits.
     pub credit_committed: BigInt,
-    /// Optional sponsor account address.
+    /// Optional default sponsor account address.
     pub credit_sponsor: Option<Address>,
     /// The chain epoch of the last debit.
     pub last_debit_epoch: ChainEpoch,
@@ -63,22 +63,6 @@ pub struct CreditApproval {
     pub caller_allowlist: Option<HashSet<Address>>,
 }
 
-/// Credit allowance for an account.
-#[derive(Debug, Default, Clone, PartialEq, Serialize_tuple, Deserialize_tuple)]
-pub struct CreditAllowance {
-    /// Amount from the account.
-    pub from_self: TokenAmount,
-    /// Amount from the account's default sponsor.
-    pub from_default_sponsor: TokenAmount,
-}
-
-impl CreditAllowance {
-    /// Returns the total allowance from self and default sponsor.
-    pub fn total(&self) -> TokenAmount {
-        &self.from_self + &self.from_default_sponsor
-    }
-}
-
 impl CreditApproval {
     pub fn remove_caller(&mut self, caller: &Address) -> bool {
         if let Some(allowlist) = self.caller_allowlist.as_mut() {
@@ -102,6 +86,24 @@ impl CreditApproval {
         } else {
             true
         }
+    }
+}
+
+/// Credit allowance for an account.
+#[derive(Debug, Default, Clone, PartialEq, Serialize_tuple, Deserialize_tuple)]
+pub struct CreditAllowance {
+    /// The amount from the account.
+    pub amount: TokenAmount,
+    /// The account's default sponsor.
+    pub sponsor: Option<Address>,
+    /// The amount from the account's default sponsor.
+    pub sponsored_amount: TokenAmount,
+}
+
+impl CreditAllowance {
+    /// Returns the total allowance from self and default sponsor.
+    pub fn total(&self) -> TokenAmount {
+        &self.amount + &self.sponsored_amount
     }
 }
 

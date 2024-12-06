@@ -362,7 +362,6 @@ impl<T: JsonRpcClient + Send + Sync> LotusJsonRPCClient<T> {
                 .ok_or_else(|| anyhow!("version should not be empty"))? as u64,
             from: msg.from,
             to: msg.to,
-            sponsor: None,
             sequence: msg
                 .nonce
                 .ok_or_else(|| anyhow!("nonce should not be empty"))?,

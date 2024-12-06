@@ -138,7 +138,7 @@ impl State {
 
     pub fn buy_credit(
         &mut self,
-        recipient: Address,
+        to: Address,
         amount: TokenAmount,
         current_epoch: ChainEpoch,
     ) -> anyhow::Result<Account, ActorError> {
@@ -157,21 +157,21 @@ impl State {
         self.credit_sold += &credits;
         let account = self
             .accounts
-            .entry(recipient)
+            .entry(to)
             .and_modify(|a| a.credit_free += &credits)
             .or_insert(Account::new(credits.clone(), current_epoch));
-        debug!("sold {} credits to {}", credits, recipient);
+        debug!("sold {} credits to {}", credits, to);
         Ok(account.clone())
     }
 
     pub fn update_credit(
         &mut self,
-        to: Address,
+        from: Address,
         sponsor: Option<Address>,
         add_amount: TokenAmount,
         current_epoch: ChainEpoch,
     ) -> anyhow::Result<(), ActorError> {
-        let addr = sponsor.unwrap_or(to);
+        let addr = sponsor.unwrap_or(from);
         let account = self
             .accounts
             .get_mut(&addr)
@@ -179,12 +179,12 @@ impl State {
         let delegation = if let Some(sponsor) = sponsor {
             let approval = account
                 .approvals
-                .get_mut(&to)
+                .get_mut(&from)
                 .ok_or(ActorError::forbidden(format!(
                     "approval from {} to {} not found",
-                    sponsor, to
+                    sponsor, from
                 )))?;
-            Some(CreditDelegation::new(to, to, approval))
+            Some(CreditDelegation::new(from, from, approval))
         } else {
             None
         };
@@ -309,8 +309,8 @@ impl State {
         Ok(())
     }
 
-    pub fn get_account(&self, address: Address) -> Option<Account> {
-        self.accounts.get(&address).cloned()
+    pub fn get_account(&self, from: Address) -> Option<Account> {
+        self.accounts.get(&from).cloned()
     }
 
     /// Returns the CreditApproval if one exists from the given address, to the given address,
@@ -327,15 +327,15 @@ impl State {
     /// Note: An error returned from this method would be fatal, as it's called from the FVM executor.
     pub fn get_credit_allowance(
         &self,
-        to: Address,
+        from: Address,
         current_epoch: ChainEpoch,
     ) -> anyhow::Result<CreditAllowance, ActorError> {
-        let account = match self.accounts.get(&to) {
+        let account = match self.accounts.get(&from) {
             None => return Ok(CreditAllowance::default()),
             Some(account) => account,
         };
         let mut allowance = CreditAllowance {
-            from_self: TokenAmount::from_atto(account.credit_free.clone()),
+            amount: TokenAmount::from_atto(account.credit_free.clone()),
             ..Default::default()
         };
         if let Some(credit_sponsor) = account.credit_sponsor {
@@ -345,7 +345,7 @@ impl State {
             };
             let sponsored = sponsor
                 .approvals
-                .get(&to)
+                .get(&from)
                 .and_then(|approval| {
                     let expiry_valid = approval
                         .expiry
@@ -362,7 +362,8 @@ impl State {
                     Some(TokenAmount::from_atto(amount))
                 })
                 .unwrap_or(TokenAmount::zero());
-            allowance.from_default_sponsor = sponsored;
+            allowance.sponsor = Some(credit_sponsor);
+            allowance.sponsored_amount = sponsored;
         } else {
             return Ok(allowance);
         }
@@ -371,15 +372,16 @@ impl State {
 
     pub fn set_credit_sponsor(
         &mut self,
-        to: Address,
+        from: Address,
         sponsor: Option<Address>,
+        current_epoch: ChainEpoch,
     ) -> anyhow::Result<(), ActorError> {
         let account = self
             .accounts
-            .get_mut(&to)
-            .ok_or(ActorError::not_found(format!("account {} not found", to)))?;
+            .entry(from)
+            .or_insert(Account::new(BigInt::zero(), current_epoch));
         account.credit_sponsor = sponsor;
-        debug!("set credit sponsor for {} to {:?}", to, sponsor);
+        debug!("set credit sponsor for {} to {:?}", from, sponsor);
         Ok(())
     }
 

@@ -15,17 +15,17 @@ use fendermint_actor_blobs_shared::state::{
     SubscriptionId,
 };
 use fendermint_actor_blobs_shared::Method;
-use fendermint_actor_machine::{resolve_external, resolve_external_non_machine};
+use fendermint_actor_machine::{
+    ensure_addr_is_origin_or_caller, resolve_external, resolve_external_non_machine,
+};
 use fil_actors_runtime::{
     actor_dispatch, actor_error, extract_send_result,
     runtime::{ActorCode, Runtime},
     ActorError, FIRST_EXPORTED_METHOD_NUMBER, SYSTEM_ACTOR_ADDR,
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
-use fvm_shared::econ::TokenAmount;
 use fvm_shared::error::ExitCode;
 use fvm_shared::{address::Address, MethodNum, METHOD_SEND};
-use num_traits::Zero;
 
 use crate::{ConstructorParams, State, BLOBS_ACTOR_NAME};
 
@@ -59,14 +59,14 @@ impl BlobsActor {
 
     fn update_credit(rt: &impl Runtime, params: UpdateCreditParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let to = resolve_external_non_machine(rt, params.to)?;
+        let from = resolve_external_non_machine(rt, params.from)?;
         let sponsor = if let Some(sponsor) = params.sponsor {
             Some(resolve_external_non_machine(rt, sponsor)?)
         } else {
             None
         };
         rt.transaction(|st: &mut State, rt| {
-            st.update_credit(to, sponsor, params.add_amount, rt.curr_epoch())
+            st.update_credit(from, sponsor, params.add_amount, rt.curr_epoch())
         })
     }
 
@@ -76,21 +76,7 @@ impl BlobsActor {
     ) -> Result<CreditApproval, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let from = resolve_external_non_machine(rt, params.from)?;
-        let (origin, caller) = if rt.message().origin() == rt.message().caller() {
-            let (origin, _) = resolve_external(rt, rt.message().origin())?;
-            (origin, origin)
-        } else {
-            let (origin, _) = resolve_external(rt, rt.message().origin())?;
-            let (caller, _) = resolve_external(rt, rt.message().caller())?;
-            (origin, caller)
-        };
-        // Credit owner must be the transaction origin or caller
-        if from != caller && from != origin {
-            return Err(ActorError::illegal_argument(format!(
-                "from {} does not match origin or caller",
-                from
-            )));
-        }
+        ensure_addr_is_origin_or_caller(rt, from)?;
         let to = resolve_external_non_machine(rt, params.to)?;
         let caller_allowlist = if let Some(allowlist) = params.caller_allowlist {
             let resolved: HashSet<_> = allowlist
@@ -119,21 +105,7 @@ impl BlobsActor {
     fn revoke_credit(rt: &impl Runtime, params: RevokeCreditParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let from = resolve_external_non_machine(rt, params.from)?;
-        let (origin, caller) = if rt.message().origin() == rt.message().caller() {
-            let (origin, _) = resolve_external(rt, rt.message().origin())?;
-            (origin, origin)
-        } else {
-            let (origin, _) = resolve_external(rt, rt.message().origin())?;
-            let (caller, _) = resolve_external(rt, rt.message().caller())?;
-            (origin, caller)
-        };
-        // Credit owner must be the transaction origin or caller
-        if from != caller && from != origin {
-            return Err(ActorError::illegal_argument(format!(
-                "from {} does not match origin or caller",
-                from
-            )));
-        }
+        ensure_addr_is_origin_or_caller(rt, from)?;
         let to = resolve_external_non_machine(rt, params.to)?;
         let for_caller = if let Some(caller) = params.for_caller {
             let (resolved, _) = resolve_external(rt, caller)?;
@@ -149,13 +121,14 @@ impl BlobsActor {
         params: SetCreditSponsorParams,
     ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let (origin, _) = resolve_external(rt, rt.message().origin())?;
-        let sponsor = if let Some(sponsor) = params.0 {
+        let (from, _) = resolve_external(rt, params.from)?;
+        ensure_addr_is_origin_or_caller(rt, from)?;
+        let sponsor = if let Some(sponsor) = params.sponsor {
             Some(resolve_external_non_machine(rt, sponsor)?)
         } else {
             None
         };
-        rt.transaction(|st: &mut State, _| st.set_credit_sponsor(origin, sponsor))
+        rt.transaction(|st: &mut State, _| st.set_credit_sponsor(from, sponsor, rt.curr_epoch()))
     }
 
     fn get_account(
@@ -183,7 +156,7 @@ impl BlobsActor {
         params: GetCreditAllowanceParams,
     ) -> Result<CreditAllowance, ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let to = match resolve_external_non_machine(rt, params.0) {
+        let from = match resolve_external_non_machine(rt, params.0) {
             Ok(to) => to,
             Err(e) => {
                 return if e.exit_code() == ExitCode::USR_FORBIDDEN {
@@ -195,7 +168,7 @@ impl BlobsActor {
             }
         };
         rt.state::<State>()?
-            .get_credit_allowance(to, rt.curr_epoch())
+            .get_credit_allowance(from, rt.curr_epoch())
     }
 
     fn debit_accounts(rt: &impl Runtime) -> Result<(), ActorError> {
@@ -397,6 +370,8 @@ mod tests {
     };
     use fvm_shared::bigint::BigInt;
     use fvm_shared::clock::ChainEpoch;
+    use fvm_shared::econ::TokenAmount;
+    use num_traits::Zero;
     use rand::RngCore;
 
     pub fn new_hash(size: usize) -> (Hash, u64) {

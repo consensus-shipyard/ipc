@@ -21,7 +21,7 @@ pub struct BuyCreditParams(pub Address);
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct UpdateCreditParams {
     /// Account address that initiated the update.
-    pub to: Address,
+    pub from: Address,
     /// Optional account address that is sponsoring the update.
     pub sponsor: Option<Address>,
     /// Token amount to add, which can be negative.
@@ -61,9 +61,14 @@ pub struct RevokeCreditParams {
 }
 
 /// Params for setting credit sponsor.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct SetCreditSponsorParams(pub Option<Address>);
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct SetCreditSponsorParams {
+    /// Account address that is setting a credit sponsor.
+    pub from: Address,
+    /// Credit sponsor.
+    /// If not present, the sponsor is unset.
+    pub sponsor: Option<Address>,
+}
 
 /// Params for getting an account.
 #[derive(Clone, Debug, Serialize, Deserialize)]

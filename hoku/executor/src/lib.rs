@@ -79,7 +79,7 @@ where
         raw_length: usize,
     ) -> Result<ApplyRet> {
         // Validate if the message was correct, charge for it, and extract some preliminary data.
-        let (sender_id, gas_costs, inclusion_cost) =
+        let (sender_id, sponsor_id, gas_costs, inclusion_cost) =
             match self.preflight_message(&msg, apply_kind, raw_length)? {
                 Ok(res) => res,
                 Err(apply_ret) => return Ok(apply_ret),
@@ -99,15 +99,6 @@ where
             .state_tree()
             .lookup_id(&msg.to)
             .context("failure when looking up message receiver")?;
-
-        // Pre-resolve the message sponsor's address, if known.
-        let sponsor_id = if let Some(sponsor) = msg.sponsor {
-            self.state_tree()
-                .lookup_id(&sponsor)
-                .context("failure when looking up message sponsor")?
-        } else {
-            None
-        };
 
         // Filecoin caps the premium plus the base-fee at the fee-cap.
         // We expose the _effective_ premium to the user.
@@ -170,7 +161,6 @@ where
                 cm.call_actor::<K>(
                     sender_id,
                     msg.to,
-                    sponsor_id,
                     Entrypoint::Invoke(msg.method_num),
                     params,
                     &msg.value,
@@ -285,6 +275,7 @@ where
         match apply_kind {
             ApplyKind::Explicit => self.finish_message(
                 sender_id,
+                sponsor_id,
                 msg,
                 receipt,
                 failure_info,
@@ -358,7 +349,7 @@ where
         msg: &Message,
         apply_kind: ApplyKind,
         raw_length: usize,
-    ) -> Result<StdResult<(ActorID, GasAmounts, GasCharge), ApplyRet>> {
+    ) -> Result<StdResult<(ActorID, Option<ActorID>, GasAmounts, GasCharge), ApplyRet>> {
         msg.check().or_fatal()?;
 
         // TODO We don't like having price lists _inside_ the FVM, but passing
@@ -405,7 +396,7 @@ where
         };
 
         if apply_kind == ApplyKind::Implicit {
-            return Ok(Ok((sender_id, GasAmounts::default(), inclusion_cost)));
+            return Ok(Ok((sender_id, None, GasAmounts::default(), inclusion_cost)));
         }
 
         let mut sender_state = match self
@@ -465,9 +456,20 @@ where
 
         sender_state.sequence += 1;
 
+        // Get sender's credit allowance for gas fees.
+        let credit_allowance = self.get_credit_allowance(msg.from)?;
+
+        // Pre-resolve the message sponsor's address, if known.
+        let sponsor_id = if let Some(sponsor) = credit_allowance.sponsor {
+            self.state_tree()
+                .lookup_id(&sponsor)
+                .context("failure when looking up message sponsor")?
+        } else {
+            None
+        };
+
         // Ensure from actor has enough balance to cover the gas cost of the message.
-        let allowance = self.get_credit_allowance(msg.from)?;
-        let total_credit_allowance = allowance.total();
+        let total_credit_allowance = credit_allowance.total();
         let total_gas_cost: TokenAmount = msg.gas_fee_cap.clone() * msg.gas_limit;
         let sender_balance = sender_state.balance.clone();
         if &total_credit_allowance + &sender_balance < total_gas_cost {
@@ -528,27 +530,27 @@ where
                 // Consume entire allowance
                 GasAmounts::new(
                     sender_gas_cost,
-                    allowance.from_self,
-                    allowance.from_default_sponsor,
+                    credit_allowance.amount,
+                    credit_allowance.sponsored_amount,
                 )
             } else {
                 // Deduct entire gas cost from source
                 source_state.deduct_funds(&total_gas_cost)?;
                 // Consume allowances
                 let (credit_cost, sponsored_credit_cost) =
-                    if allowance.from_default_sponsor.is_zero() {
+                    if credit_allowance.sponsored_amount.is_zero() {
                         // Consume from own allowance
                         (total_gas_cost, TokenAmount::zero())
                     } else {
                         // Prioritize sponsor allowance when consuming
-                        if allowance.from_default_sponsor > total_gas_cost {
+                        if credit_allowance.sponsored_amount > total_gas_cost {
                             // Consume from sponsored allowance
                             (TokenAmount::zero(), total_gas_cost)
                         } else {
                             // Consume entire sponsored allowance
                             (
-                                &total_gas_cost - &allowance.from_default_sponsor,
-                                allowance.from_default_sponsor,
+                                &total_gas_cost - &credit_allowance.sponsored_amount,
+                                credit_allowance.sponsored_amount,
                             )
                         }
                     };
@@ -568,7 +570,7 @@ where
         self.update_credit_allowance(msg.from, None, -gas_costs.from_credit.clone())?;
         self.update_credit_allowance(
             msg.from,
-            msg.sponsor,
+            credit_allowance.sponsor,
             -gas_costs.from_sponsor_credit.clone(),
         )?;
 
@@ -581,13 +583,14 @@ where
             msg.to
         );
 
-        Ok(Ok((sender_id, gas_costs, inclusion_cost)))
+        Ok(Ok((sender_id, sponsor_id, gas_costs, inclusion_cost)))
     }
 
     #[allow(clippy::too_many_arguments)]
     fn finish_message(
         &mut self,
         sender_id: ActorID,
+        sponsor_id: Option<ActorID>,
         msg: Message,
         receipt: Receipt,
         failure_info: Option<ApplyFailure>,
@@ -662,7 +665,11 @@ where
 
         // Refund gas credit difference
         self.update_credit_allowance(msg.from, None, gas_refunds.from_credit)?;
-        self.update_credit_allowance(msg.from, msg.sponsor, gas_refunds.from_sponsor_credit)?;
+        self.update_credit_allowance(
+            msg.from,
+            sponsor_id.map(Address::new_id),
+            gas_refunds.from_sponsor_credit,
+        )?;
 
         Ok(ApplyRet {
             msg_receipt: receipt,
@@ -702,8 +709,7 @@ where
         let msg = Message {
             from: SYSTEM_ACTOR_ADDR,
             to: BLOBS_ACTOR_ADDR,
-            sponsor: None, // gas sponsor is none in this context
-            sequence: 0,   // irrelevant for implicit executions
+            sequence: 0, // irrelevant for implicit executions
             gas_limit: i64::MAX as u64,
             method_num: fendermint_actor_blobs_shared::Method::GetCreditAllowance as u64,
             params,
@@ -725,7 +731,7 @@ where
     /// Updates credit allowance from the sender.
     fn update_credit_allowance(
         &mut self,
-        to: Address,
+        from: Address,
         sponsor: Option<Address>,
         add_amount: TokenAmount,
     ) -> Result<()> {
@@ -734,7 +740,7 @@ where
         }
 
         let params = RawBytes::serialize(UpdateCreditParams {
-            to,
+            from,
             sponsor,
             add_amount: add_amount.clone(),
         })?;
@@ -742,8 +748,7 @@ where
         let msg = Message {
             from: SYSTEM_ACTOR_ADDR,
             to: BLOBS_ACTOR_ADDR,
-            sponsor: None, // gas sponsor is none in this context
-            sequence: 0,   // irrelevant for implicit executions
+            sequence: 0, // irrelevant for implicit executions
             gas_limit: i64::MAX as u64,
             method_num: fendermint_actor_blobs_shared::Method::UpdateCredit as u64,
             params,
@@ -757,7 +762,7 @@ where
         if let Some(err) = apply_ret.failure_info {
             bail!(
                 "failed to update credit allowance for {} (amount: {}; sponsor: {:?}): {}",
-                to,
+                from,
                 add_amount,
                 sponsor,
                 err
@@ -766,7 +771,7 @@ where
 
         debug!(
             "updated credit allowance for {} (amount: {}; sponsor: {:?})",
-            to, add_amount, sponsor
+            from, add_amount, sponsor
         );
 
         Ok(())
