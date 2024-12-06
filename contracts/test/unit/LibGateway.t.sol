@@ -219,7 +219,7 @@ contract LibGatewayTest is Test {
             kind: IpcMsgKind.Result,
             from: crossMsg.to,
             to: crossMsg.from,
-            value: crossMsg.value,
+            value: 0,
             message: abi.encode(message),
             nonce: 0
         });
@@ -332,7 +332,7 @@ contract LibGatewayTest is Test {
             kind: IpcMsgKind.Result,
             from: crossMsg.to,
             to: crossMsg.from,
-            value: crossMsg.value,
+            value: 0,
             message: abi.encode(message),
             nonce: 0
         });
@@ -386,7 +386,7 @@ contract LibGatewayTest is Test {
             kind: IpcMsgKind.Result,
             from: crossMsg.to,
             to: crossMsg.from,
-            value: crossMsg.value,
+            value: 0,
             message: abi.encode(message),
             nonce: 0
         });

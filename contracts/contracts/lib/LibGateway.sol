@@ -251,7 +251,7 @@ library LibGateway {
 
         crossMessage.nonce = topDownNonce;
         subnet.topDownNonce = topDownNonce + 1;
-        if (crossMessage.kind == IpcMsgKind.Transfer) {
+        if (crossMessage.kind != IpcMsgKind.Call) {
             subnet.circSupply += crossMessage.value;
         }
 
@@ -531,7 +531,6 @@ library LibGateway {
         // If the directionality is top-down, or if we're inverting the direction
         // because we're the LCA, commit a top-down message.
         if (applyType == IPCMsgType.TopDown || isLCA) {
-            ++s.appliedTopDownNonce;
             (, SubnetID memory subnetId) = to.down(s.networkName);
             (, Subnet storage subnet) = getSubnet(subnetId);
             LibGateway.commitTopDownMsg(subnet, crossMessage);
@@ -618,7 +617,7 @@ library LibGateway {
             return InvalidXnetMessageReason.CommonParentNotExist;
         }
 
-        revert("Unhandled CrossMessageValidationOutcome");
+        revert("Unhandled validation outcome");
     }
     
      /**
