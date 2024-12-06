@@ -467,7 +467,6 @@ mod tests {
             chain_id: out.chain_id.into(),
             power_scale: out.power_scale,
             app_version: 0,
-            credit_debit_interval: out.credit_debit_interval,
         };
 
         (state_params, store)

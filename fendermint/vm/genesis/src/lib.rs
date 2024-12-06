@@ -12,7 +12,6 @@ use fendermint_actor_eam::PermissionModeParams;
 use fendermint_crypto::{normalize_public_key, PublicKey};
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_encoding::IsHumanReadable;
-use fvm_shared::clock::ChainEpoch;
 use fvm_shared::version::NetworkVersion;
 use fvm_shared::{address::Address, econ::TokenAmount};
 
@@ -47,8 +46,6 @@ pub struct Genesis {
     /// IPC related configuration, if enabled.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ipc: Option<ipc::IpcParams>,
-    /// Block interval at which to debit all credit accounts.
-    pub credit_debit_interval: ChainEpoch,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

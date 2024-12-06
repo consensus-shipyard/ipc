@@ -31,7 +31,6 @@ use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_car::{load_car, CarHeader};
 use fvm_ipld_encoding::CborStore;
 use fvm_shared::chainid::ChainID;
-use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
 use ipc_actors_abis::i_diamond::FacetCut;
@@ -65,7 +64,6 @@ impl GenesisMetadata {
             chain_id: out.chain_id.into(),
             power_scale: out.power_scale,
             app_version: 0,
-            credit_debit_interval: out.credit_debit_interval,
         };
 
         GenesisMetadata {
@@ -157,7 +155,6 @@ pub struct GenesisOutput {
     pub power_scale: PowerScale,
     pub circ_supply: TokenAmount,
     pub validators: Vec<Validator<Power>>,
-    pub credit_debit_interval: ChainEpoch,
 }
 
 pub struct GenesisBuilder {
@@ -303,7 +300,6 @@ impl GenesisBuilder {
             base_fee: genesis.base_fee,
             power_scale: genesis.power_scale,
             validators,
-            credit_debit_interval: genesis.credit_debit_interval,
         };
 
         // STAGE 0: Declare the built-in EVM contracts we'll have to deploy.
@@ -452,7 +448,7 @@ impl GenesisBuilder {
         // Initialize the hoku config actor.
         let hoku_config_state = fendermint_actor_hoku_config::State {
             admin: None,
-            config: fendermint_actor_hoku_config::Config::default(),
+            config: fendermint_actor_hoku_config::HokuConfig::default(),
         };
         state
             .create_custom_actor(
@@ -571,7 +567,6 @@ impl GenesisBuilder {
                 out.circ_supply.clone(),
                 out.chain_id.into(),
                 out.power_scale,
-                out.credit_debit_interval,
             )
             .context("failed to init exec state")?;
 

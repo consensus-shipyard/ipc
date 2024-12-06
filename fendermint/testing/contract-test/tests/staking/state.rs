@@ -587,7 +587,6 @@ impl arbitrary::Arbitrary<'_> for StakingState {
             accounts: parent_actors,
             eam_permission_mode: PermissionMode::Unrestricted,
             ipc: Some(parent_ipc),
-            credit_debit_interval: ChainEpoch::arbitrary(u)?,
         };
 
         let child_ipc = IpcParams {
@@ -609,7 +608,6 @@ impl arbitrary::Arbitrary<'_> for StakingState {
             accounts: Vec::new(),
             eam_permission_mode: PermissionMode::Unrestricted,
             ipc: Some(child_ipc),
-            credit_debit_interval: ChainEpoch::arbitrary(u)?,
         };
 
         Ok(StakingState::new(accounts, parent_genesis, child_genesis))

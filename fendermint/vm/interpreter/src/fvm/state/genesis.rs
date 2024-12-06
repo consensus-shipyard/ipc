@@ -139,7 +139,6 @@ where
         circ_supply: TokenAmount,
         chain_id: u64,
         power_scale: PowerScale,
-        credit_debit_interval: ChainEpoch,
     ) -> anyhow::Result<()> {
         self.stage = match &mut self.stage {
             Stage::Exec(_) => bail!("execution engine already initialized"),
@@ -156,7 +155,6 @@ where
                     chain_id,
                     power_scale,
                     app_version: 0,
-                    credit_debit_interval,
                 };
 
                 let exec_state =

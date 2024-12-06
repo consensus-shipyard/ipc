@@ -85,7 +85,6 @@ where
             chain_id: out.chain_id.into(),
             power_scale: out.power_scale,
             app_version: 0,
-            credit_debit_interval: out.credit_debit_interval,
         };
 
         Ok(Self {
@@ -183,7 +182,6 @@ where
                 base_fee,
                 circ_supply,
                 power_scale,
-                credit_debit_interval,
             },
             _,
         ) = exec_state.commit().context("failed to commit FVM")?;
@@ -193,7 +191,6 @@ where
         self.state_params.base_fee = base_fee;
         self.state_params.circ_supply = circ_supply;
         self.state_params.power_scale = power_scale;
-        self.state_params.credit_debit_interval = credit_debit_interval;
 
         eprintln!("self.state_params: {:?}", self.state_params);
 
