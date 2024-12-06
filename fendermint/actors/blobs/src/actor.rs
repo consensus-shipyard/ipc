@@ -11,7 +11,8 @@ use fendermint_actor_blobs_shared::params::{
     RevokeCreditParams, SetBlobPendingParams, SetCreditSponsorParams, UpdateCreditParams,
 };
 use fendermint_actor_blobs_shared::state::{
-    Account, Blob, BlobStatus, CreditApproval, Hash, PublicKey, Subscription, SubscriptionId,
+    Account, Blob, BlobStatus, CreditAllowance, CreditApproval, Hash, PublicKey, Subscription,
+    SubscriptionId,
 };
 use fendermint_actor_blobs_shared::Method;
 use fendermint_actor_machine::{resolve_external, resolve_external_non_machine};
@@ -180,26 +181,21 @@ impl BlobsActor {
     fn get_credit_allowance(
         rt: &impl Runtime,
         params: GetCreditAllowanceParams,
-    ) -> Result<TokenAmount, ActorError> {
+    ) -> Result<CreditAllowance, ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let to = match resolve_external_non_machine(rt, params.to) {
+        let to = match resolve_external_non_machine(rt, params.0) {
             Ok(to) => to,
             Err(e) => {
                 return if e.exit_code() == ExitCode::USR_FORBIDDEN {
                     // Disallowed actor type (this is called by all txns so we can't error)
-                    Ok(TokenAmount::zero())
+                    Ok(CreditAllowance::default())
                 } else {
                     Err(e)
                 };
             }
         };
-        let sponsor = if let Some(sponsor) = params.sponsor {
-            Some(resolve_external_non_machine(rt, sponsor)?)
-        } else {
-            None
-        };
         rt.state::<State>()?
-            .get_credit_allowance(to, sponsor, rt.curr_epoch())
+            .get_credit_allowance(to, rt.curr_epoch())
     }
 
     fn debit_accounts(rt: &impl Runtime) -> Result<(), ActorError> {

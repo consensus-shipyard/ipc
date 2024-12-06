@@ -7,8 +7,8 @@ use std::ops::Bound::{Included, Unbounded};
 
 use fendermint_actor_blobs_shared::params::GetStatsReturn;
 use fendermint_actor_blobs_shared::state::{
-    Account, Blob, BlobStatus, CreditApproval, Hash, PublicKey, Subscription, SubscriptionGroup,
-    SubscriptionId,
+    Account, Blob, BlobStatus, CreditAllowance, CreditApproval, Hash, PublicKey, Subscription,
+    SubscriptionGroup, SubscriptionId,
 };
 use fil_actors_runtime::ActorError;
 use fvm_ipld_encoding::tuple::*;
@@ -323,41 +323,49 @@ impl State {
         account.approvals.get(&to).cloned()
     }
 
-    /// Returns the free credit for the given address, or from an approval from a sponsor.
+    /// Returns the free credit for the given address, including an amount from a default sponsor.
     /// Note: An error returned from this method would be fatal, as it's called from the FVM executor.
     pub fn get_credit_allowance(
         &self,
         to: Address,
-        sponsor: Option<Address>,
         current_epoch: ChainEpoch,
-    ) -> anyhow::Result<TokenAmount, ActorError> {
-        let addr = sponsor.unwrap_or(to);
-        let account = match self.accounts.get(&addr) {
-            None => return Ok(TokenAmount::zero()),
+    ) -> anyhow::Result<CreditAllowance, ActorError> {
+        let account = match self.accounts.get(&to) {
+            None => return Ok(CreditAllowance::default()),
             Some(account) => account,
         };
-        if sponsor.is_none() {
-            return Ok(TokenAmount::from_atto(account.credit_free.clone()));
+        let mut allowance = CreditAllowance {
+            from_self: TokenAmount::from_atto(account.credit_free.clone()),
+            ..Default::default()
+        };
+        if let Some(credit_sponsor) = account.credit_sponsor {
+            let sponsor = match self.accounts.get(&credit_sponsor) {
+                None => return Ok(allowance),
+                Some(account) => account,
+            };
+            let sponsored = sponsor
+                .approvals
+                .get(&to)
+                .and_then(|approval| {
+                    let expiry_valid = approval
+                        .expiry
+                        .map_or(true, |expiry| expiry > current_epoch);
+                    if !expiry_valid {
+                        return None;
+                    }
+                    let credit_free = sponsor.credit_free.clone();
+                    let used = approval.used.clone();
+                    let amount = approval
+                        .limit
+                        .clone()
+                        .map_or(credit_free.clone(), |limit| (limit - used).min(credit_free));
+                    Some(TokenAmount::from_atto(amount))
+                })
+                .unwrap_or(TokenAmount::zero());
+            allowance.from_default_sponsor = sponsored;
+        } else {
+            return Ok(allowance);
         }
-        let allowance = account
-            .approvals
-            .get(&to)
-            .and_then(|approval| {
-                let expiry_valid = approval
-                    .expiry
-                    .map_or(true, |expiry| expiry > current_epoch);
-                if !expiry_valid {
-                    return None;
-                }
-                let credit_free = account.credit_free.clone();
-                let used = approval.used.clone();
-                let amount = approval
-                    .limit
-                    .clone()
-                    .map_or(credit_free.clone(), |limit| (limit - used).min(credit_free));
-                Some(TokenAmount::from_atto(amount))
-            })
-            .unwrap_or(TokenAmount::zero());
         Ok(allowance)
     }
 

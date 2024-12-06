@@ -8,6 +8,7 @@ use std::result::Result as StdResult;
 use anyhow::{anyhow, bail, Context, Result};
 use cid::Cid;
 use fendermint_actor_blobs_shared::params::{GetCreditAllowanceParams, UpdateCreditParams};
+use fendermint_actor_blobs_shared::state::CreditAllowance;
 use fendermint_vm_actor_interface::{
     blobs::{BLOBS_ACTOR_ADDR, BLOBS_ACTOR_ID},
     eam::EAM_ACTOR_ID,
@@ -465,9 +466,8 @@ where
         sender_state.sequence += 1;
 
         // Ensure from actor has enough balance to cover the gas cost of the message.
-        let (credit_allowance, sponsored_credit_allowance) =
-            self.get_total_credit_allowance(msg.from, msg.sponsor)?;
-        let total_credit_allowance = &credit_allowance + &sponsored_credit_allowance;
+        let allowance = self.get_credit_allowance(msg.from)?;
+        let total_credit_allowance = allowance.total();
         let total_gas_cost: TokenAmount = msg.gas_fee_cap.clone() * msg.gas_limit;
         let sender_balance = sender_state.balance.clone();
         if &total_credit_allowance + &sender_balance < total_gas_cost {
@@ -528,29 +528,30 @@ where
                 // Consume entire allowance
                 GasAmounts::new(
                     sender_gas_cost,
-                    credit_allowance,
-                    sponsored_credit_allowance,
+                    allowance.from_self,
+                    allowance.from_default_sponsor,
                 )
             } else {
                 // Deduct entire gas cost from source
                 source_state.deduct_funds(&total_gas_cost)?;
                 // Consume allowances
-                let (credit_cost, sponsored_credit_cost) = if sponsored_credit_allowance.is_zero() {
-                    // Consume from own allowance
-                    (total_gas_cost, TokenAmount::zero())
-                } else {
-                    // Prioritize sponsor allowance when consuming
-                    if sponsored_credit_allowance > total_gas_cost {
-                        // Consume from sponsored allowance
-                        (TokenAmount::zero(), total_gas_cost)
+                let (credit_cost, sponsored_credit_cost) =
+                    if allowance.from_default_sponsor.is_zero() {
+                        // Consume from own allowance
+                        (total_gas_cost, TokenAmount::zero())
                     } else {
-                        // Consume entire sponsored allowance
-                        (
-                            &total_gas_cost - &sponsored_credit_allowance,
-                            sponsored_credit_allowance,
-                        )
-                    }
-                };
+                        // Prioritize sponsor allowance when consuming
+                        if allowance.from_default_sponsor > total_gas_cost {
+                            // Consume from sponsored allowance
+                            (TokenAmount::zero(), total_gas_cost)
+                        } else {
+                            // Consume entire sponsored allowance
+                            (
+                                &total_gas_cost - &allowance.from_default_sponsor,
+                                allowance.from_default_sponsor,
+                            )
+                        }
+                    };
                 GasAmounts::new(TokenAmount::zero(), credit_cost, sponsored_credit_cost)
             };
 
@@ -694,28 +695,9 @@ where
         )
     }
 
-    /// Returns the total credit allowance for the sender with a message sponsor.
-    fn get_total_credit_allowance(
-        &mut self,
-        to: Address,
-        sponsor: Option<Address>,
-    ) -> Result<(TokenAmount, TokenAmount)> {
-        let allowance = self.get_credit_allowance(to, None)?;
-        let sponsored_allowance = if let Some(sponsor) = sponsor {
-            self.get_credit_allowance(to, Some(sponsor))?
-        } else {
-            TokenAmount::zero()
-        };
-        Ok((allowance, sponsored_allowance))
-    }
-
     /// Returns the credit allowance for the sender.
-    fn get_credit_allowance(
-        &mut self,
-        to: Address,
-        sponsor: Option<Address>,
-    ) -> Result<TokenAmount> {
-        let params = RawBytes::serialize(GetCreditAllowanceParams { to, sponsor })?;
+    fn get_credit_allowance(&mut self, to: Address) -> Result<CreditAllowance> {
+        let params = RawBytes::serialize(GetCreditAllowanceParams(to))?;
 
         let msg = Message {
             from: SYSTEM_ACTOR_ADDR,
@@ -733,15 +715,10 @@ where
 
         let apply_ret = self.execute_message(msg, ApplyKind::Implicit, 0)?;
         if let Some(err) = apply_ret.failure_info {
-            bail!(
-                "failed to get credit allowance for {} (sponsor: {:?}): {}",
-                to,
-                sponsor,
-                err
-            );
+            bail!("failed to get credit allowance for {}: {}", to, err);
         }
 
-        fvm_ipld_encoding::from_slice::<TokenAmount>(&apply_ret.msg_receipt.return_data)
+        fvm_ipld_encoding::from_slice::<CreditAllowance>(&apply_ret.msg_receipt.return_data)
             .context("failed to parse credit allowance")
     }
 

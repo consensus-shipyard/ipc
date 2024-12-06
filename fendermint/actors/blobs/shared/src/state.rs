@@ -10,6 +10,7 @@ use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
+use fvm_shared::econ::TokenAmount;
 use serde::{Deserialize, Serialize};
 
 /// The stored representation of a credit account.
@@ -60,6 +61,22 @@ pub struct CreditApproval {
     /// Optional caller allowlist.
     /// If not present, any caller is allowed.
     pub caller_allowlist: Option<HashSet<Address>>,
+}
+
+/// Credit allowance for an account.
+#[derive(Debug, Default, Clone, PartialEq, Serialize_tuple, Deserialize_tuple)]
+pub struct CreditAllowance {
+    /// Amount from the account.
+    pub from_self: TokenAmount,
+    /// Amount from the account's default sponsor.
+    pub from_default_sponsor: TokenAmount,
+}
+
+impl CreditAllowance {
+    /// Returns the total allowance from self and default sponsor.
+    pub fn total(&self) -> TokenAmount {
+        &self.from_self + &self.from_default_sponsor
+    }
 }
 
 impl CreditApproval {

@@ -80,13 +80,9 @@ pub struct GetCreditApprovalParams {
 }
 
 /// Params for looking up credit allowance.
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct GetCreditAllowanceParams {
-    /// Account address to get the allowance for.
-    pub to: Address,
-    /// Optional account address to return a sponsored allowance for.
-    pub sponsor: Option<Address>,
-}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct GetCreditAllowanceParams(pub Address);
 
 /// Params for adding a blob.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
