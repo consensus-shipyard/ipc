@@ -286,6 +286,9 @@ pub struct Settings {
     /// Number of pending blobs to process in parallel.
     pub blob_concurrency: u32,
 
+    /// Number of pending read requests to process in parallel.
+    pub read_request_concurrency: u32,
+
     pub abci: AbciSettings,
     pub db: DbSettings,
     pub metrics: MetricsSettings,

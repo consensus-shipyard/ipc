@@ -32,6 +32,7 @@ members = [
     "fendermint/actors",
     "fendermint/actors/api",
     "fendermint/actors/chainmetadata",
+    "fendermint/actors/activity-tracker",
     "fendermint/actors/eam",
     "fendermint/actors/gas_market/eip1559",
     # hoku
@@ -83,8 +84,8 @@ data-encoding = { version = "2.3.3" }
 dirs = "5.0"
 dircpy = "0.3.19"
 either = "1.10"
-entangler = { git = "ssh://git@github.com/hokunet/entanglement.git", rev = "dc93353e97a438a800a4a22ed46fe75e77eca200" }
-entangler_storage = { package = "storage", git = "ssh://git@github.com/hokunet/entanglement.git", rev = "dc93353e97a438a800a4a22ed46fe75e77eca200" }
+entangler = { git = "ssh://git@github.com/hokunet/entanglement.git", rev = "fbc33c4cc8f183825fc920a40ab09e90d1a647e3" }
+entangler_storage = { package = "storage", git = "ssh://git@github.com/hokunet/entanglement.git", rev = "fbc33c4cc8f183825fc920a40ab09e90d1a647e3" }
 env_logger = "0.10"
 erased-serde = "0.3"
 ethers = { version = "2.0.13", features = ["abigen", "ws"] }

@@ -8,7 +8,7 @@ use std::ops::Bound::{Included, Unbounded};
 use fendermint_actor_blobs_shared::params::GetStatsReturn;
 use fendermint_actor_blobs_shared::state::{
     Account, Blob, BlobStatus, CreditAllowance, CreditApproval, Hash, PublicKey, Subscription,
-    SubscriptionGroup, SubscriptionId,
+    SubscriptionGroup, SubscriptionId, TtlStatus,
 };
 use fil_actors_runtime::ActorError;
 use fvm_ipld_encoding::tuple::*;
@@ -486,11 +486,11 @@ impl State {
         source: PublicKey,
         tokens_received: TokenAmount,
     ) -> anyhow::Result<(Subscription, TokenAmount), ActorError> {
-        let (ttl, auto_renew) = accept_ttl(ttl)?;
         let account = self
             .accounts
             .entry(subscriber)
             .or_insert(Account::new(BigInt::zero(), current_epoch));
+        let (ttl, auto_renew) = accept_ttl(ttl, account)?;
         let delegation = if origin != subscriber {
             // Look for an approval for origin from subscriber and validate the caller is allowed.
             let approval = account
@@ -506,7 +506,7 @@ impl State {
             None
         };
         // Capacity updates and required credit depend on whether the subscriber is already
-        // subcribing to this blob
+        // subscribing to this blob
         let size = BigInt::from(size);
         let expiry = current_epoch + ttl;
         let mut new_capacity = BigInt::zero();
@@ -1291,6 +1291,30 @@ impl State {
         Ok(delete_blob)
     }
 
+    pub fn set_ttl_status(
+        &mut self,
+        account: Address,
+        status: TtlStatus,
+        current_epoch: ChainEpoch,
+    ) -> anyhow::Result<(), ActorError> {
+        match status {
+            // We don't want to create an account for default TTL
+            TtlStatus::Default => {
+                if let Some(account) = self.accounts.get_mut(&account) {
+                    account.max_ttl_epochs = status.into();
+                }
+            }
+            _ => {
+                let account = self
+                    .accounts
+                    .entry(account)
+                    .or_insert(Account::new(BigInt::zero(), current_epoch));
+                account.max_ttl_epochs = status.into();
+            }
+        }
+        Ok(())
+    }
+
     /// Return available capacity as a difference between `capacity_total` and `capacity_used`.
     fn capacity_available(&self) -> BigInt {
         &self.capacity_total - &self.capacity_used
@@ -1453,16 +1477,24 @@ fn update_expiry_index(
     }
 }
 
-fn accept_ttl(ttl: Option<ChainEpoch>) -> anyhow::Result<(ChainEpoch, bool), ActorError> {
+fn accept_ttl(
+    ttl: Option<ChainEpoch>,
+    account: &Account,
+) -> anyhow::Result<(ChainEpoch, bool), ActorError> {
     let (ttl, auto_renew) = ttl.map(|ttl| (ttl, false)).unwrap_or((AUTO_TTL, true));
     if ttl < MIN_TTL {
-        Err(ActorError::illegal_argument(format!(
+        return Err(ActorError::illegal_argument(format!(
             "minimum blob TTL is {}",
             MIN_TTL
-        )))
-    } else {
-        Ok((ttl, auto_renew))
+        )));
     }
+    if ChainEpoch::from(account.max_ttl_epochs) < ttl {
+        return Err(ActorError::forbidden(format!(
+            "attempt to add a blob with TTL ({}) that exceeds account's max allowed TTL ({})",
+            ttl, account.max_ttl_epochs,
+        )));
+    }
+    Ok((ttl, auto_renew))
 }
 
 #[cfg(test)]
@@ -3024,6 +3056,114 @@ mod tests {
             current_epoch,
             token_amount,
         );
+    }
+
+    #[test]
+    fn test_if_blobs_ttl_exceeds_accounts_ttl_should_error() {
+        setup_logs();
+
+        // Test cases structure
+        struct TestCase {
+            name: &'static str,
+            account_ttl_status: TtlStatus,
+            blob_ttl: ChainEpoch,
+            should_succeed: bool,
+        }
+
+        // Define test cases
+        let test_cases = vec![
+            TestCase {
+                name: "Reduced status rejects even minimum TTL",
+                account_ttl_status: TtlStatus::Reduced,
+                blob_ttl: MIN_TTL,
+                should_succeed: false,
+            },
+            TestCase {
+                name: "Default status allows default TTL",
+                account_ttl_status: TtlStatus::Default,
+                blob_ttl: TtlStatus::DEFAULT_MAX_TTL,
+                should_succeed: true,
+            },
+            TestCase {
+                name: "Default status rejects higher TTL",
+                account_ttl_status: TtlStatus::Default,
+                blob_ttl: TtlStatus::DEFAULT_MAX_TTL + 1,
+                should_succeed: false,
+            },
+            TestCase {
+                name: "Custom status allows matching TTL",
+                account_ttl_status: TtlStatus::Custom(7200),
+                blob_ttl: 7200,
+                should_succeed: true,
+            },
+            TestCase {
+                name: "Custom status rejects higher TTL",
+                account_ttl_status: TtlStatus::Custom(7200),
+                blob_ttl: 7201,
+                should_succeed: false,
+            },
+            TestCase {
+                name: "Extended status allows any TTL",
+                account_ttl_status: TtlStatus::Extended,
+                blob_ttl: 365 * 24 * 60 * 60, // 1 year
+                should_succeed: true,
+            },
+        ];
+
+        // Run all test cases
+        for tc in test_cases {
+            let capacity = 1024 * 1024;
+            let mut state = State::new(capacity, 1);
+            let subscriber = new_address();
+            let current_epoch = ChainEpoch::from(1);
+            let amount = TokenAmount::from_whole(10);
+
+            state
+                .buy_credit(subscriber, amount.clone(), current_epoch)
+                .unwrap();
+            state
+                .set_ttl_status(subscriber, tc.account_ttl_status, current_epoch)
+                .unwrap();
+
+            let (hash, size) = new_hash(1024);
+            let res = state.add_blob(
+                subscriber,
+                subscriber,
+                subscriber,
+                current_epoch,
+                hash,
+                new_metadata_hash(),
+                SubscriptionId::Default,
+                size,
+                Some(tc.blob_ttl),
+                new_pk(),
+                TokenAmount::zero(),
+            );
+
+            if tc.should_succeed {
+                assert!(
+                    res.is_ok(),
+                    "Test case '{}' should succeed but failed: {:?}",
+                    tc.name,
+                    res.err()
+                );
+            } else {
+                assert!(
+                    res.is_err(),
+                    "Test case '{}' should fail but succeeded",
+                    tc.name
+                );
+                assert_eq!(
+                    res.err().unwrap().msg(),
+                    format!(
+                        "attempt to add a blob with TTL ({}) that exceeds account's max allowed TTL ({})",
+                        tc.blob_ttl, i64::from(tc.account_ttl_status),
+                    ),
+                    "Test case '{}' failed with unexpected error message",
+                    tc.name
+                );
+            }
+        }
     }
 
     fn delete_blob_refund(

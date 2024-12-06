@@ -11,8 +11,7 @@ use hoku_kernel_ops::HokuOps;
 use iroh::blobs::Hash;
 use iroh_manager::IrohManager;
 use once_cell::sync::Lazy;
-use tokio::spawn;
-use tokio::sync::Mutex;
+use tokio::{spawn, sync::Mutex};
 
 pub const MODULE_NAME: &str = "hoku";
 pub const HASHRM_SYSCALL_FUNCTION_NAME: &str = "hash_rm";

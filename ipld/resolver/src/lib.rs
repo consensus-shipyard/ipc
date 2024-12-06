@@ -4,8 +4,8 @@ mod behaviour;
 mod client;
 mod hash;
 mod limiter;
+mod observe;
 mod service;
-mod stats;
 mod timestamp;
 
 mod provider_cache;
@@ -20,7 +20,7 @@ mod arb;
 pub mod missing_blocks;
 
 pub use behaviour::{ContentConfig, DiscoveryConfig, MembershipConfig, NetworkConfig};
-pub use client::{Client, Resolver, ResolverIroh};
+pub use client::{Client, Resolver, ResolverIroh, ResolverIrohReadRequest};
 pub use service::{Config, ConnectionConfig, Event, NoKnownPeers, Service};
 pub use timestamp::Timestamp;
 pub use vote_record::{ValidatorKey, VoteRecord};

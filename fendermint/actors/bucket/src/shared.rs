@@ -13,7 +13,7 @@ use fvm_shared::clock::ChainEpoch;
 use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
 
-pub use crate::state::State;
+pub use crate::state::{ObjectState, State};
 
 pub const BUCKET_ACTOR_NAME: &str = "bucket";
 
@@ -73,8 +73,8 @@ pub struct ListParams {
     /// The delimiter used to define object hierarchy.
     #[serde(with = "strict_bytes")]
     pub delimiter: Vec<u8>,
-    /// The offset to start listing objects from.
-    pub offset: u64,
+    /// The key to start listing objects from.
+    pub start_key: Option<Vec<u8>>,
     /// The maximum number of objects to list.
     pub limit: u64,
 }
@@ -98,7 +98,9 @@ pub struct Object {
 #[derive(Default, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ListObjectsReturn {
     /// List of key-values matching the list query.
-    pub objects: Vec<(Vec<u8>, Option<Object>)>,
+    pub objects: Vec<(Vec<u8>, ObjectState)>,
     /// When a delimiter is used in the list query, this contains common key prefixes.
     pub common_prefixes: Vec<Vec<u8>>,
+    /// Next key to use for paginating when there are more objects to list.
+    pub next_key: Option<Vec<u8>>,
 }

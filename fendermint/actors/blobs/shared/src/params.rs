@@ -10,7 +10,7 @@ use fvm_shared::econ::TokenAmount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
-use crate::state::{BlobStatus, Hash, PublicKey, SubscriptionId};
+use crate::state::{BlobStatus, Hash, PublicKey, SubscriptionId, TtlStatus};
 
 /// Params for buying credits.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -176,6 +176,15 @@ pub struct DeleteBlobParams {
     pub hash: Hash,
     /// Identifier used to differentiate blob additions for the same subscriber.
     pub id: SubscriptionId,
+}
+
+/// Params for setting a TTL status for an account.
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct SetAccountBlobTtlStatusParams {
+    /// Account address to set the TTL status for.
+    pub account: Address,
+    /// TTL status to set.
+    pub status: TtlStatus,
 }
 
 /// The stats of the blob actor.

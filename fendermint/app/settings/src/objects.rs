@@ -11,6 +11,7 @@ use serde_with::serde_as;
 #[serde_as]
 #[derive(Debug, Deserialize, Clone)]
 pub struct ObjectsSettings {
+    pub max_object_size: u64,
     pub listen: SocketAddress,
     pub tracing: TracingSettings,
     pub metrics: MetricsSettings,

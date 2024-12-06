@@ -17,7 +17,7 @@ use fendermint_vm_interpreter::fvm::observe::register_metrics as register_interp
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
 use fendermint_vm_interpreter::{
     bytes::{BytesMessageInterpreter, ProposalPrepareMode},
-    chain::{BlobPool, ChainMessageInterpreter, CheckpointPool},
+    chain::{BlobPool, ChainMessageInterpreter, CheckpointPool, ReadRequestPool},
     fvm::{Broadcaster, FvmMessageInterpreter, ValidatorContext},
     signed::SignedMessageInterpreter,
 };
@@ -28,7 +28,9 @@ use fendermint_vm_topdown::observe::register_metrics as register_topdown_metrics
 use fendermint_vm_topdown::proxy::{IPCProviderProxy, IPCProviderProxyWithLatency};
 use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
-use fendermint_vm_topdown::{CachedFinalityProvider, IPCBlobFinality, IPCParentFinality, Toggle};
+use fendermint_vm_topdown::{
+    CachedFinalityProvider, IPCBlobFinality, IPCParentFinality, IPCReadRequestClosed, Toggle,
+};
 use fvm_shared::address::{current_network, Address, Network};
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
 use ipc_observability::{emit, observe::register_metrics as register_default_metrics};
@@ -43,7 +45,7 @@ use crate::{cmd, options::run::RunArgs, settings::Settings};
 use fendermint_app::observe::register_metrics as register_consensus_metrics;
 use fendermint_vm_iroh_resolver::observe::{
     register_metrics as register_blobs_metrics, BlobsFinalityVotingFailure,
-    BlobsFinalityVotingSuccess,
+    BlobsFinalityVotingSuccess, ReadRequestsCloseVoting,
 };
 
 cmd! {
@@ -173,7 +175,8 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
         NamespaceBlockstore::new(db.clone(), ns.state_store).context("error creating state DB")?;
 
     let checkpoint_pool = CheckpointPool::new();
-    let iroh_pin_pool = BlobPool::new();
+    let blob_pool = BlobPool::new();
+    let read_request_pool = ReadRequestPool::new();
     let parent_finality_votes = VoteTally::empty();
 
     let topdown_enabled = settings.topdown_enabled();
@@ -240,20 +243,38 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
         }
 
         if let Some(key) = validator_keypair {
+            // Blob resolver
             let iroh_resolver = IrohResolver::new(
                 client.clone(),
-                iroh_pin_pool.queue(),
+                blob_pool.queue(),
                 settings.resolver.retry_delay,
                 parent_finality_votes.clone(),
-                key,
-                own_subnet_id,
+                key.clone(),
+                own_subnet_id.clone(),
                 |hash, success| AppVote::BlobFinality(IPCBlobFinality::new(hash, success)),
+                blob_pool.results(),
             );
 
             info!("starting the iroh Resolver...");
             tokio::spawn(async move { iroh_resolver.run().await });
+
+            // Read request resolver
+            let read_request_resolver = IrohResolver::new(
+                client.clone(),
+                read_request_pool.queue(),
+                settings.resolver.retry_delay,
+                parent_finality_votes.clone(),
+                key,
+                own_subnet_id,
+                |hash, _| AppVote::ReadRequestClosed(IPCReadRequestClosed::new(hash)),
+                read_request_pool.results(),
+            );
+
+            info!("starting the read request resolver...");
+            tokio::spawn(async move { read_request_resolver.run().await });
         } else {
-            info!("iroh Resolver disabled.")
+            info!("iroh Resolver disabled.");
+            info!("read request resolver disabled.");
         }
 
         info!("subscribing to gossip...");
@@ -348,8 +369,10 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
             checkpoint_pool,
             parent_finality_provider: parent_finality_provider.clone(),
             parent_finality_votes: parent_finality_votes.clone(),
-            blob_pool: iroh_pin_pool,
+            blob_pool,
             blob_concurrency: settings.blob_concurrency,
+            read_request_pool,
+            read_request_concurrency: settings.read_request_concurrency,
         },
         snapshots,
         tendermint_client.clone(),
@@ -586,45 +609,49 @@ async fn dispatch_vote(
                 debug!("ignoring vote; topdown disabled");
                 return;
             }
-            let res = atomically_or_err(|| {
+            match atomically_or_err(|| {
                 parent_finality_votes.add_vote(
                     vote.public_key.clone(),
                     f.height,
                     f.block_hash.clone(),
                 )
             })
-            .await;
-
-            match res {
+            .await
+            {
+                Ok(_) => {
+                    debug!("vote handled for parent finality");
+                }
                 Err(e @ VoteError::Equivocation(_, _, _, _)) => {
-                    warn!(error = e.to_string(), "failed to handle vote");
+                    warn!(
+                        error = e.to_string(),
+                        "failed to handle parent finality vote"
+                    );
                 }
-                Err(e @ (
-                VoteError::Uninitialized // early vote, we're not ready yet
-                | VoteError::UnpoweredValidator(_) // maybe arrived too early or too late, or spam
-                | VoteError::UnexpectedBlock(_, _) // won't happen here
-                )) => {
-                    debug!(error = e.to_string(), "failed to handle vote");
+                Err(
+                    e @ (VoteError::Uninitialized // early vote, we're not ready yet
+                    | VoteError::UnpoweredValidator(_) // maybe arrived too early or too late, or spam
+                    | VoteError::UnexpectedBlock(_, _)), // won't happen here
+                ) => {
+                    debug!(
+                        error = e.to_string(),
+                        "failed to handle parent finality vote"
+                    );
                 }
-                _ => {
-                    debug!("vote handled");
-                }
-            };
+            }
         }
         AppVote::BlobFinality(f) => {
             debug!(hash = ?f.hash, success = ?f.success, "received vote for blob finality");
-
-            let res = atomically_or_err(|| {
+            match atomically_or_err(|| {
                 parent_finality_votes.add_blob_vote(
                     vote.public_key.clone(),
                     f.hash.as_bytes().to_vec(),
                     f.success,
                 )
             })
-            .await;
-
-            match res {
+            .await
+            {
                 Ok(_) => {
+                    debug!("vote handled for blob finality");
                     if f.success {
                         emit(BlobsFinalityVotingSuccess {
                             blob_hash: Some(f.hash.into()),
@@ -636,16 +663,51 @@ async fn dispatch_vote(
                     }
                 }
                 Err(e @ VoteError::Equivocation(_, _, _, _)) => {
-                    warn!(error = e.to_string(), "failed to handle vote");
+                    warn!(error = e.to_string(), "failed to handle blob finality vote");
                 }
-                Err(e @ (
-                VoteError::Uninitialized // early vote, we're not ready yet
-                | VoteError::UnpoweredValidator(_) // maybe arrived too early or too late, or spam
-                | VoteError::UnexpectedBlock(_, _) // won't happen here
-                )) => {
-                    debug!(error = e.to_string(), "failed to handle vote");
+                Err(
+                    e @ (VoteError::Uninitialized // early vote, we're not ready yet
+                    | VoteError::UnpoweredValidator(_) // maybe arrived too early or too late, or spam
+                    | VoteError::UnexpectedBlock(_, _)), // won't happen here
+                ) => {
+                    debug!(error = e.to_string(), "failed to handle blob finality vote");
                 }
-            };
+            }
+        }
+        AppVote::ReadRequestClosed(r) => {
+            debug!(hash = ?r.hash, "received vote for read request completion");
+            match atomically_or_err(|| {
+                parent_finality_votes.add_blob_vote(
+                    vote.public_key.clone(),
+                    r.hash.as_bytes().to_vec(),
+                    true,
+                )
+            })
+            .await
+            {
+                Ok(_) => {
+                    debug!("vote handled for read request completion");
+                    emit(ReadRequestsCloseVoting {
+                        read_request_id: Some(r.hash.into()),
+                    });
+                }
+                Err(e @ VoteError::Equivocation(_, _, _, _)) => {
+                    warn!(
+                        error = e.to_string(),
+                        "failed to handle read request completion vote"
+                    );
+                }
+                Err(
+                    e @ (VoteError::Uninitialized // early vote, we're not ready yet
+                    | VoteError::UnpoweredValidator(_) // maybe arrived too early or too late, or spam
+                    | VoteError::UnexpectedBlock(_, _)), // won't happen here
+                ) => {
+                    debug!(
+                        error = e.to_string(),
+                        "failed to handle read request completion vote"
+                    );
+                }
+            }
         }
     }
 }

@@ -74,6 +74,7 @@ pub mod subnet_actor_diamond {
                                     ],
                                 ),
                                 ::ethers::core::abi::ethabi::ParamType::Address,
+                                ::ethers::core::abi::ethabi::ParamType::Address,
                             ],
                         ),
                         internal_type: ::core::option::Option::Some(
@@ -545,7 +546,7 @@ pub mod subnet_actor_diamond {
     pub static SUBNETACTORDIAMOND_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
         ::ethers::contract::Lazy::new(__abi);
     #[rustfmt::skip]
-    const __DEPLOYED_BYTECODE: &[u8] = b"`\x80`@R6\x15`\x87W`\0\x805`\x01`\x01`\xE0\x1B\x03\x19\x16\x80\x82R\x7F\x80n\x0C\xBB\x9F\xCE)k\xBC3jH\xF4+\xF1\xDB\xC6\x97\"\xD1\x8D\x90\xD6\xFEp[u\x82\xC2\xBBK\xD2` R`@\x90\x91 T`\x01`\x01`\xA0\x1B\x03\x16\x90\x81\x15`sW`\0\x80\x836\x82\x807\x816\x91Z\xF4=`\0\x80>\x15`nW=`\0\xF3[=`\0\xFD[c\n\x82\xDDs`\xE3\x1B`\0R`\x04R`$`\0\xFD[`\x05T`\x01`\x01`\xA0\x1B\x03\x163\x03`\x9AW\0[c\xE7\xE6\x01\xDB`\xE0\x1B`\0R`\x04`\0\xFD\xFE\xA2dipfsX\"\x12 \xA4\x92\x86k\x1F\x1B\xCD\x8C\x0B\x10\xF4\x13\x92]\x94\xE06\x0E\xA7\xD7\x89w\xC3:\xD8W(\xA8f\x0F\xB3\xBEdsolcC\0\x08\x1A\x003";
+    const __DEPLOYED_BYTECODE: &[u8] = b"`\x80`@R6\x15`\x91W`\0\x805`\x01`\x01`\xE0\x1B\x03\x19\x16\x80\x82R\x7F\x80n\x0C\xBB\x9F\xCE)k\xBC3jH\xF4+\xF1\xDB\xC6\x97\"\xD1\x8D\x90\xD6\xFEp[u\x82\xC2\xBBK\xD2` R`@\x82 T`\x01`\x01`\xA0\x1B\x03\x16\x90\x81\x15`oWP\x81\x80\x916\x82\x807\x816\x91Z\xF4=\x82\x80>\x15`kW=\x90\xF3[=\x90\xFD[c\n\x82\xDDs`\xE3\x1B`\x80R`\x01`\x01`\xE0\x1B\x03\x19\x16`\x84R`\x7F\x19`\xA4\x01`\x80\xFD[`\x05T`\x01`\x01`\xA0\x1B\x03\x163\x03`\xA4W\0[c\xE7\xE6\x01\xDB`\xE0\x1B`\x80R`\x04`\x80\xFD\xFE\xA2dipfsX\"\x12 \xC6p\x89\xD7\xEA\x1B\xAF\xECI\xD6\xFE\x0B\xAE\xFAix\x07\xF4\xB1RDb3\xCB\x9F\xBE\xE4\x896A\xCE>dsolcC\0\x08\x17\x003";
     /// The deployed bytecode of the contract.
     pub static SUBNETACTORDIAMOND_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
         ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
@@ -1508,7 +1509,7 @@ pub mod subnet_actor_diamond {
         pub action: u8,
         pub function_selectors: ::std::vec::Vec<[u8; 4]>,
     }
-    ///`ConstructorParams(uint256,uint64,uint64,address,uint16,uint8,uint8,int8,uint8,(uint8,address),(uint8,address),(uint64,address[]),address)`
+    ///`ConstructorParams(uint256,uint64,uint64,address,uint16,uint8,uint8,int8,uint8,(uint8,address),(uint8,address),(uint64,address[]),address,address)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -1533,6 +1534,7 @@ pub mod subnet_actor_diamond {
         pub collateral_source: Asset,
         pub parent_id: SubnetID,
         pub validator_gater: ::ethers::core::types::Address,
+        pub validator_rewarder: ::ethers::core::types::Address,
     }
     ///`SubnetID(uint64,address[])`
     #[derive(

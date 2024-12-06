@@ -29,9 +29,7 @@ hoku_actor_sdk = { path = "../../../hoku/actor_sdk" }
 [dev-dependencies]
 fendermint_testing = { path = "../../testing", features = ["arb"] }
 fil_actors_evm_shared = { workspace = true }
-fil_actors_runtime = { workspace = true, features = [
-    "test_utils",
-] }
+fil_actors_runtime = { workspace = true, features = ["test_utils"] }
 hex-literal = { workspace = true }
 iroh-base = { workspace = true, features = ["key"] }
 quickcheck = { workspace = true }

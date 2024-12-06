@@ -26,6 +26,7 @@ use iroh::blobs::Hash;
 use iroh::client::blobs::BlobStatus;
 use iroh::net::NodeAddr;
 use lazy_static::lazy_static;
+use num_traits::Zero;
 use prometheus::register_histogram;
 use prometheus::register_int_counter;
 use prometheus::Histogram;
@@ -44,8 +45,10 @@ use warp::{
 use crate::cmd;
 use crate::options::objects::{ObjectsArgs, ObjectsCommands};
 
-const MAX_OBJECT_LENGTH: u64 = 1024 * 1024 * 1024;
-/// The alpha parameter for alpha entanglement determines the number of parity blob to generate for the original blob.
+/// Maximum size of the multipart form used for object upload.
+const MAX_FORM_LENGTH: u64 = 1024 * 1024;
+/// The alpha parameter for alpha entanglement determines the number of parity blobs to generate
+/// for the original blob.
 const ENTANGLER_ALPHA: u8 = 3;
 /// The s parameter for alpha entanglement determines the number of horizontal strands in the grid.
 const ENTANGLER_S: u8 = 5;
@@ -90,7 +93,8 @@ cmd! {
                 .and(warp::post())
                 .and(with_client(client.clone()))
                 .and(with_iroh(iroh_client.clone()))
-                .and(warp::multipart::form().max_length(MAX_OBJECT_LENGTH))
+                .and(warp::multipart::form().max_length(MAX_FORM_LENGTH))
+                .and(with_max_size(settings.max_object_size))
                 .and_then(handle_object_upload);
 
                 let objects_download = warp::path!("v1" / "objects" / Address / ..)
@@ -134,6 +138,10 @@ fn with_iroh(
     client: iroh::client::Iroh,
 ) -> impl Filter<Extract = (iroh::client::Iroh,), Error = Infallible> + Clone {
     warp::any().map(move || client.clone())
+}
+
+fn with_max_size(max_size: u64) -> impl Filter<Extract = (u64,), Error = Infallible> + Clone {
+    warp::any().map(move || max_size)
 }
 
 #[derive(Serialize, Deserialize)]
@@ -346,6 +354,7 @@ async fn handle_object_upload<F: QueryClient>(
     client: F,
     iroh: iroh::client::Iroh,
     form_parts: warp::multipart::FormData,
+    max_size: u64,
 ) -> Result<impl Reply, Rejection> {
     let start_time = Instant::now();
     let parser = ObjectParser::read_form(form_parts).await.map_err(|e| {
@@ -395,6 +404,11 @@ async fn handle_object_upload<F: QueryClient>(
             }))
         }
     };
+    if size > max_size {
+        return Err(Rejection::from(BadRequest {
+            message: format!("blob size exceeds maximum of {}", max_size),
+        }));
+    }
     let source = match parser.source {
         Some(source) => source,
         None => {
@@ -431,6 +445,15 @@ async fn handle_object_upload<F: QueryClient>(
             message: format!("failed to fetch blob {}: {}", hash, e),
         })
     })?;
+    let outcome_size = outcome.local_size + outcome.downloaded_size;
+    if outcome_size != size {
+        return Err(Rejection::from(BadRequest {
+            message: format!(
+                "blob size and given size do not match (expected {}, got {})",
+                size, outcome_size
+            ),
+        }));
+    }
 
     let ent = new_entangler(iroh).map_err(|e| {
         Rejection::from(BadRequest {
@@ -487,7 +510,7 @@ fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ObjectsError
     if range.len() != 2 {
         return Err(ObjectsError::RangeHeaderInvalid);
     }
-    let (first, last): (u64, u64) = match (!range[0].is_empty(), !range[1].is_empty()) {
+    let (first, mut last): (u64, u64) = match (!range[0].is_empty(), !range[1].is_empty()) {
         (true, true) => (range[0].parse::<u64>()?, range[1].parse::<u64>()?),
         (true, false) => (range[0].parse::<u64>()?, size - 1),
         (false, true) => {
@@ -500,8 +523,11 @@ fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ObjectsError
         }
         (false, false) => (0, size - 1),
     };
-    if first > last || last >= size {
+    if first >= last {
         return Err(ObjectsError::RangeHeaderInvalid);
+    }
+    if last >= size {
+        last = size - 1;
     }
     Ok((first, last))
 }
@@ -546,11 +572,16 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                 })
             })?;
             let BlobStatus::Complete { size } = status else {
-                // TODO: handle partial state if the range is in that
                 return Err(Rejection::from(BadRequest {
                     message: format!("object {} is not available", hash),
                 }));
             };
+            // Sanity check size
+            if size.is_zero() {
+                return Err(Rejection::from(BadRequest {
+                    message: format!("object {} has zero size", hash),
+                }));
+            }
 
             let ent = new_entangler(iroh).map_err(|e| {
                 Rejection::from(BadRequest {
@@ -561,7 +592,11 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
 
             let object_range = match range {
                 Some(range) => {
-                    let (first_byte, last_byte) = get_range_params(range, size).unwrap();
+                    let (first_byte, last_byte) = get_range_params(range, size).map_err(|e| {
+                        Rejection::from(BadRequest {
+                            message: e.to_string(),
+                        })
+                    })?;
                     let len = (last_byte - first_byte) + 1;
 
                     let first_chunk = first_byte / CHUNK_SIZE;
@@ -585,11 +620,17 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
 
                     let bytes_stream = bytes_stream.enumerate().map(move |(i, chunk)| {
                         let chunk = chunk?;
-                        let result = if i == 0 {
+                        let result = if first_chunk == last_chunk {
+                            // Single chunk case - slice with both offsets
+                            chunk.slice(offset..end_offset)
+                        } else if i == 0 {
+                            // First of multiple chunks
                             chunk.slice(offset..)
                         } else if i == (last_chunk - first_chunk) as usize {
+                            // Last of multiple chunks
                             chunk.slice(..end_offset)
                         } else {
+                            // Middle chunks
                             chunk
                         };
                         Ok::<_, anyhow::Error>(result)
@@ -788,7 +829,7 @@ mod tests {
             "info": "",
             "index": "0",
             "key": "",
-            "value": "mKASGE0YpBhjGGMYaRhkGFgYJAEYcBIYIBilGGgY5AQY2BjqGNoY7BiSGFoYwxi8GBsYNhglGJwPGG0YcAANGHIYnBjZGBgYxBhqGIMYbxhJGHYYVxhkGHMYaRh6GGUGGGgYchhlGHMYbxhsGHYYZRhkGPUYaBhtGGUYdBhhGGQYYRh0GGEYoRhlGF8YcxhpGHoYZRhhGDYYMBiiGNgYbhg6GEsKBxhtGGUYcxhzGGEYZxhlEg0KBBhmGHIYbxhtEgMYdBgwGDAYGAESGDEKAhh0GG8SGCkYdBgyGHcYdRhoGHEYNxh0GGEYMxgzGGUYdxgzGGMYMhhuGGQYbRhnGGIYbBg3GDcYNxh6GDUYeBg0GGQYbBh5GGYYbhhtGHkYbBhqGGkYaBhxGBgB",
+            "value": "mQEIEhizARiFGJgYIBgYGNcYGBhJGBgYgRgYGO8YGBinCgwYGBiICxgYGI0YGBiMGBgYGRgYGIUYGBjQGBgYdRgYGNsYGBjLGBgY9hgYGHkYGBi5GBgYmhgYGF8YGBiZFBgYGOUYGBiqGBgY+RgYGGsYGBiDGBgYGhgYGJ4YGBgkGJgYIBgYGOwYGBhRGBgYoBgYGNEYGBhyGBgY2RgYGOcYGBhlGBgYpxgYGDMYGBjKExgYGOsYGBgYGBgY8hgYGN0YGBjNGBgYbRgYGMwYGBhOGBgYKhgYGPcYGBgoGBgYixgYGBgYGBjJGBgYXRgYGDQYGBiJABgYGIcYGBj3CxgZFRg2GKIYYxhmGG8YbxhjGGIYYRhyGGwYYxhvGG4YdBhlGG4YdBgtGHQYeRhwGGUYeBgYGGEYcBhwGGwYaRhjGGEYdBhpGG8YbhgvGG8YYxh0GGUYdBgtGHMYdBhyGGUYYRhtGDAYzBjgGL8CGDoYSwoHGG0YZRhzGHMYYRhnGGUSDQoEGGYYchhvGG0SAxh0GDAYMBgYARIYMQoCGHQYbxIYKRh0GDIYZxhvGGMYcBhuGGwYcRhpGGwYeBh5GG0Ydhh3GDQYdhhuGGwYaBg0GG4YcBhuGGQYeRh4GGoYYxhsGDMYMxh5GGgYdRhjGHQYaRhjGGkYGAE=",
             "proof": null,
             "height": "6017",
             "codespace": ""
@@ -941,7 +982,7 @@ mod tests {
         let multipart_form =
             multipart_form(&serialized_signed_message_b64, hash, client_node_addr, size).await;
 
-        let reply = handle_object_upload(client, iroh.client().clone(), multipart_form)
+        let reply = handle_object_upload(client, iroh.client().clone(), multipart_form, 1000)
             .await
             .unwrap();
         let response = reply.into_response();
@@ -1034,7 +1075,7 @@ mod tests {
         let multipart_form =
             multipart_form(&serialized_eth_tx_b64, hash, client_node_addr, size).await;
 
-        let reply = handle_object_upload(client, iroh.client().clone(), multipart_form)
+        let reply = handle_object_upload(client, iroh.client().clone(), multipart_form, 1000)
             .await
             .unwrap();
         let response = reply.into_response();
@@ -1123,7 +1164,8 @@ mod tests {
         let multipart_form =
             multipart_form(&serialized_eth_tx_b64, hash, client_node_addr, size).await;
 
-        let result = handle_object_upload(client, iroh.client().clone(), multipart_form).await;
+        let result =
+            handle_object_upload(client, iroh.client().clone(), multipart_form, 1000).await;
         match result {
             Ok(_) => panic!("expected an error for legacy transaction"),
             Err(rejection) => {
@@ -1143,7 +1185,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn test_handle_object_download_get() {
         let matcher = MockRequestMethodMatcher::default().map(
             Method::AbciQuery,
@@ -1191,7 +1232,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn test_handle_object_download_with_range() {
         let matcher = MockRequestMethodMatcher::default().map(
             Method::AbciQuery,
@@ -1230,7 +1270,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore]
     async fn test_handle_object_download_head() {
         let matcher = MockRequestMethodMatcher::default().map(
             Method::AbciQuery,
@@ -1264,5 +1303,37 @@ mod tests {
         let response = result.unwrap().into_response();
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(response.headers().get("Content-Length").unwrap(), "11");
+    }
+
+    #[test]
+    fn test_get_range_params() {
+        // bad formats
+        let _ = get_range_params("bytes=0,50".into(), 100).is_err();
+        let _ = get_range_params("bytes=-0-50".into(), 100).is_err();
+        let _ = get_range_params("bytes=-50-".into(), 100).is_err();
+        // first > last
+        let _ = get_range_params("bytes=50-0".into(), 100).is_err();
+        // first == last
+        let _ = get_range_params("bytes=0-0".into(), 100).is_err();
+        // exact range given
+        let (first, last) = get_range_params("bytes=0-50".into(), 100).unwrap();
+        assert_eq!(first, 0);
+        assert_eq!(last, 50);
+        // only end given, this means "give me last 50 bytes"
+        let (first, last) = get_range_params("bytes=-50".into(), 100).unwrap();
+        assert_eq!(first, 50);
+        assert_eq!(last, 99);
+        // only start given, this means "give me everything but the first 50 bytes"
+        let (first, last) = get_range_params("bytes=50-".into(), 100).unwrap();
+        assert_eq!(first, 50);
+        assert_eq!(last, 99);
+        // neither given, this means "give me everything"
+        let (first, last) = get_range_params("bytes=-".into(), 100).unwrap();
+        assert_eq!(first, 0);
+        assert_eq!(last, 99);
+        // last >= size
+        let (first, last) = get_range_params("bytes=50-100".into(), 100).unwrap();
+        assert_eq!(first, 50);
+        assert_eq!(last, 99);
     }
 }

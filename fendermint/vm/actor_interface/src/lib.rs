@@ -43,7 +43,9 @@ macro_rules! define_singleton {
 }
 
 pub mod account;
+pub mod activity;
 pub mod adm;
+pub mod blob_reader;
 pub mod blobs;
 pub mod bucket;
 pub mod burntfunds;

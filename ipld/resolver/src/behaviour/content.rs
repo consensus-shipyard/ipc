@@ -7,6 +7,11 @@ use std::{
     time::Duration,
 };
 
+use crate::{
+    limiter::{RateLimit, RateLimiter},
+    observe,
+};
+use ipc_observability::emit;
 use libipld::{store::StoreParams, Cid};
 use libp2p::{
     core::{ConnectedPoint, Endpoint},
@@ -22,11 +27,7 @@ use libp2p_bitswap::{Bitswap, BitswapConfig, BitswapEvent, BitswapResponse, Bits
 use log::debug;
 use prometheus::Registry;
 
-use crate::service::QueryId;
-use crate::{
-    limiter::{RateLimit, RateLimiter},
-    stats,
-};
+pub type QueryId = libp2p_bitswap::QueryId;
 
 // Not much to do here, just hiding the `Progress` event as I don't think we'll need it.
 // We can't really turn it into anything more meaningful; the outer Service, which drives
@@ -139,15 +140,9 @@ impl<P: StoreParams> Behaviour<P> {
     /// will initiate connections to the peers which aren't connected at the moment.
     pub fn resolve(&mut self, cid: Cid, peers: Vec<PeerId>) -> QueryId {
         debug!("resolving {cid} from {peers:?}");
-        stats::CONTENT_RESOLVE_RUNNING.inc();
+        emit(observe::ResolveEvent::Started(cid));
         // Not passing any missing items, which will result in a call to `BitswapStore::missing_blocks`.
-        QueryId(
-            self.inner
-                .sync(cid, peers, [].into_iter())
-                .to_string()
-                .parse()
-                .unwrap(),
-        )
+        self.inner.sync(cid, peers, [].into_iter())
     }
 
     /// Check whether the peer has already exhaused their rate limit.
@@ -339,8 +334,8 @@ impl<P: StoreParams> NetworkBehaviour for Behaviour<P> {
                 ToSwarm::GenerateEvent(ev) => match ev {
                     BitswapEvent::Progress(_, _) => {}
                     BitswapEvent::Complete(id, result) => {
-                        stats::CONTENT_RESOLVE_RUNNING.dec();
-                        let out = Event::Complete(QueryId(id.to_string().parse().unwrap()), result);
+                        emit(observe::ResolveEvent::Completed);
+                        let out = Event::Complete(id, result);
                         return Poll::Ready(ToSwarm::GenerateEvent(out));
                     }
                 },

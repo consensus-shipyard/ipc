@@ -12,6 +12,7 @@ async-trait = { workspace = true }
 base64 = { workspace = true }
 blake2b_simd = { workspace = true }
 bloom = { workspace = true }
+bytes = { workspace = true }
 gcra = { workspace = true }
 iroh = { workspace = true }
 lazy_static = { workspace = true }
@@ -29,12 +30,15 @@ serde = { workspace = true }
 serde_json = { workspace = true, features = ["raw_value"] }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+hex = { workspace = true }
 
 fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true }
 fvm_ipld_blockstore = { workspace = true, optional = true }
 
 ipc-api = { path = "../../ipc/api", default-features = false }
+ipc-observability = { workspace = true }
+
 iroh_manager = { path = "../../hoku/iroh_manager" }
 
 [dev-dependencies]

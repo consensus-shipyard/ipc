@@ -3,6 +3,9 @@
 
 use std::collections::{HashMap, HashSet};
 
+use crate::fvm::activity::actor::ActorActivityTracker;
+use crate::fvm::externs::FendermintExterns;
+use crate::fvm::gas::BlockGasTracker;
 use anyhow::Ok;
 use cid::Cid;
 use fendermint_actors_api::gas_market::Reading;
@@ -28,9 +31,6 @@ use hoku_executor::HokuExecutor;
 use hoku_kernel::HokuKernel;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-
-use crate::fvm::externs::FendermintExterns;
-use crate::fvm::gas::BlockGasTracker;
 
 pub type BlockHash = [u8; 32];
 
@@ -161,8 +161,8 @@ where
 
         let engine = multi_engine.get(&nc)?;
         let externs = FendermintExterns::new(blockstore.clone(), params.state_root);
-        let machine = DefaultMachine::new(&mc, blockstore, externs)?;
-        let mut executor = HokuExecutor::new(engine, machine)?;
+        let machine = DefaultMachine::new(&mc, blockstore.clone(), externs)?;
+        let mut executor = HokuExecutor::new(engine.clone(), machine)?;
 
         let block_gas_tracker = BlockGasTracker::create(&mut executor)?;
 
@@ -211,6 +211,16 @@ where
     /// Execute message implicitly.
     pub fn execute_implicit(&mut self, msg: Message) -> ExecResult {
         self.execute_message(msg, ApplyKind::Implicit)
+    }
+
+    /// Execute message implicitly but ensures the execution is successful and returns only the ApplyRet.
+    pub fn execute_implicit_ok(&mut self, msg: Message) -> ExecResult {
+        let r = self.execute_implicit(msg)?;
+        if let Some(err) = &r.0.failure_info {
+            anyhow::bail!("failed to apply message: {}", err)
+        } else {
+            Ok(r)
+        }
     }
 
     /// Execute message explicitly.
@@ -319,6 +329,10 @@ where
     /// The [ChainID] from the network configuration.
     pub fn chain_id(&self) -> ChainID {
         self.executor.context().network.chain_id
+    }
+
+    pub fn activity_tracker(&mut self) -> ActorActivityTracker<DB> {
+        ActorActivityTracker { executor: self }
     }
 
     /// Collect all the event emitters' delegated addresses, for those who have any.

@@ -9,7 +9,7 @@ use async_stm::{
     Stm, TVar,
 };
 use iroh::blobs::Hash;
-use iroh::net::{NodeAddr, NodeId};
+use iroh::net::NodeId;
 
 /// The maximum number of times a task can be attempted.
 /// TODO: make configurable
@@ -72,23 +72,31 @@ where
 pub struct ResolveTask {
     /// Content to resolve.
     key: ResolveKey,
-    /// Source Iroh node ID from which to resolve the content.
-    source: ResolveSource,
     /// Flag to flip when the task is done.
     is_resolved: TVar<bool>,
     /// Current number of resolve attempts.
     num_attempts: TVar<u64>,
     /// Counter to add to if all attempts are used.
     num_failures: TVar<u64>,
+    /// Type of task
+    task_type: TaskType,
+}
+
+#[derive(Clone, Debug)]
+pub enum TaskType {
+    ResolveBlob {
+        source: ResolveSource,
+    },
+    CloseReadRequest {
+        blob_hash: Hash,
+        offset: u32,
+        len: u32,
+    },
 }
 
 impl ResolveTask {
     pub fn hash(&self) -> Hash {
         self.key.hash
-    }
-
-    pub fn node_addr(&self) -> NodeAddr {
-        NodeAddr::new(self.source.id)
     }
 
     pub fn set_resolved(&self) -> Stm<()> {
@@ -108,9 +116,14 @@ impl ResolveTask {
     pub fn add_failure(&self) -> Stm<()> {
         self.num_failures.update(|a| a + 1)
     }
+
+    pub fn task_type(&self) -> TaskType {
+        self.task_type.clone()
+    }
 }
 
 pub type ResolveQueue = TChan<ResolveTask>;
+pub type ResolveResults = TVar<im::HashMap<ResolveKey, Vec<u8>>>;
 
 /// A data structure used to communicate resolution requirements and outcomes
 /// between the resolver running in the background and the application waiting
@@ -127,18 +140,21 @@ where
     items: TVar<im::HashMap<ResolveKey, ResolveStatus<T>>>,
     /// Items queued for resolution.
     queue: ResolveQueue,
+    /// Results of resolved items.
+    results: ResolveResults,
 }
 
 impl<T> ResolvePool<T>
 where
     for<'a> ResolveKey: From<&'a T>,
-    for<'a> ResolveSource: From<&'a T>,
+    for<'a> TaskType: From<&'a T>,
     T: Sync + Send + Clone + std::hash::Hash + Eq + PartialEq + 'static,
 {
     pub fn new() -> Self {
         Self {
             items: Default::default(),
             queue: Default::default(),
+            results: Default::default(),
         }
     }
 
@@ -149,12 +165,17 @@ where
         self.queue.clone()
     }
 
+    /// Results of resolved items.
+    pub fn results(&self) -> ResolveResults {
+        self.results.clone()
+    }
+
     /// Add an item to the resolution targets.
     ///
     /// If the item is new, enqueue it from background resolution, otherwise return its existing status.
     pub fn add(&self, item: T) -> Stm<ResolveStatus<T>> {
         let key = ResolveKey::from(&item);
-        let source = ResolveSource::from(&item);
+        let task_type = TaskType::from(&item);
         let mut items = self.items.read_clone()?;
 
         if items.contains_key(&key) {
@@ -169,10 +190,10 @@ where
             self.items.write(items)?;
             self.queue.write(ResolveTask {
                 key,
-                source,
                 is_resolved: status.is_resolved.clone(),
                 num_attempts: TVar::new(0),
                 num_failures: status.num_failures.clone(),
+                task_type,
             })?;
             Ok(status)
         }
@@ -204,17 +225,34 @@ where
     }
 
     /// Remove an item from the resolution targets.
-    pub fn remove(&self, item: &T) -> Stm<()> {
+    pub fn remove_task(&self, item: &T) -> Stm<()> {
         let key = ResolveKey::from(item);
         self.items.update_mut(|items| {
             items.remove(&key);
+        })
+    }
+
+    /// Get the result of a resolved item.
+    pub fn get_result(&self, item: &T) -> Stm<Option<Vec<u8>>> {
+        let key = ResolveKey::from(item);
+        self.results
+            .read()
+            .map(|results| results.get(&key).cloned())
+    }
+
+    /// Remove the result of a resolved item.
+    pub fn remove_result(&self, item: &T) -> Stm<()> {
+        let key = ResolveKey::from(item);
+        self.results.update(|mut results| {
+            results.remove(&key);
+            results
         })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{ResolveKey, ResolvePool, ResolveSource};
+    use super::{ResolveKey, ResolvePool, ResolveSource, TaskType};
 
     use async_stm::{atomically, queues::TQueueLike};
     use iroh::base::key::SecretKey;
@@ -245,9 +283,11 @@ mod tests {
         }
     }
 
-    impl From<&TestItem> for ResolveSource {
+    impl From<&TestItem> for TaskType {
         fn from(value: &TestItem) -> Self {
-            Self { id: value.source }
+            Self::ResolveBlob {
+                source: ResolveSource { id: value.source },
+            }
         }
     }
 

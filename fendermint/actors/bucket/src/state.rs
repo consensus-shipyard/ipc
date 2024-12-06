@@ -16,7 +16,7 @@ use fvm_shared::address::Address;
 use serde::{Deserialize, Serialize};
 
 const BIT_WIDTH: u32 = 8;
-const MAX_LIST_LIMIT: usize = 10000;
+const MAX_LIST_LIMIT: usize = 1000;
 
 fn state_error(e: fvm_ipld_hamt::Error) -> ActorError {
     ActorError::illegal_state(e.to_string())
@@ -96,6 +96,8 @@ impl MachineState for State {
 pub struct ObjectState {
     /// The object blake3 hash.
     pub hash: Hash,
+    /// The object size.
+    pub size: u64,
     /// User-defined object metadata (e.g., last modified timestamp, etc.).
     pub metadata: HashMap<String, String>,
 }
@@ -115,12 +117,17 @@ impl State {
         store: &BS,
         key: BytesKey,
         hash: Hash,
+        size: u64,
         metadata: HashMap<String, String>,
         overwrite: bool,
     ) -> anyhow::Result<Cid, ActorError> {
         let mut hamt = Hamt::<_, ObjectState>::load_with_bit_width(&self.root, store, BIT_WIDTH)
             .map_err(state_error)?;
-        let object = ObjectState { hash, metadata };
+        let object = ObjectState {
+            hash,
+            size,
+            metadata,
+        };
         if overwrite {
             hamt.set(key, object).map_err(state_error)?;
         } else {
@@ -162,10 +169,10 @@ impl State {
         store: &BS,
         prefix: Vec<u8>,
         delimiter: Vec<u8>,
-        offset: u64,
+        start_key: Option<&BytesKey>,
         limit: u64,
         mut collector: F,
-    ) -> anyhow::Result<Vec<Vec<u8>>, ActorError>
+    ) -> anyhow::Result<(Vec<Vec<u8>>, Option<BytesKey>), ActorError>
     where
         F: FnMut(Vec<u8>, ObjectState) -> anyhow::Result<(), ActorError>,
     {
@@ -177,37 +184,32 @@ impl State {
         } else {
             (limit as usize).min(MAX_LIST_LIMIT)
         };
-        let mut count = 0;
-        let mut collected: usize = 0;
-        for pair in &hamt {
-            let (k, v) = pair.map_err(state_error)?;
-            let key = k.0.clone();
-            if !prefix.is_empty() && !key.starts_with(&prefix) {
-                continue;
-            }
-            if !delimiter.is_empty() {
-                let utf8_prefix = String::from_utf8(prefix.clone()).map_err(utf8_error)?;
-                let prefix_length = utf8_prefix.len();
-                let utf8_key = String::from_utf8(key.clone()).map_err(utf8_error)?;
-                let utf8_delimiter = String::from_utf8(delimiter.clone()).map_err(utf8_error)?;
-                if let Some(index) = utf8_key[prefix_length..].find(&utf8_delimiter) {
-                    let subset = utf8_key[..=(index + prefix_length)].as_bytes().to_owned();
-                    common_prefixes.insert(subset);
-                    continue;
+
+        let (_, next_key) = hamt
+            .for_each_ranged(start_key, Some(limit), |k, v| {
+                let key = k.0.clone();
+                if !prefix.is_empty() && !key.starts_with(&prefix) {
+                    return Ok(());
                 }
-            }
-            count += 1;
-            if count <= offset {
-                continue;
-            }
-            collector(key, v.to_owned())?;
-            collected += 1;
-            if limit > 0 && collected >= limit {
-                break;
-            }
-        }
+                if !delimiter.is_empty() {
+                    let utf8_prefix = String::from_utf8(prefix.clone()).map_err(utf8_error)?;
+                    let prefix_length = utf8_prefix.len();
+                    let utf8_key = String::from_utf8(key.clone()).map_err(utf8_error)?;
+                    let utf8_delimiter =
+                        String::from_utf8(delimiter.clone()).map_err(utf8_error)?;
+                    if let Some(index) = utf8_key[prefix_length..].find(&utf8_delimiter) {
+                        let subset = utf8_key[..=(index + prefix_length)].as_bytes().to_owned();
+                        common_prefixes.insert(subset);
+                        return Ok(());
+                    }
+                }
+                collector(key, v.to_owned())?;
+                Ok(())
+            })
+            .map_err(state_error)?;
+
         let common_prefixes = common_prefixes.into_iter().collect();
-        Ok(common_prefixes)
+        Ok((common_prefixes, next_key))
     }
 }
 
@@ -236,6 +238,7 @@ mod tests {
             let hash = new_hash(u16::arbitrary(g) as usize);
             ObjectState {
                 hash: hash.0,
+                size: u64::arbitrary(g),
                 metadata: HashMap::arbitrary(g),
             }
         }
@@ -249,11 +252,12 @@ mod tests {
         metadata.insert("_modified".to_string(), String::from("1718464345"));
         ObjectState {
             hash: Hash(*hash.as_bytes()),
+            size: data.len() as u64,
             metadata,
         }
     }
 
-    const OBJECT_ONE_CID: &str = "bafy2bzacecywsmknwmizkt3yamzqfvik65diqjepqla4e6qlhigblhobtunx4";
+    const OBJECT_ONE_CID: &str = "bafy2bzaceae4nfmqeqjqkx4hymxvldrgzaabbp3tffrxbmhzb7kod4sgy22xe";
 
     fn object_two() -> ObjectState {
         let data = [6, 7, 8, 9, 10, 11];
@@ -263,6 +267,7 @@ mod tests {
         metadata.insert("_modified".to_string(), String::from("1718480987"));
         ObjectState {
             hash: Hash(*hash.as_bytes()),
+            size: data.len() as u64,
             metadata,
         }
     }
@@ -275,32 +280,51 @@ mod tests {
         metadata.insert("_modified".to_string(), String::from("1718512346"));
         ObjectState {
             hash: Hash(*hash.as_bytes()),
+            size: data.len() as u64,
             metadata,
         }
     }
 
     #[allow(clippy::type_complexity)]
     fn list<BS: Blockstore>(
-        state: State,
+        state: &State,
         store: &BS,
         prefix: Vec<u8>,
         delimiter: Vec<u8>,
-        offset: u64,
+        start_key: Option<&BytesKey>,
         limit: u64,
-    ) -> anyhow::Result<(Vec<(Vec<u8>, ObjectState)>, Vec<Vec<u8>>), ActorError> {
+    ) -> anyhow::Result<(Vec<(Vec<u8>, ObjectState)>, Vec<Vec<u8>>, Option<BytesKey>), ActorError>
+    {
         let mut objects = Vec::new();
-        let prefixes = state.list(
+        let (prefixes, next_key) = state.list(
             store,
             prefix,
             delimiter,
-            offset,
+            start_key,
             limit,
             |key: Vec<u8>, object: ObjectState| -> anyhow::Result<(), ActorError> {
                 objects.push((key, object));
                 Ok(())
             },
         )?;
-        Ok((objects, prefixes))
+        Ok((objects, prefixes, next_key))
+    }
+
+    fn get_lex_sequence(start: Vec<u8>, count: usize) -> Vec<Vec<u8>> {
+        let mut current = start;
+        let mut sequence = Vec::with_capacity(count);
+        for _ in 0..count {
+            sequence.push(current.clone());
+            for i in (0..current.len()).rev() {
+                if current[i] < 255 {
+                    current[i] += 1;
+                    break;
+                } else {
+                    current[i] = 0; // Reset this byte to 0 and carry to the next byte
+                }
+            }
+        }
+        sequence
     }
 
     #[test]
@@ -336,6 +360,7 @@ mod tests {
                 &store,
                 BytesKey(vec![1, 2, 3]),
                 object.hash,
+                object.size,
                 object.metadata,
                 true
             )
@@ -356,7 +381,14 @@ mod tests {
         .unwrap();
         let key = BytesKey(vec![1, 2, 3]);
         state
-            .add(&store, key.clone(), object.hash, object.metadata, true)
+            .add(
+                &store,
+                key.clone(),
+                object.hash,
+                object.size,
+                object.metadata,
+                true,
+            )
             .unwrap();
         assert!(state.delete(&store, &key).is_ok());
 
@@ -378,7 +410,7 @@ mod tests {
         let key = BytesKey(vec![1, 2, 3]);
         let md = object.metadata.clone();
         state
-            .add(&store, key.clone(), object.hash, md, true)
+            .add(&store, key.clone(), object.hash, object.size, md, true)
             .unwrap();
         let result = state.get(&store, &key);
 
@@ -392,10 +424,24 @@ mod tests {
     ) -> anyhow::Result<(BytesKey, BytesKey, BytesKey)> {
         let baz_key = BytesKey("foo/baz.png".as_bytes().to_vec()); // index 0
         let object = object_one();
-        state.add(store, baz_key.clone(), object.hash, object.metadata, false)?;
+        state.add(
+            store,
+            baz_key.clone(),
+            object.hash,
+            object.size,
+            object.metadata,
+            false,
+        )?;
         let bar_key = BytesKey("foo/bar.png".as_bytes().to_vec()); // index 1
         let object = object_two();
-        state.add(store, bar_key.clone(), object.hash, object.metadata, false)?;
+        state.add(
+            store,
+            bar_key.clone(),
+            object.hash,
+            object.size,
+            object.metadata,
+            false,
+        )?;
         // We'll mostly ignore this one
         let other_key = BytesKey("zzzz/image.png".as_bytes().to_vec()); // index 2
         let hash = new_hash(256);
@@ -403,12 +449,20 @@ mod tests {
             &store,
             other_key.clone(),
             hash.0,
+            8,
             HashMap::<String, String>::new(),
             false,
         )?;
         let jpeg_key = BytesKey("foo.jpeg".as_bytes().to_vec()); // index 3
         let object = object_three();
-        state.add(store, jpeg_key.clone(), object.hash, object.metadata, false)?;
+        state.add(
+            store,
+            jpeg_key.clone(),
+            object.hash,
+            object.size,
+            object.metadata,
+            false,
+        )?;
         Ok((baz_key, bar_key, jpeg_key))
     }
 
@@ -426,11 +480,92 @@ mod tests {
         let (baz_key, _, _) = create_and_put_objects(&mut state, &store).unwrap();
 
         // List all keys with a limit
-        let result = list(state, &store, vec![], vec![], 0, 0);
+        let result = list(&state, &store, vec![], vec![], None, 0);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.0.len(), 4);
         assert_eq!(result.0.first(), Some(&(baz_key.0, object_one())));
+        assert_eq!(result.2, None);
+    }
+
+    #[test]
+    fn test_list_more_than_max_limit() {
+        let store = MemoryBlockstore::default();
+        let mut state = State::new(
+            &store,
+            Address::new_id(100),
+            WriteAccess::OnlyOwner,
+            HashMap::new(),
+        )
+        .unwrap();
+
+        let sequence = get_lex_sequence(vec![0, 0, 0], MAX_LIST_LIMIT + 10);
+        for key in sequence {
+            let key = BytesKey(key);
+            let object = object_one();
+            state
+                .add(
+                    &store,
+                    key.clone(),
+                    object.hash,
+                    object.size,
+                    object.metadata,
+                    false,
+                )
+                .unwrap();
+        }
+
+        // List all keys but has more
+        let result = list(&state, &store, vec![], vec![], None, 0);
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert_eq!(result.0.len(), MAX_LIST_LIMIT);
+        // Note: This isn't the element at MAX_LIST_LIMIT + 1 as one might expect.
+        // The ordering is deterministic but depends on the HAMT structure.
+        assert_eq!(result.2, Some(BytesKey(vec![0, 3, 86])));
+
+        let next_key = result.2.unwrap();
+
+        // List remaining objects
+        let result = list(&state, &store, vec![], vec![], Some(&next_key), 0);
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert_eq!(result.0.len(), 10);
+        assert_eq!(result.2, None);
+    }
+
+    #[test]
+    fn test_list_at_max_limit() {
+        let store = MemoryBlockstore::default();
+        let mut state = State::new(
+            &store,
+            Address::new_id(100),
+            WriteAccess::OnlyOwner,
+            HashMap::new(),
+        )
+        .unwrap();
+
+        for i in 0..MAX_LIST_LIMIT {
+            let key = BytesKey(format!("{}.txt", i).as_bytes().to_vec());
+            let object = object_one();
+            state
+                .add(
+                    &store,
+                    key.clone(),
+                    object.hash,
+                    object.size,
+                    object.metadata,
+                    false,
+                )
+                .unwrap();
+        }
+
+        // List all keys
+        let result = list(&state, &store, vec![], vec![], None, 0);
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert_eq!(result.0.len(), MAX_LIST_LIMIT);
+        assert_eq!(result.2, None);
     }
 
     #[test]
@@ -447,7 +582,7 @@ mod tests {
         let (baz_key, bar_key, _) = create_and_put_objects(&mut state, &store).unwrap();
 
         let foo_key = BytesKey("foo".as_bytes().to_vec());
-        let result = list(state, &store, foo_key.0.clone(), vec![], 0, 0);
+        let result = list(&state, &store, foo_key.0.clone(), vec![], None, 0);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.0.len(), 3);
@@ -472,12 +607,12 @@ mod tests {
         let delimiter_key = BytesKey("/".as_bytes().to_vec());
         let full_key = [foo_key.clone(), delimiter_key.clone()].concat();
         let result = list(
-            state,
+            &state,
             &store,
             foo_key.0.clone(),
             delimiter_key.0.clone(),
-            0,
-            3,
+            None,
+            4,
         );
         assert!(result.is_ok());
         let result = result.unwrap();
@@ -504,6 +639,7 @@ mod tests {
                 &store,
                 jpeg_key.clone(),
                 hash.0,
+                8,
                 HashMap::<String, String>::new(),
                 false,
             )
@@ -515,6 +651,7 @@ mod tests {
                 &store,
                 bar_key.clone(),
                 hash.0,
+                8,
                 HashMap::<String, String>::new(),
                 false,
             )
@@ -526,6 +663,7 @@ mod tests {
                 &store,
                 baz_key.clone(),
                 hash.0,
+                8,
                 HashMap::<String, String>::new(),
                 false,
             )
@@ -535,11 +673,11 @@ mod tests {
         let full_key = BytesKey("bin/foo/".as_bytes().to_vec());
         let delimiter_key = BytesKey("/".as_bytes().to_vec());
         let result = list(
-            state,
+            &state,
             &store,
             bin_key.0.clone(),
             delimiter_key.0.clone(),
-            0,
+            None,
             0,
         );
         assert!(result.is_ok());
@@ -550,7 +688,7 @@ mod tests {
     }
 
     #[test]
-    fn test_list_with_offset_and_limit() {
+    fn test_list_with_start_key_and_limit() {
         let store = MemoryBlockstore::default();
         let mut state = State::new(
             &store,
@@ -562,17 +700,17 @@ mod tests {
 
         let (_, bar_key, _) = create_and_put_objects(&mut state, &store).unwrap();
 
-        // List all keys with a limit and offset
-        let result = list(state, &store, vec![], vec![], 1, 1);
+        // List all keys with a limit and start key
+        let result = list(&state, &store, vec![], vec![], Some(&bar_key), 1);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert_eq!(result.0.len(), 1);
-        // Note that baz is listed first in order, so an offset of 1 will return bar
+        // Note that baz is listed first in order
         assert_eq!(result.0.first(), Some(&(bar_key.0, object_two())));
     }
 
     #[test]
-    fn test_list_with_prefix_delimiter_and_offset_and_limit() {
+    fn test_list_with_prefix_delimiter_and_start_key_and_limit() {
         let store = MemoryBlockstore::default();
         let mut state = State::new(
             &store,
@@ -589,6 +727,7 @@ mod tests {
                 &store,
                 one.clone(),
                 hash.0,
+                8,
                 HashMap::<String, String>::new(),
                 false,
             )
@@ -600,22 +739,23 @@ mod tests {
                 &store,
                 two.clone(),
                 hash.0,
+                8,
                 HashMap::<String, String>::new(),
                 false,
             )
             .unwrap();
 
-        // List all keys with a limit and offset
+        // List all keys with a limit and start key
         let result = list(
-            state,
+            &state,
             &store,
             "hello/".as_bytes().to_vec(),
             "/".as_bytes().to_vec(),
-            2,
+            Some(&two),
             0,
         );
         assert!(result.is_ok());
         let result = result.unwrap();
-        assert_eq!(result.0.len(), 0);
+        assert_eq!(result.0.len(), 1);
     }
 }

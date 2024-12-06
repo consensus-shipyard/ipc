@@ -2480,7 +2480,7 @@ dependencies = [
 [[package]]
 name = "entangler"
 version = "0.1.0"
-source = "git+ssh://git@github.com/hokunet/entanglement.git?rev=dc93353e97a438a800a4a22ed46fe75e77eca200#dc93353e97a438a800a4a22ed46fe75e77eca200"
+source = "git+ssh://git@github.com/hokunet/entanglement.git?rev=fbc33c4cc8f183825fc920a40ab09e90d1a647e3#fbc33c4cc8f183825fc920a40ab09e90d1a647e3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3074,6 +3074,51 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_actor_activity_tracker"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cid",
+ "fil_actors_evm_shared",
+ "fil_actors_runtime",
+ "frc42_dispatch",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "hex-literal 0.4.1",
+ "log",
+ "multihash 0.18.1",
+ "num-derive 0.3.3",
+ "num-traits",
+ "serde",
+ "serde_tuple",
+]
+
+[[package]]
+name = "fendermint_actor_blob_reader"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "data-encoding",
+ "fendermint_actor_blobs_shared",
+ "fil_actors_evm_shared",
+ "fil_actors_runtime",
+ "frc42_dispatch",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "hex-literal 0.4.1",
+ "iroh-base",
+ "log",
+ "num-derive 0.3.3",
+ "num-traits",
+ "rand",
+ "serde",
+ "serde_tuple",
+ "sha2 0.10.8",
+]
+
+[[package]]
 name = "fendermint_actor_blobs"
 version = "0.1.0"
 dependencies = [
@@ -3248,6 +3293,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid",
+ "fendermint_actor_activity_tracker",
+ "fendermint_actor_blob_reader",
  "fendermint_actor_blobs",
  "fendermint_actor_bucket",
  "fendermint_actor_chainmetadata",
@@ -3755,6 +3802,7 @@ dependencies = [
  "fvm_shared",
  "hex",
  "ipc-api",
+ "ipc-types",
  "multihash 0.18.1",
  "num-traits",
  "quickcheck",
@@ -3777,6 +3825,8 @@ dependencies = [
  "base64 0.21.7",
  "cid",
  "ethers",
+ "fendermint_actor_activity_tracker",
+ "fendermint_actor_blob_reader",
  "fendermint_actor_blobs",
  "fendermint_actor_blobs_shared",
  "fendermint_actor_bucket",
@@ -3816,7 +3866,9 @@ dependencies = [
  "ipc-observability",
  "ipc_actors_abis",
  "iroh",
+ "iroh-base",
  "libipld",
+ "merkle-tree-rs",
  "multihash 0.18.1",
  "num-traits",
  "pin-project",
@@ -5987,6 +6039,7 @@ dependencies = [
  "ipc_actors_abis",
  "lazy_static",
  "log",
+ "merkle-tree-rs",
  "num-traits",
  "num_enum",
  "serde",
@@ -6088,6 +6141,7 @@ dependencies = [
  "ipc_actors_abis",
  "libsecp256k1",
  "log",
+ "merkle-tree-rs",
  "num-derive 0.3.3",
  "num-traits",
  "prometheus",
@@ -6180,6 +6234,7 @@ dependencies = [
  "base64 0.21.7",
  "blake2b_simd",
  "bloom",
+ "bytes",
  "cid",
  "env_logger 0.10.2",
  "fvm_ipld_blockstore",
@@ -6187,7 +6242,9 @@ dependencies = [
  "fvm_ipld_hamt",
  "fvm_shared",
  "gcra",
+ "hex",
  "ipc-api",
+ "ipc-observability",
  "ipc_ipld_resolver",
  "iroh",
  "iroh_manager",
@@ -11050,7 +11107,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 [[package]]
 name = "storage"
 version = "0.1.0"
-source = "git+ssh://git@github.com/hokunet/entanglement.git?rev=dc93353e97a438a800a4a22ed46fe75e77eca200#dc93353e97a438a800a4a22ed46fe75e77eca200"
+source = "git+ssh://git@github.com/hokunet/entanglement.git?rev=fbc33c4cc8f183825fc920a40ab09e90d1a647e3#fbc33c4cc8f183825fc920a40ab09e90d1a647e3"
 dependencies = [
  "anyhow",
  "async-trait",
