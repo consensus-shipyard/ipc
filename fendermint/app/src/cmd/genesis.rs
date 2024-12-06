@@ -43,7 +43,7 @@ cmd! {
     let genesis = Genesis {
       timestamp: Timestamp(self.timestamp),
       chain_name: self.chain_name.clone(),
-            chain_id: None,
+      chain_id: None,
       network_version: self.network_version,
       base_fee: self.base_fee.clone(),
       power_scale: self.power_scale,
