@@ -30,6 +30,7 @@ cmd! {
         GenesisCommands::AddAccount(args) => args.exec(genesis_file).await,
         GenesisCommands::AddMultisig(args) => args.exec(genesis_file).await,
         GenesisCommands::AddValidator(args) => args.exec(genesis_file).await,
+        GenesisCommands::SetChainId(args) => args.exec(genesis_file).await,
         GenesisCommands::IntoTendermint(args) => args.exec(genesis_file).await,
         GenesisCommands::SetEamPermissions(args) => args.exec(genesis_file).await,
         GenesisCommands::Ipc { command } => command.exec(genesis_file).await,
@@ -76,6 +77,11 @@ cmd! {
     add_validator(&genesis_file, self)
   }
 }
+cmd! {
+  GenesisSetChainIdArgs(self, genesis_file: PathBuf) {
+    set_chain_id(&genesis_file, self)
+  }
+}
 
 cmd! {
   GenesisIntoTendermintArgs(self, genesis_file: PathBuf) {
@@ -100,6 +106,13 @@ cmd! {
             seal_genesis(&genesis_file, args).await,
     }
   }
+}
+
+fn set_chain_id(genesis_file: &PathBuf, args: &GenesisSetChainIdArgs) -> anyhow::Result<()> {
+    update_genesis(genesis_file, |mut genesis| {
+        genesis.chain_id = Some(args.chain_id);
+        Ok(genesis)
+    })
 }
 
 fn add_account(genesis_file: &PathBuf, args: &GenesisAddAccountArgs) -> anyhow::Result<()> {
