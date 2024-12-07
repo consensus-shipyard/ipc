@@ -4,8 +4,8 @@
 
 use crate::fvm::FvmMessage;
 use anyhow::{bail, Context};
-use fendermint_actor_hoku_config::HokuConfig;
-use fendermint_actor_hoku_config::Method::GetConfig;
+use fendermint_actor_hoku_config_shared::HokuConfig;
+use fendermint_actor_hoku_config_shared::Method::GetConfig;
 use fendermint_vm_actor_interface::hoku_config::HOKU_CONFIG_ACTOR_ADDR;
 use fendermint_vm_actor_interface::system;
 use fvm::executor::{ApplyKind, ApplyRet, Executor};
@@ -18,7 +18,7 @@ pub struct HokuConfigTracker {
     /// The total storage capacity of the subnet.
     pub blob_capacity: u64,
     /// The byte-blocks per atto token rate.
-    pub blob_credit_debit_rate: u64,
+    pub blob_credits_per_byte_block: u64,
     /// Block interval at which to debit all credit accounts.
     pub blob_credit_debit_interval: ChainEpoch,
 }
@@ -27,14 +27,14 @@ impl HokuConfigTracker {
     pub fn create<E: Executor>(executor: &mut E) -> anyhow::Result<HokuConfigTracker> {
         let mut ret = Self {
             blob_capacity: Zero::zero(),
-            blob_credit_debit_rate: Zero::zero(),
+            blob_credits_per_byte_block: Zero::zero(),
             blob_credit_debit_interval: Zero::zero(),
         };
 
         let reading = Self::read_hoku_config(executor)?;
 
         ret.blob_capacity = reading.blob_capacity;
-        ret.blob_credit_debit_rate = reading.blob_credit_debit_rate;
+        ret.blob_credits_per_byte_block = reading.blob_credits_per_byte_block;
         ret.blob_credit_debit_interval = reading.blob_credit_debit_interval;
 
         Ok(ret)

@@ -3,7 +3,6 @@
 
 use fendermint_testing::arb::{ArbCid, ArbTokenAmount};
 use fendermint_vm_core::{chainid, Timestamp};
-use fvm_shared::clock::ChainEpoch;
 use fvm_shared::version::NetworkVersion;
 use quickcheck::{Arbitrary, Gen};
 

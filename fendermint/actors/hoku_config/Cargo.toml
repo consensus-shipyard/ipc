@@ -16,11 +16,10 @@ fil_actors_runtime = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true }
 log = { workspace = true, features = ["std"] }
-num-derive = { workspace = true }
 num-traits = { workspace = true }
-serde = { workspace = true }
-frc42_dispatch = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 
+fendermint_actor_hoku_config_shared = { path = "../hoku_config/shared" }
 fendermint_actor_machine = { path = "../machine" }
 
 [dev-dependencies]

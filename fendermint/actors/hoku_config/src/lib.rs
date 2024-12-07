@@ -2,6 +2,7 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use fendermint_actor_hoku_config_shared::{HokuConfig, Method, SetAdminParams, SetConfigParams};
 use fendermint_actor_machine::resolve_external;
 use fil_actors_runtime::actor_error;
 use fil_actors_runtime::runtime::{ActorCode, Runtime};
@@ -10,20 +11,11 @@ use fil_actors_runtime::{actor_dispatch, ActorError};
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
-use fvm_shared::METHOD_CONSTRUCTOR;
-use num_derive::FromPrimitive;
-use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
 
 pub const ACTOR_NAME: &str = "hoku_config";
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct SetAdminParams(pub Address);
-
-pub type SetConfigParams = HokuConfig;
 
 #[derive(Serialize_tuple, Deserialize_tuple, Debug, Clone)]
 pub struct State {
@@ -33,34 +25,14 @@ pub struct State {
     pub config: HokuConfig,
 }
 
-/// The updatable config.
-#[derive(Serialize_tuple, Deserialize_tuple, Debug, Clone)]
-pub struct HokuConfig {
-    /// The total storage capacity of the subnet.
-    pub blob_capacity: u64,
-    /// The byte-blocks per atto token rate.
-    pub blob_credit_debit_rate: u64,
-    /// Block interval at which to debit all credit accounts.
-    pub blob_credit_debit_interval: ChainEpoch,
-}
-
 #[derive(Serialize_tuple, Deserialize_tuple, Debug, Clone)]
 pub struct ConstructorParams {
     initial_blob_capacity: u64,
-    initial_blob_credit_debit_rate: u64,
+    initial_blob_credits_per_byte_block: u64,
     initial_blob_credit_debit_interval: ChainEpoch,
 }
 
 pub struct Actor {}
-
-#[derive(FromPrimitive)]
-#[repr(u64)]
-pub enum Method {
-    Constructor = METHOD_CONSTRUCTOR,
-    SetAdmin = frc42_dispatch::method_hash!("SetAdmin"),
-    SetConfig = frc42_dispatch::method_hash!("SetConfig"),
-    GetConfig = frc42_dispatch::method_hash!("GetConfig"),
-}
 
 impl Actor {
     /// Creates the actor
@@ -70,7 +42,7 @@ impl Actor {
             admin: None,
             config: HokuConfig {
                 blob_capacity: params.initial_blob_capacity,
-                blob_credit_debit_rate: params.initial_blob_credit_debit_rate,
+                blob_credits_per_byte_block: params.initial_blob_credits_per_byte_block,
                 blob_credit_debit_interval: params.initial_blob_credit_debit_interval,
             },
         };
@@ -84,6 +56,11 @@ impl Actor {
             st.admin = Some(new_admin);
             Ok(())
         })
+    }
+
+    fn get_admin(rt: &impl Runtime) -> Result<Option<Address>, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+        rt.state::<State>().map(|s| s.admin)
     }
 
     fn set_config(rt: &impl Runtime, params: SetConfigParams) -> Result<(), ActorError> {
@@ -134,16 +111,6 @@ impl Actor {
     }
 }
 
-impl Default for HokuConfig {
-    fn default() -> Self {
-        Self {
-            blob_capacity: 1024 * 1024 * 1024 * 1024, // 1 TiB
-            blob_credit_debit_rate: 1,
-            blob_credit_debit_interval: ChainEpoch::from(3600),
-        }
-    }
-}
-
 impl ActorCode for Actor {
     type Methods = Method;
 
@@ -154,11 +121,13 @@ impl ActorCode for Actor {
     actor_dispatch! {
         Constructor => constructor,
         SetAdmin => set_admin,
+        GetAdmin => get_admin,
         SetConfig => set_config,
         GetConfig => get_config,
     }
 }
 
+// TODO: Modify these tests for this actor
 // #[cfg(test)]
 // mod tests {
 //     use crate::{Actor, Constants, ConstructorParams, Method, State};

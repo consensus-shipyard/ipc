@@ -57,6 +57,7 @@ fendermint_actor_chainmetadata = { path = "../../actors/chainmetadata" }
 fendermint_actor_eam = { path = "../../actors/eam" }
 fendermint_actor_gas_market_eip1559 = { path = "../../actors/gas_market/eip1559" }
 fendermint_actor_hoku_config = { path = "../../actors/hoku_config" }
+fendermint_actor_hoku_config_shared = { path = "../../actors/hoku_config/shared" }
 fendermint_actor_timehub = { path = "../../actors/timehub" }
 fendermint_actors = { path = "../../actors" }
 fendermint_crypto = { path = "../../crypto" }

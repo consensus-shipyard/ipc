@@ -16,7 +16,6 @@ use fendermint_vm_genesis::{
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::bigint::Integer;
-use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{econ::TokenAmount, version::NetworkVersion};
 use ipc_api::subnet_id::SubnetID;
 use rand::rngs::StdRng;

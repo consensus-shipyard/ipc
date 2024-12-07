@@ -1,25 +1,29 @@
 {
-  "chain_name": "",
-  "timestamp": 4259887934593795099,
+  "chain_name": "\u001aw؄\f\u0017'",
+  "timestamp": 346192052859741926,
   "network_version": 21,
-  "base_fee": "126302546353362806422098972872540174419",
-  "power_scale": 0,
+  "base_fee": "234712318566428382114657166790140719963",
+  "power_scale": -1,
   "validators": [
     {
-      "public_key": "BFlVdIdDRr1fGbV/uPmEvrqqDGkRD7hG3jMborQ0d3XDY6BNSQGsAWtxM5QJiwMvFLuD8kQFf+OEPrqqhkvX4oo=",
-      "power": "79156561391430657060593590037117493557"
+      "public_key": "BEJHhPge3ArzE20LmW1jwUBdBrhNlZpCTOBVMDhdTsaF49HBX7LZJrUyz5YMWzDZ/szUzFp9ekCNVNdBloEYoUw=",
+      "power": "183126647527288603715121164621056540120"
     },
     {
-      "public_key": "BA9hWuSz4hfWJWcrLzFS50M3/kE48nqXwNH0f32oriOcJ14VHl0gSnLXSaEFiJhAW+fR1BQWNR1WOHo2Xq63HEw=",
-      "power": "304333830919718568337854092328760652306"
+      "public_key": "BAB0bnX9k3ejpbfHKHKs+DTRM3FS4xYovV/BifVK0gRNe/K26X2lG29lpg2Pc8moJC4DEk6Y67VwrFNr3Tp6R5k=",
+      "power": "247658454596839303942828102663567082572"
     },
     {
-      "public_key": "BCxH6u3WavnZnm6zNkd1My9Be7ki/bhYQ0PUrDPIKsALfoQL+0PPg6WpTY5+UxTlOumGTpf0Z9gTlweYFZ68yyo=",
-      "power": "254259597483563958682987282456695191059"
+      "public_key": "BBScBQmBqigpitAbAEPMxce4qcD2U9B/EG29Nf85YZVg4ev2BagRzoai+3NOWumbC7de5UxoMB+IYNLiv/DchHY=",
+      "power": "84492901398263691866642316543044245709"
     },
     {
-      "public_key": "BOFMOUiDGoHlkZ5FGkOVMnxPquD2BQNrp3sTOtxzFZncsrY2a3x1bEgmyR7XFQVaog5678+axmZTQFb53lcYV3g=",
-      "power": "6926972537384874089"
+      "public_key": "BL7owFg7bDysPDzn8CkToiTYqdp/dryYxcRLDBZtavoufGC1jeME3TCe1NXzKlzSpKr3gxUcCXWiBf+7VhEW6qU=",
+      "power": "113585121460282288643108364096687540417"
+    },
+    {
+      "public_key": "BCUnDazXhmkbhXPiNX79+VYw8XfN4Dxit7X+lI9WrAbmSR9Tcf1t1NJG7pijuxpa5Xy01el1Cj4YefPliQBKAmo=",
+      "power": "2062966846146326815323125885440916142"
     }
   ],
   "accounts": [
@@ -27,85 +31,53 @@
       "meta": {
         "Multisig": {
           "signers": [
-            "f1x3uagvs2l2soyi52tfkahwanzgf4zdsnbudiz7a",
-            "f1ihcyobm3z3sed62kprjjnbksdj3vtdqxx34dvnq"
+            "f1f3rvi5ln6bo3ki3mrvuwgxp3zzijvqjb5svhepi",
+            "f1br3cfp5yluoym7cjm73t6w75whhmjgspa3zsw3q",
+            "f15nsy2ovawwkncwdna6adr6jwervo4rjbxkkr2aa",
+            "f12eneyjorkct4sbo2ustnykfnvcasenikt2rhsyq",
+            "f1osgjudkjjqya636v2yamjwau5oh3k5fjrizecdy"
           ],
-          "threshold": 1,
-          "vesting_duration": 10847738401026284642,
-          "vesting_start": 16249952637321243452
+          "threshold": 4,
+          "vesting_duration": 4760225628128985398,
+          "vesting_start": 2746472010868611986
+        }
+      },
+      "balance": "340282366920938463462199613946416529983"
+    },
+    {
+      "meta": {
+        "Multisig": {
+          "signers": [
+            "f1s4grmaeyapzw7jwhtv3lg3lkmudzv4mhufbxkkq",
+            "f153cjzmjz5vguuz6sowm3ksfjgcoqpunm5tgn4ty",
+            "f1zdq3pl3cptybydmfkxovegg42fchd55wacjc7ri"
+          ],
+          "threshold": 3,
+          "vesting_duration": 1,
+          "vesting_start": 17171477612836513577
+        }
+      },
+      "balance": "311806883927512593824097199314391012393"
+    },
+    {
+      "meta": {
+        "Multisig": {
+          "signers": [
+            "f1kwyy5qzwhzwe6io4keghzbmfxekptfqjm7h3lqi",
+            "f1xnbhfoelnjzkmstdycih666h7nnbkyeoyykogay",
+            "f1w2gqrhdrqagdfhoggm2tporcpqxyhpwf5zmu4pa",
+            "f16q73gw5m7dbdow6vuaxjctxhh5mroj2jh6xknda",
+            "f1bmkatm6g7vxxefvpmb25c6q45e3aibyfxvmcozq"
+          ],
+          "threshold": 2,
+          "vesting_duration": 14857860900098949821,
+          "vesting_start": 10242620114468403152
         }
       },
       "balance": "0"
-    },
-    {
-      "meta": {
-        "Multisig": {
-          "signers": [
-            "f1p56olsmbpvidymzllt364774urthepupqnkxksa",
-            "f1vo6xelypf23lstio3qckm2u3guz4ewcxgu3kvcy",
-            "f1rckarhia3mhjzpycbx6cn2e45pejw37jmxd4gbq",
-            "f1bqodg6qv2dt4mwxtw64ls2m7q3hsmsb6js6chda",
-            "f135gi72pyly6rhu5ehstaxo3q2uyqtph7axiuwmi"
-          ],
-          "threshold": 4,
-          "vesting_duration": 14996602053206986297,
-          "vesting_start": 7249787644709213761
-        }
-      },
-      "balance": "255177224844217121496597212630654524501"
-    },
-    {
-      "meta": {
-        "Multisig": {
-          "signers": [
-            "f1eau6rlzqrvknyvbqpldgl6nqlulbdhihjihplti",
-            "f1l4ikzqbhozblfdofeoe3vlj7ol4zzjhqf5aylay"
-          ],
-          "threshold": 1,
-          "vesting_duration": 16224824622494162686,
-          "vesting_start": 14320737881366489854
-        }
-      },
-      "balance": "32497310764949248412695854841626457894"
-    },
-    {
-      "meta": {
-        "Multisig": {
-          "signers": [
-            "f1pednnthmgzt7n54eejninyzljvehvfnmdelb6vy",
-            "f1qomk3qrt7xujvfe2laohyxw3h5ytjrajy3aqc7i",
-            "f1bj337vjg2dkg6rmlrgbmnei7c44iuzcdxowllbq",
-            "f17nnla4noypfzi56ail7p6wpr5ijidb2miguplji",
-            "f1wtakvvbs5g6awdp22fbcye2eyx434wydmtdcyrq"
-          ],
-          "threshold": 3,
-          "vesting_duration": 14042117237837263251,
-          "vesting_start": 12327047936653063840
-        }
-      },
-      "balance": "5128310443127104283593479262772632474"
-    },
-    {
-      "meta": {
-        "Multisig": {
-          "signers": [
-            "f1xp7oqykhjtwofgk35mqfpqlgsg4bi27ynn72k4y",
-            "f1onie2rtrzkin46kqmnxheughpupyj2zhxktnyta",
-            "f1rgziap7immlmrgub64wqaopznbdod45nqeriiga",
-            "f1txz5mifhffvcc2hsfkvdhebo5ql26hg3fealfgi"
-          ],
-          "threshold": 1,
-          "vesting_duration": 8330672603659047114,
-          "vesting_start": 1
-        }
-      },
-      "balance": "246413732239868851267408487519274492428"
     }
   ],
   "eam_permission_mode": {
     "mode": "unrestricted"
-  },
-  "credit_debit_interval": 1591466125801812436,
-  "blob_storage_capacity": 3542900559559507625,
-  "blob_debit_rate": 5728263280758894318
+  }
 }

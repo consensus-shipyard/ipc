@@ -1,6 +1,6 @@
 [package]
-name = "fendermint_actor_blobs_shared"
-description = "Shared resources for blobs"
+name = "fendermint_actor_hoku_config_shared"
+description = "Shared resources for the hoku config"
 license.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -12,9 +12,6 @@ version = "0.1.0"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
-anyhow = { workspace = true }
-blake3 = { workspace = true }
-data-encoding = { workspace = true }
 fil_actors_runtime = { workspace = true }
 frc42_dispatch = { workspace = true }
 fvm_ipld_encoding = { workspace = true }

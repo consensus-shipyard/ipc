@@ -202,8 +202,8 @@ pub struct GetStatsReturn {
     pub credit_committed: BigInt,
     /// The total number of credits debited in the subnet.
     pub credit_debited: BigInt,
-    /// The byte-blocks per atto token rate set at genesis.
-    pub credit_debit_rate: u64,
+    /// The current byte-blocks per atto token rate.
+    pub blob_credits_per_byte_block: u64,
     /// Total number of debit accounts.
     pub num_accounts: u64,
     /// Total number of actively stored blobs.
