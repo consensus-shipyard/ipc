@@ -13,11 +13,13 @@ crate-type = ["cdylib", "lib"]
 
 [dependencies]
 anyhow = { workspace = true }
+cid = { workspace = true }
 log = { workspace = true, features = ["std"] }
 num-traits = { workspace = true }
 fil_actors_runtime = { workspace = true }
-fvm_ipld_encoding = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
+fvm_ipld_encoding = { workspace = true }
+fvm_ipld_hamt = { workspace = true }
 fvm_shared = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 

@@ -40,7 +40,11 @@ type BlobTuple = (Hash, HashSet<(Address, SubscriptionId, PublicKey)>);
 impl BlobsActor {
     fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let state = State::new(params.blob_capacity, params.blob_credits_per_byte_block);
+        let state = State::new(
+            rt.store(),
+            params.blob_capacity,
+            params.blob_credits_per_byte_block,
+        )?;
         rt.create(&state)
     }
 

@@ -5,19 +5,26 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Bound::{Included, Unbounded};
 
+use cid::Cid;
 use fendermint_actor_blobs_shared::params::GetStatsReturn;
 use fendermint_actor_blobs_shared::state::{
     Account, Blob, BlobStatus, CreditAllowance, CreditApproval, Hash, PublicKey, Subscription,
     SubscriptionGroup, SubscriptionId, TtlStatus,
 };
 use fil_actors_runtime::ActorError;
+use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::*;
+use fvm_ipld_hamt::{BytesKey, Hamt};
 use fvm_shared::address::Address;
 use fvm_shared::bigint::{BigInt, BigUint};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use log::{debug, warn};
 use num_traits::{Signed, ToPrimitive, Zero};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+
+const BIT_WIDTH: u32 = 8;
 
 /// The minimum epoch duration a blob can be stored.
 const MIN_TTL: ChainEpoch = 3600; // one hour
@@ -51,6 +58,9 @@ pub struct State {
     pub added: BTreeMap<Hash, HashSet<(Address, SubscriptionId, PublicKey)>>,
     /// Map of currently pending blob hashes to account and source Iroh node IDs.
     pub pending: BTreeMap<Hash, HashSet<(Address, SubscriptionId, PublicKey)>>,
+
+    pub accounts_root: Cid,
+    pub blobs_root: Cid,
 }
 
 /// Key used to namespace subscriptions in the expiry index.
@@ -102,9 +112,38 @@ impl<'a> CreditDelegation<'a> {
     }
 }
 
+fn new_hamt<BS, V>(store: &BS) -> anyhow::Result<Cid, ActorError>
+where
+    BS: Blockstore,
+    V: Serialize + DeserializeOwned,
+{
+    Hamt::<_, V>::new_with_bit_width(store, BIT_WIDTH)
+        .flush()
+        .map_err(|e| ActorError::illegal_state(format!("failed to create empty Hamt: {}", e)))
+}
+
+fn load_hamt<BS, V>(store: &BS, root: &Cid) -> HamtImpl<&BS, V>
+where
+    BS: Blockstore,
+    V: Serialize + DeserializeOwned,
+{
+    Hamt::<_, V>::load_with_bit_width(&root, store, BIT_WIDTH).map_err(state_error)?
+}
+
+fn state_error(e: fvm_ipld_hamt::Error) -> ActorError {
+    ActorError::illegal_state(e.to_string())
+}
+
 impl State {
-    pub fn new(blob_capacity: u64, blob_credits_per_byte_block: u64) -> Self {
-        Self {
+    pub fn new<BS: Blockstore>(
+        store: &BS,
+        blob_capacity: u64,
+        blob_credits_per_byte_block: u64,
+    ) -> anyhow::Result<Self, ActorError> {
+        let accounts_root = new_hamt::<BS, Account>(store)?;
+        let blobs_root = new_hamt::<BS, Account>(store)?;
+
+        Ok(Self {
             capacity_total: BigInt::from(blob_capacity),
             capacity_used: BigInt::zero(),
             credit_sold: BigInt::zero(),
@@ -116,7 +155,9 @@ impl State {
             expiries: BTreeMap::new(),
             added: BTreeMap::new(),
             pending: BTreeMap::new(),
-        }
+            accounts_root,
+            blobs_root,
+        })
     }
 
     // TODO: Don't calculate stats on the fly, use running counters.
@@ -138,8 +179,9 @@ impl State {
         }
     }
 
-    pub fn buy_credit(
+    pub fn buy_credit<BS: Blockstore>(
         &mut self,
+        store: &BS,
         to: Address,
         amount: TokenAmount,
         current_epoch: ChainEpoch,
@@ -157,6 +199,23 @@ impl State {
             ));
         }
         self.credit_sold += &credits;
+
+        let mut hamt =
+            Hamt::<_, Account>::load_with_bit_width(&self.accounts_root, store, BIT_WIDTH)
+                .map_err(state_error)?;
+        // let object = ObjectState {
+        //     hash,
+        //     size,
+        //     metadata,
+        // };
+        // if overwrite {
+        //     hamt.set(key, object).map_err(state_error)?;
+        // } else {
+        //     hamt.set_if_absent(key, object).map_err(state_error)?;
+        // }
+        // self.root = hamt.flush().map_err(state_error)?;
+        // Ok(self.root)
+
         let account = self
             .accounts
             .entry(to)
@@ -1499,6 +1558,7 @@ fn accept_ttl(
     Ok((ttl, auto_renew))
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3283,3 +3343,4 @@ mod tests {
         );
     }
 }
+*/

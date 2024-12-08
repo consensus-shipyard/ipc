@@ -3119,12 +3119,14 @@ name = "fendermint_actor_blobs"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "cid",
  "fendermint_actor_blobs_shared",
  "fendermint_actor_machine",
  "fil_actors_evm_shared",
  "fil_actors_runtime",
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
+ "fvm_ipld_hamt",
  "fvm_shared",
  "hex-literal 0.4.1",
  "hoku_actor_sdk",
@@ -5353,6 +5355,22 @@ dependencies = [
  "num-traits",
  "replace_with",
  "tracing",
+]
+
+[[package]]
+name = "hoku_ipld"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cid",
+ "fil_actors_runtime",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_hamt",
+ "fvm_sdk",
+ "fvm_shared",
+ "integer-encoding",
+ "num-traits",
+ "serde",
 ]
 
 [[package]]
