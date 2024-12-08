@@ -1,4 +1,5 @@
 // Copyright 2024 Hoku Contributors
+// Copyright 2022-2024 Protocol Labs
 // Copyright 2019-2022 ChainSafe Systems
 // SPDX-License-Identifier: Apache-2.0, MIT
 
@@ -195,6 +196,11 @@ where
                 ))),
             },
         }
+    }
+
+    /// Consumes the underlying HAMT and returns the Blockstore it owns.
+    pub fn into_store(self) -> BS {
+        self.hamt.into_store()
     }
 }
 

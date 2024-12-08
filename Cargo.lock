@@ -3126,10 +3126,10 @@ dependencies = [
  "fil_actors_runtime",
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
- "fvm_ipld_hamt",
  "fvm_shared",
  "hex-literal 0.4.1",
  "hoku_actor_sdk",
+ "hoku_ipld",
  "iroh-base",
  "log",
  "num-traits",
@@ -3149,6 +3149,7 @@ dependencies = [
  "frc42_dispatch",
  "fvm_ipld_encoding",
  "fvm_shared",
+ "hoku_ipld",
  "num-derive 0.3.3",
  "num-traits",
  "serde",
@@ -5369,7 +5370,6 @@ dependencies = [
  "fvm_sdk",
  "fvm_shared",
  "integer-encoding",
- "num-traits",
  "serde",
 ]
 

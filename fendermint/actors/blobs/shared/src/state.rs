@@ -11,10 +11,11 @@ use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
+use hoku_ipld::map::MapKey;
 use serde::{Deserialize, Serialize};
 
 /// The stored representation of a credit account.
-#[derive(Clone, Debug, PartialEq, Serialize_tuple, Deserialize_tuple)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Account {
     /// Total size of all blobs managed by the account.
     pub capacity_used: BigInt,
@@ -33,27 +34,23 @@ pub struct Account {
     /// the origin is Alice.
     /// An approval for Bob might be valid from only one contract caller, so long as
     /// the origin is Bob.
-    pub approvals: HashMap<Address, CreditApproval>,
+    pub approvals: HashMap<String, CreditApproval>,
     /// The maximum allowed TTL for actor's blobs.
     pub max_ttl_epochs: ChainEpoch,
 }
 
 impl Account {
-    pub fn new(credit_free: BigInt, current_epoch: ChainEpoch) -> Self {
+    pub fn new(current_epoch: ChainEpoch) -> Self {
         Self {
-            capacity_used: Default::default(),
-            credit_free,
-            credit_committed: Default::default(),
-            credit_sponsor: None,
             last_debit_epoch: current_epoch,
-            approvals: Default::default(),
             max_ttl_epochs: TtlStatus::DEFAULT_MAX_TTL,
+            ..Default::default()
         }
     }
 }
 
 /// A credit approval from one account to another.
-#[derive(Debug, Clone, PartialEq, Serialize_tuple, Deserialize_tuple)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CreditApproval {
     /// Optional credit approval limit.
     pub limit: Option<BigInt>,
@@ -116,6 +113,30 @@ impl CreditAllowance {
 )]
 #[serde(transparent)]
 pub struct Hash(pub [u8; 32]);
+
+impl TryInto<Hash> for &[u8] {
+    type Error = String;
+
+    fn try_into(self) -> Result<Hash, Self::Error> {
+        if self.len() == 32 {
+            let mut array = [0u8; 32];
+            array.copy_from_slice(self);
+            Ok(Hash(array))
+        } else {
+            Err("hash slice must be exactly 32 bytes".into())
+        }
+    }
+}
+
+impl MapKey for Hash {
+    fn from_bytes(b: &[u8]) -> Result<Self, String> {
+        b.try_into()
+    }
+
+    fn to_bytes(&self) -> Result<Vec<u8>, String> {
+        Ok(self.0.to_vec())
+    }
+}
 
 /// Source https://github.com/n0-computer/iroh/blob/main/iroh-base/src/hash.rs
 impl fmt::Display for Hash {

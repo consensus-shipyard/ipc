@@ -205,7 +205,7 @@ pub struct GetStatsReturn {
     /// The current byte-blocks per atto token rate.
     pub blob_credits_per_byte_block: u64,
     /// Total number of debit accounts.
-    pub num_accounts: u64,
+    // pub num_accounts: u64,
     /// Total number of actively stored blobs.
     pub num_blobs: u64,
     /// Total number of currently resolving blobs.
