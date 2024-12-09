@@ -332,7 +332,7 @@ fi
 
 if [[ $local_deploy = true ]]; then
   # note: the subnet hasn't been created yet, but it's always the same value and we need it for the docker network name
-  subnet_id="/r31337/t410fkzrz3mlkyufisiuae3scumllgalzuu3wxlxa2ly"
+  subnet_id="/r31337/t410f6gbdxrbehnaeeo4mrq7wc5hgq6smnefys4qanwi"
   cd "$IPC_FOLDER"
   cargo make --makefile infra/fendermint/Makefile.toml \
       -e NODE_NAME=anvil \
