@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use fendermint_actor_blobs_shared::state::{Blob, BlobStatus, SubscriptionId};
-use fendermint_actor_blobs_shared::{add_blob, delete_blob, get_blob};
+use fendermint_actor_blobs_shared::{add_blob, delete_blob, get_blob, overwrite_blob};
 use fendermint_actor_machine::MachineActor;
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
@@ -31,27 +31,40 @@ impl Actor {
         let key = BytesKey(params.key.clone());
         let metadata = params.metadata.clone();
         let sub_id = get_blob_id(&state, params.key)?;
-        // TODO: Allow overwrite at blob layer
-        if let Some(object) = state.get(rt.store(), &key)? {
+        let sub = if let Some(object) = state.get(rt.store(), &key)? {
+            // If we have existing blob
             if params.overwrite {
-                delete_blob(rt, Some(state.owner), object.hash, sub_id.clone())?;
+                // Overwrite if the flag is passed
+                overwrite_blob(
+                    rt,
+                    object.hash,
+                    sub_id,
+                    params.hash,
+                    Some(state.owner),
+                    params.source,
+                    params.recovery_hash,
+                    params.size,
+                    params.ttl,
+                )?
             } else {
+                // Return an error if no overwrite flag gets passed
                 return Err(ActorError::illegal_state(
                     "key exists; use overwrite".into(),
                 ));
             }
-        }
-        // Add blob for the object
-        let sub = add_blob(
-            rt,
-            Some(state.owner),
-            params.source,
-            params.hash,
-            params.recovery_hash,
-            sub_id,
-            params.size,
-            params.ttl,
-        )?;
+        } else {
+            // No object found, just a new blob
+            add_blob(
+                rt,
+                sub_id,
+                params.hash,
+                Some(state.owner),
+                params.source,
+                params.recovery_hash,
+                params.size,
+                params.ttl,
+            )?
+        };
         // Update state
         rt.transaction(|st: &mut State, rt| {
             st.add(
@@ -81,7 +94,7 @@ impl Actor {
             .ok_or(ActorError::illegal_state("object not found".into()))?;
         // Delete blob for object
         let sub_id = get_blob_id(&state, params.0)?;
-        delete_blob(rt, Some(state.owner), object.hash, sub_id)?;
+        delete_blob(rt, sub_id, object.hash, Some(state.owner))?;
         // Update state
         rt.transaction(|st: &mut State, rt| st.delete(rt.store(), &key))?;
         Ok(())
@@ -205,7 +218,9 @@ mod tests {
 
     use std::collections::HashMap;
 
-    use fendermint_actor_blobs_shared::params::{AddBlobParams, DeleteBlobParams, GetBlobParams};
+    use fendermint_actor_blobs_shared::params::{
+        AddBlobParams, DeleteBlobParams, GetBlobParams, OverwriteBlobParams,
+    };
     use fendermint_actor_blobs_shared::state::{Hash, PublicKey, Subscription, SubscriptionGroup};
     use fendermint_actor_blobs_shared::{Method as BlobMethod, BLOBS_ACTOR_ADDR};
     use fendermint_actor_machine::{ConstructorParams, InitParams, WriteAccess};
@@ -426,28 +441,18 @@ mod tests {
         rt.expect_validate_caller_any();
         rt.expect_send_simple(
             BLOBS_ACTOR_ADDR,
-            BlobMethod::DeleteBlob as MethodNum,
-            IpldBlock::serialize_cbor(&DeleteBlobParams {
-                sponsor: Some(f4_eth_addr),
-                hash: add_params.hash,
-                id: sub_id.clone(),
-            })
-            .unwrap(),
-            TokenAmount::from_whole(0),
-            None,
-            ExitCode::OK,
-        );
-        rt.expect_send_simple(
-            BLOBS_ACTOR_ADDR,
-            BlobMethod::AddBlob as MethodNum,
-            IpldBlock::serialize_cbor(&AddBlobParams {
-                sponsor: Some(f4_eth_addr),
-                source: add_params2.source,
-                hash: add_params2.hash,
-                metadata_hash: add_params2.recovery_hash,
-                id: sub_id,
-                size: add_params2.size,
-                ttl: add_params2.ttl,
+            BlobMethod::OverwriteBlob as MethodNum,
+            IpldBlock::serialize_cbor(&OverwriteBlobParams {
+                old_hash: add_params.hash,
+                add: AddBlobParams {
+                    id: sub_id,
+                    hash: add_params2.hash,
+                    sponsor: Some(f4_eth_addr),
+                    source: add_params2.source,
+                    metadata_hash: add_params2.recovery_hash,
+                    size: add_params2.size,
+                    ttl: add_params2.ttl,
+                },
             })
             .unwrap(),
             TokenAmount::from_whole(0),
