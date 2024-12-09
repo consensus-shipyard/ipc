@@ -35,7 +35,6 @@ use fvm_shared::version::NetworkVersion;
 use ipc_actors_abis::i_diamond::FacetCut;
 use num_traits::Zero;
 
-use crate::fvm::state::ipc::GatewayCaller;
 use crate::fvm::state::snapshot::{derive_cid, StateTreeStreamer};
 use crate::fvm::state::{FvmGenesisState, FvmStateParams};
 use crate::fvm::store::memory::MemoryBlockstore;
