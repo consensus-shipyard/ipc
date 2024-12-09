@@ -9,10 +9,11 @@ pub use crate::state::State;
 pub const BLOBS_ACTOR_NAME: &str = "blobs";
 
 /// Params for actor construction.
+/// TODO: Remove constructor params
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ConstructorParams {
-    // The total storage capacity of the subnet.
-    pub capacity: u64,
+    /// The total storage capacity of the subnet.
+    pub blob_capacity: u64,
     /// The byte-blocks per atto token rate.
-    pub debit_rate: u64,
+    pub blob_credits_per_byte_block: u64,
 }

@@ -3098,13 +3098,10 @@ dependencies = [
 name = "fendermint_actor_blob_reader"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "data-encoding",
  "fendermint_actor_blobs_shared",
  "fil_actors_evm_shared",
  "fil_actors_runtime",
  "frc42_dispatch",
- "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
  "fvm_shared",
  "hex-literal 0.4.1",
@@ -3114,7 +3111,6 @@ dependencies = [
  "num-traits",
  "rand",
  "serde",
- "serde_tuple",
  "sha2 0.10.8",
 ]
 
@@ -3125,7 +3121,6 @@ dependencies = [
  "anyhow",
  "fendermint_actor_blobs_shared",
  "fendermint_actor_machine",
- "fendermint_testing",
  "fil_actors_evm_shared",
  "fil_actors_runtime",
  "fvm_ipld_blockstore",
@@ -3136,11 +3131,8 @@ dependencies = [
  "iroh-base",
  "log",
  "num-traits",
- "quickcheck",
- "quickcheck_macros",
  "rand",
  "serde",
- "serde_tuple",
  "tracing-subscriber",
 ]
 
@@ -3151,7 +3143,6 @@ dependencies = [
  "anyhow",
  "blake3",
  "data-encoding",
- "fendermint_actor_machine",
  "fil_actors_runtime",
  "frc42_dispatch",
  "fvm_ipld_encoding",
@@ -3159,7 +3150,6 @@ dependencies = [
  "num-derive 0.3.3",
  "num-traits",
  "serde",
- "serde_tuple",
 ]
 
 [[package]]
@@ -3170,7 +3160,6 @@ dependencies = [
  "cid",
  "fendermint_actor_blobs_shared",
  "fendermint_actor_machine",
- "fendermint_testing",
  "fil_actors_evm_shared",
  "fil_actors_runtime",
  "frc42_dispatch",
@@ -3187,7 +3176,6 @@ dependencies = [
  "quickcheck_macros",
  "rand",
  "serde",
- "serde_tuple",
 ]
 
 [[package]]
@@ -3251,6 +3239,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_actor_hoku_config"
+version = "0.1.0"
+dependencies = [
+ "fendermint_actor_hoku_config_shared",
+ "fendermint_actor_machine",
+ "fil_actors_runtime",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "log",
+ "num-traits",
+ "serde",
+]
+
+[[package]]
+name = "fendermint_actor_hoku_config_shared"
+version = "0.1.0"
+dependencies = [
+ "fil_actors_runtime",
+ "frc42_dispatch",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "num-derive 0.3.3",
+ "num-traits",
+ "serde",
+]
+
+[[package]]
 name = "fendermint_actor_machine"
 version = "0.1.0"
 dependencies = [
@@ -3279,11 +3294,9 @@ dependencies = [
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
  "fvm_shared",
- "log",
  "num-derive 0.3.3",
  "num-traits",
  "serde",
- "serde_tuple",
  "tracing",
 ]
 
@@ -3300,6 +3313,7 @@ dependencies = [
  "fendermint_actor_chainmetadata",
  "fendermint_actor_eam",
  "fendermint_actor_gas_market_eip1559",
+ "fendermint_actor_hoku_config",
  "fendermint_actor_timehub",
  "fil_actor_bundler",
  "fil_actors_runtime",
@@ -3833,6 +3847,8 @@ dependencies = [
  "fendermint_actor_chainmetadata",
  "fendermint_actor_eam",
  "fendermint_actor_gas_market_eip1559",
+ "fendermint_actor_hoku_config",
+ "fendermint_actor_hoku_config_shared",
  "fendermint_actor_timehub",
  "fendermint_actors",
  "fendermint_actors_api",

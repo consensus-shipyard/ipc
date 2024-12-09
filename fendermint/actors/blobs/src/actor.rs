@@ -42,7 +42,7 @@ type BlobTuple = (Hash, HashSet<(Address, SubscriptionId, PublicKey)>);
 impl BlobsActor {
     fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let state = State::new(params.capacity, params.debit_rate);
+        let state = State::new(params.blob_capacity, params.blob_credits_per_byte_block);
         rt.create(&state)
     }
 
@@ -454,7 +454,10 @@ mod tests {
         PublicKey(data)
     }
 
-    pub fn construct_and_verify(capacity: u64, debit_rate: u64) -> MockRuntime {
+    pub fn construct_and_verify(
+        blob_capacity: u64,
+        blob_credits_per_byte_block: u64,
+    ) -> MockRuntime {
         let rt = MockRuntime {
             receiver: Address::new_id(10),
             ..Default::default()
@@ -465,8 +468,8 @@ mod tests {
             .call::<BlobsActor>(
                 Method::Constructor as u64,
                 IpldBlock::serialize_cbor(&ConstructorParams {
-                    capacity,
-                    debit_rate,
+                    blob_capacity,
+                    blob_credits_per_byte_block,
                 })
                 .unwrap(),
             )

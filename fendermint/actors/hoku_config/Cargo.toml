@@ -1,6 +1,6 @@
 [package]
-name = "fendermint_actor_blobs"
-description = "Singleton actor for blob management"
+name = "fendermint_actor_hoku_config"
+description = "Singleton actor for updateable Hoku network parameters"
 license.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -12,26 +12,18 @@ version = "0.1.0"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
-anyhow = { workspace = true }
-log = { workspace = true, features = ["std"] }
-num-traits = { workspace = true }
 fil_actors_runtime = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
-fvm_ipld_blockstore = { workspace = true }
 fvm_shared = { workspace = true }
+log = { workspace = true, features = ["std"] }
+num-traits = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
-fendermint_actor_blobs_shared = { path = "./shared" }
+fendermint_actor_hoku_config_shared = { path = "../hoku_config/shared" }
 fendermint_actor_machine = { path = "../machine" }
-hoku_actor_sdk = { path = "../../../hoku/actor_sdk" }
 
 [dev-dependencies]
-fil_actors_evm_shared = { workspace = true }
 fil_actors_runtime = { workspace = true, features = ["test_utils"] }
-hex-literal = { workspace = true }
-iroh-base = { workspace = true, features = ["key"] }
-rand = { workspace = true }
-tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 [features]
 fil-actor = ["fil_actors_runtime/fil-actor"]

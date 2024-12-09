@@ -21,7 +21,7 @@ use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use fendermint_vm_actor_interface::{
     account, activity, adm, blob_reader, blobs, burntfunds, chainmetadata, cron, eam, gas_market,
-    init, ipc, reward, system, EMPTY_ARR,
+    hoku_config, init, ipc, reward, system, EMPTY_ARR,
 };
 use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{ActorMeta, Collateral, Genesis, Power, PowerScale, Validator};
@@ -31,7 +31,6 @@ use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_car::{load_car, CarHeader};
 use fvm_ipld_encoding::CborStore;
 use fvm_shared::chainid::ChainID;
-use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
 use ipc_actors_abis::i_diamond::FacetCut;
@@ -65,9 +64,6 @@ impl GenesisMetadata {
             chain_id: out.chain_id.into(),
             power_scale: out.power_scale,
             app_version: 0,
-            credit_debit_interval: out.credit_debit_interval,
-            blob_storage_capacity: out.blob_storage_capacity,
-            blob_debit_rate: out.blob_debit_rate,
         };
 
         GenesisMetadata {
@@ -159,9 +155,6 @@ pub struct GenesisOutput {
     pub power_scale: PowerScale,
     pub circ_supply: TokenAmount,
     pub validators: Vec<Validator<Power>>,
-    pub credit_debit_interval: ChainEpoch,
-    pub blob_storage_capacity: u64,
-    pub blob_debit_rate: u64,
 }
 
 pub struct GenesisBuilder {
@@ -307,9 +300,6 @@ impl GenesisBuilder {
             base_fee: genesis.base_fee,
             power_scale: genesis.power_scale,
             validators,
-            credit_debit_interval: genesis.credit_debit_interval,
-            blob_storage_capacity: genesis.blob_storage_capacity,
-            blob_debit_rate: genesis.blob_debit_rate,
         };
 
         // STAGE 0: Declare the built-in EVM contracts we'll have to deploy.
@@ -455,10 +445,26 @@ impl GenesisBuilder {
             )
             .context("failed to create chainmetadata actor")?;
 
+        // Initialize the hoku config actor.
+        let hoku_config_state = fendermint_actor_hoku_config::State {
+            admin: None,
+            config: fendermint_actor_hoku_config_shared::HokuConfig::default(),
+        };
+        state
+            .create_custom_actor(
+                fendermint_actor_hoku_config::ACTOR_NAME,
+                hoku_config::HOKU_CONFIG_ACTOR_ID,
+                &hoku_config_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create hoku config actor")?;
+
         // Initialize the blob actor.
+        // TODO: Remove constructor params that live in the hoku config actor
         let blobs_state = fendermint_actor_blobs::State::new(
-            genesis.blob_storage_capacity,
-            genesis.blob_debit_rate,
+            hoku_config_state.config.blob_capacity,
+            hoku_config_state.config.blob_credits_per_byte_block,
         );
         state
             .create_custom_actor(
@@ -562,9 +568,6 @@ impl GenesisBuilder {
                 out.circ_supply.clone(),
                 out.chain_id.into(),
                 out.power_scale,
-                out.credit_debit_interval,
-                out.blob_storage_capacity,
-                out.blob_debit_rate,
             )
             .context("failed to init exec state")?;
 

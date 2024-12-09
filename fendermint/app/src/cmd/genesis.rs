@@ -49,9 +49,6 @@ cmd! {
             accounts: Vec::new(),
             eam_permission_mode: PermissionMode::Unrestricted,
             ipc: None,
-            credit_debit_interval: self.credit_debit_interval,
-            blob_storage_capacity: self.blob_storage_capacity,
-            blob_debit_rate: self.blob_debit_rate,
         };
 
         let json = serde_json::to_string_pretty(&genesis)?;
@@ -354,9 +351,6 @@ async fn new_genesis_from_parent(
         accounts: Vec::new(),
         eam_permission_mode: PermissionMode::Unrestricted,
         ipc: Some(ipc_params),
-        credit_debit_interval: args.credit_debit_interval,
-        blob_storage_capacity: args.blob_storage_capacity,
-        blob_debit_rate: args.blob_debit_rate,
     };
 
     for v in genesis_info.validators {

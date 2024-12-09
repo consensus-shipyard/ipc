@@ -1,6 +1,6 @@
 [package]
 name = "fendermint_actor_timehub"
-description = "Actor for event accumulation"
+description = "Actor for time event accumulation"
 license.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -20,11 +20,9 @@ fvm_ipld_amt = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true }
-log = { workspace = true, features = ["std"] }
 num-derive = { workspace = true }
 num-traits = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-serde_tuple = { workspace = true }
 tracing = { workspace = true, features = ["log"] }
 
 fendermint_actor_blobs_shared = { path = "../blobs/shared" }
