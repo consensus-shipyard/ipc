@@ -14,7 +14,7 @@ if [[ -z "${BOOTSTRAP_PEER_ID:-}" ]]; then
   exit 1
 fi
 
-subnet_id="/r31337/t410fkzrz3mlkyufisiuae3scumllgalzuu3wxlxa2ly"
+subnet_id="/r31337/t410f6gbdxrbehnaeeo4mrq7wc5hgq6smnefys4qanwi"
 subnet_eth_addr="0x56639dB16Ac50A89228026e42a316B30179A5376"
 validator_addr="0x90f79bf6eb2c4f870365e785982e1f101e93b906"
 

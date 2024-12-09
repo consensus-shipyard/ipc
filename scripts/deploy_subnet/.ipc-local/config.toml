@@ -12,7 +12,7 @@ registry_addr = "0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1"
 
 # Local subnet
 [[subnets]]
-id = "/r31337/t410fkzrz3mlkyufisiuae3scumllgalzuu3wxlxa2ly"
+id = "/r31337/t410f6gbdxrbehnaeeo4mrq7wc5hgq6smnefys4qanwi"
 
 [subnets.config]
 network_type = "fevm"
