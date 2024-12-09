@@ -256,6 +256,27 @@ pub mod ipc {
         pub majority_percentage: u8,
         pub active_validators_limit: u16,
     }
+
+    impl Default for GatewayParams {
+        fn default() -> Self {
+            // Default values are taken from here contracts/tasks/deploy-gateway.ts.
+            Self {
+                subnet_id: SubnetID::default(),
+                bottom_up_check_period: 10,
+                majority_percentage: 66,
+                active_validators_limit: 100,
+            }
+        }
+    }
+
+    impl GatewayParams {
+        pub fn new(subnet_id: SubnetID) -> Self {
+            Self {
+                subnet_id,
+                ..Default::default()
+            }
+        }
+    }
 }
 
 #[cfg(test)]

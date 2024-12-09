@@ -5,12 +5,13 @@ use super::{
     checkpoint::{self, PowerUpdates},
     observe::{CheckpointFinalized, MsgExec, MsgExecPurpose},
     state::FvmExecState,
-    BlockGasLimit, FvmMessage, FvmMessageInterpreter,
+    FvmMessage, FvmMessageInterpreter,
 };
 use crate::fvm::activity::ValidatorActivityTracker;
 use crate::ExecInterpreter;
 use anyhow::Context;
 use async_trait::async_trait;
+use fendermint_actors_api::gas_market::Reading;
 use fendermint_vm_actor_interface::{chainmetadata, cron, system};
 use fvm::executor::ApplyRet;
 use fvm_ipld_blockstore::Blockstore;
@@ -39,7 +40,7 @@ pub struct FvmApplyRet {
 
 pub struct EndBlockOutput {
     pub power_updates: PowerUpdates,
-    pub block_gas_limit: BlockGasLimit,
+    pub gas_market: Reading,
     /// The end block events to be recorded
     pub events: BlockEndEvents,
 }
@@ -269,7 +270,7 @@ where
 
         let ret = EndBlockOutput {
             power_updates: updates,
-            block_gas_limit: next_gas_market.block_gas_limit,
+            gas_market: next_gas_market,
             events: block_end_events,
         };
         Ok((state, ret))

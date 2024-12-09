@@ -331,7 +331,7 @@ pub fn emit_trace_if_check_checkpoint_finalized<DB>(
 where
     DB: Blockstore + Clone,
 {
-    if !gateway.enabled(state)? {
+    if !gateway.is_root(state)? {
         return Ok(());
     }
 
@@ -372,7 +372,7 @@ fn should_create_checkpoint<DB>(
 where
     DB: Blockstore + Clone,
 {
-    if !gateway.enabled(state)? {
+    if !gateway.is_root(state)? {
         return Ok(None);
     }
 
