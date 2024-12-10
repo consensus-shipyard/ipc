@@ -29,6 +29,8 @@ pub enum GenesisCommands {
     AddMultisig(GenesisAddMultisigArgs),
     /// Add a validator to the genesis file.
     AddValidator(GenesisAddValidatorArgs),
+    /// Set the chain id explicitly
+    SetChainId(GenesisSetChainIdArgs),
     /// Set the EAM actor permission mode.
     SetEamPermissions(GenesisSetEAMPermissionsArgs),
     /// IPC commands.
@@ -129,6 +131,13 @@ pub struct GenesisAddValidatorArgs {
     /// The collateral staked by the validator, lending it its voting power.
     #[arg(long, short = 'v', value_parser = parse_full_fil)]
     pub power: TokenAmount,
+}
+
+#[derive(Args, Debug)]
+pub struct GenesisSetChainIdArgs {
+    /// The chain id of the blockchain
+    #[arg(long, short)]
+    pub chain_id: u64,
 }
 
 #[derive(Args, Debug)]

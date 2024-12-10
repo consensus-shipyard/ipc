@@ -22,7 +22,7 @@ use fendermint_vm_actor_interface::{
     account, activity, burntfunds, chainmetadata, cron, eam, gas_market, init, ipc, reward, system,
     EMPTY_ARR,
 };
-use fendermint_vm_core::{chainid, Timestamp};
+use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{ActorMeta, Collateral, Genesis, Power, PowerScale, Validator};
 use futures_util::io::Cursor;
 use fvm::engine::MultiEngine;
@@ -278,7 +278,7 @@ impl GenesisBuilder {
         //       and rejecting genesis if it doesn't match the expectation,
         //       but the Tendermint genesis file also has this field, and
         //       presumably Tendermint checks that its peers have the same.
-        let chain_id = chainid::from_str_hashed(&genesis.chain_name)?;
+        let chain_id = genesis.chain_id()?;
 
         // Convert validators to CometBFT power scale.
         let validators = genesis
