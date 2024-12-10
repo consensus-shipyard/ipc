@@ -2,6 +2,8 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::collections::HashMap;
+
 use fendermint_actor_blobs_shared::state::{Blob, BlobStatus, SubscriptionId};
 use fendermint_actor_blobs_shared::{add_blob, delete_blob, get_blob, overwrite_blob};
 use fendermint_actor_machine::MachineActor;
@@ -18,6 +20,11 @@ use crate::shared::{
     BUCKET_ACTOR_NAME,
 };
 use crate::state::{ObjectState, State};
+use crate::ModifyObjectMetadataParams;
+
+const MAX_METADATA_ENTRIES: u32 = 20;
+const MAX_METADATA_KEY_SIZE: u32 = 64;
+const MAX_METADATA_VALUE_SIZE: u32 = 128;
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
@@ -30,6 +37,8 @@ impl Actor {
         let state = rt.state::<State>()?;
         let key = BytesKey(params.key.clone());
         let metadata = params.metadata.clone();
+        validate_metadata(&metadata)?;
+
         let sub_id = get_blob_id(&state, params.key)?;
         let sub = if let Some(object) = state.get(rt.store(), &key)? {
             // If we have existing blob
@@ -143,6 +152,50 @@ impl Actor {
             common_prefixes: prefixes,
         })
     }
+
+    fn modify_object_metadata(
+        rt: &impl Runtime,
+        params: ModifyObjectMetadataParams,
+    ) -> Result<(), ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+
+        let state = rt.state::<State>()?;
+        let key = BytesKey(params.key.clone());
+        let metadata = params.metadata.clone();
+
+        let mut object = state
+            .get(rt.store(), &key)?
+            .ok_or(ActorError::illegal_state("object not found".into()))?;
+
+        for (key, val) in metadata {
+            match val {
+                Some(v) => {
+                    object
+                        .metadata
+                        .entry(key)
+                        .and_modify(|s| *s = v.clone())
+                        .or_insert(v);
+                }
+                None => {
+                    object.metadata.remove(&key);
+                }
+            }
+        }
+
+        validate_metadata(&object.metadata)?;
+
+        rt.transaction(|st: &mut State, rt| {
+            st.add(
+                rt.store(),
+                key,
+                object.hash,
+                object.size,
+                object.metadata,
+                true,
+            )
+        })?;
+        Ok(())
+    }
 }
 
 /// Returns a blob subscription ID specific to this machine and object key.
@@ -191,6 +244,33 @@ fn build_object(
     }
 }
 
+fn validate_metadata(metadata: &HashMap<String, String>) -> anyhow::Result<(), ActorError> {
+    if metadata.len() as u32 > MAX_METADATA_ENTRIES {
+        return Err(ActorError::illegal_state(format!(
+            "the maximum metadata entries allowed is {}",
+            MAX_METADATA_ENTRIES
+        )));
+    }
+
+    for (key, value) in metadata {
+        if key.len() as u32 > MAX_METADATA_KEY_SIZE {
+            return Err(ActorError::illegal_state(format!(
+                "key must be less than or equal to {}",
+                MAX_METADATA_KEY_SIZE
+            )));
+        }
+
+        if value.is_empty() || value.len() as u32 > MAX_METADATA_VALUE_SIZE {
+            return Err(ActorError::illegal_state(format!(
+                "value must non-empty and less than or equal to {}",
+                MAX_METADATA_VALUE_SIZE
+            )));
+        }
+    }
+
+    Ok(())
+}
+
 impl MachineActor for Actor {
     type State = State;
 }
@@ -211,6 +291,7 @@ impl ActorCode for Actor {
         DeleteObject => delete_object,
         GetObject => get_object,
         ListObjects => list_objects,
+        ModifyObjectMetadata => modify_object_metadata,
         _ => fallback,
     }
 }
@@ -779,6 +860,139 @@ mod tests {
                 size: add_params.size,
                 expiry: ttl,
                 metadata: add_params.metadata,
+            })
+        );
+        rt.verify();
+    }
+
+    #[test]
+    pub fn test_modify_object_metadata() {
+        let id_addr = Address::new_id(110);
+        let eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000000"
+        ));
+        let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
+
+        let rt = construct_and_verify(f4_eth_addr);
+        rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
+        rt.set_origin(id_addr);
+
+        // Add object
+        let hash = new_hash(256);
+        let key = vec![0, 1, 2];
+        let add_params: AddParams = AddParams {
+            source: new_pk(),
+            key: key.clone(),
+            hash: hash.0,
+            size: hash.1,
+            recovery_hash: new_hash(256).0,
+            ttl: None,
+            metadata: HashMap::from([("foo".into(), "bar".into()), ("foo2".into(), "bar".into())]),
+            overwrite: false,
+        };
+        rt.expect_validate_caller_any();
+        let state = rt.state::<State>().unwrap();
+        let sub_id = get_blob_id(&state, key.clone()).unwrap();
+        rt.expect_send_simple(
+            BLOBS_ACTOR_ADDR,
+            BlobMethod::AddBlob as MethodNum,
+            IpldBlock::serialize_cbor(&AddBlobParams {
+                sponsor: Some(f4_eth_addr),
+                source: add_params.source,
+                hash: add_params.hash,
+                metadata_hash: add_params.recovery_hash,
+                id: sub_id,
+                size: add_params.size,
+                ttl: add_params.ttl,
+            })
+            .unwrap(),
+            TokenAmount::from_whole(0),
+            IpldBlock::serialize_cbor(&Subscription::default()).unwrap(),
+            ExitCode::OK,
+        );
+        let result = rt
+            .call::<Actor>(
+                Method::AddObject as u64,
+                IpldBlock::serialize_cbor(&add_params).unwrap(),
+            )
+            .unwrap()
+            .unwrap()
+            .deserialize::<Object>()
+            .unwrap();
+        let state = rt.state::<State>().unwrap();
+        assert_eq!(add_params.hash, result.hash);
+        assert_eq!(add_params.metadata, result.metadata);
+        assert_eq!(add_params.recovery_hash, result.recovery_hash);
+        assert_eq!(add_params.size, result.size);
+        rt.verify();
+
+        // Modify metadata
+        let modify_object_params = ModifyObjectMetadataParams {
+            key: add_params.key,
+            metadata: HashMap::from([("foo".into(), Some("zar".into())), ("foo2".into(), None), ("foo3".into(), Some("bar".into()))]),
+        };
+        rt.expect_validate_caller_any();
+        let result = rt.call::<Actor>(
+            Method::ModifyObjectMetadata as u64,
+            IpldBlock::serialize_cbor(&modify_object_params).unwrap(),
+        );
+        assert!(result.is_ok());
+        rt.verify();
+
+        // Get object and check metadata
+        let sub_id = get_blob_id(&state, key.clone()).unwrap();
+        let blob = Blob {
+            size: add_params.size,
+            subscribers: HashMap::from([(
+                f4_eth_addr,
+                SubscriptionGroup {
+                    subscriptions: HashMap::from([(
+                        sub_id,
+                        Subscription {
+                            added: 0,
+                            expiry: ChainEpoch::from(3600),
+                            auto_renew: false,
+                            source: add_params.source,
+                            delegate: Some((f4_eth_addr, f4_eth_addr)),
+                            failed: false,
+                        },
+                    )]),
+                },
+            )]),
+            status: BlobStatus::Resolved,
+            metadata_hash: add_params.recovery_hash,
+        };
+        rt.expect_validate_caller_any();
+        rt.expect_send(
+            BLOBS_ACTOR_ADDR,
+            BlobMethod::GetBlob as MethodNum,
+            IpldBlock::serialize_cbor(&GetBlobParams(add_params.hash)).unwrap(),
+            TokenAmount::from_whole(0),
+            None,
+            SendFlags::READ_ONLY,
+            IpldBlock::serialize_cbor(&Some(blob)).unwrap(),
+            ExitCode::OK,
+            None,
+        );
+        let get_params = GetParams(key);
+        let result = rt
+            .call::<Actor>(
+                Method::GetObject as u64,
+                IpldBlock::serialize_cbor(&get_params).unwrap(),
+            )
+            .unwrap()
+            .unwrap()
+            .deserialize::<Option<Object>>();
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            Some(Object {
+                hash: hash.0,
+                recovery_hash: add_params.recovery_hash,
+                size: add_params.size,
+                expiry: ChainEpoch::from(3600),
+                metadata: HashMap::from([("foo".into(), "zar".into()), ("foo3".into(), "bar".into())]),
             })
         );
         rt.verify();
