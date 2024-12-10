@@ -441,12 +441,11 @@ mod tests {
         let mut g = quickcheck::Gen::new(5);
         let genesis = Genesis::arbitrary(&mut g);
 
-        let maybe_contract_path = genesis.ipc.as_ref().map(|_| contracts_path());
         let (state, out) = create_test_genesis_state(
             bundle_path(),
             custom_actors_bundle_path(),
+            contracts_path(),
             genesis,
-            maybe_contract_path,
         )
         .await
         .expect("cannot create genesis state");
@@ -467,6 +466,7 @@ mod tests {
             chain_id: out.chain_id.into(),
             power_scale: out.power_scale,
             app_version: 0,
+            consensus_params: None,
         };
 
         (state_params, store)

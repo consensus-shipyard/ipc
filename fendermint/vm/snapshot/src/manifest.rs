@@ -190,6 +190,7 @@ mod arb {
                         .into(),
                     power_scale: *g.choose(&[-1, 0, 3]).unwrap(),
                     app_version: 0,
+                    consensus_params: None,
                 },
                 version: Arbitrary::arbitrary(g),
             }

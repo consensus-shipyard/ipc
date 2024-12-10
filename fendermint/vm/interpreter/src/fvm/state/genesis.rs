@@ -154,6 +154,7 @@ where
                     chain_id,
                     power_scale,
                     app_version: 0,
+                    consensus_params: None,
                 };
 
                 let exec_state =
