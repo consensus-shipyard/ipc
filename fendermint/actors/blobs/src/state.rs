@@ -22,6 +22,7 @@ use log::{debug, warn};
 use num_traits::{Signed, ToPrimitive, Zero};
 
 use crate::accounts::Accounts;
+use crate::hamt_blobs::HamtBlobsRoot;
 
 /// The minimum epoch duration a blob can be stored.
 const MIN_TTL: ChainEpoch = 3600; // one hour
@@ -50,7 +51,7 @@ pub struct State {
     /// Map containing all accounts by robust (non-ID) actor address.
 
     /// Map containing all blobs.
-    pub blobs: HashMap<Hash, Blob>,
+    // pub blobs: HashMap<Hash, Blob>,
     /// Map of expiries to blob hashes.
     pub expiries: BTreeMap<ChainEpoch, HashMap<Address, HashMap<ExpiryKey, bool>>>,
     /// Map of currently added blob hashes to account and source Iroh node IDs.
@@ -58,6 +59,7 @@ pub struct State {
     /// Map of currently pending blob hashes to account and source Iroh node IDs.
     pub pending: BTreeMap<Hash, HashSet<(Address, SubscriptionId, PublicKey)>>,
     pub accounts_root: Cid,
+    pub blobs_root: HamtBlobsRoot
 }
 
 /// Key used to namespace subscriptions in the expiry index.
@@ -122,15 +124,16 @@ impl State {
             credit_committed: BigInt::zero(),
             credit_debited: BigInt::zero(),
             blob_credits_per_byte_block,
-            blobs: HashMap::new(),
+            // blobs: HashMap::new(),
             expiries: BTreeMap::new(),
             added: BTreeMap::new(),
             pending: BTreeMap::new(),
             accounts_root: Accounts::flush_empty(store)?,
+            blobs_root: HamtBlobsRoot::flush_empty(store)?,
         })
     }
 
-    // TODO: Don't calculate stats on the fly, use running counters.
+    // TODO: Don't calculate stats on the fly, use running counters: num_accounts, num_blobs, bytes_resolving, bytes_added
     pub fn get_stats(&self, balance: TokenAmount) -> GetStatsReturn {
         GetStatsReturn {
             balance,
@@ -141,11 +144,11 @@ impl State {
             credit_debited: self.credit_debited.clone(),
             blob_credits_per_byte_block: self.blob_credits_per_byte_block,
             // num_accounts: self.accounts.len() as u64,
-            num_blobs: self.blobs.len() as u64,
+            // num_blobs: self.blobs.len() as u64, FIXME SU
             num_resolving: self.pending.len() as u64,
-            bytes_resolving: self.pending.keys().map(|hash| self.blobs[hash].size).sum(),
+            // bytes_resolving: self.pending.keys().map(|hash| self.blobs[hash].size).sum(), FIXME SU Use running counter
             num_added: self.added.len() as u64,
-            bytes_added: self.added.keys().map(|hash| self.blobs[hash].size).sum(),
+            // bytes_added: self.added.keys().map(|hash| self.blobs[hash].size).sum(), FIXME SU Use running counter
         }
     }
 
@@ -576,7 +579,11 @@ impl State {
         let credit_required: BigInt;
         // Like cashback but for sending unspent tokens back
         let tokens_unspent: TokenAmount;
-        let sub = if let Some(blob) = self.blobs.get_mut(&hash) {
+
+
+        let blobs = &mut self.blobs_root.load(store)?;
+
+        let (sub, blob) = if let Some(mut blob) = blobs.get(&hash)? {
             let sub = if let Some(group) = blob.subscribers.get_mut(&subscriber) {
                 let (group_expiry, new_group_expiry) = group.max_expiries(&id, Some(expiry));
                 // If the subscriber has been debited after the group's max expiry, we need to
@@ -724,7 +731,7 @@ impl State {
                     })
                     .or_insert(HashSet::from([(subscriber, id, source)]));
             }
-            sub
+            (sub, blob)
         } else {
             new_account_capacity = size.clone();
             // New blob increases network capacity as well.
@@ -768,7 +775,6 @@ impl State {
                 )]),
                 status: BlobStatus::Added,
             };
-            self.blobs.insert(hash, blob);
             debug!("created new blob {}", hash);
             debug!(
                 "created new subscription to blob {} for {} (key: {})",
@@ -786,7 +792,7 @@ impl State {
             // Add to added
             self.added
                 .insert(hash, HashSet::from([(subscriber, id, source)]));
-            sub
+            (sub, blob)
         };
         // Account capacity is changing, debit for existing usage
         let debit_blocks = current_epoch - account.last_debit_epoch;
@@ -811,6 +817,8 @@ impl State {
         }
         // Save account
         self.accounts_root = accounts.set_and_flush(&subscriber, account)?;
+        // Save blob
+        self.blobs_root = blobs.set_and_flush(&hash, blob)?;
 
         if credit_required.is_positive() {
             debug!("committed {} credits from {}", credit_required, subscriber);
@@ -836,10 +844,9 @@ impl State {
         let mut accounts = Accounts::load(store, &self.accounts_root)?;
         let mut account = accounts.get_or_create(&subscriber, current_epoch)?;
         // Get the blob
-        let blob = self
-            .blobs
-            .get_mut(&hash)
-            .ok_or(ActorError::not_found(format!("blob {} not found", hash)))?;
+        let blobs = &mut self.blobs_root.load(store)?;
+        let mut blob = blobs
+            .get_or_err(&hash)?;
         if matches!(blob.status, BlobStatus::Failed) {
             // Do not renew failed blobs.
             return Err(ActorError::illegal_state(format!(
@@ -942,22 +949,30 @@ impl State {
         }
         // Save account
         self.accounts_root = accounts.set_and_flush(&subscriber, account.clone())?;
+        // Seve blobs
+        self.blobs_root = blobs.set_and_flush(&hash, blob)?;
 
         debug!("committed {} credits from {}", credit_required, subscriber);
         Ok(account)
     }
 
-    pub fn get_blob(&self, hash: Hash) -> Option<Blob> {
-        self.blobs.get(&hash).cloned()
+    pub fn get_blob<BS: Blockstore>(&self,  store: &BS, hash: Hash) -> anyhow::Result<Option<Blob>, ActorError> {
+        let blobs = self.blobs_root.load(store)?;
+        blobs.get(&hash)
     }
 
-    pub fn get_blob_status(
+    pub fn get_blob_status<BS: Blockstore>(
         &self,
+        store: &BS,
         subscriber: Address,
         hash: Hash,
         id: SubscriptionId,
     ) -> Option<BlobStatus> {
-        let blob = self.blobs.get(&hash)?;
+        let blob = self.blobs_root.load(store).ok().and_then(|blobs| blobs.get(&hash).ok()).flatten();
+        if blob.is_none() {
+            return None;
+        }
+        let blob = blob.unwrap();
         if blob.subscribers.contains_key(&subscriber) {
             match blob.status {
                 BlobStatus::Added => Some(BlobStatus::Added),
@@ -1013,20 +1028,23 @@ impl State {
             .collect::<Vec<_>>()
     }
 
-    pub fn set_blob_pending(
+    pub fn set_blob_pending<BS: Blockstore>(
         &mut self,
+        store: &BS,
         subscriber: Address,
         hash: Hash,
         id: SubscriptionId,
         source: PublicKey,
     ) -> anyhow::Result<(), ActorError> {
-        let blob = if let Some(blob) = self.blobs.get_mut(&hash) {
+        let mut blobs = self.blobs_root.load(store)?;
+        let mut blob = if let Some(blob) = blobs.get(&hash)? {
             blob
         } else {
             // The blob may have been deleted before it was set to pending
             return Ok(());
         };
         blob.status = BlobStatus::Pending;
+        self.blobs_root = blobs.set_and_flush(&hash, blob)?;
         // Add to pending
         self.pending
             .insert(hash, HashSet::from([(subscriber, id, source)]));
@@ -1055,7 +1073,8 @@ impl State {
         let mut accounts = Accounts::load(store, &self.accounts_root)?;
         let mut account = accounts.get_or_create(&subscriber, current_epoch)?;
         // Get the blob
-        let blob = if let Some(blob) = self.blobs.get_mut(&hash) {
+        let mut blobs = self.blobs_root.load(store)?;
+        let mut blob = if let Some(blob) = blobs.get(&hash)? {
             blob
         } else {
             // The blob may have been deleted before it was finalized
@@ -1160,6 +1179,7 @@ impl State {
         }
         // Save account
         self.accounts_root = accounts.set_and_flush(&subscriber, account)?;
+        self.blobs_root = blobs.set_and_flush(&hash, blob)?;
         Ok(())
     }
 
@@ -1178,7 +1198,9 @@ impl State {
         let mut accounts = Accounts::load(store, &self.accounts_root)?;
         let mut account = accounts.get_or_create(&subscriber, current_epoch)?;
         // Get the blob
-        let blob = if let Some(blob) = self.blobs.get_mut(&hash) {
+        let mut blobs = self.blobs_root.load(store)?;
+
+        let mut blob = if let Some(blob) = blobs.get(&hash)? {
             blob
         } else {
             // We could error here, but since this method is called from other actors,
@@ -1356,11 +1378,12 @@ impl State {
             // Delete or update blob
             let delete_blob = blob.subscribers.is_empty();
             if delete_blob {
-                self.blobs.remove(&hash);
+                self.blobs_root = blobs.delete_and_flush(&hash)?;
                 debug!("deleted blob {}", hash);
             }
             delete_blob
         } else {
+            self.blobs_root = blobs.set_and_flush(&hash, blob)?;
             false
         };
         // Save account

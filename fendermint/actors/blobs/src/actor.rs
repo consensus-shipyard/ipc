@@ -238,7 +238,7 @@ impl BlobsActor {
 
     fn get_blob(rt: &impl Runtime, params: GetBlobParams) -> Result<Option<Blob>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let blob = rt.state::<State>()?.get_blob(params.0);
+        let blob = rt.state::<State>()?.get_blob(rt.store(), params.0)?;
         Ok(blob)
     }
 
@@ -249,7 +249,7 @@ impl BlobsActor {
         rt.validate_immediate_caller_accept_any()?;
         let status =
             rt.state::<State>()?
-                .get_blob_status(params.subscriber, params.hash, params.id);
+                .get_blob_status(rt.store(), params.subscriber, params.hash, params.id);
         Ok(status)
     }
 
@@ -276,7 +276,7 @@ impl BlobsActor {
         // We control this method call and can guarantee subscriber is an external address,
         // i.e., no need to resolve its external address.
         rt.transaction(|st: &mut State, _| {
-            st.set_blob_pending(params.subscriber, params.hash, params.id, params.source)
+            st.set_blob_pending(rt.store(), params.subscriber, params.hash, params.id, params.source)
         })
     }
 

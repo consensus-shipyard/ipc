@@ -6,5 +6,6 @@ mod accounts;
 mod actor;
 mod shared;
 mod state;
+mod hamt_blobs;
 
 pub use shared::*;

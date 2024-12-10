@@ -172,7 +172,7 @@ impl TryFrom<&str> for Hash {
 pub struct PublicKey(pub [u8; 32]);
 
 /// The stored representation of a blob.
-#[derive(Clone, Debug, Default, Serialize_tuple, Deserialize_tuple)]
+#[derive(Clone, PartialEq, Debug, Default, Serialize_tuple, Deserialize_tuple)]
 pub struct Blob {
     /// The size of the content.
     pub size: u64,
@@ -235,7 +235,7 @@ impl fmt::Display for SubscriptionId {
 }
 
 /// A group of subscriptions for the same subscriber.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct SubscriptionGroup {
     /// Subscription group keys.
