@@ -30,6 +30,7 @@ use fvm_shared::{
 };
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
+use tendermint::consensus::params::Params as TendermintConsensusParams;
 
 pub type BlockHash = [u8; 32];
 
@@ -66,6 +67,8 @@ pub struct FvmStateParams {
     /// The application protocol version.
     #[serde(default)]
     pub app_version: u64,
+    /// Tendermint consensus params.
+    pub consensus_params: Option<TendermintConsensusParams>,
 }
 
 /// Parts of the state which can be updated by message execution, apart from the actor state.

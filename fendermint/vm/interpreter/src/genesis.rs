@@ -63,6 +63,7 @@ impl GenesisMetadata {
             chain_id: out.chain_id.into(),
             power_scale: out.power_scale,
             app_version: 0,
+            consensus_params: None,
         };
 
         GenesisMetadata {

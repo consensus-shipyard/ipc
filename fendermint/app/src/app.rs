@@ -53,6 +53,7 @@ use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
 use tendermint::consensus::params::Params as TendermintConsensusParams;
 use tracing::instrument;
+
 #[derive(Serialize)]
 #[repr(u8)]
 pub enum AppStoreKey {
@@ -82,8 +83,6 @@ pub struct AppState {
     oldest_state_height: BlockHeight,
     /// Last committed version of the evolving state of the FVM.
     state_params: FvmStateParams,
-    /// Tendermint consensus params.
-    consensus_params: Option<TendermintConsensusParams>,
 }
 
 impl AppState {
@@ -239,8 +238,8 @@ where
                     chain_id: 0,
                     power_scale: 0,
                     app_version: 0,
+                    consensus_params: None,
                 },
-                consensus_params: None,
             };
             self.set_committed_state(state)?;
         }
@@ -298,6 +297,7 @@ where
     ) -> Result<Option<TendermintConsensusParams>> {
         let mut state = self.committed_state()?;
         let current = state
+            .state_params
             .consensus_params
             .ok_or_else(|| anyhow!("no current consensus params in state"))?;
 
@@ -308,7 +308,7 @@ where
         // Proceeding with update.
         let mut updated = current;
         updated.block.max_gas = gas_market.block_gas_limit as i64;
-        state.consensus_params = Some(updated.clone());
+        state.state_params.consensus_params = Some(updated.clone());
         self.set_committed_state(state)?;
 
         Ok(Some(updated))
@@ -513,7 +513,10 @@ where
         // Make it easy to spot any discrepancies between nodes.
         tracing::info!(genesis_hash = genesis_hash.to_string(), "genesis");
 
-        let (validators, state_params) = read_genesis_car(genesis_bytes, &self.state_store).await?;
+        let (validators, mut state_params) =
+            read_genesis_car(genesis_bytes, &self.state_store).await?;
+
+        state_params.consensus_params = Some(request.consensus_params);
 
         let validators =
             to_validator_updates(validators).context("failed to convert validators")?;
@@ -536,7 +539,6 @@ where
             block_height: height,
             oldest_state_height: height,
             state_params,
-            consensus_params: Some(request.consensus_params),
         };
 
         let response = response::InitChain {
