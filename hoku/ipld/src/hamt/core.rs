@@ -17,7 +17,7 @@ use integer_encoding::VarInt;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use crate::{Hasher, HAMT_BIT_WIDTH};
+use crate::Hasher;
 
 /// Wraps a HAMT to provide a convenient map API.
 /// Any errors are returned with exit code indicating illegal state.
@@ -29,7 +29,7 @@ where
     V: DeserializeOwned + Serialize,
 {
     hamt: hamt::Hamt<BS, V, hamt::BytesKey, Hasher>,
-    name: &'static str,
+    name: String,
     key_type: PhantomData<K>,
 }
 
@@ -39,6 +39,8 @@ pub trait MapKey: Sized + Debug {
 }
 
 pub type Config = hamt::Config;
+
+pub const HAMT_BIT_WIDTH: u32 = 5;
 
 pub const DEFAULT_HAMT_CONFIG: Config = Config {
     bit_width: HAMT_BIT_WIDTH,
@@ -52,8 +54,12 @@ where
     K: MapKey,
     V: DeserializeOwned + Serialize,
 {
+    pub fn name(&self) -> String {
+        self.name.clone()
+    }
+
     /// Creates a new, empty map.
-    pub fn empty(store: BS, config: Config, name: &'static str) -> Self {
+    pub fn empty(store: BS, config: Config, name: String) -> Self {
         Self {
             hamt: hamt::Hamt::new_with_config(store, config),
             name,
@@ -66,19 +72,14 @@ where
     pub fn flush_empty(store: BS, config: Config) -> Result<Cid, ActorError> {
         // This CID is constant regardless of the HAMT's configuration, so as an optimisation
         // we could hard-code it and merely check it is already stored.
-        Self::empty(store, config, "empty").flush()
+        Self::empty(store, config, "empty".into()).flush()
     }
 
     /// Loads a map from the store.
     // There is no version of this method that doesn't take an explicit config parameter.
     // The caller must know the configuration to interpret the HAMT correctly.
     // Forcing them to provide it makes it harder to accidentally use an incorrect default.
-    pub fn load(
-        store: BS,
-        root: &Cid,
-        config: Config,
-        name: &'static str,
-    ) -> Result<Self, ActorError> {
+    pub fn load(store: BS, root: &Cid, config: Config, name: String) -> Result<Self, ActorError> {
         Ok(Self {
             hamt: hamt::Hamt::load_with_config(root, store, config)
                 .with_context_code(ExitCode::USR_ILLEGAL_STATE, || {
@@ -198,9 +199,50 @@ where
         }
     }
 
-    /// Consumes the underlying HAMT and returns the Blockstore it owns.
-    pub fn into_store(self) -> BS {
-        self.hamt.into_store()
+    /// Iterates over key-value pairs in the map starting at a key up to a max.
+    /// Returns the next key if there are more items in the map.
+    #[allow(clippy::blocks_in_conditions)]
+    pub fn for_each_ranged<F>(
+        &self,
+        starting_key: Option<&hamt::BytesKey>,
+        max: Option<usize>,
+        mut f: F,
+    ) -> Result<(usize, Option<K>), ActorError>
+    where
+        // Note the result type of F uses ActorError.
+        // The implementation will extract and propagate any ActorError
+        // wrapped in a hamt::Error::Dynamic.
+        F: FnMut(K, &V) -> Result<(), ActorError>,
+    {
+        match self.hamt.for_each_ranged(starting_key, max, |k, v| {
+            let key = K::from_bytes(k).context_code(ExitCode::USR_ILLEGAL_STATE, "invalid key")?;
+            f(key, v).map_err(|e| anyhow!(e))
+        }) {
+            Ok((traversed, next)) => {
+                let next = if let Some(next) = next {
+                    Some(
+                        K::from_bytes(&next)
+                            .context_code(ExitCode::USR_ILLEGAL_STATE, "invalid key")?,
+                    )
+                } else {
+                    None
+                };
+                Ok((traversed, next))
+            }
+            Err(hamt_err) => match hamt_err {
+                hamt::Error::Dynamic(e) => match e.downcast::<ActorError>() {
+                    Ok(ae) => Err(ae),
+                    Err(e) => Err(ActorError::illegal_state(format!(
+                        "error in callback traversing HAMT {}: {}",
+                        self.name, e
+                    ))),
+                },
+                e => Err(ActorError::illegal_state(format!(
+                    "error traversing HAMT {}: {}",
+                    self.name, e
+                ))),
+            },
+        }
     }
 }
 
@@ -276,7 +318,7 @@ mod tests {
     #[test]
     fn basic_put_get() {
         let bs = MemoryBlockstore::new();
-        let mut m = Map::<_, u64, String>::empty(bs, DEFAULT_HAMT_CONFIG, "empty");
+        let mut m = Map::<_, u64, String>::empty(bs, DEFAULT_HAMT_CONFIG, "empty".into());
         m.set(&1234, "1234".to_string()).unwrap();
         assert!(m.get(&2222).unwrap().is_none());
         assert_eq!(&"1234".to_string(), m.get(&1234).unwrap().unwrap());
@@ -285,7 +327,7 @@ mod tests {
     #[test]
     fn for_each_callback_exitcode_propagates() {
         let bs = MemoryBlockstore::new();
-        let mut m = Map::<_, u64, String>::empty(bs, DEFAULT_HAMT_CONFIG, "empty");
+        let mut m = Map::<_, u64, String>::empty(bs, DEFAULT_HAMT_CONFIG, "empty".into());
         m.set(&1234, "1234".to_string()).unwrap();
         let res = m.for_each(|_, _| Err(ActorError::forbidden("test".to_string())));
         assert!(res.is_err());

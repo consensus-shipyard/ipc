@@ -5,7 +5,6 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Bound::{Included, Unbounded};
 
-use cid::Cid;
 use fendermint_actor_blobs_shared::params::GetStatsReturn;
 use fendermint_actor_blobs_shared::state::{
     Account, Blob, BlobStatus, CreditAllowance, CreditApproval, Hash, PublicKey, Subscription,
@@ -18,11 +17,9 @@ use fvm_shared::address::Address;
 use fvm_shared::bigint::{BigInt, BigUint};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
+use hoku_ipld::hamt;
 use log::{debug, warn};
 use num_traits::{Signed, ToPrimitive, Zero};
-
-use crate::accounts::Accounts;
-use crate::hamt_blobs::HamtBlobsRoot;
 
 /// The minimum epoch duration a blob can be stored.
 const MIN_TTL: ChainEpoch = 3600; // one hour
@@ -53,9 +50,9 @@ pub struct State {
     /// Map of currently pending blob hashes to account and source Iroh node IDs.
     pub pending: BTreeMap<Hash, HashSet<(Address, SubscriptionId, PublicKey)>>,
     /// HAMT containing all accounts keyed by robust (non-ID) actor address.
-    pub accounts_root: Cid,
+    pub accounts_root: hamt::Root<Address, Account>,
     /// HAMT containing all blobs keyed by blob hash.
-    pub blobs_root: HamtBlobsRoot,
+    pub blobs_root: hamt::Root<Hash, Blob>,
 }
 
 /// Key used to namespace subscriptions in the expiry index.
@@ -123,8 +120,8 @@ impl State {
             expiries: BTreeMap::new(),
             added: BTreeMap::new(),
             pending: BTreeMap::new(),
-            accounts_root: Accounts::flush_empty(store)?,
-            blobs_root: HamtBlobsRoot::flush_empty(store)?,
+            accounts_root: hamt::Root::<Address, Account>::new(store, "accounts")?,
+            blobs_root: hamt::Root::<Hash, Blob>::new(store, "blobs")?,
         })
     }
 
@@ -168,8 +165,8 @@ impl State {
         }
         self.credit_sold += &credits;
         // Get or create a new account
-        let mut accounts = Accounts::load(store, &self.accounts_root)?;
-        let mut account = accounts.get_or_create(&to, current_epoch)?;
+        let mut accounts = self.accounts_root.hamt(store)?;
+        let mut account = accounts.get_or_create(&to, || Account::new(current_epoch))?;
         account.credit_free += &credits;
         // Save account
         self.accounts_root = accounts.set_and_flush(&to, account.clone())?;
@@ -188,7 +185,7 @@ impl State {
     ) -> anyhow::Result<(), ActorError> {
         let addr = sponsor.unwrap_or(from);
         // Get the account
-        let mut accounts = Accounts::load(store, &self.accounts_root)?;
+        let mut accounts = self.accounts_root.hamt(store)?;
         let mut account = accounts.get_or_err(&addr)?;
         let delegation = if let Some(sponsor) = sponsor {
             let approval =
@@ -254,8 +251,8 @@ impl State {
         }
         let expiry = ttl.map(|t| t + current_epoch);
         // Get or create a new account
-        let mut accounts = Accounts::load(store, &self.accounts_root)?;
-        let mut account = accounts.get_or_create(&from, current_epoch)?;
+        let mut accounts = self.accounts_root.hamt(store)?;
+        let mut account = accounts.get_or_create(&from, || Account::new(current_epoch))?;
         // Get or add a new approval
         let approval = account
             .approvals
@@ -301,7 +298,7 @@ impl State {
         for_caller: Option<Address>,
     ) -> anyhow::Result<(), ActorError> {
         // Get the account
-        let mut accounts = Accounts::load(store, &self.accounts_root)?;
+        let mut accounts = self.accounts_root.hamt(store)?;
         let mut account = accounts.get_or_err(&from)?;
         if let Some(caller) = for_caller {
             let approval =
@@ -344,7 +341,7 @@ impl State {
         store: &BS,
         from: Address,
     ) -> anyhow::Result<Option<Account>, ActorError> {
-        let accounts = Accounts::load(store, &self.accounts_root)?;
+        let accounts = self.accounts_root.hamt(store)?;
         accounts.get(&from)
     }
 
@@ -356,7 +353,7 @@ impl State {
         from: Address,
         to: Address,
     ) -> anyhow::Result<Option<CreditApproval>, ActorError> {
-        let accounts = Accounts::load(store, &self.accounts_root)?;
+        let accounts = self.accounts_root.hamt(store)?;
         Ok(accounts
             .get(&from)?
             .map(|a| a.approvals.get(&to.to_string()).cloned())
@@ -372,7 +369,7 @@ impl State {
         current_epoch: ChainEpoch,
     ) -> anyhow::Result<CreditAllowance, ActorError> {
         // Get the account or return default allowance
-        let accounts = Accounts::load(store, &self.accounts_root)?;
+        let accounts = self.accounts_root.hamt(store)?;
         let account = match accounts.get(&from)? {
             None => return Ok(CreditAllowance::default()),
             Some(account) => account,
@@ -421,8 +418,8 @@ impl State {
         current_epoch: ChainEpoch,
     ) -> anyhow::Result<(), ActorError> {
         // Get or create a new account
-        let mut accounts = Accounts::load(store, &self.accounts_root)?;
-        let mut account = accounts.get_or_create(&from, current_epoch)?;
+        let mut accounts = self.accounts_root.hamt(store)?;
+        let mut account = accounts.get_or_create(&from, || Account::new(current_epoch))?;
         account.credit_sponsor = sponsor;
         // Save account
         self.accounts_root = accounts.set_and_flush(&from, account)?;
@@ -499,9 +496,9 @@ impl State {
             delete_from_disc.len()
         );
         // Debit for existing usage
-        let reader = Accounts::load(store, &self.accounts_root)?;
-        let mut writer = Accounts::load(store, &self.accounts_root)?;
-        reader.map.for_each(|address, account| {
+        let reader = self.accounts_root.hamt(store)?;
+        let mut writer = self.accounts_root.hamt(store)?;
+        reader.for_each(|address, account| {
             let mut account = account.clone();
             let debit_blocks = current_epoch - account.last_debit_epoch;
             let debit_byte_block = debit_blocks as u64 * &account.capacity_used;
@@ -511,10 +508,10 @@ impl State {
             account.credit_committed -= &debit_credits;
             account.last_debit_epoch = current_epoch;
             debug!("debited {} credits from {}", debit_credits, address);
-            writer.map.set(&address, account)?;
+            writer.set(&address, account)?;
             Ok(())
         })?;
-        self.accounts_root = writer.map.flush()?;
+        self.accounts_root = writer.flush()?;
         Ok(delete_from_disc)
     }
 
@@ -546,8 +543,8 @@ impl State {
         tokens_received: TokenAmount,
     ) -> anyhow::Result<(Subscription, TokenAmount), ActorError> {
         // Get or create a new account
-        let mut accounts = Accounts::load(store, &self.accounts_root)?;
-        let mut account = accounts.get_or_create(&subscriber, current_epoch)?;
+        let mut accounts = self.accounts_root.hamt(store)?;
+        let mut account = accounts.get_or_create(&subscriber, || Account::new(current_epoch))?;
         // Validate the TTL
         let (ttl, auto_renew) = accept_ttl(ttl, &account)?;
         // Get the credit delgation if needed
@@ -575,7 +572,7 @@ impl State {
         // Like cashback but for sending unspent tokens back
         let tokens_unspent: TokenAmount;
         // Get or create a new blob
-        let blobs = &mut self.blobs_root.load(store)?;
+        let mut blobs = self.blobs_root.hamt(store)?;
         let (sub, blob) = if let Some(mut blob) = blobs.get(&hash)? {
             let sub = if let Some(group) = blob.subscribers.get_mut(&subscriber.to_string()) {
                 let (group_expiry, new_group_expiry) = group.max_expiries(&id, Some(expiry));
@@ -836,10 +833,10 @@ impl State {
         id: SubscriptionId,
     ) -> anyhow::Result<Account, ActorError> {
         // Get or create a new account
-        let mut accounts = Accounts::load(store, &self.accounts_root)?;
-        let mut account = accounts.get_or_create(&subscriber, current_epoch)?;
+        let mut accounts = self.accounts_root.hamt(store)?;
+        let mut account = accounts.get_or_create(&subscriber, || Account::new(current_epoch))?;
         // Get the blob
-        let blobs = &mut self.blobs_root.load(store)?;
+        let mut blobs = self.blobs_root.hamt(store)?;
         let mut blob = blobs.get_or_err(&hash)?;
         if matches!(blob.status, BlobStatus::Failed) {
             // Do not renew failed blobs.
@@ -955,7 +952,7 @@ impl State {
         store: &BS,
         hash: Hash,
     ) -> anyhow::Result<Option<Blob>, ActorError> {
-        let blobs = self.blobs_root.load(store)?;
+        let blobs = self.blobs_root.hamt(store)?;
         blobs.get(&hash)
     }
 
@@ -968,15 +965,10 @@ impl State {
     ) -> Option<BlobStatus> {
         let blob = self
             .blobs_root
-            .load(store)
+            .hamt(store)
             .ok()
             .and_then(|blobs| blobs.get(&hash).ok())
-            .flatten();
-        let blob = if let Some(blob) = blob {
-            blob
-        } else {
-            return None;
-        };
+            .flatten()?;
         if blob.subscribers.contains_key(&subscriber.to_string()) {
             match blob.status {
                 BlobStatus::Added => Some(BlobStatus::Added),
@@ -1040,7 +1032,7 @@ impl State {
         id: SubscriptionId,
         source: PublicKey,
     ) -> anyhow::Result<(), ActorError> {
-        let mut blobs = self.blobs_root.load(store)?;
+        let mut blobs = self.blobs_root.hamt(store)?;
         let mut blob = if let Some(blob) = blobs.get(&hash)? {
             blob
         } else {
@@ -1075,10 +1067,10 @@ impl State {
             )));
         }
         // Get or create a new account
-        let mut accounts = Accounts::load(store, &self.accounts_root)?;
-        let mut account = accounts.get_or_create(&subscriber, current_epoch)?;
+        let mut accounts = self.accounts_root.hamt(store)?;
+        let mut account = accounts.get_or_create(&subscriber, || Account::new(current_epoch))?;
         // Get the blob
-        let mut blobs = self.blobs_root.load(store)?;
+        let mut blobs = self.blobs_root.hamt(store)?;
         let mut blob = if let Some(blob) = blobs.get(&hash)? {
             blob
         } else {
@@ -1201,10 +1193,10 @@ impl State {
         id: SubscriptionId,
     ) -> anyhow::Result<bool, ActorError> {
         // Get or create a new account
-        let mut accounts = Accounts::load(store, &self.accounts_root)?;
-        let mut account = accounts.get_or_create(&subscriber, current_epoch)?;
+        let mut accounts = self.accounts_root.hamt(store)?;
+        let mut account = accounts.get_or_create(&subscriber, || Account::new(current_epoch))?;
         // Get the blob
-        let mut blobs = self.blobs_root.load(store)?;
+        let mut blobs = self.blobs_root.hamt(store)?;
         let mut blob = if let Some(blob) = blobs.get(&hash)? {
             blob
         } else {
@@ -1403,7 +1395,7 @@ impl State {
         status: TtlStatus,
         current_epoch: ChainEpoch,
     ) -> anyhow::Result<(), ActorError> {
-        let mut accounts = Accounts::load(store, &self.accounts_root)?;
+        let mut accounts = self.accounts_root.hamt(store)?;
         match status {
             // We don't want to create an account for default TTL
             TtlStatus::Default => {
@@ -1414,7 +1406,8 @@ impl State {
             }
             _ => {
                 // Get or create a new account
-                let mut account = accounts.get_or_create(&subscriber, current_epoch)?;
+                let mut account =
+                    accounts.get_or_create(&subscriber, || Account::new(current_epoch))?;
                 account.max_ttl_epochs = status.into();
                 self.accounts_root = accounts.set_and_flush(&subscriber, account)?;
             }
@@ -1928,7 +1921,7 @@ mod tests {
         assert!(res.is_err());
         assert_eq!(
             res.err().unwrap().msg(),
-            format!("account {} not found", from)
+            format!("{} not found in accounts", from)
         );
     }
 

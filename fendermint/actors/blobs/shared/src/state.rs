@@ -8,7 +8,7 @@ use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
-use hoku_ipld::map::MapKey;
+use hoku_ipld::hamt::MapKey;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -270,7 +270,7 @@ impl SubscriptionGroup {
             if sub.expiry > max.unwrap_or(0) {
                 max = Some(sub.expiry);
             }
-            let new_value = if id.to_string() == target_id.to_string() {
+            let new_value = if *id == target_id.to_string() {
                 new_value.unwrap_or_default()
             } else {
                 sub.expiry
@@ -304,7 +304,7 @@ impl SubscriptionGroup {
             )))?;
         let mut next_min = None;
         for (id, sub) in self.subscriptions.iter() {
-            if sub.failed || id.to_string() == tid {
+            if sub.failed || *id == tid {
                 continue;
             }
             if sub.added < trim.added {
