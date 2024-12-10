@@ -140,17 +140,6 @@ pub trait SubnetManager:
         amount: TokenAmount,
     ) -> Result<ChainEpoch>;
 
-    /// Propagate a cross-net message forward. For `postbox_msg_key`, we are using bytes because different
-    /// runtime have different representations. For FVM, it should be `CID` as bytes. For EVM, it is
-    /// `bytes32`.
-    async fn propagate(
-        &self,
-        subnet: SubnetID,
-        gateway_addr: Address,
-        from: Address,
-        postbox_msg_key: Vec<u8>,
-    ) -> Result<()>;
-
     /// Send value between two addresses in a subnet
     async fn send_value(&self, from: Address, to: Address, amount: TokenAmount) -> Result<()>;
 

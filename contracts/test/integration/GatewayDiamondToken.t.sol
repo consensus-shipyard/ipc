@@ -113,7 +113,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
             10
         );
         vm.expectEmit(true, true, true, true, address(gatewayDiamond));
-        emit LibGateway.NewTopDownMessage(address(saDiamond), expected);
+        emit LibGateway.NewTopDownMessage(address(saDiamond), expected, expected.toDeterministicHash());
         gatewayDiamond.manager().fundWithToken(subnet.id, FvmAddressHelper.from(caller), 10);
 
         // Assert post-conditions.
@@ -191,8 +191,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         gatewayDiamond.checkpointer().commitCheckpoint(batch);
     }
 
-    // Call a smart contract in the parent through a smart contract and with
-    // an ERC20 token supply.
+    // Call a smart contract in the parent through a smart contract.
     function test_childToParentCall() public {
         Subnet memory subnet = createTokenSubnet(address(token));
 
@@ -233,7 +232,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         vm.prank(address(saDiamond));
         vm.expectCall(recipient, abi.encodeCall(IIpcHandler.handleIpcMessage, (msgs[0])), 1);
         gatewayDiamond.checkpointer().commitCheckpoint(batch);
-        assertEq(token.balanceOf(recipient), 8);
+        assertEq(token.balanceOf(recipient), 0);
     }
 
     function test_propagation() public {

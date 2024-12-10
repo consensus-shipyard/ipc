@@ -8,10 +8,10 @@ use std::time::Duration;
 
 use ethers_contract::{ContractError, EthLogDecode, LogMeta};
 use ipc_actors_abis::{
-    checkpointing_facet, gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
-    lib_gateway, lib_quorum, lib_staking_change_log, register_subnet_facet,
-    subnet_actor_activity_facet, subnet_actor_checkpointing_facet, subnet_actor_getter_facet,
-    subnet_actor_manager_facet, subnet_actor_reward_facet,
+    checkpointing_facet, gateway_getter_facet, gateway_manager_facet, lib_gateway, lib_quorum,
+    lib_staking_change_log, register_subnet_facet, subnet_actor_activity_facet,
+    subnet_actor_checkpointing_facet, subnet_actor_getter_facet, subnet_actor_manager_facet,
+    subnet_actor_reward_facet,
 };
 use ipc_api::evm::{fil_to_eth_amount, payload_to_evm_address, subnet_id_to_evm_addresses};
 use ipc_api::validator::from_contract_validators;
@@ -671,42 +671,6 @@ impl SubnetManager for EthSubnetManager {
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
         block_number_from_receipt(receipt)
-    }
-
-    /// Propagate the postbox message key. The key should be `bytes32`.
-    async fn propagate(
-        &self,
-        _subnet: SubnetID,
-        gateway_addr: Address,
-        from: Address,
-        postbox_msg_key: Vec<u8>,
-    ) -> Result<()> {
-        if postbox_msg_key.len() != 32 {
-            return Err(anyhow!(
-                "invalid message cid length, expect 32 but found {}",
-                postbox_msg_key.len()
-            ));
-        }
-
-        self.ensure_same_gateway(&gateway_addr)?;
-
-        tracing::info!("propagate postbox evm gateway contract: {gateway_addr:} with message key: {postbox_msg_key:?}");
-
-        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
-        let gateway_contract = gateway_messenger_facet::GatewayMessengerFacet::new(
-            self.ipc_contract_info.gateway_addr,
-            signer.clone(),
-        );
-
-        let mut key = [0u8; 32];
-        key.copy_from_slice(&postbox_msg_key);
-
-        extend_call_with_pending_block(gateway_contract.propagate(key))
-            .await?
-            .send()
-            .await?;
-
-        Ok(())
     }
 
     /// Send value between two addresses in a subnet
