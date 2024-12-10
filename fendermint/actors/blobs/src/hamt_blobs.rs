@@ -9,6 +9,8 @@ use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::*;
 use hoku_ipld::map::{Map, DEFAULT_HAMT_CONFIG};
 
+pub type BlobMap<BS> = Map<BS, Hash, Blob>;
+
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct HamtBlobsRoot {
     cid: Cid,
@@ -19,14 +21,14 @@ impl HamtBlobsRoot {
         HamtBlobs::load(store, &self.cid)
     }
 
-    pub fn flush_empty<'a, BS: Blockstore>(store: BS) -> Result<Self, ActorError> {
-        let cid = Map::<BS, Hash, Blob>::flush_empty(store, DEFAULT_HAMT_CONFIG)?;
+    pub fn flush_empty<BS: Blockstore>(store: BS) -> Result<Self, ActorError> {
+        let cid = BlobMap::flush_empty(store, DEFAULT_HAMT_CONFIG)?;
         Ok(Self { cid })
     }
 }
 
 pub struct HamtBlobs<BS: Blockstore> {
-    pub map: Map<BS, Hash, Blob>
+    pub map: BlobMap<BS>,
 }
 
 impl<BS> HamtBlobs<BS>
@@ -34,11 +36,11 @@ where
     BS: Blockstore,
 {
     pub fn flush_empty(store: BS) -> Result<Cid, ActorError> {
-        Map::<BS, Hash, Blob>::flush_empty(store, DEFAULT_HAMT_CONFIG)
+        BlobMap::flush_empty(store, DEFAULT_HAMT_CONFIG)
     }
 
     pub fn load(store: BS, root: &Cid) -> Result<Self, ActorError> {
-        let map = Map::<BS, Hash, Blob>::load(store, root, DEFAULT_HAMT_CONFIG, "blobs")?;
+        let map = BlobMap::load(store, root, DEFAULT_HAMT_CONFIG, "blobs")?;
         Ok(Self { map })
     }
 

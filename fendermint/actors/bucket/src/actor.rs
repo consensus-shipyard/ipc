@@ -148,12 +148,15 @@ fn build_object(
 ) -> anyhow::Result<Option<Object>, ActorError> {
     match blob.status {
         BlobStatus::Resolved => {
-            let group = blob.subscribers.get(&subscriber).ok_or_else(|| {
-                ActorError::illegal_state(format!(
-                    "object store {} is not subscribed to blob {}; this should not happen",
-                    object_state.hash, subscriber,
-                ))
-            })?;
+            let group = blob
+                .subscribers
+                .get(&subscriber.to_string())
+                .ok_or_else(|| {
+                    ActorError::illegal_state(format!(
+                        "object store {} is not subscribed to blob {}; this should not happen",
+                        object_state.hash, subscriber,
+                    ))
+                })?;
             let id = SubscriptionId::from(object_key);
             let (expiry, _) = group.max_expiries(&id, None);
             if let Some(expiry) = expiry {
@@ -729,10 +732,10 @@ mod tests {
         let blob = Blob {
             size: add_params.size,
             subscribers: HashMap::from([(
-                f4_eth_addr,
+                f4_eth_addr.to_string(),
                 SubscriptionGroup {
                     subscriptions: HashMap::from([(
-                        sub_id,
+                        sub_id.to_string(),
                         Subscription {
                             added: 0,
                             expiry: ttl,

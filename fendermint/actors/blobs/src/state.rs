@@ -29,8 +29,6 @@ const MIN_TTL: ChainEpoch = 3600; // one hour
 /// The rolling epoch duration used for non-expiring blobs.
 const AUTO_TTL: ChainEpoch = 3600; // one hour
 
-// pub type BlobMap<'a, BS> = Map<BS, Hash, Blob>;
-
 /// The state represents all accounts and stored blobs.
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct State {
@@ -48,18 +46,16 @@ pub struct State {
     /// The byte-blocks per atto token rate set at genesis.
     /// TODO: Remove this in favor of the value in the hoku config actor
     pub blob_credits_per_byte_block: u64,
-    /// Map containing all accounts by robust (non-ID) actor address.
-
-    /// Map containing all blobs.
-    // pub blobs: HashMap<Hash, Blob>,
     /// Map of expiries to blob hashes.
     pub expiries: BTreeMap<ChainEpoch, HashMap<Address, HashMap<ExpiryKey, bool>>>,
     /// Map of currently added blob hashes to account and source Iroh node IDs.
     pub added: BTreeMap<Hash, HashSet<(Address, SubscriptionId, PublicKey)>>,
     /// Map of currently pending blob hashes to account and source Iroh node IDs.
     pub pending: BTreeMap<Hash, HashSet<(Address, SubscriptionId, PublicKey)>>,
+    /// HAMT containing all accounts keyed by robust (non-ID) actor address.
     pub accounts_root: Cid,
-    pub blobs_root: HamtBlobsRoot
+    /// HAMT containing all blobs keyed by blob hash.
+    pub blobs_root: HamtBlobsRoot,
 }
 
 /// Key used to namespace subscriptions in the expiry index.
@@ -124,7 +120,6 @@ impl State {
             credit_committed: BigInt::zero(),
             credit_debited: BigInt::zero(),
             blob_credits_per_byte_block,
-            // blobs: HashMap::new(),
             expiries: BTreeMap::new(),
             added: BTreeMap::new(),
             pending: BTreeMap::new(),
@@ -579,12 +574,10 @@ impl State {
         let credit_required: BigInt;
         // Like cashback but for sending unspent tokens back
         let tokens_unspent: TokenAmount;
-
-
+        // Get or create a new blob
         let blobs = &mut self.blobs_root.load(store)?;
-
         let (sub, blob) = if let Some(mut blob) = blobs.get(&hash)? {
-            let sub = if let Some(group) = blob.subscribers.get_mut(&subscriber) {
+            let sub = if let Some(group) = blob.subscribers.get_mut(&subscriber.to_string()) {
                 let (group_expiry, new_group_expiry) = group.max_expiries(&id, Some(expiry));
                 // If the subscriber has been debited after the group's max expiry, we need to
                 // clean up the accounting with a refund.
@@ -625,7 +618,7 @@ impl State {
                     current_epoch,
                     &delegation,
                 )?;
-                if let Some(sub) = group.subscriptions.get_mut(&id) {
+                if let Some(sub) = group.subscriptions.get_mut(&id.to_string()) {
                     // Update expiry index
                     if expiry != sub.expiry {
                         update_expiry_index(
@@ -658,7 +651,9 @@ impl State {
                         delegate: delegation.as_ref().map(|d| d.addresses()),
                         failed: false,
                     };
-                    group.subscriptions.insert(id.clone(), sub.clone());
+                    group
+                        .subscriptions
+                        .insert(id.clone().to_string(), sub.clone());
                     debug!(
                         "created new subscription to blob {} for {} (key: {})",
                         hash, subscriber, id
@@ -700,9 +695,9 @@ impl State {
                     failed: false,
                 };
                 blob.subscribers.insert(
-                    subscriber,
+                    subscriber.to_string(),
                     SubscriptionGroup {
-                        subscriptions: HashMap::from([(id.clone(), sub.clone())]),
+                        subscriptions: HashMap::from([(id.clone().to_string(), sub.clone())]),
                     },
                 );
                 debug!(
@@ -768,9 +763,9 @@ impl State {
                 size: size.to_u64().unwrap(),
                 metadata_hash,
                 subscribers: HashMap::from([(
-                    subscriber,
+                    subscriber.to_string(),
                     SubscriptionGroup {
-                        subscriptions: HashMap::from([(id.clone(), sub.clone())]),
+                        subscriptions: HashMap::from([(id.clone().to_string(), sub.clone())]),
                     },
                 )]),
                 status: BlobStatus::Added,
@@ -845,8 +840,7 @@ impl State {
         let mut account = accounts.get_or_create(&subscriber, current_epoch)?;
         // Get the blob
         let blobs = &mut self.blobs_root.load(store)?;
-        let mut blob = blobs
-            .get_or_err(&hash)?;
+        let mut blob = blobs.get_or_err(&hash)?;
         if matches!(blob.status, BlobStatus::Failed) {
             // Do not renew failed blobs.
             return Err(ActorError::illegal_state(format!(
@@ -854,13 +848,13 @@ impl State {
                 hash
             )));
         }
-        let group = blob
-            .subscribers
-            .get_mut(&subscriber)
-            .ok_or(ActorError::forbidden(format!(
-                "subscriber {} is not subscribed to blob {}",
-                subscriber, hash
-            )))?;
+        let group =
+            blob.subscribers
+                .get_mut(&subscriber.to_string())
+                .ok_or(ActorError::forbidden(format!(
+                    "subscriber {} is not subscribed to blob {}",
+                    subscriber, hash
+                )))?;
         // Renewal must begin at the current epoch to avoid potential issues with auto-renewal.
         // Simply adding TTL to the current max expiry could result in an expiry date that's not
         // truly in the future, depending on how frequently auto-renewal occurs.
@@ -869,7 +863,7 @@ impl State {
         let (group_expiry, new_group_expiry) = group.max_expiries(&id, Some(expiry));
         let sub = group
             .subscriptions
-            .get_mut(&id)
+            .get_mut(&id.to_string())
             .ok_or(ActorError::not_found(format!(
                 "subscription id {} not found",
                 id.clone()
@@ -949,14 +943,18 @@ impl State {
         }
         // Save account
         self.accounts_root = accounts.set_and_flush(&subscriber, account.clone())?;
-        // Seve blobs
+        // Save blob
         self.blobs_root = blobs.set_and_flush(&hash, blob)?;
 
         debug!("committed {} credits from {}", credit_required, subscriber);
         Ok(account)
     }
 
-    pub fn get_blob<BS: Blockstore>(&self,  store: &BS, hash: Hash) -> anyhow::Result<Option<Blob>, ActorError> {
+    pub fn get_blob<BS: Blockstore>(
+        &self,
+        store: &BS,
+        hash: Hash,
+    ) -> anyhow::Result<Option<Blob>, ActorError> {
         let blobs = self.blobs_root.load(store)?;
         blobs.get(&hash)
     }
@@ -968,12 +966,18 @@ impl State {
         hash: Hash,
         id: SubscriptionId,
     ) -> Option<BlobStatus> {
-        let blob = self.blobs_root.load(store).ok().and_then(|blobs| blobs.get(&hash).ok()).flatten();
-        if blob.is_none() {
+        let blob = self
+            .blobs_root
+            .load(store)
+            .ok()
+            .and_then(|blobs| blobs.get(&hash).ok())
+            .flatten();
+        let blob = if let Some(blob) = blob {
+            blob
+        } else {
             return None;
-        }
-        let blob = blob.unwrap();
-        if blob.subscribers.contains_key(&subscriber) {
+        };
+        if blob.subscribers.contains_key(&subscriber.to_string()) {
             match blob.status {
                 BlobStatus::Added => Some(BlobStatus::Added),
                 BlobStatus::Pending => Some(BlobStatus::Pending),
@@ -984,10 +988,10 @@ impl State {
                     // We need to see if this specific subscription failed.
                     if let Some(sub) = blob
                         .subscribers
-                        .get(&subscriber)
+                        .get(&subscriber.to_string())
                         .unwrap() // safe here
                         .subscriptions
-                        .get(&id)
+                        .get(&id.to_string())
                     {
                         if sub.failed {
                             Some(BlobStatus::Failed)
@@ -1044,12 +1048,13 @@ impl State {
             return Ok(());
         };
         blob.status = BlobStatus::Pending;
-        self.blobs_root = blobs.set_and_flush(&hash, blob)?;
         // Add to pending
         self.pending
             .insert(hash, HashSet::from([(subscriber, id, source)]));
         // Remove from added
         self.added.remove(&hash);
+        // Save blob
+        self.blobs_root = blobs.set_and_flush(&hash, blob)?;
         Ok(())
     }
 
@@ -1090,20 +1095,20 @@ impl State {
             // We can ignore later finalizations, even if they are failed.
             return Ok(());
         }
-        let group = blob
-            .subscribers
-            .get_mut(&subscriber)
-            .ok_or(ActorError::forbidden(format!(
-                "subscriber {} is not subscribed to blob {}",
-                subscriber, hash
-            )))?;
+        let group =
+            blob.subscribers
+                .get_mut(&subscriber.to_string())
+                .ok_or(ActorError::forbidden(format!(
+                    "subscriber {} is not subscribed to blob {}",
+                    subscriber, hash
+                )))?;
         // Get max expiries with the current subscription removed in case we need them below.
         // We have to do this here to avoid breaking borrow rules.
         let (group_expiry, new_group_expiry) = group.max_expiries(&id, Some(0));
         let (sub_is_min_added, next_min_added) = group.is_min_added(&id)?;
         let sub = group
             .subscriptions
-            .get_mut(&id)
+            .get_mut(&id.to_string())
             .ok_or(ActorError::not_found(format!(
                 "subscription id {} not found",
                 id.clone()
@@ -1179,6 +1184,7 @@ impl State {
         }
         // Save account
         self.accounts_root = accounts.set_and_flush(&subscriber, account)?;
+        // Save blob
         self.blobs_root = blobs.set_and_flush(&hash, blob)?;
         Ok(())
     }
@@ -1199,7 +1205,6 @@ impl State {
         let mut account = accounts.get_or_create(&subscriber, current_epoch)?;
         // Get the blob
         let mut blobs = self.blobs_root.load(store)?;
-
         let mut blob = if let Some(blob) = blobs.get(&hash)? {
             blob
         } else {
@@ -1213,17 +1218,17 @@ impl State {
             return Ok(false);
         };
         let num_subscribers = blob.subscribers.len();
-        let group = blob
-            .subscribers
-            .get_mut(&subscriber)
-            .ok_or(ActorError::forbidden(format!(
-                "subscriber {} is not subscribed to blob {}",
-                subscriber, hash
-            )))?;
+        let group =
+            blob.subscribers
+                .get_mut(&subscriber.to_string())
+                .ok_or(ActorError::forbidden(format!(
+                    "subscriber {} is not subscribed to blob {}",
+                    subscriber, hash
+                )))?;
         let (group_expiry, new_group_expiry) = group.max_expiries(&id, Some(0));
         let sub = group
             .subscriptions
-            .get(&id)
+            .get(&id.to_string())
             .ok_or(ActorError::not_found(format!(
                 "subscription id {} not found",
                 id.clone()
@@ -1366,14 +1371,14 @@ impl State {
             }
         }
         // Delete subscription
-        group.subscriptions.remove(&id);
+        group.subscriptions.remove(&id.to_string());
         debug!(
             "deleted subscription to blob {} for {} (key: {})",
             hash, subscriber, id
         );
         // Delete the group if empty
         let delete_blob = if group.subscriptions.is_empty() {
-            blob.subscribers.remove(&subscriber);
+            blob.subscribers.remove(&subscriber.to_string());
             debug!("deleted subscriber {} to blob {}", subscriber, hash);
             // Delete or update blob
             let delete_blob = blob.subscribers.is_empty();
@@ -2011,7 +2016,7 @@ mod tests {
         assert!(res.is_ok());
 
         // Set to status pending
-        let res = state.set_blob_pending(subscriber, hash, id1.clone(), source);
+        let res = state.set_blob_pending(&store, subscriber, hash, id1.clone(), source);
         assert!(res.is_ok());
 
         // Finalize as resolved
@@ -2037,7 +2042,7 @@ mod tests {
         // Add the same blob but this time uses a different subscription ID
         let add2_epoch = ChainEpoch::from(21);
         let ttl2 = ChainEpoch::from(MIN_TTL);
-        let id2 = SubscriptionId::Key(b"foo".to_vec());
+        let id2 = SubscriptionId::Key("foo".into());
         let source = new_pk();
         let res = state.add_blob(
             &store,
@@ -2067,8 +2072,8 @@ mod tests {
         assert_eq!(account.capacity_used, BigInt::from(size)); // not changed
 
         // Check the subscription group
-        let blob = state.get_blob(hash).unwrap();
-        let group = blob.subscribers.get(&subscriber).unwrap();
+        let blob = state.get_blob(&store, hash).unwrap().unwrap();
+        let group = blob.subscribers.get(&subscriber.to_string()).unwrap();
         assert_eq!(group.subscriptions.len(), 2);
 
         // Debit all accounts at an epoch between the two expiries (3601-3621)
@@ -2087,8 +2092,8 @@ mod tests {
         assert_eq!(account.capacity_used, BigInt::from(size)); // not changed
 
         // Check the subscription group
-        let blob = state.get_blob(hash).unwrap();
-        let group = blob.subscribers.get(&subscriber).unwrap();
+        let blob = state.get_blob(&store, hash).unwrap().unwrap();
+        let group = blob.subscribers.get(&subscriber.to_string()).unwrap();
         assert_eq!(group.subscriptions.len(), 1); // the first subscription was deleted
 
         // Debit all accounts at an epoch greater than group expiry (3621)
@@ -2225,7 +2230,7 @@ mod tests {
         // Add another blob past the first blob's expiry
         let (hash2, size2) = new_hash(2048);
         let add2_epoch = ChainEpoch::from(MIN_TTL + 11);
-        let id2 = SubscriptionId::Key(b"foo".to_vec());
+        let id2 = SubscriptionId::Key("foo".into());
         let source = new_pk();
         let res = state.add_blob(
             &store,
@@ -2454,20 +2459,20 @@ mod tests {
 
         // Check the blob status
         assert_eq!(
-            state.get_blob_status(subscriber, hash, id1.clone()),
+            state.get_blob_status(&store, subscriber, hash, id1.clone()),
             Some(BlobStatus::Added)
         );
 
         // Check the blob
-        let blob = state.get_blob(hash).unwrap();
+        let blob = state.get_blob(&store, hash).unwrap().unwrap();
         assert_eq!(blob.subscribers.len(), 1);
         assert_eq!(blob.status, BlobStatus::Added);
         assert_eq!(blob.size, size);
 
         // Check the subscription group
-        let group = blob.subscribers.get(&subscriber).unwrap();
+        let group = blob.subscribers.get(&subscriber.to_string()).unwrap();
         assert_eq!(group.subscriptions.len(), 1);
-        let got_sub = group.subscriptions.get(&id1.clone()).unwrap();
+        let got_sub = group.subscriptions.get(&id1.clone().to_string()).unwrap();
         assert_eq!(*got_sub, sub);
 
         // Check the account balance
@@ -2482,7 +2487,7 @@ mod tests {
         assert_eq!(account.capacity_used, BigInt::from(size));
 
         // Set to status pending
-        let res = state.set_blob_pending(subscriber, hash, id1.clone(), source);
+        let res = state.set_blob_pending(&store, subscriber, hash, id1.clone(), source);
         assert!(res.is_ok());
 
         // Finalize as resolved
@@ -2497,7 +2502,7 @@ mod tests {
         );
         assert!(res.is_ok());
         assert_eq!(
-            state.get_blob_status(subscriber, hash, id1.clone()),
+            state.get_blob_status(&store, subscriber, hash, id1.clone()),
             Some(BlobStatus::Resolved)
         );
 
@@ -2532,20 +2537,20 @@ mod tests {
         // Check the blob status
         // Should already be resolved
         assert_eq!(
-            state.get_blob_status(subscriber, hash, id1.clone()),
+            state.get_blob_status(&store, subscriber, hash, id1.clone()),
             Some(BlobStatus::Resolved)
         );
 
         // Check the blob
-        let blob = state.get_blob(hash).unwrap();
+        let blob = state.get_blob(&store, hash).unwrap().unwrap();
         assert_eq!(blob.subscribers.len(), 1);
         assert_eq!(blob.status, BlobStatus::Resolved);
         assert_eq!(blob.size, size);
 
         // Check the subscription group
-        let group = blob.subscribers.get(&subscriber).unwrap();
+        let group = blob.subscribers.get(&subscriber.to_string()).unwrap();
         assert_eq!(group.subscriptions.len(), 1); // Still only one subscription
-        let got_sub = group.subscriptions.get(&id1.clone()).unwrap();
+        let got_sub = group.subscriptions.get(&id1.clone().to_string()).unwrap();
         assert_eq!(*got_sub, sub);
 
         // Check the account balance
@@ -2561,7 +2566,7 @@ mod tests {
 
         // Add the same blob again but use a different subscription ID
         let add3_epoch = ChainEpoch::from(31);
-        let id2 = SubscriptionId::Key(b"foo".to_vec());
+        let id2 = SubscriptionId::Key("foo".into());
         let source = new_pk();
         let res = state.add_blob(
             &store,
@@ -2591,20 +2596,20 @@ mod tests {
         // Check the blob status
         // Should already be resolved
         assert_eq!(
-            state.get_blob_status(subscriber, hash, id2.clone()),
+            state.get_blob_status(&store, subscriber, hash, id2.clone()),
             Some(BlobStatus::Resolved)
         );
 
         // Check the blob
-        let blob = state.get_blob(hash).unwrap();
+        let blob = state.get_blob(&store, hash).unwrap().unwrap();
         assert_eq!(blob.subscribers.len(), 1); // still only one subscriber
         assert_eq!(blob.status, BlobStatus::Resolved);
         assert_eq!(blob.size, size);
 
         // Check the subscription group
-        let group = blob.subscribers.get(&subscriber).unwrap();
+        let group = blob.subscribers.get(&subscriber.to_string()).unwrap();
         assert_eq!(group.subscriptions.len(), 2);
-        let got_sub = group.subscriptions.get(&id2.clone()).unwrap();
+        let got_sub = group.subscriptions.get(&id2.clone().to_string()).unwrap();
         assert_eq!(*got_sub, sub);
 
         // Check the account balance
@@ -2654,15 +2659,15 @@ mod tests {
         assert!(!delete_from_disk);
 
         // Check the blob
-        let blob = state.get_blob(hash).unwrap();
+        let blob = state.get_blob(&store, hash).unwrap().unwrap();
         assert_eq!(blob.subscribers.len(), 1); // still one subscriber
         assert_eq!(blob.status, BlobStatus::Resolved);
         assert_eq!(blob.size, size);
 
         // Check the subscription group
-        let group = blob.subscribers.get(&subscriber).unwrap();
+        let group = blob.subscribers.get(&subscriber.to_string()).unwrap();
         assert_eq!(group.subscriptions.len(), 1);
-        let sub = group.subscriptions.get(&id2.clone()).unwrap();
+        let sub = group.subscriptions.get(&id2.clone().to_string()).unwrap();
         assert_eq!(sub.added, add3_epoch);
         assert_eq!(sub.expiry, add3_epoch + AUTO_TTL);
 
@@ -2745,7 +2750,7 @@ mod tests {
         assert_eq!(account.capacity_used, BigInt::from(size));
 
         // Set to status pending
-        let res = state.set_blob_pending(subscriber, hash, SubscriptionId::Default, source);
+        let res = state.set_blob_pending(&store, subscriber, hash, SubscriptionId::Default, source);
         assert!(res.is_ok());
 
         // Finalize as resolved
@@ -2845,7 +2850,7 @@ mod tests {
         // Add another blob past the first blob's expiry
         let (hash2, size2) = new_hash(2048);
         let add2_epoch = ChainEpoch::from(AUTO_TTL + 11);
-        let id2 = SubscriptionId::Key(b"foo".to_vec());
+        let id2 = SubscriptionId::Key("foo".into());
         let source = new_pk();
         let res = state.add_blob(
             &store,
@@ -3005,7 +3010,7 @@ mod tests {
         assert!(res.is_ok());
 
         // Set to status pending
-        let res = state.set_blob_pending(subscriber, hash, SubscriptionId::Default, source);
+        let res = state.set_blob_pending(&store, subscriber, hash, SubscriptionId::Default, source);
         assert!(res.is_ok());
 
         // Finalize as resolved
@@ -3022,7 +3027,7 @@ mod tests {
 
         // Check status
         let status = state
-            .get_blob_status(subscriber, hash, SubscriptionId::Default)
+            .get_blob_status(&store, subscriber, hash, SubscriptionId::Default)
             .unwrap();
         assert!(matches!(status, BlobStatus::Resolved));
 
@@ -3067,7 +3072,7 @@ mod tests {
         assert!(res.is_ok());
 
         // Set to status pending
-        let res = state.set_blob_pending(subscriber, hash, SubscriptionId::Default, source);
+        let res = state.set_blob_pending(&store, subscriber, hash, SubscriptionId::Default, source);
         assert!(res.is_ok());
 
         // Finalize as failed
@@ -3084,7 +3089,7 @@ mod tests {
 
         // Check status
         let status = state
-            .get_blob_status(subscriber, hash, SubscriptionId::Default)
+            .get_blob_status(&store, subscriber, hash, SubscriptionId::Default)
             .unwrap();
         assert!(matches!(status, BlobStatus::Failed));
 
@@ -3180,7 +3185,7 @@ mod tests {
         assert_eq!(state.capacity_used, account.capacity_used);
 
         // Set to status pending
-        let res = state.set_blob_pending(subscriber, hash, SubscriptionId::Default, source);
+        let res = state.set_blob_pending(&store, subscriber, hash, SubscriptionId::Default, source);
         assert!(res.is_ok());
 
         // Finalize as failed
@@ -3197,7 +3202,7 @@ mod tests {
 
         // Check status
         let status = state
-            .get_blob_status(subscriber, hash, SubscriptionId::Default)
+            .get_blob_status(&store, subscriber, hash, SubscriptionId::Default)
             .unwrap();
         assert!(matches!(status, BlobStatus::Failed));
 

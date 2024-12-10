@@ -188,8 +188,10 @@ impl BlobsActor {
                 };
             }
         };
-        rt.state::<State>()?
-            .get_credit_allowance(rt.store(), from, rt.curr_epoch())
+        let allowance =
+            rt.state::<State>()?
+                .get_credit_allowance(rt.store(), from, rt.curr_epoch())?;
+        Ok(allowance)
     }
 
     fn debit_accounts(rt: &impl Runtime) -> Result<(), ActorError> {
@@ -247,9 +249,12 @@ impl BlobsActor {
         params: GetBlobStatusParams,
     ) -> Result<Option<BlobStatus>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let status =
-            rt.state::<State>()?
-                .get_blob_status(rt.store(), params.subscriber, params.hash, params.id);
+        let status = rt.state::<State>()?.get_blob_status(
+            rt.store(),
+            params.subscriber,
+            params.hash,
+            params.id,
+        );
         Ok(status)
     }
 
@@ -275,8 +280,14 @@ impl BlobsActor {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         // We control this method call and can guarantee subscriber is an external address,
         // i.e., no need to resolve its external address.
-        rt.transaction(|st: &mut State, _| {
-            st.set_blob_pending(rt.store(), params.subscriber, params.hash, params.id, params.source)
+        rt.transaction(|st: &mut State, rt| {
+            st.set_blob_pending(
+                rt.store(),
+                params.subscriber,
+                params.hash,
+                params.id,
+                params.source,
+            )
         })
     }
 
