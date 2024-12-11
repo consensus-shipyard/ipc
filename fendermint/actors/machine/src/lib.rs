@@ -198,11 +198,6 @@ pub trait MachineActor {
         })
     }
 
-    /// Ensures that immediate caller is allowed to write to the machine.
-    fn ensure_write_allowed(rt: &impl Runtime) -> Result<(), ActorError> {
-        Ok(())
-    }
-
     fn fallback(
         rt: &impl Runtime,
         method: MethodNum,
