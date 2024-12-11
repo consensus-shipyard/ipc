@@ -1105,11 +1105,14 @@ where
         }
 
         // Get pending blobs count and bytes count to emit metrics
-        let stats = get_blobs_stats(&mut state)?;
-        ipc_observability::emit(BlobsFinalityPendingBlobs(stats.num_resolving));
-        ipc_observability::emit(BlobsFinalityPendingBytes(stats.bytes_resolving));
-        ipc_observability::emit(BlobsFinalityAddedBlobs(stats.num_added));
-        ipc_observability::emit(BlobsFinalityAddedBytes(stats.bytes_added));
+        // Only emit metrics every 10 blocks
+        if state.block_height() % 10 == 0 {
+            let stats = get_blobs_stats(&mut state)?;
+            ipc_observability::emit(BlobsFinalityPendingBlobs(stats.num_resolving));
+            ipc_observability::emit(BlobsFinalityPendingBytes(stats.bytes_resolving));
+            ipc_observability::emit(BlobsFinalityAddedBlobs(stats.num_added));
+            ipc_observability::emit(BlobsFinalityAddedBytes(stats.bytes_added));
+        }
 
         Ok(((env, state), out))
     }
