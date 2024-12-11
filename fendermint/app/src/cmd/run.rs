@@ -373,6 +373,7 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
             blob_concurrency: settings.blob_concurrency,
             read_request_pool,
             read_request_concurrency: settings.read_request_concurrency,
+            blob_metrics_interval: settings.blob_metrics_interval,
         },
         snapshots,
         tendermint_client.clone(),

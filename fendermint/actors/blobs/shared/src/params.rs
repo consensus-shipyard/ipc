@@ -178,6 +178,15 @@ pub struct DeleteBlobParams {
     pub id: SubscriptionId,
 }
 
+/// Params for overwriting a blob, i.e. deleting one and adding another.
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct OverwriteBlobParams {
+    /// Blake3 hash of the blob to be deleted.
+    pub old_hash: Hash,
+    /// Params for a new blob to add.
+    pub add: AddBlobParams,
+}
+
 /// Params for setting a TTL status for an account.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct SetAccountBlobTtlStatusParams {

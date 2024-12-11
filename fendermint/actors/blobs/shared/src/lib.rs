@@ -44,6 +44,7 @@ pub enum Method {
     SetBlobPending = frc42_dispatch::method_hash!("SetBlobPending"),
     FinalizeBlob = frc42_dispatch::method_hash!("FinalizeBlob"),
     DeleteBlob = frc42_dispatch::method_hash!("DeleteBlob"),
+    OverwriteBlob = frc42_dispatch::method_hash!("OverwriteBlob"),
     SetAccountBlobTtlStatus = frc42_dispatch::method_hash!("SetAccountBlobTtlStatus"),
 }
 
@@ -117,11 +118,11 @@ pub fn revoke_credit(
 #[allow(clippy::too_many_arguments)]
 pub fn add_blob(
     rt: &impl Runtime,
+    sub_id: state::SubscriptionId,
+    hash: state::Hash,
     sponsor: Option<Address>,
     source: state::PublicKey,
-    hash: state::Hash,
     metadata_hash: state::Hash,
-    id: state::SubscriptionId,
     size: u64,
     ttl: Option<ChainEpoch>,
 ) -> Result<Subscription, ActorError> {
@@ -130,7 +131,7 @@ pub fn add_blob(
         source,
         hash,
         metadata_hash,
-        id,
+        id: sub_id,
         size,
         ttl,
     })?;
@@ -155,15 +156,51 @@ pub fn get_blob(rt: &impl Runtime, hash: state::Hash) -> Result<Option<state::Bl
 
 pub fn delete_blob(
     rt: &impl Runtime,
-    sponsor: Option<Address>,
+    sub_id: state::SubscriptionId,
     hash: state::Hash,
-    id: state::SubscriptionId,
+    sponsor: Option<Address>,
 ) -> Result<(), ActorError> {
     extract_send_result(rt.send_simple(
         &BLOBS_ACTOR_ADDR,
         Method::DeleteBlob as MethodNum,
-        IpldBlock::serialize_cbor(&params::DeleteBlobParams { sponsor, hash, id })?,
+        IpldBlock::serialize_cbor(&params::DeleteBlobParams {
+            sponsor,
+            hash,
+            id: sub_id,
+        })?,
         rt.message().value_received(),
     ))?;
     Ok(())
+}
+
+/// Overwrite a blob, i.e. delete one, and add another in a single call.
+#[allow(clippy::too_many_arguments)]
+pub fn overwrite_blob(
+    rt: &impl Runtime,
+    old_hash: state::Hash,
+    sub_id: state::SubscriptionId,
+    hash: state::Hash,
+    sponsor: Option<Address>,
+    source: state::PublicKey,
+    metadata_hash: state::Hash,
+    size: u64,
+    ttl: Option<ChainEpoch>,
+) -> Result<Subscription, ActorError> {
+    deserialize_block(extract_send_result(rt.send_simple(
+        &BLOBS_ACTOR_ADDR,
+        Method::OverwriteBlob as MethodNum,
+        IpldBlock::serialize_cbor(&params::OverwriteBlobParams {
+            old_hash,
+            add: params::AddBlobParams {
+                sponsor,
+                id: sub_id,
+                source,
+                hash,
+                metadata_hash,
+                size,
+                ttl,
+            },
+        })?,
+        rt.message().value_received(),
+    ))?)
 }
