@@ -331,7 +331,7 @@ pub fn emit_trace_if_check_checkpoint_finalized<DB>(
 where
     DB: Blockstore + Clone,
 {
-    if !gateway.is_root(state)? {
+    if !gateway.is_anchored(state)? {
         return Ok(());
     }
 

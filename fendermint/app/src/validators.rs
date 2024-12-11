@@ -1,8 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-//! Tracks the validator ID from Tendermint to their corresponding public key.
-
 use anyhow::{anyhow, Ok, Result};
 use fendermint_crypto::PublicKey;
 use fendermint_vm_interpreter::fvm::state::ipc::GatewayCaller;
@@ -15,6 +13,7 @@ use tendermint::PublicKey as TendermintPubKey;
 use fvm_ipld_blockstore::Blockstore;
 
 #[derive(Clone)]
+// Tracks the validator ID from Tendermint to their corresponding public key.
 pub(crate) struct ValidatorCache {
     map: HashMap<TendermintId, PublicKey>,
 }

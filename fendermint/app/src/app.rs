@@ -419,7 +419,7 @@ where
     }
 
     /// Replaces the current validators cache with a new one.
-    async fn replace_validators_cache(&self) -> Result<()> {
+    async fn refresh_validators_cache(&self) -> Result<()> {
         let mut state = self
             .read_only_view(None)?
             .ok_or_else(|| anyhow!("exec state should be present"))?;
@@ -862,7 +862,7 @@ where
 
         // Replace the validator cache if the validator set has changed.
         if !validator_updates.is_empty() {
-            self.replace_validators_cache().await?;
+            self.refresh_validators_cache().await?;
         }
 
         // Maybe update the app state with the new block gas limit.

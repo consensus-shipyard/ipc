@@ -80,7 +80,7 @@ impl<DB> GatewayCaller<DB> {
 
 impl<DB: Blockstore + Clone> GatewayCaller<DB> {
     /// Return true if the current subnet is the root subnet.
-    pub fn is_root(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<bool> {
+    pub fn is_anchored(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<bool> {
         self.subnet_id(state).map(|id| id.route.is_empty())
     }
 
