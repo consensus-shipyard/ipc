@@ -153,7 +153,7 @@ pub mod tests {
     use rand::{rngs::StdRng, SeedableRng};
 
     use crate::conv::{
-        from_eth::to_fvm_message,
+        from_eth::fvm_message_from_eip1559,
         tests::{EthMessage, KeyPair},
     };
 
@@ -212,7 +212,7 @@ pub mod tests {
         let msg0 = msg.0;
         let tx = to_eth_transaction_request(&msg0, &chain_id)
             .expect("to_eth_transaction_request failed");
-        let msg1 = to_fvm_message(&tx).expect("to_fvm_message failed");
+        let msg1 = fvm_message_from_eip1559(&tx).expect("to_fvm_message failed");
 
         assert_eq!(msg1, msg0)
     }
@@ -242,7 +242,7 @@ pub mod tests {
             .expect("failed to decode RLP as signed TypedTransaction");
 
         let tx1 = tx1.as_eip1559_ref().expect("not an eip1559 transaction");
-        let msg1 = to_fvm_message(tx1).expect("to_fvm_message failed");
+        let msg1 = fvm_message_from_eip1559(tx1).expect("to_fvm_message failed");
 
         let signed = SignedMessage {
             message: msg1,

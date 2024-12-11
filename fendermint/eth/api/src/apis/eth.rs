@@ -633,7 +633,7 @@ where
         data.tx_cache.insert(msghash, tx);
     }
 
-    let msg = to_fvm_message(tx, false)?;
+    let msg = to_fvm_message(tx)?;
     let sender = msg.from;
     let nonce = msg.sequence;
 
@@ -688,7 +688,7 @@ pub async fn call<C>(
 where
     C: Client + Sync + Send,
 {
-    let msg = to_fvm_message(tx.into(), true)?;
+    let msg = to_fvm_message(tx.into())?;
     let is_create = msg.to == EAM_ACTOR_ADDR;
     let height = data.query_height(block_id).await?;
     let response = data.client.call(msg, height).await?;
@@ -737,7 +737,7 @@ where
         EstimateGasParams::Two((tx, block_id)) => (tx, block_id),
     };
 
-    let msg = to_fvm_message(tx.into(), true).context("failed to convert to FVM message")?;
+    let msg = to_fvm_message(tx.into()).context("failed to convert to FVM message")?;
 
     let height = data
         .query_height(block_id)
