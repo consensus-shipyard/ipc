@@ -578,6 +578,7 @@ impl arbitrary::Arbitrary<'_> for StakingState {
 
         let parent_genesis = Genesis {
             chain_name: String::arbitrary(u)?,
+            chain_id: None,
             timestamp: Timestamp(u64::arbitrary(u)?),
             network_version: NetworkVersion::V21,
             base_fee: ArbTokenAmount::arbitrary(u)?.0,
@@ -599,6 +600,7 @@ impl arbitrary::Arbitrary<'_> for StakingState {
 
         let child_genesis = Genesis {
             chain_name: String::arbitrary(u)?,
+            chain_id: None,
             timestamp: Timestamp(u64::arbitrary(u)?),
             network_version: NetworkVersion::V21,
             base_fee: ArbTokenAmount::arbitrary(u)?.0,

@@ -3365,6 +3365,7 @@ dependencies = [
  "fendermint_actor_gas_market_eip1559",
  "fendermint_actor_machine",
  "fendermint_actor_timehub",
+ "fendermint_actors_api",
  "fendermint_app_options",
  "fendermint_app_settings",
  "fendermint_crypto",

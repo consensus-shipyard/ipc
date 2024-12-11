@@ -199,6 +199,7 @@ async fn test_applying_upgrades() {
 
     let genesis = Genesis {
         chain_name: CHAIN_NAME.to_string(),
+        chain_id: None,
         timestamp: Timestamp(0),
         network_version: NetworkVersion::V21,
         base_fee: TokenAmount::zero(),

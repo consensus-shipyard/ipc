@@ -460,6 +460,32 @@ pub mod subnet_actor_getter_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("getActiveValidators"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "getActiveValidators",
+                            ),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
+                                        ::std::boxed::Box::new(
+                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                        ),
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("address[]"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("getActiveValidatorsNumber"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Function {
@@ -720,6 +746,32 @@ pub mod subnet_actor_getter_facet {
                                     ),
                                     internal_type: ::core::option::Option::Some(
                                         ::std::borrow::ToOwned::to_owned("struct ValidatorInfo"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("getWaitingValidators"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "getWaitingValidators",
+                            ),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
+                                        ::std::boxed::Box::new(
+                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                        ),
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("address[]"),
                                     ),
                                 },
                             ],
@@ -1115,6 +1167,17 @@ pub mod subnet_actor_getter_facet {
                 .method_hash([217, 46, 143, 18], ())
                 .expect("method not found (this should never happen)")
         }
+        ///Calls the contract's `getActiveValidators` (0x9de70258) function
+        pub fn get_active_validators(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::std::vec::Vec<::ethers::core::types::Address>,
+        > {
+            self.0
+                .method_hash([157, 231, 2, 88], ())
+                .expect("method not found (this should never happen)")
+        }
         ///Calls the contract's `getActiveValidatorsNumber` (0xc7cda762) function
         pub fn get_active_validators_number(
             &self,
@@ -1195,6 +1258,17 @@ pub mod subnet_actor_getter_facet {
         ) -> ::ethers::contract::builders::ContractCall<M, ValidatorInfo> {
             self.0
                 .method_hash([25, 4, 187, 46], validator_address)
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `getWaitingValidators` (0x6ad04c79) function
+        pub fn get_waiting_validators(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<
+            M,
+            ::std::vec::Vec<::ethers::core::types::Address>,
+        > {
+            self.0
+                .method_hash([106, 208, 76, 121], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `ipcGatewayAddr` (0xcfca2824) function
@@ -1441,6 +1515,19 @@ pub mod subnet_actor_getter_facet {
     )]
     #[ethcall(name = "genesisValidators", abi = "genesisValidators()")]
     pub struct GenesisValidatorsCall;
+    ///Container type for all input parameters for the `getActiveValidators` function with signature `getActiveValidators()` and selector `0x9de70258`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(name = "getActiveValidators", abi = "getActiveValidators()")]
+    pub struct GetActiveValidatorsCall;
     ///Container type for all input parameters for the `getActiveValidatorsNumber` function with signature `getActiveValidatorsNumber()` and selector `0xc7cda762`
     #[derive(
         Clone,
@@ -1586,6 +1673,19 @@ pub mod subnet_actor_getter_facet {
     pub struct GetValidatorCall {
         pub validator_address: ::ethers::core::types::Address,
     }
+    ///Container type for all input parameters for the `getWaitingValidators` function with signature `getWaitingValidators()` and selector `0x6ad04c79`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(name = "getWaitingValidators", abi = "getWaitingValidators()")]
+    pub struct GetWaitingValidatorsCall;
     ///Container type for all input parameters for the `ipcGatewayAddr` function with signature `ipcGatewayAddr()` and selector `0xcfca2824`
     #[derive(
         Clone,
@@ -1750,6 +1850,7 @@ pub mod subnet_actor_getter_facet {
         GenesisBalances(GenesisBalancesCall),
         GenesisCircSupply(GenesisCircSupplyCall),
         GenesisValidators(GenesisValidatorsCall),
+        GetActiveValidators(GetActiveValidatorsCall),
         GetActiveValidatorsNumber(GetActiveValidatorsNumberCall),
         GetBootstrapNodes(GetBootstrapNodesCall),
         GetConfigurationNumbers(GetConfigurationNumbersCall),
@@ -1760,6 +1861,7 @@ pub mod subnet_actor_getter_facet {
         GetTotalValidatorCollateral(GetTotalValidatorCollateralCall),
         GetTotalValidatorsNumber(GetTotalValidatorsNumberCall),
         GetValidator(GetValidatorCall),
+        GetWaitingValidators(GetWaitingValidatorsCall),
         IpcGatewayAddr(IpcGatewayAddrCall),
         IsActiveValidator(IsActiveValidatorCall),
         IsWaitingValidator(IsWaitingValidatorCall),
@@ -1829,6 +1931,11 @@ pub mod subnet_actor_getter_facet {
                 return Ok(Self::GenesisValidators(decoded));
             }
             if let Ok(decoded) =
+                <GetActiveValidatorsCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::GetActiveValidators(decoded));
+            }
+            if let Ok(decoded) =
                 <GetActiveValidatorsNumberCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::GetActiveValidatorsNumber(decoded));
@@ -1872,6 +1979,11 @@ pub mod subnet_actor_getter_facet {
             if let Ok(decoded) = <GetValidatorCall as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::GetValidator(decoded));
+            }
+            if let Ok(decoded) =
+                <GetWaitingValidatorsCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::GetWaitingValidators(decoded));
             }
             if let Ok(decoded) =
                 <IpcGatewayAddrCall as ::ethers::core::abi::AbiDecode>::decode(data)
@@ -1947,6 +2059,9 @@ pub mod subnet_actor_getter_facet {
                 Self::GenesisBalances(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::GenesisCircSupply(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::GenesisValidators(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::GetActiveValidators(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::GetActiveValidatorsNumber(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1969,6 +2084,9 @@ pub mod subnet_actor_getter_facet {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::GetValidator(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::GetWaitingValidators(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::IpcGatewayAddr(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::IsActiveValidator(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::IsWaitingValidator(element) => {
@@ -2007,6 +2125,7 @@ pub mod subnet_actor_getter_facet {
                 Self::GenesisBalances(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GenesisCircSupply(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GenesisValidators(element) => ::core::fmt::Display::fmt(element, f),
+                Self::GetActiveValidators(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetActiveValidatorsNumber(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetBootstrapNodes(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetConfigurationNumbers(element) => ::core::fmt::Display::fmt(element, f),
@@ -2017,6 +2136,7 @@ pub mod subnet_actor_getter_facet {
                 Self::GetTotalValidatorCollateral(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetTotalValidatorsNumber(element) => ::core::fmt::Display::fmt(element, f),
                 Self::GetValidator(element) => ::core::fmt::Display::fmt(element, f),
+                Self::GetWaitingValidators(element) => ::core::fmt::Display::fmt(element, f),
                 Self::IpcGatewayAddr(element) => ::core::fmt::Display::fmt(element, f),
                 Self::IsActiveValidator(element) => ::core::fmt::Display::fmt(element, f),
                 Self::IsWaitingValidator(element) => ::core::fmt::Display::fmt(element, f),
@@ -2088,6 +2208,11 @@ pub mod subnet_actor_getter_facet {
             Self::GenesisValidators(value)
         }
     }
+    impl ::core::convert::From<GetActiveValidatorsCall> for SubnetActorGetterFacetCalls {
+        fn from(value: GetActiveValidatorsCall) -> Self {
+            Self::GetActiveValidators(value)
+        }
+    }
     impl ::core::convert::From<GetActiveValidatorsNumberCall> for SubnetActorGetterFacetCalls {
         fn from(value: GetActiveValidatorsNumberCall) -> Self {
             Self::GetActiveValidatorsNumber(value)
@@ -2136,6 +2261,11 @@ pub mod subnet_actor_getter_facet {
     impl ::core::convert::From<GetValidatorCall> for SubnetActorGetterFacetCalls {
         fn from(value: GetValidatorCall) -> Self {
             Self::GetValidator(value)
+        }
+    }
+    impl ::core::convert::From<GetWaitingValidatorsCall> for SubnetActorGetterFacetCalls {
+        fn from(value: GetWaitingValidatorsCall) -> Self {
+            Self::GetWaitingValidators(value)
         }
     }
     impl ::core::convert::From<IpcGatewayAddrCall> for SubnetActorGetterFacetCalls {
@@ -2333,6 +2463,18 @@ pub mod subnet_actor_getter_facet {
         Hash,
     )]
     pub struct GenesisValidatorsReturn(pub ::std::vec::Vec<Validator>);
+    ///Container type for all return fields from the `getActiveValidators` function with signature `getActiveValidators()` and selector `0x9de70258`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct GetActiveValidatorsReturn(pub ::std::vec::Vec<::ethers::core::types::Address>);
     ///Container type for all return fields from the `getActiveValidatorsNumber` function with signature `getActiveValidatorsNumber()` and selector `0xc7cda762`
     #[derive(
         Clone,
@@ -2455,6 +2597,18 @@ pub mod subnet_actor_getter_facet {
     pub struct GetValidatorReturn {
         pub validator: ValidatorInfo,
     }
+    ///Container type for all return fields from the `getWaitingValidators` function with signature `getWaitingValidators()` and selector `0x6ad04c79`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct GetWaitingValidatorsReturn(pub ::std::vec::Vec<::ethers::core::types::Address>);
     ///Container type for all return fields from the `ipcGatewayAddr` function with signature `ipcGatewayAddr()` and selector `0xcfca2824`
     #[derive(
         Clone,

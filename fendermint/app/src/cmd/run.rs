@@ -355,7 +355,7 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
         None
     };
 
-    let app: App<_, _, AppStore, _, _> = App::new(
+    let app: App<_, _, AppStore, _> = App::new(
         AppConfig {
             app_namespace: ns.app,
             state_hist_namespace: ns.state_hist,
@@ -376,7 +376,6 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
             blob_metrics_interval: settings.blob_metrics_interval,
         },
         snapshots,
-        tendermint_client.clone(),
     )?;
 
     if let Some((agent_proxy, config)) = ipc_tuple {
