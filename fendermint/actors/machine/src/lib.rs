@@ -3,10 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use std::collections::HashMap;
-use std::fmt::Display;
-use std::str::FromStr;
 
-use anyhow::anyhow;
 pub use fil_actor_adm::Kind;
 use fil_actors_runtime::{
     actor_error, deserialize_block, runtime::builtins::Type, runtime::Runtime, ActorError,
@@ -17,15 +14,13 @@ use fvm_ipld_encoding::{ipld_block::IpldBlock, tuple::*};
 pub use fvm_shared::METHOD_CONSTRUCTOR;
 use fvm_shared::{address::Address, error::ExitCode, sys::SendFlags, MethodNum};
 use num_traits::Zero;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 
 /// Params for creating a machine.
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ConstructorParams {
     /// The machine owner robust address.
     pub owner: Address,
-    /// Write access dictates who can write to the machine.
-    pub write_access: WriteAccess,
     /// User-defined metadata.
     pub metadata: HashMap<String, String>,
 }
@@ -35,37 +30,6 @@ pub struct ConstructorParams {
 pub struct InitParams {
     /// The machine reorg safe address.
     pub robust_address: Address,
-}
-
-/// The different types of machine write access.
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
-pub enum WriteAccess {
-    /// Only the owner can write to the machine.
-    OnlyOwner,
-    /// Any valid account can write to the machine.
-    Public,
-}
-
-impl FromStr for WriteAccess {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s {
-            "onlyowner" => Self::OnlyOwner,
-            "public" => Self::Public,
-            _ => return Err(anyhow!("invalid write access")),
-        })
-    }
-}
-
-impl Display for WriteAccess {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let str = match self {
-            Self::OnlyOwner => "onlyowner",
-            Self::Public => "public",
-        };
-        write!(f, "{}", str)
-    }
 }
 
 /// Machine initialization method number.
@@ -206,12 +170,7 @@ pub trait MachineActor {
     /// Machine actor constructor.
     fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&INIT_ACTOR_ADDR))?;
-        let state = Self::State::new(
-            rt.store(),
-            params.owner,
-            params.write_access,
-            params.metadata,
-        )?;
+        let state = Self::State::new(rt.store(), params.owner, params.metadata)?;
         rt.create(&state)
     }
 
@@ -241,28 +200,6 @@ pub trait MachineActor {
 
     /// Ensures that immediate caller is allowed to write to the machine.
     fn ensure_write_allowed(rt: &impl Runtime) -> Result<(), ActorError> {
-        let state = rt.state::<Self::State>()?;
-        match state.write_access() {
-            WriteAccess::OnlyOwner => {
-                // Leaving this note here as something to revisit in the future before mainnet.
-                //
-                // We want owners to be stored as a robust address that users can understand,
-                // but the caller is always an ID address. This means we have to resolve the
-                // actor ID from the init actor, which adds some extra ops and charges gas.
-                // We could instead store both actor ID and robust address in machine state,
-                // but I _think_ that could result in incorrect robust address to actor ID
-                // pairings in the case of a reorg.
-                if let Some(owner_id) = rt.resolve_address(&state.owner()) {
-                    rt.validate_immediate_caller_is(std::iter::once(&Address::new_id(owner_id)))?
-                } else {
-                    // This should not happen.
-                    return Err(ActorError::forbidden(String::from(
-                        "failed to resolve machine owner id",
-                    )));
-                }
-            }
-            WriteAccess::Public => rt.validate_immediate_caller_accept_any()?,
-        }
         Ok(())
     }
 
@@ -296,7 +233,6 @@ pub trait MachineState {
     fn new<BS: Blockstore>(
         store: &BS,
         owner: Address,
-        write_access: WriteAccess,
         metadata: HashMap<String, String>,
     ) -> Result<Self, ActorError>
     where
@@ -305,7 +241,6 @@ pub trait MachineState {
     fn address(&self) -> MachineAddress;
     fn kind(&self) -> Kind;
     fn owner(&self) -> Address;
-    fn write_access(&self) -> WriteAccess;
     fn metadata(&self) -> HashMap<String, String>;
 }
 

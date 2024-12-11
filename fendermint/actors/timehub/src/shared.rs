@@ -7,8 +7,8 @@ use std::collections::HashMap;
 use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
 use fendermint_actor_machine::{
-    Kind, MachineAddress, MachineState, WriteAccess, GET_ADDRESS_METHOD, GET_METADATA_METHOD,
-    INIT_METHOD, METHOD_CONSTRUCTOR,
+    Kind, MachineAddress, MachineState, GET_ADDRESS_METHOD, GET_METADATA_METHOD, INIT_METHOD,
+    METHOD_CONSTRUCTOR,
 };
 use fil_actors_runtime::ActorError;
 use fvm_ipld_amt::Amt;
@@ -248,8 +248,6 @@ pub struct State {
     pub address: MachineAddress,
     /// The machine rubust owner address.
     pub owner: Address,
-    /// Write access dictates who can write to the machine.
-    pub write_access: WriteAccess,
     /// Root of the AMT that is storing the peaks of the MMR
     pub peaks: Cid,
     /// Number of leaf nodes in the timehub MMR.
@@ -262,7 +260,6 @@ impl MachineState for State {
     fn new<BS: Blockstore>(
         store: &BS,
         owner: Address,
-        write_access: WriteAccess,
         metadata: HashMap<String, String>,
     ) -> anyhow::Result<Self, ActorError> {
         let peaks = match Amt::<(), _>::new_with_bit_width(store, BIT_WIDTH).flush() {
@@ -277,7 +274,6 @@ impl MachineState for State {
         Ok(Self {
             address: Default::default(),
             owner,
-            write_access,
             peaks,
             leaf_count: 0,
             metadata,
@@ -298,10 +294,6 @@ impl MachineState for State {
 
     fn owner(&self) -> Address {
         self.owner
-    }
-
-    fn write_access(&self) -> WriteAccess {
-        self.write_access
     }
 
     fn metadata(&self) -> HashMap<String, String> {
@@ -369,12 +361,7 @@ mod tests {
     #[test]
     fn test_constructor() {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
-        let state = State::new(
-            &store,
-            Address::new_id(100),
-            WriteAccess::OnlyOwner,
-            HashMap::new(),
-        );
+        let state = State::new(&store, Address::new_id(100), HashMap::new());
         assert!(state.is_ok());
         let state = state.unwrap();
         assert_eq!(
@@ -388,13 +375,7 @@ mod tests {
     #[test]
     fn test_hash_and_put_pair() {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
-        let mut state = State::new(
-            &store,
-            Address::new_id(100),
-            WriteAccess::OnlyOwner,
-            HashMap::new(),
-        )
-        .unwrap();
+        let mut state = State::new(&store, Address::new_id(100), HashMap::new()).unwrap();
 
         let obj1 = vec![1, 2, 3];
         let obj2 = vec![1, 2, 3];
@@ -414,13 +395,7 @@ mod tests {
     #[test]
     fn test_hash_pair() {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
-        let mut state = State::new(
-            &store,
-            Address::new_id(100),
-            WriteAccess::OnlyOwner,
-            HashMap::new(),
-        )
-        .unwrap();
+        let mut state = State::new(&store, Address::new_id(100), HashMap::new()).unwrap();
 
         let obj1 = vec![1, 2, 3];
         let obj2 = vec![1, 2, 3];
@@ -437,13 +412,7 @@ mod tests {
     #[test]
     fn test_push_simple() {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
-        let mut state = State::new(
-            &store,
-            Address::new_id(100),
-            WriteAccess::OnlyOwner,
-            HashMap::new(),
-        )
-        .unwrap();
+        let mut state = State::new(&store, Address::new_id(100), HashMap::new()).unwrap();
         let obj = vec![1, 2, 3];
         let res = state.push(&store, obj).expect("push failed");
         assert_eq!(res.root, state.get_root(&store).expect("get_root failed"));
@@ -454,13 +423,7 @@ mod tests {
     #[test]
     fn test_get_peaks() {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
-        let mut state = State::new(
-            &store,
-            Address::new_id(100),
-            WriteAccess::OnlyOwner,
-            HashMap::new(),
-        )
-        .unwrap();
+        let mut state = State::new(&store, Address::new_id(100), HashMap::new()).unwrap();
         let obj = vec![1, 2, 3];
         assert!(state.push(&store, obj).is_ok());
         assert_eq!(state.leaf_count(), 1);
@@ -478,13 +441,7 @@ mod tests {
     #[test]
     fn test_bag_peaks() {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
-        let mut state = State::new(
-            &store,
-            Address::new_id(100),
-            WriteAccess::OnlyOwner,
-            HashMap::new(),
-        )
-        .unwrap();
+        let mut state = State::new(&store, Address::new_id(100), HashMap::new()).unwrap();
         let mut root = Cid::default();
         for i in 1..=11 {
             let res = state.push(&store, vec![i]).unwrap();
@@ -500,13 +457,7 @@ mod tests {
     #[test]
     fn test_get_obj_basic() {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
-        let mut state = State::new(
-            &store,
-            Address::new_id(100),
-            WriteAccess::OnlyOwner,
-            HashMap::new(),
-        )
-        .unwrap();
+        let mut state = State::new(&store, Address::new_id(100), HashMap::new()).unwrap();
 
         state.push(&store, vec![0]).unwrap();
         assert_eq!(state.peak_count(), 1);
@@ -554,13 +505,7 @@ mod tests {
     #[test]
     fn test_get_obj() {
         let store = fvm_ipld_blockstore::MemoryBlockstore::default();
-        let mut state = State::new(
-            &store,
-            Address::new_id(100),
-            WriteAccess::OnlyOwner,
-            HashMap::new(),
-        )
-        .unwrap();
+        let mut state = State::new(&store, Address::new_id(100), HashMap::new()).unwrap();
         for i in 0..31 {
             state.push(&store, vec![i]).unwrap();
             assert_eq!(state.leaf_count(), i + 1);
