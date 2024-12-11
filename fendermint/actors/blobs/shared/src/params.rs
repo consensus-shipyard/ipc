@@ -8,6 +8,7 @@ use fvm_shared::bigint::{BigInt, BigUint};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 use crate::state::{BlobStatus, Hash, PublicKey, SubscriptionId, TtlStatus};
 
@@ -16,17 +17,28 @@ use crate::state::{BlobStatus, Hash, PublicKey, SubscriptionId, TtlStatus};
 #[serde(transparent)]
 pub struct BuyCreditParams(pub Address);
 
+/// Params for updating credit.
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct UpdateCreditParams {
+    /// Account address that initiated the update.
+    pub from: Address,
+    /// Optional account address that is sponsoring the update.
+    pub sponsor: Option<Address>,
+    /// Token amount to add, which can be negative.
+    pub add_amount: TokenAmount,
+}
+
 /// Params for approving credit.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ApproveCreditParams {
-    /// Account address (credit owner) that is making the approval.
-    /// Required due to approval by proxy from an EVM contract.
+    /// Account address that is making the approval.
     pub from: Address,
     /// Account address that is receiving the approval.
-    pub receiver: Address,
-    /// Optional restriction on caller address, e.g., a bucket.
-    /// The receiver will only be able to use the approval via a caller contract.
-    pub required_caller: Option<Address>,
+    pub to: Address,
+    /// Optional restriction on caller addresses, e.g., a bucket.
+    /// The receiver will only be able to use the approval via an allowlisted caller.
+    /// If not present, any caller is allowed.
+    pub caller_allowlist: Option<HashSet<Address>>,
     /// Optional credit approval limit.
     /// If specified, the approval becomes invalid once the committed credits reach the
     /// specified limit.
@@ -36,29 +48,26 @@ pub struct ApproveCreditParams {
     pub ttl: Option<ChainEpoch>,
 }
 
-/// Params for looking up a credit approval
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct GetCreditApprovalParams {
-    /// Account address (credit owner) that made the approval.
-    pub from: Address,
-    /// Account address that received the approval.
-    pub receiver: Address,
-    /// The caller address, e.g., a bucket.
-    /// The receiver can only use the approval via a caller contract.
-    pub caller: Address,
-}
-
 /// Params for revoking credit.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct RevokeCreditParams {
-    /// Account address (credit owner) that is making the approval.
-    /// Required due to approval by proxy from an EVM contract.
+    /// Account address that is revoking the approval.
     pub from: Address,
-    /// Account address that is receiving the approval.
-    pub receiver: Address,
-    /// Optional restriction on caller address, e.g., a bucket.
-    /// This allows the origin of a transaction to use an approval limited to the caller.
-    pub required_caller: Option<Address>,
+    /// Account address whose approval is being revoked.
+    pub to: Address,
+    /// Optional caller address to remove from the caller allowlist.
+    /// If not present, the entire approval is revoked.
+    pub for_caller: Option<Address>,
+}
+
+/// Params for setting credit sponsor.
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct SetCreditSponsorParams {
+    /// Account address that is setting a credit sponsor.
+    pub from: Address,
+    /// Credit sponsor.
+    /// If not present, the sponsor is unset.
+    pub sponsor: Option<Address>,
 }
 
 /// Params for getting an account.
@@ -66,11 +75,25 @@ pub struct RevokeCreditParams {
 #[serde(transparent)]
 pub struct GetAccountParams(pub Address);
 
+/// Params for looking up a credit approval.
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct GetCreditApprovalParams {
+    /// Account address that made the approval.
+    pub from: Address,
+    /// Account address that received the approval.
+    pub to: Address,
+}
+
+/// Params for looking up credit allowance.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct GetCreditAllowanceParams(pub Address);
+
 /// Params for adding a blob.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct AddBlobParams {
     /// Optional sponsor address.
-    /// Txn origin must have a delegation from sponsor.
+    /// Origin or caller must still have a delegation from sponsor.
     pub sponsor: Option<Address>,
     /// Source Iroh node ID used for ingestion.
     pub source: PublicKey,
@@ -146,13 +169,22 @@ pub struct FinalizeBlobParams {
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct DeleteBlobParams {
     /// Optional sponsor address.
-    /// Caller must still have a delegation from sponsor.
+    /// Origin or caller must still have a delegation from sponsor.
     /// Must be used if the caller is the delegate who added the blob.
     pub sponsor: Option<Address>,
     /// Blob blake3 hash.
     pub hash: Hash,
     /// Identifier used to differentiate blob additions for the same subscriber.
     pub id: SubscriptionId,
+}
+
+/// Params for overwriting a blob, i.e. deleting one and adding another.
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct OverwriteBlobParams {
+    /// Blake3 hash of the blob to be deleted.
+    pub old_hash: Hash,
+    /// Params for a new blob to add.
+    pub add: AddBlobParams,
 }
 
 /// Params for setting a TTL status for an account.
@@ -179,8 +211,8 @@ pub struct GetStatsReturn {
     pub credit_committed: BigInt,
     /// The total number of credits debited in the subnet.
     pub credit_debited: BigInt,
-    /// The byte-blocks per atto token rate set at genesis.
-    pub credit_debit_rate: u64,
+    /// The current byte-blocks per atto token rate.
+    pub blob_credits_per_byte_block: u64,
     /// Total number of debit accounts.
     pub num_accounts: u64,
     /// Total number of actively stored blobs.

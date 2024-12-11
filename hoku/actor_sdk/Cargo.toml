@@ -1,5 +1,5 @@
 [package]
-name = "blobs_actor_sdk"
+name = "hoku_actor_sdk"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
@@ -11,5 +11,4 @@ crate-type = ["cdylib", "lib"]
 [dependencies]
 fvm_shared = { workspace = true }
 fvm_sdk = { workspace = true }
-log = { workspace = true }
 num-traits = { workspace = true }

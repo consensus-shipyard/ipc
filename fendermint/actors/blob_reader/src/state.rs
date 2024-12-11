@@ -15,19 +15,13 @@ use fendermint_actor_blobs_shared::state::Hash;
 const MAX_READ_REQUEST_LEN: u32 = 1024 * 1024; // 1MB
 
 /// The state represents all read requests.
-#[derive(Debug, Serialize_tuple, Deserialize_tuple)]
+#[derive(Debug, Default, Serialize_tuple, Deserialize_tuple)]
 pub struct State {
     /// Map of read requests by request ID.
     pub read_requests: HashMap<Hash, ReadRequest>,
 }
 
 impl State {
-    pub fn new() -> Self {
-        Self {
-            read_requests: HashMap::new(),
-        }
-    }
-
     pub fn open_read_request(
         &mut self,
         blob_hash: Hash,

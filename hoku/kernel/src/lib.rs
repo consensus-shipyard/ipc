@@ -1,4 +1,4 @@
-// Copyright 2024 Textile
+// Copyright 2024 Hoku Contributors
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
@@ -19,7 +19,9 @@ use fvm_shared::randomness::RANDOMNESS_LENGTH;
 use fvm_shared::sys::out::network::NetworkContext;
 use fvm_shared::sys::out::vm::MessageContext;
 use fvm_shared::{address::Address, econ::TokenAmount, ActorID, MethodNum};
+use hoku_kernel_ops::HokuOps;
 
+#[allow(clippy::duplicated_attributes)]
 #[derive(Delegate)]
 #[delegate(ActorOps, where = "C: CallManager")]
 #[delegate(SendOps < K >, generics = "K", where = "K: Kernel")]
@@ -33,10 +35,6 @@ use fvm_shared::{address::Address, econ::TokenAmount, ActorID, MethodNum};
 #[delegate(RandomnessOps, where = "C: CallManager")]
 #[delegate(SelfOps, where = "C: CallManager")]
 pub struct HokuKernel<C>(pub DefaultKernel<C>);
-
-pub trait HokuOps {
-    fn block_add(&mut self, cid: Cid, data: &[u8]) -> Result<()>;
-}
 
 impl<C> HokuOps for HokuKernel<C>
 where
@@ -73,9 +71,9 @@ where
     fn link_syscalls(linker: &mut Linker<K>) -> anyhow::Result<()> {
         DefaultKernel::<K::CallManager>::link_syscalls(linker)?;
         linker.link_syscall(
-            crate::SYSCALL_MODULE_NAME,
-            crate::HASHRM_SYSCALL_FUNCTION_NAME,
-            crate::hash_rm,
+            hoku_syscalls::MODULE_NAME,
+            hoku_syscalls::HASHRM_SYSCALL_FUNCTION_NAME,
+            hoku_syscalls::hash_rm,
         )?;
 
         Ok(())

@@ -40,12 +40,12 @@ use fendermint_vm_iroh_resolver::pool::{
     ResolveKey as IrohResolveKey, ResolvePool as IrohResolvePool,
     ResolveSource as IrohResolveSource, TaskType as IrohTaskType,
 };
-use fendermint_vm_message::ipc::{
-    ClosedReadRequest, FinalizedBlob, ParentFinality, PendingBlob, PendingReadRequest,
-};
 use fendermint_vm_message::{
     chain::ChainMessage,
-    ipc::{BottomUpCheckpoint, CertifiedMessage, IpcMessage, SignedRelayedMessage},
+    ipc::{
+        BottomUpCheckpoint, CertifiedMessage, ClosedReadRequest, FinalizedBlob, IpcMessage,
+        ParentFinality, PendingBlob, PendingReadRequest, SignedRelayedMessage,
+    },
 };
 use fendermint_vm_resolver::pool::{ResolveKey, ResolvePool};
 use fendermint_vm_topdown::proxy::IPCProviderProxyWithLatency;
@@ -302,7 +302,7 @@ where
 
         // Maybe debit all credit accounts
         let current_height = state.block_height();
-        let debit_interval = state.credit_debit_interval();
+        let debit_interval = state.hoku_config_tracker().blob_credit_debit_interval;
         if current_height > 0 && debit_interval > 0 && current_height % debit_interval == 0 {
             msgs.push(ChainMessage::Ipc(IpcMessage::DebitCreditAccounts));
         }
@@ -575,7 +575,7 @@ where
                 ChainMessage::Ipc(IpcMessage::DebitCreditAccounts) => {
                     // Ensure that this is a valid height to debit accounts
                     let current_height = state.block_height();
-                    let debit_interval = state.credit_debit_interval();
+                    let debit_interval = state.hoku_config_tracker().blob_credit_debit_interval;
                     if !(current_height > 0
                         && debit_interval > 0
                         && current_height % debit_interval == 0)
@@ -1003,7 +1003,7 @@ where
                         version: Default::default(),
                         from,
                         to,
-                        sequence: 0, // We will use implicit execution which doesn't check or modify this.
+                        sequence: 0,
                         value: Default::default(),
                         method_num,
                         params: Default::default(),

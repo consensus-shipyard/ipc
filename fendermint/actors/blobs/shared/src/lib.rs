@@ -2,6 +2,8 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::collections::HashSet;
+
 use fil_actors_runtime::runtime::Runtime;
 use fil_actors_runtime::{deserialize_block, extract_send_result, ActorError};
 use fvm_ipld_encoding::ipld_block::IpldBlock;
@@ -26,10 +28,13 @@ pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
     GetStats = frc42_dispatch::method_hash!("GetStats"),
     BuyCredit = frc42_dispatch::method_hash!("BuyCredit"),
+    UpdateCredit = frc42_dispatch::method_hash!("UpdateCredit"),
     ApproveCredit = frc42_dispatch::method_hash!("ApproveCredit"),
-    GetCreditApproval = frc42_dispatch::method_hash!("GetCreditApproval"),
     RevokeCredit = frc42_dispatch::method_hash!("RevokeCredit"),
+    SetCreditSponsor = frc42_dispatch::method_hash!("SetCreditSponsor"),
     GetAccount = frc42_dispatch::method_hash!("GetAccount"),
+    GetCreditApproval = frc42_dispatch::method_hash!("GetCreditApproval"),
+    GetCreditAllowance = frc42_dispatch::method_hash!("GetCreditAllowance"),
     DebitAccounts = frc42_dispatch::method_hash!("DebitAccounts"),
     AddBlob = frc42_dispatch::method_hash!("AddBlob"),
     GetBlob = frc42_dispatch::method_hash!("GetBlob"),
@@ -39,14 +44,15 @@ pub enum Method {
     SetBlobPending = frc42_dispatch::method_hash!("SetBlobPending"),
     FinalizeBlob = frc42_dispatch::method_hash!("FinalizeBlob"),
     DeleteBlob = frc42_dispatch::method_hash!("DeleteBlob"),
+    OverwriteBlob = frc42_dispatch::method_hash!("OverwriteBlob"),
     SetAccountBlobTtlStatus = frc42_dispatch::method_hash!("SetAccountBlobTtlStatus"),
 }
 
-pub fn buy_credit(rt: &impl Runtime, recipient: Address) -> Result<Account, ActorError> {
+pub fn buy_credit(rt: &impl Runtime, to: Address) -> Result<Account, ActorError> {
     deserialize_block(extract_send_result(rt.send_simple(
         &BLOBS_ACTOR_ADDR,
         Method::BuyCredit as MethodNum,
-        IpldBlock::serialize_cbor(&params::BuyCreditParams(recipient))?,
+        IpldBlock::serialize_cbor(&params::BuyCreditParams(to))?,
         rt.message().value_received(),
     ))?)
 }
@@ -54,8 +60,8 @@ pub fn buy_credit(rt: &impl Runtime, recipient: Address) -> Result<Account, Acto
 pub fn approve_credit(
     rt: &impl Runtime,
     from: Address,
-    receiver: Address,
-    required_caller: Option<Address>,
+    to: Address,
+    caller_allowlist: Option<HashSet<Address>>,
     limit: Option<BigUint>,
     ttl: Option<ChainEpoch>,
 ) -> Result<CreditApproval, ActorError> {
@@ -64,8 +70,8 @@ pub fn approve_credit(
         Method::ApproveCredit as MethodNum,
         IpldBlock::serialize_cbor(&params::ApproveCreditParams {
             from,
-            receiver,
-            required_caller,
+            to,
+            caller_allowlist,
             limit,
             ttl,
         })?,
@@ -76,14 +82,9 @@ pub fn approve_credit(
 pub fn get_credit_approval(
     rt: &impl Runtime,
     from: Address,
-    receiver: Address,
-    caller: Address,
+    to: Address,
 ) -> Result<Option<CreditApproval>, ActorError> {
-    let params = params::GetCreditApprovalParams {
-        from,
-        receiver,
-        caller,
-    };
+    let params = params::GetCreditApprovalParams { from, to };
 
     deserialize_block(extract_send_result(rt.send(
         &BLOBS_ACTOR_ADDR,
@@ -98,16 +99,16 @@ pub fn get_credit_approval(
 pub fn revoke_credit(
     rt: &impl Runtime,
     from: Address,
-    receiver: Address,
-    required_caller: Option<Address>,
+    to: Address,
+    for_caller: Option<Address>,
 ) -> Result<(), ActorError> {
     extract_send_result(rt.send_simple(
         &BLOBS_ACTOR_ADDR,
         Method::RevokeCredit as MethodNum,
         IpldBlock::serialize_cbor(&params::RevokeCreditParams {
             from,
-            receiver,
-            required_caller,
+            to,
+            for_caller,
         })?,
         rt.message().value_received(),
     ))?;
@@ -117,11 +118,11 @@ pub fn revoke_credit(
 #[allow(clippy::too_many_arguments)]
 pub fn add_blob(
     rt: &impl Runtime,
+    sub_id: state::SubscriptionId,
+    hash: state::Hash,
     sponsor: Option<Address>,
     source: state::PublicKey,
-    hash: state::Hash,
     metadata_hash: state::Hash,
-    id: state::SubscriptionId,
     size: u64,
     ttl: Option<ChainEpoch>,
 ) -> Result<Subscription, ActorError> {
@@ -130,7 +131,7 @@ pub fn add_blob(
         source,
         hash,
         metadata_hash,
-        id,
+        id: sub_id,
         size,
         ttl,
     })?;
@@ -155,15 +156,51 @@ pub fn get_blob(rt: &impl Runtime, hash: state::Hash) -> Result<Option<state::Bl
 
 pub fn delete_blob(
     rt: &impl Runtime,
-    sponsor: Option<Address>,
+    sub_id: state::SubscriptionId,
     hash: state::Hash,
-    id: state::SubscriptionId,
+    sponsor: Option<Address>,
 ) -> Result<(), ActorError> {
     extract_send_result(rt.send_simple(
         &BLOBS_ACTOR_ADDR,
         Method::DeleteBlob as MethodNum,
-        IpldBlock::serialize_cbor(&params::DeleteBlobParams { sponsor, hash, id })?,
+        IpldBlock::serialize_cbor(&params::DeleteBlobParams {
+            sponsor,
+            hash,
+            id: sub_id,
+        })?,
         rt.message().value_received(),
     ))?;
     Ok(())
+}
+
+/// Overwrite a blob, i.e. delete one, and add another in a single call.
+#[allow(clippy::too_many_arguments)]
+pub fn overwrite_blob(
+    rt: &impl Runtime,
+    old_hash: state::Hash,
+    sub_id: state::SubscriptionId,
+    hash: state::Hash,
+    sponsor: Option<Address>,
+    source: state::PublicKey,
+    metadata_hash: state::Hash,
+    size: u64,
+    ttl: Option<ChainEpoch>,
+) -> Result<Subscription, ActorError> {
+    deserialize_block(extract_send_result(rt.send_simple(
+        &BLOBS_ACTOR_ADDR,
+        Method::OverwriteBlob as MethodNum,
+        IpldBlock::serialize_cbor(&params::OverwriteBlobParams {
+            old_hash,
+            add: params::AddBlobParams {
+                sponsor,
+                id: sub_id,
+                source,
+                hash,
+                metadata_hash,
+                size,
+                ttl,
+            },
+        })?,
+        rt.message().value_received(),
+    ))?)
 }

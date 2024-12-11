@@ -1,4 +1,4 @@
-// Copyright 2024 Textile
+// Copyright 2024 Hoku Contributors
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
@@ -7,24 +7,30 @@ use std::collections::HashSet;
 use fendermint_actor_blobs_shared::params::{
     AddBlobParams, ApproveCreditParams, BuyCreditParams, DeleteBlobParams, FinalizeBlobParams,
     GetAccountParams, GetAddedBlobsParams, GetBlobParams, GetBlobStatusParams,
-    GetCreditApprovalParams, GetPendingBlobsParams, GetStatsReturn, RevokeCreditParams,
-    SetAccountBlobTtlStatusParams, SetBlobPendingParams,
+    GetCreditAllowanceParams, GetCreditApprovalParams, GetPendingBlobsParams, GetStatsReturn,
+    OverwriteBlobParams, RevokeCreditParams, SetAccountBlobTtlStatusParams, SetBlobPendingParams,
+    SetCreditSponsorParams, UpdateCreditParams,
 };
 use fendermint_actor_blobs_shared::state::{
-    Account, Blob, BlobStatus, CreditApproval, Hash, PublicKey, Subscription, SubscriptionId,
+    Account, Blob, BlobStatus, CreditAllowance, CreditApproval, Hash, PublicKey, Subscription,
+    SubscriptionId,
 };
-
-use crate::{ConstructorParams, State, BLOBS_ACTOR_NAME};
 use fendermint_actor_blobs_shared::Method;
-use fendermint_actor_machine::{resolve_external, resolve_external_non_machine};
+use fendermint_actor_machine::{
+    ensure_addr_is_origin_or_caller, resolve_external, resolve_external_non_machine,
+};
 use fil_actors_runtime::{
     actor_dispatch, actor_error, extract_send_result,
     runtime::{ActorCode, Runtime},
     ActorError, FIRST_EXPORTED_METHOD_NUMBER, SYSTEM_ACTOR_ADDR,
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
-use fvm_shared::address::Address;
-use fvm_shared::{MethodNum, METHOD_SEND};
+use fvm_shared::econ::TokenAmount;
+use fvm_shared::error::ExitCode;
+use fvm_shared::{address::Address, MethodNum, METHOD_SEND};
+use num_traits::Zero;
+
+use crate::{ConstructorParams, State, BLOBS_ACTOR_NAME};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(BlobsActor);
@@ -36,7 +42,7 @@ type BlobTuple = (Hash, HashSet<(Address, SubscriptionId, PublicKey)>);
 impl BlobsActor {
     fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let state = State::new(params.capacity, params.debit_rate);
+        let state = State::new(params.blob_capacity, params.blob_credits_per_byte_block);
         rt.create(&state)
     }
 
@@ -48,9 +54,22 @@ impl BlobsActor {
 
     fn buy_credit(rt: &impl Runtime, params: BuyCreditParams) -> Result<Account, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let recipient = resolve_external_non_machine(rt, params.0)?;
+        let to = resolve_external_non_machine(rt, params.0)?;
         rt.transaction(|st: &mut State, rt| {
-            st.buy_credit(recipient, rt.message().value_received(), rt.curr_epoch())
+            st.buy_credit(to, rt.message().value_received(), rt.curr_epoch())
+        })
+    }
+
+    fn update_credit(rt: &impl Runtime, params: UpdateCreditParams) -> Result<(), ActorError> {
+        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
+        let from = resolve_external_non_machine(rt, params.from)?;
+        let sponsor = if let Some(sponsor) = params.sponsor {
+            Some(resolve_external_non_machine(rt, sponsor)?)
+        } else {
+            None
+        };
+        rt.transaction(|st: &mut State, rt| {
+            st.update_credit(from, sponsor, params.add_amount, rt.curr_epoch())
         })
     }
 
@@ -60,33 +79,25 @@ impl BlobsActor {
     ) -> Result<CreditApproval, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let from = resolve_external_non_machine(rt, params.from)?;
-        let (origin, caller) = if rt.message().origin() == rt.message().caller() {
-            let (origin, _) = resolve_external(rt, rt.message().origin())?;
-            (origin, origin)
-        } else {
-            let (origin, _) = resolve_external(rt, rt.message().origin())?;
-            let (caller, _) = resolve_external(rt, rt.message().caller())?;
-            (origin, caller)
-        };
-        // Credit owner must be the transaction origin or caller
-        if from != caller && from != origin {
-            return Err(ActorError::illegal_argument(format!(
-                "from {} does not match origin or caller",
-                from
-            )));
-        }
-        let receiver = resolve_external_non_machine(rt, params.receiver)?;
-        let required_caller = if let Some(required_caller) = params.required_caller {
-            let (required_caller, _) = resolve_external(rt, required_caller)?;
-            Some(required_caller)
+        ensure_addr_is_origin_or_caller(rt, from)?;
+        let to = resolve_external_non_machine(rt, params.to)?;
+        let caller_allowlist = if let Some(allowlist) = params.caller_allowlist {
+            let resolved: HashSet<_> = allowlist
+                .into_iter()
+                .map(|caller| {
+                    let (caller, _) = resolve_external(rt, caller)?;
+                    Ok::<Address, ActorError>(caller)
+                })
+                .collect::<Result<_, _>>()?;
+            Some(resolved)
         } else {
             None
         };
         rt.transaction(|st: &mut State, rt| {
             st.approve_credit(
                 from,
-                receiver,
-                required_caller,
+                to,
+                caller_allowlist,
                 rt.curr_epoch(),
                 params.limit,
                 params.ttl,
@@ -94,46 +105,33 @@ impl BlobsActor {
         })
     }
 
-    fn get_credit_approval(
-        rt: &impl Runtime,
-        params: GetCreditApprovalParams,
-    ) -> Result<Option<CreditApproval>, ActorError> {
-        rt.validate_immediate_caller_accept_any()?;
-        let from = resolve_external_non_machine(rt, params.from)?;
-        let receiver = resolve_external_non_machine(rt, params.receiver)?;
-        let (caller, _) = resolve_external(rt, params.caller)?;
-        let approval = rt
-            .state::<State>()?
-            .get_credit_approval(from, receiver, caller);
-        Ok(approval)
-    }
-
     fn revoke_credit(rt: &impl Runtime, params: RevokeCreditParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let from = resolve_external_non_machine(rt, params.from)?;
-        let (origin, caller) = if rt.message().origin() == rt.message().caller() {
-            let (origin, _) = resolve_external(rt, rt.message().origin())?;
-            (origin, origin)
-        } else {
-            let (origin, _) = resolve_external(rt, rt.message().origin())?;
-            let (caller, _) = resolve_external(rt, rt.message().caller())?;
-            (origin, caller)
-        };
-        // Credit owner must be the transaction origin or caller
-        if from != caller && from != origin {
-            return Err(ActorError::illegal_argument(format!(
-                "from {} does not match origin or caller",
-                from
-            )));
-        }
-        let receiver = resolve_external_non_machine(rt, params.receiver)?;
-        let required_caller = if let Some(required_caller) = params.required_caller {
-            let (required_caller, _) = resolve_external(rt, required_caller)?;
-            Some(required_caller)
+        ensure_addr_is_origin_or_caller(rt, from)?;
+        let to = resolve_external_non_machine(rt, params.to)?;
+        let for_caller = if let Some(caller) = params.for_caller {
+            let (resolved, _) = resolve_external(rt, caller)?;
+            Some(resolved)
         } else {
             None
         };
-        rt.transaction(|st: &mut State, _| st.revoke_credit(from, receiver, required_caller))
+        rt.transaction(|st: &mut State, _| st.revoke_credit(from, to, for_caller))
+    }
+
+    fn set_credit_sponsor(
+        rt: &impl Runtime,
+        params: SetCreditSponsorParams,
+    ) -> Result<(), ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+        let (from, _) = resolve_external(rt, params.from)?;
+        ensure_addr_is_origin_or_caller(rt, from)?;
+        let sponsor = if let Some(sponsor) = params.sponsor {
+            Some(resolve_external_non_machine(rt, sponsor)?)
+        } else {
+            None
+        };
+        rt.transaction(|st: &mut State, _| st.set_credit_sponsor(from, sponsor, rt.curr_epoch()))
     }
 
     fn get_account(
@@ -143,6 +141,37 @@ impl BlobsActor {
         rt.validate_immediate_caller_accept_any()?;
         let account = rt.state::<State>()?.get_account(params.0);
         Ok(account)
+    }
+
+    fn get_credit_approval(
+        rt: &impl Runtime,
+        params: GetCreditApprovalParams,
+    ) -> Result<Option<CreditApproval>, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+        let from = resolve_external_non_machine(rt, params.from)?;
+        let to = resolve_external_non_machine(rt, params.to)?;
+        let approval = rt.state::<State>()?.get_credit_approval(from, to);
+        Ok(approval)
+    }
+
+    fn get_credit_allowance(
+        rt: &impl Runtime,
+        params: GetCreditAllowanceParams,
+    ) -> Result<CreditAllowance, ActorError> {
+        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
+        let from = match resolve_external_non_machine(rt, params.0) {
+            Ok(to) => to,
+            Err(e) => {
+                return if e.exit_code() == ExitCode::USR_FORBIDDEN {
+                    // Disallowed actor type (this is called by all txns so we can't error)
+                    Ok(CreditAllowance::default())
+                } else {
+                    Err(e)
+                };
+            }
+        };
+        rt.state::<State>()?
+            .get_credit_allowance(from, rt.curr_epoch())
     }
 
     fn debit_accounts(rt: &impl Runtime) -> Result<(), ActorError> {
@@ -233,11 +262,10 @@ impl BlobsActor {
 
     fn finalize_blob(rt: &impl Runtime, params: FinalizeBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        // We control this method call and can guarantee subscriber is an external address,
-        // i.e., no need to resolve its external address.
+        let (subscriber, _) = resolve_external(rt, params.subscriber)?;
         rt.transaction(|st: &mut State, _| {
             st.finalize_blob(
-                params.subscriber,
+                subscriber,
                 rt.curr_epoch(),
                 params.hash,
                 params.id,
@@ -272,16 +300,62 @@ impl BlobsActor {
         Ok(())
     }
 
+    /// Delete a blob, and add another in a single call
+    fn overwrite_blob(
+        rt: &impl Runtime,
+        params: OverwriteBlobParams,
+    ) -> Result<Subscription, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+        let (origin, _) = resolve_external(rt, rt.message().origin())?;
+        let (caller, _) = resolve_external(rt, rt.message().caller())?;
+        // The blob subscriber will be the sponsor if specified and approved
+        let subscriber = if let Some(sponsor) = params.add.sponsor {
+            resolve_external_non_machine(rt, sponsor)?
+        } else {
+            origin
+        };
+
+        // The call should be atomic, hence we wrap two independent calls in a transaction.
+        let (delete, subscription) = rt.transaction(|st: &mut State, _| {
+            let add_params = params.add;
+            let delete = st.delete_blob(
+                origin,
+                caller,
+                subscriber,
+                rt.curr_epoch(),
+                params.old_hash,
+                add_params.id.clone(),
+            )?;
+            let (subscription, _) = st.add_blob(
+                origin,
+                caller,
+                subscriber,
+                rt.curr_epoch(),
+                add_params.hash,
+                add_params.metadata_hash,
+                add_params.id,
+                add_params.size,
+                add_params.ttl,
+                add_params.source,
+                TokenAmount::zero(),
+            )?;
+            Ok((delete, subscription))
+        })?;
+        if delete {
+            delete_from_disc(params.old_hash)?;
+        }
+        Ok(subscription)
+    }
+
     fn set_account_blob_ttl_status(
         rt: &impl Runtime,
         params: SetAccountBlobTtlStatusParams,
     ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        
+        let account = resolve_external_non_machine(rt, params.account)?;
         rt.transaction(|st: &mut State, _| {
-            st.set_ttl_status(params.account, params.status, rt.curr_epoch())
-        })?;
-        Ok(())
+            st.set_ttl_status(account, params.status, rt.curr_epoch())
+        })
     }
 
     /// Fallback method for unimplemented method numbers.
@@ -302,7 +376,7 @@ impl BlobsActor {
 fn delete_from_disc(hash: Hash) -> Result<(), ActorError> {
     #[cfg(feature = "fil-actor")]
     {
-        blobs_actor_sdk::hash_rm(hash.0).map_err(|en| {
+        hoku_actor_sdk::hash_rm(hash.0).map_err(|en| {
             ActorError::unspecified(format!("failed to delete blob from disc: {:?}", en))
         })?;
         log::debug!("deleted blob {} from disc", hash);
@@ -326,10 +400,13 @@ impl ActorCode for BlobsActor {
         Constructor => constructor,
         GetStats => get_stats,
         BuyCredit => buy_credit,
+        UpdateCredit => update_credit,
         ApproveCredit => approve_credit,
-        GetCreditApproval => get_credit_approval,
         RevokeCredit => revoke_credit,
+        SetCreditSponsor => set_credit_sponsor,
         GetAccount => get_account,
+        GetCreditApproval => get_credit_approval,
+        GetCreditAllowance => get_credit_allowance,
         DebitAccounts => debit_accounts,
         AddBlob => add_blob,
         GetBlob => get_blob,
@@ -339,6 +416,7 @@ impl ActorCode for BlobsActor {
         SetBlobPending => set_blob_pending,
         FinalizeBlob => finalize_blob,
         DeleteBlob => delete_blob,
+        OverwriteBlob => overwrite_blob,
         SetAccountBlobTtlStatus => set_account_blob_ttl_status,
         _ => fallback,
     }
@@ -353,13 +431,9 @@ mod tests {
         expect_empty, MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, EVM_ACTOR_CODE_ID,
         SYSTEM_ACTOR_CODE_ID,
     };
-    use fil_actors_runtime::SYSTEM_ACTOR_ADDR;
-    use fvm_ipld_encoding::ipld_block::IpldBlock;
-    use fvm_shared::address::Address;
     use fvm_shared::bigint::BigInt;
     use fvm_shared::clock::ChainEpoch;
     use fvm_shared::econ::TokenAmount;
-    use fvm_shared::{error::ExitCode, METHOD_SEND};
     use num_traits::Zero;
     use rand::RngCore;
 
@@ -380,7 +454,10 @@ mod tests {
         PublicKey(data)
     }
 
-    pub fn construct_and_verify(capacity: u64, debit_rate: u64) -> MockRuntime {
+    pub fn construct_and_verify(
+        blob_capacity: u64,
+        blob_credits_per_byte_block: u64,
+    ) -> MockRuntime {
         let rt = MockRuntime {
             receiver: Address::new_id(10),
             ..Default::default()
@@ -391,8 +468,8 @@ mod tests {
             .call::<BlobsActor>(
                 Method::Constructor as u64,
                 IpldBlock::serialize_cbor(&ConstructorParams {
-                    capacity,
-                    debit_rate,
+                    blob_capacity,
+                    blob_credits_per_byte_block,
                 })
                 .unwrap(),
             )
@@ -479,13 +556,13 @@ mod tests {
         rt.set_delegated_address(owner_id_addr.id().unwrap(), owner_f4_eth_addr);
 
         // Credit receiver
-        let receiver_id_addr = Address::new_id(111);
+        let to_id_addr = Address::new_id(111);
         let receiver_eth_addr = EthAddress(hex_literal::hex!(
             "CAFEB0BA00000000000000000000000000000001"
         ));
         let receiver_f4_eth_addr = Address::new_delegated(10, &receiver_eth_addr.0).unwrap();
-        rt.set_delegated_address(receiver_id_addr.id().unwrap(), receiver_f4_eth_addr);
-        rt.set_address_actor_type(receiver_id_addr, *ETHACCOUNT_ACTOR_CODE_ID);
+        rt.set_delegated_address(to_id_addr.id().unwrap(), receiver_f4_eth_addr);
+        rt.set_address_actor_type(to_id_addr, *ETHACCOUNT_ACTOR_CODE_ID);
 
         // Proxy EVM contract on behalf of the credit owner
         let proxy_id_addr = Address::new_id(112);
@@ -502,8 +579,8 @@ mod tests {
         rt.expect_validate_caller_any();
         let approve_params = ApproveCreditParams {
             from: owner_id_addr,
-            receiver: receiver_id_addr,
-            required_caller: None,
+            to: to_id_addr,
+            caller_allowlist: None,
             limit: None,
             ttl: None,
         };
@@ -520,8 +597,8 @@ mod tests {
         rt.expect_validate_caller_any();
         let approve_params = ApproveCreditParams {
             from: owner_id_addr,
-            receiver: receiver_id_addr,
-            required_caller: None,
+            to: to_id_addr,
+            caller_allowlist: None,
             limit: None,
             ttl: None,
         };
@@ -537,9 +614,9 @@ mod tests {
         rt.set_origin(owner_id_addr);
         rt.expect_validate_caller_any();
         let approve_params = ApproveCreditParams {
-            from: receiver_id_addr, // mismatch
-            receiver: receiver_id_addr,
-            required_caller: None,
+            from: to_id_addr, // mismatch
+            to: to_id_addr,
+            caller_allowlist: None,
             limit: None,
             ttl: None,
         };
@@ -548,7 +625,7 @@ mod tests {
             IpldBlock::serialize_cbor(&approve_params).unwrap(),
         );
         let expected_return = Err(ActorError::illegal_argument(format!(
-            "from {} does not match origin or caller",
+            "address {} does not match origin or caller",
             receiver_f4_eth_addr
         )));
         assert_eq!(result, expected_return);
@@ -568,13 +645,13 @@ mod tests {
         rt.set_delegated_address(owner_id_addr.id().unwrap(), owner_f4_eth_addr);
 
         // Credit receiver
-        let receiver_id_addr = Address::new_id(111);
+        let to_id_addr = Address::new_id(111);
         let receiver_eth_addr = EthAddress(hex_literal::hex!(
             "CAFEB0BA00000000000000000000000000000001"
         ));
         let receiver_f4_eth_addr = Address::new_delegated(10, &receiver_eth_addr.0).unwrap();
-        rt.set_delegated_address(receiver_id_addr.id().unwrap(), receiver_f4_eth_addr);
-        rt.set_address_actor_type(receiver_id_addr, *ETHACCOUNT_ACTOR_CODE_ID);
+        rt.set_delegated_address(to_id_addr.id().unwrap(), receiver_f4_eth_addr);
+        rt.set_address_actor_type(to_id_addr, *ETHACCOUNT_ACTOR_CODE_ID);
 
         // Proxy EVM contract on behalf of the credit owner
         let proxy_id_addr = Address::new_id(112);
@@ -591,8 +668,8 @@ mod tests {
         rt.expect_validate_caller_any();
         let approve_params = ApproveCreditParams {
             from: owner_id_addr,
-            receiver: receiver_id_addr,
-            required_caller: None,
+            to: to_id_addr,
+            caller_allowlist: None,
             limit: None,
             ttl: None,
         };
@@ -609,8 +686,8 @@ mod tests {
         rt.expect_validate_caller_any();
         let revoke_params = RevokeCreditParams {
             from: owner_id_addr,
-            receiver: receiver_id_addr,
-            required_caller: None,
+            to: to_id_addr,
+            for_caller: None,
         };
         let result = rt.call::<BlobsActor>(
             Method::RevokeCredit as u64,
@@ -625,14 +702,16 @@ mod tests {
         rt.expect_validate_caller_any();
         let revoke_params = RevokeCreditParams {
             from: owner_id_addr,
-            receiver: receiver_id_addr,
-            required_caller: None,
+            to: to_id_addr,
+            for_caller: None,
         };
         let result = rt.call::<BlobsActor>(
             Method::RevokeCredit as u64,
             IpldBlock::serialize_cbor(&revoke_params).unwrap(),
         );
-        assert!(result.is_ok());
+        // This should be a state error, not from the actor API
+        assert!(result.is_err());
+        assert!(result.err().unwrap().msg().contains("not found"),);
         rt.verify();
 
         // Caller/origin mismatch with from
@@ -640,16 +719,16 @@ mod tests {
         rt.set_origin(owner_id_addr);
         rt.expect_validate_caller_any();
         let revoke_params = RevokeCreditParams {
-            from: receiver_id_addr, // mismatch
-            receiver: receiver_id_addr,
-            required_caller: None,
+            from: to_id_addr, // mismatch
+            to: to_id_addr,
+            for_caller: None,
         };
         let result = rt.call::<BlobsActor>(
             Method::RevokeCredit as u64,
             IpldBlock::serialize_cbor(&revoke_params).unwrap(),
         );
         let expected_return = Err(ActorError::illegal_argument(format!(
-            "from {} does not match origin or caller",
+            "address {} does not match origin or caller",
             receiver_f4_eth_addr
         )));
         assert_eq!(result, expected_return);
@@ -858,8 +937,8 @@ mod tests {
         rt.expect_validate_caller_any();
         let approve_params = ApproveCreditParams {
             from: sponsor_id_addr,
-            receiver: spender_id_addr,
-            required_caller: None,
+            to: spender_id_addr,
+            caller_allowlist: None,
             limit: None,
             ttl: None,
         };
@@ -875,8 +954,8 @@ mod tests {
         rt.expect_validate_caller_any();
         let approve_params = ApproveCreditParams {
             from: sponsor_id_addr,
-            receiver: spender_id_addr,
-            required_caller: None,
+            to: spender_id_addr,
+            caller_allowlist: None,
             limit: None,
             ttl: None,
         };

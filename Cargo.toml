@@ -39,11 +39,16 @@ members = [
     "fendermint/actors/blobs",
     "fendermint/actors/blobs/shared",
     "fendermint/actors/bucket",
+    "fendermint/actors/hoku_config",
+    "fendermint/actors/hoku_config/shared",
     "fendermint/actors/machine",
     "fendermint/actors/timehub",
-    "hoku/blobs_actor_sdk",
-    "hoku/blobs_syscall",
-    "hoku/maybe_iroh",
+    "hoku/actor_sdk",
+    "hoku/executor",
+    "hoku/iroh_manager",
+    "hoku/kernel",
+    "hoku/kernel/ops",
+    "hoku/syscalls",
 ]
 exclude = ["builtin-actors"]
 
@@ -154,6 +159,7 @@ quickcheck_macros = "1"
 rand = "0.8"
 rand_chacha = "0.3"
 regex = "1"
+replace_with = "0.1.7"
 reqwest = { version = "0.11.13", features = ["json"] }
 sha2 = "0.10"
 serde = { version = "1", features = ["derive"] }
@@ -264,9 +270,9 @@ gcra = { git = "https://github.com/consensus-shipyard/gcra-rs.git", branch = "ma
 
 # Use below when working locally on entanglement and this repo simultaneously.
 # Assumes the entanglement checkout is in a sibling directory with the same name.
-#[patch."ssh://git@github.com/hokunet/entanglement.git"]
-#entangler = { path = "../entanglement/entangler" }
-#entangler_storage = { package = "storage", path = "../entanglement/storage" }
+# [patch."ssh://git@github.com/hokunet/entanglement.git"]
+# entangler = { path = "../entanglement/entangler" }
+# entangler_storage = { package = "storage", path = "../entanglement/storage" }
 
 [profile.wasm]
 inherits = "release"

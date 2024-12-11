@@ -1,4 +1,4 @@
-// Copyright 2024 Textile
+// Copyright 2024 Hoku Contributors
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
@@ -8,22 +8,16 @@ use std::str::FromStr;
 
 use anyhow::anyhow;
 pub use fil_actor_adm::Kind;
-use fil_actors_runtime::runtime::builtins::Type;
 use fil_actors_runtime::{
-    actor_error, deserialize_block, runtime::Runtime, ActorError, AsActorError, ADM_ACTOR_ADDR,
-    FIRST_EXPORTED_METHOD_NUMBER, INIT_ACTOR_ADDR,
+    actor_error, deserialize_block, runtime::builtins::Type, runtime::Runtime, ActorError,
+    AsActorError, ADM_ACTOR_ADDR, FIRST_EXPORTED_METHOD_NUMBER, INIT_ACTOR_ADDR,
 };
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::ipld_block::IpldBlock;
-use fvm_ipld_encoding::tuple::*;
-use fvm_shared::error::ExitCode;
-use fvm_shared::sys::SendFlags;
+use fvm_ipld_encoding::{ipld_block::IpldBlock, tuple::*};
 pub use fvm_shared::METHOD_CONSTRUCTOR;
-use fvm_shared::{address::Address, MethodNum};
+use fvm_shared::{address::Address, error::ExitCode, sys::SendFlags, MethodNum};
 use num_traits::Zero;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-
-mod ext;
 
 /// Params for creating a machine.
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
@@ -81,11 +75,54 @@ pub const GET_ADDRESS_METHOD: MethodNum = frc42_dispatch::method_hash!("GetAddre
 /// Get machine metadata method number.
 pub const GET_METADATA_METHOD: MethodNum = frc42_dispatch::method_hash!("GetMetadata");
 
+/// Returns an error if the address does not match the message origin or caller.
+pub fn ensure_addr_is_origin_or_caller(
+    rt: &impl Runtime,
+    address: Address,
+) -> Result<(), ActorError> {
+    if rt.message().origin() == rt.message().caller() {
+        let (origin, _) = resolve_external(rt, rt.message().origin())?;
+        if address == origin {
+            return Ok(());
+        }
+    } else {
+        let (origin, _) = resolve_external(rt, rt.message().origin())?;
+        if address == origin {
+            return Ok(());
+        }
+        let (caller, _) = resolve_external(rt, rt.message().caller())?;
+        if address == caller {
+            return Ok(());
+        }
+    }
+    Err(ActorError::illegal_argument(format!(
+        "address {} does not match origin or caller",
+        address
+    )))
+}
+
+/// Actor type that includes Hoku Machines.
 pub enum ActorType {
     Account,
-    EthAccount,
+    Placeholder,
     Evm,
+    EthAccount,
     Machine,
+}
+
+impl ActorType {
+    fn from_builtin_type(t: Type) -> Result<Self, ActorError> {
+        match t {
+            Type::Account => Ok(ActorType::Account),
+            Type::Placeholder => Ok(ActorType::Placeholder),
+            Type::EVM => Ok(ActorType::Evm),
+            Type::EthAccount => Ok(ActorType::EthAccount),
+            _ => Err(ActorError::illegal_argument(format!(
+                "builtin actor type {:?} cannot be mapped to actor type",
+                t
+            ))),
+        }
+    }
 }
 
 /// Resolve robust address and ensure it is not a Machine actor type.
@@ -120,53 +157,22 @@ pub fn resolve_external(
         .get_actor_code_cid(&actor_id)
         .expect("failed to lookup caller code");
     match rt.resolve_builtin_actor_type(&code_cid) {
-        Some(Type::Account) => {
-            let result = rt
-                .send(
-                    &address,
-                    ext::account::PUBKEY_ADDRESS_METHOD,
-                    None,
-                    Zero::zero(),
-                    None,
-                    SendFlags::READ_ONLY,
-                )
-                .context_code(
-                    ExitCode::USR_ASSERTION_FAILED,
-                    "account failed to return its key address",
-                )?;
-            if !result.exit_code.is_success() {
-                return Err(ActorError::checked(
-                    result.exit_code,
-                    "failed to retrieve account robust address".to_string(),
-                    None,
-                ));
+        Some(t) => match t {
+            Type::Placeholder | Type::EVM | Type::EthAccount => {
+                let delegated_addr =
+                    rt.lookup_delegated_address(actor_id)
+                        .ok_or(ActorError::illegal_argument(format!(
+                            "actor {} does not have delegated address",
+                            actor_id
+                        )))?;
+                Ok((delegated_addr, ActorType::from_builtin_type(t)?))
             }
-            let robust_addr: Address = deserialize_block(result.return_data)?;
-            Ok((robust_addr, ActorType::Account))
-        }
-        Some(Type::EthAccount) => {
-            let delegated_addr =
-                rt.lookup_delegated_address(actor_id)
-                    .ok_or(ActorError::forbidden(format!(
-                        "actor {} does not have delegated address",
-                        actor_id
-                    )))?;
-            Ok((delegated_addr, ActorType::EthAccount))
-        }
-        Some(Type::EVM) => {
-            let delegated_addr =
-                rt.lookup_delegated_address(actor_id)
-                    .ok_or(ActorError::forbidden(format!(
-                        "actor {} does not have delegated address",
-                        actor_id
-                    )))?;
-            Ok((delegated_addr, ActorType::Evm))
-        }
-        Some(t) => Err(ActorError::forbidden(format!(
-            "disallowed caller type {} for address {}",
-            t.name(),
-            address
-        ))),
+            _ => Err(ActorError::forbidden(format!(
+                "disallowed caller type {} for address {}",
+                t.name(),
+                address
+            ))),
+        },
         None => {
             // The caller might be a machine
             let result = rt

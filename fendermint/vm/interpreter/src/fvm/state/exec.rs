@@ -6,8 +6,8 @@ use std::collections::{HashMap, HashSet};
 use crate::fvm::activity::actor::ActorActivityTracker;
 use crate::fvm::externs::FendermintExterns;
 use crate::fvm::gas::BlockGasTracker;
+use crate::fvm::hoku_config::HokuConfigTracker;
 use anyhow::Ok;
-use blobs_syscall::hoku_kernel::HokuKernel;
 use cid::Cid;
 use fendermint_actors_api::gas_market::Reading;
 use fendermint_crypto::PublicKey;
@@ -18,7 +18,7 @@ use fendermint_vm_genesis::PowerScale;
 use fvm::{
     call_manager::DefaultCallManager,
     engine::MultiEngine,
-    executor::{ApplyFailure, ApplyKind, ApplyRet, DefaultExecutor, Executor},
+    executor::{ApplyFailure, ApplyKind, ApplyRet, Executor},
     machine::{DefaultMachine, Machine, Manifest, NetworkConfig},
     state_tree::StateTree,
 };
@@ -28,6 +28,8 @@ use fvm_shared::{
     address::Address, chainid::ChainID, clock::ChainEpoch, econ::TokenAmount, error::ExitCode,
     message::Message, receipt::Receipt, version::NetworkVersion, ActorID,
 };
+use hoku_executor::HokuExecutor;
+use hoku_kernel::HokuKernel;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 
@@ -66,12 +68,6 @@ pub struct FvmStateParams {
     /// The application protocol version.
     #[serde(default)]
     pub app_version: u64,
-    /// Block interval at which to debit all credit accounts.
-    pub credit_debit_interval: ChainEpoch,
-    /// Subnet capacity
-    pub blob_storage_capacity: u64,
-    /// Subnet debit rate
-    pub blob_debit_rate: u64,
 }
 
 /// Parts of the state which can be updated by message execution, apart from the actor state.
@@ -93,12 +89,6 @@ pub struct FvmUpdatableParams {
     /// Doesn't change at the moment but in theory it could,
     /// and it doesn't have a place within the FVM.
     pub power_scale: PowerScale,
-    /// Block interval at which to debit all credit accounts.
-    pub credit_debit_interval: ChainEpoch,
-    /// Subnet capacity
-    pub blob_storage_capacity: u64,
-    /// Subnet debit rate
-    pub blob_debit_rate: u64,
 }
 
 pub type MachineBlockstore<DB> = <DefaultMachine<DB, FendermintExterns<DB>> as Machine>::Blockstore;
@@ -110,7 +100,7 @@ where
 {
     #[allow(clippy::type_complexity)]
     executor:
-        DefaultExecutor<HokuKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>>,
+        HokuExecutor<HokuKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>>,
     /// Hash of the block currently being executed. For queries and checks this is empty.
     ///
     /// The main motivation to add it here was to make it easier to pass in data to the
@@ -122,6 +112,8 @@ where
     /// Keeps track of block gas usage during execution, and takes care of updating
     /// the chosen gas market strategy (by default an on-chain actor delivering EIP-1559 behaviour).
     block_gas_tracker: BlockGasTracker,
+    /// Keeps track of hoku config parameters used during execution.
+    hoku_config_tracker: HokuConfigTracker,
     /// State of parameters that are outside the control of the FVM but can change and need to be persisted.
     params: FvmUpdatableParams,
     /// Indicate whether the parameters have been updated.
@@ -161,23 +153,23 @@ where
         let engine = multi_engine.get(&nc)?;
         let externs = FendermintExterns::new(blockstore.clone(), params.state_root);
         let machine = DefaultMachine::new(&mc, blockstore.clone(), externs)?;
-        let mut executor = DefaultExecutor::new(engine.clone(), machine)?;
+        let mut executor = HokuExecutor::new(engine.clone(), machine)?;
 
         let block_gas_tracker = BlockGasTracker::create(&mut executor)?;
+
+        let hoku_config_tracker = HokuConfigTracker::create(&mut executor)?;
 
         Ok(Self {
             executor,
             block_hash: None,
             block_producer: None,
             block_gas_tracker,
+            hoku_config_tracker,
             params: FvmUpdatableParams {
                 app_version: params.app_version,
                 base_fee: params.base_fee,
                 circ_supply: params.circ_supply,
                 power_scale: params.power_scale,
-                credit_debit_interval: params.credit_debit_interval,
-                blob_storage_capacity: params.blob_storage_capacity,
-                blob_debit_rate: params.blob_debit_rate,
             },
             params_dirty: false,
         })
@@ -205,6 +197,10 @@ where
 
     pub fn read_gas_market(&mut self) -> anyhow::Result<Reading> {
         BlockGasTracker::read_gas_market(&mut self.executor)
+    }
+
+    pub fn hoku_config_tracker(&self) -> &HokuConfigTracker {
+        &self.hoku_config_tracker
     }
 
     /// Execute message implicitly.
@@ -249,7 +245,7 @@ where
     pub fn execute_with_executor<F, R>(&mut self, exec_func: F) -> anyhow::Result<R>
     where
         F: FnOnce(
-            &mut DefaultExecutor<
+            &mut HokuExecutor<
                 HokuKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
             >,
         ) -> anyhow::Result<R>,
@@ -296,18 +292,6 @@ where
 
     pub fn app_version(&self) -> u64 {
         self.params.app_version
-    }
-
-    pub fn credit_debit_interval(&self) -> ChainEpoch {
-        self.params.credit_debit_interval
-    }
-
-    pub fn blob_storage_capacity(&self) -> u64 {
-        self.params.blob_storage_capacity
-    }
-
-    pub fn blob_debit_rate(&self) -> u64 {
-        self.params.blob_debit_rate
     }
 
     /// Get a mutable reference to the underlying [StateTree].
@@ -384,27 +368,6 @@ where
         F: FnOnce(&mut TokenAmount),
     {
         self.update_params(|p| f(&mut p.circ_supply))
-    }
-
-    pub fn update_credit_debit_interval<F>(&mut self, f: F)
-    where
-        F: FnOnce(&mut ChainEpoch),
-    {
-        self.update_params(|p| f(&mut p.credit_debit_interval))
-    }
-
-    pub fn update_blob_storage_capacity<F>(&mut self, f: F)
-    where
-        F: FnOnce(&mut u64),
-    {
-        self.update_params(|p| f(&mut p.blob_storage_capacity))
-    }
-
-    pub fn update_blob_debit_rate<F>(&mut self, f: F)
-    where
-        F: FnOnce(&mut u64),
-    {
-        self.update_params(|p| f(&mut p.blob_debit_rate))
     }
 
     /// Update the parameters and mark them as dirty.

@@ -1,46 +1,31 @@
-// Copyright 2024 Textile
+// Copyright 2024 Hoku Contributors
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::fmt::Display;
 use std::sync::Arc;
 
-use crate::hoku_kernel::HokuOps;
 use fvm::kernel::{ExecutionError, Result, SyscallError};
 use fvm::syscalls::Context;
 use fvm_shared::error::ErrorNumber;
+use hoku_kernel_ops::HokuOps;
 use iroh::blobs::Hash;
-use maybe_iroh::MaybeIroh;
-use num_traits::FromPrimitive;
+use iroh_manager::IrohManager;
 use once_cell::sync::Lazy;
 use tokio::{spawn, sync::Mutex};
 
-pub mod hoku_kernel;
-
-pub const SYSCALL_MODULE_NAME: &str = "blobs";
+pub const MODULE_NAME: &str = "hoku";
 pub const HASHRM_SYSCALL_FUNCTION_NAME: &str = "hash_rm";
 
 const ENV_IROH_ADDR: &str = "IROH_RPC_ADDR";
-const HASHRM_SYSCALL_ERROR_CODE: u32 = 101; // TODO(sander): Is the okay?
-
-static IROH_INSTANCE: Lazy<Arc<Mutex<MaybeIroh>>> = Lazy::new(|| {
+static IROH_INSTANCE: Lazy<Arc<Mutex<IrohManager>>> = Lazy::new(|| {
     let iroh_addr = std::env::var(ENV_IROH_ADDR).ok();
-    Arc::new(Mutex::new(MaybeIroh::maybe_addr(iroh_addr)))
+    Arc::new(Mutex::new(IrohManager::from_addr(iroh_addr)))
 });
-
-fn syscall_error<D: Display>(error_number: u32) -> impl FnOnce(D) -> ExecutionError {
-    move |e| {
-        ExecutionError::Syscall(SyscallError::new(
-            ErrorNumber::from_u32(error_number).unwrap(),
-            e,
-        ))
-    }
-}
 
 fn hash_source(bytes: &[u8]) -> Result<[u8; 32]> {
     bytes
         .try_into()
-        .map_err(|e| syscall_error(HASHRM_SYSCALL_ERROR_CODE)(e))
+        .map_err(|e| ExecutionError::Syscall(SyscallError::new(ErrorNumber::IllegalArgument, e)))
 }
 
 pub fn hash_rm(context: Context<'_, impl HokuOps>, hash_offset: u32) -> Result<()> {

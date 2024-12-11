@@ -27,7 +27,7 @@ pub struct ReadReqActor;
 impl ReadReqActor {
     fn constructor(rt: &impl Runtime) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let state = State::new();
+        let state = State::default();
         rt.create(&state)
     }
 

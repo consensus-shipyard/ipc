@@ -1,0 +1,29 @@
+[package]
+name = "fendermint_actor_hoku_config"
+description = "Singleton actor for updateable Hoku network parameters"
+license.workspace = true
+edition.workspace = true
+authors.workspace = true
+version = "0.1.0"
+
+[lib]
+## lib is necessary for integration tests
+## cdylib is necessary for Wasm build
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+fil_actors_runtime = { workspace = true }
+fvm_ipld_encoding = { workspace = true }
+fvm_shared = { workspace = true }
+log = { workspace = true, features = ["std"] }
+num-traits = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+
+fendermint_actor_hoku_config_shared = { path = "../hoku_config/shared" }
+fendermint_actor_machine = { path = "../machine" }
+
+[dev-dependencies]
+fil_actors_runtime = { workspace = true, features = ["test_utils"] }
+
+[features]
+fil-actor = ["fil_actors_runtime/fil-actor"]

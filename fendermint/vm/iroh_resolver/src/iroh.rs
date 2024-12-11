@@ -1,4 +1,4 @@
-// Copyright 2024 Textile
+// Copyright 2024 Hoku Contributors
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
@@ -140,8 +140,8 @@ fn start_resolve<V>(
                         );
                         // If we fail to re-enqueue the task, cast a "failure" vote.
                         // And emit a failure event.
-                        if !reenqueue(task.clone(), queue, retry_delay).await {
-                            if add_own_vote(
+                        if !reenqueue(task.clone(), queue, retry_delay).await
+                            && add_own_vote(
                                 task.hash(),
                                 client,
                                 vote_tally,
@@ -151,11 +151,10 @@ fn start_resolve<V>(
                                 to_vote,
                             )
                             .await
-                            {
-                                emit(BlobsFinalityVotingFailure {
-                                    blob_hash: Some(task.hash().into()),
-                                });
-                            }
+                        {
+                            emit(BlobsFinalityVotingFailure {
+                                blob_hash: Some(task.hash().into()),
+                            });
                         }
                     }
                 };

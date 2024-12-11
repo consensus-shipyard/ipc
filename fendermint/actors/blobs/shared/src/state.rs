@@ -2,7 +2,7 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 use fil_actors_runtime::ActorError;
@@ -10,6 +10,7 @@ use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
+use fvm_shared::econ::TokenAmount;
 use serde::{Deserialize, Serialize};
 
 /// The stored representation of a credit account.
@@ -21,6 +22,8 @@ pub struct Account {
     pub credit_free: BigInt,
     /// Current committed credit in byte-blocks that will be used for debits.
     pub credit_committed: BigInt,
+    /// Optional default sponsor account address.
+    pub credit_sponsor: Option<Address>,
     /// The chain epoch of the last debit.
     pub last_debit_epoch: ChainEpoch,
     /// Credit approvals to other accounts, keyed by receiver, keyed by caller,
@@ -30,7 +33,7 @@ pub struct Account {
     /// the origin is Alice.
     /// An approval for Bob might be valid from only one contract caller, so long as
     /// the origin is Bob.
-    pub approvals: HashMap<Address, HashMap<Address, CreditApproval>>,
+    pub approvals: HashMap<Address, CreditApproval>,
     /// The maximum allowed TTL for actor's blobs.
     pub max_ttl_epochs: ChainEpoch,
 }
@@ -41,6 +44,7 @@ impl Account {
             capacity_used: Default::default(),
             credit_free,
             credit_committed: Default::default(),
+            credit_sponsor: None,
             last_debit_epoch: current_epoch,
             approvals: Default::default(),
             max_ttl_epochs: TtlStatus::DEFAULT_MAX_TTL,
@@ -57,6 +61,53 @@ pub struct CreditApproval {
     pub expiry: Option<ChainEpoch>,
     /// Counter for how much credit has been used via this approval.
     pub used: BigInt,
+    /// Optional caller allowlist.
+    /// If not present, any caller is allowed.
+    pub caller_allowlist: Option<HashSet<Address>>,
+}
+
+impl CreditApproval {
+    pub fn remove_caller(&mut self, caller: &Address) -> bool {
+        if let Some(allowlist) = self.caller_allowlist.as_mut() {
+            allowlist.remove(caller)
+        } else {
+            false
+        }
+    }
+
+    pub fn has_allowlist(&self) -> bool {
+        if let Some(allowlist) = self.caller_allowlist.as_ref() {
+            !allowlist.is_empty()
+        } else {
+            false
+        }
+    }
+
+    pub fn is_caller_allowed(&self, caller: &Address) -> bool {
+        if let Some(allowlist) = self.caller_allowlist.as_ref() {
+            allowlist.contains(caller)
+        } else {
+            true
+        }
+    }
+}
+
+/// Credit allowance for an account.
+#[derive(Debug, Default, Clone, PartialEq, Serialize_tuple, Deserialize_tuple)]
+pub struct CreditAllowance {
+    /// The amount from the account.
+    pub amount: TokenAmount,
+    /// The account's default sponsor.
+    pub sponsor: Option<Address>,
+    /// The amount from the account's default sponsor.
+    pub sponsored_amount: TokenAmount,
+}
+
+impl CreditAllowance {
+    /// Returns the total allowance from self and default sponsor.
+    pub fn total(&self) -> TokenAmount {
+        &self.amount + &self.sponsored_amount
+    }
 }
 
 /// Blob blake3 hash.

@@ -1,4 +1,4 @@
-// Copyright 2024 Textile
+// Copyright 2024 Hoku Contributors
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
@@ -35,14 +35,18 @@ impl Actor {
         let (origin, _) = resolve_external(rt, rt.message().origin())?;
         let actor_address = state.address.get()?;
         if origin != owner {
-            let approval = get_credit_approval(rt, owner, origin, actor_address)?;
-            approval.ok_or(actor_error!(
-                forbidden;
-                format!("Unauthorized: missing credit approval from Timehub owner {} to caller {} for Timehub {}", owner, origin, actor_address)))?;
+            let approved = get_credit_approval(rt, owner, origin)?
+                .map(|approval| approval.is_caller_allowed(&actor_address))
+                .unwrap_or_default();
+            if !approved {
+                return Err(actor_error!(
+                    forbidden;
+                    format!("Unauthorized: missing credit approval from Timehub owner {} to origin {} for Timehub {}", owner, origin, actor_address)));
+            }
         }
 
         // Decode the raw bytes as a Cid and report any errors.
-        // However we pass opaque bytes to the store as it tries to validate and resolve any CIDs
+        // However, we pass opaque bytes to the store as it tries to validate and resolve any CIDs
         // it stores.
         let _cid = Cid::try_from(params.0.as_slice()).map_err(|_err| {
             actor_error!(illegal_argument;
