@@ -92,6 +92,8 @@ pub struct ChainEnv {
     pub read_request_pool: ReadRequestPool,
     /// Number of pending read requests to process in parallel.
     pub read_request_concurrency: u32,
+    /// Interval in blocks at which to emit blob metrics
+    pub blob_metrics_interval: ChainEpoch,
 }
 
 #[derive(Clone, Hash, PartialEq, Eq)]
@@ -1106,7 +1108,11 @@ where
 
         // Get pending blobs count and bytes count to emit metrics
         // Only emit metrics every 10 blocks
-        if state.block_height() % 10 == 0 {
+        let current_block = state.block_height();
+        if current_block > 0
+            && env.blob_metrics_interval > 0
+            && current_block % env.blob_metrics_interval == 0
+        {
             let stats = get_blobs_stats(&mut state)?;
             ipc_observability::emit(BlobsFinalityPendingBlobs(stats.num_resolving));
             ipc_observability::emit(BlobsFinalityPendingBytes(stats.bytes_resolving));

@@ -5,6 +5,7 @@ use anyhow::{anyhow, bail, Context};
 use config::{Config, ConfigError, Environment, File};
 use fvm_shared::address::Address;
 use fvm_shared::bigint::Zero;
+use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use ipc_api::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
@@ -288,6 +289,9 @@ pub struct Settings {
 
     /// Number of pending read requests to process in parallel.
     pub read_request_concurrency: u32,
+
+    /// Interval in blocks at which to emit blob metrics
+    pub blob_metrics_interval: ChainEpoch,
 
     pub abci: AbciSettings,
     pub db: DbSettings,
