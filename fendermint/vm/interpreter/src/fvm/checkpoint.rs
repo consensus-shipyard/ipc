@@ -372,10 +372,6 @@ fn should_create_checkpoint<DB>(
 where
     DB: Blockstore + Clone,
 {
-    if !gateway.is_root(state)? {
-        return Ok(None);
-    }
-
     let id = gateway.subnet_id(state)?;
     let is_root = id.route.is_empty();
 
