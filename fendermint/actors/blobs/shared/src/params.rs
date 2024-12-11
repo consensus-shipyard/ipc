@@ -214,15 +214,15 @@ pub struct GetStatsReturn {
     /// The current byte-blocks per atto token rate.
     pub blob_credits_per_byte_block: u64,
     /// Total number of debit accounts.
-    pub num_accounts: u64,
+    // pub num_accounts: u64,
     /// Total number of actively stored blobs.
-    pub num_blobs: u64,
+    // pub num_blobs: u64, FIXME SU Use running counters
     /// Total number of currently resolving blobs.
     pub num_resolving: u64,
     /// Total bytes of all currently resolving blobs.
-    pub bytes_resolving: u64,
+    // pub bytes_resolving: u64, FIXME SU Use running counters
     /// Total number of blobs that are not yet added to the validator's resolve pool.
     pub num_added: u64,
-    /// Total bytes of all blobs that are not yet added to the validator's resolve pool.
-    pub bytes_added: u64,
+    // Total bytes of all blobs that are not yet added to the validator's resolve pool.
+    // pub bytes_added: u64, FIXME SU Use running counters
 }

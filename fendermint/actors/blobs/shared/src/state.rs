@@ -2,19 +2,20 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::{HashMap, HashSet};
-use std::fmt;
-
 use fil_actors_runtime::ActorError;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
+use hoku_ipld::hamt::MapKey;
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use std::fmt;
+use std::str::FromStr;
 
 /// The stored representation of a credit account.
-#[derive(Clone, Debug, PartialEq, Serialize_tuple, Deserialize_tuple)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize_tuple, Deserialize_tuple)]
 pub struct Account {
     /// Total size of all blobs managed by the account.
     pub capacity_used: BigInt,
@@ -33,21 +34,17 @@ pub struct Account {
     /// the origin is Alice.
     /// An approval for Bob might be valid from only one contract caller, so long as
     /// the origin is Bob.
-    pub approvals: HashMap<Address, CreditApproval>,
+    pub approvals: HashMap<String, CreditApproval>,
     /// The maximum allowed TTL for actor's blobs.
     pub max_ttl_epochs: ChainEpoch,
 }
 
 impl Account {
-    pub fn new(credit_free: BigInt, current_epoch: ChainEpoch) -> Self {
+    pub fn new(current_epoch: ChainEpoch) -> Self {
         Self {
-            capacity_used: Default::default(),
-            credit_free,
-            credit_committed: Default::default(),
-            credit_sponsor: None,
             last_debit_epoch: current_epoch,
-            approvals: Default::default(),
             max_ttl_epochs: TtlStatus::DEFAULT_MAX_TTL,
+            ..Default::default()
         }
     }
 }
@@ -117,6 +114,30 @@ impl CreditAllowance {
 #[serde(transparent)]
 pub struct Hash(pub [u8; 32]);
 
+impl TryInto<Hash> for &[u8] {
+    type Error = String;
+
+    fn try_into(self) -> Result<Hash, Self::Error> {
+        if self.len() == 32 {
+            let mut array = [0u8; 32];
+            array.copy_from_slice(self);
+            Ok(Hash(array))
+        } else {
+            Err("hash slice must be exactly 32 bytes".into())
+        }
+    }
+}
+
+impl MapKey for Hash {
+    fn from_bytes(b: &[u8]) -> Result<Self, String> {
+        b.try_into()
+    }
+
+    fn to_bytes(&self) -> Result<Vec<u8>, String> {
+        Ok(self.0.to_vec())
+    }
+}
+
 /// Source https://github.com/n0-computer/iroh/blob/main/iroh-base/src/hash.rs
 impl fmt::Display for Hash {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -151,14 +172,14 @@ impl TryFrom<&str> for Hash {
 pub struct PublicKey(pub [u8; 32]);
 
 /// The stored representation of a blob.
-#[derive(Clone, Debug, Default, Serialize_tuple, Deserialize_tuple)]
+#[derive(Clone, PartialEq, Debug, Default, Serialize_tuple, Deserialize_tuple)]
 pub struct Blob {
     /// The size of the content.
     pub size: u64,
     /// Blob metadata that contains information for block recovery.
     pub metadata_hash: Hash,
     /// Active subscribers (accounts) that are paying for the blob.
-    pub subscribers: HashMap<Address, SubscriptionGroup>,
+    pub subscribers: HashMap<String, SubscriptionGroup>,
     /// Blob status.
     pub status: BlobStatus,
 }
@@ -190,7 +211,7 @@ pub enum SubscriptionId {
     /// Default (empty) ID.
     Default,
     /// Key-based ID.
-    Key(Vec<u8>),
+    Key(String),
 }
 
 impl From<Vec<u8>> for SubscriptionId {
@@ -198,7 +219,18 @@ impl From<Vec<u8>> for SubscriptionId {
         if value.is_empty() {
             SubscriptionId::Default
         } else {
-            let key = blake3::hash(&value).as_bytes().to_vec();
+            let key = blake3::hash(&value).to_hex().to_string();
+            SubscriptionId::Key(key)
+        }
+    }
+}
+
+impl From<String> for SubscriptionId {
+    fn from(value: String) -> Self {
+        if value.is_empty() {
+            SubscriptionId::Default
+        } else {
+            let key = blake3::Hash::from_str(&value).unwrap().to_hex().to_string();
             SubscriptionId::Key(key)
         }
     }
@@ -214,11 +246,11 @@ impl fmt::Display for SubscriptionId {
 }
 
 /// A group of subscriptions for the same subscriber.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct SubscriptionGroup {
     /// Subscription group keys.
-    pub subscriptions: HashMap<SubscriptionId, Subscription>,
+    pub subscriptions: HashMap<String, Subscription>,
 }
 
 impl SubscriptionGroup {
@@ -238,7 +270,7 @@ impl SubscriptionGroup {
             if sub.expiry > max.unwrap_or(0) {
                 max = Some(sub.expiry);
             }
-            let new_value = if id == target_id {
+            let new_value = if *id == target_id.to_string() {
                 new_value.unwrap_or_default()
             } else {
                 sub.expiry
@@ -262,16 +294,17 @@ impl SubscriptionGroup {
         &self,
         trim_id: &SubscriptionId,
     ) -> anyhow::Result<(bool, Option<ChainEpoch>), ActorError> {
+        let tid = trim_id.to_string();
         let trim = self
             .subscriptions
-            .get(trim_id)
+            .get(&tid)
             .ok_or(ActorError::not_found(format!(
                 "subscription id {} not found",
                 trim_id
             )))?;
         let mut next_min = None;
         for (id, sub) in self.subscriptions.iter() {
-            if sub.failed || id == trim_id {
+            if sub.failed || *id == tid {
                 continue;
             }
             if sub.added < trim.added {

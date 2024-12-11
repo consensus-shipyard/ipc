@@ -45,6 +45,7 @@ members = [
     "fendermint/actors/timehub",
     "hoku/actor_sdk",
     "hoku/executor",
+    "hoku/ipld",
     "hoku/iroh_manager",
     "hoku/kernel",
     "hoku/kernel/ops",

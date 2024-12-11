@@ -463,9 +463,10 @@ impl GenesisBuilder {
         // Initialize the blob actor.
         // TODO: Remove constructor params that live in the hoku config actor
         let blobs_state = fendermint_actor_blobs::State::new(
+            &state.store(),
             hoku_config_state.config.blob_capacity,
             hoku_config_state.config.blob_credits_per_byte_block,
-        );
+        )?;
         state
             .create_custom_actor(
                 fendermint_actor_blobs::BLOBS_ACTOR_NAME,

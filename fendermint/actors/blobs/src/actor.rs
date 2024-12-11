@@ -42,7 +42,11 @@ type BlobTuple = (Hash, HashSet<(Address, SubscriptionId, PublicKey)>);
 impl BlobsActor {
     fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let state = State::new(params.blob_capacity, params.blob_credits_per_byte_block);
+        let state = State::new(
+            rt.store(),
+            params.blob_capacity,
+            params.blob_credits_per_byte_block,
+        )?;
         rt.create(&state)
     }
 
@@ -56,7 +60,12 @@ impl BlobsActor {
         rt.validate_immediate_caller_accept_any()?;
         let to = resolve_external_non_machine(rt, params.0)?;
         rt.transaction(|st: &mut State, rt| {
-            st.buy_credit(to, rt.message().value_received(), rt.curr_epoch())
+            st.buy_credit(
+                rt.store(),
+                to,
+                rt.message().value_received(),
+                rt.curr_epoch(),
+            )
         })
     }
 
@@ -69,7 +78,13 @@ impl BlobsActor {
             None
         };
         rt.transaction(|st: &mut State, rt| {
-            st.update_credit(from, sponsor, params.add_amount, rt.curr_epoch())
+            st.update_credit(
+                rt.store(),
+                from,
+                sponsor,
+                params.add_amount,
+                rt.curr_epoch(),
+            )
         })
     }
 
@@ -95,6 +110,7 @@ impl BlobsActor {
         };
         rt.transaction(|st: &mut State, rt| {
             st.approve_credit(
+                rt.store(),
                 from,
                 to,
                 caller_allowlist,
@@ -116,7 +132,7 @@ impl BlobsActor {
         } else {
             None
         };
-        rt.transaction(|st: &mut State, _| st.revoke_credit(from, to, for_caller))
+        rt.transaction(|st: &mut State, rt| st.revoke_credit(rt.store(), from, to, for_caller))
     }
 
     fn set_credit_sponsor(
@@ -131,7 +147,9 @@ impl BlobsActor {
         } else {
             None
         };
-        rt.transaction(|st: &mut State, _| st.set_credit_sponsor(from, sponsor, rt.curr_epoch()))
+        rt.transaction(|st: &mut State, rt| {
+            st.set_credit_sponsor(rt.store(), from, sponsor, rt.curr_epoch())
+        })
     }
 
     fn get_account(
@@ -139,7 +157,7 @@ impl BlobsActor {
         params: GetAccountParams,
     ) -> Result<Option<Account>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let account = rt.state::<State>()?.get_account(params.0);
+        let account = rt.state::<State>()?.get_account(rt.store(), params.0)?;
         Ok(account)
     }
 
@@ -150,7 +168,9 @@ impl BlobsActor {
         rt.validate_immediate_caller_accept_any()?;
         let from = resolve_external_non_machine(rt, params.from)?;
         let to = resolve_external_non_machine(rt, params.to)?;
-        let approval = rt.state::<State>()?.get_credit_approval(from, to);
+        let approval = rt
+            .state::<State>()?
+            .get_credit_approval(rt.store(), from, to)?;
         Ok(approval)
     }
 
@@ -170,13 +190,16 @@ impl BlobsActor {
                 };
             }
         };
-        rt.state::<State>()?
-            .get_credit_allowance(from, rt.curr_epoch())
+        let allowance =
+            rt.state::<State>()?
+                .get_credit_allowance(rt.store(), from, rt.curr_epoch())?;
+        Ok(allowance)
     }
 
     fn debit_accounts(rt: &impl Runtime) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let deletes = rt.transaction(|st: &mut State, _| st.debit_accounts(rt.curr_epoch()))?;
+        let deletes =
+            rt.transaction(|st: &mut State, rt| st.debit_accounts(rt.store(), rt.curr_epoch()))?;
         for hash in deletes {
             delete_from_disc(hash)?;
         }
@@ -196,6 +219,7 @@ impl BlobsActor {
         let tokens_received = rt.message().value_received();
         let (subscription, unspent_tokens) = rt.transaction(|st: &mut State, rt| {
             st.add_blob(
+                rt.store(),
                 origin,
                 caller,
                 subscriber,
@@ -218,7 +242,7 @@ impl BlobsActor {
 
     fn get_blob(rt: &impl Runtime, params: GetBlobParams) -> Result<Option<Blob>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let blob = rt.state::<State>()?.get_blob(params.0);
+        let blob = rt.state::<State>()?.get_blob(rt.store(), params.0)?;
         Ok(blob)
     }
 
@@ -227,9 +251,12 @@ impl BlobsActor {
         params: GetBlobStatusParams,
     ) -> Result<Option<BlobStatus>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let status =
-            rt.state::<State>()?
-                .get_blob_status(params.subscriber, params.hash, params.id);
+        let status = rt.state::<State>()?.get_blob_status(
+            rt.store(),
+            params.subscriber,
+            params.hash,
+            params.id,
+        );
         Ok(status)
     }
 
@@ -255,16 +282,23 @@ impl BlobsActor {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         // We control this method call and can guarantee subscriber is an external address,
         // i.e., no need to resolve its external address.
-        rt.transaction(|st: &mut State, _| {
-            st.set_blob_pending(params.subscriber, params.hash, params.id, params.source)
+        rt.transaction(|st: &mut State, rt| {
+            st.set_blob_pending(
+                rt.store(),
+                params.subscriber,
+                params.hash,
+                params.id,
+                params.source,
+            )
         })
     }
 
     fn finalize_blob(rt: &impl Runtime, params: FinalizeBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         let (subscriber, _) = resolve_external(rt, params.subscriber)?;
-        rt.transaction(|st: &mut State, _| {
+        rt.transaction(|st: &mut State, rt| {
             st.finalize_blob(
+                rt.store(),
                 subscriber,
                 rt.curr_epoch(),
                 params.hash,
@@ -284,8 +318,9 @@ impl BlobsActor {
         } else {
             origin
         };
-        let delete = rt.transaction(|st: &mut State, _| {
+        let delete = rt.transaction(|st: &mut State, rt| {
             st.delete_blob(
+                rt.store(),
                 origin,
                 caller,
                 subscriber,
@@ -316,9 +351,10 @@ impl BlobsActor {
         };
 
         // The call should be atomic, hence we wrap two independent calls in a transaction.
-        let (delete, subscription) = rt.transaction(|st: &mut State, _| {
+        let (delete, subscription) = rt.transaction(|st: &mut State, rt| {
             let add_params = params.add;
             let delete = st.delete_blob(
+                rt.store(),
                 origin,
                 caller,
                 subscriber,
@@ -327,6 +363,7 @@ impl BlobsActor {
                 add_params.id.clone(),
             )?;
             let (subscription, _) = st.add_blob(
+                rt.store(),
                 origin,
                 caller,
                 subscriber,
@@ -353,8 +390,8 @@ impl BlobsActor {
     ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         let account = resolve_external_non_machine(rt, params.account)?;
-        rt.transaction(|st: &mut State, _| {
-            st.set_ttl_status(account, params.status, rt.curr_epoch())
+        rt.transaction(|st: &mut State, rt| {
+            st.set_ttl_status(rt.store(), account, params.status, rt.curr_epoch())
         })
     }
 
