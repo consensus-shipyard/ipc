@@ -36,6 +36,9 @@ blob_concurrency = 1024
 # Number of pending read requests to process in parallel
 read_request_concurrency = 10
 
+# Interval in blocks at which to emit blob metrics
+blob_metrics_interval = 10
+
 [abci]
 # Number of concurrent requests allowed to be _submitted_ to the application.
 # Because message handling is asynhronous, this doesn't make any difference
