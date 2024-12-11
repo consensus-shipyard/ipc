@@ -29,7 +29,7 @@ pub struct HokuConfig {
 impl Default for HokuConfig {
     fn default() -> Self {
         Self {
-            blob_capacity: 1024 * 1024 * 1024 * 1024, // 1 TiB
+            blob_capacity: 10 * 1024 * 1024 * 1024 * 1024, // 10 TiB
             blob_credits_per_byte_block: 1,
             blob_credit_debit_interval: ChainEpoch::from(3600),
         }
