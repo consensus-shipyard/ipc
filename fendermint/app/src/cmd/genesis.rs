@@ -305,15 +305,12 @@ fn set_ipc_gateway(genesis_file: &PathBuf, args: &GenesisIpcGatewayArgs) -> anyh
 async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> anyhow::Result<()> {
     let genesis_params = read_genesis(genesis_file)?;
 
-    let mut builder = GenesisBuilder::new(
+    let builder = GenesisBuilder::new(
         args.builtin_actors_path.clone(),
         args.custom_actors_path.clone(),
+        args.artifacts_path.clone(),
         genesis_params,
     );
-
-    if let Some(ref ipc_system_artifacts) = args.artifacts_path {
-        builder = builder.with_ipc_system_contracts(ipc_system_artifacts.clone());
-    }
 
     builder.write_to(args.output_path.clone()).await
 }

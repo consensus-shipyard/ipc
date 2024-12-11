@@ -1,69 +1,49 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-//! Tracks the validator id from tendermint to their corresponding public key.
-
-use anyhow::anyhow;
+use anyhow::{anyhow, Ok, Result};
 use fendermint_crypto::PublicKey;
-use fvm_shared::clock::ChainEpoch;
+use fendermint_vm_interpreter::fvm::state::ipc::GatewayCaller;
+use fendermint_vm_interpreter::fvm::state::FvmExecState;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
-use tendermint::block::Height;
-use tendermint_rpc::{Client, Paging};
+
+use tendermint::account::Id as TendermintId;
+use tendermint::PublicKey as TendermintPubKey;
+
+use fvm_ipld_blockstore::Blockstore;
 
 #[derive(Clone)]
-pub(crate) struct ValidatorTracker<C> {
-    client: C,
-    public_keys: Arc<RwLock<HashMap<tendermint::account::Id, PublicKey>>>,
+// Tracks the validator ID from Tendermint to their corresponding public key.
+pub(crate) struct ValidatorCache {
+    map: HashMap<TendermintId, PublicKey>,
 }
 
-impl<C: Client> ValidatorTracker<C> {
-    pub fn new(client: C) -> Self {
-        Self {
-            client,
-            public_keys: Arc::new(RwLock::new(HashMap::new())),
-        }
-    }
-}
+impl ValidatorCache {
+    pub fn new_from_state<SS>(state: &mut FvmExecState<SS>) -> Result<Self>
+    where
+        SS: Blockstore + Clone + 'static,
+    {
+        let gateway = GatewayCaller::default();
+        let (_, validators) = gateway.current_power_table(state)?;
 
-impl<C: Client + Sync> ValidatorTracker<C> {
-    /// Get the public key of the validator by id. Note that the id is expected to be a validator.
-    pub async fn get_validator(
-        &self,
-        id: &tendermint::account::Id,
-        height: ChainEpoch,
-    ) -> anyhow::Result<PublicKey> {
-        if let Some(key) = self.get_from_cache(id) {
-            return Ok(key);
-        }
+        let map = validators
+            .iter()
+            .map(|v| {
+                let tendermint_pub_key: TendermintPubKey =
+                    TendermintPubKey::try_from(v.public_key.clone())?;
+                let id = TendermintId::from(tendermint_pub_key);
+                let key = *v.public_key.public_key();
+                Ok((id, key))
+            })
+            .collect::<Result<HashMap<_, _>, _>>()?;
 
-        // this means validators have changed, re-pull all validators
-        let height = Height::try_from(height)?;
-        let response = self.client.validators(height, Paging::All).await?;
-
-        let mut new_validators = HashMap::new();
-        let mut pubkey = None;
-        for validator in response.validators {
-            let p = validator.pub_key.secp256k1().unwrap();
-            let compressed = p.to_encoded_point(true);
-            let b = compressed.as_bytes();
-            let key = PublicKey::parse_slice(b, None)?;
-
-            if *id == validator.address {
-                pubkey = Some(key);
-            }
-
-            new_validators.insert(validator.address, key);
-        }
-
-        *self.public_keys.write().unwrap() = new_validators;
-
-        // cannot find the validator, this should not have happened usually
-        pubkey.ok_or_else(|| anyhow!("{} not validator", id))
+        Ok(Self { map })
     }
 
-    fn get_from_cache(&self, id: &tendermint::account::Id) -> Option<PublicKey> {
-        let keys = self.public_keys.read().unwrap();
-        keys.get(id).copied()
+    pub fn get_validator(&self, id: &tendermint::account::Id) -> Result<PublicKey> {
+        self.map
+            .get(id)
+            .cloned()
+            .ok_or_else(|| anyhow!("validator not found"))
     }
 }
