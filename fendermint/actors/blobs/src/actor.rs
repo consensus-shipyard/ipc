@@ -351,9 +351,10 @@ impl BlobsActor {
         };
 
         // The call should be atomic, hence we wrap two independent calls in a transaction.
-        let (delete, subscription) = rt.transaction(|st: &mut State, _| {
+        let (delete, subscription) = rt.transaction(|st: &mut State, rt| {
             let add_params = params.add;
             let delete = st.delete_blob(
+                rt.store(),
                 origin,
                 caller,
                 subscriber,
@@ -362,6 +363,7 @@ impl BlobsActor {
                 add_params.id.clone(),
             )?;
             let (subscription, _) = st.add_blob(
+                rt.store(),
                 origin,
                 caller,
                 subscriber,
