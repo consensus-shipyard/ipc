@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use crate::fvm::FvmMessage;
-use fvm_shared::bigint::BigInt;
 use fvm_shared::econ::TokenAmount;
 use num_traits::{ToPrimitive, Zero};
 
@@ -40,15 +39,12 @@ impl TxnPriorityCalculator {
     pub fn priority(&self, msg: &FvmMessage) -> i64 {
         let base_fee = self.lowest_base_fee();
 
-        if msg.gas_fee_cap >= base_fee {
-            let i = msg.gas_fee_cap.clone() - base_fee + msg.gas_premium.clone();
-            i.atto()
-                .min(&BigInt::from(i64::MAX))
-                .to_i64()
-                .expect("clipped to i64 max")
-        } else {
-            0
+        if msg.gas_fee_cap < base_fee {
+            return i64::MIN;
         }
+
+        let effective_premium = msg.gas_premium.clone().min(&msg.gas_fee_cap - base_fee);
+        effective_premium.atto().to_i64().unwrap_or(i64::MAX)
     }
 
     fn lowest_base_fee(&self) -> TokenAmount {
@@ -187,17 +183,20 @@ mod tests {
         // lowest base fee is 10
 
         let msg = create_msg(TokenAmount::from_atto(1), TokenAmount::from_atto(20));
-        assert_eq!(cal.priority(&msg), 0);
+        assert_eq!(cal.priority(&msg), i64::MIN);
 
         let msg = create_msg(TokenAmount::from_atto(10), TokenAmount::from_atto(20));
-        assert_eq!(cal.priority(&msg), 20);
+        assert_eq!(cal.priority(&msg), 0);
 
         let msg = create_msg(TokenAmount::from_atto(15), TokenAmount::from_atto(20));
-        assert_eq!(cal.priority(&msg), 25);
+        assert_eq!(cal.priority(&msg), 5);
+
+        let msg = create_msg(TokenAmount::from_atto(40), TokenAmount::from_atto(20));
+        assert_eq!(cal.priority(&msg), 20);
 
         let msg = create_msg(
-            TokenAmount::from_atto(BigInt::from(i64::MAX)),
-            TokenAmount::from_atto(BigInt::from(i64::MAX)),
+            TokenAmount::from_atto(BigInt::from(i128::MAX)),
+            TokenAmount::from_atto(BigInt::from(i128::MAX)),
         );
         assert_eq!(cal.priority(&msg), i64::MAX);
     }
