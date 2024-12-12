@@ -56,3 +56,23 @@ pub fn to_eth_transaction(
         other: Default::default(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use ethers_core::types::Signature;
+    use ethers_core::types::transaction::eip2718::TypedTransaction;
+    use ethers_core::utils::rlp;
+    use crate::conv::from_eth::to_fvm_message;
+
+    #[test]
+    fn test_legacy_transaction() {
+        let raw_tx = "f86e158512bfb19e608301f8dc94c083e9947cf02b8ffc7d3090ae9aea72df98fd4789056bc75e2d63100000801ca0a254fe085f721c2abe00a2cd244110bfc0df5f4f25461c85d8ab75ebac11eb10a030b7835ba481955b20193a703ebc5fdffeab081d63117199040cdf5a91c68765";
+        let raw_tx = hex::decode(raw_tx).unwrap();
+
+        let rlp = rlp::Rlp::new(raw_tx.as_ref());
+        let (tx, sig): (TypedTransaction, Signature) = TypedTransaction::decode_signed(&rlp).unwrap();
+
+        let r = to_fvm_message(tx).unwrap();
+
+    }
+}

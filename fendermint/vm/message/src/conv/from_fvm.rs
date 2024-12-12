@@ -93,8 +93,48 @@ pub fn to_eth_signature(sig: &FvmSignature, normalized: bool) -> anyhow::Result<
     Ok(sig)
 }
 
-/// Turn an FVM `Message` back into an Ethereum transaction request.
-pub fn to_eth_transaction_request(
+/// Turn an FVM `Message` back into an Ethereum legacy transaction request.
+pub fn to_eth_legacy_request(
+    msg: &Message,
+    chain_id: &ChainID,
+) -> anyhow::Result<et::TransactionRequest> {
+    let chain_id: u64 = (*chain_id).into();
+
+    let Message {
+        from,
+        to,
+        sequence,
+        value,
+        params,
+        gas_limit,
+        gas_fee_cap,
+        ..
+    } = msg;
+
+    let data = fvm_ipld_encoding::from_slice::<BytesDe>(params).map(|bz| bz.0)?;
+
+    let mut tx = et::TransactionRequest::new()
+        .chain_id(chain_id)
+        .from(to_eth_address(from)?.unwrap_or_default())
+        .nonce(*sequence)
+        .gas(*gas_limit)
+        .gas_price(to_eth_tokens(gas_fee_cap)?)
+        .data(et::Bytes::from(data));
+
+    tx.to = to_eth_address(to)?.map(et::NameOrAddress::Address);
+
+    // NOTE: It's impossible to tell if the original Ethereum transaction sent None or Some(0).
+    // The ethers deployer sends None, so let's assume that's the useful behavour to match.
+    // Luckily the RLP encoding at some point seems to resolve them to the same thing.
+    if !value.is_zero() {
+        tx.value = Some(to_eth_tokens(value)?);
+    }
+
+    Ok(tx)
+}
+
+/// Turn an FVM `Message` back into an Ethereum eip1559 transaction request.
+pub fn to_eth_eip1559_request(
     msg: &Message,
     chain_id: &ChainID,
 ) -> anyhow::Result<et::Eip1559TransactionRequest> {
@@ -157,7 +197,7 @@ pub mod tests {
         tests::{EthMessage, KeyPair},
     };
 
-    use super::{to_eth_signature, to_eth_tokens, to_eth_transaction_request};
+    use super::{to_eth_signature, to_eth_tokens, to_eth_eip1559_request};
 
     #[quickcheck]
     fn prop_to_eth_tokens(tokens: ArbTokenAmount) -> bool {
@@ -210,7 +250,7 @@ pub mod tests {
     fn prop_to_and_from_eth_transaction(msg: EthMessage, chain_id: u64) {
         let chain_id = ChainID::from(chain_id);
         let msg0 = msg.0;
-        let tx = to_eth_transaction_request(&msg0, &chain_id)
+        let tx = to_eth_eip1559_request(&msg0, &chain_id)
             .expect("to_eth_transaction_request failed");
         let msg1 = fvm_message_from_eip1559(&tx).expect("to_fvm_message failed");
 
@@ -225,7 +265,7 @@ pub mod tests {
 
         let chain_id = ChainID::from(chain_id);
         let msg0 = msg.0;
-        let tx: TypedTransaction = to_eth_transaction_request(&msg0, &chain_id)
+        let tx: TypedTransaction = to_eth_eip1559_request(&msg0, &chain_id)
             .expect("to_eth_transaction_request failed")
             .into();
 

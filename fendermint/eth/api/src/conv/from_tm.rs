@@ -9,7 +9,7 @@ use std::str::FromStr;
 use anyhow::{anyhow, Context};
 use ethers_core::types::{self as et};
 use fendermint_vm_actor_interface::eam::EthAddress;
-use fendermint_vm_message::conv::from_fvm::to_eth_transaction_request;
+use fendermint_vm_message::conv::from_fvm::to_eth_eip1559_request;
 use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
 use fvm_shared::address::Address;
 use fvm_shared::bigint::Zero;
@@ -215,7 +215,7 @@ pub fn to_eth_transaction(
         to_eth_signature(msg.signature(), true).context("failed to convert to eth signature")?;
 
     // Recover the original request; this method has better tests.
-    let tx = to_eth_transaction_request(&msg.message, &chain_id)
+    let tx = to_eth_eip1559_request(&msg.message, &chain_id)
         .context("failed to convert to tx request")?;
 
     let tx = from_eth::to_eth_transaction(tx, sig, hash);
