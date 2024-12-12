@@ -331,7 +331,7 @@ pub fn emit_trace_if_check_checkpoint_finalized<DB>(
 where
     DB: Blockstore + Clone,
 {
-    if !gateway.enabled(state)? {
+    if !gateway.is_anchored(state)? {
         return Ok(());
     }
 
@@ -372,10 +372,6 @@ fn should_create_checkpoint<DB>(
 where
     DB: Blockstore + Clone,
 {
-    if !gateway.enabled(state)? {
-        return Ok(None);
-    }
-
     let id = gateway.subnet_id(state)?;
     let is_root = id.route.is_empty();
 

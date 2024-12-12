@@ -79,16 +79,8 @@ impl<DB> GatewayCaller<DB> {
 }
 
 impl<DB: Blockstore + Clone> GatewayCaller<DB> {
-    /// Check that IPC is configured in this deployment.
-    pub fn enabled(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<bool> {
-        match state.state_tree_mut().get_actor(GATEWAY_ACTOR_ID)? {
-            None => Ok(false),
-            Some(a) => Ok(!state.builtin_actors().is_placeholder_actor(&a.code)),
-        }
-    }
-
     /// Return true if the current subnet is the root subnet.
-    pub fn is_root(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<bool> {
+    pub fn is_anchored(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<bool> {
         self.subnet_id(state).map(|id| id.route.is_empty())
     }
 
