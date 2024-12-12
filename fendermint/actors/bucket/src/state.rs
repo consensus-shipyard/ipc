@@ -7,7 +7,7 @@ use std::string::FromUtf8Error;
 
 use cid::Cid;
 use fendermint_actor_blobs_shared::state::Hash;
-use fendermint_actor_machine::{Kind, MachineAddress, MachineState, WriteAccess};
+use fendermint_actor_machine::{Kind, MachineAddress, MachineState};
 use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::*;
@@ -33,8 +33,6 @@ pub struct State {
     pub address: MachineAddress,
     /// The machine robust owner address.
     pub owner: Address,
-    /// Write access dictates who can write to the machine.
-    pub write_access: WriteAccess,
     /// The root cid of the Hamt.
     pub root: Cid,
     /// User-defined metadata (e.g., bucket name, etc.).
@@ -45,7 +43,6 @@ impl MachineState for State {
     fn new<BS: Blockstore>(
         store: &BS,
         owner: Address,
-        write_access: WriteAccess,
         metadata: HashMap<String, String>,
     ) -> anyhow::Result<Self, ActorError> {
         let root = match Hamt::<_, ObjectState>::new_with_bit_width(store, BIT_WIDTH).flush() {
@@ -60,7 +57,6 @@ impl MachineState for State {
         Ok(Self {
             address: Default::default(),
             owner,
-            write_access,
             root,
             metadata,
         })
@@ -80,10 +76,6 @@ impl MachineState for State {
 
     fn owner(&self) -> Address {
         self.owner
-    }
-
-    fn write_access(&self) -> WriteAccess {
-        self.write_access
     }
 
     fn metadata(&self) -> HashMap<String, String> {
@@ -330,12 +322,7 @@ mod tests {
     #[test]
     fn test_constructor() {
         let store = MemoryBlockstore::default();
-        let state = State::new(
-            &store,
-            Address::new_id(100),
-            WriteAccess::OnlyOwner,
-            HashMap::new(),
-        );
+        let state = State::new(&store, Address::new_id(100), HashMap::new());
         assert!(state.is_ok());
         assert_eq!(
             state.unwrap().root,
@@ -347,13 +334,7 @@ mod tests {
     #[test]
     fn test_add() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(
-            &store,
-            Address::new_id(100),
-            WriteAccess::OnlyOwner,
-            HashMap::new(),
-        )
-        .unwrap();
+        let mut state = State::new(&store, Address::new_id(100), HashMap::new()).unwrap();
         let object = object_one();
         assert!(state
             .add(
@@ -372,13 +353,7 @@ mod tests {
     #[quickcheck]
     fn test_delete(object: ObjectState) {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(
-            &store,
-            Address::new_id(100),
-            WriteAccess::OnlyOwner,
-            HashMap::new(),
-        )
-        .unwrap();
+        let mut state = State::new(&store, Address::new_id(100), HashMap::new()).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
         state
             .add(
@@ -400,13 +375,7 @@ mod tests {
     #[quickcheck]
     fn test_get(object: ObjectState) {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(
-            &store,
-            Address::new_id(100),
-            WriteAccess::OnlyOwner,
-            HashMap::new(),
-        )
-        .unwrap();
+        let mut state = State::new(&store, Address::new_id(100), HashMap::new()).unwrap();
         let key = BytesKey(vec![1, 2, 3]);
         let md = object.metadata.clone();
         state
@@ -469,13 +438,7 @@ mod tests {
     #[test]
     fn test_list_all_keys() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(
-            &store,
-            Address::new_id(100),
-            WriteAccess::OnlyOwner,
-            HashMap::new(),
-        )
-        .unwrap();
+        let mut state = State::new(&store, Address::new_id(100), HashMap::new()).unwrap();
 
         let (baz_key, _, _) = create_and_put_objects(&mut state, &store).unwrap();
 
@@ -491,13 +454,7 @@ mod tests {
     #[test]
     fn test_list_more_than_max_limit() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(
-            &store,
-            Address::new_id(100),
-            WriteAccess::OnlyOwner,
-            HashMap::new(),
-        )
-        .unwrap();
+        let mut state = State::new(&store, Address::new_id(100), HashMap::new()).unwrap();
 
         let sequence = get_lex_sequence(vec![0, 0, 0], MAX_LIST_LIMIT + 10);
         for key in sequence {
@@ -537,13 +494,7 @@ mod tests {
     #[test]
     fn test_list_at_max_limit() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(
-            &store,
-            Address::new_id(100),
-            WriteAccess::OnlyOwner,
-            HashMap::new(),
-        )
-        .unwrap();
+        let mut state = State::new(&store, Address::new_id(100), HashMap::new()).unwrap();
 
         for i in 0..MAX_LIST_LIMIT {
             let key = BytesKey(format!("{}.txt", i).as_bytes().to_vec());
@@ -571,13 +522,7 @@ mod tests {
     #[test]
     fn test_list_keys_with_prefix() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(
-            &store,
-            Address::new_id(100),
-            WriteAccess::OnlyOwner,
-            HashMap::new(),
-        )
-        .unwrap();
+        let mut state = State::new(&store, Address::new_id(100), HashMap::new()).unwrap();
 
         let (baz_key, bar_key, _) = create_and_put_objects(&mut state, &store).unwrap();
 
@@ -593,13 +538,7 @@ mod tests {
     #[test]
     fn test_list_keys_with_delimiter() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(
-            &store,
-            Address::new_id(100),
-            WriteAccess::OnlyOwner,
-            HashMap::new(),
-        )
-        .unwrap();
+        let mut state = State::new(&store, Address::new_id(100), HashMap::new()).unwrap();
 
         let (_, _, jpeg_key) = create_and_put_objects(&mut state, &store).unwrap();
 
@@ -624,13 +563,7 @@ mod tests {
     #[test]
     fn test_list_keys_with_nested_delimiter() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(
-            &store,
-            Address::new_id(100),
-            WriteAccess::OnlyOwner,
-            HashMap::new(),
-        )
-        .unwrap();
+        let mut state = State::new(&store, Address::new_id(100), HashMap::new()).unwrap();
 
         let jpeg_key = BytesKey("foo.jpeg".as_bytes().to_vec());
         let hash = new_hash(256);
@@ -690,13 +623,7 @@ mod tests {
     #[test]
     fn test_list_with_start_key_and_limit() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(
-            &store,
-            Address::new_id(100),
-            WriteAccess::OnlyOwner,
-            HashMap::new(),
-        )
-        .unwrap();
+        let mut state = State::new(&store, Address::new_id(100), HashMap::new()).unwrap();
 
         let (_, bar_key, _) = create_and_put_objects(&mut state, &store).unwrap();
 
@@ -712,13 +639,7 @@ mod tests {
     #[test]
     fn test_list_with_prefix_delimiter_and_start_key_and_limit() {
         let store = MemoryBlockstore::default();
-        let mut state = State::new(
-            &store,
-            Address::new_id(100),
-            WriteAccess::OnlyOwner,
-            HashMap::new(),
-        )
-        .unwrap();
+        let mut state = State::new(&store, Address::new_id(100), HashMap::new()).unwrap();
 
         let one = BytesKey("hello/world".as_bytes().to_vec());
         let hash = new_hash(256);

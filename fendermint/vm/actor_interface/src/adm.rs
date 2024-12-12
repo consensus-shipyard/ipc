@@ -1,7 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use fendermint_actor_machine::WriteAccess;
 use fvm_ipld_encoding::tuple::{Deserialize_tuple, Serialize_tuple};
 use fvm_shared::{address::Address, ActorID, METHOD_CONSTRUCTOR};
 use serde::{Deserialize, Serialize};
@@ -59,7 +58,6 @@ pub struct Metadata {
 pub struct CreateExternalParams {
     pub owner: Address,
     pub kind: Kind,
-    pub write_access: WriteAccess,
     pub metadata: HashMap<String, String>,
 }
 

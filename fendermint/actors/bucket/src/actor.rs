@@ -226,7 +226,7 @@ mod tests {
     };
     use fendermint_actor_blobs_shared::state::{Hash, PublicKey, Subscription, SubscriptionGroup};
     use fendermint_actor_blobs_shared::{Method as BlobMethod, BLOBS_ACTOR_ADDR};
-    use fendermint_actor_machine::{ConstructorParams, InitParams, WriteAccess};
+    use fendermint_actor_machine::{ConstructorParams, InitParams};
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::runtime::Runtime;
     use fil_actors_runtime::test_utils::{
@@ -250,17 +250,11 @@ mod tests {
         };
         rt.set_caller(*INIT_ACTOR_CODE_ID, INIT_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![INIT_ACTOR_ADDR]);
-        let write_access: WriteAccess = WriteAccess::Public;
         let metadata = HashMap::new();
         let actor_construction = rt
             .call::<Actor>(
                 Method::Constructor as u64,
-                IpldBlock::serialize_cbor(&ConstructorParams {
-                    owner,
-                    write_access,
-                    metadata,
-                })
-                .unwrap(),
+                IpldBlock::serialize_cbor(&ConstructorParams { owner, metadata }).unwrap(),
             )
             .unwrap();
         expect_empty(actor_construction);
