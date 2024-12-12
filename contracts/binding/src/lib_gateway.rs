@@ -113,12 +113,12 @@ pub mod lib_gateway {
     pub static LIBGATEWAY_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
         ::ethers::contract::Lazy::new(__abi);
     #[rustfmt::skip]
-    const __BYTECODE: &[u8] = b"`\x80\x80`@R4`\x17W`:\x90\x81`\x1D\x8290\x81PP\xF3[`\0\x80\xFD\xFE`\0\x80\xFD\xFE\xA2dipfsX\"\x12 \xAF>\xD4\xDF\x12\x1D\xE6\x1Fy<$_\x06\xC2z^)2L\\d\x81\xC5\xC1\xDE\x17zi|6S\xB2dsolcC\0\x08\x17\x003";
+    const __BYTECODE: &[u8] = b"`\x80\x80`@R4`\x17W`:\x90\x81`\x1D\x8290\x81PP\xF3[`\0\x80\xFD\xFE`\0\x80\xFD\xFE\xA2dipfsX\"\x12 \xFA\xD61M\x13Df\xA0'\xF5\xDD\x8A\xBEc\xF2\x11\xEF9a\xDE\xE1\xC2\xAE\xE6p\n4W\xBF\xB6\xEA\x9FdsolcC\0\x08\x17\x003";
     /// The bytecode of the contract.
     pub static LIBGATEWAY_BYTECODE: ::ethers::core::types::Bytes =
         ::ethers::core::types::Bytes::from_static(__BYTECODE);
     #[rustfmt::skip]
-    const __DEPLOYED_BYTECODE: &[u8] = b"`\0\x80\xFD\xFE\xA2dipfsX\"\x12 \xAF>\xD4\xDF\x12\x1D\xE6\x1Fy<$_\x06\xC2z^)2L\\d\x81\xC5\xC1\xDE\x17zi|6S\xB2dsolcC\0\x08\x17\x003";
+    const __DEPLOYED_BYTECODE: &[u8] = b"`\0\x80\xFD\xFE\xA2dipfsX\"\x12 \xFA\xD61M\x13Df\xA0'\xF5\xDD\x8A\xBEc\xF2\x11\xEF9a\xDE\xE1\xC2\xAE\xE6p\n4W\xBF\xB6\xEA\x9FdsolcC\0\x08\x17\x003";
     /// The deployed bytecode of the contract.
     pub static LIBGATEWAY_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
         ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);

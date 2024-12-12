@@ -3,12 +3,22 @@
 use std::future::Future;
 use std::sync::Arc;
 
+use crate::observe::{
+    BlockCommitted, BlockProposalEvaluated, BlockProposalReceived, BlockProposalSent, Message,
+    MpoolReceived,
+};
+use crate::validators::ValidatorCache;
+use crate::AppExitCode;
+use crate::BlockHeight;
+use crate::{tmconv::*, VERSION};
 use anyhow::{anyhow, Context, Result};
 use async_stm::{atomically, atomically_or_err};
 use async_trait::async_trait;
 use cid::Cid;
 use fendermint_abci::util::take_until_max_size;
 use fendermint_abci::{AbciResult, Application};
+use fendermint_actors_api::gas_market::Reading;
+use fendermint_crypto::PublicKey;
 use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
 };
@@ -41,17 +51,8 @@ use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
-use tendermint_rpc::Client;
+use tendermint::consensus::params::Params as TendermintConsensusParams;
 use tracing::instrument;
-
-use crate::observe::{
-    BlockCommitted, BlockProposalEvaluated, BlockProposalReceived, BlockProposalSent, Message,
-    MpoolReceived,
-};
-use crate::validators::ValidatorTracker;
-use crate::AppExitCode;
-use crate::BlockHeight;
-use crate::{tmconv::*, VERSION};
 
 #[derive(Serialize)]
 #[repr(u8)]
@@ -117,11 +118,10 @@ pub struct AppConfig<S: KVStore> {
 
 /// Handle ABCI requests.
 #[derive(Clone)]
-pub struct App<DB, SS, S, I, C>
+pub struct App<DB, SS, S, I>
 where
     SS: Blockstore + Clone + 'static,
     S: KVStore,
-    C: Client,
 {
     /// Database backing all key-value operations.
     db: Arc<DB>,
@@ -162,13 +162,11 @@ where
     ///
     /// Zero means unlimited.
     state_hist_size: u64,
-    /// Tracks the validator
-    validators: ValidatorTracker<C>,
-    /// The cometbft client
-    client: C,
+    /// Caches the validators.
+    validators_cache: Arc<tokio::sync::Mutex<Option<ValidatorCache>>>,
 }
 
-impl<DB, SS, S, I, C> App<DB, SS, S, I, C>
+impl<DB, SS, S, I> App<DB, SS, S, I>
 where
     S: KVStore
         + Codec<AppState>
@@ -177,7 +175,6 @@ where
         + Codec<FvmStateParams>,
     DB: KVWritable<S> + KVReadable<S> + Clone + 'static,
     SS: Blockstore + Clone + 'static,
-    C: Client + Clone,
 {
     pub fn new(
         config: AppConfig<S>,
@@ -186,7 +183,6 @@ where
         interpreter: I,
         chain_env: ChainEnv,
         snapshots: Option<SnapshotClient>,
-        client: C,
     ) -> Result<Self> {
         let app = Self {
             db: Arc::new(db),
@@ -201,15 +197,14 @@ where
             snapshots,
             exec_state: Arc::new(tokio::sync::Mutex::new(None)),
             check_state: Arc::new(tokio::sync::Mutex::new(None)),
-            validators: ValidatorTracker::new(client.clone()),
-            client,
+            validators_cache: Arc::new(tokio::sync::Mutex::new(None)),
         };
         app.init_committed_state()?;
         Ok(app)
     }
 }
 
-impl<DB, SS, S, I, C> App<DB, SS, S, I, C>
+impl<DB, SS, S, I> App<DB, SS, S, I>
 where
     S: KVStore
         + Codec<AppState>
@@ -218,7 +213,6 @@ where
         + Codec<FvmStateParams>,
     DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
     SS: Blockstore + 'static + Clone,
-    C: Client,
 {
     /// Get an owned clone of the state store.
     fn state_store_clone(&self) -> SS {
@@ -244,6 +238,7 @@ where
                     chain_id: 0,
                     power_scale: 0,
                     app_version: 0,
+                    consensus_params: None,
                 },
             };
             self.set_committed_state(state)?;
@@ -292,6 +287,31 @@ where
                 Ok(())
             })
             .context("commit failed")
+    }
+
+    /// Diff our current consensus params with new values, and return Some with the final params
+    /// if they differ (and therefore a consensus layer update is necessary).
+    fn maybe_update_app_state(
+        &self,
+        gas_market: &Reading,
+    ) -> Result<Option<TendermintConsensusParams>> {
+        let mut state = self.committed_state()?;
+        let current = state
+            .state_params
+            .consensus_params
+            .ok_or_else(|| anyhow!("no current consensus params in state"))?;
+
+        if current.block.max_gas == gas_market.block_gas_limit as i64 {
+            return Ok(None); // No update necessary.
+        }
+
+        // Proceeding with update.
+        let mut updated = current;
+        updated.block.max_gas = gas_market.block_gas_limit as i64;
+        state.state_params.consensus_params = Some(updated.clone());
+        self.set_committed_state(state)?;
+
+        Ok(Some(updated))
     }
 
     /// Put the execution state during block execution. Has to be empty.
@@ -397,6 +417,37 @@ where
             _ => Err(anyhow!("invalid app state json")),
         }
     }
+
+    /// Replaces the current validators cache with a new one.
+    async fn refresh_validators_cache(&self) -> Result<()> {
+        let mut state = self
+            .read_only_view(None)?
+            .ok_or_else(|| anyhow!("exec state should be present"))?;
+
+        let mut cache = self.validators_cache.lock().await;
+        *cache = Some(ValidatorCache::new_from_state(&mut state)?);
+        Ok(())
+    }
+
+    /// Retrieves a validator from the cache, initializing it if necessary.
+    async fn get_validator_from_cache(&self, id: &tendermint::account::Id) -> Result<PublicKey> {
+        let mut cache = self.validators_cache.lock().await;
+
+        // If cache is not initialized, update it from the state
+        if cache.is_none() {
+            let mut state = self
+                .read_only_view(None)?
+                .ok_or_else(|| anyhow!("exec state should be present"))?;
+
+            *cache = Some(ValidatorCache::new_from_state(&mut state)?);
+        }
+
+        // Retrieve the validator from the cache
+        cache
+            .as_ref()
+            .context("Validator cache is not available")?
+            .get_validator(id)
+    }
 }
 
 // NOTE: The `Application` interface doesn't allow failures at the moment. The protobuf
@@ -405,7 +456,7 @@ where
 // the `tower-abci` library would throw an exception when it tried to convert a
 // `Response::Exception` into a `ConsensusResponse` for example.
 #[async_trait]
-impl<DB, SS, S, I, C> Application for App<DB, SS, S, I, C>
+impl<DB, SS, S, I> Application for App<DB, SS, S, I>
 where
     S: KVStore
         + Codec<AppState>
@@ -436,7 +487,6 @@ where
         Query = BytesMessageQuery,
         Output = BytesMessageQueryRes,
     >,
-    C: Client + Sync + Clone,
 {
     /// Provide information about the ABCI application.
     async fn info(&self, _request: request::Info) -> AbciResult<response::Info> {
@@ -463,7 +513,11 @@ where
         // Make it easy to spot any discrepancies between nodes.
         tracing::info!(genesis_hash = genesis_hash.to_string(), "genesis");
 
-        let (validators, state_params) = read_genesis_car(genesis_bytes, &self.state_store).await?;
+        let (validators, mut state_params) =
+            read_genesis_car(genesis_bytes, &self.state_store).await?;
+
+        state_params.consensus_params = Some(request.consensus_params);
+
         let validators =
             to_validator_updates(validators).context("failed to convert validators")?;
 
@@ -488,7 +542,7 @@ where
         };
 
         let response = response::InitChain {
-            consensus_params: None,
+            consensus_params: None, // not updating the proposed consensus params
             validators,
             app_hash: app_state.app_hash(),
         };
@@ -734,8 +788,7 @@ where
         state_params.timestamp = to_timestamp(request.header.time);
 
         let validator = self
-            .validators
-            .get_validator(&request.header.proposer_address, block_height)
+            .get_validator_from_cache(&request.header.proposer_address)
             .await?;
 
         let state = FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
@@ -798,7 +851,7 @@ where
         // End the interpreter for this block.
         let EndBlockOutput {
             power_updates,
-            block_gas_limit: new_block_gas_limit,
+            gas_market,
             events,
         } = self
             .modify_exec_state(|s| self.interpreter.end(s))
@@ -809,22 +862,15 @@ where
         let validator_updates =
             to_validator_updates(power_updates.0).context("failed to convert validator updates")?;
 
-        // If the block gas limit has changed, we need to update the consensus layer so it can
-        // pack subsequent blocks against the new limit.
-        let consensus_param_updates = {
-            let mut consensus_params = self
-                .client
-                .consensus_params(tendermint::block::Height::try_from(request.height)?)
-                .await?
-                .consensus_params;
+        // Replace the validator cache if the validator set has changed.
+        if !validator_updates.is_empty() {
+            self.refresh_validators_cache().await?;
+        }
 
-            if consensus_params.block.max_gas != new_block_gas_limit as i64 {
-                consensus_params.block.max_gas = new_block_gas_limit as i64;
-                Some(consensus_params)
-            } else {
-                None
-            }
-        };
+        // Maybe update the app state with the new block gas limit.
+        let consensus_param_updates = self
+            .maybe_update_app_state(&gas_market)
+            .context("failed to update block gas limit")?;
 
         let ret = response::EndBlock {
             validator_updates,

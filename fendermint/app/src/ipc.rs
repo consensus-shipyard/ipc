@@ -15,7 +15,6 @@ use fvm_ipld_blockstore::Blockstore;
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
-use tendermint_rpc::Client;
 
 /// All the things that can be voted on in a subnet.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -29,18 +28,17 @@ pub enum AppVote {
 }
 
 /// Queries the LATEST COMMITTED parent finality from the storage
-pub struct AppParentFinalityQuery<DB, SS, S, I, C>
+pub struct AppParentFinalityQuery<DB, SS, S, I>
 where
     SS: Blockstore + Clone + 'static,
     S: KVStore,
-    C: Client,
 {
     /// The app to get state
-    app: App<DB, SS, S, I, C>,
+    app: App<DB, SS, S, I>,
     gateway_caller: GatewayCaller<ReadOnlyBlockstore<Arc<SS>>>,
 }
 
-impl<DB, SS, S, I, C> AppParentFinalityQuery<DB, SS, S, I, C>
+impl<DB, SS, S, I> AppParentFinalityQuery<DB, SS, S, I>
 where
     S: KVStore
         + Codec<AppState>
@@ -49,9 +47,8 @@ where
         + Codec<FvmStateParams>,
     DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
     SS: Blockstore + 'static + Clone,
-    C: Client,
 {
-    pub fn new(app: App<DB, SS, S, I, C>) -> Self {
+    pub fn new(app: App<DB, SS, S, I>) -> Self {
         Self {
             app,
             gateway_caller: GatewayCaller::default(),
@@ -69,7 +66,7 @@ where
     }
 }
 
-impl<DB, SS, S, I, C> ParentFinalityStateQuery for AppParentFinalityQuery<DB, SS, S, I, C>
+impl<DB, SS, S, I> ParentFinalityStateQuery for AppParentFinalityQuery<DB, SS, S, I>
 where
     S: KVStore
         + Codec<AppState>
@@ -78,7 +75,6 @@ where
         + Codec<FvmStateParams>,
     DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
     SS: Blockstore + 'static + Clone,
-    C: Client,
 {
     fn get_latest_committed_finality(&self) -> anyhow::Result<Option<IPCParentFinality>> {
         self.with_exec_state(|mut exec_state| {
