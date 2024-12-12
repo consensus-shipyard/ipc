@@ -186,7 +186,7 @@ pub mod tests {
     use ethers_core::{k256::ecdsa::SigningKey, types::transaction::eip2718::TypedTransaction};
     use fendermint_crypto::SecretKey;
     use fendermint_testing::arb::ArbTokenAmount;
-    use fendermint_vm_message::signed::SignedMessage;
+    use fendermint_vm_message::signed::{SignedMessage, OriginKind};
     use fvm_shared::crypto::signature::Signature;
     use fvm_shared::{bigint::BigInt, chainid::ChainID, econ::TokenAmount};
     use quickcheck_macros::quickcheck;
@@ -197,7 +197,7 @@ pub mod tests {
         tests::{EthMessage, KeyPair},
     };
 
-    use super::{to_eth_signature, to_eth_tokens, to_eth_eip1559_request};
+    use super::{to_eth_eip1559_request, to_eth_signature, to_eth_tokens};
 
     #[quickcheck]
     fn prop_to_eth_tokens(tokens: ArbTokenAmount) -> bool {
@@ -250,8 +250,8 @@ pub mod tests {
     fn prop_to_and_from_eth_transaction(msg: EthMessage, chain_id: u64) {
         let chain_id = ChainID::from(chain_id);
         let msg0 = msg.0;
-        let tx = to_eth_eip1559_request(&msg0, &chain_id)
-            .expect("to_eth_transaction_request failed");
+        let tx =
+            to_eth_eip1559_request(&msg0, &chain_id).expect("to_eth_transaction_request failed");
         let msg1 = fvm_message_from_eip1559(&tx).expect("to_fvm_message failed");
 
         assert_eq!(msg1, msg0)
@@ -285,6 +285,7 @@ pub mod tests {
         let msg1 = fvm_message_from_eip1559(tx1).expect("to_fvm_message failed");
 
         let signed = SignedMessage {
+            origin_kind: OriginKind::EthereumEIP1559,
             message: msg1,
             signature: Signature::new_secp256k1(sig.to_vec()),
         };

@@ -19,7 +19,7 @@ use fendermint_vm_actor_interface::eam::{EthAddress, EAM_ACTOR_ADDR};
 use fendermint_vm_actor_interface::evm;
 use fendermint_vm_message::chain::ChainMessage;
 use fendermint_vm_message::query::FvmQueryHeight;
-use fendermint_vm_message::signed::SignedMessage;
+use fendermint_vm_message::signed::{OriginKind, SignedMessage};
 use futures::FutureExt;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
@@ -624,6 +624,18 @@ where
     let (tx, sig): (TypedTransaction, et::Signature) = TypedTransaction::decode_signed(&rlp)
         .context("failed to decode RLP as signed TypedTransaction")?;
 
+    let origin_kind = match &tx {
+        TypedTransaction::Legacy(_) => OriginKind::EthereumLegacy,
+        TypedTransaction::Eip1559(_) => OriginKind::EthereumEIP1559,
+        _ => {
+            return error_with_revert(
+                ExitCode::USR_ILLEGAL_ARGUMENT,
+                "txn type not supported",
+                None::<Vec<u8>>,
+            )
+        }
+    };
+
     let sighash = tx.sighash();
     let msghash = et::TxHash::from(ethers_core::utils::keccak256(rlp.as_raw()));
     tracing::debug!(?sighash, eth_hash = ?msghash, ?tx, "received raw transaction");
@@ -638,6 +650,7 @@ where
     let nonce = msg.sequence;
 
     let msg = SignedMessage {
+        origin_kind,
         message: msg,
         signature: Signature::new_secp256k1(sig.to_vec()),
     };

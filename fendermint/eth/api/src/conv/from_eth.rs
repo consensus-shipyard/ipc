@@ -59,10 +59,10 @@ pub fn to_eth_transaction(
 
 #[cfg(test)]
 mod tests {
-    use ethers_core::types::Signature;
-    use ethers_core::types::transaction::eip2718::TypedTransaction;
-    use ethers_core::utils::rlp;
     use crate::conv::from_eth::to_fvm_message;
+    use ethers_core::types::transaction::eip2718::TypedTransaction;
+    use ethers_core::types::Signature;
+    use ethers_core::utils::rlp;
 
     #[test]
     fn test_legacy_transaction() {
@@ -70,9 +70,9 @@ mod tests {
         let raw_tx = hex::decode(raw_tx).unwrap();
 
         let rlp = rlp::Rlp::new(raw_tx.as_ref());
-        let (tx, sig): (TypedTransaction, Signature) = TypedTransaction::decode_signed(&rlp).unwrap();
+        let (tx, sig): (TypedTransaction, Signature) =
+            TypedTransaction::decode_signed(&rlp).unwrap();
 
         let r = to_fvm_message(tx).unwrap();
-
     }
 }

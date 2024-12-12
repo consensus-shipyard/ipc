@@ -143,6 +143,7 @@ mod tests {
         conv::{from_eth::fvm_message_from_eip1559, from_fvm::to_eth_tokens},
         signed::{DomainHash, SignedMessage},
     };
+    use crate::signed::OriginKind;
 
     use super::to_fvm_tokens;
 
@@ -174,6 +175,7 @@ mod tests {
         let chain_id: ChainID = tx0.chain_id().unwrap().as_u64().into();
 
         let msg = SignedMessage {
+            origin_kind: OriginKind::EthereumEIP1559,
             message: fvm_message_from_eip1559(tx0.as_eip1559_ref().unwrap())
                 .expect("to_fvm_message"),
             signature: Signature::new_secp256k1(sig.to_vec()),

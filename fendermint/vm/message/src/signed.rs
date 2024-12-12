@@ -2,7 +2,7 @@
 // Copyright 2019-2022 ChainSafe Systems
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::{anyhow, bail};
+use anyhow::anyhow;
 use cid::multihash::MultihashDigest;
 use cid::Cid;
 use ethers_core::types as et;
@@ -77,26 +77,48 @@ pub enum OriginKind {
     EthereumEIP1559 = 2,
 }
 
+impl From<u8> for OriginKind {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => Self::Fvm,
+            1 => Self::EthereumLegacy,
+            _ => Self::EthereumEIP1559,
+        }
+    }
+}
+
 impl SignedMessage {
     /// Generate a new signed message from fields.
     ///
     /// The signature will not be verified.
-    pub fn new_unchecked(origin_kind: OriginKind, message: Message, signature: Signature) -> SignedMessage {
-        SignedMessage { origin_kind, message, signature }
+    pub fn new_unchecked(
+        origin_kind: OriginKind,
+        message: Message,
+        signature: Signature,
+    ) -> SignedMessage {
+        SignedMessage {
+            origin_kind,
+            message,
+            signature,
+        }
     }
 
-    /// Create a signed message.
+    /// Create a signed message. Note that for evm, only EIP1559 txn is supported.
     pub fn new_secp256k1(
         message: Message,
         sk: &SecretKey,
         chain_id: &ChainID,
     ) -> Result<Self, SignedMessageError> {
-        let signature = match Self::signable(&message, chain_id)? {
-            Signable::Ethereum((hash, _)) => sign_eth(sk, hash),
-            Signable::Regular(data) => sign_regular(sk, &data),
-            Signable::RegularFromEth((data, _)) => sign_regular(sk, &data),
+        let (signature, origin_kind) = match Self::signable(&message, chain_id)? {
+            Signable::Ethereum((hash, _)) => (sign_eth(sk, hash), OriginKind::EthereumEIP1559),
+            Signable::Regular(data) => (sign_regular(sk, &data), OriginKind::Fvm),
+            Signable::RegularFromEth((data, _)) => (sign_regular(sk, &data), OriginKind::EthereumEIP1559),
         };
-        Ok(Self { message, signature })
+        Ok(Self {
+            origin_kind,
+            message,
+            signature,
+        })
     }
 
     /// Calculate the CID of an FVM message.
@@ -142,7 +164,7 @@ impl SignedMessage {
                 let mut data = Self::cid(message)?.to_bytes();
                 data.extend(chain_id_bytes(chain_id).iter());
                 Ok(Signable::Regular(data))
-            },
+            }
         }
     }
 
@@ -163,18 +185,18 @@ impl SignedMessage {
                     let tx = from_fvm::to_eth_legacy_request(message, chain_id)
                         .map_err(SignedMessageError::Ethereum)?;
                     Ok(TypedTransaction::Legacy(tx))
-                }
+                },
             ),
             OriginKind::EthereumEIP1559 => Self::verify_ethereum_signature(
                 message,
                 chain_id,
                 signature,
                 |message, chain_id| {
-                    from_fvm::to_eth_eip1559_request(message, chain_id)
+                    Ok(from_fvm::to_eth_eip1559_request(message, chain_id)
                         .map_err(SignedMessageError::Ethereum)?
-                        .into()
+                        .into())
                 },
-            )
+            ),
         }
     }
 
@@ -199,7 +221,9 @@ impl SignedMessage {
         // We detect the case where the recipient is not an ethereum address. If that is the case then use regular signing rules,
         // which should allow messages from ethereum accounts to go to any other type of account, e.g. custom Wasm actors.
         let Some(from) = maybe_eth_address(&message.from) else {
-            return Err(SignedMessageError::Ethereum(anyhow!("sender not ethereum address")));
+            return Err(SignedMessageError::Ethereum(anyhow!(
+                "sender not ethereum address"
+            )));
         };
 
         if !is_eth_addr_compat(&message.to) {
@@ -218,12 +242,14 @@ impl SignedMessage {
             };
         }
 
-        let hash = to_eth_txn(message, chain_id).map_err(SignedMessageError::Ethereum)?.sighash();
+        let hash = to_eth_txn(message, chain_id)
+            .map_err(SignedMessageError::Ethereum)?
+            .sighash();
 
         // If the sender is ethereum, recover the public key from the signature (which verifies it),
         // then turn it into an `EthAddress` and verify it matches the `from` of the message.
-        let sig = from_fvm::to_eth_signature(signature, true)
-            .map_err(SignedMessageError::Ethereum)?;
+        let sig =
+            from_fvm::to_eth_signature(signature, true).map_err(SignedMessageError::Ethereum)?;
 
         let rec = sig
             .recover(hash)
@@ -255,10 +281,9 @@ impl SignedMessage {
         chain_id: &ChainID,
     ) -> Result<Option<DomainHash>, SignedMessageError> {
         if is_eth_addr_deleg(&self.message.from) && is_eth_addr_compat(&self.message.to) {
-            let tx: TypedTransaction =
-                from_fvm::to_eth_eip1559_request(self.message(), chain_id)
-                    .map_err(SignedMessageError::Ethereum)?
-                    .into();
+            let tx: TypedTransaction = from_fvm::to_eth_eip1559_request(self.message(), chain_id)
+                .map_err(SignedMessageError::Ethereum)?
+                .into();
 
             let sig = from_fvm::to_eth_signature(self.signature(), true)
                 .map_err(SignedMessageError::Ethereum)?;
@@ -422,9 +447,9 @@ fn recover_secp256k1(signature: &Signature, data: &[u8]) -> Result<PublicKey, St
 /// Signed message with an invalid random signature.
 #[cfg(feature = "arb")]
 mod arb {
+    use crate::signed::OriginKind;
     use fendermint_testing::arb::ArbMessage;
     use fvm_shared::crypto::signature::Signature;
-    use crate::signed::OriginKind;
 
     use super::SignedMessage;
 
@@ -432,7 +457,7 @@ mod arb {
     impl quickcheck::Arbitrary for SignedMessage {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
             Self {
-                origin_kind: u8::arbitrary() % 3 as OriginKind,
+                origin_kind: OriginKind::from(u8::arbitrary(g) % 3),
                 message: ArbMessage::arbitrary(g).0,
                 signature: Signature::arbitrary(g),
             }
