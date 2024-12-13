@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 mod core;
-mod map;
+pub mod map;
 
 pub use core::MapKey;
 pub use map::Root;

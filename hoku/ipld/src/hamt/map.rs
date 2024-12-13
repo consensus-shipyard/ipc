@@ -45,8 +45,8 @@ where
         }
     }
 
-    pub fn hamt<BS: Blockstore>(&self, store: BS) -> Result<Hamt<BS, K, V>, ActorError> {
-        Hamt::load(store, &self.cid, self.name.clone())
+    pub fn hamt<BS: Blockstore>(&self, store: BS, size: u64) -> Result<Hamt<BS, K, V>, ActorError> {
+        Hamt::load(store, &self.cid, self.name.clone(), size)
     }
 
     pub fn cid(&self) -> &Cid {
@@ -61,6 +61,16 @@ where
     V: DeserializeOwned + Serialize + PartialEq + Clone,
 {
     map: Map<BS, K, V>,
+    size: u64,
+}
+
+pub struct TrackedFlushResult<K, V>
+where
+    K: MapKey + Display,
+    V: DeserializeOwned + Serialize + PartialEq + Clone,
+{
+    pub root: Root<K, V>,
+    pub size: u64,
 }
 
 impl<BS, K, V> Hamt<BS, K, V>
@@ -69,9 +79,9 @@ where
     K: MapKey + Display,
     V: DeserializeOwned + Serialize + PartialEq + Clone,
 {
-    fn load(store: BS, root: &Cid, name: String) -> Result<Self, ActorError> {
+    fn load(store: BS, root: &Cid, name: String, size: u64) -> Result<Self, ActorError> {
         let map = Map::<BS, K, V>::load(store, root, DEFAULT_HAMT_CONFIG, name)?;
-        Ok(Self { map })
+        Ok(Self { map, size })
     }
 
     pub fn get(&self, key: &K) -> Result<Option<V>, ActorError> {
@@ -79,17 +89,30 @@ where
     }
 
     pub fn set(&mut self, key: &K, value: V) -> Result<Option<V>, ActorError> {
-        self.map.set(key, value)
+        let previous = self.map.set(key, value)?;
+        if previous.is_none() {
+            self.size += 1;
+        }
+        Ok(previous)
     }
 
     pub fn set_if_absent(&mut self, key: &K, value: V) -> Result<bool, ActorError> {
-        self.map.set_if_absent(key, value)
+        let was_absent = self.map.set_if_absent(key, value.clone())?;
+        if was_absent {
+            self.size += 1;
+        }
+        Ok(was_absent)
     }
 
     pub fn set_and_flush(&mut self, key: &K, value: V) -> Result<Root<K, V>, ActorError> {
-        self.map.set(key, value)?;
+        self.set(key, value)?;
         let cid = self.map.flush()?;
         Ok(Root::from_cid(cid, self.map.name()))
+    }
+
+    pub fn set_and_flush_tracked(&mut self, key: &K, value: V) -> Result<TrackedFlushResult<K, V>, ActorError> {
+        let root = self.set_and_flush(key, value)?;
+        Ok(TrackedFlushResult { root, size: self.size })
     }
 
     pub fn get_or_err(&self, key: &K) -> Result<V, ActorError> {
@@ -114,13 +137,22 @@ where
     }
 
     pub fn delete(&mut self, key: &K) -> Result<Option<V>, ActorError> {
-        self.map.delete(key)
+        let deleted = self.map.delete(key)?;
+        if deleted.is_some() {
+            self.size -= 1;
+        }
+        Ok(deleted)
     }
 
     pub fn delete_and_flush(&mut self, key: &K) -> Result<Root<K, V>, ActorError> {
-        self.map.delete(key)?;
+        self.delete(key)?;
         let cid = self.map.flush()?;
         Ok(Root::from_cid(cid, self.map.name()))
+    }
+
+    pub fn delete_and_flush_tracked(&mut self, key: &K) -> Result<TrackedFlushResult<K, V>, ActorError> {
+        let root = self.delete_and_flush(key)?;
+        Ok(TrackedFlushResult { root, size: self.size })
     }
 
     pub fn flush(&mut self) -> Result<Root<K, V>, ActorError> {

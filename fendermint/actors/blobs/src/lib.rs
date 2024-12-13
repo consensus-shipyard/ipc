@@ -5,5 +5,6 @@
 mod actor;
 mod shared;
 mod state;
+mod state_fields;
 
 pub use shared::*;

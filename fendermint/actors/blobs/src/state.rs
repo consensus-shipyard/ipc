@@ -17,9 +17,10 @@ use fvm_shared::address::Address;
 use fvm_shared::bigint::{BigInt, BigUint};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
-use hoku_ipld::hamt;
 use log::{debug, warn};
 use num_traits::{Signed, ToPrimitive, Zero};
+
+use crate::state_fields::{AccountsState, BlobsProgressCollection, BlobsState};
 
 /// The minimum epoch duration a blob can be stored.
 const MIN_TTL: ChainEpoch = 3600; // one hour
@@ -46,13 +47,13 @@ pub struct State {
     /// Map of expiries to blob hashes.
     pub expiries: BTreeMap<ChainEpoch, HashMap<Address, HashMap<ExpiryKey, bool>>>,
     /// Map of currently added blob hashes to account and source Iroh node IDs.
-    pub added: BTreeMap<Hash, HashSet<(Address, SubscriptionId, PublicKey)>>,
+    pub added: BlobsProgressCollection,
     /// Map of currently pending blob hashes to account and source Iroh node IDs.
-    pub pending: BTreeMap<Hash, HashSet<(Address, SubscriptionId, PublicKey)>>,
+    pub pending: BlobsProgressCollection,
     /// HAMT containing all accounts keyed by robust (non-ID) actor address.
-    pub accounts_root: hamt::Root<Address, Account>,
+    pub accounts: AccountsState,
     /// HAMT containing all blobs keyed by blob hash.
-    pub blobs_root: hamt::Root<Hash, Blob>,
+    pub blobs: BlobsState,
 }
 
 /// Key used to namespace subscriptions in the expiry index.
@@ -118,10 +119,10 @@ impl State {
             credit_debited: BigInt::zero(),
             blob_credits_per_byte_block,
             expiries: BTreeMap::new(),
-            added: BTreeMap::new(),
-            pending: BTreeMap::new(),
-            accounts_root: hamt::Root::<Address, Account>::new(store, "accounts")?,
-            blobs_root: hamt::Root::<Hash, Blob>::new(store, "blobs")?,
+            added: BlobsProgressCollection::new(),
+            pending: BlobsProgressCollection::new(),
+            accounts: AccountsState::new(store)?,
+            blobs: BlobsState::new(store)?,
         })
     }
 
@@ -135,12 +136,12 @@ impl State {
             credit_committed: self.credit_committed.clone(),
             credit_debited: self.credit_debited.clone(),
             blob_credits_per_byte_block: self.blob_credits_per_byte_block,
-            // num_accounts: self.accounts.len() as u64,
-            // num_blobs: self.blobs.len() as u64, FIXME SU
-            num_resolving: self.pending.len() as u64,
-            // bytes_resolving: self.pending.keys().map(|hash| self.blobs[hash].size).sum(), FIXME SU Use running counter
-            num_added: self.added.len() as u64,
-            // bytes_added: self.added.keys().map(|hash| self.blobs[hash].size).sum(), FIXME SU Use running counter
+            num_accounts: self.accounts.len(),
+            num_blobs: self.blobs.len(),
+            num_resolving: self.pending.len(),
+            bytes_resolving: self.pending.bytes_size(),
+            num_added: self.added.len(),
+            bytes_added: self.added.bytes_size(),
         }
     }
 
@@ -165,11 +166,12 @@ impl State {
         }
         self.credit_sold += &credits;
         // Get or create a new account
-        let mut accounts = self.accounts_root.hamt(store)?;
+        let mut accounts = self.accounts.hamt(store)?;
         let mut account = accounts.get_or_create(&to, || Account::new(current_epoch))?;
         account.credit_free += &credits;
         // Save account
-        self.accounts_root = accounts.set_and_flush(&to, account.clone())?;
+        self.accounts
+            .save_tracked(accounts.set_and_flush_tracked(&to, account.clone())?);
 
         debug!("sold {} credits to {}", credits, to);
         Ok(account)
@@ -185,7 +187,7 @@ impl State {
     ) -> anyhow::Result<(), ActorError> {
         let addr = sponsor.unwrap_or(from);
         // Get the account
-        let mut accounts = self.accounts_root.hamt(store)?;
+        let mut accounts = self.accounts.hamt(store)?;
         let mut account = accounts.get_or_err(&addr)?;
         let delegation = if let Some(sponsor) = sponsor {
             let approval =
@@ -219,7 +221,8 @@ impl State {
             delegation.approval.used -= &add_credit;
         }
         // Save account
-        self.accounts_root = accounts.set_and_flush(&addr, account)?;
+        self.accounts
+            .save_tracked(accounts.set_and_flush_tracked(&addr, account)?);
 
         if add_credit.is_positive() {
             debug!("refunded {} credits to {}", add_credit, addr);
@@ -251,7 +254,7 @@ impl State {
         }
         let expiry = ttl.map(|t| t + current_epoch);
         // Get or create a new account
-        let mut accounts = self.accounts_root.hamt(store)?;
+        let mut accounts = self.accounts.hamt(store)?;
         let mut account = accounts.get_or_create(&from, || Account::new(current_epoch))?;
         // Get or add a new approval
         let approval = account
@@ -277,7 +280,8 @@ impl State {
         approval.caller_allowlist = caller_allowlist.clone();
         let approval = approval.clone();
         // Save account
-        self.accounts_root = accounts.set_and_flush(&from, account)?;
+        self.accounts
+            .save_tracked(accounts.set_and_flush_tracked(&from, account)?);
 
         debug!(
             "approved credits from {} to {} (limit: {:?}; expiry: {:?}, caller_allowlist: {:?})",
@@ -298,7 +302,7 @@ impl State {
         for_caller: Option<Address>,
     ) -> anyhow::Result<(), ActorError> {
         // Get the account
-        let mut accounts = self.accounts_root.hamt(store)?;
+        let mut accounts = self.accounts.hamt(store)?;
         let mut account = accounts.get_or_err(&from)?;
         if let Some(caller) = for_caller {
             let approval =
@@ -327,7 +331,8 @@ impl State {
             )));
         }
         // Save account
-        self.accounts_root = accounts.set_and_flush(&from, account)?;
+        self.accounts
+            .save_tracked(accounts.set_and_flush_tracked(&from, account)?);
 
         debug!(
             "revoked credits from {} to {} (required_caller: {:?})",
@@ -341,7 +346,7 @@ impl State {
         store: &BS,
         from: Address,
     ) -> anyhow::Result<Option<Account>, ActorError> {
-        let accounts = self.accounts_root.hamt(store)?;
+        let accounts = self.accounts.hamt(store)?;
         accounts.get(&from)
     }
 
@@ -353,7 +358,7 @@ impl State {
         from: Address,
         to: Address,
     ) -> anyhow::Result<Option<CreditApproval>, ActorError> {
-        let accounts = self.accounts_root.hamt(store)?;
+        let accounts = self.accounts.hamt(store)?;
         Ok(accounts
             .get(&from)?
             .map(|a| a.approvals.get(&to.to_string()).cloned())
@@ -369,7 +374,7 @@ impl State {
         current_epoch: ChainEpoch,
     ) -> anyhow::Result<CreditAllowance, ActorError> {
         // Get the account or return default allowance
-        let accounts = self.accounts_root.hamt(store)?;
+        let accounts = self.accounts.hamt(store)?;
         let account = match accounts.get(&from)? {
             None => return Ok(CreditAllowance::default()),
             Some(account) => account,
@@ -418,11 +423,12 @@ impl State {
         current_epoch: ChainEpoch,
     ) -> anyhow::Result<(), ActorError> {
         // Get or create a new account
-        let mut accounts = self.accounts_root.hamt(store)?;
+        let mut accounts = self.accounts.hamt(store)?;
         let mut account = accounts.get_or_create(&from, || Account::new(current_epoch))?;
         account.credit_sponsor = sponsor;
         // Save account
-        self.accounts_root = accounts.set_and_flush(&from, account)?;
+        self.accounts
+            .save_tracked(accounts.set_and_flush_tracked(&from, account)?);
 
         debug!("set credit sponsor for {} to {:?}", from, sponsor);
         Ok(())
@@ -496,8 +502,8 @@ impl State {
             delete_from_disc.len()
         );
         // Debit for existing usage
-        let reader = self.accounts_root.hamt(store)?;
-        let mut writer = self.accounts_root.hamt(store)?;
+        let reader = self.accounts.hamt(store)?;
+        let mut writer = self.accounts.hamt(store)?;
         reader.for_each(|address, account| {
             let mut account = account.clone();
             let debit_blocks = current_epoch - account.last_debit_epoch;
@@ -511,7 +517,7 @@ impl State {
             writer.set(&address, account)?;
             Ok(())
         })?;
-        self.accounts_root = writer.flush()?;
+        self.accounts.root = writer.flush()?;
         Ok(delete_from_disc)
     }
 
@@ -543,7 +549,7 @@ impl State {
         tokens_received: TokenAmount,
     ) -> anyhow::Result<(Subscription, TokenAmount), ActorError> {
         // Get or create a new account
-        let mut accounts = self.accounts_root.hamt(store)?;
+        let mut accounts = self.accounts.hamt(store)?;
         let mut account = accounts.get_or_create(&subscriber, || Account::new(current_epoch))?;
         // Validate the TTL
         let (ttl, auto_renew) = accept_ttl(ttl, &account)?;
@@ -572,7 +578,7 @@ impl State {
         // Like cashback but for sending unspent tokens back
         let tokens_unspent: TokenAmount;
         // Get or create a new blob
-        let mut blobs = self.blobs_root.hamt(store)?;
+        let mut blobs = self.blobs.hamt(store)?;
         let (sub, blob) = if let Some(mut blob) = blobs.get(&hash)? {
             let sub = if let Some(group) = blob.subscribers.get_mut(&subscriber.to_string()) {
                 let (group_expiry, new_group_expiry) = group.max_expiries(&id, Some(expiry));
@@ -716,12 +722,7 @@ impl State {
                 // It's pending or failed, reset to added status
                 blob.status = BlobStatus::Added;
                 // Add/update added with hash and its source
-                self.added
-                    .entry(hash)
-                    .and_modify(|sources| {
-                        sources.insert((subscriber, id.clone(), source));
-                    })
-                    .or_insert(HashSet::from([(subscriber, id, source)]));
+                self.added.upsert(hash, subscriber, id, source, blob.size);
             }
             (sub, blob)
         } else {
@@ -783,7 +784,7 @@ impl State {
             );
             // Add to added
             self.added
-                .insert(hash, HashSet::from([(subscriber, id, source)]));
+                .insert(hash, HashSet::from([(subscriber, id, source)]), blob.size);
             (sub, blob)
         };
         // Account capacity is changing, debit for existing usage
@@ -808,9 +809,11 @@ impl State {
             delegation.approval.used += &credit_required;
         }
         // Save account
-        self.accounts_root = accounts.set_and_flush(&subscriber, account)?;
+        self.accounts
+            .save_tracked(accounts.set_and_flush_tracked(&subscriber, account)?);
         // Save blob
-        self.blobs_root = blobs.set_and_flush(&hash, blob)?;
+        self.blobs
+            .save_tracked(blobs.set_and_flush_tracked(&hash, blob)?);
 
         if credit_required.is_positive() {
             debug!("committed {} credits from {}", credit_required, subscriber);
@@ -833,10 +836,10 @@ impl State {
         id: SubscriptionId,
     ) -> anyhow::Result<Account, ActorError> {
         // Get or create a new account
-        let mut accounts = self.accounts_root.hamt(store)?;
+        let mut accounts = self.accounts.hamt(store)?;
         let mut account = accounts.get_or_create(&subscriber, || Account::new(current_epoch))?;
         // Get the blob
-        let mut blobs = self.blobs_root.hamt(store)?;
+        let mut blobs = self.blobs.hamt(store)?;
         let mut blob = blobs.get_or_err(&hash)?;
         if matches!(blob.status, BlobStatus::Failed) {
             // Do not renew failed blobs.
@@ -939,9 +942,11 @@ impl State {
             delegation.approval.used += &credit_required;
         }
         // Save account
-        self.accounts_root = accounts.set_and_flush(&subscriber, account.clone())?;
+        self.accounts
+            .save_tracked(accounts.set_and_flush_tracked(&subscriber, account.clone())?);
         // Save blob
-        self.blobs_root = blobs.set_and_flush(&hash, blob)?;
+        self.blobs
+            .save_tracked(blobs.set_and_flush_tracked(&hash, blob)?);
 
         debug!("committed {} credits from {}", credit_required, subscriber);
         Ok(account)
@@ -952,7 +957,7 @@ impl State {
         store: &BS,
         hash: Hash,
     ) -> anyhow::Result<Option<Blob>, ActorError> {
-        let blobs = self.blobs_root.hamt(store)?;
+        let blobs = self.blobs.hamt(store)?;
         blobs.get(&hash)
     }
 
@@ -964,7 +969,7 @@ impl State {
         id: SubscriptionId,
     ) -> Option<BlobStatus> {
         let blob = self
-            .blobs_root
+            .blobs
             .hamt(store)
             .ok()
             .and_then(|blobs| blobs.get(&hash).ok())
@@ -1005,11 +1010,7 @@ impl State {
         &self,
         size: u32,
     ) -> Vec<(Hash, HashSet<(Address, SubscriptionId, PublicKey)>)> {
-        self.added
-            .iter()
-            .take(size as usize)
-            .map(|element| (*element.0, element.1.clone()))
-            .collect::<Vec<_>>()
+        self.added.take_page(size)
     }
 
     #[allow(clippy::type_complexity)]
@@ -1017,11 +1018,7 @@ impl State {
         &self,
         size: u32,
     ) -> Vec<(Hash, HashSet<(Address, SubscriptionId, PublicKey)>)> {
-        self.pending
-            .iter()
-            .take(size as usize)
-            .map(|element| (*element.0, element.1.clone()))
-            .collect::<Vec<_>>()
+        self.pending.take_page(size)
     }
 
     pub fn set_blob_pending<BS: Blockstore>(
@@ -1032,7 +1029,7 @@ impl State {
         id: SubscriptionId,
         source: PublicKey,
     ) -> anyhow::Result<(), ActorError> {
-        let mut blobs = self.blobs_root.hamt(store)?;
+        let mut blobs = self.blobs.hamt(store)?;
         let mut blob = if let Some(blob) = blobs.get(&hash)? {
             blob
         } else {
@@ -1042,11 +1039,12 @@ impl State {
         blob.status = BlobStatus::Pending;
         // Add to pending
         self.pending
-            .insert(hash, HashSet::from([(subscriber, id, source)]));
+            .insert(hash, HashSet::from([(subscriber, id, source)]), blob.size);
         // Remove from added
-        self.added.remove(&hash);
+        self.added.remove(&hash, blob.size);
         // Save blob
-        self.blobs_root = blobs.set_and_flush(&hash, blob)?;
+        self.blobs
+            .save_tracked(blobs.set_and_flush_tracked(&hash, blob)?);
         Ok(())
     }
 
@@ -1067,10 +1065,10 @@ impl State {
             )));
         }
         // Get or create a new account
-        let mut accounts = self.accounts_root.hamt(store)?;
+        let mut accounts = self.accounts.hamt(store)?;
         let mut account = accounts.get_or_create(&subscriber, || Account::new(current_epoch))?;
         // Get the blob
-        let mut blobs = self.blobs_root.hamt(store)?;
+        let mut blobs = self.blobs.hamt(store)?;
         let mut blob = if let Some(blob) = blobs.get(&hash)? {
             blob
         } else {
@@ -1168,16 +1166,14 @@ impl State {
             sub.failed = true;
         }
         // Remove entry from pending
-        if let Some(entry) = self.pending.get_mut(&hash) {
-            entry.remove(&(subscriber, id, sub.source));
-            if entry.is_empty() {
-                self.pending.remove(&hash);
-            }
-        }
+        self.pending
+            .remove_entry(hash, subscriber, id, sub.source, blob.size);
         // Save account
-        self.accounts_root = accounts.set_and_flush(&subscriber, account)?;
+        self.accounts
+            .save_tracked(accounts.set_and_flush_tracked(&subscriber, account)?);
         // Save blob
-        self.blobs_root = blobs.set_and_flush(&hash, blob)?;
+        self.blobs
+            .save_tracked(blobs.set_and_flush_tracked(&hash, blob)?);
         Ok(())
     }
 
@@ -1193,10 +1189,10 @@ impl State {
         id: SubscriptionId,
     ) -> anyhow::Result<bool, ActorError> {
         // Get or create a new account
-        let mut accounts = self.accounts_root.hamt(store)?;
+        let mut accounts = self.accounts.hamt(store)?;
         let mut account = accounts.get_or_create(&subscriber, || Account::new(current_epoch))?;
         // Get the blob
-        let mut blobs = self.blobs_root.hamt(store)?;
+        let mut blobs = self.blobs.hamt(store)?;
         let mut blob = if let Some(blob) = blobs.get(&hash)? {
             blob
         } else {
@@ -1349,19 +1345,11 @@ impl State {
             Some(sub.expiry),
         );
         // Remove entry from added
-        if let Some(entry) = self.added.get_mut(&hash) {
-            entry.remove(&(subscriber, id.clone(), sub.source));
-            if entry.is_empty() {
-                self.added.remove(&hash);
-            }
-        }
+        self.added
+            .remove_entry(hash, subscriber, id.clone(), sub.source, blob.size);
         // Remove entry from pending
-        if let Some(entry) = self.pending.get_mut(&hash) {
-            entry.remove(&(subscriber, id.clone(), sub.source));
-            if entry.is_empty() {
-                self.pending.remove(&hash);
-            }
-        }
+        self.pending
+            .remove_entry(hash, subscriber, id.clone(), sub.source, blob.size);
         // Delete subscription
         group.subscriptions.remove(&id.to_string());
         debug!(
@@ -1375,16 +1363,19 @@ impl State {
             // Delete or update blob
             let delete_blob = blob.subscribers.is_empty();
             if delete_blob {
-                self.blobs_root = blobs.delete_and_flush(&hash)?;
+                self.blobs
+                    .save_tracked(blobs.delete_and_flush_tracked(&hash)?);
                 debug!("deleted blob {}", hash);
             }
             delete_blob
         } else {
-            self.blobs_root = blobs.set_and_flush(&hash, blob)?;
+            self.blobs
+                .save_tracked(blobs.set_and_flush_tracked(&hash, blob)?);
             false
         };
         // Save account
-        self.accounts_root = accounts.set_and_flush(&subscriber, account)?;
+        self.accounts
+            .save_tracked(accounts.set_and_flush_tracked(&subscriber, account)?);
         Ok(delete_blob)
     }
 
@@ -1395,13 +1386,14 @@ impl State {
         status: TtlStatus,
         current_epoch: ChainEpoch,
     ) -> anyhow::Result<(), ActorError> {
-        let mut accounts = self.accounts_root.hamt(store)?;
+        let mut accounts = self.accounts.hamt(store)?;
         match status {
             // We don't want to create an account for default TTL
             TtlStatus::Default => {
                 if let Some(mut account) = accounts.get(&subscriber)? {
                     account.max_ttl_epochs = status.into();
-                    self.accounts_root = accounts.set_and_flush(&subscriber, account)?;
+                    self.accounts
+                        .save_tracked(accounts.set_and_flush_tracked(&subscriber, account)?);
                 }
             }
             _ => {
@@ -1409,7 +1401,8 @@ impl State {
                 let mut account =
                     accounts.get_or_create(&subscriber, || Account::new(current_epoch))?;
                 account.max_ttl_epochs = status.into();
-                self.accounts_root = accounts.set_and_flush(&subscriber, account)?;
+                self.accounts
+                    .save_tracked(accounts.set_and_flush_tracked(&subscriber, account)?);
             }
         }
         Ok(())
@@ -2008,9 +2001,23 @@ mod tests {
         );
         assert!(res.is_ok());
 
+        let stats = state.get_stats(TokenAmount::zero());
+        assert_eq!(stats.num_accounts, 1);
+        assert_eq!(stats.num_blobs, 1);
+        assert_eq!(stats.num_resolving, 0);
+        assert_eq!(stats.bytes_resolving, 0);
+        assert_eq!(stats.num_added, 1);
+        assert_eq!(stats.bytes_added, size);
+
         // Set to status pending
         let res = state.set_blob_pending(&store, subscriber, hash, id1.clone(), source);
         assert!(res.is_ok());
+        let stats = state.get_stats(TokenAmount::zero());
+        assert_eq!(stats.num_blobs, 1);
+        assert_eq!(stats.num_resolving, 1);
+        assert_eq!(stats.bytes_resolving, size);
+        assert_eq!(stats.num_added, 0);
+        assert_eq!(stats.bytes_added, 0);
 
         // Finalize as resolved
         let finalize_epoch = ChainEpoch::from(11);
@@ -2023,6 +2030,12 @@ mod tests {
             BlobStatus::Resolved,
         );
         assert!(res.is_ok());
+        let stats = state.get_stats(TokenAmount::zero());
+        assert_eq!(stats.num_blobs, 1);
+        assert_eq!(stats.num_resolving, 0);
+        assert_eq!(stats.bytes_resolving, 0);
+        assert_eq!(stats.num_added, 0);
+        assert_eq!(stats.bytes_added, 0);
 
         // Check the account balance
         let account = state.get_account(&store, subscriber).unwrap().unwrap();
@@ -2052,6 +2065,13 @@ mod tests {
             TokenAmount::zero(),
         );
         assert!(res.is_ok());
+
+        let stats = state.get_stats(TokenAmount::zero());
+        assert_eq!(stats.num_blobs, 1);
+        assert_eq!(stats.num_resolving, 0);
+        assert_eq!(stats.bytes_resolving, 0);
+        assert_eq!(stats.num_added, 0);
+        assert_eq!(stats.bytes_added, 0);
 
         // Check the account balance
         let account = state.get_account(&store, subscriber).unwrap().unwrap();
@@ -2209,6 +2229,14 @@ mod tests {
         );
         assert!(res.is_ok());
 
+        // Check stats
+        let stats = state.get_stats(TokenAmount::zero());
+        assert_eq!(stats.num_blobs, 1);
+        assert_eq!(stats.num_resolving, 0);
+        assert_eq!(stats.bytes_resolving, 0);
+        assert_eq!(stats.num_added, 1);
+        assert_eq!(stats.bytes_added, size1);
+
         // Check the account balance
         let account = state.get_account(&store, subscriber).unwrap().unwrap();
         assert_eq!(account.last_debit_epoch, add1_epoch);
@@ -2240,6 +2268,14 @@ mod tests {
             TokenAmount::zero(),
         );
         assert!(res.is_ok());
+
+        // Check stats
+        let stats = state.get_stats(TokenAmount::zero());
+        assert_eq!(stats.num_blobs, 2);
+        assert_eq!(stats.num_resolving, 0);
+        assert_eq!(stats.bytes_resolving, 0);
+        assert_eq!(stats.num_added, 2);
+        assert_eq!(stats.bytes_added, size1 + size2);
 
         // Check the account balance
         let account = state.get_account(&store, subscriber).unwrap().unwrap();
@@ -2286,6 +2322,14 @@ mod tests {
             TokenAmount::zero(),
         );
         assert!(res.is_ok());
+
+        // Check stats
+        let stats = state.get_stats(TokenAmount::zero());
+        assert_eq!(stats.num_blobs, 2);
+        assert_eq!(stats.num_resolving, 0);
+        assert_eq!(stats.bytes_resolving, 0);
+        assert_eq!(stats.num_added, 2);
+        assert_eq!(stats.bytes_added, size1 + size2);
 
         // Check the account balance
         let account = state.get_account(&store, subscriber).unwrap().unwrap();
@@ -2450,6 +2494,14 @@ mod tests {
             assert_eq!(sub.delegate, Some((origin, caller)));
         }
 
+        // Check stats
+        let stats = state.get_stats(TokenAmount::zero());
+        assert_eq!(stats.num_blobs, 1);
+        assert_eq!(stats.num_resolving, 0);
+        assert_eq!(stats.bytes_resolving, 0);
+        assert_eq!(stats.num_added, 1);
+        assert_eq!(stats.bytes_added, size);
+
         // Check the blob status
         assert_eq!(
             state.get_blob_status(&store, subscriber, hash, id1.clone()),
@@ -2483,6 +2535,14 @@ mod tests {
         let res = state.set_blob_pending(&store, subscriber, hash, id1.clone(), source);
         assert!(res.is_ok());
 
+        // Check stats
+        let stats = state.get_stats(TokenAmount::zero());
+        assert_eq!(stats.num_blobs, 1);
+        assert_eq!(stats.num_resolving, 1);
+        assert_eq!(stats.bytes_resolving, size);
+        assert_eq!(stats.num_added, 0);
+        assert_eq!(stats.bytes_added, 0);
+
         // Finalize as resolved
         let finalize_epoch = ChainEpoch::from(11);
         let res = state.finalize_blob(
@@ -2498,6 +2558,14 @@ mod tests {
             state.get_blob_status(&store, subscriber, hash, id1.clone()),
             Some(BlobStatus::Resolved)
         );
+
+        // Check stats
+        let stats = state.get_stats(TokenAmount::zero());
+        assert_eq!(stats.num_blobs, 1);
+        assert_eq!(stats.num_resolving, 0);
+        assert_eq!(stats.bytes_resolving, 0);
+        assert_eq!(stats.num_added, 0);
+        assert_eq!(stats.bytes_added, 0);
 
         // Add the same blob again with a default subscription ID
         let add2_epoch = ChainEpoch::from(21);
@@ -2585,6 +2653,14 @@ mod tests {
         if subscriber != origin {
             assert_eq!(sub.delegate, Some((origin, caller)));
         }
+
+        // Check stats
+        let stats = state.get_stats(TokenAmount::zero());
+        assert_eq!(stats.num_blobs, 1);
+        assert_eq!(stats.num_resolving, 0);
+        assert_eq!(stats.bytes_resolving, 0);
+        assert_eq!(stats.num_added, 0);
+        assert_eq!(stats.bytes_added, 0);
 
         // Check the blob status
         // Should already be resolved
@@ -3407,6 +3483,14 @@ mod tests {
         );
         assert!(res.is_ok());
 
+        // Check stats
+        let stats = state.get_stats(TokenAmount::zero());
+        assert_eq!(stats.num_blobs, 1);
+        assert_eq!(stats.num_resolving, 0);
+        assert_eq!(stats.bytes_resolving, 0);
+        assert_eq!(stats.num_added, 1);
+        assert_eq!(stats.bytes_added, size1);
+
         // Check the account balance
         let account = state.get_account(&store, subscriber).unwrap().unwrap();
         assert_eq!(account.last_debit_epoch, add1_epoch);
@@ -3438,6 +3522,14 @@ mod tests {
         );
         assert!(res.is_ok());
 
+        // Check stats
+        let stats = state.get_stats(TokenAmount::zero());
+        assert_eq!(stats.num_blobs, 2);
+        assert_eq!(stats.num_resolving, 0);
+        assert_eq!(stats.bytes_resolving, 0);
+        assert_eq!(stats.num_added, 2);
+        assert_eq!(stats.bytes_added, size1 + size2);
+
         // Check the account balance
         let account = state.get_account(&store, subscriber).unwrap().unwrap();
         assert_eq!(account.last_debit_epoch, add2_epoch);
@@ -3465,6 +3557,14 @@ mod tests {
             )
             .unwrap();
         assert!(delete_from_disc);
+
+        // Check stats
+        let stats = state.get_stats(TokenAmount::zero());
+        assert_eq!(stats.num_blobs, 1);
+        assert_eq!(stats.num_resolving, 0);
+        assert_eq!(stats.bytes_resolving, 0);
+        assert_eq!(stats.num_added, 1);
+        assert_eq!(stats.bytes_added, size2);
 
         // Check the account balance
         let account = state.get_account(&store, subscriber).unwrap().unwrap();

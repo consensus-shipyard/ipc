@@ -32,7 +32,10 @@ use fendermint_actor_blobs_shared::{
 use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::{blob_reader, blobs, ipc, system};
 use fendermint_vm_event::ParentFinalityMissingQuorum;
-use fendermint_vm_iroh_resolver::observe::{BlobsFinalityAddedBlobs, BlobsFinalityPendingBlobs};
+use fendermint_vm_iroh_resolver::observe::{
+    BlobsFinalityAddedBlobs, BlobsFinalityAddedBytes, BlobsFinalityPendingBlobs,
+    BlobsFinalityPendingBytes,
+};
 use fendermint_vm_iroh_resolver::pool::{
     ResolveKey as IrohResolveKey, ResolvePool as IrohResolvePool,
     ResolveSource as IrohResolveSource, TaskType as IrohTaskType,
@@ -1112,9 +1115,9 @@ where
         {
             let stats = get_blobs_stats(&mut state)?;
             ipc_observability::emit(BlobsFinalityPendingBlobs(stats.num_resolving));
-            // ipc_observability::emit(BlobsFinalityPendingBytes(stats.bytes_resolving));
+            ipc_observability::emit(BlobsFinalityPendingBytes(stats.bytes_resolving));
             ipc_observability::emit(BlobsFinalityAddedBlobs(stats.num_added));
-            // ipc_observability::emit(BlobsFinalityAddedBytes(stats.bytes_added));
+            ipc_observability::emit(BlobsFinalityAddedBytes(stats.bytes_added));
         }
 
         Ok(((env, state), out))
