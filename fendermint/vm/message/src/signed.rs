@@ -112,7 +112,9 @@ impl SignedMessage {
         let (signature, origin_kind) = match Self::signable(&message, chain_id)? {
             Signable::Ethereum((hash, _)) => (sign_eth(sk, hash), OriginKind::EthereumEIP1559),
             Signable::Regular(data) => (sign_regular(sk, &data), OriginKind::Fvm),
-            Signable::RegularFromEth((data, _)) => (sign_regular(sk, &data), OriginKind::EthereumEIP1559),
+            Signable::RegularFromEth((data, _)) => {
+                (sign_regular(sk, &data), OriginKind::EthereumEIP1559)
+            }
         };
         Ok(Self {
             origin_kind,

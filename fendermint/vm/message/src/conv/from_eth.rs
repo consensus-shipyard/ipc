@@ -50,13 +50,17 @@ pub fn fvm_message_from_legacy(tx: &TransactionRequest) -> anyhow::Result<Messag
     let params = RawBytes::serialize(BytesSer(&calldata))?;
 
     let gas_price = tx.gas_price.unwrap_or_default();
-
+    let value = if let Some(v) = tx.value {
+        to_fvm_tokens(&v)
+    } else {
+        TokenAmount::from_atto(-1)
+    };
     let msg = Message {
         version: 0,
         from,
         to,
         sequence: tx.nonce.unwrap_or_default().as_u64(),
-        value: to_fvm_tokens(&tx.value.unwrap_or_default()),
+        value,
         method_num,
         params,
         gas_limit: tx
@@ -139,11 +143,11 @@ mod tests {
     use fvm_shared::{chainid::ChainID, crypto::signature::Signature};
     use quickcheck_macros::quickcheck;
 
+    use crate::signed::OriginKind;
     use crate::{
         conv::{from_eth::fvm_message_from_eip1559, from_fvm::to_eth_tokens},
         signed::{DomainHash, SignedMessage},
     };
-    use crate::signed::OriginKind;
 
     use super::to_fvm_tokens;
 

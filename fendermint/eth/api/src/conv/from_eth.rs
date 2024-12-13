@@ -63,16 +63,25 @@ mod tests {
     use ethers_core::types::transaction::eip2718::TypedTransaction;
     use ethers_core::types::Signature;
     use ethers_core::utils::rlp;
+    use fendermint_vm_message::signed::{OriginKind, SignedMessage};
+    use fvm_shared::chainid::ChainID;
 
     #[test]
     fn test_legacy_transaction() {
-        let raw_tx = "f86e158512bfb19e608301f8dc94c083e9947cf02b8ffc7d3090ae9aea72df98fd4789056bc75e2d63100000801ca0a254fe085f721c2abe00a2cd244110bfc0df5f4f25461c85d8ab75ebac11eb10a030b7835ba481955b20193a703ebc5fdffeab081d63117199040cdf5a91c68765";
+        let raw_tx = "f86c098504a817c800825208943535353535353535353535353535353535353535880de0b6b3a76400008025a028ef61340bd939bc2195fe537567866003e1a15d3c71ff63e1590620aa636276a067cbe9d8997f761aecb703304b3800ccf555c9f3dc64214b297fb1966a3b6d83";
         let raw_tx = hex::decode(raw_tx).unwrap();
 
         let rlp = rlp::Rlp::new(raw_tx.as_ref());
         let (tx, sig): (TypedTransaction, Signature) =
             TypedTransaction::decode_signed(&rlp).unwrap();
 
-        let r = to_fvm_message(tx).unwrap();
+        let msg = to_fvm_message(tx).unwrap();
+
+        let signed_msg = SignedMessage {
+            origin_kind: OriginKind::EthereumLegacy,
+            message: msg,
+            signature: fvm_shared::crypto::signature::Signature::new_secp256k1(sig.to_vec()),
+        };
+        assert!(signed_msg.verify(&ChainID::from(1)).is_ok());
     }
 }

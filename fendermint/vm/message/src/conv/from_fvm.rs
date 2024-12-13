@@ -8,7 +8,6 @@ use std::str::FromStr;
 use anyhow::anyhow;
 use anyhow::bail;
 use ethers_core::types as et;
-use fendermint_crypto::{RecoveryId, Signature};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::eam::EAM_ACTOR_ID;
 use fvm_ipld_encoding::BytesDe;
@@ -17,7 +16,6 @@ use fvm_shared::bigint::BigInt;
 use fvm_shared::chainid::ChainID;
 use fvm_shared::crypto::signature::Signature as FvmSignature;
 use fvm_shared::crypto::signature::SignatureType;
-use fvm_shared::crypto::signature::SECP_SIG_LEN;
 use fvm_shared::message::Message;
 use fvm_shared::{address::Payload, econ::TokenAmount};
 use lazy_static::lazy_static;
@@ -50,24 +48,6 @@ pub fn to_eth_address(addr: &Address) -> anyhow::Result<Option<et::H160>> {
     }
 }
 
-fn parse_secp256k1(sig: &[u8]) -> anyhow::Result<(RecoveryId, Signature)> {
-    if sig.len() != SECP_SIG_LEN {
-        return Err(anyhow!("unexpected Secp256k1 length: {}", sig.len()));
-    }
-
-    // generate types to recover key from
-    let rec_id = RecoveryId::parse(sig[64])?;
-
-    // Signature value without recovery byte
-    let mut s = [0u8; 64];
-    s.clone_from_slice(&sig[..64]);
-
-    // generate Signature
-    let sig = Signature::parse_standard(&s)?;
-
-    Ok((rec_id, sig))
-}
-
 /// Convert an FVM signature, which is a normal Secp256k1 signature, to an Ethereum one,
 /// where the `v` is optionally shifted by 27 to make it compatible with Solidity.
 ///
@@ -75,19 +55,15 @@ fn parse_secp256k1(sig: &[u8]) -> anyhow::Result<(RecoveryId, Signature)> {
 ///
 /// Ethers normalizes Ethereum signatures during conversion to RLP.
 pub fn to_eth_signature(sig: &FvmSignature, normalized: bool) -> anyhow::Result<et::Signature> {
-    let (v, sig) = match sig.sig_type {
-        SignatureType::Secp256k1 => parse_secp256k1(&sig.bytes)?,
+    let mut sig = match sig.sig_type {
+        SignatureType::Secp256k1 => et::Signature::try_from(sig.bytes.as_slice())?,
         other => return Err(anyhow!("unexpected signature type: {other:?}")),
     };
 
     // By adding 27 to the recovery ID we make this compatible with Ethereum,
     // so that we can verify such signatures in Solidity with e.g. openzeppelin ECDSA.sol
-    let shift = if normalized { 0 } else { 27 };
-
-    let sig = et::Signature {
-        v: et::U64::from(v.serialize() + shift).as_u64(),
-        r: et::U256::from_big_endian(sig.r.b32().as_ref()),
-        s: et::U256::from_big_endian(sig.s.b32().as_ref()),
+    if !normalized {
+        sig.v += 27
     };
 
     Ok(sig)
@@ -111,22 +87,27 @@ pub fn to_eth_legacy_request(
         ..
     } = msg;
 
-    let data = fvm_ipld_encoding::from_slice::<BytesDe>(params).map(|bz| bz.0)?;
-
     let mut tx = et::TransactionRequest::new()
-        .chain_id(chain_id)
         .from(to_eth_address(from)?.unwrap_or_default())
         .nonce(*sequence)
         .gas(*gas_limit)
         .gas_price(to_eth_tokens(gas_fee_cap)?)
-        .data(et::Bytes::from(data));
+        // ethers sometimes interprets chain id == 1 as None for mainnet.
+        // but most likely chain id will not be 1 in our use case, set it anyways
+        .chain_id(chain_id);
+
+    let data = fvm_ipld_encoding::from_slice::<BytesDe>(params).map(|bz| bz.0)?;
+    // ethers seems to parse empty bytes as None instead of Some(Bytes(0x))
+    if !data.is_empty() {
+        tx = tx.data(et::Bytes::from(data));
+    }
 
     tx.to = to_eth_address(to)?.map(et::NameOrAddress::Address);
 
     // NOTE: It's impossible to tell if the original Ethereum transaction sent None or Some(0).
     // The ethers deployer sends None, so let's assume that's the useful behavour to match.
     // Luckily the RLP encoding at some point seems to resolve them to the same thing.
-    if !value.is_zero() {
+    if !value.is_negative() {
         tx.value = Some(to_eth_tokens(value)?);
     }
 
@@ -186,7 +167,7 @@ pub mod tests {
     use ethers_core::{k256::ecdsa::SigningKey, types::transaction::eip2718::TypedTransaction};
     use fendermint_crypto::SecretKey;
     use fendermint_testing::arb::ArbTokenAmount;
-    use fendermint_vm_message::signed::{SignedMessage, OriginKind};
+    use fendermint_vm_message::signed::{OriginKind, SignedMessage};
     use fvm_shared::crypto::signature::Signature;
     use fvm_shared::{bigint::BigInt, chainid::ChainID, econ::TokenAmount};
     use quickcheck_macros::quickcheck;
