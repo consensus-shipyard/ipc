@@ -28,7 +28,7 @@ pub struct State {
 #[derive(Serialize_tuple, Deserialize_tuple, Debug, Clone)]
 pub struct ConstructorParams {
     initial_blob_capacity: u64,
-    initial_blob_credits_per_byte_block: u64,
+    initial_token_credit_rate: u64,
     initial_blob_credit_debit_interval: ChainEpoch,
 }
 
@@ -42,7 +42,7 @@ impl Actor {
             admin: None,
             config: HokuConfig {
                 blob_capacity: params.initial_blob_capacity,
-                blob_credits_per_byte_block: params.initial_blob_credits_per_byte_block,
+                token_credit_rate: params.initial_token_credit_rate,
                 blob_credit_debit_interval: params.initial_blob_credit_debit_interval,
             },
         };
@@ -127,164 +127,104 @@ impl ActorCode for Actor {
     }
 }
 
-// TODO: Modify these tests for this actor
-// #[cfg(test)]
-// mod tests {
-//     use crate::{Actor, Constants, ConstructorParams, Method, State};
-//     use fendermint_actors_api::gas_market::{Reading, Utilization};
-//     use fil_actors_runtime::test_utils::{expect_empty, MockRuntime, SYSTEM_ACTOR_CODE_ID};
-//     use fil_actors_runtime::SYSTEM_ACTOR_ADDR;
-//     use fvm_ipld_encoding::ipld_block::IpldBlock;
-//     use fvm_shared::address::Address;
-//     use fvm_shared::econ::TokenAmount;
-//     use fvm_shared::error::ExitCode;
-//
-//     pub fn construct_and_verify() -> MockRuntime {
-//         let rt = MockRuntime {
-//             receiver: Address::new_id(10),
-//             ..Default::default()
-//         };
-//
-//         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
-//         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-//
-//         let result = rt
-//             .call::<Actor>(
-//                 Method::Constructor as u64,
-//                 IpldBlock::serialize_cbor(&ConstructorParams {
-//                     initial_base_fee: TokenAmount::from_atto(100),
-//                     constants: Constants::default(),
-//                 })
-//                 .unwrap(),
-//             )
-//             .unwrap();
-//         expect_empty(result);
-//         rt.verify();
-//         rt.reset();
-//
-//         rt
-//     }
-//
-//     #[test]
-//     fn test_set_ok() {
-//         let rt = construct_and_verify();
-//
-//         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
-//         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-//
-//         let r = rt.call::<Actor>(
-//             Method::SetConstants as u64,
-//             IpldBlock::serialize_cbor(&Constants {
-//                 minimal_base_fee: Default::default(),
-//                 elasticity_multiplier: 0,
-//                 base_fee_max_change_denominator: 0,
-//                 block_gas_limit: 20,
-//             })
-//             .unwrap(),
-//         );
-//         assert!(r.is_ok());
-//
-//         let s = rt.get_state::<State>();
-//         assert_eq!(s.constants.block_gas_limit, 20);
-//     }
-//
-//     #[test]
-//     fn test_update_utilization_full_usage() {
-//         let rt = construct_and_verify();
-//
-//         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
-//         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-//
-//         let r = rt.call::<Actor>(
-//             Method::UpdateUtilization as u64,
-//             IpldBlock::serialize_cbor(&Utilization {
-//                 // full block usage
-//                 block_gas_used: 10_000_000_000,
-//             })
-//             .unwrap(),
-//         );
-//         assert!(r.is_ok());
-//
-//         rt.expect_validate_caller_any();
-//         let r = rt
-//             .call::<Actor>(Method::CurrentReading as u64, None)
-//             .unwrap()
-//             .unwrap();
-//         let reading = r.deserialize::<Reading>().unwrap();
-//         assert_eq!(reading.base_fee, TokenAmount::from_atto(112));
-//     }
-//
-//     #[test]
-//     fn test_update_utilization_equal_usage() {
-//         let rt = construct_and_verify();
-//
-//         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
-//         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-//
-//         let r = rt.call::<Actor>(
-//             Method::UpdateUtilization as u64,
-//             IpldBlock::serialize_cbor(&Utilization {
-//                 // full block usage
-//                 block_gas_used: 5_000_000_000,
-//             })
-//             .unwrap(),
-//         );
-//         assert!(r.is_ok());
-//
-//         rt.expect_validate_caller_any();
-//         let r = rt
-//             .call::<Actor>(Method::CurrentReading as u64, None)
-//             .unwrap()
-//             .unwrap();
-//         let reading = r.deserialize::<Reading>().unwrap();
-//         assert_eq!(reading.base_fee, TokenAmount::from_atto(100));
-//     }
-//
-//     #[test]
-//     fn test_update_utilization_under_usage() {
-//         let rt = construct_and_verify();
-//
-//         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
-//         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-//
-//         let r = rt.call::<Actor>(
-//             Method::UpdateUtilization as u64,
-//             IpldBlock::serialize_cbor(&Utilization {
-//                 // full block usage
-//                 block_gas_used: 100_000_000,
-//             })
-//             .unwrap(),
-//         );
-//         assert!(r.is_ok());
-//
-//         rt.expect_validate_caller_any();
-//         let r = rt
-//             .call::<Actor>(Method::CurrentReading as u64, None)
-//             .unwrap()
-//             .unwrap();
-//         let reading = r.deserialize::<Reading>().unwrap();
-//         assert_eq!(reading.base_fee, TokenAmount::from_atto(88));
-//     }
-//
-//     #[test]
-//     fn test_not_allowed() {
-//         let rt = construct_and_verify();
-//         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, Address::new_id(1000));
-//         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-//
-//         let code = rt
-//             .call::<Actor>(
-//                 Method::SetConstants as u64,
-//                 IpldBlock::serialize_cbor(&Constants {
-//                     minimal_base_fee: TokenAmount::from_atto(10000),
-//                     elasticity_multiplier: 0,
-//                     base_fee_max_change_denominator: 0,
-//                     block_gas_limit: 20,
-//                 })
-//                 .unwrap(),
-//             )
-//             .unwrap_err()
-//             .exit_code();
-//         assert_eq!(code, ExitCode::USR_FORBIDDEN)
-//     }
-// }
+#[cfg(test)]
+mod tests {
+    use crate::{Actor, ConstructorParams, Method};
+    use fendermint_actor_hoku_config_shared::{HokuConfig, HOKU_CONFIG_ACTOR_ID};
+    use fil_actors_evm_shared::address::EthAddress;
+    use fil_actors_runtime::test_utils::{
+        expect_empty, MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, SYSTEM_ACTOR_CODE_ID,
+    };
+    use fil_actors_runtime::SYSTEM_ACTOR_ADDR;
+    use fvm_ipld_encoding::ipld_block::IpldBlock;
+    use fvm_shared::address::Address;
+    use fvm_shared::clock::ChainEpoch;
+
+    pub fn construct_and_verify(
+        token_credit_rate: u64,
+        blob_capacity: u64,
+        blob_credit_debit_interval: i32,
+    ) -> MockRuntime {
+        let rt = MockRuntime {
+            receiver: Address::new_id(HOKU_CONFIG_ACTOR_ID),
+            ..Default::default()
+        };
+
+        rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
+        rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
+
+        let result = rt
+            .call::<Actor>(
+                Method::Constructor as u64,
+                IpldBlock::serialize_cbor(&ConstructorParams {
+                    initial_token_credit_rate: token_credit_rate,
+                    initial_blob_capacity: blob_capacity,
+                    initial_blob_credit_debit_interval: ChainEpoch::from(
+                        blob_credit_debit_interval,
+                    ),
+                })
+                .unwrap(),
+            )
+            .unwrap();
+        expect_empty(result);
+        rt.verify();
+        rt.reset();
+
+        rt
+    }
+
+    #[test]
+    fn test_get_config() {
+        let rt = construct_and_verify(5, 1024, 3600);
+
+        rt.expect_validate_caller_any();
+        let hoku_config = rt
+            .call::<Actor>(Method::GetConfig as u64, None)
+            .unwrap()
+            .unwrap()
+            .deserialize::<HokuConfig>()
+            .unwrap();
+
+        assert_eq!(hoku_config.token_credit_rate, 5);
+        assert_eq!(hoku_config.blob_capacity, 1024);
+        assert_eq!(hoku_config.blob_credit_debit_interval, 3600);
+    }
+
+    #[test]
+    fn test_set_config() {
+        let rt = construct_and_verify(5, 1024, 3600);
+
+        let id_addr = Address::new_id(110);
+        let eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000000"
+        ));
+        let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
+
+        rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
+
+        rt.expect_validate_caller_any();
+        let result = rt.call::<Actor>(
+            Method::SetConfig as u64,
+            IpldBlock::serialize_cbor(&HokuConfig {
+                blob_capacity: 2048,
+                token_credit_rate: 10,
+                blob_credit_debit_interval: ChainEpoch::from(1800),
+            })
+            .unwrap(),
+        );
+        assert!(result.is_ok());
+
+        rt.expect_validate_caller_any();
+        let hoku_config = rt
+            .call::<Actor>(Method::GetConfig as u64, None)
+            .unwrap()
+            .unwrap()
+            .deserialize::<HokuConfig>()
+            .unwrap();
+
+        assert_eq!(hoku_config.token_credit_rate, 10);
+        assert_eq!(hoku_config.blob_capacity, 2048);
+        assert_eq!(hoku_config.blob_credit_debit_interval, 1800);
+    }
+}

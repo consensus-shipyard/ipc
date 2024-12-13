@@ -7,12 +7,12 @@ use std::collections::HashSet;
 use fendermint_actor_blobs_shared::params::{
     AddBlobParams, AdjustBlobTtlForAccountParams, ApproveCreditParams, BuyCreditParams,
     DeleteBlobParams, FinalizeBlobParams, GetAccountParams, GetAddedBlobsParams, GetBlobParams,
-    GetBlobStatusParams, GetCreditAllowanceParams, GetCreditApprovalParams, GetPendingBlobsParams,
+    GetBlobStatusParams, GetCreditApprovalParams, GetGasAllowanceParams, GetPendingBlobsParams,
     GetStatsReturn, OverwriteBlobParams, RevokeCreditParams, SetAccountBlobTtlStatusParams,
-    SetBlobPendingParams, SetCreditSponsorParams, UpdateCreditParams,
+    SetBlobPendingParams, SetCreditSponsorParams, UpdateGasAllowanceParams,
 };
 use fendermint_actor_blobs_shared::state::{
-    Account, Blob, BlobStatus, CreditAllowance, CreditApproval, Hash, PublicKey, Subscription,
+    Account, Blob, BlobStatus, CreditApproval, GasAllowance, Hash, PublicKey, Subscription,
     SubscriptionId,
 };
 use fendermint_actor_blobs_shared::Method;
@@ -71,7 +71,10 @@ impl BlobsActor {
         })
     }
 
-    fn update_credit(rt: &impl Runtime, params: UpdateCreditParams) -> Result<(), ActorError> {
+    fn update_gas_allowance(
+        rt: &impl Runtime,
+        params: UpdateGasAllowanceParams,
+    ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         let from = resolve_external_non_machine(rt, params.from)?;
         let sponsor = if let Some(sponsor) = params.sponsor {
@@ -80,7 +83,7 @@ impl BlobsActor {
             None
         };
         rt.transaction(|st: &mut State, rt| {
-            st.update_credit(
+            st.update_gas_allowance(
                 rt.store(),
                 from,
                 sponsor,
@@ -117,7 +120,8 @@ impl BlobsActor {
                 to,
                 caller_allowlist,
                 rt.curr_epoch(),
-                params.limit,
+                params.credit_limit,
+                params.gas_fee_limit,
                 params.ttl,
             )
         })
@@ -176,17 +180,17 @@ impl BlobsActor {
         Ok(approval)
     }
 
-    fn get_credit_allowance(
+    fn get_gas_allowance(
         rt: &impl Runtime,
-        params: GetCreditAllowanceParams,
-    ) -> Result<CreditAllowance, ActorError> {
+        params: GetGasAllowanceParams,
+    ) -> Result<GasAllowance, ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         let from = match resolve_external_non_machine(rt, params.0) {
             Ok(to) => to,
             Err(e) => {
                 return if e.exit_code() == ExitCode::USR_FORBIDDEN {
                     // Disallowed actor type (this is called by all txns so we can't error)
-                    Ok(CreditAllowance::default())
+                    Ok(GasAllowance::default())
                 } else {
                     Err(e)
                 };
@@ -194,16 +198,14 @@ impl BlobsActor {
         };
         let allowance =
             rt.state::<State>()?
-                .get_credit_allowance(rt.store(), from, rt.curr_epoch())?;
+                .get_gas_allowance(rt.store(), from, rt.curr_epoch())?;
         Ok(allowance)
     }
 
     fn debit_accounts(rt: &impl Runtime) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let hoku_config = hoku_config::get_config(rt)?;
-        let deletes = rt.transaction(|st: &mut State, rt| {
-            st.debit_accounts(&hoku_config, rt.store(), rt.curr_epoch())
-        })?;
+        let deletes =
+            rt.transaction(|st: &mut State, rt| st.debit_accounts(rt.store(), rt.curr_epoch()))?;
         for hash in deletes {
             delete_from_disc(hash)?;
         }
@@ -302,10 +304,8 @@ impl BlobsActor {
     fn finalize_blob(rt: &impl Runtime, params: FinalizeBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         let (subscriber, _) = resolve_external(rt, params.subscriber)?;
-        let hoku_config = hoku_config::get_config(rt)?;
         rt.transaction(|st: &mut State, rt| {
             st.finalize_blob(
-                &hoku_config,
                 rt.store(),
                 subscriber,
                 rt.curr_epoch(),
@@ -326,10 +326,8 @@ impl BlobsActor {
         } else {
             origin
         };
-        let hoku_config = hoku_config::get_config(rt)?;
         let delete = rt.transaction(|st: &mut State, rt| {
             st.delete_blob(
-                &hoku_config,
                 rt.store(),
                 origin,
                 caller,
@@ -365,7 +363,6 @@ impl BlobsActor {
         let (delete, subscription) = rt.transaction(|st: &mut State, rt| {
             let add_params = params.add;
             let delete = st.delete_blob(
-                &hoku_config,
                 rt.store(),
                 origin,
                 caller,
@@ -423,9 +420,8 @@ impl BlobsActor {
     /// Get the maximum TTL for blobs for an account.
     fn get_account_type(rt: &impl Runtime, account: Address) -> Result<i64, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        Ok(rt
-            .state::<State>()?
-            .get_account_max_ttl(rt.store(), account)?)
+        rt.state::<State>()?
+            .get_account_max_ttl(rt.store(), account)
     }
 
     /// Adjusts all subscriptions for an account according to its max TTL.
@@ -495,13 +491,13 @@ impl ActorCode for BlobsActor {
         Constructor => constructor,
         GetStats => get_stats,
         BuyCredit => buy_credit,
-        UpdateCredit => update_credit,
+        UpdateGasAllowance => update_gas_allowance,
         ApproveCredit => approve_credit,
         RevokeCredit => revoke_credit,
         SetCreditSponsor => set_credit_sponsor,
         GetAccount => get_account,
         GetCreditApproval => get_credit_approval,
-        GetCreditAllowance => get_credit_allowance,
+        GetGasAllowance => get_gas_allowance,
         DebitAccounts => debit_accounts,
         AddBlob => add_blob,
         GetBlob => get_blob,
@@ -587,6 +583,9 @@ mod tests {
     fn test_buy_credit() {
         let rt = construct_and_verify();
 
+        // TODO: set config 1024 * 1024 and 2
+        let token_credit_rate = 2; // 1 atto buys 2  credits
+
         let id_addr = Address::new_id(110);
         let eth_addr = EthAddress(hex_literal::hex!(
             "CAFEB0BA00000000000000000000000000000000"
@@ -597,8 +596,11 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
 
-        let mut expected_credits = BigInt::from(1000000000000000000u64);
-        rt.set_received(TokenAmount::from_whole(1));
+        let tokens = 1;
+        let mut expected_credits =
+            BigInt::from(1000000000000000000u64 * tokens) * token_credit_rate;
+        let mut expected_gas_allowance = TokenAmount::from_whole(tokens);
+        rt.set_received(TokenAmount::from_whole(tokens));
         rt.expect_validate_caller_any();
         let fund_params = BuyCreditParams(f4_eth_addr);
         expect_get_config(&rt);
@@ -612,10 +614,12 @@ mod tests {
             .deserialize::<Account>()
             .unwrap();
         assert_eq!(result.credit_free, expected_credits);
+        assert_eq!(result.gas_allowance, expected_gas_allowance);
         rt.verify();
 
-        expected_credits += BigInt::from(1000000000u64);
-        rt.set_received(TokenAmount::from_nano(1));
+        expected_credits += BigInt::from(1000000000u64 * tokens) * token_credit_rate;
+        expected_gas_allowance += TokenAmount::from_nano(tokens);
+        rt.set_received(TokenAmount::from_nano(tokens));
         rt.expect_validate_caller_any();
         let fund_params = BuyCreditParams(f4_eth_addr);
         expect_get_config(&rt);
@@ -629,10 +633,12 @@ mod tests {
             .deserialize::<Account>()
             .unwrap();
         assert_eq!(result.credit_free, expected_credits);
+        assert_eq!(result.gas_allowance, expected_gas_allowance);
         rt.verify();
 
-        expected_credits += BigInt::from(1u64);
-        rt.set_received(TokenAmount::from_atto(1));
+        expected_credits += BigInt::from(tokens) * token_credit_rate;
+        expected_gas_allowance += TokenAmount::from_atto(tokens);
+        rt.set_received(TokenAmount::from_atto(tokens));
         rt.expect_validate_caller_any();
         let fund_params = BuyCreditParams(f4_eth_addr);
         expect_get_config(&rt);
@@ -646,6 +652,7 @@ mod tests {
             .deserialize::<Account>()
             .unwrap();
         assert_eq!(result.credit_free, expected_credits);
+        assert_eq!(result.gas_allowance, expected_gas_allowance);
         rt.verify();
     }
 
@@ -687,7 +694,8 @@ mod tests {
             from: owner_id_addr,
             to: to_id_addr,
             caller_allowlist: None,
-            limit: None,
+            credit_limit: None,
+            gas_fee_limit: None,
             ttl: None,
         };
         let result = rt.call::<BlobsActor>(
@@ -705,7 +713,8 @@ mod tests {
             from: owner_id_addr,
             to: to_id_addr,
             caller_allowlist: None,
-            limit: None,
+            credit_limit: None,
+            gas_fee_limit: None,
             ttl: None,
         };
         let result = rt.call::<BlobsActor>(
@@ -723,7 +732,8 @@ mod tests {
             from: to_id_addr, // mismatch
             to: to_id_addr,
             caller_allowlist: None,
-            limit: None,
+            credit_limit: None,
+            gas_fee_limit: None,
             ttl: None,
         };
         let result = rt.call::<BlobsActor>(
@@ -776,7 +786,8 @@ mod tests {
             from: owner_id_addr,
             to: to_id_addr,
             caller_allowlist: None,
-            limit: None,
+            credit_limit: None,
+            gas_fee_limit: None,
             ttl: None,
         };
         let result = rt.call::<BlobsActor>(
@@ -1053,7 +1064,8 @@ mod tests {
             from: sponsor_id_addr,
             to: spender_id_addr,
             caller_allowlist: None,
-            limit: None,
+            credit_limit: None,
+            gas_fee_limit: None,
             ttl: None,
         };
         let result = rt.call::<BlobsActor>(
@@ -1070,7 +1082,8 @@ mod tests {
             from: sponsor_id_addr,
             to: spender_id_addr,
             caller_allowlist: None,
-            limit: None,
+            credit_limit: None,
+            gas_fee_limit: None,
             ttl: None,
         };
         let approve_result = rt.call::<BlobsActor>(

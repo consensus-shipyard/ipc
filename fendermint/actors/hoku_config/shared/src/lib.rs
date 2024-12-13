@@ -22,8 +22,8 @@ pub const HOKU_CONFIG_ACTOR_ADDR: Address = Address::new_id(HOKU_CONFIG_ACTOR_ID
 pub struct HokuConfig {
     /// The total storage capacity of the subnet.
     pub blob_capacity: u64,
-    /// The byte-blocks per atto token rate.
-    pub blob_credits_per_byte_block: u64,
+    /// The token to credit rate. The amount of credits that 1 atto buys.
+    pub token_credit_rate: u64,
     /// Block interval at which to debit all credit accounts.
     pub blob_credit_debit_interval: ChainEpoch,
 }
@@ -32,7 +32,7 @@ impl Default for HokuConfig {
     fn default() -> Self {
         Self {
             blob_capacity: 10 * 1024 * 1024 * 1024 * 1024, // 10 TiB
-            blob_credits_per_byte_block: 1,
+            token_credit_rate: 1,                          // 1 atto = 1 credit
             blob_credit_debit_interval: ChainEpoch::from(3600),
         }
     }

@@ -210,7 +210,7 @@ fn get_blob_id(state: &State, key: Vec<u8>) -> anyhow::Result<SubscriptionId, Ac
     let mut data = state.address.get()?.payload_bytes();
     data.extend(key);
     let id = blake3::hash(&data).to_hex().to_string();
-    Ok(SubscriptionId::new(&id)?)
+    SubscriptionId::new(&id)
 }
 
 /// Build an object from its state and blob.

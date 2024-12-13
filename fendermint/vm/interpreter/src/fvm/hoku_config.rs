@@ -17,8 +17,8 @@ use num_traits::Zero;
 pub struct HokuConfigTracker {
     /// The total storage capacity of the subnet.
     pub blob_capacity: u64,
-    /// The byte-blocks per atto token rate.
-    pub blob_credits_per_byte_block: u64,
+    /// The token to credit rate. The amount of credits that 1 atto buys.
+    pub token_credit_rate: u64,
     /// Block interval at which to debit all credit accounts.
     pub blob_credit_debit_interval: ChainEpoch,
 }
@@ -27,14 +27,14 @@ impl HokuConfigTracker {
     pub fn create<E: Executor>(executor: &mut E) -> anyhow::Result<HokuConfigTracker> {
         let mut ret = Self {
             blob_capacity: Zero::zero(),
-            blob_credits_per_byte_block: Zero::zero(),
+            token_credit_rate: Zero::zero(),
             blob_credit_debit_interval: Zero::zero(),
         };
 
         let reading = Self::read_hoku_config(executor)?;
 
         ret.blob_capacity = reading.blob_capacity;
-        ret.blob_credits_per_byte_block = reading.blob_credits_per_byte_block;
+        ret.token_credit_rate = reading.token_credit_rate;
         ret.blob_credit_debit_interval = reading.blob_credit_debit_interval;
 
         Ok(ret)

@@ -10,6 +10,7 @@ use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigUint;
 use fvm_shared::clock::ChainEpoch;
+use fvm_shared::econ::TokenAmount;
 use fvm_shared::sys::SendFlags;
 use fvm_shared::{ActorID, MethodNum, METHOD_CONSTRUCTOR};
 use num_derive::FromPrimitive;
@@ -28,13 +29,13 @@ pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
     GetStats = frc42_dispatch::method_hash!("GetStats"),
     BuyCredit = frc42_dispatch::method_hash!("BuyCredit"),
-    UpdateCredit = frc42_dispatch::method_hash!("UpdateCredit"),
+    UpdateGasAllowance = frc42_dispatch::method_hash!("UpdateGasAllowance"),
     ApproveCredit = frc42_dispatch::method_hash!("ApproveCredit"),
     RevokeCredit = frc42_dispatch::method_hash!("RevokeCredit"),
     SetCreditSponsor = frc42_dispatch::method_hash!("SetCreditSponsor"),
     GetAccount = frc42_dispatch::method_hash!("GetAccount"),
     GetCreditApproval = frc42_dispatch::method_hash!("GetCreditApproval"),
-    GetCreditAllowance = frc42_dispatch::method_hash!("GetCreditAllowance"),
+    GetGasAllowance = frc42_dispatch::method_hash!("GetGasAllowance"),
     DebitAccounts = frc42_dispatch::method_hash!("DebitAccounts"),
     AddBlob = frc42_dispatch::method_hash!("AddBlob"),
     GetBlob = frc42_dispatch::method_hash!("GetBlob"),
@@ -64,7 +65,8 @@ pub fn approve_credit(
     from: Address,
     to: Address,
     caller_allowlist: Option<HashSet<Address>>,
-    limit: Option<BigUint>,
+    credit_limit: Option<BigUint>,
+    gas_fee_limit: Option<TokenAmount>,
     ttl: Option<ChainEpoch>,
 ) -> Result<CreditApproval, ActorError> {
     deserialize_block(extract_send_result(rt.send_simple(
@@ -74,7 +76,8 @@ pub fn approve_credit(
             from,
             to,
             caller_allowlist,
-            limit,
+            credit_limit,
+            gas_fee_limit,
             ttl,
         })?,
         rt.message().value_received(),

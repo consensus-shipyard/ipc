@@ -35,6 +35,8 @@ pub struct Account {
     pub approvals: HashMap<String, CreditApproval>,
     /// The maximum allowed TTL for actor's blobs.
     pub max_ttl: ChainEpoch,
+    /// The total token value an account has used to buy credits.
+    pub gas_allowance: TokenAmount,
 }
 
 impl Account {
@@ -51,11 +53,15 @@ impl Account {
 #[derive(Debug, Clone, PartialEq, Serialize_tuple, Deserialize_tuple)]
 pub struct CreditApproval {
     /// Optional credit approval limit.
-    pub limit: Option<BigInt>,
+    pub credit_limit: Option<BigInt>,
+    /// Used to limit gas fee delegation.
+    pub gas_fee_limit: Option<TokenAmount>,
     /// Optional credit approval expiry epoch.
     pub expiry: Option<ChainEpoch>,
     /// Counter for how much credit has been used via this approval.
-    pub used: BigInt,
+    pub credit_used: BigInt,
+    /// Used to track gas fees paid for by the delegation
+    pub gas_fee_used: TokenAmount,
     /// Optional caller allowlist.
     /// If not present, any caller is allowed.
     pub caller_allowlist: Option<HashSet<Address>>,
@@ -87,9 +93,9 @@ impl CreditApproval {
     }
 }
 
-/// Credit allowance for an account.
+/// Gas allowance for an account.
 #[derive(Debug, Default, Clone, PartialEq, Serialize_tuple, Deserialize_tuple)]
-pub struct CreditAllowance {
+pub struct GasAllowance {
     /// The amount from the account.
     pub amount: TokenAmount,
     /// The account's default sponsor.
@@ -98,7 +104,7 @@ pub struct CreditAllowance {
     pub sponsored_amount: TokenAmount,
 }
 
-impl CreditAllowance {
+impl GasAllowance {
     /// Returns the total allowance from self and default sponsor.
     pub fn total(&self) -> TokenAmount {
         &self.amount + &self.sponsored_amount

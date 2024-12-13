@@ -19,7 +19,7 @@ pub struct BuyCreditParams(pub Address);
 
 /// Params for updating credit.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct UpdateCreditParams {
+pub struct UpdateGasAllowanceParams {
     /// Account address that initiated the update.
     pub from: Address,
     /// Optional account address that is sponsoring the update.
@@ -42,7 +42,11 @@ pub struct ApproveCreditParams {
     /// Optional credit approval limit.
     /// If specified, the approval becomes invalid once the committed credits reach the
     /// specified limit.
-    pub limit: Option<BigUint>,
+    pub credit_limit: Option<BigUint>,
+    /// Optional gas fee limit.
+    /// If specified, the approval becomes invalid once the commited gas reach the
+    /// specified limit.
+    pub gas_fee_limit: Option<TokenAmount>,
     /// Optional credit approval time-to-live epochs.
     /// If specified, the approval becomes invalid after this duration.
     pub ttl: Option<ChainEpoch>,
@@ -87,7 +91,7 @@ pub struct GetCreditApprovalParams {
 /// Params for looking up credit allowance.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct GetCreditAllowanceParams(pub Address);
+pub struct GetGasAllowanceParams(pub Address);
 
 /// Params for adding a blob.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
@@ -223,8 +227,8 @@ pub struct GetStatsReturn {
     pub credit_committed: BigInt,
     /// The total number of credits debited in the subnet.
     pub credit_debited: BigInt,
-    /// The current byte-blocks per atto token rate.
-    pub blob_credits_per_byte_block: u64,
+    /// The token to credit rate. The amount of credits that 1 atto buys.
+    pub token_credit_rate: u64,
     /// Total number of debit accounts.
     pub num_accounts: u64,
     /// Total number of actively stored blobs.

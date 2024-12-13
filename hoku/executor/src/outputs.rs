@@ -7,25 +7,25 @@ use num_traits::Zero;
 #[derive(Clone, Debug, Default)]
 pub(crate) struct GasAmounts {
     pub from_balance: TokenAmount,
-    pub from_credit: TokenAmount,
-    pub from_sponsor_credit: TokenAmount,
+    pub from_allowance: TokenAmount,
+    pub from_sponsor_allowance: TokenAmount,
 }
 
 impl GasAmounts {
     pub fn new(
         from_balance: TokenAmount,
-        from_credit: TokenAmount,
-        from_sponsor_credit: TokenAmount,
+        from_allowance: TokenAmount,
+        from_sponsor_allowance: TokenAmount,
     ) -> Self {
         Self {
             from_balance,
-            from_credit,
-            from_sponsor_credit,
+            from_allowance,
+            from_sponsor_allowance,
         }
     }
 
     pub fn total(&self) -> TokenAmount {
-        &self.from_balance + &self.from_credit + &self.from_sponsor_credit
+        &self.from_balance + &self.from_allowance + &self.from_sponsor_allowance
     }
 
     // Calculate refunds, prioritizing the sender
@@ -33,7 +33,7 @@ impl GasAmounts {
         if refund < &self.from_balance {
             // The entire refund goes to the sender balance
             GasAmounts::new(refund.clone(), TokenAmount::zero(), TokenAmount::zero())
-        } else if refund < &(&self.from_balance + &self.from_credit) {
+        } else if refund < &(&self.from_balance + &self.from_allowance) {
             // Cap the sender balance refund to its cost
             // The remainder goes to the sender's gas credit
             let remainder = refund - &self.from_balance;
@@ -42,10 +42,10 @@ impl GasAmounts {
             // Cap the sender balance refund to its cost
             // Cap the sender gas credit refund to its cost
             // The remainder goes to the sponsor's gas credit
-            let remainder = refund - &self.from_balance - &self.from_credit;
+            let remainder = refund - &self.from_balance - &self.from_allowance;
             GasAmounts::new(
                 self.from_balance.clone(),
-                self.from_credit.clone(),
+                self.from_allowance.clone(),
                 remainder,
             )
         }
