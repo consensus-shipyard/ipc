@@ -106,9 +106,8 @@ pub fn to_eth_legacy_request(
 
     // NOTE: It's impossible to tell if the original Ethereum transaction sent None or Some(0).
     // The ethers deployer sends None, so let's assume that's the useful behavour to match.
-    // TODO: review, if value is None, it's set to -1 for intermediate conversion
-    // TODO: or we just assume Some(0) will not occur in fendermint.
-    if !value.is_negative() {
+    // Luckily the RLP encoding at some point seems to resolve them to the same thing.
+    if !value.is_zero() {
         tx.value = Some(to_eth_tokens(value)?);
     }
 

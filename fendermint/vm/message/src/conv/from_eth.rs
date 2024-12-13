@@ -50,17 +50,13 @@ pub fn fvm_message_from_legacy(tx: &TransactionRequest) -> anyhow::Result<Messag
     let params = RawBytes::serialize(BytesSer(&calldata))?;
 
     let gas_price = tx.gas_price.unwrap_or_default();
-    let value = if let Some(v) = tx.value {
-        to_fvm_tokens(&v)
-    } else {
-        TokenAmount::from_atto(-1)
-    };
+
     let msg = Message {
         version: 0,
         from,
         to,
         sequence: tx.nonce.unwrap_or_default().as_u64(),
-        value,
+        value: to_fvm_tokens(&tx.value.unwrap_or_default()),
         method_num,
         params,
         gas_limit: tx
