@@ -167,7 +167,7 @@ to the config folder (defaults to `~/.ipc`).
 ./scripts/deploy_subnet/deploy.sh
 ```
 
-By default, the script will deploy the latest `develop` branch. If you want to deploy a specific
+By default, the script will deploy the latest `main` branch. If you want to deploy a specific
 branch, you can pass the branch name as an argument:
 
 ```shell
