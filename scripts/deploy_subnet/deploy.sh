@@ -5,8 +5,8 @@ set -euo pipefail
 DASHES='------'
 
 if (($# != 1)); then
-  echo "Arguments: <Specify GitHub remote branch name to use to deploy. Or use 'local' (without quote) to indicate using local repo instead. If not provided, will default to develop branch"
-  head_ref=develop
+  echo "Arguments: <Specify GitHub remote branch name to use to deploy. Or use 'local' (without quote) to indicate using local repo instead. If not provided, will default to main branch"
+  head_ref=main
   local_deploy=false
 else
   if [[ "$1" = "local" || "$1" = "localnet" ]]; then
