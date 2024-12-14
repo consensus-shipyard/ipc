@@ -13,6 +13,7 @@ crate-type = ["cdylib", "lib"]
 
 [dependencies]
 anyhow = { workspace = true }
+blake3 = { workspace = true }
 cid = { workspace = true, default-features = false }
 fil_actors_runtime = { workspace = true }
 frc42_dispatch = { workspace = true }

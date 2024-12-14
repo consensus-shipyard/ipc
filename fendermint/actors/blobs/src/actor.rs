@@ -841,7 +841,7 @@ mod tests {
             source: new_pk(),
             hash: hash.0,
             metadata_hash: new_hash(1024).0,
-            id: SubscriptionId::Default,
+            id: SubscriptionId::default(),
             size: hash.1,
             ttl: Some(3600),
         };
@@ -905,7 +905,7 @@ mod tests {
             hash: hash.0,
             metadata_hash: new_hash(1024).0,
             source: new_pk(),
-            id: SubscriptionId::Default,
+            id: SubscriptionId::default(),
             size: hash.1,
             ttl: Some(3600),
         };
@@ -938,7 +938,7 @@ mod tests {
             hash: hash.0,
             metadata_hash: new_hash(1024).0,
             source: new_pk(),
-            id: SubscriptionId::Default,
+            id: SubscriptionId::default(),
             size: hash.1,
             ttl: Some(3600),
         };
@@ -960,7 +960,7 @@ mod tests {
             hash: hash.0,
             metadata_hash: new_hash(1024).0,
             source: new_pk(),
-            id: SubscriptionId::Default,
+            id: SubscriptionId::default(),
             size: hash.1,
             ttl: Some(3600),
         };
@@ -1060,7 +1060,7 @@ mod tests {
             hash: hash.0,
             metadata_hash: new_hash(1024).0,
             source: new_pk(),
-            id: SubscriptionId::Default,
+            id: SubscriptionId::default(),
             size: hash.1,
             ttl: Some(3600),
         };
@@ -1082,7 +1082,7 @@ mod tests {
             hash: hash.0,
             metadata_hash: new_hash(1024).0,
             source: new_pk(),
-            id: SubscriptionId::Default,
+            id: SubscriptionId::default(),
             size: hash.1,
             ttl: Some(3600),
         };

@@ -113,9 +113,10 @@ impl Actor {
         let state = rt.state::<State>()?;
         let owner = state.owner;
         let key = BytesKey(params.0.clone());
+        let sub_id = get_blob_id(&state, params.0)?;
         if let Some(object_state) = state.get(rt.store(), &key)? {
             if let Some(blob) = get_blob(rt, object_state.hash)? {
-                let object = build_object(&blob, &object_state, params.0, owner)?;
+                let object = build_object(&blob, &object_state, sub_id, owner)?;
                 Ok(object)
             } else {
                 Ok(None)
@@ -208,14 +209,15 @@ impl Actor {
 fn get_blob_id(state: &State, key: Vec<u8>) -> anyhow::Result<SubscriptionId, ActorError> {
     let mut data = state.address.get()?.payload_bytes();
     data.extend(key);
-    Ok(SubscriptionId::from(data))
+    let id = blake3::hash(&data).to_hex().to_string();
+    Ok(SubscriptionId::new(&id)?)
 }
 
 /// Build an object from its state and blob.
 fn build_object(
     blob: &Blob,
     object_state: &ObjectState,
-    object_key: Vec<u8>,
+    sub_id: SubscriptionId,
     subscriber: Address,
 ) -> anyhow::Result<Option<Object>, ActorError> {
     match blob.status {
@@ -225,12 +227,11 @@ fn build_object(
                 .get(&subscriber.to_string())
                 .ok_or_else(|| {
                     ActorError::illegal_state(format!(
-                        "object store {} is not subscribed to blob {}; this should not happen",
-                        object_state.hash, subscriber,
+                        "bucket {} is not subscribed to blob {}; this should not happen",
+                        subscriber, object_state.hash
                     ))
                 })?;
-            let id = SubscriptionId::from(object_key);
-            let (expiry, _) = group.max_expiries(&id, None);
+            let (expiry, _) = group.max_expiries(&sub_id, None);
             if let Some(expiry) = expiry {
                 Ok(Some(Object {
                     hash: object_state.hash,

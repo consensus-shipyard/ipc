@@ -1937,7 +1937,7 @@ mod tests {
             current_epoch,
             hash,
             new_metadata_hash(),
-            SubscriptionId::Default,
+            SubscriptionId::default(),
             size,
             None,
             new_pk(),
@@ -2097,7 +2097,7 @@ mod tests {
         // Add blob with default a subscription ID
         let (hash, size) = new_hash(1024);
         let add1_epoch = current_epoch;
-        let id1 = SubscriptionId::Default;
+        let id1 = SubscriptionId::default();
         let ttl1 = ChainEpoch::from(MIN_TTL);
         let source = new_pk();
         let res = state.add_blob(
@@ -2163,7 +2163,7 @@ mod tests {
         // Add the same blob but this time uses a different subscription ID
         let add2_epoch = ChainEpoch::from(21);
         let ttl2 = ChainEpoch::from(MIN_TTL);
-        let id2 = SubscriptionId::Key("foo".into());
+        let id2 = SubscriptionId::new("foo").unwrap();
         let source = new_pk();
         let res = state.add_blob(
             &store,
@@ -2326,7 +2326,7 @@ mod tests {
         // Add blob with default a subscription ID
         let (hash1, size1) = new_hash(1024);
         let add1_epoch = current_epoch;
-        let id1 = SubscriptionId::Default;
+        let id1 = SubscriptionId::default();
         let source = new_pk();
         let res = state.add_blob(
             &store,
@@ -2370,7 +2370,7 @@ mod tests {
         // Add another blob past the first blob's expiry
         let (hash2, size2) = new_hash(2048);
         let add2_epoch = ChainEpoch::from(MIN_TTL + 11);
-        let id2 = SubscriptionId::Key("foo".into());
+        let id2 = SubscriptionId::new("foo").unwrap();
         let source = new_pk();
         let res = state.add_blob(
             &store,
@@ -2424,7 +2424,7 @@ mod tests {
 
         // Add the first (now expired) blob again
         let add3_epoch = ChainEpoch::from(MIN_TTL + 21);
-        let id1 = SubscriptionId::Default;
+        let id1 = SubscriptionId::default();
         let source = new_pk();
         let res = state.add_blob(
             &store,
@@ -2590,7 +2590,7 @@ mod tests {
         // Add blob with default a subscription ID
         let (hash, size) = new_hash(1024);
         let add1_epoch = current_epoch;
-        let id1 = SubscriptionId::Default;
+        let id1 = SubscriptionId::default();
         let source = new_pk();
         let res = state.add_blob(
             &store,
@@ -2750,7 +2750,7 @@ mod tests {
 
         // Add the same blob again but use a different subscription ID
         let add3_epoch = ChainEpoch::from(31);
-        let id2 = SubscriptionId::Key("foo".into());
+        let id2 = SubscriptionId::new("foo").unwrap();
         let source = new_pk();
         let res = state.add_blob(
             &store,
@@ -2926,7 +2926,7 @@ mod tests {
             add_epoch,
             hash,
             new_metadata_hash(),
-            SubscriptionId::Default,
+            SubscriptionId::default(),
             size,
             None,
             source,
@@ -2946,7 +2946,8 @@ mod tests {
         assert_eq!(account.capacity_used, BigInt::from(size));
 
         // Set to status pending
-        let res = state.set_blob_pending(&store, subscriber, hash, SubscriptionId::Default, source);
+        let res =
+            state.set_blob_pending(&store, subscriber, hash, SubscriptionId::default(), source);
         assert!(res.is_ok());
 
         // Finalize as resolved
@@ -2956,7 +2957,7 @@ mod tests {
             subscriber,
             finalize_epoch,
             hash,
-            SubscriptionId::Default,
+            SubscriptionId::default(),
             BlobStatus::Resolved,
         );
         assert!(res.is_ok());
@@ -2968,7 +2969,7 @@ mod tests {
             subscriber,
             renew_epoch,
             hash,
-            SubscriptionId::Default,
+            SubscriptionId::default(),
         );
         assert!(res.is_ok());
 
@@ -3018,7 +3019,7 @@ mod tests {
         // Add blob with default a subscription ID
         let (hash1, size1) = new_hash(1024);
         let add1_epoch = current_epoch;
-        let id1 = SubscriptionId::Default;
+        let id1 = SubscriptionId::default();
         let source = new_pk();
         let res = state.add_blob(
             &store,
@@ -3050,7 +3051,7 @@ mod tests {
         // Add another blob past the first blob's expiry
         let (hash2, size2) = new_hash(2048);
         let add2_epoch = ChainEpoch::from(AUTO_TTL + 11);
-        let id2 = SubscriptionId::Key("foo".into());
+        let id2 = SubscriptionId::new("foo").unwrap();
         let source = new_pk();
         let res = state.add_blob(
             &store,
@@ -3152,7 +3153,7 @@ mod tests {
             current_epoch,
             hash,
             new_metadata_hash(),
-            SubscriptionId::Default,
+            SubscriptionId::default(),
             size,
             None,
             new_pk(),
@@ -3167,7 +3168,7 @@ mod tests {
             subscriber,
             finalize_epoch,
             hash,
-            SubscriptionId::Default,
+            SubscriptionId::default(),
             BlobStatus::Pending,
         );
         assert!(res.is_err());
@@ -3201,7 +3202,7 @@ mod tests {
             current_epoch,
             hash,
             new_metadata_hash(),
-            SubscriptionId::Default,
+            SubscriptionId::default(),
             size,
             None,
             source,
@@ -3210,7 +3211,8 @@ mod tests {
         assert!(res.is_ok());
 
         // Set to status pending
-        let res = state.set_blob_pending(&store, subscriber, hash, SubscriptionId::Default, source);
+        let res =
+            state.set_blob_pending(&store, subscriber, hash, SubscriptionId::default(), source);
         assert!(res.is_ok());
 
         // Finalize as resolved
@@ -3220,14 +3222,14 @@ mod tests {
             subscriber,
             finalize_epoch,
             hash,
-            SubscriptionId::Default,
+            SubscriptionId::default(),
             BlobStatus::Resolved,
         );
         assert!(res.is_ok());
 
         // Check status
         let status = state
-            .get_blob_status(&store, subscriber, hash, SubscriptionId::Default)
+            .get_blob_status(&store, subscriber, hash, SubscriptionId::default())
             .unwrap();
         assert!(matches!(status, BlobStatus::Resolved));
 
@@ -3263,7 +3265,7 @@ mod tests {
             add_epoch,
             hash,
             new_metadata_hash(),
-            SubscriptionId::Default,
+            SubscriptionId::default(),
             size,
             None,
             source,
@@ -3272,7 +3274,8 @@ mod tests {
         assert!(res.is_ok());
 
         // Set to status pending
-        let res = state.set_blob_pending(&store, subscriber, hash, SubscriptionId::Default, source);
+        let res =
+            state.set_blob_pending(&store, subscriber, hash, SubscriptionId::default(), source);
         assert!(res.is_ok());
 
         // Finalize as failed
@@ -3282,14 +3285,14 @@ mod tests {
             subscriber,
             finalize_epoch,
             hash,
-            SubscriptionId::Default,
+            SubscriptionId::default(),
             BlobStatus::Failed,
         );
         assert!(res.is_ok());
 
         // Check status
         let status = state
-            .get_blob_status(&store, subscriber, hash, SubscriptionId::Default)
+            .get_blob_status(&store, subscriber, hash, SubscriptionId::default())
             .unwrap();
         assert!(matches!(status, BlobStatus::Failed));
 
@@ -3341,7 +3344,7 @@ mod tests {
             add_epoch,
             hash,
             new_metadata_hash(),
-            SubscriptionId::Default,
+            SubscriptionId::default(),
             size,
             None,
             source,
@@ -3389,7 +3392,8 @@ mod tests {
         assert_eq!(state.capacity_used, account.capacity_used);
 
         // Set to status pending
-        let res = state.set_blob_pending(&store, subscriber, hash, SubscriptionId::Default, source);
+        let res =
+            state.set_blob_pending(&store, subscriber, hash, SubscriptionId::default(), source);
         assert!(res.is_ok());
 
         // Finalize as failed
@@ -3399,14 +3403,14 @@ mod tests {
             subscriber,
             finalize_epoch,
             hash,
-            SubscriptionId::Default,
+            SubscriptionId::default(),
             BlobStatus::Failed,
         );
         assert!(res.is_ok());
 
         // Check status
         let status = state
-            .get_blob_status(&store, subscriber, hash, SubscriptionId::Default)
+            .get_blob_status(&store, subscriber, hash, SubscriptionId::default())
             .unwrap();
         assert!(matches!(status, BlobStatus::Failed));
 
@@ -3596,7 +3600,7 @@ mod tests {
                 current_epoch,
                 hash,
                 new_metadata_hash(),
-                SubscriptionId::Default,
+                SubscriptionId::default(),
                 size,
                 tc.blob_ttl,
                 new_pk(),
@@ -3677,7 +3681,7 @@ mod tests {
             add1_epoch,
             hash1,
             new_metadata_hash(),
-            SubscriptionId::Default,
+            SubscriptionId::default(),
             size1,
             Some(MIN_TTL),
             new_pk(),
@@ -3716,7 +3720,7 @@ mod tests {
             add2_epoch,
             hash2,
             new_metadata_hash(),
-            SubscriptionId::Default,
+            SubscriptionId::default(),
             size2,
             Some(MIN_TTL),
             new_pk(),
@@ -3755,7 +3759,7 @@ mod tests {
                 subscriber,
                 delete_epoch,
                 hash1,
-                SubscriptionId::Default,
+                SubscriptionId::default(),
             )
             .unwrap();
         assert!(delete_from_disc);
