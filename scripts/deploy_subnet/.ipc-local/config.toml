@@ -8,7 +8,7 @@ id = "/r31337"
 network_type = "fevm"
 provider_http = "http://127.0.0.1:8545"
 gateway_addr = "0x9A676e781A523b5d0C0e43731313A708CB607508"
-registry_addr = "0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1"
+registry_addr = "0x322813Fd9A801c5507c9de605d63CEA4f2CE6c44"
 
 # Local subnet
 [[subnets]]
