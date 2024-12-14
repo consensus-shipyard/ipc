@@ -447,7 +447,7 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
     echo "$deploy_supply_source_token_out"
     echo ""
     # note: this is consistently going to be
-    # 0xa85233C63b9Ee964Add6F2cffe00Fd84eb32338f for localnet
+    # 0x4A679253410272dd5232B3Ff7cF5dbB88f295319 for localnet
     SUPPLY_SOURCE_ADDRESS=$(echo "$deploy_supply_source_token_out" | sed -n 's/.*contract Hoku *\([^ ]*\).*/\1/p')
 
     # fund the all anvil accounts with 10100 HOKU (note the extra 100 HOKU)
@@ -471,16 +471,15 @@ echo "Parent supply source address: $SUPPLY_SOURCE_ADDRESS"
 # use the same account validator 0th account to deploy validator gater
 cd "${IPC_FOLDER}/hoku-contracts"
 forge clean && forge build # Note: required to avoid upgradeable safety validation errors with `ValidatorGater.sol`
-chain_env=$(if $local_deploy; then echo "local"; else echo "testnet"; fi)
 gas_mult=$(if $local_deploy; then echo 130; else echo 100000; fi)
-deploy_validator_gater_token_out="$(forge script script/ValidatorGater.s.sol --private-key "${pk}" --rpc-url "${rpc_url}" --tc DeployScript --sig 'run(string)' "${chain_env}" --broadcast --timeout 120 -g "${gas_mult}" -vv)"
+deploy_validator_gater_token_out="$(forge script script/ValidatorGater.s.sol --private-key "${pk}" --rpc-url "${rpc_url}" --tc DeployScript --sig 'run()' --broadcast --timeout 120 -g "${gas_mult}" -vv)"
 
 echo "$DASHES deploy validator gater output $DASHES"
 echo ""
 echo "$deploy_validator_gater_token_out"
 echo ""
 # note: this is consistently going to be
-# 0x851356ae760d987E095750cCeb3bC6014560891C for localnet
+# 0xf5059a5D33d5853360D16C683c16e67980206f36 for localnet
 VALIDATOR_GATER_ADDRESS=$(echo "$deploy_validator_gater_token_out" | sed -n 's/.*contract ValidatorGater *\([^ ]*\).*/\1/p')
 echo "Parent validator gater address: $VALIDATOR_GATER_ADDRESS"
 cd "$IPC_FOLDER"
@@ -765,16 +764,19 @@ if [[ $local_deploy = true ]]; then
   deployer_pk=$(jq .[9].private_key < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
   cd "${IPC_FOLDER}/hoku-contracts"
   echo "$DASHES deploy bucket and credit manager output $DASHES"
-  deploy_bucket_manager_token_out="$(forge script script/BucketManager.s.sol --private-key "${deployer_pk}" --rpc-url http://localhost:"${ETHAPI_HOST_PORTS[0]}" --tc DeployScript --sig 'run(string)' local --broadcast --timeout 120 -g 100000 -vv)"
-  deploy_credit_manager_token_out="$(forge script script/Credit.s.sol --private-key "${deployer_pk}" --rpc-url http://localhost:"${ETHAPI_HOST_PORTS[0]}" --tc DeployScript --sig 'run(string)' local --broadcast --timeout 120 -g 100000 -vv)"
+  deploy_blob_manager_token_out="$(forge script script/BlobManager.s.sol --private-key "${deployer_pk}" --rpc-url http://localhost:"${ETHAPI_HOST_PORTS[0]}" --tc DeployScript --sig 'run()' --broadcast --timeout 120 -g 100000 -vv)"
+  deploy_bucket_manager_token_out="$(forge script script/BucketManager.s.sol --private-key "${deployer_pk}" --rpc-url http://localhost:"${ETHAPI_HOST_PORTS[0]}" --tc DeployScript --sig 'run()' --broadcast --timeout 120 -g 100000 -vv)"
+  deploy_credit_manager_token_out="$(forge script script/CreditManager.s.sol --private-key "${deployer_pk}" --rpc-url http://localhost:"${ETHAPI_HOST_PORTS[0]}" --tc DeployScript --sig 'run()' --broadcast --timeout 120 -g 100000 -vv)"
   echo ""
   echo "$deploy_bucket_manager_token_out"
   echo "$deploy_credit_manager_token_out"
   echo ""
   # note: these are consistently going to be 0xe1Aa25618fA0c7A1CFDab5d6B456af611873b629 and
   # 0xf7Cd8fa9b94DB2Aa972023b379c7f72c65E4De9D, respectively, for localnet
+  BLOB_MANAGER_ADDRESS=$(echo "$deploy_blob_manager_token_out" | sed -n 's/.*contract BlobManager *\([^ ]*\).*/\1/p')
   BUCKET_MANAGER_ADDRESS=$(echo "$deploy_bucket_manager_token_out" | sed -n 's/.*contract BucketManager *\([^ ]*\).*/\1/p')
-  CREDIT_MANAGER_ADDRESS=$(echo "$deploy_credit_manager_token_out" | sed -n 's/.*contract Credit *\([^ ]*\).*/\1/p')
+  CREDIT_MANAGER_ADDRESS=$(echo "$deploy_credit_manager_token_out" | sed -n 's/.*contract CreditManager *\([^ ]*\).*/\1/p')
+  echo "Blob manager address: ${BLOB_MANAGER_ADDRESS}"
   echo "Bucket manager address: ${BUCKET_MANAGER_ADDRESS}"
   echo "Credit manager address: ${CREDIT_MANAGER_ADDRESS}"
   echo
@@ -835,7 +837,8 @@ Subnet registry:        0x74539671a1d2f1c8f200826baba665179f53a1b7
 EOF
 
 if [[ $local_deploy = true ]]; then
-  echo "Subnet bucket manager:  ${BUCKET_MANAGER_ADDRESS}"
+  echo "Subnet blob manager:   ${BLOB_MANAGER_ADDRESS}"
+  echo "Subnet bucket manager: ${BUCKET_MANAGER_ADDRESS}"
   echo "Subnet credit manager:  ${CREDIT_MANAGER_ADDRESS}"
   echo
   echo "Account balances:"
