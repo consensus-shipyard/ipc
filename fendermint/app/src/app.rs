@@ -420,12 +420,15 @@ where
 
     /// Replaces the current validators cache with a new one.
     async fn refresh_validators_cache(&self) -> Result<()> {
-        let mut state = self
-            .read_only_view(None)?
-            .ok_or_else(|| anyhow!("exec state should be present"))?;
+        // TODO: This should be read only state, but we can't use the read-only view here
+        // because it hasn't been committed to state store yet.
+        self.modify_exec_state(|mut s| async {
+            let mut cache = self.validators_cache.lock().await;
+            *cache = Some(ValidatorCache::new_from_state(&mut s.1)?);
+            Ok((s, ()))
+        })
+        .await?;
 
-        let mut cache = self.validators_cache.lock().await;
-        *cache = Some(ValidatorCache::new_from_state(&mut state)?);
         Ok(())
     }
 
