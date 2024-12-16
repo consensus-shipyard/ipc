@@ -30,7 +30,32 @@ pub fn to_eth_transaction_response(
     hash: et::TxHash,
 ) -> Result<et::Transaction, JsonRpcError> {
     match &tx {
-        TypedTransaction::Legacy(_) => todo!(),
+        TypedTransaction::Legacy(tx) => {
+            Ok(et::Transaction {
+                hash,
+                nonce: tx.nonce.unwrap_or_default(),
+                block_hash: None,
+                block_number: None,
+                transaction_index: None,
+                from: tx.from.unwrap_or_default(),
+                to: tx.to.clone().and_then(|to| to.as_address().cloned()),
+                value: tx.value.unwrap_or_default(),
+                gas: tx.gas.unwrap_or_default(),
+                // Strictly speaking a "Type 2" transaction should not need to set this, but we do because Blockscout
+                // has a database constraint that if a transaction is included in a block this can't be null.
+                gas_price: tx.gas_price,
+                input: tx.data.clone().unwrap_or_default(),
+                chain_id: tx.chain_id.map(|x| et::U256::from(x.as_u64())),
+                v: et::U64::from(sig.v),
+                r: sig.r,
+                s: sig.s,
+                transaction_type: Some(0u64.into()),
+                access_list: None,
+                other: Default::default(),
+                max_fee_per_gas: None,
+                max_priority_fee_per_gas: None,
+            })
+        }
         TypedTransaction::Eip1559(tx) => {
             Ok(et::Transaction {
                 hash,
