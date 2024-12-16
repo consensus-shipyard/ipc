@@ -38,8 +38,6 @@ pub type ActorAddressMap = HashMap<ActorID, Address>;
 /// The result of the message application bundled with any delegated addresses of event emitters.
 pub type ExecResult = anyhow::Result<(ApplyRet, ActorAddressMap)>;
 
-const DEFAULT_BASE_FEE_HISTORY: usize = 5;
-
 /// Parts of the state which evolve during the lifetime of the chain.
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -155,6 +153,7 @@ where
         let mut executor = DefaultExecutor::new(engine, machine)?;
 
         let block_gas_tracker = BlockGasTracker::create(&mut executor)?;
+        let base_fee = block_gas_tracker.base_fee().clone();
 
         Ok(Self {
             executor,
@@ -168,7 +167,7 @@ where
                 power_scale: params.power_scale,
             },
             params_dirty: false,
-            txn_priority: TxnPriorityCalculator::new(DEFAULT_BASE_FEE_HISTORY),
+            txn_priority: TxnPriorityCalculator::new(base_fee),
         })
     }
 
@@ -275,10 +274,6 @@ where
 
     pub fn txn_priority_calculator(&self) -> &TxnPriorityCalculator {
         &self.txn_priority
-    }
-
-    pub fn txn_priority_calculator_mut(&mut self) -> &mut TxnPriorityCalculator {
-        &mut self.txn_priority
     }
 
     pub fn app_version(&self) -> u64 {
