@@ -589,6 +589,9 @@ where
             .await
             .context("error running check")?;
 
+        // Update the check state.
+        *guard = Some(state);
+
         let mut mpool_received_trace = MpoolReceived::default();
 
         let response = match result {
@@ -604,9 +607,6 @@ where
                 }
             },
         };
-
-        // Update the check state.
-        *guard = Some(state);
 
         mpool_received_trace.accept = response.code.is_ok();
         if !mpool_received_trace.accept {
