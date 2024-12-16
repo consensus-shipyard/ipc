@@ -40,7 +40,9 @@ use crate::handlers::ws::MethodNotification;
 use crate::mpool::{TransactionBuffer, TransactionCache};
 use crate::GasOpt;
 use crate::{
-    conv::from_tm::{map_rpc_block_txs, to_chain_message, to_eth_block, to_eth_transaction},
+    conv::from_tm::{
+        map_rpc_block_txs, to_chain_message, to_eth_block, to_eth_transaction_response,
+    },
     error, JsonRpcResult,
 };
 
@@ -357,7 +359,7 @@ where
                     return error(ExitCode::USR_ILLEGAL_ARGUMENT, "incompatible transaction");
                 };
 
-                let mut tx = to_eth_transaction(msg, chain_id, hash)
+                let mut tx = to_eth_transaction_response(msg, chain_id, hash)
                     .context("failed to convert to eth transaction")?;
                 tx.transaction_index = Some(index);
                 tx.block_hash = Some(et::H256::from_slice(block.header.hash().as_bytes()));

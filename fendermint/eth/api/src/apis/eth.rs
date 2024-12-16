@@ -46,7 +46,7 @@ use crate::{
     conv::{
         from_eth::to_fvm_address,
         from_fvm::to_eth_tokens,
-        from_tm::{to_eth_receipt, to_eth_transaction},
+        from_tm::{to_eth_receipt, to_eth_transaction_response},
     },
     error, JsonRpcData, JsonRpcResult,
 };
@@ -440,7 +440,7 @@ where
                 .await?;
             let chain_id = ChainID::from(sp.value.chain_id);
             let hash = msg_hash(&res.tx_result.events, &res.tx);
-            let mut tx = to_eth_transaction(msg, chain_id, hash)?;
+            let mut tx = to_eth_transaction_response(msg, chain_id, hash)?;
             tx.transaction_index = Some(et::U64::from(res.index));
             tx.block_hash = Some(et::H256::from_slice(header.header.hash().as_bytes()));
             tx.block_number = Some(et::U64::from(res.height.value()));
@@ -640,10 +640,10 @@ where
     let msghash = et::TxHash::from(ethers_core::utils::keccak256(rlp.as_raw()));
     tracing::debug!(?sighash, eth_hash = ?msghash, ?tx, "received raw transaction");
 
-    if let Some(tx) = tx.as_eip1559_ref() {
-        let tx = from_eth::to_eth_transaction(tx.clone(), sig, msghash);
-        data.tx_cache.insert(msghash, tx);
-    }
+    data.tx_cache.insert(
+        msghash,
+        from_eth::to_eth_transaction_response(&tx, sig, msghash)?,
+    );
 
     let msg = to_fvm_message(tx)?;
     let sender = msg.from;

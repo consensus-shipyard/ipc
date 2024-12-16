@@ -5,9 +5,11 @@
 
 use std::str::FromStr;
 
+use crate::signed::{OriginKind, SignedMessage};
 use anyhow::anyhow;
 use anyhow::bail;
 use ethers_core::types as et;
+use ethers_core::types::transaction::eip2718::TypedTransaction;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::eam::EAM_ACTOR_ID;
 use fvm_ipld_encoding::BytesDe;
@@ -67,6 +69,23 @@ pub fn to_eth_signature(sig: &FvmSignature, normalized: bool) -> anyhow::Result<
     };
 
     Ok(sig)
+}
+
+pub fn to_eth_typed_transaction(
+    msg: &SignedMessage,
+    chain_id: &ChainID,
+) -> anyhow::Result<TypedTransaction> {
+    match msg.origin_kind {
+        OriginKind::Fvm => Err(anyhow!("fvm message not allowed")),
+        OriginKind::EthereumLegacy => Ok(TypedTransaction::Legacy(to_eth_legacy_request(
+            &msg.message,
+            chain_id,
+        )?)),
+        OriginKind::EthereumEIP1559 => Ok(TypedTransaction::Eip1559(to_eth_eip1559_request(
+            &msg.message,
+            chain_id,
+        )?)),
+    }
 }
 
 /// Turn an FVM `Message` back into an Ethereum legacy transaction request.

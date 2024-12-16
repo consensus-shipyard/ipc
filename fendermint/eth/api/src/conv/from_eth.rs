@@ -9,6 +9,7 @@ use ethers_core::types::transaction::eip2718::TypedTransaction;
 pub use fendermint_vm_message::conv::from_eth::*;
 use fvm_shared::{error::ExitCode, message::Message};
 
+use crate::error::JsonRpcError;
 use crate::{error, JsonRpcResult};
 
 pub fn to_fvm_message(tx: TypedTransaction) -> JsonRpcResult<Message> {
@@ -23,37 +24,47 @@ pub fn to_fvm_message(tx: TypedTransaction) -> JsonRpcResult<Message> {
 }
 
 /// Turn a request into the DTO returned by the API.
-pub fn to_eth_transaction(
-    tx: et::Eip1559TransactionRequest,
+pub fn to_eth_transaction_response(
+    tx: &TypedTransaction,
     sig: et::Signature,
     hash: et::TxHash,
-) -> et::Transaction {
-    et::Transaction {
-        hash,
-        nonce: tx.nonce.unwrap_or_default(),
-        block_hash: None,
-        block_number: None,
-        transaction_index: None,
-        from: tx.from.unwrap_or_default(),
-        to: tx.to.and_then(|to| to.as_address().cloned()),
-        value: tx.value.unwrap_or_default(),
-        gas: tx.gas.unwrap_or_default(),
-        max_fee_per_gas: tx.max_fee_per_gas,
-        max_priority_fee_per_gas: tx.max_priority_fee_per_gas,
-        // Strictly speaking a "Type 2" transaction should not need to set this, but we do because Blockscout
-        // has a database constraint that if a transaction is included in a block this can't be null.
-        gas_price: Some(
-            tx.max_fee_per_gas.unwrap_or_default()
-                + tx.max_priority_fee_per_gas.unwrap_or_default(),
+) -> Result<et::Transaction, JsonRpcError> {
+    match &tx {
+        TypedTransaction::Legacy(_) => todo!(),
+        TypedTransaction::Eip1559(tx) => {
+            Ok(et::Transaction {
+                hash,
+                nonce: tx.nonce.unwrap_or_default(),
+                block_hash: None,
+                block_number: None,
+                transaction_index: None,
+                from: tx.from.unwrap_or_default(),
+                to: tx.to.clone().and_then(|to| to.as_address().cloned()),
+                value: tx.value.unwrap_or_default(),
+                gas: tx.gas.unwrap_or_default(),
+                max_fee_per_gas: tx.max_fee_per_gas,
+                max_priority_fee_per_gas: tx.max_priority_fee_per_gas,
+                // Strictly speaking a "Type 2" transaction should not need to set this, but we do because Blockscout
+                // has a database constraint that if a transaction is included in a block this can't be null.
+                gas_price: Some(
+                    tx.max_fee_per_gas.unwrap_or_default()
+                        + tx.max_priority_fee_per_gas.unwrap_or_default(),
+                ),
+                input: tx.data.clone().unwrap_or_default(),
+                chain_id: tx.chain_id.map(|x| et::U256::from(x.as_u64())),
+                v: et::U64::from(sig.v),
+                r: sig.r,
+                s: sig.s,
+                transaction_type: Some(2u64.into()),
+                access_list: Some(tx.access_list.clone()),
+                other: Default::default(),
+            })
+        }
+        _ => error::error_with_revert(
+            ExitCode::USR_ILLEGAL_ARGUMENT,
+            "txn type not supported",
+            None::<Vec<u8>>,
         ),
-        input: tx.data.unwrap_or_default(),
-        chain_id: tx.chain_id.map(|x| et::U256::from(x.as_u64())),
-        v: et::U64::from(sig.v),
-        r: sig.r,
-        s: sig.s,
-        transaction_type: Some(2u64.into()),
-        access_list: Some(tx.access_list),
-        other: Default::default(),
     }
 }
 
