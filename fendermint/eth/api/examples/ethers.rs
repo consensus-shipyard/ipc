@@ -41,8 +41,8 @@ use ethers_core::{
     abi::Abi,
     types::{
         transaction::eip2718::TypedTransaction, Address, BlockId, BlockNumber, Bytes,
-        Eip1559TransactionRequest, Filter, Log, SyncingStatus, TransactionReceipt, TxHash, H256,
-        U256, U64,
+        Eip1559TransactionRequest, Filter, Log, SyncingStatus, TransactionReceipt,
+        TransactionRequest, TxHash, H256, U256, U64,
     },
 };
 use tracing::Level;
@@ -705,6 +705,21 @@ where
             *ok
         })?;
     }
+
+    // Check legacy transactions
+    // Set up the transaction details for a legacy transaction
+    let tx = TransactionRequest::new()
+        .to(to.eth_addr) // Replace with recipient address
+        .value(U256::from(1u64)) // Sending 1 wei
+        .gas_price(U256::from(50_000_000_000u64)) // Set gas price (e.g., 50 gwei)
+        .gas(21000); // Gas limit for standard ETH transfer
+
+    // Send the transaction
+    let pending_tx = mw.send_transaction(tx, None).await?;
+
+    // Wait for the transaction receipt
+    let receipt = pending_tx.await?.unwrap();
+    tracing::info!("legacy transaction sent: {:?}", receipt.transaction_hash);
 
     Ok(())
 }
