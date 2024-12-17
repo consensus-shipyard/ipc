@@ -20,11 +20,10 @@ use crate::shared::{
     BUCKET_ACTOR_NAME,
 };
 use crate::state::{ObjectState, State};
-use crate::ModifyObjectMetadataParams;
-
-const MAX_METADATA_ENTRIES: u32 = 20;
-const MAX_METADATA_KEY_SIZE: u32 = 64;
-const MAX_METADATA_VALUE_SIZE: u32 = 128;
+use crate::{
+    UpdateObjectMetadataParams, MAX_METADATA_ENTRIES, MAX_METADATA_KEY_SIZE,
+    MAX_METADATA_VALUE_SIZE,
+};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
@@ -153,9 +152,9 @@ impl Actor {
         })
     }
 
-    fn modify_object_metadata(
+    fn update_object_metadata(
         rt: &impl Runtime,
-        params: ModifyObjectMetadataParams,
+        params: UpdateObjectMetadataParams,
     ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
@@ -167,24 +166,31 @@ impl Actor {
             .get(rt.store(), &key)?
             .ok_or(ActorError::illegal_state("object not found".into()))?;
 
-        for (key, val) in metadata {
-            match val {
-                Some(v) => {
-                    object
-                        .metadata
-                        .entry(key)
-                        .and_modify(|s| *s = v.clone())
-                        .or_insert(v);
-                }
-                None => {
-                    object.metadata.remove(&key);
-                }
-            }
-        }
-
-        validate_metadata(&object.metadata)?;
+        validate_metadata_optional(&metadata)?;
 
         rt.transaction(|st: &mut State, rt| {
+            for (key, val) in metadata {
+                match val {
+                    Some(v) => {
+                        object
+                            .metadata
+                            .entry(key)
+                            .and_modify(|s| *s = v.clone())
+                            .or_insert(v);
+                    }
+                    None => {
+                        object.metadata.remove(&key);
+                    }
+                }
+            }
+
+            if object.metadata.len() as u32 > MAX_METADATA_ENTRIES {
+                return Err(ActorError::illegal_state(format!(
+                    "the maximum metadata entries allowed is {}",
+                    MAX_METADATA_ENTRIES
+                )));
+            }
+
             st.add(
                 rt.store(),
                 key,
@@ -271,6 +277,30 @@ fn validate_metadata(metadata: &HashMap<String, String>) -> anyhow::Result<(), A
     Ok(())
 }
 
+fn validate_metadata_optional(
+    metadata: &HashMap<String, Option<String>>,
+) -> anyhow::Result<(), ActorError> {
+    for (key, value) in metadata {
+        if key.len() as u32 > MAX_METADATA_KEY_SIZE {
+            return Err(ActorError::illegal_state(format!(
+                "key must be less than or equal to {}",
+                MAX_METADATA_KEY_SIZE
+            )));
+        }
+
+        if let Some(value) = value {
+            if value.is_empty() || value.len() as u32 > MAX_METADATA_VALUE_SIZE {
+                return Err(ActorError::illegal_state(format!(
+                    "value must non-empty and less than or equal to {}",
+                    MAX_METADATA_VALUE_SIZE
+                )));
+            }
+        }
+    }
+
+    Ok(())
+}
+
 impl MachineActor for Actor {
     type State = State;
 }
@@ -291,7 +321,7 @@ impl ActorCode for Actor {
         DeleteObject => delete_object,
         GetObject => get_object,
         ListObjects => list_objects,
-        ModifyObjectMetadata => modify_object_metadata,
+        UpdateObjectMetadata => update_object_metadata,
         _ => fallback,
     }
 }
@@ -866,7 +896,7 @@ mod tests {
     }
 
     #[test]
-    pub fn test_modify_object_metadata() {
+    pub fn test_update_object_metadata() {
         let id_addr = Address::new_id(110);
         let eth_addr = EthAddress(hex_literal::hex!(
             "CAFEB0BA00000000000000000000000000000000"
@@ -927,15 +957,19 @@ mod tests {
         assert_eq!(add_params.size, result.size);
         rt.verify();
 
-        // Modify metadata
-        let modify_object_params = ModifyObjectMetadataParams {
+        // Update metadata
+        let update_object_params = UpdateObjectMetadataParams {
             key: add_params.key,
-            metadata: HashMap::from([("foo".into(), Some("zar".into())), ("foo2".into(), None), ("foo3".into(), Some("bar".into()))]),
+            metadata: HashMap::from([
+                ("foo".into(), Some("zar".into())),
+                ("foo2".into(), None),
+                ("foo3".into(), Some("bar".into())),
+            ]),
         };
         rt.expect_validate_caller_any();
         let result = rt.call::<Actor>(
-            Method::ModifyObjectMetadata as u64,
-            IpldBlock::serialize_cbor(&modify_object_params).unwrap(),
+            Method::UpdateObjectMetadata as u64,
+            IpldBlock::serialize_cbor(&update_object_params).unwrap(),
         );
         assert!(result.is_ok());
         rt.verify();
@@ -945,10 +979,10 @@ mod tests {
         let blob = Blob {
             size: add_params.size,
             subscribers: HashMap::from([(
-                f4_eth_addr,
+                f4_eth_addr.to_string(),
                 SubscriptionGroup {
                     subscriptions: HashMap::from([(
-                        sub_id,
+                        sub_id.to_string(),
                         Subscription {
                             added: 0,
                             expiry: ChainEpoch::from(3600),
@@ -992,7 +1026,10 @@ mod tests {
                 recovery_hash: add_params.recovery_hash,
                 size: add_params.size,
                 expiry: ChainEpoch::from(3600),
-                metadata: HashMap::from([("foo".into(), "zar".into()), ("foo3".into(), "bar".into())]),
+                metadata: HashMap::from([
+                    ("foo".into(), "zar".into()),
+                    ("foo3".into(), "bar".into())
+                ]),
             })
         );
         rt.verify();
