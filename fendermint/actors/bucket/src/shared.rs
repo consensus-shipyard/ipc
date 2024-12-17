@@ -16,7 +16,9 @@ use serde::{Deserialize, Serialize};
 pub use crate::state::{ObjectState, State};
 
 pub const BUCKET_ACTOR_NAME: &str = "bucket";
-
+pub const MAX_METADATA_ENTRIES: u32 = 20;
+pub const MAX_METADATA_KEY_SIZE: u32 = 32;
+pub const MAX_METADATA_VALUE_SIZE: u32 = 128;
 #[derive(FromPrimitive)]
 #[repr(u64)]
 pub enum Method {
@@ -28,6 +30,7 @@ pub enum Method {
     DeleteObject = frc42_dispatch::method_hash!("DeleteObject"),
     GetObject = frc42_dispatch::method_hash!("GetObject"),
     ListObjects = frc42_dispatch::method_hash!("ListObjects"),
+    UpdateObjectMetadata = frc42_dispatch::method_hash!("UpdateObjectMetadata"),
 }
 
 /// Params for adding an object.
@@ -103,4 +106,16 @@ pub struct ListObjectsReturn {
     pub common_prefixes: Vec<Vec<u8>>,
     /// Next key to use for paginating when there are more objects to list.
     pub next_key: Option<Vec<u8>>,
+}
+
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct UpdateObjectMetadataParams {
+    /// Object key.
+    #[serde(with = "strict_bytes")]
+    pub key: Vec<u8>,
+    /// Object metadata to be inserted/updated/deleted.
+    ///
+    /// If a key-value is present, we'll update the entry (or insert if it does not exist)
+    /// If only the key is present, we will delete the metadata entry
+    pub metadata: HashMap<String, Option<String>>,
 }
