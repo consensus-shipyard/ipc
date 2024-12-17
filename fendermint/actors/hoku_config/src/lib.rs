@@ -10,6 +10,7 @@ use fil_actors_runtime::SYSTEM_ACTOR_ADDR;
 use fil_actors_runtime::{actor_dispatch, ActorError};
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
+use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 
 #[cfg(feature = "fil-actor")]
@@ -28,7 +29,7 @@ pub struct State {
 #[derive(Serialize_tuple, Deserialize_tuple, Debug, Clone)]
 pub struct ConstructorParams {
     initial_blob_capacity: u64,
-    initial_token_credit_rate: u64,
+    initial_token_credit_rate: BigInt,
     initial_blob_credit_debit_interval: ChainEpoch,
 }
 
@@ -138,10 +139,11 @@ mod tests {
     use fil_actors_runtime::SYSTEM_ACTOR_ADDR;
     use fvm_ipld_encoding::ipld_block::IpldBlock;
     use fvm_shared::address::Address;
+    use fvm_shared::bigint::BigInt;
     use fvm_shared::clock::ChainEpoch;
 
     pub fn construct_and_verify(
-        token_credit_rate: u64,
+        token_credit_rate: BigInt,
         blob_capacity: u64,
         blob_credit_debit_interval: i32,
     ) -> MockRuntime {
@@ -175,7 +177,7 @@ mod tests {
 
     #[test]
     fn test_get_config() {
-        let rt = construct_and_verify(5, 1024, 3600);
+        let rt = construct_and_verify(BigInt::from(5), 1024, 3600);
 
         rt.expect_validate_caller_any();
         let hoku_config = rt
@@ -185,14 +187,14 @@ mod tests {
             .deserialize::<HokuConfig>()
             .unwrap();
 
-        assert_eq!(hoku_config.token_credit_rate, 5);
+        assert_eq!(hoku_config.token_credit_rate, BigInt::from(5));
         assert_eq!(hoku_config.blob_capacity, 1024);
         assert_eq!(hoku_config.blob_credit_debit_interval, 3600);
     }
 
     #[test]
     fn test_set_config() {
-        let rt = construct_and_verify(5, 1024, 3600);
+        let rt = construct_and_verify(BigInt::from(5), 1024, 3600);
 
         let id_addr = Address::new_id(110);
         let eth_addr = EthAddress(hex_literal::hex!(
@@ -208,7 +210,7 @@ mod tests {
             Method::SetConfig as u64,
             IpldBlock::serialize_cbor(&HokuConfig {
                 blob_capacity: 2048,
-                token_credit_rate: 10,
+                token_credit_rate: BigInt::from(10),
                 blob_credit_debit_interval: ChainEpoch::from(1800),
             })
             .unwrap(),
@@ -223,7 +225,7 @@ mod tests {
             .deserialize::<HokuConfig>()
             .unwrap();
 
-        assert_eq!(hoku_config.token_credit_rate, 10);
+        assert_eq!(hoku_config.token_credit_rate, BigInt::from(10));
         assert_eq!(hoku_config.blob_capacity, 2048);
         assert_eq!(hoku_config.blob_credit_debit_interval, 1800);
     }

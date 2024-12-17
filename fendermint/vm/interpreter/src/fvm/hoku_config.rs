@@ -9,6 +9,7 @@ use fendermint_actor_hoku_config_shared::Method::GetConfig;
 use fendermint_vm_actor_interface::hoku_config::HOKU_CONFIG_ACTOR_ADDR;
 use fendermint_vm_actor_interface::system;
 use fvm::executor::{ApplyKind, ApplyRet, Executor};
+use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use num_traits::Zero;
 
@@ -17,8 +18,8 @@ use num_traits::Zero;
 pub struct HokuConfigTracker {
     /// The total storage capacity of the subnet.
     pub blob_capacity: u64,
-    /// The token to credit rate. The amount of credits that 1 atto buys.
-    pub token_credit_rate: u64,
+    /// The token to credit rate. The amount of atto credits that 1 atto buys.
+    pub token_credit_rate: BigInt,
     /// Block interval at which to debit all credit accounts.
     pub blob_credit_debit_interval: ChainEpoch,
 }

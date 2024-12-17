@@ -8,14 +8,13 @@ use fil_actors_runtime::runtime::Runtime;
 use fil_actors_runtime::{deserialize_block, extract_send_result, ActorError};
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::address::Address;
-use fvm_shared::bigint::BigUint;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::sys::SendFlags;
 use fvm_shared::{ActorID, MethodNum, METHOD_CONSTRUCTOR};
 use num_derive::FromPrimitive;
 
-use crate::state::{Account, CreditApproval, Subscription};
+use crate::state::{Account, Credit, CreditApproval, Subscription};
 
 pub mod params;
 pub mod state;
@@ -65,7 +64,7 @@ pub fn approve_credit(
     from: Address,
     to: Address,
     caller_allowlist: Option<HashSet<Address>>,
-    credit_limit: Option<BigUint>,
+    credit_limit: Option<Credit>,
     gas_fee_limit: Option<TokenAmount>,
     ttl: Option<ChainEpoch>,
 ) -> Result<CreditApproval, ActorError> {

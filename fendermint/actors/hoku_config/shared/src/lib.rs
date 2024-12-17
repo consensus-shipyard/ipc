@@ -6,6 +6,7 @@ use fil_actors_runtime::runtime::Runtime;
 use fil_actors_runtime::{deserialize_block, extract_send_result, ActorError};
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
+use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::sys::SendFlags;
@@ -22,8 +23,8 @@ pub const HOKU_CONFIG_ACTOR_ADDR: Address = Address::new_id(HOKU_CONFIG_ACTOR_ID
 pub struct HokuConfig {
     /// The total storage capacity of the subnet.
     pub blob_capacity: u64,
-    /// The token to credit rate. The amount of credits that 1 atto buys.
-    pub token_credit_rate: u64,
+    /// The token to credit rate. The amount of atto credits that 1 atto buys.
+    pub token_credit_rate: BigInt,
     /// Block interval at which to debit all credit accounts.
     pub blob_credit_debit_interval: ChainEpoch,
 }
@@ -32,7 +33,7 @@ impl Default for HokuConfig {
     fn default() -> Self {
         Self {
             blob_capacity: 10 * 1024 * 1024 * 1024 * 1024, // 10 TiB
-            token_credit_rate: 1,                          // 1 atto = 1 credit
+            token_credit_rate: BigInt::from(1_000_000_000_000_000_000u64), // 1 atto = 1 credit (1e18 atto credit)
             blob_credit_debit_interval: ChainEpoch::from(3600),
         }
     }

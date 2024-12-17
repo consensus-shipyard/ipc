@@ -519,6 +519,7 @@ impl ActorCode for BlobsActor {
 mod tests {
     use super::*;
 
+    use fendermint_actor_blobs_shared::state::Credit;
     use fendermint_actor_hoku_config_shared::{HokuConfig, HOKU_CONFIG_ACTOR_ADDR};
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::test_utils::{
@@ -583,8 +584,8 @@ mod tests {
     fn test_buy_credit() {
         let rt = construct_and_verify();
 
-        // TODO: set config 1024 * 1024 and 2
-        let token_credit_rate = 2; // 1 atto buys 2  credits
+        // TODO(bcalza): Choose a rate different than default
+        let token_credit_rate = BigInt::from(1000000000000000000u64);
 
         let id_addr = Address::new_id(110);
         let eth_addr = EthAddress(hex_literal::hex!(
@@ -598,7 +599,7 @@ mod tests {
 
         let tokens = 1;
         let mut expected_credits =
-            BigInt::from(1000000000000000000u64 * tokens) * token_credit_rate;
+            Credit::from_atto(1000000000000000000u64 * tokens * &token_credit_rate);
         let mut expected_gas_allowance = TokenAmount::from_whole(tokens);
         rt.set_received(TokenAmount::from_whole(tokens));
         rt.expect_validate_caller_any();
@@ -617,7 +618,7 @@ mod tests {
         assert_eq!(result.gas_allowance, expected_gas_allowance);
         rt.verify();
 
-        expected_credits += BigInt::from(1000000000u64 * tokens) * token_credit_rate;
+        expected_credits += Credit::from_atto(1000000000u64 * tokens * &token_credit_rate);
         expected_gas_allowance += TokenAmount::from_nano(tokens);
         rt.set_received(TokenAmount::from_nano(tokens));
         rt.expect_validate_caller_any();
@@ -636,7 +637,7 @@ mod tests {
         assert_eq!(result.gas_allowance, expected_gas_allowance);
         rt.verify();
 
-        expected_credits += BigInt::from(tokens) * token_credit_rate;
+        expected_credits += Credit::from_atto(tokens * &token_credit_rate);
         expected_gas_allowance += TokenAmount::from_atto(tokens);
         rt.set_received(TokenAmount::from_atto(tokens));
         rt.expect_validate_caller_any();
@@ -965,6 +966,7 @@ mod tests {
             Method::AddBlob as u64,
             IpldBlock::serialize_cbor(&add_params).unwrap(),
         );
+        dbg!(result.clone().err());
         assert!(result.is_ok());
         rt.verify();
 
