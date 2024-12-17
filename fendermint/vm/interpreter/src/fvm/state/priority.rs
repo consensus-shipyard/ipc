@@ -68,6 +68,9 @@ mod tests {
         let msg = create_msg(TokenAmount::from_atto(50), TokenAmount::from_atto(20));
         assert_eq!(cal.priority(&msg), 20);
 
+        let msg = create_msg(TokenAmount::from_atto(50), TokenAmount::from_atto(10));
+        assert_eq!(cal.priority(&msg), 10);
+
         let msg = create_msg(
             TokenAmount::from_atto(BigInt::from(i128::MAX)),
             TokenAmount::from_atto(BigInt::from(i128::MAX)),
