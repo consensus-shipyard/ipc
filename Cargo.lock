@@ -2480,7 +2480,7 @@ dependencies = [
 [[package]]
 name = "entangler"
 version = "0.1.0"
-source = "git+ssh://git@github.com/hokunet/entanglement.git?rev=fbc33c4cc8f183825fc920a40ab09e90d1a647e3#fbc33c4cc8f183825fc920a40ab09e90d1a647e3"
+source = "git+ssh://git@github.com/hokunet/entanglement.git?rev=75ae8ed83ecd7be3363e183533ea9c0b60c437fc#75ae8ed83ecd7be3363e183533ea9c0b60c437fc"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -11144,13 +11144,14 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 [[package]]
 name = "storage"
 version = "0.1.0"
-source = "git+ssh://git@github.com/hokunet/entanglement.git?rev=fbc33c4cc8f183825fc920a40ab09e90d1a647e3#fbc33c4cc8f183825fc920a40ab09e90d1a647e3"
+source = "git+ssh://git@github.com/hokunet/entanglement.git?rev=75ae8ed83ecd7be3363e183533ea9c0b60c437fc#75ae8ed83ecd7be3363e183533ea9c0b60c437fc"
 dependencies = [
  "anyhow",
  "async-trait",
  "bytes",
  "cid",
  "futures",
+ "futures-lite 2.5.0",
  "iroh",
  "serde",
  "serde_json",
