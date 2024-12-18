@@ -227,7 +227,7 @@ fn build_object(
                 .get(&subscriber.to_string())
                 .ok_or_else(|| {
                     ActorError::illegal_state(format!(
-                        "bucket {} is not subscribed to blob {}; this should not happen",
+                        "owner {} is not subscribed to blob {}; this should not happen",
                         subscriber, object_state.hash
                     ))
                 })?;
