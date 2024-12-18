@@ -12,8 +12,6 @@ use hoku_ipld::hamt::MapKey;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::str::FromStr;
-
 /// The stored representation of a credit account.
 #[derive(Clone, Debug, Default, PartialEq, Serialize_tuple, Deserialize_tuple)]
 pub struct Account {
@@ -206,42 +204,39 @@ pub struct Subscription {
 }
 
 /// User-defined identifier used to differentiate blob subscriptions for the same subscriber.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum SubscriptionId {
-    /// Default (empty) ID.
-    Default,
-    /// Key-based ID.
-    Key(String),
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct SubscriptionId {
+    inner: String,
 }
 
-impl From<Vec<u8>> for SubscriptionId {
-    fn from(value: Vec<u8>) -> Self {
-        if value.is_empty() {
-            SubscriptionId::Default
-        } else {
-            let key = blake3::hash(&value).to_hex().to_string();
-            SubscriptionId::Key(key)
+impl SubscriptionId {
+    pub const MAX_LEN: usize = 64;
+
+    pub fn new(value: &str) -> Result<Self, ActorError> {
+        if value.len() > Self::MAX_LEN {
+            return Err(ActorError::illegal_argument(format!(
+                "subscription ID length is {} but must not exceed the maximum of {} characters",
+                value.len(),
+                Self::MAX_LEN
+            )));
         }
+        Ok(Self {
+            inner: value.to_string(),
+        })
     }
 }
 
-impl From<String> for SubscriptionId {
-    fn from(value: String) -> Self {
-        if value.is_empty() {
-            SubscriptionId::Default
-        } else {
-            let key = blake3::Hash::from_str(&value).unwrap().to_hex().to_string();
-            SubscriptionId::Key(key)
-        }
+impl TryFrom<String> for SubscriptionId {
+    type Error = ActorError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::new(&value)
     }
 }
 
 impl fmt::Display for SubscriptionId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            SubscriptionId::Default => write!(f, "default"),
-            SubscriptionId::Key(key) => write!(f, "{}", key),
-        }
+        write!(f, "{}", self.inner)
     }
 }
 
@@ -376,5 +371,20 @@ impl From<TtlStatus> for ChainEpoch {
             TtlStatus::Reduced => 0,
             TtlStatus::Extended => ChainEpoch::MAX,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_subsciption_id_length() {
+        let id_str = |len: usize| "a".repeat(len);
+        let id = SubscriptionId::new(&id_str(SubscriptionId::MAX_LEN)).unwrap();
+        assert_eq!(id.inner, id_str(SubscriptionId::MAX_LEN));
+
+        let id = SubscriptionId::new(&id_str(SubscriptionId::MAX_LEN + 1));
+        assert!(id.is_err());
     }
 }
