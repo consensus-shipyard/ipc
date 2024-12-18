@@ -1451,7 +1451,7 @@ impl State {
                                     subscriber,
                                     current_epoch,
                                     hash,
-                                    SubscriptionId::Key(id.clone()),
+                                    SubscriptionId::new(&id.clone())?,
                                 )? {
                                     deleted_blobs.push(hash);
                                 };
@@ -1464,7 +1464,7 @@ impl State {
                                     current_epoch,
                                     hash,
                                     blob.metadata_hash.clone(),
-                                    SubscriptionId::Key(id.clone()),
+                                    SubscriptionId::new(&id.clone())?,
                                     blob.size,
                                     Some(new_ttl),
                                     sub.source,
@@ -1488,7 +1488,7 @@ impl State {
                                 current_epoch,
                                 hash,
                                 blob.metadata_hash.clone(),
-                                SubscriptionId::Key(id.clone()),
+                                SubscriptionId::new(&id.clone())?,
                                 blob.size,
                                 Some(TtlStatus::DEFAULT_MAX_TTL),
                                 sub.source,
@@ -3961,7 +3961,7 @@ mod tests {
                         current_epoch,
                         hash,
                         new_metadata_hash(),
-                        SubscriptionId::Key(format!("blob-{}", i)),
+                        SubscriptionId::try_from(format!("blob-{}", i)).unwrap(),
                         size as u64,
                         *ttl,
                         new_pk(),
@@ -4122,7 +4122,7 @@ mod tests {
                         current_epoch,
                         hash,
                         new_metadata_hash(),
-                        SubscriptionId::Key(format!("blob-{}", i)),
+                        SubscriptionId::try_from(format!("blob-{}", i)).unwrap(),
                         size,
                         Some(7200), // 2 hours
                         new_pk(),
@@ -4244,7 +4244,7 @@ mod tests {
                     current_epoch,
                     hash,
                     new_metadata_hash(),
-                    SubscriptionId::Key(format!("blob-1-{}", i)),
+                    SubscriptionId::try_from(format!("blob-1-{}", i)).unwrap(),
                     size,
                     Some(7200), // 2 hours
                     new_pk(),
@@ -4264,7 +4264,7 @@ mod tests {
                     current_epoch,
                     hash,
                     new_metadata_hash(),
-                    SubscriptionId::Key(format!("blob-2-{}", i)),
+                    SubscriptionId::try_from(format!("blob-2-{}", i)).unwrap(),
                     size,
                     Some(7200), // 2 hours
                     new_pk(),
