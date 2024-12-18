@@ -9,7 +9,7 @@ use std::str::FromStr;
 use anyhow::{anyhow, Context};
 use ethers_core::types::{self as et};
 use fendermint_vm_actor_interface::eam::EthAddress;
-use fendermint_vm_message::conv::from_fvm::to_eth_transaction_request;
+use fendermint_vm_message::conv::from_fvm::to_eth_typed_transaction;
 use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
 use fvm_shared::address::Address;
 use fvm_shared::bigint::Zero;
@@ -160,8 +160,10 @@ pub fn to_eth_block(
         if let ChainMessage::Signed(msg) = msg {
             let hash = msg_hash(&result.events, data);
 
-            let mut tx = to_eth_transaction(msg, chain_id, hash)
+            let mut tx = to_eth_transaction_response(msg, chain_id)
                 .context("failed to convert to eth transaction")?;
+
+            debug_assert_eq!(hash, tx.hash);
 
             tx.transaction_index = Some(et::U64::from(idx));
             tx.block_hash = Some(et::H256::from_slice(block.header.hash().as_bytes()));
@@ -205,20 +207,19 @@ pub fn to_eth_block(
     Ok(block)
 }
 
-pub fn to_eth_transaction(
+pub fn to_eth_transaction_response(
     msg: SignedMessage,
     chain_id: ChainID,
-    hash: et::TxHash,
 ) -> anyhow::Result<et::Transaction> {
     // Based on https://github.com/filecoin-project/lotus/blob/6cc506f5cf751215be6badc94a960251c6453202/node/impl/full/eth.go#L2048
     let sig =
         to_eth_signature(msg.signature(), true).context("failed to convert to eth signature")?;
 
     // Recover the original request; this method has better tests.
-    let tx = to_eth_transaction_request(&msg.message, &chain_id)
+    let tx = to_eth_typed_transaction(msg.origin_kind, &msg.message, &chain_id)
         .context("failed to convert to tx request")?;
 
-    let tx = from_eth::to_eth_transaction(tx, sig, hash);
+    let tx = from_eth::to_eth_transaction_response(&tx, sig)?;
 
     Ok(tx)
 }

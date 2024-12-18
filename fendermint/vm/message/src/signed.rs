@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::anyhow;
-use cid::multihash::MultihashDigest;
 use cid::Cid;
 use ethers_core::types as et;
 use ethers_core::types::transaction::eip2718::TypedTransaction;
@@ -16,6 +15,7 @@ use fvm_shared::chainid::ChainID;
 use fvm_shared::crypto::signature::ops::recover_secp_public_key;
 use fvm_shared::crypto::signature::{Signature, SignatureType, SECP_SIG_LEN};
 use fvm_shared::message::Message;
+use serde::{Deserialize, Serialize};
 
 use thiserror::Error;
 
@@ -61,30 +61,65 @@ pub enum DomainHash {
 /// and because the `Message` is already serialized as a tuple.
 #[derive(PartialEq, Clone, Debug, Serialize_tuple, Deserialize_tuple, Hash, Eq)]
 pub struct SignedMessage {
+    pub origin_kind: OriginKind,
     pub message: Message,
     pub signature: Signature,
+}
+
+/// The original type of the message determines which fields of the message that should be used to
+/// to valid the signature.
+#[repr(u8)]
+#[derive(PartialEq, Clone, Copy, Debug, Serialize, Deserialize, Hash, Eq)]
+pub enum OriginKind {
+    Fvm = 0,
+    EthereumLegacy = 1,
+    EthereumEIP1559 = 2,
+}
+
+impl From<u8> for OriginKind {
+    fn from(value: u8) -> Self {
+        match value {
+            0 => Self::Fvm,
+            1 => Self::EthereumLegacy,
+            _ => Self::EthereumEIP1559,
+        }
+    }
 }
 
 impl SignedMessage {
     /// Generate a new signed message from fields.
     ///
     /// The signature will not be verified.
-    pub fn new_unchecked(message: Message, signature: Signature) -> SignedMessage {
-        SignedMessage { message, signature }
+    pub fn new_unchecked(
+        origin_kind: OriginKind,
+        message: Message,
+        signature: Signature,
+    ) -> SignedMessage {
+        SignedMessage {
+            origin_kind,
+            message,
+            signature,
+        }
     }
 
-    /// Create a signed message.
+    /// Create a signed message. Note that for evm, only EIP1559 txn is supported.
     pub fn new_secp256k1(
         message: Message,
         sk: &SecretKey,
         chain_id: &ChainID,
     ) -> Result<Self, SignedMessageError> {
-        let signature = match Self::signable(&message, chain_id)? {
-            Signable::Ethereum((hash, _)) => sign_eth(sk, hash),
-            Signable::Regular(data) => sign_regular(sk, &data),
-            Signable::RegularFromEth((data, _)) => sign_regular(sk, &data),
+        let (signature, origin_kind) = match Self::signable(&message, chain_id)? {
+            Signable::Ethereum((hash, _)) => (sign_eth(sk, hash), OriginKind::EthereumEIP1559),
+            Signable::Regular(data) => (sign_regular(sk, &data), OriginKind::Fvm),
+            Signable::RegularFromEth((data, _)) => {
+                (sign_regular(sk, &data), OriginKind::EthereumEIP1559)
+            }
         };
-        Ok(Self { message, signature })
+        Ok(Self {
+            origin_kind,
+            message,
+            signature,
+        })
     }
 
     /// Calculate the CID of an FVM message.
@@ -115,7 +150,7 @@ impl SignedMessage {
         // which should allow messages from ethereum accounts to go to any other type of account, e.g. custom Wasm actors.
         match maybe_eth_address(&message.from) {
             Some(addr) if is_eth_addr_compat(&message.to) => {
-                let tx: TypedTransaction = from_fvm::to_eth_transaction_request(message, chain_id)
+                let tx: TypedTransaction = from_fvm::to_eth_eip1559_request(message, chain_id)
                     .map_err(SignedMessageError::Ethereum)?
                     .into();
 
@@ -136,46 +171,109 @@ impl SignedMessage {
 
     /// Verify that the message CID was signed by the `from` address.
     pub fn verify_signature(
+        origin_kind: OriginKind,
         message: &Message,
         signature: &Signature,
         chain_id: &ChainID,
     ) -> Result<(), SignedMessageError> {
-        match Self::signable(message, chain_id)? {
-            Signable::Ethereum((hash, from)) => {
-                // If the sender is ethereum, recover the public key from the signature (which verifies it),
-                // then turn it into an `EthAddress` and verify it matches the `from` of the message.
-                let sig = from_fvm::to_eth_signature(signature, true)
-                    .map_err(SignedMessageError::Ethereum)?;
-
-                let rec = sig
-                    .recover(hash)
-                    .map_err(|e| SignedMessageError::Ethereum(anyhow!(e)))?;
-
-                if rec == from {
-                    verify_eth_method(message)
-                } else {
-                    Err(SignedMessageError::InvalidSignature(format!("the Ethereum delegated address did not match the one recovered from the signature (sighash = {:?})", hash)))
-                }
-            }
-            Signable::Regular(data) => {
-                // This works when `from` corresponds to the signature type.
-                signature
-                    .verify(&data, &message.from)
-                    .map_err(SignedMessageError::InvalidSignature)
-            }
-            Signable::RegularFromEth((data, from)) => {
-                let rec = recover_secp256k1(signature, &data)
-                    .map_err(SignedMessageError::InvalidSignature)?;
-
-                let rec_addr = EthAddress::from(rec);
-
-                if rec_addr.0 == from.0 {
-                    Ok(())
-                } else {
-                    Err(SignedMessageError::InvalidSignature("the Ethereum delegated address did not match the one recovered from the signature".to_string()))
-                }
-            }
+        match origin_kind {
+            OriginKind::Fvm => Self::verify_fvm_signature(message, chain_id, signature),
+            OriginKind::EthereumLegacy => Self::verify_ethereum_signature(
+                message,
+                chain_id,
+                signature,
+                |message, chain_id| {
+                    let tx = from_fvm::to_eth_legacy_request(message, chain_id)
+                        .map_err(SignedMessageError::Ethereum)?;
+                    Ok(TypedTransaction::Legacy(tx))
+                },
+            ),
+            OriginKind::EthereumEIP1559 => Self::verify_ethereum_signature(
+                message,
+                chain_id,
+                signature,
+                |message, chain_id| {
+                    Ok(from_fvm::to_eth_eip1559_request(message, chain_id)
+                        .map_err(SignedMessageError::Ethereum)?
+                        .into())
+                },
+            ),
         }
+    }
+
+    fn verify_ethereum_signature<F: Fn(&Message, &ChainID) -> anyhow::Result<TypedTransaction>>(
+        message: &Message,
+        chain_id: &ChainID,
+        signature: &Signature,
+        to_eth_txn: F,
+    ) -> anyhow::Result<(), SignedMessageError> {
+        // This is in contrast to https://github.com/filecoin-project/FIPs/blob/master/FIPS/fip-0055.md#delegated-signature-type
+        // which introduces a `SignatureType::Delegated`, in which case the signature check should be done by the recipient actor.
+        //
+        // However, that isn't implemented, and adding that type would mean copying the entire `Signature` type into Fendermint,
+        // similarly to how Forest did it https://github.com/ChainSafe/forest/blob/b3c5efe6cc81607da945227bb41c60cec47909c3/utils/forest_shim/src/crypto.rs#L166
+        //
+        // Instead of special casing on the signature type, we are special casing on the sender,
+        // which should be okay because the CLI only uses `f1` addresses and the Ethereum API only uses `f410` addresses,
+        // so at least for now they are easy to tell apart: any `f410` address is coming from Ethereum API and must have
+        // been signed according to the Ethereum scheme, and it could not have been signed by an `f1` address, it doesn't
+        // work with regular accounts.
+        //
+        // We detect the case where the recipient is not an ethereum address. If that is the case then use regular signing rules,
+        // which should allow messages from ethereum accounts to go to any other type of account, e.g. custom Wasm actors.
+        let Some(from) = maybe_eth_address(&message.from) else {
+            return Err(SignedMessageError::Ethereum(anyhow!(
+                "sender not ethereum address"
+            )));
+        };
+
+        if !is_eth_addr_compat(&message.to) {
+            let mut data = Self::cid(message)?.to_bytes();
+            data.extend(chain_id_bytes(chain_id).iter());
+
+            let rec = recover_secp256k1(signature, &data)
+                .map_err(SignedMessageError::InvalidSignature)?;
+
+            let rec_addr = EthAddress::from(rec);
+
+            return if rec_addr.0 == from.0 {
+                Ok(())
+            } else {
+                Err(SignedMessageError::InvalidSignature("the Ethereum delegated address did not match the one recovered from the signature".to_string()))
+            };
+        }
+
+        let hash = to_eth_txn(message, chain_id)
+            .map_err(SignedMessageError::Ethereum)?
+            .sighash();
+
+        // If the sender is ethereum, recover the public key from the signature (which verifies it),
+        // then turn it into an `EthAddress` and verify it matches the `from` of the message.
+        let sig =
+            from_fvm::to_eth_signature(signature, true).map_err(SignedMessageError::Ethereum)?;
+
+        let rec = sig
+            .recover(hash)
+            .map_err(|e| SignedMessageError::Ethereum(anyhow!(e)))?;
+
+        if rec != from {
+            return Err(SignedMessageError::InvalidSignature(format!("the Ethereum delegated address did not match the one recovered from the signature (sighash = {:?})", hash)));
+        }
+        verify_eth_method(message)
+    }
+
+    fn verify_fvm_signature(
+        message: &Message,
+        chain_id: &ChainID,
+        signature: &Signature,
+    ) -> anyhow::Result<(), SignedMessageError> {
+        let mut data = Self::cid(message)?.to_bytes();
+        data.extend(chain_id_bytes(chain_id).iter());
+
+        // This works when `from` corresponds to the signature type.
+        signature
+            .verify(&data, &message.from)
+            .map_err(SignedMessageError::InvalidSignature)
     }
 
     /// Calculate an optional hash that ecosystem tools expect.
@@ -184,20 +282,13 @@ impl SignedMessage {
         chain_id: &ChainID,
     ) -> Result<Option<DomainHash>, SignedMessageError> {
         if is_eth_addr_deleg(&self.message.from) && is_eth_addr_compat(&self.message.to) {
-            let tx: TypedTransaction =
-                from_fvm::to_eth_transaction_request(self.message(), chain_id)
-                    .map_err(SignedMessageError::Ethereum)?
-                    .into();
+            let tx = from_fvm::to_eth_typed_transaction(self.origin_kind, self.message(), chain_id)
+                .map_err(SignedMessageError::Ethereum)?;
 
             let sig = from_fvm::to_eth_signature(self.signature(), true)
                 .map_err(SignedMessageError::Ethereum)?;
 
-            let rlp = tx.rlp_signed(&sig);
-
-            let hash = cid::multihash::Code::Keccak256.digest(&rlp);
-            let hash = hash.digest().try_into().expect("Keccak256 is 32 bytes");
-
-            Ok(Some(DomainHash::Eth(hash)))
+            Ok(Some(DomainHash::Eth(tx.hash(&sig).0)))
         } else {
             // Use the default transaction ID.
             Ok(None)
@@ -206,7 +297,7 @@ impl SignedMessage {
 
     /// Verifies that the from address of the message generated the signature.
     pub fn verify(&self, chain_id: &ChainID) -> Result<(), SignedMessageError> {
-        Self::verify_signature(&self.message, &self.signature, chain_id)
+        Self::verify_signature(self.origin_kind, &self.message, &self.signature, chain_id)
     }
 
     /// Returns reference to the unsigned message.
@@ -351,6 +442,7 @@ fn recover_secp256k1(signature: &Signature, data: &[u8]) -> Result<PublicKey, St
 /// Signed message with an invalid random signature.
 #[cfg(feature = "arb")]
 mod arb {
+    use crate::signed::OriginKind;
     use fendermint_testing::arb::ArbMessage;
     use fvm_shared::crypto::signature::Signature;
 
@@ -360,6 +452,7 @@ mod arb {
     impl quickcheck::Arbitrary for SignedMessage {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
             Self {
+                origin_kind: OriginKind::from(u8::arbitrary(g) % 3),
                 message: ArbMessage::arbitrary(g).0,
                 signature: Signature::arbitrary(g),
             }
