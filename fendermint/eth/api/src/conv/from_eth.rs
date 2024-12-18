@@ -5,92 +5,101 @@
 
 use ethers_core::types as et;
 use ethers_core::types::transaction::eip2718::TypedTransaction;
+use ethers_core::types::{Eip1559TransactionRequest, TransactionRequest};
 
 pub use fendermint_vm_message::conv::from_eth::*;
+use fendermint_vm_message::signed::OriginKind;
 use fvm_shared::{error::ExitCode, message::Message};
 
-use crate::error::JsonRpcError;
-use crate::{error, JsonRpcResult};
+use crate::error::error_with_revert;
+use crate::JsonRpcResult;
 
-pub fn to_fvm_message(tx: TypedTransaction) -> JsonRpcResult<Message> {
+fn handle_typed_txn<
+    R,
+    F1: Fn(&TransactionRequest) -> JsonRpcResult<R>,
+    F2: Fn(&Eip1559TransactionRequest) -> JsonRpcResult<R>,
+>(
+    tx: &TypedTransaction,
+    handle_legacy: F1,
+    handle_eip1559: F2,
+) -> JsonRpcResult<R> {
     match tx {
-        TypedTransaction::Eip1559(ref tx) => Ok(fvm_message_from_eip1559(tx)?),
-        TypedTransaction::Legacy(ref tx) => Ok(fvm_message_from_legacy(tx)?),
-        _ => error(
+        TypedTransaction::Legacy(ref t) => handle_legacy(t),
+        TypedTransaction::Eip1559(ref t) => handle_eip1559(t),
+        _ => error_with_revert(
             ExitCode::USR_ILLEGAL_ARGUMENT,
-            "unexpected transaction type",
+            "txn type not supported",
+            None::<Vec<u8>>,
         ),
     }
+}
+
+pub fn derive_origin_kind(tx: &TypedTransaction) -> JsonRpcResult<OriginKind> {
+    handle_typed_txn(
+        tx,
+        |_| Ok(OriginKind::EthereumLegacy),
+        |_| Ok(OriginKind::EthereumEIP1559),
+    )
+}
+
+pub fn to_fvm_message(tx: TypedTransaction) -> JsonRpcResult<Message> {
+    handle_typed_txn(
+        &tx,
+        |r| Ok(fvm_message_from_legacy(r)?),
+        |r| Ok(fvm_message_from_eip1559(r)?),
+    )
 }
 
 /// Turn a request into the DTO returned by the API.
 pub fn to_eth_transaction_response(
     tx: &TypedTransaction,
     sig: et::Signature,
-    hash: et::TxHash,
-) -> Result<et::Transaction, JsonRpcError> {
-    match &tx {
-        TypedTransaction::Legacy(tx) => {
-            Ok(et::Transaction {
-                hash,
-                nonce: tx.nonce.unwrap_or_default(),
-                block_hash: None,
-                block_number: None,
-                transaction_index: None,
-                from: tx.from.unwrap_or_default(),
-                to: tx.to.clone().and_then(|to| to.as_address().cloned()),
-                value: tx.value.unwrap_or_default(),
-                gas: tx.gas.unwrap_or_default(),
-                // Strictly speaking a "Type 2" transaction should not need to set this, but we do because Blockscout
-                // has a database constraint that if a transaction is included in a block this can't be null.
-                gas_price: tx.gas_price,
-                input: tx.data.clone().unwrap_or_default(),
-                chain_id: tx.chain_id.map(|x| et::U256::from(x.as_u64())),
-                v: et::U64::from(sig.v),
-                r: sig.r,
-                s: sig.s,
-                transaction_type: Some(0u64.into()),
-                access_list: None,
-                other: Default::default(),
-                max_fee_per_gas: None,
-                max_priority_fee_per_gas: None,
-            })
-        }
-        TypedTransaction::Eip1559(tx) => {
-            Ok(et::Transaction {
-                hash,
-                nonce: tx.nonce.unwrap_or_default(),
-                block_hash: None,
-                block_number: None,
-                transaction_index: None,
-                from: tx.from.unwrap_or_default(),
-                to: tx.to.clone().and_then(|to| to.as_address().cloned()),
-                value: tx.value.unwrap_or_default(),
-                gas: tx.gas.unwrap_or_default(),
-                max_fee_per_gas: tx.max_fee_per_gas,
-                max_priority_fee_per_gas: tx.max_priority_fee_per_gas,
-                // Strictly speaking a "Type 2" transaction should not need to set this, but we do because Blockscout
-                // has a database constraint that if a transaction is included in a block this can't be null.
-                gas_price: Some(
-                    tx.max_fee_per_gas.unwrap_or_default()
-                        + tx.max_priority_fee_per_gas.unwrap_or_default(),
-                ),
-                input: tx.data.clone().unwrap_or_default(),
-                chain_id: tx.chain_id.map(|x| et::U256::from(x.as_u64())),
-                v: et::U64::from(sig.v),
-                r: sig.r,
-                s: sig.s,
-                transaction_type: Some(2u64.into()),
-                access_list: Some(tx.access_list.clone()),
-                other: Default::default(),
-            })
-        }
-        _ => error::error_with_revert(
-            ExitCode::USR_ILLEGAL_ARGUMENT,
-            "txn type not supported",
-            None::<Vec<u8>>,
-        ),
+) -> JsonRpcResult<et::Transaction> {
+    macro_rules! essential_txn_response {
+        ($tx: expr, $hash: expr) => {{
+            let mut r = et::Transaction::default();
+
+            r.nonce = $tx.nonce.unwrap_or_default();
+            r.hash = $hash;
+            r.from = $tx.from.unwrap_or_default();
+            r.to = $tx.to.clone().and_then(|to| to.as_address().cloned());
+            r.value = $tx.value.unwrap_or_default();
+            r.gas = $tx.gas.unwrap_or_default();
+            r.input = $tx.data.clone().unwrap_or_default();
+            r.chain_id = $tx.chain_id.map(|x| et::U256::from(x.as_u64()));
+            r.v = et::U64::from(sig.v);
+            r.r = sig.r;
+            r.s = sig.s;
+
+            r
+        }};
     }
+
+    let hash = tx.hash(&sig);
+
+    handle_typed_txn(
+        tx,
+        |tx| {
+            let mut r = essential_txn_response!(tx, hash);
+            r.gas_price = tx.gas_price;
+            r.transaction_type = Some(0u64.into());
+            Ok(r)
+        },
+        |tx| {
+            let mut r = essential_txn_response!(tx, hash);
+            r.max_fee_per_gas = tx.max_fee_per_gas;
+            r.max_priority_fee_per_gas = tx.max_priority_fee_per_gas;
+            // Strictly speaking a "Type 2" transaction should not need to set this, but we do because Blockscout
+            // has a database constraint that if a transaction is included in a block this can't be null.
+            r.gas_price = Some(
+                tx.max_fee_per_gas.unwrap_or_default()
+                    + tx.max_priority_fee_per_gas.unwrap_or_default(),
+            );
+            r.transaction_type = Some(2u64.into());
+            r.access_list = Some(tx.access_list.clone());
+            Ok(r)
+        },
+    )
 }
 
 #[cfg(test)]

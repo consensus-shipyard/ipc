@@ -5,7 +5,7 @@
 
 use std::str::FromStr;
 
-use crate::signed::{OriginKind, SignedMessage};
+use crate::signed::OriginKind;
 use anyhow::anyhow;
 use anyhow::bail;
 use ethers_core::types as et;
@@ -72,18 +72,17 @@ pub fn to_eth_signature(sig: &FvmSignature, normalized: bool) -> anyhow::Result<
 }
 
 pub fn to_eth_typed_transaction(
-    msg: &SignedMessage,
+    origin_kind: OriginKind,
+    message: &Message,
     chain_id: &ChainID,
 ) -> anyhow::Result<TypedTransaction> {
-    match msg.origin_kind {
+    match origin_kind {
         OriginKind::Fvm => Err(anyhow!("fvm message not allowed")),
         OriginKind::EthereumLegacy => Ok(TypedTransaction::Legacy(to_eth_legacy_request(
-            &msg.message,
-            chain_id,
+            message, chain_id,
         )?)),
         OriginKind::EthereumEIP1559 => Ok(TypedTransaction::Eip1559(to_eth_eip1559_request(
-            &msg.message,
-            chain_id,
+            message, chain_id,
         )?)),
     }
 }

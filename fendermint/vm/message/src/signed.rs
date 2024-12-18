@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::anyhow;
-use cid::multihash::MultihashDigest;
 use cid::Cid;
 use ethers_core::types as et;
 use ethers_core::types::transaction::eip2718::TypedTransaction;
@@ -283,19 +282,13 @@ impl SignedMessage {
         chain_id: &ChainID,
     ) -> Result<Option<DomainHash>, SignedMessageError> {
         if is_eth_addr_deleg(&self.message.from) && is_eth_addr_compat(&self.message.to) {
-            let tx: TypedTransaction = from_fvm::to_eth_eip1559_request(self.message(), chain_id)
-                .map_err(SignedMessageError::Ethereum)?
-                .into();
+            let tx = from_fvm::to_eth_typed_transaction(self.origin_kind, self.message(), chain_id)
+                .map_err(SignedMessageError::Ethereum)?;
 
             let sig = from_fvm::to_eth_signature(self.signature(), true)
                 .map_err(SignedMessageError::Ethereum)?;
 
-            let rlp = tx.rlp_signed(&sig);
-
-            let hash = cid::multihash::Code::Keccak256.digest(&rlp);
-            let hash = hash.digest().try_into().expect("Keccak256 is 32 bytes");
-
-            Ok(Some(DomainHash::Eth(hash)))
+            Ok(Some(DomainHash::Eth(tx.hash(&sig).0)))
         } else {
             // Use the default transaction ID.
             Ok(None)

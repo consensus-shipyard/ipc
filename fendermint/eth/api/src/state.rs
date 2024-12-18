@@ -359,8 +359,10 @@ where
                     return error(ExitCode::USR_ILLEGAL_ARGUMENT, "incompatible transaction");
                 };
 
-                let mut tx = to_eth_transaction_response(msg, chain_id, hash)
+                let mut tx = to_eth_transaction_response(msg, chain_id)
                     .context("failed to convert to eth transaction")?;
+                debug_assert_eq!(tx.hash, hash);
+
                 tx.transaction_index = Some(index);
                 tx.block_hash = Some(et::H256::from_slice(block.header.hash().as_bytes()));
                 tx.block_number = Some(et::U64::from(block.header.height.value()));

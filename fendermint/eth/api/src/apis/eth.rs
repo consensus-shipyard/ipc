@@ -19,7 +19,8 @@ use fendermint_vm_actor_interface::eam::{EthAddress, EAM_ACTOR_ADDR};
 use fendermint_vm_actor_interface::evm;
 use fendermint_vm_message::chain::ChainMessage;
 use fendermint_vm_message::query::FvmQueryHeight;
-use fendermint_vm_message::signed::{OriginKind, SignedMessage};
+use fendermint_vm_message::signed::SignedMessage;
+use fil_actors_evm_shared::uints;
 use futures::FutureExt;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
@@ -36,9 +37,7 @@ use tendermint_rpc::{
     Client,
 };
 
-use fil_actors_evm_shared::uints;
-
-use crate::conv::from_eth::{self, to_fvm_message};
+use crate::conv::from_eth::{self, derive_origin_kind, to_fvm_message};
 use crate::conv::from_tm::{self, msg_hash, to_chain_message, to_cumulative, to_eth_block_zero};
 use crate::error::{error_with_revert, OutOfSequence};
 use crate::filters::{matches_topics, FilterId, FilterKind, FilterRecords};
@@ -427,7 +426,8 @@ where
     C: Client + Sync + Send,
 {
     // Check in the pending cache first.
-    if let Some(tx) = data.tx_cache.get(&tx_hash) {
+    if let Some((tx, sig)) = data.tx_cache.get(&tx_hash) {
+        let tx = from_eth::to_eth_transaction_response(&tx, sig)?;
         Ok(Some(tx))
     } else if let Some(res) = data.tx_by_hash(tx_hash).await? {
         let msg = to_chain_message(&res.tx)?;
@@ -439,8 +439,11 @@ where
                 .state_params(FvmQueryHeight::Height(header.header.height.value()))
                 .await?;
             let chain_id = ChainID::from(sp.value.chain_id);
+
             let hash = msg_hash(&res.tx_result.events, &res.tx);
-            let mut tx = to_eth_transaction_response(msg, chain_id, hash)?;
+            let mut tx = to_eth_transaction_response(msg, chain_id)?;
+            debug_assert_eq!(hash, tx.hash);
+
             tx.transaction_index = Some(et::U64::from(res.index));
             tx.block_hash = Some(et::H256::from_slice(header.header.hash().as_bytes()));
             tx.block_number = Some(et::U64::from(res.height.value()));
@@ -612,6 +615,14 @@ pub async fn get_uncle_by_block_number_and_index<C>(
     Ok(None)
 }
 
+fn normalize_signature(sig: &mut et::Signature) -> JsonRpcResult<()> {
+    sig.v = sig
+        .recovery_id()
+        .context("cannot covert recovery id")?
+        .to_byte() as u64;
+    Ok(())
+}
+
 /// Creates new message call transaction or a contract creation for signed transactions.
 pub async fn send_raw_transaction<C>(
     data: JsonRpcData<C>,
@@ -621,36 +632,23 @@ where
     C: Client + Sync + Send,
 {
     let rlp = rlp::Rlp::new(tx.as_ref());
-    let (tx, sig): (TypedTransaction, et::Signature) = TypedTransaction::decode_signed(&rlp)
+    let (tx, mut sig): (TypedTransaction, et::Signature) = TypedTransaction::decode_signed(&rlp)
         .context("failed to decode RLP as signed TypedTransaction")?;
 
-    let origin_kind = match &tx {
-        TypedTransaction::Legacy(_) => OriginKind::EthereumLegacy,
-        TypedTransaction::Eip1559(_) => OriginKind::EthereumEIP1559,
-        _ => {
-            return error_with_revert(
-                ExitCode::USR_ILLEGAL_ARGUMENT,
-                "txn type not supported",
-                None::<Vec<u8>>,
-            )
-        }
-    };
+    // for legacy eip155 transactions, the chain id is encoded in it. The `v` most likely will not
+    // be normalized, normalize to ensure consistent txn hash calculation.
+    normalize_signature(&mut sig)?;
 
     let sighash = tx.sighash();
-    let msghash = et::TxHash::from(ethers_core::utils::keccak256(rlp.as_raw()));
+    let msghash = tx.hash(&sig);
     tracing::debug!(?sighash, eth_hash = ?msghash, ?tx, "received raw transaction");
 
-    data.tx_cache.insert(
-        msghash,
-        from_eth::to_eth_transaction_response(&tx, sig, msghash)?,
-    );
-
-    let msg = to_fvm_message(tx)?;
+    let msg = to_fvm_message(tx.clone())?;
     let sender = msg.from;
     let nonce = msg.sequence;
 
     let msg = SignedMessage {
-        origin_kind,
+        origin_kind: derive_origin_kind(&tx)?,
         message: msg,
         signature: Signature::new_secp256k1(sig.to_vec()),
     };
@@ -661,6 +659,8 @@ where
     // but not the execution results - those will have to be polled with get_transaction_receipt.
     let res: tx_sync::Response = data.tm().broadcast_tx_sync(bz).await?;
     if res.code.is_ok() {
+        data.tx_cache.insert(msghash, (tx, sig));
+
         // The following hash would be okay for ethers-rs,and we could use it to look up the TX with Tendermint,
         // but ethers.js would reject it because it doesn't match what Ethereum would use.
         // Ok(et::TxHash::from_slice(res.hash.as_bytes()))
@@ -684,6 +684,8 @@ where
             tracing::debug!(eth_hash = ?msghash, expected = oos.expected, got = oos.got, is_admissible, "out-of-sequence transaction received");
 
             if is_admissible {
+                data.tx_cache.insert(msghash, (tx, sig));
+
                 data.tx_buffer.insert(sender, nonce, msg);
                 return Ok(msghash);
             }
