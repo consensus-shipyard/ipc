@@ -196,6 +196,18 @@ pub struct SetAccountBlobTtlStatusParams {
     pub status: TtlStatus,
 }
 
+/// Params for setting a TTL status for an account.
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct AdjustBlobTtlForAccountParams {
+    /// Account address to set the TTL status for.
+    pub account: Address,
+    /// Starting hash to adjust TTLs from.
+    pub starting_hash: Option<Hash>,
+    /// Limit of blobs to adjust TTLs for. This specifies the maximum number of blobs
+    /// that will be examined for TTL adjustment.
+    pub limit: Option<usize>,
+}
+
 /// The stats of the blob actor.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct GetStatsReturn {

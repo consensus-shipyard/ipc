@@ -5,17 +5,18 @@
 use std::collections::HashSet;
 
 use fendermint_actor_blobs_shared::params::{
-    AddBlobParams, ApproveCreditParams, BuyCreditParams, DeleteBlobParams, FinalizeBlobParams,
-    GetAccountParams, GetAddedBlobsParams, GetBlobParams, GetBlobStatusParams,
-    GetCreditAllowanceParams, GetCreditApprovalParams, GetPendingBlobsParams, GetStatsReturn,
-    OverwriteBlobParams, RevokeCreditParams, SetAccountBlobTtlStatusParams, SetBlobPendingParams,
-    SetCreditSponsorParams, UpdateCreditParams,
+    AddBlobParams, AdjustBlobTtlForAccountParams, ApproveCreditParams, BuyCreditParams,
+    DeleteBlobParams, FinalizeBlobParams, GetAccountParams, GetAddedBlobsParams, GetBlobParams,
+    GetBlobStatusParams, GetCreditAllowanceParams, GetCreditApprovalParams, GetPendingBlobsParams,
+    GetStatsReturn, OverwriteBlobParams, RevokeCreditParams, SetAccountBlobTtlStatusParams,
+    SetBlobPendingParams, SetCreditSponsorParams, UpdateCreditParams,
 };
 use fendermint_actor_blobs_shared::state::{
     Account, Blob, BlobStatus, CreditAllowance, CreditApproval, Hash, PublicKey, Subscription,
     SubscriptionId,
 };
 use fendermint_actor_blobs_shared::Method;
+use fendermint_actor_hoku_config_shared as hoku_config;
 use fendermint_actor_machine::{
     ensure_addr_is_origin_or_caller, resolve_external, resolve_external_non_machine,
 };
@@ -384,15 +385,58 @@ impl BlobsActor {
         Ok(subscription)
     }
 
-    fn set_account_blob_ttl_status(
+    fn validate_caller_is_admin(rt: &impl Runtime) -> Result<(), ActorError> {
+        let admin = hoku_config::get_admin(rt)?;
+        if admin.is_none() {
+            Err(ActorError::illegal_state(
+                "admin address not set".to_string(),
+            ))
+        } else {
+            Ok(rt.validate_immediate_caller_is(std::iter::once(&admin.unwrap()))?)
+        }
+    }
+
+    /// Set the TTL status of an account.
+    fn set_account_type(
         rt: &impl Runtime,
         params: SetAccountBlobTtlStatusParams,
     ) -> Result<(), ActorError> {
-        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
+        BlobsActor::validate_caller_is_admin(rt)?;
         let account = resolve_external_non_machine(rt, params.account)?;
         rt.transaction(|st: &mut State, rt| {
             st.set_ttl_status(rt.store(), account, params.status, rt.curr_epoch())
         })
+    }
+
+    /// Get the maximum TTL for blobs for an account.
+    fn get_account_type(rt: &impl Runtime, account: Address) -> Result<i64, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+        Ok(rt
+            .state::<State>()?
+            .get_account_max_ttl(rt.store(), account)?)
+    }
+
+    /// Adjusts all subscriptions for an account according to its max TTL.
+    /// Returns the number of subscriptions processed and the next key to continue iteration.
+    fn trim_blobs(
+        rt: &impl Runtime,
+        params: AdjustBlobTtlForAccountParams,
+    ) -> Result<(u32, Option<Hash>), ActorError> {
+        BlobsActor::validate_caller_is_admin(rt)?;
+        let account = resolve_external_non_machine(rt, params.account)?;
+        let (processed, next_key, deleted_blobs) = rt.transaction(|st: &mut State, rt| {
+            st.adjust_blob_ttls_for_account(
+                rt.store(),
+                account,
+                rt.curr_epoch(),
+                params.starting_hash,
+                params.limit,
+            )
+        })?;
+        for hash in deleted_blobs {
+            delete_from_disc(hash)?;
+        }
+        Ok((processed, next_key))
     }
 
     /// Fallback method for unimplemented method numbers.
@@ -454,7 +498,9 @@ impl ActorCode for BlobsActor {
         FinalizeBlob => finalize_blob,
         DeleteBlob => delete_blob,
         OverwriteBlob => overwrite_blob,
-        SetAccountBlobTtlStatus => set_account_blob_ttl_status,
+        SetAccountType => set_account_type,
+        GetAccountType => get_account_type,
+        TrimBlobs => trim_blobs,
         _ => fallback,
     }
 }

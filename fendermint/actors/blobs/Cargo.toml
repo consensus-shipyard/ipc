@@ -22,6 +22,7 @@ fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
+fendermint_actor_hoku_config_shared = { path = "../hoku_config/shared" }
 fendermint_actor_blobs_shared = { path = "./shared" }
 fendermint_actor_machine = { path = "../machine" }
 
