@@ -527,19 +527,6 @@ impl IpcProvider {
             .await
     }
 
-    /// Propagate a cross-net message forward. For `postbox_msg_key`, we are using bytes because different
-    /// runtime have different representations. For FVM, it should be `CID` as bytes. For EVM, it is
-    /// `bytes32`.
-    pub async fn propagate(
-        &self,
-        _subnet: SubnetID,
-        _gateway_addr: Address,
-        _from: Address,
-        _postbox_msg_key: Vec<u8>,
-    ) -> anyhow::Result<()> {
-        todo!()
-    }
-
     /// Send value between two addresses in a subnet
     pub async fn send_value(
         &mut self,

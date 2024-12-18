@@ -65,6 +65,8 @@ struct GatewayActorStorage {
     /// an actor that need to be propagated further through the hierarchy.
     /// cross-net message id => CrossMsg
     mapping(bytes32 => IpcEnvelope) postbox;
+    /// @notice Keys of the envelopes in the postbox. Useful to iterate through them
+    EnumerableSet.Bytes32Set postboxKeys;
     /// @notice A mapping of block numbers to bottom-up checkpoints
     // slither-disable-next-line uninitialized-state
     mapping(uint256 => BottomUpCheckpoint) bottomUpCheckpoints;

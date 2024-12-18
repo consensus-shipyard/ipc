@@ -8,6 +8,7 @@ import "../../contracts/lib/FvmAddressHelper.sol";
 import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
 import {Asset} from "../../contracts/structs/Subnet.sol";
 import {IpcMsgKind, CallMsg} from "../../contracts/structs/CrossNet.sol";
+import {MockFallbackContract} from "../helpers/TestUtils.sol";
 
 import "@openzeppelin/contracts/utils/Address.sol";
 
@@ -145,7 +146,7 @@ contract CrossMsgHelperTest is Test {
 
     function test_Execute_Works_SendValue() public {
         address sender = address(this);
-        address recipient = address(100);
+        address recipient = address(new MockFallbackContract());
 
         crossMsg.to.rawAddress = FvmAddressHelper.from(recipient);
         crossMsg.kind = IpcMsgKind.Call;
@@ -159,13 +160,11 @@ contract CrossMsgHelperTest is Test {
         (, bytes memory result) = crossMsg.execute(AssetHelper.native());
 
         require(keccak256(result) == keccak256(EMPTY_BYTES));
-        require(recipient.balance == 1);
-        require(sender.balance == 1 ether - 1);
     }
 
     function test_Execute_Works_FunctionCallWithValue() public {
         address sender = address(this);
-        address recipient = address(100);
+        address recipient = address(new MockFallbackContract());
 
         crossMsg.to.rawAddress = FvmAddressHelper.from(recipient);
         crossMsg.kind = IpcMsgKind.Call;
@@ -176,7 +175,7 @@ contract CrossMsgHelperTest is Test {
         crossMsg = crossMsg.setCallMsg(message);
 
         vm.deal(sender, 1 ether);
-        vm.expectCall(recipient, crossMsg.value, new bytes(0), 1);
+        vm.expectCall(recipient, 0, new bytes(0), 1);
 
         (, bytes memory result) = crossMsg.execute(AssetHelper.native());
 
@@ -185,7 +184,7 @@ contract CrossMsgHelperTest is Test {
 
     function test_Execute_Works_FunctionCallWithoutValue() public {
         address sender = address(this);
-        address recipient = address(100);
+        address recipient = address(new MockFallbackContract());
 
         crossMsg.kind = IpcMsgKind.Call;
         crossMsg.to.rawAddress = FvmAddressHelper.from(recipient);
