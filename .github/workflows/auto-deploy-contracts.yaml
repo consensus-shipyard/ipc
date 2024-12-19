@@ -8,6 +8,9 @@ on:
     paths:
       - contracts/**
 
+permissions:
+  contents: write
+
 env:
   GIT_USERNAME: github-actions[bot]
   GIT_EMAIL: ipc+github-actions[bot]@users.noreply.github.com
@@ -21,7 +24,7 @@ jobs:
   deploy-contracts:
     runs-on: ubuntu-latest
     env:
-      RPC_URL: https://calibration.filfox.info/rpc/v1
+      RPC_URL: https://calibration.filfox.io/rpc/v1
       PRIVATE_KEY: ${{ secrets.CONTRACTS_DEPLOYER_PRIVATE_KEY }}
     steps:
       - name: Checkout cd/contracts branch
@@ -30,7 +33,6 @@ jobs:
           ref: cd/contracts
           submodules: recursive
           fetch-depth: 0
-          token: ${{ secrets.WORKFLOW_PAT_JIE }}
 
       - name: (Dry run) Try merge from main branch to see if there's any conflicts that can't be resolved itself
         run: |
@@ -61,11 +63,11 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
 
-      - name: Deploy IPC contracts to calibration net
+      - name: Deploy IPC contracts to Calibrationnet
         id: deploy_contracts
         run: |
           cd contracts
-          npm install --save hardhat
+          npm install
           output=$(make deploy-stack NETWORK=calibrationnet)
           echo "deploy_output<<EOF" >> $GITHUB_OUTPUT
           echo "$output" >> $GITHUB_OUTPUT
@@ -93,7 +95,6 @@ jobs:
           ref: cd/contracts
           submodules: recursive
           fetch-depth: 0
-          token: ${{ secrets.WORKFLOW_PAT_JIE }}
 
       - name: Merge from main branch and update cd/contracts branch
         run: |
@@ -113,13 +114,9 @@ jobs:
           cat deployments/r314159.json
 
       - name: Commit output file and push it to remote repo
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: Update contract address
-          branch: cd/contracts
-          file_pattern: deployments/r314159.json
-          commit_user_name: ${{env.GIT_USERNAME}}
-          commit_user_email: ${{env.GIT_EMAIL}}
-          push_options: '--force'
-          skip_dirty_check: true
-          create_branch: true
+        run: |
+          git config user.name ${{env.GIT_USERNAME}}
+          git config user.email ${{env.GIT_EMAIL}}
+          git add deployments/r314159.json
+          git commit -m "Update contract address"
+          git push origin cd/contracts
