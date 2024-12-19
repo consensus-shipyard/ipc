@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: write
-  workflows: write
 
 env:
   GIT_USERNAME: github-actions[bot]
@@ -24,19 +23,28 @@ concurrency:
 jobs:
   deploy-contracts:
     runs-on: ubuntu-latest
+
     env:
       RPC_URL: https://calibration.filfox.io/rpc/v1
       PRIVATE_KEY: ${{ secrets.CONTRACTS_DEPLOYER_PRIVATE_KEY }}
+
     steps:
       - name: Configure git
         run: |
           git config --global user.name "$GIT_USERNAME"
           git config --global user.email "$GIT_EMAIL"
 
-      - name: Checkout cd/contracts branch-test
+      - name: Setup node and npm
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'pnpm-lock.yaml'
+
+      - name: Check out the branch that triggered this run
         uses: actions/checkout@v4
         with:
-          ref: cd/contracts-test
+          ref: ${{ github.ref_name }}
           submodules: recursive
           fetch-depth: 0
 
@@ -54,30 +62,6 @@ jobs:
             contracts/out
             contracts/deployments
             contracts/artifacts
-
-      - name: (Dry run) Try merge from main to fail early if there are unresolvable conflicts
-        run: |
-          git show HEAD
-          git checkout main
-          git pull --rebase origin main
-          git checkout cd/contracts-test
-          git merge main --no-edit --allow-unrelated-histories
-
-      - name: Checkout the branch that triggered this run
-        uses: actions/checkout@v4
-        with:
-          # TODO(jie): After switch to workflow_dispatch only, we should use ref_name.
-          # head_ref only works for workflow triggered by pull requests.
-          # ref: ${{ github.ref_name }}
-          ref: ${{ github.head_ref }}
-          submodules: recursive
-
-      - name: Setup node and npm
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: 'pnpm-lock.yaml'
 
       - name: Deploy IPC contracts to Calibrationnet
         id: deploy_contracts
@@ -105,30 +89,22 @@ jobs:
           echo "gateway_address: $gateway_address"
           echo "registry_address: $registry_address"
 
-      - name: Switch code repo to cd/contracts branch-test
+      - name: Switch code repo to cd/contracts branch
         uses: actions/checkout@v4
         with:
-          ref: cd/contracts-test
+          ref: cd/contracts
           submodules: recursive
           fetch-depth: 0
 
-      - name: Merge from main branch and update cd/contracts branch-test
-        run: |
-          git checkout main
-          git pull --rebase origin main
-          git checkout cd/contracts-test
-          git merge main --no-edit --allow-unrelated-histories
-          git push -f origin cd/contracts-test
-
-      - name: Write deployed address to output file
+      - name: Write deployment addresses
         run: |
           mkdir -p deployments
           json_str='{"commit":"'$commit_hash'","gateway_addr":"'$gateway_address'","registry_addr":"'$registry_address'"}'
           jq -n "$json_str" > deployments/r314159.json
           cat deployments/r314159.json
 
-      - name: Commit output file and push it to remote repo
+      - name: Commit and push deployment addresses file
         run: |
           git add deployments/r314159.json
-          git commit -m "Update contract address"
-          git push origin cd/contracts-test
+          git commit -m "Contracts deployed @ ${{ github.sha }}"
+          git push origin cd/contracts
