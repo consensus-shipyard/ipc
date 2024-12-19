@@ -48,6 +48,9 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'pnpm-lock.yaml'
 
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
       - name: Cache artifacts
         uses: actions/cache@v4
         with:
@@ -67,7 +70,7 @@ jobs:
         id: deploy_contracts
         run: |
           cd contracts
-          npm install
+          pnpm install
           output=$(make deploy-stack NETWORK=calibrationnet | tee /dev/tty)
           echo "deploy_output<<EOF" >> $GITHUB_OUTPUT
           echo "$output" >> $GITHUB_OUTPUT
