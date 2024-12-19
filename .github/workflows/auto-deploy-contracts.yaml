@@ -28,6 +28,11 @@ jobs:
       RPC_URL: https://calibration.filfox.io/rpc/v1
       PRIVATE_KEY: ${{ secrets.CONTRACTS_DEPLOYER_PRIVATE_KEY }}
     steps:
+      - name: Configure git
+        run: |
+          git config --global user.name "$GIT_USERNAME"
+          git config --global user.email "$GIT_EMAIL"
+
       - name: Checkout cd/contracts branch-test
         uses: actions/checkout@v4
         with:
@@ -35,10 +40,20 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Configure git
-        run: |
-          git config --global user.name "$GIT_USERNAME"
-          git config --global user.email "$GIT_EMAIL"
+      - name: Cache artifacts
+        uses: actions/cache@v4
+        with:
+          ## Hardhat is intelligent enough to perform incremental compilation. But GitHub Actions caches are immutable.
+          ## Since we can't have a rolling cache, we create a new cache for each run, but use restore-keys to load the
+          ## most recently created cache.
+          ## Reference: https://github.com/actions/cache/blob/main/tips-and-workarounds.md#update-a-cache
+          key: ${{ runner.os }}-contracts-artifacts-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-contracts-artifacts-
+          path: |
+            contracts/out
+            contracts/deployments
+            contracts/artifacts
 
       - name: (Dry run) Try merge from main to fail early if there are unresolvable conflicts
         run: |
