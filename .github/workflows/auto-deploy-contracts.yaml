@@ -41,12 +41,11 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - name: Setup node and npm
+      - name: Set up node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: 'pnpm-lock.yaml'
+          node-version: '21'
+          cache: 'pnpm'
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
