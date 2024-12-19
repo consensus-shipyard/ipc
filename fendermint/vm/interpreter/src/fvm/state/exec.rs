@@ -7,6 +7,7 @@ use crate::fvm::activity::actor::ActorActivityTracker;
 use crate::fvm::externs::FendermintExterns;
 use crate::fvm::gas::BlockGasTracker;
 use crate::fvm::hoku_config::HokuConfigTracker;
+use crate::fvm::state::priority::TxnPriorityCalculator;
 use anyhow::Ok;
 use cid::Cid;
 use fendermint_actors_api::gas_market::Reading;
@@ -152,6 +153,8 @@ where
     params: FvmUpdatableParams,
     /// Indicate whether the parameters have been updated.
     params_dirty: bool,
+
+    txn_priority: TxnPriorityCalculator,
 }
 
 impl<DB> FvmExecState<DB>
@@ -190,6 +193,7 @@ where
         let mut executor = HokuExecutor::new(engine.clone(), machine)?;
 
         let block_gas_tracker = BlockGasTracker::create(&mut executor)?;
+        let base_fee = block_gas_tracker.base_fee().clone();
 
         let hoku_config_tracker = HokuConfigTracker::create(&mut executor)?;
 
@@ -206,6 +210,7 @@ where
                 power_scale: params.power_scale,
             },
             params_dirty: false,
+            txn_priority: TxnPriorityCalculator::new(base_fee),
         })
     }
 
@@ -322,6 +327,10 @@ where
     /// Conversion between collateral and voting power.
     pub fn power_scale(&self) -> PowerScale {
         self.params.power_scale
+    }
+
+    pub fn txn_priority_calculator(&self) -> &TxnPriorityCalculator {
+        &self.txn_priority
     }
 
     pub fn app_version(&self) -> u64 {
