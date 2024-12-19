@@ -2,6 +2,10 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::collections::HashMap;
+use std::fmt;
+use std::ops::{Div, Mul};
+
 use fil_actors_runtime::ActorError;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
@@ -10,10 +14,6 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use hoku_ipld::hamt::MapKey;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
-use std::fmt;
-use std::fmt::Display;
-use std::ops::{Div, Mul};
 
 /// Credit is counted the same way as tokens.
 /// The smallest indivisible unit is 1 atto, and 1 credit = 1e18 atto credits.
@@ -33,8 +33,8 @@ impl TokenCreditRate {
     }
 }
 
-impl Display for TokenCreditRate {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for TokenCreditRate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.rate)
     }
 }
@@ -257,7 +257,11 @@ impl TryFrom<String> for SubscriptionId {
 
 impl fmt::Display for SubscriptionId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.inner)
+        if self.inner.is_empty() {
+            write!(f, "default")
+        } else {
+            write!(f, "{}", self.inner)
+        }
     }
 }
 
@@ -348,7 +352,7 @@ pub enum BlobStatus {
     Failed,
 }
 
-impl Display for BlobStatus {
+impl fmt::Display for BlobStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             BlobStatus::Added => write!(f, "added"),

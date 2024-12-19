@@ -38,6 +38,7 @@ members = [
     # hoku
     "fendermint/actors/blobs",
     "fendermint/actors/blobs/shared",
+    "fendermint/actors/blobs/testing",
     "fendermint/actors/bucket",
     "fendermint/actors/hoku_config",
     "fendermint/actors/hoku_config/shared",
