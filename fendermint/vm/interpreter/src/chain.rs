@@ -190,6 +190,7 @@ where
         msgs: Vec<Self::Message>,
     ) -> anyhow::Result<bool> {
         let mut block_gas_usage = 0;
+        let base_fee = state.block_gas_tracker().base_fee();
 
         for msg in msgs {
             match msg {
@@ -228,6 +229,12 @@ where
                     }
                 }
                 ChainMessage::Signed(signed) => {
+                    if &signed.message.gas_fee_cap < base_fee {
+                        // We do not accept blocks containing transactions with gas parameters below the current base fee.
+                        // Producing an invalid block like this should penalize the validator going forward.
+                        return Ok(false);
+                    }
+
                     block_gas_usage += signed.message.gas_limit;
                 }
                 _ => {}
