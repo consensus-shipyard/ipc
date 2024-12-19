@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  workflows: write
 
 env:
   GIT_USERNAME: github-actions[bot]
