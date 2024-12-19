@@ -68,6 +68,8 @@ jobs:
 
       - name: Deploy IPC contracts to Calibrationnet
         id: deploy_contracts
+        env:
+          REGISTRY_CREATION_PRIVILEGES: 'unrestricted'
         run: |
           cd contracts
           pnpm install
