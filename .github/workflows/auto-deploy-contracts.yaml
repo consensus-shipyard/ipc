@@ -34,14 +34,14 @@ jobs:
           git config --global user.name "$GIT_USERNAME"
           git config --global user.email "$GIT_EMAIL"
 
-      - uses: pnpm/action-setup@v2
-
       - name: Check out the branch that triggered this run
         uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}
           submodules: recursive
           fetch-depth: 0
+
+      - uses: pnpm/action-setup@v2
 
       - name: Set up node.js
         uses: actions/setup-node@v4
