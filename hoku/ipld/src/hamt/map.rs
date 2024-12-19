@@ -110,9 +110,16 @@ where
         Ok(Root::from_cid(cid, self.map.name()))
     }
 
-    pub fn set_and_flush_tracked(&mut self, key: &K, value: V) -> Result<TrackedFlushResult<K, V>, ActorError> {
+    pub fn set_and_flush_tracked(
+        &mut self,
+        key: &K,
+        value: V,
+    ) -> Result<TrackedFlushResult<K, V>, ActorError> {
         let root = self.set_and_flush(key, value)?;
-        Ok(TrackedFlushResult { root, size: self.size })
+        Ok(TrackedFlushResult {
+            root,
+            size: self.size,
+        })
     }
 
     pub fn get_or_err(&self, key: &K) -> Result<V, ActorError> {
@@ -150,9 +157,15 @@ where
         Ok(Root::from_cid(cid, self.map.name()))
     }
 
-    pub fn delete_and_flush_tracked(&mut self, key: &K) -> Result<TrackedFlushResult<K, V>, ActorError> {
+    pub fn delete_and_flush_tracked(
+        &mut self,
+        key: &K,
+    ) -> Result<TrackedFlushResult<K, V>, ActorError> {
         let root = self.delete_and_flush(key)?;
-        Ok(TrackedFlushResult { root, size: self.size })
+        Ok(TrackedFlushResult {
+            root,
+            size: self.size,
+        })
     }
 
     pub fn flush(&mut self) -> Result<Root<K, V>, ActorError> {

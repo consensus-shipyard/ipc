@@ -4,13 +4,13 @@
 
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
-use fvm_shared::bigint::{BigInt, BigUint};
+use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
-use crate::state::{BlobStatus, Hash, PublicKey, SubscriptionId, TtlStatus};
+use crate::state::{BlobStatus, Credit, Hash, PublicKey, SubscriptionId, TtlStatus};
 
 /// Params for buying credits.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -19,7 +19,7 @@ pub struct BuyCreditParams(pub Address);
 
 /// Params for updating credit.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct UpdateCreditParams {
+pub struct UpdateGasAllowanceParams {
     /// Account address that initiated the update.
     pub from: Address,
     /// Optional account address that is sponsoring the update.
@@ -42,7 +42,11 @@ pub struct ApproveCreditParams {
     /// Optional credit approval limit.
     /// If specified, the approval becomes invalid once the committed credits reach the
     /// specified limit.
-    pub limit: Option<BigUint>,
+    pub credit_limit: Option<Credit>,
+    /// Optional gas fee limit.
+    /// If specified, the approval becomes invalid once the commited gas reach the
+    /// specified limit.
+    pub gas_fee_limit: Option<TokenAmount>,
     /// Optional credit approval time-to-live epochs.
     /// If specified, the approval becomes invalid after this duration.
     pub ttl: Option<ChainEpoch>,
@@ -87,7 +91,7 @@ pub struct GetCreditApprovalParams {
 /// Params for looking up credit allowance.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct GetCreditAllowanceParams(pub Address);
+pub struct GetGasAllowanceParams(pub Address);
 
 /// Params for adding a blob.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
@@ -218,13 +222,13 @@ pub struct GetStatsReturn {
     /// The total used storage capacity of the subnet.
     pub capacity_used: u64,
     /// The total number of credits sold in the subnet.
-    pub credit_sold: BigInt,
+    pub credit_sold: Credit,
     /// The total number of credits committed to active storage in the subnet.
-    pub credit_committed: BigInt,
+    pub credit_committed: Credit,
     /// The total number of credits debited in the subnet.
-    pub credit_debited: BigInt,
-    /// The current byte-blocks per atto token rate.
-    pub blob_credits_per_byte_block: u64,
+    pub credit_debited: Credit,
+    /// The token to credit rate. The amount of atto credits that 1 atto buys.
+    pub token_credit_rate: BigInt,
     /// Total number of debit accounts.
     pub num_accounts: u64,
     /// Total number of actively stored blobs.

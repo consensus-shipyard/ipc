@@ -161,7 +161,7 @@ pub struct GenesisOutput {
 pub struct GenesisBuilder {
     /// Hardhat like util to deploy ipc contracts
     hardhat: Hardhat,
-    /// The built in actors bundle path
+    /// The built-in actors bundle path
     builtin_actors_path: PathBuf,
     /// The custom actors bundle path
     custom_actors_path: PathBuf,

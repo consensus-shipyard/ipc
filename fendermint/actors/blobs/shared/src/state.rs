@@ -5,22 +5,26 @@
 use fil_actors_runtime::ActorError;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
-use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use hoku_ipld::hamt::MapKey;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+
+/// Credit is counted the same way as tokens.
+/// The smallest indivisible unit is 1 atto, and 1 credit = 1e18 atto credits.
+pub type Credit = TokenAmount;
+
 /// The stored representation of a credit account.
 #[derive(Clone, Debug, Default, PartialEq, Serialize_tuple, Deserialize_tuple)]
 pub struct Account {
     /// Total size of all blobs managed by the account.
     pub capacity_used: u64,
     /// Current free credit in byte-blocks that can be used for new commitments.
-    pub credit_free: BigInt,
+    pub credit_free: Credit,
     /// Current committed credit in byte-blocks that will be used for debits.
-    pub credit_committed: BigInt,
+    pub credit_committed: Credit,
     /// Optional default sponsor account address.
     pub credit_sponsor: Option<Address>,
     /// The chain epoch of the last debit.
@@ -35,6 +39,8 @@ pub struct Account {
     pub approvals: HashMap<String, CreditApproval>,
     /// The maximum allowed TTL for actor's blobs.
     pub max_ttl: ChainEpoch,
+    /// The total token value an account has used to buy credits.
+    pub gas_allowance: TokenAmount,
 }
 
 impl Account {
@@ -51,11 +57,15 @@ impl Account {
 #[derive(Debug, Clone, PartialEq, Serialize_tuple, Deserialize_tuple)]
 pub struct CreditApproval {
     /// Optional credit approval limit.
-    pub limit: Option<BigInt>,
+    pub credit_limit: Option<Credit>,
+    /// Used to limit gas fee delegation.
+    pub gas_fee_limit: Option<TokenAmount>,
     /// Optional credit approval expiry epoch.
     pub expiry: Option<ChainEpoch>,
     /// Counter for how much credit has been used via this approval.
-    pub used: BigInt,
+    pub credit_used: Credit,
+    /// Used to track gas fees paid for by the delegation
+    pub gas_fee_used: TokenAmount,
     /// Optional caller allowlist.
     /// If not present, any caller is allowed.
     pub caller_allowlist: Option<HashSet<Address>>,
@@ -87,9 +97,9 @@ impl CreditApproval {
     }
 }
 
-/// Credit allowance for an account.
+/// Gas allowance for an account.
 #[derive(Debug, Default, Clone, PartialEq, Serialize_tuple, Deserialize_tuple)]
-pub struct CreditAllowance {
+pub struct GasAllowance {
     /// The amount from the account.
     pub amount: TokenAmount,
     /// The account's default sponsor.
@@ -98,7 +108,7 @@ pub struct CreditAllowance {
     pub sponsored_amount: TokenAmount,
 }
 
-impl CreditAllowance {
+impl GasAllowance {
     /// Returns the total allowance from self and default sponsor.
     pub fn total(&self) -> TokenAmount {
         &self.amount + &self.sponsored_amount
