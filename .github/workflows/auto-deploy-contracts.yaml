@@ -28,10 +28,10 @@ jobs:
       RPC_URL: https://calibration.filfox.io/rpc/v1
       PRIVATE_KEY: ${{ secrets.CONTRACTS_DEPLOYER_PRIVATE_KEY }}
     steps:
-      - name: Checkout cd/contracts branch
+      - name: Checkout cd/contracts branch-test
         uses: actions/checkout@v4
         with:
-          ref: cd/contracts
+          ref: cd/contracts-test
           submodules: recursive
           fetch-depth: 0
 
@@ -45,7 +45,7 @@ jobs:
           git show HEAD
           git checkout main
           git pull --rebase origin main
-          git checkout cd/contracts
+          git checkout cd/contracts-test
           git merge main --no-edit --allow-unrelated-histories
 
       - name: Checkout the branch that triggered this run
@@ -90,20 +90,20 @@ jobs:
           echo "gateway_address: $gateway_address"
           echo "registry_address: $registry_address"
 
-      - name: Switch code repo to cd/contracts branch
+      - name: Switch code repo to cd/contracts branch-test
         uses: actions/checkout@v4
         with:
-          ref: cd/contracts
+          ref: cd/contracts-test
           submodules: recursive
           fetch-depth: 0
 
-      - name: Merge from main branch and update cd/contracts branch
+      - name: Merge from main branch and update cd/contracts branch-test
         run: |
           git checkout main
           git pull --rebase origin main
-          git checkout cd/contracts
+          git checkout cd/contracts-test
           git merge main --no-edit --allow-unrelated-histories
-          git push -f origin cd/contracts
+          git push -f origin cd/contracts-test
 
       - name: Write deployed address to output file
         run: |
@@ -116,4 +116,4 @@ jobs:
         run: |
           git add deployments/r314159.json
           git commit -m "Update contract address"
-          git push origin cd/contracts
+          git push origin cd/contracts-test
