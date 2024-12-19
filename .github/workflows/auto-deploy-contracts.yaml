@@ -74,7 +74,7 @@ jobs:
         run: |
           cd contracts
           pnpm install
-          output=$(make deploy-stack NETWORK=calibrationnet | tee /dev/tty)
+          output=$(make deploy-stack NETWORK=calibrationnet | tee /dev/stdout)
           echo "deploy_output<<EOF" >> $GITHUB_OUTPUT
           echo "$output" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
