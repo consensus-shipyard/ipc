@@ -110,8 +110,8 @@ impl State {
             credit_committed: Credit::zero(),
             credit_debited: Credit::zero(),
             expiries: BTreeMap::new(),
-            added: BlobsProgressCollection::new(),
-            pending: BlobsProgressCollection::new(),
+            added: BlobsProgressCollection::default(),
+            pending: BlobsProgressCollection::default(),
             accounts: AccountsState::new(store)?,
             blobs: BlobsState::new(store)?,
         })
@@ -2174,6 +2174,7 @@ mod tests {
         );
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn debit_accounts_delete_from_disc<BS: Blockstore>(
         hoku_config: &HokuConfig,
         store: &BS,
@@ -2210,7 +2211,7 @@ mod tests {
         );
         assert!(res.is_ok());
 
-        let stats = state.get_stats(TokenAmount::zero(), &hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
         assert_eq!(stats.num_accounts, 1);
         assert_eq!(stats.num_blobs, 1);
         assert_eq!(stats.num_resolving, 0);
@@ -2221,7 +2222,7 @@ mod tests {
         // Set to status pending
         let res = state.set_blob_pending(&store, subscriber, hash, id1.clone(), source);
         assert!(res.is_ok());
-        let stats = state.get_stats(TokenAmount::zero(), &hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
         assert_eq!(stats.num_blobs, 1);
         assert_eq!(stats.num_resolving, 1);
         assert_eq!(stats.bytes_resolving, size);
@@ -2239,7 +2240,7 @@ mod tests {
             BlobStatus::Resolved,
         );
         assert!(res.is_ok());
-        let stats = state.get_stats(TokenAmount::zero(), &hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
         assert_eq!(stats.num_blobs, 1);
         assert_eq!(stats.num_resolving, 0);
         assert_eq!(stats.bytes_resolving, 0);
@@ -2263,7 +2264,7 @@ mod tests {
         let id2 = SubscriptionId::new("foo").unwrap();
         let source = new_pk();
         let res = state.add_blob(
-            &hoku_config,
+            hoku_config,
             &store,
             origin,
             caller,
@@ -2279,7 +2280,7 @@ mod tests {
         );
         assert!(res.is_ok());
 
-        let stats = state.get_stats(TokenAmount::zero(), &hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
         assert_eq!(stats.num_blobs, 1);
         assert_eq!(stats.num_resolving, 0);
         assert_eq!(stats.bytes_resolving, 0);
@@ -2434,6 +2435,7 @@ mod tests {
         );
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn add_blob_refund<BS: Blockstore>(
         hoku_config: &HokuConfig,
         store: &BS,
@@ -2470,7 +2472,7 @@ mod tests {
         assert!(res.is_ok());
 
         // Check stats
-        let stats = state.get_stats(TokenAmount::zero(), &hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
         assert_eq!(stats.num_blobs, 1);
         assert_eq!(stats.num_resolving, 0);
         assert_eq!(stats.bytes_resolving, 0);
@@ -2498,7 +2500,7 @@ mod tests {
         let id2 = SubscriptionId::new("foo").unwrap();
         let source = new_pk();
         let res = state.add_blob(
-            &hoku_config,
+            hoku_config,
             &store,
             origin,
             caller,
@@ -2515,7 +2517,7 @@ mod tests {
         assert!(res.is_ok());
 
         // Check stats
-        let stats = state.get_stats(TokenAmount::zero(), &hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
         assert_eq!(stats.num_blobs, 2);
         assert_eq!(stats.num_resolving, 0);
         assert_eq!(stats.bytes_resolving, 0);
@@ -2556,7 +2558,7 @@ mod tests {
         let id1 = SubscriptionId::default();
         let source = new_pk();
         let res = state.add_blob(
-            &hoku_config,
+            hoku_config,
             &store,
             origin,
             caller,
@@ -2573,7 +2575,7 @@ mod tests {
         assert!(res.is_ok());
 
         // Check stats
-        let stats = state.get_stats(TokenAmount::zero(), &hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
         assert_eq!(stats.num_blobs, 2);
         assert_eq!(stats.num_resolving, 0);
         assert_eq!(stats.bytes_resolving, 0);
@@ -2736,6 +2738,7 @@ mod tests {
         );
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn add_blob_same_hash_same_account<BS: Blockstore>(
         hoku_config: &HokuConfig,
         store: &BS,
@@ -2759,7 +2762,7 @@ mod tests {
         let id1 = SubscriptionId::default();
         let source = new_pk();
         let res = state.add_blob(
-            &hoku_config,
+            hoku_config,
             &store,
             origin,
             caller,
@@ -2785,7 +2788,7 @@ mod tests {
         }
 
         // Check stats
-        let stats = state.get_stats(TokenAmount::zero(), &hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
         assert_eq!(stats.num_blobs, 1);
         assert_eq!(stats.num_resolving, 0);
         assert_eq!(stats.bytes_resolving, 0);
@@ -2826,7 +2829,7 @@ mod tests {
         assert!(res.is_ok());
 
         // Check stats
-        let stats = state.get_stats(TokenAmount::zero(), &hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
         assert_eq!(stats.num_blobs, 1);
         assert_eq!(stats.num_resolving, 1);
         assert_eq!(stats.bytes_resolving, size);
@@ -2850,7 +2853,7 @@ mod tests {
         );
 
         // Check stats
-        let stats = state.get_stats(TokenAmount::zero(), &hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
         assert_eq!(stats.num_blobs, 1);
         assert_eq!(stats.num_resolving, 0);
         assert_eq!(stats.bytes_resolving, 0);
@@ -2861,7 +2864,7 @@ mod tests {
         let add2_epoch = ChainEpoch::from(21);
         let source = new_pk();
         let res = state.add_blob(
-            &hoku_config,
+            hoku_config,
             &store,
             origin,
             caller,
@@ -2921,7 +2924,7 @@ mod tests {
         let id2 = SubscriptionId::new("foo").unwrap();
         let source = new_pk();
         let res = state.add_blob(
-            &hoku_config,
+            hoku_config,
             &store,
             origin,
             caller,
@@ -2947,7 +2950,7 @@ mod tests {
         }
 
         // Check stats
-        let stats = state.get_stats(TokenAmount::zero(), &hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
         assert_eq!(stats.num_blobs, 1);
         assert_eq!(stats.num_resolving, 0);
         assert_eq!(stats.bytes_resolving, 0);
@@ -3920,6 +3923,7 @@ mod tests {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn delete_blob_refund<BS: Blockstore>(
         hoku_config: &HokuConfig,
         store: &BS,
@@ -3954,7 +3958,7 @@ mod tests {
         assert!(res.is_ok());
 
         // Check stats
-        let stats = state.get_stats(TokenAmount::zero(), &hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
         assert_eq!(stats.num_blobs, 1);
         assert_eq!(stats.num_resolving, 0);
         assert_eq!(stats.bytes_resolving, 0);
@@ -3977,7 +3981,7 @@ mod tests {
         let add2_epoch = ChainEpoch::from(MIN_TTL + 10);
         let (hash2, size2) = new_hash(2048);
         let res = state.add_blob(
-            &hoku_config,
+            hoku_config,
             &store,
             origin,
             caller,
@@ -3994,7 +3998,7 @@ mod tests {
         assert!(res.is_ok());
 
         // Check stats
-        let stats = state.get_stats(TokenAmount::zero(), &hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
         assert_eq!(stats.num_blobs, 2);
         assert_eq!(stats.num_resolving, 0);
         assert_eq!(stats.bytes_resolving, 0);
@@ -4030,7 +4034,7 @@ mod tests {
         assert!(delete_from_disc);
 
         // Check stats
-        let stats = state.get_stats(TokenAmount::zero(), &hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
         assert_eq!(stats.num_blobs, 1);
         assert_eq!(stats.num_resolving, 0);
         assert_eq!(stats.bytes_resolving, 0);
