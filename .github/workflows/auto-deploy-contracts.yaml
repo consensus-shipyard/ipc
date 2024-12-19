@@ -1,4 +1,4 @@
-name: Auto deploy IPC contracts when changed
+name: Auto-deploy IPC contracts to Calibrationnet when changed
 
 on:
   workflow_dispatch:
@@ -34,11 +34,14 @@ jobs:
           submodules: recursive
           fetch-depth: 0
 
-      - name: (Dry run) Try merge from main branch to see if there's any conflicts that can't be resolved itself
+      - name: Configure git
         run: |
-          git show HEAD
           git config --global user.name "$GIT_USERNAME"
           git config --global user.email "$GIT_EMAIL"
+
+      - name: (Dry run) Try merge from main to fail early if there are unresolvable conflicts
+        run: |
+          git show HEAD
           git checkout main
           git pull --rebase origin main
           git checkout cd/contracts
@@ -60,25 +63,22 @@ jobs:
           cache: 'npm'
           cache-dependency-path: 'pnpm-lock.yaml'
 
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-
       - name: Deploy IPC contracts to Calibrationnet
         id: deploy_contracts
         run: |
           cd contracts
           npm install
-          output=$(make deploy-stack NETWORK=calibrationnet)
+          output=$(make deploy-stack NETWORK=calibrationnet | tee /dev/tty)
           echo "deploy_output<<EOF" >> $GITHUB_OUTPUT
           echo "$output" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Parse deploy output
+      - name: Extract deployed addresses
         run: |
           deploy_output='${{ steps.deploy_contracts.outputs.deploy_output }}'
           echo "$deploy_output"
-          deployed_gateway_address=$(echo "$deploy_output" | grep '"Gateway"' | awk -F'"' '{print $4}')
-          deployed_registry_address=$(echo "$deploy_output" | grep '"SubnetRegistry"' | awk -F'"' '{print $4}')
+          deployed_gateway_address=$(jq -r ".address" deployments/calibrationnet/GatewayDiamond.json)
+          deployed_registry_address=$(jq -r ".address" deployments/calibrationnet/SubnetRegistryDiamond.json)
           echo "gateway_address=$deployed_gateway_address" >> $GITHUB_ENV
           echo "registry_address=$deployed_registry_address" >> $GITHUB_ENV
           echo "commit_hash=$(git rev-parse HEAD)" >> $GITHUB_ENV
@@ -98,8 +98,6 @@ jobs:
 
       - name: Merge from main branch and update cd/contracts branch
         run: |
-          git config --global user.name "$GIT_USERNAME"
-          git config --global user.email "$GIT_EMAIL"
           git checkout main
           git pull --rebase origin main
           git checkout cd/contracts
@@ -115,8 +113,6 @@ jobs:
 
       - name: Commit output file and push it to remote repo
         run: |
-          git config user.name ${{env.GIT_USERNAME}}
-          git config user.email ${{env.GIT_EMAIL}}
           git add deployments/r314159.json
           git commit -m "Update contract address"
           git push origin cd/contracts
