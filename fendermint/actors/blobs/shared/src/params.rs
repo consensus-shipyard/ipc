@@ -214,9 +214,9 @@ pub struct GetStatsReturn {
     /// The current token balance earned by the subnet.
     pub balance: TokenAmount,
     /// The total free storage capacity of the subnet.
-    pub capacity_free: BigInt,
+    pub capacity_free: u64,
     /// The total used storage capacity of the subnet.
-    pub capacity_used: BigInt,
+    pub capacity_used: u64,
     /// The total number of credits sold in the subnet.
     pub credit_sold: BigInt,
     /// The total number of credits committed to active storage in the subnet.

@@ -7,9 +7,11 @@ use fil_actors_runtime::{deserialize_block, extract_send_result, ActorError};
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
+use fvm_shared::econ::TokenAmount;
 use fvm_shared::sys::SendFlags;
 use fvm_shared::{ActorID, MethodNum, METHOD_CONSTRUCTOR};
 use num_derive::FromPrimitive;
+use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 
 pub const HOKU_CONFIG_ACTOR_ID: ActorID = 70;
@@ -57,7 +59,7 @@ pub fn get_admin(rt: &impl Runtime) -> Result<Option<Address>, ActorError> {
         &HOKU_CONFIG_ACTOR_ADDR,
         Method::GetAdmin as MethodNum,
         None,
-        rt.message().value_received(),
+        TokenAmount::zero(),
         None,
         SendFlags::READ_ONLY,
     ))?)
@@ -68,7 +70,7 @@ pub fn get_config(rt: &impl Runtime) -> Result<HokuConfig, ActorError> {
         &HOKU_CONFIG_ACTOR_ADDR,
         Method::GetConfig as MethodNum,
         None,
-        rt.message().value_received(),
+        TokenAmount::zero(),
         None,
         SendFlags::READ_ONLY,
     ))?)

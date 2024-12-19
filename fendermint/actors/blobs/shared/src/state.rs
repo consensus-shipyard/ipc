@@ -16,7 +16,7 @@ use std::fmt;
 #[derive(Clone, Debug, Default, PartialEq, Serialize_tuple, Deserialize_tuple)]
 pub struct Account {
     /// Total size of all blobs managed by the account.
-    pub capacity_used: BigInt,
+    pub capacity_used: u64,
     /// Current free credit in byte-blocks that can be used for new commitments.
     pub credit_free: BigInt,
     /// Current committed credit in byte-blocks that will be used for debits.

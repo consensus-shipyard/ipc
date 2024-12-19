@@ -31,7 +31,7 @@ use fvm_shared::error::ExitCode;
 use fvm_shared::{address::Address, MethodNum, METHOD_SEND};
 use num_traits::Zero;
 
-use crate::{ConstructorParams, State, BLOBS_ACTOR_NAME};
+use crate::{State, BLOBS_ACTOR_NAME};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(BlobsActor);
@@ -41,27 +41,28 @@ pub struct BlobsActor;
 type BlobTuple = (Hash, HashSet<(Address, SubscriptionId, PublicKey)>);
 
 impl BlobsActor {
-    fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
+    fn constructor(rt: &impl Runtime) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let state = State::new(
-            rt.store(),
-            params.blob_capacity,
-            params.blob_credits_per_byte_block,
-        )?;
+        let state = State::new(rt.store())?;
         rt.create(&state)
     }
 
     fn get_stats(rt: &impl Runtime) -> Result<GetStatsReturn, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let stats = rt.state::<State>()?.get_stats(rt.current_balance());
+        let hoku_config = hoku_config::get_config(rt)?;
+        let stats = rt
+            .state::<State>()?
+            .get_stats(rt.current_balance(), &hoku_config);
         Ok(stats)
     }
 
     fn buy_credit(rt: &impl Runtime, params: BuyCreditParams) -> Result<Account, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let to = resolve_external_non_machine(rt, params.0)?;
+        let hoku_config = hoku_config::get_config(rt)?;
         rt.transaction(|st: &mut State, rt| {
             st.buy_credit(
+                &hoku_config,
                 rt.store(),
                 to,
                 rt.message().value_received(),
@@ -199,8 +200,10 @@ impl BlobsActor {
 
     fn debit_accounts(rt: &impl Runtime) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let deletes =
-            rt.transaction(|st: &mut State, rt| st.debit_accounts(rt.store(), rt.curr_epoch()))?;
+        let hoku_config = hoku_config::get_config(rt)?;
+        let deletes = rt.transaction(|st: &mut State, rt| {
+            st.debit_accounts(&hoku_config, rt.store(), rt.curr_epoch())
+        })?;
         for hash in deletes {
             delete_from_disc(hash)?;
         }
@@ -218,8 +221,10 @@ impl BlobsActor {
             origin
         };
         let tokens_received = rt.message().value_received();
+        let hoku_config = hoku_config::get_config(rt)?;
         let (subscription, unspent_tokens) = rt.transaction(|st: &mut State, rt| {
             st.add_blob(
+                &hoku_config,
                 rt.store(),
                 origin,
                 caller,
@@ -297,8 +302,10 @@ impl BlobsActor {
     fn finalize_blob(rt: &impl Runtime, params: FinalizeBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         let (subscriber, _) = resolve_external(rt, params.subscriber)?;
+        let hoku_config = hoku_config::get_config(rt)?;
         rt.transaction(|st: &mut State, rt| {
             st.finalize_blob(
+                &hoku_config,
                 rt.store(),
                 subscriber,
                 rt.curr_epoch(),
@@ -319,8 +326,10 @@ impl BlobsActor {
         } else {
             origin
         };
+        let hoku_config = hoku_config::get_config(rt)?;
         let delete = rt.transaction(|st: &mut State, rt| {
             st.delete_blob(
+                &hoku_config,
                 rt.store(),
                 origin,
                 caller,
@@ -350,11 +359,13 @@ impl BlobsActor {
         } else {
             origin
         };
+        let hoku_config = hoku_config::get_config(rt)?;
 
         // The call should be atomic, hence we wrap two independent calls in a transaction.
         let (delete, subscription) = rt.transaction(|st: &mut State, rt| {
             let add_params = params.add;
             let delete = st.delete_blob(
+                &hoku_config,
                 rt.store(),
                 origin,
                 caller,
@@ -364,6 +375,7 @@ impl BlobsActor {
                 add_params.id.clone(),
             )?;
             let (subscription, _) = st.add_blob(
+                &hoku_config,
                 rt.store(),
                 origin,
                 caller,
@@ -424,8 +436,10 @@ impl BlobsActor {
     ) -> Result<(u32, Option<Hash>), ActorError> {
         BlobsActor::validate_caller_is_admin(rt)?;
         let account = resolve_external_non_machine(rt, params.account)?;
+        let hoku_config = hoku_config::get_config(rt)?;
         let (processed, next_key, deleted_blobs) = rt.transaction(|st: &mut State, rt| {
             st.adjust_blob_ttls_for_account(
+                &hoku_config,
                 rt.store(),
                 account,
                 rt.curr_epoch(),
@@ -509,6 +523,7 @@ impl ActorCode for BlobsActor {
 mod tests {
     use super::*;
 
+    use fendermint_actor_hoku_config_shared::{HokuConfig, HOKU_CONFIG_ACTOR_ADDR};
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::test_utils::{
         expect_empty, MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, EVM_ACTOR_CODE_ID,
@@ -517,6 +532,7 @@ mod tests {
     use fvm_shared::bigint::BigInt;
     use fvm_shared::clock::ChainEpoch;
     use fvm_shared::econ::TokenAmount;
+    use fvm_shared::sys::SendFlags;
     use num_traits::Zero;
     use rand::RngCore;
 
@@ -537,10 +553,7 @@ mod tests {
         PublicKey(data)
     }
 
-    pub fn construct_and_verify(
-        blob_capacity: u64,
-        blob_credits_per_byte_block: u64,
-    ) -> MockRuntime {
+    pub fn construct_and_verify() -> MockRuntime {
         let rt = MockRuntime {
             receiver: Address::new_id(10),
             ..Default::default()
@@ -548,14 +561,7 @@ mod tests {
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
         let result = rt
-            .call::<BlobsActor>(
-                Method::Constructor as u64,
-                IpldBlock::serialize_cbor(&ConstructorParams {
-                    blob_capacity,
-                    blob_credits_per_byte_block,
-                })
-                .unwrap(),
-            )
+            .call::<BlobsActor>(Method::Constructor as u64, None)
             .unwrap();
         expect_empty(result);
         rt.verify();
@@ -563,9 +569,23 @@ mod tests {
         rt
     }
 
+    fn expect_get_config(rt: &MockRuntime) {
+        rt.expect_send(
+            HOKU_CONFIG_ACTOR_ADDR,
+            fendermint_actor_hoku_config_shared::Method::GetConfig as MethodNum,
+            None,
+            TokenAmount::zero(),
+            None,
+            SendFlags::READ_ONLY,
+            IpldBlock::serialize_cbor(&HokuConfig::default()).unwrap(),
+            ExitCode::OK,
+            None,
+        );
+    }
+
     #[test]
     fn test_buy_credit() {
-        let rt = construct_and_verify(1024 * 1024, 1);
+        let rt = construct_and_verify();
 
         let id_addr = Address::new_id(110);
         let eth_addr = EthAddress(hex_literal::hex!(
@@ -581,6 +601,7 @@ mod tests {
         rt.set_received(TokenAmount::from_whole(1));
         rt.expect_validate_caller_any();
         let fund_params = BuyCreditParams(f4_eth_addr);
+        expect_get_config(&rt);
         let result = rt
             .call::<BlobsActor>(
                 Method::BuyCredit as u64,
@@ -597,6 +618,7 @@ mod tests {
         rt.set_received(TokenAmount::from_nano(1));
         rt.expect_validate_caller_any();
         let fund_params = BuyCreditParams(f4_eth_addr);
+        expect_get_config(&rt);
         let result = rt
             .call::<BlobsActor>(
                 Method::BuyCredit as u64,
@@ -613,6 +635,7 @@ mod tests {
         rt.set_received(TokenAmount::from_atto(1));
         rt.expect_validate_caller_any();
         let fund_params = BuyCreditParams(f4_eth_addr);
+        expect_get_config(&rt);
         let result = rt
             .call::<BlobsActor>(
                 Method::BuyCredit as u64,
@@ -628,7 +651,7 @@ mod tests {
 
     #[test]
     fn test_approve_credit() {
-        let rt = construct_and_verify(1024 * 1024, 1);
+        let rt = construct_and_verify();
 
         // Credit owner
         let owner_id_addr = Address::new_id(110);
@@ -717,7 +740,7 @@ mod tests {
 
     #[test]
     fn test_revoke_credit() {
-        let rt = construct_and_verify(1024 * 1024, 1);
+        let rt = construct_and_verify();
 
         // Credit owner
         let owner_id_addr = Address::new_id(110);
@@ -820,7 +843,7 @@ mod tests {
 
     #[test]
     fn test_add_blob() {
-        let rt = construct_and_verify(1024 * 1024, 1);
+        let rt = construct_and_verify();
 
         let id_addr = Address::new_id(110);
         let eth_addr = EthAddress(hex_literal::hex!(
@@ -845,6 +868,7 @@ mod tests {
             size: hash.1,
             ttl: Some(3600),
         };
+        expect_get_config(&rt);
         let result = rt.call::<BlobsActor>(
             Method::AddBlob as u64,
             IpldBlock::serialize_cbor(&add_params).unwrap(),
@@ -853,9 +877,11 @@ mod tests {
         rt.verify();
 
         // Fund an account
-        rt.set_received(TokenAmount::from_whole(1));
+        let received = TokenAmount::from_whole(1);
+        rt.set_received(received.clone());
         rt.expect_validate_caller_any();
         let fund_params = BuyCreditParams(f4_eth_addr);
+        expect_get_config(&rt);
         let result = rt.call::<BlobsActor>(
             Method::BuyCredit as u64,
             IpldBlock::serialize_cbor(&fund_params).unwrap(),
@@ -866,6 +892,7 @@ mod tests {
         // Try with sufficient balance
         rt.set_epoch(ChainEpoch::from(5));
         rt.expect_validate_caller_any();
+        expect_get_config(&rt);
         let subscription = rt
             .call::<BlobsActor>(
                 Method::AddBlob as u64,
@@ -884,7 +911,7 @@ mod tests {
 
     #[test]
     fn test_add_blob_inline_buy() {
-        let rt = construct_and_verify(1024 * 1024, 1);
+        let rt = construct_and_verify();
 
         let id_addr = Address::new_id(110);
         let eth_addr = EthAddress(hex_literal::hex!(
@@ -914,6 +941,7 @@ mod tests {
         rt.set_balance(tokens_sent.clone());
         let tokens_required_atto = add_params.size * add_params.ttl.unwrap() as u64;
         let expected_tokens_unspent = tokens_sent.atto() - tokens_required_atto;
+        expect_get_config(&rt);
         rt.expect_send_simple(
             f4_eth_addr,
             METHOD_SEND,
@@ -942,6 +970,7 @@ mod tests {
             size: hash.1,
             ttl: Some(3600),
         };
+        expect_get_config(&rt);
         let response = rt.call::<BlobsActor>(
             Method::AddBlob as u64,
             IpldBlock::serialize_cbor(&add_params).unwrap(),
@@ -964,6 +993,7 @@ mod tests {
             size: hash.1,
             ttl: Some(3600),
         };
+        expect_get_config(&rt);
         let result = rt.call::<BlobsActor>(
             Method::AddBlob as u64,
             IpldBlock::serialize_cbor(&add_params).unwrap(),
@@ -974,7 +1004,7 @@ mod tests {
 
     #[test]
     fn test_add_blob_with_sponsor() {
-        let rt = construct_and_verify(1024 * 1024, 1);
+        let rt = construct_and_verify();
 
         // Credit sponsor
         let sponsor_id_addr = Address::new_id(110);
@@ -1007,6 +1037,7 @@ mod tests {
         rt.set_received(TokenAmount::from_whole(1));
         rt.expect_validate_caller_any();
         let fund_params = BuyCreditParams(sponsor_id_addr);
+        expect_get_config(&rt);
         let buy_credit_result = rt.call::<BlobsActor>(
             Method::BuyCredit as u64,
             IpldBlock::serialize_cbor(&fund_params).unwrap(),
@@ -1064,6 +1095,7 @@ mod tests {
             size: hash.1,
             ttl: Some(3600),
         };
+        expect_get_config(&rt);
         let response = rt.call::<BlobsActor>(
             Method::AddBlob as u64,
             IpldBlock::serialize_cbor(&add_params).unwrap(),
@@ -1086,6 +1118,7 @@ mod tests {
             size: hash.1,
             ttl: Some(3600),
         };
+        expect_get_config(&rt);
         let response = rt.call::<BlobsActor>(
             Method::AddBlob as u64,
             IpldBlock::serialize_cbor(&add_params).unwrap(),
