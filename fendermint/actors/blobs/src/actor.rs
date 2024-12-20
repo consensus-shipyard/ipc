@@ -113,8 +113,10 @@ impl BlobsActor {
         } else {
             None
         };
+        let hoku_config = hoku_config::get_config(rt)?;
         rt.transaction(|st: &mut State, rt| {
             st.approve_credit(
+                &hoku_config,
                 rt.store(),
                 from,
                 to,
@@ -204,8 +206,10 @@ impl BlobsActor {
 
     fn debit_accounts(rt: &impl Runtime) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let deletes =
-            rt.transaction(|st: &mut State, rt| st.debit_accounts(rt.store(), rt.curr_epoch()))?;
+        let hoku_config = hoku_config::get_config(rt)?;
+        let deletes = rt.transaction(|st: &mut State, rt| {
+            st.debit_accounts(&hoku_config, rt.store(), rt.curr_epoch())
+        })?;
         for hash in deletes {
             delete_from_disc(hash)?;
         }
@@ -691,6 +695,7 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, owner_id_addr);
         rt.set_origin(owner_id_addr);
         rt.expect_validate_caller_any();
+        expect_get_config(&rt);
         let approve_params = ApproveCreditParams {
             from: owner_id_addr,
             to: to_id_addr,
@@ -710,6 +715,7 @@ mod tests {
         rt.set_caller(*EVM_ACTOR_CODE_ID, proxy_id_addr);
         rt.set_origin(owner_id_addr);
         rt.expect_validate_caller_any();
+        expect_get_config(&rt);
         let approve_params = ApproveCreditParams {
             from: owner_id_addr,
             to: to_id_addr,
@@ -783,6 +789,7 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, owner_id_addr);
         rt.set_origin(owner_id_addr);
         rt.expect_validate_caller_any();
+        expect_get_config(&rt);
         let approve_params = ApproveCreditParams {
             from: owner_id_addr,
             to: to_id_addr,
@@ -1062,6 +1069,7 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, sponsor_id_addr);
         rt.set_origin(sponsor_id_addr);
         rt.expect_validate_caller_any();
+        expect_get_config(&rt);
         let approve_params = ApproveCreditParams {
             from: sponsor_id_addr,
             to: spender_id_addr,
@@ -1088,6 +1096,7 @@ mod tests {
             gas_fee_limit: None,
             ttl: None,
         };
+        expect_get_config(&rt);
         let approve_result = rt.call::<BlobsActor>(
             Method::ApproveCredit as u64,
             IpldBlock::serialize_cbor(&approve_params).unwrap(),

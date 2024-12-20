@@ -27,6 +27,10 @@ pub struct HokuConfig {
     pub token_credit_rate: BigInt,
     /// Block interval at which to debit all credit accounts.
     pub blob_credit_debit_interval: ChainEpoch,
+    /// The minimum epoch duration a blob can be stored.
+    pub blob_min_ttl: ChainEpoch,
+    /// The rolling epoch duration used for non-expiring blobs.
+    pub blob_auto_renew_ttl: ChainEpoch,
 }
 
 impl Default for HokuConfig {
@@ -35,6 +39,8 @@ impl Default for HokuConfig {
             blob_capacity: 10 * 1024 * 1024 * 1024 * 1024, // 10 TiB
             token_credit_rate: BigInt::from(1_000_000_000_000_000_000u64), // 1 atto = 1 credit (1e18 atto credit)
             blob_credit_debit_interval: ChainEpoch::from(3600),
+            blob_min_ttl: ChainEpoch::from(3600),
+            blob_auto_renew_ttl: ChainEpoch::from(3600),
         }
     }
 }
