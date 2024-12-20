@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
 import {IpcEnvelope, CallMsg, IpcMsgKind} from "../structs/CrossNet.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
-import {Subnet, SubnetID, AssetKind, IPCAddress} from "../structs/Subnet.sol";
+import {Subnet, SubnetID, AssetKind, IPCAddress, Asset} from "../structs/Subnet.sol";
 import {InvalidXnetMessage, InvalidXnetMessageReason, CannotSendCrossMsgToItself, MethodNotAllowed, UnroutableMessage} from "../errors/IPCErrors.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {LibGateway, CrossMessageValidationOutcome} from "../lib/LibGateway.sol";
@@ -12,6 +12,7 @@ import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {AssetHelper} from "../lib/AssetHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
+import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
@@ -23,6 +24,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
     using EnumerableSet for EnumerableSet.Bytes32Set;
     using CrossMsgHelper for IpcEnvelope;
+    using AssetHelper for Asset;
 
     /**
      * @dev Sends a general-purpose cross-message from the local subnet to the destination subnet.
@@ -47,9 +49,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
             revert InvalidXnetMessage(InvalidXnetMessageReason.Sender);
         }
 
-        if (envelope.kind != IpcMsgKind.Call) {
-            revert InvalidXnetMessage(InvalidXnetMessageReason.Kind);
-        }
+        ISubnetActor(s.networkName.getActor()).supplySource().lock(envelope.value);
 
         // Will revert if the message won't deserialize into a CallMsg.
         abi.decode(envelope.message, (CallMsg));

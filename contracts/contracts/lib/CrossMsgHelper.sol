@@ -72,8 +72,7 @@ library CrossMsgHelper {
         uint256 value = crossMsg.value;
         // if the message was executed successfully, the value stayed
         // in the subnet and there's no need to return it.
-        // or if the message is a call, the value is always 0 because transfers for calls are not allowed
-        if (outcome == OutcomeType.Ok || crossMsg.kind == IpcMsgKind.Call) {
+        if (outcome == OutcomeType.Ok) {
             value = 0;
         }
         return
@@ -185,9 +184,6 @@ library CrossMsgHelper {
         if (crossMsg.kind == IpcMsgKind.Transfer) {
             return supplySource.transferFunds({recipient: payable(recipient), value: crossMsg.value});
         } else if (crossMsg.kind == IpcMsgKind.Call || crossMsg.kind == IpcMsgKind.Result) {
-            // transferring funds is not allowed for Call messages
-            uint256 value = crossMsg.kind == IpcMsgKind.Call ? 0 : crossMsg.value;
-
             // send the envelope directly to the entrypoint
             // use supplySource so the tokens in the message are handled successfully
             // and by the right supply source
@@ -195,7 +191,7 @@ library CrossMsgHelper {
                 supplySource.performCall(
                     payable(recipient),
                     abi.encodeCall(IIpcHandler.handleIpcMessage, (crossMsg)),
-                    value
+                    crossMsg.value
                 );
         }
         return (false, EMPTY_BYTES);
