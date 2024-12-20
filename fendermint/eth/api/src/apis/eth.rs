@@ -618,7 +618,7 @@ pub async fn get_uncle_by_block_number_and_index<C>(
 fn normalize_signature(sig: &mut et::Signature) -> JsonRpcResult<()> {
     sig.v = sig
         .recovery_id()
-        .context("cannot covert recovery id")?
+        .context("cannot normalize eth signature")?
         .to_byte() as u64;
     Ok(())
 }
