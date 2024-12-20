@@ -13,6 +13,7 @@ import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {AssetHelper} from "../lib/AssetHelper.sol";
+import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 // Validation outcomes for cross messages
@@ -20,7 +21,8 @@ enum CrossMessageValidationOutcome {
     Valid,
     InvalidDstSubnet,
     CannotSendToItself,
-    CommonParentNotExist
+    CommonParentNotExist,
+    InvalidSupplySource
 }
 
 library LibGateway {
@@ -567,28 +569,69 @@ library LibGateway {
         }
     }
 
+    /// Checks if the incoming and outgoing subnet supply sources can be mapped.
+    /// Caller should make sure the incoming/outgoing subnets and current subnet are immediate parent/child subnets.
+    function checkSubnetsAssets(
+        bool isLCA,
+        IPCMsgType applyType,
+        SubnetID memory incoming,
+        SubnetID memory outgoing,
+        SubnetID memory current
+    ) internal view returns(CrossMessageValidationOutcome) {
+        if (isLCA) {
+            // now, it's pivoting @ LCA (i.e. upwards => downwards)
+            // if incoming bottom up subnet and outgoing target subnet have the same 
+            // asset, we will allow it. This is because if they are using the 
+            // same asset, then the asset can be mapped in both subnets.
+            
+            (, SubnetID memory incDown) = incoming.down(current);
+            (, SubnetID memory outDown) = outgoing.down(current);
+
+            Asset memory incAsset = ISubnetActor(incDown.getActor()).supplySource();
+            Asset memory outAsset = ISubnetActor(outDown.getActor()).supplySource();
+
+            return incAsset.equals(outAsset);
+        }
+        
+        if (applyType == IPCMsgType.BottomUp) {
+            // The child subnet has supply source native, this is the same as 
+            // the current subnet's native source, the mapping makes sense, propagate up.
+            (, SubnetID memory incDown) = incoming.down(current);
+            return incDown.getActor().hasSupplyOfKind(AssetKind.Native);
+        }
+        
+        // Topdown handling
+
+        // The incoming subnet's supply source will be mapped to native coin in the 
+        // next child subnet. If the down subnet has native, then the mapping makes 
+        // sense.
+        (, SubnetID memory down) = outgoing.down(current);
+        return down.getActor().hasSupplyOfKind(AssetKind.Native);
+    }
+
     /// @notice Validates a cross message before committing it.
     function validateCrossMessage(IpcEnvelope memory envelope) internal view returns (CrossMessageValidationOutcome) {
-        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
         SubnetID memory toSubnetId = envelope.to.subnetId;
-
         if (toSubnetId.isEmpty()) {
             return CrossMessageValidationOutcome.InvalidDstSubnet;
         }
 
+        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
+        SubnetID memory currentNetwork = s.networkName;
+
         // We cannot send a cross message to the same subnet.
-        if (toSubnetId.equals(s.networkName)) {
+        if (toSubnetId.equals(currentNetwork)) {
             return CrossMessageValidationOutcome.CannotSendToItself;
         }
 
         // Lowest common ancestor subnet
-        bool isLCA = toSubnetId.commonParent(envelope.from.subnetId).equals(s.networkName);
-        IPCMsgType applyType = envelope.applyType(s.networkName);
-        
+        bool isLCA = toSubnetId.commonParent(envelope.from.subnetId).equals(currentNetwork);
+        IPCMsgType applyType = envelope.applyType(currentNetwork);
+
         // If the directionality is top-down, or if we're inverting the direction
         // else we need to check if the common parent exists.
         if (applyType == IPCMsgType.TopDown || isLCA) {
-            (bool foundChildSubnetId, SubnetID memory childSubnetId) = toSubnetId.down(s.networkName);
+            (bool foundChildSubnetId, SubnetID memory childSubnetId) = toSubnetId.down(currentNetwork);
             if (!foundChildSubnetId) {
                 return CrossMessageValidationOutcome.InvalidDstSubnet;
             }
@@ -598,10 +641,21 @@ library LibGateway {
                 return CrossMessageValidationOutcome.InvalidDstSubnet;
             }
         } else {
-            SubnetID memory commonParent = toSubnetId.commonParent(s.networkName);
+            SubnetID memory commonParent = toSubnetId.commonParent(currentNetwork);
             if (commonParent.isEmpty()) {
                 return CrossMessageValidationOutcome.CommonParentNotExist;
             }
+        }
+
+        bool validSupplySources = checkSubnetsAssets({
+            isLCA: isLCA,
+            applyType: applyType, 
+            incoming: envelope.from.subnetId,
+            outgoing: envelope.to.subnetId,
+            current: currentNetwork
+        });
+        if (validSupplySources) {
+            return CrossMessageValidationOutcome.InvalidSupplySource;
         }
 
         return CrossMessageValidationOutcome.Valid;
