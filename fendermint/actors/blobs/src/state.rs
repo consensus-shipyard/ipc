@@ -4,12 +4,11 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ops::Bound::{Included, Unbounded};
-use std::ops::Div;
 
 use fendermint_actor_blobs_shared::params::GetStatsReturn;
 use fendermint_actor_blobs_shared::state::{
     Account, Blob, BlobStatus, Credit, CreditApproval, GasAllowance, Hash, PublicKey, Subscription,
-    SubscriptionGroup, SubscriptionId, TtlStatus,
+    SubscriptionGroup, SubscriptionId, TokenCreditRate, TtlStatus,
 };
 use fendermint_actor_hoku_config_shared::HokuConfig;
 use fil_actors_runtime::ActorError;
@@ -35,7 +34,6 @@ pub struct State {
     pub credit_committed: Credit,
     /// The total number of credits debited in the subnet.
     pub credit_debited: Credit,
-    /// The token to credit rate. The amount of atto credits that 1 atto buys.
     /// Map of expiries to blob hashes.
     pub expiries: BTreeMap<ChainEpoch, HashMap<Address, HashMap<ExpiryKey, bool>>>,
     /// Map of currently added blob hashes to account and source Iroh node IDs.
@@ -143,7 +141,8 @@ impl State {
                 "token amount must be positive".into(),
             ));
         }
-        let credits = Credit::from_atto(amount.atto().clone() * &hoku_config.token_credit_rate);
+
+        let credits: Credit = amount.clone() * &hoku_config.token_credit_rate;
         // Don't sell credits if we're at storage capacity
         if self.capacity_available(hoku_config.blob_capacity).is_zero() {
             return Err(ActorError::forbidden(
@@ -1598,7 +1597,7 @@ fn ensure_credit_or_buy(
     account_credit_free: &mut Credit,
     state_credit_sold: &mut Credit,
     credit_required: &Credit,
-    token_credit_rate: &BigInt,
+    token_credit_rate: &TokenCreditRate,
     tokens_received: &TokenAmount,
     subscriber: &Address,
     current_epoch: ChainEpoch,
@@ -1615,9 +1614,8 @@ fn ensure_credit_or_buy(
             // Try buying credits for self
             let not_enough_credits = *account_credit_free < *credit_required;
             if not_enough_credits {
-                let credits_needed = credit_required - &*account_credit_free;
-                let tokens_needed =
-                    TokenAmount::from_atto(credits_needed.atto().clone().div(token_credit_rate));
+                let credits_needed: Credit = credit_required - &*account_credit_free;
+                let tokens_needed = &credits_needed / token_credit_rate;
                 if tokens_needed <= *tokens_received {
                     let tokens_to_rebate = tokens_received - tokens_needed;
                     *state_credit_sold += &credits_needed;
@@ -1829,7 +1827,7 @@ mod tests {
         let res = state.buy_credit(&hoku_config, &store, to, amount.clone(), 1);
         assert!(res.is_ok());
         let account = res.unwrap();
-        let credit_sold = Credit::from_whole(amount.atto().clone());
+        let credit_sold = amount.clone() * &hoku_config.token_credit_rate;
         assert_eq!(account.credit_free, credit_sold);
         assert_eq!(account.gas_allowance, amount);
         assert_eq!(state.credit_sold, credit_sold);
@@ -2399,8 +2397,7 @@ mod tests {
         assert_eq!(state.credit_committed, Credit::from_whole(0)); // credit was released
         assert_eq!(
             state.credit_debited,
-            Credit::from_atto(token_amount.atto().clone() * &hoku_config.token_credit_rate)
-                - &account.credit_free
+            token_amount * &hoku_config.token_credit_rate - &account.credit_free
         );
         assert_eq!(state.capacity_used, 0); // capacity was released
 
@@ -2505,8 +2502,7 @@ mod tests {
         token_amount: TokenAmount,
     ) {
         let token_credit_rate = BigInt::from(1_000_000_000_000_000_000u64);
-        let mut credit_amount =
-            Credit::from_atto(token_amount.atto().clone() * &hoku_config.token_credit_rate);
+        let mut credit_amount = token_amount.clone() * &hoku_config.token_credit_rate;
         // Add blob with default a subscription ID
         let (hash1, size1) = new_hash(1024);
         let add1_epoch = current_epoch;
@@ -2599,10 +2595,8 @@ mod tests {
         assert_eq!(state.credit_committed, account.credit_committed);
         assert_eq!(
             state.credit_debited,
-            Credit::from_atto(
-                token_amount.atto() * &token_credit_rate
-                    - (&account.credit_free + &account.credit_committed).atto()
-            )
+            (token_amount.clone() * &token_credit_rate)
+                - (&account.credit_free + &account.credit_committed)
         );
         assert_eq!(state.capacity_used, account.capacity_used);
 
@@ -2658,10 +2652,8 @@ mod tests {
         assert_eq!(state.credit_committed, account.credit_committed);
         assert_eq!(
             state.credit_debited,
-            Credit::from_atto(
-                token_amount.atto() * &token_credit_rate
-                    - (&account.credit_free + &account.credit_committed).atto()
-            )
+            token_amount.clone() * &token_credit_rate
+                - (&account.credit_free + &account.credit_committed)
         );
         assert_eq!(state.capacity_used, account.capacity_used);
 
@@ -3116,10 +3108,8 @@ mod tests {
         assert_eq!(state.credit_committed, account.credit_committed);
         assert_eq!(
             state.credit_debited,
-            Credit::from_atto(
-                token_amount.atto() * &hoku_config.token_credit_rate
-                    - (&account.credit_free + &account.credit_committed).atto()
-            )
+            (token_amount.clone() * &hoku_config.token_credit_rate)
+                - (&account.credit_free + &account.credit_committed)
         );
         assert_eq!(state.capacity_used, size);
 
@@ -3156,8 +3146,7 @@ mod tests {
                 current_epoch,
             )
             .unwrap();
-        let mut credit_amount =
-            Credit::from_atto(amount.atto().clone() * &hoku_config.token_credit_rate);
+        let mut credit_amount = amount.clone() * &hoku_config.token_credit_rate;
 
         assert!(state
             .set_ttl_status(&store, subscriber, TtlStatus::Extended, current_epoch)
@@ -3241,10 +3230,8 @@ mod tests {
         assert_eq!(state.credit_committed, account.credit_committed);
         assert_eq!(
             state.credit_debited,
-            Credit::from_atto(
-                amount.atto() * hoku_config.token_credit_rate
-                    - (&account.credit_free + &account.credit_committed).atto()
-            )
+            amount.clone() * &hoku_config.token_credit_rate
+                - (&account.credit_free + &account.credit_committed)
         );
         assert_eq!(state.capacity_used, account.capacity_used);
 
@@ -3272,8 +3259,7 @@ mod tests {
                 current_epoch,
             )
             .unwrap();
-        let mut credit_amount =
-            Credit::from_atto(amount.atto().clone() * &hoku_config.token_credit_rate);
+        let mut credit_amount = amount.clone() * &hoku_config.token_credit_rate;
 
         assert!(state
             .set_ttl_status(&store, subscriber, TtlStatus::Extended, current_epoch)
@@ -3351,10 +3337,8 @@ mod tests {
         assert_eq!(state.credit_committed, account.credit_committed);
         assert_eq!(
             state.credit_debited,
-            Credit::from_atto(
-                amount.atto() * &hoku_config.token_credit_rate
-                    - (&account.credit_free + &account.credit_committed).atto()
-            )
+            amount.clone() * &hoku_config.token_credit_rate
+                - (&account.credit_free + &account.credit_committed)
         );
         assert_eq!(state.capacity_used, account.capacity_used);
 
@@ -3395,10 +3379,8 @@ mod tests {
         assert_eq!(state.credit_committed, account.credit_committed);
         assert_eq!(
             state.credit_debited,
-            Credit::from_atto(
-                amount.atto() * &hoku_config.token_credit_rate
-                    - (&account.credit_free + &account.credit_committed).atto()
-            )
+            amount.clone() * &hoku_config.token_credit_rate
+                - (&account.credit_free + &account.credit_committed)
         );
         assert_eq!(state.capacity_used, account.capacity_used);
 
@@ -3549,8 +3531,7 @@ mod tests {
                 current_epoch,
             )
             .unwrap();
-        let credit_amount =
-            Credit::from_atto(amount.atto().clone() * &hoku_config.token_credit_rate);
+        let credit_amount = amount * &hoku_config.token_credit_rate;
 
         // Add a blob
         let add_epoch = current_epoch;
@@ -3632,8 +3613,7 @@ mod tests {
                 current_epoch,
             )
             .unwrap();
-        let mut credit_amount =
-            Credit::from_atto(amount.atto().clone() * &hoku_config.token_credit_rate);
+        let mut credit_amount = amount.clone() * &hoku_config.token_credit_rate;
 
         assert!(state
             .set_ttl_status(&store, subscriber, TtlStatus::Extended, current_epoch)
@@ -3732,7 +3712,7 @@ mod tests {
         assert_eq!(account.credit_committed, Credit::from_whole(0)); // credit was released
         assert_eq!(
             account.credit_free,
-            Credit::from_atto(amount.atto().clone() * &hoku_config.token_credit_rate)
+            amount.clone() * &hoku_config.token_credit_rate
         ); // credit was refunded
         assert_eq!(account.capacity_used, 0); // capacity was released
 
@@ -4016,8 +3996,7 @@ mod tests {
         current_epoch: ChainEpoch,
         token_amount: TokenAmount,
     ) {
-        let mut credit_amount =
-            Credit::from_atto(token_amount.atto().clone() * &hoku_config.token_credit_rate);
+        let mut credit_amount = token_amount * &hoku_config.token_credit_rate;
 
         // Add a blob
         let add1_epoch = current_epoch;

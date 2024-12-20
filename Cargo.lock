@@ -3246,6 +3246,7 @@ dependencies = [
 name = "fendermint_actor_hoku_config"
 version = "0.1.0"
 dependencies = [
+ "fendermint_actor_blobs_shared",
  "fendermint_actor_hoku_config_shared",
  "fendermint_actor_machine",
  "fil_actors_evm_shared",
@@ -3262,6 +3263,7 @@ dependencies = [
 name = "fendermint_actor_hoku_config_shared"
 version = "0.1.0"
 dependencies = [
+ "fendermint_actor_blobs_shared",
  "fil_actors_runtime",
  "frc42_dispatch",
  "fvm_ipld_encoding",

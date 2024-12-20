@@ -2,6 +2,7 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use fendermint_actor_blobs_shared::state::TokenCreditRate;
 use fil_actors_runtime::runtime::Runtime;
 use fil_actors_runtime::{deserialize_block, extract_send_result, ActorError};
 use fvm_ipld_encoding::tuple::*;
@@ -23,8 +24,8 @@ pub const HOKU_CONFIG_ACTOR_ADDR: Address = Address::new_id(HOKU_CONFIG_ACTOR_ID
 pub struct HokuConfig {
     /// The total storage capacity of the subnet.
     pub blob_capacity: u64,
-    /// The token to credit rate. The amount of atto credits that 1 atto buys.
-    pub token_credit_rate: BigInt,
+    /// The token to credit rate.
+    pub token_credit_rate: TokenCreditRate,
     /// Block interval at which to debit all credit accounts.
     pub blob_credit_debit_interval: ChainEpoch,
     /// The minimum epoch duration a blob can be stored.
@@ -37,7 +38,8 @@ impl Default for HokuConfig {
     fn default() -> Self {
         Self {
             blob_capacity: 10 * 1024 * 1024 * 1024 * 1024, // 10 TiB
-            token_credit_rate: BigInt::from(1_000_000_000_000_000_000u64), // 1 atto = 1 credit (1e18 atto credit)
+            // 1 HOKU buys 1e18 credits ~ 1 HOKU buys 1e36 atto credits.
+            token_credit_rate: TokenCreditRate::from(BigInt::from(10u128.pow(36))),
             blob_credit_debit_interval: ChainEpoch::from(3600),
             blob_min_ttl: ChainEpoch::from(3600),
             blob_auto_renew_ttl: ChainEpoch::from(3600),
