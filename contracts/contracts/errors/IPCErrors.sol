@@ -84,13 +84,17 @@ error MissingActivityCommitment();
 error ValidatorAlreadyClaimed();
 error InvalidActivityProof();
 error NotOwner();
+error CommonParentDoesNotExist();
+error UnroutableMessage(string reason);
 
 enum InvalidXnetMessageReason {
     Sender,
     DstSubnet,
     Nonce,
     Value,
-    Kind
+    Kind,
+    CannotSendToItself,
+    CommonParentNotExist
 }
 
 string constant ERR_PERMISSIONED_AND_BOOTSTRAPPED = "Method not allowed if permissioned is enabled and subnet bootstrapped";
