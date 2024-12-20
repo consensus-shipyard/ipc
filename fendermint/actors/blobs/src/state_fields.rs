@@ -72,7 +72,7 @@ impl BlobsState {
     }
 }
 
-#[derive(Debug, Serialize_tuple, Deserialize_tuple)]
+#[derive(Debug, Default, Serialize_tuple, Deserialize_tuple)]
 pub struct BlobsProgressCollection {
     map: BTreeMap<Hash, BlobsProgressValue>,
     bytes_size: u64,
@@ -81,14 +81,7 @@ pub struct BlobsProgressCollection {
 type BlobsProgressValue = HashSet<(Address, SubscriptionId, PublicKey)>;
 
 impl BlobsProgressCollection {
-    pub fn new() -> Self {
-        Self {
-            map: BTreeMap::new(),
-            bytes_size: 0,
-        }
-    }
-
-    /// Amount of bytes for blobs in the collection
+    /// Number of bytes for blobs in the collection
     pub fn bytes_size(&self) -> u64 {
         self.bytes_size
     }
