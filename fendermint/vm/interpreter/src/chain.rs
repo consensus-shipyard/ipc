@@ -32,6 +32,7 @@ use fvm_ipld_encoding::RawBytes;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use num_traits::Zero;
+use std::any::Any;
 use std::sync::Arc;
 
 /// A resolution pool for bottom-up and top-down checkpoints.
@@ -190,7 +191,7 @@ where
         msgs: Vec<Self::Message>,
     ) -> anyhow::Result<bool> {
         let mut block_gas_usage = 0;
-        let base_fee = state.block_gas_tracker().base_fee();
+        let gas_market = state.block_gas_tracker().current_gas_market();
 
         for msg in msgs {
             match msg {
@@ -229,7 +230,9 @@ where
                     }
                 }
                 ChainMessage::Signed(signed) => {
-                    if &signed.message.gas_fee_cap < base_fee {
+                    // We do not need to check against the minimium base fee because the gas market
+                    // is guaranteed to be capped at it anyway.
+                    if signed.message.gas_fee_cap < gas_market.base_fee {
                         // We do not accept blocks containing transactions with gas parameters below the current base fee.
                         // Producing an invalid block like this should penalize the validator going forward.
                         return Ok(false);
@@ -469,6 +472,7 @@ impl<I, DB> CheckInterpreter for ChainMessageInterpreter<I, DB>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
     I: CheckInterpreter<Message = VerifiableMessage, Output = SignedMessageCheckRes>,
+    I::State: Any,
 {
     type State = I::State;
     type Message = ChainMessage;
@@ -482,6 +486,22 @@ where
     ) -> anyhow::Result<(Self::State, Self::Output)> {
         match msg {
             ChainMessage::Signed(msg) => {
+                // TODO The recursive, generic Interpreter design is extremely inflexible, and ultimately useless.
+                //  We will untangle this later (see https://github.com/consensus-shipyard/ipc/issues/1241).
+                //  In the meantime we are compelled to downcast to access the actual types in use.
+                //  This check cannot be performed in the last interpreter (which has access to the FvmExecState) because
+                //  that one returns an exit code, whereas illegal messages do not lead to any execution and therefore
+                //  they do not benefit from an exit code.
+                let fvm_exec_state = (&state as &dyn Any)
+                    .downcast_ref::<FvmExecState<ReadOnlyBlockstore<DB>>>()
+                    .context("inner state not downcastable to FvmExecState")?;
+                let gas_market = fvm_exec_state.block_gas_tracker().current_gas_market();
+                if msg.message.gas_limit > gas_market.block_gas_limit
+                    || msg.message.gas_fee_cap < gas_market.min_base_fee
+                {
+                    return Ok((state, Err(IllegalMessage)));
+                }
+
                 let (state, ret) = self
                     .inner
                     .check(state, VerifiableMessage::Signed(msg), is_recheck)
