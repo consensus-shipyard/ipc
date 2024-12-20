@@ -22,7 +22,7 @@ enum CrossMessageValidationOutcome {
     InvalidDstSubnet,
     CannotSendToItself,
     CommonParentNotExist,
-    InvalidSupplySource
+    IncompatibleSupplySource
 }
 
 library LibGateway {
@@ -571,13 +571,13 @@ library LibGateway {
 
     /// Checks if the incoming and outgoing subnet supply sources can be mapped.
     /// Caller should make sure the incoming/outgoing subnets and current subnet are immediate parent/child subnets.
-    function checkSubnetsAssets(
+    function checkSubnetsSupplyCompatible(
         bool isLCA,
         IPCMsgType applyType,
         SubnetID memory incoming,
         SubnetID memory outgoing,
         SubnetID memory current
-    ) internal view returns(CrossMessageValidationOutcome) {
+    ) internal view returns(bool) {
         if (isLCA) {
             // now, it's pivoting @ LCA (i.e. upwards => downwards)
             // if incoming bottom up subnet and outgoing target subnet have the same 
@@ -647,15 +647,15 @@ library LibGateway {
             }
         }
 
-        bool validSupplySources = checkSubnetsAssets({
+        bool supplySourcesCompatible = checkSubnetsSupplyCompatible({
             isLCA: isLCA,
             applyType: applyType, 
             incoming: envelope.from.subnetId,
             outgoing: envelope.to.subnetId,
             current: currentNetwork
         });
-        if (validSupplySources) {
-            return CrossMessageValidationOutcome.InvalidSupplySource;
+        if (supplySourcesCompatible) {
+            return CrossMessageValidationOutcome.IncompatibleSupplySource;
         }
 
         return CrossMessageValidationOutcome.Valid;

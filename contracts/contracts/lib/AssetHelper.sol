@@ -38,7 +38,7 @@ library AssetHelper {
     }
 
     function equals(Asset memory asset, Asset memory asset2) internal pure returns (bool) {
-        return asset.tokenAddress == asset2.tokenAddress;
+        return asset.tokenAddress == asset2.tokenAddress && asset.kind == asset2.kind;
     }
 
     /// @notice Locks the specified amount from msg.sender into custody.
