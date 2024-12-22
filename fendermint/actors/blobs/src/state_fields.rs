@@ -81,7 +81,7 @@ pub struct BlobsProgressCollection {
 type BlobsProgressValue = HashSet<(Address, SubscriptionId, PublicKey)>;
 
 impl BlobsProgressCollection {
-    /// Ammount of bytes for blobs in the collection
+    /// Number of bytes for blobs in the collection
     pub fn bytes_size(&self) -> u64 {
         self.bytes_size
     }

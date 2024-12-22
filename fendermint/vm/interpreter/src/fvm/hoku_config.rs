@@ -22,6 +22,10 @@ pub struct HokuConfigTracker {
     pub token_credit_rate: BigInt,
     /// Block interval at which to debit all credit accounts.
     pub blob_credit_debit_interval: ChainEpoch,
+    /// The minimum epoch duration a blob can be stored.
+    pub blob_min_ttl: ChainEpoch,
+    /// The rolling epoch duration used for non-expiring blobs.
+    pub blob_auto_renew_ttl: ChainEpoch,
 }
 
 impl HokuConfigTracker {
@@ -30,6 +34,8 @@ impl HokuConfigTracker {
             blob_capacity: Zero::zero(),
             token_credit_rate: Zero::zero(),
             blob_credit_debit_interval: Zero::zero(),
+            blob_min_ttl: Zero::zero(),
+            blob_auto_renew_ttl: Zero::zero(),
         };
 
         let reading = Self::read_hoku_config(executor)?;
@@ -37,6 +43,8 @@ impl HokuConfigTracker {
         ret.blob_capacity = reading.blob_capacity;
         ret.token_credit_rate = reading.token_credit_rate;
         ret.blob_credit_debit_interval = reading.blob_credit_debit_interval;
+        ret.blob_min_ttl = reading.blob_min_ttl;
+        ret.blob_auto_renew_ttl = reading.blob_auto_renew_ttl;
 
         Ok(ret)
     }
