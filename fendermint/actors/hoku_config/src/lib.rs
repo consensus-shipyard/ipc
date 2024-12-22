@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use fendermint_actor_hoku_config_shared::{HokuConfig, Method, SetAdminParams, SetConfigParams};
-use fendermint_actor_machine::resolve_external;
+use fendermint_actor_machine::to_id_address;
 use fil_actors_runtime::actor_error;
 use fil_actors_runtime::runtime::{ActorCode, Runtime};
 use fil_actors_runtime::SYSTEM_ACTOR_ADDR;
@@ -52,7 +52,7 @@ impl Actor {
 
     fn set_admin(rt: &impl Runtime, params: SetAdminParams) -> Result<(), ActorError> {
         Self::ensure_update_allowed(rt)?;
-        let (new_admin, _) = resolve_external(rt, params.0)?;
+        let new_admin = to_id_address(rt, params.0, false)?;
         rt.transaction(|st: &mut State, _rt| {
             st.admin = Some(new_admin);
             Ok(())
@@ -68,7 +68,7 @@ impl Actor {
         let admin_exists = Self::ensure_update_allowed(rt)?;
         let new_admin = if !admin_exists {
             // The first caller becomes admin
-            let (new_admin, _) = resolve_external(rt, rt.message().caller())?;
+            let new_admin = to_id_address(rt, rt.message().caller(), false)?;
             Some(new_admin)
         } else {
             None

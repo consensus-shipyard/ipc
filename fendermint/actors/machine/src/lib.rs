@@ -2,24 +2,22 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::HashMap;
-
 pub use fil_actor_adm::Kind;
 use fil_actors_runtime::{
-    actor_error, deserialize_block, runtime::builtins::Type, runtime::Runtime, ActorError,
-    AsActorError, ADM_ACTOR_ADDR, FIRST_EXPORTED_METHOD_NUMBER, INIT_ACTOR_ADDR,
+    actor_error, runtime::builtins::Type, runtime::Runtime, ActorError, ADM_ACTOR_ADDR,
+    FIRST_EXPORTED_METHOD_NUMBER, INIT_ACTOR_ADDR,
 };
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{ipld_block::IpldBlock, tuple::*};
 pub use fvm_shared::METHOD_CONSTRUCTOR;
-use fvm_shared::{address::Address, error::ExitCode, sys::SendFlags, MethodNum};
-use num_traits::Zero;
+use fvm_shared::{address::Address, MethodNum};
 use serde::{de::DeserializeOwned, Serialize};
+use std::collections::HashMap;
 
 /// Params for creating a machine.
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ConstructorParams {
-    /// The machine owner robust address.
+    /// The machine owner ID address.
     pub owner: Address,
     /// User-defined metadata.
     pub metadata: HashMap<String, String>,
@@ -28,8 +26,8 @@ pub struct ConstructorParams {
 /// Params for initializing a machine.
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct InitParams {
-    /// The machine reorg safe address.
-    pub robust_address: Address,
+    /// The machine ID address.
+    pub address: Address,
 }
 
 /// Machine initialization method number.
@@ -40,24 +38,13 @@ pub const GET_ADDRESS_METHOD: MethodNum = frc42_dispatch::method_hash!("GetAddre
 pub const GET_METADATA_METHOD: MethodNum = frc42_dispatch::method_hash!("GetMetadata");
 
 /// Returns an error if the address does not match the message origin or caller.
-pub fn ensure_addr_is_origin_or_caller(
+pub fn require_addr_is_origin_or_caller(
     rt: &impl Runtime,
     address: Address,
 ) -> Result<(), ActorError> {
-    if rt.message().origin() == rt.message().caller() {
-        let (origin, _) = resolve_external(rt, rt.message().origin())?;
-        if address == origin {
-            return Ok(());
-        }
-    } else {
-        let (origin, _) = resolve_external(rt, rt.message().origin())?;
-        if address == origin {
-            return Ok(());
-        }
-        let (caller, _) = resolve_external(rt, rt.message().caller())?;
-        if address == caller {
-            return Ok(());
-        }
+    let address = to_id_address(rt, address, false)?;
+    if address == rt.message().origin() || address == rt.message().caller() {
+        return Ok(());
     }
     Err(ActorError::illegal_argument(format!(
         "address {} does not match origin or caller",
@@ -65,102 +52,36 @@ pub fn ensure_addr_is_origin_or_caller(
     )))
 }
 
-/// Actor type that includes Hoku Machines.
-pub enum ActorType {
-    Account,
-    Placeholder,
-    Evm,
-    EthAccount,
-    Machine,
-}
-
-impl ActorType {
-    fn from_builtin_type(t: Type) -> Result<Self, ActorError> {
-        match t {
-            Type::Account => Ok(ActorType::Account),
-            Type::Placeholder => Ok(ActorType::Placeholder),
-            Type::EVM => Ok(ActorType::Evm),
-            Type::EthAccount => Ok(ActorType::EthAccount),
-            _ => Err(ActorError::illegal_argument(format!(
-                "builtin actor type {:?} cannot be mapped to actor type",
-                t
-            ))),
-        }
-    }
-}
-
-/// Resolve robust address and ensure it is not a Machine actor type.
-/// See `resolve_external`.
-pub fn resolve_external_non_machine(
+/// Resolves ID address of an actor.
+/// If `require_delegated` is `true`, the address must be of type
+/// EVM (a Solidity contract), EthAccount (an Ethereum-style EOA), or Placeholder (a yet to be
+/// determined EOA or Solidity contract).
+pub fn to_id_address(
     rt: &impl Runtime,
     address: Address,
+    require_delegated: bool,
 ) -> Result<Address, ActorError> {
-    let (address, actor_type) = resolve_external(rt, address)?;
-    if matches!(actor_type, ActorType::Machine) {
-        Err(ActorError::illegal_argument(format!(
-            "address {} cannot be a machine",
-            address
-        )))
-    } else {
-        Ok(address)
-    }
-}
-
-/// Resolves robust address of an actor.
-pub fn resolve_external(
-    rt: &impl Runtime,
-    address: Address,
-) -> Result<(Address, ActorType), ActorError> {
     let actor_id = rt
         .resolve_address(&address)
         .ok_or(ActorError::not_found(format!(
             "actor {} not found",
             address
         )))?;
-    let code_cid = rt
-        .get_actor_code_cid(&actor_id)
-        .expect("failed to lookup caller code");
-    match rt.resolve_builtin_actor_type(&code_cid) {
-        Some(t) => match t {
-            Type::Placeholder | Type::EVM | Type::EthAccount => {
-                let delegated_addr =
-                    rt.lookup_delegated_address(actor_id)
-                        .ok_or(ActorError::illegal_argument(format!(
-                            "actor {} does not have delegated address",
-                            actor_id
-                        )))?;
-                Ok((delegated_addr, ActorType::from_builtin_type(t)?))
-            }
-            _ => Err(ActorError::forbidden(format!(
-                "disallowed caller type {} for address {}",
-                t.name(),
-                address
-            ))),
-        },
-        None => {
-            // The caller might be a machine
-            let result = rt
-                .send(
-                    &address,
-                    GET_ADDRESS_METHOD,
-                    None,
-                    Zero::zero(),
-                    None,
-                    SendFlags::READ_ONLY,
-                )
-                .context_code(
-                    ExitCode::USR_ASSERTION_FAILED,
-                    "machine failed to return its key address",
-                )?;
-            if !result.exit_code.is_success() {
-                return Err(ActorError::forbidden(format!(
-                    "disallowed caller code {code_cid}"
-                )));
-            }
-            let robust_addr: Address = deserialize_block(result.return_data)?;
-            Ok((robust_addr, ActorType::Machine))
+    if require_delegated {
+        let code_cid = rt
+            .get_actor_code_cid(&actor_id)
+            .expect("failed to lookup actor code cid");
+        if !matches!(
+            rt.resolve_builtin_actor_type(&code_cid),
+            Some(Type::Placeholder | Type::EVM | Type::EthAccount)
+        ) {
+            return Err(ActorError::forbidden(format!(
+                "address {} is not delegated",
+                address,
+            )));
         }
     }
+    Ok(Address::new_id(actor_id))
 }
 
 // TODO: Add method for changing owner from ADM actor.
@@ -170,14 +91,20 @@ pub trait MachineActor {
     /// Machine actor constructor.
     fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&INIT_ACTOR_ADDR))?;
+        params.owner.id().map_err(|_| {
+            ActorError::illegal_argument("machine owner address must be an ID address".into())
+        })?;
         let state = Self::State::new(rt.store(), params.owner, params.metadata)?;
         rt.create(&state)
     }
 
-    /// Initializes the machine with a robust address.
+    /// Initializes the machine with its ID address.
     fn init(rt: &impl Runtime, params: InitParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&ADM_ACTOR_ADDR))?;
-        rt.transaction(|st: &mut Self::State, _| st.init(params.robust_address))
+        params.address.id().map_err(|_| {
+            ActorError::illegal_argument("machine address must be an ID address".into())
+        })?;
+        rt.transaction(|st: &mut Self::State, _| st.init(params.address))
     }
 
     /// Get machine robust address.
@@ -217,7 +144,7 @@ pub trait MachineActor {
 pub struct Metadata {
     /// Machine kind.
     pub kind: Kind,
-    /// Machine owner robust address.
+    /// Machine owner ID address.
     pub owner: Address,
     /// User-defined data.
     pub metadata: HashMap<String, String>,

@@ -348,7 +348,8 @@ impl fmt::Display for BlobStatus {
     }
 }
 
-/// The TTL status of an account. This controls the max TTL that the user is allowed to set on their blobs.  
+/// The TTL status of an account.
+/// This controls the max TTL that the user is allowed to set on their blobs.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 pub enum TtlStatus {
     // Default TTL.

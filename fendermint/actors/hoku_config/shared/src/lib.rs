@@ -66,6 +66,18 @@ pub fn get_admin(rt: &impl Runtime) -> Result<Option<Address>, ActorError> {
     ))?)
 }
 
+/// Requires caller is the Hoku Admin.
+pub fn require_caller_is_admin(rt: &impl Runtime) -> Result<(), ActorError> {
+    let admin = get_admin(rt)?;
+    if admin.is_none() {
+        Err(ActorError::illegal_state(
+            "admin address not set".to_string(),
+        ))
+    } else {
+        Ok(rt.validate_immediate_caller_is(std::iter::once(&admin.unwrap()))?)
+    }
+}
+
 pub fn get_config(rt: &impl Runtime) -> Result<HokuConfig, ActorError> {
     deserialize_block(extract_send_result(rt.send(
         &HOKU_CONFIG_ACTOR_ADDR,
