@@ -16,6 +16,8 @@ import {AssetHelper} from "../lib/AssetHelper.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
+import {console} from "forge-std/Test.sol";
+
 // Validation outcomes for cross messages
 enum CrossMessageValidationOutcome {
     Valid,
@@ -450,6 +452,7 @@ library LibGateway {
         // of the batch (this is way we have this after the nonce logic).
         if (!crossMsg.to.subnetId.equals(s.networkName)) {
             CrossMessageValidationOutcome outcome = validateCrossMessage(crossMsg);
+            console.log("outcome", uint8(outcome));
             if (outcome != CrossMessageValidationOutcome.Valid) {
                 sendReceipt(
                     crossMsg,
@@ -578,6 +581,7 @@ library LibGateway {
         SubnetID memory outgoing,
         SubnetID memory current
     ) internal view returns(bool) {
+        console.log(isLCA);
         if (isLCA) {
             // now, it's pivoting @ LCA (i.e. upwards => downwards)
             // if incoming bottom up subnet and outgoing target subnet have the same 
@@ -597,6 +601,9 @@ library LibGateway {
             // The child subnet has supply source native, this is the same as 
             // the current subnet's native source, the mapping makes sense, propagate up.
             (, SubnetID memory incDown) = incoming.down(current);
+            console.log(current.route.length);
+            console.log(incDown.route.length, incDown.route[0]);
+            console.log(incDown.getActor().hasSupplyOfKind(AssetKind.Native));
             return incDown.getActor().hasSupplyOfKind(AssetKind.Native);
         }
         
@@ -647,6 +654,11 @@ library LibGateway {
             }
         }
 
+        // starting/ending subnet, no need check supply sources
+        if (envelope.from.subnetId.equals(currentNetwork) || envelope.to.subnetId.equals(currentNetwork)) {
+            return CrossMessageValidationOutcome.Valid;
+        }
+
         bool supplySourcesCompatible = checkSubnetsSupplyCompatible({
             isLCA: isLCA,
             applyType: applyType, 
@@ -654,7 +666,8 @@ library LibGateway {
             outgoing: envelope.to.subnetId,
             current: currentNetwork
         });
-        if (supplySourcesCompatible) {
+
+        if (!supplySourcesCompatible) {
             return CrossMessageValidationOutcome.IncompatibleSupplySource;
         }
 
@@ -669,6 +682,8 @@ library LibGateway {
             return InvalidXnetMessageReason.CannotSendToItself;
         } else if (outcome == CrossMessageValidationOutcome.CommonParentNotExist) {
             return InvalidXnetMessageReason.CommonParentNotExist;
+        } else if (outcome == CrossMessageValidationOutcome.IncompatibleSupplySource) {
+            return InvalidXnetMessageReason.IncompatibleSupplySource;
         }
 
         revert("Unhandled validation outcome");

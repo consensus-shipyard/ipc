@@ -240,4 +240,7 @@ library AssetHelper {
         return Asset({kind: AssetKind.Native, tokenAddress: address(0)});
     }
 
+    function erc20(address token) internal pure returns (Asset memory) {
+        return Asset({kind: AssetKind.ERC20, tokenAddress: token});
+    }
 }
