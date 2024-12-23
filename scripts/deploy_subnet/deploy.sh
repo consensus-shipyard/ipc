@@ -310,6 +310,16 @@ cp "$IPC_FOLDER"/infra/loki/loki-config.yaml "$IPC_CONFIG_FOLDER"
 cp "$IPC_FOLDER"/infra/promtail/promtail-config.yaml "$IPC_CONFIG_FOLDER"
 cp "$IPC_FOLDER"/infra/iroh/iroh.config.toml "$IPC_CONFIG_FOLDER"
 
+# Explicitly set the chain ID if not provided
+if [[ -z ${CHAIN_ID+x} ]]; then
+  if [[ $local_deploy == true ]]; then
+    CHAIN_ID=248163216
+  else
+    CHAIN_ID=2481632
+  fi
+fi
+echo "Using chain ID: $CHAIN_ID"
+
 if [[ -z ${SKIP_BUILD+x} || "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; then
   # Build contracts
   echo "$DASHES Building ipc contracts..."
@@ -572,6 +582,7 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=validator-0 \
     -e PRIVATE_KEY_PATH="${IPC_CONFIG_FOLDER}"/validator_0.sk \
     -e SUBNET_ID="${subnet_id}" \
+    -e CHAIN_ID="${CHAIN_ID}" \
     -e PARENT_ENDPOINT="${PARENT_ENDPOINT}" \
     -e CMT_P2P_HOST_PORT="${CMT_P2P_HOST_PORTS[0]}" \
     -e CMT_RPC_HOST_PORT="${CMT_RPC_HOST_PORTS[0]}" \
@@ -611,6 +622,7 @@ do
       -e NODE_NAME=validator-"${i}" \
       -e PRIVATE_KEY_PATH="${IPC_CONFIG_FOLDER}"/validator_"${i}".sk \
       -e SUBNET_ID="${subnet_id}" \
+      -e CHAIN_ID="${CHAIN_ID}" \
       -e PARENT_ENDPOINT="${PARENT_ENDPOINT}" \
       -e CMT_P2P_HOST_PORT="${CMT_P2P_HOST_PORTS[i]}" \
       -e CMT_RPC_HOST_PORT="${CMT_RPC_HOST_PORTS[i]}" \
@@ -837,8 +849,8 @@ Subnet registry:        0x74539671a1d2f1c8f200826baba665179f53a1b7
 EOF
 
 if [[ $local_deploy = true ]]; then
-  echo "Subnet blob manager:   ${BLOB_MANAGER_ADDRESS}"
-  echo "Subnet bucket manager: ${BUCKET_MANAGER_ADDRESS}"
+  echo "Subnet blob manager:    ${BLOB_MANAGER_ADDRESS}"
+  echo "Subnet bucket manager:  ${BUCKET_MANAGER_ADDRESS}"
   echo "Subnet credit manager:  ${CREDIT_MANAGER_ADDRESS}"
   echo
   echo "Account balances:"
