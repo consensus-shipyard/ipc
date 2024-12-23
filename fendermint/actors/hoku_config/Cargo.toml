@@ -12,6 +12,7 @@ version = "0.1.0"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
+fendermint_actor_blobs_shared = { path = "../blobs/shared" }
 fil_actors_runtime = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true }
