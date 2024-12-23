@@ -580,7 +580,7 @@ impl State {
     ) -> anyhow::Result<(Subscription, TokenAmount), ActorError> {
         // Get or create a new account
         let mut accounts = self.accounts.hamt(store)?;
-        let mut account = accounts.get_or_err(&subscriber)?;
+        let mut account = accounts.get_or_create(&subscriber, || Account::new(current_epoch))?;
         // Validate the TTL
         let (ttl, auto_renew) = self.accept_ttl(hoku_config, ttl, &account)?;
         // Get the credit delegation if needed
@@ -1608,7 +1608,7 @@ fn ensure_credit_or_buy(
     let has_delegation = delegate.is_some();
     match (tokens_received_non_zero, has_delegation) {
         (true, true) => Err(ActorError::illegal_argument(format!(
-            "can not buy credits inline for {}",
+            "cannot buy credits inline for {}",
             subscriber,
         ))),
         (true, false) => {
@@ -2359,7 +2359,7 @@ mod tests {
         // Debit all accounts at an epoch between the two expiries (3601-3621)
         let debit_epoch = ChainEpoch::from(hoku_config.blob_min_ttl + 11);
         let deletes_from_disc = state
-            .debit_accounts(&hoku_config, &store, debit_epoch)
+            .debit_accounts(hoku_config, &store, debit_epoch)
             .unwrap();
         assert!(deletes_from_disc.is_empty());
 
@@ -2381,7 +2381,7 @@ mod tests {
         // Debit all accounts at an epoch greater than group expiry (3621)
         let debit_epoch = ChainEpoch::from(hoku_config.blob_min_ttl + 31);
         let deletes_from_disc = state
-            .debit_accounts(&hoku_config, &store, debit_epoch)
+            .debit_accounts(hoku_config, &store, debit_epoch)
             .unwrap();
         assert!(!deletes_from_disc.is_empty()); // blob is marked for deletion
 
@@ -3051,7 +3051,7 @@ mod tests {
         // Debit all accounts
         let debit_epoch = ChainEpoch::from(41);
         let deletes_from_disc = state
-            .debit_accounts(&hoku_config, &store, debit_epoch)
+            .debit_accounts(hoku_config, &store, debit_epoch)
             .unwrap();
         assert!(deletes_from_disc.is_empty());
 
@@ -4023,7 +4023,7 @@ mod tests {
         let add1_epoch = current_epoch;
         let (hash1, size1) = new_hash(1024);
         let res = state.add_blob(
-            &hoku_config,
+            hoku_config,
             &store,
             origin,
             caller,

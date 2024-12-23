@@ -38,6 +38,8 @@ fil_actors_runtime::wasm_trampoline!(BlobsActor);
 ///
 /// The [`Address`]es stored in this actor's state _must_ be ID-based addresses for
 /// efficient comparison with message origin and caller addresses, which are always ID-based.
+/// [`Address`]es in the method params can be of any type.
+/// They will be resolved to ID-based addresses.
 ///
 /// For simplicity, this actor currently manages both blobs and credit.
 /// A future version of the protocol will likely separate them in some way.
@@ -47,7 +49,6 @@ pub struct BlobsActor;
 /// See `get_added_blobs` and `get_pending_blobs` for more information.
 type BlobRequest = (Hash, HashSet<(Address, SubscriptionId, PublicKey)>);
 
-/// Note
 impl BlobsActor {
     /// Creates a new `[BlobsActor]` state.
     ///
@@ -293,14 +294,21 @@ impl BlobsActor {
     /// and the only way to get an account is to buy credits, which requires a delegated address.   
     fn add_blob(rt: &impl Runtime, params: AddBlobParams) -> Result<Subscription, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
+        let tokens_received = rt.message().value_received();
         let origin = rt.message().origin();
         let caller = rt.message().caller();
         let subscriber = if let Some(sponsor) = params.sponsor {
-            to_id_address(rt, sponsor, false)?
+            to_id_address(rt, sponsor, tokens_received.is_positive())?
         } else {
-            origin
+            // If the origin is buying credits inline, perform the delegated address check,
+            // otherwise, don't waste gas on it. If the account doesn't have credits, the txn
+            // will fail, and the only way to buy credits it with a delegated address.
+            if tokens_received.is_positive() {
+                to_id_address(rt, origin, true)?
+            } else {
+                origin
+            }
         };
-        let tokens_received = rt.message().value_received();
         let hoku_config = hoku_config::get_config(rt)?;
         let (subscription, unspent_tokens) = rt.transaction(|st: &mut State, rt| {
             st.add_blob(
@@ -836,7 +844,7 @@ mod tests {
         );
         let expected_return = Err(ActorError::illegal_argument(format!(
             "address {} does not match origin or caller",
-            receiver_f4_eth_addr
+            to_id_addr
         )));
         assert_eq!(result, expected_return);
         rt.verify();
@@ -941,7 +949,7 @@ mod tests {
         );
         let expected_return = Err(ActorError::illegal_argument(format!(
             "address {} does not match origin or caller",
-            receiver_f4_eth_addr
+            to_id_addr
         )));
         assert_eq!(result, expected_return);
         rt.verify();
@@ -1035,9 +1043,9 @@ mod tests {
         let hash = new_hash(1024);
         let add_params = AddBlobParams {
             sponsor: None,
+            source: new_pk(),
             hash: hash.0,
             metadata_hash: new_hash(1024).0,
-            source: new_pk(),
             id: SubscriptionId::default(),
             size: hash.1,
             ttl: Some(3600),
@@ -1049,7 +1057,7 @@ mod tests {
         let expected_tokens_unspent = tokens_sent.atto() - tokens_required_atto;
         expect_get_config(&rt);
         rt.expect_send_simple(
-            f4_eth_addr,
+            id_addr,
             METHOD_SEND,
             None,
             TokenAmount::from_atto(expected_tokens_unspent),
