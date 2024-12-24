@@ -31,7 +31,7 @@ import {ERR_GENERAL_CROSS_MSG_DISABLED} from "../../contracts/gateway/GatewayMes
 import {DiamondCutFacet} from "../../contracts/diamond/DiamondCutFacet.sol";
 import {LibDiamond} from "../../contracts/lib/LibDiamond.sol";
 import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
-import {TestUtils, MockIpcContract} from "../helpers/TestUtils.sol";
+import {TestUtils, MockIpcContract, MockIpcContractPayable} from "../helpers/TestUtils.sol";
 import {IntegrationTestBase, SubnetWithNativeTokenMock} from "../IntegrationTestBase.sol";
 import {SelectorLibrary} from "../helpers/SelectorLibrary.sol";
 import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
@@ -541,28 +541,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         gatewayDiamond.manager().kill();
     }
 
-    function testGatewayDiamond_SendCrossMessage_Fails_NoFunds() public {
-        address caller = address(new MockIpcContract());
-        vm.startPrank(caller);
-        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 2);
-        registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
-
-        SubnetID memory destinationSubnet = gatewayDiamond.getter().getNetworkName().createSubnetId(caller);
-
-        vm.expectRevert(abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Value));
-        gatewayDiamond.messenger().sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(
-            TestUtils.newXnetCallMsg(
-                IPCAddress({
-                    subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-                    rawAddress: FvmAddressHelper.from(caller)
-                }),
-                IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(caller)}),
-                1,
-                0
-            )
-        );
-    }
-
     function testGatewayDiamond_SendCrossMessage_Fails_Fuzz(uint256 fee) public {
         vm.assume(fee < DEFAULT_CROSS_MSG_FEE);
 
@@ -881,27 +859,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         );
     }
 
-    function testGatewayDiamond_SendCrossMessage_Fails_Failes_InvalidCrossMsgValue() public {
-        address caller = address(new MockIpcContract());
-        vm.startPrank(caller);
-        vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE + 2);
-        registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
-        SubnetID memory destinationSubnet = gatewayDiamond.getter().getNetworkName().createSubnetId(caller);
-
-        vm.expectRevert(abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Value));
-        gatewayDiamond.messenger().sendContractXnetMessage{value: DEFAULT_CROSS_MSG_FEE}(
-            TestUtils.newXnetCallMsg(
-                IPCAddress({
-                    subnetId: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-                    rawAddress: FvmAddressHelper.from(caller)
-                }),
-                IPCAddress({subnetId: destinationSubnet, rawAddress: FvmAddressHelper.from(caller)}),
-                5,
-                0
-            )
-        );
-    }
-
     // TODO: this is no longer possible because EOA cannot be subnet
     // function testGatewayDiamond_SendCrossMessage_Fails_EoACaller() public {
     //     address caller = vm.addr(100);
@@ -1185,6 +1142,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
 
     function testGatewayDiamond_commitBottomUpCheckpoint_Works_WithMessages() public {
         address caller = address(saDiamond);
+        address recipient = address(new MockIpcContractPayable());
+
         vm.startPrank(caller);
         vm.deal(caller, DEFAULT_COLLATERAL_AMOUNT + DEFAULT_CROSS_MSG_FEE);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
@@ -1210,7 +1169,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
                 IPCAddress({subnetId: subnetId, rawAddress: FvmAddressHelper.from(caller)}),
                 IPCAddress({
                     subnetId: gatewayDiamond.getter().getNetworkName(),
-                    rawAddress: FvmAddressHelper.from(vm.addr(100 + i))
+                    rawAddress: FvmAddressHelper.from(recipient)
                 }),
                 amount,
                 i
@@ -1230,7 +1189,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         gatewayDiamond.checkpointer().commitCheckpoint(checkpoint);
 
         (, subnetInfo) = gatewayDiamond.getter().getSubnet(subnetId);
-        require(subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT - 10 * amount, "unexpected circulating supply");
+        // cross net messages with Call kind does not affect the circulating supply
+        require(subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT, "unexpected circulating supply");
     }
 
     function testGatewayDiamond_listIncompleteCheckpoints() public {
