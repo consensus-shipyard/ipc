@@ -611,9 +611,15 @@ library LibGateway {
 
     /// @notice Validates a cross message before committing it.
     function validateCrossMessage(IpcEnvelope memory envelope) internal view returns (CrossMessageValidationOutcome) {
+        (CrossMessageValidationOutcome outcome, ) = checkCrossMessage(envelope);
+        return outcome;
+    }
+
+    /// @notice Validates a cross message and returns the applyType if the message is valid
+    function checkCrossMessage(IpcEnvelope memory envelope) internal view returns (CrossMessageValidationOutcome, IPCMsgType applyType) {
         SubnetID memory toSubnetId = envelope.to.subnetId;
         if (toSubnetId.isEmpty()) {
-            return CrossMessageValidationOutcome.InvalidDstSubnet;
+            return (CrossMessageValidationOutcome.InvalidDstSubnet, applyType);
         }
 
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
@@ -621,30 +627,35 @@ library LibGateway {
 
         // We cannot send a cross message to the same subnet.
         if (toSubnetId.equals(currentNetwork)) {
-            return CrossMessageValidationOutcome.CannotSendToItself;
+            return (CrossMessageValidationOutcome.CannotSendToItself, applyType);
         }
 
         // Lowest common ancestor subnet
         bool isLCA = toSubnetId.commonParent(envelope.from.subnetId).equals(currentNetwork);
-        IPCMsgType applyType = envelope.applyType(currentNetwork);
+        applyType = envelope.applyType(currentNetwork);
 
         // If the directionality is top-down, or if we're inverting the direction
         // else we need to check if the common parent exists.
         if (applyType == IPCMsgType.TopDown || isLCA) {
             (bool foundChildSubnetId, SubnetID memory childSubnetId) = toSubnetId.down(currentNetwork);
             if (!foundChildSubnetId) {
-                return CrossMessageValidationOutcome.InvalidDstSubnet;
+                return (CrossMessageValidationOutcome.InvalidDstSubnet, applyType);
             }
 
             (bool foundSubnet,) = LibGateway.getSubnet(childSubnetId);
             if (!foundSubnet) {
-                return CrossMessageValidationOutcome.InvalidDstSubnet;
+                return (CrossMessageValidationOutcome.InvalidDstSubnet, applyType);
             }
         } else {
             SubnetID memory commonParent = toSubnetId.commonParent(currentNetwork);
             if (commonParent.isEmpty()) {
-                return CrossMessageValidationOutcome.CommonParentNotExist;
+                return (CrossMessageValidationOutcome.CommonParentNotExist, applyType);
             }
+        }
+
+        // starting/ending subnet, no need check supply sources
+        if (envelope.from.subnetId.equals(currentNetwork) || envelope.to.subnetId.equals(currentNetwork)) {
+            return (CrossMessageValidationOutcome.Valid, applyType);
         }
 
         bool supplySourcesCompatible = checkSubnetsSupplyCompatible({
@@ -654,14 +665,15 @@ library LibGateway {
             outgoing: envelope.to.subnetId,
             current: currentNetwork
         });
-        if (supplySourcesCompatible) {
-            return CrossMessageValidationOutcome.IncompatibleSupplySource;
+
+        if (!supplySourcesCompatible) {
+            return (CrossMessageValidationOutcome.IncompatibleSupplySource, applyType);
         }
 
-        return CrossMessageValidationOutcome.Valid;
+        return (CrossMessageValidationOutcome.Valid, applyType);
     }
 
-     // Function to map CrossMessageValidationOutcome to InvalidXnetMessageReason
+    // Function to map CrossMessageValidationOutcome to InvalidXnetMessageReason
     function validationOutcomeToInvalidXnetMsgReason(CrossMessageValidationOutcome outcome) internal pure returns (InvalidXnetMessageReason) {
         if (outcome == CrossMessageValidationOutcome.InvalidDstSubnet) {
             return InvalidXnetMessageReason.DstSubnet;
@@ -669,6 +681,8 @@ library LibGateway {
             return InvalidXnetMessageReason.CannotSendToItself;
         } else if (outcome == CrossMessageValidationOutcome.CommonParentNotExist) {
             return InvalidXnetMessageReason.CommonParentNotExist;
+        } else if (outcome == CrossMessageValidationOutcome.IncompatibleSupplySource) {
+            return InvalidXnetMessageReason.IncompatibleSupplySource;
         }
 
         revert("Unhandled validation outcome");
@@ -681,10 +695,11 @@ library LibGateway {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
 
         uint256 keysLength = s.postboxKeys.length();
-        bytes32[] memory ids = new bytes32[](keysLength);
+
+        bytes32[] memory values = s.postboxKeys.values();
+
         for (uint256 i = 0; i < keysLength; ) {
-            bytes32 msgCid = s.postboxKeys.at(i);
-            ids[i] = msgCid;
+            bytes32 msgCid = values[i];
             LibGateway.propagatePostboxMessage(msgCid);
 
             unchecked {

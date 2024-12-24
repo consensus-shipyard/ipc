@@ -49,8 +49,6 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
             revert InvalidXnetMessage(InvalidXnetMessageReason.Sender);
         }
 
-        ISubnetActor(s.networkName.getActor()).supplySource().lock(envelope.value);
-
         // Will revert if the message won't deserialize into a CallMsg.
         abi.decode(envelope.message, (CallMsg));
 
@@ -63,7 +61,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
             nonce: 0 // nonce will be updated by LibGateway.commitValidatedCrossMessage
         });
 
-        CrossMessageValidationOutcome outcome = committed.validateCrossMessage();
+        (CrossMessageValidationOutcome outcome, IPCMsgType applyType) = committed.validateCrossMessage();
 
         if (outcome != CrossMessageValidationOutcome.Valid) {
             if (outcome == CrossMessageValidationOutcome.InvalidDstSubnet) {
@@ -73,6 +71,12 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
             } else if (outcome == CrossMessageValidationOutcome.CommonParentNotExist) {
                 revert UnroutableMessage("no common parent");
             }
+        }
+
+        if (applyType == IPCMsgType.TopDown) {
+            (, SubnetID memory nextHop) = committed.to.subnetId.down(s.networkName);
+            // lock funds on the current subnet gateway for the next hop
+            ISubnetActor(nextHop.getActor()).supplySource().lock(envelope.value);
         }
 
         // Commit xnet message for dispatch.

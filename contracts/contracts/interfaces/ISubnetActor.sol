@@ -5,5 +5,5 @@ import {Asset} from "../structs/Subnet.sol";
 
 /// @title Subnet actor interface
 interface ISubnetActor {
-    function supplySource() external view returns(Asset memory);
+    function supplySource() external view returns (Asset memory);
 }
