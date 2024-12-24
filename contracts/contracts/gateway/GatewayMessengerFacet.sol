@@ -15,7 +15,6 @@ import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {console} from "forge-std/Test.sol";
 
 string constant ERR_GENERAL_CROSS_MSG_DISABLED = "Support for general-purpose cross-net messages is disabled";
 string constant ERR_MULTILEVEL_CROSS_MSG_DISABLED = "Support for multi-level cross-net messages is disabled";
@@ -50,11 +49,8 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
             revert InvalidXnetMessage(InvalidXnetMessageReason.Sender);
         }
 
-        ISubnetActor(s.networkName.getActor()).supplySource().lock(envelope.value);
-
         // Will revert if the message won't deserialize into a CallMsg.
         abi.decode(envelope.message, (CallMsg));
-        console.log("here0");
 
         committed = IpcEnvelope({
             kind: IpcMsgKind.Call,
@@ -65,22 +61,23 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
             nonce: 0 // nonce will be updated by LibGateway.commitValidatedCrossMessage
         });
 
-        CrossMessageValidationOutcome outcome = committed.validateCrossMessage();
+        (CrossMessageValidationOutcome outcome, IPCMsgType applyType) = committed.validateCrossMessage();
 
         if (outcome != CrossMessageValidationOutcome.Valid) {
             if (outcome == CrossMessageValidationOutcome.InvalidDstSubnet) {
-                console.log("here2");
                 revert InvalidXnetMessage(InvalidXnetMessageReason.DstSubnet);
             } else if (outcome == CrossMessageValidationOutcome.CannotSendToItself) {
-                console.log("here3");
                 revert CannotSendCrossMsgToItself();
             } else if (outcome == CrossMessageValidationOutcome.CommonParentNotExist) {
-                console.log("here4");
                 revert UnroutableMessage("no common parent");
             }
         }
 
-        console.log("here1");
+        if (applyType == IPCMsgType.TopDown) {
+            (, SubnetID memory nextHop) = committed.to.subnetId.down(s.networkName);
+            // lock funds on the current subnet gateway for the next hop
+            ISubnetActor(nextHop.getActor()).supplySource().lock(envelope.value);
+        }
 
         // Commit xnet message for dispatch.
         bool shouldBurn = LibGateway.commitValidatedCrossMessage(committed);

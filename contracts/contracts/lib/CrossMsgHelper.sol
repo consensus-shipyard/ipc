@@ -220,7 +220,7 @@ library CrossMsgHelper {
         return true;
     }
 
-    function validateCrossMessage(IpcEnvelope memory crossMsg) internal view returns (CrossMessageValidationOutcome)  {
-        return LibGateway.validateCrossMessage(crossMsg);
+    function validateCrossMessage(IpcEnvelope memory crossMsg) internal view returns (CrossMessageValidationOutcome, IPCMsgType)  {
+        return LibGateway.checkCrossMessage(crossMsg);
     }
 }

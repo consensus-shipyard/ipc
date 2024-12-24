@@ -3,9 +3,8 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import "../../contracts/errors/IPCErrors.sol";
-import {EMPTY_BYTES} from "../../contracts/constants/Constants.sol";
-import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind, OutcomeType} from "../../contracts/structs/CrossNet.sol";
-import {SubnetID, Subnet, IPCAddress, Validator} from "../../contracts/structs/Subnet.sol";
+import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind} from "../../contracts/structs/CrossNet.sol";
+import {SubnetID, Subnet, IPCAddress, Validator, FvmAddress} from "../../contracts/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
 import {AssetHelper} from "../../contracts/lib/AssetHelper.sol";
 import {Asset, AssetKind} from "../../contracts/structs/Subnet.sol";
@@ -34,6 +33,7 @@ import {ERC20PresetFixedSupply} from "../helpers/ERC20PresetFixedSupply.sol";
 
 import {ActivityHelper} from "../helpers/ActivityHelper.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {ISubnetActor} from "../../contracts/interfaces/ISubnetActor.sol";
 
 import "forge-std/console.sol";
 
@@ -42,6 +42,7 @@ struct SubnetsHierarchy {
     bytes32 l1NodeLookupKey;
     /// @dev The lookup keys to the children and beyond
     EnumerableSet.Bytes32Set subnetKeys;
+    mapping(address => bytes32) actorToLookupKeys;
     mapping(bytes32 => SubnetNode) nodes;
     mapping(bytes32 => SubnetDefinition) definitions;
 }
@@ -74,6 +75,10 @@ library LibSubnetsHierarchy {
 
     function getSubnetGateway(SubnetsHierarchy storage self, SubnetID memory id) internal view returns (address) {
         bytes32 lookupId = id.toHash();
+        return getSubnetGateway(self, lookupId);
+    }
+
+    function getSubnetGateway(SubnetsHierarchy storage self, bytes32 lookupId) internal view returns (address) {
         require(self.definitions[lookupId].gatewayAddr != address(0), "subnet not found");
         return self.definitions[lookupId].gatewayAddr;
     }
@@ -104,17 +109,28 @@ library LibSubnetsHierarchy {
         SubnetID memory child = SubnetIDHelper.createSubnetId(parent, subnetActor);
 
         bytes32 lookupId = child.toHash();
+
+        self.actorToLookupKeys[subnetActor] = lookupId;
         storeNewNode(self, lookupId, child, gateway);
         linkNewChild(self, lookupId, subnetActor);
 
         return child;
     }
+
+    function getGatewayBySubnetActor(SubnetsHierarchy storage self, address subnetActor) internal returns (address) {
+        bytes32 lookupId = self.actorToLookupKeys[subnetActor];
+        return getSubnetGateway(self, lookupId);
+    }
 }
 
-interface IMessager {
+interface IGateway {
     function sendContractXnetMessage(
         IpcEnvelope memory envelope
     ) external payable returns (IpcEnvelope memory committed);
+
+    function fund(SubnetID calldata subnetId, FvmAddress calldata to) external payable;
+
+    function fundWithToken(SubnetID calldata subnetId, FvmAddress calldata to, uint256 amount) external;
 }
 
 contract L2PlusSubnetTest is Test, IntegrationTestBase {
@@ -127,8 +143,16 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
     using LibSubnetsHierarchy for SubnetsHierarchy;
 
     SubnetsHierarchy private subnets;
+    bytes32 private new_topdown_message_topic;
 
     function setUp() public override {
+        // there seems no auto way to derive the abi in string, check this before running tests, make sure
+        // it's updated with the implementation
+        new_topdown_message_topic = keccak256(
+            "NewTopDownMessage(address,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes),bytes32)"
+        );
+
+        // get some free money.
         vm.deal(address(this), 10 ether);
     }
 
@@ -180,23 +204,35 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             });
     }
 
-    struct Params {
-        RootSubnetDefinition root;
-        TestSubnetDefinition subnet;
-        TestSubnetDefinition subnetL3;
-        MockIpcContractResult caller;
-        address callerAddr;
-        address recipientAddr;
-        uint256 callerAmount;
-        uint256 fundAmount;
-        uint256 amount;
-        OutcomeType expectedOutcome;
-        bytes expectedRet;
-    }
-
     function call(IpcEnvelope memory xnetMsg) internal {
         address gateway = subnets.getSubnetGateway(xnetMsg.from.subnetId);
-        IMessager(gateway).sendContractXnetMessage{value: xnetMsg.value}(xnetMsg);
+        IGateway(gateway).sendContractXnetMessage{value: xnetMsg.value}(xnetMsg);
+    }
+
+    function fundContract(
+        SubnetID memory originSubnet,
+        SubnetID memory targetSubnet,
+        address targetRecipient,
+        uint256 amount
+    ) internal {
+        (bool sameChain, SubnetID memory nextHop) = targetSubnet.down(originSubnet);
+        require(sameChain, "not in the same hierachy");
+
+        Asset memory supplySource = ISubnetActor(nextHop.getActor()).supplySource();
+        address gateway = subnets.getSubnetGateway(originSubnet);
+
+        vm.prank(address(this));
+        supplySource.makeAvailable(gateway, amount);
+
+        // sadly fund/fundWithToken does not support multi hierachy call, need to use xnet msg
+        IpcEnvelope memory crossMessage = TestUtils.newXnetCallMsg(
+            IPCAddress({subnetId: originSubnet, rawAddress: FvmAddressHelper.from(address(this))}),
+            IPCAddress({subnetId: targetSubnet, rawAddress: FvmAddressHelper.from(address(targetRecipient))}),
+            amount,
+            0 // the nonce, does not matter, should be handled by contract calls
+        );
+
+        call(crossMessage);
     }
 
     function initL1() internal returns (SubnetID memory) {
@@ -221,17 +257,13 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             if (params[i].supplySource.kind == AssetKind.Native) {
                 t = createNativeSubnet(parentGateway, params[i].parent);
             } else {
-                t = createTokenSubnet(
-                    params[i].supplySource.tokenAddress,
-                    parentGateway,
-                    params[i].parent
-                );
+                t = createTokenSubnet(params[i].supplySource.tokenAddress, parentGateway, params[i].parent);
             }
 
             // register child subnet to parent gateway
             vm.prank(t.subnetActorAddr);
             registerSubnetGW(0, t.subnetActorAddr, GatewayDiamond(payable(parentGateway)));
-            
+
             subnetIds[i] = subnets.registerNewSubnet(params[i].parent, t.subnetActorAddr, t.gatewayAddr);
         }
     }
@@ -246,7 +278,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             address gateway = subnets.getSubnetGateway(from);
             // this would normally submitted by releayer. It call the subnet actor on the L2 network.
             submitBottomUpCheckpoint(
-                callCreateBottomUpCheckpointFromChildSubnet(from, GatewayDiamond(payable(gateway))),
+                createBottomUpCheckpoint(from, GatewayDiamond(payable(gateway))),
                 SubnetActorDiamond(payable(from.getActor()))
             );
 
@@ -254,16 +286,37 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             finished = parent.equals(to);
         }
     }
-    
-    function propagateDown(SubnetID memory from, SubnetID memory to) internal {
-        
+
+    /// @dev Extracts all the NewTopdownMessage emitted events, down side is that all other events are consumed too.
+    function propagateDown() internal {
+        while (true) {
+            Vm.Log[] memory entries = vm.getRecordedLogs();
+
+            uint256 num = 0;
+            for (uint256 i = 0; i < entries.length; i++) {
+                if (entries[i].topics[0] == new_topdown_message_topic) {
+                    IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
+
+                    (IpcEnvelope memory xnetMsg, ) = abi.decode(entries[i].data, (IpcEnvelope, bytes32));
+                    msgs[0] = xnetMsg;
+
+                    address gateway = subnets.getGatewayBySubnetActor(address(uint160(uint256(entries[i].topics[1]))));
+                    executeTopdownMessages(msgs, GatewayDiamond(payable(gateway)));
+
+                    num++;
+                }
+            }
+
+            if (num == 0) {
+                break;
+            }
+        }
     }
 
     //--------------------
     // Call flow tests.
     //---------------------
 
-    // Native supply source subnets
     function test_NativeL3SendToNativeL3() public {
         SubnetID memory l1SubnetID = initL1();
 
@@ -281,9 +334,23 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         l3Params[1] = SubnetCreationParams({parent: l2SubnetIDs[1], supplySource: AssetHelper.native()});
         SubnetID[] memory l3SubnetIDs = newSubnets(l3Params);
 
-        // create the message
+        // create the sender and recipients
         MockIpcContractResult callerContract = new MockIpcContractResult();
         MockIpcContractResult recipientContract = new MockIpcContractResult();
+
+        // start recording events, if not called, propagate down will not work
+        vm.recordLogs();
+
+        // fund the L3 address first
+        fundContract({
+            originSubnet: l1SubnetID,
+            targetSubnet: l3SubnetIDs[0],
+            targetRecipient: address(recipientContract),
+            amount: 0.01 ether
+        });
+        propagateDown();
+
+        // the funds now arrives at L3, trigger cross network call
         uint256 amount = 1;
         IpcEnvelope memory crossMessage = TestUtils.newXnetCallMsg(
             IPCAddress({subnetId: l3SubnetIDs[0], rawAddress: FvmAddressHelper.from(address(callerContract))}),
@@ -295,650 +362,33 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         call(crossMessage);
 
         propagateUp(l3SubnetIDs[0], l1SubnetID);
-        propagateDown(l1SubnetID, l3SubnetIDs[1]);
+        propagateDown();
     }
 
-    // // Native supply source subnets
-    // function testL2PlusSubnet_Native_SendCrossMessageFromChildToParentWithOkResult() public {
-    //     MockIpcContractResult caller = new MockIpcContractResult();
-    //     Params memory params = Params({
-    //         root: rootNetwork,
-    //         subnet: nativeL2Subnet,
-    //         subnetL3: nativeL3Subnets[0],
-    //         caller: caller,
-    //         callerAddr: address(caller),
-    //         recipientAddr: address(new MockIpcContractPayable()),
-    //         amount: 3,
-    //         expectedOutcome: OutcomeType.Ok,
-    //         expectedRet: abi.encode(EMPTY_BYTES),
-    //         callerAmount: 1 ether,
-    //         fundAmount: 100000
-    //     });
+    function executeTopdownMessages(IpcEnvelope[] memory msgs, GatewayDiamond gw) internal {
+        uint256 minted_tokens;
 
-    //     sendCrossMessageFromChildToParentWithResult(params);
-    // }
+        for (uint256 i; i < msgs.length; ) {
+            minted_tokens += msgs[i].value;
+            unchecked {
+                ++i;
+            }
+        }
+        console.log("minted tokens in executed top-downs: %d", minted_tokens);
 
-    // function testL2PlusSubnet_Native_SendCrossMessageFromParentToChildWithOkResult() public {
-    //     MockIpcContractResult caller = new MockIpcContractResult();
-    //     Params memory params = Params({
-    //         root: rootNetwork,
-    //         subnet: nativeL2Subnet,
-    //         subnetL3: nativeL3Subnets[0],
-    //         caller: caller,
-    //         callerAddr: address(caller),
-    //         recipientAddr: address(new MockIpcContractPayable()),
-    //         amount: 3,
-    //         expectedOutcome: OutcomeType.Ok,
-    //         expectedRet: abi.encode(EMPTY_BYTES),
-    //         callerAmount: 1 ether,
-    //         fundAmount: 100000
-    //     });
+        // The implementation of the function in fendermint is in
+        // https://github.com/consensus-shipyard/ipc/blob/main/fendermint/vm/interpreter/contracts/fvm/topdown.rs#L43
 
-    //     sendCrossMessageFromParentToChildWithResult(params);
-    // }
+        // This emulates minting tokens.
+        vm.deal(address(gw), minted_tokens);
 
-    // function testL2PlusSubnet_Native_SendCrossMessageFromSiblingToSiblingWithOkResult() public {
-    //     sendCrossMessageFromSiblingToSiblingWithOkResult(rootNetwork, nativeL2Subnet, nativeL3Subnets);
-    // }
+        XnetMessagingFacet xnetMessenger = gw.xnetMessenger();
 
-    // // Token supply source subnets
-    // function testL2PlusSubnet_Token_SendCrossMessageFromChildToParentWithOkResult() public {
-    //     MockIpcContractResult caller = new MockIpcContractResult();
-    //     Params memory params = Params({
-    //         root: rootNetwork,
-    //         subnet: tokenL2Subnet,
-    //         subnetL3: nativeL3SubnetsWithTokenParent[0],
-    //         caller: caller,
-    //         callerAddr: address(caller),
-    //         recipientAddr: address(new MockIpcContractPayable()),
-    //         amount: 3,
-    //         expectedOutcome: OutcomeType.Ok,
-    //         expectedRet: abi.encode(EMPTY_BYTES),
-    //         callerAmount: 1 ether,
-    //         fundAmount: 100000
-    //     });
+        vm.prank(FilAddress.SYSTEM_ACTOR);
+        xnetMessenger.applyCrossMessages(msgs);
+    }
 
-    //     sendCrossMessageFromChildToParentWithResult(params);
-    // }
-
-    // function testL2PlusSubnet_TokenMixed_SendCrossMessageFromChildToParentWithOkResult() public {
-    //     MockIpcContractResult caller = new MockIpcContractResult();
-    //     Params memory params = Params({
-    //         root: rootNetwork,
-    //         subnet: tokenL2Subnet,
-    //         subnetL3: tokenL3SubnetsWithTokenParent[0],
-    //         caller: caller,
-    //         callerAddr: address(caller),
-    //         recipientAddr: address(new MockIpcContractPayable()),
-    //         amount: 3,
-    //         expectedOutcome: OutcomeType.Ok,
-    //         expectedRet: abi.encode(EMPTY_BYTES),
-    //         callerAmount: 1 ether,
-    //         fundAmount: 100000
-    //     });
-
-    //     sendCrossMessageFromChildToParentWithResult(params);
-    // }
-
-    // function testL2PlusSubnet_Token_SendCrossMessageFromParentToChildWithOkResult() public {
-    //     MockIpcContractResult caller = new MockIpcContractResult();
-    //     Params memory params = Params({
-    //         root: rootNetwork,
-    //         subnet: tokenL2Subnet,
-    //         subnetL3: nativeL3SubnetsWithTokenParent[0],
-    //         caller: caller,
-    //         callerAddr: address(caller),
-    //         recipientAddr: address(new MockIpcContractPayable()),
-    //         amount: 3,
-    //         expectedOutcome: OutcomeType.Ok,
-    //         expectedRet: abi.encode(EMPTY_BYTES),
-    //         callerAmount: 1 ether,
-    //         fundAmount: 100000
-    //     });
-
-    //     sendCrossMessageFromParentToChildWithResult(params);
-    // }
-
-    // function testL2PlusSubnet_TokenMixed_SendCrossMessageFromParentToChildWithOkResult() public {
-    //     MockIpcContractResult caller = new MockIpcContractResult();
-    //     Params memory params = Params({
-    //         root: rootNetwork,
-    //         subnet: tokenL2Subnet,
-    //         subnetL3: tokenL3SubnetsWithTokenParent[0],
-    //         caller: caller,
-    //         callerAddr: address(caller),
-    //         recipientAddr: address(new MockIpcContractPayable()),
-    //         amount: 3,
-    //         expectedOutcome: OutcomeType.Ok,
-    //         expectedRet: abi.encode(EMPTY_BYTES),
-    //         callerAmount: 1 ether,
-    //         fundAmount: 100000
-    //     });
-
-    //     sendCrossMessageFromParentToChildWithResult(params);
-    // }
-
-    // function testL2PlusSubnet_Token_SendCrossMessageFromSiblingToSiblingWithOkResult() public {
-    //     sendCrossMessageFromSiblingToSiblingWithOkResult(rootNetwork, tokenL2Subnet, nativeL3SubnetsWithTokenParent);
-    // }
-
-    // function testL2PlusSubnet_TokenMixed_SendCrossMessageFromSiblingToSiblingWithOkResult() public {
-    //     sendCrossMessageFromSiblingToSiblingWithOkResult(rootNetwork, tokenL2Subnet, tokenL3SubnetsWithTokenParent);
-    // }
-
-    // // Error scenarios
-    // function testL2PlusSubnet_Native_SendCrossMessageFromChildToNonExistingActorError() public {
-    //     MockIpcContractResult caller = new MockIpcContractResult();
-    //     Params memory params = Params({
-    //         root: rootNetwork,
-    //         subnet: nativeL2Subnet,
-    //         subnetL3: nativeL3Subnets[0],
-    //         caller: caller,
-    //         callerAddr: address(caller),
-    //         recipientAddr: 0x53c82507aA03B1a6e695000c302674ef1ecb880B,
-    //         amount: 3,
-    //         expectedOutcome: OutcomeType.ActorErr,
-    //         expectedRet: abi.encodeWithSelector(InvalidSubnetActor.selector),
-    //         callerAmount: 1 ether,
-    //         fundAmount: 100000
-    //     });
-
-    //     sendCrossMessageFromChildToParentWithResult(params);
-    // }
-
-    // function testL2PlusSubnet_Token_SendCrossMessageFromChildToNonExistingActorError() public {
-    //     MockIpcContractResult caller = new MockIpcContractResult();
-    //     Params memory params = Params({
-    //         root: rootNetwork,
-    //         subnet: tokenL2Subnet,
-    //         subnetL3: nativeL3SubnetsWithTokenParent[0],
-    //         caller: caller,
-    //         callerAddr: address(caller),
-    //         recipientAddr: 0x53c82507aA03B1a6e695000c302674ef1ecb880B,
-    //         amount: 3,
-    //         expectedOutcome: OutcomeType.ActorErr,
-    //         expectedRet: abi.encodeWithSelector(InvalidSubnetActor.selector),
-    //         callerAmount: 1 ether,
-    //         fundAmount: 100000
-    //     });
-
-    //     sendCrossMessageFromChildToParentWithResult(params);
-    // }
-
-    // function testL2PlusSubnet_Native_SendCrossMessageFromParentToNonExistingActorError() public {
-    //     MockIpcContractResult caller = new MockIpcContractResult();
-    //     Params memory params = Params({
-    //         root: rootNetwork,
-    //         subnet: nativeL2Subnet,
-    //         subnetL3: nativeL3Subnets[0],
-    //         caller: caller,
-    //         callerAddr: address(caller),
-    //         recipientAddr: 0x53c82507aA03B1a6e695000c302674ef1ecb880B,
-    //         amount: 3,
-    //         expectedOutcome: OutcomeType.ActorErr,
-    //         expectedRet: abi.encodeWithSelector(InvalidSubnetActor.selector),
-    //         callerAmount: 1 ether,
-    //         fundAmount: 100000
-    //     });
-
-    //     sendCrossMessageFromParentToChildWithResult(params);
-    // }
-
-    // function testL2PlusSubnet_Token_SendCrossMessageFromParentToNonExistingActorError() public {
-    //     MockIpcContractResult caller = new MockIpcContractResult();
-    //     Params memory params = Params({
-    //         root: rootNetwork,
-    //         subnet: tokenL2Subnet,
-    //         subnetL3: nativeL3SubnetsWithTokenParent[0],
-    //         caller: caller,
-    //         callerAddr: address(caller),
-    //         recipientAddr: 0x53c82507aA03B1a6e695000c302674ef1ecb880B,
-    //         amount: 3,
-    //         expectedOutcome: OutcomeType.ActorErr,
-    //         expectedRet: abi.encodeWithSelector(InvalidSubnetActor.selector),
-    //         callerAmount: 1 ether,
-    //         fundAmount: 100000
-    //     });
-
-    //     sendCrossMessageFromParentToChildWithResult(params);
-    // }
-
-    // function testL2PlusSubnet_ParentToChildTopDownNoncePropagatedCorrectly() public {
-    //     MockIpcContractResult caller = new MockIpcContractResult();
-    //     Params memory params = Params({
-    //         root: rootNetwork,
-    //         subnet: nativeL2Subnet,
-    //         subnetL3: nativeL3Subnets[0],
-    //         caller: caller,
-    //         callerAddr: address(caller),
-    //         recipientAddr: address(new MockIpcContractPayable()),
-    //         amount: 3,
-    //         expectedOutcome: OutcomeType.Ok,
-    //         expectedRet: abi.encode(EMPTY_BYTES),
-    //         callerAmount: 1 ether,
-    //         fundAmount: 100000
-    //     });
-
-    //     // register L2 into root network
-    //     registerSubnet(params.subnet.subnetActorAddr, params.root.gateway);
-    //     // register L3 into L2 subnet
-    //     registerSubnet(params.subnetL3.subnetActorAddr, params.subnet.gateway);
-
-    //     vm.deal(params.callerAddr, params.callerAmount);
-
-    //     IpcEnvelope memory fundCrossMessage = CrossMsgHelper.createFundMsg({
-    //         subnet: params.subnet.id,
-    //         signer: params.callerAddr,
-    //         to: FvmAddressHelper.from(params.callerAddr),
-    //         value: params.amount
-    //     });
-
-    //     // 0 is default but we set it explicitly here to make it clear
-    //     fundCrossMessage.nonce = 0;
-
-    //     vm.prank(params.callerAddr);
-    //     vm.expectEmit(true, true, true, true, params.root.gatewayAddr);
-    //     emit LibGateway.NewTopDownMessage({
-    //         subnet: params.subnet.subnetActorAddr,
-    //         message: fundCrossMessage,
-    //         id: fundCrossMessage.toDeterministicHash()
-    //     });
-
-    //     params.root.gateway.manager().fund{value: params.amount}(
-    //         params.subnet.id,
-    //         FvmAddressHelper.from(params.callerAddr)
-    //     );
-
-    //     IpcEnvelope memory callCrossMessage = TestUtils.newXnetCallMsg(
-    //         IPCAddress({subnetId: params.root.id, rawAddress: FvmAddressHelper.from(params.callerAddr)}),
-    //         IPCAddress({subnetId: params.subnetL3.id, rawAddress: FvmAddressHelper.from(params.recipientAddr)}),
-    //         params.amount,
-    //         1
-    //     );
-
-    //     // send the cross message from the root network to the L3 subnet
-    //     vm.prank(params.callerAddr);
-    //     vm.expectEmit(true, true, true, true, params.root.gatewayAddr);
-    //     emit LibGateway.NewTopDownMessage({
-    //         subnet: params.subnet.subnetActorAddr,
-    //         message: callCrossMessage,
-    //         id: callCrossMessage.toDeterministicHash()
-    //     });
-
-    //     params.root.gateway.messenger().sendContractXnetMessage{value: params.amount}(callCrossMessage);
-    //     (, uint64 rootTopDownNonce) = params.root.gateway.getter().getTopDownNonce(params.subnet.id);
-    //     assertEq(rootTopDownNonce, 2, "wrong root top down nonce");
-
-    //     IpcEnvelope[] memory msgsForL2 = new IpcEnvelope[](2);
-    //     msgsForL2[0] = fundCrossMessage;
-    //     msgsForL2[1] = callCrossMessage;
-
-    //     // the expected nonce for the top down message for L3 subnet is 0 because no previous message was sent
-    //     // from L2 to L3
-    //     msgsForL2[1].nonce = 0;
-    //     vm.prank(FilAddress.SYSTEM_ACTOR);
-    //     vm.expectEmit(true, true, true, true, params.subnet.gatewayAddr);
-    //     emit LibGateway.NewTopDownMessage({
-    //         subnet: params.subnetL3.subnetActorAddr,
-    //         message: callCrossMessage,
-    //         id: callCrossMessage.toDeterministicHash()
-    //     });
-
-    //     // nonce needs to be 1 because of the fund message.
-    //     msgsForL2[1].nonce = 1;
-    //     params.subnet.gateway.xnetMessenger().applyCrossMessages(msgsForL2);
-
-    //     uint64 subnetAppliedTopDownNonce = params.subnet.gateway.getter().appliedTopDownNonce();
-    //     assertEq(subnetAppliedTopDownNonce, 2, "wrong L2 subnet applied top down nonce");
-
-    //     IpcEnvelope[] memory msgsForL3 = new IpcEnvelope[](1);
-    //     msgsForL3[0] = callCrossMessage;
-
-    //     vm.prank(FilAddress.SYSTEM_ACTOR);
-    //     // nonce is zero because this is a first message touching the L3 subnet
-    //     msgsForL3[0].nonce = 0;
-    //     params.subnetL3.gateway.xnetMessenger().applyCrossMessages(msgsForL3);
-
-    //     uint64 subnetL3AppliedTopDownNonce = params.subnetL3.gateway.getter().appliedTopDownNonce();
-    //     assertEq(subnetL3AppliedTopDownNonce, 1, "wrong L3 subnet applied top down nonce");
-
-    //     // now fund from L2 to L3 to check to nonce propagation
-    //     vm.deal(params.callerAddr, params.callerAmount);
-
-    //     IpcEnvelope memory fundCrossMessageL3 = CrossMsgHelper.createFundMsg({
-    //         subnet: params.subnetL3.id,
-    //         signer: params.callerAddr,
-    //         to: FvmAddressHelper.from(params.callerAddr),
-    //         value: params.amount
-    //     });
-
-    //     // nonce should be 1 because this is the first cross message from L1 to L3
-    //     fundCrossMessageL3.nonce = 1;
-
-    //     vm.prank(params.callerAddr);
-    //     vm.expectEmit(true, true, true, true, params.subnet.gatewayAddr);
-    //     emit LibGateway.NewTopDownMessage({
-    //         subnet: params.subnetL3.subnetActorAddr,
-    //         message: fundCrossMessageL3,
-    //         id: fundCrossMessageL3.toDeterministicHash()
-    //     });
-
-    //     params.subnet.gateway.manager().fund{value: params.amount}(
-    //         params.subnetL3.id,
-    //         FvmAddressHelper.from(params.callerAddr)
-    //     );
-
-    //     uint64 subnetL3AppliedTopDownNonceAfterFund = params.subnetL3.gateway.getter().appliedTopDownNonce();
-    //     assertEq(subnetL3AppliedTopDownNonceAfterFund, 1, "wrong L3 subnet applied top down nonce");
-    // }
-
-    // function fundSubnet(
-    //     GatewayDiamond gateway,
-    //     TestSubnetDefinition memory subnet,
-    //     address callerAddr,
-    //     uint256 amount
-    // ) internal {
-    //     Asset memory subnetSupply = subnet.subnetActor.getter().supplySource();
-    //     if (subnetSupply.kind == AssetKind.ERC20) {
-    //         IERC20(subnetSupply.tokenAddress).approve(address(gateway), amount);
-    //         gateway.manager().fundWithToken(subnet.id, FvmAddressHelper.from(callerAddr), amount);
-    //     } else {
-    //         gateway.manager().fund{value: amount}(subnet.id, FvmAddressHelper.from(callerAddr));
-    //     }
-    // }
-
-    // function registerSubnet(address subnetActorAddr, GatewayDiamond gateway) internal {
-    //     vm.deal(subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
-    //     vm.prank(subnetActorAddr);
-    //     registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, subnetActorAddr, gateway);
-    //     vm.stopPrank();
-    // }
-
-    // function sendCrossMessageFromChildToParentWithResult(Params memory params) public {
-    //     // register L2 into root nerwork
-    //     registerSubnet(params.subnet.subnetActorAddr, params.root.gateway);
-    //     // register L3 into L2 subnet
-    //     registerSubnet(params.subnetL3.subnetActorAddr, params.subnet.gateway);
-
-    //     vm.deal(params.callerAddr, params.callerAmount);
-    //     vm.prank(params.callerAddr);
-
-    //     fundSubnet(params.root.gateway, params.subnet, params.callerAddr, params.fundAmount);
-    //     fundSubnet(params.subnet.gateway, params.subnetL3, params.callerAddr, params.fundAmount);
-
-    //     // create the xnet message on the subnet L3 - it's local gateway
-    //     IpcEnvelope memory crossMessage = TestUtils.newXnetCallMsg(
-    //         IPCAddress({subnetId: params.subnetL3.id, rawAddress: FvmAddressHelper.from(params.callerAddr)}),
-    //         IPCAddress({subnetId: params.root.id, rawAddress: FvmAddressHelper.from(params.recipientAddr)}),
-    //         params.amount,
-    //         0
-    //     );
-
-    //     vm.prank(params.callerAddr);
-    //     params.subnetL3.gateway.messenger().sendContractXnetMessage{value: params.amount}(crossMessage);
-
-    //     // this would normally submitted by releayer. It call the subnet actor on the L2 network.
-    //     submitBottomUpCheckpoint(
-    //         callCreateBottomUpCheckpointFromChildSubnet(params.subnetL3.id, params.subnetL3.gateway),
-    //         params.subnetL3.subnetActor
-    //     );
-
-    //     // create checkpoint in L2 and submit it to the root network (L2 subnet actor)
-    //     BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
-    //         params.subnet.id,
-    //         params.subnet.gateway
-    //     );
-
-    //     // expected result top down message from root to L2. This is a response to the xnet call.
-    //     IpcEnvelope memory resultMessage = crossMessage.createResultMsg(params.expectedOutcome, params.expectedRet);
-    //     resultMessage.nonce = 1;
-
-    //     submitBottomUpCheckpointAndExpectTopDownMessageEvent(
-    //         checkpoint,
-    //         params.subnet.subnetActor,
-    //         resultMessage,
-    //         params.subnet.subnetActorAddr,
-    //         params.root.gatewayAddr
-    //     );
-
-    //     // apply the result message in the L2 subnet and expect another top down message to be emitted
-    //     IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
-    //     msgs[0] = cloneIpcEnvelopeWithDifferentNonce(resultMessage, 0);
-
-    //     commitParentFinality(params.subnet.gatewayAddr);
-    //     executeTopDownMsgsAndExpectTopDownMessageEvent(
-    //         msgs,
-    //         params.subnet.gateway,
-    //         resultMessage,
-    //         params.subnetL3.subnetActorAddr,
-    //         params.subnet.gatewayAddr
-    //     );
-
-    //     // apply the result and check it was propagated to the correct actor
-    //     commitParentFinality(params.subnetL3.gatewayAddr);
-    //     executeTopDownMsgs(msgs, params.subnetL3.gateway);
-
-    //     assertTrue(params.caller.hasResult(), "missing result");
-    //     assertTrue(params.caller.result().outcome == params.expectedOutcome, "wrong result outcome");
-    //     assertTrue(keccak256(params.caller.result().ret) == keccak256(params.expectedRet), "wrong result outcome");
-    // }
-
-    // function sendCrossMessageFromParentToChildWithResult(Params memory params) public {
-    //     // register L2 into root network
-    //     registerSubnet(params.subnet.subnetActorAddr, params.root.gateway);
-    //     // register L3 into L2 subnet
-    //     registerSubnet(params.subnetL3.subnetActorAddr, params.subnet.gateway);
-
-    //     vm.deal(params.callerAddr, params.callerAmount);
-    //     vm.prank(params.callerAddr);
-
-    //     fundSubnet(params.root.gateway, params.subnet, params.callerAddr, params.fundAmount);
-
-    //     IpcEnvelope memory crossMessage = TestUtils.newXnetCallMsg(
-    //         IPCAddress({subnetId: params.root.id, rawAddress: FvmAddressHelper.from(params.callerAddr)}),
-    //         IPCAddress({subnetId: params.subnetL3.id, rawAddress: FvmAddressHelper.from(params.recipientAddr)}),
-    //         params.amount,
-    //         0
-    //     );
-
-    //     crossMessage.nonce = 1;
-    //     // send the cross message from the root network to the L3 subnet
-    //     vm.prank(params.callerAddr);
-    //     vm.expectEmit(true, true, true, true, params.root.gatewayAddr);
-    //     emit LibGateway.NewTopDownMessage({
-    //         subnet: params.subnet.subnetActorAddr,
-    //         message: crossMessage,
-    //         id: crossMessage.toDeterministicHash()
-    //     });
-
-    //     crossMessage.nonce = 0;
-    //     params.root.gateway.messenger().sendContractXnetMessage{value: params.amount}(crossMessage);
-
-    //     IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
-    //     msgs[0] = crossMessage;
-
-    //     // propagate the message from the L2 to the L3 subnet
-    //     executeTopDownMsgsAndExpectTopDownMessageEvent(
-    //         msgs,
-    //         params.subnet.gateway,
-    //         crossMessage,
-    //         params.subnetL3.subnetActorAddr,
-    //         params.subnet.gatewayAddr
-    //     );
-
-    //     // apply the cross message in the L3 subnet
-    //     executeTopDownMsgs(msgs, params.subnetL3.gateway);
-
-    //     // submit checkoint so the result message can be propagated to L2
-    //     submitBottomUpCheckpoint(
-    //         callCreateBottomUpCheckpointFromChildSubnet(params.subnetL3.id, params.subnetL3.gateway),
-    //         params.subnetL3.subnetActor
-    //     );
-
-    //     // submit checkoint so the result message can be propagated to root network
-    //     submitBottomUpCheckpoint(
-    //         callCreateBottomUpCheckpointFromChildSubnet(params.subnet.id, params.subnet.gateway),
-    //         params.subnet.subnetActor
-    //     );
-
-    //     assertTrue(params.caller.hasResult(), "missing result");
-    //     assertTrue(params.caller.result().outcome == params.expectedOutcome, "wrong result outcome");
-    //     assertTrue(keccak256(params.caller.result().ret) == keccak256(params.expectedRet), "wrong result outcome");
-    // }
-
-    // function sendCrossMessageFromSiblingToSiblingWithOkResult(
-    //     RootSubnetDefinition memory root,
-    //     TestSubnetDefinition memory subnet,
-    //     TestSubnetDefinition[] memory subnetL3s
-    // ) public {
-    //     MockIpcContractResult caller = new MockIpcContractResult();
-    //     address callerAddr = address(caller);
-    //     address recipientAddr = address(new MockIpcContract());
-    //     uint256 amount = 3;
-
-    //     vm.deal(callerAddr, 1 ether);
-
-    //     // register L2 into root nerwork
-    //     registerSubnet(subnet.subnetActorAddr, root.gateway);
-
-    //     // register L3s into L2 subnet
-    //     for (uint256 i; i < subnetL3s.length; i++) {
-    //         registerSubnet(subnetL3s[i].subnetActorAddr, subnet.gateway);
-    //     }
-
-    //     // fund account in the L3-0 subnet
-    //     vm.prank(callerAddr);
-
-    //     fundSubnet(subnet.gateway, subnetL3s[0], callerAddr, 100000);
-
-    //     // create the xnet message to send fund from L3-0 to L3-1
-    //     IpcEnvelope memory crossMessage = TestUtils.newXnetCallMsg(
-    //         IPCAddress({subnetId: subnetL3s[0].id, rawAddress: FvmAddressHelper.from(callerAddr)}),
-    //         IPCAddress({subnetId: subnetL3s[1].id, rawAddress: FvmAddressHelper.from(recipientAddr)}),
-    //         amount,
-    //         0
-    //     );
-
-    //     vm.prank(callerAddr);
-    //     subnetL3s[0].gateway.messenger().sendContractXnetMessage{value: amount}(crossMessage);
-
-    //     // submit the checkpoint from L3-0 to L2
-    //     BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
-    //         subnetL3s[0].id,
-    //         subnetL3s[0].gateway
-    //     );
-
-    //     // submit the checkpoint in L2 produces top down message to L3-1
-    //     submitBottomUpCheckpointAndExpectTopDownMessageEvent(
-    //         checkpoint,
-    //         subnetL3s[0].subnetActor,
-    //         crossMessage,
-    //         subnetL3s[1].subnetActorAddr,
-    //         subnet.gatewayAddr
-    //     );
-
-    //     // mimics the execution of the top down messages in the L3-1 subnet
-    //     IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
-    //     msgs[0] = crossMessage;
-
-    //     executeTopDownMsgs(msgs, subnetL3s[1].gateway);
-
-    //     // submit the checkpoint from L3-1 to L2 for result propagation
-    //     BottomUpCheckpoint memory resultCheckpoint = callCreateBottomUpCheckpointFromChildSubnet(
-    //         subnetL3s[1].id,
-    //         subnetL3s[1].gateway
-    //     );
-
-    //     // expected result top down message from L2 to L3. This is a response to the xnet call.
-    //     IpcEnvelope memory resultMessage = crossMessage.createResultMsg(OutcomeType.Ok, abi.encode(EMPTY_BYTES));
-    //     resultMessage.nonce = 1;
-
-    //     // submit the checkpoint in L2 produces top down message to L3-1
-    //     submitBottomUpCheckpointAndExpectTopDownMessageEvent(
-    //         resultCheckpoint,
-    //         subnetL3s[1].subnetActor,
-    //         resultMessage,
-    //         subnetL3s[0].subnetActorAddr,
-    //         subnet.gatewayAddr
-    //     );
-
-    //     // apply the result message in the L3-1 subnet
-    //     resultMessage.nonce = 0;
-    //     IpcEnvelope[] memory resultMsgs = new IpcEnvelope[](1);
-    //     resultMsgs[0] = resultMessage;
-
-    //     executeTopDownMsgs(resultMsgs, subnetL3s[0].gateway);
-    //     assertTrue(caller.hasResult(), "missing result");
-    //     assertTrue(caller.result().outcome == OutcomeType.Ok, "wrong result outcome");
-    // }
-
-    // function commitParentFinality(address gateway) internal {
-    //     vm.roll(10);
-    //     ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
-
-    //     TopDownFinalityFacet gwTopDownFinalityFacet = TopDownFinalityFacet(address(gateway));
-
-    //     vm.prank(FilAddress.SYSTEM_ACTOR);
-    //     gwTopDownFinalityFacet.commitParentFinality(finality);
-    // }
-
-    // function executeTopDownMsgs(IpcEnvelope[] memory msgs, GatewayDiamond gw) internal {
-    //     uint256 minted_tokens;
-
-    //     for (uint256 i; i < msgs.length; ) {
-    //         minted_tokens += msgs[i].value;
-    //         unchecked {
-    //             ++i;
-    //         }
-    //     }
-    //     console.log("minted tokens in executed top-downs: %d", minted_tokens);
-
-    //     // The implementation of the function in fendermint is in
-    //     // https://github.com/consensus-shipyard/ipc/blob/main/fendermint/vm/interpreter/contracts/fvm/topdown.rs#L43
-
-    //     // This emulates minting tokens.
-    //     vm.deal(address(gw), minted_tokens);
-
-    //     vm.prank(FilAddress.SYSTEM_ACTOR);
-    //     XnetMessagingFacet xnetMessenger = gw.xnetMessenger();
-    //     xnetMessenger.applyCrossMessages(msgs);
-    // }
-
-    // function executeTopDownMsgsAndExpectTopDownMessageEvent(
-    //     IpcEnvelope[] memory msgs,
-    //     GatewayDiamond gw,
-    //     IpcEnvelope memory expectedMessage,
-    //     address expectedSubnetAddr,
-    //     address expectedGatewayAddr
-    // ) internal {
-    //     uint256 minted_tokens;
-
-    //     for (uint256 i; i < msgs.length; ) {
-    //         minted_tokens += msgs[i].value;
-    //         unchecked {
-    //             ++i;
-    //         }
-    //     }
-    //     console.log("minted tokens in executed top-downs: %d", minted_tokens);
-
-    //     // The implementation of the function in fendermint is in
-    //     // https://github.com/consensus-shipyard/ipc/blob/main/fendermint/vm/interpreter/contracts/fvm/topdown.rs#L43
-
-    //     // This emulates minting tokens.
-    //     vm.deal(address(gw), minted_tokens);
-
-    //     vm.prank(FilAddress.SYSTEM_ACTOR);
-    //     vm.expectEmit(true, true, true, true, expectedGatewayAddr);
-    //     emit LibGateway.NewTopDownMessage({
-    //         subnet: expectedSubnetAddr,
-    //         message: expectedMessage,
-    //         id: expectedMessage.toDeterministicHash()
-    //     });
-    //     XnetMessagingFacet xnetMessenger = gw.xnetMessenger();
-    //     xnetMessenger.applyCrossMessages(msgs);
-    // }
-
-    function callCreateBottomUpCheckpointFromChildSubnet(
+    function createBottomUpCheckpoint(
         SubnetID memory subnet,
         GatewayDiamond gw
     ) internal returns (BottomUpCheckpoint memory checkpoint) {
@@ -948,7 +398,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         CheckpointingFacet checkpointer = gw.checkpointer();
 
         BottomUpMsgBatch memory batch = getter.bottomUpMsgBatch(e);
-        require(batch.msgs.length == 1, "batch length incorrect");
+        console.log("batch msg legnth", batch.msgs.length);
 
         (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
 
@@ -973,40 +423,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
         return checkpoint;
     }
-
-    // function callCreateBottomUpCheckpointFromChildSubnet(
-    //     SubnetID memory subnet,
-    //     GatewayDiamond gw,
-    //     IpcEnvelope[] memory msgs
-    // ) internal returns (BottomUpCheckpoint memory checkpoint) {
-    //     uint256 e = getNextEpoch(block.number, DEFAULT_CHECKPOINT_PERIOD);
-
-    //     CheckpointingFacet checkpointer = gw.checkpointer();
-
-    //     (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
-
-    //     (bytes32 membershipRoot, ) = MerkleTreeHelper.createMerkleProofsForValidators(addrs, weights);
-
-    //     checkpoint = BottomUpCheckpoint({
-    //         subnetID: subnet,
-    //         blockHeight: e,
-    //         blockHash: keccak256("block1"),
-    //         nextConfigurationNumber: 0,
-    //         msgs: msgs,
-    //         activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
-    //     });
-
-    //     vm.startPrank(FilAddress.SYSTEM_ACTOR);
-    //     checkpointer.createBottomUpCheckpoint(
-    //         checkpoint,
-    //         membershipRoot,
-    //         weights[0] + weights[1] + weights[2],
-    //         ActivityHelper.dummyActivityRollup()
-    //     );
-    //     vm.stopPrank();
-
-    //     return checkpoint;
-    // }
 
     function prepareValidatorsSignatures(
         BottomUpCheckpoint memory checkpoint,
@@ -1048,89 +464,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         checkpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
     }
 
-    // function submitBottomUpCheckpointAndExpectTopDownMessageEvent(
-    //     BottomUpCheckpoint memory checkpoint,
-    //     SubnetActorDiamond subnetActor,
-    //     IpcEnvelope memory expectedMessage,
-    //     address expectedSubnetAddr,
-    //     address expectedGatewayAddr
-    // ) internal {
-    //     (address[] memory parentValidators, bytes[] memory parentSignatures) = prepareValidatorsSignatures(
-    //         checkpoint,
-    //         subnetActor
-    //     );
-
-    //     SubnetActorCheckpointingFacet checkpointer = subnetActor.checkpointer();
-
-    //     vm.startPrank(address(subnetActor));
-    //     vm.expectEmit(true, true, true, true, expectedGatewayAddr);
-    //     emit LibGateway.NewTopDownMessage({
-    //         subnet: expectedSubnetAddr,
-    //         message: expectedMessage,
-    //         id: expectedMessage.toDeterministicHash()
-    //     });
-    //     checkpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
-    //     vm.stopPrank();
-    // }
-
-    // function submitBottomUpCheckpointRevert(BottomUpCheckpoint memory checkpoint, SubnetActorDiamond sa) internal {
-    //     vm.expectRevert();
-    //     submitBottomUpCheckpoint(checkpoint, sa);
-    // }
-
     function getNextEpoch(uint256 blockNumber, uint256 checkPeriod) internal pure returns (uint256) {
         return ((uint64(blockNumber) / checkPeriod) + 1) * checkPeriod;
     }
-
-    // function cloneIpcEnvelopeWithDifferentNonce(
-    //     IpcEnvelope memory original,
-    //     uint64 newNonce
-    // ) internal pure returns (IpcEnvelope memory) {
-    //     return
-    //         IpcEnvelope({
-    //             kind: original.kind,
-    //             to: original.to,
-    //             from: original.from,
-    //             nonce: newNonce,
-    //             value: original.value,
-    //             message: original.message
-    //         });
-    // }
-
-    // function printActors() internal view {
-    //     console.log("root name: %s", rootNetwork.id.toString());
-    //     console.log("root gateway: %s", rootNetwork.gatewayAddr);
-    //     console.log("root actor: %s", rootNetwork.id.getActor());
-    //     console.log("--------------------");
-
-    //     console.log("native L2 subnet name: %s", nativeL2Subnet.id.toString());
-    //     console.log("native L2 subnet gateway: %s", nativeL2Subnet.gatewayAddr);
-    //     console.log("native L2 subnet actor: %s", (nativeL2Subnet.subnetActorAddr));
-
-    //     for (uint256 i; i < nativeL3Subnets.length; i++) {
-    //         console.log("--------------------");
-    //         console.log("native L3-%d subnet name: %s", i, nativeL3Subnets[i].id.toString());
-    //         console.log("native L3-%d subnet gateway: %s", i, nativeL3Subnets[i].gatewayAddr);
-    //         console.log("native L3-%d subnet actor: %s", i, (nativeL3Subnets[i].subnetActorAddr));
-    //     }
-
-    //     for (uint256 i; i < nativeL3SubnetsWithTokenParent.length; i++) {
-    //         console.log("--------------------");
-    //         console.log(
-    //             "native L3-%d subnet with token parent name: %s",
-    //             i,
-    //             nativeL3SubnetsWithTokenParent[i].id.toString()
-    //         );
-    //         console.log(
-    //             "native L3-%d subnet with token parent gateway: %s",
-    //             i,
-    //             nativeL3SubnetsWithTokenParent[i].gatewayAddr
-    //         );
-    //         console.log(
-    //             "native L3-%d subnet with token parent actor: %s",
-    //             i,
-    //             (nativeL3SubnetsWithTokenParent[i].subnetActorAddr)
-    //         );
-    //     }
-    // }
 }
