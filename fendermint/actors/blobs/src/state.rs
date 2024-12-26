@@ -1266,7 +1266,7 @@ impl State {
                 }
             }
             Some(delegation) => {
-                if !(origin == delegation.origin)
+                if origin != delegation.origin
                     && origin != subscriber
                 {
                     return Err(ActorError::forbidden(format!(
@@ -2361,7 +2361,7 @@ mod tests {
         // Debit all accounts at an epoch between the two expiries (3601-3621)
         let debit_epoch = ChainEpoch::from(hoku_config.blob_min_ttl + 11);
         let deletes_from_disc = state
-            .debit_accounts(&hoku_config, &store, debit_epoch)
+            .debit_accounts(hoku_config, &store, debit_epoch)
             .unwrap();
         assert!(deletes_from_disc.is_empty());
 
@@ -2383,7 +2383,7 @@ mod tests {
         // Debit all accounts at an epoch greater than group expiry (3621)
         let debit_epoch = ChainEpoch::from(hoku_config.blob_min_ttl + 31);
         let deletes_from_disc = state
-            .debit_accounts(&hoku_config, &store, debit_epoch)
+            .debit_accounts(hoku_config, &store, debit_epoch)
             .unwrap();
         assert!(!deletes_from_disc.is_empty()); // blob is marked for deletion
 
@@ -3047,7 +3047,7 @@ mod tests {
         // Debit all accounts
         let debit_epoch = ChainEpoch::from(41);
         let deletes_from_disc = state
-            .debit_accounts(&hoku_config, &store, debit_epoch)
+            .debit_accounts(hoku_config, &store, debit_epoch)
             .unwrap();
         assert!(deletes_from_disc.is_empty());
 
@@ -4006,7 +4006,7 @@ mod tests {
         let add1_epoch = current_epoch;
         let (hash1, size1) = new_hash(1024);
         let res = state.add_blob(
-            &hoku_config,
+            hoku_config,
             &store,
             origin,
             caller,
