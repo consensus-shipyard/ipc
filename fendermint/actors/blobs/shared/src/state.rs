@@ -76,6 +76,7 @@ pub struct Account {
     /// the origin is Alice.
     /// An approval for Bob might be valid from only one contract caller, so long as
     /// the origin is Bob.
+
     pub approvals: HashMap<String, CreditApproval>,
     /// The maximum allowed TTL for actor's blobs.
     pub max_ttl: ChainEpoch,

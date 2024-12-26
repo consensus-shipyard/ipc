@@ -69,11 +69,15 @@ impl ExpiryKey {
 struct CreditDelegation<'a> {
     /// The address that is submitting the transaction to add this blob.
     pub origin: Address,
-    /// The address that is calling into the blob actor.
-    /// If the blob actor is accessed directly, this will be the same as "origin".
-    /// However, most of the time this will be the address of the actor instance that is
-    /// calling into the blobs actor, i.e., a specific Bucket or Timehub instance.
-    pub caller: Address,
+
+
+//    /// The address that is calling into the blob actor.
+//    /// If the blob actor is accessed directly, this will be the same as "origin".
+//    /// However, most of the time this will be the address of the actor instance that is
+//    /// calling into the blobs actor, i.e., a specific Bucket or Timehub instance.
+//    pub caller: Address,
+
+
     /// Information about the approval that allows "origin" to use credits via "caller".
     /// Note that the Address that has issued this approval (the subscriber/sponsor), and whose
     /// credits are being allowed to be used, are not stored internal to this struct.
@@ -81,17 +85,17 @@ struct CreditDelegation<'a> {
 }
 
 impl<'a> CreditDelegation<'a> {
-    pub fn new(origin: Address, caller: Address, approval: &'a mut CreditApproval) -> Self {
+    pub fn new(origin: Address, approval: &'a mut CreditApproval) -> Self {
         Self {
             origin,
-            caller,
             approval,
         }
     }
 
     /// Tuple of (Origin, Caller) addresses.
     pub fn addresses(&self) -> (Address, Address) {
-        (self.origin, self.caller)
+        // TODO: this was a tuple of (origin, caller), since caller is removed, what is this needed for?
+        (self.origin, self.origin)
     }
 }
 
@@ -184,7 +188,7 @@ impl State {
                         "approval from {} to {} not found",
                         sponsor, from
                     )))?;
-            Some(CreditDelegation::new(from, from, approval))
+            Some(CreditDelegation::new(from,  approval))
         } else {
             None
         };
@@ -564,7 +568,7 @@ impl State {
                     "approval from {} to {} via caller {} not found",
                     subscriber, origin, caller
                 )))?;
-            Some(CreditDelegation::new(origin, caller, approval))
+            Some(CreditDelegation::new(origin, approval))
         } else {
             None
         };
@@ -882,7 +886,7 @@ impl State {
                     "approval from {} to {} via caller {} not found",
                     subscriber, origin, caller
                 )))?;
-            Some(CreditDelegation::new(origin, caller, approval))
+            Some(CreditDelegation::new(origin,  approval))
         } else {
             None
         };
@@ -1116,7 +1120,7 @@ impl State {
                 .approvals
                 .get_mut(&origin.to_string())
                 .and_then(|approval| approval.is_caller_allowed(&caller).then_some(approval))
-                .map(|approval| CreditDelegation::new(origin, caller, approval))
+                .map(|approval| CreditDelegation::new(origin, approval))
         } else {
             None
         };
@@ -1234,7 +1238,7 @@ impl State {
                 .get_mut(&origin.to_string())
                 .and_then(|approval| approval.is_caller_allowed(&caller).then_some(approval));
             if let Some(approval) = approval {
-                Some(CreditDelegation::new(origin, caller, approval))
+                Some(CreditDelegation::new(origin, approval))
             } else {
                 // Approval may have been removed, or this is a call from the system actor,
                 // in which case the origin will be supplied as the subscriber
@@ -1262,19 +1266,19 @@ impl State {
                 }
             }
             Some(delegation) => {
-                if !(origin == delegation.origin && caller == delegation.caller)
+                if !(origin == delegation.origin)
                     && origin != subscriber
                 {
                     return Err(ActorError::forbidden(format!(
-                        "origin {} is not delegate origin {} or caller {} is not delegate caller {} or subscriber {} for blob {}",
-                        origin, delegation.origin, caller, delegation.caller, subscriber, hash
+                        "origin {} is not delegate origin {} or subscriber {} for blob {}",
+                        origin, delegation.origin, subscriber, hash
                     )));
                 }
                 if let Some(expiry) = delegation.approval.expiry {
                     if expiry <= current_epoch {
                         return Err(ActorError::forbidden(format!(
-                            "approval from {} to {} via caller {} expired",
-                            subscriber, delegation.origin, delegation.caller
+                            "approval from {} to {} expired",
+                            subscriber, delegation.origin
                         )));
                     }
                 }
@@ -1665,16 +1669,16 @@ fn ensure_delegated_credit(
             let unused = &(limit - &delegation.approval.credit_used);
             if unused < credit_required {
                 return Err(ActorError::insufficient_funds(format!(
-                    "approval from {} to {} via caller {} has insufficient credit (available: {}; required: {})",
-                    subscriber, delegation.origin, delegation.caller, unused, credit_required
+                    "approval from {} to {} has insufficient credit (available: {}; required: {})",
+                    subscriber, delegation.origin, unused, credit_required
                 )));
             }
         }
         if let Some(expiry) = delegation.approval.expiry {
             if expiry <= current_epoch {
                 return Err(ActorError::forbidden(format!(
-                    "approval from {} to {} via caller {} expired",
-                    subscriber, delegation.origin, delegation.caller
+                    "approval from {} to {} expired",
+                    subscriber, delegation.origin
                 )));
             }
         }
@@ -1693,16 +1697,16 @@ fn ensure_gas_limit(
             let unused = &(limit - &delegation.approval.gas_fee_used);
             if unused < gas_required {
                 return Err(ActorError::insufficient_funds(format!(
-                    "approval from {} to {} via caller {} has insufficient credit (available: {}; required: {})",
-                    subscriber, delegation.origin, delegation.caller, unused, gas_required
+                    "approval from {} to {} has insufficient credit (available: {}; required: {})",
+                    subscriber, delegation.origin, unused, gas_required
                 )));
             }
         }
         if let Some(expiry) = delegation.approval.expiry {
             if expiry <= current_epoch {
                 return Err(ActorError::forbidden(format!(
-                    "approval from {} to {} via caller {} expired",
-                    subscriber, delegation.origin, delegation.caller
+                    "approval from {} to {} expired",
+                    subscriber, delegation.origin
                 )));
             }
         }
