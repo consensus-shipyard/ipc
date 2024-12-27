@@ -93,9 +93,14 @@ impl<'a> CreditDelegation<'a> {
     }
 
     /// Tuple of (Origin, Caller) addresses.
-    pub fn addresses(&self) -> (Address, Address) {
-        // TODO: this was a tuple of (origin, caller), since caller is removed, what is this needed for?
-        (self.origin, self.origin)
+    pub fn addresses(&self, caller: &Address) -> (Address, Address) {
+        let clr = if self.approval.is_caller_allowed(caller) {
+            *caller
+        } else {
+            self.origin
+        };
+        // TODO: this was a tuple of (self.origin, self.caller), since self.caller is was, what is this needed for?
+        (self.origin, clr)
     }
 }
 
@@ -639,7 +644,7 @@ impl State {
                     sub.auto_renew = auto_renew;
                     // Overwrite source allows subscriber to retry resolving
                     sub.source = source;
-                    sub.delegate = delegation.as_ref().map(|d| d.addresses());
+                    sub.delegate = delegation.as_ref().map(|d| d.addresses(&caller));
                     sub.failed = false;
                     debug!(
                         "updated subscription to blob {} for {} (key: {})",
@@ -653,7 +658,7 @@ impl State {
                         expiry,
                         auto_renew,
                         source,
-                        delegate: delegation.as_ref().map(|d| d.addresses()),
+                        delegate: delegation.as_ref().map(|d| d.addresses(&caller)),
                         failed: false,
                     };
                     group
@@ -696,7 +701,7 @@ impl State {
                     expiry,
                     auto_renew,
                     source,
-                    delegate: delegation.as_ref().map(|d| d.addresses()),
+                    delegate: delegation.as_ref().map(|d| d.addresses(&caller)),
                     failed: false,
                 };
                 blob.subscribers.insert(
@@ -756,7 +761,7 @@ impl State {
                 expiry,
                 auto_renew,
                 source,
-                delegate: delegation.as_ref().map(|d| d.addresses()),
+                delegate: delegation.as_ref().map(|d| d.addresses(&caller)),
                 failed: false,
             };
             let blob = Blob {
@@ -886,7 +891,7 @@ impl State {
                     "approval from {} to {} via caller {} not found",
                     subscriber, origin, caller
                 )))?;
-            Some(CreditDelegation::new(origin,  approval))
+            Some(CreditDelegation::new(origin, approval))
         } else {
             None
         };
