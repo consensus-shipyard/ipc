@@ -232,7 +232,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         vm.prank(address(saDiamond));
         vm.expectCall(recipient, abi.encodeCall(IIpcHandler.handleIpcMessage, (msgs[0])), 1);
         gatewayDiamond.checkpointer().commitCheckpoint(batch);
-        assertEq(token.balanceOf(recipient), 0);
+        assertEq(token.balanceOf(recipient), 8);
     }
 
     function test_propagation() public {

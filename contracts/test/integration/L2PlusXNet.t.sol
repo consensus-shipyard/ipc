@@ -117,7 +117,10 @@ library LibSubnetsHierarchy {
         return child;
     }
 
-    function getGatewayBySubnetActor(SubnetsHierarchy storage self, address subnetActor) internal returns (address) {
+    function getGatewayBySubnetActor(
+        SubnetsHierarchy storage self,
+        address subnetActor
+    ) internal view returns (address) {
         bytes32 lookupId = self.actorToLookupKeys[subnetActor];
         return getSubnetGateway(self, lookupId);
     }
@@ -139,6 +142,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
     using GatewayFacetsHelper for GatewayDiamond;
     using SubnetActorFacetsHelper for SubnetActorDiamond;
     using AssetHelper for Asset;
+    using FvmAddressHelper for FvmAddress;
 
     using LibSubnetsHierarchy for SubnetsHierarchy;
 
@@ -154,6 +158,108 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
         // get some free money.
         vm.deal(address(this), 10 ether);
+    }
+
+    function executeTopdownMessages(IpcEnvelope[] memory msgs, GatewayDiamond gw) internal {
+        uint256 minted_tokens;
+
+        for (uint256 i; i < msgs.length; ) {
+            minted_tokens += msgs[i].value;
+            unchecked {
+                ++i;
+            }
+        }
+        console.log("minted tokens in executed top-downs: %d", minted_tokens);
+
+        // The implementation of the function in fendermint is in
+        // https://github.com/consensus-shipyard/ipc/blob/main/fendermint/vm/interpreter/contracts/fvm/topdown.rs#L43
+
+        // This emulates minting tokens.
+        vm.deal(address(gw), minted_tokens);
+
+        XnetMessagingFacet xnetMessenger = gw.xnetMessenger();
+
+        vm.prank(FilAddress.SYSTEM_ACTOR);
+        xnetMessenger.applyCrossMessages(msgs);
+    }
+
+    function createBottomUpCheckpoint(
+        SubnetID memory subnet,
+        GatewayDiamond gw
+    ) internal returns (BottomUpCheckpoint memory checkpoint) {
+        uint256 e = getNextEpoch(block.number, DEFAULT_CHECKPOINT_PERIOD);
+
+        GatewayGetterFacet getter = gw.getter();
+        CheckpointingFacet checkpointer = gw.checkpointer();
+
+        BottomUpMsgBatch memory batch = getter.bottomUpMsgBatch(e);
+
+        (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
+
+        (bytes32 membershipRoot, ) = MerkleTreeHelper.createMerkleProofsForValidators(addrs, weights);
+
+        checkpoint = BottomUpCheckpoint({
+            subnetID: subnet,
+            blockHeight: batch.blockHeight,
+            blockHash: keccak256("block1"),
+            nextConfigurationNumber: 0,
+            msgs: batch.msgs,
+            activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
+        });
+
+        vm.prank(FilAddress.SYSTEM_ACTOR);
+        checkpointer.createBottomUpCheckpoint(
+            checkpoint,
+            membershipRoot,
+            weights[0] + weights[1] + weights[2],
+            ActivityHelper.dummyActivityRollup()
+        );
+
+        return checkpoint;
+    }
+
+    function prepareValidatorsSignatures(
+        BottomUpCheckpoint memory checkpoint,
+        SubnetActorDiamond sa
+    ) internal returns (address[] memory, bytes[] memory) {
+        (uint256[] memory parentKeys, address[] memory parentValidators, ) = TestUtils.getThreeValidators(vm);
+        bytes[] memory parentPubKeys = new bytes[](3);
+        bytes[] memory parentSignatures = new bytes[](3);
+
+        SubnetActorManagerFacet manager = sa.manager();
+
+        for (uint256 i = 0; i < 3; i++) {
+            vm.deal(parentValidators[i], 10 gwei);
+            parentPubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(parentKeys[i]);
+            vm.prank(parentValidators[i]);
+            manager.join{value: 10}(parentPubKeys[i], 10);
+        }
+
+        bytes32 hash = keccak256(abi.encode(checkpoint));
+
+        for (uint256 i = 0; i < 3; i++) {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(parentKeys[i], hash);
+            parentSignatures[i] = abi.encodePacked(r, s, v);
+        }
+
+        return (parentValidators, parentSignatures);
+    }
+
+    function submitBottomUpCheckpoint(BottomUpCheckpoint memory checkpoint, SubnetActorDiamond sa) internal {
+        (address[] memory parentValidators, bytes[] memory parentSignatures) = prepareValidatorsSignatures(
+            checkpoint,
+            sa
+        );
+
+        SubnetActorCheckpointingFacet checkpointer = sa.checkpointer();
+
+        vm.deal(address(1), 1 ether);
+        vm.prank(address(1));
+        checkpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
+    }
+
+    function getNextEpoch(uint256 blockNumber, uint256 checkPeriod) internal pure returns (uint256) {
+        return ((uint64(blockNumber) / checkPeriod) + 1) * checkPeriod;
     }
 
     function createNativeSubnet(
@@ -206,6 +312,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
     function call(IpcEnvelope memory xnetMsg) internal {
         address gateway = subnets.getSubnetGateway(xnetMsg.from.subnetId);
+        vm.prank(xnetMsg.from.rawAddress.extractEvmAddress());
         IGateway(gateway).sendContractXnetMessage{value: xnetMsg.value}(xnetMsg);
     }
 
@@ -317,7 +424,46 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
     // Call flow tests.
     //---------------------
 
-    function test_NativeL3SendToNativeL3() public {
+    // testing Native L1 => ERC20 L2 => Native L3
+    function test_N1E2NN3_works() public {
+        SubnetID memory l1SubnetID = initL1();
+
+        address erc20 = address(new ERC20PresetFixedSupply("TestToken", "TT", 21_000_000 ether, address(this)));
+
+        // define L2s
+        SubnetCreationParams[] memory l2Params = new SubnetCreationParams[](1);
+        l2Params[0] = SubnetCreationParams({parent: l1SubnetID, supplySource: AssetHelper.erc20(erc20)});
+        SubnetID[] memory l2SubnetIDs = newSubnets(l2Params);
+
+        // define L3s
+        SubnetCreationParams[] memory l3Params = new SubnetCreationParams[](1);
+        l3Params[0] = SubnetCreationParams({parent: l2SubnetIDs[0], supplySource: AssetHelper.native()});
+        SubnetID[] memory l3SubnetIDs = newSubnets(l3Params);
+
+        // create the recipients
+        MockIpcContractResult recipientContract = new MockIpcContractResult();
+
+        // initial conditions
+        require(address(recipientContract).balance == 0);
+
+        // start recording events, if not called, propagate down will not work
+        vm.recordLogs();
+
+        // fund the L3 address first
+        fundContract({
+            originSubnet: l1SubnetID,
+            targetSubnet: l3SubnetIDs[0],
+            targetRecipient: address(recipientContract),
+            amount: 0.01 ether
+        });
+        propagateDown();
+
+        // post xnet message conditions
+        require(address(recipientContract).balance == 0.01 ether);
+    }
+
+    // testing Native L3 => ERC20 L2 => Native L1 => ERC20 L2' => Native L3'
+    function test_N3E2N1E2N3_works() public {
         SubnetID memory l1SubnetID = initL1();
 
         address erc20 = address(new ERC20PresetFixedSupply("TestToken", "TT", 21_000_000 ether, address(this)));
@@ -341,17 +487,22 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         // start recording events, if not called, propagate down will not work
         vm.recordLogs();
 
+        uint256 amount = 0.01 ether;
+
         // fund the L3 address first
         fundContract({
             originSubnet: l1SubnetID,
             targetSubnet: l3SubnetIDs[0],
-            targetRecipient: address(recipientContract),
-            amount: 0.01 ether
+            targetRecipient: address(callerContract),
+            amount: amount
         });
         propagateDown();
 
+        // initial conditions
+        require(address(callerContract).balance == amount, "sender initial balance should be 0.01 ether");
+        require(address(recipientContract).balance == 0, "recipient initial balance should be 0");
+
         // the funds now arrives at L3, trigger cross network call
-        uint256 amount = 1;
         IpcEnvelope memory crossMessage = TestUtils.newXnetCallMsg(
             IPCAddress({subnetId: l3SubnetIDs[0], rawAddress: FvmAddressHelper.from(address(callerContract))}),
             IPCAddress({subnetId: l3SubnetIDs[1], rawAddress: FvmAddressHelper.from(address(recipientContract))}),
@@ -363,108 +514,17 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
         propagateUp(l3SubnetIDs[0], l1SubnetID);
         propagateDown();
-    }
 
-    function executeTopdownMessages(IpcEnvelope[] memory msgs, GatewayDiamond gw) internal {
-        uint256 minted_tokens;
-
-        for (uint256 i; i < msgs.length; ) {
-            minted_tokens += msgs[i].value;
-            unchecked {
-                ++i;
-            }
-        }
-        console.log("minted tokens in executed top-downs: %d", minted_tokens);
-
-        // The implementation of the function in fendermint is in
-        // https://github.com/consensus-shipyard/ipc/blob/main/fendermint/vm/interpreter/contracts/fvm/topdown.rs#L43
-
-        // This emulates minting tokens.
-        vm.deal(address(gw), minted_tokens);
-
-        XnetMessagingFacet xnetMessenger = gw.xnetMessenger();
-
-        vm.prank(FilAddress.SYSTEM_ACTOR);
-        xnetMessenger.applyCrossMessages(msgs);
-    }
-
-    function createBottomUpCheckpoint(
-        SubnetID memory subnet,
-        GatewayDiamond gw
-    ) internal returns (BottomUpCheckpoint memory checkpoint) {
-        uint256 e = getNextEpoch(block.number, DEFAULT_CHECKPOINT_PERIOD);
-
-        GatewayGetterFacet getter = gw.getter();
-        CheckpointingFacet checkpointer = gw.checkpointer();
-
-        BottomUpMsgBatch memory batch = getter.bottomUpMsgBatch(e);
-        console.log("batch msg legnth", batch.msgs.length);
-
-        (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
-
-        (bytes32 membershipRoot, ) = MerkleTreeHelper.createMerkleProofsForValidators(addrs, weights);
-
-        checkpoint = BottomUpCheckpoint({
-            subnetID: subnet,
-            blockHeight: batch.blockHeight,
-            blockHash: keccak256("block1"),
-            nextConfigurationNumber: 0,
-            msgs: batch.msgs,
-            activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
-        });
-
-        vm.prank(FilAddress.SYSTEM_ACTOR);
-        checkpointer.createBottomUpCheckpoint(
-            checkpoint,
-            membershipRoot,
-            weights[0] + weights[1] + weights[2],
-            ActivityHelper.dummyActivityRollup()
+        // post xnet message conditions
+        require(address(callerContract).balance == 0, "sender final balance should be 0");
+        require(address(recipientContract).balance == amount, "recipient final balance should be 0.01 ether");
+        require(
+            address(subnets.getSubnetGateway(l3SubnetIDs[1])).balance == 0,
+            "L3 gateway final balance should be 0 ether"
         );
-
-        return checkpoint;
-    }
-
-    function prepareValidatorsSignatures(
-        BottomUpCheckpoint memory checkpoint,
-        SubnetActorDiamond sa
-    ) internal returns (address[] memory, bytes[] memory) {
-        (uint256[] memory parentKeys, address[] memory parentValidators, ) = TestUtils.getThreeValidators(vm);
-        bytes[] memory parentPubKeys = new bytes[](3);
-        bytes[] memory parentSignatures = new bytes[](3);
-
-        SubnetActorManagerFacet manager = sa.manager();
-
-        for (uint256 i = 0; i < 3; i++) {
-            vm.deal(parentValidators[i], 10 gwei);
-            parentPubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(parentKeys[i]);
-            vm.prank(parentValidators[i]);
-            manager.join{value: 10}(parentPubKeys[i], 10);
-        }
-
-        bytes32 hash = keccak256(abi.encode(checkpoint));
-
-        for (uint256 i = 0; i < 3; i++) {
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(parentKeys[i], hash);
-            parentSignatures[i] = abi.encodePacked(r, s, v);
-        }
-
-        return (parentValidators, parentSignatures);
-    }
-
-    function submitBottomUpCheckpoint(BottomUpCheckpoint memory checkpoint, SubnetActorDiamond sa) internal {
-        (address[] memory parentValidators, bytes[] memory parentSignatures) = prepareValidatorsSignatures(
-            checkpoint,
-            sa
+        require(
+            address(subnets.getSubnetGateway(l3SubnetIDs[0])).balance == 0,
+            "L3 gateway final balance should be 0 ether"
         );
-
-        SubnetActorCheckpointingFacet checkpointer = sa.checkpointer();
-
-        vm.deal(address(1), 1 ether);
-        vm.prank(address(1));
-        checkpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
-    }
-
-    function getNextEpoch(uint256 blockNumber, uint256 checkPeriod) internal pure returns (uint256) {
-        return ((uint64(blockNumber) / checkPeriod) + 1) * checkPeriod;
     }
 }

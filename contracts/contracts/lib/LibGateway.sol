@@ -466,7 +466,7 @@ library LibGateway {
             emit MessageStoredInPostbox({id: crossMsg.toDeterministicHash()});
             return;
         }
-    
+
         // execute the message and get the receipt.
         (bool success, bytes memory ret) = executeCrossMsg(crossMsg, supplySource);
         if (success) {
