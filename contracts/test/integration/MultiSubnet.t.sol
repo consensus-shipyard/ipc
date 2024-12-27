@@ -1150,17 +1150,15 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.deal(tokenSubnet.subnetActorAddr, DEFAULT_COLLATERAL_AMOUNT);
         vm.deal(caller, 1 ether);
 
-        uint256 balance = 100;
+        uint256 fundToSend = 10;
 
         // Fund an account in the subnet.
-        token.transfer(caller, balance);
+        token.transfer(caller, fundToSend);
         vm.prank(caller);
-        token.approve(rootSubnet.gatewayAddr, balance);
+        token.approve(rootSubnet.gatewayAddr, fundToSend);
 
         vm.prank(tokenSubnet.subnetActorAddr);
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, tokenSubnet.subnetActorAddr, rootSubnet.gateway);
-
-        uint256 fundToSend = 10;
 
         vm.prank(caller);
         rootSubnet.gateway.manager().fundWithToken(tokenSubnet.id, FvmAddressHelper.from(address(caller)), fundToSend);
@@ -1192,14 +1190,14 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         // but the caller is MockIpcContractRevert, which reverts whatever
         // call made to `handleIpcMessage`, we should make sure:
         // 1. The submission of checkpoint is never blocked
-        // 2. The fund is locked in the gateway as execution is rejected
         submitBottomUpCheckpoint(checkpoint, tokenSubnet.subnetActor);
 
+        // because error result xnet message should have refunded the token
+        require(token.balanceOf(caller) == amount, "caller fund should not be locked in gateway");
         require(
-            token.balanceOf(address(rootSubnet.gateway.manager())) == fundToSend,
-            "fund should still be locked in gateway"
+            token.balanceOf(address(rootSubnet.gateway.manager())) == fundToSend - amount,
+            "fund should not be locked in gateway"
         );
-        require(token.balanceOf(caller) == balance - fundToSend, "fund should still be locked in gateway");
     }
 
     function testMultiSubnet_Token_CallFromChildToParent() public {

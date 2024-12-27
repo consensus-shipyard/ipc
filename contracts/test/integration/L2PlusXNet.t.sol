@@ -34,6 +34,7 @@ import {ERC20PresetFixedSupply} from "../helpers/ERC20PresetFixedSupply.sol";
 import {ActivityHelper} from "../helpers/ActivityHelper.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {ISubnetActor} from "../../contracts/interfaces/ISubnetActor.sol";
+import {IPCMsgType} from "../../contracts/enums/IPCMsgType.sol";
 
 import "forge-std/console.sol";
 
@@ -311,9 +312,16 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
     }
 
     function call(IpcEnvelope memory xnetMsg) internal {
+        IPCMsgType msgType = xnetMsg.applyType(xnetMsg.from.subnetId);
+
         address gateway = subnets.getSubnetGateway(xnetMsg.from.subnetId);
         vm.prank(xnetMsg.from.rawAddress.extractEvmAddress());
-        IGateway(gateway).sendContractXnetMessage{value: xnetMsg.value}(xnetMsg);
+
+        if (msgType == IPCMsgType.BottomUp) {
+            IGateway(gateway).sendContractXnetMessage{value: xnetMsg.value}(xnetMsg);
+        } else {
+            IGateway(gateway).sendContractXnetMessage(xnetMsg);
+        }
     }
 
     function fundContract(
@@ -424,8 +432,51 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
     // Call flow tests.
     //---------------------
 
+    // testing Native L1 => ERC20 L2 => ERC20 L3, this supply source is not allowed
+    function test_N1E2E3_rejects() public {
+        SubnetID memory l1SubnetID = initL1();
+
+        address erc20_1 = address(new ERC20PresetFixedSupply("TestToken1", "TT", 21_000_000 ether, address(this)));
+        address erc20_2 = address(new ERC20PresetFixedSupply("TestToken2", "TT", 21_000_000 ether, address(this)));
+
+        // define L2s
+        SubnetCreationParams[] memory l2Params = new SubnetCreationParams[](1);
+        l2Params[0] = SubnetCreationParams({parent: l1SubnetID, supplySource: AssetHelper.erc20(erc20_1)});
+        SubnetID[] memory l2SubnetIDs = newSubnets(l2Params);
+
+        // define L3s
+        SubnetCreationParams[] memory l3Params = new SubnetCreationParams[](1);
+        l3Params[0] = SubnetCreationParams({parent: l2SubnetIDs[0], supplySource: AssetHelper.erc20(erc20_2)});
+        SubnetID[] memory l3SubnetIDs = newSubnets(l3Params);
+
+        // create the recipients
+        MockIpcContractResult recipientContract = new MockIpcContractResult();
+
+        // initial conditions
+        require(address(recipientContract).balance == 0);
+
+        // start recording events, if not called, propagate down will not work
+        vm.recordLogs();
+
+        uint256 originalBalance = IERC20(erc20_1).balanceOf(address(this));
+
+        // fund the L3 address should throw an error
+        fundContract({
+            originSubnet: l1SubnetID,
+            targetSubnet: l3SubnetIDs[0],
+            targetRecipient: address(recipientContract),
+            amount: 0.01 ether
+        });
+        propagateDown();
+        propagateUp(l2SubnetIDs[0], l1SubnetID);
+
+        // post xnet message conditions
+        uint256 postBalance = IERC20(erc20_1).balanceOf(address(this));
+        require(postBalance == originalBalance, "balance should not have changed");
+    }
+
     // testing Native L1 => ERC20 L2 => Native L3
-    function test_N1E2NN3_works() public {
+    function test_N1E2N3_works() public {
         SubnetID memory l1SubnetID = initL1();
 
         address erc20 = address(new ERC20PresetFixedSupply("TestToken", "TT", 21_000_000 ether, address(this)));

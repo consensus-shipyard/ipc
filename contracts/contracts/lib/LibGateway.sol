@@ -253,9 +253,7 @@ library LibGateway {
 
         crossMessage.nonce = topDownNonce;
         subnet.topDownNonce = topDownNonce + 1;
-        if (crossMessage.kind != IpcMsgKind.Call) {
-            subnet.circSupply += crossMessage.value;
-        }
+        subnet.circSupply += crossMessage.value;
 
         emit NewTopDownMessage({subnet: subnet.id.getAddress(), message: crossMessage, id: crossMessage.toDeterministicHash()});
     }

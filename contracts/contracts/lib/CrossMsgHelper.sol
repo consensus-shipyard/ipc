@@ -181,9 +181,11 @@ library CrossMsgHelper {
         }
 
         address recipient = crossMsg.to.rawAddress.extractEvmAddress().normalize();
-        if (crossMsg.kind == IpcMsgKind.Transfer) {
+        // If the cross msg kind is Result, create result message should have handled the value correctly.
+        // If the execution is ok, value should be 0, else one should perform refund.
+        if (crossMsg.kind == IpcMsgKind.Transfer || crossMsg.kind == IpcMsgKind.Result) {
             return supplySource.transferFunds({recipient: payable(recipient), value: crossMsg.value});
-        } else if (crossMsg.kind == IpcMsgKind.Call || crossMsg.kind == IpcMsgKind.Result) {
+        } else if (crossMsg.kind == IpcMsgKind.Call) {
             // send the envelope directly to the entrypoint
             // use supplySource so the tokens in the message are handled successfully
             // and by the right supply source
