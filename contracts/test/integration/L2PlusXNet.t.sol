@@ -459,20 +459,26 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         vm.recordLogs();
 
         uint256 originalBalance = IERC20(erc20_1).balanceOf(address(this));
+        uint256 amount = 0.01 ether;
 
-        // fund the L3 address should throw an error
+        // fund the L3 address should throw an error and triggers an result xnet message
         fundContract({
             originSubnet: l1SubnetID,
             targetSubnet: l3SubnetIDs[0],
             targetRecipient: address(recipientContract),
-            amount: 0.01 ether
+            amount: amount
         });
         propagateDown();
+
+        // funds should now be locked
+        require(IERC20(erc20_1).balanceOf(address(this)) == originalBalance - amount, "balance should have droppped");
+
+        // relayer carries the bottom up checkpoint
         propagateUp(l2SubnetIDs[0], l1SubnetID);
 
         // post xnet message conditions
         uint256 postBalance = IERC20(erc20_1).balanceOf(address(this));
-        require(postBalance == originalBalance, "balance should not have changed");
+        require(postBalance == originalBalance, "token should be refunded");
     }
 
     // testing Native L1 => ERC20 L2 => Native L3
