@@ -581,7 +581,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             id: crossMessage.toDeterministicHash()
         });
 
-        console.log("here");
         crossMessage.nonce = 0;
         if (subnetSupply.kind == AssetKind.ERC20) {
             params.root.gateway.messenger().sendContractXnetMessage(crossMessage);
@@ -589,7 +588,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             params.root.gateway.messenger().sendContractXnetMessage{value: params.amount}(crossMessage);
         }
 
-        console.log("here2");
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = crossMessage;
 
@@ -601,22 +599,18 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             params.subnetL3.subnetActorAddr,
             params.subnet.gatewayAddr
         );
-        console.log("here3");
         // apply the cross message in the L3 subnet
         executeTopDownMsgs(msgs, params.subnetL3.gateway);
-        console.log("here4");
         // submit checkoint so the result message can be propagated to L2
         submitBottomUpCheckpoint(
             callCreateBottomUpCheckpointFromChildSubnet(params.subnetL3.id, params.subnetL3.gateway),
             params.subnetL3.subnetActor
         );
-        console.log("here5");
         // submit checkoint so the result message can be propagated to root network
         submitBottomUpCheckpoint(
             callCreateBottomUpCheckpointFromChildSubnet(params.subnet.id, params.subnet.gateway),
             params.subnet.subnetActor
         );
-        console.log("here6");
         assertTrue(params.caller.hasResult(), "missing result");
         assertTrue(params.caller.result().outcome == params.expectedOutcome, "wrong result outcome");
         assertTrue(keccak256(params.caller.result().ret) == keccak256(params.expectedRet), "wrong result outcome");
