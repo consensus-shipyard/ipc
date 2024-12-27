@@ -35,6 +35,7 @@ import {ActivityHelper} from "../helpers/ActivityHelper.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {ISubnetActor} from "../../contracts/interfaces/ISubnetActor.sol";
 import {IPCMsgType} from "../../contracts/enums/IPCMsgType.sol";
+import {IIpcHandler} from "../../sdk/interfaces/IIpcHandler.sol";
 
 import "forge-std/console.sol";
 
@@ -137,7 +138,7 @@ interface IGateway {
     function fundWithToken(SubnetID calldata subnetId, FvmAddress calldata to, uint256 amount) external;
 }
 
-contract L2PlusSubnetTest is Test, IntegrationTestBase {
+contract L2PlusSubnetTest is Test, IntegrationTestBase, IIpcHandler {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
     using GatewayFacetsHelper for GatewayDiamond;
@@ -160,6 +161,17 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         // get some free money.
         vm.deal(address(this), 10 ether);
     }
+
+    // ======= implements ipc handler =======
+
+    /* solhint-disable-next-line unused-vars */
+    function handleIpcMessage(IpcEnvelope calldata envelope) external payable returns (bytes memory ret) {
+        ret = bytes("");
+    }
+
+    receive() external payable {}
+
+    // ======= internal util methods ========
 
     function executeTopdownMessages(IpcEnvelope[] memory msgs, GatewayDiamond gw) internal {
         uint256 minted_tokens;

@@ -181,11 +181,13 @@ library CrossMsgHelper {
         }
 
         address recipient = crossMsg.to.rawAddress.extractEvmAddress().normalize();
-        // If the cross msg kind is Result, create result message should have handled the value correctly.
-        // If the execution is ok, value should be 0, else one should perform refund.
-        if (crossMsg.kind == IpcMsgKind.Transfer || crossMsg.kind == IpcMsgKind.Result) {
+        if (crossMsg.kind == IpcMsgKind.Transfer) {
             return supplySource.transferFunds({recipient: payable(recipient), value: crossMsg.value});
-        } else if (crossMsg.kind == IpcMsgKind.Call) {
+        } else if (crossMsg.kind == IpcMsgKind.Call || crossMsg.kind == IpcMsgKind.Result) {
+            // For a Result message, the idea is to perform a call as this returns control back to the caller.
+            // If it's an account, there will be no code to invoke, so this will be have like a bare transfer.
+            // But if the original caller was a contract, this give it control so it can handle the result
+
             // send the envelope directly to the entrypoint
             // use supplySource so the tokens in the message are handled successfully
             // and by the right supply source
