@@ -49,10 +49,6 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
             revert InvalidXnetMessage(InvalidXnetMessageReason.Sender);
         }
 
-        if (msg.value != envelope.value) {
-            revert InvalidXnetMessage(InvalidXnetMessageReason.Value);
-        }
-
         // Will revert if the message won't deserialize into a CallMsg.
         abi.decode(envelope.message, (CallMsg));
 
