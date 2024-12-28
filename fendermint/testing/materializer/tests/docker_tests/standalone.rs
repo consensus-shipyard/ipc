@@ -11,10 +11,9 @@ use ethers::{
     signers::{Signer, Wallet},
     types::{transaction::eip2718::TypedTransaction, Eip1559TransactionRequest, H160},
 };
-use fendermint_materializer::{manifest::Rootnet, materials::DefaultAccount, HasEthApi};
+use fendermint_materializer::{concurrency, manifest::Rootnet, materials::DefaultAccount, HasEthApi};
 use futures::FutureExt;
-
-use crate::with_testnet;
+use crate::{with_testnet};
 
 const MANIFEST: &str = "standalone.yaml";
 
@@ -46,30 +45,31 @@ where
 async fn test_sent_tx_found_in_mempool() {
     with_testnet(
         MANIFEST,
+        Some(concurrency::Config::with_parallelism_level(3)),
         |manifest| {
             // Slow down consensus to where we can see the effect of the transaction not being found by Ethereum hash.
             if let Rootnet::New { ref mut env, .. } = manifest.rootnet {
                 env.insert("CMT_CONSENSUS_TIMEOUT_COMMIT".into(), "10s".into());
             };
         },
-        |_, _, testnet| {
-            let test = async {
-                let bob = testnet.account("bob")?;
-                let charlie = testnet.account("charlie")?;
-
+        |_, _, testnet, test_id| {
+            let sender = testnet.account_mod_nth(test_id);
+            let recipient = testnet.account_mod_nth(test_id + 1);
+            let test = async move {
+                println!("running (test_id={})", test_id);
                 let pangea = testnet.node(&testnet.root().node("pangea"))?;
                 let provider = pangea
                     .ethapi_http_provider()?
                     .expect("ethapi should be enabled");
 
-                let middleware = make_middleware(provider, bob)
+                let middleware = make_middleware(provider, sender)
                     .await
                     .context("failed to set up middleware")?;
 
-                eprintln!("middleware ready, pending tests");
+                println!("middleware ready, pending tests (test_id={})", test_id);
 
                 // Create the simplest transaction possible: send tokens between accounts.
-                let to: H160 = charlie.eth_addr().into();
+                let to: H160 = recipient.eth_addr().into();
                 let transfer = Eip1559TransactionRequest::new().to(to).value(1);
 
                 let pending: PendingTransaction<_> = middleware
@@ -79,7 +79,7 @@ async fn test_sent_tx_found_in_mempool() {
 
                 let tx_hash = pending.tx_hash();
 
-                eprintln!("sent pending txn {:?}", tx_hash);
+                println!("sent pending txn {:?} (test_id={})", tx_hash, test_id);
 
                 // We expect that the transaction is pending, however it should not return an error.
                 match middleware.get_transaction(tx_hash).await {
@@ -111,8 +111,9 @@ async fn test_out_of_order_mempool() {
 
     with_testnet(
         MANIFEST,
+        None,
         |_| {},
-        |_, _, testnet| {
+        |_, _, testnet, _| {
             let test = async {
                 let bob = testnet.account("bob")?;
                 let charlie = testnet.account("charlie")?;

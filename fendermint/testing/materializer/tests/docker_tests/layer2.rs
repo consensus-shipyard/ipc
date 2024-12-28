@@ -27,6 +27,7 @@ const MAX_RETRIES: u32 = 5;
 async fn test_topdown_and_bottomup() {
     with_testnet(
         MANIFEST,
+        None,
         |manifest| {
             // Try to make sure the bottom-up checkpoint period is quick enough for reasonable test runtime.
             let subnet = manifest
@@ -36,7 +37,7 @@ async fn test_topdown_and_bottomup() {
 
             subnet.bottom_up_checkpoint.period = CHECKPOINT_PERIOD;
         },
-        |_, _, testnet| {
+        |_, _, testnet, _| {
             let test = async {
                 let brussels = testnet.node(&testnet.root().node("brussels"))?;
                 let london = testnet.node(&testnet.root().subnet("england").node("london"))?;
