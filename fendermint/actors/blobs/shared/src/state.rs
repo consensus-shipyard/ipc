@@ -76,7 +76,6 @@ pub struct Account {
     /// the origin is Alice.
     /// An approval for Bob might be valid from only one contract caller, so long as
     /// the origin is Bob.
-
     pub approvals: HashMap<String, CreditApproval>,
     /// The maximum allowed TTL for actor's blobs.
     pub max_ttl: ChainEpoch,
@@ -107,35 +106,6 @@ pub struct CreditApproval {
     pub credit_used: Credit,
     /// Used to track gas fees paid for by the delegation
     pub gas_fee_used: TokenAmount,
-    /// Optional caller allowlist.
-    /// If not present, any caller is allowed.
-    pub caller_allowlist: Option<HashSet<Address>>,
-}
-
-impl CreditApproval {
-    pub fn remove_caller(&mut self, caller: &Address) -> bool {
-        if let Some(allowlist) = self.caller_allowlist.as_mut() {
-            allowlist.remove(caller)
-        } else {
-            false
-        }
-    }
-
-    pub fn has_allowlist(&self) -> bool {
-        if let Some(allowlist) = self.caller_allowlist.as_ref() {
-            !allowlist.is_empty()
-        } else {
-            false
-        }
-    }
-
-    pub fn is_caller_allowed(&self, caller: &Address) -> bool {
-        if let Some(allowlist) = self.caller_allowlist.as_ref() {
-            allowlist.contains(caller)
-        } else {
-            true
-        }
-    }
 }
 
 /// Gas allowance for an account.
@@ -248,8 +218,8 @@ pub struct Subscription {
     /// This might be unique to each instance of the same blob.
     /// It's included here for record keeping.
     pub source: PublicKey,
-    /// The delegate origin and caller that may have created the subscription via a credit approval.
-    pub delegate: Option<(Address, Address)>,
+    /// The delegate origin that may have created the subscription via a credit approval.
+    pub delegate: Option<Address>,
     /// Whether the subscription failed due to an issue resolving the target blob.
     pub failed: bool,
 }

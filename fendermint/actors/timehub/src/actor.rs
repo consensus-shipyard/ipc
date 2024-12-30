@@ -36,8 +36,7 @@ impl Actor {
         let actor_address = state.address.get()?;
         if origin != owner {
             let approved = get_credit_approval(rt, owner, origin)?
-                .map(|approval| approval.is_caller_allowed(&actor_address))
-                .unwrap_or_default();
+                .is_some();
             if !approved {
                 return Err(actor_error!(
                     forbidden;
