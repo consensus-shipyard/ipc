@@ -38,7 +38,7 @@ async fn test_topdown_and_bottomup() {
             subnet.bottom_up_checkpoint.period = CHECKPOINT_PERIOD;
         },
         |_, _, testnet, _| {
-            let test = async {
+            let test = async move {
                 let brussels = testnet.node(&testnet.root().node("brussels"))?;
                 let london = testnet.node(&testnet.root().subnet("england").node("london"))?;
                 let england = testnet.subnet(&testnet.root().subnet("england"))?;
@@ -142,7 +142,7 @@ async fn test_topdown_and_bottomup() {
                 Ok(())
             };
 
-            test.boxed_local()
+            test.boxed()
         },
     )
     .await

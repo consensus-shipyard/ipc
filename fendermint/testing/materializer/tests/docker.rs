@@ -6,6 +6,18 @@
 //!
 //! `cargo test -p fendermint_materializer --test docker -- --nocapture`
 
+use anyhow::{anyhow, Context};
+use ethers::providers::Middleware;
+use fendermint_materializer::{
+    concurrency,
+    docker::{DockerMaterializer, DockerMaterials},
+    manifest::Manifest,
+    testnet::Testnet,
+    HasCometBftApi, HasEthApi, TestnetName,
+};
+use futures::{Future, FutureExt};
+use lazy_static::lazy_static;
+use std::sync::Arc;
 use std::{
     collections::BTreeSet,
     env::current_dir,
@@ -13,12 +25,6 @@ use std::{
     pin::Pin,
     time::{Duration, Instant},
 };
-
-use anyhow::{anyhow, Context};
-use ethers::providers::Middleware;
-use fendermint_materializer::{concurrency, docker::{DockerMaterializer, DockerMaterials}, manifest::Manifest, testnet::Testnet, HasCometBftApi, HasEthApi, TestnetName};
-use futures::{future, Future};
-use lazy_static::lazy_static;
 use tendermint_rpc::Client;
 
 pub type DockerTestnet = Testnet<DockerMaterials, DockerMaterializer>;
@@ -54,15 +60,22 @@ fn read_manifest(file_name: &str) -> anyhow::Result<Manifest> {
 
 /// Parse a manifest file in the `manifests` directory, clean up any corresponding
 /// testnet resources, then materialize a testnet and run some tests.
-pub async fn with_testnet<F, G>(manifest_file_name: &str, concurrency: Option<concurrency::Config>, alter: G, test: F) -> anyhow::Result<()>
+pub async fn with_testnet<F, G>(
+    manifest_file_name: &str,
+    concurrency: Option<concurrency::Config>,
+    alter: G,
+    test: F,
+) -> anyhow::Result<()>
 where
-// https://users.rust-lang.org/t/function-that-takes-a-closure-with-mutable-reference-that-returns-a-future/54324
     F: for<'a> Fn(
-        &Manifest,
-        &DockerMaterializer,
-        &'a DockerTestnet,
-        usize
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a>>,
+            Arc<Manifest>,
+            Arc<DockerMaterializer>,
+            Arc<DockerTestnet>,
+            usize,
+        ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send>>
+        + Copy
+        + Send
+        + 'static,
     G: FnOnce(&mut Manifest),
 {
     let testnet_name = TestnetName::new(
@@ -100,31 +113,42 @@ where
 
     let started = wait_for_startup(&testnet).await?;
 
+    let testnet = Arc::new(testnet);
+    let materializer = Arc::new(materializer);
+    let manifest = Arc::new(manifest);
     let res = if started {
         match concurrency {
-            None => test(&manifest, &materializer, &testnet, 0).await,
+            None => test(manifest.clone(), materializer.clone(), testnet.clone(), 0).await,
             Some(cfg) => {
-                let mut futures = Vec::new();
-                let mut test_ids = Vec::new();
-                for i in 0..cfg.parallelism_level {
-                    let test_id = i;
-                    let task = test(&manifest, &materializer, &testnet, test_id);
-                    futures.push(task);
-                    test_ids.push(test_id);
-                }
+                let test_generator = {
+                    let testnet = testnet.clone();
+                    let materializer = materializer.clone();
+                    move |test_id| {
+                        let manifest = manifest.clone();
+                        let materializer = materializer.clone();
+                        let testnet = testnet.clone();
+                        async move { test(manifest, materializer, testnet, test_id).await }.boxed()
+                    }
+                };
 
-                let results: Vec<Result<(), anyhow::Error>> = future::join_all(futures).await;
+                let (summary, results) = concurrency::execute(cfg, test_generator).await;
                 let mut err = None;
-                for (i, result) in results.into_iter().enumerate() {
-                    let test_id = test_ids[i];
-                    match result {
-                        Ok(_) => println!("test completed successfully (test_id={})", test_id),
-                        Err(e) => {
-                            println!("test failed: {} (test_id={})", e, test_id);
+                for res in results.into_iter() {
+                    match res.err {
+                        None => println!(
+                            "test completed successfully (test_id={}, duration={:?})",
+                            res.test_id, res.duration
+                        ),
+                        Some(e) => {
+                            println!(
+                                "test failed (test_id={}, duration={:?})",
+                                res.test_id, res.duration
+                            );
                             err = Some(e);
-                        },
+                        }
                     }
                 }
+                println!("{:?}", summary);
                 err.map_or(Ok(()), Err)
             }
         }
@@ -158,7 +182,7 @@ where
     // otherwise the system shuts down too quick, but
     // at least we can inspect the containers.
     // If they don't all get dropped, `docker system prune` helps.
-    let drop_handle = materializer.take_dropper();
+    let drop_handle = Arc::try_unwrap(materializer).unwrap().take_dropper();
     let _ = tokio::time::timeout(*TEARDOWN_TIMEOUT, drop_handle).await;
 
     res

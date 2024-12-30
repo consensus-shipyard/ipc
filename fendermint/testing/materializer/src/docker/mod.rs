@@ -160,6 +160,7 @@ pub struct DockerMaterializerState {
     port_ranges: BTreeMap<NodeName, DockerPortRange>,
 }
 
+#[derive(Debug)]
 pub struct DockerMaterializer {
     dir: PathBuf,
     rng: StdRng,

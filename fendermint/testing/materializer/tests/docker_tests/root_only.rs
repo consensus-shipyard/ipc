@@ -19,7 +19,7 @@ async fn test_full_node_sync() {
         None,
         |_| {},
         |_, _, testnet, _| {
-            let test = async {
+            let test = async move {
                 // Allow a little bit of time for node-2 to catch up with node-1.
                 tokio::time::sleep(Duration::from_secs(5)).await;
                 // Check that node2 is following node1.
@@ -39,7 +39,7 @@ async fn test_full_node_sync() {
                 Ok(())
             };
 
-            test.boxed_local()
+            test.boxed()
         },
     )
     .await
