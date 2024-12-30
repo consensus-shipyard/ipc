@@ -4,10 +4,12 @@
 use crate::sync::TopDownSyncEvent;
 use crate::vote::operation::active::ActiveOperationMode;
 use crate::vote::operation::{
-    OperationMetrics, OperationModeHandler, OperationStateMachine, ACTIVE,
+    OperationMetrics, OperationMode, OperationModeHandler, OperationStateMachine,
 };
 use crate::vote::VotingHandler;
+use async_trait::async_trait;
 use std::fmt::{Display, Formatter};
+use tokio::select;
 
 /// The paused operation mode handler.
 ///
@@ -27,29 +29,35 @@ impl Display for PausedOperationMode {
     }
 }
 
-impl OperationModeHandler for PausedOperationMode {
-    fn advance(mut self) -> OperationStateMachine {
-        let n = self.handler.process_external_request(&self.metrics);
-        tracing::debug!(
-            num = n,
-            status = self.to_string(),
-            "handled external requests"
-        );
-
-        if let Some(v) = self.handler.poll_internal_event() {
-            // top down is still syncing, not doing anything for now
-            if matches!(v, TopDownSyncEvent::NodeSyncing) {
-                return OperationStateMachine::Paused(self);
-            }
-
-            // handle the polled event
-            self.handler.handle_event(v);
-        }
-
-        self.metrics.mode_changed(ACTIVE);
+impl PausedOperationMode {
+    fn into_active(mut self) -> OperationStateMachine {
+        self.metrics.mode_changed(OperationMode::Active);
         OperationStateMachine::Active(ActiveOperationMode {
             metrics: self.metrics,
             handler: self.handler,
         })
+    }
+}
+
+#[async_trait]
+impl OperationModeHandler for PausedOperationMode {
+    async fn advance(mut self) -> OperationStateMachine {
+        loop {
+            select! {
+                Some(req) = self.handler.req_rx.recv() => {
+                    self.handler.handle_request(req);
+                },
+                Ok(vote) = self.handler.gossip_rx.recv() => {
+                    self.handler.record_vote(vote);
+                },
+                Ok(event) = self.handler.internal_event_listener.recv() => {
+                    // top down is still syncing, pause everything
+                    if !matches!(event, TopDownSyncEvent::NodeSyncing) {
+                        return self.into_active();
+                    }
+                    self.handler.handle_event(event);
+                }
+            }
+        }
     }
 }

@@ -7,14 +7,17 @@ mod paused;
 use crate::vote::operation::active::ActiveOperationMode;
 use crate::vote::operation::paused::PausedOperationMode;
 use crate::vote::VotingHandler;
+use async_trait::async_trait;
 use std::fmt::Display;
 
-pub type OperationMode = &'static str;
-pub const INITIALIZED: &str = "init";
-pub const PAUSED: &str = "paused";
-pub const ACTIVE: &str = "active";
+#[repr(u8)]
+#[derive(Debug, Copy, Clone)]
+pub enum OperationMode {
+    Paused = 0,
+    Active = 1,
+}
 
-/// The operation mode of voting reactor.
+/// The operation state machine of voting reactor.
 ///
 /// Active: Active publishing votes and aggregating votes normally
 /// Paused: Stops voting reactor due to unknown or irrecoverable issues
@@ -42,34 +45,35 @@ pub enum OperationStateMachine {
 /// Tracks the operation mdoe metrics for the voting system
 pub(crate) struct OperationMetrics {
     current_mode: OperationMode,
-    previous_mode: OperationMode,
+    previous_mode: Option<OperationMode>,
 }
 
+#[async_trait]
 pub(crate) trait OperationModeHandler: Display {
-    fn advance(self) -> OperationStateMachine;
+    async fn advance(self) -> OperationStateMachine;
 }
 
 impl OperationStateMachine {
     /// Always start with Paused operation mode, one needs to know the exact status from syncer.
     pub fn new(handler: VotingHandler) -> OperationStateMachine {
         let metrics = OperationMetrics {
-            current_mode: PAUSED,
-            previous_mode: INITIALIZED,
+            current_mode: OperationMode::Paused,
+            previous_mode: None,
         };
         Self::Paused(PausedOperationMode { metrics, handler })
     }
 
-    pub fn step(self) -> Self {
+    pub async fn step(self) -> Self {
         match self {
-            OperationStateMachine::Paused(p) => p.advance(),
-            OperationStateMachine::Active(p) => p.advance(),
+            OperationStateMachine::Paused(p) => p.advance().await,
+            OperationStateMachine::Active(p) => p.advance().await,
         }
     }
 }
 
 impl OperationMetrics {
     pub fn mode_changed(&mut self, mode: OperationMode) {
-        self.previous_mode = self.current_mode;
+        self.previous_mode = Some(self.current_mode);
         self.current_mode = mode;
     }
 }

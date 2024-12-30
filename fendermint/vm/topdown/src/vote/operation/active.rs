@@ -3,11 +3,13 @@
 
 use crate::vote::operation::paused::PausedOperationMode;
 use crate::vote::operation::{
-    OperationMetrics, OperationModeHandler, OperationStateMachine, PAUSED,
+    OperationMetrics, OperationMode, OperationModeHandler, OperationStateMachine,
 };
 use crate::vote::TopDownSyncEvent;
 use crate::vote::VotingHandler;
+use async_trait::async_trait;
 use std::fmt::{Display, Formatter};
+use tokio::select;
 
 /// In active mode, we observe a steady rate of topdown checkpoint commitments on chain.
 /// Our lookahead buffer is sliding continuously. As we acquire new finalised parent blocks,
@@ -23,36 +25,37 @@ impl Display for ActiveOperationMode {
     }
 }
 
+impl ActiveOperationMode {
+    fn into_paused(mut self) -> OperationStateMachine {
+        self.metrics.mode_changed(OperationMode::Paused);
+        OperationStateMachine::Paused(PausedOperationMode {
+            metrics: self.metrics,
+            handler: self.handler,
+        })
+    }
+}
+
+#[async_trait]
 impl OperationModeHandler for ActiveOperationMode {
-    fn advance(mut self) -> OperationStateMachine {
-        let mut n = self.handler.process_external_request(&self.metrics);
-        tracing::debug!(
-            num = n,
-            status = self.to_string(),
-            "handled external requests"
-        );
+    async fn advance(mut self) -> OperationStateMachine {
+        loop {
+            select! {
+                Some(req) = self.handler.req_rx.recv() => {
+                    self.handler.handle_request(req);
+                },
+                Ok(vote) = self.handler.gossip_rx.recv() => {
+                    self.handler.record_vote(vote);
 
-        n = self.handler.process_gossip_subscription_votes();
-        tracing::debug!(num = n, status = self.to_string(), "handled gossip votes");
-
-        if n == 0 {
-            todo!("handle transition to soft recover")
-        }
-
-        while let Some(v) = self.handler.poll_internal_event() {
-            // top down is now syncing, pause everything
-            if matches!(v, TopDownSyncEvent::NodeSyncing) {
-                self.metrics.mode_changed(PAUSED);
-                return OperationStateMachine::Paused(PausedOperationMode {
-                    metrics: self.metrics,
-                    handler: self.handler,
-                });
+                    // TODO: need to handle soft recovery transition
+                },
+                Ok(event) = self.handler.internal_event_listener.recv() => {
+                    // top down is now syncing, pause everything
+                    if matches!(event, TopDownSyncEvent::NodeSyncing) {
+                        return self.into_paused();
+                    }
+                    self.handler.handle_event(event);
+                }
             }
-
-            // handle the polled event
-            self.handler.handle_event(v);
         }
-
-        OperationStateMachine::Active(self)
     }
 }
