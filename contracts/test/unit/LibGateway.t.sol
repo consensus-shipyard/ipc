@@ -198,13 +198,12 @@ contract LibGatewayTest is Test {
         address fromRaw = address(1000);
         address toRaw = address(1001);
 
-        IPCAddress memory from = IPCAddress({subnetId: parentSubnet, rawAddress: FvmAddressHelper.from(fromRaw)});
-        IPCAddress memory to = IPCAddress({subnetId: childSubnet, rawAddress: FvmAddressHelper.from(toRaw)});
+        uint256 value = 1000;
 
         IpcEnvelope memory crossMsg = CrossMsgHelper.createCallMsg({
-            from: from,
-            to: to,
-            value: 1000,
+            from: IPCAddress({subnetId: parentSubnet, rawAddress: FvmAddressHelper.from(fromRaw)}),
+            to: IPCAddress({subnetId: childSubnet, rawAddress: FvmAddressHelper.from(toRaw)}),
+            value: value,
             method: bytes4(0),
             params: new bytes(0)
         });
@@ -219,7 +218,7 @@ contract LibGatewayTest is Test {
             kind: IpcMsgKind.Result,
             from: crossMsg.to,
             to: crossMsg.from,
-            value: 0,
+            value: value,
             message: abi.encode(message),
             nonce: 0
         });
@@ -311,13 +310,12 @@ contract LibGatewayTest is Test {
         address fromRaw = address(1000);
         address toRaw = callingContract;
 
-        IPCAddress memory from = IPCAddress({subnetId: childSubnet, rawAddress: FvmAddressHelper.from(fromRaw)});
-        IPCAddress memory to = IPCAddress({subnetId: parentSubnet, rawAddress: FvmAddressHelper.from(toRaw)});
+        uint256 value = 1000;
 
         IpcEnvelope memory crossMsg = CrossMsgHelper.createCallMsg({
-            from: from,
-            to: to,
-            value: 1000,
+            from: IPCAddress({subnetId: childSubnet, rawAddress: FvmAddressHelper.from(fromRaw)}),
+            to: IPCAddress({subnetId: parentSubnet, rawAddress: FvmAddressHelper.from(toRaw)}),
+            value: value,
             method: GatewayDummyContract.reverts.selector,
             params: new bytes(0)
         });
@@ -332,7 +330,7 @@ contract LibGatewayTest is Test {
             kind: IpcMsgKind.Result,
             from: crossMsg.to,
             to: crossMsg.from,
-            value: 0,
+            value: value,
             message: abi.encode(message),
             nonce: 0
         });
@@ -365,13 +363,12 @@ contract LibGatewayTest is Test {
         address fromRaw = address(1000);
         address toRaw = callingContract;
 
-        IPCAddress memory from = IPCAddress({subnetId: childSubnet, rawAddress: FvmAddressHelper.from(fromRaw)});
-        IPCAddress memory to = IPCAddress({subnetId: parentSubnet, rawAddress: FvmAddressHelper.from(toRaw)});
+        uint256 value = 1000;
 
         IpcEnvelope memory crossMsg = CrossMsgHelper.createCallMsg({
-            from: from,
-            to: to,
-            value: 1000,
+            from: IPCAddress({subnetId: childSubnet, rawAddress: FvmAddressHelper.from(fromRaw)}),
+            to: IPCAddress({subnetId: parentSubnet, rawAddress: FvmAddressHelper.from(toRaw)}),
+            value: value,
             method: GatewayDummyContract.reverts.selector,
             params: new bytes(0)
         });
@@ -386,7 +383,7 @@ contract LibGatewayTest is Test {
             kind: IpcMsgKind.Result,
             from: crossMsg.to,
             to: crossMsg.from,
-            value: 0,
+            value: value,
             message: abi.encode(message),
             nonce: 0
         });

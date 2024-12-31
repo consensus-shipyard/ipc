@@ -6,7 +6,7 @@ import {Asset, AssetKind} from "../structs/Subnet.sol";
 import {EMPTY_BYTES} from "../constants/Constants.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
+import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 
 /// @notice Helpers to deal with a supply source.
 library AssetHelper {
@@ -16,7 +16,7 @@ library AssetHelper {
     ///         and checks if its supply kind matches the provided one.
     ///         It reverts if the address does not correspond to a subnet actor.
     function hasSupplyOfKind(address subnetActor, AssetKind compare) internal view returns (bool) {
-        return SubnetActorGetterFacet(subnetActor).supplySource().kind == compare;
+        return ISubnetActor(subnetActor).supplySource().kind == compare;
     }
 
     /// @notice Checks that a given supply strategy is correctly formed and its preconditions are met.
@@ -35,6 +35,10 @@ library AssetHelper {
     /// @notice Asserts that the supply strategy is of the given kind. If not, it reverts.
     function expect(Asset memory asset, AssetKind kind) internal pure {
         require(asset.kind == kind, "Unexpected asset");
+    }
+
+    function equals(Asset memory asset, Asset memory asset2) internal pure returns (bool) {
+        return asset.tokenAddress == asset2.tokenAddress && asset.kind == asset2.kind;
     }
 
     /// @notice Locks the specified amount from msg.sender into custody.
@@ -236,4 +240,7 @@ library AssetHelper {
         return Asset({kind: AssetKind.Native, tokenAddress: address(0)});
     }
 
+    function erc20(address token) internal pure returns (Asset memory) {
+        return Asset({kind: AssetKind.ERC20, tokenAddress: token});
+    }
 }
