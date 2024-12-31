@@ -6,6 +6,18 @@
 //!
 //! `cargo test -p fendermint_materializer --test docker -- --nocapture`
 
+use anyhow::{anyhow, Context};
+use ethers::providers::Middleware;
+use fendermint_materializer::{
+    concurrency,
+    docker::{DockerMaterializer, DockerMaterials},
+    manifest::Manifest,
+    testnet::Testnet,
+    HasCometBftApi, HasEthApi, TestnetName,
+};
+use futures::{Future, FutureExt};
+use lazy_static::lazy_static;
+use std::sync::Arc;
 use std::{
     collections::BTreeSet,
     env::current_dir,
@@ -13,18 +25,8 @@ use std::{
     pin::Pin,
     time::{Duration, Instant},
 };
-
-use anyhow::{anyhow, Context};
-use ethers::providers::Middleware;
-use fendermint_materializer::{
-    docker::{DockerMaterializer, DockerMaterials},
-    manifest::Manifest,
-    testnet::Testnet,
-    HasCometBftApi, HasEthApi, TestnetName,
-};
-use futures::Future;
-use lazy_static::lazy_static;
 use tendermint_rpc::Client;
+use fendermint_materializer::bencher::Bencher;
 
 pub type DockerTestnet = Testnet<DockerMaterials, DockerMaterializer>;
 
@@ -59,14 +61,23 @@ fn read_manifest(file_name: &str) -> anyhow::Result<Manifest> {
 
 /// Parse a manifest file in the `manifests` directory, clean up any corresponding
 /// testnet resources, then materialize a testnet and run some tests.
-pub async fn with_testnet<F, G>(manifest_file_name: &str, alter: G, test: F) -> anyhow::Result<()>
+pub async fn with_testnet<F, G>(
+    manifest_file_name: &str,
+    concurrency: Option<concurrency::Config>,
+    alter: G,
+    test: F,
+) -> anyhow::Result<()>
 where
-    // https://users.rust-lang.org/t/function-that-takes-a-closure-with-mutable-reference-that-returns-a-future/54324
-    F: for<'a> FnOnce(
-        &Manifest,
-        &mut DockerMaterializer,
-        &'a mut DockerTestnet,
-    ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + 'a>>,
+    F: for<'a> Fn(
+            Arc<Manifest>,
+            Arc<DockerMaterializer>,
+            Arc<DockerTestnet>,
+            usize,
+            Arc<Bencher>
+        ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send>>
+        + Copy
+        + Send
+        + 'static,
     G: FnOnce(&mut Manifest),
 {
     let testnet_name = TestnetName::new(
@@ -98,14 +109,51 @@ where
         .await
         .context("failed to remove testnet")?;
 
-    let mut testnet = Testnet::setup(&mut materializer, &testnet_name, &manifest)
+    let testnet = Testnet::setup(&mut materializer, &testnet_name, &manifest)
         .await
         .context("failed to set up testnet")?;
 
     let started = wait_for_startup(&testnet).await?;
 
+    let testnet = Arc::new(testnet);
+    let materializer = Arc::new(materializer);
+    let manifest = Arc::new(manifest);
     let res = if started {
-        test(&manifest, &mut materializer, &mut testnet).await
+        match concurrency {
+            None => test(manifest.clone(), materializer.clone(), testnet.clone(), 0, Arc::new(Bencher::new())).await,
+            Some(cfg) => {
+                let test_generator = {
+                    let testnet = testnet.clone();
+                    let materializer = materializer.clone();
+                    move |test_id: usize, bencher: Arc<Bencher>| {
+                        let manifest = manifest.clone();
+                        let materializer = materializer.clone();
+                        let testnet = testnet.clone();
+                        async move { test(manifest, materializer, testnet, test_id, bencher).await }.boxed()
+                    }
+                };
+
+                let (summary, results) = concurrency::execute(cfg, test_generator).await;
+                let mut err = None;
+                for res in results.into_iter() {
+                    match res.err {
+                        None => println!(
+                            "test completed successfully (test_id={}, records={:?})",
+                            res.test_id, res.records
+                        ),
+                        Some(e) => {
+                            println!(
+                                "test failed (test_id={}, records={:?})",
+                                res.test_id, res.records
+                            );
+                            err = Some(e);
+                        }
+                    }
+                }
+                println!("{:?}", summary);
+                err.map_or(Ok(()), Err)
+            }
+        }
     } else {
         Err(anyhow!("the startup sequence timed out"))
     };
@@ -136,7 +184,7 @@ where
     // otherwise the system shuts down too quick, but
     // at least we can inspect the containers.
     // If they don't all get dropped, `docker system prune` helps.
-    let drop_handle = materializer.take_dropper();
+    let drop_handle = Arc::try_unwrap(materializer).unwrap().take_dropper();
     let _ = tokio::time::timeout(*TEARDOWN_TIMEOUT, drop_handle).await;
 
     res
