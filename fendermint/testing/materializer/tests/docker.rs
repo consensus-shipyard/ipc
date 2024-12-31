@@ -26,6 +26,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tendermint_rpc::Client;
+use fendermint_materializer::bencher::Bencher;
 
 pub type DockerTestnet = Testnet<DockerMaterials, DockerMaterializer>;
 
@@ -72,6 +73,7 @@ where
             Arc<DockerMaterializer>,
             Arc<DockerTestnet>,
             usize,
+            Arc<Bencher>
         ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send>>
         + Copy
         + Send
@@ -118,16 +120,16 @@ where
     let manifest = Arc::new(manifest);
     let res = if started {
         match concurrency {
-            None => test(manifest.clone(), materializer.clone(), testnet.clone(), 0).await,
+            None => test(manifest.clone(), materializer.clone(), testnet.clone(), 0, Arc::new(Bencher::new())).await,
             Some(cfg) => {
                 let test_generator = {
                     let testnet = testnet.clone();
                     let materializer = materializer.clone();
-                    move |test_id| {
+                    move |test_id: usize, bencher: Arc<Bencher>| {
                         let manifest = manifest.clone();
                         let materializer = materializer.clone();
                         let testnet = testnet.clone();
-                        async move { test(manifest, materializer, testnet, test_id).await }.boxed()
+                        async move { test(manifest, materializer, testnet, test_id, bencher).await }.boxed()
                     }
                 };
 
@@ -136,13 +138,13 @@ where
                 for res in results.into_iter() {
                     match res.err {
                         None => println!(
-                            "test completed successfully (test_id={}, duration={:?})",
-                            res.test_id, res.duration
+                            "test completed successfully (test_id={}, records={:?})",
+                            res.test_id, res.records
                         ),
                         Some(e) => {
                             println!(
-                                "test failed (test_id={}, duration={:?})",
-                                res.test_id, res.duration
+                                "test failed (test_id={}, records={:?})",
+                                res.test_id, res.records
                             );
                             err = Some(e);
                         }

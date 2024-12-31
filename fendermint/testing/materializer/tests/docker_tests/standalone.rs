@@ -16,6 +16,7 @@ use fendermint_materializer::{
     concurrency, manifest::Rootnet, materials::DefaultAccount, HasEthApi,
 };
 use futures::FutureExt;
+use tokio::time::sleep;
 
 const MANIFEST: &str = "standalone.yaml";
 
@@ -47,18 +48,78 @@ where
 async fn test_sent_tx_found_in_mempool() {
     with_testnet(
         MANIFEST,
-        Some(
-            concurrency::Config::new()
-                .with_max_concurrency(50)
-                .with_duration(Duration::from_secs(10)),
-        ),
+        None,
         |manifest| {
             // Slow down consensus to where we can see the effect of the transaction not being found by Ethereum hash.
             if let Rootnet::New { ref mut env, .. } = manifest.rootnet {
                 env.insert("CMT_CONSENSUS_TIMEOUT_COMMIT".into(), "10s".into());
             };
         },
-        |_, _, testnet, test_id| {
+        |_, _, testnet, test_id, _| {
+            let test = async move {
+                let sender = testnet.account_mod_nth(test_id);
+                let recipient = testnet.account_mod_nth(test_id + 1);
+                let pangea = testnet.node(&testnet.root().node("pangea"))?;
+                let provider = pangea
+                    .ethapi_http_provider()?
+                    .expect("ethapi should be enabled");
+
+                let middleware = make_middleware(provider, sender)
+                    .await
+                    .context("failed to set up middleware")?;
+
+                eprintln!("middleware ready, pending tests");
+
+                // Create the simplest transaction possible: send tokens between accounts.
+                let to: H160 = recipient.eth_addr().into();
+                let transfer = Eip1559TransactionRequest::new().to(to).value(1);
+
+                let pending: PendingTransaction<_> = middleware
+                    .send_transaction(transfer, None)
+                    .await
+                    .context("failed to send txn")?;
+
+                let tx_hash = pending.tx_hash();
+
+                eprintln!("sent pending txn {:?}", tx_hash);
+
+                // We expect that the transaction is pending, however it should not return an error.
+                match middleware.get_transaction(tx_hash).await {
+                    Ok(Some(_)) => {}
+                    Ok(None) => bail!("pending transaction not found by eth hash"),
+                    Err(e) => {
+                        bail!("failed to get pending transaction: {e}")
+                    }
+                }
+
+                Ok(())
+            };
+
+            test.boxed()
+        },
+    )
+    .await
+    .unwrap()
+}
+
+
+#[serial_test::serial]
+#[tokio::test]
+async fn test_sent_tx_included_in_block() {
+    with_testnet(
+        MANIFEST,
+        Some(
+            concurrency::Config::new()
+                .with_max_concurrency(50)
+                .with_duration(Duration::from_secs(30)),
+        ),
+        |_| {
+            // Slow down consensus to where we can see the effect of the transaction not being found by Ethereum hash.
+            // if let Rootnet::New { ref mut env, .. } = manifest.rootnet {
+            //     env.insert("CMT_CONSENSUS_TIMEOUT_COMMIT".into(), "10s".into());
+            // };
+        },
+        |_, _, testnet, test_id, bencher| {
             let test = async move {
                 let sender = testnet.account_mod_nth(test_id);
                 let recipient = testnet.account_mod_nth(test_id + 1);
@@ -88,6 +149,7 @@ async fn test_sent_tx_found_in_mempool() {
                     .value(1)
                     .nonce(nonce);
 
+                bencher.start().await;
                 let pending: PendingTransaction<_> = middleware
                     .send_transaction(transfer, None)
                     .await
@@ -105,6 +167,17 @@ async fn test_sent_tx_found_in_mempool() {
                         bail!("failed to get pending transaction: {e}")
                     }
                 }
+                bencher.record("mempool".to_string()).await;
+
+                // TODO: improve the polling or subscribe to some stream
+                loop {
+                    if let Ok(Some(tx)) = middleware.get_transaction_receipt(tx_hash).await {
+                        println!("tx included in block {:?} (test_id={})", tx.block_number, test_id);
+                        break;
+                    }
+                    sleep(Duration::from_millis(100)).await;
+                }
+                bencher.record("block_inclusion".to_string()).await;
 
                 Ok(())
             };
@@ -112,8 +185,8 @@ async fn test_sent_tx_found_in_mempool() {
             test.boxed()
         },
     )
-    .await
-    .unwrap()
+        .await
+        .unwrap()
 }
 
 // /// Test that transactions sent out-of-order with regards to the nonce are not rejected,
