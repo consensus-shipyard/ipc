@@ -101,18 +101,6 @@ impl BlobsActor {
         let from = resolve_external_non_machine(rt, params.from)?;
         ensure_addr_is_origin_or_caller(rt, from)?;
         let to = resolve_external_non_machine(rt, params.to)?;
-        let caller_allowlist = if let Some(allowlist) = params.caller_allowlist {
-            let resolved: HashSet<_> = allowlist
-                .into_iter()
-                .map(|caller| {
-                    let (caller, _) = resolve_external(rt, caller)?;
-                    Ok::<Address, ActorError>(caller)
-                })
-                .collect::<Result<_, _>>()?;
-            Some(resolved)
-        } else {
-            None
-        };
         let hoku_config = hoku_config::get_config(rt)?;
         rt.transaction(|st: &mut State, rt| {
             st.approve_credit(
@@ -120,7 +108,6 @@ impl BlobsActor {
                 rt.store(),
                 from,
                 to,
-                caller_allowlist,
                 rt.curr_epoch(),
                 params.credit_limit,
                 params.gas_fee_limit,
@@ -134,13 +121,8 @@ impl BlobsActor {
         let from = resolve_external_non_machine(rt, params.from)?;
         ensure_addr_is_origin_or_caller(rt, from)?;
         let to = resolve_external_non_machine(rt, params.to)?;
-        let for_caller = if let Some(caller) = params.for_caller {
-            let (resolved, _) = resolve_external(rt, caller)?;
-            Some(resolved)
-        } else {
-            None
-        };
-        rt.transaction(|st: &mut State, rt| st.revoke_credit(rt.store(), from, to, for_caller))
+
+        rt.transaction(|st: &mut State, rt| st.revoke_credit(rt.store(), from, to))
     }
 
     fn set_credit_sponsor(
@@ -219,7 +201,6 @@ impl BlobsActor {
     fn add_blob(rt: &impl Runtime, params: AddBlobParams) -> Result<Subscription, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let (origin, _) = resolve_external(rt, rt.message().origin())?;
-        let (caller, _) = resolve_external(rt, rt.message().caller())?;
         // The blob subscriber will be the sponsor if specified and approved
         let subscriber = if let Some(sponsor) = params.sponsor {
             resolve_external_non_machine(rt, sponsor)?
@@ -233,7 +214,6 @@ impl BlobsActor {
                 &hoku_config,
                 rt.store(),
                 origin,
-                caller,
                 subscriber,
                 rt.curr_epoch(),
                 params.hash,
@@ -379,7 +359,6 @@ impl BlobsActor {
                 &hoku_config,
                 rt.store(),
                 origin,
-                caller,
                 subscriber,
                 rt.curr_epoch(),
                 add_params.hash,
