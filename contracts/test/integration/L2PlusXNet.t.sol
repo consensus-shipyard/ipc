@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import "../../contracts/errors/IPCErrors.sol";
-import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind} from "../../contracts/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind, ResultMsg} from "../../contracts/structs/CrossNet.sol";
 import {SubnetID, Subnet, IPCAddress, Validator, FvmAddress} from "../../contracts/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
 import {AssetHelper} from "../../contracts/lib/AssetHelper.sol";
@@ -36,6 +36,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {ISubnetActor} from "../../contracts/interfaces/ISubnetActor.sol";
 import {IPCMsgType} from "../../contracts/enums/IPCMsgType.sol";
 import {IIpcHandler} from "../../sdk/interfaces/IIpcHandler.sol";
+import {IGateway} from "../../contracts/interfaces/IGateway.sol";
 
 import "forge-std/console.sol";
 
@@ -128,16 +129,6 @@ library LibSubnetsHierarchy {
     }
 }
 
-interface IGateway {
-    function sendContractXnetMessage(
-        IpcEnvelope memory envelope
-    ) external payable returns (IpcEnvelope memory committed);
-
-    function fund(SubnetID calldata subnetId, FvmAddress calldata to) external payable;
-
-    function fundWithToken(SubnetID calldata subnetId, FvmAddress calldata to, uint256 amount) external;
-}
-
 contract L2PlusSubnetTest is Test, IntegrationTestBase, IIpcHandler {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
@@ -150,6 +141,8 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase, IIpcHandler {
 
     SubnetsHierarchy private subnets;
     bytes32 private new_topdown_message_topic;
+    /// @dev The latest result message received from sending a cross network message
+    bytes private latestResultMessage;
 
     function setUp() public override {
         // there seems no auto way to derive the abi in string, check this before running tests, make sure
@@ -166,6 +159,9 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase, IIpcHandler {
 
     /* solhint-disable-next-line unused-vars */
     function handleIpcMessage(IpcEnvelope calldata envelope) external payable returns (bytes memory ret) {
+        if (envelope.kind == IpcMsgKind.Result) {
+            latestResultMessage = envelope.message;
+        }
         ret = bytes("");
     }
 
@@ -174,21 +170,18 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase, IIpcHandler {
     // ======= internal util methods ========
 
     function executeTopdownMessages(IpcEnvelope[] memory msgs, GatewayDiamond gw) internal {
-        uint256 minted_tokens;
+        uint256 mintedTokens;
 
-        for (uint256 i; i < msgs.length; ) {
-            minted_tokens += msgs[i].value;
-            unchecked {
-                ++i;
-            }
+        for (uint256 i; i < msgs.length; i++) {
+            mintedTokens += msgs[i].value;
         }
-        console.log("minted tokens in executed top-downs: %d", minted_tokens);
+        console.log("minted tokens in executed top-downs: %d", mintedTokens);
 
         // The implementation of the function in fendermint is in
         // https://github.com/consensus-shipyard/ipc/blob/main/fendermint/vm/interpreter/contracts/fvm/topdown.rs#L43
 
         // This emulates minting tokens.
-        vm.deal(address(gw), minted_tokens);
+        vm.deal(address(gw), mintedTokens);
 
         XnetMessagingFacet xnetMessenger = gw.xnetMessenger();
 
@@ -440,6 +433,12 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase, IIpcHandler {
         }
     }
 
+    /// @dev checks and ensures the latestResultMessage matches with expected bytes
+    function checkResultMessageBytes(bytes memory expected, string memory errorMessage) internal view {
+        ResultMsg memory message = abi.decode(latestResultMessage, (ResultMsg));
+        require(keccak256(expected) == keccak256(message.ret), errorMessage);
+    }
+
     //--------------------
     // Call flow tests.
     //---------------------
@@ -491,6 +490,10 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase, IIpcHandler {
         // post xnet message conditions
         uint256 postBalance = IERC20(erc20_1).balanceOf(address(this));
         require(postBalance == originalBalance, "token should be refunded");
+        checkResultMessageBytes(
+            abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.IncompatibleSupplySource),
+            "result should be incompatible supply source"
+        );
     }
 
     // testing Native L1 => ERC20 L2 => Native L3
