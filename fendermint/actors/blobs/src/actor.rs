@@ -503,6 +503,7 @@ mod tests {
     use super::*;
 
     use fendermint_actor_blobs_shared::state::Credit;
+    use fendermint_actor_blobs_testing::{new_hash, new_pk};
     use fendermint_actor_hoku_config_shared::{HokuConfig, HOKU_CONFIG_ACTOR_ADDR};
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::test_utils::{
@@ -514,24 +515,6 @@ mod tests {
     use fvm_shared::econ::TokenAmount;
     use fvm_shared::sys::SendFlags;
     use num_traits::Zero;
-    use rand::RngCore;
-
-    pub fn new_hash(size: usize) -> (Hash, u64) {
-        let mut rng = rand::thread_rng();
-        let mut data = vec![0u8; size];
-        rng.fill_bytes(&mut data);
-        (
-            Hash(*iroh_base::hash::Hash::new(&data).as_bytes()),
-            size as u64,
-        )
-    }
-
-    pub fn new_pk() -> PublicKey {
-        let mut rng = rand::thread_rng();
-        let mut data = [0u8; 32];
-        rng.fill_bytes(&mut data);
-        PublicKey(data)
-    }
 
     pub fn construct_and_verify() -> MockRuntime {
         let rt = MockRuntime {

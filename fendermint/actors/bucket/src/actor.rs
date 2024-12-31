@@ -336,8 +336,9 @@ mod tests {
     use fendermint_actor_blobs_shared::params::{
         AddBlobParams, DeleteBlobParams, GetBlobParams, OverwriteBlobParams,
     };
-    use fendermint_actor_blobs_shared::state::{Hash, PublicKey, Subscription, SubscriptionGroup};
+    use fendermint_actor_blobs_shared::state::{Subscription, SubscriptionGroup};
     use fendermint_actor_blobs_shared::{Method as BlobMethod, BLOBS_ACTOR_ADDR};
+    use fendermint_actor_blobs_testing::{new_address, new_hash, new_pk};
     use fendermint_actor_machine::{ConstructorParams, InitParams};
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::runtime::Runtime;
@@ -352,10 +353,9 @@ mod tests {
     use fvm_shared::error::ExitCode;
     use fvm_shared::sys::SendFlags;
     use fvm_shared::MethodNum;
-    use rand::RngCore;
 
     fn construct_and_verify(owner: Address) -> MockRuntime {
-        let receiver = new_machine_address();
+        let receiver = new_address();
         let rt = MockRuntime {
             receiver,
             ..Default::default()
@@ -388,30 +388,6 @@ mod tests {
         rt
     }
 
-    pub fn new_machine_address() -> Address {
-        let mut rng = rand::thread_rng();
-        let mut data = [0u8; 32];
-        rng.fill_bytes(&mut data);
-        Address::new_actor(&data)
-    }
-
-    pub fn new_hash(size: usize) -> (Hash, u64) {
-        let mut rng = rand::thread_rng();
-        let mut data = vec![0u8; size];
-        rng.fill_bytes(&mut data);
-        (
-            Hash(*iroh_base::hash::Hash::new(&data).as_bytes()),
-            size as u64,
-        )
-    }
-
-    pub fn new_pk() -> PublicKey {
-        let mut rng = rand::thread_rng();
-        let mut data = [0u8; 32];
-        rng.fill_bytes(&mut data);
-        PublicKey(data)
-    }
-
     #[test]
     pub fn test_add_object() {
         let id_addr = Address::new_id(110);
@@ -425,7 +401,7 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
 
-        // Add object
+        // Add an object
         let hash = new_hash(256);
         let key = vec![0, 1, 2];
         let add_params: AddParams = AddParams {
@@ -487,7 +463,7 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
 
-        // Add object
+        // Add an object
         let hash = new_hash(256);
         let key = vec![0, 1, 2];
         let add_params: AddParams = AddParams {
@@ -597,7 +573,7 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
 
-        // Add object
+        // Add an object
         let hash = new_hash(256);
         let key = vec![0, 1, 2];
         let add_params: AddParams = AddParams {
@@ -682,7 +658,7 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
 
-        // Add object
+        // Add an object
         let key = vec![0, 1, 2];
         let hash = new_hash(256);
         let add_params: AddParams = AddParams {
@@ -795,7 +771,7 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
 
-        // Add object
+        // Add an object
         let key = vec![0, 1, 2];
         let hash = new_hash(256);
         let ttl = ChainEpoch::from(3600);
@@ -839,7 +815,7 @@ mod tests {
         .unwrap();
         rt.verify();
 
-        // Get object
+        // Get the object
         let blob = Blob {
             size: add_params.size,
             subscribers: HashMap::from([(
@@ -909,7 +885,7 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
 
-        // Add object
+        // Add an object
         let hash = new_hash(256);
         let key = vec![0, 1, 2];
         let add_params: AddParams = AddParams {
@@ -975,7 +951,7 @@ mod tests {
         assert!(result.is_ok());
         rt.verify();
 
-        // Get object and check metadata
+        // Get the object and check metadata
         let sub_id = get_blob_id(&state, key.clone()).unwrap();
         let blob = Blob {
             size: add_params.size,

@@ -35,8 +35,7 @@ impl Actor {
         let (origin, _) = resolve_external(rt, rt.message().origin())?;
         let actor_address = state.address.get()?;
         if origin != owner {
-            let approved = get_credit_approval(rt, owner, origin)?
-                .is_some();
+            let approved = get_credit_approval(rt, owner, origin)?.is_some();
             if !approved {
                 return Err(actor_error!(
                     forbidden;
