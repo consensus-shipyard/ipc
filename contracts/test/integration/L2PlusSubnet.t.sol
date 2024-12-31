@@ -219,50 +219,12 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         sendCrossMessageFromChildToParentWithResult(params);
     }
 
-    function testL2PlusSubnet_TokenMixed_SendCrossMessageFromChildToParentWithOkResult() public {
-        MockIpcContractResult caller = new MockIpcContractResult();
-        Params memory params = Params({
-            root: rootNetwork,
-            subnet: tokenL2Subnet,
-            subnetL3: tokenL3SubnetsWithTokenParent[0],
-            caller: caller,
-            callerAddr: address(caller),
-            recipientAddr: address(new MockIpcContractPayable()),
-            amount: 3,
-            expectedOutcome: OutcomeType.Ok,
-            expectedRet: abi.encode(EMPTY_BYTES),
-            callerAmount: 1 ether,
-            fundAmount: 100000
-        });
-
-        sendCrossMessageFromChildToParentWithResult(params);
-    }
-
     function testL2PlusSubnet_Token_SendCrossMessageFromParentToChildWithOkResult() public {
         MockIpcContractResult caller = new MockIpcContractResult();
         Params memory params = Params({
             root: rootNetwork,
             subnet: tokenL2Subnet,
             subnetL3: nativeL3SubnetsWithTokenParent[0],
-            caller: caller,
-            callerAddr: address(caller),
-            recipientAddr: address(new MockIpcContractPayable()),
-            amount: 3,
-            expectedOutcome: OutcomeType.Ok,
-            expectedRet: abi.encode(EMPTY_BYTES),
-            callerAmount: 1 ether,
-            fundAmount: 100000
-        });
-
-        sendCrossMessageFromParentToChildWithResult(params);
-    }
-
-    function testL2PlusSubnet_TokenMixed_SendCrossMessageFromParentToChildWithOkResult() public {
-        MockIpcContractResult caller = new MockIpcContractResult();
-        Params memory params = Params({
-            root: rootNetwork,
-            subnet: tokenL2Subnet,
-            subnetL3: tokenL3SubnetsWithTokenParent[0],
             caller: caller,
             callerAddr: address(caller),
             recipientAddr: address(new MockIpcContractPayable()),
@@ -599,6 +561,16 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             0
         );
 
+        Asset memory subnetSupply = params.subnet.subnetActor.getter().supplySource();
+
+        if (subnetSupply.kind == AssetKind.ERC20) {
+            // increase callerAddr's token balance
+            IERC20(subnetSupply.tokenAddress).transfer(params.callerAddr, params.amount);
+            // increase allowance so that send xnet msg will make it
+            vm.prank(params.callerAddr);
+            IERC20(subnetSupply.tokenAddress).approve(address(params.root.gatewayAddr), params.amount);
+        }
+
         crossMessage.nonce = 1;
         // send the cross message from the root network to the L3 subnet
         vm.prank(params.callerAddr);
@@ -610,7 +582,11 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         });
 
         crossMessage.nonce = 0;
-        params.root.gateway.messenger().sendContractXnetMessage{value: params.amount}(crossMessage);
+        if (subnetSupply.kind == AssetKind.ERC20) {
+            params.root.gateway.messenger().sendContractXnetMessage(crossMessage);
+        } else {
+            params.root.gateway.messenger().sendContractXnetMessage{value: params.amount}(crossMessage);
+        }
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = crossMessage;
@@ -623,22 +599,18 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             params.subnetL3.subnetActorAddr,
             params.subnet.gatewayAddr
         );
-
         // apply the cross message in the L3 subnet
         executeTopDownMsgs(msgs, params.subnetL3.gateway);
-
         // submit checkoint so the result message can be propagated to L2
         submitBottomUpCheckpoint(
             callCreateBottomUpCheckpointFromChildSubnet(params.subnetL3.id, params.subnetL3.gateway),
             params.subnetL3.subnetActor
         );
-
         // submit checkoint so the result message can be propagated to root network
         submitBottomUpCheckpoint(
             callCreateBottomUpCheckpointFromChildSubnet(params.subnet.id, params.subnet.gateway),
             params.subnet.subnetActor
         );
-
         assertTrue(params.caller.hasResult(), "missing result");
         assertTrue(params.caller.result().outcome == params.expectedOutcome, "wrong result outcome");
         assertTrue(keccak256(params.caller.result().ret) == keccak256(params.expectedRet), "wrong result outcome");
