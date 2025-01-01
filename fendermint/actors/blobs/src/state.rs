@@ -23,9 +23,13 @@ use hoku_ipld::hamt::MapKey;
 use log::{debug, warn};
 use num_traits::{ToPrimitive, Zero};
 
-use crate::state_fields::{
-    AccountsState, BlobsProgressCollection, BlobsState, ExpiriesState, ExpiryUpdate,
-};
+mod accounts;
+mod blobs;
+mod expiries;
+
+use accounts::AccountsState;
+use blobs::{BlobsProgressCollection, BlobsState};
+use expiries::{ExpiriesState, ExpiryUpdate};
 
 /// The state represents all accounts and stored blobs.
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
@@ -2222,7 +2226,7 @@ mod tests {
         assert_eq!(state.capacity_used, 0); // capacity was released
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 0);
+        assert_eq!(state.expiries.len(store).unwrap(), 0);
         assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
 
@@ -2410,7 +2414,7 @@ mod tests {
         assert_eq!(state.capacity_used, account.capacity_used);
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 2);
+        assert_eq!(state.expiries.len(store).unwrap(), 2);
         assert_eq!(state.added.len(), 2);
         assert_eq!(state.pending.len(), 0);
 
@@ -2466,7 +2470,7 @@ mod tests {
         assert_eq!(state.capacity_used, account.capacity_used);
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 2);
+        assert_eq!(state.expiries.len(store).unwrap(), 2);
         assert_eq!(state.added.len(), 2);
         assert_eq!(state.pending.len(), 0);
 
@@ -2858,7 +2862,7 @@ mod tests {
         assert_eq!(account.capacity_used, size); // not changed
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 2);
+        assert_eq!(state.expiries.len(store).unwrap(), 2);
         assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
 
@@ -2912,7 +2916,7 @@ mod tests {
         assert_eq!(state.capacity_used, size);
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 1);
+        assert_eq!(state.expiries.len(store).unwrap(), 1);
         assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
 
@@ -3028,7 +3032,7 @@ mod tests {
         assert_eq!(state.capacity_used, account.capacity_used);
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 1);
+        assert_eq!(state.expiries.len(&store).unwrap(), 1);
         assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
     }
@@ -3133,7 +3137,7 @@ mod tests {
         assert_eq!(state.capacity_used, account.capacity_used);
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 2);
+        assert_eq!(state.expiries.len(&store).unwrap(), 2);
         assert_eq!(state.added.len(), 2);
         assert_eq!(state.pending.len(), 0);
 
@@ -3175,7 +3179,7 @@ mod tests {
         assert_eq!(state.capacity_used, account.capacity_used);
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 2);
+        assert_eq!(state.expiries.len(&store).unwrap(), 2);
         assert_eq!(state.added.len(), 2);
         assert_eq!(state.pending.len(), 0);
     }
@@ -3296,7 +3300,7 @@ mod tests {
         assert!(matches!(status, BlobStatus::Resolved));
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 1);
+        assert_eq!(state.expiries.len(&store).unwrap(), 1);
         assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
     }
@@ -3377,7 +3381,7 @@ mod tests {
         assert_eq!(state.capacity_used, 0); // capacity was released
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 1); // remains until the blob is explicitly deleted
+        assert_eq!(state.expiries.len(&store).unwrap(), 1); // remains until the blob is explicitly deleted
         assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
     }
@@ -3508,7 +3512,7 @@ mod tests {
         assert_eq!(state.capacity_used, 0); // capacity was released
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 1); // remains until the blob is explicitly deleted
+        assert_eq!(state.expiries.len(&store).unwrap(), 1); // remains until the blob is explicitly deleted
         assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
     }
@@ -3903,7 +3907,7 @@ mod tests {
         assert_eq!(state.capacity_used, size2); // capacity was released
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 1);
+        assert_eq!(state.expiries.len(store).unwrap(), 1);
         assert_eq!(state.added.len(), 1);
         assert_eq!(state.pending.len(), 0);
 
