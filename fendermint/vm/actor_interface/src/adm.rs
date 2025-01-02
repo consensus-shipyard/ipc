@@ -47,7 +47,7 @@ impl Display for Kind {
 pub struct Metadata {
     /// Machine kind.
     pub kind: Kind,
-    /// Machine robust address.
+    /// Machine ID address.
     pub address: Address,
     /// User-defined metadata.
     pub metadata: HashMap<String, String>,

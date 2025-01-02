@@ -22,7 +22,7 @@ test/%:
 	cd $* && make test
 
 lint/%:
-	cd $* && make lint || echo "$* lint failed"
+	cd $* && make lint || { echo "$* lint failed"; exit 1; }
 
 license:
 	./scripts/add_license.sh
