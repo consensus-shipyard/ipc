@@ -8,13 +8,14 @@ import {SubnetID, Subnet, AssetKind, Asset} from "../structs/Subnet.sol";
 import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
 import {CallMsg, IpcMsgKind, IpcEnvelope, OutcomeType, BottomUpMsgBatch, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
 import {Membership} from "../structs/Subnet.sol";
-import "../errors/IPCErrors.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {AssetHelper} from "../lib/AssetHelper.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+// solhint-disable-next-line no-global-import
+import "../errors/IPCErrors.sol";
 
 library LibGateway {
     using SubnetIDHelper for SubnetID;

@@ -14,6 +14,7 @@ import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {Asset} from "../structs/Subnet.sol";
 import {AssetHelper} from "./AssetHelper.sol";
 import {IIpcHandler} from "../../sdk/interfaces/IIpcHandler.sol";
+// solhint-disable-next-line no-global-import
 import "../errors/IPCErrors.sol";
 
 /// @title Helper library for manipulating IpcEnvelope-related structs
