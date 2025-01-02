@@ -183,19 +183,7 @@ where
             f(key, v).map_err(|e| anyhow!(e))
         }) {
             Ok(_) => Ok(()),
-            Err(hamt_err) => match hamt_err {
-                hamt::Error::Dynamic(e) => match e.downcast::<ActorError>() {
-                    Ok(ae) => Err(ae),
-                    Err(e) => Err(ActorError::illegal_state(format!(
-                        "error in callback traversing HAMT {}: {}",
-                        self.name, e
-                    ))),
-                },
-                e => Err(ActorError::illegal_state(format!(
-                    "error traversing HAMT {}: {}",
-                    self.name, e
-                ))),
-            },
+            Err(hamt_err) => self.map_hamt_error(hamt_err),
         }
     }
 
@@ -229,19 +217,61 @@ where
                 };
                 Ok((traversed, next))
             }
-            Err(hamt_err) => match hamt_err {
-                hamt::Error::Dynamic(e) => match e.downcast::<ActorError>() {
-                    Ok(ae) => Err(ae),
-                    Err(e) => Err(ActorError::illegal_state(format!(
-                        "error in callback traversing HAMT {}: {}",
-                        self.name, e
-                    ))),
-                },
-                e => Err(ActorError::illegal_state(format!(
-                    "error traversing HAMT {}: {}",
+            Err(hamt_err) => self.map_hamt_error(hamt_err),
+        }
+    }
+
+    /// Iterates over key-value pairs in the map starting at a key up to an ending_key (included).
+    #[allow(clippy::blocks_in_conditions)]
+    pub fn for_each_until<F>(
+        &self,
+        starting_key: Option<&hamt::BytesKey>,
+        ending_key: &hamt::BytesKey,
+        mut f: F,
+    ) -> Result<(), ActorError>
+    where
+        F: FnMut(K, &V) -> Result<(), ActorError>,
+    {
+        let iter = match starting_key {
+            Some(key) => self.hamt.iter_from(key).map_err(|error| {
+                ActorError::illegal_state(format!("error traversing HAMT {}: {}", self.name, error))
+            })?,
+            None => self.hamt.iter(),
+        };
+        for res in iter.fuse().by_ref() {
+            match res {
+                Ok((k, v)) => {
+                    if k.le(ending_key) {
+                        let k = K::from_bytes(k)
+                            .context_code(ExitCode::USR_ILLEGAL_STATE, "invalid key")?;
+                        f(k, v)?;
+                    }
+                }
+                Err(hamt_err) => {
+                    return self.map_hamt_error(hamt_err);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.hamt.is_empty()
+    }
+
+    fn map_hamt_error<T>(&self, hamt_err: hamt::Error) -> Result<T, ActorError> {
+        match hamt_err {
+            hamt::Error::Dynamic(e) => match e.downcast::<ActorError>() {
+                Ok(actor_error) => Err(actor_error),
+                Err(e) => Err(ActorError::illegal_state(format!(
+                    "error in callback traversing HAMT {}: {}",
                     self.name, e
                 ))),
             },
+            e => Err(ActorError::illegal_state(format!(
+                "error traversing HAMT {}: {}",
+                self.name, e
+            ))),
         }
     }
 }

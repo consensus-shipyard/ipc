@@ -24,6 +24,7 @@ default_to_workspace = false
 [env]
 # General network-specific parameters
 SUBNET_ID = { value = "/r0", condition = { env_not_set = ["SUBNET_ID"] } }
+CHAIN_ID = { value = "", condition = { env_not_set = ["CHAIN_ID"] } }
 # The network name is derived from the SUBNET_ID, replacing slashes with dashes, and dropping the first dash if any.
 NETWORK_NAME = { script = ["echo $SUBNET_ID | sed -e 's|/|-|g' -e 's|^-||1'"] }
 # External P2P address advertised by CometBFT to other peers.

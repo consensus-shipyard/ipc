@@ -129,6 +129,7 @@ dependencies = [
 [tasks.subnet-config]
 dependencies = [
     "subnet-fetch-genesis",
+    "subnet-genesis-set-chain-id",
     "subnet-genesis-set-eam-permissions",
     "genesis-seal",
     "genesis-write",
@@ -150,6 +151,15 @@ script.pre = "mkdir -p ${BASE_DIR}/${NODE_NAME}/${KEYS_SUBDIR}; cp ${PRIVATE_KEY
 [tasks.subnet-fetch-genesis]
 extend = "fendermint-tool"
 env = { "CMD" = "genesis --genesis-file /data/genesis.json ipc from-parent --subnet-id ${SUBNET_ID} -p ${PARENT_ENDPOINT} ${PARENT_AUTH_FLAG} --parent-gateway ${PARENT_GATEWAY} --parent-registry ${PARENT_REGISTRY} --base-fee ${BASE_FEE} --power-scale ${POWER_SCALE}" }
+
+[tasks.subnet-genesis-set-chain-id]
+extend = "fendermint-tool"
+script.pre = """
+#!/bin/bash
+if [[ ! -z ${CHAIN_ID} ]]; then
+  CMD="genesis --genesis-file /data/genesis.json set-chain-id --chain-id ${CHAIN_ID}"
+fi
+"""
 
 [tasks.subnet-genesis-set-eam-permissions]
 extend = "fendermint-tool"

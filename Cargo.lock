@@ -3121,6 +3121,7 @@ dependencies = [
  "anyhow",
  "cid",
  "fendermint_actor_blobs_shared",
+ "fendermint_actor_blobs_testing",
  "fendermint_actor_hoku_config_shared",
  "fendermint_actor_machine",
  "fil_actors_evm_shared",
@@ -3131,12 +3132,9 @@ dependencies = [
  "hex-literal 0.4.1",
  "hoku_actor_sdk",
  "hoku_ipld",
- "iroh-base",
  "log",
  "num-traits",
- "rand",
  "serde",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -3156,6 +3154,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_actor_blobs_testing"
+version = "0.1.0"
+dependencies = [
+ "fendermint_actor_blobs_shared",
+ "fvm_shared",
+ "iroh-base",
+ "rand",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "fendermint_actor_bucket"
 version = "0.1.0"
 dependencies = [
@@ -3163,6 +3172,7 @@ dependencies = [
  "blake3",
  "cid",
  "fendermint_actor_blobs_shared",
+ "fendermint_actor_blobs_testing",
  "fendermint_actor_machine",
  "fil_actors_evm_shared",
  "fil_actors_runtime",
@@ -3172,13 +3182,11 @@ dependencies = [
  "fvm_ipld_hamt",
  "fvm_shared",
  "hex-literal 0.4.1",
- "iroh-base",
  "log",
  "num-derive 0.3.3",
  "num-traits",
  "quickcheck",
  "quickcheck_macros",
- "rand",
  "serde",
 ]
 
@@ -3246,6 +3254,7 @@ dependencies = [
 name = "fendermint_actor_hoku_config"
 version = "0.1.0"
 dependencies = [
+ "fendermint_actor_blobs_shared",
  "fendermint_actor_hoku_config_shared",
  "fendermint_actor_machine",
  "fil_actors_evm_shared",
@@ -3262,6 +3271,7 @@ dependencies = [
 name = "fendermint_actor_hoku_config_shared"
 version = "0.1.0"
 dependencies = [
+ "fendermint_actor_blobs_shared",
  "fil_actors_runtime",
  "frc42_dispatch",
  "fvm_ipld_encoding",
@@ -5369,6 +5379,7 @@ dependencies = [
  "anyhow",
  "cid",
  "fil_actors_runtime",
+ "fvm_ipld_amt",
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
  "fvm_ipld_hamt",

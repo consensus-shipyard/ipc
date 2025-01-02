@@ -209,21 +209,11 @@ impl State {
 mod tests {
     use super::*;
 
+    use fendermint_actor_blobs_testing::{new_hash, new_hash_from_vec};
     use fvm_ipld_blockstore::MemoryBlockstore;
     use quickcheck::Arbitrary;
     use quickcheck_macros::quickcheck;
-    use rand::RngCore;
     use std::str::FromStr;
-
-    fn new_hash(size: usize) -> (Hash, u64) {
-        let mut rng = rand::thread_rng();
-        let mut data = vec![0u8; size];
-        rng.fill_bytes(&mut data);
-        (
-            Hash(*iroh_base::hash::Hash::new(&data).as_bytes()),
-            size as u64,
-        )
-    }
 
     impl Arbitrary for ObjectState {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
@@ -237,14 +227,13 @@ mod tests {
     }
 
     fn object_one() -> ObjectState {
-        let data = [1, 2, 3, 4, 5];
-        let hash = iroh_base::hash::Hash::new(data);
+        let (hash, size) = new_hash_from_vec([1, 2, 3, 4, 5].to_vec());
         let mut metadata = HashMap::<String, String>::new();
         metadata.insert("_created".to_string(), String::from("1718464344"));
         metadata.insert("_modified".to_string(), String::from("1718464345"));
         ObjectState {
-            hash: Hash(*hash.as_bytes()),
-            size: data.len() as u64,
+            hash,
+            size,
             metadata,
         }
     }
@@ -252,27 +241,25 @@ mod tests {
     const OBJECT_ONE_CID: &str = "bafy2bzaceae4nfmqeqjqkx4hymxvldrgzaabbp3tffrxbmhzb7kod4sgy22xe";
 
     fn object_two() -> ObjectState {
-        let data = [6, 7, 8, 9, 10, 11];
-        let hash = iroh_base::hash::Hash::new(data);
+        let (hash, size) = new_hash_from_vec([6, 7, 8, 9, 10, 11].to_vec());
         let mut metadata = HashMap::<String, String>::new();
         metadata.insert("_created".to_string(), String::from("1718464456"));
         metadata.insert("_modified".to_string(), String::from("1718480987"));
         ObjectState {
-            hash: Hash(*hash.as_bytes()),
-            size: data.len() as u64,
+            hash,
+            size,
             metadata,
         }
     }
 
     fn object_three() -> ObjectState {
-        let data = [11, 12, 13, 14, 15, 16, 17];
-        let hash = iroh_base::hash::Hash::new(data);
+        let (hash, size) = new_hash_from_vec([11, 12, 13, 14, 15, 16, 17].to_vec());
         let mut metadata = HashMap::<String, String>::new();
         metadata.insert("_created".to_string(), String::from("1718465678"));
         metadata.insert("_modified".to_string(), String::from("1718512346"));
         ObjectState {
-            hash: Hash(*hash.as_bytes()),
-            size: data.len() as u64,
+            hash,
+            size,
             metadata,
         }
     }

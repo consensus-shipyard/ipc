@@ -35,9 +35,7 @@ impl Actor {
         let origin = rt.message().origin();
         let actor_address = state.address.get()?;
         if origin != owner {
-            let approved = get_credit_approval(rt, owner, origin)?
-                .map(|approval| approval.is_caller_allowed(&actor_address))
-                .unwrap_or_default();
+            let approved = get_credit_approval(rt, owner, origin)?.is_some();
             if !approved {
                 return Err(actor_error!(
                     forbidden;

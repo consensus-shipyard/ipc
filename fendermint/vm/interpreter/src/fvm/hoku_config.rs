@@ -4,6 +4,7 @@
 
 use crate::fvm::FvmMessage;
 use anyhow::{bail, Context};
+use fendermint_actor_blobs_shared::state::TokenCreditRate;
 use fendermint_actor_hoku_config_shared::HokuConfig;
 use fendermint_actor_hoku_config_shared::Method::GetConfig;
 use fendermint_vm_actor_interface::hoku_config::HOKU_CONFIG_ACTOR_ADDR;
@@ -18,8 +19,8 @@ use num_traits::Zero;
 pub struct HokuConfigTracker {
     /// The total storage capacity of the subnet.
     pub blob_capacity: u64,
-    /// The token to credit rate. The amount of atto credits that 1 atto buys.
-    pub token_credit_rate: BigInt,
+    /// The token to credit rate.
+    pub token_credit_rate: TokenCreditRate,
     /// Block interval at which to debit all credit accounts.
     pub blob_credit_debit_interval: ChainEpoch,
     /// The minimum epoch duration a blob can be stored.
@@ -32,7 +33,7 @@ impl HokuConfigTracker {
     pub fn create<E: Executor>(executor: &mut E) -> anyhow::Result<HokuConfigTracker> {
         let mut ret = Self {
             blob_capacity: Zero::zero(),
-            token_credit_rate: Zero::zero(),
+            token_credit_rate: TokenCreditRate::from(BigInt::zero()),
             blob_credit_debit_interval: Zero::zero(),
             blob_min_ttl: Zero::zero(),
             blob_auto_renew_ttl: Zero::zero(),

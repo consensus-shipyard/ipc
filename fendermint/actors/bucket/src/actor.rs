@@ -336,8 +336,9 @@ mod tests {
     use fendermint_actor_blobs_shared::params::{
         AddBlobParams, DeleteBlobParams, GetBlobParams, OverwriteBlobParams,
     };
-    use fendermint_actor_blobs_shared::state::{Hash, PublicKey, Subscription, SubscriptionGroup};
+    use fendermint_actor_blobs_shared::state::{Subscription, SubscriptionGroup};
     use fendermint_actor_blobs_shared::{Method as BlobMethod, BLOBS_ACTOR_ADDR};
+    use fendermint_actor_blobs_testing::{new_hash, new_pk};
     use fendermint_actor_machine::{ConstructorParams, InitParams};
     use fil_actors_runtime::runtime::Runtime;
     use fil_actors_runtime::test_utils::{
@@ -351,7 +352,6 @@ mod tests {
     use fvm_shared::error::ExitCode;
     use fvm_shared::sys::SendFlags;
     use fvm_shared::MethodNum;
-    use rand::{Rng, RngCore};
 
     fn get_runtime() -> (MockRuntime, Address) {
         let origin = Address::new_id(110);
@@ -362,9 +362,9 @@ mod tests {
     }
 
     fn construct_and_verify(owner: Address) -> MockRuntime {
-        let receiver = new_machine_address();
+        let buck_addr = Address::new_id(111);
         let rt = MockRuntime {
-            receiver,
+            receiver: buck_addr,
             ..Default::default()
         };
         rt.set_caller(*INIT_ACTOR_CODE_ID, INIT_ACTOR_ADDR);
@@ -383,36 +383,13 @@ mod tests {
         let actor_init = rt
             .call::<Actor>(
                 Method::Init as u64,
-                IpldBlock::serialize_cbor(&InitParams { address: receiver }).unwrap(),
+                IpldBlock::serialize_cbor(&InitParams { address: buck_addr }).unwrap(),
             )
             .unwrap();
         expect_empty(actor_init);
         rt.verify();
         rt.reset();
         rt
-    }
-
-    pub fn new_machine_address() -> Address {
-        let mut rng = rand::thread_rng();
-        let id: u64 = rng.gen_range(200..=300);
-        Address::new_id(id)
-    }
-
-    pub fn new_hash(size: usize) -> (Hash, u64) {
-        let mut rng = rand::thread_rng();
-        let mut data = vec![0u8; size];
-        rng.fill_bytes(&mut data);
-        (
-            Hash(*iroh_base::hash::Hash::new(&data).as_bytes()),
-            size as u64,
-        )
-    }
-
-    pub fn new_pk() -> PublicKey {
-        let mut rng = rand::thread_rng();
-        let mut data = [0u8; 32];
-        rng.fill_bytes(&mut data);
-        PublicKey(data)
     }
 
     #[test]
@@ -788,7 +765,7 @@ mod tests {
         .unwrap();
         rt.verify();
 
-        // Get object
+        // Get the object
         let blob = Blob {
             size: add_params.size,
             subscribers: HashMap::from([(
@@ -801,7 +778,7 @@ mod tests {
                             expiry: ttl,
                             auto_renew: false,
                             source: add_params.source,
-                            delegate: Some((origin, origin)),
+                            delegate: Some(origin),
                             failed: false,
                         },
                     )]),
@@ -915,7 +892,7 @@ mod tests {
         assert!(result.is_ok());
         rt.verify();
 
-        // Get object and check metadata
+        // Get the object and check metadata
         let sub_id = get_blob_id(&state, key.clone()).unwrap();
         let blob = Blob {
             size: add_params.size,
@@ -929,7 +906,7 @@ mod tests {
                             expiry: ChainEpoch::from(3600),
                             auto_renew: false,
                             source: add_params.source,
-                            delegate: Some((origin, origin)),
+                            delegate: Some(origin),
                             failed: false,
                         },
                     )]),

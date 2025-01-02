@@ -3,6 +3,9 @@
 // Copyright 2019-2022 ChainSafe Systems
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::fmt::Display;
+use std::marker::PhantomData;
+
 use cid::Cid;
 use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::Blockstore;
@@ -10,12 +13,10 @@ use fvm_ipld_encoding::tuple::*;
 use fvm_ipld_hamt::BytesKey;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use std::fmt::Display;
-use std::marker::PhantomData;
 
 use super::core::{Map, MapKey, DEFAULT_HAMT_CONFIG};
 
-#[derive(Debug, Serialize_tuple, Deserialize_tuple)]
+#[derive(Clone, PartialEq, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct Root<K, V>
 where
     K: MapKey + Display,
@@ -23,7 +24,9 @@ where
 {
     cid: Cid,
     name: String,
+    #[serde(skip)]
     key_type: PhantomData<K>,
+    #[serde(skip)]
     value_type: PhantomData<V>,
 }
 
@@ -52,6 +55,10 @@ where
     pub fn cid(&self) -> &Cid {
         &self.cid
     }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
 }
 
 pub struct Hamt<BS, K, V>
@@ -64,6 +71,7 @@ where
     size: u64,
 }
 
+#[derive(Debug, Clone)]
 pub struct TrackedFlushResult<K, V>
 where
     K: MapKey + Display,
@@ -178,6 +186,10 @@ where
         Ok(Root::from_cid(cid, name))
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
+
     pub fn for_each<F>(&self, mut f: F) -> Result<(), ActorError>
     where
         F: FnMut(K, &V) -> Result<(), ActorError>,
@@ -195,5 +207,17 @@ where
         F: FnMut(K, &V) -> Result<(), ActorError>,
     {
         self.map.for_each_ranged(starting_key, max, &mut f)
+    }
+
+    pub fn for_each_until<F>(
+        &self,
+        starting_key: Option<&BytesKey>,
+        ending_key: &BytesKey,
+        mut f: F,
+    ) -> Result<(), ActorError>
+    where
+        F: FnMut(K, &V) -> Result<(), ActorError>,
+    {
+        self.map.for_each_until(starting_key, ending_key, &mut f)
     }
 }

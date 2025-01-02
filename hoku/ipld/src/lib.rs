@@ -8,6 +8,7 @@ use crate::hash_algorithm::FvmHashSha256;
 #[cfg(not(feature = "fil-actor"))]
 use fvm_ipld_hamt::Sha256;
 
+pub mod amt;
 pub mod hamt;
 mod hash_algorithm;
 

@@ -130,18 +130,6 @@ impl BlobsActor {
         let from = to_id_address(rt, params.from, true)?;
         require_addr_is_origin_or_caller(rt, from)?;
         let to = to_id_address(rt, params.to, true)?;
-        let caller_allowlist = if let Some(allowlist) = params.caller_allowlist {
-            let resolved: HashSet<_> = allowlist
-                .into_iter()
-                .map(|caller| {
-                    let caller = to_id_address(rt, caller, false)?;
-                    Ok::<Address, ActorError>(caller)
-                })
-                .collect::<Result<_, _>>()?;
-            Some(resolved)
-        } else {
-            None
-        };
         let hoku_config = hoku_config::get_config(rt)?;
         rt.transaction(|st: &mut State, rt| {
             st.approve_credit(
@@ -149,7 +137,6 @@ impl BlobsActor {
                 rt.store(),
                 from,
                 to,
-                caller_allowlist,
                 rt.curr_epoch(),
                 params.credit_limit,
                 params.gas_fee_limit,
@@ -168,12 +155,7 @@ impl BlobsActor {
         let from = to_id_address(rt, params.from, true)?;
         require_addr_is_origin_or_caller(rt, from)?;
         let to = to_id_address(rt, params.to, true)?;
-        let for_caller = if let Some(caller) = params.for_caller {
-            Some(to_id_address(rt, caller, false)?)
-        } else {
-            None
-        };
-        rt.transaction(|st: &mut State, rt| st.revoke_credit(rt.store(), from, to, for_caller))
+        rt.transaction(|st: &mut State, rt| st.revoke_credit(rt.store(), from, to))
     }
 
     /// Sets or unsets a default credit and gas sponsor from one account to another.
@@ -296,7 +278,6 @@ impl BlobsActor {
         rt.validate_immediate_caller_accept_any()?;
         let tokens_received = rt.message().value_received();
         let origin = rt.message().origin();
-        let caller = rt.message().caller();
         let subscriber = if let Some(sponsor) = params.sponsor {
             to_id_address(rt, sponsor, tokens_received.is_positive())?
         } else {
@@ -315,7 +296,6 @@ impl BlobsActor {
                 &hoku_config,
                 rt.store(),
                 origin,
-                caller,
                 subscriber,
                 rt.curr_epoch(),
                 params.hash,
@@ -429,7 +409,6 @@ impl BlobsActor {
     fn delete_blob(rt: &impl Runtime, params: DeleteBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let origin = rt.message().origin();
-        let caller = rt.message().caller();
         let subscriber = if let Some(sponsor) = params.sponsor {
             to_id_address(rt, sponsor, false)?
         } else {
@@ -439,7 +418,6 @@ impl BlobsActor {
             st.delete_blob(
                 rt.store(),
                 origin,
-                caller,
                 subscriber,
                 rt.curr_epoch(),
                 params.hash,
@@ -469,21 +447,18 @@ impl BlobsActor {
     ) -> Result<Subscription, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let origin = rt.message().origin();
-        let caller = rt.message().caller();
         let subscriber = if let Some(sponsor) = params.add.sponsor {
             to_id_address(rt, sponsor, false)?
         } else {
             origin
         };
         let hoku_config = hoku_config::get_config(rt)?;
-
         // The call should be atomic, hence we wrap two independent calls in a transaction.
         let (delete, subscription) = rt.transaction(|st: &mut State, rt| {
             let add_params = params.add;
             let delete = st.delete_blob(
                 rt.store(),
                 origin,
-                caller,
                 subscriber,
                 rt.curr_epoch(),
                 params.old_hash,
@@ -493,7 +468,6 @@ impl BlobsActor {
                 &hoku_config,
                 rt.store(),
                 origin,
-                caller,
                 subscriber,
                 rt.curr_epoch(),
                 add_params.hash,
@@ -619,6 +593,7 @@ mod tests {
     use super::*;
 
     use fendermint_actor_blobs_shared::state::Credit;
+    use fendermint_actor_blobs_testing::{new_hash, new_pk};
     use fendermint_actor_hoku_config_shared::{HokuConfig, HOKU_CONFIG_ACTOR_ADDR};
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::test_utils::{
@@ -630,24 +605,6 @@ mod tests {
     use fvm_shared::econ::TokenAmount;
     use fvm_shared::sys::SendFlags;
     use num_traits::Zero;
-    use rand::RngCore;
-
-    pub fn new_hash(size: usize) -> (Hash, u64) {
-        let mut rng = rand::thread_rng();
-        let mut data = vec![0u8; size];
-        rng.fill_bytes(&mut data);
-        (
-            Hash(*iroh_base::hash::Hash::new(&data).as_bytes()),
-            size as u64,
-        )
-    }
-
-    pub fn new_pk() -> PublicKey {
-        let mut rng = rand::thread_rng();
-        let mut data = [0u8; 32];
-        rng.fill_bytes(&mut data);
-        PublicKey(data)
-    }
 
     pub fn construct_and_verify() -> MockRuntime {
         let rt = MockRuntime {

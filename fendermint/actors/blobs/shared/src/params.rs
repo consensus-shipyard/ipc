@@ -4,13 +4,14 @@
 
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
-use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
-use crate::state::{BlobStatus, Credit, Hash, PublicKey, SubscriptionId, TtlStatus};
+use crate::state::{
+    BlobStatus, Credit, Hash, PublicKey, SubscriptionId, TokenCreditRate, TtlStatus,
+};
 
 /// Params for buying credits.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -227,8 +228,8 @@ pub struct GetStatsReturn {
     pub credit_committed: Credit,
     /// The total number of credits debited in the subnet.
     pub credit_debited: Credit,
-    /// The token to credit rate. The amount of atto credits that 1 atto buys.
-    pub token_credit_rate: BigInt,
+    /// The token to credit rate.
+    pub token_credit_rate: TokenCreditRate,
     /// Total number of debit accounts.
     pub num_accounts: u64,
     /// Total number of actively stored blobs.

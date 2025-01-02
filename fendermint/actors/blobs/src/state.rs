@@ -2,27 +2,34 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::{BTreeMap, HashMap, HashSet};
-use std::ops::Bound::{Included, Unbounded};
-use std::ops::Div;
+use std::collections::{HashMap, HashSet};
+use std::fmt::Display;
 
 use fendermint_actor_blobs_shared::params::GetStatsReturn;
 use fendermint_actor_blobs_shared::state::{
     Account, Blob, BlobStatus, Credit, CreditApproval, GasAllowance, Hash, PublicKey, Subscription,
-    SubscriptionGroup, SubscriptionId, TtlStatus,
+    SubscriptionGroup, SubscriptionId, TokenCreditRate, TtlStatus,
 };
 use fendermint_actor_hoku_config_shared::HokuConfig;
 use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::*;
+use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
+use hoku_ipld::hamt::MapKey;
 use log::{debug, warn};
 use num_traits::{ToPrimitive, Zero};
 
-use crate::state_fields::{AccountsState, BlobsProgressCollection, BlobsState};
+mod accounts;
+mod blobs;
+mod expiries;
+
+use accounts::AccountsState;
+use blobs::{BlobsProgressCollection, BlobsState};
+use expiries::{ExpiriesState, ExpiryUpdate};
 
 /// The state represents all accounts and stored blobs.
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
@@ -35,9 +42,8 @@ pub struct State {
     pub credit_committed: Credit,
     /// The total number of credits debited in the subnet.
     pub credit_debited: Credit,
-    /// The token to credit rate. The amount of atto credits that 1 atto buys.
     /// Map of expiries to blob hashes.
-    pub expiries: BTreeMap<ChainEpoch, HashMap<Address, HashMap<ExpiryKey, bool>>>,
+    pub expiries: ExpiriesState,
     /// Map of currently added blob hashes to account and source Iroh node IDs.
     pub added: BlobsProgressCollection,
     /// Map of currently pending blob hashes to account and source Iroh node IDs.
@@ -57,6 +63,26 @@ pub struct ExpiryKey {
     pub id: SubscriptionId,
 }
 
+impl Display for ExpiryKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ExpiryKey(hash: {}, id: {})", self.hash, self.id)
+    }
+}
+
+impl MapKey for ExpiryKey {
+    fn from_bytes(b: &[u8]) -> Result<Self, String> {
+        let raw_bytes = RawBytes::from(b.to_vec());
+        fil_actors_runtime::cbor::deserialize(&raw_bytes, "ExpiryKey")
+            .map_err(|e| format!("Failed to deserialize ExpiryKey {}", e))
+    }
+
+    fn to_bytes(&self) -> Result<Vec<u8>, String> {
+        let raw_bytes = fil_actors_runtime::cbor::serialize(self, "ExpiryKey")
+            .map_err(|e| format!("Failed to serialize ExpiryKey {}", e))?;
+        Ok(raw_bytes.to_vec())
+    }
+}
+
 impl ExpiryKey {
     /// Create a new expiry key.
     pub fn new(hash: Hash, id: &SubscriptionId) -> Self {
@@ -71,29 +97,15 @@ impl ExpiryKey {
 struct CreditDelegation<'a> {
     /// The address that is submitting the transaction to add this blob.
     pub origin: Address,
-    /// The address that is calling into the blob actor.
-    /// If the blob actor is accessed directly, this will be the same as "origin".
-    /// However, most of the time this will be the address of the actor instance that is
-    /// calling into the blobs actor, i.e., a specific Bucket or Timehub instance.
-    pub caller: Address,
-    /// Information about the approval that allows "origin" to use credits via "caller".
+    /// Information about the approval that allows "origin" to use credits.
     /// Note that the Address that has issued this approval (the subscriber/sponsor), and whose
     /// credits are being allowed to be used, are not stored internal to this struct.
     pub approval: &'a mut CreditApproval,
 }
 
 impl<'a> CreditDelegation<'a> {
-    pub fn new(origin: Address, caller: Address, approval: &'a mut CreditApproval) -> Self {
-        Self {
-            origin,
-            caller,
-            approval,
-        }
-    }
-
-    /// Tuple of (Origin, Caller) addresses.
-    pub fn addresses(&self) -> (Address, Address) {
-        (self.origin, self.caller)
+    pub fn new(origin: Address, approval: &'a mut CreditApproval) -> Self {
+        Self { origin, approval }
     }
 }
 
@@ -104,7 +116,7 @@ impl State {
             credit_sold: Credit::zero(),
             credit_committed: Credit::zero(),
             credit_debited: Credit::zero(),
-            expiries: BTreeMap::new(),
+            expiries: ExpiriesState::new(store)?,
             added: BlobsProgressCollection::default(),
             pending: BlobsProgressCollection::default(),
             accounts: AccountsState::new(store)?,
@@ -143,7 +155,8 @@ impl State {
                 "token amount must be positive".into(),
             ));
         }
-        let credits = Credit::from_atto(amount.atto().clone() * &hoku_config.token_credit_rate);
+
+        let credits: Credit = amount.clone() * &hoku_config.token_credit_rate;
         // Don't sell credits if we're at storage capacity
         if self.capacity_available(hoku_config.blob_capacity).is_zero() {
             return Err(ActorError::forbidden(
@@ -185,7 +198,7 @@ impl State {
                         "approval from {} to {} not found",
                         sponsor, from
                     )))?;
-            Some(CreditDelegation::new(from, from, approval))
+            Some(CreditDelegation::new(from, approval))
         } else {
             None
         };
@@ -219,7 +232,6 @@ impl State {
         store: &BS,
         from: Address,
         to: Address,
-        caller_allowlist: Option<HashSet<Address>>,
         current_epoch: ChainEpoch,
         credit_limit: Option<Credit>,
         gas_fee_limit: Option<TokenAmount>,
@@ -249,7 +261,6 @@ impl State {
                 expiry,
                 credit_used: Credit::zero(),
                 gas_fee_used: TokenAmount::zero(),
-                caller_allowlist: caller_allowlist.clone(),
             });
 
         // Validate approval changes
@@ -273,54 +284,29 @@ impl State {
         approval.credit_limit = credit_limit;
         approval.gas_fee_limit = gas_fee_limit;
         approval.expiry = expiry;
-        approval.caller_allowlist = caller_allowlist.clone();
         let approval = approval.clone();
         // Save account
         self.accounts
             .save_tracked(accounts.set_and_flush_tracked(&from, account)?);
 
         debug!(
-            "approved credits from {} to {} (credit limit: {:?}; gas fee limit: {:?}, expiry: {:?}, caller_allowlist: {:?})",
-            from, to, approval.credit_limit, approval.gas_fee_limit, approval.expiry, caller_allowlist
+            "approved credits from {} to {} (credit limit: {:?}; gas fee limit: {:?}, expiry: {:?}",
+            from, to, approval.credit_limit, approval.gas_fee_limit, approval.expiry
         );
         Ok(approval)
     }
 
     /// Revokes credit from one account to another.
-    /// If a caller is specified, this will remove it from the caller allowlist.
-    /// It is not possible to use this method to transform an approval with a caller allowlist
-    /// into one without a caller allowlist.
     pub fn revoke_credit<BS: Blockstore>(
         &mut self,
         store: &BS,
         from: Address,
         to: Address,
-        for_caller: Option<Address>,
     ) -> anyhow::Result<(), ActorError> {
         // Get the account
         let mut accounts = self.accounts.hamt(store)?;
         let mut account = accounts.get_or_err(&from)?;
-        if let Some(caller) = for_caller {
-            let approval =
-                account
-                    .approvals
-                    .get_mut(&to.to_string())
-                    .ok_or(ActorError::not_found(format!(
-                        "approval from {} to {} not found",
-                        from, to,
-                    )))?;
-            if !approval.remove_caller(&caller) {
-                return Err(ActorError::not_found(format!(
-                    "approval from {} to {} via caller {} not found",
-                    from, to, caller
-                )));
-            } else if !approval.has_allowlist() {
-                // Remove the entire approval.
-                // Otherwise, removing this caller would make the approval valid for any caller,
-                // which is likely not the intention.
-                account.approvals.remove(&to.to_string());
-            }
-        } else if account.approvals.remove(&to.to_string()).is_none() {
+        if account.approvals.remove(&to.to_string()).is_none() {
             return Err(ActorError::not_found(format!(
                 "approval from {} to {} not found",
                 from, to
@@ -330,10 +316,7 @@ impl State {
         self.accounts
             .save_tracked(accounts.set_and_flush_tracked(&from, account)?);
 
-        debug!(
-            "revoked credits from {} to {} (required_caller: {:?})",
-            from, to, for_caller
-        );
+        debug!("revoked credits from {} to {}", from, to);
         Ok(())
     }
 
@@ -470,60 +453,52 @@ impl State {
     ) -> anyhow::Result<HashSet<Hash>, ActorError> {
         // Delete expired subscriptions
         let mut delete_from_disc = HashSet::new();
-        let expiries: Vec<(ChainEpoch, HashMap<Address, HashMap<ExpiryKey, bool>>)> = self
-            .expiries
-            .range((Unbounded, Included(current_epoch)))
-            .map(|(expiry, entry)| (*expiry, entry.clone()))
-            .collect();
         let mut num_renewed = 0;
         let mut num_deleted = 0;
-        for (_, entry) in expiries {
-            for (subscriber, subs) in entry {
-                for (key, auto_renew) in subs {
-                    if auto_renew {
-                        if let Err(e) = self.renew_blob(
-                            hoku_config,
-                            store,
-                            subscriber,
-                            current_epoch,
-                            key.hash,
-                            key.id.clone(),
-                        ) {
-                            // Warn and skip down to delete
-                            warn!(
-                                "failed to renew blob {} for {} (id: {}): {}",
-                                key.hash, subscriber, key.id, e
-                            );
-                        } else {
-                            num_renewed += 1;
-                            continue;
-                        }
-                    }
-                    match self.delete_blob(
-                        store,
-                        subscriber,
-                        subscriber,
-                        subscriber,
-                        current_epoch,
-                        key.hash,
-                        key.id.clone(),
-                    ) {
-                        Ok(from_disc) => {
-                            num_deleted += 1;
-                            if from_disc {
-                                delete_from_disc.insert(key.hash);
-                            }
-                        }
-                        Err(e) => {
-                            warn!(
-                                "failed to delete blob {} for {} (id: {}): {}",
-                                key.hash, subscriber, key.id, e
-                            )
-                        }
-                    }
+        let expiries = self.expiries.clone();
+        expiries.foreach_up_to_epoch(store, current_epoch, |_, subscriber, key, auto_renew| {
+            if auto_renew {
+                if let Err(e) = self.renew_blob(
+                    hoku_config,
+                    store,
+                    subscriber,
+                    current_epoch,
+                    key.hash,
+                    key.id.clone(),
+                ) {
+                    // Warn and skip down to delete
+                    warn!(
+                        "failed to renew blob {} for {} (id: {}): {}",
+                        key.hash, subscriber, key.id, e
+                    );
+                } else {
+                    num_renewed += 1;
+                    return Ok(());
                 }
             }
-        }
+            match self.delete_blob(
+                store,
+                subscriber,
+                subscriber,
+                current_epoch,
+                key.hash,
+                key.id.clone(),
+            ) {
+                Ok(from_disc) => {
+                    num_deleted += 1;
+                    if from_disc {
+                        delete_from_disc.insert(key.hash);
+                    }
+                }
+                Err(e) => {
+                    warn!(
+                        "failed to delete blob {} for {} (id: {}): {}",
+                        key.hash, subscriber, key.id, e
+                    )
+                }
+            }
+            Ok(())
+        })?;
         debug!("renewed {} expired subscriptions", num_renewed);
         debug!("deleted {} expired subscriptions", num_deleted);
         debug!(
@@ -553,10 +528,6 @@ impl State {
     /// Add a blob.
     ///
     /// @param origin - The address that is submitting the transaction to add this blob.
-    /// @param caller - The address that is calling into this function.
-    //    If the blob actor is accessed directly, this will be the same as "origin".
-    //    However, most of the time this will be the address of the actor instance that is
-    //    calling into the blobs actor, i.e., a specific Bucket or Timehub instance.
     /// @param subscriber - The address responsible for the subscription to keep this blob around.
     ///   This is whose credits will be spent by this transaction, and going forward to continue to
     ///   pay for the blob over time. Generally, this is the owner of the wrapping Actor
@@ -567,7 +538,6 @@ impl State {
         hoku_config: &HokuConfig,
         store: &BS,
         origin: Address,
-        caller: Address,
         subscriber: Address,
         current_epoch: ChainEpoch,
         hash: Hash,
@@ -585,16 +555,16 @@ impl State {
         let (ttl, auto_renew) = self.accept_ttl(hoku_config, ttl, &account)?;
         // Get the credit delegation if needed
         let delegation = if origin != subscriber {
-            // Look for an approval for origin from subscriber and validate the caller is allowed.
-            let approval = account
-                .approvals
-                .get_mut(&origin.to_string())
-                .and_then(|approval| approval.is_caller_allowed(&caller).then_some(approval))
-                .ok_or(ActorError::forbidden(format!(
-                    "approval from {} to {} via caller {} not found",
-                    subscriber, origin, caller
-                )))?;
-            Some(CreditDelegation::new(origin, caller, approval))
+            // Look for an approval for origin from subscriber
+            let approval =
+                account
+                    .approvals
+                    .get_mut(&origin.to_string())
+                    .ok_or(ActorError::forbidden(format!(
+                        "approval from {} to {} not found",
+                        subscriber, origin
+                    )))?;
+            Some(CreditDelegation::new(origin, approval))
         } else {
             None
         };
@@ -652,20 +622,22 @@ impl State {
                 if let Some(sub) = group.subscriptions.get_mut(&id.to_string()) {
                     // Update expiry index
                     if expiry != sub.expiry {
-                        update_expiry_index(
-                            &mut self.expiries,
+                        self.expiries.update_index(
+                            store,
                             subscriber,
                             hash,
                             &id,
-                            Some((expiry, auto_renew)),
-                            Some(sub.expiry),
-                        );
+                            vec![
+                                ExpiryUpdate::Add(expiry, auto_renew),
+                                ExpiryUpdate::Remove(sub.expiry),
+                            ],
+                        )?;
                     }
                     sub.expiry = expiry;
                     sub.auto_renew = auto_renew;
                     // Overwrite source allows subscriber to retry resolving
                     sub.source = source;
-                    sub.delegate = delegation.as_ref().map(|d| d.addresses());
+                    sub.delegate = delegation.as_ref().map(|d| d.origin);
                     sub.failed = false;
                     debug!(
                         "updated subscription to blob {} for {} (key: {})",
@@ -679,7 +651,7 @@ impl State {
                         expiry,
                         auto_renew,
                         source,
-                        delegate: delegation.as_ref().map(|d| d.addresses()),
+                        delegate: delegation.as_ref().map(|d| d.origin),
                         failed: false,
                     };
                     group
@@ -690,14 +662,13 @@ impl State {
                         hash, subscriber, id
                     );
                     // Update expiry index
-                    update_expiry_index(
-                        &mut self.expiries,
+                    self.expiries.update_index(
+                        store,
                         subscriber,
                         hash,
                         &id,
-                        Some((expiry, auto_renew)),
-                        None,
-                    );
+                        vec![ExpiryUpdate::Add(expiry, auto_renew)],
+                    )?;
                     sub
                 }
             } else {
@@ -722,7 +693,7 @@ impl State {
                     expiry,
                     auto_renew,
                     source,
-                    delegate: delegation.as_ref().map(|d| d.addresses()),
+                    delegate: delegation.as_ref().map(|d| d.origin),
                     failed: false,
                 };
                 blob.subscribers.insert(
@@ -736,14 +707,13 @@ impl State {
                     hash, subscriber, id
                 );
                 // Update expiry index
-                update_expiry_index(
-                    &mut self.expiries,
+                self.expiries.update_index(
+                    store,
                     subscriber,
                     hash,
                     &id,
-                    Some((expiry, auto_renew)),
-                    None,
-                );
+                    vec![ExpiryUpdate::Add(expiry, auto_renew)],
+                )?;
                 sub
             };
             if !matches!(blob.status, BlobStatus::Resolved) {
@@ -782,7 +752,7 @@ impl State {
                 expiry,
                 auto_renew,
                 source,
-                delegate: delegation.as_ref().map(|d| d.addresses()),
+                delegate: delegation.as_ref().map(|d| d.origin),
                 failed: false,
             };
             let blob = Blob {
@@ -802,14 +772,13 @@ impl State {
                 hash, subscriber, id
             );
             // Update expiry index
-            update_expiry_index(
-                &mut self.expiries,
+            self.expiries.update_index(
+                store,
                 subscriber,
                 hash,
                 &id,
-                Some((expiry, auto_renew)),
-                None,
-            );
+                vec![ExpiryUpdate::Add(expiry, auto_renew)],
+            )?;
             // Add to added
             self.added
                 .insert(hash, HashSet::from([(subscriber, id, source)]), blob.size);
@@ -902,17 +871,17 @@ impl State {
                 "subscription id {} not found",
                 id.clone()
             )))?;
-        let delegation = if let Some((origin, caller)) = sub.delegate {
-            // Look for an approval for origin from subscriber and validate the caller is allowed.
-            let approval = account
-                .approvals
-                .get_mut(&origin.to_string())
-                .and_then(|approval| approval.is_caller_allowed(&caller).then_some(approval))
-                .ok_or(ActorError::forbidden(format!(
-                    "approval from {} to {} via caller {} not found",
-                    subscriber, origin, caller
-                )))?;
-            Some(CreditDelegation::new(origin, caller, approval))
+        let delegation = if let Some(origin) = sub.delegate {
+            // Look for an approval for origin from subscriber.
+            let approval =
+                account
+                    .approvals
+                    .get_mut(&origin.to_string())
+                    .ok_or(ActorError::forbidden(format!(
+                        "approval from {} to {} not found",
+                        subscriber, origin
+                    )))?;
+            Some(CreditDelegation::new(origin, approval))
         } else {
             None
         };
@@ -955,14 +924,16 @@ impl State {
         )?;
         // Update expiry index
         if expiry != sub.expiry {
-            update_expiry_index(
-                &mut self.expiries,
+            self.expiries.update_index(
+                store,
                 subscriber,
                 hash,
                 &id,
-                Some((expiry, sub.auto_renew)),
-                Some(sub.expiry),
-            );
+                vec![
+                    ExpiryUpdate::Add(expiry, sub.auto_renew),
+                    ExpiryUpdate::Remove(sub.expiry),
+                ],
+            )?;
         }
         sub.expiry = expiry;
         debug!(
@@ -1140,13 +1111,12 @@ impl State {
                 id.clone()
             )))?;
         // Do not error if the approval was removed while this blob was pending
-        let delegation = if let Some((origin, caller)) = sub.delegate {
-            // Look for an approval for origin from subscriber and validate the caller is allowed.
+        let delegation = if let Some(origin) = sub.delegate {
+            // Look for an approval for origin from subscriber
             account
                 .approvals
                 .get_mut(&origin.to_string())
-                .and_then(|approval| approval.is_caller_allowed(&caller).then_some(approval))
-                .map(|approval| CreditDelegation::new(origin, caller, approval))
+                .map(|approval| CreditDelegation::new(origin, approval))
         } else {
             None
         };
@@ -1218,7 +1188,6 @@ impl State {
         &mut self,
         store: &BS,
         origin: Address,
-        caller: Address,
         subscriber: Address,
         current_epoch: ChainEpoch,
         hash: Hash,
@@ -1257,21 +1226,18 @@ impl State {
                 "subscription id {} not found",
                 id.clone()
             )))?;
-        let delegation = if let Some((origin, caller)) = sub.delegate {
-            // Look for an approval for origin from subscriber and validate the caller is allowed.
-            let approval = account
-                .approvals
-                .get_mut(&origin.to_string())
-                .and_then(|approval| approval.is_caller_allowed(&caller).then_some(approval));
+        let delegation = if let Some(origin) = sub.delegate {
+            // Look for an approval for origin from subscriber
+            let approval = account.approvals.get_mut(&origin.to_string());
             if let Some(approval) = approval {
-                Some(CreditDelegation::new(origin, caller, approval))
+                Some(CreditDelegation::new(origin, approval))
             } else {
                 // Approval may have been removed, or this is a call from the system actor,
                 // in which case the origin will be supplied as the subscriber
                 if origin != subscriber {
                     return Err(ActorError::forbidden(format!(
-                        "approval from {} to {} via caller {} not found",
-                        subscriber, origin, caller
+                        "approval from {} to {} not found",
+                        subscriber, origin
                     )));
                 }
                 None
@@ -1279,32 +1245,30 @@ impl State {
         } else {
             None
         };
-        // If the subscription does not have a delegate, the caller must be the subscriber.
-        // If the subscription has a delegate, it must be the caller or the
-        // caller must be the subscriber.
+        // If the subscription does not have a delegate, the origin must be the subscriber.
+        // If the subscription has a delegate, it must be the origin or the
+        // origin must be the subscriber.
         match &delegation {
             None => {
                 if origin != subscriber {
                     return Err(ActorError::forbidden(format!(
                         "origin {} is not subscriber {} for blob {}",
-                        caller, subscriber, hash
+                        origin, subscriber, hash
                     )));
                 }
             }
             Some(delegation) => {
-                if !(origin == delegation.origin && caller == delegation.caller)
-                    && origin != subscriber
-                {
+                if origin != delegation.origin && origin != subscriber {
                     return Err(ActorError::forbidden(format!(
-                        "origin {} is not delegate origin {} or caller {} is not delegate caller {} or subscriber {} for blob {}",
-                        origin, delegation.origin, caller, delegation.caller, subscriber, hash
+                        "origin {} is not delegate origin {} or subscriber {} for blob {}",
+                        origin, delegation.origin, subscriber, hash
                     )));
                 }
                 if let Some(expiry) = delegation.approval.expiry {
                     if expiry <= current_epoch {
                         return Err(ActorError::forbidden(format!(
-                            "approval from {} to {} via caller {} expired",
-                            subscriber, delegation.origin, delegation.caller
+                            "approval from {} to {} expired",
+                            subscriber, delegation.origin
                         )));
                     }
                 }
@@ -1374,14 +1338,13 @@ impl State {
             }
         }
         // Update expiry index
-        update_expiry_index(
-            &mut self.expiries,
+        self.expiries.update_index(
+            store,
             subscriber,
             hash,
             &id,
-            None,
-            Some(sub.expiry),
-        );
+            vec![ExpiryUpdate::Remove(sub.expiry)],
+        )?;
         // Remove entry from added
         self.added
             .remove_entry(hash, subscriber, id.clone(), sub.source, blob.size);
@@ -1458,7 +1421,6 @@ impl State {
                                     store,
                                     subscriber,
                                     subscriber,
-                                    subscriber,
                                     current_epoch,
                                     hash,
                                     SubscriptionId::new(&id.clone())?,
@@ -1469,7 +1431,6 @@ impl State {
                                 self.add_blob(
                                     hoku_config,
                                     store,
-                                    subscriber,
                                     subscriber,
                                     subscriber,
                                     current_epoch,
@@ -1488,13 +1449,12 @@ impl State {
                             && sub.auto_renew
                             && new_ttl != ChainEpoch::MAX
                         {
-                            // if extended user added a blob with no TTL (i.e. with auto renew) and
-                            // then switched to default account, we need to set the TTL to the default
-                            // max TTL with no auto renew
+                            // If an extended user added a blob with no TTL (i.e., with auto-renew)
+                            // and then switched to a default account, we need to set the TTL to the
+                            // default max TTL with no auto-renew.
                             self.add_blob(
                                 hoku_config,
                                 store,
-                                subscriber,
                                 subscriber,
                                 subscriber,
                                 current_epoch,
@@ -1598,7 +1558,7 @@ fn ensure_credit_or_buy(
     account_credit_free: &mut Credit,
     state_credit_sold: &mut Credit,
     credit_required: &Credit,
-    token_credit_rate: &BigInt,
+    token_credit_rate: &TokenCreditRate,
     tokens_received: &TokenAmount,
     subscriber: &Address,
     current_epoch: ChainEpoch,
@@ -1615,9 +1575,8 @@ fn ensure_credit_or_buy(
             // Try buying credits for self
             let not_enough_credits = *account_credit_free < *credit_required;
             if not_enough_credits {
-                let credits_needed = credit_required - &*account_credit_free;
-                let tokens_needed =
-                    TokenAmount::from_atto(credits_needed.atto().clone().div(token_credit_rate));
+                let credits_needed: Credit = credit_required - &*account_credit_free;
+                let tokens_needed = &credits_needed / token_credit_rate;
                 if tokens_needed <= *tokens_received {
                     let tokens_to_rebate = tokens_received - tokens_needed;
                     *state_credit_sold += &credits_needed;
@@ -1667,16 +1626,16 @@ fn ensure_delegated_credit(
             let unused = &(limit - &delegation.approval.credit_used);
             if unused < credit_required {
                 return Err(ActorError::insufficient_funds(format!(
-                    "approval from {} to {} via caller {} has insufficient credit (available: {}; required: {})",
-                    subscriber, delegation.origin, delegation.caller, unused, credit_required
+                    "approval from {} to {} has insufficient credit (available: {}; required: {})",
+                    subscriber, delegation.origin, unused, credit_required
                 )));
             }
         }
         if let Some(expiry) = delegation.approval.expiry {
             if expiry <= current_epoch {
                 return Err(ActorError::forbidden(format!(
-                    "approval from {} to {} via caller {} expired",
-                    subscriber, delegation.origin, delegation.caller
+                    "approval from {} to {} expired",
+                    subscriber, delegation.origin
                 )));
             }
         }
@@ -1695,16 +1654,16 @@ fn ensure_gas_limit(
             let unused = &(limit - &delegation.approval.gas_fee_used);
             if unused < gas_required {
                 return Err(ActorError::insufficient_funds(format!(
-                    "approval from {} to {} via caller {} has insufficient credit (available: {}; required: {})",
-                    subscriber, delegation.origin, delegation.caller, unused, gas_required
+                    "approval from {} to {} has insufficient credit (available: {}; required: {})",
+                    subscriber, delegation.origin, unused, gas_required
                 )));
             }
         }
         if let Some(expiry) = delegation.approval.expiry {
             if expiry <= current_epoch {
                 return Err(ActorError::forbidden(format!(
-                    "approval from {} to {} via caller {} expired",
-                    subscriber, delegation.origin, delegation.caller
+                    "approval from {} to {} expired",
+                    subscriber, delegation.origin
                 )));
             }
         }
@@ -1712,107 +1671,19 @@ fn ensure_gas_limit(
     Ok(())
 }
 
-fn update_expiry_index(
-    expiries: &mut BTreeMap<ChainEpoch, HashMap<Address, HashMap<ExpiryKey, bool>>>,
-    subscriber: Address,
-    hash: Hash,
-    id: &SubscriptionId,
-    add: Option<(ChainEpoch, bool)>,
-    remove: Option<ChainEpoch>,
-) {
-    if let Some((add, auto_renew)) = add {
-        expiries
-            .entry(add)
-            .and_modify(|entry| {
-                entry
-                    .entry(subscriber)
-                    .and_modify(|subs| {
-                        subs.insert(ExpiryKey::new(hash, id), auto_renew);
-                    })
-                    .or_insert(HashMap::from([(ExpiryKey::new(hash, id), auto_renew)]));
-            })
-            .or_insert(HashMap::from([(
-                subscriber,
-                HashMap::from([(ExpiryKey::new(hash, id), auto_renew)]),
-            )]));
-    }
-    if let Some(remove) = remove {
-        if let Some(entry) = expiries.get_mut(&remove) {
-            if let Some(subs) = entry.get_mut(&subscriber) {
-                subs.remove(&ExpiryKey::new(hash, id));
-                if subs.is_empty() {
-                    entry.remove(&subscriber);
-                }
-            }
-            if entry.is_empty() {
-                expiries.remove(&remove);
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    use fendermint_actor_blobs_testing::{
+        new_address, new_hash, new_metadata_hash, new_pk, setup_logs,
+    };
     use fvm_ipld_blockstore::MemoryBlockstore;
 
-    use rand::RngCore;
-
-    fn setup_logs() {
-        use tracing_subscriber::layer::SubscriberExt;
-        use tracing_subscriber::util::SubscriberInitExt;
-        use tracing_subscriber::EnvFilter;
-        tracing_subscriber::registry()
-            .with(
-                tracing_subscriber::fmt::layer()
-                    .event_format(tracing_subscriber::fmt::format().with_line_number(true))
-                    .with_writer(std::io::stdout),
-            )
-            .with(EnvFilter::from_default_env())
-            .try_init()
-            .ok();
-    }
-
-    fn new_hash(size: usize) -> (Hash, u64) {
-        let mut rng = rand::thread_rng();
-        let mut data = vec![0u8; size];
-        rng.fill_bytes(&mut data);
-        (
-            Hash(*iroh_base::hash::Hash::new(&data).as_bytes()),
-            size as u64,
-        )
-    }
-
-    fn new_metadata_hash() -> Hash {
-        let mut rng = rand::thread_rng();
-        let mut data = vec![0u8; 8];
-        rng.fill_bytes(&mut data);
-        Hash(*iroh_base::hash::Hash::new(&data).as_bytes())
-    }
-
-    pub fn new_pk() -> PublicKey {
-        let mut rng = rand::thread_rng();
-        let mut data = [0u8; 32];
-        rng.fill_bytes(&mut data);
-        PublicKey(data)
-    }
-
-    // The state does not care about the address type.
-    // We use an actor style (t/f2) addresses because they are straightforward to create.
-    fn new_address() -> Address {
-        let mut rng = rand::thread_rng();
-        let mut data = vec![0u8; 32];
-        rng.fill_bytes(&mut data);
-        Address::new_actor(&data)
-    }
-
-    fn check_approval(account: Account, origin: Address, caller: Address, expect_used: Credit) {
+    fn check_approval(account: Account, origin: Address, expect_used: Credit) {
         if !account.approvals.is_empty() {
             let approval = account.approvals.get(&origin.to_string()).unwrap();
-            if origin != caller {
-                assert!(approval.has_allowlist() && approval.is_caller_allowed(&caller));
-            }
+
             assert_eq!(approval.credit_used, expect_used);
         }
     }
@@ -1829,7 +1700,7 @@ mod tests {
         let res = state.buy_credit(&hoku_config, &store, to, amount.clone(), 1);
         assert!(res.is_ok());
         let account = res.unwrap();
-        let credit_sold = Credit::from_whole(amount.atto().clone());
+        let credit_sold = amount.clone() * &hoku_config.token_credit_rate;
         assert_eq!(account.credit_free, credit_sold);
         assert_eq!(account.gas_allowance, amount);
         assert_eq!(state.credit_sold, credit_sold);
@@ -1886,7 +1757,6 @@ mod tests {
             &store,
             from,
             to,
-            None,
             current_epoch,
             None,
             None,
@@ -1905,7 +1775,6 @@ mod tests {
             &store,
             from,
             to,
-            None,
             current_epoch,
             Some(Credit::from_whole(limit)),
             None,
@@ -1924,7 +1793,6 @@ mod tests {
             &store,
             from,
             to,
-            None,
             current_epoch,
             None,
             Some(TokenAmount::from_atto(limit)),
@@ -1943,7 +1811,6 @@ mod tests {
             &store,
             from,
             to,
-            None,
             current_epoch,
             Some(Credit::from_whole(limit)),
             None,
@@ -1954,27 +1821,6 @@ mod tests {
         assert_eq!(approval.credit_limit, Some(Credit::from_whole(limit)));
         assert_eq!(approval.gas_fee_limit, None);
         assert_eq!(approval.expiry, Some(ttl + current_epoch));
-
-        // Require caller
-        let require_caller = new_address();
-        let res = state.approve_credit(
-            &hoku_config,
-            &store,
-            from,
-            to,
-            Some(HashSet::from([require_caller])),
-            current_epoch,
-            None,
-            None,
-            None,
-        );
-        assert!(res.is_ok());
-
-        // Check the account approvals
-        let account = state.get_account(&store, from).unwrap().unwrap();
-        assert_eq!(account.approvals.len(), 1);
-        let approval = account.approvals.get(&to.to_string()).unwrap();
-        assert!(approval.has_allowlist() && approval.is_caller_allowed(&require_caller));
     }
 
     #[test]
@@ -1993,7 +1839,6 @@ mod tests {
             &store,
             from,
             to,
-            None,
             current_epoch,
             None,
             None,
@@ -2025,7 +1870,6 @@ mod tests {
             &store,
             from,
             to,
-            None,
             current_epoch,
             None,
             None,
@@ -2038,7 +1882,6 @@ mod tests {
         let res = state.add_blob(
             &hoku_config,
             &store,
-            to,
             to,
             from,
             current_epoch,
@@ -2064,7 +1907,6 @@ mod tests {
             &store,
             from,
             to,
-            None,
             current_epoch,
             Some(Credit::from_whole(limit)),
             None,
@@ -2095,7 +1937,6 @@ mod tests {
             &store,
             from,
             to,
-            None,
             current_epoch,
             None,
             None,
@@ -2106,32 +1947,9 @@ mod tests {
         // Check the account approval
         let account = state.get_account(&store, from).unwrap().unwrap();
         assert_eq!(account.approvals.len(), 1);
-        let approval = account.approvals.get(&to.to_string()).unwrap();
-        assert!(!approval.has_allowlist());
-
-        // Update the approval with a required caller
-        let require_caller = new_address();
-        let res = state.approve_credit(
-            &hoku_config,
-            &store,
-            from,
-            to,
-            Some(HashSet::from([require_caller])),
-            current_epoch,
-            None,
-            None,
-            None,
-        );
-        assert!(res.is_ok());
-
-        // Check the account approval
-        let account = state.get_account(&store, from).unwrap().unwrap();
-        assert_eq!(account.approvals.len(), 1);
-        let approval = account.approvals.get(&to.to_string()).unwrap();
-        assert!(approval.has_allowlist() && approval.is_caller_allowed(&require_caller));
 
         // Remove the approval
-        let res = state.revoke_credit(&store, from, to, None);
+        let res = state.revoke_credit(&store, from, to);
         assert!(res.is_ok());
         let account = state.get_account(&store, from).unwrap().unwrap();
         assert_eq!(account.approvals.len(), 0);
@@ -2145,7 +1963,7 @@ mod tests {
         let from = new_address();
         let to = new_address();
 
-        let res = state.revoke_credit(&store, from, to, None);
+        let res = state.revoke_credit(&store, from, to);
         assert!(res.is_err());
         assert_eq!(
             res.err().unwrap().msg(),
@@ -2175,7 +1993,6 @@ mod tests {
             &hoku_config,
             &store,
             state,
-            origin,
             origin,
             origin,
             current_epoch,
@@ -2208,7 +2025,6 @@ mod tests {
                 &store,
                 subscriber,
                 origin,
-                None,
                 current_epoch,
                 None,
                 None,
@@ -2219,7 +2035,6 @@ mod tests {
             &hoku_config,
             &store,
             state,
-            origin,
             origin,
             subscriber,
             current_epoch,
@@ -2233,7 +2048,6 @@ mod tests {
         store: &BS,
         mut state: State,
         origin: Address,
-        caller: Address,
         subscriber: Address,
         current_epoch: ChainEpoch,
         token_amount: TokenAmount,
@@ -2251,7 +2065,6 @@ mod tests {
             hoku_config,
             &store,
             origin,
-            caller,
             subscriber,
             add1_epoch,
             hash,
@@ -2320,7 +2133,6 @@ mod tests {
             hoku_config,
             &store,
             origin,
-            caller,
             subscriber,
             add2_epoch,
             hash,
@@ -2399,24 +2211,18 @@ mod tests {
         assert_eq!(state.credit_committed, Credit::from_whole(0)); // credit was released
         assert_eq!(
             state.credit_debited,
-            Credit::from_atto(token_amount.atto().clone() * &hoku_config.token_credit_rate)
-                - &account.credit_free
+            token_amount * &hoku_config.token_credit_rate - &account.credit_free
         );
         assert_eq!(state.capacity_used, 0); // capacity was released
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 0);
+        assert_eq!(state.expiries.len(store).unwrap(), 0);
         assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
 
         // Check approval
         let account_committed = account.credit_committed.clone();
-        check_approval(
-            account,
-            origin,
-            caller,
-            state.credit_debited + account_committed,
-        );
+        check_approval(account, origin, state.credit_debited + account_committed);
     }
 
     #[test]
@@ -2441,7 +2247,6 @@ mod tests {
             &hoku_config,
             &store,
             state,
-            origin,
             origin,
             origin,
             current_epoch,
@@ -2474,7 +2279,6 @@ mod tests {
                 &store,
                 subscriber,
                 origin,
-                None,
                 current_epoch,
                 None,
                 None,
@@ -2485,7 +2289,6 @@ mod tests {
             &hoku_config,
             &store,
             state,
-            origin,
             origin,
             subscriber,
             current_epoch,
@@ -2499,14 +2302,12 @@ mod tests {
         store: &BS,
         mut state: State,
         origin: Address,
-        caller: Address,
         subscriber: Address,
         current_epoch: ChainEpoch,
         token_amount: TokenAmount,
     ) {
         let token_credit_rate = BigInt::from(1_000_000_000_000_000_000u64);
-        let mut credit_amount =
-            Credit::from_atto(token_amount.atto().clone() * &hoku_config.token_credit_rate);
+        let mut credit_amount = token_amount.clone() * &hoku_config.token_credit_rate;
         // Add blob with default a subscription ID
         let (hash1, size1) = new_hash(1024);
         let add1_epoch = current_epoch;
@@ -2516,7 +2317,6 @@ mod tests {
             hoku_config,
             &store,
             origin,
-            caller,
             subscriber,
             add1_epoch,
             hash1,
@@ -2561,7 +2361,6 @@ mod tests {
             hoku_config,
             &store,
             origin,
-            caller,
             subscriber,
             add2_epoch,
             hash2,
@@ -2599,15 +2398,13 @@ mod tests {
         assert_eq!(state.credit_committed, account.credit_committed);
         assert_eq!(
             state.credit_debited,
-            Credit::from_atto(
-                token_amount.atto() * &token_credit_rate
-                    - (&account.credit_free + &account.credit_committed).atto()
-            )
+            (token_amount.clone() * &token_credit_rate)
+                - (&account.credit_free + &account.credit_committed)
         );
         assert_eq!(state.capacity_used, account.capacity_used);
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 2);
+        assert_eq!(state.expiries.len(store).unwrap(), 2);
         assert_eq!(state.added.len(), 2);
         assert_eq!(state.pending.len(), 0);
 
@@ -2619,7 +2416,6 @@ mod tests {
             hoku_config,
             &store,
             origin,
-            caller,
             subscriber,
             add3_epoch,
             hash1,
@@ -2658,26 +2454,19 @@ mod tests {
         assert_eq!(state.credit_committed, account.credit_committed);
         assert_eq!(
             state.credit_debited,
-            Credit::from_atto(
-                token_amount.atto() * &token_credit_rate
-                    - (&account.credit_free + &account.credit_committed).atto()
-            )
+            token_amount.clone() * &token_credit_rate
+                - (&account.credit_free + &account.credit_committed)
         );
         assert_eq!(state.capacity_used, account.capacity_used);
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 2);
+        assert_eq!(state.expiries.len(store).unwrap(), 2);
         assert_eq!(state.added.len(), 2);
         assert_eq!(state.pending.len(), 0);
 
         // Check approval
         let account_committed = account.credit_committed.clone();
-        check_approval(
-            account,
-            origin,
-            caller,
-            state.credit_debited + account_committed,
-        );
+        check_approval(account, origin, state.credit_debited + account_committed);
     }
 
     #[test]
@@ -2702,7 +2491,6 @@ mod tests {
             &hoku_config,
             &store,
             state,
-            origin,
             origin,
             origin,
             current_epoch,
@@ -2735,7 +2523,6 @@ mod tests {
                 &store,
                 subscriber,
                 origin,
-                None,
                 current_epoch,
                 None,
                 None,
@@ -2746,7 +2533,6 @@ mod tests {
             &hoku_config,
             &store,
             state,
-            origin,
             origin,
             subscriber,
             current_epoch,
@@ -2761,7 +2547,6 @@ mod tests {
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let origin = new_address();
-        let caller = new_address();
         let subscriber = new_address();
         let current_epoch = ChainEpoch::from(1);
         let token_amount = TokenAmount::from_whole(10);
@@ -2780,7 +2565,6 @@ mod tests {
                 &store,
                 subscriber,
                 origin,
-                Some(HashSet::from([caller])),
                 current_epoch,
                 None,
                 None,
@@ -2792,7 +2576,6 @@ mod tests {
             &store,
             state,
             origin,
-            caller,
             subscriber,
             current_epoch,
             token_amount,
@@ -2805,7 +2588,6 @@ mod tests {
         store: &BS,
         mut state: State,
         origin: Address,
-        caller: Address,
         subscriber: Address,
         current_epoch: ChainEpoch,
         token_amount: TokenAmount,
@@ -2826,7 +2608,6 @@ mod tests {
             hoku_config,
             &store,
             origin,
-            caller,
             subscriber,
             add1_epoch,
             hash,
@@ -2845,7 +2626,7 @@ mod tests {
         assert_eq!(sub.source, source);
         assert!(!sub.failed);
         if subscriber != origin {
-            assert_eq!(sub.delegate, Some((origin, caller)));
+            assert_eq!(sub.delegate, Some(origin));
         }
 
         // Check stats
@@ -2928,7 +2709,6 @@ mod tests {
             hoku_config,
             &store,
             origin,
-            caller,
             subscriber,
             add2_epoch,
             hash,
@@ -2947,7 +2727,7 @@ mod tests {
         assert_eq!(sub.source, source);
         assert!(!sub.failed);
         if subscriber != origin {
-            assert_eq!(sub.delegate, Some((origin, caller)));
+            assert_eq!(sub.delegate, Some(origin));
         }
 
         // Check the blob status
@@ -2988,7 +2768,6 @@ mod tests {
             hoku_config,
             &store,
             origin,
-            caller,
             subscriber,
             add3_epoch,
             hash,
@@ -3007,7 +2786,7 @@ mod tests {
         assert_eq!(sub.source, source);
         assert!(!sub.failed);
         if subscriber != origin {
-            assert_eq!(sub.delegate, Some((origin, caller)));
+            assert_eq!(sub.delegate, Some(origin));
         }
 
         // Check stats
@@ -3068,21 +2847,13 @@ mod tests {
         assert_eq!(account.capacity_used, size); // not changed
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 2);
+        assert_eq!(state.expiries.len(store).unwrap(), 2);
         assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
 
         // Delete the default subscription ID
         let delete_epoch = ChainEpoch::from(51);
-        let res = state.delete_blob(
-            &store,
-            origin,
-            caller,
-            subscriber,
-            delete_epoch,
-            hash,
-            id1.clone(),
-        );
+        let res = state.delete_blob(&store, origin, subscriber, delete_epoch, hash, id1.clone());
         assert!(res.is_ok());
         let delete_from_disk = res.unwrap();
         assert!(!delete_from_disk);
@@ -3116,26 +2887,19 @@ mod tests {
         assert_eq!(state.credit_committed, account.credit_committed);
         assert_eq!(
             state.credit_debited,
-            Credit::from_atto(
-                token_amount.atto() * &hoku_config.token_credit_rate
-                    - (&account.credit_free + &account.credit_committed).atto()
-            )
+            (token_amount.clone() * &hoku_config.token_credit_rate)
+                - (&account.credit_free + &account.credit_committed)
         );
         assert_eq!(state.capacity_used, size);
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 1);
+        assert_eq!(state.expiries.len(store).unwrap(), 1);
         assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
 
         // Check approval
         let account_committed = account.credit_committed.clone();
-        check_approval(
-            account,
-            origin,
-            caller,
-            state.credit_debited + account_committed,
-        );
+        check_approval(account, origin, state.credit_debited + account_committed);
     }
 
     #[test]
@@ -3156,8 +2920,7 @@ mod tests {
                 current_epoch,
             )
             .unwrap();
-        let mut credit_amount =
-            Credit::from_atto(amount.atto().clone() * &hoku_config.token_credit_rate);
+        let mut credit_amount = amount.clone() * &hoku_config.token_credit_rate;
 
         assert!(state
             .set_account_status(&store, subscriber, TtlStatus::Extended, current_epoch)
@@ -3170,7 +2933,6 @@ mod tests {
         let res = state.add_blob(
             &hoku_config,
             &store,
-            subscriber,
             subscriber,
             subscriber,
             add_epoch,
@@ -3241,15 +3003,13 @@ mod tests {
         assert_eq!(state.credit_committed, account.credit_committed);
         assert_eq!(
             state.credit_debited,
-            Credit::from_atto(
-                amount.atto() * hoku_config.token_credit_rate
-                    - (&account.credit_free + &account.credit_committed).atto()
-            )
+            amount.clone() * &hoku_config.token_credit_rate
+                - (&account.credit_free + &account.credit_committed)
         );
         assert_eq!(state.capacity_used, account.capacity_used);
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 1);
+        assert_eq!(state.expiries.len(&store).unwrap(), 1);
         assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
     }
@@ -3272,8 +3032,7 @@ mod tests {
                 current_epoch,
             )
             .unwrap();
-        let mut credit_amount =
-            Credit::from_atto(amount.atto().clone() * &hoku_config.token_credit_rate);
+        let mut credit_amount = amount.clone() * &hoku_config.token_credit_rate;
 
         assert!(state
             .set_account_status(&store, subscriber, TtlStatus::Extended, current_epoch)
@@ -3287,7 +3046,6 @@ mod tests {
         let res = state.add_blob(
             &hoku_config,
             &store,
-            subscriber,
             subscriber,
             subscriber,
             add1_epoch,
@@ -3322,7 +3080,6 @@ mod tests {
             &store,
             subscriber,
             subscriber,
-            subscriber,
             add2_epoch,
             hash2,
             new_metadata_hash(),
@@ -3351,15 +3108,13 @@ mod tests {
         assert_eq!(state.credit_committed, account.credit_committed);
         assert_eq!(
             state.credit_debited,
-            Credit::from_atto(
-                amount.atto() * &hoku_config.token_credit_rate
-                    - (&account.credit_free + &account.credit_committed).atto()
-            )
+            amount.clone() * &hoku_config.token_credit_rate
+                - (&account.credit_free + &account.credit_committed)
         );
         assert_eq!(state.capacity_used, account.capacity_used);
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 2);
+        assert_eq!(state.expiries.len(&store).unwrap(), 2);
         assert_eq!(state.added.len(), 2);
         assert_eq!(state.pending.len(), 0);
 
@@ -3395,15 +3150,13 @@ mod tests {
         assert_eq!(state.credit_committed, account.credit_committed);
         assert_eq!(
             state.credit_debited,
-            Credit::from_atto(
-                amount.atto() * &hoku_config.token_credit_rate
-                    - (&account.credit_free + &account.credit_committed).atto()
-            )
+            amount.clone() * &hoku_config.token_credit_rate
+                - (&account.credit_free + &account.credit_committed)
         );
         assert_eq!(state.capacity_used, account.capacity_used);
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 2);
+        assert_eq!(state.expiries.len(&store).unwrap(), 2);
         assert_eq!(state.added.len(), 2);
         assert_eq!(state.pending.len(), 0);
     }
@@ -3432,7 +3185,6 @@ mod tests {
         let res = state.add_blob(
             &hoku_config,
             &store,
-            subscriber,
             subscriber,
             subscriber,
             current_epoch,
@@ -3490,7 +3242,6 @@ mod tests {
             &store,
             subscriber,
             subscriber,
-            subscriber,
             current_epoch,
             hash,
             new_metadata_hash(),
@@ -3526,7 +3277,7 @@ mod tests {
         assert!(matches!(status, BlobStatus::Resolved));
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 1);
+        assert_eq!(state.expiries.len(&store).unwrap(), 1);
         assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
     }
@@ -3549,8 +3300,7 @@ mod tests {
                 current_epoch,
             )
             .unwrap();
-        let credit_amount =
-            Credit::from_atto(amount.atto().clone() * &hoku_config.token_credit_rate);
+        let credit_amount = amount * &hoku_config.token_credit_rate;
 
         // Add a blob
         let add_epoch = current_epoch;
@@ -3559,7 +3309,6 @@ mod tests {
         let res = state.add_blob(
             &hoku_config,
             &store,
-            subscriber,
             subscriber,
             subscriber,
             add_epoch,
@@ -3609,7 +3358,7 @@ mod tests {
         assert_eq!(state.capacity_used, 0); // capacity was released
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 1); // remains until the blob is explicitly deleted
+        assert_eq!(state.expiries.len(&store).unwrap(), 1); // remains until the blob is explicitly deleted
         assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
     }
@@ -3632,8 +3381,7 @@ mod tests {
                 current_epoch,
             )
             .unwrap();
-        let mut credit_amount =
-            Credit::from_atto(amount.atto().clone() * &hoku_config.token_credit_rate);
+        let mut credit_amount = amount.clone() * &hoku_config.token_credit_rate;
 
         assert!(state
             .set_account_status(&store, subscriber, TtlStatus::Extended, current_epoch)
@@ -3646,7 +3394,6 @@ mod tests {
         let res = state.add_blob(
             &hoku_config,
             &store,
-            subscriber,
             subscriber,
             subscriber,
             add_epoch,
@@ -3732,7 +3479,7 @@ mod tests {
         assert_eq!(account.credit_committed, Credit::from_whole(0)); // credit was released
         assert_eq!(
             account.credit_free,
-            Credit::from_atto(amount.atto().clone() * &hoku_config.token_credit_rate)
+            amount.clone() * &hoku_config.token_credit_rate
         ); // credit was refunded
         assert_eq!(account.capacity_used, 0); // capacity was released
 
@@ -3742,7 +3489,7 @@ mod tests {
         assert_eq!(state.capacity_used, 0); // capacity was released
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 1); // remains until the blob is explicitly deleted
+        assert_eq!(state.expiries.len(&store).unwrap(), 1); // remains until the blob is explicitly deleted
         assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
     }
@@ -3769,7 +3516,6 @@ mod tests {
             &hoku_config,
             &store,
             state,
-            origin,
             origin,
             origin,
             current_epoch,
@@ -3802,7 +3548,6 @@ mod tests {
                 &store,
                 subscriber,
                 origin,
-                None,
                 current_epoch,
                 None,
                 None,
@@ -3813,7 +3558,6 @@ mod tests {
             &hoku_config,
             &store,
             state,
-            origin,
             origin,
             subscriber,
             current_epoch,
@@ -3942,7 +3686,6 @@ mod tests {
                 &store,
                 subscriber,
                 subscriber,
-                subscriber,
                 current_epoch,
                 hash,
                 new_metadata_hash(),
@@ -4011,13 +3754,11 @@ mod tests {
         store: &BS,
         mut state: State,
         origin: Address,
-        caller: Address,
         subscriber: Address,
         current_epoch: ChainEpoch,
         token_amount: TokenAmount,
     ) {
-        let mut credit_amount =
-            Credit::from_atto(token_amount.atto().clone() * &hoku_config.token_credit_rate);
+        let mut credit_amount = token_amount * &hoku_config.token_credit_rate;
 
         // Add a blob
         let add1_epoch = current_epoch;
@@ -4026,7 +3767,6 @@ mod tests {
             hoku_config,
             &store,
             origin,
-            caller,
             subscriber,
             add1_epoch,
             hash1,
@@ -4066,7 +3806,6 @@ mod tests {
             hoku_config,
             &store,
             origin,
-            caller,
             subscriber,
             add2_epoch,
             hash2,
@@ -4106,7 +3845,6 @@ mod tests {
             .delete_blob(
                 &store,
                 origin,
-                caller,
                 subscriber,
                 delete_epoch,
                 hash1,
@@ -4142,18 +3880,13 @@ mod tests {
         assert_eq!(state.capacity_used, size2); // capacity was released
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 1);
+        assert_eq!(state.expiries.len(store).unwrap(), 1);
         assert_eq!(state.added.len(), 1);
         assert_eq!(state.pending.len(), 0);
 
         // Check approval
         let account_committed = account.credit_committed.clone();
-        check_approval(
-            account,
-            origin,
-            caller,
-            state.credit_debited + account_committed,
-        );
+        check_approval(account, origin, state.credit_debited + account_committed);
     }
 
     #[test]
@@ -4206,7 +3939,7 @@ mod tests {
             let account = new_address();
             let current_epoch = ChainEpoch::from(1);
 
-            // Initialize account if needed
+            // Initialize the account if needed
             if tc.initial_ttl_status.is_some() {
                 state
                     .set_account_status(
@@ -4312,7 +4045,6 @@ mod tests {
                     .add_blob(
                         &hoku_config,
                         &store,
-                        addr,
                         addr,
                         addr,
                         current_epoch,
@@ -4485,7 +4217,6 @@ mod tests {
                         &store,
                         addr,
                         addr,
-                        addr,
                         current_epoch,
                         hash,
                         new_metadata_hash(),
@@ -4612,7 +4343,6 @@ mod tests {
                     &store,
                     account1,
                     account1,
-                    account1,
                     current_epoch,
                     hash,
                     new_metadata_hash(),
@@ -4631,7 +4361,6 @@ mod tests {
                 .add_blob(
                     &hoku_config,
                     &store,
-                    account2,
                     account2,
                     account2,
                     current_epoch,
