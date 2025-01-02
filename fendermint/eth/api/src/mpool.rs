@@ -4,6 +4,7 @@
 use std::{collections::BTreeMap, time::Duration};
 
 use ethers_core::types as et;
+use ethers_core::types::transaction::eip2718::TypedTransaction;
 use fendermint_rpc::{
     client::TendermintClient, message::SignedMessageFactory, FendermintClient, QueryClient,
 };
@@ -21,11 +22,12 @@ use crate::{cache::Cache, state::Nonce, HybridClient};
 
 const RETRY_SLEEP_SECS: u64 = 5;
 
+pub type SignedTransaction = (TypedTransaction, et::Signature);
 /// Cache submitted transactions by their Ethereum hash, because the CometBFT
 /// API would not be able to find them until they are delivered to the application
 /// and indexed by their domain hash, which some tools interpret as the transaction
 /// being dropped from the mempool.
-pub type TransactionCache = Cache<et::TxHash, et::Transaction>;
+pub type TransactionCache = Cache<et::TxHash, SignedTransaction>;
 
 /// Buffer out-of-order messages until they can be sent to the chain.
 #[derive(Clone)]

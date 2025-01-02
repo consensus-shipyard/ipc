@@ -33,13 +33,13 @@ pub async fn create_test_exec_state(
 )> {
     let bundle_path = bundle_path();
     let custom_actors_bundle_path = custom_actors_bundle_path();
-    let maybe_contract_path = genesis.ipc.as_ref().map(|_| contracts_path());
+    let artifacts_path = contracts_path();
 
     let (state, out) = create_test_genesis_state(
         bundle_path,
         custom_actors_bundle_path,
+        artifacts_path,
         genesis,
-        maybe_contract_path,
     )
     .await?;
     let store = state.store().clone();
@@ -85,6 +85,7 @@ where
             chain_id: out.chain_id.into(),
             power_scale: out.power_scale,
             app_version: 0,
+            consensus_params: None,
         };
 
         Ok(Self {

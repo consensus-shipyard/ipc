@@ -42,6 +42,7 @@ tracing-subscriber = { workspace = true }
 literally = { workspace = true }
 
 fendermint_abci = { path = "../abci" }
+fendermint_actors_api = { path = "../actors/api" }
 fendermint_app_options = { path = "./options" }
 fendermint_app_settings = { path = "./settings" }
 fendermint_crypto = { path = "../crypto" }
