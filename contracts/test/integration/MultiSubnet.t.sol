@@ -124,14 +124,15 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         SubnetID memory tokenSubnetName = SubnetID({root: ROOTNET_CHAINID, route: tokenSubnetPath});
         GatewayDiamond tokenSubnetGateway = createGatewayDiamond(gatewayParams(tokenSubnetName));
 
-        return TestSubnetDefinition({
-            gateway: tokenSubnetGateway,
-            gatewayAddr: address(tokenSubnetGateway),
-            id: tokenSubnetName,
-            subnetActor: rootTokenSubnetActor,
-            subnetActorAddr: address(rootTokenSubnetActor),
-            path: tokenSubnetPath
-        });
+        return
+            TestSubnetDefinition({
+                gateway: tokenSubnetGateway,
+                gatewayAddr: address(tokenSubnetGateway),
+                id: tokenSubnetName,
+                subnetActor: rootTokenSubnetActor,
+                subnetActorAddr: address(rootTokenSubnetActor),
+                path: tokenSubnetPath
+            });
     }
 
     //--------------------
