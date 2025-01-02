@@ -4,7 +4,7 @@
 
 use cid::Cid;
 use fendermint_actor_blobs_shared::get_credit_approval;
-use fendermint_actor_machine::{resolve_external, MachineActor};
+use fendermint_actor_machine::MachineActor;
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
     runtime::{ActorCode, Runtime},
@@ -32,7 +32,7 @@ impl Actor {
         // credit approval to the caller.
         let state = rt.state::<State>()?;
         let owner = state.owner;
-        let (origin, _) = resolve_external(rt, rt.message().origin())?;
+        let origin = rt.message().origin();
         let actor_address = state.address.get()?;
         if origin != owner {
             let approved = get_credit_approval(rt, owner, origin)?.is_some();

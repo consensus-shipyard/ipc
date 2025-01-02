@@ -26,28 +26,35 @@ pub const BLOBS_ACTOR_ADDR: Address = Address::new_id(BLOBS_ACTOR_ID);
 #[repr(u64)]
 pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
-    GetStats = frc42_dispatch::method_hash!("GetStats"),
+
+    // User methods
     BuyCredit = frc42_dispatch::method_hash!("BuyCredit"),
-    UpdateGasAllowance = frc42_dispatch::method_hash!("UpdateGasAllowance"),
     ApproveCredit = frc42_dispatch::method_hash!("ApproveCredit"),
     RevokeCredit = frc42_dispatch::method_hash!("RevokeCredit"),
-    SetCreditSponsor = frc42_dispatch::method_hash!("SetCreditSponsor"),
+    SetAccountSponsor = frc42_dispatch::method_hash!("SetAccountSponsor"),
     GetAccount = frc42_dispatch::method_hash!("GetAccount"),
     GetCreditApproval = frc42_dispatch::method_hash!("GetCreditApproval"),
-    GetGasAllowance = frc42_dispatch::method_hash!("GetGasAllowance"),
-    DebitAccounts = frc42_dispatch::method_hash!("DebitAccounts"),
     AddBlob = frc42_dispatch::method_hash!("AddBlob"),
     GetBlob = frc42_dispatch::method_hash!("GetBlob"),
+    DeleteBlob = frc42_dispatch::method_hash!("DeleteBlob"),
+    OverwriteBlob = frc42_dispatch::method_hash!("OverwriteBlob"),
+
+    // System methods
+    GetGasAllowance = frc42_dispatch::method_hash!("GetGasAllowance"),
+    UpdateGasAllowance = frc42_dispatch::method_hash!("UpdateGasAllowance"),
     GetBlobStatus = frc42_dispatch::method_hash!("GetBlobStatus"),
     GetAddedBlobs = frc42_dispatch::method_hash!("GetAddedBlobs"),
     GetPendingBlobs = frc42_dispatch::method_hash!("GetPendingBlobs"),
     SetBlobPending = frc42_dispatch::method_hash!("SetBlobPending"),
     FinalizeBlob = frc42_dispatch::method_hash!("FinalizeBlob"),
-    DeleteBlob = frc42_dispatch::method_hash!("DeleteBlob"),
-    OverwriteBlob = frc42_dispatch::method_hash!("OverwriteBlob"),
-    SetAccountType = frc42_dispatch::method_hash!("SetAccountType"),
-    GetAccountType = frc42_dispatch::method_hash!("GetAccountType"),
-    TrimBlobs = frc42_dispatch::method_hash!("TrimBlobs"),
+    DebitAccounts = frc42_dispatch::method_hash!("DebitAccounts"),
+
+    // Admin methods
+    SetAccountStatus = frc42_dispatch::method_hash!("SetAccountStatus"),
+    TrimBlobExpiries = frc42_dispatch::method_hash!("TrimBlobExpiries"),
+
+    // Metrics methods
+    GetStats = frc42_dispatch::method_hash!("GetStats"),
 }
 
 pub fn buy_credit(rt: &impl Runtime, to: Address) -> Result<Account, ActorError> {
@@ -177,7 +184,7 @@ pub fn delete_blob(
     Ok(())
 }
 
-/// Overwrite a blob, i.e. delete one, and add another in a single call.
+/// Overwrite a blob, i.e., delete one and add another in a single call.
 #[allow(clippy::too_many_arguments)]
 pub fn overwrite_blob(
     rt: &impl Runtime,

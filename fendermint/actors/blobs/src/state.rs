@@ -23,9 +23,13 @@ use hoku_ipld::hamt::MapKey;
 use log::{debug, warn};
 use num_traits::{ToPrimitive, Zero};
 
-use crate::state_fields::{
-    AccountsState, BlobsProgressCollection, BlobsState, ExpiriesState, ExpiryUpdate,
-};
+mod accounts;
+mod blobs;
+mod expiries;
+
+use accounts::AccountsState;
+use blobs::{BlobsProgressCollection, BlobsState};
+use expiries::{ExpiriesState, ExpiryUpdate};
 
 /// The state represents all accounts and stored blobs.
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
@@ -93,7 +97,7 @@ impl ExpiryKey {
 struct CreditDelegation<'a> {
     /// The address that is submitting the transaction to add this blob.
     pub origin: Address,
-    /// Information about the approval that allows "origin" to use credits via "caller".
+    /// Information about the approval that allows "origin" to use credits.
     /// Note that the Address that has issued this approval (the subscriber/sponsor), and whose
     /// credits are being allowed to be used, are not stored internal to this struct.
     pub approval: &'a mut CreditApproval,
@@ -293,9 +297,6 @@ impl State {
     }
 
     /// Revokes credit from one account to another.
-    /// If a caller is specified, this will remove it from the caller allowlist.
-    /// It is not possible to use this method to transform an approval with a caller allowlist
-    /// into one without a caller allowlist.
     pub fn revoke_credit<BS: Blockstore>(
         &mut self,
         store: &BS,
@@ -344,7 +345,7 @@ impl State {
     }
 
     /// Returns the gas allowance for the given address, including an amount from a default sponsor.
-    /// Note: An error returned from this method would be fatal, as it's called from the FVM executor.
+    /// An error returned from this method would be fatal, as it's called from the FVM executor.
     pub fn get_gas_allowance<BS: Blockstore>(
         &self,
         store: &BS,
@@ -395,7 +396,7 @@ impl State {
         Ok(allowance)
     }
 
-    pub fn set_credit_sponsor<BS: Blockstore>(
+    pub fn set_account_sponsor<BS: Blockstore>(
         &mut self,
         store: &BS,
         from: Address,
@@ -411,6 +412,35 @@ impl State {
             .save_tracked(accounts.set_and_flush_tracked(&from, account)?);
 
         debug!("set credit sponsor for {} to {:?}", from, sponsor);
+        Ok(())
+    }
+
+    pub fn set_account_status<BS: Blockstore>(
+        &mut self,
+        store: &BS,
+        subscriber: Address,
+        status: TtlStatus,
+        current_epoch: ChainEpoch,
+    ) -> anyhow::Result<(), ActorError> {
+        let mut accounts = self.accounts.hamt(store)?;
+        match status {
+            // We don't want to create an account for default TTL
+            TtlStatus::Default => {
+                if let Some(mut account) = accounts.get(&subscriber)? {
+                    account.max_ttl = status.into();
+                    self.accounts
+                        .save_tracked(accounts.set_and_flush_tracked(&subscriber, account)?);
+                }
+            }
+            _ => {
+                // Get or create a new account
+                let mut account =
+                    accounts.get_or_create(&subscriber, || Account::new(current_epoch))?;
+                account.max_ttl = status.into();
+                self.accounts
+                    .save_tracked(accounts.set_and_flush_tracked(&subscriber, account)?);
+            }
+        }
         Ok(())
     }
 
@@ -448,7 +478,6 @@ impl State {
             }
             match self.delete_blob(
                 store,
-                subscriber,
                 subscriber,
                 subscriber,
                 current_epoch,
@@ -499,10 +528,6 @@ impl State {
     /// Add a blob.
     ///
     /// @param origin - The address that is submitting the transaction to add this blob.
-    /// @param caller - The address that is calling into this function.
-    //    If the blob actor is accessed directly, this will be the same as "origin".
-    //    However, most of the time this will be the address of the actor instance that is
-    //    calling into the blobs actor, i.e., a specific Bucket or Timehub instance.
     /// @param subscriber - The address responsible for the subscription to keep this blob around.
     ///   This is whose credits will be spent by this transaction, and going forward to continue to
     ///   pay for the blob over time. Generally, this is the owner of the wrapping Actor
@@ -530,7 +555,7 @@ impl State {
         let (ttl, auto_renew) = self.accept_ttl(hoku_config, ttl, &account)?;
         // Get the credit delegation if needed
         let delegation = if origin != subscriber {
-            // Look for an approval for origin from subscriber and validate the caller is allowed.
+            // Look for an approval for origin from subscriber
             let approval =
                 account
                     .approvals
@@ -815,7 +840,7 @@ impl State {
     ) -> anyhow::Result<Account, ActorError> {
         // Get or create a new account
         let mut accounts = self.accounts.hamt(store)?;
-        let mut account = accounts.get_or_create(&subscriber, || Account::new(current_epoch))?;
+        let mut account = accounts.get_or_err(&subscriber)?;
         // Get the blob
         let mut blobs = self.blobs.hamt(store)?;
         let mut blob = blobs.get_or_err(&hash)?;
@@ -1087,7 +1112,7 @@ impl State {
             )))?;
         // Do not error if the approval was removed while this blob was pending
         let delegation = if let Some(origin) = sub.delegate {
-            // Look for an approval for origin from subscriber and validate the caller is allowed.
+            // Look for an approval for origin from subscriber
             account
                 .approvals
                 .get_mut(&origin.to_string())
@@ -1163,7 +1188,6 @@ impl State {
         &mut self,
         store: &BS,
         origin: Address,
-        caller: Address,
         subscriber: Address,
         current_epoch: ChainEpoch,
         hash: Hash,
@@ -1171,7 +1195,7 @@ impl State {
     ) -> anyhow::Result<bool, ActorError> {
         // Get or create a new account
         let mut accounts = self.accounts.hamt(store)?;
-        let mut account = accounts.get_or_create(&subscriber, || Account::new(current_epoch))?;
+        let mut account = accounts.get_or_err(&subscriber)?;
         // Get the blob
         let mut blobs = self.blobs.hamt(store)?;
         let mut blob = if let Some(blob) = blobs.get(&hash)? {
@@ -1203,7 +1227,7 @@ impl State {
                 id.clone()
             )))?;
         let delegation = if let Some(origin) = sub.delegate {
-            // Look for an approval for origin from subscriber and validate the caller is allowed.
+            // Look for an approval for origin from subscriber
             let approval = account.approvals.get_mut(&origin.to_string());
             if let Some(approval) = approval {
                 Some(CreditDelegation::new(origin, approval))
@@ -1212,8 +1236,8 @@ impl State {
                 // in which case the origin will be supplied as the subscriber
                 if origin != subscriber {
                     return Err(ActorError::forbidden(format!(
-                        "approval from {} to {} via caller {} not found",
-                        subscriber, origin, caller
+                        "approval from {} to {} not found",
+                        subscriber, origin
                     )));
                 }
                 None
@@ -1221,15 +1245,15 @@ impl State {
         } else {
             None
         };
-        // If the subscription does not have a delegate, the caller must be the subscriber.
-        // If the subscription has a delegate, it must be the caller or the
-        // caller must be the subscriber.
+        // If the subscription does not have a delegate, the origin must be the subscriber.
+        // If the subscription has a delegate, it must be the origin or the
+        // origin must be the subscriber.
         match &delegation {
             None => {
                 if origin != subscriber {
                     return Err(ActorError::forbidden(format!(
                         "origin {} is not subscriber {} for blob {}",
-                        caller, subscriber, hash
+                        origin, subscriber, hash
                     )));
                 }
             }
@@ -1356,35 +1380,6 @@ impl State {
         Ok(delete_blob)
     }
 
-    pub fn set_ttl_status<BS: Blockstore>(
-        &mut self,
-        store: &BS,
-        subscriber: Address,
-        status: TtlStatus,
-        current_epoch: ChainEpoch,
-    ) -> anyhow::Result<(), ActorError> {
-        let mut accounts = self.accounts.hamt(store)?;
-        match status {
-            // We don't want to create an account for default TTL
-            TtlStatus::Default => {
-                if let Some(mut account) = accounts.get(&subscriber)? {
-                    account.max_ttl = status.into();
-                    self.accounts
-                        .save_tracked(accounts.set_and_flush_tracked(&subscriber, account)?);
-                }
-            }
-            _ => {
-                // Get or create a new account
-                let mut account =
-                    accounts.get_or_create(&subscriber, || Account::new(current_epoch))?;
-                account.max_ttl = status.into();
-                self.accounts
-                    .save_tracked(accounts.set_and_flush_tracked(&subscriber, account)?);
-            }
-        }
-        Ok(())
-    }
-
     /// Return available capacity as a difference between `blob_capacity_total` and `capacity_used`.
     fn capacity_available(&self, blob_capacity_total: u64) -> u64 {
         blob_capacity_total - self.capacity_used
@@ -1395,7 +1390,7 @@ impl State {
     /// If `starting_hash` is `None`, iteration starts from the beginning.
     /// If `limit` is `None`, all subscriptions are processed.
     /// If `limit` is not `None`, iteration stops after examining `limit` blobs.
-    pub fn adjust_blob_ttls_for_account<BS: Blockstore>(
+    pub fn trim_blob_expiries<BS: Blockstore>(
         &mut self,
         hoku_config: &HokuConfig,
         store: &BS,
@@ -1424,7 +1419,6 @@ impl State {
                                 // Delete subscription
                                 if self.delete_blob(
                                     store,
-                                    subscriber,
                                     subscriber,
                                     subscriber,
                                     current_epoch,
@@ -1574,7 +1568,7 @@ fn ensure_credit_or_buy(
     let has_delegation = delegate.is_some();
     match (tokens_received_non_zero, has_delegation) {
         (true, true) => Err(ActorError::illegal_argument(format!(
-            "can not buy credits inline for {}",
+            "cannot buy credits inline for {}",
             subscriber,
         ))),
         (true, false) => {
@@ -2222,7 +2216,7 @@ mod tests {
         assert_eq!(state.capacity_used, 0); // capacity was released
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 0);
+        assert_eq!(state.expiries.len(store).unwrap(), 0);
         assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
 
@@ -2355,7 +2349,7 @@ mod tests {
         assert_eq!(account.capacity_used, size1);
 
         assert!(state
-            .set_ttl_status(&store, subscriber, TtlStatus::Extended, current_epoch)
+            .set_account_status(&store, subscriber, TtlStatus::Extended, current_epoch)
             .is_ok());
 
         // Add another blob past the first blob's expiry
@@ -2410,7 +2404,7 @@ mod tests {
         assert_eq!(state.capacity_used, account.capacity_used);
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 2);
+        assert_eq!(state.expiries.len(store).unwrap(), 2);
         assert_eq!(state.added.len(), 2);
         assert_eq!(state.pending.len(), 0);
 
@@ -2466,7 +2460,7 @@ mod tests {
         assert_eq!(state.capacity_used, account.capacity_used);
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 2);
+        assert_eq!(state.expiries.len(store).unwrap(), 2);
         assert_eq!(state.added.len(), 2);
         assert_eq!(state.pending.len(), 0);
 
@@ -2497,7 +2491,6 @@ mod tests {
             &hoku_config,
             &store,
             state,
-            origin,
             origin,
             origin,
             current_epoch,
@@ -2541,7 +2534,6 @@ mod tests {
             &store,
             state,
             origin,
-            origin,
             subscriber,
             current_epoch,
             token_amount,
@@ -2555,7 +2547,6 @@ mod tests {
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let origin = new_address();
-        let caller = new_address();
         let subscriber = new_address();
         let current_epoch = ChainEpoch::from(1);
         let token_amount = TokenAmount::from_whole(10);
@@ -2585,7 +2576,6 @@ mod tests {
             &store,
             state,
             origin,
-            caller,
             subscriber,
             current_epoch,
             token_amount,
@@ -2598,7 +2588,6 @@ mod tests {
         store: &BS,
         mut state: State,
         origin: Address,
-        caller: Address,
         subscriber: Address,
         current_epoch: ChainEpoch,
         token_amount: TokenAmount,
@@ -2607,7 +2596,7 @@ mod tests {
             Credit::from_atto(token_amount.atto().clone()) * &hoku_config.token_credit_rate;
 
         assert!(state
-            .set_ttl_status(&store, subscriber, TtlStatus::Extended, current_epoch)
+            .set_account_status(&store, subscriber, TtlStatus::Extended, current_epoch)
             .is_ok());
 
         // Add blob with default a subscription ID
@@ -2858,21 +2847,13 @@ mod tests {
         assert_eq!(account.capacity_used, size); // not changed
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 2);
+        assert_eq!(state.expiries.len(store).unwrap(), 2);
         assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
 
         // Delete the default subscription ID
         let delete_epoch = ChainEpoch::from(51);
-        let res = state.delete_blob(
-            &store,
-            origin,
-            caller,
-            subscriber,
-            delete_epoch,
-            hash,
-            id1.clone(),
-        );
+        let res = state.delete_blob(&store, origin, subscriber, delete_epoch, hash, id1.clone());
         assert!(res.is_ok());
         let delete_from_disk = res.unwrap();
         assert!(!delete_from_disk);
@@ -2912,7 +2893,7 @@ mod tests {
         assert_eq!(state.capacity_used, size);
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 1);
+        assert_eq!(state.expiries.len(store).unwrap(), 1);
         assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
 
@@ -2942,7 +2923,7 @@ mod tests {
         let mut credit_amount = amount.clone() * &hoku_config.token_credit_rate;
 
         assert!(state
-            .set_ttl_status(&store, subscriber, TtlStatus::Extended, current_epoch)
+            .set_account_status(&store, subscriber, TtlStatus::Extended, current_epoch)
             .is_ok());
 
         // Add blob with default a subscription ID
@@ -3028,7 +3009,7 @@ mod tests {
         assert_eq!(state.capacity_used, account.capacity_used);
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 1);
+        assert_eq!(state.expiries.len(&store).unwrap(), 1);
         assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
     }
@@ -3054,7 +3035,7 @@ mod tests {
         let mut credit_amount = amount.clone() * &hoku_config.token_credit_rate;
 
         assert!(state
-            .set_ttl_status(&store, subscriber, TtlStatus::Extended, current_epoch)
+            .set_account_status(&store, subscriber, TtlStatus::Extended, current_epoch)
             .is_ok());
 
         // Add blob with default a subscription ID
@@ -3133,7 +3114,7 @@ mod tests {
         assert_eq!(state.capacity_used, account.capacity_used);
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 2);
+        assert_eq!(state.expiries.len(&store).unwrap(), 2);
         assert_eq!(state.added.len(), 2);
         assert_eq!(state.pending.len(), 0);
 
@@ -3175,7 +3156,7 @@ mod tests {
         assert_eq!(state.capacity_used, account.capacity_used);
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 2);
+        assert_eq!(state.expiries.len(&store).unwrap(), 2);
         assert_eq!(state.added.len(), 2);
         assert_eq!(state.pending.len(), 0);
     }
@@ -3296,7 +3277,7 @@ mod tests {
         assert!(matches!(status, BlobStatus::Resolved));
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 1);
+        assert_eq!(state.expiries.len(&store).unwrap(), 1);
         assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
     }
@@ -3377,7 +3358,7 @@ mod tests {
         assert_eq!(state.capacity_used, 0); // capacity was released
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 1); // remains until the blob is explicitly deleted
+        assert_eq!(state.expiries.len(&store).unwrap(), 1); // remains until the blob is explicitly deleted
         assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
     }
@@ -3403,7 +3384,7 @@ mod tests {
         let mut credit_amount = amount.clone() * &hoku_config.token_credit_rate;
 
         assert!(state
-            .set_ttl_status(&store, subscriber, TtlStatus::Extended, current_epoch)
+            .set_account_status(&store, subscriber, TtlStatus::Extended, current_epoch)
             .is_ok());
 
         // Add a blob
@@ -3508,7 +3489,7 @@ mod tests {
         assert_eq!(state.capacity_used, 0); // capacity was released
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 1); // remains until the blob is explicitly deleted
+        assert_eq!(state.expiries.len(&store).unwrap(), 1); // remains until the blob is explicitly deleted
         assert_eq!(state.added.len(), 0);
         assert_eq!(state.pending.len(), 0);
     }
@@ -3535,7 +3516,6 @@ mod tests {
             &hoku_config,
             &store,
             state,
-            origin,
             origin,
             origin,
             current_epoch,
@@ -3578,7 +3558,6 @@ mod tests {
             &hoku_config,
             &store,
             state,
-            origin,
             origin,
             subscriber,
             current_epoch,
@@ -3698,7 +3677,7 @@ mod tests {
                 )
                 .unwrap();
             state
-                .set_ttl_status(&store, subscriber, tc.account_ttl_status, current_epoch)
+                .set_account_status(&store, subscriber, tc.account_ttl_status, current_epoch)
                 .unwrap();
 
             let (hash, size) = new_hash(1024);
@@ -3775,7 +3754,6 @@ mod tests {
         store: &BS,
         mut state: State,
         origin: Address,
-        caller: Address,
         subscriber: Address,
         current_epoch: ChainEpoch,
         token_amount: TokenAmount,
@@ -3867,7 +3845,6 @@ mod tests {
             .delete_blob(
                 &store,
                 origin,
-                caller,
                 subscriber,
                 delete_epoch,
                 hash1,
@@ -3903,7 +3880,7 @@ mod tests {
         assert_eq!(state.capacity_used, size2); // capacity was released
 
         // Check indexes
-        assert_eq!(state.expiries.len(), 1);
+        assert_eq!(state.expiries.len(store).unwrap(), 1);
         assert_eq!(state.added.len(), 1);
         assert_eq!(state.pending.len(), 0);
 
@@ -3965,7 +3942,7 @@ mod tests {
             // Initialize the account if needed
             if tc.initial_ttl_status.is_some() {
                 state
-                    .set_ttl_status(
+                    .set_account_status(
                         &store,
                         account,
                         tc.initial_ttl_status.unwrap(),
@@ -3975,7 +3952,7 @@ mod tests {
             }
 
             // Change TTL status
-            let res = state.set_ttl_status(&store, account, tc.new_ttl_status, current_epoch);
+            let res = state.set_account_status(&store, account, tc.new_ttl_status, current_epoch);
             assert!(
                 res.is_ok(),
                 "Test case '{}' failed to set TTL status",
@@ -4051,7 +4028,7 @@ mod tests {
                 .unwrap();
             // Set extended TTL status to allow adding all blobs
             state
-                .set_ttl_status(&store, addr, TtlStatus::Extended, current_epoch)
+                .set_account_status(&store, addr, TtlStatus::Extended, current_epoch)
                 .unwrap();
 
             // Add blobs
@@ -4096,17 +4073,11 @@ mod tests {
             );
 
             state
-                .set_ttl_status(&store, addr, tc.account_ttl, current_epoch)
+                .set_account_status(&store, addr, tc.account_ttl, current_epoch)
                 .unwrap();
 
-            let res = state.adjust_blob_ttls_for_account(
-                &hoku_config,
-                &store,
-                addr,
-                current_epoch,
-                None,
-                tc.limit,
-            );
+            let res =
+                state.trim_blob_expiries(&hoku_config, &store, addr, current_epoch, None, tc.limit);
             assert!(
                 res.is_ok(),
                 "Test case '{}' failed to adjust TTLs: {}",
@@ -4234,7 +4205,7 @@ mod tests {
                 )
                 .unwrap();
             state
-                .set_ttl_status(&store, addr, TtlStatus::Extended, current_epoch)
+                .set_account_status(&store, addr, TtlStatus::Extended, current_epoch)
                 .unwrap();
 
             // Add 5 blobs with different sizes to ensure different hashes
@@ -4276,10 +4247,10 @@ mod tests {
 
             // Change to Reduced status and process blobs with pagination
             state
-                .set_ttl_status(&store, addr, TtlStatus::Reduced, current_epoch)
+                .set_account_status(&store, addr, TtlStatus::Reduced, current_epoch)
                 .unwrap();
 
-            let res = state.adjust_blob_ttls_for_account(
+            let res = state.trim_blob_expiries(
                 &hoku_config,
                 &store,
                 addr,
@@ -4354,10 +4325,10 @@ mod tests {
             )
             .unwrap();
         state
-            .set_ttl_status(&store, account1, TtlStatus::Extended, current_epoch)
+            .set_account_status(&store, account1, TtlStatus::Extended, current_epoch)
             .unwrap();
         state
-            .set_ttl_status(&store, account2, TtlStatus::Extended, current_epoch)
+            .set_account_status(&store, account2, TtlStatus::Extended, current_epoch)
             .unwrap();
 
         // Add blobs for both accounts
@@ -4406,16 +4377,10 @@ mod tests {
 
         // Change TTL status for account1 and adjust blobs
         state
-            .set_ttl_status(&store, account1, TtlStatus::Reduced, current_epoch)
+            .set_account_status(&store, account1, TtlStatus::Reduced, current_epoch)
             .unwrap();
-        let res = state.adjust_blob_ttls_for_account(
-            &hoku_config,
-            &store,
-            account1,
-            current_epoch,
-            None,
-            None,
-        );
+        let res =
+            state.trim_blob_expiries(&hoku_config, &store, account1, current_epoch, None, None);
         assert!(
             res.is_ok(),
             "Failed to adjust TTLs for account1: {}",

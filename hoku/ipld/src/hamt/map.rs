@@ -3,6 +3,9 @@
 // Copyright 2019-2022 ChainSafe Systems
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::fmt::Display;
+use std::marker::PhantomData;
+
 use cid::Cid;
 use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::Blockstore;
@@ -10,8 +13,6 @@ use fvm_ipld_encoding::tuple::*;
 use fvm_ipld_hamt::BytesKey;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use std::fmt::Display;
-use std::marker::PhantomData;
 
 use super::core::{Map, MapKey, DEFAULT_HAMT_CONFIG};
 

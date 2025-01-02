@@ -4,12 +4,13 @@
 
 use std::collections::HashSet;
 
+use crate::{State, BLOBS_ACTOR_NAME};
 use fendermint_actor_blobs_shared::params::{
-    AddBlobParams, AdjustBlobTtlForAccountParams, ApproveCreditParams, BuyCreditParams,
-    DeleteBlobParams, FinalizeBlobParams, GetAccountParams, GetAddedBlobsParams, GetBlobParams,
-    GetBlobStatusParams, GetCreditApprovalParams, GetGasAllowanceParams, GetPendingBlobsParams,
-    GetStatsReturn, OverwriteBlobParams, RevokeCreditParams, SetAccountBlobTtlStatusParams,
-    SetBlobPendingParams, SetCreditSponsorParams, UpdateGasAllowanceParams,
+    AddBlobParams, ApproveCreditParams, BuyCreditParams, DeleteBlobParams, FinalizeBlobParams,
+    GetAccountParams, GetAddedBlobsParams, GetBlobParams, GetBlobStatusParams,
+    GetCreditApprovalParams, GetGasAllowanceParams, GetPendingBlobsParams, GetStatsReturn,
+    OverwriteBlobParams, RevokeCreditParams, SetAccountStatusParams, SetBlobPendingParams,
+    SetSponsorParams, TrimBlobExpiriesParams, UpdateGasAllowanceParams,
 };
 use fendermint_actor_blobs_shared::state::{
     Account, Blob, BlobStatus, CreditApproval, GasAllowance, Hash, PublicKey, Subscription,
@@ -17,9 +18,8 @@ use fendermint_actor_blobs_shared::state::{
 };
 use fendermint_actor_blobs_shared::Method;
 use fendermint_actor_hoku_config_shared as hoku_config;
-use fendermint_actor_machine::{
-    ensure_addr_is_origin_or_caller, resolve_external, resolve_external_non_machine,
-};
+use fendermint_actor_hoku_config_shared::require_caller_is_admin;
+use fendermint_actor_machine::{require_addr_is_origin_or_caller, to_id_address};
 use fil_actors_runtime::{
     actor_dispatch, actor_error, extract_send_result,
     runtime::{ActorCode, Runtime},
@@ -31,22 +31,35 @@ use fvm_shared::error::ExitCode;
 use fvm_shared::{address::Address, MethodNum, METHOD_SEND};
 use num_traits::Zero;
 
-use crate::{State, BLOBS_ACTOR_NAME};
-
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(BlobsActor);
 
+/// Singleton actor for managing blob storage.
+///
+/// The [`Address`]es stored in this actor's state _must_ be ID-based addresses for
+/// efficient comparison with message origin and caller addresses, which are always ID-based.
+/// [`Address`]es in the method params can be of any type.
+/// They will be resolved to ID-based addresses.
+///
+/// For simplicity, this actor currently manages both blobs and credit.
+/// A future version of the protocol will likely separate them in some way.
 pub struct BlobsActor;
 
-type BlobTuple = (Hash, HashSet<(Address, SubscriptionId, PublicKey)>);
+/// The return type used when fetching "added" or "pending" blobs.
+/// See `get_added_blobs` and `get_pending_blobs` for more information.
+type BlobRequest = (Hash, HashSet<(Address, SubscriptionId, PublicKey)>);
 
 impl BlobsActor {
+    /// Creates a new `[BlobsActor]` state.
+    ///
+    /// This is only used in tests. This actor is created manually at genesis.
     fn constructor(rt: &impl Runtime) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         let state = State::new(rt.store())?;
         rt.create(&state)
     }
 
+    /// Returns credit and storage usage statistics.
     fn get_stats(rt: &impl Runtime) -> Result<GetStatsReturn, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let hoku_config = hoku_config::get_config(rt)?;
@@ -56,9 +69,12 @@ impl BlobsActor {
         Ok(stats)
     }
 
+    /// Buy credit with token.
+    ///
+    /// The recipient address must be delegated (only delegated addresses can own credit).
     fn buy_credit(rt: &impl Runtime, params: BuyCreditParams) -> Result<Account, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let to = resolve_external_non_machine(rt, params.0)?;
+        let to = to_id_address(rt, params.0, true)?;
         let hoku_config = hoku_config::get_config(rt)?;
         rt.transaction(|st: &mut State, rt| {
             st.buy_credit(
@@ -71,14 +87,19 @@ impl BlobsActor {
         })
     }
 
+    /// Updates gas allowance for the `from` address.
+    ///
+    /// The allowance update is applied to `sponsor` if it exists.
+    /// The `from` address must have an approval from `sponsor`.
+    /// This method is called by the hoku executor, and as such, cannot fail.
     fn update_gas_allowance(
         rt: &impl Runtime,
         params: UpdateGasAllowanceParams,
     ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let from = resolve_external_non_machine(rt, params.from)?;
+        let from = to_id_address(rt, params.from, false)?;
         let sponsor = if let Some(sponsor) = params.sponsor {
-            Some(resolve_external_non_machine(rt, sponsor)?)
+            Some(to_id_address(rt, sponsor, false)?)
         } else {
             None
         };
@@ -93,14 +114,22 @@ impl BlobsActor {
         })
     }
 
+    /// Approve credit and gas usage from one account to another.
+    ///
+    /// The `from` address must be delegated (only delegated addresses can own credit).
+    /// The `from` address must be the message origin or caller.
+    /// The `to` address must be delegated (only delegated addresses can use credit).
+    /// The `to` address must already exist in the FVM if it's specified as an external
+    /// (non-ID) address (we must be able to get its actor ID from the init actor).
+    /// TODO: Remove the `caller_allowlist` parameter.
     fn approve_credit(
         rt: &impl Runtime,
         params: ApproveCreditParams,
     ) -> Result<CreditApproval, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let from = resolve_external_non_machine(rt, params.from)?;
-        ensure_addr_is_origin_or_caller(rt, from)?;
-        let to = resolve_external_non_machine(rt, params.to)?;
+        let from = to_id_address(rt, params.from, true)?;
+        require_addr_is_origin_or_caller(rt, from)?;
+        let to = to_id_address(rt, params.to, true)?;
         let hoku_config = hoku_config::get_config(rt)?;
         rt.transaction(|st: &mut State, rt| {
             st.approve_credit(
@@ -116,60 +145,92 @@ impl BlobsActor {
         })
     }
 
+    /// Revoke credit and gas usage from one account to another.
+    ///
+    /// The `from` address must be delegated (only delegated addresses can own credit).
+    /// The `from` address must be the message origin or caller.
+    /// The `to` address must be delegated (only delegated addresses can use credit).
     fn revoke_credit(rt: &impl Runtime, params: RevokeCreditParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let from = resolve_external_non_machine(rt, params.from)?;
-        ensure_addr_is_origin_or_caller(rt, from)?;
-        let to = resolve_external_non_machine(rt, params.to)?;
-
+        let from = to_id_address(rt, params.from, true)?;
+        require_addr_is_origin_or_caller(rt, from)?;
+        let to = to_id_address(rt, params.to, true)?;
         rt.transaction(|st: &mut State, rt| st.revoke_credit(rt.store(), from, to))
     }
 
-    fn set_credit_sponsor(
-        rt: &impl Runtime,
-        params: SetCreditSponsorParams,
-    ) -> Result<(), ActorError> {
+    /// Sets or unsets a default credit and gas sponsor from one account to another.
+    ///
+    /// If `sponsor` does not exist, the default sponsor is unset.
+    /// The `from` address must be delegated (only delegated addresses can use credit).
+    /// The `from` address must be the message origin or caller.
+    /// The `sponsor` address must be delegated (only delegated addresses can own credit).
+    fn set_account_sponsor(rt: &impl Runtime, params: SetSponsorParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let (from, _) = resolve_external(rt, params.from)?;
-        ensure_addr_is_origin_or_caller(rt, from)?;
+        let from = to_id_address(rt, params.from, true)?;
+        require_addr_is_origin_or_caller(rt, from)?;
         let sponsor = if let Some(sponsor) = params.sponsor {
-            Some(resolve_external_non_machine(rt, sponsor)?)
+            Some(to_id_address(rt, sponsor, true)?)
         } else {
             None
         };
         rt.transaction(|st: &mut State, rt| {
-            st.set_credit_sponsor(rt.store(), from, sponsor, rt.curr_epoch())
+            st.set_account_sponsor(rt.store(), from, sponsor, rt.curr_epoch())
         })
     }
 
+    /// Sets the account status for an address.
+    fn set_account_status(
+        rt: &impl Runtime,
+        params: SetAccountStatusParams,
+    ) -> Result<(), ActorError> {
+        require_caller_is_admin(rt)?;
+        let subscriber = to_id_address(rt, params.subscriber, true)?;
+        rt.transaction(|st: &mut State, rt| {
+            st.set_account_status(rt.store(), subscriber, params.status, rt.curr_epoch())
+        })
+    }
+
+    /// Returns the account for an address.
+    ///
+    /// Only delegated addresses can own or use credit, but we don't need to waste gas enforcing
+    /// that condition here.
     fn get_account(
         rt: &impl Runtime,
         params: GetAccountParams,
     ) -> Result<Option<Account>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let account = rt.state::<State>()?.get_account(rt.store(), params.0)?;
+        let from = to_id_address(rt, params.0, false)?;
+        let account = rt.state::<State>()?.get_account(rt.store(), from)?;
         Ok(account)
     }
 
+    /// Returns the credit approval from one account to another if it exists.
+    ///
+    /// Only delegated addresses can own or use credit, but we don't need to waste gas enforcing
+    /// that condition here.
     fn get_credit_approval(
         rt: &impl Runtime,
         params: GetCreditApprovalParams,
     ) -> Result<Option<CreditApproval>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let from = resolve_external_non_machine(rt, params.from)?;
-        let to = resolve_external_non_machine(rt, params.to)?;
+        let from = to_id_address(rt, params.from, false)?;
+        let to = to_id_address(rt, params.to, false)?;
         let approval = rt
             .state::<State>()?
             .get_credit_approval(rt.store(), from, to)?;
         Ok(approval)
     }
 
+    /// Returns the gas allowance from a credit purchase for an address.
+    ///
+    /// Only delegated addresses can own or use credit, but we don't need to waste gas enforcing
+    /// that condition here.
     fn get_gas_allowance(
         rt: &impl Runtime,
         params: GetGasAllowanceParams,
     ) -> Result<GasAllowance, ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let from = match resolve_external_non_machine(rt, params.0) {
+        let from = match to_id_address(rt, params.0, false) {
             Ok(to) => to,
             Err(e) => {
                 return if e.exit_code() == ExitCode::USR_FORBIDDEN {
@@ -186,6 +247,10 @@ impl BlobsActor {
         Ok(allowance)
     }
 
+    /// Debits all accounts for current blob usage.
+    ///
+    /// This is called by the system actor every X blocks, where X is set in the hoku config actor.
+    /// TODO: Take a start key and page limit to avoid out-of-gas errors.
     fn debit_accounts(rt: &impl Runtime) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         let hoku_config = hoku_config::get_config(rt)?;
@@ -198,16 +263,33 @@ impl BlobsActor {
         Ok(())
     }
 
+    /// Adds or updates a blob subscription.
+    ///
+    /// The subscriber will only need credits for blobs that are not already covered by one of
+    /// their existing subscriptions.
+    ///
+    /// The `sponsor` will be the subscriber (the account responsible for payment), if it exists
+    /// and there is an approval from `sponsor` to the message `origin` or `caller`.    
+    ///
+    /// Only delegated addresses can own or use credit, but we don't need to waste gas enforcing
+    /// that condition here. This will return an error if the subscriber does not have an account,
+    /// and the only way to get an account is to buy credits, which requires a delegated address.   
     fn add_blob(rt: &impl Runtime, params: AddBlobParams) -> Result<Subscription, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let (origin, _) = resolve_external(rt, rt.message().origin())?;
-        // The blob subscriber will be the sponsor if specified and approved
-        let subscriber = if let Some(sponsor) = params.sponsor {
-            resolve_external_non_machine(rt, sponsor)?
-        } else {
-            origin
-        };
         let tokens_received = rt.message().value_received();
+        let origin = rt.message().origin();
+        let subscriber = if let Some(sponsor) = params.sponsor {
+            to_id_address(rt, sponsor, tokens_received.is_positive())?
+        } else {
+            // If the origin is buying credits inline, perform the delegated address check,
+            // otherwise, don't waste gas on it. If the account doesn't have credits, the txn
+            // will fail, and the only way to buy credits it with a delegated address.
+            if tokens_received.is_positive() {
+                to_id_address(rt, origin, true)?
+            } else {
+                origin
+            }
+        };
         let hoku_config = hoku_config::get_config(rt)?;
         let (subscription, unspent_tokens) = rt.transaction(|st: &mut State, rt| {
             st.add_blob(
@@ -232,52 +314,63 @@ impl BlobsActor {
         Ok(subscription)
     }
 
+    /// Returns a blob by [`Hash`] if it exists.
     fn get_blob(rt: &impl Runtime, params: GetBlobParams) -> Result<Option<Blob>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let blob = rt.state::<State>()?.get_blob(rt.store(), params.0)?;
         Ok(blob)
     }
 
+    /// Returns the current [`BlobStatus`] for a blob by [`Hash`].
     fn get_blob_status(
         rt: &impl Runtime,
         params: GetBlobStatusParams,
     ) -> Result<Option<BlobStatus>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let status = rt.state::<State>()?.get_blob_status(
-            rt.store(),
-            params.subscriber,
-            params.hash,
-            params.id,
-        );
+        let subscriber = to_id_address(rt, params.subscriber, false)?;
+        let status =
+            rt.state::<State>()?
+                .get_blob_status(rt.store(), subscriber, params.hash, params.id);
         Ok(status)
     }
 
+    /// Returns a list of [`BlobRequest`]s that are currenlty in the [`BlobStatus::Added`] state.
+    ///
+    /// All blobs that have been added but have not yet been picked up by validators for download
+    /// are in the [`BlobStatus::Added`] state.
     fn get_added_blobs(
         rt: &impl Runtime,
         params: GetAddedBlobsParams,
-    ) -> Result<Vec<BlobTuple>, ActorError> {
+    ) -> Result<Vec<BlobRequest>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let added = rt.state::<State>()?.get_added_blobs(params.0);
         Ok(added)
     }
 
+    /// Returns a list of [`BlobRequest`]s that are currenlty in the [`BlobStatus::Pending`] state.
+    ///
+    /// All blobs that have been added and picked up by validators for download are in the
+    /// [`BlobStatus::Pending`] state.
+    /// These are the blobs that validators are currently coordinating to download. They will
+    /// vote on the final status ([`BlobStatus::Resolved`] or [`BlobStatus::Failed`]), which is
+    /// recorded on-chain with the `finalize_blob` method.
     fn get_pending_blobs(
         rt: &impl Runtime,
         params: GetPendingBlobsParams,
-    ) -> Result<Vec<BlobTuple>, ActorError> {
+    ) -> Result<Vec<BlobRequest>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let pending = rt.state::<State>()?.get_pending_blobs(params.0);
         Ok(pending)
     }
 
+    /// Sets a blob to the [`BlobStatus::Pending`] state.
     fn set_blob_pending(rt: &impl Runtime, params: SetBlobPendingParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        // We control this method call and can guarantee subscriber is an external address,
-        // i.e., no need to resolve its external address.
+        let subscriber = to_id_address(rt, params.subscriber, false)?;
         rt.transaction(|st: &mut State, rt| {
             st.set_blob_pending(
                 rt.store(),
-                params.subscriber,
+                subscriber,
                 params.hash,
                 params.id,
                 params.source,
@@ -285,9 +378,14 @@ impl BlobsActor {
         })
     }
 
+    /// Finalizes a blob to the [`BlobStatus::Resolved`] or [`BlobStatus::Failed`] state.
+    ///
+    /// This is the final protocol step to add a blob, which is controlled by validator consensus.
+    /// The [`BlobStatus::Resolved`] state means that a quorum of validators was able to download the blob.
+    /// The [`BlobStatus::Failed`] state means that a quorum of validators was not able to download the blob.
     fn finalize_blob(rt: &impl Runtime, params: FinalizeBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let (subscriber, _) = resolve_external(rt, params.subscriber)?;
+        let subscriber = to_id_address(rt, params.subscriber, false)?;
         rt.transaction(|st: &mut State, rt| {
             st.finalize_blob(
                 rt.store(),
@@ -300,13 +398,19 @@ impl BlobsActor {
         })
     }
 
+    /// Deletes a blob subscription.
+    ///
+    /// The `sponsor` will be the subscriber (the account responsible for payment), if it exists
+    /// and there is an approval from `sponsor` to the message `origin` or `caller`.    
+    ///
+    /// Only delegated addresses can own or use credit, but we don't need to waste gas enforcing
+    /// that condition here. This will return an error if the subscriber does not have an account,
+    /// and the only way to get an account is to buy credits, which requires a delegated address.
     fn delete_blob(rt: &impl Runtime, params: DeleteBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let (origin, _) = resolve_external(rt, rt.message().origin())?;
-        let (caller, _) = resolve_external(rt, rt.message().caller())?;
-        // The blob subscriber will be the sponsor if specified and approved
+        let origin = rt.message().origin();
         let subscriber = if let Some(sponsor) = params.sponsor {
-            resolve_external_non_machine(rt, sponsor)?
+            to_id_address(rt, sponsor, false)?
         } else {
             origin
         };
@@ -314,7 +418,6 @@ impl BlobsActor {
             st.delete_blob(
                 rt.store(),
                 origin,
-                caller,
                 subscriber,
                 rt.curr_epoch(),
                 params.hash,
@@ -327,29 +430,35 @@ impl BlobsActor {
         Ok(())
     }
 
-    /// Delete a blob, and add another in a single call
+    /// Deletes a blob subscription and adds another in a sinlge call.
+    ///
+    /// This method is more efficient than two separate calls to `delete_blob` and `add_blob`,
+    /// and is useful for some blob workflows like a replacing a key in a bucket actor.
+    ///
+    /// The `sponsor` will be the subscriber (the account responsible for payment), if it exists
+    /// and there is an approval from `sponsor` to the message `origin` or `caller`.    
+    ///
+    /// Only delegated addresses can own or use credit, but we don't need to waste gas enforcing
+    /// that condition here. This will return an error if the subscriber does not have an account,
+    /// and the only way to get an account is to buy credits, which requires a delegated address.
     fn overwrite_blob(
         rt: &impl Runtime,
         params: OverwriteBlobParams,
     ) -> Result<Subscription, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let (origin, _) = resolve_external(rt, rt.message().origin())?;
-        let (caller, _) = resolve_external(rt, rt.message().caller())?;
-        // The blob subscriber will be the sponsor if specified and approved
+        let origin = rt.message().origin();
         let subscriber = if let Some(sponsor) = params.add.sponsor {
-            resolve_external_non_machine(rt, sponsor)?
+            to_id_address(rt, sponsor, false)?
         } else {
             origin
         };
         let hoku_config = hoku_config::get_config(rt)?;
-
         // The call should be atomic, hence we wrap two independent calls in a transaction.
         let (delete, subscription) = rt.transaction(|st: &mut State, rt| {
             let add_params = params.add;
             let delete = st.delete_blob(
                 rt.store(),
                 origin,
-                caller,
                 subscriber,
                 rt.curr_epoch(),
                 params.old_hash,
@@ -377,50 +486,23 @@ impl BlobsActor {
         Ok(subscription)
     }
 
-    fn validate_caller_is_admin(rt: &impl Runtime) -> Result<(), ActorError> {
-        let admin = hoku_config::get_admin(rt)?;
-        if admin.is_none() {
-            Err(ActorError::illegal_state(
-                "admin address not set".to_string(),
-            ))
-        } else {
-            Ok(rt.validate_immediate_caller_is(std::iter::once(&admin.unwrap()))?)
-        }
-    }
-
-    /// Set the TTL status of an account.
-    fn set_account_type(
-        rt: &impl Runtime,
-        params: SetAccountBlobTtlStatusParams,
-    ) -> Result<(), ActorError> {
-        BlobsActor::validate_caller_is_admin(rt)?;
-        let account = resolve_external_non_machine(rt, params.account)?;
-        rt.transaction(|st: &mut State, rt| {
-            st.set_ttl_status(rt.store(), account, params.status, rt.curr_epoch())
-        })
-    }
-
-    /// Get the maximum TTL for blobs for an account.
-    fn get_account_type(rt: &impl Runtime, account: Address) -> Result<i64, ActorError> {
-        rt.validate_immediate_caller_accept_any()?;
-        rt.state::<State>()?
-            .get_account_max_ttl(rt.store(), account)
-    }
-
-    /// Adjusts all subscriptions for an account according to its max TTL.
+    /// Trims the subscription expiries for an account based on its current maximum allowed blob TTL.
+    ///
+    /// This is used in conjunction with `set_account_status` when reducing an account's maximum
+    /// allowed blob TTL.
     /// Returns the number of subscriptions processed and the next key to continue iteration.
-    fn trim_blobs(
+    fn trim_blob_expiries(
         rt: &impl Runtime,
-        params: AdjustBlobTtlForAccountParams,
+        params: TrimBlobExpiriesParams,
     ) -> Result<(u32, Option<Hash>), ActorError> {
-        BlobsActor::validate_caller_is_admin(rt)?;
-        let account = resolve_external_non_machine(rt, params.account)?;
+        require_caller_is_admin(rt)?;
+        let subscriber = to_id_address(rt, params.subscriber, true)?;
         let hoku_config = hoku_config::get_config(rt)?;
         let (processed, next_key, deleted_blobs) = rt.transaction(|st: &mut State, rt| {
-            st.adjust_blob_ttls_for_account(
+            st.trim_blob_expiries(
                 &hoku_config,
                 rt.store(),
-                account,
+                subscriber,
                 rt.curr_epoch(),
                 params.starting_hash,
                 params.limit,
@@ -447,6 +529,7 @@ impl BlobsActor {
     }
 }
 
+/// Makes a syscall that will delete a blob from the underlying Iroh-based data store.
 fn delete_from_disc(hash: Hash) -> Result<(), ActorError> {
     #[cfg(feature = "fil-actor")]
     {
@@ -472,28 +555,35 @@ impl ActorCode for BlobsActor {
 
     actor_dispatch! {
         Constructor => constructor,
-        GetStats => get_stats,
+
+        // User methods
         BuyCredit => buy_credit,
-        UpdateGasAllowance => update_gas_allowance,
         ApproveCredit => approve_credit,
         RevokeCredit => revoke_credit,
-        SetCreditSponsor => set_credit_sponsor,
+        SetAccountSponsor => set_account_sponsor,
         GetAccount => get_account,
         GetCreditApproval => get_credit_approval,
-        GetGasAllowance => get_gas_allowance,
-        DebitAccounts => debit_accounts,
         AddBlob => add_blob,
         GetBlob => get_blob,
+        DeleteBlob => delete_blob,
+        OverwriteBlob => overwrite_blob,
+
+        // System methods
+        GetGasAllowance => get_gas_allowance,
+        UpdateGasAllowance => update_gas_allowance,
         GetBlobStatus => get_blob_status,
         GetAddedBlobs => get_added_blobs,
         GetPendingBlobs => get_pending_blobs,
         SetBlobPending => set_blob_pending,
         FinalizeBlob => finalize_blob,
-        DeleteBlob => delete_blob,
-        OverwriteBlob => overwrite_blob,
-        SetAccountType => set_account_type,
-        GetAccountType => get_account_type,
-        TrimBlobs => trim_blobs,
+        DebitAccounts => debit_accounts,
+
+        // Admin methods
+        SetAccountStatus => set_account_status,
+        TrimBlobExpiries => trim_blob_expiries,
+
+        // Metrics methods
+        GetStats => get_stats,
         _ => fallback,
     }
 }
@@ -711,7 +801,7 @@ mod tests {
         );
         let expected_return = Err(ActorError::illegal_argument(format!(
             "address {} does not match origin or caller",
-            receiver_f4_eth_addr
+            to_id_addr
         )));
         assert_eq!(result, expected_return);
         rt.verify();
@@ -816,7 +906,7 @@ mod tests {
         );
         let expected_return = Err(ActorError::illegal_argument(format!(
             "address {} does not match origin or caller",
-            receiver_f4_eth_addr
+            to_id_addr
         )));
         assert_eq!(result, expected_return);
         rt.verify();
@@ -910,9 +1000,9 @@ mod tests {
         let hash = new_hash(1024);
         let add_params = AddBlobParams {
             sponsor: None,
+            source: new_pk(),
             hash: hash.0,
             metadata_hash: new_hash(1024).0,
-            source: new_pk(),
             id: SubscriptionId::default(),
             size: hash.1,
             ttl: Some(3600),
@@ -924,7 +1014,7 @@ mod tests {
         let expected_tokens_unspent = tokens_sent.atto() - tokens_required_atto;
         expect_get_config(&rt);
         rt.expect_send_simple(
-            f4_eth_addr,
+            id_addr,
             METHOD_SEND,
             None,
             TokenAmount::from_atto(expected_tokens_unspent),

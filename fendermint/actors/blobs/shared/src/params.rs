@@ -65,14 +65,23 @@ pub struct RevokeCreditParams {
     pub for_caller: Option<Address>,
 }
 
-/// Params for setting credit sponsor.
+/// Params for setting sponsor.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct SetCreditSponsorParams {
+pub struct SetSponsorParams {
     /// Account address that is setting a credit sponsor.
     pub from: Address,
     /// Credit sponsor.
     /// If not present, the sponsor is unset.
     pub sponsor: Option<Address>,
+}
+
+/// Params for setting account status.
+#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct SetAccountStatusParams {
+    /// Address to set the account status for.
+    pub subscriber: Address,
+    /// TTL status to set.
+    pub status: TtlStatus,
 }
 
 /// Params for getting an account.
@@ -192,24 +201,15 @@ pub struct OverwriteBlobParams {
     pub add: AddBlobParams,
 }
 
-/// Params for setting a TTL status for an account.
+/// Params for trimming blob expiries.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct SetAccountBlobTtlStatusParams {
-    /// Account address to set the TTL status for.
-    pub account: Address,
-    /// TTL status to set.
-    pub status: TtlStatus,
-}
-
-/// Params for setting a TTL status for an account.
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct AdjustBlobTtlForAccountParams {
-    /// Account address to set the TTL status for.
-    pub account: Address,
-    /// Starting hash to adjust TTLs from.
+pub struct TrimBlobExpiriesParams {
+    /// Address to trim blob expiries for.
+    pub subscriber: Address,
+    /// Starting hash to trim expiries from.
     pub starting_hash: Option<Hash>,
-    /// Limit of blobs to adjust TTLs for. This specifies the maximum number of blobs
-    /// that will be examined for TTL adjustment.
+    /// Limit of blobs to trim expiries for.
+    /// This specifies the maximum number of blobs that will be examined for trimming.
     pub limit: Option<usize>,
 }
 

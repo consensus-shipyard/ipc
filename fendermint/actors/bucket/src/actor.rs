@@ -338,9 +338,8 @@ mod tests {
     };
     use fendermint_actor_blobs_shared::state::{Subscription, SubscriptionGroup};
     use fendermint_actor_blobs_shared::{Method as BlobMethod, BLOBS_ACTOR_ADDR};
-    use fendermint_actor_blobs_testing::{new_address, new_hash, new_pk};
+    use fendermint_actor_blobs_testing::{new_hash, new_pk};
     use fendermint_actor_machine::{ConstructorParams, InitParams};
-    use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::runtime::Runtime;
     use fil_actors_runtime::test_utils::{
         expect_empty, MockRuntime, ADM_ACTOR_CODE_ID, ETHACCOUNT_ACTOR_CODE_ID, INIT_ACTOR_CODE_ID,
@@ -354,10 +353,18 @@ mod tests {
     use fvm_shared::sys::SendFlags;
     use fvm_shared::MethodNum;
 
+    fn get_runtime() -> (MockRuntime, Address) {
+        let origin = Address::new_id(110);
+        let rt = construct_and_verify(origin);
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, origin);
+        rt.set_origin(origin);
+        (rt, origin)
+    }
+
     fn construct_and_verify(owner: Address) -> MockRuntime {
-        let receiver = new_address();
+        let buck_addr = Address::new_id(111);
         let rt = MockRuntime {
-            receiver,
+            receiver: buck_addr,
             ..Default::default()
         };
         rt.set_caller(*INIT_ACTOR_CODE_ID, INIT_ACTOR_ADDR);
@@ -376,10 +383,7 @@ mod tests {
         let actor_init = rt
             .call::<Actor>(
                 Method::Init as u64,
-                IpldBlock::serialize_cbor(&InitParams {
-                    robust_address: receiver,
-                })
-                .unwrap(),
+                IpldBlock::serialize_cbor(&InitParams { address: buck_addr }).unwrap(),
             )
             .unwrap();
         expect_empty(actor_init);
@@ -390,16 +394,7 @@ mod tests {
 
     #[test]
     pub fn test_add_object() {
-        let id_addr = Address::new_id(110);
-        let eth_addr = EthAddress(hex_literal::hex!(
-            "CAFEB0BA00000000000000000000000000000000"
-        ));
-        let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
-
-        let rt = construct_and_verify(f4_eth_addr);
-        rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
-        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
-        rt.set_origin(id_addr);
+        let (rt, origin) = get_runtime();
 
         // Add an object
         let hash = new_hash(256);
@@ -421,7 +416,7 @@ mod tests {
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
             IpldBlock::serialize_cbor(&AddBlobParams {
-                sponsor: Some(f4_eth_addr),
+                sponsor: Some(origin),
                 source: add_params.source,
                 hash: add_params.hash,
                 metadata_hash: add_params.recovery_hash,
@@ -452,16 +447,7 @@ mod tests {
 
     #[test]
     pub fn test_add_overwrite() {
-        let id_addr = Address::new_id(110);
-        let eth_addr = EthAddress(hex_literal::hex!(
-            "CAFEB0BA00000000000000000000000000000000"
-        ));
-        let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
-
-        let rt = construct_and_verify(f4_eth_addr);
-        rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
-        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
-        rt.set_origin(id_addr);
+        let (rt, origin) = get_runtime();
 
         // Add an object
         let hash = new_hash(256);
@@ -483,7 +469,7 @@ mod tests {
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
             IpldBlock::serialize_cbor(&AddBlobParams {
-                sponsor: Some(f4_eth_addr),
+                sponsor: Some(origin),
                 source: add_params.source,
                 hash: add_params.hash,
                 metadata_hash: add_params.recovery_hash,
@@ -532,7 +518,7 @@ mod tests {
                 add: AddBlobParams {
                     id: sub_id,
                     hash: add_params2.hash,
-                    sponsor: Some(f4_eth_addr),
+                    sponsor: Some(origin),
                     source: add_params2.source,
                     metadata_hash: add_params2.recovery_hash,
                     size: add_params2.size,
@@ -562,16 +548,7 @@ mod tests {
 
     #[test]
     pub fn test_add_overwrite_fail() {
-        let id_addr = Address::new_id(110);
-        let eth_addr = EthAddress(hex_literal::hex!(
-            "CAFEB0BA00000000000000000000000000000000"
-        ));
-        let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
-
-        let rt = construct_and_verify(f4_eth_addr);
-        rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
-        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
-        rt.set_origin(id_addr);
+        let (rt, origin) = get_runtime();
 
         // Add an object
         let hash = new_hash(256);
@@ -593,7 +570,7 @@ mod tests {
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
             IpldBlock::serialize_cbor(&AddBlobParams {
-                sponsor: Some(f4_eth_addr),
+                sponsor: Some(origin),
                 source: add_params.source,
                 hash: add_params.hash,
                 metadata_hash: add_params.recovery_hash,
@@ -647,16 +624,7 @@ mod tests {
 
     #[test]
     pub fn test_delete_object() {
-        let id_addr = Address::new_id(110);
-        let eth_addr = EthAddress(hex_literal::hex!(
-            "CAFEB0BA00000000000000000000000000000000"
-        ));
-        let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
-
-        let rt = construct_and_verify(f4_eth_addr);
-        rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
-        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
-        rt.set_origin(id_addr);
+        let (rt, origin) = get_runtime();
 
         // Add an object
         let key = vec![0, 1, 2];
@@ -678,7 +646,7 @@ mod tests {
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
             IpldBlock::serialize_cbor(&AddBlobParams {
-                sponsor: Some(f4_eth_addr),
+                sponsor: Some(origin),
                 source: add_params.source,
                 hash: add_params.hash,
                 id: sub_id.clone(),
@@ -713,7 +681,7 @@ mod tests {
             BLOBS_ACTOR_ADDR,
             BlobMethod::DeleteBlob as MethodNum,
             IpldBlock::serialize_cbor(&DeleteBlobParams {
-                sponsor: Some(f4_eth_addr),
+                sponsor: Some(origin),
                 hash: add_params.hash,
                 id: sub_id,
             })
@@ -732,16 +700,7 @@ mod tests {
 
     #[test]
     pub fn test_get_object_none() {
-        let id_addr = Address::new_id(110);
-        let eth_addr = EthAddress(hex_literal::hex!(
-            "CAFEB0BA00000000000000000000000000000000"
-        ));
-        let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
-
-        let rt = construct_and_verify(f4_eth_addr);
-        rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
-        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
-        rt.set_origin(id_addr);
+        let (rt, _) = get_runtime();
 
         let get_params = GetParams(vec![0, 1, 2]);
         rt.expect_validate_caller_any();
@@ -760,16 +719,7 @@ mod tests {
 
     #[test]
     pub fn test_get_object() {
-        let id_addr = Address::new_id(110);
-        let eth_addr = EthAddress(hex_literal::hex!(
-            "CAFEB0BA00000000000000000000000000000000"
-        ));
-        let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
-
-        let rt = construct_and_verify(f4_eth_addr);
-        rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
-        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
-        rt.set_origin(id_addr);
+        let (rt, origin) = get_runtime();
 
         // Add an object
         let key = vec![0, 1, 2];
@@ -792,7 +742,7 @@ mod tests {
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
             IpldBlock::serialize_cbor(&AddBlobParams {
-                sponsor: Some(f4_eth_addr),
+                sponsor: Some(origin),
                 source: add_params.source,
                 hash: add_params.hash,
                 id: sub_id.clone(),
@@ -819,7 +769,7 @@ mod tests {
         let blob = Blob {
             size: add_params.size,
             subscribers: HashMap::from([(
-                f4_eth_addr.to_string(),
+                origin.to_string(),
                 SubscriptionGroup {
                     subscriptions: HashMap::from([(
                         sub_id.to_string(),
@@ -828,7 +778,7 @@ mod tests {
                             expiry: ttl,
                             auto_renew: false,
                             source: add_params.source,
-                            delegate: Some(f4_eth_addr),
+                            delegate: Some(origin),
                             failed: false,
                         },
                     )]),
@@ -874,16 +824,7 @@ mod tests {
 
     #[test]
     pub fn test_update_object_metadata() {
-        let id_addr = Address::new_id(110);
-        let eth_addr = EthAddress(hex_literal::hex!(
-            "CAFEB0BA00000000000000000000000000000000"
-        ));
-        let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
-
-        let rt = construct_and_verify(f4_eth_addr);
-        rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
-        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
-        rt.set_origin(id_addr);
+        let (rt, origin) = get_runtime();
 
         // Add an object
         let hash = new_hash(256);
@@ -905,7 +846,7 @@ mod tests {
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
             IpldBlock::serialize_cbor(&AddBlobParams {
-                sponsor: Some(f4_eth_addr),
+                sponsor: Some(origin),
                 source: add_params.source,
                 hash: add_params.hash,
                 metadata_hash: add_params.recovery_hash,
@@ -956,7 +897,7 @@ mod tests {
         let blob = Blob {
             size: add_params.size,
             subscribers: HashMap::from([(
-                f4_eth_addr.to_string(),
+                origin.to_string(),
                 SubscriptionGroup {
                     subscriptions: HashMap::from([(
                         sub_id.to_string(),
@@ -965,7 +906,7 @@ mod tests {
                             expiry: ChainEpoch::from(3600),
                             auto_renew: false,
                             source: add_params.source,
-                            delegate: Some(f4_eth_addr),
+                            delegate: Some(origin),
                             failed: false,
                         },
                     )]),

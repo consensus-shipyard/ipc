@@ -5379,6 +5379,7 @@ dependencies = [
  "anyhow",
  "cid",
  "fil_actors_runtime",
+ "fvm_ipld_amt",
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
  "fvm_ipld_hamt",
