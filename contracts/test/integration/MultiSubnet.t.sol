@@ -115,7 +115,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         address tokenAddress,
         address rootGatewayAddress,
         SubnetID memory rootSubnetName
-    ) internal returns (TestSubnetDefinition memory tokenSubnet) {
+    ) internal returns (TestSubnetDefinition memory) {
         SubnetActorDiamond rootTokenSubnetActor = createSubnetActor(
             defaultSubnetActorParamsWith(rootGatewayAddress, rootSubnetName, tokenAddress)
         );
@@ -124,7 +124,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         SubnetID memory tokenSubnetName = SubnetID({root: ROOTNET_CHAINID, route: tokenSubnetPath});
         GatewayDiamond tokenSubnetGateway = createGatewayDiamond(gatewayParams(tokenSubnetName));
 
-        tokenSubnet = TestSubnetDefinition({
+        return TestSubnetDefinition({
             gateway: tokenSubnetGateway,
             gatewayAddr: address(tokenSubnetGateway),
             id: tokenSubnetName,

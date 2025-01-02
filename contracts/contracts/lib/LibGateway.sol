@@ -8,22 +8,13 @@ import {SubnetID, Subnet, AssetKind, Asset} from "../structs/Subnet.sol";
 import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
 import {CallMsg, IpcMsgKind, IpcEnvelope, OutcomeType, BottomUpMsgBatch, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
 import {Membership} from "../structs/Subnet.sol";
-import {CannotSendCrossMsgToItself, MethodNotAllowed, MaxMsgsPerBatchExceeded, InvalidXnetMessage ,OldConfigurationNumber, NotRegisteredSubnet, InvalidActorAddress, ParentFinalityAlreadyCommitted, InvalidXnetMessageReason, UnroutableMessage} from "../errors/IPCErrors.sol";
+import "../errors/IPCErrors.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {AssetHelper} from "../lib/AssetHelper.sol";
 import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-
-// Validation outcomes for cross messages
-enum CrossMessageValidationOutcome {
-    Valid,
-    InvalidDstSubnet,
-    CannotSendToItself,
-    CommonParentNotExist,
-    IncompatibleSupplySource
-}
 
 library LibGateway {
     using SubnetIDHelper for SubnetID;
@@ -447,12 +438,12 @@ library LibGateway {
         // should increase the appliedNonce to allow the execution of the next message
         // of the batch (this is way we have this after the nonce logic).
         if (!crossMsg.to.subnetId.equals(s.networkName)) {
-            CrossMessageValidationOutcome outcome = validateCrossMessage(crossMsg);
-            if (outcome != CrossMessageValidationOutcome.Valid) {
+            (bool valid, InvalidXnetMessageReason reason) = validateCrossMessage(crossMsg);
+            if (!valid) {
                 sendReceipt(
                     crossMsg,
                     OutcomeType.SystemErr,
-                    abi.encodeWithSelector(InvalidXnetMessage.selector, validationOutcomeToInvalidXnetMsgReason(outcome))
+                    abi.encodeWithSelector(InvalidXnetMessage.selector, reason)
                 );
                 return;
             }
@@ -608,16 +599,16 @@ library LibGateway {
     }
 
     /// @notice Validates a cross message before committing it.
-    function validateCrossMessage(IpcEnvelope memory envelope) internal view returns (CrossMessageValidationOutcome) {
-        (CrossMessageValidationOutcome outcome, ) = checkCrossMessage(envelope);
-        return outcome;
+    function validateCrossMessage(IpcEnvelope memory envelope) internal view returns (bool, InvalidXnetMessageReason) {
+        (bool valid, InvalidXnetMessageReason reason, ) = checkCrossMessage(envelope);
+        return (valid, reason);
     }
 
     /// @notice Validates a cross message and returns the applyType if the message is valid
-    function checkCrossMessage(IpcEnvelope memory envelope) internal view returns (CrossMessageValidationOutcome, IPCMsgType applyType) {
+    function checkCrossMessage(IpcEnvelope memory envelope) internal view returns (bool valid, InvalidXnetMessageReason reason, IPCMsgType applyType) {
         SubnetID memory toSubnetId = envelope.to.subnetId;
         if (toSubnetId.isEmpty()) {
-            return (CrossMessageValidationOutcome.InvalidDstSubnet, applyType);
+            return (false, InvalidXnetMessageReason.DstSubnet, applyType);
         }
 
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
@@ -625,7 +616,7 @@ library LibGateway {
 
         // We cannot send a cross message to the same subnet.
         if (toSubnetId.equals(currentNetwork)) {
-            return (CrossMessageValidationOutcome.CannotSendToItself, applyType);
+            return (false, InvalidXnetMessageReason.ReflexiveSend, applyType);
         }
 
         // Lowest common ancestor subnet
@@ -637,23 +628,23 @@ library LibGateway {
         if (applyType == IPCMsgType.TopDown || isLCA) {
             (bool foundChildSubnetId, SubnetID memory childSubnetId) = toSubnetId.down(currentNetwork);
             if (!foundChildSubnetId) {
-                return (CrossMessageValidationOutcome.InvalidDstSubnet, applyType);
+                return (false, InvalidXnetMessageReason.DstSubnet, applyType);
             }
 
             (bool foundSubnet,) = LibGateway.getSubnet(childSubnetId);
             if (!foundSubnet) {
-                return (CrossMessageValidationOutcome.InvalidDstSubnet, applyType);
+                return (false, InvalidXnetMessageReason.DstSubnet, applyType);
             }
         } else {
             SubnetID memory commonParent = toSubnetId.commonParent(currentNetwork);
             if (commonParent.isEmpty()) {
-                return (CrossMessageValidationOutcome.CommonParentNotExist, applyType);
+                return (false, InvalidXnetMessageReason.NoRoute, applyType);
             }
         }
 
         // starting/ending subnet, no need check supply sources
         if (envelope.from.subnetId.equals(currentNetwork) || envelope.to.subnetId.equals(currentNetwork)) {
-            return (CrossMessageValidationOutcome.Valid, applyType);
+            return (true, reason, applyType);
         }
 
         bool supplySourcesCompatible = checkSubnetsSupplyCompatible({
@@ -665,25 +656,10 @@ library LibGateway {
         });
 
         if (!supplySourcesCompatible) {
-            return (CrossMessageValidationOutcome.IncompatibleSupplySource, applyType);
+            return (false, InvalidXnetMessageReason.IncompatibleSupplySource, applyType);
         }
 
-        return (CrossMessageValidationOutcome.Valid, applyType);
-    }
-
-    // Function to map CrossMessageValidationOutcome to InvalidXnetMessageReason
-    function validationOutcomeToInvalidXnetMsgReason(CrossMessageValidationOutcome outcome) internal pure returns (InvalidXnetMessageReason) {
-        if (outcome == CrossMessageValidationOutcome.InvalidDstSubnet) {
-            return InvalidXnetMessageReason.DstSubnet;
-        } else if (outcome == CrossMessageValidationOutcome.CannotSendToItself) {
-            return InvalidXnetMessageReason.CannotSendToItself;
-        } else if (outcome == CrossMessageValidationOutcome.CommonParentNotExist) {
-            return InvalidXnetMessageReason.CommonParentNotExist;
-        } else if (outcome == CrossMessageValidationOutcome.IncompatibleSupplySource) {
-            return InvalidXnetMessageReason.IncompatibleSupplySource;
-        }
-
-        revert("Unhandled validation outcome");
+        return (true, reason, applyType);
     }
     
      /**

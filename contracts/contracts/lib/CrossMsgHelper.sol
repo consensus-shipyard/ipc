@@ -7,13 +7,14 @@ import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {SubnetID, IPCAddress} from "../structs/Subnet.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
-import {LibGateway, CrossMessageValidationOutcome} from "../lib/LibGateway.sol";
+import {LibGateway} from "../lib/LibGateway.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {Asset} from "../structs/Subnet.sol";
 import {AssetHelper} from "./AssetHelper.sol";
 import {IIpcHandler} from "../../sdk/interfaces/IIpcHandler.sol";
+import "../errors/IPCErrors.sol";
 
 /// @title Helper library for manipulating IpcEnvelope-related structs
 library CrossMsgHelper {
@@ -224,7 +225,7 @@ library CrossMsgHelper {
         return true;
     }
 
-    function validateCrossMessage(IpcEnvelope memory crossMsg) internal view returns (CrossMessageValidationOutcome, IPCMsgType)  {
+    function validateCrossMessage(IpcEnvelope memory crossMsg) internal view returns (bool, InvalidXnetMessageReason, IPCMsgType)  {
         return LibGateway.checkCrossMessage(crossMsg);
     }
 }
