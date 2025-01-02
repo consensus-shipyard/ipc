@@ -6,7 +6,6 @@ error AlreadyRegisteredSubnet();
 error AlreadyInSet();
 error CannotConfirmFutureChanges();
 error CannotReleaseZero();
-error CannotSendCrossMsgToItself();
 error CheckpointAlreadyExists();
 error BatchAlreadyExists();
 error MaxMsgsPerBatchExceeded();
@@ -84,8 +83,6 @@ error MissingActivityCommitment();
 error ValidatorAlreadyClaimed();
 error InvalidActivityProof();
 error NotOwner();
-error CommonParentDoesNotExist();
-error UnroutableMessage(string reason);
 
 enum InvalidXnetMessageReason {
     Sender,
@@ -93,8 +90,8 @@ enum InvalidXnetMessageReason {
     Nonce,
     Value,
     Kind,
-    CannotSendToItself,
-    CommonParentNotExist,
+    ReflexiveSend,
+    NoRoute,
     IncompatibleSupplySource
 }
 
