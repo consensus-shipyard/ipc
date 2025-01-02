@@ -845,7 +845,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
         SubnetID memory destinationSubnet = gatewayDiamond.getter().getNetworkName();
 
-        vm.expectRevert(CannotSendCrossMsgToItself.selector);
+        vm.expectRevert(abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.ReflexiveSend));
         gatewayDiamond.messenger().sendContractXnetMessage{value: 1}(
             TestUtils.newXnetCallMsg(
                 IPCAddress({

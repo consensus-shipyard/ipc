@@ -5,9 +5,9 @@ import {GatewayActorModifiers} from "../lib/LibGatewayActorStorage.sol";
 import {IpcEnvelope, CallMsg, IpcMsgKind} from "../structs/CrossNet.sol";
 import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {Subnet, SubnetID, AssetKind, IPCAddress, Asset} from "../structs/Subnet.sol";
-import {InvalidXnetMessage, InvalidXnetMessageReason, CannotSendCrossMsgToItself, MethodNotAllowed, UnroutableMessage} from "../errors/IPCErrors.sol";
+import {InvalidXnetMessage, InvalidXnetMessageReason, MethodNotAllowed} from "../errors/IPCErrors.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
-import {LibGateway, CrossMessageValidationOutcome} from "../lib/LibGateway.sol";
+import {LibGateway} from "../lib/LibGateway.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {AssetHelper} from "../lib/AssetHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
@@ -61,16 +61,9 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
             nonce: 0 // nonce will be updated by LibGateway.commitValidatedCrossMessage
         });
 
-        (CrossMessageValidationOutcome outcome, IPCMsgType applyType) = committed.validateCrossMessage();
-
-        if (outcome != CrossMessageValidationOutcome.Valid) {
-            if (outcome == CrossMessageValidationOutcome.InvalidDstSubnet) {
-                revert InvalidXnetMessage(InvalidXnetMessageReason.DstSubnet);
-            } else if (outcome == CrossMessageValidationOutcome.CannotSendToItself) {
-                revert CannotSendCrossMsgToItself();
-            } else if (outcome == CrossMessageValidationOutcome.CommonParentNotExist) {
-                revert UnroutableMessage("no common parent");
-            }
+        (bool valid, InvalidXnetMessageReason reason, IPCMsgType applyType) = committed.validateCrossMessage();
+        if (!valid) {
+            revert InvalidXnetMessage(reason);
         }
 
         if (applyType == IPCMsgType.TopDown) {
