@@ -42,7 +42,7 @@ pub enum OperationStateMachine {
     Active(ActiveOperationMode),
 }
 
-/// Tracks the operation mdoe metrics for the voting system
+/// Tracks the operation mode metrics for the voting system
 pub(crate) struct OperationMetrics {
     current_mode: OperationMode,
     previous_mode: Option<OperationMode>,

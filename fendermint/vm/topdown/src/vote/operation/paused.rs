@@ -52,10 +52,11 @@ impl OperationModeHandler for PausedOperationMode {
                 },
                 Ok(event) = self.handler.internal_event_listener.recv() => {
                     // top down is still syncing, pause everything
-                    if !matches!(event, TopDownSyncEvent::NodeSyncing) {
-                        return self.into_active();
+                    if matches!(event, TopDownSyncEvent::NodeSyncing) {
+                        continue;
                     }
                     self.handler.handle_event(event);
+                    return self.into_active();
                 }
             }
         }
