@@ -96,7 +96,7 @@ async fn test_sent_tx_found_in_mempool_and_invalid_rejected() {
                     .to(to)
                     .max_fee_per_gas(1)
                     .value(1);
-                if let Ok(_) = middleware.send_transaction(invalid, None).await {
+                if middleware.send_transaction(invalid, None).await.is_ok() {
                     bail!("expected invalid transaction to error on submission")
                 }
 
