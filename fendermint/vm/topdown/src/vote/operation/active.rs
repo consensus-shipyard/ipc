@@ -9,7 +9,6 @@ use crate::vote::operation::{
 };
 use crate::vote::TopDownSyncEvent;
 use crate::vote::VotingHandler;
-use async_trait::async_trait;
 use std::fmt::{Display, Formatter};
 use tokio::select;
 
@@ -23,7 +22,7 @@ pub(crate) struct ActiveOperationMode<G, S> {
 
 impl<G, S> Display for ActiveOperationMode<G, S> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", "ACTIVE")
+        write!(f, "ACTIVE")
     }
 }
 

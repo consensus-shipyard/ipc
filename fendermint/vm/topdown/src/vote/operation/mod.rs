@@ -9,7 +9,6 @@ use crate::vote::operation::active::ActiveOperationMode;
 use crate::vote::operation::paused::PausedOperationMode;
 use crate::vote::store::VoteStore;
 use crate::vote::VotingHandler;
-use std::fmt::Display;
 
 #[repr(u8)]
 #[derive(Debug, Copy, Clone)]

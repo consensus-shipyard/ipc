@@ -5,6 +5,7 @@
 //! cargo test --release -p fendermint_vm_topdown --test vote_reactor
 //! ```
 
+use std::time::Duration;
 use async_trait::async_trait;
 use fendermint_crypto::SecretKey;
 use fendermint_vm_genesis::ValidatorKey;
@@ -40,17 +41,17 @@ struct ChannelGossipClient {
 #[async_trait]
 impl GossipClient for ChannelGossipClient {
     async fn recv_vote(&mut self) -> Result<Vote, Error> {
-        for rx in self.rxs.iter_mut() {
-            match rx.try_recv() {
-                Ok(v) => return Ok(v),
-                Err(TryRecvError::Empty) => continue,
-                _ => panic!("should not happen"),
+        loop {
+            for rx in self.rxs.iter_mut() {
+                match rx.try_recv() {
+                    Ok(v) => return Ok(v),
+                    Err(TryRecvError::Empty) => continue,
+                    _ => panic!("should not happen"),
+                }
             }
+
+            tokio::time::sleep(Duration::from_millis(100)).await;
         }
-
-        self.rxs.iter().map(|v| async {v.recv().await }).collect::<>()
-
-        Ok(None)
     }
 
     async fn publish_vote(&self, vote: Vote) -> Result<(), Error> {
@@ -95,10 +96,6 @@ fn gen_validators(weights: Vec<Weight>) -> (Vec<Validator>, Vec<ChannelGossipCli
 
     (validators, gossips)
 }
-
-// fn gen_power_table(validators: &[Validator]) -> PowerTable {
-//     PowerTable::from_iter(validators.iter().map(|v| (v.validator_key(), v.weight)))
-// }
 
 fn gen_power_updates(validators: &[Validator]) -> PowerUpdates {
     validators

@@ -9,7 +9,6 @@ use crate::vote::operation::{
     OperationMetrics, OperationMode, OperationStateMachine,
 };
 use crate::vote::VotingHandler;
-use async_trait::async_trait;
 use std::fmt::{Display, Formatter};
 use tokio::select;
 
@@ -27,7 +26,7 @@ pub(crate) struct PausedOperationMode<G, S> {
 
 impl<G, S> Display for PausedOperationMode<G, S> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", "PAUSED")
+        write!(f, "PAUSED")
     }
 }
 
