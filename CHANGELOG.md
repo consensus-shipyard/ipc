@@ -2,6 +2,47 @@
 
 All notable changes to this project will be documented in this file.
 
+## [axon-r07] - 2024-12-02
+
+### 🚀 Features
+
+- Enable process metrics (#1180)
+- Add `subnet_id` to metrics as a global label (#1204)
+- Subnet activity rollups and validator rewards (phase 1) (#1181)
+- *(misc)* Examples: validator rewards with ERC20 minting (#1200)
+
+### 🐛 Bug Fixes
+
+- Update deploy command for calibration net (#1184)
+- Fix HumanReadable serialization error (#1189)
+- Use eth_getTransactionCount(pending) to get nonce (#1194)
+- Docs for deploy command (#1191)
+- Clippy + upgrade dependencies + Rust 1.81.0 (#1188)
+- For "Nonce Has Already Been Used" Issue During Deployment on Calibrationnet (#1186)
+- Add `--artifacts-path` flag documentation (#1199)
+- Install target arch (#1203)
+- Metrics validator label to use address instead of pk struct formatting (#1201)
+- Update deploy-registry.ts (#1206)
+- Fix inconsistent network btw eth and fendermint (#1212)
+- Improve Gas Fee Estimation by Integrating Filecoin's EIP-1559-Compatible APIs (#1182)
+
+### 🚜 Refactor
+
+- *(ipld)* Migrate metrics scheme (#1207)
+
+### 📚 Documentation
+
+- Add a doc for activity rollups. (#1222)
+
+### ⚙️ Miscellaneous Tasks
+
+- *(release)* Axon-r06. (#1176)
+- Upgrade `fvm` and `builtin-actors` versions (#1209)
+
+### Docs
+
+- Fix a broken reference for the subnets webpage (#1178)
+
 ## [axon-r06] - 2024-10-18
 
 ### 🚀 Features

@@ -39,14 +39,16 @@ struct ChannelGossipClient {
 
 #[async_trait]
 impl GossipClient for ChannelGossipClient {
-    fn try_poll_vote(&mut self) -> Result<Option<Vote>, Error> {
+    async fn recv_vote(&mut self) -> Result<Vote, Error> {
         for rx in self.rxs.iter_mut() {
             match rx.try_recv() {
-                Ok(v) => return Ok(Some(v)),
+                Ok(v) => return Ok(v),
                 Err(TryRecvError::Empty) => continue,
                 _ => panic!("should not happen"),
             }
         }
+
+        self.rxs.iter().map(|v| async {v.recv().await }).collect::<>()
 
         Ok(None)
     }
@@ -60,9 +62,6 @@ impl GossipClient for ChannelGossipClient {
 fn default_config() -> Config {
     Config {
         req_channel_buffer_size: 1024,
-        req_batch_processing_size: 10,
-        gossip_req_processing_size: 10,
-        voting_sleep_interval_sec: 1,
     }
 }
 

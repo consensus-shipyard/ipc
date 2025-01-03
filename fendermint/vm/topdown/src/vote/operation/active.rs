@@ -3,11 +3,15 @@
 
 use crate::vote::gossip::GossipClient;
 use crate::vote::operation::paused::PausedOperationMode;
-use crate::vote::operation::{OperationMetrics, OperationStateMachine, ACTIVE, PAUSED};
 use crate::vote::store::VoteStore;
+use crate::vote::operation::{
+    OperationMetrics, OperationMode, OperationStateMachine,
+};
 use crate::vote::TopDownSyncEvent;
 use crate::vote::VotingHandler;
+use async_trait::async_trait;
 use std::fmt::{Display, Formatter};
+use tokio::select;
 
 /// In active mode, we observe a steady rate of topdown checkpoint commitments on chain.
 /// Our lookahead buffer is sliding continuously. As we acquire new finalised parent blocks,
@@ -19,40 +23,40 @@ pub(crate) struct ActiveOperationMode<G, S> {
 
 impl<G, S> Display for ActiveOperationMode<G, S> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", ACTIVE)
+        write!(f, "{}", "ACTIVE")
     }
 }
 
-impl<G, S> ActiveOperationMode<G, S>
-where
-    G: GossipClient + Send + Sync + 'static,
-    S: VoteStore + Send + Sync + 'static,
-{
+impl <G, S> ActiveOperationMode<G, S> {
+    fn into_paused(mut self) -> OperationStateMachine<G, S> {
+        self.metrics.mode_changed(OperationMode::Paused);
+        OperationStateMachine::Paused(PausedOperationMode {
+            metrics: self.metrics,
+            handler: self.handler,
+        })
+    }
+}
+
+impl <G: Send + Sync + 'static + GossipClient + Clone, S: VoteStore + Send + Sync + 'static> ActiveOperationMode<G, S> {
     pub(crate) async fn advance(mut self) -> OperationStateMachine<G, S> {
-        let mut n = self.handler.process_external_request(&self.metrics);
-        tracing::debug!(
-            num = n,
-            status = self.to_string(),
-            "handled external requests"
-        );
+        loop {
+            select! {
+                Some(req) = self.handler.req_rx.recv() => {
+                    self.handler.handle_request(req, &self.metrics);
+                },
+                Ok(vote) = self.handler.gossip.recv_vote() => {
+                    self.handler.record_vote(vote);
 
-        n = self.handler.process_gossip_subscription_votes();
-        tracing::debug!(num = n, status = self.to_string(), "handled gossip votes");
-
-        while let Some(v) = self.handler.poll_internal_event() {
-            // top down is now syncing, pause everything
-            if matches!(v, TopDownSyncEvent::NodeSyncing) {
-                self.metrics.mode_changed(PAUSED);
-                return OperationStateMachine::Paused(PausedOperationMode {
-                    metrics: self.metrics,
-                    handler: self.handler,
-                });
+                    // TODO: need to handle soft recovery transition
+                },
+                Ok(event) = self.handler.internal_event_listener.recv() => {
+                    // top down is now syncing, pause everything
+                    if matches!(event, TopDownSyncEvent::NodeSyncing) {
+                        return self.into_paused();
+                    }
+                    self.handler.handle_event(event);
+                }
             }
-
-            // handle the polled event
-            self.handler.handle_event(v).await;
         }
-
-        OperationStateMachine::Active(self)
     }
 }

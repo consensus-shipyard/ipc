@@ -125,7 +125,7 @@ pub fn to_deliver_tx(
     }
 }
 
-pub fn to_check_tx(ret: FvmCheckRet) -> response::CheckTx {
+pub fn to_check_tx(ret: FvmCheckRet, priority: i64) -> response::CheckTx {
     // Putting the message `log` because only `log` appears in the `tx_sync` JSON-RPC response.
     let message = ret
         .info
@@ -144,6 +144,7 @@ pub fn to_check_tx(ret: FvmCheckRet) -> response::CheckTx {
         data,
         gas_wanted: ret.gas_limit.try_into().unwrap_or(i64::MAX),
         sender: ret.sender.to_string(),
+        priority,
         ..Default::default()
     }
 }

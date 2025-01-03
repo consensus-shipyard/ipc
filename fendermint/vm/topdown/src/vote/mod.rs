@@ -11,7 +11,6 @@ mod tally;
 use crate::observation::{CertifiedObservation, Observation};
 use crate::sync::TopDownSyncEvent;
 use crate::vote::gossip::GossipClient;
-use crate::vote::operation::{OperationMetrics, OperationStateMachine};
 use crate::vote::payload::{PowerUpdates, Vote, VoteTallyState};
 use crate::vote::store::VoteStore;
 use crate::vote::tally::VoteTally;
@@ -21,8 +20,10 @@ use fendermint_crypto::SecretKey;
 use fendermint_vm_genesis::ValidatorKey;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc, oneshot};
+use crate::vote::operation::{OperationMetrics, OperationStateMachine};
 
 pub type Weight = u64;
 
@@ -30,12 +31,6 @@ pub type Weight = u64;
 pub struct Config {
     /// The reactor request channel buffer size
     pub req_channel_buffer_size: usize,
-    /// The number of requests the reactor should process per run before handling other tasks
-    pub req_batch_processing_size: usize,
-    /// The number of vote recording requests the reactor should process per run before handling other tasks
-    pub gossip_req_processing_size: usize,
-    /// The time to sleep for voting loop if nothing happens
-    pub voting_sleep_interval_sec: u64,
 }
 
 /// The client to interact with the vote reactor
@@ -71,11 +66,9 @@ pub fn start_vote_reactor<
     let validator_key = params.validator_key;
     let internal_event_listener = params.internal_event_listener;
     let latest_child_block = params.latest_child_block;
-    let gossip = params.gossip;
+    let gossip = Arc::new(params.gossip);
 
     tokio::spawn(async move {
-        let sleep = Duration::new(config.voting_sleep_interval_sec, 0);
-
         let inner = VotingHandler {
             validator_key,
             req_rx: rx,
@@ -88,7 +81,6 @@ pub fn start_vote_reactor<
         let mut machine = OperationStateMachine::new(inner);
         loop {
             machine = machine.step().await;
-            tokio::time::sleep(sleep).await;
         }
     });
 
@@ -219,7 +211,7 @@ struct VotingHandler<Gossip, VoteStore> {
 
 impl<G, V> VotingHandler<G, V>
 where
-    G: GossipClient + Send + Sync + 'static,
+    G: GossipClient + Send + Sync + 'static + Clone,
     V: VoteStore + Send + Sync + 'static,
 {
     fn handle_request(&mut self, req: VoteReactorRequest, metrics: &OperationMetrics) {
@@ -266,7 +258,13 @@ where
         }
     }
 
-    async fn handle_event(&mut self, event: TopDownSyncEvent) {
+    fn record_vote(&mut self, vote: Vote) {
+        if let Err(e) = self.vote_tally.add_vote(vote) {
+            tracing::error!(err = e.to_string(), "cannot add vote to tally");
+        }
+    }
+
+    fn handle_event(&mut self, event: TopDownSyncEvent) {
         match event {
             TopDownSyncEvent::NewProposal(observation) => {
                 let vote = match CertifiedObservation::sign(
@@ -286,75 +284,21 @@ where
                     return;
                 }
 
-                match self.gossip.publish_vote(vote).await {
-                    Ok(_) => {}
-                    Err(e) => {
+                let gossip = self.gossip.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = gossip.publish_vote(vote).await {
                         tracing::error!(
                             err = e.to_string(),
                             "cannot send to gossip sender, tx dropped"
                         );
-
                         // when this happens, we still keep the vote tally going as
                         // we can still receive other peers's votes.
                     }
-                }
+                });
             }
             _ => {
                 // ignore events we are not interested in
             }
         };
-    }
-
-    /// Process external request, such as RPC queries for debugging and status tracking.
-    fn process_external_request(&mut self, metrics: &OperationMetrics) -> usize {
-        let mut n = 0;
-        while n < self.config.req_batch_processing_size {
-            match self.req_rx.try_recv() {
-                Ok(req) => {
-                    self.handle_request(req, metrics);
-                    n += 1
-                }
-                Err(mpsc::error::TryRecvError::Disconnected) => {
-                    tracing::warn!("voting reactor tx closed unexpected");
-                    break;
-                }
-                Err(mpsc::error::TryRecvError::Empty) => break,
-            }
-        }
-        n
-    }
-
-    /// Handles vote tally gossip pab/sub incoming votes from other peers
-    fn process_gossip_subscription_votes(&mut self) -> usize {
-        let mut vote_processed = 0;
-        while vote_processed < self.config.gossip_req_processing_size {
-            match self.gossip.try_poll_vote() {
-                Ok(Some(vote)) => {
-                    if let Err(e) = self.vote_tally.add_vote(vote) {
-                        tracing::error!(err = e.to_string(), "cannot add vote to tally");
-                    } else {
-                        vote_processed += 1;
-                    }
-                }
-                Err(e) => {
-                    tracing::warn!(err = e.to_string(), "cannot poll gossip vote");
-                    break;
-                }
-                _ => break,
-            }
-        }
-        vote_processed
-    }
-
-    /// Poll internal topdown syncer event broadcasted.
-    fn poll_internal_event(&mut self) -> Option<TopDownSyncEvent> {
-        match self.internal_event_listener.try_recv() {
-            Ok(event) => Some(event),
-            Err(broadcast::error::TryRecvError::Empty) => None,
-            _ => {
-                tracing::warn!("gossip sender lagging or closed");
-                None
-            }
-        }
     }
 }
