@@ -10,7 +10,8 @@ mod tally;
 
 use crate::observation::{CertifiedObservation, Observation};
 use crate::sync::TopDownSyncEvent;
-use crate::vote::gossip::GossipClient;
+use crate::vote::gossip::{GossipReceiver, GossipSender};
+use crate::vote::operation::{OperationMetrics, OperationStateMachine};
 use crate::vote::payload::{PowerUpdates, Vote, VoteTallyState};
 use crate::vote::store::VoteStore;
 use crate::vote::tally::VoteTally;
@@ -22,7 +23,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, oneshot};
-use crate::vote::operation::{OperationMetrics, OperationStateMachine};
 
 pub type Weight = u64;
 
@@ -37,22 +37,24 @@ pub struct VoteReactorClient {
     tx: mpsc::Sender<VoteReactorRequest>,
 }
 
-pub struct StartVoteReactorParams<G, V> {
+pub struct StartVoteReactorParams<T, R, V> {
     pub config: Config,
     pub validator_key: SecretKey,
     pub power_table: PowerUpdates,
     pub last_finalized_height: BlockHeight,
     pub latest_child_block: BlockHeight,
-    pub gossip: G,
+    pub gossip_rx: R,
+    pub gossip_tx: T,
     pub vote_store: V,
     pub internal_event_listener: broadcast::Receiver<TopDownSyncEvent>,
 }
 
 pub fn start_vote_reactor<
-    G: GossipClient + Send + Sync + 'static,
+    T: GossipSender + Send + Sync + 'static,
+    R: GossipReceiver + Send + Sync + 'static,
     V: VoteStore + Send + Sync + 'static,
 >(
-    params: StartVoteReactorParams<G, V>,
+    params: StartVoteReactorParams<T, R, V>,
 ) -> anyhow::Result<VoteReactorClient> {
     let config = params.config;
     let (tx, rx) = mpsc::channel(config.req_channel_buffer_size);
@@ -65,7 +67,8 @@ pub fn start_vote_reactor<
     let validator_key = params.validator_key;
     let internal_event_listener = params.internal_event_listener;
     let latest_child_block = params.latest_child_block;
-    let gossip = Arc::new(params.gossip);
+    let gossip_tx = Arc::new(params.gossip_tx);
+    let gossip_rx = params.gossip_rx;
 
     tokio::spawn(async move {
         let inner = VotingHandler {
@@ -75,7 +78,8 @@ pub fn start_vote_reactor<
             vote_tally,
             latest_child_block,
             config,
-            gossip,
+            gossip_rx,
+            gossip_tx,
         };
         let mut machine = OperationStateMachine::new(inner);
         loop {
@@ -193,14 +197,16 @@ enum VoteReactorRequest {
     },
 }
 
-struct VotingHandler<Gossip, VoteStore> {
+struct VotingHandler<GossipTx, GossipRx, VoteStore> {
     /// The validator key that is used to sign proposal produced for broadcasting
     validator_key: SecretKey,
     /// Handles the requests targeting the vote reactor, could be querying the
     /// vote tally status and etc.
     req_rx: mpsc::Receiver<VoteReactorRequest>,
-    /// Interface to gossip pub/sub for topdown voting
-    gossip: Gossip,
+    /// Listening to incoming vote and publish to gossip pub/sub channel
+    gossip_tx: GossipTx,
+    /// Listening to gossip pub/sub channel for new votes
+    gossip_rx: GossipRx,
     /// Listens to internal events and handles the events accordingly
     internal_event_listener: broadcast::Receiver<TopDownSyncEvent>,
     vote_tally: VoteTally<VoteStore>,
@@ -208,9 +214,10 @@ struct VotingHandler<Gossip, VoteStore> {
     config: Config,
 }
 
-impl<G, V> VotingHandler<G, V>
+impl<T, R, V> VotingHandler<T, R, V>
 where
-    G: GossipClient + Send + Sync + 'static + Clone,
+    T: GossipSender + Send + Sync + 'static + Clone,
+    R: GossipReceiver + Send + Sync + 'static,
     V: VoteStore + Send + Sync + 'static,
 {
     fn handle_request(&mut self, req: VoteReactorRequest, metrics: &OperationMetrics) {
@@ -283,7 +290,7 @@ where
                     return;
                 }
 
-                let gossip = self.gossip.clone();
+                let gossip = self.gossip_tx.clone();
                 tokio::spawn(async move {
                     if let Err(e) = gossip.publish_vote(vote).await {
                         tracing::error!(
