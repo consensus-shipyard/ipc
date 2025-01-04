@@ -456,14 +456,19 @@ impl BlobsActor {
         // The call should be atomic, hence we wrap two independent calls in a transaction.
         let (delete, subscription) = rt.transaction(|st: &mut State, rt| {
             let add_params = params.add;
-            let delete = st.delete_blob(
-                rt.store(),
-                origin,
-                subscriber,
-                rt.curr_epoch(),
-                params.old_hash,
-                add_params.id.clone(),
-            )?;
+            // Do not delete the blob if the old hash is the same as the new hash.
+            let delete = if params.old_hash != add_params.hash {
+                st.delete_blob(
+                    rt.store(),
+                    origin,
+                    subscriber,
+                    rt.curr_epoch(),
+                    params.old_hash,
+                    add_params.id.clone(),
+                )?
+            } else {
+                false
+            };
             let (subscription, _) = st.add_blob(
                 &hoku_config,
                 rt.store(),

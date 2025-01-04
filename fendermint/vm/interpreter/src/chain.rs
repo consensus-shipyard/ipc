@@ -287,6 +287,7 @@ where
         // Collect and enqueue blobs that are not added in the pool yet.
         state.state_tree_mut().begin_transaction();
         let added_blobs = get_added_blobs(&mut state, chain_env.blob_concurrency)?;
+        tracing::debug!(size = added_blobs.len(), "blobs fetched from chain");
         state
             .state_tree_mut()
             .end_transaction(true)
@@ -314,6 +315,10 @@ where
         // but have not yet been resolved by _this_ proposer. However, a blob like this will get
         // picked up by a different proposer who _does_ consider it resolved.
         let local_finalized_blobs = atomically(|| chain_env.blob_pool.collect_done()).await;
+        tracing::debug!(
+            size = local_finalized_blobs.len(),
+            "locally finalized blobs"
+        );
 
         // Create transactions ready to be included on the chain. These are from locally resolved
         // or failed blobs that have reached a global quorum and are not yet finalized.
@@ -333,7 +338,6 @@ where
                     atomically(|| chain_env.blob_pool.remove_result(item)).await;
                     continue;
                 }
-
                 let (is_globally_finalized, succeeded) = atomically(|| {
                     chain_env
                         .parent_finality_votes
@@ -358,13 +362,12 @@ where
                 .end_transaction(true)
                 .expect("we just started a transaction");
 
-            let pending_blobs = atomically(|| chain_env.blob_pool.count()).await;
-            tracing::info!(size = pending_blobs, "blob pool status");
-
             // Append at the end - if we run out of block space,
             // these are going to be reproposed in the next block.
             msgs.extend(blobs);
         }
+        let pending_blobs = atomically(|| chain_env.blob_pool.count()).await;
+        tracing::info!(size = pending_blobs, "blob pool status");
 
         // Get pending read requests from the blob_reader actor
         let open_requests = with_state_transaction(&mut state, |state| {
@@ -373,7 +376,7 @@ where
             Ok(requests)
         })?;
 
-        // create IPC messages to add read requests to the pool
+        // Create IPC messages to add read requests to the pool
         for (id, blob_hash, offset, len, callback_addr, callback_method) in open_requests {
             msgs.push(ChainMessage::Ipc(IpcMessage::ReadRequestPending(
                 PendingReadRequest {
@@ -386,21 +389,25 @@ where
             )));
         }
 
-        // collect locally resolved read requests
-        let locally_resolved_read_requests =
+        // Collect locally completed read requests from the pool.
+        // The logic is the same as for blobs above.
+        let locally_finalized_read_requests =
             atomically(|| chain_env.read_request_pool.collect_done()).await;
         tracing::debug!(
-            size = locally_resolved_read_requests.len(),
-            "locally resolved read requests"
+            size = locally_finalized_read_requests.len(),
+            "locally finalized read requests"
         );
 
-        if !locally_resolved_read_requests.is_empty() {
+        // Create transactions ready to be included on the chain. These are from locally resolved
+        // or failed requests that have reached a global quorum and are not yet finalized.
+        if !locally_finalized_read_requests.is_empty() {
             let mut read_requests: Vec<ChainMessage> = vec![];
             // We start a blockstore transaction that can be reverted
             state.state_tree_mut().begin_transaction();
-            for item in locally_resolved_read_requests.iter() {
-                // check if the read request is closed i.e. not open or pending
-                // if a request is not found in actor state but exists in the pool, it is considered closed
+            for item in locally_finalized_read_requests.iter() {
+                // Check if the read request is closed, i.e., not open or pending.
+                // If a request is not found in actor state but exists in the pool,
+                // it is considered closed.
                 if get_read_request_status(&mut state, item.id)?.is_none() {
                     tracing::debug!(request_id = ?item.id, "read request already fulfilled on chain; removing from pool");
                     atomically(|| chain_env.read_request_pool.remove_task(item)).await;
@@ -413,7 +420,7 @@ where
                 atomically(|| chain_env.read_request_pool.remove_result(item)).await;
 
                 // Extend request id with response data to use as the vote hash.
-                // This ensures that the all validators are voting
+                // This ensures that all validators are voting
                 // on the same response from IROH.
                 let mut request_id = item.id.as_bytes().to_vec();
                 request_id.extend(read_response.clone());
@@ -424,19 +431,6 @@ where
                         .find_blob_quorum(&vote_hash.as_bytes().to_vec())
                 })
                 .await;
-                tracing::debug!(
-                    request_id = ?item.id,
-                    quorum = ?is_globally_finalized,
-                    "read request quorum"
-                );
-                let item = ReadRequestPoolItem {
-                    id: item.id,
-                    blob_hash: item.blob_hash,
-                    offset: item.offset,
-                    len: item.len,
-                    callback: item.callback,
-                };
-
                 if is_globally_finalized {
                     tracing::debug!(request_id = ?item.id, "read request has quorum; adding tx to chain");
                     read_requests.push(ChainMessage::Ipc(IpcMessage::ReadRequestClosed(
@@ -456,12 +450,12 @@ where
                 .end_transaction(true)
                 .expect("we just started a transaction");
 
-            let pending_read_requests = atomically(|| chain_env.read_request_pool.count()).await;
-            tracing::info!(size = pending_read_requests, "read request pool status");
             // Append at the end - if we run out of block space,
             // these are going to be reproposed in the next block.
             msgs.extend(read_requests);
         }
+        let pending_read_requests = atomically(|| chain_env.read_request_pool.count()).await;
+        tracing::info!(size = pending_read_requests, "read request pool status");
 
         Ok(msgs)
     }

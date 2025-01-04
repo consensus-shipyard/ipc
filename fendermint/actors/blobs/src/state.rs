@@ -220,7 +220,11 @@ impl State {
         if add_amount.is_positive() {
             debug!("refunded {} atto to {}", add_amount.atto(), addr);
         } else {
-            debug!("debited {} atto from {}", add_amount.atto(), addr);
+            debug!(
+                "debited {} atto from {}",
+                add_amount.atto().magnitude(),
+                addr
+            );
         }
         Ok(())
     }

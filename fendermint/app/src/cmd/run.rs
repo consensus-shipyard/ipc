@@ -654,11 +654,11 @@ async fn dispatch_vote(
                     debug!("vote handled for blob finality");
                     if f.success {
                         emit(BlobsFinalityVotingSuccess {
-                            blob_hash: Some(f.hash.into()),
+                            blob_hash: Some(f.hash.to_string()),
                         });
                     } else {
                         emit(BlobsFinalityVotingFailure {
-                            blob_hash: Some(f.hash.into()),
+                            blob_hash: Some(f.hash.to_string()),
                         });
                     }
                 }
@@ -688,7 +688,7 @@ async fn dispatch_vote(
                 Ok(_) => {
                     debug!("vote handled for read request completion");
                     emit(ReadRequestsCloseVoting {
-                        read_request_id: Some(r.hash.into()),
+                        read_request_id: Some(r.hash.to_string()),
                     });
                 }
                 Err(e @ VoteError::Equivocation(_, _, _, _)) => {

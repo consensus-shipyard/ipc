@@ -42,11 +42,11 @@ run-devnet-iroh:
 run-devnet-fendermint:
 	rm -rf ~/.fendermint/data/rocksdb
 	FM_NETWORK=test \
-	FM_TRACING__CONSOLE__LEVEL=info \
+	FM_TRACING__CONSOLE__LEVEL=info,fendermint=debug,hoku_executor=debug \
 	FM_VALIDATOR_KEY__PATH=keys/validator.sk \
 	FM_VALIDATOR_KEY__KIND=regular \
 	FM_RESOLVER__CONNECTION__LISTEN_ADDR=/ip4/127.0.0.1/tcp/3001 \
-	./target/release/fendermint run --iroh-addr 127.0.0.1:4919
+	./target/release/fendermint run --iroh-addr 127.0.0.1:4919 > fendermint.log 2>&1
 
 run-devnet-cometbft:
 	cometbft unsafe-reset-all

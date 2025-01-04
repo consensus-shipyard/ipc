@@ -11,12 +11,17 @@ use fendermint_actor_machine::{Kind, MachineAddress, MachineState};
 use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::*;
-use fvm_ipld_hamt::{BytesKey, Hamt};
+use fvm_ipld_hamt::{BytesKey, Config, Hamt};
 use fvm_shared::address::Address;
 use serde::{Deserialize, Serialize};
 
-const BIT_WIDTH: u32 = 8;
 const MAX_LIST_LIMIT: usize = 1000;
+
+const HAMT_CONFIG: Config = Config {
+    bit_width: 5,
+    min_data_depth: 2,
+    max_array_width: 1,
+};
 
 fn state_error(e: fvm_ipld_hamt::Error) -> ActorError {
     ActorError::illegal_state(e.to_string())
@@ -45,7 +50,7 @@ impl MachineState for State {
         owner: Address,
         metadata: HashMap<String, String>,
     ) -> anyhow::Result<Self, ActorError> {
-        let root = match Hamt::<_, ObjectState>::new_with_bit_width(store, BIT_WIDTH).flush() {
+        let root = match Hamt::<_, ObjectState>::new_with_config(store, HAMT_CONFIG).flush() {
             Ok(cid) => cid,
             Err(e) => {
                 return Err(ActorError::illegal_state(format!(
@@ -113,7 +118,7 @@ impl State {
         metadata: HashMap<String, String>,
         overwrite: bool,
     ) -> anyhow::Result<Cid, ActorError> {
-        let mut hamt = Hamt::<_, ObjectState>::load_with_bit_width(&self.root, store, BIT_WIDTH)
+        let mut hamt = Hamt::<_, ObjectState>::load_with_config(&self.root, store, HAMT_CONFIG)
             .map_err(state_error)?;
         let object = ObjectState {
             hash,
@@ -134,7 +139,7 @@ impl State {
         store: &BS,
         key: &BytesKey,
     ) -> anyhow::Result<(ObjectState, Cid), ActorError> {
-        let mut hamt = Hamt::<_, ObjectState>::load_with_bit_width(&self.root, store, BIT_WIDTH)
+        let mut hamt = Hamt::<_, ObjectState>::load_with_config(&self.root, store, HAMT_CONFIG)
             .map_err(state_error)?;
         let object = hamt
             .delete(key)
@@ -150,7 +155,7 @@ impl State {
         store: &BS,
         key: &BytesKey,
     ) -> anyhow::Result<Option<ObjectState>, ActorError> {
-        let hamt = Hamt::<_, ObjectState>::load_with_bit_width(&self.root, store, BIT_WIDTH)
+        let hamt = Hamt::<_, ObjectState>::load_with_config(&self.root, store, HAMT_CONFIG)
             .map_err(state_error)?;
         let object = hamt.get(key).map(|v| v.cloned()).map_err(state_error)?;
         Ok(object)
@@ -168,7 +173,7 @@ impl State {
     where
         F: FnMut(Vec<u8>, ObjectState) -> anyhow::Result<(), ActorError>,
     {
-        let hamt = Hamt::<_, ObjectState>::load_with_bit_width(&self.root, store, BIT_WIDTH)
+        let hamt = Hamt::<_, ObjectState>::load_with_config(&self.root, store, HAMT_CONFIG)
             .map_err(state_error)?;
         let mut common_prefixes = std::collections::BTreeSet::<Vec<u8>>::new();
         let limit = if limit == 0 {

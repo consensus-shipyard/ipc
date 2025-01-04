@@ -57,26 +57,28 @@ impl_traceables!(
 
 #[derive(Debug)]
 pub struct BlobsFinalityVotingSuccess {
-    pub blob_hash: Option<[u8; 32]>,
+    pub blob_hash: Option<String>,
 }
 
 impl Recordable for BlobsFinalityVotingSuccess {
     fn record_metrics(&self) {
+        let hash = self.blob_hash.as_deref().unwrap_or("");
         BLOBS_FINALITY_VOTING_SUCCESS
-            .with_label_values(&[hex::encode(self.blob_hash.unwrap_or([0u8; 32])).as_str()])
+            .with_label_values(&[hash])
             .inc();
     }
 }
 
 #[derive(Debug)]
 pub struct BlobsFinalityVotingFailure {
-    pub blob_hash: Option<[u8; 32]>,
+    pub blob_hash: Option<String>,
 }
 
 impl Recordable for BlobsFinalityVotingFailure {
     fn record_metrics(&self) {
+        let hash = self.blob_hash.as_deref().unwrap_or("");
         BLOBS_FINALITY_VOTING_FAILURE
-            .with_label_values(&[hex::encode(self.blob_hash.unwrap_or([0u8; 32])).as_str()])
+            .with_label_values(&[hash])
             .inc();
     }
 }
@@ -119,14 +121,13 @@ impl Recordable for BlobsFinalityAddedBytes {
 
 #[derive(Debug)]
 pub struct ReadRequestsCloseVoting {
-    pub read_request_id: Option<[u8; 32]>,
+    pub read_request_id: Option<String>,
 }
 
 impl Recordable for ReadRequestsCloseVoting {
     fn record_metrics(&self) {
-        READ_REQUESTS_VOTING_CLOSE
-            .with_label_values(&[hex::encode(self.read_request_id.unwrap_or([0u8; 32])).as_str()])
-            .inc();
+        let id = self.read_request_id.as_deref().unwrap_or("");
+        READ_REQUESTS_VOTING_CLOSE.with_label_values(&[id]).inc();
     }
 }
 
@@ -151,17 +152,17 @@ mod tests {
         emit(BlobsFinalityAddedBlobs(1));
         emit(BlobsFinalityAddedBytes(1));
         emit(ReadRequestsCloseVoting {
-            read_request_id: Some([0u8; 32]),
+            read_request_id: Some(String::from("id")),
         });
     }
 
     #[test]
     fn test_emit() {
         emit(BlobsFinalityVotingSuccess {
-            blob_hash: Some([0u8; 32]),
+            blob_hash: Some(String::from("hash")),
         });
         emit(BlobsFinalityVotingFailure {
-            blob_hash: Some([0u8; 32]),
+            blob_hash: Some(String::from("hash")),
         });
         emit(BlobsFinalityPendingBlobs(1));
         emit(BlobsFinalityPendingBytes(1));

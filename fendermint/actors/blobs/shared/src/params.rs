@@ -41,11 +41,11 @@ pub struct ApproveCreditParams {
     /// If not present, any caller is allowed.
     pub caller_allowlist: Option<HashSet<Address>>,
     /// Optional credit approval limit.
-    /// If specified, the approval becomes invalid once the committed credits reach the
+    /// If specified, the approval becomes invalid once the used credits reach the
     /// specified limit.
     pub credit_limit: Option<Credit>,
     /// Optional gas fee limit.
-    /// If specified, the approval becomes invalid once the commited gas reach the
+    /// If specified, the approval becomes invalid once the used gas fees reach the
     /// specified limit.
     pub gas_fee_limit: Option<TokenAmount>,
     /// Optional credit approval time-to-live epochs.
@@ -192,7 +192,7 @@ pub struct DeleteBlobParams {
     pub id: SubscriptionId,
 }
 
-/// Params for overwriting a blob, i.e. deleting one and adding another.
+/// Params for overwriting a blob, i.e., deleting one and adding another.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct OverwriteBlobParams {
     /// Blake3 hash of the blob to be deleted.
