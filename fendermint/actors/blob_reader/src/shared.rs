@@ -2,13 +2,15 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-pub use crate::state::State;
+use std::fmt;
+
 use fendermint_actor_blobs_shared::state::Hash;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::{address::Address, ActorID, MethodNum, METHOD_CONSTRUCTOR};
 use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
-use std::fmt;
+
+pub use crate::state::State;
 
 pub const BLOB_READER_ACTOR_NAME: &str = "blob_reader";
 pub const BLOB_READER_ACTOR_ID: ActorID = 67;

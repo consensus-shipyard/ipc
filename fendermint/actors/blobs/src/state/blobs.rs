@@ -2,7 +2,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 
 use fendermint_actor_blobs_shared::state::{Blob, Hash};
 use fendermint_actor_blobs_shared::state::{PublicKey, SubscriptionId};
@@ -34,7 +34,7 @@ impl BlobsState {
 
     pub fn save_tracked(&mut self, tracked_flush_result: TrackedFlushResult<Hash, Blob>) {
         self.root = tracked_flush_result.root;
-        self.size = tracked_flush_result.size
+        self.size = tracked_flush_result.size;
     }
 
     pub fn len(&self) -> u64 {
@@ -42,86 +42,137 @@ impl BlobsState {
     }
 }
 
-#[derive(Debug, Default, Serialize_tuple, Deserialize_tuple)]
+#[derive(Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct BlobsProgressCollection {
-    map: BTreeMap<Hash, BlobsProgressValue>,
+    pub root: hamt::Root<Hash, BlobSourceSet>,
+    /// Number of blobs in the collection.
+    /// A blob with multiple sources is only counted once.
+    size: u64,
+    /// Number of blob bytes in the collection.
+    /// A blob with multiple sources is only counted once.
     bytes_size: u64,
 }
 
-type BlobsProgressValue = HashSet<(Address, SubscriptionId, PublicKey)>;
+/// Blob source is a tuple of subscriber [`Address`], blob [`SubscriptionId`],
+/// and an Iroh node [`PublicKey`].
+type BlobSource = (Address, SubscriptionId, PublicKey);
+
+/// A set of [`BlobSource`]s.
+/// A blob in the collection may have multiple sources.
+type BlobSourceSet = HashSet<(Address, SubscriptionId, PublicKey)>;
 
 impl BlobsProgressCollection {
-    /// Number of bytes for blobs in the collection
+    /// Returns a new progress collection.
+    pub fn new<BS: Blockstore>(store: &BS, name: &str) -> Result<Self, ActorError> {
+        let root = hamt::Root::<Hash, BlobSourceSet>::new(store, name)?;
+        Ok(Self {
+            root,
+            size: 0,
+            bytes_size: 0,
+        })
+    }
+
+    /// Returns the underlying [`hamt::map::Hamt`].
+    pub fn hamt<BS: Blockstore>(
+        &self,
+        store: BS,
+    ) -> Result<hamt::map::Hamt<BS, Hash, BlobSourceSet>, ActorError> {
+        self.root.hamt(store, self.size)
+    }
+
+    /// Saves the state from the [`TrackedFlushResult`].
+    pub fn save_tracked(&mut self, tracked_flush_result: TrackedFlushResult<Hash, BlobSourceSet>) {
+        self.root = tracked_flush_result.root;
+        self.size = tracked_flush_result.size;
+    }
+
+    /// Number of blobs in the collection.
+    /// A blob with multiple sources is only counted once.
+    pub fn len(&self) -> u64 {
+        self.size
+    }
+
+    /// Returns the number of blob bytes in the collection.
+    /// A blob with multiple sources is only counted once.
     pub fn bytes_size(&self) -> u64 {
         self.bytes_size
     }
 
-    /// Number of entries
-    pub fn len(&self) -> u64 {
-        self.map.len() as u64
-    }
-
-    /// Add/update added with hash and its source
-    pub fn upsert(
+    /// Adds/updates an entry in the collection.
+    pub fn upsert<BS: Blockstore>(
         &mut self,
+        store: BS,
         hash: Hash,
-        subscriber: Address,
-        id: SubscriptionId,
-        source: PublicKey,
+        source: BlobSource,
         blob_size: u64,
-    ) {
-        self.map
-            .entry(hash)
-            .and_modify(|sources| {
-                sources.insert((subscriber, id.clone(), source));
-            })
-            .or_insert_with(|| {
-                self.bytes_size += blob_size;
-                HashSet::from([(subscriber, id, source)])
-            });
+    ) -> Result<(), ActorError> {
+        let mut map = self.hamt(store)?;
+        if !map.set_if_absent(&hash, HashSet::from([source.clone()]))? {
+            // Modify existing entry
+            let mut entry = map.get(&hash)?.expect("entry should exist");
+            entry.insert(source);
+            map.set(&hash, entry)?;
+        } else {
+            // Entry did not exist, add to tracked bytes size
+            self.bytes_size += blob_size;
+        }
+        self.save_tracked(map.flush_tracked()?);
+        Ok(())
     }
 
-    pub fn take_page(&self, size: u32) -> Vec<(Hash, BlobsProgressValue)> {
-        self.map
-            .iter()
-            .take(size as usize)
-            .map(|element| (*element.0, element.1.clone()))
-            .collect::<Vec<_>>()
+    /// Returns a page of entries from the collection.
+    pub fn take_page<BS: Blockstore>(
+        &self,
+        store: BS,
+        size: u32,
+    ) -> Result<Vec<(Hash, BlobSourceSet)>, ActorError> {
+        let map = self.hamt(store)?;
+        let mut page = Vec::with_capacity(size as usize);
+        map.for_each_ranged(None, Some(size as usize), |hash, set| {
+            page.push((hash, set.clone()));
+            Ok(())
+        })?;
+        page.shrink_to_fit();
+        Ok(page)
     }
 
-    pub fn remove_entry(
+    /// Removes a source from an entry in the collection.
+    /// If the entry is empty after removing the source, the entry is also removed.
+    pub fn remove_source<BS: Blockstore>(
         &mut self,
+        store: BS,
         hash: Hash,
-        subscriber: Address,
-        sub_id: SubscriptionId,
-        source: PublicKey,
+        source: BlobSource,
         blob_size: u64,
-    ) {
-        if let Some(entry) = self.map.get_mut(&hash) {
-            entry.remove(&(subscriber, sub_id, source));
-            self.bytes_size -= blob_size;
-            if entry.is_empty() {
-                self.map.remove(&hash);
+    ) -> Result<(), ActorError> {
+        let mut map = self.hamt(store)?;
+        if let Some(mut set) = map.get(&hash)? {
+            if set.remove(&source) {
+                if set.is_empty() {
+                    map.delete(&hash)?;
+                    self.bytes_size -= blob_size;
+                } else {
+                    map.set(&hash, set)?;
+                }
+                self.save_tracked(map.flush_tracked()?);
             }
         }
+        Ok(())
     }
 
-    pub fn insert(
+    /// Removes an entry from the collection.
+    pub fn remove_entry<BS: Blockstore>(
         &mut self,
-        hash: Hash,
-        value: BlobsProgressValue,
+        store: BS,
+        hash: &Hash,
         blob_size: u64,
-    ) -> Option<BlobsProgressValue> {
-        let result = self.map.insert(hash, value);
-        self.bytes_size += blob_size;
-        result
-    }
-
-    pub fn remove(&mut self, hash: &Hash, blob_size: u64) -> Option<BlobsProgressValue> {
-        let result = self.map.remove(hash);
-        if result.is_some() {
+    ) -> Result<(), ActorError> {
+        let mut map = self.hamt(store)?;
+        let (res, deleted) = map.delete_and_flush_tracked(hash)?;
+        self.save_tracked(res);
+        if deleted.is_some() {
             self.bytes_size -= blob_size;
         }
-        result
+        Ok(())
     }
 }

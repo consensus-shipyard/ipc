@@ -159,21 +159,24 @@ where
         Ok(deleted)
     }
 
-    pub fn delete_and_flush(&mut self, key: &K) -> Result<Root<K, V>, ActorError> {
-        self.delete(key)?;
+    pub fn delete_and_flush(&mut self, key: &K) -> Result<(Root<K, V>, Option<V>), ActorError> {
+        let deleted = self.delete(key)?;
         let cid = self.map.flush()?;
-        Ok(Root::from_cid(cid, self.map.name()))
+        Ok((Root::from_cid(cid, self.map.name()), deleted))
     }
 
     pub fn delete_and_flush_tracked(
         &mut self,
         key: &K,
-    ) -> Result<TrackedFlushResult<K, V>, ActorError> {
-        let root = self.delete_and_flush(key)?;
-        Ok(TrackedFlushResult {
-            root,
-            size: self.size,
-        })
+    ) -> Result<(TrackedFlushResult<K, V>, Option<V>), ActorError> {
+        let (root, deleted) = self.delete_and_flush(key)?;
+        Ok((
+            TrackedFlushResult {
+                root,
+                size: self.size,
+            },
+            deleted,
+        ))
     }
 
     pub fn flush(&mut self) -> Result<Root<K, V>, ActorError> {
@@ -184,6 +187,14 @@ where
     pub fn flush_empty(store: BS, name: String) -> Result<Root<K, V>, ActorError> {
         let cid = Map::<BS, K, V>::flush_empty(store, DEFAULT_HAMT_CONFIG)?;
         Ok(Root::from_cid(cid, name))
+    }
+
+    pub fn flush_tracked(&mut self) -> Result<TrackedFlushResult<K, V>, ActorError> {
+        let root = self.flush()?;
+        Ok(TrackedFlushResult {
+            root,
+            size: self.size,
+        })
     }
 
     pub fn is_empty(&self) -> bool {

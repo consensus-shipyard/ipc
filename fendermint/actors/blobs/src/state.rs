@@ -117,8 +117,8 @@ impl State {
             credit_committed: Credit::zero(),
             credit_debited: Credit::zero(),
             expiries: ExpiriesState::new(store)?,
-            added: BlobsProgressCollection::default(),
-            pending: BlobsProgressCollection::default(),
+            added: BlobsProgressCollection::new(store, "added blobs queue")?,
+            pending: BlobsProgressCollection::new(store, "pending blobs queue")?,
             accounts: AccountsState::new(store)?,
             blobs: BlobsState::new(store)?,
         })
@@ -705,8 +705,9 @@ impl State {
             if !matches!(blob.status, BlobStatus::Resolved) {
                 // It's pending or failed, reset to added status
                 blob.status = BlobStatus::Added;
-                // Add/update added with hash and its source
-                self.added.upsert(hash, subscriber, id, source, blob.size);
+                // Add to or update the source in the added queue
+                self.added
+                    .upsert(store, hash, (subscriber, id, source), blob.size)?;
             }
             (sub, blob)
         } else {
@@ -764,9 +765,9 @@ impl State {
                 &id,
                 vec![ExpiryUpdate::Add(expiry)],
             )?;
-            // Add to added
+            // Add the source to the added queue
             self.added
-                .insert(hash, HashSet::from([(subscriber, id, source)]), blob.size);
+                .upsert(store, hash, (subscriber, id, source), blob.size)?;
             (sub, blob)
         };
         // Account capacity is changing, debit for existing usage
@@ -868,19 +869,23 @@ impl State {
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn get_added_blobs(
+    pub fn get_added_blobs<BS: Blockstore>(
         &self,
+        store: &BS,
         size: u32,
-    ) -> Vec<(Hash, HashSet<(Address, SubscriptionId, PublicKey)>)> {
-        self.added.take_page(size)
+    ) -> anyhow::Result<Vec<(Hash, HashSet<(Address, SubscriptionId, PublicKey)>)>, ActorError>
+    {
+        self.added.take_page(store, size)
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn get_pending_blobs(
+    pub fn get_pending_blobs<BS: Blockstore>(
         &self,
+        store: &BS,
         size: u32,
-    ) -> Vec<(Hash, HashSet<(Address, SubscriptionId, PublicKey)>)> {
-        self.pending.take_page(size)
+    ) -> anyhow::Result<Vec<(Hash, HashSet<(Address, SubscriptionId, PublicKey)>)>, ActorError>
+    {
+        self.pending.take_page(store, size)
     }
 
     pub fn set_blob_pending<BS: Blockstore>(
@@ -899,11 +904,11 @@ impl State {
             return Ok(());
         };
         blob.status = BlobStatus::Pending;
-        // Add to pending
+        // Add the source to the pending queue
         self.pending
-            .insert(hash, HashSet::from([(subscriber, id, source)]), blob.size);
-        // Remove from added
-        self.added.remove(&hash, blob.size);
+            .upsert(store, hash, (subscriber, id, source), blob.size)?;
+        // Remove entire blob entry from the added queue
+        self.added.remove_entry(store, &hash, blob.size)?;
         // Save blob
         self.blobs
             .save_tracked(blobs.set_and_flush_tracked(&hash, blob)?);
@@ -1030,9 +1035,9 @@ impl State {
             }
             sub.failed = true;
         }
-        // Remove entry from pending
+        // Remove the source from the pending queue
         self.pending
-            .remove_entry(hash, subscriber, id, sub.source, blob.size);
+            .remove_source(store, hash, (subscriber, id, sub.source), blob.size)?;
         // Save account
         self.accounts
             .save_tracked(accounts.set_and_flush_tracked(&subscriber, account)?);
@@ -1204,12 +1209,12 @@ impl State {
             &id,
             vec![ExpiryUpdate::Remove(sub.expiry)],
         )?;
-        // Remove entry from added
+        // Remove the source from the added queue
         self.added
-            .remove_entry(hash, subscriber, id.clone(), sub.source, blob.size);
-        // Remove entry from pending
+            .remove_source(store, hash, (subscriber, id.clone(), sub.source), blob.size)?;
+        // Remove the source from the pending queue
         self.pending
-            .remove_entry(hash, subscriber, id.clone(), sub.source, blob.size);
+            .remove_source(store, hash, (subscriber, id.clone(), sub.source), blob.size)?;
         // Delete subscription
         group.subscriptions.remove(&id.to_string());
         debug!(
@@ -1223,8 +1228,8 @@ impl State {
             // Delete or update blob
             let delete_blob = blob.subscribers.is_empty();
             if delete_blob {
-                self.blobs
-                    .save_tracked(blobs.delete_and_flush_tracked(&hash)?);
+                let (res, _) = blobs.delete_and_flush_tracked(&hash)?;
+                self.blobs.save_tracked(res);
                 debug!("deleted blob {}", hash);
             }
             delete_blob

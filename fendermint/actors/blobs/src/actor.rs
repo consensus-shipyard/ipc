@@ -4,7 +4,6 @@
 
 use std::collections::HashSet;
 
-use crate::{State, BLOBS_ACTOR_NAME};
 use fendermint_actor_blobs_shared::params::{
     AddBlobParams, ApproveCreditParams, BuyCreditParams, DeleteBlobParams, FinalizeBlobParams,
     GetAccountParams, GetAddedBlobsParams, GetBlobParams, GetBlobStatusParams,
@@ -30,6 +29,8 @@ use fvm_shared::econ::TokenAmount;
 use fvm_shared::error::ExitCode;
 use fvm_shared::{address::Address, MethodNum, METHOD_SEND};
 use num_traits::Zero;
+
+use crate::{State, BLOBS_ACTOR_NAME};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(BlobsActor);
@@ -349,8 +350,7 @@ impl BlobsActor {
         params: GetAddedBlobsParams,
     ) -> Result<Vec<BlobRequest>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let added = rt.state::<State>()?.get_added_blobs(params.0);
-        Ok(added)
+        rt.state::<State>()?.get_added_blobs(rt.store(), params.0)
     }
 
     /// Returns a list of [`BlobRequest`]s that are currenlty in the [`BlobStatus::Pending`] state.
@@ -365,8 +365,7 @@ impl BlobsActor {
         params: GetPendingBlobsParams,
     ) -> Result<Vec<BlobRequest>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let pending = rt.state::<State>()?.get_pending_blobs(params.0);
-        Ok(pending)
+        rt.state::<State>()?.get_pending_blobs(rt.store(), params.0)
     }
 
     /// Sets a blob to the [`BlobStatus::Pending`] state.

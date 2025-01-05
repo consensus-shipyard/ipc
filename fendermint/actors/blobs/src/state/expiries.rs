@@ -131,9 +131,10 @@ impl ExpiriesState {
                         if let Some(mut per_address_root) = per_chain_epoch_hamt.get(&subscriber)? {
                             let mut per_address_hamt = per_address_root.hamt(&store, 1)?; // The size does not matter here
                             let expiry_key = ExpiryKey::new(hash, id);
-                            per_address_root = per_address_hamt.delete_and_flush(&expiry_key)?;
+                            (per_address_root, _) =
+                                per_address_hamt.delete_and_flush(&expiry_key)?;
                             if per_address_hamt.is_empty() {
-                                per_chain_epoch_root =
+                                (per_chain_epoch_root, _) =
                                     per_chain_epoch_hamt.delete_and_flush(&subscriber)?;
                             } else {
                                 per_chain_epoch_root = per_chain_epoch_hamt

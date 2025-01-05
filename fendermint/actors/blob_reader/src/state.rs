@@ -2,12 +2,13 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::collections::HashMap;
+
 use fil_actors_runtime::ActorError;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::{address::Address, MethodNum};
 use log::info;
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
 
 use crate::shared::{ReadRequest, ReadRequestStatus};
 use fendermint_actor_blobs_shared::state::Hash;
@@ -30,7 +31,7 @@ impl State {
         callback_addr: Address,
         callback_method: u64,
     ) -> Result<(), ActorError> {
-        // Validate length is not greater than maximum allowed
+        // Validate length is not greater than the maximum allowed
         if len > MAX_READ_REQUEST_LEN {
             return Err(ActorError::illegal_argument(format!(
                 "read request length {} exceeds maximum allowed {}",
