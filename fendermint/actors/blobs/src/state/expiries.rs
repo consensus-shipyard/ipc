@@ -14,7 +14,7 @@ use hoku_ipld::{amt, hamt};
 
 use crate::state::ExpiryKey;
 
-type PerChainEpochRoot = hamt::Root<Address, hamt::Root<ExpiryKey, bool>>;
+type PerChainEpochRoot = hamt::Root<Address, hamt::Root<ExpiryKey, ()>>;
 
 #[derive(Debug, Clone, Serialize_tuple, Deserialize_tuple)]
 pub struct ExpiriesState {
@@ -65,7 +65,7 @@ impl ExpiriesState {
         mut f: F,
     ) -> Result<(), ActorError>
     where
-        F: FnMut(ChainEpoch, Address, ExpiryKey, bool) -> Result<(), ActorError>,
+        F: FnMut(ChainEpoch, Address, ExpiryKey) -> Result<(), ActorError>,
     {
         let expiries = self.amt(&store)?;
         expiries.for_each_while_ranged(None, None, |index, per_chain_epoch_root| {
@@ -75,9 +75,7 @@ impl ExpiriesState {
             let per_chain_epoch_hamt = per_chain_epoch_root.hamt(&store, 0)?; // The size is not important here
             per_chain_epoch_hamt.for_each(|address, per_address_root| {
                 let per_address_hamt = per_address_root.hamt(&store, 0)?; // The size is not important here
-                per_address_hamt.for_each(|expiry_key, auto_renew| {
-                    f(index as i64, address, expiry_key, *auto_renew)
-                })
+                per_address_hamt.for_each(|expiry_key, _| f(index as i64, address, expiry_key))
             })?;
             Ok(true)
         })?;
@@ -95,13 +93,13 @@ impl ExpiriesState {
         let mut expiries = self.amt(&store)?;
         for update in updates {
             match update {
-                ExpiryUpdate::Add(chain_epoch, auto_renew) => {
+                ExpiryUpdate::Add(chain_epoch) => {
                     // You cannot do get_or_create here: it expects value, we give it Result<Option<Value>>
                     let per_chain_epoch_root =
                         if let Some(per_chain_epoch_root) = expiries.get(chain_epoch as u64)? {
                             per_chain_epoch_root
                         } else {
-                            hamt::Root::<Address, hamt::Root<ExpiryKey, bool>>::new(
+                            hamt::Root::<Address, hamt::Root<ExpiryKey, ()>>::new(
                                 &store,
                                 &ExpiriesState::store_name_per_chain_epoch(chain_epoch),
                             )?
@@ -113,15 +111,14 @@ impl ExpiriesState {
                         if let Some(per_address_root) = per_chain_epoch_hamt.get(&subscriber)? {
                             per_address_root
                         } else {
-                            hamt::Root::<ExpiryKey, bool>::new(
+                            hamt::Root::<ExpiryKey, ()>::new(
                                 &store,
                                 &ExpiriesState::store_name_per_address(chain_epoch, &subscriber),
                             )?
                         };
                     let mut per_address_hamt = per_address_root.hamt(&store, 1)?; // The size does not matter here
                     let expiry_key = ExpiryKey::new(hash, id);
-                    let per_address_root =
-                        per_address_hamt.set_and_flush(&expiry_key, auto_renew)?;
+                    let per_address_root = per_address_hamt.set_and_flush(&expiry_key, ())?;
                     let per_chain_epoch_root =
                         per_chain_epoch_hamt.set_and_flush(&subscriber, per_address_root)?;
                     self.save_tracked(
@@ -164,7 +161,7 @@ impl ExpiriesState {
 }
 
 pub enum ExpiryUpdate {
-    Add(ChainEpoch, bool), // chain_epoch, auto_renew, it is just annoying to type struct on the caller side
+    Add(ChainEpoch),
     Remove(ChainEpoch),
 }
 
@@ -191,7 +188,7 @@ mod tests {
                     addr,
                     hash,
                     &SubscriptionId::default(),
-                    vec![ExpiryUpdate::Add(expiry, false)],
+                    vec![ExpiryUpdate::Add(expiry)],
                 )
                 .unwrap();
             hashes.push(hash);
@@ -200,7 +197,7 @@ mod tests {
 
         let mut range = vec![];
         state
-            .foreach_up_to_epoch(&store, 10, |chain_epoch, _, _, _| {
+            .foreach_up_to_epoch(&store, 10, |chain_epoch, _, _| {
                 range.push(chain_epoch);
                 Ok(())
             })
@@ -223,7 +220,7 @@ mod tests {
 
         let mut range = vec![];
         state
-            .foreach_up_to_epoch(&store, 10, |chain_epoch, _, _, _| {
+            .foreach_up_to_epoch(&store, 10, |chain_epoch, _, _| {
                 range.push(chain_epoch);
                 Ok(())
             })

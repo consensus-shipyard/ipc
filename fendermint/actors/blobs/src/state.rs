@@ -19,7 +19,7 @@ use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
-use hoku_ipld::hamt::MapKey;
+use hoku_ipld::hamt::{BytesKey, MapKey};
 use log::{debug, warn};
 use num_traits::{ToPrimitive, Zero};
 
@@ -124,10 +124,10 @@ impl State {
         })
     }
 
-    pub fn get_stats(&self, balance: TokenAmount, hoku_config: &HokuConfig) -> GetStatsReturn {
+    pub fn get_stats(&self, balance: TokenAmount, config: &HokuConfig) -> GetStatsReturn {
         GetStatsReturn {
             balance,
-            capacity_free: self.capacity_available(hoku_config.blob_capacity),
+            capacity_free: self.capacity_available(config.blob_capacity),
             capacity_used: self.capacity_used,
             credit_sold: self.credit_sold.clone(),
             credit_committed: self.credit_committed.clone(),
@@ -138,13 +138,13 @@ impl State {
             bytes_resolving: self.pending.bytes_size(),
             num_added: self.added.len(),
             bytes_added: self.added.bytes_size(),
-            token_credit_rate: hoku_config.token_credit_rate.clone(),
+            token_credit_rate: config.token_credit_rate.clone(),
         }
     }
 
     pub fn buy_credit<BS: Blockstore>(
         &mut self,
-        hoku_config: &HokuConfig,
+        config: &HokuConfig,
         store: &BS,
         to: Address,
         amount: TokenAmount,
@@ -156,9 +156,9 @@ impl State {
             ));
         }
 
-        let credits: Credit = amount.clone() * &hoku_config.token_credit_rate;
+        let credits: Credit = amount.clone() * &config.token_credit_rate;
         // Don't sell credits if we're at storage capacity
-        if self.capacity_available(hoku_config.blob_capacity).is_zero() {
+        if self.capacity_available(config.blob_capacity).is_zero() {
             return Err(ActorError::forbidden(
                 "credits not available (subnet has reached storage capacity)".into(),
             ));
@@ -232,7 +232,7 @@ impl State {
     #[allow(clippy::too_many_arguments)]
     pub fn approve_credit<BS: Blockstore>(
         &mut self,
-        hoku_config: &HokuConfig,
+        config: &HokuConfig,
         store: &BS,
         from: Address,
         to: Address,
@@ -244,10 +244,10 @@ impl State {
         let credit_limit = credit_limit.map(Credit::from);
         let gas_fee_limit = gas_fee_limit.map(TokenAmount::from);
         if let Some(ttl) = ttl {
-            if ttl < hoku_config.blob_min_ttl {
+            if ttl < config.blob_min_ttl {
                 return Err(ActorError::illegal_argument(format!(
                     "minimum approval TTL is {}",
-                    hoku_config.blob_min_ttl
+                    config.blob_min_ttl
                 )));
             }
         }
@@ -451,35 +451,14 @@ impl State {
     #[allow(clippy::type_complexity)]
     pub fn debit_accounts<BS: Blockstore>(
         &mut self,
-        hoku_config: &HokuConfig,
         store: &BS,
         current_epoch: ChainEpoch,
     ) -> anyhow::Result<HashSet<Hash>, ActorError> {
         // Delete expired subscriptions
         let mut delete_from_disc = HashSet::new();
-        let mut num_renewed = 0;
         let mut num_deleted = 0;
         let expiries = self.expiries.clone();
-        expiries.foreach_up_to_epoch(store, current_epoch, |_, subscriber, key, auto_renew| {
-            if auto_renew {
-                if let Err(e) = self.renew_blob(
-                    hoku_config,
-                    store,
-                    subscriber,
-                    current_epoch,
-                    key.hash,
-                    key.id.clone(),
-                ) {
-                    // Warn and skip down to delete
-                    warn!(
-                        "failed to renew blob {} for {} (id: {}): {}",
-                        key.hash, subscriber, key.id, e
-                    );
-                } else {
-                    num_renewed += 1;
-                    return Ok(());
-                }
-            }
+        expiries.foreach_up_to_epoch(store, current_epoch, |_, subscriber, key| {
             match self.delete_blob(
                 store,
                 subscriber,
@@ -503,7 +482,6 @@ impl State {
             }
             Ok(())
         })?;
-        debug!("renewed {} expired subscriptions", num_renewed);
         debug!("deleted {} expired subscriptions", num_deleted);
         debug!(
             "{} blobs marked for deletion from disc",
@@ -539,7 +517,7 @@ impl State {
     #[allow(clippy::too_many_arguments)]
     pub fn add_blob<BS: Blockstore>(
         &mut self,
-        hoku_config: &HokuConfig,
+        config: &HokuConfig,
         store: &BS,
         origin: Address,
         subscriber: Address,
@@ -556,7 +534,7 @@ impl State {
         let mut accounts = self.accounts.hamt(store)?;
         let mut account = accounts.get_or_create(&subscriber, || Account::new(current_epoch))?;
         // Validate the TTL
-        let (ttl, auto_renew) = self.accept_ttl(hoku_config, ttl, &account)?;
+        let ttl = self.validate_ttl(config, ttl, &account)?;
         // Get the credit delegation if needed
         let delegation = if origin != subscriber {
             // Look for an approval for origin from subscriber
@@ -617,7 +595,7 @@ impl State {
                     &mut account.credit_free,
                     &mut self.credit_sold,
                     &credit_required,
-                    &hoku_config.token_credit_rate,
+                    &config.token_credit_rate,
                     &tokens_received,
                     &subscriber,
                     current_epoch,
@@ -631,14 +609,10 @@ impl State {
                             subscriber,
                             hash,
                             &id,
-                            vec![
-                                ExpiryUpdate::Add(expiry, auto_renew),
-                                ExpiryUpdate::Remove(sub.expiry),
-                            ],
+                            vec![ExpiryUpdate::Add(expiry), ExpiryUpdate::Remove(sub.expiry)],
                         )?;
                     }
                     sub.expiry = expiry;
-                    sub.auto_renew = auto_renew;
                     // Overwrite source allows subscriber to retry resolving
                     sub.source = source;
                     sub.delegate = delegation.as_ref().map(|d| d.origin);
@@ -653,7 +627,6 @@ impl State {
                     let sub = Subscription {
                         added: current_epoch,
                         expiry,
-                        auto_renew,
                         source,
                         delegate: delegation.as_ref().map(|d| d.origin),
                         failed: false,
@@ -671,7 +644,7 @@ impl State {
                         subscriber,
                         hash,
                         &id,
-                        vec![ExpiryUpdate::Add(expiry, auto_renew)],
+                        vec![ExpiryUpdate::Add(expiry)],
                     )?;
                     sub
                 }
@@ -685,7 +658,7 @@ impl State {
                     &mut account.credit_free,
                     &mut self.credit_sold,
                     &credit_required,
-                    &hoku_config.token_credit_rate,
+                    &config.token_credit_rate,
                     &tokens_received,
                     &subscriber,
                     current_epoch,
@@ -695,7 +668,6 @@ impl State {
                 let sub = Subscription {
                     added: current_epoch,
                     expiry,
-                    auto_renew,
                     source,
                     delegate: delegation.as_ref().map(|d| d.origin),
                     failed: false,
@@ -716,7 +688,7 @@ impl State {
                     subscriber,
                     hash,
                     &id,
-                    vec![ExpiryUpdate::Add(expiry, auto_renew)],
+                    vec![ExpiryUpdate::Add(expiry)],
                 )?;
                 sub
             };
@@ -731,7 +703,7 @@ impl State {
             new_account_capacity = size;
             // New blob increases network capacity as well.
             // Ensure there is enough capacity available.
-            let available_capacity = self.capacity_available(hoku_config.blob_capacity);
+            let available_capacity = self.capacity_available(config.blob_capacity);
             if size > available_capacity {
                 return Err(ActorError::forbidden(format!(
                     "subnet has insufficient storage capacity (available: {}; required: {})",
@@ -744,7 +716,7 @@ impl State {
                 &mut account.credit_free,
                 &mut self.credit_sold,
                 &credit_required,
-                &hoku_config.token_credit_rate,
+                &config.token_credit_rate,
                 &tokens_received,
                 &subscriber,
                 current_epoch,
@@ -754,7 +726,6 @@ impl State {
             let sub = Subscription {
                 added: current_epoch,
                 expiry,
-                auto_renew,
                 source,
                 delegate: delegation.as_ref().map(|d| d.origin),
                 failed: false,
@@ -781,7 +752,7 @@ impl State {
                 subscriber,
                 hash,
                 &id,
-                vec![ExpiryUpdate::Add(expiry, auto_renew)],
+                vec![ExpiryUpdate::Add(expiry)],
             )?;
             // Add to added
             self.added
@@ -831,136 +802,6 @@ impl State {
 
     fn get_storage_cost(&self, ttl: i64, size: &u64) -> BigInt {
         ttl * BigInt::from(*size)
-    }
-
-    fn renew_blob<BS: Blockstore>(
-        &mut self,
-        hoku_config: &HokuConfig,
-        store: &BS,
-        subscriber: Address,
-        current_epoch: ChainEpoch,
-        hash: Hash,
-        id: SubscriptionId,
-    ) -> anyhow::Result<Account, ActorError> {
-        // Get or create a new account
-        let mut accounts = self.accounts.hamt(store)?;
-        let mut account = accounts.get_or_err(&subscriber)?;
-        // Get the blob
-        let mut blobs = self.blobs.hamt(store)?;
-        let mut blob = blobs.get_or_err(&hash)?;
-        if matches!(blob.status, BlobStatus::Failed) {
-            // Do not renew failed blobs.
-            return Err(ActorError::illegal_state(format!(
-                "cannot renew failed blob {}",
-                hash
-            )));
-        }
-        let group =
-            blob.subscribers
-                .get_mut(&subscriber.to_string())
-                .ok_or(ActorError::forbidden(format!(
-                    "subscriber {} is not subscribed to blob {}",
-                    subscriber, hash
-                )))?;
-        // Renewal must begin at the current epoch to avoid potential issues with auto-renewal.
-        // Simply adding TTL to the current max expiry could result in an expiry date that's not
-        // truly in the future, depending on how frequently auto-renewal occurs.
-        // We'll ensure below that past unpaid for blocks are accounted for.
-        let expiry = current_epoch + hoku_config.blob_auto_renew_ttl;
-        let (group_expiry, new_group_expiry) = group.max_expiries(&id, Some(expiry));
-        let sub = group
-            .subscriptions
-            .get_mut(&id.to_string())
-            .ok_or(ActorError::not_found(format!(
-                "subscription id {} not found",
-                id.clone()
-            )))?;
-        let delegation = if let Some(origin) = sub.delegate {
-            // Look for an approval for origin from subscriber.
-            let approval =
-                account
-                    .approvals
-                    .get_mut(&origin.to_string())
-                    .ok_or(ActorError::forbidden(format!(
-                        "approval from {} to {} not found",
-                        subscriber, origin
-                    )))?;
-            Some(CreditDelegation::new(origin, approval))
-        } else {
-            None
-        };
-        // If the subscriber has been debited after the group's max expiry, we need to
-        // clean up the accounting with a refund.
-        // We could just account for the refund amount when ensuring credit below, but if that
-        // fails, the overcharge would still exist.
-        // When renewing, the existing group expiry will always contain a value.
-        let group_expiry = group_expiry.unwrap();
-        let size = blob.size;
-        if account.last_debit_epoch > group_expiry {
-            // The refund extends up to the last debit epoch
-            let refund_credits = Credit::from_whole(
-                self.get_storage_cost(account.last_debit_epoch - group_expiry, &size),
-            );
-
-            // Re-mint spent credit
-            self.credit_debited -= &refund_credits;
-            self.credit_committed += &refund_credits;
-            account.credit_committed += &refund_credits;
-            debug!("refunded {} credits to {}", refund_credits, subscriber);
-        }
-        // Ensure subscriber has enough credits, considering the subscription group may
-        // have expiries that cover a portion of the renewal.
-        // Required credit can be negative if subscriber is reducing expiry.
-        // When renewing, the new group expiry will always contain a value.
-        // There may be a gap between the existing expiry and the last debit that will make
-        // the renewal discontinuous.
-        let new_group_expiry = new_group_expiry.unwrap();
-        let credit_required = Credit::from_whole(self.get_storage_cost(
-            new_group_expiry - group_expiry.max(account.last_debit_epoch),
-            &size,
-        ));
-        ensure_credit(
-            &subscriber,
-            current_epoch,
-            &account.credit_free,
-            &credit_required,
-            &delegation,
-        )?;
-        // Update expiry index
-        if expiry != sub.expiry {
-            self.expiries.update_index(
-                store,
-                subscriber,
-                hash,
-                &id,
-                vec![
-                    ExpiryUpdate::Add(expiry, sub.auto_renew),
-                    ExpiryUpdate::Remove(sub.expiry),
-                ],
-            )?;
-        }
-        sub.expiry = expiry;
-        debug!(
-            "renewed subscription to blob {} for {} (key: {})",
-            hash, subscriber, id
-        );
-        // Move free credit to committed credit
-        self.credit_committed += &credit_required;
-        account.credit_committed += &credit_required;
-        account.credit_free -= &credit_required;
-        // Update credit approval
-        if let Some(delegation) = delegation {
-            delegation.approval.credit_used += &credit_required;
-        }
-        // Save account
-        self.accounts
-            .save_tracked(accounts.set_and_flush_tracked(&subscriber, account.clone())?);
-        // Save blob
-        self.blobs
-            .save_tracked(blobs.set_and_flush_tracked(&hash, blob)?);
-
-        debug!("committed {} credits from {}", credit_required, subscriber);
-        Ok(account)
     }
 
     pub fn get_blob<BS: Blockstore>(
@@ -1396,19 +1237,15 @@ impl State {
     /// If `limit` is not `None`, iteration stops after examining `limit` blobs.
     pub fn trim_blob_expiries<BS: Blockstore>(
         &mut self,
-        hoku_config: &HokuConfig,
+        config: &HokuConfig,
         store: &BS,
         subscriber: Address,
         current_epoch: ChainEpoch,
         starting_hash: Option<Hash>,
         limit: Option<usize>,
     ) -> anyhow::Result<(u32, Option<Hash>, Vec<Hash>), ActorError> {
-        use hoku_ipld::hamt::BytesKey;
-
         let new_ttl = self.get_account_max_ttl(store, subscriber)?;
-
         let mut deleted_blobs = Vec::new();
-
         let mut processed = 0;
         let blobs = self.blobs.hamt(store)?;
         let starting_key = starting_hash.map(|h| BytesKey::from(h.0.as_slice()));
@@ -1433,7 +1270,7 @@ impl State {
                                 };
                             } else {
                                 self.add_blob(
-                                    hoku_config,
+                                    config,
                                     store,
                                     subscriber,
                                     subscriber,
@@ -1447,29 +1284,6 @@ impl State {
                                     TokenAmount::zero(),
                                 )?;
                             }
-
-                            processed += 1;
-                        } else if sub.expiry - sub.added < TtlStatus::DEFAULT_MAX_TTL
-                            && sub.auto_renew
-                            && new_ttl != ChainEpoch::MAX
-                        {
-                            // If an extended user added a blob with no TTL (i.e., with auto-renew)
-                            // and then switched to a default account, we need to set the TTL to the
-                            // default max TTL with no auto-renew.
-                            self.add_blob(
-                                hoku_config,
-                                store,
-                                subscriber,
-                                subscriber,
-                                current_epoch,
-                                hash,
-                                blob.metadata_hash,
-                                SubscriptionId::new(&id.clone())?,
-                                blob.size,
-                                Some(TtlStatus::DEFAULT_MAX_TTL),
-                                sub.source,
-                                TokenAmount::zero(),
-                            )?;
                             processed += 1;
                         }
                     }
@@ -1477,7 +1291,6 @@ impl State {
                 Ok(())
             },
         )?;
-
         Ok((processed, next_key, deleted_blobs))
     }
 
@@ -1492,40 +1305,25 @@ impl State {
             .map_or(TtlStatus::DEFAULT_MAX_TTL, |account| account.max_ttl))
     }
 
-    fn accept_ttl(
+    fn validate_ttl(
         &self,
-        hoku_config: &HokuConfig,
+        config: &HokuConfig,
         ttl: Option<ChainEpoch>,
         account: &Account,
-    ) -> anyhow::Result<(ChainEpoch, bool), ActorError> {
-        let (ttl, auto_renew) = ttl
-            .map(|ttl| (ttl, false))
-            .unwrap_or((hoku_config.blob_auto_renew_ttl, true));
-        if ttl < hoku_config.blob_min_ttl {
+    ) -> anyhow::Result<ChainEpoch, ActorError> {
+        let ttl = ttl.unwrap_or(config.blob_default_ttl);
+        if ttl < config.blob_min_ttl {
             return Err(ActorError::illegal_argument(format!(
                 "minimum blob TTL is {}",
-                hoku_config.blob_min_ttl
+                config.blob_min_ttl
             )));
-        }
-
-        if ChainEpoch::from(account.max_ttl) < ttl {
+        } else if ttl > account.max_ttl {
             return Err(ActorError::forbidden(format!(
                 "attempt to add a blob with TTL ({}) that exceeds account's max allowed TTL ({})",
                 ttl, account.max_ttl,
             )));
         }
-        if account.max_ttl == TtlStatus::DEFAULT_MAX_TTL {
-            Ok((
-                if auto_renew {
-                    TtlStatus::DEFAULT_MAX_TTL
-                } else {
-                    ttl
-                },
-                false,
-            ))
-        } else {
-            Ok((ttl, auto_renew))
-        }
+        Ok(ttl)
     }
 }
 
@@ -1695,16 +1493,16 @@ mod tests {
     #[test]
     fn test_buy_credit_success() {
         setup_logs();
-        let hoku_config = HokuConfig::default();
+        let config = HokuConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let to = new_address();
         let amount = TokenAmount::from_whole(1);
 
-        let res = state.buy_credit(&hoku_config, &store, to, amount.clone(), 1);
+        let res = state.buy_credit(&config, &store, to, amount.clone(), 1);
         assert!(res.is_ok());
         let account = res.unwrap();
-        let credit_sold = amount.clone() * &hoku_config.token_credit_rate;
+        let credit_sold = amount.clone() * &config.token_credit_rate;
         assert_eq!(account.credit_free, credit_sold);
         assert_eq!(account.gas_allowance, amount);
         assert_eq!(state.credit_sold, credit_sold);
@@ -1715,13 +1513,13 @@ mod tests {
     #[test]
     fn test_buy_credit_negative_amount() {
         setup_logs();
-        let hoku_config = HokuConfig::default();
+        let config = HokuConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let recipient = new_address();
         let amount = TokenAmount::from_whole(-1);
 
-        let res = state.buy_credit(&hoku_config, &store, recipient, amount, 1);
+        let res = state.buy_credit(&config, &store, recipient, amount, 1);
         assert!(res.is_err());
         assert_eq!(res.err().unwrap().msg(), "token amount must be positive");
     }
@@ -1729,14 +1527,14 @@ mod tests {
     #[test]
     fn test_buy_credit_at_capacity() {
         setup_logs();
-        let hoku_config = HokuConfig::default();
+        let config = HokuConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let recipient = new_address();
         let amount = TokenAmount::from_whole(1);
 
-        state.capacity_used = hoku_config.blob_capacity;
-        let res = state.buy_credit(&hoku_config, &store, recipient, amount, 1);
+        state.capacity_used = config.blob_capacity;
+        let res = state.buy_credit(&config, &store, recipient, amount, 1);
         assert!(res.is_err());
         assert_eq!(
             res.err().unwrap().msg(),
@@ -1753,19 +1551,10 @@ mod tests {
         let to = new_address();
         let current_epoch = 1;
 
-        let hoku_config = HokuConfig::default();
+        let config = HokuConfig::default();
 
         // No limit or expiry
-        let res = state.approve_credit(
-            &hoku_config,
-            &store,
-            from,
-            to,
-            current_epoch,
-            None,
-            None,
-            None,
-        );
+        let res = state.approve_credit(&config, &store, from, to, current_epoch, None, None, None);
         assert!(res.is_ok());
         let approval = res.unwrap();
         assert_eq!(approval.credit_limit, None);
@@ -1775,7 +1564,7 @@ mod tests {
         // Add credit limit
         let limit = 1_000_000_000_000_000_000u64;
         let res = state.approve_credit(
-            &hoku_config,
+            &config,
             &store,
             from,
             to,
@@ -1793,7 +1582,7 @@ mod tests {
         // Add gas fee limit
         let limit = 1_000_000_000_000_000_000u64;
         let res = state.approve_credit(
-            &hoku_config,
+            &config,
             &store,
             from,
             to,
@@ -1809,9 +1598,9 @@ mod tests {
         assert_eq!(approval.expiry, None);
 
         // Add ttl
-        let ttl = ChainEpoch::from(hoku_config.blob_min_ttl);
+        let ttl = ChainEpoch::from(config.blob_min_ttl);
         let res = state.approve_credit(
-            &hoku_config,
+            &config,
             &store,
             from,
             to,
@@ -1836,10 +1625,10 @@ mod tests {
         let to = new_address();
         let current_epoch = 1;
 
-        let hoku_config = HokuConfig::default();
-        let ttl = ChainEpoch::from(hoku_config.blob_min_ttl - 1);
+        let config = HokuConfig::default();
+        let ttl = ChainEpoch::from(config.blob_min_ttl - 1);
         let res = state.approve_credit(
-            &hoku_config,
+            &config,
             &store,
             from,
             to,
@@ -1851,14 +1640,14 @@ mod tests {
         assert!(res.is_err());
         assert_eq!(
             res.err().unwrap().msg(),
-            format!("minimum approval TTL is {}", hoku_config.blob_min_ttl)
+            format!("minimum approval TTL is {}", config.blob_min_ttl)
         );
     }
 
     #[test]
     fn test_approve_credit_insufficient_credit() {
         setup_logs();
-        let hoku_config = HokuConfig::default();
+        let config = HokuConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let from = new_address();
@@ -1867,24 +1656,15 @@ mod tests {
 
         let amount = TokenAmount::from_whole(10);
         state
-            .buy_credit(&hoku_config, &store, from, amount.clone(), current_epoch)
+            .buy_credit(&config, &store, from, amount.clone(), current_epoch)
             .unwrap();
-        let res = state.approve_credit(
-            &hoku_config,
-            &store,
-            from,
-            to,
-            current_epoch,
-            None,
-            None,
-            None,
-        );
+        let res = state.approve_credit(&config, &store, from, to, current_epoch, None, None, None);
         assert!(res.is_ok());
 
         // Add a blob
         let (hash, size) = new_hash(1024);
         let res = state.add_blob(
-            &hoku_config,
+            &config,
             &store,
             to,
             from,
@@ -1907,7 +1687,7 @@ mod tests {
         // Try to update approval with a limit below what's already been committed
         let limit = 1_000u64;
         let res = state.approve_credit(
-            &hoku_config,
+            &config,
             &store,
             from,
             to,
@@ -1935,17 +1715,8 @@ mod tests {
         let to = new_address();
         let current_epoch = 1;
 
-        let hoku_config = HokuConfig::default();
-        let res = state.approve_credit(
-            &hoku_config,
-            &store,
-            from,
-            to,
-            current_epoch,
-            None,
-            None,
-            None,
-        );
+        let config = HokuConfig::default();
+        let res = state.approve_credit(&config, &store, from, to, current_epoch, None, None, None);
         assert!(res.is_ok());
 
         // Check the account approval
@@ -1978,23 +1749,17 @@ mod tests {
     #[test]
     fn test_debit_accounts_delete_from_disc() {
         setup_logs();
-        let hoku_config = HokuConfig::default();
+        let config = HokuConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let origin = new_address();
         let current_epoch = ChainEpoch::from(1);
         let token_amount = TokenAmount::from_whole(10);
         state
-            .buy_credit(
-                &hoku_config,
-                &store,
-                origin,
-                token_amount.clone(),
-                current_epoch,
-            )
+            .buy_credit(&config, &store, origin, token_amount.clone(), current_epoch)
             .unwrap();
         debit_accounts_delete_from_disc(
-            &hoku_config,
+            &config,
             &store,
             state,
             origin,
@@ -2007,7 +1772,7 @@ mod tests {
     #[test]
     fn test_debit_accounts_delete_from_disc_with_approval() {
         setup_logs();
-        let hoku_config = HokuConfig::default();
+        let config = HokuConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let origin = new_address();
@@ -2016,7 +1781,7 @@ mod tests {
         let token_amount = TokenAmount::from_whole(10);
         state
             .buy_credit(
-                &hoku_config,
+                &config,
                 &store,
                 subscriber,
                 token_amount.clone(),
@@ -2025,7 +1790,7 @@ mod tests {
             .unwrap();
         state
             .approve_credit(
-                &hoku_config,
+                &config,
                 &store,
                 subscriber,
                 origin,
@@ -2036,7 +1801,7 @@ mod tests {
             )
             .unwrap();
         debit_accounts_delete_from_disc(
-            &hoku_config,
+            &config,
             &store,
             state,
             origin,
@@ -2048,7 +1813,7 @@ mod tests {
 
     #[allow(clippy::too_many_arguments)]
     fn debit_accounts_delete_from_disc<BS: Blockstore>(
-        hoku_config: &HokuConfig,
+        config: &HokuConfig,
         store: &BS,
         mut state: State,
         origin: Address,
@@ -2057,16 +1822,16 @@ mod tests {
         token_amount: TokenAmount,
     ) {
         let mut credit_amount =
-            Credit::from_atto(token_amount.atto().clone()) * &hoku_config.token_credit_rate;
+            Credit::from_atto(token_amount.atto().clone()) * &config.token_credit_rate;
 
         // Add blob with default a subscription ID
         let (hash, size) = new_hash(1024);
         let add1_epoch = current_epoch;
         let id1 = SubscriptionId::default();
-        let ttl1 = ChainEpoch::from(hoku_config.blob_min_ttl);
+        let ttl1 = ChainEpoch::from(config.blob_min_ttl);
         let source = new_pk();
         let res = state.add_blob(
-            hoku_config,
+            config,
             &store,
             origin,
             subscriber,
@@ -2081,7 +1846,7 @@ mod tests {
         );
         assert!(res.is_ok());
 
-        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), config);
         assert_eq!(stats.num_accounts, 1);
         assert_eq!(stats.num_blobs, 1);
         assert_eq!(stats.num_resolving, 0);
@@ -2092,7 +1857,7 @@ mod tests {
         // Set to status pending
         let res = state.set_blob_pending(&store, subscriber, hash, id1.clone(), source);
         assert!(res.is_ok());
-        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), config);
         assert_eq!(stats.num_blobs, 1);
         assert_eq!(stats.num_resolving, 1);
         assert_eq!(stats.bytes_resolving, size);
@@ -2110,7 +1875,7 @@ mod tests {
             BlobStatus::Resolved,
         );
         assert!(res.is_ok());
-        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), config);
         assert_eq!(stats.num_blobs, 1);
         assert_eq!(stats.num_resolving, 0);
         assert_eq!(stats.bytes_resolving, 0);
@@ -2130,11 +1895,11 @@ mod tests {
 
         // Add the same blob but this time uses a different subscription ID
         let add2_epoch = ChainEpoch::from(21);
-        let ttl2 = ChainEpoch::from(hoku_config.blob_min_ttl);
+        let ttl2 = ChainEpoch::from(config.blob_min_ttl);
         let id2 = SubscriptionId::new("foo").unwrap();
         let source = new_pk();
         let res = state.add_blob(
-            hoku_config,
+            config,
             &store,
             origin,
             subscriber,
@@ -2149,7 +1914,7 @@ mod tests {
         );
         assert!(res.is_ok());
 
-        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), config);
         assert_eq!(stats.num_blobs, 1);
         assert_eq!(stats.num_resolving, 0);
         assert_eq!(stats.bytes_resolving, 0);
@@ -2173,10 +1938,8 @@ mod tests {
         assert_eq!(group.subscriptions.len(), 2);
 
         // Debit all accounts at an epoch between the two expiries (3601-3621)
-        let debit_epoch = ChainEpoch::from(hoku_config.blob_min_ttl + 11);
-        let deletes_from_disc = state
-            .debit_accounts(hoku_config, &store, debit_epoch)
-            .unwrap();
+        let debit_epoch = ChainEpoch::from(config.blob_min_ttl + 11);
+        let deletes_from_disc = state.debit_accounts(&store, debit_epoch).unwrap();
         assert!(deletes_from_disc.is_empty());
 
         // Check the account balance
@@ -2195,10 +1958,8 @@ mod tests {
         assert_eq!(group.subscriptions.len(), 1); // the first subscription was deleted
 
         // Debit all accounts at an epoch greater than group expiry (3621)
-        let debit_epoch = ChainEpoch::from(hoku_config.blob_min_ttl + 31);
-        let deletes_from_disc = state
-            .debit_accounts(hoku_config, &store, debit_epoch)
-            .unwrap();
+        let debit_epoch = ChainEpoch::from(config.blob_min_ttl + 31);
+        let deletes_from_disc = state.debit_accounts(&store, debit_epoch).unwrap();
         assert!(!deletes_from_disc.is_empty()); // blob is marked for deletion
 
         // Check the account balance
@@ -2215,7 +1976,7 @@ mod tests {
         assert_eq!(state.credit_committed, Credit::from_whole(0)); // credit was released
         assert_eq!(
             state.credit_debited,
-            token_amount * &hoku_config.token_credit_rate - &account.credit_free
+            token_amount * &config.token_credit_rate - &account.credit_free
         );
         assert_eq!(state.capacity_used, 0); // capacity was released
 
@@ -2232,23 +1993,17 @@ mod tests {
     #[test]
     fn test_add_blob_refund() {
         setup_logs();
-        let hoku_config = HokuConfig::default();
+        let config = HokuConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let origin = new_address();
         let current_epoch = ChainEpoch::from(1);
         let token_amount = TokenAmount::from_whole(10);
         state
-            .buy_credit(
-                &hoku_config,
-                &store,
-                origin,
-                token_amount.clone(),
-                current_epoch,
-            )
+            .buy_credit(&config, &store, origin, token_amount.clone(), current_epoch)
             .unwrap();
         add_blob_refund(
-            &hoku_config,
+            &config,
             &store,
             state,
             origin,
@@ -2261,7 +2016,7 @@ mod tests {
     #[test]
     fn test_add_blob_refund_with_approval() {
         setup_logs();
-        let hoku_config = HokuConfig::default();
+        let config = HokuConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let origin = new_address();
@@ -2270,7 +2025,7 @@ mod tests {
         let token_amount = TokenAmount::from_whole(10);
         state
             .buy_credit(
-                &hoku_config,
+                &config,
                 &store,
                 subscriber,
                 token_amount.clone(),
@@ -2279,7 +2034,7 @@ mod tests {
             .unwrap();
         state
             .approve_credit(
-                &hoku_config,
+                &config,
                 &store,
                 subscriber,
                 origin,
@@ -2290,7 +2045,7 @@ mod tests {
             )
             .unwrap();
         add_blob_refund(
-            &hoku_config,
+            &config,
             &store,
             state,
             origin,
@@ -2302,7 +2057,7 @@ mod tests {
 
     #[allow(clippy::too_many_arguments)]
     fn add_blob_refund<BS: Blockstore>(
-        hoku_config: &HokuConfig,
+        config: &HokuConfig,
         store: &BS,
         mut state: State,
         origin: Address,
@@ -2311,14 +2066,15 @@ mod tests {
         token_amount: TokenAmount,
     ) {
         let token_credit_rate = BigInt::from(1_000_000_000_000_000_000u64);
-        let mut credit_amount = token_amount.clone() * &hoku_config.token_credit_rate;
+        let mut credit_amount = token_amount.clone() * &config.token_credit_rate;
+
         // Add blob with default a subscription ID
         let (hash1, size1) = new_hash(1024);
         let add1_epoch = current_epoch;
         let id1 = SubscriptionId::default();
         let source = new_pk();
         let res = state.add_blob(
-            hoku_config,
+            config,
             &store,
             origin,
             subscriber,
@@ -2327,14 +2083,14 @@ mod tests {
             new_metadata_hash(),
             id1.clone(),
             size1,
-            Some(hoku_config.blob_min_ttl),
+            Some(config.blob_min_ttl),
             source,
             TokenAmount::zero(),
         );
         assert!(res.is_ok());
 
         // Check stats
-        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), config);
         assert_eq!(stats.num_blobs, 1);
         assert_eq!(stats.num_resolving, 0);
         assert_eq!(stats.bytes_resolving, 0);
@@ -2346,7 +2102,7 @@ mod tests {
         assert_eq!(account.last_debit_epoch, add1_epoch);
         assert_eq!(
             account.credit_committed,
-            Credit::from_whole(hoku_config.blob_min_ttl as u64 * size1),
+            Credit::from_whole(config.blob_min_ttl as u64 * size1),
         );
         credit_amount -= &account.credit_committed;
         assert_eq!(account.credit_free, credit_amount);
@@ -2358,11 +2114,11 @@ mod tests {
 
         // Add another blob past the first blob's expiry
         let (hash2, size2) = new_hash(2048);
-        let add2_epoch = ChainEpoch::from(hoku_config.blob_min_ttl + 11);
+        let add2_epoch = ChainEpoch::from(config.blob_min_ttl + 11);
         let id2 = SubscriptionId::new("foo").unwrap();
         let source = new_pk();
         let res = state.add_blob(
-            hoku_config,
+            config,
             &store,
             origin,
             subscriber,
@@ -2371,14 +2127,14 @@ mod tests {
             new_metadata_hash(),
             id2.clone(),
             size2,
-            None,
+            Some(config.blob_min_ttl),
             source,
             TokenAmount::zero(),
         );
         assert!(res.is_ok());
 
         // Check stats
-        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), config);
         assert_eq!(stats.num_blobs, 2);
         assert_eq!(stats.num_resolving, 0);
         assert_eq!(stats.bytes_resolving, 0);
@@ -2388,13 +2144,13 @@ mod tests {
         // Check the account balance
         let account = state.get_account(&store, subscriber).unwrap().unwrap();
         assert_eq!(account.last_debit_epoch, add2_epoch);
-        let blob1_expiry = ChainEpoch::from(hoku_config.blob_min_ttl + add1_epoch);
+        let blob1_expiry = ChainEpoch::from(config.blob_min_ttl + add1_epoch);
         let overcharge = BigInt::from((add2_epoch - blob1_expiry) as u64 * size1);
         assert_eq!(
             account.credit_committed, // this includes an overcharge that needs to be refunded
-            Credit::from_whole(hoku_config.blob_auto_renew_ttl as u64 * size2 - overcharge),
+            Credit::from_whole(config.blob_min_ttl as u64 * size2 - overcharge),
         );
-        credit_amount -= Credit::from_whole(hoku_config.blob_auto_renew_ttl as u64 * size2);
+        credit_amount -= Credit::from_whole(config.blob_min_ttl as u64 * size2);
         assert_eq!(account.credit_free, credit_amount);
         assert_eq!(account.capacity_used, size1 + size2);
 
@@ -2413,11 +2169,11 @@ mod tests {
         assert_eq!(state.pending.len(), 0);
 
         // Add the first (now expired) blob again
-        let add3_epoch = ChainEpoch::from(hoku_config.blob_min_ttl + 21);
+        let add3_epoch = ChainEpoch::from(config.blob_min_ttl + 21);
         let id1 = SubscriptionId::default();
         let source = new_pk();
         let res = state.add_blob(
-            hoku_config,
+            config,
             &store,
             origin,
             subscriber,
@@ -2426,14 +2182,14 @@ mod tests {
             new_metadata_hash(),
             id1.clone(),
             size1,
-            None,
+            Some(config.blob_min_ttl),
             source,
             TokenAmount::zero(),
         );
         assert!(res.is_ok());
 
         // Check stats
-        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), config);
         assert_eq!(stats.num_blobs, 2);
         assert_eq!(stats.num_resolving, 0);
         assert_eq!(stats.bytes_resolving, 0);
@@ -2446,11 +2202,11 @@ mod tests {
         assert_eq!(
             account.credit_committed, // should not include overcharge due to refund
             Credit::from_whole(
-                (hoku_config.blob_auto_renew_ttl - (add3_epoch - add2_epoch)) as u64 * size2
-                    + hoku_config.blob_auto_renew_ttl as u64 * size1
+                (config.blob_min_ttl - (add3_epoch - add2_epoch)) as u64 * size2
+                    + config.blob_min_ttl as u64 * size1
             ),
         );
-        credit_amount -= Credit::from_whole(hoku_config.blob_auto_renew_ttl as u64 * size1);
+        credit_amount -= Credit::from_whole(config.blob_min_ttl as u64 * size1);
         assert_eq!(account.credit_free, credit_amount);
         assert_eq!(account.capacity_used, size1 + size2);
 
@@ -2476,23 +2232,17 @@ mod tests {
     #[test]
     fn test_add_blob_same_hash_same_account() {
         setup_logs();
-        let hoku_config = HokuConfig::default();
+        let config = HokuConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let origin = new_address();
         let current_epoch = ChainEpoch::from(1);
         let token_amount = TokenAmount::from_whole(10);
         state
-            .buy_credit(
-                &hoku_config,
-                &store,
-                origin,
-                token_amount.clone(),
-                current_epoch,
-            )
+            .buy_credit(&config, &store, origin, token_amount.clone(), current_epoch)
             .unwrap();
         add_blob_same_hash_same_account(
-            &hoku_config,
+            &config,
             &store,
             state,
             origin,
@@ -2505,7 +2255,7 @@ mod tests {
     #[test]
     fn test_add_blob_same_hash_same_account_with_approval() {
         setup_logs();
-        let hoku_config = HokuConfig::default();
+        let config = HokuConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let origin = new_address();
@@ -2514,7 +2264,7 @@ mod tests {
         let token_amount = TokenAmount::from_whole(10);
         state
             .buy_credit(
-                &hoku_config,
+                &config,
                 &store,
                 subscriber,
                 token_amount.clone(),
@@ -2523,7 +2273,7 @@ mod tests {
             .unwrap();
         state
             .approve_credit(
-                &hoku_config,
+                &config,
                 &store,
                 subscriber,
                 origin,
@@ -2534,49 +2284,7 @@ mod tests {
             )
             .unwrap();
         add_blob_same_hash_same_account(
-            &hoku_config,
-            &store,
-            state,
-            origin,
-            subscriber,
-            current_epoch,
-            token_amount,
-        );
-    }
-
-    #[test]
-    fn test_add_blob_same_hash_same_account_with_scoped_approval() {
-        setup_logs();
-        let hoku_config = HokuConfig::default();
-        let store = MemoryBlockstore::default();
-        let mut state = State::new(&store).unwrap();
-        let origin = new_address();
-        let subscriber = new_address();
-        let current_epoch = ChainEpoch::from(1);
-        let token_amount = TokenAmount::from_whole(10);
-        state
-            .buy_credit(
-                &hoku_config,
-                &store,
-                subscriber,
-                token_amount.clone(),
-                current_epoch,
-            )
-            .unwrap();
-        state
-            .approve_credit(
-                &hoku_config,
-                &store,
-                subscriber,
-                origin,
-                current_epoch,
-                None,
-                None,
-                None,
-            )
-            .unwrap();
-        add_blob_same_hash_same_account(
-            &hoku_config,
+            &config,
             &store,
             state,
             origin,
@@ -2588,7 +2296,7 @@ mod tests {
 
     #[allow(clippy::too_many_arguments)]
     fn add_blob_same_hash_same_account<BS: Blockstore>(
-        hoku_config: &HokuConfig,
+        config: &HokuConfig,
         store: &BS,
         mut state: State,
         origin: Address,
@@ -2597,7 +2305,7 @@ mod tests {
         token_amount: TokenAmount,
     ) {
         let mut credit_amount =
-            Credit::from_atto(token_amount.atto().clone()) * &hoku_config.token_credit_rate;
+            Credit::from_atto(token_amount.atto().clone()) * &config.token_credit_rate;
 
         assert!(state
             .set_account_status(&store, subscriber, TtlStatus::Extended, current_epoch)
@@ -2609,7 +2317,7 @@ mod tests {
         let id1 = SubscriptionId::default();
         let source = new_pk();
         let res = state.add_blob(
-            hoku_config,
+            config,
             &store,
             origin,
             subscriber,
@@ -2618,15 +2326,14 @@ mod tests {
             new_metadata_hash(),
             id1.clone(),
             size,
-            None,
+            Some(config.blob_min_ttl),
             source,
             TokenAmount::zero(),
         );
         assert!(res.is_ok());
         let (sub, _) = res.unwrap();
         assert_eq!(sub.added, add1_epoch);
-        assert_eq!(sub.expiry, add1_epoch + hoku_config.blob_auto_renew_ttl);
-        assert!(sub.auto_renew);
+        assert_eq!(sub.expiry, add1_epoch + config.blob_min_ttl);
         assert_eq!(sub.source, source);
         assert!(!sub.failed);
         if subscriber != origin {
@@ -2634,7 +2341,7 @@ mod tests {
         }
 
         // Check stats
-        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), config);
         assert_eq!(stats.num_blobs, 1);
         assert_eq!(stats.num_resolving, 0);
         assert_eq!(stats.bytes_resolving, 0);
@@ -2664,7 +2371,7 @@ mod tests {
         assert_eq!(account.last_debit_epoch, add1_epoch);
         assert_eq!(
             account.credit_committed,
-            Credit::from_whole(hoku_config.blob_auto_renew_ttl as u64 * size),
+            Credit::from_whole(config.blob_min_ttl as u64 * size),
         );
         credit_amount -= &account.credit_committed;
         assert_eq!(account.credit_free, credit_amount);
@@ -2675,7 +2382,7 @@ mod tests {
         assert!(res.is_ok());
 
         // Check stats
-        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), config);
         assert_eq!(stats.num_blobs, 1);
         assert_eq!(stats.num_resolving, 1);
         assert_eq!(stats.bytes_resolving, size);
@@ -2699,7 +2406,7 @@ mod tests {
         );
 
         // Check stats
-        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), config);
         assert_eq!(stats.num_blobs, 1);
         assert_eq!(stats.num_resolving, 0);
         assert_eq!(stats.bytes_resolving, 0);
@@ -2710,7 +2417,7 @@ mod tests {
         let add2_epoch = ChainEpoch::from(21);
         let source = new_pk();
         let res = state.add_blob(
-            hoku_config,
+            config,
             &store,
             origin,
             subscriber,
@@ -2719,15 +2426,14 @@ mod tests {
             new_metadata_hash(),
             id1.clone(),
             size,
-            None,
+            Some(config.blob_min_ttl),
             source,
             TokenAmount::zero(),
         );
         assert!(res.is_ok());
         let (sub, _) = res.unwrap();
         assert_eq!(sub.added, add1_epoch); // added should not change
-        assert_eq!(sub.expiry, add2_epoch + hoku_config.blob_auto_renew_ttl);
-        assert!(sub.auto_renew);
+        assert_eq!(sub.expiry, add2_epoch + config.blob_min_ttl);
         assert_eq!(sub.source, source);
         assert!(!sub.failed);
         if subscriber != origin {
@@ -2758,7 +2464,7 @@ mod tests {
         assert_eq!(account.last_debit_epoch, add2_epoch);
         assert_eq!(
             account.credit_committed, // stays the same becuase we're starting over
-            Credit::from_whole(hoku_config.blob_auto_renew_ttl as u64 * size),
+            Credit::from_whole(config.blob_min_ttl as u64 * size),
         );
         credit_amount -= Credit::from_whole((add2_epoch - add1_epoch) as u64 * size);
         assert_eq!(account.credit_free, credit_amount);
@@ -2769,7 +2475,7 @@ mod tests {
         let id2 = SubscriptionId::new("foo").unwrap();
         let source = new_pk();
         let res = state.add_blob(
-            hoku_config,
+            config,
             &store,
             origin,
             subscriber,
@@ -2778,15 +2484,14 @@ mod tests {
             new_metadata_hash(),
             id2.clone(),
             size,
-            None,
+            Some(config.blob_min_ttl),
             source,
             TokenAmount::zero(),
         );
         assert!(res.is_ok());
         let (sub, _) = res.unwrap();
         assert_eq!(sub.added, add3_epoch);
-        assert_eq!(sub.expiry, add3_epoch + hoku_config.blob_auto_renew_ttl);
-        assert!(sub.auto_renew);
+        assert_eq!(sub.expiry, add3_epoch + config.blob_min_ttl);
         assert_eq!(sub.source, source);
         assert!(!sub.failed);
         if subscriber != origin {
@@ -2794,7 +2499,7 @@ mod tests {
         }
 
         // Check stats
-        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
+        let stats = state.get_stats(TokenAmount::zero(), config);
         assert_eq!(stats.num_blobs, 1);
         assert_eq!(stats.num_resolving, 0);
         assert_eq!(stats.bytes_resolving, 0);
@@ -2825,7 +2530,7 @@ mod tests {
         assert_eq!(account.last_debit_epoch, add3_epoch);
         assert_eq!(
             account.credit_committed, // stays the same becuase we're starting over
-            Credit::from_whole(hoku_config.blob_auto_renew_ttl as u64 * size),
+            Credit::from_whole(config.blob_min_ttl as u64 * size),
         );
         credit_amount -= Credit::from_whole((add3_epoch - add2_epoch) as u64 * size);
         assert_eq!(account.credit_free, credit_amount);
@@ -2833,9 +2538,7 @@ mod tests {
 
         // Debit all accounts
         let debit_epoch = ChainEpoch::from(41);
-        let deletes_from_disc = state
-            .debit_accounts(hoku_config, &store, debit_epoch)
-            .unwrap();
+        let deletes_from_disc = state.debit_accounts(&store, debit_epoch).unwrap();
         assert!(deletes_from_disc.is_empty());
 
         // Check the account balance
@@ -2843,9 +2546,7 @@ mod tests {
         assert_eq!(account.last_debit_epoch, debit_epoch);
         assert_eq!(
             account.credit_committed, // debit reduces this
-            Credit::from_whole(
-                (hoku_config.blob_auto_renew_ttl - (debit_epoch - add3_epoch)) as u64 * size
-            ),
+            Credit::from_whole((config.blob_min_ttl - (debit_epoch - add3_epoch)) as u64 * size),
         );
         assert_eq!(account.credit_free, credit_amount); // not changed
         assert_eq!(account.capacity_used, size); // not changed
@@ -2873,16 +2574,14 @@ mod tests {
         assert_eq!(group.subscriptions.len(), 1);
         let sub = group.subscriptions.get(&id2.clone().to_string()).unwrap();
         assert_eq!(sub.added, add3_epoch);
-        assert_eq!(sub.expiry, add3_epoch + hoku_config.blob_auto_renew_ttl);
+        assert_eq!(sub.expiry, add3_epoch + config.blob_min_ttl);
 
         // Check the account balance
         let account = state.get_account(&store, subscriber).unwrap().unwrap();
         assert_eq!(account.last_debit_epoch, delete_epoch);
         assert_eq!(
             account.credit_committed, // debit reduces this
-            Credit::from_whole(
-                (hoku_config.blob_auto_renew_ttl - (delete_epoch - add3_epoch)) as u64 * size
-            ),
+            Credit::from_whole((config.blob_min_ttl - (delete_epoch - add3_epoch)) as u64 * size),
         );
         assert_eq!(account.credit_free, credit_amount); // not changed
         assert_eq!(account.capacity_used, size); // not changed
@@ -2891,7 +2590,7 @@ mod tests {
         assert_eq!(state.credit_committed, account.credit_committed);
         assert_eq!(
             state.credit_debited,
-            (token_amount.clone() * &hoku_config.token_credit_rate)
+            (token_amount.clone() * &config.token_credit_rate)
                 - (&account.credit_free + &account.credit_committed)
         );
         assert_eq!(state.capacity_used, size);
@@ -2907,287 +2606,22 @@ mod tests {
     }
 
     #[test]
-    fn test_renew_blob_success() {
-        setup_logs();
-        let hoku_config = HokuConfig::default();
-        let store = MemoryBlockstore::default();
-        let mut state = State::new(&store).unwrap();
-        let subscriber = new_address();
-        let current_epoch = ChainEpoch::from(1);
-        let amount = TokenAmount::from_whole(10);
-        state
-            .buy_credit(
-                &hoku_config,
-                &store,
-                subscriber,
-                amount.clone(),
-                current_epoch,
-            )
-            .unwrap();
-        let mut credit_amount = amount.clone() * &hoku_config.token_credit_rate;
-
-        assert!(state
-            .set_account_status(&store, subscriber, TtlStatus::Extended, current_epoch)
-            .is_ok());
-
-        // Add blob with default a subscription ID
-        let (hash, size) = new_hash(1024);
-        let add_epoch = current_epoch;
-        let source = new_pk();
-        let res = state.add_blob(
-            &hoku_config,
-            &store,
-            subscriber,
-            subscriber,
-            add_epoch,
-            hash,
-            new_metadata_hash(),
-            SubscriptionId::default(),
-            size,
-            None,
-            source,
-            TokenAmount::zero(),
-        );
-        assert!(res.is_ok());
-
-        // Check the account balance
-        let account = state.get_account(&store, subscriber).unwrap().unwrap();
-        assert_eq!(account.last_debit_epoch, add_epoch);
-        assert_eq!(
-            account.credit_committed,
-            Credit::from_whole(hoku_config.blob_auto_renew_ttl as u64 * size),
-        );
-        credit_amount -= &account.credit_committed;
-        assert_eq!(account.credit_free, credit_amount);
-        assert_eq!(account.capacity_used, size);
-
-        // Set to status pending
-        let res =
-            state.set_blob_pending(&store, subscriber, hash, SubscriptionId::default(), source);
-        assert!(res.is_ok());
-
-        // Finalize as resolved
-        let finalize_epoch = ChainEpoch::from(11);
-        let res = state.finalize_blob(
-            &store,
-            subscriber,
-            finalize_epoch,
-            hash,
-            SubscriptionId::default(),
-            BlobStatus::Resolved,
-        );
-        assert!(res.is_ok());
-
-        // Renew blob
-        let renew_epoch = ChainEpoch::from(21);
-        let res = state.renew_blob(
-            &hoku_config,
-            &store,
-            subscriber,
-            renew_epoch,
-            hash,
-            SubscriptionId::default(),
-        );
-        assert!(res.is_ok());
-
-        // Check the account balance
-        let account = state.get_account(&store, subscriber).unwrap().unwrap();
-        assert_eq!(account.last_debit_epoch, add_epoch);
-        assert_eq!(
-            account.credit_committed,
-            Credit::from_whole(
-                (hoku_config.blob_auto_renew_ttl + (renew_epoch - add_epoch)) as u64 * size
-            ),
-        );
-        credit_amount -= Credit::from_whole((renew_epoch - add_epoch) as u64 * size);
-        assert_eq!(account.credit_free, credit_amount);
-        assert_eq!(account.capacity_used, size);
-
-        // Check state
-        assert_eq!(state.credit_committed, account.credit_committed);
-        assert_eq!(
-            state.credit_debited,
-            amount.clone() * &hoku_config.token_credit_rate
-                - (&account.credit_free + &account.credit_committed)
-        );
-        assert_eq!(state.capacity_used, account.capacity_used);
-
-        // Check indexes
-        assert_eq!(state.expiries.len(&store).unwrap(), 1);
-        assert_eq!(state.added.len(), 0);
-        assert_eq!(state.pending.len(), 0);
-    }
-
-    #[test]
-    fn test_renew_blob_refund() {
-        setup_logs();
-        let hoku_config = HokuConfig::default();
-        let store = MemoryBlockstore::default();
-        let mut state = State::new(&store).unwrap();
-        let subscriber = new_address();
-        let current_epoch = ChainEpoch::from(1);
-        let amount = TokenAmount::from_whole(10);
-        state
-            .buy_credit(
-                &hoku_config,
-                &store,
-                subscriber,
-                amount.clone(),
-                current_epoch,
-            )
-            .unwrap();
-        let mut credit_amount = amount.clone() * &hoku_config.token_credit_rate;
-
-        assert!(state
-            .set_account_status(&store, subscriber, TtlStatus::Extended, current_epoch)
-            .is_ok());
-
-        // Add blob with default a subscription ID
-        let (hash1, size1) = new_hash(1024);
-        let add1_epoch = current_epoch;
-        let id1 = SubscriptionId::default();
-        let source = new_pk();
-        let res = state.add_blob(
-            &hoku_config,
-            &store,
-            subscriber,
-            subscriber,
-            add1_epoch,
-            hash1,
-            new_metadata_hash(),
-            id1.clone(),
-            size1,
-            None,
-            source,
-            TokenAmount::zero(),
-        );
-        assert!(res.is_ok());
-
-        // Check the account balance
-        let account = state.get_account(&store, subscriber).unwrap().unwrap();
-        assert_eq!(account.last_debit_epoch, add1_epoch);
-        assert_eq!(
-            account.credit_committed,
-            Credit::from_whole(hoku_config.blob_auto_renew_ttl as u64 * size1),
-        );
-        credit_amount -= &account.credit_committed;
-        assert_eq!(account.credit_free, credit_amount);
-        assert_eq!(account.capacity_used, size1);
-
-        // Add another blob past the first blob's expiry
-        let (hash2, size2) = new_hash(2048);
-        let add2_epoch = ChainEpoch::from(hoku_config.blob_auto_renew_ttl + 11);
-        let id2 = SubscriptionId::new("foo").unwrap();
-        let source = new_pk();
-        let res = state.add_blob(
-            &hoku_config,
-            &store,
-            subscriber,
-            subscriber,
-            add2_epoch,
-            hash2,
-            new_metadata_hash(),
-            id2.clone(),
-            size2,
-            None,
-            source,
-            TokenAmount::zero(),
-        );
-        assert!(res.is_ok());
-
-        // Check the account balance
-        let account = state.get_account(&store, subscriber).unwrap().unwrap();
-        assert_eq!(account.last_debit_epoch, add2_epoch);
-        let blob1_expiry = ChainEpoch::from(hoku_config.blob_auto_renew_ttl + add1_epoch);
-        let overcharge = BigInt::from((add2_epoch - blob1_expiry) as u64 * size1);
-        assert_eq!(
-            account.credit_committed, // this includes an overcharge that needs to be accounted for
-            Credit::from_whole(hoku_config.blob_auto_renew_ttl as u64 * size2 - overcharge),
-        );
-        credit_amount -= Credit::from_whole(hoku_config.blob_auto_renew_ttl as u64 * size2);
-        assert_eq!(account.credit_free, credit_amount);
-        assert_eq!(account.capacity_used, size1 + size2);
-
-        // Check state
-        assert_eq!(state.credit_committed, account.credit_committed);
-        assert_eq!(
-            state.credit_debited,
-            amount.clone() * &hoku_config.token_credit_rate
-                - (&account.credit_free + &account.credit_committed)
-        );
-        assert_eq!(state.capacity_used, account.capacity_used);
-
-        // Check indexes
-        assert_eq!(state.expiries.len(&store).unwrap(), 2);
-        assert_eq!(state.added.len(), 2);
-        assert_eq!(state.pending.len(), 0);
-
-        // Renew the first blob
-        let renew_epoch = ChainEpoch::from(hoku_config.blob_auto_renew_ttl + 31);
-        let res = state.renew_blob(
-            &hoku_config,
-            &store,
-            subscriber,
-            renew_epoch,
-            hash1,
-            id1.clone(),
-        );
-        assert!(res.is_ok());
-
-        // Check the account balance
-        let account = state.get_account(&store, subscriber).unwrap().unwrap();
-        assert_eq!(account.last_debit_epoch, add2_epoch);
-        let blob1_expiry2 = ChainEpoch::from(hoku_config.blob_auto_renew_ttl + renew_epoch);
-        let blob2_expiry = ChainEpoch::from(hoku_config.blob_auto_renew_ttl + add2_epoch);
-        assert_eq!(
-            account.credit_committed,
-            Credit::from_whole(
-                (blob2_expiry - add2_epoch) as u64 * size2
-                    + (blob1_expiry2 - add2_epoch) as u64 * size1
-            ),
-        );
-        credit_amount -= Credit::from_whole((blob1_expiry2 - add2_epoch) as u64 * size1);
-        assert_eq!(account.credit_free, credit_amount);
-        assert_eq!(account.capacity_used, size1 + size2);
-
-        // Check state
-        assert_eq!(state.credit_committed, account.credit_committed);
-        assert_eq!(
-            state.credit_debited,
-            amount.clone() * &hoku_config.token_credit_rate
-                - (&account.credit_free + &account.credit_committed)
-        );
-        assert_eq!(state.capacity_used, account.capacity_used);
-
-        // Check indexes
-        assert_eq!(state.expiries.len(&store).unwrap(), 2);
-        assert_eq!(state.added.len(), 2);
-        assert_eq!(state.pending.len(), 0);
-    }
-
-    #[test]
     fn test_finalize_blob_from_bad_state() {
         setup_logs();
-        let hoku_config = HokuConfig::default();
+        let config = HokuConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let subscriber = new_address();
         let current_epoch = ChainEpoch::from(1);
         let amount = TokenAmount::from_whole(10);
         state
-            .buy_credit(
-                &hoku_config,
-                &store,
-                subscriber,
-                amount.clone(),
-                current_epoch,
-            )
+            .buy_credit(&config, &store, subscriber, amount.clone(), current_epoch)
             .unwrap();
 
         // Add a blob
         let (hash, size) = new_hash(1024);
         let res = state.add_blob(
-            &hoku_config,
+            &config,
             &store,
             subscriber,
             subscriber,
@@ -3222,27 +2656,21 @@ mod tests {
     #[test]
     fn test_finalize_blob_resolved() {
         setup_logs();
-        let hoku_config = HokuConfig::default();
+        let config = HokuConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let subscriber = new_address();
         let current_epoch = ChainEpoch::from(1);
         let amount = TokenAmount::from_whole(10);
         state
-            .buy_credit(
-                &hoku_config,
-                &store,
-                subscriber,
-                amount.clone(),
-                current_epoch,
-            )
+            .buy_credit(&config, &store, subscriber, amount.clone(), current_epoch)
             .unwrap();
 
         // Add a blob
         let (hash, size) = new_hash(1024);
         let source = new_pk();
         let res = state.add_blob(
-            &hoku_config,
+            &config,
             &store,
             subscriber,
             subscriber,
@@ -3289,29 +2717,23 @@ mod tests {
     #[test]
     fn test_finalize_blob_failed() {
         setup_logs();
-        let hoku_config = HokuConfig::default();
+        let config = HokuConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let subscriber = new_address();
         let current_epoch = ChainEpoch::from(1);
         let amount = TokenAmount::from_whole(10);
         state
-            .buy_credit(
-                &hoku_config,
-                &store,
-                subscriber,
-                amount.clone(),
-                current_epoch,
-            )
+            .buy_credit(&config, &store, subscriber, amount.clone(), current_epoch)
             .unwrap();
-        let credit_amount = amount * &hoku_config.token_credit_rate;
+        let credit_amount = amount * &config.token_credit_rate;
 
         // Add a blob
         let add_epoch = current_epoch;
         let (hash, size) = new_hash(1024);
         let source = new_pk();
         let res = state.add_blob(
-            &hoku_config,
+            &config,
             &store,
             subscriber,
             subscriber,
@@ -3370,22 +2792,16 @@ mod tests {
     #[test]
     fn test_finalize_blob_failed_refund() {
         setup_logs();
-        let hoku_config = HokuConfig::default();
+        let config = HokuConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let subscriber = new_address();
         let current_epoch = ChainEpoch::from(1);
         let amount = TokenAmount::from_whole(10);
         state
-            .buy_credit(
-                &hoku_config,
-                &store,
-                subscriber,
-                amount.clone(),
-                current_epoch,
-            )
+            .buy_credit(&config, &store, subscriber, amount.clone(), current_epoch)
             .unwrap();
-        let mut credit_amount = amount.clone() * &hoku_config.token_credit_rate;
+        let mut credit_amount = amount.clone() * &config.token_credit_rate;
 
         assert!(state
             .set_account_status(&store, subscriber, TtlStatus::Extended, current_epoch)
@@ -3396,7 +2812,7 @@ mod tests {
         let (hash, size) = new_hash(1024);
         let source = new_pk();
         let res = state.add_blob(
-            &hoku_config,
+            &config,
             &store,
             subscriber,
             subscriber,
@@ -3405,7 +2821,7 @@ mod tests {
             new_metadata_hash(),
             SubscriptionId::default(),
             size,
-            None,
+            Some(config.blob_min_ttl),
             source,
             TokenAmount::zero(),
         );
@@ -3416,7 +2832,7 @@ mod tests {
         assert_eq!(account.last_debit_epoch, add_epoch);
         assert_eq!(
             account.credit_committed,
-            Credit::from_whole(hoku_config.blob_auto_renew_ttl as u64 * size),
+            Credit::from_whole(config.blob_min_ttl as u64 * size),
         );
         credit_amount -= &account.credit_committed;
         assert_eq!(account.credit_free, credit_amount);
@@ -3429,9 +2845,7 @@ mod tests {
 
         // Debit accounts to trigger a refund when we fail below
         let debit_epoch = ChainEpoch::from(11);
-        let deletes_from_disc = state
-            .debit_accounts(&hoku_config, &store, debit_epoch)
-            .unwrap();
+        let deletes_from_disc = state.debit_accounts(&store, debit_epoch).unwrap();
         assert!(deletes_from_disc.is_empty());
 
         // Check the account balance
@@ -3439,9 +2853,7 @@ mod tests {
         assert_eq!(account.last_debit_epoch, debit_epoch);
         assert_eq!(
             account.credit_committed,
-            Credit::from_whole(
-                (hoku_config.blob_auto_renew_ttl - (debit_epoch - add_epoch)) as u64 * size
-            ),
+            Credit::from_whole((config.blob_min_ttl - (debit_epoch - add_epoch)) as u64 * size),
         );
         assert_eq!(account.credit_free, credit_amount); // not changed
         assert_eq!(account.capacity_used, size);
@@ -3483,7 +2895,7 @@ mod tests {
         assert_eq!(account.credit_committed, Credit::from_whole(0)); // credit was released
         assert_eq!(
             account.credit_free,
-            amount.clone() * &hoku_config.token_credit_rate
+            amount.clone() * &config.token_credit_rate
         ); // credit was refunded
         assert_eq!(account.capacity_used, 0); // capacity was released
 
@@ -3501,23 +2913,17 @@ mod tests {
     #[test]
     fn test_delete_blob_refund() {
         setup_logs();
-        let hoku_config = HokuConfig::default();
+        let config = HokuConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let origin = new_address();
         let current_epoch = ChainEpoch::from(1);
         let token_amount = TokenAmount::from_whole(10);
         state
-            .buy_credit(
-                &hoku_config,
-                &store,
-                origin,
-                token_amount.clone(),
-                current_epoch,
-            )
+            .buy_credit(&config, &store, origin, token_amount.clone(), current_epoch)
             .unwrap();
         delete_blob_refund(
-            &hoku_config,
+            &config,
             &store,
             state,
             origin,
@@ -3530,7 +2936,7 @@ mod tests {
     #[test]
     fn test_delete_blob_refund_with_approval() {
         setup_logs();
-        let hoku_config = HokuConfig::default();
+        let config = HokuConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let origin = new_address();
@@ -3539,7 +2945,7 @@ mod tests {
         let token_amount = TokenAmount::from_whole(10);
         state
             .buy_credit(
-                &hoku_config,
+                &config,
                 &store,
                 subscriber,
                 token_amount.clone(),
@@ -3548,7 +2954,7 @@ mod tests {
             .unwrap();
         state
             .approve_credit(
-                &hoku_config,
+                &config,
                 &store,
                 subscriber,
                 origin,
@@ -3559,7 +2965,7 @@ mod tests {
             )
             .unwrap();
         delete_blob_refund(
-            &hoku_config,
+            &config,
             &store,
             state,
             origin,
@@ -3569,10 +2975,152 @@ mod tests {
         );
     }
 
+    #[allow(clippy::too_many_arguments)]
+    fn delete_blob_refund<BS: Blockstore>(
+        config: &HokuConfig,
+        store: &BS,
+        mut state: State,
+        origin: Address,
+        subscriber: Address,
+        current_epoch: ChainEpoch,
+        token_amount: TokenAmount,
+    ) {
+        let mut credit_amount = token_amount * &config.token_credit_rate;
+
+        // Add a blob
+        let add1_epoch = current_epoch;
+        let (hash1, size1) = new_hash(1024);
+        let res = state.add_blob(
+            config,
+            &store,
+            origin,
+            subscriber,
+            add1_epoch,
+            hash1,
+            new_metadata_hash(),
+            SubscriptionId::default(),
+            size1,
+            Some(config.blob_min_ttl),
+            new_pk(),
+            TokenAmount::zero(),
+        );
+        assert!(res.is_ok());
+
+        // Check stats
+        let stats = state.get_stats(TokenAmount::zero(), config);
+        assert_eq!(stats.num_blobs, 1);
+        assert_eq!(stats.num_resolving, 0);
+        assert_eq!(stats.bytes_resolving, 0);
+        assert_eq!(stats.num_added, 1);
+        assert_eq!(stats.bytes_added, size1);
+
+        // Check the account balance
+        let account = state.get_account(&store, subscriber).unwrap().unwrap();
+        assert_eq!(account.last_debit_epoch, add1_epoch);
+        assert_eq!(
+            account.credit_committed,
+            Credit::from_whole(config.blob_min_ttl as u64 * size1),
+        );
+        credit_amount -= &account.credit_committed;
+        assert_eq!(account.credit_free, credit_amount);
+        assert_eq!(account.capacity_used, size1);
+
+        // Add another blob past the first blob expiry
+        // This will trigger a debit on the account
+        let add2_epoch = ChainEpoch::from(config.blob_min_ttl + 10);
+        let (hash2, size2) = new_hash(2048);
+        let res = state.add_blob(
+            config,
+            &store,
+            origin,
+            subscriber,
+            add2_epoch,
+            hash2,
+            new_metadata_hash(),
+            SubscriptionId::default(),
+            size2,
+            Some(config.blob_min_ttl),
+            new_pk(),
+            TokenAmount::zero(),
+        );
+        assert!(res.is_ok());
+
+        // Check stats
+        let stats = state.get_stats(TokenAmount::zero(), config);
+        assert_eq!(stats.num_blobs, 2);
+        assert_eq!(stats.num_resolving, 0);
+        assert_eq!(stats.bytes_resolving, 0);
+        assert_eq!(stats.num_added, 2);
+        assert_eq!(stats.bytes_added, size1 + size2);
+
+        // Check the account balance
+        let account = state.get_account(&store, subscriber).unwrap().unwrap();
+        assert_eq!(account.last_debit_epoch, add2_epoch);
+        let blob1_expiry = ChainEpoch::from(config.blob_min_ttl + add1_epoch);
+        let overcharge = BigInt::from((add2_epoch - blob1_expiry) as u64 * size1);
+        assert_eq!(
+            account.credit_committed, // this includes an overcharge that needs to be refunded
+            Credit::from_whole(config.blob_min_ttl as u64 * size2 - overcharge),
+        );
+        credit_amount -= Credit::from_whole(config.blob_min_ttl as u64 * size2);
+        assert_eq!(account.credit_free, credit_amount);
+        assert_eq!(account.capacity_used, size1 + size2);
+
+        // Delete the first blob
+        let delete_epoch = ChainEpoch::from(config.blob_min_ttl + 20);
+        let delete_from_disc = state
+            .delete_blob(
+                &store,
+                origin,
+                subscriber,
+                delete_epoch,
+                hash1,
+                SubscriptionId::default(),
+            )
+            .unwrap();
+        assert!(delete_from_disc);
+
+        // Check stats
+        let stats = state.get_stats(TokenAmount::zero(), config);
+        assert_eq!(stats.num_blobs, 1);
+        assert_eq!(stats.num_resolving, 0);
+        assert_eq!(stats.bytes_resolving, 0);
+        assert_eq!(stats.num_added, 1);
+        assert_eq!(stats.bytes_added, size2);
+
+        // Check the account balance
+        let account = state.get_account(&store, subscriber).unwrap().unwrap();
+        assert_eq!(account.last_debit_epoch, add2_epoch); // not changed, blob is expired
+        assert_eq!(
+            account.credit_committed, // should not include overcharge due to refund
+            Credit::from_whole(config.blob_min_ttl as u64 * size2),
+        );
+        assert_eq!(account.credit_free, credit_amount); // not changed
+        assert_eq!(account.capacity_used, size2);
+
+        // Check state
+        assert_eq!(state.credit_committed, account.credit_committed); // credit was released
+        assert_eq!(
+            state.credit_debited,
+            Credit::from_whole(config.blob_min_ttl as u64 * size1)
+        );
+        assert_eq!(state.capacity_used, size2); // capacity was released
+
+        // Check indexes
+        assert_eq!(state.expiries.len(store).unwrap(), 1);
+        assert_eq!(state.added.len(), 1);
+        assert_eq!(state.pending.len(), 0);
+
+        // Check approval
+        let account_committed = account.credit_committed.clone();
+        check_approval(account, origin, state.credit_debited + account_committed);
+    }
+
     #[test]
     fn test_if_blobs_ttl_exceeds_accounts_ttl_should_error() {
         setup_logs();
 
+        let config = HokuConfig::default();
         const YEAR: ChainEpoch = 365 * 24 * 60 * 60;
 
         // Test cases structure
@@ -3581,7 +3129,6 @@ mod tests {
             account_ttl_status: TtlStatus,
             blob_ttl: Option<ChainEpoch>,
             should_succeed: bool,
-            should_auto_renew: bool,
             expected_account_ttl: ChainEpoch,
             expected_blob_ttl: ChainEpoch,
         }
@@ -3591,55 +3138,49 @@ mod tests {
             TestCase {
                 name: "Reduced status rejects even minimum TTL",
                 account_ttl_status: TtlStatus::Reduced,
-                blob_ttl: Some(3600),
+                blob_ttl: Some(config.blob_min_ttl),
                 should_succeed: false,
-                should_auto_renew: false,
                 expected_account_ttl: 0,
                 expected_blob_ttl: 0,
             },
             TestCase {
                 name: "Reduced status rejects no TTL",
                 account_ttl_status: TtlStatus::Reduced,
-                blob_ttl: Some(3600),
+                blob_ttl: Some(config.blob_min_ttl),
                 should_succeed: false,
-                should_auto_renew: false,
                 expected_account_ttl: 0,
                 expected_blob_ttl: 0,
             },
             TestCase {
                 name: "Default status allows default TTL",
                 account_ttl_status: TtlStatus::Default,
-                blob_ttl: Some(TtlStatus::DEFAULT_MAX_TTL),
+                blob_ttl: Some(config.blob_default_ttl),
                 should_succeed: true,
-                should_auto_renew: false,
-                expected_account_ttl: TtlStatus::DEFAULT_MAX_TTL,
-                expected_blob_ttl: TtlStatus::DEFAULT_MAX_TTL,
+                expected_account_ttl: config.blob_default_ttl,
+                expected_blob_ttl: config.blob_default_ttl,
             },
             TestCase {
                 name: "Default status sets no TTL to default without auto renew",
                 account_ttl_status: TtlStatus::Default,
                 blob_ttl: None,
                 should_succeed: true,
-                should_auto_renew: false,
-                expected_account_ttl: TtlStatus::DEFAULT_MAX_TTL,
-                expected_blob_ttl: TtlStatus::DEFAULT_MAX_TTL,
+                expected_account_ttl: config.blob_default_ttl,
+                expected_blob_ttl: config.blob_default_ttl,
             },
             TestCase {
                 name: "Default status preserves given TTL if it's less than default",
                 account_ttl_status: TtlStatus::Default,
-                blob_ttl: Some(TtlStatus::DEFAULT_MAX_TTL - 1),
+                blob_ttl: Some(config.blob_default_ttl - 1),
                 should_succeed: true,
-                should_auto_renew: false,
-                expected_account_ttl: TtlStatus::DEFAULT_MAX_TTL,
-                expected_blob_ttl: TtlStatus::DEFAULT_MAX_TTL - 1,
+                expected_account_ttl: config.blob_default_ttl,
+                expected_blob_ttl: config.blob_default_ttl - 1,
             },
             TestCase {
                 name: "Default status rejects TTLs higher than default",
                 account_ttl_status: TtlStatus::Default,
-                blob_ttl: Some(TtlStatus::DEFAULT_MAX_TTL + 1),
+                blob_ttl: Some(config.blob_default_ttl + 1),
                 should_succeed: false,
-                should_auto_renew: false,
-                expected_account_ttl: TtlStatus::DEFAULT_MAX_TTL,
+                expected_account_ttl: config.blob_default_ttl,
                 expected_blob_ttl: 0,
             },
             TestCase {
@@ -3647,24 +3188,14 @@ mod tests {
                 account_ttl_status: TtlStatus::Extended,
                 blob_ttl: Some(YEAR),
                 should_succeed: true,
-                should_auto_renew: false,
                 expected_account_ttl: ChainEpoch::MAX,
                 expected_blob_ttl: YEAR,
-            },
-            TestCase {
-                name: "Extended status allows auto renew",
-                account_ttl_status: TtlStatus::Extended,
-                blob_ttl: None,
-                should_succeed: true,
-                should_auto_renew: true,
-                expected_account_ttl: ChainEpoch::MAX,
-                expected_blob_ttl: 3600,
             },
         ];
 
         // Run all test cases
         for tc in test_cases {
-            let hoku_config = HokuConfig::default();
+            let config = HokuConfig::default();
             let store = MemoryBlockstore::default();
             let mut state = State::new(&store).unwrap();
             let subscriber = new_address();
@@ -3672,13 +3203,7 @@ mod tests {
             let amount = TokenAmount::from_whole(10);
 
             state
-                .buy_credit(
-                    &hoku_config,
-                    &store,
-                    subscriber,
-                    amount.clone(),
-                    current_epoch,
-                )
+                .buy_credit(&config, &store, subscriber, amount.clone(), current_epoch)
                 .unwrap();
             state
                 .set_account_status(&store, subscriber, tc.account_ttl_status, current_epoch)
@@ -3686,7 +3211,7 @@ mod tests {
 
             let (hash, size) = new_hash(1024);
             let res = state.add_blob(
-                &hoku_config,
+                &config,
                 &store,
                 subscriber,
                 subscriber,
@@ -3726,11 +3251,6 @@ mod tests {
                             "Test case '{}' has unexpected blob expiry",
                             tc.name
                         );
-                        assert_eq!(
-                            sub.auto_renew, tc.should_auto_renew,
-                            "Test case '{}' has unexpected auto renew value",
-                            tc.name
-                        );
                     }
                 }
             } else {
@@ -3752,150 +3272,11 @@ mod tests {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn delete_blob_refund<BS: Blockstore>(
-        hoku_config: &HokuConfig,
-        store: &BS,
-        mut state: State,
-        origin: Address,
-        subscriber: Address,
-        current_epoch: ChainEpoch,
-        token_amount: TokenAmount,
-    ) {
-        let mut credit_amount = token_amount * &hoku_config.token_credit_rate;
-
-        // Add a blob
-        let add1_epoch = current_epoch;
-        let (hash1, size1) = new_hash(1024);
-        let res = state.add_blob(
-            hoku_config,
-            &store,
-            origin,
-            subscriber,
-            add1_epoch,
-            hash1,
-            new_metadata_hash(),
-            SubscriptionId::default(),
-            size1,
-            Some(hoku_config.blob_min_ttl),
-            new_pk(),
-            TokenAmount::zero(),
-        );
-        assert!(res.is_ok());
-
-        // Check stats
-        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
-        assert_eq!(stats.num_blobs, 1);
-        assert_eq!(stats.num_resolving, 0);
-        assert_eq!(stats.bytes_resolving, 0);
-        assert_eq!(stats.num_added, 1);
-        assert_eq!(stats.bytes_added, size1);
-
-        // Check the account balance
-        let account = state.get_account(&store, subscriber).unwrap().unwrap();
-        assert_eq!(account.last_debit_epoch, add1_epoch);
-        assert_eq!(
-            account.credit_committed,
-            Credit::from_whole(hoku_config.blob_min_ttl as u64 * size1),
-        );
-        credit_amount -= &account.credit_committed;
-        assert_eq!(account.credit_free, credit_amount);
-        assert_eq!(account.capacity_used, size1);
-
-        // Add another blob past the first blob expiry
-        // This will trigger a debit on the account
-        let add2_epoch = ChainEpoch::from(hoku_config.blob_min_ttl + 10);
-        let (hash2, size2) = new_hash(2048);
-        let res = state.add_blob(
-            hoku_config,
-            &store,
-            origin,
-            subscriber,
-            add2_epoch,
-            hash2,
-            new_metadata_hash(),
-            SubscriptionId::default(),
-            size2,
-            Some(hoku_config.blob_min_ttl),
-            new_pk(),
-            TokenAmount::zero(),
-        );
-        assert!(res.is_ok());
-
-        // Check stats
-        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
-        assert_eq!(stats.num_blobs, 2);
-        assert_eq!(stats.num_resolving, 0);
-        assert_eq!(stats.bytes_resolving, 0);
-        assert_eq!(stats.num_added, 2);
-        assert_eq!(stats.bytes_added, size1 + size2);
-
-        // Check the account balance
-        let account = state.get_account(&store, subscriber).unwrap().unwrap();
-        assert_eq!(account.last_debit_epoch, add2_epoch);
-        let blob1_expiry = ChainEpoch::from(hoku_config.blob_min_ttl + add1_epoch);
-        let overcharge = BigInt::from((add2_epoch - blob1_expiry) as u64 * size1);
-        assert_eq!(
-            account.credit_committed, // this includes an overcharge that needs to be refunded
-            Credit::from_whole(hoku_config.blob_min_ttl as u64 * size2 - overcharge),
-        );
-        credit_amount -= Credit::from_whole(hoku_config.blob_min_ttl as u64 * size2);
-        assert_eq!(account.credit_free, credit_amount);
-        assert_eq!(account.capacity_used, size1 + size2);
-
-        // Delete the first blob
-        let delete_epoch = ChainEpoch::from(hoku_config.blob_min_ttl + 20);
-        let delete_from_disc = state
-            .delete_blob(
-                &store,
-                origin,
-                subscriber,
-                delete_epoch,
-                hash1,
-                SubscriptionId::default(),
-            )
-            .unwrap();
-        assert!(delete_from_disc);
-
-        // Check stats
-        let stats = state.get_stats(TokenAmount::zero(), hoku_config);
-        assert_eq!(stats.num_blobs, 1);
-        assert_eq!(stats.num_resolving, 0);
-        assert_eq!(stats.bytes_resolving, 0);
-        assert_eq!(stats.num_added, 1);
-        assert_eq!(stats.bytes_added, size2);
-
-        // Check the account balance
-        let account = state.get_account(&store, subscriber).unwrap().unwrap();
-        assert_eq!(account.last_debit_epoch, add2_epoch); // not changed, blob is expired
-        assert_eq!(
-            account.credit_committed, // should not include overcharge due to refund
-            Credit::from_whole(hoku_config.blob_min_ttl as u64 * size2),
-        );
-        assert_eq!(account.credit_free, credit_amount); // not changed
-        assert_eq!(account.capacity_used, size2);
-
-        // Check state
-        assert_eq!(state.credit_committed, account.credit_committed); // credit was released
-        assert_eq!(
-            state.credit_debited,
-            Credit::from_whole(hoku_config.blob_min_ttl as u64 * size1)
-        );
-        assert_eq!(state.capacity_used, size2); // capacity was released
-
-        // Check indexes
-        assert_eq!(state.expiries.len(store).unwrap(), 1);
-        assert_eq!(state.added.len(), 1);
-        assert_eq!(state.pending.len(), 0);
-
-        // Check approval
-        let account_committed = account.credit_committed.clone();
-        check_approval(account, origin, state.credit_debited + account_committed);
-    }
-
     #[test]
     fn test_set_ttl_status() {
         setup_logs();
+
+        let config = HokuConfig::default();
 
         struct TestCase {
             name: &'static str,
@@ -3915,7 +3296,7 @@ mod tests {
                 name: "Setting Default on new account",
                 initial_ttl_status: None,
                 new_ttl_status: TtlStatus::Default,
-                expected_ttl: TtlStatus::DEFAULT_MAX_TTL,
+                expected_ttl: config.blob_default_ttl,
             },
             TestCase {
                 name: "Changing from Default to Reduced",
@@ -3976,7 +3357,7 @@ mod tests {
     #[test]
     fn test_adjust_blob_ttls_for_account() {
         setup_logs();
-        let hoku_config = HokuConfig::default();
+        let config = HokuConfig::default();
 
         const HOUR: ChainEpoch = 3600;
         const TWO_HOURS: ChainEpoch = HOUR * 2;
@@ -3990,7 +3371,6 @@ mod tests {
             name: &'static str,
             account_ttl: TtlStatus,
             expected_ttls: Vec<ChainEpoch>,
-            expected_auto_renewals: Vec<bool>,
             limit: Option<usize>, // None means process all at once
         }
 
@@ -3999,21 +3379,18 @@ mod tests {
                 name: "Set to zero with Reduced status",
                 account_ttl: TtlStatus::Reduced,
                 expected_ttls: vec![0, 0, 0, 0, 0],
-                expected_auto_renewals: vec![false, false, false, false, false],
                 limit: None,
             },
             TestCase {
                 name: "Set to default with Default status",
                 account_ttl: TtlStatus::Default,
                 expected_ttls: vec![DAY, HOUR, TWO_HOURS, DAY, DAY],
-                expected_auto_renewals: vec![false, false, false, false, false],
                 limit: None,
             },
             TestCase {
                 name: "Set to extended with Extended status",
                 account_ttl: TtlStatus::Extended,
-                expected_ttls: vec![HOUR, HOUR, TWO_HOURS, DAY, YEAR],
-                expected_auto_renewals: vec![true, false, false, false, false],
+                expected_ttls: vec![DAY, HOUR, TWO_HOURS, DAY, YEAR],
                 limit: None,
             },
         ];
@@ -4026,10 +3403,10 @@ mod tests {
 
             // Setup account with credits and TTL status
             let token = TokenAmount::from_whole(1000);
-
             state
-                .buy_credit(&hoku_config, &store, addr, token, current_epoch)
+                .buy_credit(&config, &store, addr, token, current_epoch)
                 .unwrap();
+
             // Set extended TTL status to allow adding all blobs
             state
                 .set_account_status(&store, addr, TtlStatus::Extended, current_epoch)
@@ -4047,7 +3424,7 @@ mod tests {
 
                 state
                     .add_blob(
-                        &hoku_config,
+                        &config,
                         &store,
                         addr,
                         addr,
@@ -4063,7 +3440,7 @@ mod tests {
                     .unwrap();
 
                 total_cost += Credit::from_whole(
-                    state.get_storage_cost(ttl.unwrap_or(hoku_config.blob_auto_renew_ttl), &size),
+                    state.get_storage_cost(ttl.unwrap_or(config.blob_default_ttl), &size),
                 );
                 expected_credits +=
                     Credit::from_whole(state.get_storage_cost(tc.expected_ttls[i], &size));
@@ -4081,7 +3458,7 @@ mod tests {
                 .unwrap();
 
             let res =
-                state.trim_blob_expiries(&hoku_config, &store, addr, current_epoch, None, tc.limit);
+                state.trim_blob_expiries(&config, &store, addr, current_epoch, None, tc.limit);
             assert!(
                 res.is_ok(),
                 "Test case '{}' failed to adjust TTLs: {}",
@@ -4113,15 +3490,6 @@ mod tests {
                         tc.expected_ttls[i],
                         sub.expiry - sub.added,
                     );
-                    assert_eq!(
-                        sub.auto_renew,
-                        tc.expected_auto_renewals[i],
-                        "Test case '{}' failed: blob {} auto-renewal not adjusted correctly. Expected {}, got {}",
-                        tc.name,
-                        i,
-                        tc.expected_auto_renewals[i],
-                        sub.auto_renew
-                    );
                 }
             }
 
@@ -4143,7 +3511,7 @@ mod tests {
     #[test]
     fn test_adjust_blob_ttls_pagination() {
         setup_logs();
-        let hoku_config = HokuConfig::default();
+        let config = HokuConfig::default();
 
         // Test cases for pagination
         struct PaginationTest {
@@ -4201,7 +3569,7 @@ mod tests {
             // Setup account with credits and Extended TTL status to allow adding all blobs
             state
                 .buy_credit(
-                    &hoku_config,
+                    &config,
                     &store,
                     addr,
                     TokenAmount::from_whole(1000),
@@ -4217,7 +3585,7 @@ mod tests {
                 let (hash, size) = new_hash((i + 1) * 1024);
                 state
                     .add_blob(
-                        &hoku_config,
+                        &config,
                         &store,
                         addr,
                         addr,
@@ -4255,7 +3623,7 @@ mod tests {
                 .unwrap();
 
             let res = state.trim_blob_expiries(
-                &hoku_config,
+                &config,
                 &store,
                 addr,
                 current_epoch,
@@ -4302,7 +3670,7 @@ mod tests {
     fn test_adjust_blob_ttls_for_multiple_accounts() {
         setup_logs();
 
-        let hoku_config = HokuConfig::default();
+        let config = HokuConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let account1 = new_address();
@@ -4312,7 +3680,7 @@ mod tests {
         // Setup accounts with credits and Extended TTL status to allow adding all blobs
         state
             .buy_credit(
-                &hoku_config,
+                &config,
                 &store,
                 account1,
                 TokenAmount::from_whole(1000),
@@ -4321,7 +3689,7 @@ mod tests {
             .unwrap();
         state
             .buy_credit(
-                &hoku_config,
+                &config,
                 &store,
                 account2,
                 TokenAmount::from_whole(1000),
@@ -4343,7 +3711,7 @@ mod tests {
             blob_hashes_account1.push(hash);
             state
                 .add_blob(
-                    &hoku_config,
+                    &config,
                     &store,
                     account1,
                     account1,
@@ -4363,7 +3731,7 @@ mod tests {
             blob_hashes_account2.push(hash);
             state
                 .add_blob(
-                    &hoku_config,
+                    &config,
                     &store,
                     account2,
                     account2,
@@ -4383,8 +3751,7 @@ mod tests {
         state
             .set_account_status(&store, account1, TtlStatus::Reduced, current_epoch)
             .unwrap();
-        let res =
-            state.trim_blob_expiries(&hoku_config, &store, account1, current_epoch, None, None);
+        let res = state.trim_blob_expiries(&config, &store, account1, current_epoch, None, None);
         assert!(
             res.is_ok(),
             "Failed to adjust TTLs for account1: {}",

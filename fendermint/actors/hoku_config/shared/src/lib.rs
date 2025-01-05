@@ -30,8 +30,8 @@ pub struct HokuConfig {
     pub blob_credit_debit_interval: ChainEpoch,
     /// The minimum epoch duration a blob can be stored.
     pub blob_min_ttl: ChainEpoch,
-    /// The rolling epoch duration used for non-expiring blobs.
-    pub blob_auto_renew_ttl: ChainEpoch,
+    /// The default epoch duration a blob is stored.
+    pub blob_default_ttl: ChainEpoch,
 }
 
 impl Default for HokuConfig {
@@ -42,7 +42,7 @@ impl Default for HokuConfig {
             token_credit_rate: TokenCreditRate::from(BigInt::from(10u128.pow(36))),
             blob_credit_debit_interval: ChainEpoch::from(3600),
             blob_min_ttl: ChainEpoch::from(3600),
-            blob_auto_renew_ttl: ChainEpoch::from(3600),
+            blob_default_ttl: ChainEpoch::from(60 * 60 * 24), // ~1 day
         }
     }
 }

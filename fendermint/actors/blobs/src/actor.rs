@@ -253,10 +253,8 @@ impl BlobsActor {
     /// TODO: Take a start key and page limit to avoid out-of-gas errors.
     fn debit_accounts(rt: &impl Runtime) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let hoku_config = hoku_config::get_config(rt)?;
-        let deletes = rt.transaction(|st: &mut State, rt| {
-            st.debit_accounts(&hoku_config, rt.store(), rt.curr_epoch())
-        })?;
+        let deletes =
+            rt.transaction(|st: &mut State, rt| st.debit_accounts(rt.store(), rt.curr_epoch()))?;
         for hash in deletes {
             delete_from_disc(hash)?;
         }
@@ -980,7 +978,6 @@ mod tests {
             .unwrap();
         assert_eq!(subscription.added, 5);
         assert_eq!(subscription.expiry, 3605);
-        assert!(!subscription.auto_renew);
         assert_eq!(subscription.delegate, None);
         rt.verify();
     }

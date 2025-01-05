@@ -212,8 +212,6 @@ pub struct Subscription {
     pub added: ChainEpoch,
     /// Expiry block.
     pub expiry: ChainEpoch,
-    /// Whether to automatically renew the subscription.
-    pub auto_renew: bool,
     /// Source Iroh node ID used for ingestion.
     /// This might be unique to each instance of the same blob.
     /// It's included here for record keeping.
