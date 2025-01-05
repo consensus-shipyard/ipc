@@ -48,8 +48,7 @@ pub struct AddParams {
     /// Object size.
     pub size: u64,
     /// Object time-to-live epochs.
-    /// If not specified, the auto-debitor maintains about one hour of credits as an
-    /// ongoing commitment.
+    /// If not specified, the current default TTL from the config actor is used.
     pub ttl: Option<ChainEpoch>,
     /// Object metadata.
     pub metadata: HashMap<String, String>,

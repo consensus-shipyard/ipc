@@ -284,14 +284,22 @@ where
         // the next block.
         msgs.extend(ckpts);
 
-        // Collect and enqueue blobs that are not added in the pool yet.
+        // Maybe debit all credit accounts
+        let current_height = state.block_height();
+        let debit_interval = state.hoku_config_tracker().blob_credit_debit_interval;
+        if current_height > 0 && debit_interval > 0 && current_height % debit_interval == 0 {
+            msgs.push(ChainMessage::Ipc(IpcMessage::DebitCreditAccounts));
+        }
+
+        // Get added blobs from the blob actor
         state.state_tree_mut().begin_transaction();
-        let added_blobs = get_added_blobs(&mut state, chain_env.blob_concurrency)?;
-        tracing::debug!(size = added_blobs.len(), "blobs fetched from chain");
-        state
-            .state_tree_mut()
-            .end_transaction(true)
-            .expect("we just started a transaction");
+        let added_blobs = with_state_transaction(&mut state, |state| {
+            let blobs = get_added_blobs(state, chain_env.blob_concurrency)?;
+            tracing::debug!(size = blobs.len(), "blobs fetched from chain");
+            Ok(blobs)
+        })?;
+
+        // Create IPC messages to add blobs to the pool
         for (hash, sources) in added_blobs {
             for (subscriber, id, source) in sources {
                 msgs.push(ChainMessage::Ipc(IpcMessage::BlobPending(PendingBlob {
@@ -301,13 +309,6 @@ where
                     source,
                 })));
             }
-        }
-
-        // Maybe debit all credit accounts
-        let current_height = state.block_height();
-        let debit_interval = state.hoku_config_tracker().blob_credit_debit_interval;
-        if current_height > 0 && debit_interval > 0 && current_height % debit_interval == 0 {
-            msgs.push(ChainMessage::Ipc(IpcMessage::DebitCreditAccounts));
         }
 
         // Collect locally completed blobs from the pool. We're relying on the proposer's local
@@ -469,6 +470,9 @@ where
         let mut block_gas_usage = 0;
         for msg in msgs {
             match msg {
+                ChainMessage::Signed(signed) => {
+                    block_gas_usage += signed.message.gas_limit;
+                }
                 ChainMessage::Ipc(IpcMessage::BottomUpExec(msg)) => {
                     let item = CheckpointPoolItem::BottomUp(msg);
 
@@ -503,6 +507,22 @@ where
                         return Ok(false);
                     }
                 }
+                ChainMessage::Ipc(IpcMessage::DebitCreditAccounts) => {
+                    // Ensure that this is a valid height to debit accounts
+                    let current_height = state.block_height();
+                    let debit_interval = state.hoku_config_tracker().blob_credit_debit_interval;
+                    if !(current_height > 0
+                        && debit_interval > 0
+                        && current_height % debit_interval == 0)
+                    {
+                        tracing::debug!(
+                            interval = ?debit_interval,
+                            height = ?current_height,
+                            "invalid height for credit debit; rejecting proposal"
+                        );
+                        return Ok(false);
+                    }
+                }
                 ChainMessage::Ipc(IpcMessage::BlobPending(blob)) => {
                     // Check that blobs that are being enqueued are still in "added" state in the actor
                     // Once we enqueue a blob, the actor will transition it to "pending" state.
@@ -515,16 +535,13 @@ where
                     // Ensure that the blob is ready to be included on-chain.
                     // We can accept the proposal if the blob has reached a global quorum and is
                     // not yet finalized.
-                    // Start a blockstore transaction that can be reverted.
-                    state.state_tree_mut().begin_transaction();
-                    if is_blob_finalized(&mut state, blob.subscriber, blob.hash, blob.id.clone())? {
+                    let is_blob_finalized = with_state_transaction(&mut state, |state| {
+                        is_blob_finalized(state, blob.subscriber, blob.hash, blob.id.clone())
+                    })?;
+                    if is_blob_finalized {
                         tracing::debug!(hash = ?blob.hash, "blob is already finalized on chain; rejecting proposal");
                         return Ok(false);
                     }
-                    state
-                        .state_tree_mut()
-                        .end_transaction(true)
-                        .expect("we just started a transaction");
 
                     let (is_globally_finalized, succeeded) = atomically(|| {
                         chain_env
@@ -568,24 +585,13 @@ where
                         tracing::debug!(hash = ?blob.hash, "blob is not locally finalized");
                     }
                 }
-                ChainMessage::Ipc(IpcMessage::DebitCreditAccounts) => {
-                    // Ensure that this is a valid height to debit accounts
-                    let current_height = state.block_height();
-                    let debit_interval = state.hoku_config_tracker().blob_credit_debit_interval;
-                    if !(current_height > 0
-                        && debit_interval > 0
-                        && current_height % debit_interval == 0)
-                    {
-                        tracing::debug!(
-                            interval = ?debit_interval,
-                            height = ?current_height,
-                            "invalid height for credit debit; rejecting proposal"
-                        );
+                ChainMessage::Ipc(IpcMessage::ReadRequestPending(read_request)) => {
+                    // Check that the read request is still open
+                    let status = get_read_request_status(&mut state, read_request.id)?;
+                    if !matches!(status, Some(ReadRequestStatus::Open)) {
+                        tracing::info!(request_id = ?read_request.id, "read request is not open; rejecting proposal");
                         return Ok(false);
                     }
-                }
-                ChainMessage::Signed(signed) => {
-                    block_gas_usage += signed.message.gas_limit;
                 }
                 ChainMessage::Ipc(IpcMessage::ReadRequestClosed(read_request)) => {
                     // Ensure that the read request is ready to be fulfilled.
@@ -601,7 +607,7 @@ where
 
                     let read_response = read_request.response.clone();
                     // Extend request id with response data to use as the vote hash.
-                    // This ensures that the all validators are voting
+                    // This ensures that all validators are voting
                     // on the same response from IROH.
                     let mut request_id = read_request.id.as_bytes().to_vec();
                     request_id.extend(read_response.clone());
@@ -638,14 +644,6 @@ where
                         atomically(|| chain_env.read_request_pool.remove_result(&item)).await;
                     } else {
                         tracing::debug!(request_id = ?read_request.id, "read request is not locally finalized");
-                    }
-                }
-                ChainMessage::Ipc(IpcMessage::ReadRequestPending(read_request)) => {
-                    // Check that the read request is still open
-                    let status = get_read_request_status(&mut state, read_request.id)?;
-                    if !matches!(status, Some(ReadRequestStatus::Open)) {
-                        tracing::info!(request_id = ?read_request.id, "read request is not open; rejecting proposal");
-                        return Ok(false);
                     }
                 }
                 _ => {}
@@ -1547,6 +1545,6 @@ where
     state
         .state_tree_mut()
         .end_transaction(true)
-        .expect("we just started a transaction");
+        .expect("interpreter failed to end state transaction");
     result
 }

@@ -17,7 +17,7 @@ use fendermint_actor_blobs_shared::state::{
     SubscriptionId,
 };
 use fendermint_actor_blobs_shared::Method;
-use fendermint_actor_hoku_config_shared as hoku_config;
+use fendermint_actor_hoku_config_shared as config;
 use fendermint_actor_hoku_config_shared::require_caller_is_admin;
 use fendermint_actor_machine::{require_addr_is_origin_or_caller, to_id_address};
 use fil_actors_runtime::{
@@ -62,10 +62,10 @@ impl BlobsActor {
     /// Returns credit and storage usage statistics.
     fn get_stats(rt: &impl Runtime) -> Result<GetStatsReturn, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let hoku_config = hoku_config::get_config(rt)?;
+        let config = config::get_config(rt)?;
         let stats = rt
             .state::<State>()?
-            .get_stats(rt.current_balance(), &hoku_config);
+            .get_stats(rt.current_balance(), &config);
         Ok(stats)
     }
 
@@ -75,10 +75,10 @@ impl BlobsActor {
     fn buy_credit(rt: &impl Runtime, params: BuyCreditParams) -> Result<Account, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let to = to_id_address(rt, params.0, true)?;
-        let hoku_config = hoku_config::get_config(rt)?;
+        let config = config::get_config(rt)?;
         rt.transaction(|st: &mut State, rt| {
             st.buy_credit(
-                &hoku_config,
+                &config,
                 rt.store(),
                 to,
                 rt.message().value_received(),
@@ -130,10 +130,10 @@ impl BlobsActor {
         let from = to_id_address(rt, params.from, true)?;
         require_addr_is_origin_or_caller(rt, from)?;
         let to = to_id_address(rt, params.to, true)?;
-        let hoku_config = hoku_config::get_config(rt)?;
+        let config = config::get_config(rt)?;
         rt.transaction(|st: &mut State, rt| {
             st.approve_credit(
-                &hoku_config,
+                &config,
                 rt.store(),
                 from,
                 to,
@@ -173,8 +173,9 @@ impl BlobsActor {
         } else {
             None
         };
+        let config = config::get_config(rt)?;
         rt.transaction(|st: &mut State, rt| {
-            st.set_account_sponsor(rt.store(), from, sponsor, rt.curr_epoch())
+            st.set_account_sponsor(&config, rt.store(), from, sponsor, rt.curr_epoch())
         })
     }
 
@@ -186,7 +187,14 @@ impl BlobsActor {
         require_caller_is_admin(rt)?;
         let subscriber = to_id_address(rt, params.subscriber, true)?;
         rt.transaction(|st: &mut State, rt| {
-            st.set_account_status(rt.store(), subscriber, params.status, rt.curr_epoch())
+            let config = config::get_config(rt)?;
+            st.set_account_status(
+                &config,
+                rt.store(),
+                subscriber,
+                params.status,
+                rt.curr_epoch(),
+            )
         })
     }
 
@@ -288,10 +296,10 @@ impl BlobsActor {
                 origin
             }
         };
-        let hoku_config = hoku_config::get_config(rt)?;
+        let config = config::get_config(rt)?;
         let (subscription, unspent_tokens) = rt.transaction(|st: &mut State, rt| {
             st.add_blob(
-                &hoku_config,
+                &config,
                 rt.store(),
                 origin,
                 subscriber,
@@ -384,8 +392,10 @@ impl BlobsActor {
     fn finalize_blob(rt: &impl Runtime, params: FinalizeBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         let subscriber = to_id_address(rt, params.subscriber, false)?;
+        let config = config::get_config(rt)?;
         rt.transaction(|st: &mut State, rt| {
             st.finalize_blob(
+                &config,
                 rt.store(),
                 subscriber,
                 rt.curr_epoch(),
@@ -450,7 +460,7 @@ impl BlobsActor {
         } else {
             origin
         };
-        let hoku_config = hoku_config::get_config(rt)?;
+        let config = config::get_config(rt)?;
         // The call should be atomic, hence we wrap two independent calls in a transaction.
         let (delete, subscription) = rt.transaction(|st: &mut State, rt| {
             let add_params = params.add;
@@ -468,7 +478,7 @@ impl BlobsActor {
                 false
             };
             let (subscription, _) = st.add_blob(
-                &hoku_config,
+                &config,
                 rt.store(),
                 origin,
                 subscriber,
@@ -500,10 +510,10 @@ impl BlobsActor {
     ) -> Result<(u32, Option<Hash>), ActorError> {
         require_caller_is_admin(rt)?;
         let subscriber = to_id_address(rt, params.subscriber, true)?;
-        let hoku_config = hoku_config::get_config(rt)?;
+        let config = config::get_config(rt)?;
         let (processed, next_key, deleted_blobs) = rt.transaction(|st: &mut State, rt| {
             st.trim_blob_expiries(
-                &hoku_config,
+                &config,
                 rt.store(),
                 subscriber,
                 rt.curr_epoch(),

@@ -166,7 +166,8 @@ impl State {
         self.credit_sold += &credits;
         // Get or create a new account
         let mut accounts = self.accounts.hamt(store)?;
-        let mut account = accounts.get_or_create(&to, || Account::new(current_epoch))?;
+        let mut account =
+            accounts.get_or_create(&to, || Account::new(current_epoch, config.blob_default_ttl))?;
         account.credit_free += &credits;
         account.gas_allowance += amount;
         // Save account
@@ -254,7 +255,9 @@ impl State {
         let expiry = ttl.map(|t| t + current_epoch);
         // Get or create a new account
         let mut accounts = self.accounts.hamt(store)?;
-        let mut account = accounts.get_or_create(&from, || Account::new(current_epoch))?;
+        let mut account = accounts.get_or_create(&from, || {
+            Account::new(current_epoch, config.blob_default_ttl)
+        })?;
         // Get or add a new approval
         let approval = account
             .approvals
@@ -402,6 +405,7 @@ impl State {
 
     pub fn set_account_sponsor<BS: Blockstore>(
         &mut self,
+        config: &HokuConfig,
         store: &BS,
         from: Address,
         sponsor: Option<Address>,
@@ -409,7 +413,9 @@ impl State {
     ) -> anyhow::Result<(), ActorError> {
         // Get or create a new account
         let mut accounts = self.accounts.hamt(store)?;
-        let mut account = accounts.get_or_create(&from, || Account::new(current_epoch))?;
+        let mut account = accounts.get_or_create(&from, || {
+            Account::new(current_epoch, config.blob_default_ttl)
+        })?;
         account.credit_sponsor = sponsor;
         // Save account
         self.accounts
@@ -421,6 +427,7 @@ impl State {
 
     pub fn set_account_status<BS: Blockstore>(
         &mut self,
+        config: &HokuConfig,
         store: &BS,
         subscriber: Address,
         status: TtlStatus,
@@ -431,16 +438,17 @@ impl State {
             // We don't want to create an account for default TTL
             TtlStatus::Default => {
                 if let Some(mut account) = accounts.get(&subscriber)? {
-                    account.max_ttl = status.into();
+                    account.max_ttl = status.get_max_ttl(config.blob_default_ttl);
                     self.accounts
                         .save_tracked(accounts.set_and_flush_tracked(&subscriber, account)?);
                 }
             }
             _ => {
                 // Get or create a new account
+                let max_ttl = status.get_max_ttl(config.blob_default_ttl);
                 let mut account =
-                    accounts.get_or_create(&subscriber, || Account::new(current_epoch))?;
-                account.max_ttl = status.into();
+                    accounts.get_or_create(&subscriber, || Account::new(current_epoch, max_ttl))?;
+                account.max_ttl = max_ttl;
                 self.accounts
                     .save_tracked(accounts.set_and_flush_tracked(&subscriber, account)?);
             }
@@ -532,7 +540,9 @@ impl State {
     ) -> anyhow::Result<(Subscription, TokenAmount), ActorError> {
         // Get or create a new account
         let mut accounts = self.accounts.hamt(store)?;
-        let mut account = accounts.get_or_create(&subscriber, || Account::new(current_epoch))?;
+        let mut account = accounts.get_or_create(&subscriber, || {
+            Account::new(current_epoch, config.blob_default_ttl)
+        })?;
         // Validate the TTL
         let ttl = self.validate_ttl(config, ttl, &account)?;
         // Get the credit delegation if needed
@@ -900,8 +910,10 @@ impl State {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn finalize_blob<BS: Blockstore>(
         &mut self,
+        config: &HokuConfig,
         store: &BS,
         subscriber: Address,
         current_epoch: ChainEpoch,
@@ -918,7 +930,9 @@ impl State {
         }
         // Get or create a new account
         let mut accounts = self.accounts.hamt(store)?;
-        let mut account = accounts.get_or_create(&subscriber, || Account::new(current_epoch))?;
+        let mut account = accounts.get_or_create(&subscriber, || {
+            Account::new(current_epoch, config.blob_default_ttl)
+        })?;
         // Get the blob
         let mut blobs = self.blobs.hamt(store)?;
         let mut blob = if let Some(blob) = blobs.get(&hash)? {
@@ -1244,7 +1258,7 @@ impl State {
         starting_hash: Option<Hash>,
         limit: Option<usize>,
     ) -> anyhow::Result<(u32, Option<Hash>, Vec<Hash>), ActorError> {
-        let new_ttl = self.get_account_max_ttl(store, subscriber)?;
+        let new_ttl = self.get_account_max_ttl(config, store, subscriber)?;
         let mut deleted_blobs = Vec::new();
         let mut processed = 0;
         let blobs = self.blobs.hamt(store)?;
@@ -1296,13 +1310,14 @@ impl State {
 
     pub fn get_account_max_ttl<BS: Blockstore>(
         &self,
+        config: &HokuConfig,
         store: &BS,
         account: Address,
     ) -> Result<ChainEpoch, ActorError> {
         let accounts = self.accounts.hamt(store)?;
         Ok(accounts
             .get(&account)?
-            .map_or(TtlStatus::DEFAULT_MAX_TTL, |account| account.max_ttl))
+            .map_or(config.blob_default_ttl, |account| account.max_ttl))
     }
 
     fn validate_ttl(
@@ -1867,6 +1882,7 @@ mod tests {
         // Finalize as resolved
         let finalize_epoch = ChainEpoch::from(11);
         let res = state.finalize_blob(
+            config,
             &store,
             subscriber,
             finalize_epoch,
@@ -2109,7 +2125,13 @@ mod tests {
         assert_eq!(account.capacity_used, size1);
 
         assert!(state
-            .set_account_status(&store, subscriber, TtlStatus::Extended, current_epoch)
+            .set_account_status(
+                config,
+                &store,
+                subscriber,
+                TtlStatus::Extended,
+                current_epoch
+            )
             .is_ok());
 
         // Add another blob past the first blob's expiry
@@ -2308,7 +2330,13 @@ mod tests {
             Credit::from_atto(token_amount.atto().clone()) * &config.token_credit_rate;
 
         assert!(state
-            .set_account_status(&store, subscriber, TtlStatus::Extended, current_epoch)
+            .set_account_status(
+                config,
+                &store,
+                subscriber,
+                TtlStatus::Extended,
+                current_epoch
+            )
             .is_ok());
 
         // Add blob with default a subscription ID
@@ -2392,6 +2420,7 @@ mod tests {
         // Finalize as resolved
         let finalize_epoch = ChainEpoch::from(11);
         let res = state.finalize_blob(
+            config,
             &store,
             subscriber,
             finalize_epoch,
@@ -2639,6 +2668,7 @@ mod tests {
         // Finalize as pending
         let finalize_epoch = ChainEpoch::from(11);
         let res = state.finalize_blob(
+            &config,
             &store,
             subscriber,
             finalize_epoch,
@@ -2693,6 +2723,7 @@ mod tests {
         // Finalize as resolved
         let finalize_epoch = ChainEpoch::from(11);
         let res = state.finalize_blob(
+            &config,
             &store,
             subscriber,
             finalize_epoch,
@@ -2756,6 +2787,7 @@ mod tests {
         // Finalize as failed
         let finalize_epoch = ChainEpoch::from(11);
         let res = state.finalize_blob(
+            &config,
             &store,
             subscriber,
             finalize_epoch,
@@ -2804,7 +2836,13 @@ mod tests {
         let mut credit_amount = amount.clone() * &config.token_credit_rate;
 
         assert!(state
-            .set_account_status(&store, subscriber, TtlStatus::Extended, current_epoch)
+            .set_account_status(
+                &config,
+                &store,
+                subscriber,
+                TtlStatus::Extended,
+                current_epoch
+            )
             .is_ok());
 
         // Add a blob
@@ -2874,6 +2912,7 @@ mod tests {
         // Finalize as failed
         let finalize_epoch = ChainEpoch::from(21);
         let res = state.finalize_blob(
+            &config,
             &store,
             subscriber,
             finalize_epoch,
@@ -3206,7 +3245,13 @@ mod tests {
                 .buy_credit(&config, &store, subscriber, amount.clone(), current_epoch)
                 .unwrap();
             state
-                .set_account_status(&store, subscriber, tc.account_ttl_status, current_epoch)
+                .set_account_status(
+                    &config,
+                    &store,
+                    subscriber,
+                    tc.account_ttl_status,
+                    current_epoch,
+                )
                 .unwrap();
 
             let (hash, size) = new_hash(1024);
@@ -3225,11 +3270,13 @@ mod tests {
                 TokenAmount::zero(),
             );
 
-            let account_ttl = state.get_account_max_ttl(&store, subscriber).unwrap();
+            let account_ttl = state
+                .get_account_max_ttl(&config, &store, subscriber)
+                .unwrap();
             assert_eq!(
                 account_ttl, tc.expected_account_ttl,
-                "Test case '{}' has unexpected account TTL",
-                tc.name
+                "Test case '{}' has unexpected account TTL (expected {}, got {})",
+                tc.name, tc.expected_account_ttl, account_ttl
             );
 
             if tc.should_succeed {
@@ -3263,7 +3310,7 @@ mod tests {
                     res.err().unwrap().msg(),
                     format!(
                         "attempt to add a blob with TTL ({}) that exceeds account's max allowed TTL ({})",
-                        tc.blob_ttl.map_or_else(|| "none".to_string(), |ttl| ttl.to_string()), i64::from(tc.account_ttl_status),
+                        tc.blob_ttl.map_or_else(|| "none".to_string(), |ttl| ttl.to_string()), tc.account_ttl_status.get_max_ttl(config.blob_default_ttl),
                     ),
                     "Test case '{}' failed with unexpected error message",
                     tc.name
@@ -3328,6 +3375,7 @@ mod tests {
             if tc.initial_ttl_status.is_some() {
                 state
                     .set_account_status(
+                        &config,
                         &store,
                         account,
                         tc.initial_ttl_status.unwrap(),
@@ -3337,7 +3385,13 @@ mod tests {
             }
 
             // Change TTL status
-            let res = state.set_account_status(&store, account, tc.new_ttl_status, current_epoch);
+            let res = state.set_account_status(
+                &config,
+                &store,
+                account,
+                tc.new_ttl_status,
+                current_epoch,
+            );
             assert!(
                 res.is_ok(),
                 "Test case '{}' failed to set TTL status",
@@ -3345,7 +3399,7 @@ mod tests {
             );
 
             // Verify max TTL
-            let max_ttl = state.get_account_max_ttl(&store, account).unwrap();
+            let max_ttl = state.get_account_max_ttl(&config, &store, account).unwrap();
             assert_eq!(
                 max_ttl, tc.expected_ttl,
                 "Test case '{}' failed: expected max TTL {}, got {}",
@@ -3409,7 +3463,7 @@ mod tests {
 
             // Set extended TTL status to allow adding all blobs
             state
-                .set_account_status(&store, addr, TtlStatus::Extended, current_epoch)
+                .set_account_status(&config, &store, addr, TtlStatus::Extended, current_epoch)
                 .unwrap();
 
             // Add blobs
@@ -3454,7 +3508,7 @@ mod tests {
             );
 
             state
-                .set_account_status(&store, addr, tc.account_ttl, current_epoch)
+                .set_account_status(&config, &store, addr, tc.account_ttl, current_epoch)
                 .unwrap();
 
             let res =
@@ -3577,7 +3631,7 @@ mod tests {
                 )
                 .unwrap();
             state
-                .set_account_status(&store, addr, TtlStatus::Extended, current_epoch)
+                .set_account_status(&config, &store, addr, TtlStatus::Extended, current_epoch)
                 .unwrap();
 
             // Add 5 blobs with different sizes to ensure different hashes
@@ -3619,7 +3673,7 @@ mod tests {
 
             // Change to Reduced status and process blobs with pagination
             state
-                .set_account_status(&store, addr, TtlStatus::Reduced, current_epoch)
+                .set_account_status(&config, &store, addr, TtlStatus::Reduced, current_epoch)
                 .unwrap();
 
             let res = state.trim_blob_expiries(
@@ -3697,10 +3751,22 @@ mod tests {
             )
             .unwrap();
         state
-            .set_account_status(&store, account1, TtlStatus::Extended, current_epoch)
+            .set_account_status(
+                &config,
+                &store,
+                account1,
+                TtlStatus::Extended,
+                current_epoch,
+            )
             .unwrap();
         state
-            .set_account_status(&store, account2, TtlStatus::Extended, current_epoch)
+            .set_account_status(
+                &config,
+                &store,
+                account2,
+                TtlStatus::Extended,
+                current_epoch,
+            )
             .unwrap();
 
         // Add blobs for both accounts
@@ -3749,7 +3815,7 @@ mod tests {
 
         // Change TTL status for account1 and adjust blobs
         state
-            .set_account_status(&store, account1, TtlStatus::Reduced, current_epoch)
+            .set_account_status(&config, &store, account1, TtlStatus::Reduced, current_epoch)
             .unwrap();
         let res = state.trim_blob_expiries(&config, &store, account1, current_epoch, None, None);
         assert!(
