@@ -26,6 +26,10 @@ pub struct BlockGasTracker {
 }
 
 impl BlockGasTracker {
+    pub fn base_fee(&self) -> &TokenAmount {
+        &self.base_fee
+    }
+
     pub fn create<E: Executor>(executor: &mut E) -> anyhow::Result<BlockGasTracker> {
         let mut ret = Self {
             base_fee: Zero::zero(),

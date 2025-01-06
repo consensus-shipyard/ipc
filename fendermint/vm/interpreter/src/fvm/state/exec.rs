@@ -6,6 +6,7 @@ use std::collections::{HashMap, HashSet};
 use crate::fvm::activity::actor::ActorActivityTracker;
 use crate::fvm::externs::FendermintExterns;
 use crate::fvm::gas::BlockGasTracker;
+use crate::fvm::state::priority::TxnPriorityCalculator;
 use anyhow::Ok;
 use cid::Cid;
 use fendermint_actors_api::gas_market::Reading;
@@ -30,6 +31,8 @@ use fvm_shared::{
 };
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
+use std::fmt;
+use tendermint::consensus::params::Params as TendermintConsensusParams;
 
 pub type BlockHash = [u8; 32];
 
@@ -40,7 +43,7 @@ pub type ExecResult = anyhow::Result<(ApplyRet, ActorAddressMap)>;
 
 /// Parts of the state which evolve during the lifetime of the chain.
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct FvmStateParams {
     /// Root CID of the actor state map.
     #[serde_as(as = "IsHumanReadable")]
@@ -66,6 +69,38 @@ pub struct FvmStateParams {
     /// The application protocol version.
     #[serde(default)]
     pub app_version: u64,
+    /// Tendermint consensus params.
+    pub consensus_params: Option<TendermintConsensusParams>,
+}
+
+/// Custom implementation of Debug to exclude `consensus_params` from the debug output
+/// if it is `None`. This ensures consistency between the debug output and JSON/CBOR
+/// serialization, which omits `None` values for `consensus_params`. See: fendermint/vm/interpreter/tests/golden.rs.
+///
+/// This implementation is temporary and should be removed once `consensus_params` is
+/// no longer part of `FvmStateParams`.
+///
+/// @TODO: Remove this implementation when `consensus_params` is deprecated.
+impl fmt::Debug for FvmStateParams {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut ds = f.debug_struct("FvmStateParams");
+
+        ds.field("state_root", &self.state_root)
+            .field("timestamp", &self.timestamp)
+            .field("network_version", &self.network_version)
+            .field("base_fee", &self.base_fee)
+            .field("circ_supply", &self.circ_supply)
+            .field("chain_id", &self.chain_id)
+            .field("power_scale", &self.power_scale)
+            .field("app_version", &self.app_version);
+
+        // Only include `consensus_params` in the debug output if it is `Some`.
+        if let Some(ref params) = self.consensus_params {
+            ds.field("consensus_params", params);
+        }
+
+        ds.finish()
+    }
 }
 
 /// Parts of the state which can be updated by message execution, apart from the actor state.
@@ -115,6 +150,8 @@ where
     params: FvmUpdatableParams,
     /// Indicate whether the parameters have been updated.
     params_dirty: bool,
+
+    txn_priority: TxnPriorityCalculator,
 }
 
 impl<DB> FvmExecState<DB>
@@ -151,6 +188,7 @@ where
         let mut executor = DefaultExecutor::new(engine.clone(), machine)?;
 
         let block_gas_tracker = BlockGasTracker::create(&mut executor)?;
+        let base_fee = block_gas_tracker.base_fee().clone();
 
         Ok(Self {
             executor,
@@ -164,6 +202,7 @@ where
                 power_scale: params.power_scale,
             },
             params_dirty: false,
+            txn_priority: TxnPriorityCalculator::new(base_fee),
         })
     }
 
@@ -276,6 +315,10 @@ where
     /// Conversion between collateral and voting power.
     pub fn power_scale(&self) -> PowerScale {
         self.params.power_scale
+    }
+
+    pub fn txn_priority_calculator(&self) -> &TxnPriorityCalculator {
+        &self.txn_priority
     }
 
     pub fn app_version(&self) -> u64 {

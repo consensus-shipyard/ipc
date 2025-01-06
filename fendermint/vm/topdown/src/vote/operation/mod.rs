@@ -4,18 +4,20 @@
 mod active;
 mod paused;
 
-use crate::vote::gossip::GossipClient;
+use crate::vote::gossip::{GossipReceiver, GossipSender};
 use crate::vote::operation::active::ActiveOperationMode;
 use crate::vote::operation::paused::PausedOperationMode;
 use crate::vote::store::VoteStore;
 use crate::vote::VotingHandler;
 
-pub type OperationMode = &'static str;
-pub const INITIALIZED: &str = "init";
-pub const PAUSED: &str = "paused";
-pub const ACTIVE: &str = "active";
+#[repr(u8)]
+#[derive(Debug, Copy, Clone)]
+pub enum OperationMode {
+    Paused = 0,
+    Active = 1,
+}
 
-/// The operation mode of voting reactor.
+/// The operation state machine of voting reactor.
 ///
 /// Active: Active publishing votes and aggregating votes normally
 /// Paused: Stops voting reactor due to unknown or irrecoverable issues
@@ -35,32 +37,35 @@ pub const ACTIVE: &str = "active";
 ///     HardRecovery --> [*] : New checkpoints
 ///   }
 /// TODO: Soft and Hard recovery mode to be added
-pub enum OperationStateMachine<G, S> {
-    Paused(PausedOperationMode<G, S>),
-    Active(ActiveOperationMode<G, S>),
+pub enum OperationStateMachine<T, S, V> {
+    Paused(PausedOperationMode<T, S, V>),
+    Active(ActiveOperationMode<T, S, V>),
 }
 
 /// Tracks the operation mdoe metrics for the voting system
 #[derive(Clone, Debug)]
 pub struct OperationMetrics {
-    pub current_mode: OperationMode,
-    pub previous_mode: OperationMode,
+    current_mode: OperationMode,
+    previous_mode: Option<OperationMode>,
 }
 
-impl<G, S> OperationStateMachine<G, S>
-where
-    G: GossipClient + Send + Sync + 'static,
-    S: VoteStore + Send + Sync + 'static,
-{
+impl<T, S, V> OperationStateMachine<T, S, V> {
     /// Always start with Paused operation mode, one needs to know the exact status from syncer.
-    pub fn new(handler: VotingHandler<G, S>) -> OperationStateMachine<G, S> {
+    pub fn new(handler: VotingHandler<T, S, V>) -> OperationStateMachine<T, S, V> {
         let metrics = OperationMetrics {
-            current_mode: PAUSED,
-            previous_mode: INITIALIZED,
+            current_mode: OperationMode::Paused,
+            previous_mode: None,
         };
         Self::Paused(PausedOperationMode { metrics, handler })
     }
+}
 
+impl<
+        T: GossipSender + Send + Sync + 'static + Clone,
+        S: GossipReceiver + Send + Sync + 'static,
+        V: VoteStore + Send + Sync + 'static,
+    > OperationStateMachine<T, S, V>
+{
     pub async fn step(self) -> Self {
         match self {
             OperationStateMachine::Paused(p) => p.advance().await,
@@ -71,7 +76,7 @@ where
 
 impl OperationMetrics {
     pub fn mode_changed(&mut self, mode: OperationMode) {
-        self.previous_mode = self.current_mode;
+        self.previous_mode = Some(self.current_mode);
         self.current_mode = mode;
     }
 }

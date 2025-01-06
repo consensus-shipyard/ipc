@@ -11,11 +11,12 @@ use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 
 use fendermint_actor_eam::PermissionModeParams;
+use fvm_shared::chainid::ChainID;
 use fvm_shared::version::NetworkVersion;
 use fvm_shared::{address::Address, econ::TokenAmount};
 
 use fendermint_crypto::{normalize_public_key, PublicKey};
-use fendermint_vm_core::Timestamp;
+use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_encoding::IsHumanReadable;
 
 #[cfg(feature = "arb")]
@@ -33,6 +34,7 @@ pub struct Genesis {
     /// It will be used to derive a chain ID as well as being
     /// the network name in the `InitActor`.
     pub chain_name: String,
+    pub chain_id: Option<u64>,
     pub timestamp: Timestamp,
     pub network_version: NetworkVersion,
     #[serde_as(as = "IsHumanReadable")]
@@ -49,6 +51,16 @@ pub struct Genesis {
     /// IPC related configuration, if enabled.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ipc: Option<ipc::IpcParams>,
+}
+
+impl Genesis {
+    pub fn chain_id(&self) -> anyhow::Result<ChainID> {
+        let id = match self.chain_id {
+            None => chainid::from_str_hashed(&self.chain_name)?.into(),
+            Some(v) => v,
+        };
+        Ok(id.into())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -249,6 +261,27 @@ pub mod ipc {
         pub bottom_up_check_period: u64,
         pub majority_percentage: u8,
         pub active_validators_limit: u16,
+    }
+
+    impl Default for GatewayParams {
+        fn default() -> Self {
+            // Default values are taken from here contracts/tasks/deploy-gateway.ts.
+            Self {
+                subnet_id: SubnetID::default(),
+                bottom_up_check_period: 10,
+                majority_percentage: 66,
+                active_validators_limit: 100,
+            }
+        }
+    }
+
+    impl GatewayParams {
+        pub fn new(subnet_id: SubnetID) -> Self {
+            Self {
+                subnet_id,
+                ..Default::default()
+            }
+        }
     }
 }
 
