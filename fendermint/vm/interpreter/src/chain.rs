@@ -839,35 +839,12 @@ where
 
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
-                IpcMessage::BlobPending(blob) => {
+                IpcMessage::DebitCreditAccounts => {
                     let from = system::SYSTEM_ACTOR_ADDR;
                     let to = blobs::BLOBS_ACTOR_ADDR;
-                    let method_num = SetBlobPending as u64;
+                    let method_num = DebitAccounts as u64;
                     let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
-
-                    let source =
-                        fendermint_actor_blobs_shared::state::PublicKey(*blob.source.as_bytes());
-                    let hash = fendermint_actor_blobs_shared::state::Hash(*blob.hash.as_bytes());
-                    let params = SetBlobPendingParams {
-                        source,
-                        subscriber: blob.subscriber,
-                        hash,
-                        id: blob.id.clone(),
-                    };
-                    let params = RawBytes::serialize(params)?;
-                    let msg = Message {
-                        version: Default::default(),
-                        from,
-                        to,
-                        sequence: 0,
-                        value: Default::default(),
-                        method_num,
-                        params,
-                        gas_limit,
-                        gas_fee_cap: Default::default(),
-                        gas_premium: Default::default(),
-                    };
-
+                    let msg = create_implicit_message(to, method_num, Default::default());
                     let (apply_ret, emitters) = state.execute_implicit(msg)?;
 
                     let info = apply_ret
@@ -885,7 +862,51 @@ where
                         info = info.unwrap_or_default(),
                         "implicit tx delivered"
                     );
+                    tracing::debug!("chain interpreter debited accounts");
 
+                    let ret = FvmApplyRet {
+                        apply_ret,
+                        from,
+                        to,
+                        method_num,
+                        gas_limit,
+                        emitters,
+                    };
+                    Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
+                }
+                IpcMessage::BlobPending(blob) => {
+                    let from = system::SYSTEM_ACTOR_ADDR;
+                    let to = blobs::BLOBS_ACTOR_ADDR;
+                    let method_num = SetBlobPending as u64;
+                    let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
+                    let source =
+                        fendermint_actor_blobs_shared::state::PublicKey(*blob.source.as_bytes());
+                    let hash = fendermint_actor_blobs_shared::state::Hash(*blob.hash.as_bytes());
+                    let params = SetBlobPendingParams {
+                        source,
+                        subscriber: blob.subscriber,
+                        hash,
+                        id: blob.id.clone(),
+                    };
+                    let params = RawBytes::serialize(params)?;
+                    let msg = create_implicit_message(to, method_num, params);
+                    let (apply_ret, emitters) = state.execute_implicit(msg)?;
+
+                    let info = apply_ret
+                        .failure_info
+                        .clone()
+                        .map(|i| i.to_string())
+                        .filter(|s| !s.is_empty());
+                    tracing::info!(
+                        exit_code = apply_ret.msg_receipt.exit_code.value(),
+                        from = from.to_string(),
+                        to = to.to_string(),
+                        method_num = method_num,
+                        gas_limit = gas_limit,
+                        gas_used = apply_ret.msg_receipt.gas_used,
+                        info = info.unwrap_or_default(),
+                        "implicit tx delivered"
+                    );
                     tracing::debug!(
                         hash = ?blob.hash,
                         "chain interpreter has set blob to pending"
@@ -918,7 +939,6 @@ where
                     let to = blobs::BLOBS_ACTOR_ADDR;
                     let method_num = FinalizeBlob as u64;
                     let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
-
                     let hash = fendermint_actor_blobs_shared::state::Hash(*blob.hash.as_bytes());
                     let status = if blob.succeeded {
                         BlobStatus::Resolved
@@ -932,19 +952,7 @@ where
                         status,
                     };
                     let params = RawBytes::serialize(params)?;
-                    let msg = Message {
-                        version: Default::default(),
-                        from,
-                        to,
-                        sequence: 0,
-                        value: Default::default(),
-                        method_num,
-                        params,
-                        gas_limit,
-                        gas_fee_cap: Default::default(),
-                        gas_premium: Default::default(),
-                    };
-
+                    let msg = create_implicit_message(to, method_num, params);
                     let (apply_ret, emitters) = state.execute_implicit(msg)?;
 
                     let info = apply_ret
@@ -962,7 +970,6 @@ where
                         info = info.unwrap_or_default(),
                         "implicit tx delivered"
                     );
-
                     tracing::debug!(
                         hash = ?blob.hash,
                         "chain interpreter has finalized blob"
@@ -987,70 +994,6 @@ where
 
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
-                IpcMessage::DebitCreditAccounts => {
-                    let from = system::SYSTEM_ACTOR_ADDR;
-                    let to = blobs::BLOBS_ACTOR_ADDR;
-                    let method_num = DebitAccounts as u64;
-                    let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
-
-                    let msg = Message {
-                        version: Default::default(),
-                        from,
-                        to,
-                        sequence: 0,
-                        value: Default::default(),
-                        method_num,
-                        params: Default::default(),
-                        gas_limit,
-                        gas_fee_cap: Default::default(),
-                        gas_premium: Default::default(),
-                    };
-
-                    let (apply_ret, emitters) = state.execute_implicit(msg)?;
-
-                    let info = apply_ret
-                        .failure_info
-                        .clone()
-                        .map(|i| i.to_string())
-                        .filter(|s| !s.is_empty());
-                    tracing::info!(
-                        exit_code = apply_ret.msg_receipt.exit_code.value(),
-                        from = from.to_string(),
-                        to = to.to_string(),
-                        method_num = method_num,
-                        gas_limit = gas_limit,
-                        gas_used = apply_ret.msg_receipt.gas_used,
-                        info = info.unwrap_or_default(),
-                        "implicit tx delivered"
-                    );
-
-                    tracing::debug!("chain interpreter debited accounts");
-
-                    let ret = FvmApplyRet {
-                        apply_ret,
-                        from,
-                        to,
-                        method_num,
-                        gas_limit,
-                        emitters,
-                    };
-                    Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
-                }
-                IpcMessage::ReadRequestClosed(read_request) => {
-                    // send the data to the callback address
-                    // if this fails (e.g. the callback address is not reachable),
-                    // we will still close the request
-                    read_request_callback(&mut state, &read_request)?;
-                    // set the status of the request to fulfilled
-                    let ret = close_read_request(&mut state, read_request.id)?;
-
-                    tracing::debug!(
-                        hash = ?read_request.id,
-                        "read request is closed"
-                    );
-
-                    Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
-                }
                 IpcMessage::ReadRequestPending(read_request) => {
                     // Set the read request to "pending" state
                     let ret = set_read_request_pending(&mut state, read_request.id)?;
@@ -1066,6 +1009,21 @@ where
                     })
                     .await;
                     tracing::info!(request_id = ?read_request.id, "read request added to pool");
+                    Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
+                }
+                IpcMessage::ReadRequestClosed(read_request) => {
+                    // Send the data to the callback address.
+                    // If this fails (e.g., the callback address is not reachable),
+                    // we will still close the request.
+                    read_request_callback(&mut state, &read_request)?;
+                    // Set the status of the request to fulfill.
+                    let ret = close_read_request(&mut state, read_request.id)?;
+
+                    tracing::debug!(
+                        hash = ?read_request.id,
+                        "read request is closed"
+                    );
+
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
             },
@@ -1157,9 +1115,9 @@ where
                     }
                     IpcMessage::TopDownExec(_)
                     | IpcMessage::BottomUpExec(_)
+                    | IpcMessage::DebitCreditAccounts
                     | IpcMessage::BlobPending(_)
                     | IpcMessage::BlobFinalized(_)
-                    | IpcMessage::DebitCreditAccounts
                     | IpcMessage::ReadRequestClosed(_)
                     | IpcMessage::ReadRequestPending(_) => {
                         // Users cannot send these messages, only validators can propose them in blocks.
@@ -1220,6 +1178,34 @@ fn relayed_bottom_up_ckpt_to_fvm(
     Ok(msg)
 }
 
+/// Selects messages to be executed. Currently, this is a static function whose main purpose is to
+/// coordinate various selectors. However, it does not have formal semantics for doing so, e.g.
+/// do we daisy-chain selectors, do we parallelize, how do we treat rejections and acceptances?
+/// It hasn't been well thought out yet. When we refactor the whole *Interpreter stack, we will
+/// revisit this and make the selection function properly pluggable.
+fn messages_selection<DB: Blockstore + Clone + 'static>(
+    msgs: Vec<ChainMessage>,
+    state: &FvmExecState<DB>,
+) -> anyhow::Result<Vec<ChainMessage>> {
+    let mut user_msgs = msgs
+        .into_iter()
+        .map(|msg| match msg {
+            ChainMessage::Signed(inner) => Ok(inner),
+            ChainMessage::Ipc(_) => Err(anyhow!("should not have ipc messages in user proposals")),
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+
+    // Currently only one selector, we can potentially extend to more selectors
+    // This selector enforces that the total cumulative gas limit of all messages is less than the
+    // currently active block gas limit.
+    let selectors = vec![GasLimitSelector {}];
+    for s in selectors {
+        user_msgs = s.select_messages(state, user_msgs)
+    }
+
+    Ok(user_msgs.into_iter().map(ChainMessage::Signed).collect())
+}
+
 /// Get added blobs from on chain state.
 fn get_added_blobs<DB>(
     state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
@@ -1230,18 +1216,7 @@ where
 {
     let params = GetAddedBlobsParams(size);
     let params = RawBytes::serialize(params)?;
-    let msg = FvmMessage {
-        version: 0,
-        from: system::SYSTEM_ACTOR_ADDR,
-        to: blobs::BLOBS_ACTOR_ADDR,
-        sequence: 0,
-        value: Default::default(),
-        method_num: GetAddedBlobs as u64,
-        params,
-        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
-        gas_fee_cap: Default::default(),
-        gas_premium: Default::default(),
-    };
+    let msg = create_implicit_message(blobs::BLOBS_ACTOR_ADDR, GetAddedBlobs as u64, params);
     let (apply_ret, _) = state.execute_implicit(msg)?;
 
     let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
@@ -1266,18 +1241,7 @@ where
         id,
     };
     let params = RawBytes::serialize(params)?;
-    let msg = FvmMessage {
-        version: 0,
-        from: system::SYSTEM_ACTOR_ADDR,
-        to: blobs::BLOBS_ACTOR_ADDR,
-        sequence: 0,
-        value: Default::default(),
-        method_num: GetBlobStatus as u64,
-        params,
-        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
-        gas_fee_cap: Default::default(),
-        gas_premium: Default::default(),
-    };
+    let msg = create_implicit_message(blobs::BLOBS_ACTOR_ADDR, GetBlobStatus as u64, params);
     let (apply_ret, _) = state.execute_implicit(msg)?;
 
     let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
@@ -1328,67 +1292,12 @@ fn get_blobs_stats<DB>(state: &mut FvmExecState<DB>) -> anyhow::Result<GetStatsR
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    let msg = FvmMessage {
-        version: 0,
-        from: system::SYSTEM_ACTOR_ADDR,
-        to: blobs::BLOBS_ACTOR_ADDR,
-        sequence: 0,
-        value: Default::default(),
-        method_num: GetStats as u64,
-        params: RawBytes::default(),
-        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
-        gas_fee_cap: Default::default(),
-        gas_premium: Default::default(),
-    };
+    let msg = create_implicit_message(blobs::BLOBS_ACTOR_ADDR, GetStats as u64, Default::default());
     let (apply_ret, _) = state.execute_implicit(msg)?;
 
     let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
     fvm_ipld_encoding::from_slice::<GetStatsReturn>(&data)
         .map_err(|e| anyhow!("error parsing stats: {e}"))
-}
-
-/// Selects messages to be executed. Currently, this is a static function whose main purpose is to
-/// coordinate various selectors. However, it does not have formal semantics for doing so, e.g.
-/// do we daisy-chain selectors, do we parallelize, how do we treat rejections and acceptances?
-/// It hasn't been well thought out yet. When we refactor the whole *Interpreter stack, we will
-/// revisit this and make the selection function properly pluggable.
-fn messages_selection<DB: Blockstore + Clone + 'static>(
-    msgs: Vec<ChainMessage>,
-    state: &FvmExecState<DB>,
-) -> anyhow::Result<Vec<ChainMessage>> {
-    let mut user_msgs = msgs
-        .into_iter()
-        .map(|msg| match msg {
-            ChainMessage::Signed(inner) => Ok(inner),
-            ChainMessage::Ipc(_) => Err(anyhow!("should not have ipc messages in user proposals")),
-        })
-        .collect::<anyhow::Result<Vec<_>>>()?;
-
-    // Currently only one selector, we can potentially extend to more selectors
-    // This selector enforces that the total cumulative gas limit of all messages is less than the
-    // currently active block gas limit.
-    let selectors = vec![GasLimitSelector {}];
-    for s in selectors {
-        user_msgs = s.select_messages(state, user_msgs)
-    }
-
-    Ok(user_msgs.into_iter().map(ChainMessage::Signed).collect())
-}
-
-/// Creates a standard implicit message with default values
-fn create_implicit_message(to: Address, method_num: u64, params: RawBytes) -> Message {
-    Message {
-        version: Default::default(),
-        from: system::SYSTEM_ACTOR_ADDR,
-        to,
-        sequence: 0,
-        value: Default::default(),
-        method_num,
-        params,
-        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
-        gas_fee_cap: Default::default(),
-        gas_premium: Default::default(),
-    }
 }
 
 fn get_open_read_requests<DB>(
@@ -1530,6 +1439,22 @@ where
         gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
         emitters,
     })
+}
+
+/// Creates a standard implicit message with default values
+fn create_implicit_message(to: Address, method_num: u64, params: RawBytes) -> Message {
+    Message {
+        version: Default::default(),
+        from: system::SYSTEM_ACTOR_ADDR,
+        to,
+        sequence: 0,
+        value: Default::default(),
+        method_num,
+        params,
+        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
+        gas_fee_cap: Default::default(),
+        gas_premium: Default::default(),
+    }
 }
 
 fn with_state_transaction<F, R, DB>(

@@ -3957,6 +3957,7 @@ mod tests {
         let mut blobs = generate_test_blobs(blob_pool_size, min_size, max_size);
 
         // Map of resolve epochs to set of blob indexes
+        #[allow(clippy::type_complexity)]
         let mut resolves: BTreeMap<
             ChainEpoch,
             HashMap<Address, HashMap<usize, (SubscriptionId, PublicKey, Credit)>>,
