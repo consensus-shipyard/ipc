@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::ops::Add;
 use std::time::{Duration};
 
 use crate::with_testnet;
@@ -12,8 +13,9 @@ use ethers::{
     signers::{Signer, Wallet},
     types::{Eip1559TransactionRequest, H160},
 };
+use ethers::types::{BlockId, U256};
 use fendermint_materializer::{
-    concurrency, manifest::Rootnet, materials::DefaultAccount, HasEthApi,
+    concurrency::{self, config::Execution}, manifest::Rootnet, materials::DefaultAccount, HasEthApi,
 };
 use futures::FutureExt;
 use tokio::time::sleep;
@@ -55,7 +57,8 @@ async fn test_sent_tx_found_in_mempool() {
                 env.insert("CMT_CONSENSUS_TIMEOUT_COMMIT".into(), "10s".into());
             };
         },
-        |_, _, testnet, test_id, _| {
+        |_,_| { Box::pin(async { })},
+        |_, _, testnet, test_id, _, _| {
             let test = async move {
                 let sender = testnet.account_mod_nth(test_id);
                 let recipient = testnet.account_mod_nth(test_id + 1);
@@ -102,28 +105,31 @@ async fn test_sent_tx_found_in_mempool() {
     .unwrap()
 }
 
-
 #[serial_test::serial]
 #[tokio::test]
 async fn test_sent_tx_included_in_block() {
     with_testnet(
         MANIFEST,
-        Some(
-            concurrency::Config::new()
-                .with_max_concurrency(50)
-                .with_duration(Duration::from_secs(30)),
+        Some(Execution::new()
+            .add_step(10, 5)
+            .add_step(100, 5)
         ),
-        |_| {
+        |manifest| {
             // Slow down consensus to where we can see the effect of the transaction not being found by Ethereum hash.
-            // if let Rootnet::New { ref mut env, .. } = manifest.rootnet {
-            //     env.insert("CMT_CONSENSUS_TIMEOUT_COMMIT".into(), "10s".into());
-            // };
+            if let Rootnet::New { ref mut env, .. } = manifest.rootnet {
+                env.insert("CMT_CONSENSUS_TIMEOUT_COMMIT".into(), "1s".into());
+            };
         },
-        |_, _, testnet, test_id, bencher| {
+        |testnet,nonce_manager| {
+            Box::pin(async move {
+            })
+        },
+        |_, _, testnet, test_id, bencher, nonce_manager| {
             let test = async move {
                 let sender = testnet.account_mod_nth(test_id);
                 let recipient = testnet.account_mod_nth(test_id + 1);
                 println!("running (test_id={})", test_id);
+
                 let pangea = testnet.node(&testnet.root().node("pangea"))?;
                 let provider = pangea
                     .ethapi_http_provider()?
@@ -136,11 +142,11 @@ async fn test_sent_tx_included_in_block() {
                 println!("middleware ready, pending tests (test_id={})", test_id);
 
                 let sender: H160 = sender.eth_addr().into();
-                let current_nonce = middleware
-                    .get_transaction_count(sender, None)
-                    .await
-                    .context("failed to fetch nonce")?;
-                let nonce = current_nonce + 1;
+                // let current_nonce = middleware
+                //     .get_transaction_count(sender, None)
+                //     .await
+                //     .context("failed to fetch nonce")?;
+                let nonce = nonce_manager.get_and_increment(sender).await;
 
                 // Create the simplest transaction possible: send tokens between accounts.
                 let to: H160 = recipient.eth_addr().into();
@@ -148,6 +154,7 @@ async fn test_sent_tx_included_in_block() {
                     .to(to)
                     .value(1)
                     .nonce(nonce);
+
 
                 bencher.start().await;
                 let pending: PendingTransaction<_> = middleware
@@ -173,6 +180,7 @@ async fn test_sent_tx_included_in_block() {
                 loop {
                     if let Ok(Some(tx)) = middleware.get_transaction_receipt(tx_hash).await {
                         println!("tx included in block {:?} (test_id={})", tx.block_number, test_id);
+
                         break;
                     }
                     sleep(Duration::from_millis(100)).await;

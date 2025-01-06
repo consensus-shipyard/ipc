@@ -27,6 +27,7 @@ use std::{
 };
 use tendermint_rpc::Client;
 use fendermint_materializer::bencher::Bencher;
+use fendermint_materializer::concurrency::nonce_manager::NonceManager;
 
 pub type DockerTestnet = Testnet<DockerMaterials, DockerMaterializer>;
 
@@ -61,24 +62,30 @@ fn read_manifest(file_name: &str) -> anyhow::Result<Manifest> {
 
 /// Parse a manifest file in the `manifests` directory, clean up any corresponding
 /// testnet resources, then materialize a testnet and run some tests.
-pub async fn with_testnet<F, G>(
+pub async fn with_testnet<F, G, I>(
     manifest_file_name: &str,
-    concurrency: Option<concurrency::Config>,
+    concurrency: Option<concurrency::config::Execution>,
     alter: G,
+    init: I,
     test: F,
 ) -> anyhow::Result<()>
 where
+    G: FnOnce(&mut Manifest),
+    I: FnOnce(
+        Arc<DockerTestnet>,
+        Arc<NonceManager>
+    ) -> Pin<Box<dyn Future<Output = ()>>>,
     F: for<'a> Fn(
             Arc<Manifest>,
             Arc<DockerMaterializer>,
             Arc<DockerTestnet>,
             usize,
-            Arc<Bencher>
+            Arc<Bencher>,
+            Arc<NonceManager>
         ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send>>
         + Copy
         + Send
         + 'static,
-    G: FnOnce(&mut Manifest),
 {
     let testnet_name = TestnetName::new(
         PathBuf::from(manifest_file_name)
@@ -118,9 +125,21 @@ where
     let testnet = Arc::new(testnet);
     let materializer = Arc::new(materializer);
     let manifest = Arc::new(manifest);
+    let nonce_manager = Arc::new(NonceManager::new());
     let res = if started {
+        init(
+            testnet.clone(),
+            nonce_manager.clone()
+        ).await;
         match concurrency {
-            None => test(manifest.clone(), materializer.clone(), testnet.clone(), 0, Arc::new(Bencher::new())).await,
+            None => test(
+                manifest.clone(),
+                materializer.clone(),
+                testnet.clone(),
+                0,
+                Arc::new(Bencher::new()),
+                nonce_manager.clone()
+            ).await,
             Some(cfg) => {
                 let test_generator = {
                     let testnet = testnet.clone();
@@ -129,29 +148,20 @@ where
                         let manifest = manifest.clone();
                         let materializer = materializer.clone();
                         let testnet = testnet.clone();
-                        async move { test(manifest, materializer, testnet, test_id, bencher).await }.boxed()
+                        let nonce_manager = nonce_manager.clone();
+                        async move { test(manifest, materializer, testnet, test_id, bencher, nonce_manager).await }.boxed()
                     }
                 };
 
-                let (summary, results) = concurrency::execute(cfg, test_generator).await;
-                let mut err = None;
-                for res in results.into_iter() {
-                    match res.err {
-                        None => println!(
-                            "test completed successfully (test_id={}, records={:?})",
-                            res.test_id, res.records
-                        ),
-                        Some(e) => {
-                            println!(
-                                "test failed (test_id={}, records={:?})",
-                                res.test_id, res.records
-                            );
-                            err = Some(e);
-                        }
-                    }
-                }
+                let results = concurrency::execute(cfg.clone(), test_generator).await;
+                let summary = concurrency::ExecutionSummary::new(cfg.clone(), results);
                 println!("{:?}", summary);
-                err.map_or(Ok(()), Err)
+
+                let errs = summary.errs();
+                match errs.is_empty() {
+                    true => Ok(()),
+                    false => Err(anyhow::anyhow!(errs.join("\n"))),
+                }
             }
         }
     } else {
