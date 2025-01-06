@@ -56,8 +56,7 @@ pub fn start_vote_reactor<
 >(
     params: StartVoteReactorParams<T, R, V>,
 ) -> anyhow::Result<VoteReactorClient> {
-    let config = params.config;
-    let (tx, rx) = mpsc::channel(config.req_channel_buffer_size);
+    let (tx, rx) = mpsc::channel(params.config.req_channel_buffer_size);
     let vote_tally = VoteTally::new(
         params.power_table,
         params.last_finalized_height,
@@ -77,7 +76,6 @@ pub fn start_vote_reactor<
             internal_event_listener,
             vote_tally,
             latest_child_block,
-            config,
             gossip_rx,
             gossip_tx,
         };
@@ -211,7 +209,6 @@ struct VotingHandler<GossipTx, GossipRx, VoteStore> {
     internal_event_listener: broadcast::Receiver<TopDownSyncEvent>,
     vote_tally: VoteTally<VoteStore>,
     latest_child_block: BlockHeight,
-    config: Config,
 }
 
 impl<T, R, V> VotingHandler<T, R, V>
