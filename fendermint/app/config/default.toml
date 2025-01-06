@@ -119,7 +119,7 @@ gas_search_step = 1.25
 #
 # Enabling this option is required to fully support "pending" queries in the Ethereum API,
 # otherwise only the nonces and balances are projected into a partial state.
-exec_in_check = false
+exec_in_check = true
 
 # Gas fee used when broadcasting transactions.
 # TODO: Configure a value once validators are charged for the "miner penalty".

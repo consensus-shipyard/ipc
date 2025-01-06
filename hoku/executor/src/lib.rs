@@ -702,8 +702,8 @@ where
     }
 
     /// Returns the gas allowance for the sender.
-    fn get_gas_allowance(&mut self, to: Address) -> Result<GasAllowance> {
-        let params = RawBytes::serialize(GetGasAllowanceParams(to))?;
+    fn get_gas_allowance(&mut self, from: Address) -> Result<GasAllowance> {
+        let params = RawBytes::serialize(GetGasAllowanceParams(from))?;
 
         let msg = Message {
             from: SYSTEM_ACTOR_ADDR,
@@ -720,7 +720,7 @@ where
 
         let apply_ret = self.execute_message(msg, ApplyKind::Implicit, 0)?;
         if let Some(err) = apply_ret.failure_info {
-            bail!("failed to get gas allowance for {}: {}", to, err);
+            bail!("failed to get gas allowance for {}: {}", from, err);
         }
 
         fvm_ipld_encoding::from_slice::<GasAllowance>(&apply_ret.msg_receipt.return_data)

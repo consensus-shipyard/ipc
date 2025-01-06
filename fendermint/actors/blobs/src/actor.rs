@@ -234,13 +234,14 @@ impl BlobsActor {
     ///
     /// Only delegated addresses can own or use credit, but we don't need to waste gas enforcing
     /// that condition here.
+    /// TODO: Gas allowance methods need unit tests.
     fn get_gas_allowance(
         rt: &impl Runtime,
         params: GetGasAllowanceParams,
     ) -> Result<GasAllowance, ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         let from = match to_id_address(rt, params.0, false) {
-            Ok(to) => to,
+            Ok(from) => from,
             Err(e) => {
                 return if e.exit_code() == ExitCode::USR_FORBIDDEN {
                     // Disallowed actor type (this is called by all txns so we can't error)
