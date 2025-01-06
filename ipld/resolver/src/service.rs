@@ -9,7 +9,6 @@ use crate::behaviour::{
 };
 use crate::client::Client;
 use crate::observe;
-use crate::vote_record::{SignedVoteRecord, VoteRecord};
 use anyhow::anyhow;
 use bloom::{BloomFilter, ASMS};
 use ipc_api::subnet_id::SubnetID;

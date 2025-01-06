@@ -9,7 +9,6 @@ use crate::hash::blake2b_256;
 use crate::provider_cache::{ProviderDelta, SubnetProviderCache};
 use crate::provider_record::{ProviderRecord, SignedProviderRecord};
 use crate::vote_record::SubnetVoteRecord;
-use crate::vote_record::{SignedVoteRecord, VoteRecord};
 use crate::Timestamp;
 use crate::{observe, NetworkConfig};
 use anyhow::anyhow;

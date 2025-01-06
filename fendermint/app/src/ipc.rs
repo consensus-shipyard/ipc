@@ -14,7 +14,6 @@ use fvm_ipld_blockstore::Blockstore;
 use std::sync::Arc;
 
 use fendermint_vm_topdown::Checkpoint;
-use tendermint_rpc::Client;
 
 /// Queries the LATEST COMMITTED parent finality from the storage
 pub struct AppParentFinalityQuery<DB, SS, S, I>
