@@ -32,7 +32,7 @@ pub struct ConstructorParams {
     initial_token_credit_rate: TokenCreditRate,
     initial_blob_credit_debit_interval: ChainEpoch,
     initial_blob_min_ttl: ChainEpoch,
-    initial_blob_auto_renew_ttl: ChainEpoch,
+    initial_blob_default_ttl: ChainEpoch,
 }
 
 pub struct Actor {}
@@ -48,7 +48,7 @@ impl Actor {
                 token_credit_rate: params.initial_token_credit_rate,
                 blob_credit_debit_interval: params.initial_blob_credit_debit_interval,
                 blob_min_ttl: params.initial_blob_min_ttl,
-                blob_auto_renew_ttl: params.initial_blob_auto_renew_ttl,
+                blob_default_ttl: params.initial_blob_default_ttl,
             },
         };
         rt.create(&st)
@@ -152,7 +152,7 @@ mod tests {
         blob_capacity: u64,
         blob_credit_debit_interval: i32,
         initial_blob_min_ttl: ChainEpoch,
-        initial_blob_auto_renew_ttl: ChainEpoch,
+        initial_blob_default_ttl: ChainEpoch,
     ) -> MockRuntime {
         let rt = MockRuntime {
             receiver: Address::new_id(HOKU_CONFIG_ACTOR_ID),
@@ -172,7 +172,7 @@ mod tests {
                         blob_credit_debit_interval,
                     ),
                     initial_blob_min_ttl,
-                    initial_blob_auto_renew_ttl,
+                    initial_blob_default_ttl,
                 })
                 .unwrap(),
             )
@@ -237,7 +237,7 @@ mod tests {
                 token_credit_rate: TokenCreditRate::from(BigInt::from(10)),
                 blob_credit_debit_interval: ChainEpoch::from(1800),
                 blob_min_ttl: ChainEpoch::from(2 * 60 * 60),
-                blob_auto_renew_ttl: ChainEpoch::from(24 * 60 * 60),
+                blob_default_ttl: ChainEpoch::from(24 * 60 * 60),
             })
             .unwrap(),
         );
@@ -258,9 +258,6 @@ mod tests {
         assert_eq!(hoku_config.blob_capacity, 2048);
         assert_eq!(hoku_config.blob_credit_debit_interval, 1800);
         assert_eq!(hoku_config.blob_min_ttl, ChainEpoch::from(2 * 60 * 60));
-        assert_eq!(
-            hoku_config.blob_auto_renew_ttl,
-            ChainEpoch::from(24 * 60 * 60)
-        );
+        assert_eq!(hoku_config.blob_default_ttl, ChainEpoch::from(24 * 60 * 60));
     }
 }

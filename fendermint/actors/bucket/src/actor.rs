@@ -776,7 +776,6 @@ mod tests {
                         Subscription {
                             added: 0,
                             expiry: ttl,
-                            auto_renew: false,
                             source: add_params.source,
                             delegate: Some(origin),
                             failed: false,
@@ -904,7 +903,6 @@ mod tests {
                         Subscription {
                             added: 0,
                             expiry: ChainEpoch::from(3600),
-                            auto_renew: false,
                             source: add_params.source,
                             delegate: Some(origin),
                             failed: false,

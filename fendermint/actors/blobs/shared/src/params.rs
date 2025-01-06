@@ -41,11 +41,11 @@ pub struct ApproveCreditParams {
     /// If not present, any caller is allowed.
     pub caller_allowlist: Option<HashSet<Address>>,
     /// Optional credit approval limit.
-    /// If specified, the approval becomes invalid once the committed credits reach the
+    /// If specified, the approval becomes invalid once the used credits reach the
     /// specified limit.
     pub credit_limit: Option<Credit>,
     /// Optional gas fee limit.
-    /// If specified, the approval becomes invalid once the commited gas reach the
+    /// If specified, the approval becomes invalid once the used gas fees reach the
     /// specified limit.
     pub gas_fee_limit: Option<TokenAmount>,
     /// Optional credit approval time-to-live epochs.
@@ -120,8 +120,7 @@ pub struct AddBlobParams {
     /// Blob size.
     pub size: u64,
     /// Blob time-to-live epochs.
-    /// If not specified, the auto-debitor maintains about one hour of credits as an
-    /// ongoing commitment.
+    /// If not specified, the current default TTL from the config actor is used.
     pub ttl: Option<ChainEpoch>,
 }
 
@@ -192,7 +191,7 @@ pub struct DeleteBlobParams {
     pub id: SubscriptionId,
 }
 
-/// Params for overwriting a blob, i.e. deleting one and adding another.
+/// Params for overwriting a blob, i.e., deleting one and adding another.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct OverwriteBlobParams {
     /// Blake3 hash of the blob to be deleted.
@@ -234,12 +233,12 @@ pub struct GetStatsReturn {
     pub num_accounts: u64,
     /// Total number of actively stored blobs.
     pub num_blobs: u64,
-    /// Total number of currently resolving blobs.
-    pub num_resolving: u64,
-    /// Total bytes of all currently resolving blobs.
-    pub bytes_resolving: u64,
     /// Total number of blobs that are not yet added to the validator's resolve pool.
     pub num_added: u64,
     // Total bytes of all blobs that are not yet added to the validator's resolve pool.
     pub bytes_added: u64,
+    /// Total number of currently resolving blobs.
+    pub num_resolving: u64,
+    /// Total bytes of all currently resolving blobs.
+    pub bytes_resolving: u64,
 }

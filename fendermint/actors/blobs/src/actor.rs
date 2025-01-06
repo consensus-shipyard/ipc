@@ -4,7 +4,6 @@
 
 use std::collections::HashSet;
 
-use crate::{State, BLOBS_ACTOR_NAME};
 use fendermint_actor_blobs_shared::params::{
     AddBlobParams, ApproveCreditParams, BuyCreditParams, DeleteBlobParams, FinalizeBlobParams,
     GetAccountParams, GetAddedBlobsParams, GetBlobParams, GetBlobStatusParams,
@@ -17,7 +16,7 @@ use fendermint_actor_blobs_shared::state::{
     SubscriptionId,
 };
 use fendermint_actor_blobs_shared::Method;
-use fendermint_actor_hoku_config_shared as hoku_config;
+use fendermint_actor_hoku_config_shared as config;
 use fendermint_actor_hoku_config_shared::require_caller_is_admin;
 use fendermint_actor_machine::{require_addr_is_origin_or_caller, to_id_address};
 use fil_actors_runtime::{
@@ -30,6 +29,8 @@ use fvm_shared::econ::TokenAmount;
 use fvm_shared::error::ExitCode;
 use fvm_shared::{address::Address, MethodNum, METHOD_SEND};
 use num_traits::Zero;
+
+use crate::{State, BLOBS_ACTOR_NAME};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(BlobsActor);
@@ -62,10 +63,10 @@ impl BlobsActor {
     /// Returns credit and storage usage statistics.
     fn get_stats(rt: &impl Runtime) -> Result<GetStatsReturn, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let hoku_config = hoku_config::get_config(rt)?;
+        let config = config::get_config(rt)?;
         let stats = rt
             .state::<State>()?
-            .get_stats(rt.current_balance(), &hoku_config);
+            .get_stats(&config, rt.current_balance());
         Ok(stats)
     }
 
@@ -75,10 +76,10 @@ impl BlobsActor {
     fn buy_credit(rt: &impl Runtime, params: BuyCreditParams) -> Result<Account, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let to = to_id_address(rt, params.0, true)?;
-        let hoku_config = hoku_config::get_config(rt)?;
+        let config = config::get_config(rt)?;
         rt.transaction(|st: &mut State, rt| {
             st.buy_credit(
-                &hoku_config,
+                &config,
                 rt.store(),
                 to,
                 rt.message().value_received(),
@@ -130,10 +131,10 @@ impl BlobsActor {
         let from = to_id_address(rt, params.from, true)?;
         require_addr_is_origin_or_caller(rt, from)?;
         let to = to_id_address(rt, params.to, true)?;
-        let hoku_config = hoku_config::get_config(rt)?;
+        let config = config::get_config(rt)?;
         rt.transaction(|st: &mut State, rt| {
             st.approve_credit(
-                &hoku_config,
+                &config,
                 rt.store(),
                 from,
                 to,
@@ -173,8 +174,9 @@ impl BlobsActor {
         } else {
             None
         };
+        let config = config::get_config(rt)?;
         rt.transaction(|st: &mut State, rt| {
-            st.set_account_sponsor(rt.store(), from, sponsor, rt.curr_epoch())
+            st.set_account_sponsor(&config, rt.store(), from, sponsor, rt.curr_epoch())
         })
     }
 
@@ -186,7 +188,14 @@ impl BlobsActor {
         require_caller_is_admin(rt)?;
         let subscriber = to_id_address(rt, params.subscriber, true)?;
         rt.transaction(|st: &mut State, rt| {
-            st.set_account_status(rt.store(), subscriber, params.status, rt.curr_epoch())
+            let config = config::get_config(rt)?;
+            st.set_account_status(
+                &config,
+                rt.store(),
+                subscriber,
+                params.status,
+                rt.curr_epoch(),
+            )
         })
     }
 
@@ -225,13 +234,14 @@ impl BlobsActor {
     ///
     /// Only delegated addresses can own or use credit, but we don't need to waste gas enforcing
     /// that condition here.
+    /// TODO: Gas allowance methods need unit tests.
     fn get_gas_allowance(
         rt: &impl Runtime,
         params: GetGasAllowanceParams,
     ) -> Result<GasAllowance, ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         let from = match to_id_address(rt, params.0, false) {
-            Ok(to) => to,
+            Ok(from) => from,
             Err(e) => {
                 return if e.exit_code() == ExitCode::USR_FORBIDDEN {
                     // Disallowed actor type (this is called by all txns so we can't error)
@@ -253,10 +263,8 @@ impl BlobsActor {
     /// TODO: Take a start key and page limit to avoid out-of-gas errors.
     fn debit_accounts(rt: &impl Runtime) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let hoku_config = hoku_config::get_config(rt)?;
-        let deletes = rt.transaction(|st: &mut State, rt| {
-            st.debit_accounts(&hoku_config, rt.store(), rt.curr_epoch())
-        })?;
+        let deletes =
+            rt.transaction(|st: &mut State, rt| st.debit_accounts(rt.store(), rt.curr_epoch()))?;
         for hash in deletes {
             delete_from_disc(hash)?;
         }
@@ -290,10 +298,10 @@ impl BlobsActor {
                 origin
             }
         };
-        let hoku_config = hoku_config::get_config(rt)?;
+        let config = config::get_config(rt)?;
         let (subscription, unspent_tokens) = rt.transaction(|st: &mut State, rt| {
             st.add_blob(
-                &hoku_config,
+                &config,
                 rt.store(),
                 origin,
                 subscriber,
@@ -343,8 +351,7 @@ impl BlobsActor {
         params: GetAddedBlobsParams,
     ) -> Result<Vec<BlobRequest>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let added = rt.state::<State>()?.get_added_blobs(params.0);
-        Ok(added)
+        rt.state::<State>()?.get_added_blobs(rt.store(), params.0)
     }
 
     /// Returns a list of [`BlobRequest`]s that are currenlty in the [`BlobStatus::Pending`] state.
@@ -359,8 +366,7 @@ impl BlobsActor {
         params: GetPendingBlobsParams,
     ) -> Result<Vec<BlobRequest>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let pending = rt.state::<State>()?.get_pending_blobs(params.0);
-        Ok(pending)
+        rt.state::<State>()?.get_pending_blobs(rt.store(), params.0)
     }
 
     /// Sets a blob to the [`BlobStatus::Pending`] state.
@@ -386,8 +392,10 @@ impl BlobsActor {
     fn finalize_blob(rt: &impl Runtime, params: FinalizeBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         let subscriber = to_id_address(rt, params.subscriber, false)?;
+        let config = config::get_config(rt)?;
         rt.transaction(|st: &mut State, rt| {
             st.finalize_blob(
+                &config,
                 rt.store(),
                 subscriber,
                 rt.curr_epoch(),
@@ -452,20 +460,25 @@ impl BlobsActor {
         } else {
             origin
         };
-        let hoku_config = hoku_config::get_config(rt)?;
+        let config = config::get_config(rt)?;
         // The call should be atomic, hence we wrap two independent calls in a transaction.
         let (delete, subscription) = rt.transaction(|st: &mut State, rt| {
             let add_params = params.add;
-            let delete = st.delete_blob(
-                rt.store(),
-                origin,
-                subscriber,
-                rt.curr_epoch(),
-                params.old_hash,
-                add_params.id.clone(),
-            )?;
+            // Do not delete the blob if the old hash is the same as the new hash.
+            let delete = if params.old_hash != add_params.hash {
+                st.delete_blob(
+                    rt.store(),
+                    origin,
+                    subscriber,
+                    rt.curr_epoch(),
+                    params.old_hash,
+                    add_params.id.clone(),
+                )?
+            } else {
+                false
+            };
             let (subscription, _) = st.add_blob(
-                &hoku_config,
+                &config,
                 rt.store(),
                 origin,
                 subscriber,
@@ -497,10 +510,10 @@ impl BlobsActor {
     ) -> Result<(u32, Option<Hash>), ActorError> {
         require_caller_is_admin(rt)?;
         let subscriber = to_id_address(rt, params.subscriber, true)?;
-        let hoku_config = hoku_config::get_config(rt)?;
+        let config = config::get_config(rt)?;
         let (processed, next_key, deleted_blobs) = rt.transaction(|st: &mut State, rt| {
             st.trim_blob_expiries(
-                &hoku_config,
+                &config,
                 rt.store(),
                 subscriber,
                 rt.curr_epoch(),
@@ -975,7 +988,6 @@ mod tests {
             .unwrap();
         assert_eq!(subscription.added, 5);
         assert_eq!(subscription.expiry, 3605);
-        assert!(!subscription.auto_renew);
         assert_eq!(subscription.delegate, None);
         rt.verify();
     }

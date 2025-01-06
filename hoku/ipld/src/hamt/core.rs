@@ -40,12 +40,10 @@ pub trait MapKey: Sized + Debug {
 
 pub type Config = hamt::Config;
 
-pub const HAMT_BIT_WIDTH: u32 = 5;
-
 pub const DEFAULT_HAMT_CONFIG: Config = Config {
-    bit_width: HAMT_BIT_WIDTH,
-    min_data_depth: 0,
-    max_array_width: 3,
+    bit_width: 5,
+    min_data_depth: 2,
+    max_array_width: 1,
 };
 
 impl<BS, K, V> Map<BS, K, V>
@@ -70,7 +68,7 @@ where
     /// Creates a new empty map and flushes it to the store.
     /// Returns the CID of the empty map root.
     pub fn flush_empty(store: BS, config: Config) -> Result<Cid, ActorError> {
-        // This CID is constant regardless of the HAMT's configuration, so as an optimisation
+        // This CID is constant regardless of the HAMT's configuration, so as an optimization,
         // we could hard-code it and merely check it is already stored.
         Self::empty(store, config, "empty".into()).flush()
     }

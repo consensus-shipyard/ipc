@@ -2,11 +2,6 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::shared::{
-    CloseReadRequestParams, GetOpenReadRequestsParams, GetReadRequestStatusParams, Method,
-    OpenReadRequestParams, ReadRequestStatus, SetReadRequestPendingParams, State,
-    BLOB_READER_ACTOR_NAME,
-};
 use fendermint_actor_blobs_shared::state::Hash;
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
@@ -16,6 +11,12 @@ use fil_actors_runtime::{
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::address::Address;
 use fvm_shared::MethodNum;
+
+use crate::shared::{
+    CloseReadRequestParams, GetOpenReadRequestsParams, GetReadRequestStatusParams, Method,
+    OpenReadRequestParams, ReadRequestStatus, SetReadRequestPendingParams, State,
+    BLOB_READER_ACTOR_NAME,
+};
 
 type OpenReadRequestTuple = (Hash, Hash, u32, u32, Address, u64);
 

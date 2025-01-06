@@ -30,8 +30,8 @@ pub struct HokuConfig {
     pub blob_credit_debit_interval: ChainEpoch,
     /// The minimum epoch duration a blob can be stored.
     pub blob_min_ttl: ChainEpoch,
-    /// The rolling epoch duration used for non-expiring blobs.
-    pub blob_auto_renew_ttl: ChainEpoch,
+    /// The default epoch duration a blob is stored.
+    pub blob_default_ttl: ChainEpoch,
 }
 
 impl Default for HokuConfig {
@@ -40,9 +40,11 @@ impl Default for HokuConfig {
             blob_capacity: 10 * 1024 * 1024 * 1024 * 1024, // 10 TiB
             // 1 HOKU buys 1e18 credits ~ 1 HOKU buys 1e36 atto credits.
             token_credit_rate: TokenCreditRate::from(BigInt::from(10u128.pow(36))),
-            blob_credit_debit_interval: ChainEpoch::from(3600),
-            blob_min_ttl: ChainEpoch::from(3600),
-            blob_auto_renew_ttl: ChainEpoch::from(3600),
+            // This needs to be low enough to avoid out-of-gas errors.
+            // TODO: Stress test with max-throughput (~100 blobs/s)
+            blob_credit_debit_interval: ChainEpoch::from(60 * 10), // ~10 min
+            blob_min_ttl: ChainEpoch::from(60 * 60),               // ~1 hour
+            blob_default_ttl: ChainEpoch::from(60 * 60 * 24),      // ~1 day
         }
     }
 }

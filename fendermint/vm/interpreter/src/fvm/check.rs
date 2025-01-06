@@ -93,18 +93,8 @@ where
         if let Some(id) = state_tree.lookup_id(&msg.from)? {
             if let Some(mut actor) = state_tree.get_actor(id)? {
                 let balance_needed = msg.gas_fee_cap.clone() * msg.gas_limit;
-                if actor.balance < balance_needed {
-                    return checked(
-                        state,
-                        ExitCode::SYS_SENDER_STATE_INVALID,
-                        None,
-                        None,
-                        Some(
-                            format! {"actor balance {} less than needed {}", actor.balance, balance_needed},
-                        ),
-                    );
-                } else if actor.sequence != msg.sequence {
-                    return checked(
+                return if actor.sequence != msg.sequence {
+                    checked(
                         state,
                         ExitCode::SYS_SENDER_STATE_INVALID,
                         None,
@@ -112,8 +102,11 @@ where
                         Some(
                             format! {"expected sequence {}, got {}", actor.sequence, msg.sequence},
                         ),
-                    );
+                    )
                 } else if self.exec_in_check {
+                    // Note(HOKU): Virtual gas requires that we run in exec_in_check mode, which
+                    // is the default.
+
                     // Instead of modifying just the partial state, we will execute the call in earnest.
                     // This is required for fully supporting the Ethereum API "pending" queries, if that's needed.
 
@@ -130,7 +123,7 @@ where
                         exit_code: apply_ret.msg_receipt.exit_code.value(),
                     });
 
-                    return checked(
+                    checked(
                         state,
                         apply_ret.msg_receipt.exit_code,
                         Some(apply_ret.msg_receipt.gas_used),
@@ -139,14 +132,26 @@ where
                             .failure_info
                             .map(|i| i.to_string())
                             .filter(|s| !s.is_empty()),
-                    );
+                    )
+                } else if actor.balance < balance_needed {
+                    // Note(HOKU): This check has been moved below exec_in_check to allow for
+                    // virtual gas allowance checks.
+                    checked(
+                        state,
+                        ExitCode::SYS_SENDER_STATE_INVALID,
+                        None,
+                        None,
+                        Some(
+                            format! {"actor balance {} less than needed {}", actor.balance, balance_needed},
+                        ),
+                    )
                 } else {
                     actor.sequence += 1;
                     actor.balance -= balance_needed;
                     state_tree.set_actor(id, actor);
 
-                    return checked(state, ExitCode::OK, None, None, None);
-                }
+                    checked(state, ExitCode::OK, None, None, None)
+                };
             }
         }
 

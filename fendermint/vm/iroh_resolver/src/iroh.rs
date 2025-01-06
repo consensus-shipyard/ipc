@@ -128,7 +128,7 @@ fn start_resolve<V>(
                         .await
                         {
                             emit(BlobsFinalityVotingSuccess {
-                                blob_hash: Some(task.hash().into()),
+                                blob_hash: Some(task.hash().to_string()),
                             });
                         }
                     }
@@ -153,7 +153,7 @@ fn start_resolve<V>(
                             .await
                         {
                             emit(BlobsFinalityVotingFailure {
-                                blob_hash: Some(task.hash().into()),
+                                blob_hash: Some(task.hash().to_string()),
                             });
                         }
                     }
@@ -198,7 +198,7 @@ fn start_resolve<V>(
                         .await
                         {
                             emit(ReadRequestsCloseVoting {
-                                read_request_id: Some(vote_hash.into()),
+                                read_request_id: Some(vote_hash.to_string()),
                             });
                         }
                     }

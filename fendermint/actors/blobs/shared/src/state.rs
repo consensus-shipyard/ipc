@@ -84,10 +84,10 @@ pub struct Account {
 }
 
 impl Account {
-    pub fn new(current_epoch: ChainEpoch) -> Self {
+    pub fn new(current_epoch: ChainEpoch, max_ttl: ChainEpoch) -> Self {
         Self {
             last_debit_epoch: current_epoch,
-            max_ttl: TtlStatus::DEFAULT_MAX_TTL,
+            max_ttl,
             ..Default::default()
         }
     }
@@ -212,8 +212,6 @@ pub struct Subscription {
     pub added: ChainEpoch,
     /// Expiry block.
     pub expiry: ChainEpoch,
-    /// Whether to automatically renew the subscription.
-    pub auto_renew: bool,
     /// Source Iroh node ID used for ingestion.
     /// This might be unique to each instance of the same blob.
     /// It's included here for record keeping.
@@ -377,7 +375,14 @@ pub enum TtlStatus {
 }
 
 impl TtlStatus {
-    pub const DEFAULT_MAX_TTL: ChainEpoch = 60 * 60 * 24; // 1 day
+    /// Returns the max allowed TTL.
+    pub fn get_max_ttl(&self, default_max_ttl: ChainEpoch) -> ChainEpoch {
+        match self {
+            TtlStatus::Default => default_max_ttl,
+            TtlStatus::Reduced => 0,
+            TtlStatus::Extended => ChainEpoch::MAX,
+        }
+    }
 }
 
 impl fmt::Display for TtlStatus {
@@ -386,16 +391,6 @@ impl fmt::Display for TtlStatus {
             TtlStatus::Default => write!(f, "default"),
             TtlStatus::Reduced => write!(f, "reduced"),
             TtlStatus::Extended => write!(f, "extended"),
-        }
-    }
-}
-
-impl From<TtlStatus> for ChainEpoch {
-    fn from(status: TtlStatus) -> Self {
-        match status {
-            TtlStatus::Default => TtlStatus::DEFAULT_MAX_TTL,
-            TtlStatus::Reduced => 0,
-            TtlStatus::Extended => ChainEpoch::MAX,
         }
     }
 }

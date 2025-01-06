@@ -3134,6 +3134,7 @@ dependencies = [
  "hoku_ipld",
  "log",
  "num-traits",
+ "rand",
  "serde",
 ]
 
@@ -5363,7 +5364,6 @@ dependencies = [
  "cid",
  "fendermint_actor_blobs_shared",
  "fendermint_vm_actor_interface",
- "frc42_dispatch",
  "fvm",
  "fvm_ipld_encoding",
  "fvm_shared",
