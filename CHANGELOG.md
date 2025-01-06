@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [axon-r08] - 2024-12-31
+
+### 🚀 Features
+
+- *(node)* Configurable chain id (#1230)
+- *(cli)* Add `list-validators` command (#1221)
+- *(node)* Txn prioritization based on gas parameters (#1185)
+- *(node)* Support legacy transactions (#1235)
+
+### 🐛 Bug Fixes
+
+- Patch missing ipc messages in eth get_logs (#1226)
+- Prevent panic on chain replay (#1197)
+- Use current exec state when querying validator table (#1234)
+- Contracts auto-deploy GitHub Actions workflow (#1238)
+
 ## [axon-r07] - 2024-12-02
 
 ### 🚀 Features
