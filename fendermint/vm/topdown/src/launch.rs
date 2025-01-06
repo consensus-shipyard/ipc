@@ -6,7 +6,7 @@ use crate::syncer::store::InMemoryParentViewStore;
 use crate::syncer::{
     start_polling_reactor, ParentPoller, ParentSyncerConfig, ParentSyncerReactorClient,
 };
-use crate::vote::gossip::GossipClient;
+use crate::vote::gossip::{GossipReceiver, GossipSender};
 use crate::vote::payload::PowerUpdates;
 use crate::vote::store::InMemoryVoteStore;
 use crate::vote::{StartVoteReactorParams, VoteReactorClient};
@@ -30,18 +30,21 @@ use std::time::Duration;
 ///     - signs/certifies and broadcast topdown observation to p2p peers
 ///     - listens to certified topdown observation from p2p
 ///     - aggregate peer certified observations into a quorum certificate for commitment in fendermint
-pub async fn run_topdown<CheckpointQuery, Gossip, Poller, ParentClient>(
+pub async fn run_topdown<CheckpointQuery, GossipTx, GossipRx, Poller, ParentClient>(
     store: InMemoryParentViewStore,
     query: CheckpointQuery,
     config: Config,
     validator_key: SecretKey,
-    gossip_client: Gossip,
+    gossip: (GossipTx, GossipRx),
     parent_client: ParentClient,
-    poller_fn: impl FnOnce(&Checkpoint, ParentClient, ParentSyncerConfig) -> Poller + Send + 'static,
+    create_poller_fn: impl FnOnce(&Checkpoint, ParentClient, ParentSyncerConfig) -> Poller
+        + Send
+        + 'static,
 ) -> anyhow::Result<TopdownClient>
 where
     CheckpointQuery: LaunchQuery + Send + Sync + 'static,
-    Gossip: GossipClient + Send + Sync + 'static,
+    GossipTx: GossipSender + Send + Sync + 'static,
+    GossipRx: GossipReceiver + Send + Sync + 'static,
     Poller: ParentPoller + Send + Sync + 'static,
     ParentClient: ParentQueryProxy + Send + Sync + 'static,
 {
@@ -68,7 +71,7 @@ where
             })
             .collect::<Vec<_>>();
 
-        let poller = poller_fn(&checkpoint, parent_client, config.syncer.clone());
+        let poller = create_poller_fn(&checkpoint, parent_client, config.syncer.clone());
         let internal_event_rx = poller.subscribe();
 
         syncer_client_cloned
@@ -87,7 +90,8 @@ where
                 latest_child_block: query
                     .latest_chain_block()
                     .expect("should query latest chain block"),
-                gossip: gossip_client,
+                gossip_tx: gossip.0,
+                gossip_rx: gossip.1,
                 vote_store: InMemoryVoteStore::default(),
                 internal_event_listener: internal_event_rx,
             },

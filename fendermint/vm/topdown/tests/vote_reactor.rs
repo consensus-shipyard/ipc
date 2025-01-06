@@ -11,11 +11,12 @@ use fendermint_vm_genesis::ValidatorKey;
 use fendermint_vm_topdown::observation::Observation;
 use fendermint_vm_topdown::syncer::TopDownSyncEvent;
 use fendermint_vm_topdown::vote::error::Error;
-use fendermint_vm_topdown::vote::gossip::GossipClient;
+use fendermint_vm_topdown::vote::gossip::{GossipReceiver, GossipSender};
 use fendermint_vm_topdown::vote::payload::{PowerUpdates, Vote};
 use fendermint_vm_topdown::vote::store::InMemoryVoteStore;
 use fendermint_vm_topdown::vote::{StartVoteReactorParams, VoteConfig, VoteReactorClient, Weight};
 use fendermint_vm_topdown::BlockHeight;
+use std::time::Duration;
 use tokio::sync::broadcast;
 use tokio::sync::broadcast::error::TryRecvError;
 
@@ -30,58 +31,69 @@ impl Validator {
     }
 }
 
-struct ChannelGossipClient {
+struct ChannelGossipSender {
     tx: broadcast::Sender<Vote>,
+}
+
+struct ChannelGossipReceiver {
     rxs: Vec<broadcast::Receiver<Vote>>,
 }
 
 #[async_trait]
-impl GossipClient for ChannelGossipClient {
-    fn try_poll_vote(&mut self) -> Result<Option<Vote>, Error> {
-        for rx in self.rxs.iter_mut() {
-            match rx.try_recv() {
-                Ok(v) => return Ok(Some(v)),
-                Err(TryRecvError::Empty) => continue,
-                _ => panic!("should not happen"),
-            }
-        }
-
-        Ok(None)
-    }
-
+impl GossipSender for ChannelGossipSender {
     async fn publish_vote(&self, vote: Vote) -> Result<(), Error> {
         let _ = self.tx.send(vote);
         Ok(())
     }
 }
 
-fn default_config() -> VoteConfig {
-    VoteConfig {
-        req_channel_buffer_size: 1024,
-        req_batch_processing_size: 10,
-        gossip_req_processing_size: 10,
-        voting_sleep_interval_millis: 1,
+#[async_trait]
+impl GossipReceiver for ChannelGossipReceiver {
+    async fn recv_vote(&mut self) -> Result<Vote, Error> {
+        loop {
+            for rx in self.rxs.iter_mut() {
+                match rx.try_recv() {
+                    Ok(v) => return Ok(v),
+                    Err(TryRecvError::Empty) => continue,
+                    _ => panic!("should not happen"),
+                }
+            }
+
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
     }
 }
 
-fn gen_validators(weights: Vec<Weight>) -> (Vec<Validator>, Vec<ChannelGossipClient>) {
+fn default_config() -> VoteConfig {
+    VoteConfig {
+        req_channel_buffer_size: 1024,
+    }
+}
+
+fn gen_validators(
+    weights: Vec<Weight>,
+) -> (
+    Vec<Validator>,
+    Vec<(ChannelGossipSender, ChannelGossipReceiver)>,
+) {
     let mut rng = rand::thread_rng();
 
-    let mut gossips: Vec<ChannelGossipClient> = vec![];
+    let mut gossips: Vec<(ChannelGossipSender, ChannelGossipReceiver)> = vec![];
     for _ in 0..weights.len() {
         let (tx, _) = broadcast::channel(100);
 
-        let mut g = ChannelGossipClient { tx, rxs: vec![] };
+        let s = ChannelGossipSender { tx };
+        let mut rs = vec![];
 
         for existing in gossips.iter() {
-            g.rxs.push(existing.tx.subscribe())
+            rs.push(existing.0.tx.subscribe())
         }
 
         for existing in gossips.iter_mut() {
-            existing.rxs.push(g.tx.subscribe());
+            existing.1.rxs.push(s.tx.subscribe());
         }
 
-        gossips.push(g);
+        gossips.push((s, ChannelGossipReceiver { rxs: rs }));
     }
 
     let validators = weights
@@ -94,10 +106,6 @@ fn gen_validators(weights: Vec<Weight>) -> (Vec<Validator>, Vec<ChannelGossipCli
 
     (validators, gossips)
 }
-
-// fn gen_power_table(validators: &[Validator]) -> PowerTable {
-//     PowerTable::from_iter(validators.iter().map(|v| (v.validator_key(), v.weight)))
-// }
 
 fn gen_power_updates(validators: &[Validator]) -> PowerUpdates {
     validators
@@ -129,6 +137,7 @@ async fn simple_lifecycle() {
     let (internal_event_tx, _) = broadcast::channel(validators.len() + 1);
 
     let (client, rx) = VoteReactorClient::new(1024);
+    let (gossip_tx, gossip_rx) = gossips.pop().unwrap();
     VoteReactorClient::start_reactor(
         rx,
         StartVoteReactorParams {
@@ -137,7 +146,8 @@ async fn simple_lifecycle() {
             power_table: power_updates.clone(),
             last_finalized_height: initial_finalized_height,
             latest_child_block: 100,
-            gossip: gossips.pop().unwrap(),
+            gossip_tx,
+            gossip_rx,
             vote_store: InMemoryVoteStore::default(),
             internal_event_listener: internal_event_tx.subscribe(),
         },
@@ -211,6 +221,7 @@ async fn waiting_for_quorum() {
         let (internal_event_tx, _) = broadcast::channel(validators.len() + 1);
 
         let (client, rx) = VoteReactorClient::new(1024);
+        let (gossip_tx, gossip_rx) = gossips.pop().unwrap();
         VoteReactorClient::start_reactor(
             rx,
             StartVoteReactorParams {
@@ -219,7 +230,8 @@ async fn waiting_for_quorum() {
                 power_table: power_updates.clone(),
                 last_finalized_height: initial_finalized_height,
                 latest_child_block: 100,
-                gossip: gossips.pop().unwrap(),
+                gossip_tx,
+                gossip_rx,
                 vote_store: InMemoryVoteStore::default(),
                 internal_event_listener: internal_event_tx.subscribe(),
             },
@@ -345,6 +357,7 @@ async fn all_validator_in_sync() {
     let mut node_clients = vec![];
     for validator in &validators {
         let (r, rx) = VoteReactorClient::new(1024);
+        let (gossip_tx, gossip_rx) = gossips.pop().unwrap();
         VoteReactorClient::start_reactor(
             rx,
             StartVoteReactorParams {
@@ -353,7 +366,8 @@ async fn all_validator_in_sync() {
                 power_table: power_updates.clone(),
                 last_finalized_height: initial_finalized_height,
                 latest_child_block: 100,
-                gossip: gossips.pop().unwrap(),
+                gossip_tx,
+                gossip_rx,
                 vote_store: InMemoryVoteStore::default(),
                 internal_event_listener: internal_event_tx.subscribe(),
             },

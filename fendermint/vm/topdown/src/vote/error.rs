@@ -25,4 +25,10 @@ pub enum Error {
 
     #[error("cannot publish vote {0}")]
     CannotPublishVote(String),
+
+    #[error("receive gossip vote encountered error: {0}")]
+    CannotReceiveVote(String),
+
+    #[error("received unexpected gossip event {0}")]
+    UnexpectedGossipEvent(String),
 }

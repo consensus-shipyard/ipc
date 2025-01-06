@@ -34,23 +34,24 @@ use fendermint_vm_topdown::syncer::poll::ParentPoll;
 use fendermint_vm_topdown::syncer::store::{InMemoryParentViewStore, ParentViewStore};
 use fendermint_vm_topdown::syncer::{ParentPoller, ParentSyncerConfig, TopDownSyncEvent};
 use fendermint_vm_topdown::vote::error::Error;
-use fendermint_vm_topdown::vote::gossip::GossipClient;
+use fendermint_vm_topdown::vote::gossip::{GossipReceiver, GossipSender};
 use fendermint_vm_topdown::vote::payload::Vote;
 use fendermint_vm_topdown::vote::VoteConfig;
 use fendermint_vm_topdown::{Checkpoint, TopdownClient};
 use fvm_shared::address::{current_network, Address, Network};
 use ipc_api::subnet_id::SubnetID;
-use ipc_ipld_resolver::{Event as ResolverEvent, SubnetVoteRecord};
+use ipc_ipld_resolver::{Event as ResolverEvent, Event, SubnetVoteRecord};
 use ipc_observability::observe::register_metrics as register_default_metrics;
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
 use libp2p::identity::secp256k1;
 use libp2p::identity::Keypair;
+use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 use tendermint_rpc::Client;
 use tokio::sync::broadcast;
-use tokio::sync::broadcast::error::TryRecvError;
+use tokio::sync::broadcast::error::{RecvError, TryRecvError};
 use tokio::sync::broadcast::Receiver;
 use tower::ServiceBuilder;
 use tracing::info;
@@ -200,8 +201,8 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
 
         info!("subscribing to gossip...");
         let rx = service.subscribe();
-        let gossip_client = IPLDGossip {
-            rx,
+        let topdown_gossip_rx = IPLDTopdownGossipReceiver { rx };
+        let topdown_gossip_tx = IPLDTopdownGossipSender {
             client,
             subnet: own_subnet_id,
         };
@@ -216,7 +217,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         tracing::info!("starting the IPLD Resolver...");
         tokio::spawn(async move { resolver.run().await });
 
-        Some(gossip_client)
+        Some((topdown_gossip_tx, topdown_gossip_rx))
     } else {
         tracing::info!("IPLD Resolver disabled.");
         None
@@ -248,7 +249,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         None
     };
 
-    let mut app: App<_, _, AppStore, _, _> = App::new(
+    let mut app: App<_, _, AppStore, _> = App::new(
         AppConfig {
             app_namespace: ns.app,
             state_hist_namespace: ns.state_hist,
@@ -263,7 +264,6 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             topdown_client: Toggle::<TopdownClient>::disable(),
         },
         snapshots,
-        tendermint_client.clone(),
     )?;
 
     if settings.topdown_enabled() {
@@ -287,9 +287,6 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             },
             voting: VoteConfig {
                 req_channel_buffer_size: 1024,
-                req_batch_processing_size: 10,
-                gossip_req_processing_size: 256,
-                voting_sleep_interval_millis: 100,
             },
         };
 
@@ -298,7 +295,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         )?));
         let parent_view_store = InMemoryParentViewStore::new();
 
-        let gossip_client = ipld_gossip_client
+        let gossip = ipld_gossip_client
             .ok_or_else(|| anyhow!("topdown enabled but ipld is not, enable ipld first"))?;
 
         let client = run_topdown(
@@ -309,7 +306,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
                 .clone()
                 .ok_or_else(|| anyhow!("need validator key to run topdown"))?
                 .0,
-            gossip_client,
+            gossip,
             parent_proxy,
             move |checkpoint, proxy, config| {
                 let poller_inner =
@@ -499,32 +496,17 @@ fn to_address(sk: &SecretKey, kind: &AccountKind) -> anyhow::Result<Address> {
     }
 }
 
-struct IPLDGossip {
-    rx: broadcast::Receiver<ResolverEvent<Vote>>,
+struct IPLDTopdownGossipSender {
     client: ipc_ipld_resolver::Client<Vote>,
     subnet: SubnetID,
 }
 
-#[async_trait]
-impl GossipClient for IPLDGossip {
-    fn try_poll_vote(&mut self) -> Result<Option<Vote>, Error> {
-        Ok(match self.rx.try_recv() {
-            Ok(v) => match v {
-                ResolverEvent::ReceivedVote(v) => Some(*v),
-                _ => None,
-            },
-            Err(TryRecvError::Lagged(n)) => {
-                tracing::warn!("the resolver service skipped {n} gossip events");
-                None
-            }
-            Err(TryRecvError::Closed) => {
-                tracing::error!("the resolver service stopped receiving gossip");
-                None
-            }
-            Err(TryRecvError::Empty) => None,
-        })
-    }
+struct IPLDTopdownGossipReceiver {
+    rx: broadcast::Receiver<ResolverEvent<Vote>>,
+}
 
+#[async_trait]
+impl GossipSender for IPLDTopdownGossipSender {
     async fn publish_vote(&self, vote: Vote) -> Result<(), Error> {
         let v = SubnetVoteRecord {
             subnet: self.subnet.clone(),
@@ -533,6 +515,22 @@ impl GossipClient for IPLDGossip {
         self.client
             .publish_vote(v)
             .map_err(|e| Error::CannotPublishVote(e.to_string()))
+    }
+}
+
+#[async_trait]
+impl GossipReceiver for IPLDTopdownGossipReceiver {
+    async fn recv_vote(&mut self) -> Result<Vote, Error> {
+        match self.rx.recv().await {
+            Ok(v) => match v {
+                ResolverEvent::ReceivedVote(v) => Ok(*v),
+                e => {
+                    tracing::error!("unused event received");
+                    Err(Error::UnexpectedGossipEvent(format!("{e:?}")))
+                }
+            },
+            Err(e) => Err(Error::CannotReceiveVote(format!("{e}"))),
+        }
     }
 }
 

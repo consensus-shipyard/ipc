@@ -10,7 +10,7 @@ mod tally;
 
 use crate::observation::{CertifiedObservation, Observation};
 use crate::syncer::TopDownSyncEvent;
-use crate::vote::gossip::GossipClient;
+use crate::vote::gossip::{GossipReceiver, GossipSender};
 use crate::vote::operation::{OperationMetrics, OperationStateMachine};
 use crate::vote::payload::{PowerUpdates, Vote, VoteTallyState};
 use crate::vote::store::VoteStore;
@@ -24,7 +24,7 @@ use fendermint_vm_genesis::ValidatorKey;
 use serde::Deserialize;
 use std::borrow::Borrow;
 use std::collections::HashMap;
-use std::time::Duration;
+use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, oneshot};
 
 pub type Weight = u64;
@@ -33,12 +33,6 @@ pub type Weight = u64;
 pub struct VoteConfig {
     /// The reactor request channel buffer size
     pub req_channel_buffer_size: usize,
-    /// The number of requests the reactor should process per run before handling other tasks
-    pub req_batch_processing_size: usize,
-    /// The number of vote recording requests the reactor should process per run before handling other tasks
-    pub gossip_req_processing_size: usize,
-    /// The time to sleep for voting loop if nothing happens
-    pub voting_sleep_interval_millis: u64,
 }
 
 /// The client to interact with the vote reactor
@@ -54,13 +48,13 @@ impl VoteReactorClient {
     }
 
     pub fn start_reactor<
-        G: GossipClient + Send + Sync + 'static,
+        T: GossipSender + Send + Sync + 'static,
+        R: GossipReceiver + Send + Sync + 'static,
         V: VoteStore + Send + Sync + 'static,
     >(
         rx: mpsc::Receiver<VoteReactorRequest>,
-        params: StartVoteReactorParams<G, V>,
+        params: StartVoteReactorParams<T, R, V>,
     ) -> anyhow::Result<()> {
-        let config = params.config;
         let vote_tally = VoteTally::new(
             params.power_table,
             params.last_finalized_height,
@@ -70,24 +64,22 @@ impl VoteReactorClient {
         let validator_key = params.validator_key;
         let internal_event_listener = params.internal_event_listener;
         let latest_child_block = params.latest_child_block;
-        let gossip = params.gossip;
+        let gossip_tx = Arc::new(params.gossip_tx);
+        let gossip_rx = params.gossip_rx;
 
         tokio::spawn(async move {
-            let sleep = Duration::from_millis(config.voting_sleep_interval_millis);
-
             let inner = VotingHandler {
                 validator_key,
                 req_rx: rx,
                 internal_event_listener,
                 vote_tally,
                 latest_child_block,
-                config,
-                gossip,
+                gossip_rx,
+                gossip_tx,
             };
             let mut machine = OperationStateMachine::new(inner);
             loop {
                 machine = machine.step().await;
-                tokio::time::sleep(sleep).await;
             }
         });
 
@@ -95,13 +87,14 @@ impl VoteReactorClient {
     }
 }
 
-pub struct StartVoteReactorParams<G, V> {
+pub struct StartVoteReactorParams<T, R, V> {
     pub config: VoteConfig,
     pub validator_key: SecretKey,
     pub power_table: PowerUpdates,
     pub last_finalized_height: BlockHeight,
     pub latest_child_block: BlockHeight,
-    pub gossip: G,
+    pub gossip_rx: R,
+    pub gossip_tx: T,
     pub vote_store: V,
     pub internal_event_listener: broadcast::Receiver<TopDownSyncEvent>,
 }
@@ -230,24 +223,26 @@ pub enum VoteReactorRequest {
     },
 }
 
-struct VotingHandler<Gossip, VoteStore> {
+struct VotingHandler<GossipTx, GossipRx, VoteStore> {
     /// The validator key that is used to sign proposal produced for broadcasting
     validator_key: SecretKey,
     /// Handles the requests targeting the vote reactor, could be querying the
     /// vote tally status and etc.
     req_rx: mpsc::Receiver<VoteReactorRequest>,
-    /// Interface to gossip pub/sub for topdown voting
-    gossip: Gossip,
+    /// Listening to incoming vote and publish to gossip pub/sub channel
+    gossip_tx: GossipTx,
+    /// Listening to gossip pub/sub channel for new votes
+    gossip_rx: GossipRx,
     /// Listens to internal events and handles the events accordingly
     internal_event_listener: broadcast::Receiver<TopDownSyncEvent>,
     vote_tally: VoteTally<VoteStore>,
     latest_child_block: BlockHeight,
-    config: VoteConfig,
 }
 
-impl<G, V> VotingHandler<G, V>
+impl<T, R, V> VotingHandler<T, R, V>
 where
-    G: GossipClient + Send + Sync + 'static,
+    T: GossipSender + Send + Sync + 'static + Clone,
+    R: GossipReceiver + Send + Sync + 'static,
     V: VoteStore + Send + Sync + 'static,
 {
     fn handle_request(&mut self, req: VoteReactorRequest, metrics: &OperationMetrics) {
@@ -310,7 +305,13 @@ where
         }
     }
 
-    async fn handle_event(&mut self, event: TopDownSyncEvent) {
+    fn record_vote(&mut self, vote: Vote) {
+        if let Err(e) = self.vote_tally.add_vote(vote) {
+            tracing::error!(err = e.to_string(), "cannot add vote to tally");
+        }
+    }
+
+    fn handle_event(&mut self, event: TopDownSyncEvent) {
         match event {
             TopDownSyncEvent::NewProposal(observation) => {
                 let vote = match CertifiedObservation::sign(
@@ -330,75 +331,21 @@ where
                     return;
                 }
 
-                match self.gossip.publish_vote(vote).await {
-                    Ok(_) => {}
-                    Err(e) => {
+                let gossip = self.gossip_tx.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = gossip.publish_vote(vote).await {
                         tracing::error!(
                             err = e.to_string(),
                             "cannot send to gossip sender, tx dropped"
                         );
-
                         // when this happens, we still keep the vote tally going as
                         // we can still receive other peers's votes.
                     }
-                }
+                });
             }
             _ => {
                 // ignore events we are not interested in
             }
         };
-    }
-
-    /// Process external request, such as RPC queries for debugging and status tracking.
-    fn process_external_request(&mut self, metrics: &OperationMetrics) -> usize {
-        let mut n = 0;
-        while n < self.config.req_batch_processing_size {
-            match self.req_rx.try_recv() {
-                Ok(req) => {
-                    self.handle_request(req, metrics);
-                    n += 1
-                }
-                Err(mpsc::error::TryRecvError::Disconnected) => {
-                    tracing::warn!("voting reactor tx closed unexpected");
-                    break;
-                }
-                Err(mpsc::error::TryRecvError::Empty) => break,
-            }
-        }
-        n
-    }
-
-    /// Handles vote tally gossip pab/sub incoming votes from other peers
-    fn process_gossip_subscription_votes(&mut self) -> usize {
-        let mut vote_processed = 0;
-        while vote_processed < self.config.gossip_req_processing_size {
-            match self.gossip.try_poll_vote() {
-                Ok(Some(vote)) => {
-                    if let Err(e) = self.vote_tally.add_vote(vote) {
-                        tracing::error!(err = e.to_string(), "cannot add vote to tally");
-                    } else {
-                        vote_processed += 1;
-                    }
-                }
-                Err(e) => {
-                    tracing::warn!(err = e.to_string(), "cannot poll gossip vote");
-                    break;
-                }
-                _ => break,
-            }
-        }
-        vote_processed
-    }
-
-    /// Poll internal topdown syncer event broadcasted.
-    fn poll_internal_event(&mut self) -> Option<TopDownSyncEvent> {
-        match self.internal_event_listener.try_recv() {
-            Ok(event) => Some(event),
-            Err(broadcast::error::TryRecvError::Empty) => None,
-            _ => {
-                tracing::warn!("gossip sender lagging or closed");
-                None
-            }
-        }
     }
 }

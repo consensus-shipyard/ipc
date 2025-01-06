@@ -4,8 +4,8 @@ mod behaviour;
 mod client;
 mod hash;
 mod limiter;
+mod observe;
 mod service;
-mod stats;
 mod timestamp;
 
 mod provider_cache;
