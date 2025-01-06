@@ -66,7 +66,7 @@ impl BlobsActor {
         let config = config::get_config(rt)?;
         let stats = rt
             .state::<State>()?
-            .get_stats(rt.current_balance(), &config);
+            .get_stats(&config, rt.current_balance());
         Ok(stats)
     }
 

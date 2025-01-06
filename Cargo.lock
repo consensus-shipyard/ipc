@@ -3134,6 +3134,7 @@ dependencies = [
  "hoku_ipld",
  "log",
  "num-traits",
+ "rand",
  "serde",
 ]
 

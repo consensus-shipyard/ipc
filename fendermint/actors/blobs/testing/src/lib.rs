@@ -2,9 +2,10 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use fendermint_actor_blobs_shared::state::{Hash, PublicKey};
+use fendermint_actor_blobs_shared::state::{Hash, PublicKey, SubscriptionId};
 use fvm_shared::address::Address;
-use rand::RngCore;
+use rand::distributions::Alphanumeric;
+use rand::{Rng, RngCore};
 
 pub fn setup_logs() {
     use tracing_subscriber::layer::SubscriberExt;
@@ -57,4 +58,13 @@ pub fn new_address() -> Address {
     let mut data = vec![0u8; 32];
     rng.fill_bytes(&mut data);
     Address::new_actor(&data)
+}
+
+pub fn new_subscription_id(length: usize) -> SubscriptionId {
+    let str: String = rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(length)
+        .map(char::from)
+        .collect();
+    SubscriptionId::try_from(str).unwrap()
 }
