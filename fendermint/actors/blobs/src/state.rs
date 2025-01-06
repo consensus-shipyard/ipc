@@ -3061,6 +3061,7 @@ mod tests {
         // Add a blob
         let add1_epoch = current_epoch;
         let (hash1, size1) = new_hash(1024);
+        let source1 = new_pk();
         let res = state.add_blob(
             config,
             &store,
@@ -3072,8 +3073,29 @@ mod tests {
             SubscriptionId::default(),
             size1,
             Some(config.blob_min_ttl),
-            new_pk(),
+            source1,
             TokenAmount::zero(),
+        );
+        assert!(res.is_ok());
+
+        // Finalize as resolved
+        let res = state.set_blob_pending(
+            &store,
+            subscriber,
+            hash1,
+            SubscriptionId::default(),
+            source1,
+        );
+        assert!(res.is_ok());
+        let finalize_epoch = ChainEpoch::from(current_epoch + 1);
+        let res = state.finalize_blob(
+            config,
+            &store,
+            subscriber,
+            finalize_epoch,
+            hash1,
+            SubscriptionId::default(),
+            BlobStatus::Resolved,
         );
         assert!(res.is_ok());
 
@@ -3082,8 +3104,8 @@ mod tests {
         assert_eq!(stats.num_blobs, 1);
         assert_eq!(stats.num_resolving, 0);
         assert_eq!(stats.bytes_resolving, 0);
-        assert_eq!(stats.num_added, 1);
-        assert_eq!(stats.bytes_added, size1);
+        assert_eq!(stats.num_added, 0);
+        assert_eq!(stats.bytes_added, 0);
 
         // Check the account balance
         let account = state.get_account(&store, subscriber).unwrap().unwrap();
@@ -3121,8 +3143,8 @@ mod tests {
         assert_eq!(stats.num_blobs, 2);
         assert_eq!(stats.num_resolving, 0);
         assert_eq!(stats.bytes_resolving, 0);
-        assert_eq!(stats.num_added, 2);
-        assert_eq!(stats.bytes_added, size1 + size2);
+        assert_eq!(stats.num_added, 1);
+        assert_eq!(stats.bytes_added, size2);
 
         // Check the account balance
         let account = state.get_account(&store, subscriber).unwrap().unwrap();
@@ -3506,6 +3528,8 @@ mod tests {
                 let size = (i + 1) * 1024;
                 let (hash, _) = new_hash(size);
                 let size = size as u64;
+                let id = SubscriptionId::try_from(format!("blob-{}", i)).unwrap();
+                let source = new_pk();
                 blob_hashes.push(hash);
 
                 state
@@ -3517,11 +3541,25 @@ mod tests {
                         current_epoch,
                         hash,
                         new_metadata_hash(),
-                        SubscriptionId::try_from(format!("blob-{}", i)).unwrap(),
+                        id.clone(),
                         size,
                         *ttl,
-                        new_pk(),
+                        source,
                         TokenAmount::zero(),
+                    )
+                    .unwrap();
+                state
+                    .set_blob_pending(&store, addr, hash, id.clone(), source)
+                    .unwrap();
+                state
+                    .finalize_blob(
+                        &config,
+                        &store,
+                        addr,
+                        current_epoch,
+                        hash,
+                        id,
+                        BlobStatus::Resolved,
                     )
                     .unwrap();
 
@@ -3669,6 +3707,8 @@ mod tests {
             // Add 5 blobs with different sizes to ensure different hashes
             for i in 0..5 {
                 let (hash, size) = new_hash((i + 1) * 1024);
+                let id = SubscriptionId::try_from(format!("blob-{}", i)).unwrap();
+                let source = new_pk();
                 state
                     .add_blob(
                         &config,
@@ -3678,11 +3718,25 @@ mod tests {
                         current_epoch,
                         hash,
                         new_metadata_hash(),
-                        SubscriptionId::try_from(format!("blob-{}", i)).unwrap(),
+                        id.clone(),
                         size,
                         Some(7200), // 2 hours
-                        new_pk(),
+                        source,
                         TokenAmount::zero(),
+                    )
+                    .unwrap();
+                state
+                    .set_blob_pending(&store, addr, hash, id.clone(), source)
+                    .unwrap();
+                state
+                    .finalize_blob(
+                        &config,
+                        &store,
+                        addr,
+                        current_epoch,
+                        hash,
+                        id,
+                        BlobStatus::Resolved,
                     )
                     .unwrap();
             }
@@ -3806,6 +3860,8 @@ mod tests {
         let mut blob_hashes_account2 = Vec::new();
         for i in 0..3 {
             let (hash, size) = new_hash((i + 1) * 1024);
+            let id = SubscriptionId::try_from(format!("blob-1-{}", i)).unwrap();
+            let source = new_pk();
             blob_hashes_account1.push(hash);
             state
                 .add_blob(
@@ -3816,16 +3872,32 @@ mod tests {
                     current_epoch,
                     hash,
                     new_metadata_hash(),
-                    SubscriptionId::try_from(format!("blob-1-{}", i)).unwrap(),
+                    id.clone(),
                     size,
                     Some(7200), // 2 hours
-                    new_pk(),
+                    source,
                     TokenAmount::zero(),
+                )
+                .unwrap();
+            state
+                .set_blob_pending(&store, account1, hash, id.clone(), source)
+                .unwrap();
+            state
+                .finalize_blob(
+                    &config,
+                    &store,
+                    account1,
+                    current_epoch,
+                    hash,
+                    id,
+                    BlobStatus::Resolved,
                 )
                 .unwrap();
         }
         for i in 0..3 {
             let (hash, size) = new_hash((i + 1) * 1024);
+            let id = SubscriptionId::try_from(format!("blob-2-{}", i)).unwrap();
+            let source = new_pk();
             blob_hashes_account2.push(hash);
             state
                 .add_blob(
@@ -3836,11 +3908,25 @@ mod tests {
                     current_epoch,
                     hash,
                     new_metadata_hash(),
-                    SubscriptionId::try_from(format!("blob-2-{}", i)).unwrap(),
+                    id.clone(),
                     size,
                     Some(7200), // 2 hours
-                    new_pk(),
+                    source,
                     TokenAmount::zero(),
+                )
+                .unwrap();
+            state
+                .set_blob_pending(&store, account2, hash, id.clone(), source)
+                .unwrap();
+            state
+                .finalize_blob(
+                    &config,
+                    &store,
+                    account2,
+                    current_epoch,
+                    hash,
+                    id,
+                    BlobStatus::Resolved,
                 )
                 .unwrap();
         }

@@ -243,7 +243,7 @@ mod tests {
         }
     }
 
-    const OBJECT_ONE_CID: &str = "bafy2bzaceae4nfmqeqjqkx4hymxvldrgzaabbp3tffrxbmhzb7kod4sgy22xe";
+    const OBJECT_ONE_CID: &str = "bafy2bzacealtpdigmoweehfr3573mdks5r3eaj4djoh7dzcdl7zdbkxnx2kds";
 
     fn object_two() -> ObjectState {
         let (hash, size) = new_hash_from_vec([6, 7, 8, 9, 10, 11].to_vec());
