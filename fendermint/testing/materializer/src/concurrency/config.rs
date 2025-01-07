@@ -7,15 +7,13 @@ pub struct Execution {
 
 impl Execution {
     pub fn new() -> Self {
-        Self {
-            steps: Vec::new(),
-        }
+        Self { steps: Vec::new() }
     }
 
     pub fn add_step(mut self, max_concurrency: usize, secs: u64) -> Self {
         self.steps.push(ExecutionStep {
             max_concurrency,
-            duration: Duration::from_secs(secs)
+            duration: Duration::from_secs(secs),
         });
         self
     }

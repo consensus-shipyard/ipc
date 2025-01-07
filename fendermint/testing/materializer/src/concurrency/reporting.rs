@@ -1,21 +1,23 @@
-use std::collections::HashMap;
-use std::time::Duration;
+use crate::bencher::Bencher;
 use crate::concurrency::config;
 use crate::concurrency::config::ExecutionStep;
+use anyhow::anyhow;
+use std::collections::HashMap;
+use std::time::Duration;
 
 #[derive(Debug)]
 pub struct TestResult {
     pub test_id: usize,
     pub step_id: usize,
-    pub records: HashMap<String, Duration>,
+    pub bencher: Option<Bencher>,
     pub err: Option<anyhow::Error>,
 }
 
 #[derive(Debug)]
 pub struct StepSummary {
-    pub cfg: config::ExecutionStep,
+    pub cfg: ExecutionStep,
     pub avg_latencies: HashMap<String, Duration>,
-    pub errs: Vec<anyhow::Error>
+    pub errs: Vec<anyhow::Error>,
 }
 
 impl StepSummary {
@@ -24,7 +26,8 @@ impl StepSummary {
         let mut counts: HashMap<String, usize> = HashMap::new();
         let mut errs = Vec::new();
         for res in results {
-            for (key, duration) in res.records.clone() {
+            let Some(bencher) = res.bencher else { continue };
+            for (key, duration) in bencher.records.clone() {
                 *total_durations.entry(key.clone()).or_insert(Duration::ZERO) += duration;
                 *counts.entry(key).or_insert(0) += 1;
             }
@@ -44,14 +47,14 @@ impl StepSummary {
         Self {
             cfg,
             avg_latencies,
-            errs
+            errs,
         }
     }
 }
 
 #[derive(Debug)]
 pub struct ExecutionSummary {
-    pub summaries: Vec<StepSummary>
+    pub summaries: Vec<StepSummary>,
 }
 
 impl ExecutionSummary {
@@ -62,19 +65,26 @@ impl ExecutionSummary {
             summaries.push(StepSummary::new(cfg, step_results));
         }
 
-        Self {
-            summaries
+        Self { summaries }
+    }
+
+    pub fn to_result(&self) -> anyhow::Result<()> {
+        let errs = self.errs();
+        if errs.is_empty() {
+            Ok(())
+        } else {
+            Err(anyhow!(errs.join("\n")))
         }
     }
 
     pub fn errs(&self) -> Vec<String> {
         let mut errs = Vec::new();
         for summary in self.summaries.iter() {
-            let cloned_errs: Vec<String> = summary.errs
+            let cloned_errs: Vec<String> = summary
+                .errs
                 .iter()
-                .map(|e|
-                    format!("{:?}", e))
-                    // e.chain().map(|cause|cause.to_string()).collect::<Vec<_>>().join(" -> "))
+                .map(|e| format!("{:?}", e))
+                // e.chain().map(|cause|cause.to_string()).collect::<Vec<_>>().join(" -> "))
                 .collect();
             errs.extend(cloned_errs);
         }

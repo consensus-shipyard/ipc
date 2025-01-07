@@ -1,10 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-
-use std::ops::Add;
-use std::time::{Duration};
-
-use crate::with_testnet;
+use crate::make_testnet;
 use anyhow::{bail, Context};
 use ethers::{
     core::k256::ecdsa::SigningKey,
@@ -13,12 +9,7 @@ use ethers::{
     signers::{Signer, Wallet},
     types::{Eip1559TransactionRequest, H160},
 };
-use ethers::types::{BlockId, U256};
-use fendermint_materializer::{
-    concurrency::{self, config::Execution}, manifest::Rootnet, materials::DefaultAccount, HasEthApi,
-};
-use futures::FutureExt;
-use tokio::time::sleep;
+use fendermint_materializer::{manifest::Rootnet, materials::DefaultAccount, HasEthApi};
 
 const MANIFEST: &str = "standalone.yaml";
 
@@ -47,154 +38,56 @@ where
 /// from the ethereum API instance it was sent to even before it is included in the block.
 #[serial_test::serial]
 #[tokio::test]
-async fn test_sent_tx_found_in_mempool() {
-    with_testnet(
-        MANIFEST,
-        None,
-        |manifest| {
-            // Slow down consensus to where we can see the effect of the transaction not being found by Ethereum hash.
-            if let Rootnet::New { ref mut env, .. } = manifest.rootnet {
-                env.insert("CMT_CONSENSUS_TIMEOUT_COMMIT".into(), "10s".into());
-            };
-        },
-        |_,_| { Box::pin(async { })},
-        |_, _, testnet, test_id, _, _| {
-            let test = async move {
-                let sender = testnet.account_mod_nth(test_id);
-                let recipient = testnet.account_mod_nth(test_id + 1);
-                let pangea = testnet.node(&testnet.root().node("pangea"))?;
-                let provider = pangea
-                    .ethapi_http_provider()?
-                    .expect("ethapi should be enabled");
+async fn test_sent_tx_found_in_mempool() -> Result<(), anyhow::Error> {
+    let (testnet, cleanup) = make_testnet(MANIFEST, |manifest| {
+        // Slow down consensus to where we can see the effect of the transaction not being found by Ethereum hash.
+        if let Rootnet::New { ref mut env, .. } = manifest.rootnet {
+            env.insert("CMT_CONSENSUS_TIMEOUT_COMMIT".into(), "10s".into());
+        };
+    })
+    .await?;
 
-                let middleware = make_middleware(provider, sender)
-                    .await
-                    .context("failed to set up middleware")?;
+    let res = {
+        let bob = testnet.account("bob")?;
+        let charlie = testnet.account("charlie")?;
 
-                eprintln!("middleware ready, pending tests");
+        let pangea = testnet.node(&testnet.root().node("pangea"))?;
+        let provider = pangea
+            .ethapi_http_provider()?
+            .expect("ethapi should be enabled");
 
-                // Create the simplest transaction possible: send tokens between accounts.
-                let to: H160 = recipient.eth_addr().into();
-                let transfer = Eip1559TransactionRequest::new().to(to).value(1);
+        let middleware = make_middleware(provider, bob)
+            .await
+            .context("failed to set up middleware")?;
 
-                let pending: PendingTransaction<_> = middleware
-                    .send_transaction(transfer, None)
-                    .await
-                    .context("failed to send txn")?;
+        eprintln!("middleware ready, pending tests");
 
-                let tx_hash = pending.tx_hash();
+        // Create the simplest transaction possible: send tokens between accounts.
+        let to: H160 = charlie.eth_addr().into();
+        let transfer = Eip1559TransactionRequest::new().to(to).value(1);
 
-                eprintln!("sent pending txn {:?}", tx_hash);
+        let pending: PendingTransaction<_> = middleware
+            .send_transaction(transfer, None)
+            .await
+            .context("failed to send txn")?;
 
-                // We expect that the transaction is pending, however it should not return an error.
-                match middleware.get_transaction(tx_hash).await {
-                    Ok(Some(_)) => {}
-                    Ok(None) => bail!("pending transaction not found by eth hash"),
-                    Err(e) => {
-                        bail!("failed to get pending transaction: {e}")
-                    }
-                }
+        let tx_hash = pending.tx_hash();
 
-                Ok(())
-            };
+        eprintln!("sent pending txn {:?}", tx_hash);
 
-            test.boxed()
-        },
-    )
-    .await
-    .unwrap()
-}
+        // We expect that the transaction is pending, however it should not return an error.
+        match middleware.get_transaction(tx_hash).await {
+            Ok(Some(_)) => {}
+            Ok(None) => bail!("pending transaction not found by eth hash"),
+            Err(e) => {
+                bail!("failed to get pending transaction: {e}")
+            }
+        }
+        Ok(())
+    };
 
-#[serial_test::serial]
-#[tokio::test]
-async fn test_sent_tx_included_in_block() {
-    with_testnet(
-        MANIFEST,
-        Some(Execution::new()
-            .add_step(10, 5)
-            .add_step(100, 5)
-        ),
-        |manifest| {
-            // Slow down consensus to where we can see the effect of the transaction not being found by Ethereum hash.
-            if let Rootnet::New { ref mut env, .. } = manifest.rootnet {
-                env.insert("CMT_CONSENSUS_TIMEOUT_COMMIT".into(), "1s".into());
-            };
-        },
-        |testnet,nonce_manager| {
-            Box::pin(async move {
-            })
-        },
-        |_, _, testnet, test_id, bencher, nonce_manager| {
-            let test = async move {
-                let sender = testnet.account_mod_nth(test_id);
-                let recipient = testnet.account_mod_nth(test_id + 1);
-                println!("running (test_id={})", test_id);
-
-                let pangea = testnet.node(&testnet.root().node("pangea"))?;
-                let provider = pangea
-                    .ethapi_http_provider()?
-                    .expect("ethapi should be enabled");
-
-                let middleware = make_middleware(provider, sender)
-                    .await
-                    .context("failed to set up middleware")?;
-
-                println!("middleware ready, pending tests (test_id={})", test_id);
-
-                let sender: H160 = sender.eth_addr().into();
-                // let current_nonce = middleware
-                //     .get_transaction_count(sender, None)
-                //     .await
-                //     .context("failed to fetch nonce")?;
-                let nonce = nonce_manager.get_and_increment(sender).await;
-
-                // Create the simplest transaction possible: send tokens between accounts.
-                let to: H160 = recipient.eth_addr().into();
-                let transfer = Eip1559TransactionRequest::new()
-                    .to(to)
-                    .value(1)
-                    .nonce(nonce);
-
-
-                bencher.start().await;
-                let pending: PendingTransaction<_> = middleware
-                    .send_transaction(transfer, None)
-                    .await
-                    .context("failed to send txn")?;
-
-                let tx_hash = pending.tx_hash();
-
-                println!("sent pending txn {:?} (test_id={})", tx_hash, test_id);
-
-                // We expect that the transaction is pending, however it should not return an error.
-                match middleware.get_transaction(tx_hash).await {
-                    Ok(Some(_)) => {}
-                    Ok(None) => bail!("pending transaction not found by eth hash"),
-                    Err(e) => {
-                        bail!("failed to get pending transaction: {e}")
-                    }
-                }
-                bencher.record("mempool".to_string()).await;
-
-                // TODO: improve the polling or subscribe to some stream
-                loop {
-                    if let Ok(Some(tx)) = middleware.get_transaction_receipt(tx_hash).await {
-                        println!("tx included in block {:?} (test_id={})", tx.block_number, test_id);
-
-                        break;
-                    }
-                    sleep(Duration::from_millis(100)).await;
-                }
-                bencher.record("block_inclusion".to_string()).await;
-
-                Ok(())
-            };
-
-            test.boxed()
-        },
-    )
-        .await
-        .unwrap()
+    cleanup(res.is_err(), testnet).await;
+    res
 }
 
 // /// Test that transactions sent out-of-order with regards to the nonce are not rejected,

@@ -9,7 +9,6 @@
 use anyhow::{anyhow, Context};
 use ethers::providers::Middleware;
 use fendermint_materializer::{
-    concurrency,
     docker::{DockerMaterializer, DockerMaterials},
     manifest::Manifest,
     testnet::Testnet,
@@ -17,7 +16,6 @@ use fendermint_materializer::{
 };
 use futures::{Future, FutureExt};
 use lazy_static::lazy_static;
-use std::sync::Arc;
 use std::{
     collections::BTreeSet,
     env::current_dir,
@@ -26,8 +24,6 @@ use std::{
     time::{Duration, Instant},
 };
 use tendermint_rpc::Client;
-use fendermint_materializer::bencher::Bencher;
-use fendermint_materializer::concurrency::nonce_manager::NonceManager;
 
 pub type DockerTestnet = Testnet<DockerMaterials, DockerMaterializer>;
 
@@ -61,31 +57,16 @@ fn read_manifest(file_name: &str) -> anyhow::Result<Manifest> {
 }
 
 /// Parse a manifest file in the `manifests` directory, clean up any corresponding
-/// testnet resources, then materialize a testnet and run some tests.
-pub async fn with_testnet<F, G, I>(
+/// testnet resources, then materialize a testnet and provide a cleanup function.
+pub async fn make_testnet<F>(
     manifest_file_name: &str,
-    concurrency: Option<concurrency::config::Execution>,
-    alter: G,
-    init: I,
-    test: F,
-) -> anyhow::Result<()>
+    alter: F,
+) -> anyhow::Result<(
+    DockerTestnet,
+    Box<dyn FnOnce(bool, DockerTestnet) -> Pin<Box<dyn Future<Output = ()> + Send>> + Send>,
+)>
 where
-    G: FnOnce(&mut Manifest),
-    I: FnOnce(
-        Arc<DockerTestnet>,
-        Arc<NonceManager>
-    ) -> Pin<Box<dyn Future<Output = ()>>>,
-    F: for<'a> Fn(
-            Arc<Manifest>,
-            Arc<DockerMaterializer>,
-            Arc<DockerTestnet>,
-            usize,
-            Arc<Bencher>,
-            Arc<NonceManager>
-        ) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send>>
-        + Copy
-        + Send
-        + 'static,
+    F: FnOnce(&mut Manifest),
 {
     let testnet_name = TestnetName::new(
         PathBuf::from(manifest_file_name)
@@ -121,83 +102,44 @@ where
         .context("failed to set up testnet")?;
 
     let started = wait_for_startup(&testnet).await?;
-
-    let testnet = Arc::new(testnet);
-    let materializer = Arc::new(materializer);
-    let manifest = Arc::new(manifest);
-    let nonce_manager = Arc::new(NonceManager::new());
-    let res = if started {
-        init(
-            testnet.clone(),
-            nonce_manager.clone()
-        ).await;
-        match concurrency {
-            None => test(
-                manifest.clone(),
-                materializer.clone(),
-                testnet.clone(),
-                0,
-                Arc::new(Bencher::new()),
-                nonce_manager.clone()
-            ).await,
-            Some(cfg) => {
-                let test_generator = {
-                    let testnet = testnet.clone();
-                    let materializer = materializer.clone();
-                    move |test_id: usize, bencher: Arc<Bencher>| {
-                        let manifest = manifest.clone();
-                        let materializer = materializer.clone();
-                        let testnet = testnet.clone();
-                        let nonce_manager = nonce_manager.clone();
-                        async move { test(manifest, materializer, testnet, test_id, bencher, nonce_manager).await }.boxed()
-                    }
-                };
-
-                let results = concurrency::execute(cfg.clone(), test_generator).await;
-                let summary = concurrency::ExecutionSummary::new(cfg.clone(), results);
-                println!("{:?}", summary);
-
-                let errs = summary.errs();
-                match errs.is_empty() {
-                    true => Ok(()),
-                    false => Err(anyhow::anyhow!(errs.join("\n"))),
-                }
-            }
-        }
-    } else {
-        Err(anyhow!("the startup sequence timed out"))
-    };
-
-    // Print all logs on failure.
-    // Some might be available in logs in the files which are left behind,
-    // e.g. for `fendermint` we have logs, but maybe not for `cometbft`.
-    if res.is_err() && *PRINT_LOGS_ON_ERROR {
-        for (name, node) in testnet.nodes() {
-            let name = name.path_string();
-            for log in node.fendermint_logs().await {
-                eprintln!("{name}/fendermint: {log}");
-            }
-            for log in node.cometbft_logs().await {
-                eprintln!("{name}/cometbft: {log}");
-            }
-            for log in node.ethapi_logs().await {
-                eprintln!("{name}/ethapi: {log}");
-            }
-        }
+    if !started {
+        return Err(anyhow!("the startup sequence timed out"));
     }
 
-    // Tear down the testnet.
-    drop(testnet);
+    let cleanup = Box::new(|failure: bool, testnet: DockerTestnet| {
+        async move {
+            println!("Cleaning up...");
 
-    // Allow some time for containers to be dropped.
-    // This only happens if the testnet setup succeeded,
-    // otherwise the system shuts down too quick, but
-    // at least we can inspect the containers.
-    // If they don't all get dropped, `docker system prune` helps.
-    let drop_handle = Arc::try_unwrap(materializer).unwrap().take_dropper();
-    let _ = tokio::time::timeout(*TEARDOWN_TIMEOUT, drop_handle).await;
+            // Print all logs on failure.
+            // Some might be available in logs in the files which are left behind,
+            // e.g. for `fendermint` we have logs, but maybe not for `cometbft`.
+            if failure && *PRINT_LOGS_ON_ERROR {
+                for (name, node) in testnet.nodes() {
+                    let name = name.path_string();
+                    for log in node.fendermint_logs().await {
+                        eprintln!("{name}/fendermint: {log}");
+                    }
+                    for log in node.cometbft_logs().await {
+                        eprintln!("{name}/cometbft: {log}");
+                    }
+                    for log in node.ethapi_logs().await {
+                        eprintln!("{name}/ethapi: {log}");
+                    }
+                }
+            }
 
-    res
+            // Allow some time for containers to be dropped.
+            // This only happens if the testnet setup succeeded,
+            // otherwise the system shuts down too quick, but
+            // at least we can inspect the containers.
+            // If they don't all get dropped, `docker system prune` helps.
+            let drop_handle = materializer.take_dropper();
+            let _ = tokio::time::timeout(*TEARDOWN_TIMEOUT, drop_handle).await;
+        }
+        .boxed()
+    });
+
+    Ok((testnet, cleanup))
 }
 
 /// Allow time for things to consolidate and APIs to start.

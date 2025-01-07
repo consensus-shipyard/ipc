@@ -90,6 +90,7 @@ macro_rules! env_vars {
     };
 }
 
+#[derive(Debug)]
 pub struct DockerMaterials;
 
 impl Materials for DockerMaterials {

@@ -1,22 +1,20 @@
 pub mod config;
-pub mod reporting;
 pub mod nonce_manager;
+pub mod reporting;
 
 pub use reporting::*;
 
-use futures::{FutureExt};
+use crate::bencher::Bencher;
+use futures::FutureExt;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
-use ethers::types::spoof::nonce;
-use tokio::sync::{Semaphore};
-use crate::bencher::Bencher;
-use crate::concurrency::nonce_manager::NonceManager;
+use std::time::Instant;
+use tokio::sync::Semaphore;
 
-pub async fn execute<F>(cfg: config::Execution, test: F) -> Vec<Vec<TestResult>>
+pub async fn execute<F>(cfg: config::Execution, test_factory: F) -> Vec<Vec<TestResult>>
 where
-    F: Fn(usize, Arc<Bencher>) -> Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send>>,
+    F: Fn(usize, Bencher) -> Pin<Box<dyn Future<Output = anyhow::Result<Bencher>> + Send>>,
 {
     let mut test_id = 0;
     let mut results = Vec::new();
@@ -30,17 +28,20 @@ where
                 break;
             }
             let permit = semaphore.clone().acquire_owned().await.unwrap();
-            let bencher = Arc::new(Bencher::new());
-            let task = test(test_id, bencher.clone()).boxed();
+            let bencher = Bencher::new();
+            let task = test_factory(test_id, bencher).boxed();
             let step_results = step_results.clone();
             let handle = tokio::spawn(async move {
-                let result = task.await;
-                let records = bencher.records.lock().await.clone();
+                let res = task.await;
+                let (bencher, err) = match res {
+                    Ok(bencher) => (Some(bencher), None),
+                    Err(err) => (None, Some(err)),
+                };
                 step_results.lock().await.push(TestResult {
                     test_id,
                     step_id,
-                    records,
-                    err: result.err(),
+                    bencher,
+                    err,
                 });
                 drop(permit);
             });
@@ -58,4 +59,3 @@ where
     }
     results
 }
-
