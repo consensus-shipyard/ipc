@@ -3,7 +3,7 @@
 
 use std::time::Duration;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Execution {
     pub steps: Vec<ExecutionStep>,
 }

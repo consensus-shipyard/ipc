@@ -49,7 +49,7 @@ where
                 drop(permit);
             });
             handles.push(handle);
-            test_id = test_id + 1;
+            test_id += 1;
         }
 
         // Exhaust unfinished handles.
