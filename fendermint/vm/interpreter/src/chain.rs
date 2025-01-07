@@ -591,13 +591,20 @@ fn select_messages<DB: Blockstore + Clone + 'static>(
     state: &FvmExecState<DB>,
 ) -> anyhow::Result<Vec<ChainMessage>> {
     // Ensure we only have signed messages.
-    let signed = msgs
+    let mut signed = msgs
         .into_iter()
         .map(|msg| match msg {
             ChainMessage::Signed(inner) => Ok(inner),
             ChainMessage::Ipc(_) => Err(anyhow!("should not have ipc messages in user proposals")),
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
+
+    // Shuffle the messages to prevent attackers from predicting or controlling message selection.
+    {
+        let signed = signed.as_mut_slice();
+        let mut rng = rand::thread_rng();
+        rand::seq::SliceRandom::shuffle(signed, &mut rng);
+    }
 
     let total_gas_limit = state.block_gas_tracker().available();
     let gas_market = state.block_gas_tracker().current_gas_market();
