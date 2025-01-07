@@ -32,7 +32,7 @@ lint: license $(patsubst %, lint/%, $(SUBTREES_ALL))
 ## Hoku
 
 config-devnet:
-	PATH="$(PATH):./target/release" \
+	PATH="./target/release:$(PATH)" \
 	./scripts/setup.sh
 
 run-devnet-iroh:
