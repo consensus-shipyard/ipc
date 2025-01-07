@@ -70,7 +70,7 @@ impl From<&CheckpointPoolItem> for ResolveKey {
 }
 
 /// A user sent a transaction which they are not allowed to do.
-pub struct IllegalMessage;
+pub struct IllegalMessage(pub String);
 
 // For now this is the only option, later we can expand.
 pub enum ChainMessageApplyRet {
@@ -499,7 +499,10 @@ where
                 if msg.message.gas_limit > gas_market.block_gas_limit
                     || msg.message.gas_fee_cap < gas_market.min_base_fee
                 {
-                    return Ok((state, Err(IllegalMessage)));
+                    return Ok((
+                        state,
+                        Err(IllegalMessage("unacceptable gas parameters".to_string())),
+                    ));
                 }
 
                 let (state, ret) = self
@@ -525,7 +528,10 @@ where
                     }
                     IpcMessage::TopDownExec(_) | IpcMessage::BottomUpExec(_) => {
                         // Users cannot send these messages, only validators can propose them in blocks.
-                        Ok((state, Err(IllegalMessage)))
+                        Ok((
+                            state,
+                            Err(IllegalMessage("unacceptable message type".to_string())),
+                        ))
                     }
                 }
             }
