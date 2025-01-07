@@ -76,7 +76,6 @@ async fn test_concurrent_transfer() -> Result<(), anyhow::Error> {
             let middleware = make_middleware(provider, sender)
                 .await
                 .context("failed to set up middleware")?;
-
             println!("middleware ready, pending tests (test_id={})", test_id);
 
             let sender: H160 = sender.eth_addr().into();

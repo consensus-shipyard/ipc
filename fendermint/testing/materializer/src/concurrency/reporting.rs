@@ -1,3 +1,6 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
+
 use crate::bencher::Bencher;
 use crate::concurrency::config;
 use crate::concurrency::config::ExecutionStep;
@@ -80,12 +83,8 @@ impl ExecutionSummary {
     pub fn errs(&self) -> Vec<String> {
         let mut errs = Vec::new();
         for summary in self.summaries.iter() {
-            let cloned_errs: Vec<String> = summary
-                .errs
-                .iter()
-                .map(|e| format!("{:?}", e))
-                // e.chain().map(|cause|cause.to_string()).collect::<Vec<_>>().join(" -> "))
-                .collect();
+            let cloned_errs: Vec<String> =
+                summary.errs.iter().map(|e| format!("{:?}", e)).collect();
             errs.extend(cloned_errs);
         }
         errs
