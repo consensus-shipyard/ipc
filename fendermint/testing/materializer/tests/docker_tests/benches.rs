@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use crate::make_testnet;
 use anyhow::{bail, Context};
+use ethers::types::U256;
 use ethers::{
     core::k256::ecdsa::SigningKey,
     middleware::SignerMiddleware,
@@ -31,15 +32,11 @@ pub type TestMiddleware<C> = SignerMiddleware<Provider<C>, Wallet<SigningKey>>;
 async fn make_middleware<C>(
     provider: Provider<C>,
     sender: &DefaultAccount,
+    chain_id: U256,
 ) -> anyhow::Result<TestMiddleware<C>>
 where
     C: JsonRpcClient,
 {
-    let chain_id = provider
-        .get_chainid()
-        .await
-        .context("failed to get chain ID")?;
-
     let wallet: Wallet<SigningKey> = Wallet::from_bytes(sender.secret_key().serialize().as_ref())?
         .with_chain_id(chain_id.as_u64());
 
@@ -51,32 +48,37 @@ where
 async fn test_concurrent_transfer() -> Result<(), anyhow::Error> {
     let (testnet, cleanup) = make_testnet(MANIFEST, |_| {}).await?;
 
+    let pangea = testnet.node(&testnet.root().node("pangea"))?;
+    let provider = pangea
+        .ethapi_http_provider()?
+        .expect("ethapi should be enabled");
+    let chain_id = provider
+        .get_chainid()
+        .await
+        .context("failed to get chain ID")?;
+
     // Drive concurrency.
     let cfg = Execution::new()
         .add_step(10, 5)
         .add_step(100, 5)
-        .add_step(200, 5);
+        .add_step(150, 5);
     let testnet = Arc::new(testnet);
     let testnet_clone = testnet.clone();
     let nonce_manager = Arc::new(NonceManager::new());
+
     let results = concurrency::execute(cfg.clone(), move |test_id: usize, mut bencher: Bencher| {
         let testnet = testnet_clone.clone();
         let nonce_manager = nonce_manager.clone();
+        let provider = provider.clone();
 
         let test = async move {
             let sender = testnet.account_mod_nth(test_id);
             let recipient = testnet.account_mod_nth(test_id + 1);
             println!("running (test_id={})", test_id);
 
-            let pangea = testnet.node(&testnet.root().node("pangea"))?;
-            let provider = pangea
-                .ethapi_http_provider()?
-                .expect("ethapi should be enabled");
-
-            let middleware = make_middleware(provider, sender)
+            let middleware = make_middleware(provider, sender, chain_id)
                 .await
                 .context("failed to set up middleware")?;
-            println!("middleware ready, pending tests (test_id={})", test_id);
 
             let sender: H160 = sender.eth_addr().into();
             let nonce = nonce_manager.get_and_increment(sender).await;
@@ -126,12 +128,12 @@ async fn test_concurrent_transfer() -> Result<(), anyhow::Error> {
     .await;
 
     let summary = concurrency::ExecutionSummary::new(cfg.clone(), results);
-    println!("{:?}", summary);
+    summary.print();
 
+    let res = summary.to_result();
     let Ok(testnet) = Arc::try_unwrap(testnet) else {
         bail!("Arc::try_unwrap(testnet)");
     };
-    let res = summary.to_result();
     cleanup(res.is_err(), testnet).await;
     res
 }

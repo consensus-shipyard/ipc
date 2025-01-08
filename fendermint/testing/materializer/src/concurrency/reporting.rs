@@ -5,7 +5,8 @@ use crate::bencher::Bencher;
 use crate::concurrency::config;
 use crate::concurrency::config::ExecutionStep;
 use anyhow::anyhow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::io;
 use std::time::Duration;
 
 #[derive(Debug)]
@@ -88,5 +89,39 @@ impl ExecutionSummary {
             errs.extend(cloned_errs);
         }
         errs
+    }
+
+    pub fn print(&self) {
+        let mut data = vec![];
+
+        let latencies: HashSet<String> = self
+            .summaries
+            .iter()
+            .flat_map(|summary| summary.avg_latencies.keys().cloned())
+            .collect();
+
+        let mut header = vec!["max_concurrency".to_string(), "duration".to_string()];
+        header.extend(latencies.iter().map(|key| format!("{} latency (ms)", key)));
+        data.push(header);
+
+        for summary in self.summaries.iter() {
+            let mut row = vec![];
+            row.push(summary.cfg.max_concurrency.to_string());
+            row.push(summary.cfg.duration.as_secs().to_string());
+
+            for key in &latencies {
+                let latency = summary
+                    .avg_latencies
+                    .get(key)
+                    .map_or(String::from("-"), |duration| {
+                        duration.as_millis().to_string()
+                    });
+                row.push(latency);
+            }
+
+            data.push(row);
+        }
+
+        text_tables::render(&mut io::stdout(), data).unwrap();
     }
 }
