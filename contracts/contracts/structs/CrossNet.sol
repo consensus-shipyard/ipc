@@ -88,6 +88,8 @@ struct IpcEnvelope {
     uint256 value;
     /// @dev abi.encoded message
     bytes message;
+    /// @dev original nonce of the message from the source network
+    uint64 originalNonce;
     /// @dev the gas limit is currently not used.
     // FIXME: currently not used.
     // uint256 gasLimit;

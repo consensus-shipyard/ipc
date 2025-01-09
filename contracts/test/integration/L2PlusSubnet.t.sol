@@ -361,7 +361,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         emit LibGateway.NewTopDownMessage({
             subnet: params.subnet.subnetActorAddr,
             message: fundCrossMessage,
-            id: fundCrossMessage.toDeterministicHash()
+            id: fundCrossMessage.toTracingId()
         });
 
         params.root.gateway.manager().fund{value: params.amount}(
@@ -382,7 +382,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         emit LibGateway.NewTopDownMessage({
             subnet: params.subnet.subnetActorAddr,
             message: callCrossMessage,
-            id: callCrossMessage.toDeterministicHash()
+            id: callCrossMessage.toTracingId()
         });
 
         params.root.gateway.messenger().sendContractXnetMessage{value: params.amount}(callCrossMessage);
@@ -401,7 +401,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         emit LibGateway.NewTopDownMessage({
             subnet: params.subnetL3.subnetActorAddr,
             message: callCrossMessage,
-            id: callCrossMessage.toDeterministicHash()
+            id: callCrossMessage.toTracingId()
         });
 
         // nonce needs to be 1 because of the fund message.
@@ -440,7 +440,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         emit LibGateway.NewTopDownMessage({
             subnet: params.subnetL3.subnetActorAddr,
             message: fundCrossMessageL3,
-            id: fundCrossMessageL3.toDeterministicHash()
+            id: fundCrossMessageL3.toTracingId()
         });
 
         params.subnet.gateway.manager().fund{value: params.amount}(
@@ -578,7 +578,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         emit LibGateway.NewTopDownMessage({
             subnet: params.subnet.subnetActorAddr,
             message: crossMessage,
-            id: crossMessage.toDeterministicHash()
+            id: crossMessage.toTracingId()
         });
 
         crossMessage.nonce = 0;
@@ -762,7 +762,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         emit LibGateway.NewTopDownMessage({
             subnet: expectedSubnetAddr,
             message: expectedMessage,
-            id: expectedMessage.toDeterministicHash()
+            id: expectedMessage.toTracingId()
         });
         XnetMessagingFacet xnetMessenger = gw.xnetMessenger();
         xnetMessenger.applyCrossMessages(msgs);
@@ -898,7 +898,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         emit LibGateway.NewTopDownMessage({
             subnet: expectedSubnetAddr,
             message: expectedMessage,
-            id: expectedMessage.toDeterministicHash()
+            id: expectedMessage.toTracingId()
         });
         checkpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
         vm.stopPrank();
@@ -923,6 +923,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
                 to: original.to,
                 from: original.from,
                 nonce: newNonce,
+                originalNonce: 0,
                 value: original.value,
                 message: original.message
             });

@@ -244,10 +244,14 @@ library LibGateway {
         uint64 topDownNonce = subnet.topDownNonce;
 
         crossMessage.nonce = topDownNonce;
+        // only set the original nonce if the message is from this subnet
+        if (crossMessage.from.subnetId.equals(subnet.id)) {
+            crossMessage.originalNonce = topDownNonce;
+        }
         subnet.topDownNonce = topDownNonce + 1;
         subnet.circSupply += crossMessage.value;
 
-        emit NewTopDownMessage({subnet: subnet.id.getAddress(), message: crossMessage, id: crossMessage.toDeterministicHash()});
+        emit NewTopDownMessage({subnet: subnet.id.getAddress(), message: crossMessage, id: crossMessage.toTracingId()});
     }
 
     /// @notice Commits a new cross-net message to a message batch for execution
@@ -258,6 +262,10 @@ library LibGateway {
 
         // assign nonce to the message.
         crossMessage.nonce = s.bottomUpNonce;
+        // only set the original nonce if the message is from this subnet
+        if (crossMessage.from.subnetId.equals(s.networkName)) {
+            crossMessage.originalNonce = s.bottomUpNonce;
+        }
         s.bottomUpNonce += 1;
 
         // populate the batch for that epoch
@@ -267,7 +275,7 @@ library LibGateway {
             batch.blockHeight = epoch;
             // we need to use push here to initialize the array.
             batch.msgs.push(crossMessage);
-            emit QueuedBottomUpMessage({id: crossMessage.toDeterministicHash()});
+            emit QueuedBottomUpMessage({id: crossMessage.toTracingId()});
             return;
         }
 
@@ -305,7 +313,7 @@ library LibGateway {
             batch.msgs.push(crossMessage);
         }
 
-        emit QueuedBottomUpMessage({id: crossMessage.toDeterministicHash()});
+        emit QueuedBottomUpMessage({id: crossMessage.toTracingId()});
     }
 
     /// @notice returns the subnet created by a validator
@@ -453,7 +461,7 @@ library LibGateway {
             s.postboxKeys.add(cid);
             s.postbox[cid] = crossMsg;
 
-            emit MessageStoredInPostbox({id: crossMsg.toDeterministicHash()});
+            emit MessageStoredInPostbox({id: crossMsg.toTracingId()});
             return;
         }
 
@@ -699,7 +707,7 @@ library LibGateway {
 
         // Cache value before deletion to avoid re-entrancy
         uint256 v = crossMsg.value;
-        bytes32 deterministicId = crossMsg.toDeterministicHash();
+        bytes32 deterministicId = crossMsg.toTracingId();
 
         // Remove the message to prevent re-entrancy and clean up state
         delete s.postbox[msgCid];

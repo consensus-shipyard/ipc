@@ -118,6 +118,7 @@ contract IpcExchangeTest is Test {
             to: ipcAddressB,
             value: 1000,
             message: abi.encode(callMsg),
+            originalNonce: 0,
             nonce: 0
         });
 
@@ -129,6 +130,7 @@ contract IpcExchangeTest is Test {
             to: ipcAddressA,
             value: 1000,
             message: abi.encode(resultMsg),
+            originalNonce: 0,
             nonce: 0
         });
 

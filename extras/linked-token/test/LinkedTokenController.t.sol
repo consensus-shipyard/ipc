@@ -108,6 +108,7 @@ contract LinkedTokenControllerTest is Test, IntegrationTestBase {
             to: IPCAddress({subnetId: controllerSubnet, rawAddress: FvmAddressHelper.from(address(replica))}),
             value: DEFAULT_CROSS_MSG_FEE,
             nonce: 0,
+            originalNonce: 0,
             message: abi.encode(message)
         });
 
@@ -120,6 +121,7 @@ contract LinkedTokenControllerTest is Test, IntegrationTestBase {
             to: IPCAddress({subnetId: controllerSubnet, rawAddress: FvmAddressHelper.from(address(replica))}),
             value: DEFAULT_CROSS_MSG_FEE,
             nonce: 0,
+            originalNonce: 0,
             message: abi.encode(message)
         });
 
@@ -132,6 +134,7 @@ contract LinkedTokenControllerTest is Test, IntegrationTestBase {
             to: IPCAddress({subnetId: controllerSubnet, rawAddress: FvmAddressHelper.from(address(replica))}),
             value: DEFAULT_CROSS_MSG_FEE,
             nonce: 0,
+            originalNonce: 0,
             message: abi.encode(message)
         });
 

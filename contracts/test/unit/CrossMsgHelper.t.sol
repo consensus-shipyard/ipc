@@ -337,7 +337,15 @@ contract CrossMsgHelperTest is Test {
         uint64 nonce
     ) internal pure returns (IpcEnvelope memory) {
         return
-            IpcEnvelope({kind: IpcMsgKind.Transfer, from: from, to: to, value: 0, message: EMPTY_BYTES, nonce: nonce});
+            IpcEnvelope({
+                kind: IpcMsgKind.Transfer,
+                from: from,
+                to: to,
+                value: 0,
+                message: EMPTY_BYTES,
+                nonce: nonce,
+                originalNonce: 0
+            });
     }
 
     function createCrossMsgs(uint256 length, uint64 nonce) internal pure returns (IpcEnvelope[] memory _crossMsgs) {

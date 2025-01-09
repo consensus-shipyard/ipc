@@ -80,6 +80,7 @@ abstract contract IpcExchange is IIpcHandler, Ownable, ReentrancyGuard {
                 from: to, // TODO: will anyway be replaced by sendContractXnetMessage.
                 to: to,
                 nonce: 0, // TODO: will be replaced.
+                originalNonce: 0, // TODO: will be replaced
                 value: value,
                 message: abi.encode(callMsg)
             })

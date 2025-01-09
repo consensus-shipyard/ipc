@@ -113,7 +113,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
             10
         );
         vm.expectEmit(true, true, true, true, address(gatewayDiamond));
-        emit LibGateway.NewTopDownMessage(address(saDiamond), expected, expected.toDeterministicHash());
+        emit LibGateway.NewTopDownMessage(address(saDiamond), expected, expected.toTracingId());
         gatewayDiamond.manager().fundWithToken(subnet.id, FvmAddressHelper.from(caller), 10);
 
         // Assert post-conditions.

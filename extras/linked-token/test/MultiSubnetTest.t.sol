@@ -291,6 +291,7 @@ contract MultiSubnetTest is IntegrationTestBase {
             to: lockAndTransferEnvelope.to,
             value: 0,
             message: lockAndTransferEnvelope.message,
+            originalNonce: 0,
             nonce: 0 // nonce will be updated by LibGateway.commitCrossMessage
         });
 

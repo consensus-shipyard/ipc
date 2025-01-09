@@ -803,6 +803,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             }),
             value: DEFAULT_CROSS_MSG_FEE + 1,
             nonce: 0,
+            originalNonce: 0,
             message: EMPTY_BYTES
         });
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);

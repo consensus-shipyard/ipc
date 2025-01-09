@@ -63,6 +63,7 @@ contract CrossMessengerCaller is IpcExchange {
             to: to,
             value: value,
             message: abi.encode(callMsg),
+            originalNonce: 0,
             nonce: 0
         });
 

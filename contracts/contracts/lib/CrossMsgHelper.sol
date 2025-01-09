@@ -38,6 +38,7 @@ library CrossMsgHelper {
                 to: to,
                 value: value,
                 message: EMPTY_BYTES,
+                originalNonce: 0,
                 nonce: 0
             });
     }
@@ -57,6 +58,7 @@ library CrossMsgHelper {
                 to: to,
                 value: value,
                 message: abi.encode(message),
+                originalNonce: 0,
                 nonce: 0
             });
     }
@@ -69,7 +71,7 @@ library CrossMsgHelper {
         OutcomeType outcome,
         bytes memory ret
     ) public pure returns (IpcEnvelope memory) {
-        ResultMsg memory message = ResultMsg({id: toDeterministicHash(crossMsg), outcome: outcome, ret: ret});
+        ResultMsg memory message = ResultMsg({id:toTracingId(crossMsg), outcome: outcome, ret: ret});
 
         uint256 value = crossMsg.value;
         // if the message was executed successfully, the value stayed
@@ -84,6 +86,7 @@ library CrossMsgHelper {
                 to: crossMsg.from,
                 value: value,
                 message: abi.encode(message),
+                originalNonce: 0,
                 nonce: 0
             });
     }
@@ -137,9 +140,13 @@ library CrossMsgHelper {
         return keccak256(abi.encode(crossMsg));
     }
 
-    /// @notice Returns a deterministic hash for the given cross message. The hash remains the same accross different networks
-    /// because it doesn't include the network-specific nonce.
-    function toDeterministicHash(IpcEnvelope memory crossMsg) internal pure returns (bytes32) {
+    function toHash(IpcEnvelope[] memory crossMsgs) public pure returns (bytes32) {
+        return keccak256(abi.encode(crossMsgs));
+    }
+
+    /// @notice Returns a deterministic hash for the given cross message, excluding the nonce,
+    /// which is useful for generating a `tracingId` for cross messages.
+    function toTracingId(IpcEnvelope memory crossMsg) internal pure returns (bytes32) {
         return keccak256(
             // solhint-disable-next-line func-named-parameters
             abi.encode(
@@ -147,14 +154,10 @@ library CrossMsgHelper {
                 crossMsg.to,
                 crossMsg.from,
                 crossMsg.value,
-                crossMsg.message
+                crossMsg.message,
+                crossMsg.originalNonce
             )
         );
-    }
-
-
-    function toHash(IpcEnvelope[] memory crossMsgs) public pure returns (bytes32) {
-        return keccak256(abi.encode(crossMsgs));
     }
 
     function isEmpty(IpcEnvelope memory crossMsg) internal pure returns (bool) {
