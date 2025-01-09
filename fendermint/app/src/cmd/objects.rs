@@ -523,7 +523,7 @@ fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ObjectsError
         }
         (false, false) => (0, size - 1),
     };
-    if first >= last {
+    if first > last || first >= size {
         return Err(ObjectsError::RangeHeaderInvalid);
     }
     if last >= size {
@@ -1313,8 +1313,12 @@ mod tests {
         let _ = get_range_params("bytes=-50-".into(), 100).is_err();
         // first > last
         let _ = get_range_params("bytes=50-0".into(), 100).is_err();
+        // first >= size
+        let _ = get_range_params("bytes=100-".into(), 100).is_err();
         // first == last
-        let _ = get_range_params("bytes=0-0".into(), 100).is_err();
+        let (first, last) = get_range_params("bytes=0-0".into(), 100).unwrap();
+        assert_eq!(first, 0);
+        assert_eq!(last, 0);
         // exact range given
         let (first, last) = get_range_params("bytes=0-50".into(), 100).unwrap();
         assert_eq!(first, 0);
