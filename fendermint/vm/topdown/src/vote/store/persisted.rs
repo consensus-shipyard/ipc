@@ -99,7 +99,7 @@ impl VoteStore for PersistedVoteStore {
     }
 }
 
-fn get_cf<'a>(
+pub(crate) fn get_cf<'a>(
     db: &'a OptimisticTransactionDB,
     ns: &'a str,
 ) -> Result<Arc<BoundColumnFamily<'a>>, Error> {

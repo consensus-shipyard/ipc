@@ -1,9 +1,12 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+mod persisted;
+
 use crate::syncer::error::Error;
 use crate::syncer::payload::ParentBlockView;
 use crate::{BlockHeight, SequentialKeyCache};
+pub use persisted::PersistedParentViewStore;
 use std::sync::{Arc, RwLock};
 
 /// Stores the parent view observed of the current node
