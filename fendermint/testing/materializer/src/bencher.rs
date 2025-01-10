@@ -7,23 +7,34 @@ use std::time::{Duration, Instant};
 #[derive(Debug, Clone, Default)]
 pub struct Bencher {
     pub start_time: Option<Instant>,
-    pub records: HashMap<String, Duration>,
+    pub latencies: HashMap<String, Duration>,
+    pub block_inclusion: Option<u64>,
 }
 
 impl Bencher {
     pub fn new() -> Self {
         Self {
             start_time: None,
-            records: HashMap::new(),
+            latencies: HashMap::new(),
+            block_inclusion: None,
         }
     }
 
-    pub async fn start(&mut self) {
+    pub fn start(&mut self) {
         self.start_time = Some(Instant::now());
     }
 
-    pub async fn record(&mut self, label: String) {
+    pub fn mempool(&mut self) {
+        self.set_latency("mempool".to_string());
+    }
+
+    pub fn block_inclusion(&mut self, block_number: u64) {
+        self.set_latency("block_inclusion".to_string());
+        self.block_inclusion = Some(block_number);
+    }
+
+    fn set_latency(&mut self, label: String) {
         let duration = self.start_time.unwrap().elapsed();
-        self.records.insert(label, duration);
+        self.latencies.insert(label, duration);
     }
 }

@@ -6,6 +6,7 @@ use std::time::Duration;
 
 use crate::make_testnet;
 use anyhow::{bail, Context};
+use ethers::prelude::{Block, H256};
 use ethers::types::U256;
 use ethers::{
     core::k256::ecdsa::SigningKey,
@@ -15,7 +16,9 @@ use ethers::{
     types::{Eip1559TransactionRequest, H160},
 };
 use fendermint_materializer::bencher::Bencher;
+use fendermint_materializer::concurrency::collect::collect_blocks;
 use fendermint_materializer::concurrency::nonce_manager::NonceManager;
+use fendermint_materializer::concurrency::signal::Signal;
 use fendermint_materializer::{
     concurrency::{self, config::Execution},
     materials::DefaultAccount,
@@ -43,10 +46,16 @@ where
     Ok(SignerMiddleware::new(provider, wallet))
 }
 
+const BLOCK_GAS_LIMIT: u64 = 10_000_000_000;
+const MAX_TX_GAS_LIMIT: u64 = 3_000_000;
+
 #[serial_test::serial]
 #[tokio::test]
 async fn test_concurrent_transfer() -> Result<(), anyhow::Error> {
     let (testnet, cleanup) = make_testnet(MANIFEST, |_| {}).await?;
+
+    let block_gas_limit = U256::from(BLOCK_GAS_LIMIT);
+    let max_tx_gas_limit = U256::from(MAX_TX_GAS_LIMIT);
 
     let pangea = testnet.node(&testnet.root().node("pangea"))?;
     let provider = pangea
@@ -57,11 +66,27 @@ async fn test_concurrent_transfer() -> Result<(), anyhow::Error> {
         .await
         .context("failed to get chain ID")?;
 
+    let cancel = Arc::new(Signal::new());
+
+    // Set up background blocks collector.
+    let blocks_collector = {
+        let cancel = cancel.clone();
+        let provider = provider.clone();
+        let assert = move |block: &Block<H256>| {
+            // Make sure block gas limit isn't the bottleneck.
+            let unused_gas_limit = block_gas_limit - block.gas_limit;
+            assert!(unused_gas_limit >= max_tx_gas_limit);
+        };
+        tokio::spawn(collect_blocks(cancel, provider, assert))
+    };
+
     // Drive concurrency.
     let cfg = Execution::new()
+        .add_step(1, 5)
         .add_step(10, 5)
         .add_step(100, 5)
-        .add_step(150, 5);
+        .add_step(150, 5)
+        .add_step(200, 5);
     let testnet = Arc::new(testnet);
     let testnet_clone = testnet.clone();
     let nonce_manager = Arc::new(NonceManager::new());
@@ -78,26 +103,33 @@ async fn test_concurrent_transfer() -> Result<(), anyhow::Error> {
 
             let middleware = make_middleware(provider, sender, chain_id)
                 .await
-                .context("failed to set up middleware")?;
+                .context("make_middleware")?;
 
             let sender: H160 = sender.eth_addr().into();
             let nonce = nonce_manager.get_and_increment(sender).await;
 
             // Create the simplest transaction possible: send tokens between accounts.
             let to: H160 = recipient.eth_addr().into();
-            let transfer = Eip1559TransactionRequest::new()
+            let mut tx = Eip1559TransactionRequest::new()
                 .to(to)
                 .value(1)
                 .nonce(nonce);
 
-            bencher.start().await;
+            let gas_estimation = middleware
+                .estimate_gas(&tx.clone().into(), None)
+                .await
+                .unwrap();
+            tx = tx.gas(gas_estimation);
+            assert!(gas_estimation <= max_tx_gas_limit);
+
+            bencher.start();
 
             let pending: PendingTransaction<_> = middleware
-                .send_transaction(transfer, None)
+                .send_transaction(tx, None)
                 .await
                 .context("failed to send txn")?;
             let tx_hash = pending.tx_hash();
-            println!("sent pending txn {:?} (test_id={})", tx_hash, test_id);
+            println!("sent tx {:?} (test_id={})", tx_hash, test_id);
 
             // We expect that the transaction is pending, however it should not return an error.
             match middleware.get_transaction(tx_hash).await {
@@ -107,7 +139,7 @@ async fn test_concurrent_transfer() -> Result<(), anyhow::Error> {
                     bail!("failed to get pending transaction: {e}")
                 }
             }
-            bencher.record("mempool".to_string()).await;
+            bencher.mempool();
 
             loop {
                 if let Ok(Some(tx)) = middleware.get_transaction_receipt(tx_hash).await {
@@ -115,11 +147,12 @@ async fn test_concurrent_transfer() -> Result<(), anyhow::Error> {
                         "tx included in block {:?} (test_id={})",
                         tx.block_number, test_id
                     );
+                    let block_number = tx.block_number.unwrap().as_u64();
+                    bencher.block_inclusion(block_number);
                     break;
                 }
                 sleep(Duration::from_millis(100)).await;
             }
-            bencher.record("block_inclusion".to_string()).await;
 
             Ok(bencher)
         };
@@ -127,7 +160,9 @@ async fn test_concurrent_transfer() -> Result<(), anyhow::Error> {
     })
     .await;
 
-    let summary = concurrency::ExecutionSummary::new(cfg.clone(), results);
+    cancel.send();
+    let blocks = blocks_collector.await??;
+    let summary = concurrency::ExecutionSummary::new(cfg.clone(), blocks, results);
     summary.print();
 
     let res = summary.to_result();
