@@ -10,7 +10,7 @@ pub use persisted::PersistedParentViewStore;
 use std::sync::{Arc, RwLock};
 
 /// Stores the parent view observed of the current node
-pub trait ParentViewStore {
+pub trait ParentViewStore: Clone {
     /// Store a newly observed parent view
     fn store(&self, view: ParentBlockView) -> Result<(), Error>;
 

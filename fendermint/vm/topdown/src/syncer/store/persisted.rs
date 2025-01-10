@@ -8,6 +8,7 @@ use crate::BlockHeight;
 use rocksdb::{BoundColumnFamily, IteratorMode, OptimisticTransactionDB};
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct PersistedParentViewStore {
     cache: InMemoryParentViewStore,
     db: Arc<OptimisticTransactionDB>,
@@ -15,11 +16,7 @@ pub struct PersistedParentViewStore {
 }
 
 impl PersistedParentViewStore {
-    pub fn new(
-        db: Arc<OptimisticTransactionDB>,
-        ns: String,
-        previous_finality_height: BlockHeight,
-    ) -> Result<Self, Error> {
+    pub fn new(db: Arc<OptimisticTransactionDB>, ns: String) -> Result<Self, Error> {
         // All namespaces are pre-created during open.
         if db.cf_handle(&ns).is_none() {
             return Err(Error::PersistentParentViewStore(format!(
@@ -32,19 +29,7 @@ impl PersistedParentViewStore {
         let cf = get_cf(&db, &ns)?;
         let iter = db.iterator_cf(&cf, IteratorMode::Start);
         for item in iter {
-            let (key, value) =
-                item.map_err(|e| Error::PersistentParentViewStore(format!("{e}")))?;
-            let height = BlockHeight::from_be_bytes(
-                key[0..8]
-                    .try_into()
-                    .map_err(|e| Error::PersistentParentViewStore(format!("{e}")))?,
-            );
-            if height <= previous_finality_height {
-                db.delete_cf(&cf, key).map_err(|e| {
-                    Error::PersistentParentViewStore(format!("cannot delete block height {e}"))
-                })?;
-                continue;
-            }
+            let (_, value) = item.map_err(|e| Error::PersistentParentViewStore(format!("{e}")))?;
 
             let view = fvm_ipld_encoding::from_slice(value.as_ref()).map_err(|e| {
                 Error::PersistentParentViewStore(format!("cannot convert value to vote: {e}"))

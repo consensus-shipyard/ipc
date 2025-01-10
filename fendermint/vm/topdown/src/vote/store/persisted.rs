@@ -16,11 +16,7 @@ pub struct PersistedVoteStore {
 }
 
 impl PersistedVoteStore {
-    pub fn new(
-        db: Arc<OptimisticTransactionDB>,
-        ns: String,
-        previous_finality_height: BlockHeight,
-    ) -> Result<Self, Error> {
+    pub fn new(db: Arc<OptimisticTransactionDB>, ns: String) -> Result<Self, Error> {
         // All namespaces are pre-created during open.
         if db.cf_handle(&ns).is_none() {
             return Err(Error::PersistentVoteStore(format!(
@@ -39,12 +35,6 @@ impl PersistedVoteStore {
                     .try_into()
                     .map_err(|e| Error::PersistentVoteStore(format!("{e}")))?,
             );
-            if height <= previous_finality_height {
-                db.delete_cf(&cf, key).map_err(|e| {
-                    Error::PersistentVoteStore(format!("cannot delete block height {e}"))
-                })?;
-                continue;
-            }
 
             let vote = fvm_ipld_encoding::from_slice(value.as_ref()).map_err(|e| {
                 Error::PersistentVoteStore(format!("cannot convert value to vote: {e}"))
