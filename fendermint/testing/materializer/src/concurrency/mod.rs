@@ -4,8 +4,8 @@
 pub mod collect;
 pub mod config;
 pub mod nonce_manager;
-pub mod signal;
 pub mod reporting;
+pub mod signal;
 
 pub use reporting::*;
 
