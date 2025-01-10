@@ -243,7 +243,7 @@ library LibGateway {
     function commitTopDownMsg(Subnet storage subnet, IpcEnvelope memory crossMessage) internal {
         uint64 topDownNonce = subnet.topDownNonce;
 
-        crossMessage.nonce = topDownNonce;
+        crossMessage.localNonce = topDownNonce;
         // only set the original nonce if the message is from this subnet
         if (crossMessage.from.subnetId.equals(subnet.id)) {
             crossMessage.originalNonce = topDownNonce;
@@ -261,7 +261,7 @@ library LibGateway {
         uint256 epoch = getNextEpoch(block.number, s.bottomUpCheckPeriod);
 
         // assign nonce to the message.
-        crossMessage.nonce = s.bottomUpNonce;
+        crossMessage.localNonce = s.bottomUpNonce;
         // only set the original nonce if the message is from this subnet
         if (crossMessage.from.subnetId.equals(s.networkName)) {
             crossMessage.originalNonce = s.bottomUpNonce;
@@ -419,7 +419,7 @@ library LibGateway {
             // This is because non existing child should not send messages.
             (, Subnet storage subnet) = LibGateway.getSubnet(arrivingFrom);
 
-            if (subnet.appliedBottomUpNonce != crossMsg.nonce) {
+            if (subnet.appliedBottomUpNonce != crossMsg.localNonce) {
                 sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Nonce));
                 return;
             }
@@ -430,7 +430,7 @@ library LibGateway {
             supplySource = SubnetActorGetterFacet(subnet.id.getActor()).supplySource();
         } else if (applyType == IPCMsgType.TopDown) {
             // Note: there is no need to load the subnet, as a top-down application means that _we_ are the subnet.
-            if (s.appliedTopDownNonce != crossMsg.nonce) {
+            if (s.appliedTopDownNonce != crossMsg.localNonce) {
                 sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Nonce));
                 return;
             }

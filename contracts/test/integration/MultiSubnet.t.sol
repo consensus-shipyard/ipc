@@ -1125,7 +1125,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             value: xnetCallMsg.value,
             message: xnetCallMsg.message,
             originalNonce: 0,
-            nonce: 1
+            localNonce: 1
         });
 
         vm.prank(address(caller));
@@ -1274,7 +1274,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             value: xnetCallMsg.value,
             message: xnetCallMsg.message,
             originalNonce: 0,
-            nonce: 1
+            localNonce: 1
         });
 
         vm.prank(address(caller));

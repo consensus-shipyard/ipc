@@ -69,7 +69,7 @@ contract CrossMsgHelperTest is Test {
         require(releaseMsg.to.subnetId.toHash() == parentSubnetId.toHash());
         require(releaseMsg.to.rawAddress.extractEvmAddress() == sender);
         require(releaseMsg.value == releaseAmount);
-        require(releaseMsg.nonce == 0);
+        require(releaseMsg.localNonce == 0);
         require(releaseMsg.message.length == 0);
         require(releaseMsg.kind == IpcMsgKind.Transfer);
     }
@@ -103,7 +103,7 @@ contract CrossMsgHelperTest is Test {
         require(fundMsg.to.subnetId.toHash() == parentSubnetId.toHash());
         require(fundMsg.to.rawAddress.extractEvmAddress() == sender);
         require(fundMsg.value == fundAmount);
-        require(fundMsg.nonce == 0);
+        require(fundMsg.localNonce == 0);
         require(fundMsg.message.length == 0);
         require(fundMsg.kind == IpcMsgKind.Transfer);
     }
@@ -132,7 +132,7 @@ contract CrossMsgHelperTest is Test {
         require(fundMsg.to.subnetId.toHash() == subnetId.toHash());
         require(fundMsg.to.rawAddress.extractEvmAddress() == sender);
         require(fundMsg.value == fundAmount);
-        require(fundMsg.nonce == 0);
+        require(fundMsg.localNonce == 0);
         require(fundMsg.kind == IpcMsgKind.Transfer);
     }
 
@@ -343,7 +343,7 @@ contract CrossMsgHelperTest is Test {
                 to: to,
                 value: 0,
                 message: EMPTY_BYTES,
-                nonce: nonce,
+                localNonce: nonce,
                 originalNonce: 0
             });
     }
@@ -357,7 +357,7 @@ contract CrossMsgHelperTest is Test {
     }
 
     function addCrossMsg(uint64 nonce) internal {
-        crossMsg.nonce = nonce;
+        crossMsg.localNonce = nonce;
 
         crossMsgs.push(crossMsg);
     }

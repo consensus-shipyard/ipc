@@ -168,7 +168,7 @@ library TestUtils {
                 value: value,
                 message: abi.encode(message),
                 originalNonce: 0,
-                nonce: nonce
+                localNonce: nonce
             });
     }
 }

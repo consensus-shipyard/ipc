@@ -292,7 +292,7 @@ contract MultiSubnetTest is IntegrationTestBase {
             value: 0,
             message: lockAndTransferEnvelope.message,
             originalNonce: 0,
-            nonce: 0 // nonce will be updated by LibGateway.commitCrossMessage
+            localNonce: 0 // localNonce will be updated by LibGateway.commitCrossMessage
         });
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);

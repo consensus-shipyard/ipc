@@ -32,7 +32,7 @@ pub struct IpcEnvelope {
     pub message: Vec<u8>,
     /// outgoing nonce for the envelope.
     /// This nonce is set by the gateway when committing the message for propagation
-    pub nonce: u64,
+    pub local_nonce: u64,
     /// original nonce of the message from the source network
     pub original_nonce: u64,
 }
@@ -58,7 +58,7 @@ impl IpcEnvelope {
             from,
             to,
             value,
-            nonce: 0,
+            local_nonce: 0,
             original_nonce: 0,
             message: Default::default(),
         })
@@ -85,7 +85,7 @@ impl IpcEnvelope {
             from,
             to,
             value,
-            nonce: 0,
+            local_nonce: 0,
             original_nonce: 0,
             message: Default::default(),
         })

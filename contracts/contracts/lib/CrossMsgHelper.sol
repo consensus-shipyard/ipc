@@ -39,7 +39,7 @@ library CrossMsgHelper {
                 value: value,
                 message: EMPTY_BYTES,
                 originalNonce: 0,
-                nonce: 0
+                localNonce: 0
             });
     }
 
@@ -59,7 +59,7 @@ library CrossMsgHelper {
                 value: value,
                 message: abi.encode(message),
                 originalNonce: 0,
-                nonce: 0
+                localNonce: 0
             });
     }
 
@@ -87,7 +87,7 @@ library CrossMsgHelper {
                 value: value,
                 message: abi.encode(message),
                 originalNonce: 0,
-                nonce: 0
+                localNonce: 0
             });
     }
 
@@ -211,7 +211,7 @@ library CrossMsgHelper {
         uint256 prevNonce;
         uint256 length = crossMsgs.length;
         for (uint256 i; i < length; ) {
-            uint256 nonce = crossMsgs[i].nonce;
+            uint256 nonce = crossMsgs[i].localNonce;
 
             if (prevNonce >= nonce) {
                 // gas-opt: original check: i > 0

@@ -40,7 +40,7 @@ impl CommandLineHandler for ListTopdownMsgs {
                     msg.from.to_string()?,
                     msg.to.to_string()?,
                     hex::encode(msg.message),
-                    msg.nonce
+                    msg.local_nonce
                 );
             }
         }

@@ -64,7 +64,7 @@ contract CrossMessengerCaller is IpcExchange {
             value: value,
             message: abi.encode(callMsg),
             originalNonce: 0,
-            nonce: 0
+            localNonce: 0
         });
 
         IGateway(gatewayAddr).sendContractXnetMessage(envelope);

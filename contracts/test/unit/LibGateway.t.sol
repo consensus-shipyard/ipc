@@ -39,7 +39,7 @@ contract LibGatewayTest is Test {
             value: 0,
             message: new bytes(0),
             originalNonce: 0,
-            nonce: 0
+            localNonce: 0
         });
 
         vm.recordLogs();
@@ -62,7 +62,7 @@ contract LibGatewayTest is Test {
             value: 0,
             message: new bytes(0),
             originalNonce: 0,
-            nonce: 0
+            localNonce: 0
         });
 
         t.applyMsg(subnetId, envelope);
@@ -101,7 +101,7 @@ contract LibGatewayTest is Test {
             method: GatewayDummyContract.reverts.selector,
             params: new bytes(0)
         });
-        crossMsg.nonce = 0;
+        crossMsg.localNonce = 0;
 
         ResultMsg memory message = ResultMsg({
             outcome: OutcomeType.Ok,
@@ -115,7 +115,7 @@ contract LibGatewayTest is Test {
             value: 0, // it succeeded
             message: abi.encode(message),
             originalNonce: 0,
-            nonce: 0
+            localNonce: 0
         });
 
         vm.expectEmit(address(t));
@@ -156,7 +156,7 @@ contract LibGatewayTest is Test {
             method: bytes4(0),
             params: new bytes(0)
         });
-        crossMsg.nonce = 0;
+        crossMsg.localNonce = 0;
 
         ResultMsg memory message = ResultMsg({
             outcome: OutcomeType.Ok,
@@ -170,7 +170,7 @@ contract LibGatewayTest is Test {
             value: 0, // it succeeded
             message: abi.encode(message),
             originalNonce: 0,
-            nonce: 0
+            localNonce: 0
         });
 
         t.applyMsg(parentSubnet, crossMsg);
@@ -211,7 +211,7 @@ contract LibGatewayTest is Test {
             method: bytes4(0),
             params: new bytes(0)
         });
-        crossMsg.nonce = 10; // a wrong nonce
+        crossMsg.localNonce = 10; // a wrong nonce
 
         ResultMsg memory message = ResultMsg({
             outcome: OutcomeType.SystemErr,
@@ -225,7 +225,7 @@ contract LibGatewayTest is Test {
             value: value,
             message: abi.encode(message),
             originalNonce: 0,
-            nonce: 0
+            localNonce: 0
         });
 
         t.applyMsg(parentSubnet, crossMsg);
@@ -268,7 +268,7 @@ contract LibGatewayTest is Test {
             method: GatewayDummyContract.reverts.selector,
             params: new bytes(0)
         });
-        crossMsg.nonce = 0;
+        crossMsg.localNonce = 0;
 
         ResultMsg memory message = ResultMsg({
             outcome: OutcomeType.ActorErr,
@@ -282,7 +282,7 @@ contract LibGatewayTest is Test {
             value: 0,
             message: abi.encode(message),
             originalNonce: 0,
-            nonce: 0
+            localNonce: 0
         });
 
         t.applyMsg(parentSubnet, crossMsg);
@@ -325,7 +325,7 @@ contract LibGatewayTest is Test {
             method: GatewayDummyContract.reverts.selector,
             params: new bytes(0)
         });
-        crossMsg.nonce = 10;
+        crossMsg.localNonce = 10;
 
         ResultMsg memory message = ResultMsg({
             outcome: OutcomeType.SystemErr,
@@ -339,7 +339,7 @@ contract LibGatewayTest is Test {
             value: value,
             message: abi.encode(message),
             originalNonce: 0,
-            nonce: 0
+            localNonce: 0
         });
 
         vm.expectEmit(address(t));
@@ -379,7 +379,7 @@ contract LibGatewayTest is Test {
             method: GatewayDummyContract.reverts.selector,
             params: new bytes(0)
         });
-        crossMsg.nonce = 0;
+        crossMsg.localNonce = 0;
 
         ResultMsg memory message = ResultMsg({
             outcome: OutcomeType.ActorErr,
@@ -393,7 +393,7 @@ contract LibGatewayTest is Test {
             value: value,
             message: abi.encode(message),
             originalNonce: 0,
-            nonce: 0
+            localNonce: 0
         });
 
         vm.deal(address(t), 1 ether);

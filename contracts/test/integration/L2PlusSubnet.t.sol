@@ -354,7 +354,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         });
 
         // 0 is default but we set it explicitly here to make it clear
-        fundCrossMessage.nonce = 0;
+        fundCrossMessage.localNonce = 0;
 
         vm.prank(params.callerAddr);
         vm.expectEmit(true, true, true, true, params.root.gatewayAddr);
@@ -395,7 +395,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
         // the expected nonce for the top down message for L3 subnet is 0 because no previous message was sent
         // from L2 to L3
-        msgsForL2[1].nonce = 0;
+        msgsForL2[1].localNonce = 0;
         vm.prank(FilAddress.SYSTEM_ACTOR);
         vm.expectEmit(true, true, true, true, params.subnet.gatewayAddr);
         emit LibGateway.NewTopDownMessage({
@@ -405,7 +405,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         });
 
         // nonce needs to be 1 because of the fund message.
-        msgsForL2[1].nonce = 1;
+        msgsForL2[1].localNonce = 1;
         params.subnet.gateway.xnetMessenger().applyCrossMessages(msgsForL2);
 
         uint64 subnetAppliedTopDownNonce = params.subnet.gateway.getter().appliedTopDownNonce();
@@ -416,7 +416,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
         vm.prank(FilAddress.SYSTEM_ACTOR);
         // nonce is zero because this is a first message touching the L3 subnet
-        msgsForL3[0].nonce = 0;
+        msgsForL3[0].localNonce = 0;
         params.subnetL3.gateway.xnetMessenger().applyCrossMessages(msgsForL3);
 
         uint64 subnetL3AppliedTopDownNonce = params.subnetL3.gateway.getter().appliedTopDownNonce();
@@ -433,7 +433,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         });
 
         // nonce should be 1 because this is the first cross message from L1 to L3
-        fundCrossMessageL3.nonce = 1;
+        fundCrossMessageL3.localNonce = 1;
 
         vm.prank(params.callerAddr);
         vm.expectEmit(true, true, true, true, params.subnet.gatewayAddr);
@@ -511,7 +511,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
         // expected result top down message from root to L2. This is a response to the xnet call.
         IpcEnvelope memory resultMessage = crossMessage.createResultMsg(params.expectedOutcome, params.expectedRet);
-        resultMessage.nonce = 1;
+        resultMessage.localNonce = 1;
 
         submitBottomUpCheckpointAndExpectTopDownMessageEvent(
             checkpoint,
@@ -571,7 +571,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             IERC20(subnetSupply.tokenAddress).approve(address(params.root.gatewayAddr), params.amount);
         }
 
-        crossMessage.nonce = 1;
+        crossMessage.localNonce = 1;
         // send the cross message from the root network to the L3 subnet
         vm.prank(params.callerAddr);
         vm.expectEmit(true, true, true, true, params.root.gatewayAddr);
@@ -581,7 +581,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             id: crossMessage.toTracingId()
         });
 
-        crossMessage.nonce = 0;
+        crossMessage.localNonce = 0;
         if (subnetSupply.kind == AssetKind.ERC20) {
             params.root.gateway.messenger().sendContractXnetMessage(crossMessage);
         } else {
@@ -681,7 +681,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
         // expected result top down message from L2 to L3. This is a response to the xnet call.
         IpcEnvelope memory resultMessage = crossMessage.createResultMsg(OutcomeType.Ok, abi.encode(EMPTY_BYTES));
-        resultMessage.nonce = 1;
+        resultMessage.localNonce = 1;
 
         // submit the checkpoint in L2 produces top down message to L3-1
         submitBottomUpCheckpointAndExpectTopDownMessageEvent(
@@ -693,7 +693,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         );
 
         // apply the result message in the L3-1 subnet
-        resultMessage.nonce = 0;
+        resultMessage.localNonce = 0;
         IpcEnvelope[] memory resultMsgs = new IpcEnvelope[](1);
         resultMsgs[0] = resultMessage;
 
@@ -922,7 +922,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
                 kind: original.kind,
                 to: original.to,
                 from: original.from,
-                nonce: newNonce,
+                localNonce: newNonce,
                 originalNonce: 0,
                 value: original.value,
                 message: original.message

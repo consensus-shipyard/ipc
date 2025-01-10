@@ -60,7 +60,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
             message: envelope.message,
             // nonce and originalNonce will be updated by LibGateway.commitValidatedCrossMessage
             originalNonce: 0,
-            nonce: 0
+            localNonce: 0
         });
 
         (bool valid, InvalidXnetMessageReason reason, IPCMsgType applyType) = committed.validateCrossMessage();
