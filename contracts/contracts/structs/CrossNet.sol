@@ -74,7 +74,7 @@ struct IpcEnvelope {
     /// @dev address sending the message
     IPCAddress from;
     /// @dev outgoing nonce for the envelope.
-    /// This nonce is set by the gateway when committing the message for propagation. 
+    /// This nonce is set by the gateway when committing the message for propagation.
     /// This nonce is changed on each network when the message is propagated,
     /// so it is unique for each network and prevents replay attacks.
     uint64 localNonce;
