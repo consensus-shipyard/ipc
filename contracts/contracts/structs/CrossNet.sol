@@ -58,7 +58,6 @@ enum IpcMsgKind {
     /// @dev general-purpose cross-net transaction that call smart contracts.
     Call,
     /// @dev receipt from the execution of cross-net messages
-    /// (currently limited to `Transfer` messages)
     Result
 }
 
@@ -79,14 +78,6 @@ struct IpcEnvelope {
     /// so it is unique for each network and prevents replay attacks.
     uint64 localNonce;
     /// @dev Value being sent in the message.
-    /// For `Call` and `Result` kinds, the `value` field is synthetic and does not represent an actual token or native currency transfer.
-    /// Instead, it serves as metadata or an abstract representation of value to be interpreted by the target contract or receipt handler.
-    ///
-    /// For example, in a `Call` message, `value` might represent the intended payment amount for a service in a cross-network dApp,
-    /// allowing the receiving contract to process it as part of its logic, regardless of the actual token transfer mechanics.
-    /// Similarly, in a `Result` message, `value` might represent the outcome of a transaction, such as the total tokens minted or refunded.
-    ///
-    /// For `Transfer` messages, `value` represents the actual amount of native tokens being transferred across networks.
     uint256 value;
     /// @dev abi.encoded message
     bytes message;
