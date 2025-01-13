@@ -782,7 +782,11 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         weights[1] = 100;
         weights[2] = 100;
 
-        TopdownCheckpoint memory finality = TopdownCheckpoint({height: block.number, blockHash: bytes32(0), effectsCommitment: new bytes(0)});
+        TopdownCheckpoint memory finality = TopdownCheckpoint({
+            height: block.number,
+            blockHash: bytes32(0),
+            effectsCommitment: new bytes(0)
+        });
 
         vm.prank(FilAddress.SYSTEM_ACTOR);
         gatewayDiamond.topDownFinalizer().commitTopdownCheckpoint(finality);
@@ -829,7 +833,11 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         weights[0] = weight;
 
         vm.deal(validator, 1);
-        TopdownCheckpoint memory finality = TopdownCheckpoint({height: block.number, blockHash: bytes32(0), effectsCommitment: new bytes(0)});
+        TopdownCheckpoint memory finality = TopdownCheckpoint({
+            height: block.number,
+            blockHash: bytes32(0),
+            effectsCommitment: new bytes(0)
+        });
         // uint64 n = gatewayDiamond.getter().getLastConfigurationNumber() + 1;
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);

@@ -150,11 +150,12 @@ impl<S: VoteStore> VoteTally<S> {
         }
 
         if self.votes.has_voted(&parent_height, &validator)? {
-            tracing::warn!(
+            tracing::error!(
                 parent_height,
                 validator = validator.to_string(),
                 "equivocation by validator"
             );
+            return Err(Error::Equivocation);
         }
 
         self.votes.store_vote(parent_height, vote)?;
