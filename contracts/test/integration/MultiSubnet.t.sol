@@ -1292,7 +1292,11 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
     function commitTopdownCheckpoint(address gateway) internal {
         vm.roll(10);
-        TopdownCheckpoint memory finality = TopdownCheckpoint({height: block.number, blockHash: bytes32(0), effectsCommitment: new bytes(0)});
+        TopdownCheckpoint memory finality = TopdownCheckpoint({
+            height: block.number,
+            blockHash: bytes32(0),
+            effectsCommitment: new bytes(0)
+        });
 
         TopDownFinalityFacet gwTopDownFinalityFacet = TopDownFinalityFacet(address(gateway));
 

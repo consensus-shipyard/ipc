@@ -962,7 +962,11 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         vm.prank(caller);
         vm.expectRevert(NotSystemActor.selector);
 
-        TopdownCheckpoint memory finality = TopdownCheckpoint({height: block.number, blockHash: bytes32(0), effectsCommitment: new bytes(0)});
+        TopdownCheckpoint memory finality = TopdownCheckpoint({
+            height: block.number,
+            blockHash: bytes32(0),
+            effectsCommitment: new bytes(0)
+        });
 
         gatewayDiamond.topDownFinalizer().commitTopdownCheckpoint(finality);
     }
@@ -1048,14 +1052,21 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         // not the same as init committed parent finality height
         vm.roll(10);
 
-        TopdownCheckpoint memory finality = TopdownCheckpoint({height: block.number, blockHash: bytes32(0), effectsCommitment: new bytes(0)});
+        TopdownCheckpoint memory finality = TopdownCheckpoint({
+            height: block.number,
+            blockHash: bytes32(0),
+            effectsCommitment: new bytes(0)
+        });
 
         gatewayDiamond.topDownFinalizer().commitTopdownCheckpoint(finality);
         TopdownCheckpoint memory committedFinality = gatewayDiamond.getter().getTopdownCheckpoint(block.number);
 
         require(committedFinality.height == finality.height, "heights are not equal");
         require(committedFinality.blockHash == finality.blockHash, "blockHash is not equal");
-        require(gatewayDiamond.getter().getLatestTopdownCheckpoint().height == block.number, "finality height not equal");
+        require(
+            gatewayDiamond.getter().getLatestTopdownCheckpoint().height == block.number,
+            "finality height not equal"
+        );
 
         vm.stopPrank();
     }
