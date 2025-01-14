@@ -115,7 +115,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         address tokenAddress,
         address rootGatewayAddress,
         SubnetID memory rootSubnetName
-    ) internal returns (TestSubnetDefinition memory tokenSubnet) {
+    ) internal returns (TestSubnetDefinition memory) {
         SubnetActorDiamond rootTokenSubnetActor = createSubnetActor(
             defaultSubnetActorParamsWith(rootGatewayAddress, rootSubnetName, tokenAddress)
         );
@@ -124,14 +124,15 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         SubnetID memory tokenSubnetName = SubnetID({root: ROOTNET_CHAINID, route: tokenSubnetPath});
         GatewayDiamond tokenSubnetGateway = createGatewayDiamond(gatewayParams(tokenSubnetName));
 
-        tokenSubnet = TestSubnetDefinition({
-            gateway: tokenSubnetGateway,
-            gatewayAddr: address(tokenSubnetGateway),
-            id: tokenSubnetName,
-            subnetActor: rootTokenSubnetActor,
-            subnetActorAddr: address(rootTokenSubnetActor),
-            path: tokenSubnetPath
-        });
+        return
+            TestSubnetDefinition({
+                gateway: tokenSubnetGateway,
+                gatewayAddr: address(tokenSubnetGateway),
+                id: tokenSubnetName,
+                subnetActor: rootTokenSubnetActor,
+                subnetActorAddr: address(rootTokenSubnetActor),
+                path: tokenSubnetPath
+            });
     }
 
     //--------------------
@@ -158,7 +159,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         vm.prank(caller);
         vm.expectEmit(true, true, true, true, rootSubnet.gatewayAddr);
-        emit LibGateway.NewTopDownMessage(nativeSubnet.subnetActorAddr, expected);
+        emit LibGateway.NewTopDownMessage(nativeSubnet.subnetActorAddr, expected, expected.toTracingId());
         rootSubnet.gateway.manager().fund{value: amount}(nativeSubnet.id, FvmAddressHelper.from(address(recipient)));
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
@@ -287,7 +288,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         vm.prank(caller);
         vm.expectEmit(true, true, true, true, rootSubnet.gatewayAddr);
-        emit LibGateway.NewTopDownMessage(nativeSubnet.subnetActorAddr, expected);
+        emit LibGateway.NewTopDownMessage(nativeSubnet.subnetActorAddr, expected, expected.toTracingId());
         rootSubnet.gateway.manager().fund{value: amount}(nativeSubnet.id, FvmAddressHelper.from(address(recipient)));
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
@@ -324,7 +325,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         vm.prank(caller);
         vm.expectEmit(true, true, true, true, rootSubnet.gatewayAddr);
-        emit LibGateway.NewTopDownMessage(tokenSubnet.subnetActorAddr, expected);
+        emit LibGateway.NewTopDownMessage(tokenSubnet.subnetActorAddr, expected, expected.toTracingId());
         rootSubnet.gateway.manager().fundWithToken(tokenSubnet.id, FvmAddressHelper.from(address(recipient)), amount);
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
@@ -571,7 +572,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         vm.prank(caller);
         vm.expectEmit(true, true, true, true, rootSubnet.gatewayAddr);
-        emit LibGateway.NewTopDownMessage(tokenSubnet.subnetActorAddr, expected);
+        emit LibGateway.NewTopDownMessage(tokenSubnet.subnetActorAddr, expected, expected.toTracingId());
         rootSubnet.gateway.manager().fundWithToken(tokenSubnet.id, FvmAddressHelper.from(address(recipient)), amount);
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
@@ -1094,8 +1095,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         );
 
         submitBottomUpCheckpoint(checkpoint, nativeSubnet.subnetActor);
-
-        assertEq(recipient.balance, amount);
     }
 
     function testMultiSubnet_Native_SendCrossMessageFromParentToChild() public {
@@ -1125,12 +1124,17 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             to: xnetCallMsg.to,
             value: xnetCallMsg.value,
             message: xnetCallMsg.message,
-            nonce: 1
+            originalNonce: 0,
+            localNonce: 1
         });
 
         vm.prank(address(caller));
         vm.expectEmit(true, true, true, true, rootSubnet.gatewayAddr);
-        emit LibGateway.NewTopDownMessage({subnet: nativeSubnet.subnetActorAddr, message: committedEvent});
+        emit LibGateway.NewTopDownMessage({
+            subnet: nativeSubnet.subnetActorAddr,
+            message: committedEvent,
+            id: committedEvent.toTracingId()
+        });
         rootSubnet.gateway.messenger().sendContractXnetMessage{value: amount}(xnetCallMsg);
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
@@ -1138,8 +1142,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         commitParentFinality(nativeSubnet.gatewayAddr);
         executeTopDownMsgs(msgs, nativeSubnet.id, nativeSubnet.gateway);
-
-        assertEq(address(recipient).balance, amount);
     }
 
     function testMultiSubnet_Token_CallResultRevertsFromChildToParent() public {
@@ -1238,8 +1240,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         );
 
         submitBottomUpCheckpoint(checkpoint, tokenSubnet.subnetActor);
-
-        assertEq(token.balanceOf(recipient), amount);
     }
 
     function testMultiSubnet_Erc20_SendCrossMessageFromParentToChild() public {
@@ -1273,12 +1273,17 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             to: xnetCallMsg.to,
             value: xnetCallMsg.value,
             message: xnetCallMsg.message,
-            nonce: 1
+            originalNonce: 0,
+            localNonce: 1
         });
 
         vm.prank(address(caller));
         vm.expectEmit(true, true, true, true, rootSubnet.gatewayAddr);
-        emit LibGateway.NewTopDownMessage({subnet: tokenSubnet.subnetActorAddr, message: committedEvent});
+        emit LibGateway.NewTopDownMessage({
+            subnet: tokenSubnet.subnetActorAddr,
+            message: committedEvent,
+            id: committedEvent.toTracingId()
+        });
         rootSubnet.gateway.messenger().sendContractXnetMessage{value: amount}(xnetCallMsg);
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
@@ -1286,8 +1291,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         commitParentFinality(tokenSubnet.gatewayAddr);
         executeTopDownMsgs(msgs, tokenSubnet.id, tokenSubnet.gateway);
-
-        assertEq(address(recipient).balance, amount);
     }
 
     function commitParentFinality(address gateway) internal {

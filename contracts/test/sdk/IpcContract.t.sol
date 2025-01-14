@@ -118,7 +118,8 @@ contract IpcExchangeTest is Test {
             to: ipcAddressB,
             value: 1000,
             message: abi.encode(callMsg),
-            nonce: 0
+            originalNonce: 0,
+            localNonce: 0
         });
 
         resultMsg = ResultMsg({outcome: OutcomeType.Ok, id: callEnvelope.toHash(), ret: bytes("")});
@@ -129,7 +130,8 @@ contract IpcExchangeTest is Test {
             to: ipcAddressA,
             value: 1000,
             message: abi.encode(resultMsg),
-            nonce: 0
+            originalNonce: 0,
+            localNonce: 0
         });
 
         exch = new RecorderIpcExchange(gateway);
@@ -210,7 +212,7 @@ contract IpcExchangeTest is Test {
         // Send three messages from within the contract.
         bytes32[] memory ids = new bytes32[](3);
         for (uint64 i = 0; i < 3; i++) {
-            callEnvelope.nonce = i;
+            callEnvelope.localNonce = i;
             vm.mockCall(
                 gateway,
                 abi.encodeWithSelector(IGateway.sendContractXnetMessage.selector),

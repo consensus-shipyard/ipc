@@ -140,7 +140,7 @@ abstract contract LinkedToken is Initializable, IpcExchangeUpgradeable {
             sender: msg.sender,
             recipient: recipient,
             id: committed.toHash(),
-            nonce: committed.nonce,
+            nonce: committed.localNonce,
             value: amount
         });
     }

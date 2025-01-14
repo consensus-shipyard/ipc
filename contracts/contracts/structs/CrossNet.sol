@@ -74,15 +74,26 @@ struct IpcEnvelope {
     /// @dev address sending the message
     IPCAddress from;
     /// @dev outgoing nonce for the envelope.
-    /// This nonce is set by the gateway when committing the message for propagation
-    uint64 nonce;
-    /// @dev value being sent in the message.
-    /// If we want receipts to return value, and all messages to be able
-    /// to handle different supply sources we can expose the value
-    /// as a common field.
+    /// This nonce is set by the gateway when committing the message for propagation.
+    /// This nonce is changed on each network when the message is propagated,
+    /// so it is unique for each network and prevents replay attacks.
+    uint64 localNonce;
+    /// @dev Value being sent in the message.
+    /// For `Call` and `Result` kinds, the `value` field is synthetic and does not represent an actual token or native currency transfer.
+    /// Instead, it serves as metadata or an abstract representation of value to be interpreted by the target contract or receipt handler.
+    ///
+    /// For example, in a `Call` message, `value` might represent the intended payment amount for a service in a cross-network dApp,
+    /// allowing the receiving contract to process it as part of its logic, regardless of the actual token transfer mechanics.
+    /// Similarly, in a `Result` message, `value` might represent the outcome of a transaction, such as the total tokens minted or refunded.
+    ///
+    /// For `Transfer` messages, `value` represents the actual amount of native tokens being transferred across networks.
     uint256 value;
     /// @dev abi.encoded message
     bytes message;
+    /// @dev original nonce of the message from the source network.
+    /// It is set once at the source network and remains unchanged during propagation.
+    /// It is used to generate a unique tracing ID across networks, which is useful for debugging and auditing purposes.
+    uint64 originalNonce;
     /// @dev the gas limit is currently not used.
     // FIXME: currently not used.
     // uint256 gasLimit;

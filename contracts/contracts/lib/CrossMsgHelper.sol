@@ -7,12 +7,15 @@ import {IPCMsgType} from "../enums/IPCMsgType.sol";
 import {SubnetID, IPCAddress} from "../structs/Subnet.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../lib/FvmAddressHelper.sol";
+import {LibGateway} from "../lib/LibGateway.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {Asset} from "../structs/Subnet.sol";
 import {AssetHelper} from "./AssetHelper.sol";
 import {IIpcHandler} from "../../sdk/interfaces/IIpcHandler.sol";
+// solhint-disable-next-line no-global-import
+import "../errors/IPCErrors.sol";
 
 /// @title Helper library for manipulating IpcEnvelope-related structs
 library CrossMsgHelper {
@@ -35,7 +38,8 @@ library CrossMsgHelper {
                 to: to,
                 value: value,
                 message: EMPTY_BYTES,
-                nonce: 0
+                originalNonce: 0,
+                localNonce: 0
             });
     }
 
@@ -54,7 +58,8 @@ library CrossMsgHelper {
                 to: to,
                 value: value,
                 message: abi.encode(message),
-                nonce: 0
+                originalNonce: 0,
+                localNonce: 0
             });
     }
 
@@ -66,11 +71,12 @@ library CrossMsgHelper {
         OutcomeType outcome,
         bytes memory ret
     ) public pure returns (IpcEnvelope memory) {
-        ResultMsg memory message = ResultMsg({id: toHash(crossMsg), outcome: outcome, ret: ret});
+        ResultMsg memory message = ResultMsg({id:toTracingId(crossMsg), outcome: outcome, ret: ret});
+
         uint256 value = crossMsg.value;
+        // if the message was executed successfully, the value stayed
+        // in the subnet and there's no need to return it.
         if (outcome == OutcomeType.Ok) {
-            // if the message was executed successfully, the value stayed
-            // in the subnet and there's no need to return it.
             value = 0;
         }
         return
@@ -80,10 +86,12 @@ library CrossMsgHelper {
                 to: crossMsg.from,
                 value: value,
                 message: abi.encode(message),
-                nonce: 0
+                originalNonce: 0,
+                localNonce: 0
             });
     }
 
+    // creates transfer message from the child subnet to the parent subnet
     function createReleaseMsg(
         SubnetID calldata subnet,
         address signer,
@@ -98,6 +106,7 @@ library CrossMsgHelper {
             );
     }
 
+    // creates transfer message from the parent subnet to the child subnet
     function createFundMsg(
         SubnetID calldata subnet,
         address signer,
@@ -135,6 +144,22 @@ library CrossMsgHelper {
         return keccak256(abi.encode(crossMsgs));
     }
 
+    /// @notice Returns a deterministic hash for the given cross message, excluding the nonce,
+    /// which is useful for generating a `tracingId` for cross messages.
+    function toTracingId(IpcEnvelope memory crossMsg) internal pure returns (bytes32) {
+        return keccak256(
+            // solhint-disable-next-line func-named-parameters
+            abi.encode(
+                crossMsg.kind,
+                crossMsg.to,
+                crossMsg.from,
+                crossMsg.value,
+                crossMsg.message,
+                crossMsg.originalNonce
+            )
+        );
+    }
+
     function isEmpty(IpcEnvelope memory crossMsg) internal pure returns (bool) {
         // envelopes need to necessarily include a message inside except
         // if it is a plain `Transfer`.
@@ -164,6 +189,10 @@ library CrossMsgHelper {
         if (crossMsg.kind == IpcMsgKind.Transfer) {
             return supplySource.transferFunds({recipient: payable(recipient), value: crossMsg.value});
         } else if (crossMsg.kind == IpcMsgKind.Call || crossMsg.kind == IpcMsgKind.Result) {
+            // For a Result message, the idea is to perform a call as this returns control back to the caller.
+            // If it's an account, there will be no code to invoke, so this will be have like a bare transfer.
+            // But if the original caller was a contract, this give it control so it can handle the result
+
             // send the envelope directly to the entrypoint
             // use supplySource so the tokens in the message are handled successfully
             // and by the right supply source
@@ -182,7 +211,7 @@ library CrossMsgHelper {
         uint256 prevNonce;
         uint256 length = crossMsgs.length;
         for (uint256 i; i < length; ) {
-            uint256 nonce = crossMsgs[i].nonce;
+            uint256 nonce = crossMsgs[i].localNonce;
 
             if (prevNonce >= nonce) {
                 // gas-opt: original check: i > 0
@@ -198,5 +227,9 @@ library CrossMsgHelper {
         }
 
         return true;
+    }
+
+    function validateCrossMessage(IpcEnvelope memory crossMsg) internal view returns (bool, InvalidXnetMessageReason, IPCMsgType)  {
+        return LibGateway.checkCrossMessage(crossMsg);
     }
 }
