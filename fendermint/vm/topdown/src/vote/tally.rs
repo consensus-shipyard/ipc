@@ -200,7 +200,6 @@ impl<S: VoteStore> VoteTally<S> {
     pub fn set_finalized(&mut self, block_height: BlockHeight) -> Result<(), Error> {
         self.votes.purge_votes_at_height(block_height)?;
         self.last_finalized_height = block_height;
-        self.latest_quorum_formed = None;
         Ok(())
     }
 
