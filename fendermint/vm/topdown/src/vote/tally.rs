@@ -178,27 +178,14 @@ impl<S: VoteStore> VoteTally<S> {
 
     /// Find a block on the (from our perspective) finalized chain that gathered enough votes from validators.
     fn find_quorum(&self) -> Result<Option<Observation>, Error> {
-        let quorum_threshold = self.quorum_threshold();
         let Some(max_height) = self.votes.latest_vote_height()? else {
             tracing::info!("vote store has no vote yet, skip finding quorum");
             return Ok(None);
         };
 
         for h in ((self.last_finalized_height + 1)..=max_height).rev() {
-            let votes = self.votes.get_votes_at_height(h)?;
-
-            for (observation, weight) in votes.observation_weights(&self.power_table) {
-                tracing::info!(
-                    height = h,
-                    observation = observation.to_string(),
-                    weight,
-                    quorum_threshold,
-                    "observation and weight"
-                );
-
-                if weight >= quorum_threshold {
-                    return Ok(Some(observation.clone()));
-                }
+            if let Some(q) = self.check_quorum_at_height(h)? {
+                return Ok(Some(q));
             }
 
             tracing::info!(height = h, "no quorum found");

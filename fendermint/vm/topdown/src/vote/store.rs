@@ -98,27 +98,6 @@ impl<'a> VoteAgg<'a> {
         self.0.into_iter().cloned().collect()
     }
 
-    pub fn observation_weights(&self, power_table: &PowerTable) -> Vec<(&Observation, Weight)> {
-        let mut votes: Vec<(&Observation, Weight)> = Vec::new();
-
-        for v in self.0.iter() {
-            let validator = v.voter();
-
-            let power = power_table.get(&validator).cloned().unwrap_or(0);
-            if power == 0 {
-                continue;
-            }
-
-            if let Some(w) = votes.iter_mut().find(|w| w.0 == v.observation()) {
-                w.1 += power;
-            } else {
-                votes.push((v.observation(), power))
-            }
-        }
-
-        votes
-    }
-
     pub fn max_observation_weight(
         &self,
         power_table: &PowerTable,
