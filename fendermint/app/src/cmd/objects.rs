@@ -7,7 +7,6 @@ use std::{convert::Infallible, net::ToSocketAddrs, num::ParseIntError};
 
 use anyhow::anyhow;
 use anyhow::Context;
-use base64::{engine::general_purpose, Engine};
 use bytes::Buf;
 use entangler::{ChunkRange, Config, Entangler};
 use entangler_storage::iroh::IrohStorage as EntanglerIrohStorage;
@@ -16,11 +15,8 @@ use fendermint_app_settings::objects::ObjectsSettings;
 use fendermint_rpc::client::FendermintClient;
 use fendermint_rpc::message::GasParams;
 use fendermint_rpc::QueryClient;
-use fendermint_vm_message::conv::from_eth;
 use fendermint_vm_message::query::FvmQueryHeight;
-use fendermint_vm_message::signed::SignedMessage;
 use futures_util::{StreamExt, TryStreamExt};
-use fvm_shared::chainid::ChainID;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use iroh::blobs::Hash;
 use iroh::client::blobs::BlobStatus;
@@ -45,8 +41,6 @@ use warp::{
 use crate::cmd;
 use crate::options::objects::{ObjectsArgs, ObjectsCommands};
 
-/// Maximum size of the multipart form used for object upload.
-const MAX_FORM_LENGTH: u64 = 1024 * 1024;
 /// The alpha parameter for alpha entanglement determines the number of parity blobs to generate
 /// for the original blob.
 const ENTANGLER_ALPHA: u8 = 3;
@@ -91,9 +85,8 @@ cmd! {
                 // Objects routes
                 let objects_upload = warp::path!("v1" / "objects" )
                 .and(warp::post())
-                .and(with_client(client.clone()))
                 .and(with_iroh(iroh_client.clone()))
-                .and(warp::multipart::form().max_length(MAX_FORM_LENGTH))
+                .and(warp::multipart::form().max_length(settings.max_object_size + 1024 * 1024)) // max_object_size + 1MB for form overhead
                 .and(with_max_size(settings.max_object_size))
                 .and_then(handle_object_upload);
 
@@ -163,24 +156,12 @@ impl From<ParseIntError> for ObjectsError {
     }
 }
 
+#[derive(Default)]
 struct ObjectParser {
-    signed_msg: Option<SignedMessage>,
-    chain_id: ChainID,
     hash: Option<Hash>,
     size: Option<u64>,
     source: Option<NodeAddr>,
-}
-
-impl Default for ObjectParser {
-    fn default() -> Self {
-        ObjectParser {
-            signed_msg: None,
-            chain_id: ChainID::from(0),
-            hash: None,
-            size: None,
-            source: None,
-        }
-    }
+    data: Option<Vec<u8>>,
 }
 
 impl ObjectParser {
@@ -195,50 +176,6 @@ impl ObjectParser {
             })
             .await;
         Ok(value)
-    }
-
-    async fn read_chain_id(&mut self, form_part: Part) -> anyhow::Result<()> {
-        let value = self.read_part(form_part).await?;
-        let text = String::from_utf8(value).map_err(|_| anyhow!("cannot parse chain id"))?;
-        let int: u64 = text.parse().map_err(|_| anyhow!("cannot parse chain_id"))?;
-        self.chain_id = ChainID::from(int);
-        Ok(())
-    }
-
-    async fn read_msg(&mut self, form_part: Part) -> anyhow::Result<()> {
-        let value = self.read_part(form_part).await?;
-        let signed_msg = general_purpose::URL_SAFE
-            .decode(value)
-            .map_err(|e| anyhow!("Failed to decode b64 encoded message: {}", e))
-            .and_then(|b64_decoded| {
-                // Allow both FVM signed messages and EVM EIP-1559 signed transactions. Note: this
-                // presumes the `to` address can be converted to a non-masked Ethereum address.
-                // That is, signed EVM transactions cannot directly interface with a bucket actor,
-                // so they must proxy calls through something like EVM Solidity wrapper contracts.
-                match fvm_ipld_encoding::from_slice::<SignedMessage>(&b64_decoded) {
-                    Ok(signed_msg) => Ok(signed_msg),
-                    Err(e) => {
-                        tracing::debug!(
-                            "failed to deserialize FVM signed message, trying EVM tx format: {}",
-                            e
-                        );
-                        let tx = ethers::types::Bytes::from(b64_decoded);
-                        let rlp = ethers::core::utils::rlp::Rlp::new(&tx);
-                        let (tx, sig) =
-                            ethers::types::transaction::eip2718::TypedTransaction::decode_signed(
-                                &rlp,
-                            )?;
-                        let tx = tx.as_eip1559_ref().ok_or_else(|| {
-                            anyhow!("failed to process signed transaction as eip1559")
-                        })?;
-                        let fvm_msg = from_eth::to_fvm_signed_message(tx, &sig)
-                            .map_err(|e| anyhow!("failed to deserialize signed message: {}", e))?;
-                        Ok(fvm_msg)
-                    }
-                }
-            })?;
-        self.signed_msg = Some(signed_msg);
-        Ok(())
     }
 
     async fn read_hash(&mut self, form_part: Part) -> anyhow::Result<()> {
@@ -266,6 +203,11 @@ impl ObjectParser {
         Ok(())
     }
 
+    async fn read_data(&mut self, form_part: Part) -> anyhow::Result<()> {
+        self.data = Some(self.read_part(form_part).await?);
+        Ok(())
+    }
+
     async fn read_form(mut form_parts: warp::multipart::FormData) -> anyhow::Result<Self> {
         let mut object_parser = ObjectParser::default();
         while let Some(part) = form_parts.next().await {
@@ -274,12 +216,6 @@ impl ObjectParser {
                 anyhow!("cannot read form data")
             })?;
             match part.name() {
-                "chain_id" => {
-                    object_parser.read_chain_id(part).await?;
-                }
-                "msg" => {
-                    object_parser.read_msg(part).await?;
-                }
                 "hash" => {
                     object_parser.read_hash(part).await?;
                 }
@@ -288,6 +224,14 @@ impl ObjectParser {
                 }
                 "source" => {
                     object_parser.read_source(part).await?;
+                }
+                "data" => {
+                    object_parser.read_data(part).await?;
+                }
+                // Ignore but accept signature-related fields for backward compatibility
+                "chain_id" | "msg" => {
+                    // Just read and discard the data
+                    let _ = object_parser.read_part(part).await?;
                 }
                 _ => {
                     return Err(anyhow!("unknown form field"));
@@ -350,8 +294,7 @@ struct UploadResponse {
     metadata_hash: String,
 }
 
-async fn handle_object_upload<F: QueryClient>(
-    client: F,
+async fn handle_object_upload(
     iroh: iroh::client::Iroh,
     form_parts: warp::multipart::FormData,
     max_size: u64,
@@ -363,39 +306,6 @@ async fn handle_object_upload<F: QueryClient>(
         })
     })?;
 
-    // Verify the signature
-    let signed_msg = match parser.signed_msg {
-        Some(signed_msg) => signed_msg,
-        None => {
-            return Err(Rejection::from(BadRequest {
-                message: "missing signed message".to_string(),
-            }))
-        }
-    };
-    signed_msg.verify(&parser.chain_id).map_err(|e| {
-        Rejection::from(BadRequest {
-            message: e.to_string(),
-        })
-    })?;
-
-    // Ensure the bucket exists and fetch the data through iroh
-    let SignedMessage { message, .. } = signed_msg;
-    ensure_bucket_exists(client, message.to)
-        .await
-        .map_err(|e| {
-            Rejection::from(BadRequest {
-                message: format!("failed to connect with bucket: {}", e),
-            })
-        })?;
-
-    let hash = match parser.hash {
-        Some(hash) => hash,
-        None => {
-            return Err(Rejection::from(BadRequest {
-                message: "missing hash in form".to_string(),
-            }))
-        }
-    };
     let size = match parser.size {
         Some(size) => size,
         None => {
@@ -409,51 +319,101 @@ async fn handle_object_upload<F: QueryClient>(
             message: format!("blob size exceeds maximum of {}", max_size),
         }));
     }
-    let source = match parser.source {
-        Some(source) => source,
-        None => {
+
+    // Handle the two upload cases
+    let hash = match (parser.source, parser.data) {
+        // Case 1: Source node provided - download from the source
+        (Some(source), None) => {
+            let hash = match parser.hash {
+                Some(hash) => hash,
+                None => {
+                    return Err(Rejection::from(BadRequest {
+                        message: "missing hash in form".to_string(),
+                    }))
+                }
+            };
+            let tag = iroh::blobs::Tag(format!("temp-{hash}").into());
+            let progress = iroh
+                .blobs()
+                .download_with_opts(
+                    hash,
+                    iroh::client::blobs::DownloadOptions {
+                        format: iroh::blobs::BlobFormat::Raw,
+                        nodes: vec![source],
+                        tag: iroh::blobs::util::SetTagOption::Named(tag),
+                        mode: iroh::client::blobs::DownloadMode::Queued,
+                    },
+                )
+                .await
+                .map_err(|e| {
+                    Rejection::from(BadRequest {
+                        message: format!("failed to fetch blob {}: {}", hash, e),
+                    })
+                })?;
+            let outcome = progress.finish().await.map_err(|e| {
+                Rejection::from(BadRequest {
+                    message: format!("failed to fetch blob {}: {}", hash, e),
+                })
+            })?;
+            let outcome_size = outcome.local_size + outcome.downloaded_size;
+            if outcome_size != size {
+                return Err(Rejection::from(BadRequest {
+                    message: format!(
+                        "blob size and given size do not match (expected {}, got {})",
+                        size, outcome_size
+                    ),
+                }));
+            }
+
+            info!(
+                "downloaded blob {} in {:?} (size: {}; local_size: {}; downloaded_size: {})",
+                hash, outcome.stats.elapsed, size, outcome.local_size, outcome.downloaded_size,
+            );
+            COUNTER_BYTES_UPLOADED.inc_by(outcome.downloaded_size);
+            hash
+        }
+
+        // Case 2: Direct upload - store the provided data
+        (None, Some(data)) => {
+            if data.len() as u64 != size {
+                return Err(Rejection::from(BadRequest {
+                    message: format!(
+                        "uploaded data size and given size do not match (expected {}, got {})",
+                        size,
+                        data.len()
+                    ),
+                }));
+            }
+
+            let uploaded_hash = iroh
+                .blobs()
+                .add_bytes(data.as_slice().to_vec())
+                .await
+                .map_err(|e| {
+                    Rejection::from(BadRequest {
+                        message: format!("failed to store blob: {}", e),
+                    })
+                })?
+                .hash;
+
+            info!("stored uploaded blob {} (size: {})", uploaded_hash, size);
+            COUNTER_BYTES_UPLOADED.inc_by(size);
+
+            uploaded_hash
+        }
+
+        (Some(_), Some(_)) => {
             return Err(Rejection::from(BadRequest {
-                message: "missing source in form".to_string(),
-            }))
+                message: "cannot provide both source and data".to_string(),
+            }));
+        }
+
+        (None, None) => {
+            return Err(Rejection::from(BadRequest {
+                message: "must provide either source or data".to_string(),
+            }));
         }
     };
-
-    // On failure, GC will cleanup things
-    // We tag with a "temp" tag to make clear that it is not confirmed yet that we want to keep this around.
-    // TODO: we need to schedule a task that deletes the temp tag after a certain amount of time.
-    // TODO: this needs to be tagged with a "user id"
-    let tag = iroh::blobs::Tag(format!("temp-{hash}").into());
-    let progress = iroh
-        .blobs()
-        .download_with_opts(
-            hash,
-            iroh::client::blobs::DownloadOptions {
-                format: iroh::blobs::BlobFormat::Raw,
-                nodes: vec![source],
-                tag: iroh::blobs::util::SetTagOption::Named(tag),
-                mode: iroh::client::blobs::DownloadMode::Queued,
-            },
-        )
-        .await
-        .map_err(|e| {
-            Rejection::from(BadRequest {
-                message: format!("failed to fetch blob {}: {}", hash, e),
-            })
-        })?;
-    let outcome = progress.finish().await.map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("failed to fetch blob {}: {}", hash, e),
-        })
-    })?;
-    let outcome_size = outcome.local_size + outcome.downloaded_size;
-    if outcome_size != size {
-        return Err(Rejection::from(BadRequest {
-            message: format!(
-                "blob size and given size do not match (expected {}, got {})",
-                size, outcome_size
-            ),
-        }));
-    }
 
     let ent = new_entangler(iroh).map_err(|e| {
         Rejection::from(BadRequest {
@@ -466,17 +426,7 @@ async fn handle_object_upload<F: QueryClient>(
         })
     })?;
 
-    info!(
-        "downloaded blob {} in {:?} (size: {}; local_size: {}; downloaded_size: {}; metadata: {})",
-        hash,
-        outcome.stats.elapsed,
-        size,
-        outcome.local_size,
-        outcome.downloaded_size,
-        metadata_hash,
-    );
     COUNTER_BLOBS_UPLOADED.inc();
-    COUNTER_BYTES_UPLOADED.inc_by(outcome.downloaded_size);
     HISTOGRAM_UPLOAD_TIME.observe(start_time.elapsed().as_secs_f64());
 
     let response = UploadResponse {
@@ -493,12 +443,6 @@ fn new_entangler(
         EntanglerIrohStorage::from_client(iroh),
         Config::new(ENTANGLER_ALPHA, ENTANGLER_S, ENTANGLER_P),
     )
-}
-
-async fn ensure_bucket_exists<F: QueryClient>(client: F, to: Address) -> anyhow::Result<()> {
-    let actor_state = client.actor_state(&to, FvmQueryHeight::Committed).await?;
-    actor_state.value.ok_or(anyhow!("cannot find actor {to}"))?;
-    Ok(())
 }
 
 fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ObjectsError> {
@@ -783,42 +727,13 @@ async fn os_get<F: QueryClient + Send + Sync>(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-    use std::str::FromStr;
-
     use super::*;
-    use ethers::core::abi;
-    use ethers::core::k256::ecdsa::SigningKey;
-    use ethers::core::rand::{rngs::StdRng, SeedableRng};
-    use ethers::signers::{LocalWallet, Signer};
-    use ethers::types as et;
-    use fendermint_actor_bucket::AddParams;
     use fendermint_rpc::FendermintClient;
-    use fendermint_vm_message::conv::from_eth::to_fvm_address;
-    use fvm_ipld_encoding::RawBytes;
-    use iroh::blobs::Hash;
-    use iroh::net::NodeAddr;
+    use rand_chacha::rand_core::{RngCore, SeedableRng};
+    use rand_chacha::ChaCha8Rng;
     use tendermint_rpc::{Method, MockClient, MockRequestMethodMatcher};
 
     // Used to mocking Actor State
-    const ABCI_QUERY_RESPONSE_UPLOAD: &str = r#"{
-        "jsonrpc": "2.0",
-        "id": "",
-        "result": {
-         "response": {
-             "code": 0,
-             "log": "",
-             "info": "",
-             "index": "0",
-             "key": "GGQ=",
-             "value": "pWRjb2Rl2CpYJwABVaDkAiB4ZQKaqaSEiu8tIb2Ef7bIWOoxPeNkAEljZabMaAMlaGVzdGF0ZdgqWCcAAXGg5AIgRbDPwiDO7Ft8HGLE1Bk9OOTrpI6IFXKc51+cCrDkwcBoc2VxdWVuY2UAZ2JhbGFuY2VKADY1ya3F3qAAAHFkZWxlZ2F0ZWRfYWRkcmVzc1YECqf8cO8ArRpoWzmcqFtkasWDXCqx",
-             "proof": null,
-             "height": "8",
-             "codespace": ""
-           }
-        }
-     }"#;
-
     const ABCI_QUERY_RESPONSE_DOWNLOAD: &str = r#"{
         "jsonrpc": "2.0",
         "id": "",
@@ -836,66 +751,6 @@ mod tests {
             }
         }
      }"#;
-
-    fn form_body(
-        boundary: &str,
-        serialized_signed_message_b64: &str,
-        hash: Hash,
-        source: NodeAddr,
-        size: u64,
-    ) -> Vec<u8> {
-        let mut body = Vec::new();
-        let form_data = format!(
-            "\
-            --{0}\r\n\
-            content-disposition: form-data; name=\"chain_id\"\r\n\r\n\
-            314159\r\n\
-            --{0}\r\n\
-            content-disposition: form-data; name=\"msg\"\r\n\r\n\
-            {1}\r\n\
-            --{0}\r\n\
-            content-disposition: form-data; name=\"hash\"\r\n\r\n\
-            {2}\r\n\
-            --{0}\r\n\
-            content-disposition: form-data; name=\"size\"\r\n\r\n\
-            {3}\r\n\
-            --{0}\r\n\
-            content-disposition: form-data; name=\"source\"\r\n\r\n\
-            {4}\r\n\
-            --{0}--\r\n\
-            ",
-            boundary,
-            serialized_signed_message_b64,
-            hash,
-            size,
-            serde_json::to_string_pretty(&source).unwrap(),
-        );
-        body.extend_from_slice(form_data.as_bytes());
-
-        dbg!(std::str::from_utf8(&body)).unwrap();
-        body
-    }
-
-    async fn multipart_form(
-        serialized_signed_message_b64: &str,
-        hash: Hash,
-        source: NodeAddr,
-        size: u64,
-    ) -> warp::multipart::FormData {
-        let boundary = "--abcdef1234--";
-        let body = form_body(boundary, serialized_signed_message_b64, hash, source, size);
-        warp::test::request()
-            .method("POST")
-            .header("content-length", body.len())
-            .header(
-                "content-type",
-                format!("multipart/form-data; boundary={}", boundary),
-            )
-            .body(body)
-            .filter(&warp::multipart::form())
-            .await
-            .unwrap()
-    }
 
     fn setup_logs() {
         use tracing_subscriber::layer::SubscriberExt;
@@ -917,13 +772,7 @@ mod tests {
     async fn test_handle_object_upload() {
         setup_logs();
 
-        let matcher = MockRequestMethodMatcher::default().map(
-            Method::AbciQuery,
-            Ok(ABCI_QUERY_RESPONSE_UPLOAD.to_string()),
-        );
-        let client = FendermintClient::new(MockClient::new(matcher).0);
         let iroh = iroh::node::Node::memory().spawn().await.unwrap();
-
         // client iroh node
         let client_iroh = iroh::node::Node::memory().spawn().await.unwrap();
         let hash = client_iroh
@@ -933,56 +782,44 @@ mod tests {
             .unwrap()
             .hash;
         let client_node_addr = client_iroh.net().node_addr().await.unwrap();
-
-        let iroh_storage = EntanglerIrohStorage::from_client(client_iroh.client().clone());
-        let ent = Entangler::new(iroh_storage, Config::new(3, 5, 5)).unwrap();
-        let metadata_hash = ent.entangle_uploaded(hash.to_string()).await.unwrap();
-
-        let iroh_metadata_hash = Hash::from_str(metadata_hash.as_str()).unwrap();
-
-        let store = Address::new_id(90);
-        let key = b"key";
         let size = 11;
-        let params = AddParams {
-            source: fendermint_actor_blobs_shared::state::PublicKey(*iroh.node_id().as_bytes()),
-            key: key.to_vec(),
-            hash: fendermint_actor_blobs_shared::state::Hash(*hash.as_bytes()),
+
+        // Create multipart form for source-based upload
+        let boundary = "--abcdef1234--";
+        let mut body = Vec::new();
+        let form_data = format!(
+            "\
+            --{0}\r\n\
+            content-disposition: form-data; name=\"hash\"\r\n\r\n\
+            {1}\r\n\
+            --{0}\r\n\
+            content-disposition: form-data; name=\"size\"\r\n\r\n\
+            {2}\r\n\
+            --{0}\r\n\
+            content-disposition: form-data; name=\"source\"\r\n\r\n\
+            {3}\r\n\
+            --{0}--\r\n\
+            ",
+            boundary,
+            hash,
             size,
-            recovery_hash: fendermint_actor_blobs_shared::state::Hash(
-                *iroh_metadata_hash.as_bytes(),
-            ),
-            ttl: None,
-            metadata: HashMap::new(),
-            overwrite: true,
-        };
-        let params = RawBytes::serialize(params).unwrap();
+            serde_json::to_string(&client_node_addr).unwrap(),
+        );
+        body.extend_from_slice(form_data.as_bytes());
 
-        let sk = fendermint_crypto::SecretKey::random(&mut StdRng::from_entropy());
-        let signing_key = SigningKey::from_slice(sk.serialize().as_ref()).unwrap();
-        let from_address = ethers::core::utils::secret_key_to_address(&signing_key);
-        let message = fvm_shared::message::Message {
-            version: Default::default(),
-            from: to_fvm_address(from_address),
-            to: store,
-            sequence: 0,
-            value: TokenAmount::from_atto(0),
-            method_num: fendermint_actor_bucket::Method::AddObject as u64,
-            params,
-            gas_limit: 3000000,
-            gas_fee_cap: TokenAmount::from_atto(0),
-            gas_premium: TokenAmount::from_atto(0),
-        };
-        let chain_id = fvm_shared::chainid::ChainID::from(314159);
-        let signed = SignedMessage::new_secp256k1(message, &sk, &chain_id).unwrap();
+        let form_data = warp::test::request()
+            .method("POST")
+            .header("content-length", body.len())
+            .header(
+                "content-type",
+                format!("multipart/form-data; boundary={}", boundary),
+            )
+            .body(body)
+            .filter(&warp::multipart::form())
+            .await
+            .unwrap();
 
-        let serialized_signed_message = fvm_ipld_encoding::to_vec(&signed).unwrap();
-        let serialized_signed_message_b64 =
-            general_purpose::URL_SAFE.encode(&serialized_signed_message);
-
-        let multipart_form =
-            multipart_form(&serialized_signed_message_b64, hash, client_node_addr, size).await;
-
-        let reply = handle_object_upload(client, iroh.client().clone(), multipart_form, 1000)
+        let reply = handle_object_upload(iroh.client().clone(), form_data, 1000)
             .await
             .unwrap();
         let response = reply.into_response();
@@ -990,197 +827,73 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_handle_object_upload_from_eth_tx() {
+    async fn test_handle_object_upload_direct() {
         setup_logs();
 
-        let matcher = MockRequestMethodMatcher::default().map(
-            Method::AbciQuery,
-            Ok(ABCI_QUERY_RESPONSE_UPLOAD.to_string()),
-        );
-        let client = FendermintClient::new(MockClient::new(matcher).0);
         let iroh = iroh::node::Node::memory().spawn().await.unwrap();
 
-        // client iroh node
-        let client_iroh = iroh::node::Node::memory().spawn().await.unwrap();
-        let hash = client_iroh
-            .blobs()
-            .add_bytes(&b"hello world"[..])
+        // Create a 10MB random file
+        const FILE_SIZE: usize = 10 * 1024 * 1024; // 10MB
+        let mut rng = ChaCha8Rng::seed_from_u64(12345);
+        let mut test_data = vec![0u8; FILE_SIZE];
+        rng.fill_bytes(&mut test_data);
+
+        let size = test_data.len() as u64;
+        let hash = iroh_base::hash::Hash::new(&test_data);
+
+        // Create multipart form with direct data upload
+        let boundary = "------------------------abcdef1234567890"; // Use a longer boundary
+        let mut body = Vec::with_capacity(FILE_SIZE + 1024); // Pre-allocate with some extra space for headers
+
+        // Write form fields
+        body.extend_from_slice(
+            format!(
+                "\
+            --{boundary}\r\n\
+            Content-Disposition: form-data; name=\"hash\"\r\n\r\n\
+            {hash}\r\n\
+            --{boundary}\r\n\
+            Content-Disposition: form-data; name=\"size\"\r\n\r\n\
+            {size}\r\n\
+            --{boundary}\r\n\
+            Content-Disposition: form-data; name=\"data\"\r\n\
+            Content-Type: application/octet-stream\r\n\r\n",
+            )
+            .as_bytes(),
+        );
+
+        // Write file data
+        body.extend_from_slice(&test_data);
+
+        // Write final boundary
+        body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+
+        let form_data = warp::test::request()
+            .method("POST")
+            .header("content-length", body.len())
+            .header(
+                "content-type",
+                format!("multipart/form-data; boundary={boundary}"),
+            )
+            .body(body)
+            .filter(&warp::multipart::form().max_length(11 * 1024 * 1024))
             .await
-            .unwrap()
-            .hash;
-        let client_node_addr = client_iroh.net().node_addr().await.unwrap();
+            .unwrap();
 
-        let iroh_storage = EntanglerIrohStorage::from_client(client_iroh.client().clone());
-        let ent = Entangler::new(iroh_storage, Config::new(3, 5, 5)).unwrap();
-        let metadata_hash = ent.entangle_uploaded(hash.to_string()).await.unwrap();
-
-        let iroh_metadata_hash = Hash::from_str(metadata_hash.as_str()).unwrap();
-
-        let store = Address::new_id(90);
-        let key = b"key";
-        let size = 11;
-        let params = AddParams {
-            source: fendermint_actor_blobs_shared::state::PublicKey(*iroh.node_id().as_bytes()),
-            key: key.to_vec(),
-            hash: fendermint_actor_blobs_shared::state::Hash(*hash.as_bytes()),
-            size,
-            recovery_hash: fendermint_actor_blobs_shared::state::Hash(
-                *iroh_metadata_hash.as_bytes(),
-            ),
-            ttl: None,
-            metadata: HashMap::new(),
-            overwrite: true,
-        };
-        let params = RawBytes::serialize(params).unwrap();
-
-        // This mimics how Solidity wrappers send transactions to a bucket actor (needs to be `to` EVM address)
-        const CALL_ACTOR_ID: &str = "0xfe00000000000000000000000000000000000005";
-        let calldata = abi::encode(&[
-            abi::Token::Uint(et::U256::from(
-                fendermint_actor_bucket::Method::AddObject as u64, // method_num
-            )),
-            abi::Token::Uint(0.into()),                       // value
-            abi::Token::Uint(0x00000000.into()),              // static call
-            abi::Token::Uint(fvm_ipld_encoding::CBOR.into()), // cbor codec
-            abi::Token::Bytes(params.to_vec()),               // params
-            abi::Token::Uint(store.id().unwrap().into()),     // target contract ID address
-        ]);
-
-        // Set up EVM wallet
-        let sk = fendermint_crypto::SecretKey::random(&mut StdRng::from_entropy());
-        let signing_key = SigningKey::from_slice(sk.serialize().as_ref()).unwrap();
-        let chain_id = 314159u64;
-        let wallet = LocalWallet::from_bytes(signing_key.to_bytes().as_ref())
-            .unwrap()
-            .with_chain_id(chain_id);
-
-        // Create and sign an EVM transaction
-        let tx = et::Eip1559TransactionRequest::new()
-            .from(wallet.address())
-            .to(CALL_ACTOR_ID.parse::<et::Address>().unwrap())
-            .nonce(0)
-            .gas(3000000)
-            .max_fee_per_gas(et::U256::zero())
-            .max_priority_fee_per_gas(et::U256::zero())
-            .data(et::Bytes::from(calldata))
-            .chain_id(chain_id);
-        let tx = et::transaction::eip2718::TypedTransaction::Eip1559(tx);
-        let sig = wallet.sign_transaction_sync(&tx).expect("failed to sign");
-
-        // Encode the signed bytes as base64
-        let bz = tx.rlp_signed(&sig);
-        let serialized_eth_tx_b64 = general_purpose::URL_SAFE.encode(bz.as_ref());
-
-        // Send the signed EVM tx as a multipart form in the `msg` field
-        let multipart_form =
-            multipart_form(&serialized_eth_tx_b64, hash, client_node_addr, size).await;
-
-        let reply = handle_object_upload(client, iroh.client().clone(), multipart_form, 1000)
+        // Test with a larger max_size to accommodate our test file
+        let reply = handle_object_upload(iroh.client().clone(), form_data, FILE_SIZE as u64 * 2)
             .await
             .unwrap();
         let response = reply.into_response();
         assert_eq!(response.status(), StatusCode::OK);
-    }
 
-    #[tokio::test]
-    async fn test_handle_invalid_object_upload_from_eth_tx() {
-        setup_logs();
-
-        let matcher = MockRequestMethodMatcher::default().map(
-            Method::AbciQuery,
-            Ok(ABCI_QUERY_RESPONSE_UPLOAD.to_string()),
-        );
-        let client = FendermintClient::new(MockClient::new(matcher).0);
-        let iroh = iroh::node::Node::memory().spawn().await.unwrap();
-
-        // client iroh node
-        let client_iroh = iroh::node::Node::memory().spawn().await.unwrap();
-        let hash = client_iroh
-            .blobs()
-            .add_bytes(&b"hello world"[..])
-            .await
-            .unwrap()
-            .hash;
-        let client_node_addr = client_iroh.net().node_addr().await.unwrap();
-
-        let iroh_storage = EntanglerIrohStorage::from_client(client_iroh.client().clone());
-        let ent = Entangler::new(iroh_storage, Config::new(3, 5, 5)).unwrap();
-        let metadata_hash = ent.entangle_uploaded(hash.to_string()).await.unwrap();
-
-        let iroh_metadata_hash = Hash::from_str(metadata_hash.as_str()).unwrap();
-
-        let store = Address::new_id(90);
-        let key = b"key";
-        let size = 11;
-        let params = AddParams {
-            source: fendermint_actor_blobs_shared::state::PublicKey(*iroh.node_id().as_bytes()),
-            key: key.to_vec(),
-            hash: fendermint_actor_blobs_shared::state::Hash(*hash.as_bytes()),
-            size,
-            recovery_hash: fendermint_actor_blobs_shared::state::Hash(
-                *iroh_metadata_hash.as_bytes(),
-            ),
-            ttl: None,
-            metadata: HashMap::new(),
-            overwrite: true,
-        };
-        let params = RawBytes::serialize(params).unwrap();
-
-        // This mimics how Solidity wrappers send transactions to a bucket actor (needs to be `to` EVM address)
-        const CALL_ACTOR_ID: &str = "0xfe00000000000000000000000000000000000005";
-        let calldata = abi::encode(&[
-            abi::Token::Uint(et::U256::from(
-                fendermint_actor_bucket::Method::AddObject as u64, // method_num
-            )),
-            abi::Token::Uint(0.into()),                       // value
-            abi::Token::Uint(0x00000000.into()),              // static call
-            abi::Token::Uint(fvm_ipld_encoding::CBOR.into()), // cbor codec
-            abi::Token::Bytes(params.to_vec()),               // params
-            abi::Token::Uint(store.id().unwrap().into()),     // target contract ID address
-        ]);
-
-        // Set up EVM wallet
-        let sk = fendermint_crypto::SecretKey::random(&mut StdRng::from_entropy());
-        let signing_key = SigningKey::from_slice(sk.serialize().as_ref()).unwrap();
-        let chain_id = 314159u64;
-        let wallet = LocalWallet::from_bytes(signing_key.to_bytes().as_ref())
-            .unwrap()
-            .with_chain_id(chain_id);
-
-        // Try with an invalid (legacy) EVM tx
-        let tx = et::TransactionRequest::new()
-            .from(wallet.address())
-            .to(CALL_ACTOR_ID.parse::<et::Address>().unwrap())
-            .nonce(0)
-            .gas(3000000)
-            .gas_price(et::U256::zero())
-            .data(et::Bytes::from(calldata))
-            .chain_id(chain_id);
-        let tx = et::transaction::eip2718::TypedTransaction::Legacy(tx);
-        let sig = wallet.sign_transaction_sync(&tx).expect("failed to sign");
-        let bz = tx.rlp_signed(&sig);
-        let serialized_eth_tx_b64 = general_purpose::URL_SAFE.encode(bz.as_ref());
-
-        let multipart_form =
-            multipart_form(&serialized_eth_tx_b64, hash, client_node_addr, size).await;
-
-        let result =
-            handle_object_upload(client, iroh.client().clone(), multipart_form, 1000).await;
-        match result {
-            Ok(_) => panic!("expected an error for legacy transaction"),
-            Err(rejection) => {
-                if let Some(bad_request) = rejection.find::<BadRequest>() {
-                    assert!(
-                        bad_request
-                            .message
-                            .contains("failed to process signed transaction as eip1559"),
-                        "unexpected error message: {}",
-                        bad_request.message
-                    );
-                } else {
-                    panic!("expected BadRequest rejection");
-                }
+        // Verify the blob was stored in iroh
+        let status = iroh.blobs().status(hash).await.unwrap();
+        match status {
+            BlobStatus::Complete { size: stored_size } => {
+                assert_eq!(stored_size, size);
             }
+            _ => panic!("Expected blob to be stored completely"),
         }
     }
 

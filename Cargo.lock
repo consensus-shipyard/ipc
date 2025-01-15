@@ -3413,6 +3413,7 @@ dependencies = [
  "ipc-provider",
  "ipc_ipld_resolver",
  "iroh",
+ "iroh-base",
  "k256 0.11.6",
  "lazy_static",
  "libipld",
