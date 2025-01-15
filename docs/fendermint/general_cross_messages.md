@@ -1,5 +1,10 @@
 ## Overview
 
+> :warning: **Caution**
+> This document does not focus on simple transfers using the Transfer message kind (e.g., Gateway#release, an abstraction
+> over Transfer). Instead, it covers the general message–building blocks implemented with the Call message kind, which enable
+> communication across L2+ subnets and provide a foundation for higher-level communication abstractions.
+
 General cross-net messages enable the transmission of arbitrary messages between IPC subnets. They are particularly useful for transferring tokens (when supported, more on this later) or transmitting arbitrary data. This is not a feature that allows users to trigger messages from wallets; rather, it is a framework for cross-subnet contract-to-contract communication.
 
 Messages are transmitted across subnets using top-down and bottom-up mechanisms. For example, if a message is sent from a parent to a child subnet, the top-down mechanism is used, and vice versa. Similarly, messages between subnets not directly connected but sharing a common parent are routed automatically by the IPC system.
