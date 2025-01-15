@@ -118,6 +118,30 @@ impl<'a> VoteAgg<'a> {
 
         votes
     }
+
+    pub fn max_observation_weight(
+        &self,
+        power_table: &PowerTable,
+    ) -> Option<(&Observation, Weight)> {
+        let mut votes: HashMap<&Observation, Weight> = HashMap::new();
+
+        for v in self.0.iter() {
+            let validator = v.voter();
+
+            let power = power_table.get(&validator).cloned().unwrap_or(0);
+            if power == 0 {
+                continue;
+            }
+
+            let ob = v.observation();
+            votes.entry(ob).and_modify(|w| *w += power).or_insert(power);
+        }
+
+        votes
+            .iter()
+            .max_by(|a, b| a.1.cmp(b.1))
+            .map(|(k, v)| (*k, *v))
+    }
 }
 
 #[cfg(test)]
@@ -181,7 +205,10 @@ mod tests {
         );
 
         let agg = VoteAgg(votes.iter().collect());
-        let weights = agg.observation_weights(&HashMap::from_iter(powers));
-        assert_eq!(weights, vec![(&observation1, 1), (&observation2, 2),])
+        let (ob, weight) = agg
+            .max_observation_weight(&HashMap::from_iter(powers))
+            .unwrap();
+        assert_eq!(ob, &observation2);
+        assert_eq!(weight, 2);
     }
 }

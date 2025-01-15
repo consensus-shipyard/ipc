@@ -231,11 +231,7 @@ where
                 let _ = tx.send(());
             }
             VoteReactorRequest::FindQuorum(tx) => {
-                let quorum = self
-                    .vote_tally
-                    .find_quorum()
-                    .inspect_err(|e| tracing::error!(err = e.to_string(), "cannot find quorum"))
-                    .unwrap_or_default();
+                let quorum = self.vote_tally.get_latest_quorum();
                 let _ = tx.send(quorum);
             }
             VoteReactorRequest::SetPowerTable { updates, tx } => {
