@@ -148,7 +148,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase, IIpcHandler {
         // there seems no auto way to derive the abi in string, check this before running tests, make sure
         // it's updated with the implementation
         new_topdown_message_topic = keccak256(
-            "NewTopDownMessage(address,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes,uint64),bytes32)"
+            "NewTopDownMessage(address,(uint8,uint64,uint64,uint256,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),bytes),bytes32)"
         );
 
         // get some free money.
