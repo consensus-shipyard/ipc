@@ -607,55 +607,55 @@
           "type": "t_enum(IpcMsgKind)21376"
         },
         {
-          "astId": 21385,
-          "contract": "contracts/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
-          "label": "to",
-          "offset": 0,
-          "slot": "1",
-          "type": "t_struct(IPCAddress)21658_storage"
-        },
-        {
-          "astId": 21389,
-          "contract": "contracts/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
-          "label": "from",
-          "offset": 0,
-          "slot": "5",
-          "type": "t_struct(IPCAddress)21658_storage"
-        },
-        {
-          "astId": 21392,
+          "astId": 21384,
           "contract": "contracts/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "localNonce",
-          "offset": 0,
-          "slot": "9",
+          "offset": 1,
+          "slot": "0",
           "type": "t_uint64"
         },
         {
-          "astId": 21395,
+          "astId": 21387,
+          "contract": "contracts/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
+          "label": "originalNonce",
+          "offset": 9,
+          "slot": "0",
+          "type": "t_uint64"
+        },
+        {
+          "astId": 21390,
           "contract": "contracts/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
           "label": "value",
           "offset": 0,
-          "slot": "10",
+          "slot": "1",
           "type": "t_uint256"
+        },
+        {
+          "astId": 21394,
+          "contract": "contracts/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
+          "label": "to",
+          "offset": 0,
+          "slot": "2",
+          "type": "t_struct(IPCAddress)21658_storage"
         },
         {
           "astId": 21398,
           "contract": "contracts/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
-          "label": "message",
+          "label": "from",
           "offset": 0,
-          "slot": "11",
-          "type": "t_bytes_storage"
+          "slot": "6",
+          "type": "t_struct(IPCAddress)21658_storage"
         },
         {
           "astId": 21401,
           "contract": "contracts/lib/LibGatewayActorStorage.sol:GatewayActorModifiers",
-          "label": "originalNonce",
+          "label": "message",
           "offset": 0,
-          "slot": "12",
-          "type": "t_uint64"
+          "slot": "10",
+          "type": "t_bytes_storage"
         }
       ],
-      "numberOfBytes": "416"
+      "numberOfBytes": "352"
     },
     "t_struct(MaxPQ)19752_storage": {
       "encoding": "inplace",
