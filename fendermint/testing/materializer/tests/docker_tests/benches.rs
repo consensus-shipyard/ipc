@@ -15,10 +15,11 @@ use ethers::{
     signers::{Signer, Wallet},
     types::{Eip1559TransactionRequest, H160},
 };
-use fendermint_materializer::bencher::Bencher;
 use fendermint_materializer::concurrency::collect::collect_blocks;
 use fendermint_materializer::concurrency::nonce_manager::NonceManager;
+use fendermint_materializer::concurrency::reporting::summary::ExecutionSummary;
 use fendermint_materializer::concurrency::signal::Signal;
+use fendermint_materializer::concurrency::TestOutput;
 use fendermint_materializer::{
     concurrency::{self, config::Execution},
     materials::DefaultAccount,
@@ -85,21 +86,20 @@ async fn test_concurrent_transfer() -> Result<(), anyhow::Error> {
         .add_step(1, 5)
         .add_step(10, 5)
         .add_step(100, 5)
-        .add_step(150, 5)
-        .add_step(200, 5);
+        .add_step(150, 5);
     let testnet = Arc::new(testnet);
     let testnet_clone = testnet.clone();
     let nonce_manager = Arc::new(NonceManager::new());
 
-    let results = concurrency::execute(cfg.clone(), move |test_id: usize, mut bencher: Bencher| {
+    let results = concurrency::execute(cfg.clone(), move |mut input| {
         let testnet = testnet_clone.clone();
         let nonce_manager = nonce_manager.clone();
         let provider = provider.clone();
 
         let test = async move {
-            let sender = testnet.account_mod_nth(test_id);
-            let recipient = testnet.account_mod_nth(test_id + 1);
-            println!("running (test_id={})", test_id);
+            let sender = testnet.account_mod_nth(input.test_id);
+            let recipient = testnet.account_mod_nth(input.test_id + 1);
+            println!("running (test_id={})", input.test_id);
 
             let middleware = make_middleware(provider, sender, chain_id)
                 .await
@@ -122,14 +122,14 @@ async fn test_concurrent_transfer() -> Result<(), anyhow::Error> {
             tx = tx.gas(gas_estimation);
             assert!(gas_estimation <= max_tx_gas_limit);
 
-            bencher.start();
+            input.bencher.start();
 
             let pending: PendingTransaction<_> = middleware
                 .send_transaction(tx, None)
                 .await
                 .context("failed to send txn")?;
             let tx_hash = pending.tx_hash();
-            println!("sent tx {:?} (test_id={})", tx_hash, test_id);
+            println!("sent tx {:?} (test_id={})", tx_hash, input.test_id);
 
             // We expect that the transaction is pending, however it should not return an error.
             match middleware.get_transaction(tx_hash).await {
@@ -139,22 +139,25 @@ async fn test_concurrent_transfer() -> Result<(), anyhow::Error> {
                     bail!("failed to get pending transaction: {e}")
                 }
             }
-            bencher.mempool();
+            input.bencher.mempool();
 
             loop {
                 if let Ok(Some(tx)) = middleware.get_transaction_receipt(tx_hash).await {
                     println!(
                         "tx included in block {:?} (test_id={})",
-                        tx.block_number, test_id
+                        tx.block_number, input.test_id
                     );
                     let block_number = tx.block_number.unwrap().as_u64();
-                    bencher.block_inclusion(block_number);
+                    input.bencher.block_inclusion(block_number);
                     break;
                 }
                 sleep(Duration::from_millis(100)).await;
             }
 
-            Ok(bencher)
+            Ok(TestOutput {
+                bencher: input.bencher,
+                tx_hash,
+            })
         };
         test.boxed()
     })
@@ -162,7 +165,7 @@ async fn test_concurrent_transfer() -> Result<(), anyhow::Error> {
 
     cancel.send();
     let blocks = blocks_collector.await??;
-    let summary = concurrency::ExecutionSummary::new(cfg.clone(), blocks, results);
+    let summary = ExecutionSummary::new(cfg.clone(), blocks, results);
     summary.print();
 
     let res = summary.to_result();

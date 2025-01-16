@@ -7,9 +7,9 @@ pub mod nonce_manager;
 pub mod reporting;
 pub mod signal;
 
-pub use reporting::*;
-
 use crate::bencher::Bencher;
+use crate::concurrency::reporting::TestResult;
+use ethers::types::H256;
 use futures::FutureExt;
 use std::future::Future;
 use std::pin::Pin;
@@ -17,9 +17,21 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::Semaphore;
 
+#[derive(Debug)]
+pub struct TestInput {
+    pub test_id: usize,
+    pub bencher: Bencher,
+}
+
+#[derive(Debug)]
+pub struct TestOutput {
+    pub bencher: Bencher,
+    pub tx_hash: H256,
+}
+
 pub async fn execute<F>(cfg: config::Execution, test_factory: F) -> Vec<Vec<TestResult>>
 where
-    F: Fn(usize, Bencher) -> Pin<Box<dyn Future<Output = anyhow::Result<Bencher>> + Send>>,
+    F: Fn(TestInput) -> Pin<Box<dyn Future<Output = anyhow::Result<TestOutput>> + Send>>,
 {
     let mut test_id = 0;
     let mut results = Vec::new();
@@ -34,18 +46,20 @@ where
             }
             let permit = semaphore.clone().acquire_owned().await.unwrap();
             let bencher = Bencher::new();
-            let task = test_factory(test_id, bencher).boxed();
+            let test_input = TestInput { test_id, bencher };
+            let task = test_factory(test_input).boxed();
             let step_results = step_results.clone();
             let handle = tokio::spawn(async move {
-                let res = task.await;
-                let (bencher, err) = match res {
-                    Ok(bencher) => (Some(bencher), None),
-                    Err(err) => (None, Some(err)),
+                let test_output = task.await;
+                let (bencher, tx_hash, err) = match test_output {
+                    Ok(test_output) => (Some(test_output.bencher), Some(test_output.tx_hash), None),
+                    Err(err) => (None, None, Some(err)),
                 };
                 step_results.lock().await.push(TestResult {
                     test_id,
                     step_id,
                     bencher,
+                    tx_hash,
                     err,
                 });
                 drop(permit);
