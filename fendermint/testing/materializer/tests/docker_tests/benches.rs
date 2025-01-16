@@ -52,7 +52,7 @@ const MAX_TX_GAS_LIMIT: u64 = 3_000_000;
 
 #[serial_test::serial]
 #[tokio::test]
-async fn test_concurrent_transfer() -> Result<(), anyhow::Error> {
+async fn test_native_coin_transfer() -> Result<(), anyhow::Error> {
     let (testnet, cleanup) = make_testnet(MANIFEST, |_| {}).await?;
 
     let block_gas_limit = U256::from(BLOCK_GAS_LIMIT);
