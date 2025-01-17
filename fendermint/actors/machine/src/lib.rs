@@ -52,6 +52,25 @@ pub fn require_addr_is_origin_or_caller(
     )))
 }
 
+/// Resolves an Account ID Address to its external delegated Address
+pub fn resolve_delegated_address(
+    rt: &impl Runtime,
+    account_address: Address,
+) -> Result<Address, ActorError> {
+    let account_id = rt
+        .resolve_address(&account_address)
+        .ok_or(ActorError::not_found(format!(
+            "actor {} not found",
+            account_address
+        )))?;
+
+    rt.lookup_delegated_address(account_id)
+        .ok_or(ActorError::not_found(format!(
+            "invalid address: actor {} is not delegated",
+            account_address
+        )))
+}
+
 /// Resolves ID address of an actor.
 /// If `require_delegated` is `true`, the address must be of type
 /// EVM (a Solidity contract), EthAccount (an Ethereum-style EOA), or Placeholder (a yet to be
