@@ -190,19 +190,18 @@ impl State {
         // Get the account
         let mut accounts = self.accounts.hamt(store)?;
         let mut account = accounts.get_or_err(&addr)?;
-        let delegation = if let Some(sponsor) = sponsor {
-            let approval =
-                account
-                    .approvals
-                    .get_mut(&from.to_string())
-                    .ok_or(ActorError::forbidden(format!(
+        let delegation =
+            if let Some(sponsor) = sponsor {
+                let approval = account.approvals_to.get_mut(&from.to_string()).ok_or(
+                    ActorError::forbidden(format!(
                         "approval from {} to {} not found",
                         sponsor, from
-                    )))?;
-            Some(CreditDelegation::new(from, approval))
-        } else {
-            None
-        };
+                    )),
+                )?;
+                Some(CreditDelegation::new(from, approval))
+            } else {
+                None
+            };
         // Check gas balance and debit
         if add_amount.is_negative() {
             let gas_required = -add_amount.clone();
@@ -212,11 +211,24 @@ impl State {
         account.gas_allowance += &add_amount.clone();
         // Update credit approval
         if let Some(delegation) = delegation {
+            let origin = delegation.origin;
+            let mut origin_account = accounts.get_or_err(&origin)?;
+            let origin_approval = origin_account
+                .approvals_from
+                .get_mut(&addr.to_string())
+                .ok_or(ActorError::illegal_state(format!(
+                    "approval from {} to {} not found in 'to' account",
+                    addr, origin
+                )))?;
+
             delegation.approval.gas_fee_used -= add_amount.clone();
+            origin_approval.gas_fee_used -= add_amount.clone();
+            // Save delegation origin account
+            accounts.set(&origin, origin_account)?;
         }
-        // Save account
-        self.accounts
-            .save_tracked(accounts.set_and_flush_tracked(&addr, account)?);
+        // Save accounts
+        accounts.set(&addr, account)?;
+        self.accounts.save_tracked(accounts.flush_tracked()?);
 
         if add_amount.is_positive() {
             debug!("refunded {} atto to {}", add_amount.atto(), addr);
@@ -255,52 +267,69 @@ impl State {
         let expiry = ttl.map(|t| t + current_epoch);
         // Get or create a new account
         let mut accounts = self.accounts.hamt(store)?;
-        let mut account = accounts.get_or_create(&from, || {
+        let mut from_account = accounts.get_or_create(&from, || {
             Account::new(current_epoch, config.blob_default_ttl)
         })?;
+        let mut to_account =
+            accounts.get_or_create(&to, || Account::new(current_epoch, config.blob_default_ttl))?;
         // Get or add a new approval
-        let approval = account
-            .approvals
+        let approval = CreditApproval {
+            credit_limit: credit_limit.clone(),
+            gas_fee_limit: gas_fee_limit.clone(),
+            expiry,
+            credit_used: Credit::zero(),
+            gas_fee_used: TokenAmount::zero(),
+        };
+        let from_approval = from_account
+            .approvals_to
             .entry(to.to_string())
-            .or_insert(CreditApproval {
-                credit_limit: credit_limit.clone(),
-                gas_fee_limit: gas_fee_limit.clone(),
-                expiry,
-                credit_used: Credit::zero(),
-                gas_fee_used: TokenAmount::zero(),
-            });
+            .or_insert(approval.clone());
+        let to_approval = to_account
+            .approvals_from
+            .entry(from.to_string())
+            .or_insert(approval);
+        if from_approval != to_approval {
+            return Err(ActorError::illegal_state(format!(
+                "approval in 'from' account ({}) doesn't match approval in 'to' account ({})",
+                from, to,
+            )));
+        }
 
         // Validate approval changes
         if let Some(limit) = credit_limit.clone() {
-            if approval.credit_used > limit {
+            if from_approval.credit_used > limit {
                 return Err(ActorError::illegal_argument(format!(
                     "limit cannot be less than amount of already used credits ({})",
-                    approval.credit_used
+                    from_approval.credit_used
                 )));
             }
         }
 
         if let Some(limit) = gas_fee_limit.clone() {
-            if approval.gas_fee_used > limit {
+            if from_approval.gas_fee_used > limit {
                 return Err(ActorError::illegal_argument(format!(
                     "limit cannot be less than amount of already used gas fees ({})",
-                    approval.credit_used
+                    from_approval.gas_fee_used
                 )));
             }
         }
-        approval.credit_limit = credit_limit;
-        approval.gas_fee_limit = gas_fee_limit;
-        approval.expiry = expiry;
-        let approval = approval.clone();
-        // Save account
-        self.accounts
-            .save_tracked(accounts.set_and_flush_tracked(&from, account)?);
+        from_approval.credit_limit = credit_limit.clone();
+        from_approval.gas_fee_limit = gas_fee_limit.clone();
+        from_approval.expiry = expiry;
+        to_approval.credit_limit = credit_limit;
+        to_approval.gas_fee_limit = gas_fee_limit;
+        to_approval.expiry = expiry;
+        // Save accounts
+        let from_approval = from_approval.clone();
+        accounts.set(&from, from_account)?;
+        accounts.set(&to, to_account)?;
+        self.accounts.save_tracked(accounts.flush_tracked()?);
 
         debug!(
             "approved credits from {} to {} (credit limit: {:?}; gas fee limit: {:?}, expiry: {:?}",
-            from, to, approval.credit_limit, approval.gas_fee_limit, approval.expiry
+            from, to, from_approval.credit_limit, from_approval.gas_fee_limit, from_approval.expiry
         );
-        Ok(approval)
+        Ok(from_approval)
     }
 
     /// Revokes credit from one account to another.
@@ -312,16 +341,28 @@ impl State {
     ) -> anyhow::Result<(), ActorError> {
         // Get the account
         let mut accounts = self.accounts.hamt(store)?;
-        let mut account = accounts.get_or_err(&from)?;
-        if account.approvals.remove(&to.to_string()).is_none() {
+        let mut from_account = accounts.get_or_err(&from)?;
+        if from_account.approvals_to.remove(&to.to_string()).is_none() {
             return Err(ActorError::not_found(format!(
                 "approval from {} to {} not found",
                 from, to
             )));
         }
-        // Save account
-        self.accounts
-            .save_tracked(accounts.set_and_flush_tracked(&from, account)?);
+        let mut to_account = accounts.get_or_err(&to)?;
+        if to_account
+            .approvals_from
+            .remove(&from.to_string())
+            .is_none()
+        {
+            return Err(ActorError::not_found(format!(
+                "approval from {} to {} not found in 'to' account",
+                from, to
+            )));
+        }
+        // Save accounts
+        accounts.set(&from, from_account)?;
+        accounts.set(&to, to_account)?;
+        self.accounts.save_tracked(accounts.flush_tracked()?);
 
         debug!("revoked credits from {} to {}", from, to);
         Ok(())
@@ -347,7 +388,7 @@ impl State {
         let accounts = self.accounts.hamt(store)?;
         Ok(accounts
             .get(&from)?
-            .map(|a| a.approvals.get(&to.to_string()).cloned())
+            .map(|a| a.approvals_to.get(&to.to_string()).cloned())
             .and_then(|a| a))
     }
 
@@ -375,7 +416,7 @@ impl State {
                 Some(account) => account,
             };
             let sponsored = sponsor
-                .approvals
+                .approvals_to
                 .get(&from.to_string())
                 .and_then(|approval| {
                     let expiry_valid = approval
@@ -546,20 +587,19 @@ impl State {
         // Validate the TTL
         let ttl = self.validate_ttl(config, ttl, &account)?;
         // Get the credit delegation if needed
-        let delegation = if origin != subscriber {
-            // Look for an approval for origin from subscriber
-            let approval =
-                account
-                    .approvals
-                    .get_mut(&origin.to_string())
-                    .ok_or(ActorError::forbidden(format!(
+        let delegation =
+            if origin != subscriber {
+                // Look for an approval for origin from subscriber
+                let approval = account.approvals_to.get_mut(&origin.to_string()).ok_or(
+                    ActorError::forbidden(format!(
                         "approval from {} to {} not found",
                         subscriber, origin
-                    )))?;
-            Some(CreditDelegation::new(origin, approval))
-        } else {
-            None
-        };
+                    )),
+                )?;
+                Some(CreditDelegation::new(origin, approval))
+            } else {
+                None
+            };
         // Capacity updates and required credit depend on whether the subscriber is already
         // subscribing to this blob
         let expiry = current_epoch + ttl;
@@ -790,11 +830,25 @@ impl State {
         account.credit_free -= &credit_required;
         // Update credit approval
         if let Some(delegation) = delegation {
+            let origin = delegation.origin;
+            let mut origin_account = accounts.get_or_err(&origin)?;
+            let origin_approval = origin_account
+                .approvals_from
+                .get_mut(&subscriber.to_string())
+                .ok_or(ActorError::illegal_state(format!(
+                    "approval from {} to {} not found in 'to' account",
+                    subscriber, origin
+                )))?;
+
             delegation.approval.credit_used += &credit_required;
+            origin_approval.credit_used += &credit_required;
+            // Save delegation origin account
+            accounts.set(&origin, origin_account)?;
         }
-        // Save account
-        self.accounts
-            .save_tracked(accounts.set_and_flush_tracked(&subscriber, account)?);
+        // Save accounts
+        accounts.set(&subscriber, account)?;
+        self.accounts.save_tracked(accounts.flush_tracked()?);
+
         // Save blob
         self.blobs
             .save_tracked(blobs.set_and_flush_tracked(&hash, blob)?);
@@ -978,7 +1032,7 @@ impl State {
         let delegation = if let Some(origin) = sub.delegate {
             // Look for an approval for origin from subscriber
             account
-                .approvals
+                .approvals_to
                 .get_mut(&origin.to_string())
                 .map(|approval| CreditDelegation::new(origin, approval))
         } else {
@@ -1042,6 +1096,21 @@ impl State {
                 // Update credit approval
                 if let Some(delegation) = delegation {
                     delegation.approval.credit_used -= &reclaim_credits;
+
+                    let origin = delegation.origin;
+                    let mut origin_account = accounts.get_or_err(&origin)?;
+                    let origin_approval = origin_account
+                        .approvals_from
+                        .get_mut(&subscriber.to_string())
+                        .ok_or(ActorError::illegal_state(format!(
+                            "approval from {} to {} not found in 'to' account",
+                            subscriber, origin
+                        )))?;
+
+                    delegation.approval.credit_used -= &reclaim_credits;
+                    origin_approval.credit_used -= &reclaim_credits;
+                    // Save delegation origin account
+                    accounts.set(&origin, origin_account)?;
                 }
                 debug!("released {} credits to {}", reclaim_credits, subscriber);
             }
@@ -1050,9 +1119,9 @@ impl State {
         // Remove the source from the pending queue
         self.pending
             .remove_source(store, hash, (subscriber, id, sub.source), blob.size)?;
-        // Save account
-        self.accounts
-            .save_tracked(accounts.set_and_flush_tracked(&subscriber, account)?);
+        // Save accounts
+        accounts.set(&subscriber, account)?;
+        self.accounts.save_tracked(accounts.flush_tracked()?);
         // Save blob
         self.blobs
             .save_tracked(blobs.set_and_flush_tracked(&hash, blob)?);
@@ -1104,7 +1173,7 @@ impl State {
             )))?;
         let delegation = if let Some(origin) = sub.delegate {
             // Look for an approval for origin from subscriber
-            let approval = account.approvals.get_mut(&origin.to_string());
+            let approval = account.approvals_to.get_mut(&origin.to_string());
             if let Some(approval) = approval {
                 Some(CreditDelegation::new(origin, approval))
             } else {
@@ -1219,6 +1288,21 @@ impl State {
                     // Update credit approval
                     if let Some(delegation) = delegation {
                         delegation.approval.credit_used -= &reclaim_credits;
+
+                        let origin = delegation.origin;
+                        let mut origin_account = accounts.get_or_err(&origin)?;
+                        let origin_approval = origin_account
+                            .approvals_from
+                            .get_mut(&subscriber.to_string())
+                            .ok_or(ActorError::illegal_state(format!(
+                                "approval from {} to {} not found in 'to' account",
+                                subscriber, origin
+                            )))?;
+
+                        delegation.approval.credit_used -= &reclaim_credits;
+                        origin_approval.credit_used -= &reclaim_credits;
+                        // Save delegation origin account
+                        accounts.set(&origin, origin_account)?;
                     }
                     debug!("released {} credits to {}", reclaim_credits, subscriber);
                 }
@@ -1261,9 +1345,9 @@ impl State {
                 .save_tracked(blobs.set_and_flush_tracked(&hash, blob)?);
             false
         };
-        // Save account
-        self.accounts
-            .save_tracked(accounts.set_and_flush_tracked(&subscriber, account)?);
+        // Save accounts
+        accounts.set(&subscriber, account)?;
+        self.accounts.save_tracked(accounts.flush_tracked()?);
         Ok(delete_blob)
     }
 
@@ -1529,12 +1613,50 @@ mod tests {
     use std::collections::BTreeMap;
     use std::ops::{AddAssign, SubAssign};
 
-    fn check_approval(account: Account, origin: Address, expect_used: Credit) {
-        if !account.approvals.is_empty() {
-            let approval = account.approvals.get(&origin.to_string()).unwrap();
+    fn check_approval_used<BS: Blockstore>(
+        state: &State,
+        store: &BS,
+        origin: Address,
+        subscriber: Address,
+        expect_used: Credit,
+    ) {
+        let subscriber_account = state.get_account(&store, subscriber).unwrap().unwrap();
+        let subscriber_approval = subscriber_account
+            .approvals_to
+            .get(&origin.to_string())
+            .unwrap();
+        assert_eq!(
+            subscriber_approval.credit_used,
+            state.credit_debited.clone() + subscriber_account.credit_committed.clone()
+        );
+        let origin_account = state.get_account(&store, origin).unwrap().unwrap();
+        let origin_approval = origin_account
+            .approvals_from
+            .get(&subscriber.to_string())
+            .unwrap();
+        assert_eq!(
+            subscriber_approval.credit_used,
+            state.credit_debited.clone() + subscriber_account.credit_committed.clone()
+        );
+    }
 
-            assert_eq!(approval.credit_used, expect_used);
-        }
+    fn check_approvals_match(
+        state: &State,
+        store: &MemoryBlockstore,
+        from: Address,
+        to: Address,
+        expected: CreditApproval,
+    ) {
+        let from_account = state.get_account(&store, from).unwrap().unwrap();
+        assert_eq!(
+            *from_account.approvals_to.get(&to.to_string()).unwrap(),
+            expected
+        );
+        let to_account = state.get_account(&store, to).unwrap().unwrap();
+        assert_eq!(
+            *to_account.approvals_from.get(&from.to_string()).unwrap(),
+            expected
+        );
     }
 
     #[test]
@@ -1607,6 +1729,7 @@ mod tests {
         assert_eq!(approval.credit_limit, None);
         assert_eq!(approval.gas_fee_limit, None);
         assert_eq!(approval.expiry, None);
+        check_approvals_match(&state, &store, from, to, approval);
 
         // Add credit limit
         let limit = 1_000_000_000_000_000_000u64;
@@ -1625,6 +1748,7 @@ mod tests {
         assert_eq!(approval.credit_limit, Some(Credit::from_whole(limit)));
         assert_eq!(approval.gas_fee_limit, None);
         assert_eq!(approval.expiry, None);
+        check_approvals_match(&state, &store, from, to, approval);
 
         // Add gas fee limit
         let limit = 1_000_000_000_000_000_000u64;
@@ -1643,6 +1767,7 @@ mod tests {
         assert_eq!(approval.credit_limit, None);
         assert_eq!(approval.gas_fee_limit, Some(TokenAmount::from_atto(limit)));
         assert_eq!(approval.expiry, None);
+        check_approvals_match(&state, &store, from, to, approval);
 
         // Add ttl
         let ttl = ChainEpoch::from(config.blob_min_ttl);
@@ -1661,6 +1786,7 @@ mod tests {
         assert_eq!(approval.credit_limit, Some(Credit::from_whole(limit)));
         assert_eq!(approval.gas_fee_limit, None);
         assert_eq!(approval.expiry, Some(ttl + current_epoch));
+        check_approvals_match(&state, &store, from, to, approval);
     }
 
     #[test]
@@ -1728,7 +1854,7 @@ mod tests {
 
         // Check approval
         let account = state.get_account(&store, from).unwrap().unwrap();
-        let approval = account.approvals.get(&to.to_string()).unwrap();
+        let approval = account.approvals_to.get(&to.to_string()).unwrap();
         assert_eq!(account.credit_committed, approval.credit_used);
 
         // Try to update approval with a limit below what's already been committed
@@ -1766,15 +1892,19 @@ mod tests {
         let res = state.approve_credit(&config, &store, from, to, current_epoch, None, None, None);
         assert!(res.is_ok());
 
-        // Check the account approval
-        let account = state.get_account(&store, from).unwrap().unwrap();
-        assert_eq!(account.approvals.len(), 1);
+        // Check the account approvals
+        let from_account = state.get_account(&store, from).unwrap().unwrap();
+        assert_eq!(from_account.approvals_to.len(), 1);
+        let to_account = state.get_account(&store, to).unwrap().unwrap();
+        assert_eq!(to_account.approvals_from.len(), 1);
 
         // Remove the approval
         let res = state.revoke_credit(&store, from, to);
         assert!(res.is_ok());
-        let account = state.get_account(&store, from).unwrap().unwrap();
-        assert_eq!(account.approvals.len(), 0);
+        let from_account = state.get_account(&store, from).unwrap().unwrap();
+        assert_eq!(from_account.approvals_to.len(), 0);
+        let to_account = state.get_account(&store, to).unwrap().unwrap();
+        assert_eq!(to_account.approvals_from.len(), 0);
     }
 
     #[test]
@@ -1813,6 +1943,7 @@ mod tests {
             origin,
             current_epoch,
             token_amount,
+            false,
         );
     }
 
@@ -1855,6 +1986,7 @@ mod tests {
             subscriber,
             current_epoch,
             token_amount,
+            true,
         );
     }
 
@@ -1867,6 +1999,7 @@ mod tests {
         subscriber: Address,
         current_epoch: ChainEpoch,
         token_amount: TokenAmount,
+        using_approval: bool,
     ) {
         let mut credit_amount =
             Credit::from_atto(token_amount.atto().clone()) * &config.token_credit_rate;
@@ -1894,7 +2027,9 @@ mod tests {
         assert!(res.is_ok());
 
         let stats = state.get_stats(config, TokenAmount::zero());
-        assert_eq!(stats.num_accounts, 1);
+        // Using a credit delegation creates both the from and to account
+        let expected_num_accounts = if using_approval { 2 } else { 1 };
+        assert_eq!(stats.num_accounts, expected_num_accounts);
         assert_eq!(stats.num_blobs, 1);
         assert_eq!(stats.num_resolving, 0);
         assert_eq!(stats.bytes_resolving, 0);
@@ -2034,8 +2169,15 @@ mod tests {
         assert_eq!(state.pending.len(), 0);
 
         // Check approval
-        let account_committed = account.credit_committed.clone();
-        check_approval(account, origin, state.credit_debited + account_committed);
+        if using_approval {
+            check_approval_used(
+                &state,
+                store,
+                origin,
+                subscriber,
+                state.credit_debited.clone() + account.credit_committed.clone(),
+            );
+        }
     }
 
     #[test]
@@ -2058,6 +2200,7 @@ mod tests {
             origin,
             current_epoch,
             token_amount,
+            false,
         );
     }
 
@@ -2100,6 +2243,7 @@ mod tests {
             subscriber,
             current_epoch,
             token_amount,
+            true,
         );
     }
 
@@ -2112,6 +2256,7 @@ mod tests {
         subscriber: Address,
         current_epoch: ChainEpoch,
         token_amount: TokenAmount,
+        using_approval: bool,
     ) {
         let token_credit_rate = BigInt::from(1_000_000_000_000_000_000u64);
         let mut credit_amount = token_amount.clone() * &config.token_credit_rate;
@@ -2279,8 +2424,15 @@ mod tests {
         assert_eq!(state.pending.len(), 0);
 
         // Check approval
-        let account_committed = account.credit_committed.clone();
-        check_approval(account, origin, state.credit_debited + account_committed);
+        if using_approval {
+            check_approval_used(
+                &state,
+                store,
+                origin,
+                subscriber,
+                state.credit_debited.clone() + account.credit_committed.clone(),
+            );
+        }
     }
 
     #[test]
@@ -2303,6 +2455,7 @@ mod tests {
             origin,
             current_epoch,
             token_amount,
+            false,
         );
     }
 
@@ -2345,6 +2498,7 @@ mod tests {
             subscriber,
             current_epoch,
             token_amount,
+            true,
         );
     }
 
@@ -2357,6 +2511,7 @@ mod tests {
         subscriber: Address,
         current_epoch: ChainEpoch,
         token_amount: TokenAmount,
+        using_approval: bool,
     ) {
         let mut credit_amount =
             Credit::from_atto(token_amount.atto().clone()) * &config.token_credit_rate;
@@ -2662,8 +2817,15 @@ mod tests {
         assert_eq!(state.pending.len(), 0);
 
         // Check approval
-        let account_committed = account.credit_committed.clone();
-        check_approval(account, origin, state.credit_debited + account_committed);
+        if using_approval {
+            check_approval_used(
+                &state,
+                store,
+                origin,
+                subscriber,
+                state.credit_debited.clone() + account.credit_committed.clone(),
+            );
+        }
     }
 
     #[test]
@@ -3001,6 +3163,7 @@ mod tests {
             origin,
             current_epoch,
             token_amount,
+            false,
         );
     }
 
@@ -3043,6 +3206,7 @@ mod tests {
             subscriber,
             current_epoch,
             token_amount,
+            true,
         );
     }
 
@@ -3055,6 +3219,7 @@ mod tests {
         subscriber: Address,
         current_epoch: ChainEpoch,
         token_amount: TokenAmount,
+        using_approval: bool,
     ) {
         let mut credit_amount = token_amount * &config.token_credit_rate;
 
@@ -3205,8 +3370,15 @@ mod tests {
         assert_eq!(state.pending.len(), 0);
 
         // Check approval
-        let account_committed = account.credit_committed.clone();
-        check_approval(account, origin, state.credit_debited + account_committed);
+        if using_approval {
+            check_approval_used(
+                &state,
+                store,
+                origin,
+                subscriber,
+                state.credit_debited.clone() + account.credit_committed.clone(),
+            );
+        }
     }
 
     #[test]

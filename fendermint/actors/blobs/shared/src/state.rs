@@ -69,14 +69,10 @@ pub struct Account {
     pub credit_sponsor: Option<Address>,
     /// The chain epoch of the last debit.
     pub last_debit_epoch: ChainEpoch,
-    /// Credit approvals to other accounts, keyed by receiver, keyed by caller,
-    /// which could be the receiver or a specific contract, like a bucket.
-    /// This allows for limiting approvals to interactions from a specific contract.
-    /// For example, an approval for Alice might be valid for any contract caller, so long as
-    /// the origin is Alice.
-    /// An approval for Bob might be valid from only one contract caller, so long as
-    /// the origin is Bob.
-    pub approvals: HashMap<String, CreditApproval>,
+    /// Credit approvals to other accounts from this account, keyed by receiver.
+    pub approvals_to: HashMap<String, CreditApproval>,
+    /// Credit approvals to this account from other accounts, keyed by sender.
+    pub approvals_from: HashMap<String, CreditApproval>,
     /// The maximum allowed TTL for actor's blobs.
     pub max_ttl: ChainEpoch,
     /// The total token value an account has used to buy credits.
