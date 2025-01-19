@@ -1,10 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::anyhow;
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Metrics {
     pub mean: f64,
     pub median: f64,
@@ -29,9 +28,9 @@ impl Metrics {
     }
 }
 
-pub fn calc_metrics(data: Vec<f64>) -> anyhow::Result<Metrics> {
+pub fn calc_metrics(data: Vec<f64>) -> Metrics {
     if data.is_empty() {
-        return Err(anyhow!("empty data"));
+        return Metrics::default();
     }
 
     let mut sorted_data = data.clone();
@@ -52,13 +51,13 @@ pub fn calc_metrics(data: Vec<f64>) -> anyhow::Result<Metrics> {
     let percentile_90_index = ((count as f64) * 0.9).ceil() as usize - 1;
     let percentile_90 = sorted_data[percentile_90_index];
 
-    Ok(Metrics {
+    Metrics {
         mean,
         median,
         max,
         min,
         percentile_90,
-    })
+    }
 }
 
 #[cfg(test)]
@@ -76,7 +75,7 @@ mod tests {
         let expected_min = 1.0;
         let expected_percentile_90 = 9.0;
 
-        let metrics = calc_metrics(data).unwrap();
+        let metrics = calc_metrics(data);
 
         assert!((metrics.mean - expected_mean).abs() < FLOAT_TOLERANCE);
         assert!((metrics.median - expected_median).abs() < FLOAT_TOLERANCE);

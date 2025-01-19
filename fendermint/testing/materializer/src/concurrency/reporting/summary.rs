@@ -154,6 +154,10 @@ impl StepSummary {
         let mut errs = Vec::new();
 
         for res in results {
+            if let Some(err) = res.err {
+                errs.push(err);
+            }
+
             let Some(bencher) = res.bencher else { continue };
 
             for (key, duration) in bencher.latencies.clone() {
@@ -162,18 +166,14 @@ impl StepSummary {
                     .or_default()
                     .push(duration.as_secs_f64());
             }
-
-            if let Some(err) = res.err {
-                errs.push(err);
-            }
         }
 
         let latencies = latencies
             .into_iter()
-            .map(|(key, dataset)| (key, calc_metrics(dataset).unwrap()))
+            .map(|(key, dataset)| (key, calc_metrics(dataset)))
             .collect();
 
-        let tps = calc_metrics(calc_tps(blocks)).unwrap();
+        let tps = calc_metrics(calc_tps(blocks));
 
         Self {
             cfg,
