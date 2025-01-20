@@ -149,6 +149,10 @@ where
             .unwrap()
     }
 
+    pub fn accounts(&self) -> &BTreeMap<AccountId, M::Account> {
+        &self.accounts
+    }
+
     /// Get a node by name.
     pub fn node(&self, name: &NodeName) -> anyhow::Result<&M::Node> {
         self.nodes
