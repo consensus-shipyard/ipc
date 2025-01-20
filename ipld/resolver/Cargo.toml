@@ -34,7 +34,7 @@ fvm_ipld_blockstore = { workspace = true, optional = true }
 
 ipc-api = { path = "../../ipc/api", default-features = false }
 ipc-observability = { workspace = true }
-gcra = { path = "../../ext/gcra-rs" }
+gcra = { workspace = true }
 
 [dev-dependencies]
 cid = { workspace = true }

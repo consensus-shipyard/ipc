@@ -6,7 +6,6 @@ members = [
 
   # merkle
   "ext/merkle-tree-rs",
-  "ext/gcra-rs",
   "ext/libp2p-bitswap",
   "ext/frc42_dispatch",
 
@@ -84,6 +83,7 @@ fnv = "1.0"
 futures = "0.3"
 futures-core = "0.3"
 futures-util = "0.3"
+gcra = "0.6.0"
 hex = "0.4"
 hex-literal = "0.4.1"
 http = "0.2.12"

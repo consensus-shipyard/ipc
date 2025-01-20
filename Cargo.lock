@@ -1346,10 +1346,8 @@ checksum = "a21f936df1771bf62b77f047b726c4625ff2e8aa607c01ec06e5a05bd8463401"
 dependencies = [
  "android-tzdata",
  "iana-time-zone",
- "js-sys",
  "num-traits",
  "serde",
- "wasm-bindgen",
  "windows-targets 0.52.6",
 ]
 
@@ -4036,7 +4034,7 @@ dependencies = [
 
 [[package]]
 name = "frc42_dispatch"
-version = "7.0.0"
+version = "8.0.0"
 dependencies = [
  "frc42_hasher",
  "frc42_macros",
@@ -4048,7 +4046,7 @@ dependencies = [
 
 [[package]]
 name = "frc42_hasher"
-version = "5.0.0"
+version = "6.0.0"
 dependencies = [
  "fvm_sdk",
  "fvm_shared",
@@ -4057,7 +4055,7 @@ dependencies = [
 
 [[package]]
 name = "frc42_macros"
-version = "5.0.0"
+version = "6.0.0"
 dependencies = [
  "blake2b_simd",
  "frc42_hasher",
@@ -4448,13 +4446,13 @@ dependencies = [
 
 [[package]]
 name = "gcra"
-version = "0.4.0"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "707407fbc399298809d33e7eef7133f3783d6ba39a7c560095465d3532a27696"
 dependencies = [
- "chrono",
  "dashmap",
  "rustc-hash 1.1.0",
  "thiserror 1.0.69",
- "tokio",
 ]
 
 [[package]]
