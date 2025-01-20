@@ -45,7 +45,7 @@ contract GatewayMessengerFacet is GatewayActorModifiers {
         }
 
         // We prevent the sender from being an EoA.
-        if (!(msg.sender.code.length > 0)) {
+        if (msg.sender.code.length == 0) {
             revert InvalidXnetMessage(InvalidXnetMessageReason.Sender);
         }
 
