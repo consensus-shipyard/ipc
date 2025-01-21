@@ -81,13 +81,13 @@ impl Display for DockerNode {
 }
 
 impl DockerNode {
-    pub async fn get_or_create<'a>(
+    pub async fn get_or_create(
         root: impl AsRef<Path>,
         docker: Docker,
         dropper: DropChute,
         drop_policy: &DropPolicy,
         node_name: &NodeName,
-        node_config: &NodeConfig<'a, DockerMaterials>,
+        node_config: &NodeConfig<'_, DockerMaterials>,
         port_range: DockerPortRange,
     ) -> anyhow::Result<Self> {
         let fendermint_name = container_name(node_name, "fendermint");

@@ -528,9 +528,9 @@ impl DockerMaterializer {
 
     /// Run some kind of command with the `ipc-cli` that needs to be executed as
     /// transaction by an account on a given subnet.
-    async fn ipc_cli_run_cmd<'a>(
+    async fn ipc_cli_run_cmd(
         &mut self,
-        submit_config: &SubmitConfig<'a, DockerMaterials>,
+        submit_config: &SubmitConfig<'_, DockerMaterials>,
         account: &DefaultAccount,
         cmd: String,
     ) -> anyhow::Result<Vec<String>> {
