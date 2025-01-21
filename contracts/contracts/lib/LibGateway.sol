@@ -423,7 +423,7 @@ library LibGateway {
                 sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Nonce));
                 return;
             }
-            ++subnet.appliedBottomUpNonce;
+            subnet.appliedBottomUpNonce += 1;
 
             // The value carried in bottom-up messages needs to be treated according to the supply source
             // configuration of the subnet.
@@ -434,7 +434,7 @@ library LibGateway {
                 sendReceipt(crossMsg, OutcomeType.SystemErr, abi.encodeWithSelector(InvalidXnetMessage.selector, InvalidXnetMessageReason.Nonce));
                 return;
             }
-            ++s.appliedTopDownNonce;
+            s.appliedTopDownNonce += 1;
 
             // The value carried in top-down messages locally maps to the native coin, so we pass over the
             // native supply source.

@@ -27,7 +27,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     using AssetHelper for Asset;
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
-    event SubnetKilled(SubnetID id);
+    event SubnetDestroyed(SubnetID id);
 
     /// @notice register a subnet in the gateway. It is called by a subnet when it reaches the threshold stake
     /// @dev The subnet can optionally pass a genesis circulating supply that would be pre-allocated in the
@@ -128,7 +128,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         s.subnetKeys.remove(id);
         SubnetActorGetterFacet(msg.sender).collateralSource().transferFunds(payable(msg.sender), stake);
 
-        emit SubnetKilled(subnet.id);
+        emit SubnetDestroyed(subnet.id);
     }
 
     /// @notice credits the received value to the specified address in the specified child subnet.
