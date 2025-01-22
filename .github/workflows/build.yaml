@@ -73,6 +73,8 @@ jobs:
           rustc --version
           echo "cargo version:"
           cargo -V
+          echo "glibc version"
+          ldd --version
 
       - name: Check fmt (nightly)
         run: cargo +nightly-2024-07-05 fmt --check --all
