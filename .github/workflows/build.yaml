@@ -7,7 +7,7 @@ on:
 jobs:
   build:
     name: Build IPC
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     env:
       RUST_BACKTRACE: full
       RUSTFLAGS: -Dwarnings
