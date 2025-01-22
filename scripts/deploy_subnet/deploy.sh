@@ -183,7 +183,7 @@ if [[ -z ${SKIP_DEPENDENCIES+x} || "$SKIP_DEPENDENCIES" == "" || "$SKIP_DEPENDEN
     fi
     # Check Foundry
     echo "$DASHES Check foundry..."
-    if which foundryup &> /dev/null ; then
+    if which anvil &> /dev/null ; then
       echo "$DASHES foundry is already installed."
     else
       echo "$DASHES Need to install foundry"

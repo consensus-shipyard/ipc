@@ -2,7 +2,6 @@
 
 set -euo pipefail
 
-GOPATH="${GOPATH:-$HOME/go}"
 export FM_NETWORK=test
 
 # Clean up old network files
@@ -16,7 +15,7 @@ cp -r ./fendermint/app/config "$HOME/.fendermint/config"
 
 # Init CometBFT
 rm -rf "$HOME/.cometbft"
-"$GOPATH/bin/cometbft" init
+cometbft init
 
 # Build actors
 if [[ -z ${SKIP_BUILD+x} || "$SKIP_BUILD" == "" || "$SKIP_BUILD" == "false" ]]; then
