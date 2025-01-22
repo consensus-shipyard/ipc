@@ -75,7 +75,7 @@ jobs:
           cargo -V
 
       - name: Check fmt (nightly)
-        run: cargo +nightly-2024-10-05 fmt --check --all
+        run: cargo +nightly-2024-07-05 fmt --check --all
 
       - name: Check clippy
         run: cargo clippy --release --tests --no-deps -- -D clippy::all
