@@ -62,7 +62,7 @@ jobs:
       - name: Install Rust nightly
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly
+          toolchain: nightly-2024-07-05
           components: rustfmt,clippy
 
       - name: Print Rust toolchain default versions
