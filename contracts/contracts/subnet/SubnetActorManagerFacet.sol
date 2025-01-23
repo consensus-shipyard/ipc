@@ -77,7 +77,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
     }
 
     /// @notice Sets the validator gater contract implementation
-    /// @param gater The addresseof validator gater implementation.
+    /// @param gater The addresse of validator gater implementation.
     function setValidatorGater(address gater) external notKilled {
         LibDiamond.enforceIsContractOwner();
 

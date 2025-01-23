@@ -63,7 +63,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     }
 
     /// @notice addStake - add collateral for an existing subnet
-    function addStake(uint256 amount) external payable nonReentrant {
+    function addStake(uint256 amount) external payable {
         if (amount == 0) {
             revert NotEnoughFunds();
         }
