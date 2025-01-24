@@ -570,9 +570,6 @@ echo "Set validator gater subnet ID"
 cast send --private-key "$pk" --rpc-url "$rpc_url" --timeout 120 "$VALIDATOR_REWARDER_ADDRESS" "setSubnet((uint64,address[]), uint256)" "$subnet_struct" "$bottomup_check_period"
 echo "Set validator rewarder subnet ID"
 
-# set inflation rate
-cast send --private-key "$pk" --rpc-url "$rpc_url" --timeout 120 "$VALIDATOR_REWARDER_ADDRESS" "setInflationRate(uint256)" 15471259606
-
 # Use the new subnet ID to update IPC config file
 toml set "${IPC_CONFIG_FOLDER}"/config.toml 'subnets[1].id' "$subnet_id" > /tmp/config.toml.3
 cp /tmp/config.toml.3 "${IPC_CONFIG_FOLDER}"/config.toml
