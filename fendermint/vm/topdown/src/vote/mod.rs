@@ -101,7 +101,8 @@ impl VoteReactorClient {
 
     /// Query the current operation mode of the vote tally state machine
     pub async fn query_operation_mode(&self) -> anyhow::Result<OperationMetrics> {
-        self.request(VoteReactorRequest::QueryOperationMode).await
+        self.request(|tx| VoteReactorRequest::QueryOperationMode { tx })
+            .await
     }
 
     /// Query the current validator votes at the target block height
@@ -115,12 +116,14 @@ impl VoteReactorClient {
 
     /// Queries the vote tally to see if there are new quorum formed
     pub async fn find_quorum(&self) -> anyhow::Result<Option<Observation>> {
-        self.request(VoteReactorRequest::FindQuorum).await
+        self.request(|tx| VoteReactorRequest::FindQuorum { tx })
+            .await
     }
 
     /// Get the current vote tally state variables in vote tally
     pub async fn query_vote_tally_state(&self) -> anyhow::Result<VoteTallyState> {
-        self.request(VoteReactorRequest::QueryState).await
+        self.request(|tx| VoteReactorRequest::QueryState { tx })
+            .await
     }
 
     /// Update power of some validators. If the weight is zero, the validator is removed
@@ -148,13 +151,14 @@ impl VoteReactorClient {
     pub async fn dump_votes(
         &self,
     ) -> anyhow::Result<Result<HashMap<BlockHeight, Vec<Vote>>, Error>> {
-        self.request(VoteReactorRequest::DumpAllVotes).await
+        self.request(|tx| VoteReactorRequest::DumpAllVotes { tx })
+            .await
     }
 
     /// A new child/local block is mined
-    pub async fn new_local_block_mined(&self, h: BlockHeight) -> anyhow::Result<()> {
+    pub async fn new_local_block_mined(&self, height: BlockHeight) -> anyhow::Result<()> {
         self.tx
-            .send(VoteReactorRequest::NewLocalBlockMined(h))
+            .send(VoteReactorRequest::NewLocalBlockMined { height })
             .await?;
         Ok(())
     }
@@ -162,9 +166,11 @@ impl VoteReactorClient {
 
 enum VoteReactorRequest {
     /// A new child subnet block is mined, this is the fendermint block
-    NewLocalBlockMined(BlockHeight),
+    NewLocalBlockMined { height: BlockHeight },
     /// Query the current operation mode of the vote tally state machine
-    QueryOperationMode(oneshot::Sender<OperationMetrics>),
+    QueryOperationMode {
+        tx: oneshot::Sender<OperationMetrics>,
+    },
     /// Query the current validator votes at the target block height
     QueryVotes {
         height: BlockHeight,
@@ -172,11 +178,15 @@ enum VoteReactorRequest {
     },
     /// Dump all the votes that is currently stored in the vote tally.
     /// This is generally a very expensive operation, but good for debugging, use with care
-    DumpAllVotes(oneshot::Sender<Result<HashMap<BlockHeight, Vec<Vote>>, Error>>),
+    DumpAllVotes {
+        tx: oneshot::Sender<Result<HashMap<BlockHeight, Vec<Vote>>, Error>>,
+    },
     /// Get the current vote tally state variables in vote tally
-    QueryState(oneshot::Sender<VoteTallyState>),
+    QueryState { tx: oneshot::Sender<VoteTallyState> },
     /// Queries the vote tally to see if there are new quorum formed
-    FindQuorum(oneshot::Sender<Option<Observation>>),
+    FindQuorum {
+        tx: oneshot::Sender<Option<Observation>>,
+    },
     /// Update power of some validators. If the weight is zero, the validator is removed
     /// from the power table.
     UpdatePowerTable {
@@ -219,7 +229,7 @@ where
 {
     fn handle_request(&mut self, req: VoteReactorRequest, metrics: &OperationMetrics) {
         match req {
-            VoteReactorRequest::QueryOperationMode(tx) => {
+            VoteReactorRequest::QueryOperationMode { tx } => {
                 // ignore error
                 let _ = tx.send(metrics.clone());
             }
@@ -230,7 +240,7 @@ where
                 self.vote_tally.update_power_table(updates);
                 let _ = tx.send(());
             }
-            VoteReactorRequest::FindQuorum(tx) => {
+            VoteReactorRequest::FindQuorum { tx } => {
                 let quorum = self.vote_tally.get_latest_quorum();
                 let _ = tx.send(quorum);
             }
@@ -241,18 +251,18 @@ where
             VoteReactorRequest::SetQuorumFinalized { height, tx } => {
                 let _ = tx.send(self.vote_tally.set_finalized(height));
             }
-            VoteReactorRequest::QueryState(tx) => {
+            VoteReactorRequest::QueryState { tx } => {
                 let _ = tx.send(VoteTallyState {
                     last_finalized_height: self.vote_tally.last_finalized_height(),
                     quorum_threshold: self.vote_tally.quorum_threshold(),
                     power_table: self.vote_tally.power_table().clone(),
                 });
             }
-            VoteReactorRequest::DumpAllVotes(tx) => {
+            VoteReactorRequest::DumpAllVotes { tx } => {
                 let _ = tx.send(self.vote_tally.dump_votes());
             }
-            VoteReactorRequest::NewLocalBlockMined(n) => {
-                self.latest_child_block = n;
+            VoteReactorRequest::NewLocalBlockMined { height } => {
+                self.latest_child_block = height;
             }
         }
     }
