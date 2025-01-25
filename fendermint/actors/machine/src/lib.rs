@@ -87,9 +87,9 @@ pub fn to_id_address(
             address
         )))?;
     if require_delegated {
-        let code_cid = rt
-            .get_actor_code_cid(&actor_id)
-            .expect("failed to lookup actor code cid");
+        let code_cid = rt.get_actor_code_cid(&actor_id).ok_or_else(|| {
+            ActorError::not_found(format!("actor {} code cid not found", address))
+        })?;
         if !matches!(
             rt.resolve_builtin_actor_type(&code_cid),
             Some(Type::Placeholder | Type::EVM | Type::EthAccount)

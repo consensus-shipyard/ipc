@@ -1618,7 +1618,6 @@ mod tests {
         store: &BS,
         origin: Address,
         subscriber: Address,
-        expect_used: Credit,
     ) {
         let subscriber_account = state.get_account(&store, subscriber).unwrap().unwrap();
         let subscriber_approval = subscriber_account
@@ -1636,8 +1635,9 @@ mod tests {
             .unwrap();
         assert_eq!(
             subscriber_approval.credit_used,
-            state.credit_debited.clone() + subscriber_account.credit_committed.clone()
+            &state.credit_debited + &subscriber_account.credit_committed
         );
+        assert_eq!(subscriber_approval.credit_used, origin_approval.credit_used);
     }
 
     fn check_approvals_match(
@@ -2170,13 +2170,7 @@ mod tests {
 
         // Check approval
         if using_approval {
-            check_approval_used(
-                &state,
-                store,
-                origin,
-                subscriber,
-                state.credit_debited.clone() + account.credit_committed.clone(),
-            );
+            check_approval_used(&state, store, origin, subscriber);
         }
     }
 
@@ -2425,13 +2419,7 @@ mod tests {
 
         // Check approval
         if using_approval {
-            check_approval_used(
-                &state,
-                store,
-                origin,
-                subscriber,
-                state.credit_debited.clone() + account.credit_committed.clone(),
-            );
+            check_approval_used(&state, store, origin, subscriber);
         }
     }
 
@@ -2818,13 +2806,7 @@ mod tests {
 
         // Check approval
         if using_approval {
-            check_approval_used(
-                &state,
-                store,
-                origin,
-                subscriber,
-                state.credit_debited.clone() + account.credit_committed.clone(),
-            );
+            check_approval_used(&state, store, origin, subscriber);
         }
     }
 
@@ -3371,13 +3353,7 @@ mod tests {
 
         // Check approval
         if using_approval {
-            check_approval_used(
-                &state,
-                store,
-                origin,
-                subscriber,
-                state.credit_debited.clone() + account.credit_committed.clone(),
-            );
+            check_approval_used(&state, store, origin, subscriber);
         }
     }
 

@@ -144,8 +144,6 @@ impl BlobsActor {
     /// The `from` address must be delegated (only delegated addresses can own credit).
     /// The `from` address must be the message origin or caller.
     /// The `to` address must be delegated (only delegated addresses can use credit).
-    /// The `to` address must already exist in the FVM if it's specified as an external
-    /// (non-ID) address (we must be able to get its actor ID from the init actor).
     /// TODO: Remove the `caller_allowlist` parameter.
     fn approve_credit(
         rt: &impl Runtime,
@@ -154,20 +152,48 @@ impl BlobsActor {
         rt.validate_immediate_caller_accept_any()?;
         let from = to_id_address(rt, params.from, true)?;
         require_addr_is_origin_or_caller(rt, from)?;
-        let to = to_id_address(rt, params.to, true)?;
+
         let config = config::get_config(rt)?;
-        rt.transaction(|st: &mut State, rt| {
-            st.approve_credit(
-                &config,
-                rt.store(),
-                from,
-                to,
-                rt.curr_epoch(),
-                params.credit_limit,
-                params.gas_fee_limit,
-                params.ttl,
-            )
-        })
+
+        match to_id_address(rt, params.to, true) {
+            Ok(to) => rt.transaction(|st: &mut State, rt| {
+                st.approve_credit(
+                    &config,
+                    rt.store(),
+                    from,
+                    to,
+                    rt.curr_epoch(),
+                    params.credit_limit,
+                    params.gas_fee_limit,
+                    params.ttl,
+                )
+            }),
+            Err(e) if e.exit_code() == ExitCode::USR_NOT_FOUND => {
+                // We send zero tokens to create the account in the FVM
+                extract_send_result(rt.send_simple(
+                    &params.to,
+                    METHOD_SEND,
+                    None,
+                    TokenAmount::zero(),
+                ))?;
+                let to = to_id_address(rt, params.to, true)?;
+                rt.transaction(|st: &mut State, rt| {
+                    let approval = st.approve_credit(
+                        &config,
+                        rt.store(),
+                        from,
+                        to,
+                        rt.curr_epoch(),
+                        params.credit_limit,
+                        params.gas_fee_limit,
+                        params.ttl,
+                    );
+                    st.set_account_sponsor(&config, rt.store(), to, Some(from), rt.curr_epoch())?;
+                    approval
+                })
+            }
+            Err(e) => Err(e),
+        }
     }
 
     /// Revoke credit and gas usage from one account to another.
@@ -856,6 +882,59 @@ mod tests {
             to_id_addr
         )));
         assert_eq!(result, expected_return);
+        rt.verify();
+    }
+
+    #[test]
+    fn test_approve_credit_to_new_account() {
+        let rt = construct_and_verify();
+
+        // Credit owner
+        let owner_id_addr = Address::new_id(110);
+        let owner_eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000000"
+        ));
+        let owner_f4_eth_addr = Address::new_delegated(10, &owner_eth_addr.0).unwrap();
+        rt.set_delegated_address(owner_id_addr.id().unwrap(), owner_f4_eth_addr);
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, owner_id_addr);
+        rt.set_origin(owner_id_addr);
+
+        // Use a new receiver that doesn't exist in the FVM
+        let receiver_eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000001"
+        ));
+        let receiver_f4_eth_addr = Address::new_delegated(10, &receiver_eth_addr.0).unwrap();
+
+        rt.expect_validate_caller_any();
+        expect_get_config(&rt);
+        rt.expect_send_simple(
+            receiver_f4_eth_addr,
+            METHOD_SEND,
+            None,
+            TokenAmount::zero(),
+            None,
+            ExitCode::OK,
+        );
+        let approve_params = ApproveCreditParams {
+            from: owner_f4_eth_addr,
+            to: receiver_f4_eth_addr, // Use the external address to force the ID lookup to fail
+            caller_allowlist: None,
+            credit_limit: None,
+            gas_fee_limit: None,
+            ttl: None,
+        };
+        let result = rt.call::<BlobsActor>(
+            Method::ApproveCredit as u64,
+            IpldBlock::serialize_cbor(&approve_params).unwrap(),
+        );
+        // This test should pass, but in the mock runtime, sending token to an address does not
+        // create the actor, like it does in the real FVM runtime.
+        // The result is that the second call to to_id_address in the approve_credit method still
+        // fails after the call to send with a "not found" error.
+        // However, we are able to test that the call to send did happen using
+        // rt.expect_send_simple above.
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().exit_code(), ExitCode::USR_NOT_FOUND);
         rt.verify();
     }
 
