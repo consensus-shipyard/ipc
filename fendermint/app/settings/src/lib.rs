@@ -293,6 +293,9 @@ pub struct Settings {
     /// Interval in blocks at which to emit blob metrics
     pub blob_metrics_interval: ChainEpoch,
 
+    /// Gas limit used by the system actor to manage blob queues.
+    pub blob_queue_gas_limit: u64,
+
     pub abci: AbciSettings,
     pub db: DbSettings,
     pub metrics: MetricsSettings,

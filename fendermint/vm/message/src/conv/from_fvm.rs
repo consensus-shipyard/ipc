@@ -116,7 +116,13 @@ pub fn to_eth_legacy_request(
         // but most likely chain id will not be 1 in our use case, set it anyways
         .chain_id(chain_id);
 
-    let data = fvm_ipld_encoding::from_slice::<BytesDe>(params).map(|bz| bz.0)?;
+    let data = match fvm_ipld_encoding::from_slice::<BytesDe>(params).map(|bz| bz.0) {
+        Ok(bz) => bz,
+        Err(_) => {
+            // The param data was not raw bytes
+            params.bytes().to_vec()
+        }
+    };
     // ethers seems to parse empty bytes as None instead of Some(Bytes(0x))
     if !data.is_empty() {
         tx = tx.data(et::Bytes::from(data));
@@ -154,7 +160,13 @@ pub fn to_eth_eip1559_request(
         gas_premium,
     } = msg;
 
-    let data = fvm_ipld_encoding::from_slice::<BytesDe>(params).map(|bz| bz.0)?;
+    let data = match fvm_ipld_encoding::from_slice::<BytesDe>(params).map(|bz| bz.0) {
+        Ok(bz) => bz,
+        Err(_) => {
+            // The param data was not raw bytes
+            params.bytes().to_vec()
+        }
+    };
 
     let mut tx = et::Eip1559TransactionRequest::new()
         .chain_id(chain_id)

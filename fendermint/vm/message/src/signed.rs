@@ -280,7 +280,7 @@ impl SignedMessage {
         &self,
         chain_id: &ChainID,
     ) -> Result<Option<DomainHash>, SignedMessageError> {
-        if is_eth_addr_deleg(&self.message.from) && is_eth_addr_compat_no_masked(&self.message.to) {
+        if is_eth_addr_deleg(&self.message.from) && is_eth_addr_compat(&self.message.to) {
             let tx = from_fvm::to_eth_typed_transaction(self.origin_kind, self.message(), chain_id)
                 .map_err(SignedMessageError::Ethereum)?;
 
@@ -359,6 +359,11 @@ fn maybe_eth_address(addr: &Address) -> Option<et::H160> {
         }
         _ => None,
     }
+}
+
+/// Check if the address can be converted to an Ethereum one.
+fn is_eth_addr_compat(addr: &Address) -> bool {
+    from_fvm::to_eth_address(addr, true).is_ok()
 }
 
 /// Check if the address can be converted to a non-masked Ethereum one.

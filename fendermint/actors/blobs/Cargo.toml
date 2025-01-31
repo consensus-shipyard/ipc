@@ -13,7 +13,6 @@ crate-type = ["cdylib", "lib"]
 
 [dependencies]
 anyhow = { workspace = true }
-cid = { workspace = true }
 log = { workspace = true, features = ["std"] }
 num-traits = { workspace = true }
 fil_actors_runtime = { workspace = true }

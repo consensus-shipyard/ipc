@@ -16,8 +16,8 @@ anyhow = { workspace = true }
 blake3 = { workspace = true }
 cid = { workspace = true, default-features = false }
 fil_actors_runtime = { workspace = true }
+fil_actors_evm_shared = { workspace = true }
 frc42_dispatch = { workspace = true }
-log = { workspace = true, features = ["std"] }
 num-derive = { workspace = true }
 num-traits = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
@@ -30,9 +30,7 @@ fendermint_actor_blobs_shared = { path = "../blobs/shared" }
 fendermint_actor_machine = { path = "../machine" }
 
 [dev-dependencies]
-fil_actors_evm_shared = { workspace = true }
 fil_actors_runtime = { workspace = true, features = ["test_utils"] }
-hex-literal = { workspace = true }
 quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }
 

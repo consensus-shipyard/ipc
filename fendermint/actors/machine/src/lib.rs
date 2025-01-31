@@ -14,6 +14,8 @@ use fvm_shared::{address::Address, MethodNum};
 use serde::{de::DeserializeOwned, Serialize};
 use std::collections::HashMap;
 
+pub mod events;
+
 /// Params for creating a machine.
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ConstructorParams {

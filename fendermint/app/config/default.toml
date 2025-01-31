@@ -30,14 +30,17 @@ halt_height = 0
 # # The on-chain account kind (regular|ethereum)
 # kind =
 
-# Number of pending blobs to process in parallel
+# Number of pending blobs to process in parallel.
 blob_concurrency = 1024
 
-# Number of pending read requests to process in parallel
+# Number of pending read requests to process in parallel.
 read_request_concurrency = 10
 
-# Interval in blocks at which to emit blob metrics
+# Interval in blocks at which to emit blob metrics.
 blob_metrics_interval = 10
+
+# Gas limit used by the system actor to manage blob queues.
+blob_queue_gas_limit = 500000000
 
 [abci]
 # Number of concurrent requests allowed to be _submitted_ to the application.

@@ -94,6 +94,8 @@ pub struct ChainEnv {
     pub read_request_concurrency: u32,
     /// Interval in blocks at which to emit blob metrics
     pub blob_metrics_interval: ChainEpoch,
+    /// Gas limit used by the system actor to manage blob queues.
+    pub blob_queue_gas_limit: u64,
 }
 
 #[derive(Clone, Hash, PartialEq, Eq)]
@@ -844,7 +846,8 @@ where
                     let to = blobs::BLOBS_ACTOR_ADDR;
                     let method_num = DebitAccounts as u64;
                     let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
-                    let msg = create_implicit_message(to, method_num, Default::default());
+                    let msg =
+                        create_implicit_message(to, method_num, Default::default(), gas_limit);
                     let (apply_ret, emitters) = state.execute_implicit(msg)?;
 
                     let info = apply_ret
@@ -878,7 +881,7 @@ where
                     let from = system::SYSTEM_ACTOR_ADDR;
                     let to = blobs::BLOBS_ACTOR_ADDR;
                     let method_num = SetBlobPending as u64;
-                    let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
+                    let gas_limit = env.blob_queue_gas_limit;
                     let source =
                         fendermint_actor_blobs_shared::state::PublicKey(*blob.source.as_bytes());
                     let hash = fendermint_actor_blobs_shared::state::Hash(*blob.hash.as_bytes());
@@ -889,24 +892,9 @@ where
                         id: blob.id.clone(),
                     };
                     let params = RawBytes::serialize(params)?;
-                    let msg = create_implicit_message(to, method_num, params);
+                    let msg = create_implicit_message(to, method_num, params, gas_limit);
                     let (apply_ret, emitters) = state.execute_implicit(msg)?;
 
-                    let info = apply_ret
-                        .failure_info
-                        .clone()
-                        .map(|i| i.to_string())
-                        .filter(|s| !s.is_empty());
-                    tracing::info!(
-                        exit_code = apply_ret.msg_receipt.exit_code.value(),
-                        from = from.to_string(),
-                        to = to.to_string(),
-                        method_num = method_num,
-                        gas_limit = gas_limit,
-                        gas_used = apply_ret.msg_receipt.gas_used,
-                        info = info.unwrap_or_default(),
-                        "implicit tx delivered"
-                    );
                     tracing::debug!(
                         hash = ?blob.hash,
                         "chain interpreter has set blob to pending"
@@ -938,7 +926,7 @@ where
                     let from = system::SYSTEM_ACTOR_ADDR;
                     let to = blobs::BLOBS_ACTOR_ADDR;
                     let method_num = FinalizeBlob as u64;
-                    let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
+                    let gas_limit = env.blob_queue_gas_limit;
                     let hash = fendermint_actor_blobs_shared::state::Hash(*blob.hash.as_bytes());
                     let status = if blob.succeeded {
                         BlobStatus::Resolved
@@ -952,24 +940,9 @@ where
                         status,
                     };
                     let params = RawBytes::serialize(params)?;
-                    let msg = create_implicit_message(to, method_num, params);
+                    let msg = create_implicit_message(to, method_num, params, gas_limit);
                     let (apply_ret, emitters) = state.execute_implicit(msg)?;
 
-                    let info = apply_ret
-                        .failure_info
-                        .clone()
-                        .map(|i| i.to_string())
-                        .filter(|s| !s.is_empty());
-                    tracing::info!(
-                        exit_code = apply_ret.msg_receipt.exit_code.value(),
-                        from = from.to_string(),
-                        to = to.to_string(),
-                        method_num = method_num,
-                        gas_limit = gas_limit,
-                        gas_used = apply_ret.msg_receipt.gas_used,
-                        info = info.unwrap_or_default(),
-                        "implicit tx delivered"
-                    );
                     tracing::debug!(
                         hash = ?blob.hash,
                         "chain interpreter has finalized blob"
@@ -1216,7 +1189,12 @@ where
 {
     let params = GetAddedBlobsParams(size);
     let params = RawBytes::serialize(params)?;
-    let msg = create_implicit_message(blobs::BLOBS_ACTOR_ADDR, GetAddedBlobs as u64, params);
+    let msg = create_implicit_message(
+        blobs::BLOBS_ACTOR_ADDR,
+        GetAddedBlobs as u64,
+        params,
+        fvm_shared::BLOCK_GAS_LIMIT,
+    );
     let (apply_ret, _) = state.execute_implicit(msg)?;
 
     let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
@@ -1241,7 +1219,12 @@ where
         id,
     };
     let params = RawBytes::serialize(params)?;
-    let msg = create_implicit_message(blobs::BLOBS_ACTOR_ADDR, GetBlobStatus as u64, params);
+    let msg = create_implicit_message(
+        blobs::BLOBS_ACTOR_ADDR,
+        GetBlobStatus as u64,
+        params,
+        fvm_shared::BLOCK_GAS_LIMIT,
+    );
     let (apply_ret, _) = state.execute_implicit(msg)?;
 
     let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
@@ -1292,7 +1275,12 @@ fn get_blobs_stats<DB>(state: &mut FvmExecState<DB>) -> anyhow::Result<GetStatsR
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    let msg = create_implicit_message(blobs::BLOBS_ACTOR_ADDR, GetStats as u64, Default::default());
+    let msg = create_implicit_message(
+        blobs::BLOBS_ACTOR_ADDR,
+        GetStats as u64,
+        Default::default(),
+        fvm_shared::BLOCK_GAS_LIMIT,
+    );
     let (apply_ret, _) = state.execute_implicit(msg)?;
 
     let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
@@ -1312,6 +1300,7 @@ where
         blob_reader::BLOB_READER_ACTOR_ADDR,
         GetOpenReadRequests as u64,
         params,
+        fvm_shared::BLOCK_GAS_LIMIT,
     );
 
     let (apply_ret, _) = state.execute_implicit(msg)?;
@@ -1332,38 +1321,17 @@ where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
     let ClosedReadRequest {
-        id,
-        blob_hash,
-        offset,
-        len,
+        id: _,
+        blob_hash: _,
+        offset: _,
+        len: _,
         callback: (to, method_num),
         response,
     } = read_request.clone();
 
     let params = RawBytes::serialize(response)?;
-    let msg = create_implicit_message(to, method_num, params);
-    let (apply_ret, _) = state.execute_implicit(msg)?;
-
-    let info = apply_ret
-        .failure_info
-        .clone()
-        .map(|i| i.to_string())
-        .filter(|s| !s.is_empty());
-
-    tracing::info!(
-        exit_code = apply_ret.msg_receipt.exit_code.value(),
-        from = system::SYSTEM_ACTOR_ADDR.to_string(),
-        to = to.to_string(),
-        method_num = method_num,
-        read_request_id = id.to_string(),
-        blob_hash = blob_hash.to_string(),
-        read_offset = offset,
-        read_len = len,
-        gas_limit = fvm_shared::BLOCK_GAS_LIMIT,
-        gas_used = apply_ret.msg_receipt.gas_used,
-        info = info.unwrap_or_default(),
-        "implicit tx delivered"
-    );
+    let msg = create_implicit_message(to, method_num, params, fvm_shared::BLOCK_GAS_LIMIT);
+    state.execute_implicit(msg)?;
 
     Ok(())
 }
@@ -1375,10 +1343,12 @@ where
     let params = RawBytes::serialize(CloseReadRequestParams(
         fendermint_actor_blobs_shared::state::Hash(*id.as_bytes()),
     ))?;
+    let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
     let msg = create_implicit_message(
         blob_reader::BLOB_READER_ACTOR_ADDR,
         CloseReadRequest as u64,
         params,
+        gas_limit,
     );
 
     let (apply_ret, emitters) = state.execute_implicit(msg)?;
@@ -1387,7 +1357,7 @@ where
         from: system::SYSTEM_ACTOR_ADDR,
         to: blob_reader::BLOB_READER_ACTOR_ADDR,
         method_num: CloseReadRequest as u64,
-        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
+        gas_limit,
         emitters,
     })
 }
@@ -1405,12 +1375,13 @@ where
         blob_reader::BLOB_READER_ACTOR_ADDR,
         GetReadRequestStatus as u64,
         params,
+        fvm_shared::BLOCK_GAS_LIMIT,
     );
 
     let (apply_ret, _) = state.execute_implicit(msg)?;
     let data: bytes::Bytes = apply_ret.msg_receipt.return_data.to_vec().into();
     fvm_ipld_encoding::from_slice::<Option<ReadRequestStatus>>(&data)
-        .map_err(|e| anyhow!("error parsing as Option<ReadRequestStatus>: {e}"))
+        .map_err(|e| anyhow!("error parsing read request status: {e}"))
 }
 
 fn set_read_request_pending<DB>(
@@ -1423,11 +1394,12 @@ where
     let params = RawBytes::serialize(SetReadRequestPendingParams(
         fendermint_actor_blobs_shared::state::Hash(*id.as_bytes()),
     ))?;
-
+    let gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
     let msg = create_implicit_message(
         blob_reader::BLOB_READER_ACTOR_ADDR,
         SetReadRequestPending as u64,
         params,
+        gas_limit,
     );
 
     let (apply_ret, emitters) = state.execute_implicit(msg)?;
@@ -1436,13 +1408,18 @@ where
         from: system::SYSTEM_ACTOR_ADDR,
         to: blob_reader::BLOB_READER_ACTOR_ADDR,
         method_num: SetReadRequestPending as u64,
-        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
+        gas_limit,
         emitters,
     })
 }
 
 /// Creates a standard implicit message with default values
-fn create_implicit_message(to: Address, method_num: u64, params: RawBytes) -> Message {
+fn create_implicit_message(
+    to: Address,
+    method_num: u64,
+    params: RawBytes,
+    gas_limit: u64,
+) -> Message {
     Message {
         version: Default::default(),
         from: system::SYSTEM_ACTOR_ADDR,
@@ -1451,7 +1428,7 @@ fn create_implicit_message(to: Address, method_num: u64, params: RawBytes) -> Me
         value: Default::default(),
         method_num,
         params,
-        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
+        gas_limit,
         gas_fee_cap: Default::default(),
         gas_premium: Default::default(),
     }

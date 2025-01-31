@@ -3119,7 +3119,6 @@ name = "fendermint_actor_blobs"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "cid",
  "fendermint_actor_blobs_shared",
  "fendermint_actor_blobs_testing",
  "fendermint_actor_hoku_config_shared",
@@ -3182,8 +3181,6 @@ dependencies = [
  "fvm_ipld_encoding",
  "fvm_ipld_hamt",
  "fvm_shared",
- "hex-literal 0.4.1",
- "log",
  "num-derive 0.3.3",
  "num-traits",
  "quickcheck",
@@ -3286,13 +3283,15 @@ dependencies = [
 name = "fendermint_actor_machine"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "fil_actor_adm",
+ "fil_actors_evm_shared",
  "fil_actors_runtime",
  "frc42_dispatch",
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
  "fvm_shared",
+ "hex",
+ "multihash 0.18.1",
  "num-traits",
  "serde",
 ]

@@ -513,7 +513,7 @@ fn to_topics_and_data(attrs: &Vec<EventAttribute>) -> anyhow::Result<(Vec<et::H2
                     return Err(anyhow!("unexpected topic value: {attr:?}"));
                 }
                 let h = et::H256::from_slice(&bz);
-                let i = attr.key[1..].parse::<usize>().unwrap().saturating_sub(1);
+                let i = attr.key[1..].parse::<usize>()?.saturating_sub(1);
                 while topics.len() <= i {
                     topics.push(et::H256::default())
                 }

@@ -6,7 +6,9 @@ use std::collections::HashMap;
 
 use fendermint_actor_blobs_shared::state::{Blob, BlobStatus, SubscriptionId};
 use fendermint_actor_blobs_shared::{add_blob, delete_blob, get_blob, overwrite_blob};
+use fendermint_actor_machine::events::EventBuilder;
 use fendermint_actor_machine::MachineActor;
+use fil_actors_evm_shared::uints::U256;
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
     runtime::{ActorCode, Runtime},
@@ -27,6 +29,8 @@ use crate::{
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
+
+const OBJECT_ADDED_EVENT: &str = "ObjectAdded(bytes32,uint256,uint256)";
 
 pub struct Actor;
 
@@ -84,6 +88,13 @@ impl Actor {
                 params.overwrite,
             )
         })?;
+
+        EventBuilder::new(OBJECT_ADDED_EVENT)
+            .param_indexed(params.hash.0)
+            .param_indexed(U256::from(params.size))
+            .param_indexed(U256::from(sub.expiry))
+            .emit(rt)?;
+
         Ok(Object {
             hash: params.hash,
             recovery_hash: params.recovery_hash,
@@ -392,6 +403,16 @@ mod tests {
         rt
     }
 
+    fn expect_emitted_add_event(rt: &MockRuntime, add_params: &AddParams) {
+        let event = EventBuilder::new(OBJECT_ADDED_EVENT)
+            .param_indexed(add_params.hash.0)
+            .param_indexed(U256::from(add_params.size))
+            .param_indexed(U256::from(0))
+            .build()
+            .unwrap();
+        rt.expect_emitted_event(event);
+    }
+
     #[test]
     pub fn test_add_object() {
         let (rt, origin) = get_runtime();
@@ -429,6 +450,7 @@ mod tests {
             IpldBlock::serialize_cbor(&Subscription::default()).unwrap(),
             ExitCode::OK,
         );
+        expect_emitted_add_event(&rt, &add_params);
         let result = rt
             .call::<Actor>(
                 Method::AddObject as u64,
@@ -482,6 +504,7 @@ mod tests {
             IpldBlock::serialize_cbor(&Subscription::default()).unwrap(),
             ExitCode::OK,
         );
+        expect_emitted_add_event(&rt, &add_params);
         let result = rt
             .call::<Actor>(
                 Method::AddObject as u64,
@@ -530,6 +553,7 @@ mod tests {
             IpldBlock::serialize_cbor(&Subscription::default()).unwrap(),
             ExitCode::OK,
         );
+        expect_emitted_add_event(&rt, &add_params2);
         let result = rt
             .call::<Actor>(
                 Method::AddObject as u64,
@@ -583,6 +607,7 @@ mod tests {
             IpldBlock::serialize_cbor(&Subscription::default()).unwrap(),
             ExitCode::OK,
         );
+        expect_emitted_add_event(&rt, &add_params);
         let result = rt
             .call::<Actor>(
                 Method::AddObject as u64,
@@ -659,6 +684,7 @@ mod tests {
             IpldBlock::serialize_cbor(&Subscription::default()).unwrap(),
             ExitCode::OK,
         );
+        expect_emitted_add_event(&rt, &add_params);
         let result_add = rt
             .call::<Actor>(
                 Method::AddObject as u64,
@@ -755,6 +781,7 @@ mod tests {
             IpldBlock::serialize_cbor(&Subscription::default()).unwrap(),
             ExitCode::OK,
         );
+        expect_emitted_add_event(&rt, &add_params);
         rt.call::<Actor>(
             Method::AddObject as u64,
             IpldBlock::serialize_cbor(&add_params).unwrap(),
@@ -858,6 +885,7 @@ mod tests {
             IpldBlock::serialize_cbor(&Subscription::default()).unwrap(),
             ExitCode::OK,
         );
+        expect_emitted_add_event(&rt, &add_params);
         let result = rt
             .call::<Actor>(
                 Method::AddObject as u64,

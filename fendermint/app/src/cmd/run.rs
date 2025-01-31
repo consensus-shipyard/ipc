@@ -374,6 +374,7 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
             read_request_pool,
             read_request_concurrency: settings.read_request_concurrency,
             blob_metrics_interval: settings.blob_metrics_interval,
+            blob_queue_gas_limit: settings.blob_queue_gas_limit,
         },
         snapshots,
     )?;
