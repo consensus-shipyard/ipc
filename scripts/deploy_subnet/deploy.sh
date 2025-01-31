@@ -787,7 +787,7 @@ if [[ $local_deploy = true ]]; then
     for i in {0..9}
     do
       private_key=$(jq .["$i"].private_key < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
-      HOKU_PRIVATE_KEY="${private_key}" HOKU_NETWORK=localnet hoku credit buy "${credit_amount}"
+      HOKU_PRIVATE_KEY="${private_key}" HOKU_NETWORK=localnet hoku account credit buy "${credit_amount}"
     done
     echo "Bought subnet credits for test accounts"
   else
@@ -889,7 +889,7 @@ if [[ $local_deploy = true ]]; then
   echo "Parent HOKU:   ${parent_hoku%.*} HOKU"
   echo "Subnet native: ${subnet_native%.*} HOKU"
   if [[ -n $(which hoku) ]]; then
-    credit_balance=$(HOKU_NETWORK=localnet hoku credit balance --address "${addr}" | jq '.credit_free' | tr -d '"')
+    credit_balance=$(HOKU_NETWORK=localnet hoku account info --address "${addr}" | jq '.credit.credit_free' | tr -d '"')
     echo "Subnet credits: ${credit_balance}"
   fi
   echo
