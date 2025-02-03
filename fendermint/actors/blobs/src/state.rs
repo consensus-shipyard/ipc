@@ -264,7 +264,7 @@ impl State {
                 )));
             }
         }
-        let expiry = ttl.map(|t| t + current_epoch);
+        let expiry = ttl.map(|t| i64::saturating_add(t, current_epoch));
         // Get or create a new account
         let mut accounts = self.accounts.hamt(store)?;
         let mut from_account = accounts.get_or_create(&from, || {
@@ -602,7 +602,7 @@ impl State {
             };
         // Capacity updates and required credit depend on whether the subscriber is already
         // subscribing to this blob
-        let expiry = current_epoch + ttl;
+        let expiry = i64::saturating_add(current_epoch, ttl);
         let mut new_capacity: u64 = 0;
         let mut new_account_capacity: u64 = 0;
         let credit_required: Credit;
@@ -1818,6 +1818,32 @@ mod tests {
     }
 
     #[test]
+    fn test_approve_credit_overflowing_ttl() {
+        setup_logs();
+        let store = MemoryBlockstore::default();
+        let mut state = State::new(&store).unwrap();
+        let from = new_address();
+        let to = new_address();
+        let current_epoch = 1;
+
+        let config = RecallConfig::default();
+
+        let res = state.approve_credit(
+            &config,
+            &store,
+            from,
+            to,
+            current_epoch,
+            None,
+            None,
+            Some(ChainEpoch::MAX),
+        );
+        assert!(res.is_ok());
+        let approval = res.unwrap();
+        assert_eq!(approval.expiry, Some(i64::MAX));
+    }
+
+    #[test]
     fn test_approve_credit_insufficient_credit() {
         setup_logs();
         let config = RecallConfig::default();
@@ -2857,6 +2883,48 @@ mod tests {
             res.err().unwrap().msg(),
             format!("cannot finalize blob {} as added or pending", hash)
         );
+    }
+
+    #[test]
+    fn test_add_blob_with_overflowing_ttl() {
+        setup_logs();
+        let config = RecallConfig::default();
+        let store = MemoryBlockstore::default();
+        let mut state = State::new(&store).unwrap();
+        let subscriber = new_address();
+        let current_epoch = ChainEpoch::from(1);
+        let amount = TokenAmount::from_whole(1000000);
+        state
+            .buy_credit(&config, &store, subscriber, amount.clone(), current_epoch)
+            .unwrap();
+
+        let res = state.set_account_status(
+            &config,
+            &store,
+            subscriber,
+            TtlStatus::Extended,
+            current_epoch,
+        );
+        assert!(res.is_ok());
+
+        let (hash, size) = new_hash(1024);
+        let res = state.add_blob(
+            &config,
+            &store,
+            subscriber,
+            subscriber,
+            current_epoch,
+            hash,
+            new_metadata_hash(),
+            SubscriptionId::default(),
+            size,
+            Some(ChainEpoch::MAX),
+            new_pk(),
+            TokenAmount::zero(),
+        );
+        assert!(res.is_ok());
+        let (sub, _) = res.unwrap();
+        assert_eq!(sub.expiry, ChainEpoch::MAX);
     }
 
     #[test]
