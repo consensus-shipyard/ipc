@@ -104,7 +104,7 @@ where
                         ),
                     )
                 } else if self.exec_in_check {
-                    // Note(HOKU): Virtual gas requires that we run in exec_in_check mode, which
+                    // Note(RECALL): Virtual gas requires that we run in exec_in_check mode, which
                     // is the default.
 
                     // Instead of modifying just the partial state, we will execute the call in earnest.
@@ -134,7 +134,7 @@ where
                             .filter(|s| !s.is_empty()),
                     )
                 } else if actor.balance < balance_needed {
-                    // Note(HOKU): This check has been moved below exec_in_check to allow for
+                    // Note(RECALL): This check has been moved below exec_in_check to allow for
                     // virtual gas allowance checks.
                     checked(
                         state,

@@ -1,4 +1,4 @@
-// Copyright 2024 Hoku Contributors
+// Copyright 2025 Recall Contributors
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
@@ -9,8 +9,8 @@ use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
-use hoku_ipld::amt::vec::TrackedFlushResult;
-use hoku_ipld::{amt, hamt};
+use recall_ipld::amt::vec::TrackedFlushResult;
+use recall_ipld::{amt, hamt};
 
 use crate::state::ExpiryKey;
 

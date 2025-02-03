@@ -129,7 +129,7 @@ below:
 
 Once these are running, you should be able to interact with the `devnet` and _most_ of the expected
 functionality. One thing to be aware of: there's no parent (rootnet), so certain pieces that involve
-parent-child actions will not work. For example, the `hoku` CLI's `account` commands will not work
+parent-child actions will not work. For example, the `recall` CLI's `account` commands will not work
 since these read from or write to the parent's state.
 
 ## Development
@@ -138,8 +138,8 @@ If you _ever_ make changes to any of this codebase—particularly, pieces that `
 you'll need to make sure you rebuild everything and install via the `make install` command. Then,
 follow the steps outlined above to get the `devnet` up and running.
 
-If you're using the `rust-hoku` CLI, you must set the `NETWORK` environment variable to `devnet` in
-order to use it. Note that `fendermint`, `ipc-cli`, and `hoku` use the same `NETWORK` flag but with
+If you're using the `rust-recall` CLI, you must set the `NETWORK` environment variable to `devnet` in
+order to use it. Note that `fendermint`, `ipc-cli`, and `recall` use the same `NETWORK` flag but with
 varying values, so be sure to open a new terminal window to avoid conflicts if you're using any of
 them simultaneously.
 
@@ -149,4 +149,4 @@ export PRIVATE_KEY=1c323d494d1d069fe4c891350a1ec691c4216c17418a0cb3c7533b143bd2b
 ```
 
 Similarly, you'll use the `devnet` in the SDK where necessary—e.g.,
-`hoku_sdk::network::Network::Devnet.init()`.
+`recall_sdk::network::Network::Devnet.init()`.

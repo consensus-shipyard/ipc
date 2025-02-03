@@ -64,7 +64,7 @@ lint: fmt
 	pnpm exec solhint 'contracts/**/*.sol' 'sdk/**/**/*.sol'
 
 fmt:
-	pnpm install --silent --no-save
+	pnpm install --no-save
 	pnpm exec prettier --check -w 'contracts/**/**/*.sol' 'sdk/**/**/*.sol' 'test/**/**/*.sol' 'test/**/**/*.t.sol' '**/*.{js,jsx,ts,tsx,json,css,md}'
 
 deps: node_modules

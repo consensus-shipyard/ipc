@@ -1,4 +1,4 @@
-// Copyright 2024 Hoku Contributors
+// Copyright 2025 Recall Contributors
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
@@ -10,7 +10,7 @@ use fendermint_actor_blobs_shared::state::{
     Account, Blob, BlobStatus, Credit, CreditApproval, GasAllowance, Hash, PublicKey, Subscription,
     SubscriptionGroup, SubscriptionId, TokenCreditRate, TtlStatus,
 };
-use fendermint_actor_hoku_config_shared::HokuConfig;
+use fendermint_actor_recall_config_shared::RecallConfig;
 use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::*;
@@ -19,9 +19,9 @@ use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
-use hoku_ipld::hamt::{BytesKey, MapKey};
 use log::{debug, warn};
 use num_traits::{ToPrimitive, Zero};
+use recall_ipld::hamt::{BytesKey, MapKey};
 
 mod accounts;
 mod blobs;
@@ -124,7 +124,7 @@ impl State {
         })
     }
 
-    pub fn get_stats(&self, config: &HokuConfig, balance: TokenAmount) -> GetStatsReturn {
+    pub fn get_stats(&self, config: &RecallConfig, balance: TokenAmount) -> GetStatsReturn {
         GetStatsReturn {
             balance,
             capacity_free: self.capacity_available(config.blob_capacity),
@@ -144,7 +144,7 @@ impl State {
 
     pub fn buy_credit<BS: Blockstore>(
         &mut self,
-        config: &HokuConfig,
+        config: &RecallConfig,
         store: &BS,
         to: Address,
         amount: TokenAmount,
@@ -245,7 +245,7 @@ impl State {
     #[allow(clippy::too_many_arguments)]
     pub fn approve_credit<BS: Blockstore>(
         &mut self,
-        config: &HokuConfig,
+        config: &RecallConfig,
         store: &BS,
         from: Address,
         to: Address,
@@ -446,7 +446,7 @@ impl State {
 
     pub fn set_account_sponsor<BS: Blockstore>(
         &mut self,
-        config: &HokuConfig,
+        config: &RecallConfig,
         store: &BS,
         from: Address,
         sponsor: Option<Address>,
@@ -468,7 +468,7 @@ impl State {
 
     pub fn set_account_status<BS: Blockstore>(
         &mut self,
-        config: &HokuConfig,
+        config: &RecallConfig,
         store: &BS,
         subscriber: Address,
         status: TtlStatus,
@@ -566,7 +566,7 @@ impl State {
     #[allow(clippy::too_many_arguments)]
     pub fn add_blob<BS: Blockstore>(
         &mut self,
-        config: &HokuConfig,
+        config: &RecallConfig,
         store: &BS,
         origin: Address,
         subscriber: Address,
@@ -972,7 +972,7 @@ impl State {
     #[allow(clippy::too_many_arguments)]
     pub fn finalize_blob<BS: Blockstore>(
         &mut self,
-        config: &HokuConfig,
+        config: &RecallConfig,
         store: &BS,
         subscriber: Address,
         current_epoch: ChainEpoch,
@@ -1363,7 +1363,7 @@ impl State {
     /// If `limit` is not `None`, iteration stops after examining `limit` blobs.
     pub fn trim_blob_expiries<BS: Blockstore>(
         &mut self,
-        config: &HokuConfig,
+        config: &RecallConfig,
         store: &BS,
         subscriber: Address,
         current_epoch: ChainEpoch,
@@ -1422,7 +1422,7 @@ impl State {
 
     pub fn get_account_max_ttl<BS: Blockstore>(
         &self,
-        config: &HokuConfig,
+        config: &RecallConfig,
         store: &BS,
         account: Address,
     ) -> Result<ChainEpoch, ActorError> {
@@ -1434,7 +1434,7 @@ impl State {
 
     fn validate_ttl(
         &self,
-        config: &HokuConfig,
+        config: &RecallConfig,
         ttl: Option<ChainEpoch>,
         account: &Account,
     ) -> anyhow::Result<ChainEpoch, ActorError> {
@@ -1662,7 +1662,7 @@ mod tests {
     #[test]
     fn test_buy_credit_success() {
         setup_logs();
-        let config = HokuConfig::default();
+        let config = RecallConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let to = new_address();
@@ -1682,7 +1682,7 @@ mod tests {
     #[test]
     fn test_buy_credit_negative_amount() {
         setup_logs();
-        let config = HokuConfig::default();
+        let config = RecallConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let recipient = new_address();
@@ -1696,7 +1696,7 @@ mod tests {
     #[test]
     fn test_buy_credit_at_capacity() {
         setup_logs();
-        let config = HokuConfig::default();
+        let config = RecallConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let recipient = new_address();
@@ -1720,7 +1720,7 @@ mod tests {
         let to = new_address();
         let current_epoch = 1;
 
-        let config = HokuConfig::default();
+        let config = RecallConfig::default();
 
         // No limit or expiry
         let res = state.approve_credit(&config, &store, from, to, current_epoch, None, None, None);
@@ -1798,7 +1798,7 @@ mod tests {
         let to = new_address();
         let current_epoch = 1;
 
-        let config = HokuConfig::default();
+        let config = RecallConfig::default();
         let ttl = ChainEpoch::from(config.blob_min_ttl - 1);
         let res = state.approve_credit(
             &config,
@@ -1820,7 +1820,7 @@ mod tests {
     #[test]
     fn test_approve_credit_insufficient_credit() {
         setup_logs();
-        let config = HokuConfig::default();
+        let config = RecallConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let from = new_address();
@@ -1888,7 +1888,7 @@ mod tests {
         let to = new_address();
         let current_epoch = 1;
 
-        let config = HokuConfig::default();
+        let config = RecallConfig::default();
         let res = state.approve_credit(&config, &store, from, to, current_epoch, None, None, None);
         assert!(res.is_ok());
 
@@ -1926,7 +1926,7 @@ mod tests {
     #[test]
     fn test_debit_accounts_delete_from_disc() {
         setup_logs();
-        let config = HokuConfig::default();
+        let config = RecallConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let origin = new_address();
@@ -1950,7 +1950,7 @@ mod tests {
     #[test]
     fn test_debit_accounts_delete_from_disc_with_approval() {
         setup_logs();
-        let config = HokuConfig::default();
+        let config = RecallConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let origin = new_address();
@@ -1992,7 +1992,7 @@ mod tests {
 
     #[allow(clippy::too_many_arguments)]
     fn debit_accounts_delete_from_disc<BS: Blockstore>(
-        config: &HokuConfig,
+        config: &RecallConfig,
         store: &BS,
         mut state: State,
         origin: Address,
@@ -2177,7 +2177,7 @@ mod tests {
     #[test]
     fn test_add_blob_refund() {
         setup_logs();
-        let config = HokuConfig::default();
+        let config = RecallConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let origin = new_address();
@@ -2201,7 +2201,7 @@ mod tests {
     #[test]
     fn test_add_blob_refund_with_approval() {
         setup_logs();
-        let config = HokuConfig::default();
+        let config = RecallConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let origin = new_address();
@@ -2243,7 +2243,7 @@ mod tests {
 
     #[allow(clippy::too_many_arguments)]
     fn add_blob_refund<BS: Blockstore>(
-        config: &HokuConfig,
+        config: &RecallConfig,
         store: &BS,
         mut state: State,
         origin: Address,
@@ -2426,7 +2426,7 @@ mod tests {
     #[test]
     fn test_add_blob_same_hash_same_account() {
         setup_logs();
-        let config = HokuConfig::default();
+        let config = RecallConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let origin = new_address();
@@ -2450,7 +2450,7 @@ mod tests {
     #[test]
     fn test_add_blob_same_hash_same_account_with_approval() {
         setup_logs();
-        let config = HokuConfig::default();
+        let config = RecallConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let origin = new_address();
@@ -2492,7 +2492,7 @@ mod tests {
 
     #[allow(clippy::too_many_arguments)]
     fn add_blob_same_hash_same_account<BS: Blockstore>(
-        config: &HokuConfig,
+        config: &RecallConfig,
         store: &BS,
         mut state: State,
         origin: Address,
@@ -2813,7 +2813,7 @@ mod tests {
     #[test]
     fn test_finalize_blob_from_bad_state() {
         setup_logs();
-        let config = HokuConfig::default();
+        let config = RecallConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let subscriber = new_address();
@@ -2862,7 +2862,7 @@ mod tests {
     #[test]
     fn test_finalize_blob_resolved() {
         setup_logs();
-        let config = HokuConfig::default();
+        let config = RecallConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let subscriber = new_address();
@@ -2924,7 +2924,7 @@ mod tests {
     #[test]
     fn test_finalize_blob_failed() {
         setup_logs();
-        let config = HokuConfig::default();
+        let config = RecallConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let subscriber = new_address();
@@ -3000,7 +3000,7 @@ mod tests {
     #[test]
     fn test_finalize_blob_failed_refund() {
         setup_logs();
-        let config = HokuConfig::default();
+        let config = RecallConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let subscriber = new_address();
@@ -3128,7 +3128,7 @@ mod tests {
     #[test]
     fn test_delete_blob_refund() {
         setup_logs();
-        let config = HokuConfig::default();
+        let config = RecallConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let origin = new_address();
@@ -3152,7 +3152,7 @@ mod tests {
     #[test]
     fn test_delete_blob_refund_with_approval() {
         setup_logs();
-        let config = HokuConfig::default();
+        let config = RecallConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let origin = new_address();
@@ -3194,7 +3194,7 @@ mod tests {
 
     #[allow(clippy::too_many_arguments)]
     fn delete_blob_refund<BS: Blockstore>(
-        config: &HokuConfig,
+        config: &RecallConfig,
         store: &BS,
         mut state: State,
         origin: Address,
@@ -3361,7 +3361,7 @@ mod tests {
     fn test_if_blobs_ttl_exceeds_accounts_ttl_should_error() {
         setup_logs();
 
-        let config = HokuConfig::default();
+        let config = RecallConfig::default();
         const YEAR: ChainEpoch = 365 * 24 * 60 * 60;
 
         // Test cases structure
@@ -3436,7 +3436,7 @@ mod tests {
 
         // Run all test cases
         for tc in test_cases {
-            let config = HokuConfig::default();
+            let config = RecallConfig::default();
             let store = MemoryBlockstore::default();
             let mut state = State::new(&store).unwrap();
             let subscriber = new_address();
@@ -3525,7 +3525,7 @@ mod tests {
     fn test_set_ttl_status() {
         setup_logs();
 
-        let config = HokuConfig::default();
+        let config = RecallConfig::default();
 
         struct TestCase {
             name: &'static str,
@@ -3613,7 +3613,7 @@ mod tests {
     #[test]
     fn test_adjust_blob_ttls_for_account() {
         setup_logs();
-        let config = HokuConfig::default();
+        let config = RecallConfig::default();
 
         const HOUR: ChainEpoch = 3600;
         const TWO_HOURS: ChainEpoch = HOUR * 2;
@@ -3783,7 +3783,7 @@ mod tests {
     #[test]
     fn test_adjust_blob_ttls_pagination() {
         setup_logs();
-        let config = HokuConfig::default();
+        let config = RecallConfig::default();
 
         // Test cases for pagination
         struct PaginationTest {
@@ -3958,7 +3958,7 @@ mod tests {
     fn test_adjust_blob_ttls_for_multiple_accounts() {
         setup_logs();
 
-        let config = HokuConfig::default();
+        let config = RecallConfig::default();
         let store = MemoryBlockstore::default();
         let mut state = State::new(&store).unwrap();
         let account1 = new_address();
@@ -4113,7 +4113,7 @@ mod tests {
     fn test_simulate_one_day() {
         setup_logs();
 
-        let config = HokuConfig {
+        let config = RecallConfig {
             blob_credit_debit_interval: ChainEpoch::from(60),
             blob_min_ttl: ChainEpoch::from(10),
             ..Default::default()
@@ -4147,7 +4147,7 @@ mod tests {
         }
 
         fn generate_test_users<BS: Blockstore>(
-            config: &HokuConfig,
+            config: &RecallConfig,
             store: &BS,
             state: &mut State,
             credit_tokens: TokenAmount,

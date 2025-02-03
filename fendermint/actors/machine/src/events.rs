@@ -1,4 +1,4 @@
-// Copyright 2024 Hoku Contributors
+// Copyright 2024 Recall Contributors
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
@@ -263,7 +263,7 @@ impl EventBuilder {
             .map(|e| e.evm_type.to_string())
             .collect::<Vec<_>>()
             .join(",");
-        validate_sig(&self.signature, &types)?;
+        validate_sig(self.signature, &types)?;
         let mut hasher = Keccak256::default();
         hasher.update(self.signature.as_bytes());
         Ok(hasher.finalize().to_vec())

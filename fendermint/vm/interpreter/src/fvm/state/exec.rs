@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use crate::fvm::activity::actor::ActorActivityTracker;
 use crate::fvm::externs::FendermintExterns;
 use crate::fvm::gas::BlockGasTracker;
-use crate::fvm::hoku_config::HokuConfigTracker;
+use crate::fvm::recall_config::RecallConfigTracker;
 use crate::fvm::state::priority::TxnPriorityCalculator;
 use anyhow::Ok;
 use cid::Cid;
@@ -29,8 +29,8 @@ use fvm_shared::{
     address::Address, chainid::ChainID, clock::ChainEpoch, econ::TokenAmount, error::ExitCode,
     message::Message, receipt::Receipt, version::NetworkVersion, ActorID,
 };
-use hoku_executor::HokuExecutor;
-use hoku_kernel::HokuKernel;
+use recall_executor::RecallExecutor;
+use recall_kernel::RecallKernel;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::fmt;
@@ -135,7 +135,7 @@ where
 {
     #[allow(clippy::type_complexity)]
     executor:
-        HokuExecutor<HokuKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>>,
+        RecallExecutor<RecallKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>>,
     /// Hash of the block currently being executed. For queries and checks this is empty.
     ///
     /// The main motivation to add it here was to make it easier to pass in data to the
@@ -147,8 +147,8 @@ where
     /// Keeps track of block gas usage during execution, and takes care of updating
     /// the chosen gas market strategy (by default an on-chain actor delivering EIP-1559 behaviour).
     block_gas_tracker: BlockGasTracker,
-    /// Keeps track of hoku config parameters used during execution.
-    hoku_config_tracker: HokuConfigTracker,
+    /// Keeps track of recall config parameters used during execution.
+    recall_config_tracker: RecallConfigTracker,
     /// State of parameters that are outside the control of the FVM but can change and need to be persisted.
     params: FvmUpdatableParams,
     /// Indicate whether the parameters have been updated.
@@ -190,19 +190,19 @@ where
         let engine = multi_engine.get(&nc)?;
         let externs = FendermintExterns::new(blockstore.clone(), params.state_root);
         let machine = DefaultMachine::new(&mc, blockstore.clone(), externs)?;
-        let mut executor = HokuExecutor::new(engine.clone(), machine)?;
+        let mut executor = RecallExecutor::new(engine.clone(), machine)?;
 
         let block_gas_tracker = BlockGasTracker::create(&mut executor)?;
         let base_fee = block_gas_tracker.base_fee().clone();
 
-        let hoku_config_tracker = HokuConfigTracker::create(&mut executor)?;
+        let recall_config_tracker = RecallConfigTracker::create(&mut executor)?;
 
         Ok(Self {
             executor,
             block_hash: None,
             block_producer: None,
             block_gas_tracker,
-            hoku_config_tracker,
+            recall_config_tracker,
             params: FvmUpdatableParams {
                 app_version: params.app_version,
                 base_fee: params.base_fee,
@@ -238,8 +238,8 @@ where
         BlockGasTracker::read_gas_market(&mut self.executor)
     }
 
-    pub fn hoku_config_tracker(&self) -> &HokuConfigTracker {
-        &self.hoku_config_tracker
+    pub fn recall_config_tracker(&self) -> &RecallConfigTracker {
+        &self.recall_config_tracker
     }
 
     /// Execute message implicitly.
@@ -284,8 +284,8 @@ where
     pub fn execute_with_executor<F, R>(&mut self, exec_func: F) -> anyhow::Result<R>
     where
         F: FnOnce(
-            &mut HokuExecutor<
-                HokuKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
+            &mut RecallExecutor<
+                RecallKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
             >,
         ) -> anyhow::Result<R>,
     {

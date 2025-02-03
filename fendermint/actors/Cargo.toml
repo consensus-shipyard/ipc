@@ -13,7 +13,7 @@ fendermint_actor_bucket = { path = "bucket", features = ["fil-actor"] }
 fendermint_actor_chainmetadata = { path = "chainmetadata", features = ["fil-actor"] }
 fendermint_actor_eam = { path = "eam", features = ["fil-actor"] }
 fendermint_actor_gas_market_eip1559 = { path = "gas_market/eip1559", features = ["fil-actor"] }
-fendermint_actor_hoku_config = { path = "hoku_config", features = ["fil-actor"] }
+fendermint_actor_recall_config = { path = "recall_config", features = ["fil-actor"] }
 fendermint_actor_timehub = { path = "timehub", features = ["fil-actor"] }
 
 [dependencies]
@@ -27,7 +27,7 @@ fendermint_actor_bucket = { path = "bucket" }
 fendermint_actor_chainmetadata = { path = "chainmetadata" }
 fendermint_actor_eam = { path = "eam" }
 fendermint_actor_gas_market_eip1559 = { path = "gas_market/eip1559" }
-fendermint_actor_hoku_config = { path = "hoku_config" }
+fendermint_actor_recall_config = { path = "recall_config" }
 fendermint_actor_timehub = { path = "timehub" }
 
 [build-dependencies]

@@ -1,4 +1,4 @@
-// Copyright 2024 Hoku Contributors
+// Copyright 2025 Recall Contributors
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
@@ -12,14 +12,14 @@ use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
-use hoku_ipld::hamt::MapKey;
+use recall_ipld::hamt::MapKey;
 use serde::{Deserialize, Serialize};
 
 /// Credit is counted the same way as tokens.
 /// The smallest indivisible unit is 1 atto, and 1 credit = 1e18 atto credits.
 pub type Credit = TokenAmount;
 
-/// TokenCreditRate determines how much atto credits can be bought by a certain amount of HOKU.
+/// TokenCreditRate determines how much atto credits can be bought by a certain amount of RECALL.
 #[derive(Clone, Default, Debug, serde::Serialize, serde::Deserialize, Eq, PartialEq)]
 pub struct TokenCreditRate {
     rate: BigInt,
@@ -419,61 +419,61 @@ mod tests {
                 tokens: TokenAmount::from_whole(1),
                 rate: TokenCreditRate::from(BigInt::from(1)),
                 expected: "0.000000000000000001",
-                description: "lower bound: 1 HOKU buys 1 atto credit",
+                description: "lower bound: 1 RECALL buys 1 atto credit",
             },
             TestCase {
-                tokens: TokenAmount::from_nano(BigInt::from(500000000)), // 0.5 HOKU
+                tokens: TokenAmount::from_nano(BigInt::from(500000000)), // 0.5 RECALL
                 rate: TokenCreditRate::from(BigInt::from(1)),
                 expected: "0.0",
-                description: "crossing lower bound. 0.5 HOKU cannot buy 1 atto credit",
+                description: "crossing lower bound. 0.5 RECALL cannot buy 1 atto credit",
             },
             TestCase {
                 tokens: TokenAmount::from_whole(BigInt::from(1)),
                 rate: TokenCreditRate::from(BigInt::from(2)),
                 expected: "0.000000000000000002",
-                description: "1 HOKU buys 2 atto credits",
+                description: "1 RECALL buys 2 atto credits",
             },
             TestCase {
                 tokens: TokenAmount::from_whole(BigInt::from(1)),
                 rate: TokenCreditRate::from(BigInt::from(10u64.pow(18))),
                 expected: "1.0",
-                description: "1 HOKU buys 1 whole credit",
+                description: "1 RECALL buys 1 whole credit",
             },
             TestCase {
                 tokens: TokenAmount::from_whole(BigInt::from(50)),
                 rate: TokenCreditRate::from(BigInt::from(10u64.pow(18))),
                 expected: "50.0",
-                description: "50 HOKU buys 50 whole credits",
+                description: "50 RECALL buys 50 whole credits",
             },
             TestCase {
                 tokens: TokenAmount::from_nano(BigInt::from(233432100u64)),
                 rate: TokenCreditRate::from(BigInt::from(10u64.pow(18))),
                 expected: "0.2334321",
-                description: "0.2334321 HOKU buys 0.2334321 credits",
+                description: "0.2334321 RECALL buys 0.2334321 credits",
             },
             TestCase {
                 tokens: TokenAmount::from_nano(BigInt::from(233432100u64)),
                 rate: TokenCreditRate::from(BigInt::from(10u128.pow(36))),
                 expected: "233432100000000000.0",
-                description: "0.2334321 HOKU buys 233432100000000000 credits",
+                description: "0.2334321 RECALL buys 233432100000000000 credits",
             },
             TestCase {
-                tokens: TokenAmount::from_atto(BigInt::from(1)), // 1 attoHOKU
+                tokens: TokenAmount::from_atto(BigInt::from(1)), // 1 attoRECALL
                 rate: TokenCreditRate::from(BigInt::from(10u128.pow(36))),
                 expected: "1.0",
-                description: "1 atto HOKU buys 1 credit",
+                description: "1 atto RECALL buys 1 credit",
             },
             TestCase {
                 tokens: TokenAmount::from_whole(BigInt::from(1)),
                 rate: TokenCreditRate::from(BigInt::from(10u128.pow(18)).div(4)),
                 expected: "0.25",
-                description: "1 HOKU buys 0.25 credit",
+                description: "1 RECALL buys 0.25 credit",
             },
             TestCase {
                 tokens: TokenAmount::from_whole(BigInt::from(1)),
                 rate: TokenCreditRate::from(BigInt::from(10u128.pow(18)).div(3)),
                 expected: "0.333333333333333333",
-                description: "1 HOKU buys 0.333333333333333333 credit",
+                description: "1 RECALL buys 0.333333333333333333 credit",
             },
         ];
 

@@ -56,8 +56,8 @@ fendermint_actor_bucket = { path = "../../actors/bucket" }
 fendermint_actor_chainmetadata = { path = "../../actors/chainmetadata" }
 fendermint_actor_eam = { path = "../../actors/eam" }
 fendermint_actor_gas_market_eip1559 = { path = "../../actors/gas_market/eip1559" }
-fendermint_actor_hoku_config = { path = "../../actors/hoku_config" }
-fendermint_actor_hoku_config_shared = { path = "../../actors/hoku_config/shared" }
+fendermint_actor_recall_config = { path = "../../actors/recall_config" }
+fendermint_actor_recall_config_shared = { path = "../../actors/recall_config/shared" }
 fendermint_actor_timehub = { path = "../../actors/timehub" }
 fendermint_actors = { path = "../../actors" }
 fendermint_crypto = { path = "../../crypto" }
@@ -74,8 +74,8 @@ fendermint_vm_iroh_resolver = { path = "../iroh_resolver" }
 fendermint_vm_message = { path = "../message" }
 fendermint_vm_resolver = { path = "../resolver" }
 fendermint_vm_topdown = { path = "../topdown" }
-hoku_executor = { path = "../../../hoku/executor" }
-hoku_kernel = { path = "../../../hoku/kernel" }
+recall_executor = { path = "../../../recall/executor" }
+recall_kernel = { path = "../../../recall/kernel" }
 
 merkle-tree-rs = { path = "../../../ext/merkle-tree-rs" }
 

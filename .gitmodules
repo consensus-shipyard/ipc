@@ -12,7 +12,8 @@
 	url = https://github.com/foundry-rs/forge-std
 [submodule "builtin-actors"]
 	path = builtin-actors
-	url = git@github.com:hokunet/builtin-actors.git
-[submodule "hoku-contracts"]
-	path = hoku-contracts
-	url = git@github.com:hokunet/contracts.git
+	url = git@github.com:recallnet/builtin-actors.git
+[submodule "recall-contracts"]
+	path = recall-contracts
+	url = git@github.com:recallnet/contracts.git
+	branch = joe/rename

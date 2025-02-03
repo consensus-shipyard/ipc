@@ -53,18 +53,18 @@ echo "Export private key for $validator_addr to ${IPC_CONFIG_FOLDER}/validator_3
 
 echo "$DASHES Approve new validator to stake $DASHES"
 pk=$(cat "${IPC_CONFIG_FOLDER}"/validator_0.sk)
-cd "${IPC_FOLDER}/hoku-contracts"
-# approved power min 1 HOKU max 10 HOKU
+cd "${IPC_FOLDER}/recall-contracts"
+# approved power min 1 RECALL max 10 RECALL
 cast send "$VALIDATOR_GATER_ADDRESS" "approve(address,uint256,uint256)" "$validator_addr" 1000000000000000000 100000000000000000000 --rpc-url "http://localhost:${ANVIL_HOST_PORT}" --private-key "$pk"
 echo "Approved new validator to stake on anvil rootnet"
 cd "$IPC_FOLDER"
 
 echo "$DASHES Join subnet for new validator $DASHES"
 echo "Joining subnet ${subnet_id} for validator $validator_addr}"
-# Approve subnet contract to lock up to 10 HOKU from collateral contract (which is also the supply source contract)
+# Approve subnet contract to lock up to 10 RECALL from collateral contract (which is also the supply source contract)
 vpk=$(cat "${IPC_CONFIG_FOLDER}"/validator_3.sk)
 cast send "$SUPPLY_SOURCE_ADDRESS" "approve(address,uint256)" "$subnet_eth_addr" 10000000000000000000 --private-key "$vpk"
-# Join and stake 10 HOKU
+# Join and stake 10 RECALL
 ipc-cli subnet join --from "$validator_addr" --subnet "$subnet_id" --collateral 10
 
 bootstrap_node_endpoint=${BOOTSTRAP_NODE_ID}@validator-0-cometbft:26656

@@ -22,7 +22,7 @@ num-derive = { workspace = true }
 num-traits = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
-hoku_ipld = { path = "../../../../hoku/ipld" }
+recall_ipld = { path = "../../../../recall/ipld" }
 
 [features]
 fil-actor = ["fil_actors_runtime/fil-actor"]

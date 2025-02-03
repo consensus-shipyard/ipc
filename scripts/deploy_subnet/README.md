@@ -1,4 +1,4 @@
-# Hoku development
+# Recall development
 
 > Start a three-node network for remote or local development.
 
@@ -22,7 +22,7 @@
 
 ## Background
 
-These scripts handle deploying Hoku subnets. There are two target environments:
+These scripts handle deploying Recall subnets. There are two target environments:
 
 - Testnet: Deploy to a live network (Filecoin Calibration) as a fresh instance or attach to an
   existing one (i.e., pre-existing registry and gateway contracts).
@@ -60,9 +60,9 @@ for macOS.
 Optionally, you can pass the `SKIP_DEPENDENCIES=true` environment variable to `deploy.sh` to skip
 this entirely (e.g., if you already have these installed).
 
-Also optional is the `hoku` CLI, which (if installed) will pre-buy credits for all accounts in the
-localnet subnet setup. Follow the instructions in the `rust-hoku` repo to install it:
-[here](https://github.com/hokunet/rust-hoku).
+Also optional is the `recall` CLI, which (if installed) will pre-buy credits for all accounts in the
+localnet subnet setup. Follow the instructions in the `rust-recall` repo to install it:
+[here](https://github.com/recallnet/rust-recall).
 
 #### Linux
 
@@ -245,7 +245,7 @@ other validators:
 
 ## Development
 
-You can test using the subnet with the [`hoku` SDK & CLI](https://github.com/hokunet/rust-hoku).
+You can test using the subnet with the [`recall` SDK & CLI](https://github.com/recallnet/rust-recall).
 Keys _are not_ logged if you're running a testnet. For localnet, keys _are_ logged with their
 corresponding balances. You'll notice the first three accounts correspond to the validators and
 marked as reserved. If you're trying to do non-validator actions (e.g., create a bucket or timehub),
@@ -254,8 +254,8 @@ it's best to avoid these accounts since nonce race conditions can occur.
 ```txt
 Account balances:
 Parent native: 10000 ETH
-Parent HOKU:   100 HOKU
-Subnet native: 5000 HOKU
+Parent RECALL:   100 RECALL
+Subnet native: 5000 RECALL
 Subnet credits: 5000000000000000000000
 
 Accounts:
@@ -273,15 +273,15 @@ Private keys:
 ...
 ```
 
-You can use then these keys with the `hoku` SDK and CLI by creating an `.env` file and sourcing it,
+You can use then these keys with the `recall` SDK and CLI by creating an `.env` file and sourcing it,
 or by setting the variables in your shell. Keep in mind a `NETWORK` variable is used by `fendermint`
-and `ipc-cli`, and these differ from the `HOKU_NETWORK` value used by the CLI.
+and `ipc-cli`, and these differ from the `RECALL_NETWORK` value used by the CLI.
 
 ```dotenv
-export HOKU_NETWORK=localnet
-export HOKU_PRIVATE_KEY=<private_key>
+export RECALL_NETWORK=localnet
+export RECALL_PRIVATE_KEY=<private_key>
 ```
 
-You can now use `hoku` as normal, e.g., `hoku account deposit`, `hoku os create`, etc. Similarly,
+You can now use `recall` as normal, e.g., `recall account deposit`, `recall os create`, etc. Similarly,
 the SDK lets you use the `localnet` by explicitly initializing it with
-`hoku_sdk::network::Network::Localnet.init()`.
+`recall_sdk::network::Network::Localnet.init()`.

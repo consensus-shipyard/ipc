@@ -7,7 +7,7 @@ default:
 	./target/release/ipc-cli --version
 	./target/release/fendermint --version
 
-SUBTREES_RUST := fendermint ipc ipld/resolver hoku
+SUBTREES_RUST := fendermint ipc ipld/resolver recall
 SUBTREES_CONTRACTS := contracts
 SUBTREES_ALL := $(SUBTREES_RUST) $(SUBTREES_CONTRACTS)
 
@@ -29,7 +29,7 @@ license:
 
 lint: license $(patsubst %, lint/%, $(SUBTREES_ALL))
 
-## Hoku
+## Recall
 
 config-devnet:
 	PATH="./target/release:$(PATH)" \
@@ -42,7 +42,7 @@ run-devnet-iroh:
 run-devnet-fendermint:
 	rm -rf ~/.fendermint/data/rocksdb
 	FM_NETWORK=test \
-	FM_TRACING__CONSOLE__LEVEL=info,fendermint=debug,hoku_executor=debug \
+	FM_TRACING__CONSOLE__LEVEL=info,fendermint=debug,recall_executor=debug \
 	FM_VALIDATOR_KEY__PATH=keys/validator.sk \
 	FM_VALIDATOR_KEY__KIND=regular \
 	FM_RESOLVER__CONNECTION__LISTEN_ADDR=/ip4/127.0.0.1/tcp/3001 \

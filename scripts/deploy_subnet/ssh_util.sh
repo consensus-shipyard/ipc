@@ -4,15 +4,15 @@ set -euo pipefail
 
 # Define the SSH key locations
 declare -A REPO_KEYS=(
-  ["ipc"]="$HOME/.ssh/id_ed25519.hokunet.ipc"
-  ["builtin-actors"]="$HOME/.ssh/id_ed25519.hokunet.builtin-actors"
-  ["contracts"]="$HOME/.ssh/id_ed25519.hokunet.contracts"
+  ["ipc"]="$HOME/.ssh/id_ed25519.recallnet.ipc"
+  ["builtin-actors"]="$HOME/.ssh/id_ed25519.recallnet.builtin-actors"
+  ["contracts"]="$HOME/.ssh/id_ed25519.recallnet.contracts"
 )
 
 # Define the SSH alias to submodule mapping
 declare -A SUBMODULE_URLS=(
-  ["builtin-actors"]="git@github.com-builtin-actors:hokunet/builtin-actors.git"
-  ["hoku-contracts"]="git@github.com-contracts:hokunet/contracts.git"
+  ["builtin-actors"]="git@github.com-builtin-actors:recallnet/builtin-actors.git"
+  ["recall-contracts"]="git@github.com-contracts:recallnet/contracts.git"
 )
 
 # Add SSH aliases to ~/.ssh/config

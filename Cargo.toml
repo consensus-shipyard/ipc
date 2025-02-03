@@ -35,22 +35,22 @@ members = [
     "fendermint/actors/activity-tracker",
     "fendermint/actors/eam",
     "fendermint/actors/gas_market/eip1559",
-    # hoku
+    # recall
     "fendermint/actors/blobs",
     "fendermint/actors/blobs/shared",
     "fendermint/actors/blobs/testing",
     "fendermint/actors/bucket",
-    "fendermint/actors/hoku_config",
-    "fendermint/actors/hoku_config/shared",
+    "fendermint/actors/recall_config",
+    "fendermint/actors/recall_config/shared",
     "fendermint/actors/machine",
     "fendermint/actors/timehub",
-    "hoku/actor_sdk",
-    "hoku/executor",
-    "hoku/ipld",
-    "hoku/iroh_manager",
-    "hoku/kernel",
-    "hoku/kernel/ops",
-    "hoku/syscalls",
+    "recall/actor_sdk",
+    "recall/executor",
+    "recall/ipld",
+    "recall/iroh_manager",
+    "recall/kernel",
+    "recall/kernel/ops",
+    "recall/syscalls",
 ]
 exclude = ["builtin-actors"]
 
@@ -88,8 +88,8 @@ data-encoding = { version = "2.3.3" }
 dirs = "5.0"
 dircpy = "0.3.19"
 either = "1.10"
-entangler = { git = "ssh://git@github.com/hokunet/entanglement.git", rev = "a72a26c3561cbb392d8ab2b4fcd7e818d12d4f80" }
-entangler_storage = { package = "storage", git = "ssh://git@github.com/hokunet/entanglement.git", rev = "a72a26c3561cbb392d8ab2b4fcd7e818d12d4f80" }
+entangler = { git = "ssh://git@github.com/recallnet/entanglement.git", rev = "c578aa2973c8c31cecb26a92546051a3ec03de89" }
+entangler_storage = { package = "storage", git = "ssh://git@github.com/recallnet/entanglement.git", rev = "c578aa2973c8c31cecb26a92546051a3ec03de89" }
 env_logger = "0.10"
 erased-serde = "0.3"
 ethers = { version = "2.0.13", features = ["abigen", "ws"] }
@@ -271,7 +271,7 @@ gcra = { git = "https://github.com/consensus-shipyard/gcra-rs.git", branch = "ma
 
 # Use below when working locally on entanglement and this repo simultaneously.
 # Assumes the entanglement checkout is in a sibling directory with the same name.
-# [patch."ssh://git@github.com/hokunet/entanglement.git"]
+# [patch."ssh://git@github.com/recallnet/entanglement.git"]
 # entangler = { path = "../entanglement/entangler" }
 # entangler_storage = { package = "storage", path = "../entanglement/storage" }
 

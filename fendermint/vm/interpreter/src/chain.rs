@@ -288,7 +288,7 @@ where
 
         // Maybe debit all credit accounts
         let current_height = state.block_height();
-        let debit_interval = state.hoku_config_tracker().blob_credit_debit_interval;
+        let debit_interval = state.recall_config_tracker().blob_credit_debit_interval;
         if current_height > 0 && debit_interval > 0 && current_height % debit_interval == 0 {
             msgs.push(ChainMessage::Ipc(IpcMessage::DebitCreditAccounts));
         }
@@ -512,7 +512,7 @@ where
                 ChainMessage::Ipc(IpcMessage::DebitCreditAccounts) => {
                     // Ensure that this is a valid height to debit accounts
                     let current_height = state.block_height();
-                    let debit_interval = state.hoku_config_tracker().blob_credit_debit_interval;
+                    let debit_interval = state.recall_config_tracker().blob_credit_debit_interval;
                     if !(current_height > 0
                         && debit_interval > 0
                         && current_height % debit_interval == 0)

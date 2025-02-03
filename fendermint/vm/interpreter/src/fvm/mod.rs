@@ -17,7 +17,7 @@ pub mod bundle;
 
 pub mod activity;
 pub(crate) mod gas;
-pub(crate) mod hoku_config;
+pub(crate) mod recall_config;
 pub(crate) mod topdown;
 
 pub use check::FvmCheckRet;

@@ -1,4 +1,4 @@
-// Copyright 2024 Hoku Contributors
+// Copyright 2025 Recall Contributors
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
@@ -14,11 +14,11 @@ use fendermint_actor_blobs_shared::state::{
     SubscriptionId,
 };
 use fendermint_actor_blobs_shared::Method;
-use fendermint_actor_hoku_config_shared as config;
-use fendermint_actor_hoku_config_shared::require_caller_is_admin;
 use fendermint_actor_machine::{
     require_addr_is_origin_or_caller, resolve_delegated_address, to_id_address,
 };
+use fendermint_actor_recall_config_shared as config;
+use fendermint_actor_recall_config_shared::require_caller_is_admin;
 use fil_actors_runtime::{
     actor_dispatch, actor_error, extract_send_result,
     runtime::{ActorCode, Runtime},
@@ -116,7 +116,7 @@ impl BlobsActor {
     ///
     /// The allowance update is applied to `sponsor` if it exists.
     /// The `from` address must have an approval from `sponsor`.
-    /// This method is called by the hoku executor, and as such, cannot fail.
+    /// This method is called by the recall executor, and as such, cannot fail.
     fn update_gas_allowance(
         rt: &impl Runtime,
         params: UpdateGasAllowanceParams,
@@ -324,7 +324,7 @@ impl BlobsActor {
 
     /// Debits all accounts for current blob usage.
     ///
-    /// This is called by the system actor every X blocks, where X is set in the hoku config actor.
+    /// This is called by the system actor every X blocks, where X is set in the recall config actor.
     /// TODO: Take a start key and page limit to avoid out-of-gas errors.
     fn debit_accounts(rt: &impl Runtime) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
@@ -611,7 +611,7 @@ impl BlobsActor {
 fn delete_from_disc(hash: Hash) -> Result<(), ActorError> {
     #[cfg(feature = "fil-actor")]
     {
-        hoku_actor_sdk::hash_rm(hash.0).map_err(|en| {
+        recall_actor_sdk::hash_rm(hash.0).map_err(|en| {
             ActorError::unspecified(format!("failed to delete blob from disc: {:?}", en))
         })?;
         log::debug!("deleted blob {} from disc", hash);
@@ -672,7 +672,7 @@ mod tests {
 
     use fendermint_actor_blobs_shared::state::Credit;
     use fendermint_actor_blobs_testing::{new_hash, new_pk};
-    use fendermint_actor_hoku_config_shared::{HokuConfig, HOKU_CONFIG_ACTOR_ADDR};
+    use fendermint_actor_recall_config_shared::{RecallConfig, RECALL_CONFIG_ACTOR_ADDR};
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::test_utils::{
         expect_empty, MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, EVM_ACTOR_CODE_ID,
@@ -702,13 +702,13 @@ mod tests {
 
     fn expect_get_config(rt: &MockRuntime) {
         rt.expect_send(
-            HOKU_CONFIG_ACTOR_ADDR,
-            fendermint_actor_hoku_config_shared::Method::GetConfig as MethodNum,
+            RECALL_CONFIG_ACTOR_ADDR,
+            fendermint_actor_recall_config_shared::Method::GetConfig as MethodNum,
             None,
             TokenAmount::zero(),
             None,
             SendFlags::READ_ONLY,
-            IpldBlock::serialize_cbor(&HokuConfig::default()).unwrap(),
+            IpldBlock::serialize_cbor(&RecallConfig::default()).unwrap(),
             ExitCode::OK,
             None,
         );
