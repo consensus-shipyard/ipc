@@ -181,6 +181,7 @@ async fn wait_for_startup(testnet: &DockerTestnet) -> anyhow::Result<bool> {
     }
 }
 
+// TODO move every test into a unique ephemeral `tmp_dir`
 // Run these tests serially because they share a common `materializer-state.json` file with the port mappings.
 // Unfortunately the `#[serial]` macro can only be applied to module blocks, not this.
 mod docker_tests;
