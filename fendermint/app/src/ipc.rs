@@ -55,7 +55,7 @@ where
     where
         F: FnOnce(FvmExecState<ReadOnlyBlockstore<Arc<SS>>>) -> anyhow::Result<T>,
     {
-        match self.app.new_read_only_exec_state()? {
+        match self.app.read_only_view(None)? {
             Some(s) => f(s).map(Some),
             None => Ok(None),
         }

@@ -68,16 +68,22 @@ export class Deployments {
                 ...(contract.libraries || []),
             )
 
+            // Manually managed nonce due to a Filecoin update, which requires specifying 'pending' with
+            // getTransactionCount to retrieve the latest nonce.
+            const nonce = await hre.ethers.provider.getTransactionCount(deployer, "pending");
+
             const result = await hre.deployments.deploy(contract.name, {
                 from: deployer,
                 log: true,
                 args: contract.args,
                 libraries: libraries.addresses,
+                nonce: nonce,
                 waitConfirmations: 1,
             })
             results[contract.name] = result
             console.log(`${contract.name} deployed at ${result.address}`)
         }
+
         return new Deployments(
             await Deployments.resolveContracts(hre, Object.keys(results)),
             results,

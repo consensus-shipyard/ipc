@@ -6,7 +6,7 @@ use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Power, Validator};
 use fendermint_vm_interpreter::fvm::{
     state::{BlockHash, FvmStateParams},
-    FvmApplyRet, FvmCheckRet, FvmQueryRet, PowerUpdates,
+    FvmApplyRet, FvmCheckRet, FvmQueryRet,
 };
 use fendermint_vm_message::signed::DomainHash;
 use fendermint_vm_snapshot::{SnapshotItem, SnapshotManifest};
@@ -125,7 +125,7 @@ pub fn to_deliver_tx(
     }
 }
 
-pub fn to_check_tx(ret: FvmCheckRet) -> response::CheckTx {
+pub fn to_check_tx(ret: FvmCheckRet, priority: i64) -> response::CheckTx {
     // Putting the message `log` because only `log` appears in the `tx_sync` JSON-RPC response.
     let message = ret
         .info
@@ -144,20 +144,9 @@ pub fn to_check_tx(ret: FvmCheckRet) -> response::CheckTx {
         data,
         gas_wanted: ret.gas_limit.try_into().unwrap_or(i64::MAX),
         sender: ret.sender.to_string(),
+        priority,
         ..Default::default()
     }
-}
-
-/// Map the return values from epoch boundary operations to validator updates.
-pub fn to_end_block(power_table: PowerUpdates) -> anyhow::Result<response::EndBlock> {
-    let validator_updates =
-        to_validator_updates(power_table.0).context("failed to convert validator updates")?;
-
-    Ok(response::EndBlock {
-        validator_updates,
-        consensus_param_updates: None,
-        events: Vec::new(), // TODO: Events from epoch transitions?
-    })
 }
 
 /// Map the return values from cron operations.
@@ -281,7 +270,7 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> anyhow::Result<r
             // Send back an entire Tendermint deliver_tx response, encoded as IPLD.
             // This is so there is a single representation of a call result, instead
             // of a normal delivery being one way and a query exposing `FvmApplyRet`.
-            let dtx = to_deliver_tx(ret, None, None);
+            let dtx = to_deliver_tx(*ret, None, None);
             let dtx = tendermint_proto::abci::ResponseDeliverTx::from(dtx);
             let mut buf = bytes::BytesMut::new();
             dtx.encode(&mut buf)?;
@@ -320,6 +309,8 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> anyhow::Result<r
 }
 
 /// Project Genesis validators to Tendermint.
+/// TODO: the import is quite strange, `Validator` and `Power` are imported from `genesis` crate,
+/// TODO: which should be from a `type` or `validator` crate.
 pub fn to_validator_updates(
     validators: Vec<Validator<Power>>,
 ) -> anyhow::Result<Vec<tendermint::validator::Update>> {

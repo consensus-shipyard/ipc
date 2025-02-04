@@ -199,6 +199,7 @@ async fn test_applying_upgrades() {
 
     let genesis = Genesis {
         chain_name: CHAIN_NAME.to_string(),
+        chain_id: None,
         timestamp: Timestamp(0),
         network_version: NetworkVersion::V21,
         base_fee: TokenAmount::zero(),
@@ -219,9 +220,11 @@ async fn test_applying_upgrades() {
     // check that the app version is 0
     assert_eq!(tester.state_params().app_version, 0);
 
+    let producer = my_secret_key().public_key();
+
     // iterate over all the upgrades
     for block_height in 1..=3 {
-        tester.begin_block(block_height).await.unwrap();
+        tester.begin_block(block_height, producer).await.unwrap();
         tester.end_block(block_height).await.unwrap();
         tester.commit().await.unwrap();
 

@@ -19,9 +19,10 @@ use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use fendermint_vm_actor_interface::{
-    account, burntfunds, chainmetadata, cron, eam, init, ipc, reward, system, EMPTY_ARR,
+    account, activity, burntfunds, chainmetadata, cron, eam, gas_market, init, ipc, reward, system,
+    EMPTY_ARR,
 };
-use fendermint_vm_core::{chainid, Timestamp};
+use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{ActorMeta, Collateral, Genesis, Power, PowerScale, Validator};
 use futures_util::io::Cursor;
 use fvm::engine::MultiEngine;
@@ -37,7 +38,7 @@ use num_traits::Zero;
 use crate::fvm::state::snapshot::{derive_cid, StateTreeStreamer};
 use crate::fvm::state::{FvmGenesisState, FvmStateParams};
 use crate::fvm::store::memory::MemoryBlockstore;
-use fendermint_vm_genesis::ipc::IpcParams;
+use fendermint_vm_genesis::ipc::{GatewayParams, IpcParams};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use tokio_stream::StreamExt;
@@ -62,6 +63,7 @@ impl GenesisMetadata {
             chain_id: out.chain_id.into(),
             power_scale: out.power_scale,
             app_version: 0,
+            consensus_params: None,
         };
 
         GenesisMetadata {
@@ -157,7 +159,7 @@ pub struct GenesisOutput {
 
 pub struct GenesisBuilder {
     /// Hardhat like util to deploy ipc contracts
-    hardhat: Option<Hardhat>,
+    hardhat: Hardhat,
     /// The built in actors bundle path
     builtin_actors_path: PathBuf,
     /// The custom actors bundle path
@@ -171,19 +173,15 @@ impl GenesisBuilder {
     pub fn new(
         builtin_actors_path: PathBuf,
         custom_actors_path: PathBuf,
+        artifacts_path: PathBuf,
         genesis_params: Genesis,
     ) -> Self {
         Self {
-            hardhat: None,
+            hardhat: Hardhat::new(artifacts_path),
             builtin_actors_path,
             custom_actors_path,
             genesis_params,
         }
-    }
-
-    pub fn with_ipc_system_contracts(mut self, path: PathBuf) -> Self {
-        self.hardhat = Some(Hardhat::new(path));
-        self
     }
 
     /// Initialize actor states from the Genesis parameters and write the sealed genesis state to
@@ -255,19 +253,6 @@ impl GenesisBuilder {
         .context("failed to create genesis state")
     }
 
-    fn handle_ipc<'a, T, F: Fn(&'a Hardhat, &'a IpcParams) -> T>(
-        &'a self,
-        maybe_ipc: Option<&'a IpcParams>,
-        f: F,
-    ) -> anyhow::Result<Option<T>> {
-        // Only allocate IDs if the contracts are deployed.
-        match (maybe_ipc, &self.hardhat) {
-            (Some(ipc_params), Some(ref hardhat)) => Ok(Some(f(hardhat, ipc_params))),
-            (Some(_), None) => Err(anyhow!("ipc enabled but artifacts path not provided")),
-            _ => Ok(None),
-        }
-    }
-
     fn populate_state(
         &self,
         state: &mut FvmGenesisState<MemoryBlockstore>,
@@ -277,7 +262,7 @@ impl GenesisBuilder {
         //       and rejecting genesis if it doesn't match the expectation,
         //       but the Tendermint genesis file also has this field, and
         //       presumably Tendermint checks that its peers have the same.
-        let chain_id = chainid::from_str_hashed(&genesis.chain_name)?;
+        let chain_id = genesis.chain_id()?;
 
         // Convert validators to CometBFT power scale.
         let validators = genesis
@@ -303,10 +288,7 @@ impl GenesisBuilder {
         // STAGE 0: Declare the built-in EVM contracts we'll have to deploy.
         // ipc_entrypoints contains the external user facing contracts
         // all_ipc_contracts contains ipc_entrypoints + util contracts
-        let (all_ipc_contracts, ipc_entrypoints) = self
-            .handle_ipc(genesis.ipc.as_ref(), |h, _| collect_contracts(h))?
-            .transpose()?
-            .unwrap_or((Vec::new(), EthContractMap::new()));
+        let (all_ipc_contracts, ipc_entrypoints) = self.collect_contracts()?;
 
         // STAGE 1: First we initialize native built-in actors.
         // System actor
@@ -430,6 +412,39 @@ impl GenesisBuilder {
             )
             .context("failed to replace built in eam actor")?;
 
+        // Currently hardcoded for now, once genesis V2 is implemented, should be taken
+        // from genesis parameters.
+        //
+        // Default initial base fee equals minimum base fee in Filecoin.
+        let initial_base_fee = TokenAmount::from_atto(100);
+        // We construct the actor state here for simplicity, but for better decoupling we should
+        // be invoking the constructor instead.
+        let gas_market_state = fendermint_actor_gas_market_eip1559::State {
+            base_fee: initial_base_fee,
+            // If you need to customize the gas market constants, you can do so here.
+            constants: fendermint_actor_gas_market_eip1559::Constants::default(),
+        };
+        state
+            .create_custom_actor(
+                fendermint_actor_gas_market_eip1559::ACTOR_NAME,
+                gas_market::GAS_MARKET_ACTOR_ID,
+                &gas_market_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create default eip1559 gas market actor")?;
+
+        let tracker_state = fendermint_actor_activity_tracker::State::new(state.store())?;
+        state
+            .create_custom_actor(
+                fendermint_actor_activity_tracker::IPC_ACTIVITY_TRACKER_ACTOR_NAME,
+                activity::ACTIVITY_TRACKER_ACTOR_ID,
+                &tracker_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create activity tracker actor")?;
+
         // STAGE 2: Create non-builtin accounts which do not have a fixed ID.
 
         // The next ID is going to be _after_ the accounts, which have already been assigned an ID by the `Init` actor.
@@ -466,52 +481,61 @@ impl GenesisBuilder {
             )
             .context("failed to init exec state")?;
 
-        let maybe_ipc = self.handle_ipc(genesis.ipc.as_ref(), |hardhat, ipc_params| {
-            (hardhat, ipc_params)
-        })?;
-        if let Some((hardhat, ipc_params)) = maybe_ipc {
-            deploy_contracts(
-                all_ipc_contracts,
-                &ipc_entrypoints,
-                genesis.validators,
-                next_id,
-                state,
-                ipc_params,
-                hardhat,
-            )?;
-        }
+        // STAGE 4: Deploy the IPC system contracts.
+
+        let config = DeployConfig {
+            ipc_params: genesis.ipc.as_ref(),
+            chain_id: out.chain_id,
+            hardhat: &self.hardhat,
+        };
+
+        deploy_contracts(
+            all_ipc_contracts,
+            &ipc_entrypoints,
+            genesis.validators,
+            next_id,
+            state,
+            config,
+        )?;
 
         Ok(out)
     }
+
+    fn collect_contracts(&self) -> anyhow::Result<(Vec<ContractSourceAndName>, EthContractMap)> {
+        let mut all_contracts = Vec::new();
+        let mut top_level_contracts = EthContractMap::default();
+
+        top_level_contracts.extend(IPC_CONTRACTS.clone());
+
+        all_contracts.extend(top_level_contracts.keys());
+        all_contracts.extend(
+            top_level_contracts
+                .values()
+                .flat_map(|c| c.facets.iter().map(|f| f.name)),
+        );
+        // Collect dependencies of the main IPC actors.
+        let mut eth_libs = self
+            .hardhat
+            .dependencies(
+                &all_contracts
+                    .iter()
+                    .map(|n| (contract_src(n), *n))
+                    .collect::<Vec<_>>(),
+            )
+            .context("failed to collect EVM contract dependencies")?;
+
+        // Only keep library dependencies, not contracts with constructors.
+        eth_libs.retain(|(_, d)| !top_level_contracts.contains_key(d.as_str()));
+        Ok((eth_libs, top_level_contracts))
+    }
 }
 
-fn collect_contracts(
-    hardhat: &Hardhat,
-) -> anyhow::Result<(Vec<ContractSourceAndName>, EthContractMap)> {
-    let mut all_contracts = Vec::new();
-    let mut top_level_contracts = EthContractMap::default();
-
-    top_level_contracts.extend(IPC_CONTRACTS.clone());
-
-    all_contracts.extend(top_level_contracts.keys());
-    all_contracts.extend(
-        top_level_contracts
-            .values()
-            .flat_map(|c| c.facets.iter().map(|f| f.name)),
-    );
-    // Collect dependencies of the main IPC actors.
-    let mut eth_libs = hardhat
-        .dependencies(
-            &all_contracts
-                .iter()
-                .map(|n| (contract_src(n), *n))
-                .collect::<Vec<_>>(),
-        )
-        .context("failed to collect EVM contract dependencies")?;
-
-    // Only keep library dependencies, not contracts with constructors.
-    eth_libs.retain(|(_, d)| !top_level_contracts.contains_key(d.as_str()));
-    Ok((eth_libs, top_level_contracts))
+// Configuration for deploying IPC contracts.
+// This is to circumvent the arguments limit of the deploy_contracts function.
+struct DeployConfig<'a> {
+    ipc_params: Option<&'a IpcParams>,
+    chain_id: ChainID,
+    hardhat: &'a Hardhat,
 }
 
 fn deploy_contracts(
@@ -520,10 +544,10 @@ fn deploy_contracts(
     validators: Vec<Validator<Collateral>>,
     mut next_id: u64,
     state: &mut FvmGenesisState<MemoryBlockstore>,
-    ipc_params: &IpcParams,
-    hardhat: &Hardhat,
+    config: DeployConfig,
 ) -> anyhow::Result<()> {
-    let mut deployer = ContractDeployer::<MemoryBlockstore>::new(hardhat, top_level_contracts);
+    let mut deployer =
+        ContractDeployer::<MemoryBlockstore>::new(config.hardhat, top_level_contracts);
 
     // Deploy Ethereum libraries.
     for (lib_src, lib_name) in ipc_contracts {
@@ -533,8 +557,15 @@ fn deploy_contracts(
     // IPC Gateway actor.
     let gateway_addr = {
         use ipc::gateway::ConstructorParameters;
+        use ipc_api::subnet_id::SubnetID;
 
-        let params = ConstructorParameters::new(ipc_params.gateway.clone(), validators)
+        let ipc_params = if let Some(p) = config.ipc_params {
+            p.gateway.clone()
+        } else {
+            GatewayParams::new(SubnetID::new(config.chain_id.into(), vec![]))
+        };
+
+        let params = ConstructorParameters::new(ipc_params, validators)
             .context("failed to create gateway constructor")?;
 
         let facets = deployer
@@ -560,6 +591,7 @@ fn deploy_contracts(
         let diamond_loupe_facet = facets.remove(0);
         let diamond_cut_facet = facets.remove(0);
         let ownership_facet = facets.remove(0);
+        let activity_facet = facets.remove(0);
 
         debug_assert_eq!(facets.len(), 2, "SubnetRegistry has 2 facets of its own");
 
@@ -573,6 +605,7 @@ fn deploy_contracts(
             diamond_cut_facet: diamond_cut_facet.facet_address,
             diamond_loupe_facet: diamond_loupe_facet.facet_address,
             ownership_facet: ownership_facet.facet_address,
+            activity_facet: activity_facet.facet_address,
             subnet_getter_selectors: getter_facet.function_selectors,
             subnet_manager_selectors: manager_facet.function_selectors,
             subnet_rewarder_selectors: rewarder_facet.function_selectors,
@@ -581,6 +614,7 @@ fn deploy_contracts(
             subnet_actor_diamond_cut_selectors: diamond_cut_facet.function_selectors,
             subnet_actor_diamond_loupe_selectors: diamond_loupe_facet.function_selectors,
             subnet_actor_ownership_selectors: ownership_facet.function_selectors,
+            subnet_actor_activity_selectors: activity_facet.function_selectors,
             creation_privileges: 0,
         };
 
@@ -744,13 +778,15 @@ fn circ_supply(g: &Genesis) -> TokenAmount {
 pub async fn create_test_genesis_state(
     bundle_path: PathBuf,
     custom_actors_bundle_path: PathBuf,
+    ipc_path: PathBuf,
     genesis_params: Genesis,
-    maybe_ipc_path: Option<PathBuf>,
 ) -> anyhow::Result<(FvmGenesisState<MemoryBlockstore>, GenesisOutput)> {
-    let mut builder = GenesisBuilder::new(bundle_path, custom_actors_bundle_path, genesis_params);
-    if let Some(p) = maybe_ipc_path {
-        builder = builder.with_ipc_system_contracts(p);
-    }
+    let builder = GenesisBuilder::new(
+        bundle_path,
+        custom_actors_bundle_path,
+        ipc_path,
+        genesis_params,
+    );
 
     let mut state = builder.init_state().await?;
     let out = builder.populate_state(&mut state, builder.genesis_params.clone())?;

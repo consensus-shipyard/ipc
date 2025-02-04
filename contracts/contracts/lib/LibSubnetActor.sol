@@ -120,7 +120,7 @@ library LibSubnetActor {
 
         uint256 length = validators.length;
 
-        if (length <= s.minValidators) {
+        if (length < s.minValidators) {
             revert NotEnoughGenesisValidators();
         }
 

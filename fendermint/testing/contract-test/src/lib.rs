@@ -4,11 +4,12 @@
 use anyhow::{anyhow, Context, Result};
 use byteorder::{BigEndian, WriteBytesExt};
 use fendermint_vm_core::Timestamp;
-use fendermint_vm_interpreter::fvm::PowerUpdates;
 use fvm_shared::clock::ChainEpoch;
 use std::{future::Future, sync::Arc};
 
+use fendermint_crypto::PublicKey;
 use fendermint_vm_genesis::Genesis;
+use fendermint_vm_interpreter::fvm::EndBlockOutput;
 use fendermint_vm_interpreter::genesis::{create_test_genesis_state, GenesisOutput};
 use fendermint_vm_interpreter::{
     fvm::{
@@ -32,13 +33,13 @@ pub async fn create_test_exec_state(
 )> {
     let bundle_path = bundle_path();
     let custom_actors_bundle_path = custom_actors_bundle_path();
-    let maybe_contract_path = genesis.ipc.as_ref().map(|_| contracts_path());
+    let artifacts_path = contracts_path();
 
     let (state, out) = create_test_genesis_state(
         bundle_path,
         custom_actors_bundle_path,
+        artifacts_path,
         genesis,
-        maybe_contract_path,
     )
     .await?;
     let store = state.store().clone();
@@ -66,7 +67,7 @@ where
         Message = FvmMessage,
         BeginOutput = FvmApplyRet,
         DeliverOutput = FvmApplyRet,
-        EndOutput = PowerUpdates,
+        EndOutput = EndBlockOutput,
     >,
 {
     pub async fn new(interpreter: I, genesis: Genesis) -> anyhow::Result<Self> {
@@ -84,6 +85,7 @@ where
             chain_id: out.chain_id.into(),
             power_scale: out.power_scale,
             app_version: 0,
+            consensus_params: None,
         };
 
         Ok(Self {
@@ -96,7 +98,7 @@ where
     }
 
     /// Take the execution state, update it, put it back, return the output.
-    async fn modify_exec_state<T, F, R>(&self, f: F) -> anyhow::Result<T>
+    pub async fn modify_exec_state<T, F, R>(&self, f: F) -> anyhow::Result<T>
     where
         F: FnOnce(FvmExecState<MemoryBlockstore>) -> R,
         R: Future<Output = Result<(FvmExecState<MemoryBlockstore>, T)>>,
@@ -124,7 +126,7 @@ where
         guard.take().expect("exec state empty")
     }
 
-    pub async fn begin_block(&self, block_height: ChainEpoch) -> Result<()> {
+    pub async fn begin_block(&self, block_height: ChainEpoch, producer: PublicKey) -> Result<()> {
         let mut block_hash: [u8; 32] = [0; 32];
         let _ = block_hash.as_mut().write_i64::<BigEndian>(block_height);
 
@@ -134,16 +136,32 @@ where
 
         let state = FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
             .context("error creating new state")?
-            .with_block_hash(block_hash);
+            .with_block_hash(block_hash)
+            .with_block_producer(producer);
 
         self.put_exec_state(state).await;
 
         let _res = self
             .modify_exec_state(|s| self.interpreter.begin(s))
-            .await
-            .unwrap();
+            .await?;
 
         Ok(())
+    }
+
+    pub async fn execute_msgs(&self, msgs: Vec<FvmMessage>) -> Result<()> {
+        self.modify_exec_state(|mut s| async {
+            for msg in msgs {
+                let (a, out) = self.interpreter.deliver(s, msg).await?;
+                if let Some(e) = out.apply_ret.failure_info {
+                    println!("failed: {}", e);
+                    return Err(anyhow!("err in msg deliver"));
+                }
+                s = a;
+            }
+            Ok((s, ()))
+        })
+        .await
+        .context("execute msgs failed")
     }
 
     pub async fn end_block(&self, _block_height: ChainEpoch) -> Result<()> {

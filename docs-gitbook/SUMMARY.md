@@ -37,6 +37,7 @@
 - [IPLD Resolver](../specs/ipld-resolver.md)
 - [Materializer](../specs/materializer.md)
 - [Top-down Finality](../specs/topdown.md)
+- [Bottom Up Checkpoint](../specs/bottom-up-interaction.md)
 
 ## Reference
 

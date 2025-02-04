@@ -89,6 +89,7 @@ pub struct ConstructParams {
     pub supply_source: Asset,
     pub collateral_source: Asset,
     pub validator_gater: Address,
+    pub validator_rewarder: Address,
 }
 
 /// Consensus types supported by hierarchical consensus

@@ -43,6 +43,7 @@ macro_rules! define_singleton {
 }
 
 pub mod account;
+pub mod activity;
 pub mod burntfunds;
 pub mod chainmetadata;
 pub mod cron;
@@ -50,6 +51,7 @@ pub mod diamond;
 pub mod eam;
 pub mod ethaccount;
 pub mod evm;
+pub mod gas_market;
 pub mod init;
 pub mod ipc;
 pub mod multisig;

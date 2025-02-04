@@ -27,6 +27,7 @@ abstract contract IpcExchangeUpgradeable is Initializable, IIpcHandler, OwnableU
         _disableInitializers();
     }
 
+    // solhint-disable-next-line func-name-mixedcase
     function __IpcExchangeUpgradeable_init(address gatewayAddr_) public onlyInitializing {
         gatewayAddr = gatewayAddr_;
         __Ownable_init(msg.sender);
@@ -89,7 +90,8 @@ abstract contract IpcExchangeUpgradeable is Initializable, IIpcHandler, OwnableU
                 kind: IpcMsgKind.Call,
                 from: to, // TODO: will anyway be replaced by sendContractXnetMessage.
                 to: to,
-                nonce: 0, // TODO: will be replaced.
+                localNonce: 0, // TODO: will be replaced.
+                originalNonce: 0, // TODO: will be replaced.
                 value: value,
                 message: abi.encode(callMsg)
             })

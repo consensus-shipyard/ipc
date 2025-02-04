@@ -70,7 +70,8 @@ fn prop_cross_msgs_hash() {
                         },
                     },
                     value: from_fvm::to_eth_tokens(&ArbTokenAmount::arbitrary(u)?.0).unwrap(),
-                    nonce: u.arbitrary()?,
+                    local_nonce: u.arbitrary()?,
+                    original_nonce: u.arbitrary()?,
                     // FIXME: Add arbitrary here?
                     message: Vec::new().into(),
                 })

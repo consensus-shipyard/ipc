@@ -10,7 +10,7 @@ use ipc_provider::IpcProvider;
 use std::path::PathBuf;
 
 use fendermint_vm_actor_interface::eam::EthAddress;
-use fendermint_vm_core::{chainid, Timestamp};
+use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{
     ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, PermissionMode, PowerScale,
     SignerAddr, Validator, ValidatorKey,
@@ -33,6 +33,7 @@ cmd! {
         GenesisCommands::AddAccount(args) => args.exec(genesis_file).await,
         GenesisCommands::AddMultisig(args) => args.exec(genesis_file).await,
         GenesisCommands::AddValidator(args) => args.exec(genesis_file).await,
+        GenesisCommands::SetChainId(args) => args.exec(genesis_file).await,
         GenesisCommands::IntoTendermint(args) => args.exec(genesis_file).await,
         GenesisCommands::SetEamPermissions(args) => args.exec(genesis_file).await,
         GenesisCommands::Ipc { command } => command.exec(genesis_file).await,
@@ -45,6 +46,7 @@ cmd! {
     let genesis = Genesis {
       timestamp: Timestamp(self.timestamp),
       chain_name: self.chain_name.clone(),
+      chain_id: None,
       network_version: self.network_version,
       base_fee: self.base_fee.clone(),
       power_scale: self.power_scale,
@@ -78,6 +80,11 @@ cmd! {
     add_validator(&genesis_file, self)
   }
 }
+cmd! {
+  GenesisSetChainIdArgs(self, genesis_file: PathBuf) {
+    set_chain_id(&genesis_file, self)
+  }
+}
 
 cmd! {
   GenesisIntoTendermintArgs(self, genesis_file: PathBuf) {
@@ -102,6 +109,13 @@ cmd! {
             seal_genesis(&genesis_file, args).await,
     }
   }
+}
+
+fn set_chain_id(genesis_file: &PathBuf, args: &GenesisSetChainIdArgs) -> anyhow::Result<()> {
+    update_genesis(genesis_file, |mut genesis| {
+        genesis.chain_id = Some(args.chain_id);
+        Ok(genesis)
+    })
 }
 
 fn add_account(genesis_file: &PathBuf, args: &GenesisAddAccountArgs) -> anyhow::Result<()> {
@@ -226,8 +240,7 @@ fn into_tendermint(genesis_file: &PathBuf, args: &GenesisIntoTendermintArgs) -> 
         _ => None,
     };
 
-    let chain_id: u64 = chainid::from_str_hashed(&genesis.chain_name)?.into();
-    let chain_id = chain_id.to_string();
+    let chain_id = u64::from(genesis.chain_id()?).to_string();
 
     let tmg = tendermint::Genesis {
         genesis_time: tendermint::time::Time::from_unix_timestamp(genesis.timestamp.as_secs(), 0)?,
@@ -295,15 +308,12 @@ fn set_ipc_gateway(genesis_file: &PathBuf, args: &GenesisIpcGatewayArgs) -> anyh
 async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> anyhow::Result<()> {
     let genesis_params = read_genesis(genesis_file)?;
 
-    let mut builder = GenesisBuilder::new(
+    let builder = GenesisBuilder::new(
         args.builtin_actors_path.clone(),
         args.custom_actors_path.clone(),
+        args.artifacts_path.clone(),
         genesis_params,
     );
-
-    if let Some(ref ipc_system_artifacts) = args.artifacts_path {
-        builder = builder.with_ipc_system_contracts(ipc_system_artifacts.clone());
-    }
 
     builder.write_to(args.output_path.clone()).await
 }
@@ -364,6 +374,7 @@ async fn new_genesis_from_parent(
         accounts: Vec::new(),
         eam_permission_mode: PermissionMode::Unrestricted,
         ipc: Some(ipc_params),
+        chain_id: None,
     };
 
     for v in genesis_info.validators {
