@@ -11,9 +11,10 @@ SUBTREES_ALL := $(SUBTREES_RUST) $(SUBTREES_CONTRACTS)
 
 test: test-rust test-contracts
 
-test-rust: $(patsubst %, test/%, $(SUBTREES_RUST))
+test-rust:
+	cd crates && cargo test --workspace
 
-test-contracts: $(patsubst %, test/%, $(SUBTREES_CONTRACTS))
+test-contracts: test/contracts
 
 # Using `cd` instead of `-C` so $(PWD) is correct.
 test/%:

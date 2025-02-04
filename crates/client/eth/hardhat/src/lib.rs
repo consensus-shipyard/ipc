@@ -259,27 +259,24 @@ mod tests {
     use super::Hardhat;
 
     fn workspace_dir() -> PathBuf {
-        let output = std::process::Command::new(env!("CARGO"))
-            .arg("locate-project")
-            .arg("--workspace")
-            .arg("--message-format=plain")
-            .output()
-            .unwrap()
-            .stdout;
-        let cargo_path = Path::new(std::str::from_utf8(&output).unwrap().trim());
-        cargo_path.parent().unwrap().to_path_buf()
+        let workspace_dir = std::path::PathBuf::from(std::env::env("CARGO_MANIFEST_DIR").unwrap())
+            .parent().unwrap()
+            .parent().unwrap()
+            .parent().unwrap()
+            .parent().unwrap()
+            .to_path_buf();
+        workspace_dir
     }
 
     /// Path to the Solidity contracts, indended to be used in tests.
     fn contracts_path() -> PathBuf {
-        let contracts_path = std::env::var("FM_CONTRACTS_DIR").unwrap_or_else(|_| {
+        let contracts_path = std::env::var("FM_CONTRACTS_DIR").map(std::path::PathBuf::from).unwrap_or_else(|_| {
             workspace_dir()
-                .join("contracts/out")
-                .to_string_lossy()
-                .into_owned()
+                .join("contracts")
+                .join("out")
         });
 
-        PathBuf::from_str(&contracts_path).expect("malformed contracts path")
+        contracts_path
     }
 
     fn test_hardhat() -> Hardhat {
