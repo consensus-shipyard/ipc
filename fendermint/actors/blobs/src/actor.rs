@@ -349,26 +349,21 @@ impl BlobsActor {
     /// and the only way to get an account is to buy credits, which requires a delegated address.   
     fn add_blob(rt: &impl Runtime, params: AddBlobParams) -> Result<Subscription, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
+        let from = to_id_address(rt, params.from, true)?;
+        require_addr_is_origin_or_caller(rt, from)?;
+
         let tokens_received = rt.message().value_received();
-        let origin = rt.message().origin();
         let subscriber = if let Some(sponsor) = params.sponsor {
             to_id_address(rt, sponsor, tokens_received.is_positive())?
         } else {
-            // If the origin is buying credits inline, perform the delegated address check,
-            // otherwise, don't waste gas on it. If the account doesn't have credits, the txn
-            // will fail, and the only way to buy credits it with a delegated address.
-            if tokens_received.is_positive() {
-                to_id_address(rt, origin, true)?
-            } else {
-                origin
-            }
+            from
         };
         let config = config::get_config(rt)?;
         let (subscription, unspent_tokens) = rt.transaction(|st: &mut State, rt| {
             st.add_blob(
                 &config,
                 rt.store(),
-                origin,
+                from,
                 subscriber,
                 rt.curr_epoch(),
                 params.hash,
@@ -382,7 +377,7 @@ impl BlobsActor {
         })?;
         // Send the tokens not required for the buying back
         if !unspent_tokens.is_zero() {
-            extract_send_result(rt.send_simple(&origin, METHOD_SEND, None, unspent_tokens))?;
+            extract_send_result(rt.send_simple(&params.from, METHOD_SEND, None, unspent_tokens))?;
         }
         Ok(subscription)
     }
@@ -1069,6 +1064,7 @@ mod tests {
             id: SubscriptionId::default(),
             size: hash.1,
             ttl: Some(3600),
+            from: id_addr,
         };
         expect_get_config(&rt);
         let result = rt.call::<BlobsActor>(
@@ -1136,6 +1132,7 @@ mod tests {
             id: SubscriptionId::default(),
             size: hash.1,
             ttl: Some(3600),
+            from: id_addr,
         };
         let tokens_sent = TokenAmount::from_whole(1);
         rt.set_received(tokens_sent.clone());
@@ -1171,6 +1168,7 @@ mod tests {
             id: SubscriptionId::default(),
             size: hash.1,
             ttl: Some(3600),
+            from: id_addr,
         };
         expect_get_config(&rt);
         let response = rt.call::<BlobsActor>(
@@ -1194,6 +1192,7 @@ mod tests {
             id: SubscriptionId::default(),
             size: hash.1,
             ttl: Some(3600),
+            from: id_addr,
         };
         expect_get_config(&rt);
         let result = rt.call::<BlobsActor>(
@@ -1300,6 +1299,7 @@ mod tests {
             id: SubscriptionId::default(),
             size: hash.1,
             ttl: Some(3600),
+            from: spender_id_addr,
         };
         expect_get_config(&rt);
         let response = rt.call::<BlobsActor>(
@@ -1323,6 +1323,7 @@ mod tests {
             id: SubscriptionId::default(),
             size: hash.1,
             ttl: Some(3600),
+            from: spender_id_addr,
         };
         expect_get_config(&rt);
         let response = rt.call::<BlobsActor>(

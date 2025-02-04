@@ -136,6 +136,7 @@ pub fn add_blob(
     metadata_hash: state::Hash,
     size: u64,
     ttl: Option<ChainEpoch>,
+    from: Address,
 ) -> Result<Subscription, ActorError> {
     let params = IpldBlock::serialize_cbor(&params::AddBlobParams {
         sponsor,
@@ -145,6 +146,7 @@ pub fn add_blob(
         id: sub_id,
         size,
         ttl,
+        from,
     })?;
     deserialize_block(extract_send_result(rt.send_simple(
         &BLOBS_ACTOR_ADDR,
@@ -210,6 +212,7 @@ pub fn overwrite_blob(
                 metadata_hash,
                 size,
                 ttl,
+                from: rt.message().caller(),
             },
         })?,
         rt.message().value_received(),

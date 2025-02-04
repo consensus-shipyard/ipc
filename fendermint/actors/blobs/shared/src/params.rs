@@ -122,6 +122,8 @@ pub struct AddBlobParams {
     /// Blob time-to-live epochs.
     /// If not specified, the current default TTL from the config actor is used.
     pub ttl: Option<ChainEpoch>,
+    /// Address of the entity adding the blob.
+    pub from: Address,
 }
 
 /// Params for getting a blob.
