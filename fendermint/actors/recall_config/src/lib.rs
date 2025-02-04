@@ -13,6 +13,7 @@ use fil_actors_runtime::SYSTEM_ACTOR_ADDR;
 use fil_actors_runtime::{actor_dispatch, ActorError};
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
+use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 
 #[cfg(feature = "fil-actor")]
@@ -72,6 +73,49 @@ impl Actor {
 
     fn set_config(rt: &impl Runtime, params: SetConfigParams) -> Result<(), ActorError> {
         let admin_exists = Self::ensure_update_allowed(rt)?;
+
+        if params.token_credit_rate <= TokenCreditRate::from(BigInt::from(0)) {
+            return Err(actor_error!(
+                illegal_argument,
+                "token credit rate must be positive"
+            ));
+        }
+
+        if params.blob_capacity == 0 {
+            return Err(actor_error!(
+                illegal_argument,
+                "blob capacity must be positive"
+            ));
+        }
+
+        if params.blob_credit_debit_interval <= 0 {
+            return Err(actor_error!(
+                illegal_argument,
+                "credit debit interval must be positive"
+            ));
+        }
+
+        if params.blob_min_ttl <= 0 {
+            return Err(actor_error!(
+                illegal_argument,
+                "minimum TTL must be positive"
+            ));
+        }
+
+        if params.blob_default_ttl <= 0 {
+            return Err(actor_error!(
+                illegal_argument,
+                "default TTL must be positive"
+            ));
+        }
+
+        if params.blob_default_ttl < params.blob_min_ttl {
+            return Err(actor_error!(
+                illegal_argument,
+                "default TTL must be greater than or equal to minimum TTL"
+            ));
+        }
+
         let new_admin = if !admin_exists {
             // The first caller becomes admin
             let new_admin = to_id_address(rt, rt.message().caller(), false)?;
@@ -264,5 +308,130 @@ mod tests {
             recall_config.blob_default_ttl,
             ChainEpoch::from(24 * 60 * 60)
         );
+    }
+
+    #[test]
+    fn test_set_invalid_config() {
+        struct TestCase {
+            name: &'static str,
+            config: RecallConfig,
+        }
+
+        let valid_config = RecallConfig {
+            blob_capacity: 2048,
+            token_credit_rate: TokenCreditRate::from(BigInt::from(10)),
+            blob_credit_debit_interval: ChainEpoch::from(1800),
+            blob_min_ttl: ChainEpoch::from(2 * 60 * 60),
+            blob_default_ttl: ChainEpoch::from(24 * 60 * 60),
+        };
+
+        let test_cases = vec![
+            // Token credit rate validation
+            TestCase {
+                name: "token credit rate cannot be zero",
+                config: RecallConfig {
+                    token_credit_rate: TokenCreditRate::from(BigInt::from(0)),
+                    ..valid_config.clone()
+                },
+            },
+            TestCase {
+                name: "token credit rate cannot be negative",
+                config: RecallConfig {
+                    token_credit_rate: TokenCreditRate::from(BigInt::from(-1)),
+                    ..valid_config.clone()
+                },
+            },
+            // Blob capacity validation
+            TestCase {
+                name: "blob capacity cannot be zero",
+                config: RecallConfig {
+                    blob_capacity: 0,
+                    ..valid_config.clone()
+                },
+            },
+            // Credit debit interval validation
+            TestCase {
+                name: "blob credit debit interval cannot be zero",
+                config: RecallConfig {
+                    blob_credit_debit_interval: 0,
+                    ..valid_config.clone()
+                },
+            },
+            TestCase {
+                name: "blob credit debit interval cannot be negative",
+                config: RecallConfig {
+                    blob_credit_debit_interval: -1,
+                    ..valid_config.clone()
+                },
+            },
+            // TTL validations
+            TestCase {
+                name: "blob min ttl cannot be negative",
+                config: RecallConfig {
+                    blob_min_ttl: -1,
+                    ..valid_config.clone()
+                },
+            },
+            TestCase {
+                name: "blob min ttl cannot be zero",
+                config: RecallConfig {
+                    blob_min_ttl: 0,
+                    ..valid_config.clone()
+                },
+            },
+            TestCase {
+                name: "blob default ttl must be greater than or equal to min ttl",
+                config: RecallConfig {
+                    blob_min_ttl: 4 * 60 * 60,
+                    blob_default_ttl: 2 * 60 * 60,
+                    ..valid_config.clone()
+                },
+            },
+            TestCase {
+                name: "blob default ttl cannot be zero",
+                config: RecallConfig {
+                    blob_default_ttl: 0,
+                    ..valid_config.clone()
+                },
+            },
+            TestCase {
+                name: "blob default ttl cannot be negative",
+                config: RecallConfig {
+                    blob_default_ttl: -1,
+                    ..valid_config.clone()
+                },
+            },
+        ];
+
+        let rt = construct_and_verify(
+            TokenCreditRate::from(BigInt::from(5)),
+            1024,
+            3600,
+            3600,
+            3600,
+        );
+
+        let id_addr = Address::new_id(110);
+        let eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000000"
+        ));
+        let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
+
+        rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
+
+        // Now test all invalid configurations
+        for test_case in test_cases {
+            rt.expect_validate_caller_any();
+            let result = rt.call::<Actor>(
+                Method::SetConfig as u64,
+                IpldBlock::serialize_cbor(&test_case.config).unwrap(),
+            );
+            assert!(
+                result.is_err(),
+                "expected case \"{}\" to fail but it succeeded",
+                test_case.name
+            );
+        }
     }
 }

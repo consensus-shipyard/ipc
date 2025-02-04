@@ -56,6 +56,18 @@ impl<'a> Div<&TokenCreditRate> for &'a Credit {
     }
 }
 
+impl PartialOrd for TokenCreditRate {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for TokenCreditRate {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.rate.cmp(&other.rate)
+    }
+}
+
 /// The stored representation of a credit account.
 #[derive(Clone, Debug, Default, PartialEq, Serialize_tuple, Deserialize_tuple)]
 pub struct Account {
