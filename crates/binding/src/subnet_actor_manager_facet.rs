@@ -7,7 +7,7 @@ pub use subnet_actor_manager_facet::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types
+    non_camel_case_types,
 )]
 pub mod subnet_actor_manager_facet {
     #[allow(deprecated)]
@@ -17,655 +17,861 @@ pub mod subnet_actor_manager_facet {
             functions: ::core::convert::From::from([
                 (
                     ::std::borrow::ToOwned::to_owned("addBootstrapNode"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("addBootstrapNode"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("netAddress"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::String,
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("string"),
-                            ),
-                        },],
-                        outputs: ::std::vec![],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("addBootstrapNode"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("netAddress"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::String,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("string"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("join"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("join"),
-                        inputs: ::std::vec![
-                            ::ethers::core::abi::ethabi::Param {
-                                name: ::std::borrow::ToOwned::to_owned("publicKey"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                internal_type: ::core::option::Option::Some(
-                                    ::std::borrow::ToOwned::to_owned("bytes"),
-                                ),
-                            },
-                            ::ethers::core::abi::ethabi::Param {
-                                name: ::std::borrow::ToOwned::to_owned("amount"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                                internal_type: ::core::option::Option::Some(
-                                    ::std::borrow::ToOwned::to_owned("uint256"),
-                                ),
-                            },
-                        ],
-                        outputs: ::std::vec![],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::Payable,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("join"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("publicKey"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("bytes"),
+                                    ),
+                                },
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("amount"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::Payable,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("kill"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("kill"),
-                        inputs: ::std::vec![],
-                        outputs: ::std::vec![],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("kill"),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("leave"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("leave"),
-                        inputs: ::std::vec![],
-                        outputs: ::std::vec![],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("leave"),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("preFund"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("preFund"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("amount"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("uint256"),
-                            ),
-                        },],
-                        outputs: ::std::vec![],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::Payable,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("preFund"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("amount"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::Payable,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("preRelease"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("preRelease"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("amount"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("uint256"),
-                            ),
-                        },],
-                        outputs: ::std::vec![],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("preRelease"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("amount"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("setFederatedPower"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("setFederatedPower"),
-                        inputs: ::std::vec![
-                            ::ethers::core::abi::ethabi::Param {
-                                name: ::std::borrow::ToOwned::to_owned("validators"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Array(
-                                    ::std::boxed::Box::new(
-                                        ::ethers::core::abi::ethabi::ParamType::Address,
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("setFederatedPower"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("validators"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
+                                        ::std::boxed::Box::new(
+                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                        ),
                                     ),
-                                ),
-                                internal_type: ::core::option::Option::Some(
-                                    ::std::borrow::ToOwned::to_owned("address[]"),
-                                ),
-                            },
-                            ::ethers::core::abi::ethabi::Param {
-                                name: ::std::borrow::ToOwned::to_owned("publicKeys"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Array(
-                                    ::std::boxed::Box::new(
-                                        ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("address[]"),
                                     ),
-                                ),
-                                internal_type: ::core::option::Option::Some(
-                                    ::std::borrow::ToOwned::to_owned("bytes[]"),
-                                ),
-                            },
-                            ::ethers::core::abi::ethabi::Param {
-                                name: ::std::borrow::ToOwned::to_owned("powers"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Array(
-                                    ::std::boxed::Box::new(
-                                        ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                },
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("publicKeys"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
+                                        ::std::boxed::Box::new(
+                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                        ),
                                     ),
-                                ),
-                                internal_type: ::core::option::Option::Some(
-                                    ::std::borrow::ToOwned::to_owned("uint256[]"),
-                                ),
-                            },
-                        ],
-                        outputs: ::std::vec![],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
-                    },],
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("bytes[]"),
+                                    ),
+                                },
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("powers"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
+                                        ::std::boxed::Box::new(
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                        ),
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256[]"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("setValidatorGater"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("setValidatorGater"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("gater"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("address"),
-                            ),
-                        },],
-                        outputs: ::std::vec![],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("setValidatorGater"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("gater"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("address"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("stake"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("stake"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("amount"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("uint256"),
-                            ),
-                        },],
-                        outputs: ::std::vec![],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::Payable,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("stake"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("amount"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::Payable,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("unstake"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("unstake"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("amount"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("uint256"),
-                            ),
-                        },],
-                        outputs: ::std::vec![],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("unstake"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("amount"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("uint256"),
+                                    ),
+                                },
+                            ],
+                            outputs: ::std::vec![],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                        },
+                    ],
                 ),
             ]),
             events: ::core::convert::From::from([
                 (
                     ::std::borrow::ToOwned::to_owned("ActiveValidatorCollateralUpdated"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("ActiveValidatorCollateralUpdated",),
-                        inputs: ::std::vec![
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("validator"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("newPower"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                                indexed: false,
-                            },
-                        ],
-                        anonymous: false,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "ActiveValidatorCollateralUpdated",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("validator"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    indexed: false,
+                                },
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("newPower"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("ActiveValidatorLeft"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("ActiveValidatorLeft",),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::EventParam {
-                            name: ::std::borrow::ToOwned::to_owned("validator"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                            indexed: false,
-                        },],
-                        anonymous: false,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "ActiveValidatorLeft",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("validator"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("ActiveValidatorReplaced"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("ActiveValidatorReplaced",),
-                        inputs: ::std::vec![
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("oldValidator"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("newValidator"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                                indexed: false,
-                            },
-                        ],
-                        anonymous: false,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "ActiveValidatorReplaced",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("oldValidator"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    indexed: false,
+                                },
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("newValidator"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("NewActiveValidator"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("NewActiveValidator"),
-                        inputs: ::std::vec![
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("validator"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("power"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                                indexed: false,
-                            },
-                        ],
-                        anonymous: false,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned("NewActiveValidator"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("validator"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    indexed: false,
+                                },
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("power"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("NewBootstrapNode"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("NewBootstrapNode"),
-                        inputs: ::std::vec![
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("netAddress"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::String,
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("owner"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                                indexed: false,
-                            },
-                        ],
-                        anonymous: false,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned("NewBootstrapNode"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("netAddress"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::String,
+                                    indexed: false,
+                                },
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("owner"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("NewStakingChangeRequest"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("NewStakingChangeRequest",),
-                        inputs: ::std::vec![
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("op"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("validator"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("payload"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("configurationNumber",),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                indexed: false,
-                            },
-                        ],
-                        anonymous: false,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "NewStakingChangeRequest",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("op"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                    indexed: false,
+                                },
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("validator"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    indexed: false,
+                                },
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("payload"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                    indexed: false,
+                                },
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned(
+                                        "configurationNumber",
+                                    ),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("NewWaitingValidator"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("NewWaitingValidator",),
-                        inputs: ::std::vec![
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("validator"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("power"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                                indexed: false,
-                            },
-                        ],
-                        anonymous: false,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "NewWaitingValidator",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("validator"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    indexed: false,
+                                },
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("power"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("Paused"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("Paused"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::EventParam {
-                            name: ::std::borrow::ToOwned::to_owned("account"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                            indexed: false,
-                        },],
-                        anonymous: false,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned("Paused"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("account"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("SubnetBootstrapped"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("SubnetBootstrapped"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::EventParam {
-                            name: ::std::string::String::new(),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Array(
-                                ::std::boxed::Box::new(
-                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                        ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
-                                        ::ethers::core::abi::ethabi::ParamType::Address,
-                                        ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                    ],),
-                                ),
-                            ),
-                            indexed: false,
-                        },],
-                        anonymous: false,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned("SubnetBootstrapped"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
+                                        ::std::boxed::Box::new(
+                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                ::std::vec![
+                                                    ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                ],
+                                            ),
+                                        ),
+                                    ),
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("Unpaused"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("Unpaused"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::EventParam {
-                            name: ::std::borrow::ToOwned::to_owned("account"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                            indexed: false,
-                        },],
-                        anonymous: false,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned("Unpaused"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("account"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("ValidatorGaterUpdated"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("ValidatorGaterUpdated",),
-                        inputs: ::std::vec![
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("oldGater"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("newGater"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                                indexed: false,
-                            },
-                        ],
-                        anonymous: false,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "ValidatorGaterUpdated",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("oldGater"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    indexed: false,
+                                },
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("newGater"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("WaitingValidatorCollateralUpdated"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("WaitingValidatorCollateralUpdated",),
-                        inputs: ::std::vec![
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("validator"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("newPower"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                                indexed: false,
-                            },
-                        ],
-                        anonymous: false,
-                    },],
+                    ::std::borrow::ToOwned::to_owned(
+                        "WaitingValidatorCollateralUpdated",
+                    ),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "WaitingValidatorCollateralUpdated",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("validator"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    indexed: false,
+                                },
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("newPower"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("WaitingValidatorLeft"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("WaitingValidatorLeft",),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::EventParam {
-                            name: ::std::borrow::ToOwned::to_owned("validator"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                            indexed: false,
-                        },],
-                        anonymous: false,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "WaitingValidatorLeft",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("validator"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
                 ),
             ]),
             errors: ::core::convert::From::from([
                 (
                     ::std::borrow::ToOwned::to_owned("AddressEmptyCode"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("AddressEmptyCode"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("target"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("address"),
-                            ),
-                        },],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("AddressEmptyCode"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("target"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("address"),
+                                    ),
+                                },
+                            ],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("AddressInsufficientBalance"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("AddressInsufficientBalance",),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("account"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("address"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "AddressInsufficientBalance",
                             ),
-                        },],
-                    },],
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("account"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("address"),
+                                    ),
+                                },
+                            ],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("AddressShouldBeValidator"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("AddressShouldBeValidator",),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "AddressShouldBeValidator",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("CannotReleaseZero"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("CannotReleaseZero"),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("CannotReleaseZero"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("CollateralIsZero"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("CollateralIsZero"),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("CollateralIsZero"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("DuplicatedGenesisValidator"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("DuplicatedGenesisValidator",),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "DuplicatedGenesisValidator",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("EmptyAddress"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("EmptyAddress"),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("EmptyAddress"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("EnforcedPause"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("EnforcedPause"),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("EnforcedPause"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("ExpectedPause"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("ExpectedPause"),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("ExpectedPause"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("FailedInnerCall"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("FailedInnerCall"),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("FailedInnerCall"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("InvalidFederationPayload"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("InvalidFederationPayload",),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "InvalidFederationPayload",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("InvalidPublicKeyLength"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("InvalidPublicKeyLength",),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "InvalidPublicKeyLength",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("MethodNotAllowed"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("MethodNotAllowed"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("reason"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::String,
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("string"),
-                            ),
-                        },],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("MethodNotAllowed"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("reason"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::String,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("string"),
+                                    ),
+                                },
+                            ],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("NotAllValidatorsHaveLeft"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("NotAllValidatorsHaveLeft",),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "NotAllValidatorsHaveLeft",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("NotEnoughBalance"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("NotEnoughBalance"),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("NotEnoughBalance"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("NotEnoughCollateral"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("NotEnoughCollateral",),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "NotEnoughCollateral",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("NotEnoughFunds"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("NotEnoughFunds"),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("NotEnoughFunds"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("NotEnoughGenesisValidators"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("NotEnoughGenesisValidators",),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "NotEnoughGenesisValidators",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("NotOwner"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("NotOwner"),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("NotOwner"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("NotOwnerOfPublicKey"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("NotOwnerOfPublicKey",),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "NotOwnerOfPublicKey",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("NotValidator"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("NotValidator"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::string::String::new(),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("address"),
-                            ),
-                        },],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("NotValidator"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("address"),
+                                    ),
+                                },
+                            ],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("PQDoesNotContainAddress"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("PQDoesNotContainAddress",),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "PQDoesNotContainAddress",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("PQEmpty"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("PQEmpty"),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("PQEmpty"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("ReentrancyError"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("ReentrancyError"),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("ReentrancyError"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("SafeERC20FailedOperation"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("SafeERC20FailedOperation",),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("token"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("address"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "SafeERC20FailedOperation",
                             ),
-                        },],
-                    },],
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::borrow::ToOwned::to_owned("token"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("address"),
+                                    ),
+                                },
+                            ],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("SubnetAlreadyBootstrapped"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("SubnetAlreadyBootstrapped",),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "SubnetAlreadyBootstrapped",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("SubnetAlreadyKilled"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("SubnetAlreadyKilled",),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "SubnetAlreadyKilled",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("SubnetNotBootstrapped"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("SubnetNotBootstrapped",),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "SubnetNotBootstrapped",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("WithdrawExceedingCollateral"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("WithdrawExceedingCollateral",),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "WithdrawExceedingCollateral",
+                            ),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
             ]),
             receive: false,
@@ -673,8 +879,9 @@ pub mod subnet_actor_manager_facet {
         }
     }
     ///The parsed JSON ABI of the contract.
-    pub static SUBNETACTORMANAGERFACET_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
-        ::ethers::contract::Lazy::new(__abi);
+    pub static SUBNETACTORMANAGERFACET_ABI: ::ethers::contract::Lazy<
+        ::ethers::core::abi::Abi,
+    > = ::ethers::contract::Lazy::new(__abi);
     pub struct SubnetActorManagerFacet<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for SubnetActorManagerFacet<M> {
         fn clone(&self) -> Self {
@@ -706,11 +913,13 @@ pub mod subnet_actor_manager_facet {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(::ethers::contract::Contract::new(
-                address.into(),
-                SUBNETACTORMANAGERFACET_ABI.clone(),
-                client,
-            ))
+            Self(
+                ::ethers::contract::Contract::new(
+                    address.into(),
+                    SUBNETACTORMANAGERFACET_ABI.clone(),
+                    client,
+                ),
+            )
         }
         ///Calls the contract's `addBootstrapNode` (0x10fd4261) function
         pub fn add_bootstrap_node(
@@ -812,8 +1021,11 @@ pub mod subnet_actor_manager_facet {
         ///Gets the contract's `ActiveValidatorLeft` event
         pub fn active_validator_left_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ActiveValidatorLeftFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            ActiveValidatorLeftFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `ActiveValidatorReplaced` event
@@ -829,15 +1041,21 @@ pub mod subnet_actor_manager_facet {
         ///Gets the contract's `NewActiveValidator` event
         pub fn new_active_validator_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, NewActiveValidatorFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            NewActiveValidatorFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `NewBootstrapNode` event
         pub fn new_bootstrap_node_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, NewBootstrapNodeFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            NewBootstrapNodeFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `NewStakingChangeRequest` event
@@ -853,8 +1071,11 @@ pub mod subnet_actor_manager_facet {
         ///Gets the contract's `NewWaitingValidator` event
         pub fn new_waiting_validator_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, NewWaitingValidatorFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            NewWaitingValidatorFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `Paused` event
@@ -866,21 +1087,31 @@ pub mod subnet_actor_manager_facet {
         ///Gets the contract's `SubnetBootstrapped` event
         pub fn subnet_bootstrapped_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, SubnetBootstrappedFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            SubnetBootstrappedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `Unpaused` event
         pub fn unpaused_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, UnpausedFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            UnpausedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `ValidatorGaterUpdated` event
         pub fn validator_gater_updated_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ValidatorGaterUpdatedFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            ValidatorGaterUpdatedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `WaitingValidatorCollateralUpdated` event
@@ -896,8 +1127,11 @@ pub mod subnet_actor_manager_facet {
         ///Gets the contract's `WaitingValidatorLeft` event
         pub fn waiting_validator_left_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, WaitingValidatorLeftFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            WaitingValidatorLeftFilter,
+        > {
             self.0.event()
         }
         /// Returns an `Event` builder for all the events of this contract.
@@ -908,13 +1142,11 @@ pub mod subnet_actor_manager_facet {
             M,
             SubnetActorManagerFacetEvents,
         > {
-            self.0
-                .event_with_filter(::core::default::Default::default())
+            self.0.event_with_filter(::core::default::Default::default())
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-        for SubnetActorManagerFacet<M>
-    {
+    for SubnetActorManagerFacet<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
@@ -928,7 +1160,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "AddressEmptyCode", abi = "AddressEmptyCode(address)")]
     pub struct AddressEmptyCode {
@@ -943,7 +1175,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(
         name = "AddressInsufficientBalance",
@@ -961,7 +1193,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "AddressShouldBeValidator", abi = "AddressShouldBeValidator()")]
     pub struct AddressShouldBeValidator;
@@ -974,7 +1206,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "CannotReleaseZero", abi = "CannotReleaseZero()")]
     pub struct CannotReleaseZero;
@@ -987,7 +1219,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "CollateralIsZero", abi = "CollateralIsZero()")]
     pub struct CollateralIsZero;
@@ -1000,7 +1232,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(
         name = "DuplicatedGenesisValidator",
@@ -1016,7 +1248,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "EmptyAddress", abi = "EmptyAddress()")]
     pub struct EmptyAddress;
@@ -1029,7 +1261,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "EnforcedPause", abi = "EnforcedPause()")]
     pub struct EnforcedPause;
@@ -1042,7 +1274,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "ExpectedPause", abi = "ExpectedPause()")]
     pub struct ExpectedPause;
@@ -1055,7 +1287,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "FailedInnerCall", abi = "FailedInnerCall()")]
     pub struct FailedInnerCall;
@@ -1068,7 +1300,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "InvalidFederationPayload", abi = "InvalidFederationPayload()")]
     pub struct InvalidFederationPayload;
@@ -1081,7 +1313,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "InvalidPublicKeyLength", abi = "InvalidPublicKeyLength()")]
     pub struct InvalidPublicKeyLength;
@@ -1094,7 +1326,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "MethodNotAllowed", abi = "MethodNotAllowed(string)")]
     pub struct MethodNotAllowed {
@@ -1109,7 +1341,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "NotAllValidatorsHaveLeft", abi = "NotAllValidatorsHaveLeft()")]
     pub struct NotAllValidatorsHaveLeft;
@@ -1122,7 +1354,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "NotEnoughBalance", abi = "NotEnoughBalance()")]
     pub struct NotEnoughBalance;
@@ -1135,7 +1367,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "NotEnoughCollateral", abi = "NotEnoughCollateral()")]
     pub struct NotEnoughCollateral;
@@ -1148,7 +1380,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "NotEnoughFunds", abi = "NotEnoughFunds()")]
     pub struct NotEnoughFunds;
@@ -1161,7 +1393,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(
         name = "NotEnoughGenesisValidators",
@@ -1177,7 +1409,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "NotOwner", abi = "NotOwner()")]
     pub struct NotOwner;
@@ -1190,7 +1422,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "NotOwnerOfPublicKey", abi = "NotOwnerOfPublicKey()")]
     pub struct NotOwnerOfPublicKey;
@@ -1203,7 +1435,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "NotValidator", abi = "NotValidator(address)")]
     pub struct NotValidator(pub ::ethers::core::types::Address);
@@ -1216,7 +1448,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "PQDoesNotContainAddress", abi = "PQDoesNotContainAddress()")]
     pub struct PQDoesNotContainAddress;
@@ -1229,7 +1461,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "PQEmpty", abi = "PQEmpty()")]
     pub struct PQEmpty;
@@ -1242,7 +1474,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "ReentrancyError", abi = "ReentrancyError()")]
     pub struct ReentrancyError;
@@ -1255,7 +1487,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(
         name = "SafeERC20FailedOperation",
@@ -1273,12 +1505,9 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
-    #[etherror(
-        name = "SubnetAlreadyBootstrapped",
-        abi = "SubnetAlreadyBootstrapped()"
-    )]
+    #[etherror(name = "SubnetAlreadyBootstrapped", abi = "SubnetAlreadyBootstrapped()")]
     pub struct SubnetAlreadyBootstrapped;
     ///Custom Error type `SubnetAlreadyKilled` with signature `SubnetAlreadyKilled()` and selector `0x49191df6`
     #[derive(
@@ -1289,7 +1518,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "SubnetAlreadyKilled", abi = "SubnetAlreadyKilled()")]
     pub struct SubnetAlreadyKilled;
@@ -1302,7 +1531,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "SubnetNotBootstrapped", abi = "SubnetNotBootstrapped()")]
     pub struct SubnetNotBootstrapped;
@@ -1315,7 +1544,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(
         name = "WithdrawExceedingCollateral",
@@ -1363,131 +1592,154 @@ pub mod subnet_actor_manager_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) =
-                <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded) = <AddressEmptyCode as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <AddressEmptyCode as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::AddressEmptyCode(decoded));
             }
-            if let Ok(decoded) =
-                <AddressInsufficientBalance as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <AddressInsufficientBalance as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::AddressInsufficientBalance(decoded));
             }
-            if let Ok(decoded) =
-                <AddressShouldBeValidator as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <AddressShouldBeValidator as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::AddressShouldBeValidator(decoded));
             }
-            if let Ok(decoded) = <CannotReleaseZero as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <CannotReleaseZero as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CannotReleaseZero(decoded));
             }
-            if let Ok(decoded) = <CollateralIsZero as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <CollateralIsZero as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CollateralIsZero(decoded));
             }
-            if let Ok(decoded) =
-                <DuplicatedGenesisValidator as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <DuplicatedGenesisValidator as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::DuplicatedGenesisValidator(decoded));
             }
-            if let Ok(decoded) = <EmptyAddress as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <EmptyAddress as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::EmptyAddress(decoded));
             }
-            if let Ok(decoded) = <EnforcedPause as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <EnforcedPause as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::EnforcedPause(decoded));
             }
-            if let Ok(decoded) = <ExpectedPause as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ExpectedPause as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ExpectedPause(decoded));
             }
-            if let Ok(decoded) = <FailedInnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <FailedInnerCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::FailedInnerCall(decoded));
             }
-            if let Ok(decoded) =
-                <InvalidFederationPayload as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <InvalidFederationPayload as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidFederationPayload(decoded));
             }
-            if let Ok(decoded) =
-                <InvalidPublicKeyLength as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <InvalidPublicKeyLength as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidPublicKeyLength(decoded));
             }
-            if let Ok(decoded) = <MethodNotAllowed as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <MethodNotAllowed as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::MethodNotAllowed(decoded));
             }
-            if let Ok(decoded) =
-                <NotAllValidatorsHaveLeft as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <NotAllValidatorsHaveLeft as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotAllValidatorsHaveLeft(decoded));
             }
-            if let Ok(decoded) = <NotEnoughBalance as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <NotEnoughBalance as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotEnoughBalance(decoded));
             }
-            if let Ok(decoded) =
-                <NotEnoughCollateral as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <NotEnoughCollateral as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotEnoughCollateral(decoded));
             }
-            if let Ok(decoded) = <NotEnoughFunds as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NotEnoughFunds as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotEnoughFunds(decoded));
             }
-            if let Ok(decoded) =
-                <NotEnoughGenesisValidators as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <NotEnoughGenesisValidators as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotEnoughGenesisValidators(decoded));
             }
-            if let Ok(decoded) = <NotOwner as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NotOwner as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotOwner(decoded));
             }
-            if let Ok(decoded) =
-                <NotOwnerOfPublicKey as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <NotOwnerOfPublicKey as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotOwnerOfPublicKey(decoded));
             }
-            if let Ok(decoded) = <NotValidator as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NotValidator as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotValidator(decoded));
             }
-            if let Ok(decoded) =
-                <PQDoesNotContainAddress as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <PQDoesNotContainAddress as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::PQDoesNotContainAddress(decoded));
             }
-            if let Ok(decoded) = <PQEmpty as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <PQEmpty as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::PQEmpty(decoded));
             }
-            if let Ok(decoded) = <ReentrancyError as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ReentrancyError as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ReentrancyError(decoded));
             }
-            if let Ok(decoded) =
-                <SafeERC20FailedOperation as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <SafeERC20FailedOperation as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::SafeERC20FailedOperation(decoded));
             }
-            if let Ok(decoded) =
-                <SubnetAlreadyBootstrapped as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <SubnetAlreadyBootstrapped as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::SubnetAlreadyBootstrapped(decoded));
             }
-            if let Ok(decoded) =
-                <SubnetAlreadyKilled as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <SubnetAlreadyKilled as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::SubnetAlreadyKilled(decoded));
             }
-            if let Ok(decoded) =
-                <SubnetNotBootstrapped as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <SubnetNotBootstrapped as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::SubnetNotBootstrapped(decoded));
             }
-            if let Ok(decoded) =
-                <WithdrawExceedingCollateral as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <WithdrawExceedingCollateral as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::WithdrawExceedingCollateral(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -1496,50 +1748,76 @@ pub mod subnet_actor_manager_facet {
     impl ::ethers::core::abi::AbiEncode for SubnetActorManagerFacetErrors {
         fn encode(self) -> ::std::vec::Vec<u8> {
             match self {
-                Self::AddressEmptyCode(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::AddressEmptyCode(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::AddressInsufficientBalance(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::AddressShouldBeValidator(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::CannotReleaseZero(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::CollateralIsZero(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::CannotReleaseZero(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::CollateralIsZero(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::DuplicatedGenesisValidator(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::EmptyAddress(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::EnforcedPause(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ExpectedPause(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::FailedInnerCall(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::EmptyAddress(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::EnforcedPause(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::ExpectedPause(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::FailedInnerCall(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::InvalidFederationPayload(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::InvalidPublicKeyLength(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::MethodNotAllowed(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::MethodNotAllowed(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::NotAllValidatorsHaveLeft(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::NotEnoughBalance(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::NotEnoughBalance(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::NotEnoughCollateral(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::NotEnoughFunds(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::NotEnoughFunds(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::NotEnoughGenesisValidators(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::NotOwner(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::NotOwner(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::NotOwnerOfPublicKey(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::NotValidator(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::NotValidator(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::PQDoesNotContainAddress(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::PQEmpty(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ReentrancyError(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::ReentrancyError(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::SafeERC20FailedOperation(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1563,116 +1841,112 @@ pub mod subnet_actor_manager_facet {
         fn valid_selector(selector: [u8; 4]) -> bool {
             match selector {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
-                _ if selector == <AddressEmptyCode as ::ethers::contract::EthError>::selector() => {
+                _ if selector
+                    == <AddressEmptyCode as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <AddressInsufficientBalance as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <AddressInsufficientBalance as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <AddressShouldBeValidator as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <AddressShouldBeValidator as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <CannotReleaseZero as ::ethers::contract::EthError>::selector() =>
-                {
-                    true
-                }
-                _ if selector == <CollateralIsZero as ::ethers::contract::EthError>::selector() => {
+                    == <CannotReleaseZero as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <DuplicatedGenesisValidator as ::ethers::contract::EthError>::selector() =>
-                {
-                    true
-                }
-                _ if selector == <EmptyAddress as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <EnforcedPause as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector == <ExpectedPause as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector == <FailedInnerCall as ::ethers::contract::EthError>::selector() => {
+                    == <CollateralIsZero as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <InvalidFederationPayload as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <DuplicatedGenesisValidator as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <InvalidPublicKeyLength as ::ethers::contract::EthError>::selector() =>
-                {
-                    true
-                }
-                _ if selector == <MethodNotAllowed as ::ethers::contract::EthError>::selector() => {
+                    == <EmptyAddress as ::ethers::contract::EthError>::selector() => true,
+                _ if selector
+                    == <EnforcedPause as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <NotAllValidatorsHaveLeft as ::ethers::contract::EthError>::selector() =>
-                {
-                    true
-                }
-                _ if selector == <NotEnoughBalance as ::ethers::contract::EthError>::selector() => {
+                    == <ExpectedPause as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <NotEnoughCollateral as ::ethers::contract::EthError>::selector() =>
-                {
-                    true
-                }
-                _ if selector == <NotEnoughFunds as ::ethers::contract::EthError>::selector() => {
+                    == <FailedInnerCall as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <NotEnoughGenesisValidators as ::ethers::contract::EthError>::selector() =>
-                {
-                    true
-                }
-                _ if selector == <NotOwner as ::ethers::contract::EthError>::selector() => true,
-                _ if selector
-                    == <NotOwnerOfPublicKey as ::ethers::contract::EthError>::selector() =>
-                {
-                    true
-                }
-                _ if selector == <NotValidator as ::ethers::contract::EthError>::selector() => true,
-                _ if selector
-                    == <PQDoesNotContainAddress as ::ethers::contract::EthError>::selector() =>
-                {
-                    true
-                }
-                _ if selector == <PQEmpty as ::ethers::contract::EthError>::selector() => true,
-                _ if selector == <ReentrancyError as ::ethers::contract::EthError>::selector() => {
+                    == <InvalidFederationPayload as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <SafeERC20FailedOperation as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <InvalidPublicKeyLength as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <SubnetAlreadyBootstrapped as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <MethodNotAllowed as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <SubnetAlreadyKilled as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <NotAllValidatorsHaveLeft as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <SubnetNotBootstrapped as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <NotEnoughBalance as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <WithdrawExceedingCollateral as ::ethers::contract::EthError>::selector(
-                    ) =>
-                {
+                    == <NotEnoughCollateral as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <NotEnoughFunds as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <NotEnoughGenesisValidators as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <NotOwner as ::ethers::contract::EthError>::selector() => true,
+                _ if selector
+                    == <NotOwnerOfPublicKey as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <NotValidator as ::ethers::contract::EthError>::selector() => true,
+                _ if selector
+                    == <PQDoesNotContainAddress as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <PQEmpty as ::ethers::contract::EthError>::selector() => true,
+                _ if selector
+                    == <ReentrancyError as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <SafeERC20FailedOperation as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <SubnetAlreadyBootstrapped as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <SubnetAlreadyKilled as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <SubnetNotBootstrapped as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <WithdrawExceedingCollateral as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ => false,
@@ -1683,34 +1957,64 @@ pub mod subnet_actor_manager_facet {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
                 Self::AddressEmptyCode(element) => ::core::fmt::Display::fmt(element, f),
-                Self::AddressInsufficientBalance(element) => ::core::fmt::Display::fmt(element, f),
-                Self::AddressShouldBeValidator(element) => ::core::fmt::Display::fmt(element, f),
+                Self::AddressInsufficientBalance(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::AddressShouldBeValidator(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::CannotReleaseZero(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CollateralIsZero(element) => ::core::fmt::Display::fmt(element, f),
-                Self::DuplicatedGenesisValidator(element) => ::core::fmt::Display::fmt(element, f),
+                Self::DuplicatedGenesisValidator(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::EmptyAddress(element) => ::core::fmt::Display::fmt(element, f),
                 Self::EnforcedPause(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ExpectedPause(element) => ::core::fmt::Display::fmt(element, f),
                 Self::FailedInnerCall(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidFederationPayload(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidPublicKeyLength(element) => ::core::fmt::Display::fmt(element, f),
+                Self::InvalidFederationPayload(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::InvalidPublicKeyLength(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::MethodNotAllowed(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NotAllValidatorsHaveLeft(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NotAllValidatorsHaveLeft(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::NotEnoughBalance(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NotEnoughCollateral(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NotEnoughCollateral(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::NotEnoughFunds(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NotEnoughGenesisValidators(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NotEnoughGenesisValidators(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::NotOwner(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NotOwnerOfPublicKey(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NotOwnerOfPublicKey(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::NotValidator(element) => ::core::fmt::Display::fmt(element, f),
-                Self::PQDoesNotContainAddress(element) => ::core::fmt::Display::fmt(element, f),
+                Self::PQDoesNotContainAddress(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::PQEmpty(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ReentrancyError(element) => ::core::fmt::Display::fmt(element, f),
-                Self::SafeERC20FailedOperation(element) => ::core::fmt::Display::fmt(element, f),
-                Self::SubnetAlreadyBootstrapped(element) => ::core::fmt::Display::fmt(element, f),
-                Self::SubnetAlreadyKilled(element) => ::core::fmt::Display::fmt(element, f),
-                Self::SubnetNotBootstrapped(element) => ::core::fmt::Display::fmt(element, f),
-                Self::WithdrawExceedingCollateral(element) => ::core::fmt::Display::fmt(element, f),
+                Self::SafeERC20FailedOperation(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::SubnetAlreadyBootstrapped(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::SubnetAlreadyKilled(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::SubnetNotBootstrapped(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::WithdrawExceedingCollateral(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
             }
         }
@@ -1725,12 +2029,14 @@ pub mod subnet_actor_manager_facet {
             Self::AddressEmptyCode(value)
         }
     }
-    impl ::core::convert::From<AddressInsufficientBalance> for SubnetActorManagerFacetErrors {
+    impl ::core::convert::From<AddressInsufficientBalance>
+    for SubnetActorManagerFacetErrors {
         fn from(value: AddressInsufficientBalance) -> Self {
             Self::AddressInsufficientBalance(value)
         }
     }
-    impl ::core::convert::From<AddressShouldBeValidator> for SubnetActorManagerFacetErrors {
+    impl ::core::convert::From<AddressShouldBeValidator>
+    for SubnetActorManagerFacetErrors {
         fn from(value: AddressShouldBeValidator) -> Self {
             Self::AddressShouldBeValidator(value)
         }
@@ -1745,7 +2051,8 @@ pub mod subnet_actor_manager_facet {
             Self::CollateralIsZero(value)
         }
     }
-    impl ::core::convert::From<DuplicatedGenesisValidator> for SubnetActorManagerFacetErrors {
+    impl ::core::convert::From<DuplicatedGenesisValidator>
+    for SubnetActorManagerFacetErrors {
         fn from(value: DuplicatedGenesisValidator) -> Self {
             Self::DuplicatedGenesisValidator(value)
         }
@@ -1770,12 +2077,14 @@ pub mod subnet_actor_manager_facet {
             Self::FailedInnerCall(value)
         }
     }
-    impl ::core::convert::From<InvalidFederationPayload> for SubnetActorManagerFacetErrors {
+    impl ::core::convert::From<InvalidFederationPayload>
+    for SubnetActorManagerFacetErrors {
         fn from(value: InvalidFederationPayload) -> Self {
             Self::InvalidFederationPayload(value)
         }
     }
-    impl ::core::convert::From<InvalidPublicKeyLength> for SubnetActorManagerFacetErrors {
+    impl ::core::convert::From<InvalidPublicKeyLength>
+    for SubnetActorManagerFacetErrors {
         fn from(value: InvalidPublicKeyLength) -> Self {
             Self::InvalidPublicKeyLength(value)
         }
@@ -1785,7 +2094,8 @@ pub mod subnet_actor_manager_facet {
             Self::MethodNotAllowed(value)
         }
     }
-    impl ::core::convert::From<NotAllValidatorsHaveLeft> for SubnetActorManagerFacetErrors {
+    impl ::core::convert::From<NotAllValidatorsHaveLeft>
+    for SubnetActorManagerFacetErrors {
         fn from(value: NotAllValidatorsHaveLeft) -> Self {
             Self::NotAllValidatorsHaveLeft(value)
         }
@@ -1805,7 +2115,8 @@ pub mod subnet_actor_manager_facet {
             Self::NotEnoughFunds(value)
         }
     }
-    impl ::core::convert::From<NotEnoughGenesisValidators> for SubnetActorManagerFacetErrors {
+    impl ::core::convert::From<NotEnoughGenesisValidators>
+    for SubnetActorManagerFacetErrors {
         fn from(value: NotEnoughGenesisValidators) -> Self {
             Self::NotEnoughGenesisValidators(value)
         }
@@ -1825,7 +2136,8 @@ pub mod subnet_actor_manager_facet {
             Self::NotValidator(value)
         }
     }
-    impl ::core::convert::From<PQDoesNotContainAddress> for SubnetActorManagerFacetErrors {
+    impl ::core::convert::From<PQDoesNotContainAddress>
+    for SubnetActorManagerFacetErrors {
         fn from(value: PQDoesNotContainAddress) -> Self {
             Self::PQDoesNotContainAddress(value)
         }
@@ -1840,12 +2152,14 @@ pub mod subnet_actor_manager_facet {
             Self::ReentrancyError(value)
         }
     }
-    impl ::core::convert::From<SafeERC20FailedOperation> for SubnetActorManagerFacetErrors {
+    impl ::core::convert::From<SafeERC20FailedOperation>
+    for SubnetActorManagerFacetErrors {
         fn from(value: SafeERC20FailedOperation) -> Self {
             Self::SafeERC20FailedOperation(value)
         }
     }
-    impl ::core::convert::From<SubnetAlreadyBootstrapped> for SubnetActorManagerFacetErrors {
+    impl ::core::convert::From<SubnetAlreadyBootstrapped>
+    for SubnetActorManagerFacetErrors {
         fn from(value: SubnetAlreadyBootstrapped) -> Self {
             Self::SubnetAlreadyBootstrapped(value)
         }
@@ -1860,7 +2174,8 @@ pub mod subnet_actor_manager_facet {
             Self::SubnetNotBootstrapped(value)
         }
     }
-    impl ::core::convert::From<WithdrawExceedingCollateral> for SubnetActorManagerFacetErrors {
+    impl ::core::convert::From<WithdrawExceedingCollateral>
+    for SubnetActorManagerFacetErrors {
         fn from(value: WithdrawExceedingCollateral) -> Self {
             Self::WithdrawExceedingCollateral(value)
         }
@@ -1873,7 +2188,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(
         name = "ActiveValidatorCollateralUpdated",
@@ -1891,7 +2206,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(name = "ActiveValidatorLeft", abi = "ActiveValidatorLeft(address)")]
     pub struct ActiveValidatorLeftFilter {
@@ -1905,7 +2220,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(
         name = "ActiveValidatorReplaced",
@@ -1923,12 +2238,9 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
-    #[ethevent(
-        name = "NewActiveValidator",
-        abi = "NewActiveValidator(address,uint256)"
-    )]
+    #[ethevent(name = "NewActiveValidator", abi = "NewActiveValidator(address,uint256)")]
     pub struct NewActiveValidatorFilter {
         pub validator: ::ethers::core::types::Address,
         pub power: ::ethers::core::types::U256,
@@ -1941,7 +2253,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(name = "NewBootstrapNode", abi = "NewBootstrapNode(string,address)")]
     pub struct NewBootstrapNodeFilter {
@@ -1956,7 +2268,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(
         name = "NewStakingChangeRequest",
@@ -1976,7 +2288,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(
         name = "NewWaitingValidator",
@@ -1994,7 +2306,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(name = "Paused", abi = "Paused(address)")]
     pub struct PausedFilter {
@@ -2008,7 +2320,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(
         name = "SubnetBootstrapped",
@@ -2023,7 +2335,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(name = "Unpaused", abi = "Unpaused(address)")]
     pub struct UnpausedFilter {
@@ -2037,7 +2349,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(
         name = "ValidatorGaterUpdated",
@@ -2055,7 +2367,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(
         name = "WaitingValidatorCollateralUpdated",
@@ -2073,7 +2385,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(name = "WaitingValidatorLeft", abi = "WaitingValidatorLeft(address)")]
     pub struct WaitingValidatorLeftFilter {
@@ -2100,62 +2412,74 @@ pub mod subnet_actor_manager_facet {
         fn decode_log(
             log: &::ethers::core::abi::RawLog,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
-            if let Ok(decoded) = ActiveValidatorCollateralUpdatedFilter::decode_log(log) {
+            if let Ok(decoded) = ActiveValidatorCollateralUpdatedFilter::decode_log(
+                log,
+            ) {
                 return Ok(
-                    SubnetActorManagerFacetEvents::ActiveValidatorCollateralUpdatedFilter(decoded),
+                    SubnetActorManagerFacetEvents::ActiveValidatorCollateralUpdatedFilter(
+                        decoded,
+                    ),
                 );
             }
             if let Ok(decoded) = ActiveValidatorLeftFilter::decode_log(log) {
-                return Ok(SubnetActorManagerFacetEvents::ActiveValidatorLeftFilter(
-                    decoded,
-                ));
+                return Ok(
+                    SubnetActorManagerFacetEvents::ActiveValidatorLeftFilter(decoded),
+                );
             }
             if let Ok(decoded) = ActiveValidatorReplacedFilter::decode_log(log) {
-                return Ok(SubnetActorManagerFacetEvents::ActiveValidatorReplacedFilter(decoded));
+                return Ok(
+                    SubnetActorManagerFacetEvents::ActiveValidatorReplacedFilter(decoded),
+                );
             }
             if let Ok(decoded) = NewActiveValidatorFilter::decode_log(log) {
-                return Ok(SubnetActorManagerFacetEvents::NewActiveValidatorFilter(
-                    decoded,
-                ));
+                return Ok(
+                    SubnetActorManagerFacetEvents::NewActiveValidatorFilter(decoded),
+                );
             }
             if let Ok(decoded) = NewBootstrapNodeFilter::decode_log(log) {
-                return Ok(SubnetActorManagerFacetEvents::NewBootstrapNodeFilter(
-                    decoded,
-                ));
+                return Ok(
+                    SubnetActorManagerFacetEvents::NewBootstrapNodeFilter(decoded),
+                );
             }
             if let Ok(decoded) = NewStakingChangeRequestFilter::decode_log(log) {
-                return Ok(SubnetActorManagerFacetEvents::NewStakingChangeRequestFilter(decoded));
+                return Ok(
+                    SubnetActorManagerFacetEvents::NewStakingChangeRequestFilter(decoded),
+                );
             }
             if let Ok(decoded) = NewWaitingValidatorFilter::decode_log(log) {
-                return Ok(SubnetActorManagerFacetEvents::NewWaitingValidatorFilter(
-                    decoded,
-                ));
+                return Ok(
+                    SubnetActorManagerFacetEvents::NewWaitingValidatorFilter(decoded),
+                );
             }
             if let Ok(decoded) = PausedFilter::decode_log(log) {
                 return Ok(SubnetActorManagerFacetEvents::PausedFilter(decoded));
             }
             if let Ok(decoded) = SubnetBootstrappedFilter::decode_log(log) {
-                return Ok(SubnetActorManagerFacetEvents::SubnetBootstrappedFilter(
-                    decoded,
-                ));
+                return Ok(
+                    SubnetActorManagerFacetEvents::SubnetBootstrappedFilter(decoded),
+                );
             }
             if let Ok(decoded) = UnpausedFilter::decode_log(log) {
                 return Ok(SubnetActorManagerFacetEvents::UnpausedFilter(decoded));
             }
             if let Ok(decoded) = ValidatorGaterUpdatedFilter::decode_log(log) {
-                return Ok(SubnetActorManagerFacetEvents::ValidatorGaterUpdatedFilter(
-                    decoded,
-                ));
-            }
-            if let Ok(decoded) = WaitingValidatorCollateralUpdatedFilter::decode_log(log) {
                 return Ok(
-                    SubnetActorManagerFacetEvents::WaitingValidatorCollateralUpdatedFilter(decoded),
+                    SubnetActorManagerFacetEvents::ValidatorGaterUpdatedFilter(decoded),
+                );
+            }
+            if let Ok(decoded) = WaitingValidatorCollateralUpdatedFilter::decode_log(
+                log,
+            ) {
+                return Ok(
+                    SubnetActorManagerFacetEvents::WaitingValidatorCollateralUpdatedFilter(
+                        decoded,
+                    ),
                 );
             }
             if let Ok(decoded) = WaitingValidatorLeftFilter::decode_log(log) {
-                return Ok(SubnetActorManagerFacetEvents::WaitingValidatorLeftFilter(
-                    decoded,
-                ));
+                return Ok(
+                    SubnetActorManagerFacetEvents::WaitingValidatorLeftFilter(decoded),
+                );
             }
             Err(::ethers::core::abi::Error::InvalidData)
         }
@@ -2166,60 +2490,79 @@ pub mod subnet_actor_manager_facet {
                 Self::ActiveValidatorCollateralUpdatedFilter(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
-                Self::ActiveValidatorLeftFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::ActiveValidatorLeftFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::ActiveValidatorReplacedFilter(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
-                Self::NewActiveValidatorFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NewBootstrapNodeFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NewActiveValidatorFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::NewBootstrapNodeFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::NewStakingChangeRequestFilter(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
-                Self::NewWaitingValidatorFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NewWaitingValidatorFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::PausedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::SubnetBootstrappedFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::SubnetBootstrappedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::UnpausedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ValidatorGaterUpdatedFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::ValidatorGaterUpdatedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::WaitingValidatorCollateralUpdatedFilter(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
-                Self::WaitingValidatorLeftFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::WaitingValidatorLeftFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
             }
         }
     }
     impl ::core::convert::From<ActiveValidatorCollateralUpdatedFilter>
-        for SubnetActorManagerFacetEvents
-    {
+    for SubnetActorManagerFacetEvents {
         fn from(value: ActiveValidatorCollateralUpdatedFilter) -> Self {
             Self::ActiveValidatorCollateralUpdatedFilter(value)
         }
     }
-    impl ::core::convert::From<ActiveValidatorLeftFilter> for SubnetActorManagerFacetEvents {
+    impl ::core::convert::From<ActiveValidatorLeftFilter>
+    for SubnetActorManagerFacetEvents {
         fn from(value: ActiveValidatorLeftFilter) -> Self {
             Self::ActiveValidatorLeftFilter(value)
         }
     }
-    impl ::core::convert::From<ActiveValidatorReplacedFilter> for SubnetActorManagerFacetEvents {
+    impl ::core::convert::From<ActiveValidatorReplacedFilter>
+    for SubnetActorManagerFacetEvents {
         fn from(value: ActiveValidatorReplacedFilter) -> Self {
             Self::ActiveValidatorReplacedFilter(value)
         }
     }
-    impl ::core::convert::From<NewActiveValidatorFilter> for SubnetActorManagerFacetEvents {
+    impl ::core::convert::From<NewActiveValidatorFilter>
+    for SubnetActorManagerFacetEvents {
         fn from(value: NewActiveValidatorFilter) -> Self {
             Self::NewActiveValidatorFilter(value)
         }
     }
-    impl ::core::convert::From<NewBootstrapNodeFilter> for SubnetActorManagerFacetEvents {
+    impl ::core::convert::From<NewBootstrapNodeFilter>
+    for SubnetActorManagerFacetEvents {
         fn from(value: NewBootstrapNodeFilter) -> Self {
             Self::NewBootstrapNodeFilter(value)
         }
     }
-    impl ::core::convert::From<NewStakingChangeRequestFilter> for SubnetActorManagerFacetEvents {
+    impl ::core::convert::From<NewStakingChangeRequestFilter>
+    for SubnetActorManagerFacetEvents {
         fn from(value: NewStakingChangeRequestFilter) -> Self {
             Self::NewStakingChangeRequestFilter(value)
         }
     }
-    impl ::core::convert::From<NewWaitingValidatorFilter> for SubnetActorManagerFacetEvents {
+    impl ::core::convert::From<NewWaitingValidatorFilter>
+    for SubnetActorManagerFacetEvents {
         fn from(value: NewWaitingValidatorFilter) -> Self {
             Self::NewWaitingValidatorFilter(value)
         }
@@ -2229,7 +2572,8 @@ pub mod subnet_actor_manager_facet {
             Self::PausedFilter(value)
         }
     }
-    impl ::core::convert::From<SubnetBootstrappedFilter> for SubnetActorManagerFacetEvents {
+    impl ::core::convert::From<SubnetBootstrappedFilter>
+    for SubnetActorManagerFacetEvents {
         fn from(value: SubnetBootstrappedFilter) -> Self {
             Self::SubnetBootstrappedFilter(value)
         }
@@ -2239,19 +2583,20 @@ pub mod subnet_actor_manager_facet {
             Self::UnpausedFilter(value)
         }
     }
-    impl ::core::convert::From<ValidatorGaterUpdatedFilter> for SubnetActorManagerFacetEvents {
+    impl ::core::convert::From<ValidatorGaterUpdatedFilter>
+    for SubnetActorManagerFacetEvents {
         fn from(value: ValidatorGaterUpdatedFilter) -> Self {
             Self::ValidatorGaterUpdatedFilter(value)
         }
     }
     impl ::core::convert::From<WaitingValidatorCollateralUpdatedFilter>
-        for SubnetActorManagerFacetEvents
-    {
+    for SubnetActorManagerFacetEvents {
         fn from(value: WaitingValidatorCollateralUpdatedFilter) -> Self {
             Self::WaitingValidatorCollateralUpdatedFilter(value)
         }
     }
-    impl ::core::convert::From<WaitingValidatorLeftFilter> for SubnetActorManagerFacetEvents {
+    impl ::core::convert::From<WaitingValidatorLeftFilter>
+    for SubnetActorManagerFacetEvents {
         fn from(value: WaitingValidatorLeftFilter) -> Self {
             Self::WaitingValidatorLeftFilter(value)
         }
@@ -2265,7 +2610,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethcall(name = "addBootstrapNode", abi = "addBootstrapNode(string)")]
     pub struct AddBootstrapNodeCall {
@@ -2280,7 +2625,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethcall(name = "join", abi = "join(bytes,uint256)")]
     pub struct JoinCall {
@@ -2296,7 +2641,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethcall(name = "kill", abi = "kill()")]
     pub struct KillCall;
@@ -2309,7 +2654,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethcall(name = "leave", abi = "leave()")]
     pub struct LeaveCall;
@@ -2322,7 +2667,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethcall(name = "preFund", abi = "preFund(uint256)")]
     pub struct PreFundCall {
@@ -2337,7 +2682,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethcall(name = "preRelease", abi = "preRelease(uint256)")]
     pub struct PreReleaseCall {
@@ -2352,7 +2697,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethcall(
         name = "setFederatedPower",
@@ -2372,7 +2717,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethcall(name = "setValidatorGater", abi = "setValidatorGater(address)")]
     pub struct SetValidatorGaterCall {
@@ -2387,7 +2732,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethcall(name = "stake", abi = "stake(uint256)")]
     pub struct StakeCall {
@@ -2402,7 +2747,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethcall(name = "unstake", abi = "unstake(uint256)")]
     pub struct UnstakeCall {
@@ -2427,40 +2772,54 @@ pub mod subnet_actor_manager_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) =
-                <AddBootstrapNodeCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <AddBootstrapNodeCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::AddBootstrapNode(decoded));
             }
-            if let Ok(decoded) = <JoinCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <JoinCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::Join(decoded));
             }
-            if let Ok(decoded) = <KillCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <KillCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::Kill(decoded));
             }
-            if let Ok(decoded) = <LeaveCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <LeaveCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::Leave(decoded));
             }
-            if let Ok(decoded) = <PreFundCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <PreFundCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::PreFund(decoded));
             }
-            if let Ok(decoded) = <PreReleaseCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <PreReleaseCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::PreRelease(decoded));
             }
-            if let Ok(decoded) =
-                <SetFederatedPowerCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <SetFederatedPowerCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::SetFederatedPower(decoded));
             }
-            if let Ok(decoded) =
-                <SetValidatorGaterCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <SetValidatorGaterCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::SetValidatorGater(decoded));
             }
-            if let Ok(decoded) = <StakeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <StakeCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::Stake(decoded));
             }
-            if let Ok(decoded) = <UnstakeCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <UnstakeCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::Unstake(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -2469,14 +2828,22 @@ pub mod subnet_actor_manager_facet {
     impl ::ethers::core::abi::AbiEncode for SubnetActorManagerFacetCalls {
         fn encode(self) -> Vec<u8> {
             match self {
-                Self::AddBootstrapNode(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::AddBootstrapNode(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::Join(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Kill(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Leave(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::PreFund(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::PreRelease(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::SetFederatedPower(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::SetValidatorGater(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::PreRelease(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::SetFederatedPower(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::SetValidatorGater(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::Stake(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Unstake(element) => ::ethers::core::abi::AbiEncode::encode(element),
             }
@@ -2557,7 +2924,7 @@ pub mod subnet_actor_manager_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct Validator {
         pub weight: ::ethers::core::types::U256,

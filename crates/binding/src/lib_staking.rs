@@ -7,7 +7,7 @@ pub use lib_staking::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types
+    non_camel_case_types,
 )]
 pub mod lib_staking {
     #[allow(deprecated)]
@@ -18,34 +18,44 @@ pub mod lib_staking {
             events: ::core::convert::From::from([
                 (
                     ::std::borrow::ToOwned::to_owned("CollateralClaimed"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("CollateralClaimed"),
-                        inputs: ::std::vec![
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("validator"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                                indexed: false,
-                            },
-                            ::ethers::core::abi::ethabi::EventParam {
-                                name: ::std::borrow::ToOwned::to_owned("amount"),
-                                kind: ::ethers::core::abi::ethabi::ParamType::Uint(256usize,),
-                                indexed: false,
-                            },
-                        ],
-                        anonymous: false,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned("CollateralClaimed"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("validator"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    indexed: false,
+                                },
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("amount"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("ConfigurationNumberConfirmed"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("ConfigurationNumberConfirmed",),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::EventParam {
-                            name: ::std::borrow::ToOwned::to_owned("number"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                            indexed: false,
-                        },],
-                        anonymous: false,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "ConfigurationNumberConfirmed",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("number"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
                 ),
             ]),
             errors: ::std::collections::BTreeMap::new(),
@@ -54,18 +64,21 @@ pub mod lib_staking {
         }
     }
     ///The parsed JSON ABI of the contract.
-    pub static LIBSTAKING_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
-        ::ethers::contract::Lazy::new(__abi);
+    pub static LIBSTAKING_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> = ::ethers::contract::Lazy::new(
+        __abi,
+    );
     #[rustfmt::skip]
     const __BYTECODE: &[u8] = b"`\x80\x80`@R4`\x17W`9\x90\x81`\x1C\x8290\x81PP\xF3[_\x80\xFD\xFE_\x80\xFD\xFE\xA2dipfsX\"\x12 s\xC2!JR 6b>\x8Bl\x13fiY\x1D2\xDC\xDB\xAF\xCF\xE1\x85\x1F\xA22j\x1C\xA1\xB4\xF9\xD1dsolcC\0\x08\x17\x003";
     /// The bytecode of the contract.
-    pub static LIBSTAKING_BYTECODE: ::ethers::core::types::Bytes =
-        ::ethers::core::types::Bytes::from_static(__BYTECODE);
+    pub static LIBSTAKING_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
+        __BYTECODE,
+    );
     #[rustfmt::skip]
     const __DEPLOYED_BYTECODE: &[u8] = b"_\x80\xFD\xFE\xA2dipfsX\"\x12 s\xC2!JR 6b>\x8Bl\x13fiY\x1D2\xDC\xDB\xAF\xCF\xE1\x85\x1F\xA22j\x1C\xA1\xB4\xF9\xD1dsolcC\0\x08\x17\x003";
     /// The deployed bytecode of the contract.
-    pub static LIBSTAKING_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
-        ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
+    pub static LIBSTAKING_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
+        __DEPLOYED_BYTECODE,
+    );
     pub struct LibStaking<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for LibStaking<M> {
         fn clone(&self) -> Self {
@@ -85,9 +98,7 @@ pub mod lib_staking {
     }
     impl<M> ::core::fmt::Debug for LibStaking<M> {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-            f.debug_tuple(::core::stringify!(LibStaking))
-                .field(&self.address())
-                .finish()
+            f.debug_tuple(::core::stringify!(LibStaking)).field(&self.address()).finish()
         }
     }
     impl<M: ::ethers::providers::Middleware> LibStaking<M> {
@@ -97,11 +108,13 @@ pub mod lib_staking {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(::ethers::contract::Contract::new(
-                address.into(),
-                LIBSTAKING_ABI.clone(),
-                client,
-            ))
+            Self(
+                ::ethers::contract::Contract::new(
+                    address.into(),
+                    LIBSTAKING_ABI.clone(),
+                    client,
+                ),
+            )
         }
         /// Constructs the general purpose `Deployer` instance based on the provided constructor arguments and sends it.
         /// Returns a new instance of a deployer that returns an instance of this contract after sending the transaction
@@ -145,8 +158,11 @@ pub mod lib_staking {
         ///Gets the contract's `CollateralClaimed` event
         pub fn collateral_claimed_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, CollateralClaimedFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            CollateralClaimedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `ConfigurationNumberConfirmed` event
@@ -162,12 +178,16 @@ pub mod lib_staking {
         /// Returns an `Event` builder for all the events of this contract.
         pub fn events(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, LibStakingEvents> {
-            self.0
-                .event_with_filter(::core::default::Default::default())
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            LibStakingEvents,
+        > {
+            self.0.event_with_filter(::core::default::Default::default())
         }
     }
-    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>> for LibStaking<M> {
+    impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
+    for LibStaking<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
@@ -180,7 +200,7 @@ pub mod lib_staking {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(name = "CollateralClaimed", abi = "CollateralClaimed(address,uint256)")]
     pub struct CollateralClaimedFilter {
@@ -195,7 +215,7 @@ pub mod lib_staking {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(
         name = "ConfigurationNumberConfirmed",
@@ -218,9 +238,7 @@ pub mod lib_staking {
                 return Ok(LibStakingEvents::CollateralClaimedFilter(decoded));
             }
             if let Ok(decoded) = ConfigurationNumberConfirmedFilter::decode_log(log) {
-                return Ok(LibStakingEvents::ConfigurationNumberConfirmedFilter(
-                    decoded,
-                ));
+                return Ok(LibStakingEvents::ConfigurationNumberConfirmedFilter(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData)
         }
@@ -228,7 +246,9 @@ pub mod lib_staking {
     impl ::core::fmt::Display for LibStakingEvents {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::CollateralClaimedFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::CollateralClaimedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::ConfigurationNumberConfirmedFilter(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }

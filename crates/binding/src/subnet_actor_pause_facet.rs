@@ -7,7 +7,7 @@ pub use subnet_actor_pause_facet::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types
+    non_camel_case_types,
 )]
 pub mod subnet_actor_pause_facet {
     #[allow(deprecated)]
@@ -17,88 +17,110 @@ pub mod subnet_actor_pause_facet {
             functions: ::core::convert::From::from([
                 (
                     ::std::borrow::ToOwned::to_owned("pause"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("pause"),
-                        inputs: ::std::vec![],
-                        outputs: ::std::vec![],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("pause"),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("paused"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("paused"),
-                        inputs: ::std::vec![],
-                        outputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::string::String::new(),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Bool,
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("bool"),
-                            ),
-                        },],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("paused"),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Bool,
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("bool"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("unpause"),
-                    ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("unpause"),
-                        inputs: ::std::vec![],
-                        outputs: ::std::vec![],
-                        constant: ::core::option::Option::None,
-                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("unpause"),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                        },
+                    ],
                 ),
             ]),
             events: ::core::convert::From::from([
                 (
                     ::std::borrow::ToOwned::to_owned("Paused"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("Paused"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::EventParam {
-                            name: ::std::borrow::ToOwned::to_owned("account"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                            indexed: false,
-                        },],
-                        anonymous: false,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned("Paused"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("account"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("Unpaused"),
-                    ::std::vec![::ethers::core::abi::ethabi::Event {
-                        name: ::std::borrow::ToOwned::to_owned("Unpaused"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::EventParam {
-                            name: ::std::borrow::ToOwned::to_owned("account"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
-                            indexed: false,
-                        },],
-                        anonymous: false,
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned("Unpaused"),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("account"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
                 ),
             ]),
             errors: ::core::convert::From::from([
                 (
                     ::std::borrow::ToOwned::to_owned("EnforcedPause"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("EnforcedPause"),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("EnforcedPause"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("ExpectedPause"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("ExpectedPause"),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("ExpectedPause"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
                 (
                     ::std::borrow::ToOwned::to_owned("NotOwner"),
-                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("NotOwner"),
-                        inputs: ::std::vec![],
-                    },],
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::AbiError {
+                            name: ::std::borrow::ToOwned::to_owned("NotOwner"),
+                            inputs: ::std::vec![],
+                        },
+                    ],
                 ),
             ]),
             receive: false,
@@ -106,18 +128,21 @@ pub mod subnet_actor_pause_facet {
         }
     }
     ///The parsed JSON ABI of the contract.
-    pub static SUBNETACTORPAUSEFACET_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
-        ::ethers::contract::Lazy::new(__abi);
+    pub static SUBNETACTORPAUSEFACET_ABI: ::ethers::contract::Lazy<
+        ::ethers::core::abi::Abi,
+    > = ::ethers::contract::Lazy::new(__abi);
     #[rustfmt::skip]
     const __BYTECODE: &[u8] = b"`\x80\x80`@R4a\0\x16Wa\x02\r\x90\x81a\0\x1B\x829\xF3[_\x80\xFD\xFE`@`\x80\x81R`\x046\x10\x15a\0\x12W_\x80\xFD[_5`\xE0\x1C\x80c?K\xA8:\x14a\x01\nW\x80c\\\x97Z\xBB\x14a\0\xC8Wc\x84V\xCBY\x14a\0;W_\x80\xFD[4a\0\xC4W_6`\x03\x19\x01\x12a\0\xC4Wa\0Sa\x01\x92V[\x7F\xC4Q\xC9B\x9C'\xDBh\xF2\x86\xAB\x8Ah\xF3\x11\xF1\xDC\xCA\xB7\x03\xBA\x94#\xAE\xD2\x9C\xD3\x97\xAEc\xF8c\x80T`\xFF\x81\x16a\0\xB3W`\xFF\x19\x16`\x01\x17\x90UQ3\x81R\x7Fb\xE7\x8C\xEA\x01\xBE\xE3 \xCDNB\x02p\xB5\xEAt\0\r\x11\xB0\xC9\xF7GT\xEB\xDB\xFCTK\x05\xA2X\x90` \x90\xA1\0[\x82Qc\xD9<\x06e`\xE0\x1B\x81R`\x04\x90\xFD[_\x80\xFD[P4a\0\xC4W_6`\x03\x19\x01\x12a\0\xC4W` \x90`\xFF\x7F\xC4Q\xC9B\x9C'\xDBh\xF2\x86\xAB\x8Ah\xF3\x11\xF1\xDC\xCA\xB7\x03\xBA\x94#\xAE\xD2\x9C\xD3\x97\xAEc\xF8cT\x16\x90Q\x90\x15\x15\x81R\xF3[P4a\0\xC4W_6`\x03\x19\x01\x12a\0\xC4Wa\x01#a\x01\x92V[\x7F\xC4Q\xC9B\x9C'\xDBh\xF2\x86\xAB\x8Ah\xF3\x11\xF1\xDC\xCA\xB7\x03\xBA\x94#\xAE\xD2\x9C\xD3\x97\xAEc\xF8c\x80T`\xFF\x81\x16\x15a\x01\x81W`\xFF\x19\x16\x90UQ3\x81R\x7F]\xB9\xEE\nI[\xF2\xE6\xFF\x9C\x91\xA7\x83L\x1B\xA4\xFD\xD2D\xA5\xE8\xAANS{\xD3\x8A\xEA\xE4\xB0s\xAA\x90` \x90\xA1\0[\x82Qc\x8D\xFC +`\xE0\x1B\x81R`\x04\x90\xFD[\x7F\x80n\x0C\xBB\x9F\xCE)k\xBC3jH\xF4+\xF1\xDB\xC6\x97\"\xD1\x8D\x90\xD6\xFEp[u\x82\xC2\xBBK\xD5T`\x01`\x01`\xA0\x1B\x03\x163\x03a\x01\xC5WV[`@Qc0\xCDtq`\xE0\x1B\x81R`\x04\x90\xFD\xFE\xA2dipfsX\"\x12 \x8Ef\xA5\xE0\x8C\xEE\xA6\xC3\xEE\x1E\xDC\xBAO\x06\xFCZ.M`b\x07\xFF\x08)\xC2j\xAEs\xF7W\x93!dsolcC\0\x08\x17\x003";
     /// The bytecode of the contract.
-    pub static SUBNETACTORPAUSEFACET_BYTECODE: ::ethers::core::types::Bytes =
-        ::ethers::core::types::Bytes::from_static(__BYTECODE);
+    pub static SUBNETACTORPAUSEFACET_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
+        __BYTECODE,
+    );
     #[rustfmt::skip]
     const __DEPLOYED_BYTECODE: &[u8] = b"`@`\x80\x81R`\x046\x10\x15a\0\x12W_\x80\xFD[_5`\xE0\x1C\x80c?K\xA8:\x14a\x01\nW\x80c\\\x97Z\xBB\x14a\0\xC8Wc\x84V\xCBY\x14a\0;W_\x80\xFD[4a\0\xC4W_6`\x03\x19\x01\x12a\0\xC4Wa\0Sa\x01\x92V[\x7F\xC4Q\xC9B\x9C'\xDBh\xF2\x86\xAB\x8Ah\xF3\x11\xF1\xDC\xCA\xB7\x03\xBA\x94#\xAE\xD2\x9C\xD3\x97\xAEc\xF8c\x80T`\xFF\x81\x16a\0\xB3W`\xFF\x19\x16`\x01\x17\x90UQ3\x81R\x7Fb\xE7\x8C\xEA\x01\xBE\xE3 \xCDNB\x02p\xB5\xEAt\0\r\x11\xB0\xC9\xF7GT\xEB\xDB\xFCTK\x05\xA2X\x90` \x90\xA1\0[\x82Qc\xD9<\x06e`\xE0\x1B\x81R`\x04\x90\xFD[_\x80\xFD[P4a\0\xC4W_6`\x03\x19\x01\x12a\0\xC4W` \x90`\xFF\x7F\xC4Q\xC9B\x9C'\xDBh\xF2\x86\xAB\x8Ah\xF3\x11\xF1\xDC\xCA\xB7\x03\xBA\x94#\xAE\xD2\x9C\xD3\x97\xAEc\xF8cT\x16\x90Q\x90\x15\x15\x81R\xF3[P4a\0\xC4W_6`\x03\x19\x01\x12a\0\xC4Wa\x01#a\x01\x92V[\x7F\xC4Q\xC9B\x9C'\xDBh\xF2\x86\xAB\x8Ah\xF3\x11\xF1\xDC\xCA\xB7\x03\xBA\x94#\xAE\xD2\x9C\xD3\x97\xAEc\xF8c\x80T`\xFF\x81\x16\x15a\x01\x81W`\xFF\x19\x16\x90UQ3\x81R\x7F]\xB9\xEE\nI[\xF2\xE6\xFF\x9C\x91\xA7\x83L\x1B\xA4\xFD\xD2D\xA5\xE8\xAANS{\xD3\x8A\xEA\xE4\xB0s\xAA\x90` \x90\xA1\0[\x82Qc\x8D\xFC +`\xE0\x1B\x81R`\x04\x90\xFD[\x7F\x80n\x0C\xBB\x9F\xCE)k\xBC3jH\xF4+\xF1\xDB\xC6\x97\"\xD1\x8D\x90\xD6\xFEp[u\x82\xC2\xBBK\xD5T`\x01`\x01`\xA0\x1B\x03\x163\x03a\x01\xC5WV[`@Qc0\xCDtq`\xE0\x1B\x81R`\x04\x90\xFD\xFE\xA2dipfsX\"\x12 \x8Ef\xA5\xE0\x8C\xEE\xA6\xC3\xEE\x1E\xDC\xBAO\x06\xFCZ.M`b\x07\xFF\x08)\xC2j\xAEs\xF7W\x93!dsolcC\0\x08\x17\x003";
     /// The deployed bytecode of the contract.
-    pub static SUBNETACTORPAUSEFACET_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
-        ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
+    pub static SUBNETACTORPAUSEFACET_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
+        __DEPLOYED_BYTECODE,
+    );
     pub struct SubnetActorPauseFacet<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for SubnetActorPauseFacet<M> {
         fn clone(&self) -> Self {
@@ -149,11 +174,13 @@ pub mod subnet_actor_pause_facet {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(::ethers::contract::Contract::new(
-                address.into(),
-                SUBNETACTORPAUSEFACET_ABI.clone(),
-                client,
-            ))
+            Self(
+                ::ethers::contract::Contract::new(
+                    address.into(),
+                    SUBNETACTORPAUSEFACET_ABI.clone(),
+                    client,
+                ),
+            )
         }
         /// Constructs the general purpose `Deployer` instance based on the provided constructor arguments and sends it.
         /// Returns a new instance of a deployer that returns an instance of this contract after sending the transaction
@@ -221,21 +248,26 @@ pub mod subnet_actor_pause_facet {
         ///Gets the contract's `Unpaused` event
         pub fn unpaused_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, UnpausedFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            UnpausedFilter,
+        > {
             self.0.event()
         }
         /// Returns an `Event` builder for all the events of this contract.
         pub fn events(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, SubnetActorPauseFacetEvents>
-        {
-            self.0
-                .event_with_filter(::core::default::Default::default())
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            SubnetActorPauseFacetEvents,
+        > {
+            self.0.event_with_filter(::core::default::Default::default())
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-        for SubnetActorPauseFacet<M>
-    {
+    for SubnetActorPauseFacet<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
@@ -249,7 +281,7 @@ pub mod subnet_actor_pause_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "EnforcedPause", abi = "EnforcedPause()")]
     pub struct EnforcedPause;
@@ -262,7 +294,7 @@ pub mod subnet_actor_pause_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "ExpectedPause", abi = "ExpectedPause()")]
     pub struct ExpectedPause;
@@ -275,7 +307,7 @@ pub mod subnet_actor_pause_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "NotOwner", abi = "NotOwner()")]
     pub struct NotOwner;
@@ -294,18 +326,24 @@ pub mod subnet_actor_pause_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) =
-                <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded) = <EnforcedPause as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <EnforcedPause as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::EnforcedPause(decoded));
             }
-            if let Ok(decoded) = <ExpectedPause as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ExpectedPause as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ExpectedPause(decoded));
             }
-            if let Ok(decoded) = <NotOwner as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NotOwner as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotOwner(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -314,9 +352,15 @@ pub mod subnet_actor_pause_facet {
     impl ::ethers::core::abi::AbiEncode for SubnetActorPauseFacetErrors {
         fn encode(self) -> ::std::vec::Vec<u8> {
             match self {
-                Self::EnforcedPause(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ExpectedPause(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NotOwner(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::EnforcedPause(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::ExpectedPause(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::NotOwner(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::RevertString(s) => ::ethers::core::abi::AbiEncode::encode(s),
             }
         }
@@ -325,13 +369,16 @@ pub mod subnet_actor_pause_facet {
         fn valid_selector(selector: [u8; 4]) -> bool {
             match selector {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
-                _ if selector == <EnforcedPause as ::ethers::contract::EthError>::selector() => {
+                _ if selector
+                    == <EnforcedPause as ::ethers::contract::EthError>::selector() => {
                     true
                 }
-                _ if selector == <ExpectedPause as ::ethers::contract::EthError>::selector() => {
+                _ if selector
+                    == <ExpectedPause as ::ethers::contract::EthError>::selector() => {
                     true
                 }
-                _ if selector == <NotOwner as ::ethers::contract::EthError>::selector() => true,
+                _ if selector
+                    == <NotOwner as ::ethers::contract::EthError>::selector() => true,
                 _ => false,
             }
         }
@@ -374,7 +421,7 @@ pub mod subnet_actor_pause_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(name = "Paused", abi = "Paused(address)")]
     pub struct PausedFilter {
@@ -388,7 +435,7 @@ pub mod subnet_actor_pause_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(name = "Unpaused", abi = "Unpaused(address)")]
     pub struct UnpausedFilter {
@@ -440,7 +487,7 @@ pub mod subnet_actor_pause_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethcall(name = "pause", abi = "pause()")]
     pub struct PauseCall;
@@ -453,7 +500,7 @@ pub mod subnet_actor_pause_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethcall(name = "paused", abi = "paused()")]
     pub struct PausedCall;
@@ -466,7 +513,7 @@ pub mod subnet_actor_pause_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethcall(name = "unpause", abi = "unpause()")]
     pub struct UnpauseCall;
@@ -482,13 +529,19 @@ pub mod subnet_actor_pause_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) = <PauseCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <PauseCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::Pause(decoded));
             }
-            if let Ok(decoded) = <PausedCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <PausedCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::Paused(decoded));
             }
-            if let Ok(decoded) = <UnpauseCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <UnpauseCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::Unpause(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -536,7 +589,7 @@ pub mod subnet_actor_pause_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct PausedReturn(pub bool);
 }

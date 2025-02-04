@@ -7,7 +7,7 @@ pub use subnet_actor_activity_facet::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types
+    non_camel_case_types,
 )]
 pub mod subnet_actor_activity_facet {
     #[allow(deprecated)]
@@ -262,8 +262,9 @@ pub mod subnet_actor_activity_facet {
         }
     }
     ///The parsed JSON ABI of the contract.
-    pub static SUBNETACTORACTIVITYFACET_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
-        ::ethers::contract::Lazy::new(__abi);
+    pub static SUBNETACTORACTIVITYFACET_ABI: ::ethers::contract::Lazy<
+        ::ethers::core::abi::Abi,
+    > = ::ethers::contract::Lazy::new(__abi);
     pub struct SubnetActorActivityFacet<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for SubnetActorActivityFacet<M> {
         fn clone(&self) -> Self {
@@ -295,11 +296,13 @@ pub mod subnet_actor_activity_facet {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(::ethers::contract::Contract::new(
-                address.into(),
-                SUBNETACTORACTIVITYFACET_ABI.clone(),
-                client,
-            ))
+            Self(
+                ::ethers::contract::Contract::new(
+                    address.into(),
+                    SUBNETACTORACTIVITYFACET_ABI.clone(),
+                    client,
+                ),
+            )
         }
         ///Calls the contract's `batchSubnetClaim` (0x02eca6eb) function
         pub fn batch_subnet_claim(
@@ -321,7 +324,10 @@ pub mod subnet_actor_activity_facet {
             proof: ::std::vec::Vec<[u8; 32]>,
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
-                .method_hash([249, 211, 67, 76], (subnet, checkpoint_height, data, proof))
+                .method_hash(
+                    [249, 211, 67, 76],
+                    (subnet, checkpoint_height, data, proof),
+                )
                 .expect("method not found (this should never happen)")
         }
         ///Gets the contract's `Paused` event
@@ -333,7 +339,11 @@ pub mod subnet_actor_activity_facet {
         ///Gets the contract's `Unpaused` event
         pub fn unpaused_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, UnpausedFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            UnpausedFilter,
+        > {
             self.0.event()
         }
         /// Returns an `Event` builder for all the events of this contract.
@@ -344,13 +354,11 @@ pub mod subnet_actor_activity_facet {
             M,
             SubnetActorActivityFacetEvents,
         > {
-            self.0
-                .event_with_filter(::core::default::Default::default())
+            self.0.event_with_filter(::core::default::Default::default())
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-        for SubnetActorActivityFacet<M>
-    {
+    for SubnetActorActivityFacet<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
@@ -364,7 +372,7 @@ pub mod subnet_actor_activity_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "EnforcedPause", abi = "EnforcedPause()")]
     pub struct EnforcedPause;
@@ -377,7 +385,7 @@ pub mod subnet_actor_activity_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "ExpectedPause", abi = "ExpectedPause()")]
     pub struct ExpectedPause;
@@ -390,7 +398,7 @@ pub mod subnet_actor_activity_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "InvalidActivityProof", abi = "InvalidActivityProof()")]
     pub struct InvalidActivityProof;
@@ -403,12 +411,9 @@ pub mod subnet_actor_activity_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
-    #[etherror(
-        name = "MissingActivityCommitment",
-        abi = "MissingActivityCommitment()"
-    )]
+    #[etherror(name = "MissingActivityCommitment", abi = "MissingActivityCommitment()")]
     pub struct MissingActivityCommitment;
     ///Custom Error type `NotAuthorized` with signature `NotAuthorized(address)` and selector `0x4a0bfec1`
     #[derive(
@@ -419,7 +424,7 @@ pub mod subnet_actor_activity_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "NotAuthorized", abi = "NotAuthorized(address)")]
     pub struct NotAuthorized(pub ::ethers::core::types::Address);
@@ -432,7 +437,7 @@ pub mod subnet_actor_activity_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "ReentrancyError", abi = "ReentrancyError()")]
     pub struct ReentrancyError;
@@ -445,7 +450,7 @@ pub mod subnet_actor_activity_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "ValidatorAlreadyClaimed", abi = "ValidatorAlreadyClaimed()")]
     pub struct ValidatorAlreadyClaimed;
@@ -468,36 +473,44 @@ pub mod subnet_actor_activity_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) =
-                <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded) = <EnforcedPause as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <EnforcedPause as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::EnforcedPause(decoded));
             }
-            if let Ok(decoded) = <ExpectedPause as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ExpectedPause as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ExpectedPause(decoded));
             }
-            if let Ok(decoded) =
-                <InvalidActivityProof as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <InvalidActivityProof as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidActivityProof(decoded));
             }
-            if let Ok(decoded) =
-                <MissingActivityCommitment as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <MissingActivityCommitment as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::MissingActivityCommitment(decoded));
             }
-            if let Ok(decoded) = <NotAuthorized as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NotAuthorized as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotAuthorized(decoded));
             }
-            if let Ok(decoded) = <ReentrancyError as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ReentrancyError as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ReentrancyError(decoded));
             }
-            if let Ok(decoded) =
-                <ValidatorAlreadyClaimed as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <ValidatorAlreadyClaimed as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ValidatorAlreadyClaimed(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -506,16 +519,24 @@ pub mod subnet_actor_activity_facet {
     impl ::ethers::core::abi::AbiEncode for SubnetActorActivityFacetErrors {
         fn encode(self) -> ::std::vec::Vec<u8> {
             match self {
-                Self::EnforcedPause(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ExpectedPause(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::EnforcedPause(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::ExpectedPause(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::InvalidActivityProof(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::MissingActivityCommitment(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::NotAuthorized(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::ReentrancyError(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::NotAuthorized(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::ReentrancyError(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::ValidatorAlreadyClaimed(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -527,31 +548,32 @@ pub mod subnet_actor_activity_facet {
         fn valid_selector(selector: [u8; 4]) -> bool {
             match selector {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
-                _ if selector == <EnforcedPause as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector == <ExpectedPause as ::ethers::contract::EthError>::selector() => {
+                _ if selector
+                    == <EnforcedPause as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <InvalidActivityProof as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <ExpectedPause as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <MissingActivityCommitment as ::ethers::contract::EthError>::selector() =>
-                {
-                    true
-                }
-                _ if selector == <NotAuthorized as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector == <ReentrancyError as ::ethers::contract::EthError>::selector() => {
+                    == <InvalidActivityProof as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <ValidatorAlreadyClaimed as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <MissingActivityCommitment as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <NotAuthorized as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <ReentrancyError as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <ValidatorAlreadyClaimed as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ => false,
@@ -563,16 +585,23 @@ pub mod subnet_actor_activity_facet {
             match self {
                 Self::EnforcedPause(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ExpectedPause(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidActivityProof(element) => ::core::fmt::Display::fmt(element, f),
-                Self::MissingActivityCommitment(element) => ::core::fmt::Display::fmt(element, f),
+                Self::InvalidActivityProof(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::MissingActivityCommitment(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::NotAuthorized(element) => ::core::fmt::Display::fmt(element, f),
                 Self::ReentrancyError(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ValidatorAlreadyClaimed(element) => ::core::fmt::Display::fmt(element, f),
+                Self::ValidatorAlreadyClaimed(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
             }
         }
     }
-    impl ::core::convert::From<::std::string::String> for SubnetActorActivityFacetErrors {
+    impl ::core::convert::From<::std::string::String>
+    for SubnetActorActivityFacetErrors {
         fn from(value: String) -> Self {
             Self::RevertString(value)
         }
@@ -592,7 +621,8 @@ pub mod subnet_actor_activity_facet {
             Self::InvalidActivityProof(value)
         }
     }
-    impl ::core::convert::From<MissingActivityCommitment> for SubnetActorActivityFacetErrors {
+    impl ::core::convert::From<MissingActivityCommitment>
+    for SubnetActorActivityFacetErrors {
         fn from(value: MissingActivityCommitment) -> Self {
             Self::MissingActivityCommitment(value)
         }
@@ -607,7 +637,8 @@ pub mod subnet_actor_activity_facet {
             Self::ReentrancyError(value)
         }
     }
-    impl ::core::convert::From<ValidatorAlreadyClaimed> for SubnetActorActivityFacetErrors {
+    impl ::core::convert::From<ValidatorAlreadyClaimed>
+    for SubnetActorActivityFacetErrors {
         fn from(value: ValidatorAlreadyClaimed) -> Self {
             Self::ValidatorAlreadyClaimed(value)
         }
@@ -620,7 +651,7 @@ pub mod subnet_actor_activity_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(name = "Paused", abi = "Paused(address)")]
     pub struct PausedFilter {
@@ -634,7 +665,7 @@ pub mod subnet_actor_activity_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(name = "Unpaused", abi = "Unpaused(address)")]
     pub struct UnpausedFilter {
@@ -686,7 +717,7 @@ pub mod subnet_actor_activity_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethcall(
         name = "batchSubnetClaim",
@@ -706,7 +737,7 @@ pub mod subnet_actor_activity_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethcall(
         name = "claim",
@@ -729,12 +760,14 @@ pub mod subnet_actor_activity_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) =
-                <BatchSubnetClaimCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <BatchSubnetClaimCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::BatchSubnetClaim(decoded));
             }
-            if let Ok(decoded) = <ClaimCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <ClaimCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::Claim(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -743,7 +776,9 @@ pub mod subnet_actor_activity_facet {
     impl ::ethers::core::abi::AbiEncode for SubnetActorActivityFacetCalls {
         fn encode(self) -> Vec<u8> {
             match self {
-                Self::BatchSubnetClaim(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::BatchSubnetClaim(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::Claim(element) => ::ethers::core::abi::AbiEncode::encode(element),
             }
         }
@@ -775,7 +810,7 @@ pub mod subnet_actor_activity_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct ValidatorClaim {
         pub data: ValidatorData,
@@ -790,7 +825,7 @@ pub mod subnet_actor_activity_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct ValidatorData {
         pub validator: ::ethers::core::types::Address,
@@ -805,7 +840,7 @@ pub mod subnet_actor_activity_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct SubnetID {
         pub root: u64,

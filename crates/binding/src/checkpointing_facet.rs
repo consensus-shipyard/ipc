@@ -7,7 +7,7 @@ pub use checkpointing_facet::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types
+    non_camel_case_types,
 )]
 pub mod checkpointing_facet {
     #[allow(deprecated)]
@@ -843,8 +843,9 @@ pub mod checkpointing_facet {
         }
     }
     ///The parsed JSON ABI of the contract.
-    pub static CHECKPOINTINGFACET_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
-        ::ethers::contract::Lazy::new(__abi);
+    pub static CHECKPOINTINGFACET_ABI: ::ethers::contract::Lazy<
+        ::ethers::core::abi::Abi,
+    > = ::ethers::contract::Lazy::new(__abi);
     pub struct CheckpointingFacet<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for CheckpointingFacet<M> {
         fn clone(&self) -> Self {
@@ -876,11 +877,13 @@ pub mod checkpointing_facet {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(::ethers::contract::Contract::new(
-                address.into(),
-                CHECKPOINTINGFACET_ABI.clone(),
-                client,
-            ))
+            Self(
+                ::ethers::contract::Contract::new(
+                    address.into(),
+                    CHECKPOINTINGFACET_ABI.clone(),
+                    client,
+                ),
+            )
         }
         ///Calls the contract's `addCheckpointSignature` (0x53b4e7bf) function
         pub fn add_checkpoint_signature(
@@ -917,12 +920,7 @@ pub mod checkpointing_facet {
             self.0
                 .method_hash(
                     [99, 38, 55, 159],
-                    (
-                        checkpoint,
-                        membership_root_hash,
-                        membership_weight,
-                        activity,
-                    ),
+                    (checkpoint, membership_root_hash, membership_weight, activity),
                 )
                 .expect("method not found (this should never happen)")
         }
@@ -938,71 +936,96 @@ pub mod checkpointing_facet {
         ///Gets the contract's `ActivityRollupRecorded` event
         pub fn activity_rollup_recorded_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ActivityRollupRecordedFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            ActivityRollupRecordedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `CheckpointCommitted` event
         pub fn checkpoint_committed_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, CheckpointCommittedFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            CheckpointCommittedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `MessageStoredInPostbox` event
         pub fn message_stored_in_postbox_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, MessageStoredInPostboxFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            MessageStoredInPostboxFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `NewBottomUpMsgBatch` event
         pub fn new_bottom_up_msg_batch_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, NewBottomUpMsgBatchFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            NewBottomUpMsgBatchFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `NewTopDownMessage` event
         pub fn new_top_down_message_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, NewTopDownMessageFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            NewTopDownMessageFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `QueuedBottomUpMessage` event
         pub fn queued_bottom_up_message_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, QueuedBottomUpMessageFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            QueuedBottomUpMessageFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `QuorumReached` event
         pub fn quorum_reached_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, QuorumReachedFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            QuorumReachedFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `QuorumWeightUpdated` event
         pub fn quorum_weight_updated_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, QuorumWeightUpdatedFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            QuorumWeightUpdatedFilter,
+        > {
             self.0.event()
         }
         /// Returns an `Event` builder for all the events of this contract.
         pub fn events(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, CheckpointingFacetEvents>
-        {
-            self.0
-                .event_with_filter(::core::default::Default::default())
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            CheckpointingFacetEvents,
+        > {
+            self.0.event_with_filter(::core::default::Default::default())
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-        for CheckpointingFacet<M>
-    {
+    for CheckpointingFacet<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
@@ -1016,7 +1039,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "CheckpointAlreadyExists", abi = "CheckpointAlreadyExists()")]
     pub struct CheckpointAlreadyExists;
@@ -1029,7 +1052,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "CheckpointNotCreated", abi = "CheckpointNotCreated()")]
     pub struct CheckpointNotCreated;
@@ -1042,12 +1065,9 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
-    #[etherror(
-        name = "FailedAddIncompleteQuorum",
-        abi = "FailedAddIncompleteQuorum()"
-    )]
+    #[etherror(name = "FailedAddIncompleteQuorum", abi = "FailedAddIncompleteQuorum()")]
     pub struct FailedAddIncompleteQuorum;
     ///Custom Error type `FailedAddSignatory` with signature `FailedAddSignatory()` and selector `0x3363140f`
     #[derive(
@@ -1058,7 +1078,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "FailedAddSignatory", abi = "FailedAddSignatory()")]
     pub struct FailedAddSignatory;
@@ -1071,7 +1091,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(
         name = "FailedRemoveIncompleteQuorum",
@@ -1087,7 +1107,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "InvalidActorAddress", abi = "InvalidActorAddress()")]
     pub struct InvalidActorAddress;
@@ -1100,7 +1120,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "InvalidCheckpointSource", abi = "InvalidCheckpointSource()")]
     pub struct InvalidCheckpointSource;
@@ -1113,7 +1133,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "InvalidRetentionHeight", abi = "InvalidRetentionHeight()")]
     pub struct InvalidRetentionHeight;
@@ -1126,7 +1146,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "InvalidSignature", abi = "InvalidSignature()")]
     pub struct InvalidSignature;
@@ -1139,7 +1159,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "InvalidSubnet", abi = "InvalidSubnet()")]
     pub struct InvalidSubnet;
@@ -1152,7 +1172,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "MaxMsgsPerBatchExceeded", abi = "MaxMsgsPerBatchExceeded()")]
     pub struct MaxMsgsPerBatchExceeded;
@@ -1165,7 +1185,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "NotAuthorized", abi = "NotAuthorized(address)")]
     pub struct NotAuthorized(pub ::ethers::core::types::Address);
@@ -1178,12 +1198,9 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
-    #[etherror(
-        name = "NotEnoughSubnetCircSupply",
-        abi = "NotEnoughSubnetCircSupply()"
-    )]
+    #[etherror(name = "NotEnoughSubnetCircSupply", abi = "NotEnoughSubnetCircSupply()")]
     pub struct NotEnoughSubnetCircSupply;
     ///Custom Error type `NotSystemActor` with signature `NotSystemActor()` and selector `0xf0d97f3b`
     #[derive(
@@ -1194,7 +1211,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "NotSystemActor", abi = "NotSystemActor()")]
     pub struct NotSystemActor;
@@ -1207,7 +1224,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "QuorumAlreadyProcessed", abi = "QuorumAlreadyProcessed()")]
     pub struct QuorumAlreadyProcessed;
@@ -1220,7 +1237,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "SignatureReplay", abi = "SignatureReplay()")]
     pub struct SignatureReplay;
@@ -1233,7 +1250,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "SubnetNotFound", abi = "SubnetNotFound()")]
     pub struct SubnetNotFound;
@@ -1246,7 +1263,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "ZeroMembershipWeight", abi = "ZeroMembershipWeight()")]
     pub struct ZeroMembershipWeight;
@@ -1280,88 +1297,99 @@ pub mod checkpointing_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) =
-                <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::RevertString(decoded));
             }
-            if let Ok(decoded) =
-                <CheckpointAlreadyExists as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <CheckpointAlreadyExists as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CheckpointAlreadyExists(decoded));
             }
-            if let Ok(decoded) =
-                <CheckpointNotCreated as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <CheckpointNotCreated as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CheckpointNotCreated(decoded));
             }
-            if let Ok(decoded) =
-                <FailedAddIncompleteQuorum as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <FailedAddIncompleteQuorum as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::FailedAddIncompleteQuorum(decoded));
             }
-            if let Ok(decoded) =
-                <FailedAddSignatory as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <FailedAddSignatory as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::FailedAddSignatory(decoded));
             }
-            if let Ok(decoded) =
-                <FailedRemoveIncompleteQuorum as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <FailedRemoveIncompleteQuorum as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::FailedRemoveIncompleteQuorum(decoded));
             }
-            if let Ok(decoded) =
-                <InvalidActorAddress as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <InvalidActorAddress as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidActorAddress(decoded));
             }
-            if let Ok(decoded) =
-                <InvalidCheckpointSource as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <InvalidCheckpointSource as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidCheckpointSource(decoded));
             }
-            if let Ok(decoded) =
-                <InvalidRetentionHeight as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <InvalidRetentionHeight as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidRetentionHeight(decoded));
             }
-            if let Ok(decoded) = <InvalidSignature as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <InvalidSignature as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidSignature(decoded));
             }
-            if let Ok(decoded) = <InvalidSubnet as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <InvalidSubnet as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidSubnet(decoded));
             }
-            if let Ok(decoded) =
-                <MaxMsgsPerBatchExceeded as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <MaxMsgsPerBatchExceeded as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::MaxMsgsPerBatchExceeded(decoded));
             }
-            if let Ok(decoded) = <NotAuthorized as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NotAuthorized as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotAuthorized(decoded));
             }
-            if let Ok(decoded) =
-                <NotEnoughSubnetCircSupply as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <NotEnoughSubnetCircSupply as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotEnoughSubnetCircSupply(decoded));
             }
-            if let Ok(decoded) = <NotSystemActor as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NotSystemActor as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotSystemActor(decoded));
             }
-            if let Ok(decoded) =
-                <QuorumAlreadyProcessed as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <QuorumAlreadyProcessed as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::QuorumAlreadyProcessed(decoded));
             }
-            if let Ok(decoded) = <SignatureReplay as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <SignatureReplay as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::SignatureReplay(decoded));
             }
-            if let Ok(decoded) = <SubnetNotFound as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <SubnetNotFound as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::SubnetNotFound(decoded));
             }
-            if let Ok(decoded) =
-                <ZeroMembershipWeight as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <ZeroMembershipWeight as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::ZeroMembershipWeight(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -1394,21 +1422,33 @@ pub mod checkpointing_facet {
                 Self::InvalidRetentionHeight(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::InvalidSignature(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::InvalidSubnet(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::InvalidSignature(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::InvalidSubnet(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::MaxMsgsPerBatchExceeded(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::NotAuthorized(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::NotAuthorized(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::NotEnoughSubnetCircSupply(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::NotSystemActor(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::NotSystemActor(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::QuorumAlreadyProcessed(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::SignatureReplay(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::SubnetNotFound(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::SignatureReplay(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
+                Self::SubnetNotFound(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::ZeroMembershipWeight(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1421,82 +1461,75 @@ pub mod checkpointing_facet {
             match selector {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
                 _ if selector
-                    == <CheckpointAlreadyExists as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <CheckpointAlreadyExists as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <CheckpointNotCreated as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <CheckpointNotCreated as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <FailedAddIncompleteQuorum as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <FailedAddIncompleteQuorum as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <FailedAddSignatory as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <FailedAddSignatory as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <FailedRemoveIncompleteQuorum as ::ethers::contract::EthError>::selector(
-                    ) =>
-                {
+                    == <FailedRemoveIncompleteQuorum as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <InvalidActorAddress as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <InvalidActorAddress as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <InvalidCheckpointSource as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <InvalidCheckpointSource as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <InvalidRetentionHeight as ::ethers::contract::EthError>::selector() =>
-                {
-                    true
-                }
-                _ if selector == <InvalidSignature as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector == <InvalidSubnet as ::ethers::contract::EthError>::selector() => {
+                    == <InvalidRetentionHeight as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <MaxMsgsPerBatchExceeded as ::ethers::contract::EthError>::selector() =>
-                {
-                    true
-                }
-                _ if selector == <NotAuthorized as ::ethers::contract::EthError>::selector() => {
+                    == <InvalidSignature as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <NotEnoughSubnetCircSupply as ::ethers::contract::EthError>::selector() =>
-                {
-                    true
-                }
-                _ if selector == <NotSystemActor as ::ethers::contract::EthError>::selector() => {
+                    == <InvalidSubnet as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <QuorumAlreadyProcessed as ::ethers::contract::EthError>::selector() =>
-                {
-                    true
-                }
-                _ if selector == <SignatureReplay as ::ethers::contract::EthError>::selector() => {
-                    true
-                }
-                _ if selector == <SubnetNotFound as ::ethers::contract::EthError>::selector() => {
+                    == <MaxMsgsPerBatchExceeded as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
-                    == <ZeroMembershipWeight as ::ethers::contract::EthError>::selector() =>
-                {
+                    == <NotAuthorized as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <NotEnoughSubnetCircSupply as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <NotSystemActor as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <QuorumAlreadyProcessed as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <SignatureReplay as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <SubnetNotFound as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
+                _ if selector
+                    == <ZeroMembershipWeight as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ => false,
@@ -1506,26 +1539,48 @@ pub mod checkpointing_facet {
     impl ::core::fmt::Display for CheckpointingFacetErrors {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::CheckpointAlreadyExists(element) => ::core::fmt::Display::fmt(element, f),
-                Self::CheckpointNotCreated(element) => ::core::fmt::Display::fmt(element, f),
-                Self::FailedAddIncompleteQuorum(element) => ::core::fmt::Display::fmt(element, f),
-                Self::FailedAddSignatory(element) => ::core::fmt::Display::fmt(element, f),
+                Self::CheckpointAlreadyExists(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::CheckpointNotCreated(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::FailedAddIncompleteQuorum(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::FailedAddSignatory(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::FailedRemoveIncompleteQuorum(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
-                Self::InvalidActorAddress(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidCheckpointSource(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidRetentionHeight(element) => ::core::fmt::Display::fmt(element, f),
+                Self::InvalidActorAddress(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::InvalidCheckpointSource(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::InvalidRetentionHeight(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::InvalidSignature(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidSubnet(element) => ::core::fmt::Display::fmt(element, f),
-                Self::MaxMsgsPerBatchExceeded(element) => ::core::fmt::Display::fmt(element, f),
+                Self::MaxMsgsPerBatchExceeded(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::NotAuthorized(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NotEnoughSubnetCircSupply(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NotEnoughSubnetCircSupply(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::NotSystemActor(element) => ::core::fmt::Display::fmt(element, f),
-                Self::QuorumAlreadyProcessed(element) => ::core::fmt::Display::fmt(element, f),
+                Self::QuorumAlreadyProcessed(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::SignatureReplay(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SubnetNotFound(element) => ::core::fmt::Display::fmt(element, f),
-                Self::ZeroMembershipWeight(element) => ::core::fmt::Display::fmt(element, f),
+                Self::ZeroMembershipWeight(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
             }
         }
@@ -1555,7 +1610,8 @@ pub mod checkpointing_facet {
             Self::FailedAddSignatory(value)
         }
     }
-    impl ::core::convert::From<FailedRemoveIncompleteQuorum> for CheckpointingFacetErrors {
+    impl ::core::convert::From<FailedRemoveIncompleteQuorum>
+    for CheckpointingFacetErrors {
         fn from(value: FailedRemoveIncompleteQuorum) -> Self {
             Self::FailedRemoveIncompleteQuorum(value)
         }
@@ -1633,7 +1689,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(
         name = "ActivityRollupRecorded",
@@ -1651,7 +1707,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(
         name = "CheckpointCommitted",
@@ -1670,12 +1726,9 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
-    #[ethevent(
-        name = "MessageStoredInPostbox",
-        abi = "MessageStoredInPostbox(bytes32)"
-    )]
+    #[ethevent(name = "MessageStoredInPostbox", abi = "MessageStoredInPostbox(bytes32)")]
     pub struct MessageStoredInPostboxFilter {
         #[ethevent(indexed)]
         pub id: [u8; 32],
@@ -1688,7 +1741,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(name = "NewBottomUpMsgBatch", abi = "NewBottomUpMsgBatch(uint256)")]
     pub struct NewBottomUpMsgBatchFilter {
@@ -1703,7 +1756,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(
         name = "NewTopDownMessage",
@@ -1724,7 +1777,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(name = "QueuedBottomUpMessage", abi = "QueuedBottomUpMessage(bytes32)")]
     pub struct QueuedBottomUpMessageFilter {
@@ -1739,7 +1792,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(
         name = "QuorumReached",
@@ -1759,7 +1812,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(
         name = "QuorumWeightUpdated",
@@ -1788,17 +1841,17 @@ pub mod checkpointing_facet {
             log: &::ethers::core::abi::RawLog,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
             if let Ok(decoded) = ActivityRollupRecordedFilter::decode_log(log) {
-                return Ok(CheckpointingFacetEvents::ActivityRollupRecordedFilter(
-                    decoded,
-                ));
+                return Ok(
+                    CheckpointingFacetEvents::ActivityRollupRecordedFilter(decoded),
+                );
             }
             if let Ok(decoded) = CheckpointCommittedFilter::decode_log(log) {
                 return Ok(CheckpointingFacetEvents::CheckpointCommittedFilter(decoded));
             }
             if let Ok(decoded) = MessageStoredInPostboxFilter::decode_log(log) {
-                return Ok(CheckpointingFacetEvents::MessageStoredInPostboxFilter(
-                    decoded,
-                ));
+                return Ok(
+                    CheckpointingFacetEvents::MessageStoredInPostboxFilter(decoded),
+                );
             }
             if let Ok(decoded) = NewBottomUpMsgBatchFilter::decode_log(log) {
                 return Ok(CheckpointingFacetEvents::NewBottomUpMsgBatchFilter(decoded));
@@ -1807,9 +1860,9 @@ pub mod checkpointing_facet {
                 return Ok(CheckpointingFacetEvents::NewTopDownMessageFilter(decoded));
             }
             if let Ok(decoded) = QueuedBottomUpMessageFilter::decode_log(log) {
-                return Ok(CheckpointingFacetEvents::QueuedBottomUpMessageFilter(
-                    decoded,
-                ));
+                return Ok(
+                    CheckpointingFacetEvents::QueuedBottomUpMessageFilter(decoded),
+                );
             }
             if let Ok(decoded) = QuorumReachedFilter::decode_log(log) {
                 return Ok(CheckpointingFacetEvents::QuorumReachedFilter(decoded));
@@ -1826,19 +1879,32 @@ pub mod checkpointing_facet {
                 Self::ActivityRollupRecordedFilter(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
-                Self::CheckpointCommittedFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::CheckpointCommittedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::MessageStoredInPostboxFilter(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
-                Self::NewBottomUpMsgBatchFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NewTopDownMessageFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::QueuedBottomUpMessageFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::QuorumReachedFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::QuorumWeightUpdatedFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NewBottomUpMsgBatchFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::NewTopDownMessageFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::QueuedBottomUpMessageFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::QuorumReachedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::QuorumWeightUpdatedFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
             }
         }
     }
-    impl ::core::convert::From<ActivityRollupRecordedFilter> for CheckpointingFacetEvents {
+    impl ::core::convert::From<ActivityRollupRecordedFilter>
+    for CheckpointingFacetEvents {
         fn from(value: ActivityRollupRecordedFilter) -> Self {
             Self::ActivityRollupRecordedFilter(value)
         }
@@ -1848,7 +1914,8 @@ pub mod checkpointing_facet {
             Self::CheckpointCommittedFilter(value)
         }
     }
-    impl ::core::convert::From<MessageStoredInPostboxFilter> for CheckpointingFacetEvents {
+    impl ::core::convert::From<MessageStoredInPostboxFilter>
+    for CheckpointingFacetEvents {
         fn from(value: MessageStoredInPostboxFilter) -> Self {
             Self::MessageStoredInPostboxFilter(value)
         }
@@ -1863,7 +1930,8 @@ pub mod checkpointing_facet {
             Self::NewTopDownMessageFilter(value)
         }
     }
-    impl ::core::convert::From<QueuedBottomUpMessageFilter> for CheckpointingFacetEvents {
+    impl ::core::convert::From<QueuedBottomUpMessageFilter>
+    for CheckpointingFacetEvents {
         fn from(value: QueuedBottomUpMessageFilter) -> Self {
             Self::QueuedBottomUpMessageFilter(value)
         }
@@ -1887,7 +1955,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethcall(
         name = "addCheckpointSignature",
@@ -1908,7 +1976,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethcall(
         name = "commitCheckpoint",
@@ -1926,7 +1994,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethcall(
         name = "createBottomUpCheckpoint",
@@ -1947,7 +2015,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethcall(
         name = "pruneBottomUpCheckpoints",
@@ -1969,24 +2037,24 @@ pub mod checkpointing_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) =
-                <AddCheckpointSignatureCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <AddCheckpointSignatureCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::AddCheckpointSignature(decoded));
             }
-            if let Ok(decoded) =
-                <CommitCheckpointCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <CommitCheckpointCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CommitCheckpoint(decoded));
             }
-            if let Ok(decoded) =
-                <CreateBottomUpCheckpointCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <CreateBottomUpCheckpointCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CreateBottomUpCheckpoint(decoded));
             }
-            if let Ok(decoded) =
-                <PruneBottomUpCheckpointsCall as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <PruneBottomUpCheckpointsCall as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::PruneBottomUpCheckpoints(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -1998,7 +2066,9 @@ pub mod checkpointing_facet {
                 Self::AddCheckpointSignature(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::CommitCheckpoint(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::CommitCheckpoint(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::CreateBottomUpCheckpoint(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -2011,10 +2081,16 @@ pub mod checkpointing_facet {
     impl ::core::fmt::Display for CheckpointingFacetCalls {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::AddCheckpointSignature(element) => ::core::fmt::Display::fmt(element, f),
+                Self::AddCheckpointSignature(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::CommitCheckpoint(element) => ::core::fmt::Display::fmt(element, f),
-                Self::CreateBottomUpCheckpoint(element) => ::core::fmt::Display::fmt(element, f),
-                Self::PruneBottomUpCheckpoints(element) => ::core::fmt::Display::fmt(element, f),
+                Self::CreateBottomUpCheckpoint(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::PruneBottomUpCheckpoints(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
             }
         }
     }
@@ -2028,12 +2104,14 @@ pub mod checkpointing_facet {
             Self::CommitCheckpoint(value)
         }
     }
-    impl ::core::convert::From<CreateBottomUpCheckpointCall> for CheckpointingFacetCalls {
+    impl ::core::convert::From<CreateBottomUpCheckpointCall>
+    for CheckpointingFacetCalls {
         fn from(value: CreateBottomUpCheckpointCall) -> Self {
             Self::CreateBottomUpCheckpoint(value)
         }
     }
-    impl ::core::convert::From<PruneBottomUpCheckpointsCall> for CheckpointingFacetCalls {
+    impl ::core::convert::From<PruneBottomUpCheckpointsCall>
+    for CheckpointingFacetCalls {
         fn from(value: PruneBottomUpCheckpointsCall) -> Self {
             Self::PruneBottomUpCheckpoints(value)
         }
@@ -2047,7 +2125,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct BottomUpCheckpoint {
         pub subnet_id: SubnetID,
@@ -2066,7 +2144,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct CompressedActivityRollup {
         pub consensus: CompressedSummary,
@@ -2080,7 +2158,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct AggregatedStats {
         pub total_active_validators: u64,
@@ -2095,7 +2173,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct CompressedSummary {
         pub stats: AggregatedStats,
@@ -2110,7 +2188,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct FullSummary {
         pub stats: AggregatedStats,
@@ -2125,7 +2203,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct ValidatorData {
         pub validator: ::ethers::core::types::Address,
@@ -2140,7 +2218,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct FullActivityRollup {
         pub consensus: FullSummary,
@@ -2154,7 +2232,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct FvmAddress {
         pub addr_type: u8,
@@ -2169,7 +2247,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct Ipcaddress {
         pub subnet_id: SubnetID,
@@ -2184,7 +2262,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct IpcEnvelope {
         pub kind: u8,
@@ -2204,7 +2282,7 @@ pub mod checkpointing_facet {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct SubnetID {
         pub root: u64,

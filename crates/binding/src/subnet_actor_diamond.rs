@@ -7,7 +7,7 @@ pub use subnet_actor_diamond::*;
     clippy::upper_case_acronyms,
     clippy::type_complexity,
     dead_code,
-    non_camel_case_types
+    non_camel_case_types,
 )]
 pub mod subnet_actor_diamond {
     #[allow(deprecated)]
@@ -543,13 +543,15 @@ pub mod subnet_actor_diamond {
         }
     }
     ///The parsed JSON ABI of the contract.
-    pub static SUBNETACTORDIAMOND_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
-        ::ethers::contract::Lazy::new(__abi);
+    pub static SUBNETACTORDIAMOND_ABI: ::ethers::contract::Lazy<
+        ::ethers::core::abi::Abi,
+    > = ::ethers::contract::Lazy::new(__abi);
     #[rustfmt::skip]
     const __DEPLOYED_BYTECODE: &[u8] = b"`\x80`@R6\x15`\x90W_\x805`\x01`\x01`\xE0\x1B\x03\x19\x16\x80\x82R\x7F\x80n\x0C\xBB\x9F\xCE)k\xBC3jH\xF4+\xF1\xDB\xC6\x97\"\xD1\x8D\x90\xD6\xFEp[u\x82\xC2\xBBK\xD2` R`@\x90\x91 T`\x01`\x01`\xA0\x1B\x03\x16\x90\x81\x15`nW_\x80\x836\x82\x807\x816\x91Z\xF4=_\x80>\x15`jW=_\xF3[=_\xFD[c\n\x82\xDDs`\xE3\x1B`\x80R`\x01`\x01`\xE0\x1B\x03\x19\x16`\x84R`\x7F\x19`\xA4\x01`\x80\xFD[`\x05T`\x01`\x01`\xA0\x1B\x03\x163\x03`\xA3W\0[c\xE7\xE6\x01\xDB`\xE0\x1B`\x80R`\x04`\x80\xFD\xFE\xA2dipfsX\"\x12 \xE8\xED\xCA\xDD\xDD\xED\x16`\xBC\xC3\xFAbJ\xD8@\x83\x1D\xE5O|K$\x0E\x06\xF5\x8B\xF4\r\xB4\xBAR[dsolcC\0\x08\x17\x003";
     /// The deployed bytecode of the contract.
-    pub static SUBNETACTORDIAMOND_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
-        ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
+    pub static SUBNETACTORDIAMOND_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes = ::ethers::core::types::Bytes::from_static(
+        __DEPLOYED_BYTECODE,
+    );
     pub struct SubnetActorDiamond<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for SubnetActorDiamond<M> {
         fn clone(&self) -> Self {
@@ -581,37 +583,47 @@ pub mod subnet_actor_diamond {
             address: T,
             client: ::std::sync::Arc<M>,
         ) -> Self {
-            Self(::ethers::contract::Contract::new(
-                address.into(),
-                SUBNETACTORDIAMOND_ABI.clone(),
-                client,
-            ))
+            Self(
+                ::ethers::contract::Contract::new(
+                    address.into(),
+                    SUBNETACTORDIAMOND_ABI.clone(),
+                    client,
+                ),
+            )
         }
         ///Gets the contract's `DiamondCut` event
         pub fn diamond_cut_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, DiamondCutFilter> {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            DiamondCutFilter,
+        > {
             self.0.event()
         }
         ///Gets the contract's `OwnershipTransferred` event
         pub fn ownership_transferred_filter(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, OwnershipTransferredFilter>
-        {
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            OwnershipTransferredFilter,
+        > {
             self.0.event()
         }
         /// Returns an `Event` builder for all the events of this contract.
         pub fn events(
             &self,
-        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, SubnetActorDiamondEvents>
-        {
-            self.0
-                .event_with_filter(::core::default::Default::default())
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            SubnetActorDiamondEvents,
+        > {
+            self.0.event_with_filter(::core::default::Default::default())
         }
     }
     impl<M: ::ethers::providers::Middleware> From<::ethers::contract::Contract<M>>
-        for SubnetActorDiamond<M>
-    {
+    for SubnetActorDiamond<M> {
         fn from(contract: ::ethers::contract::Contract<M>) -> Self {
             Self::new(contract.address(), contract.client())
         }
@@ -625,7 +637,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(
         name = "CannotAddFunctionToDiamondThatAlreadyExists",
@@ -643,7 +655,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(
         name = "CannotAddSelectorsToZeroAddress",
@@ -661,7 +673,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(
         name = "CannotRemoveFunctionThatDoesNotExist",
@@ -679,7 +691,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(
         name = "CannotRemoveImmutableFunction",
@@ -697,7 +709,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(
         name = "CannotReplaceFunctionThatDoesNotExists",
@@ -715,7 +727,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(
         name = "CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet",
@@ -733,7 +745,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(
         name = "CannotReplaceFunctionsFromFacetWithZeroAddress",
@@ -751,7 +763,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(
         name = "CannotReplaceImmutableFunction",
@@ -769,7 +781,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "FunctionNotFound", abi = "FunctionNotFound(bytes4)")]
     pub struct FunctionNotFound {
@@ -784,7 +796,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "GatewayCannotBeZero", abi = "GatewayCannotBeZero()")]
     pub struct GatewayCannotBeZero;
@@ -797,12 +809,9 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
-    #[etherror(
-        name = "IncorrectFacetCutAction",
-        abi = "IncorrectFacetCutAction(uint8)"
-    )]
+    #[etherror(name = "IncorrectFacetCutAction", abi = "IncorrectFacetCutAction(uint8)")]
     pub struct IncorrectFacetCutAction {
         pub action: u8,
     }
@@ -815,7 +824,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(
         name = "InitializationFunctionReverted",
@@ -834,7 +843,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "InvalidCollateral", abi = "InvalidCollateral()")]
     pub struct InvalidCollateral;
@@ -847,12 +856,9 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
-    #[etherror(
-        name = "InvalidMajorityPercentage",
-        abi = "InvalidMajorityPercentage()"
-    )]
+    #[etherror(name = "InvalidMajorityPercentage", abi = "InvalidMajorityPercentage()")]
     pub struct InvalidMajorityPercentage;
     ///Custom Error type `InvalidPowerScale` with signature `InvalidPowerScale()` and selector `0xf162efca`
     #[derive(
@@ -863,7 +869,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "InvalidPowerScale", abi = "InvalidPowerScale()")]
     pub struct InvalidPowerScale;
@@ -876,7 +882,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "InvalidSubmissionPeriod", abi = "InvalidSubmissionPeriod()")]
     pub struct InvalidSubmissionPeriod;
@@ -889,7 +895,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(
         name = "NoBytecodeAtAddress",
@@ -908,7 +914,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(
         name = "NoSelectorsProvidedForFacetForCut",
@@ -926,7 +932,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(name = "NotGateway", abi = "NotGateway()")]
     pub struct NotGateway;
@@ -939,7 +945,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[etherror(
         name = "RemoveFacetAddressMustBeZeroAddress",
@@ -951,7 +957,9 @@ pub mod subnet_actor_diamond {
     ///Container type for all of the contract's custom errors
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum SubnetActorDiamondErrors {
-        CannotAddFunctionToDiamondThatAlreadyExists(CannotAddFunctionToDiamondThatAlreadyExists),
+        CannotAddFunctionToDiamondThatAlreadyExists(
+            CannotAddFunctionToDiamondThatAlreadyExists,
+        ),
         CannotAddSelectorsToZeroAddress(CannotAddSelectorsToZeroAddress),
         CannotRemoveFunctionThatDoesNotExist(CannotRemoveFunctionThatDoesNotExist),
         CannotRemoveImmutableFunction(CannotRemoveImmutableFunction),
@@ -984,9 +992,9 @@ pub mod subnet_actor_diamond {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) =
-                <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::RevertString(decoded));
             }
             if let Ok(decoded) = <CannotAddFunctionToDiamondThatAlreadyExists as ::ethers::core::abi::AbiDecode>::decode(
@@ -994,28 +1002,24 @@ pub mod subnet_actor_diamond {
             ) {
                 return Ok(Self::CannotAddFunctionToDiamondThatAlreadyExists(decoded));
             }
-            if let Ok(decoded) =
-                <CannotAddSelectorsToZeroAddress as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <CannotAddSelectorsToZeroAddress as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CannotAddSelectorsToZeroAddress(decoded));
             }
-            if let Ok(decoded) =
-                <CannotRemoveFunctionThatDoesNotExist as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                )
-            {
+            if let Ok(decoded) = <CannotRemoveFunctionThatDoesNotExist as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CannotRemoveFunctionThatDoesNotExist(decoded));
             }
-            if let Ok(decoded) =
-                <CannotRemoveImmutableFunction as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <CannotRemoveImmutableFunction as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CannotRemoveImmutableFunction(decoded));
             }
-            if let Ok(decoded) =
-                <CannotReplaceFunctionThatDoesNotExists as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                )
-            {
+            if let Ok(decoded) = <CannotReplaceFunctionThatDoesNotExists as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CannotReplaceFunctionThatDoesNotExists(decoded));
             }
             if let Ok(decoded) = <CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet as ::ethers::core::abi::AbiDecode>::decode(
@@ -1032,66 +1036,69 @@ pub mod subnet_actor_diamond {
             ) {
                 return Ok(Self::CannotReplaceFunctionsFromFacetWithZeroAddress(decoded));
             }
-            if let Ok(decoded) =
-                <CannotReplaceImmutableFunction as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <CannotReplaceImmutableFunction as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::CannotReplaceImmutableFunction(decoded));
             }
-            if let Ok(decoded) = <FunctionNotFound as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <FunctionNotFound as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::FunctionNotFound(decoded));
             }
-            if let Ok(decoded) =
-                <GatewayCannotBeZero as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <GatewayCannotBeZero as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::GatewayCannotBeZero(decoded));
             }
-            if let Ok(decoded) =
-                <IncorrectFacetCutAction as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <IncorrectFacetCutAction as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::IncorrectFacetCutAction(decoded));
             }
-            if let Ok(decoded) =
-                <InitializationFunctionReverted as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <InitializationFunctionReverted as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InitializationFunctionReverted(decoded));
             }
-            if let Ok(decoded) = <InvalidCollateral as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <InvalidCollateral as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidCollateral(decoded));
             }
-            if let Ok(decoded) =
-                <InvalidMajorityPercentage as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <InvalidMajorityPercentage as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidMajorityPercentage(decoded));
             }
-            if let Ok(decoded) = <InvalidPowerScale as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <InvalidPowerScale as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidPowerScale(decoded));
             }
-            if let Ok(decoded) =
-                <InvalidSubmissionPeriod as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <InvalidSubmissionPeriod as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::InvalidSubmissionPeriod(decoded));
             }
-            if let Ok(decoded) =
-                <NoBytecodeAtAddress as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <NoBytecodeAtAddress as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NoBytecodeAtAddress(decoded));
             }
-            if let Ok(decoded) =
-                <NoSelectorsProvidedForFacetForCut as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
+            if let Ok(decoded) = <NoSelectorsProvidedForFacetForCut as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NoSelectorsProvidedForFacetForCut(decoded));
             }
-            if let Ok(decoded) = <NotGateway as ::ethers::core::abi::AbiDecode>::decode(data) {
+            if let Ok(decoded) = <NotGateway as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::NotGateway(decoded));
             }
-            if let Ok(decoded) =
-                <RemoveFacetAddressMustBeZeroAddress as ::ethers::core::abi::AbiDecode>::decode(
-                    data,
-                )
-            {
+            if let Ok(decoded) = <RemoveFacetAddressMustBeZeroAddress as ::ethers::core::abi::AbiDecode>::decode(
+                data,
+            ) {
                 return Ok(Self::RemoveFacetAddressMustBeZeroAddress(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
@@ -1115,16 +1122,18 @@ pub mod subnet_actor_diamond {
                 Self::CannotReplaceFunctionThatDoesNotExists(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
+                Self::CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet(
+                    element,
+                ) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::CannotReplaceFunctionsFromFacetWithZeroAddress(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::CannotReplaceImmutableFunction(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::FunctionNotFound(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::FunctionNotFound(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::GatewayCannotBeZero(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1134,11 +1143,15 @@ pub mod subnet_actor_diamond {
                 Self::InitializationFunctionReverted(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::InvalidCollateral(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::InvalidCollateral(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::InvalidMajorityPercentage(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::InvalidPowerScale(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::InvalidPowerScale(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::InvalidSubmissionPeriod(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1148,7 +1161,9 @@ pub mod subnet_actor_diamond {
                 Self::NoSelectorsProvidedForFacetForCut(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::NotGateway(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::NotGateway(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
                 Self::RemoveFacetAddressMustBeZeroAddress(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1260,9 +1275,9 @@ pub mod subnet_actor_diamond {
                 Self::CannotReplaceFunctionThatDoesNotExists(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
-                Self::CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet(element) => {
-                    ::core::fmt::Display::fmt(element, f)
-                }
+                Self::CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet(
+                    element,
+                ) => ::core::fmt::Display::fmt(element, f),
                 Self::CannotReplaceFunctionsFromFacetWithZeroAddress(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
@@ -1270,16 +1285,26 @@ pub mod subnet_actor_diamond {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::FunctionNotFound(element) => ::core::fmt::Display::fmt(element, f),
-                Self::GatewayCannotBeZero(element) => ::core::fmt::Display::fmt(element, f),
-                Self::IncorrectFacetCutAction(element) => ::core::fmt::Display::fmt(element, f),
+                Self::GatewayCannotBeZero(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::IncorrectFacetCutAction(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::InitializationFunctionReverted(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::InvalidCollateral(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidMajorityPercentage(element) => ::core::fmt::Display::fmt(element, f),
+                Self::InvalidMajorityPercentage(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::InvalidPowerScale(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidSubmissionPeriod(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NoBytecodeAtAddress(element) => ::core::fmt::Display::fmt(element, f),
+                Self::InvalidSubmissionPeriod(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::NoBytecodeAtAddress(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::NoSelectorsProvidedForFacetForCut(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
@@ -1297,47 +1322,51 @@ pub mod subnet_actor_diamond {
         }
     }
     impl ::core::convert::From<CannotAddFunctionToDiamondThatAlreadyExists>
-        for SubnetActorDiamondErrors
-    {
+    for SubnetActorDiamondErrors {
         fn from(value: CannotAddFunctionToDiamondThatAlreadyExists) -> Self {
             Self::CannotAddFunctionToDiamondThatAlreadyExists(value)
         }
     }
-    impl ::core::convert::From<CannotAddSelectorsToZeroAddress> for SubnetActorDiamondErrors {
+    impl ::core::convert::From<CannotAddSelectorsToZeroAddress>
+    for SubnetActorDiamondErrors {
         fn from(value: CannotAddSelectorsToZeroAddress) -> Self {
             Self::CannotAddSelectorsToZeroAddress(value)
         }
     }
-    impl ::core::convert::From<CannotRemoveFunctionThatDoesNotExist> for SubnetActorDiamondErrors {
+    impl ::core::convert::From<CannotRemoveFunctionThatDoesNotExist>
+    for SubnetActorDiamondErrors {
         fn from(value: CannotRemoveFunctionThatDoesNotExist) -> Self {
             Self::CannotRemoveFunctionThatDoesNotExist(value)
         }
     }
-    impl ::core::convert::From<CannotRemoveImmutableFunction> for SubnetActorDiamondErrors {
+    impl ::core::convert::From<CannotRemoveImmutableFunction>
+    for SubnetActorDiamondErrors {
         fn from(value: CannotRemoveImmutableFunction) -> Self {
             Self::CannotRemoveImmutableFunction(value)
         }
     }
-    impl ::core::convert::From<CannotReplaceFunctionThatDoesNotExists> for SubnetActorDiamondErrors {
+    impl ::core::convert::From<CannotReplaceFunctionThatDoesNotExists>
+    for SubnetActorDiamondErrors {
         fn from(value: CannotReplaceFunctionThatDoesNotExists) -> Self {
             Self::CannotReplaceFunctionThatDoesNotExists(value)
         }
     }
     impl ::core::convert::From<CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet>
-        for SubnetActorDiamondErrors
-    {
-        fn from(value: CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet) -> Self {
+    for SubnetActorDiamondErrors {
+        fn from(
+            value: CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet,
+        ) -> Self {
             Self::CannotReplaceFunctionWithTheSameFunctionFromTheSameFacet(value)
         }
     }
     impl ::core::convert::From<CannotReplaceFunctionsFromFacetWithZeroAddress>
-        for SubnetActorDiamondErrors
-    {
+    for SubnetActorDiamondErrors {
         fn from(value: CannotReplaceFunctionsFromFacetWithZeroAddress) -> Self {
             Self::CannotReplaceFunctionsFromFacetWithZeroAddress(value)
         }
     }
-    impl ::core::convert::From<CannotReplaceImmutableFunction> for SubnetActorDiamondErrors {
+    impl ::core::convert::From<CannotReplaceImmutableFunction>
+    for SubnetActorDiamondErrors {
         fn from(value: CannotReplaceImmutableFunction) -> Self {
             Self::CannotReplaceImmutableFunction(value)
         }
@@ -1357,7 +1386,8 @@ pub mod subnet_actor_diamond {
             Self::IncorrectFacetCutAction(value)
         }
     }
-    impl ::core::convert::From<InitializationFunctionReverted> for SubnetActorDiamondErrors {
+    impl ::core::convert::From<InitializationFunctionReverted>
+    for SubnetActorDiamondErrors {
         fn from(value: InitializationFunctionReverted) -> Self {
             Self::InitializationFunctionReverted(value)
         }
@@ -1387,7 +1417,8 @@ pub mod subnet_actor_diamond {
             Self::NoBytecodeAtAddress(value)
         }
     }
-    impl ::core::convert::From<NoSelectorsProvidedForFacetForCut> for SubnetActorDiamondErrors {
+    impl ::core::convert::From<NoSelectorsProvidedForFacetForCut>
+    for SubnetActorDiamondErrors {
         fn from(value: NoSelectorsProvidedForFacetForCut) -> Self {
             Self::NoSelectorsProvidedForFacetForCut(value)
         }
@@ -1397,7 +1428,8 @@ pub mod subnet_actor_diamond {
             Self::NotGateway(value)
         }
     }
-    impl ::core::convert::From<RemoveFacetAddressMustBeZeroAddress> for SubnetActorDiamondErrors {
+    impl ::core::convert::From<RemoveFacetAddressMustBeZeroAddress>
+    for SubnetActorDiamondErrors {
         fn from(value: RemoveFacetAddressMustBeZeroAddress) -> Self {
             Self::RemoveFacetAddressMustBeZeroAddress(value)
         }
@@ -1410,7 +1442,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(
         name = "DiamondCut",
@@ -1429,7 +1461,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     #[ethevent(
         name = "OwnershipTransferred",
@@ -1453,9 +1485,7 @@ pub mod subnet_actor_diamond {
                 return Ok(SubnetActorDiamondEvents::DiamondCutFilter(decoded));
             }
             if let Ok(decoded) = OwnershipTransferredFilter::decode_log(log) {
-                return Ok(SubnetActorDiamondEvents::OwnershipTransferredFilter(
-                    decoded,
-                ));
+                return Ok(SubnetActorDiamondEvents::OwnershipTransferredFilter(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData)
         }
@@ -1464,7 +1494,9 @@ pub mod subnet_actor_diamond {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
                 Self::DiamondCutFilter(element) => ::core::fmt::Display::fmt(element, f),
-                Self::OwnershipTransferredFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::OwnershipTransferredFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
             }
         }
     }
@@ -1487,7 +1519,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct Asset {
         pub kind: u8,
@@ -1502,7 +1534,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct FacetCut {
         pub facet_address: ::ethers::core::types::Address,
@@ -1518,7 +1550,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct ConstructorParams {
         pub min_activation_collateral: ::ethers::core::types::U256,
@@ -1545,7 +1577,7 @@ pub mod subnet_actor_diamond {
         Debug,
         PartialEq,
         Eq,
-        Hash,
+        Hash
     )]
     pub struct SubnetID {
         pub root: u64,
