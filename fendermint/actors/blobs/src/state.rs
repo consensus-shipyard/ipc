@@ -1353,7 +1353,12 @@ impl State {
 
     /// Return available capacity as a difference between `blob_capacity_total` and `capacity_used`.
     fn capacity_available(&self, blob_capacity_total: u64) -> u64 {
-        blob_capacity_total - self.capacity_used
+        // Prevent underflow. We only care if free capacity is > 0 anyway.
+        if blob_capacity_total > self.capacity_used {
+            blob_capacity_total - self.capacity_used
+        } else {
+            0
+        }
     }
 
     /// Adjusts all subscriptions for `account` according to its max TTL.
@@ -1560,6 +1565,7 @@ fn ensure_delegated_credit(
                 )));
             }
         }
+
         if let Some(expiry) = delegation.approval.expiry {
             if expiry <= current_epoch {
                 return Err(ActorError::forbidden(format!(
