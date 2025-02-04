@@ -889,7 +889,7 @@ if [[ $local_deploy = true ]]; then
   echo "Parent RECALL:   ${parent_recall%.*} RECALL"
   echo "Subnet native: ${subnet_native%.*} RECALL"
   if [[ -n $(which recall) ]]; then
-    credit_balance=$(RECALL_NETWORK=localnet recall credit balance --address "${addr}" | jq '.credit_free' | tr -d '"')
+    credit_balance=$(RECALL_NETWORK=localnet recall account info --address "${addr}" | jq '.credit.credit_free' | tr -d '"')
     echo "Subnet credits: ${credit_balance}"
   fi
   echo
