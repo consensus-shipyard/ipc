@@ -251,30 +251,32 @@ where
 mod tests {
     use ethers_core::types as et;
     use std::collections::HashMap;
-    use std::path::{Path, PathBuf};
-    use std::str::FromStr;
+    use std::path::PathBuf;
 
     use crate::{topo_sort, DependencyTree};
 
     use super::Hardhat;
 
+    // TODO factor out into a test support crate
+    // Find the root of the workspace, not this crate, which is what `env!("CARGO_MANIFEST_DIR")` would return
     fn workspace_dir() -> PathBuf {
-        let workspace_dir = std::path::PathBuf::from(std::env::env("CARGO_MANIFEST_DIR").unwrap())
-            .parent().unwrap()
-            .parent().unwrap()
-            .parent().unwrap()
-            .parent().unwrap()
-            .to_path_buf();
-        workspace_dir
+        let output = std::process::Command::new(env!("CARGO"))
+            .arg("locate-project")
+            .arg("--workspace")
+            .arg("--message-format=plain")
+            .output()
+            .unwrap()
+            .stdout;
+
+        let cargo_path = PathBuf::from(std::str::from_utf8(&output).unwrap().trim());
+        cargo_path.parent().unwrap().parent().unwrap().to_path_buf()
     }
 
     /// Path to the Solidity contracts, indended to be used in tests.
     fn contracts_path() -> PathBuf {
-        let contracts_path = std::env::var("FM_CONTRACTS_DIR").map(std::path::PathBuf::from).unwrap_or_else(|_| {
-            workspace_dir()
-                .join("contracts")
-                .join("out")
-        });
+        let contracts_path = std::env::var("FM_CONTRACTS_DIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|_| workspace_dir().join("contracts").join("out"));
 
         contracts_path
     }
