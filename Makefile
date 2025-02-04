@@ -36,7 +36,7 @@ config-devnet:
 	./scripts/setup.sh
 
 run-devnet-iroh:
-	cargo install iroh-cli --version 0.26.0
+	cargo install iroh-cli --version 0.28.1
 	iroh --rpc-addr 127.0.0.1:4919 start
 
 run-devnet-fendermint:
@@ -46,17 +46,17 @@ run-devnet-fendermint:
 	FM_VALIDATOR_KEY__PATH=keys/validator.sk \
 	FM_VALIDATOR_KEY__KIND=regular \
 	FM_RESOLVER__CONNECTION__LISTEN_ADDR=/ip4/127.0.0.1/tcp/3001 \
-	./target/release/fendermint run --iroh-addr 127.0.0.1:4919 > fendermint.log 2>&1
+	./target/release/fendermint run --iroh-addr 127.0.0.1:4919
 
 run-devnet-cometbft:
 	cometbft unsafe-reset-all
 	cometbft start
 
 run-devnet-objects:
-	FM_NETWORK=test ./target/release/fendermint objects run
+	FM_NETWORK=test FM_OBJECTS__TRACING__CONSOLE__LEVEL=debug ./target/release/fendermint objects run
 
 run-devnet-evm:
-	./target/release/fendermint eth run
+	FM_ETH__TRACING__CONSOLE__LEVEL=debug ./target/release/fendermint eth run
 
 run-localnet:
 	./scripts/deploy_subnet/deploy.sh localnet

@@ -2,6 +2,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::str::FromStr;
 use std::time::Instant;
 use std::{convert::Infallible, net::ToSocketAddrs, num::ParseIntError};
 
@@ -12,23 +13,22 @@ use entangler::{ChunkRange, Config, Entangler};
 use entangler_storage::iroh::IrohStorage as EntanglerIrohStorage;
 use fendermint_actor_bucket::{GetParams, Object};
 use fendermint_app_settings::objects::ObjectsSettings;
-use fendermint_rpc::client::FendermintClient;
-use fendermint_rpc::message::GasParams;
-use fendermint_rpc::QueryClient;
+use fendermint_rpc::{client::FendermintClient, message::GasParams, QueryClient};
 use fendermint_vm_message::query::FvmQueryHeight;
 use futures_util::{StreamExt, TryStreamExt};
-use fvm_shared::{address::Address, econ::TokenAmount};
-use iroh::blobs::provider::AddProgress;
-use iroh::blobs::util::SetTagOption;
-use iroh::blobs::Hash;
-use iroh::client::blobs::BlobStatus;
-use iroh::net::NodeAddr;
+use fvm_shared::{
+    address::{Address, Error as NetworkError, Network},
+    econ::TokenAmount,
+};
+use ipc_api::ethers_address_to_fil_address;
+use iroh::{
+    blobs::{provider::AddProgress, util::SetTagOption, Hash},
+    client::blobs::BlobStatus,
+    net::NodeAddr,
+};
 use lazy_static::lazy_static;
 use num_traits::Zero;
-use prometheus::register_histogram;
-use prometheus::register_int_counter;
-use prometheus::Histogram;
-use prometheus::IntCounter;
+use prometheus::{register_histogram, register_int_counter, Histogram, IntCounter};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::info;
@@ -92,7 +92,7 @@ cmd! {
                 .and(with_max_size(settings.max_object_size))
                 .and_then(handle_object_upload);
 
-                let objects_download = warp::path!("v1" / "objects" / Address / ..)
+                let objects_download = warp::path!("v1" / "objects" / String / ..)
                 .and(warp::path::tail())
                 .and(
                     warp::get().map(|| "GET".to_string()).or(warp::head().map(|| "HEAD".to_string())).unify()
@@ -337,7 +337,7 @@ async fn handle_object_upload(
                     iroh::client::blobs::DownloadOptions {
                         format: iroh::blobs::BlobFormat::Raw,
                         nodes: vec![source],
-                        tag: iroh::blobs::util::SetTagOption::Named(tag),
+                        tag: SetTagOption::Named(tag),
                         mode: iroh::client::blobs::DownloadMode::Queued,
                     },
                 )
@@ -501,7 +501,7 @@ pub(crate) struct ObjectRange {
 }
 
 async fn handle_object_download<F: QueryClient + Send + Sync>(
-    address: Address,
+    address: String,
     tail: Tail,
     method: String,
     range: Option<String>,
@@ -509,6 +509,11 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
     client: F,
     iroh: iroh::client::Iroh,
 ) -> Result<impl Reply, Rejection> {
+    let address = parse_address(&address).map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("invalid address {}: {}", address, e),
+        })
+    })?;
     let height = height_query
         .height
         .unwrap_or(FvmQueryHeight::Committed.into());
@@ -674,6 +679,21 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
         }
         None => Err(Rejection::from(NotFound)),
     }
+}
+
+/// Parse an f/eth-address from string.
+pub fn parse_address(s: &str) -> anyhow::Result<Address> {
+    let addr = Network::Mainnet
+        .parse_address(s)
+        .or_else(|e| match e {
+            NetworkError::UnknownNetwork => Network::Testnet.parse_address(s),
+            _ => Err(e),
+        })
+        .or_else(|_| {
+            let addr = ethers::types::Address::from_str(s)?;
+            ethers_address_to_fil_address(&addr)
+        })?;
+    Ok(addr)
 }
 
 // Rejection handlers
@@ -855,7 +875,7 @@ mod tests {
         rng.fill_bytes(&mut test_data);
 
         let size = test_data.len() as u64;
-        let hash = iroh_base::hash::Hash::new(&test_data);
+        let hash = Hash::new(&test_data);
 
         // Create multipart form with direct data upload
         let boundary = "------------------------abcdef1234567890"; // Use a longer boundary
@@ -929,7 +949,7 @@ mod tests {
             .hash;
 
         let result = handle_object_download(
-            Address::new_actor("t2mnd5jkuvmsaf457ympnf3monalh3vothdd5njoy".as_bytes()),
+            "t2mnd5jkuvmsaf457ympnf3monalh3vothdd5njoy".into(),
             warp::test::request()
                 .path("/foo/bar")
                 .filter(&warp::path::tail())
@@ -976,7 +996,7 @@ mod tests {
             .hash;
 
         let result = handle_object_download(
-            Address::new_actor("t2mnd5jkuvmsaf457ympnf3monalh3vothdd5njoy".as_bytes()),
+            "t2mnd5jkuvmsaf457ympnf3monalh3vothdd5njoy".into(),
             warp::test::request()
                 .path("/foo/bar")
                 .filter(&warp::path::tail())
@@ -1014,7 +1034,7 @@ mod tests {
             .hash;
 
         let result = handle_object_download(
-            Address::new_actor("t2mnd5jkuvmsaf457ympnf3monalh3vothdd5njoy".as_bytes()),
+            "t2mnd5jkuvmsaf457ympnf3monalh3vothdd5njoy".into(),
             warp::test::request()
                 .path("/foo/bar")
                 .filter(&warp::path::tail())
