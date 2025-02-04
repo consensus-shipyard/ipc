@@ -18,6 +18,8 @@ use fendermint_rpc::QueryClient;
 use fendermint_vm_message::query::FvmQueryHeight;
 use futures_util::{StreamExt, TryStreamExt};
 use fvm_shared::{address::Address, econ::TokenAmount};
+use iroh::blobs::provider::AddProgress;
+use iroh::blobs::util::SetTagOption;
 use iroh::blobs::Hash;
 use iroh::client::blobs::BlobStatus;
 use iroh::net::NodeAddr;
@@ -161,7 +163,7 @@ struct ObjectParser {
     hash: Option<Hash>,
     size: Option<u64>,
     source: Option<NodeAddr>,
-    data: Option<Vec<u8>>,
+    data_part: Option<Part>,
 }
 
 impl ObjectParser {
@@ -203,18 +205,10 @@ impl ObjectParser {
         Ok(())
     }
 
-    async fn read_data(&mut self, form_part: Part) -> anyhow::Result<()> {
-        self.data = Some(self.read_part(form_part).await?);
-        Ok(())
-    }
-
-    async fn read_form(mut form_parts: warp::multipart::FormData) -> anyhow::Result<Self> {
+    async fn read_form(mut form_data: warp::multipart::FormData) -> anyhow::Result<Self> {
         let mut object_parser = ObjectParser::default();
-        while let Some(part) = form_parts.next().await {
-            let part = part.map_err(|e| {
-                dbg!(e);
-                anyhow!("cannot read form data")
-            })?;
+        while let Some(part) = form_data.next().await {
+            let part = part.map_err(|e| anyhow!("cannot read form data: {}", e))?;
             match part.name() {
                 "hash" => {
                     object_parser.read_hash(part).await?;
@@ -226,7 +220,10 @@ impl ObjectParser {
                     object_parser.read_source(part).await?;
                 }
                 "data" => {
-                    object_parser.read_data(part).await?;
+                    object_parser.data_part = Some(part);
+                    // This early return was added to avoid the "failed to lock multipart state" error.
+                    // It implies that the data field must be the last one sent in the multipart form.
+                    return Ok(object_parser);
                 }
                 // Ignore but accept signature-related fields for backward compatibility
                 "chain_id" | "msg" => {
@@ -296,11 +293,11 @@ struct UploadResponse {
 
 async fn handle_object_upload(
     iroh: iroh::client::Iroh,
-    form_parts: warp::multipart::FormData,
+    form_data: warp::multipart::FormData,
     max_size: u64,
 ) -> Result<impl Reply, Rejection> {
     let start_time = Instant::now();
-    let parser = ObjectParser::read_form(form_parts).await.map_err(|e| {
+    let parser = ObjectParser::read_form(form_data).await.map_err(|e| {
         Rejection::from(BadRequest {
             message: format!("failed to read form: {}", e),
         })
@@ -321,7 +318,7 @@ async fn handle_object_upload(
     }
 
     // Handle the two upload cases
-    let hash = match (parser.source, parser.data) {
+    let hash = match (parser.source, parser.data_part) {
         // Case 1: Source node provided - download from the source
         (Some(source), None) => {
             let hash = match parser.hash {
@@ -374,28 +371,47 @@ async fn handle_object_upload(
         }
 
         // Case 2: Direct upload - store the provided data
-        (None, Some(data)) => {
-            if data.len() as u64 != size {
-                return Err(Rejection::from(BadRequest {
-                    message: format!(
-                        "uploaded data size and given size do not match (expected {}, got {})",
-                        size,
-                        data.len()
-                    ),
-                }));
-            }
+        (None, Some(data_part)) => {
+            let stream = data_part.stream().map(|result| {
+                result
+                    .map(|mut buf| buf.copy_to_bytes(buf.remaining()))
+                    .map_err(|e| {
+                        std::io::Error::new(std::io::ErrorKind::Other, format!("Warp error: {}", e))
+                    })
+            });
 
-            let uploaded_hash = iroh
+            let mut progress = iroh
                 .blobs()
-                .add_bytes(data.as_slice().to_vec())
+                .add_stream(stream, SetTagOption::Auto)
                 .await
                 .map_err(|e| {
                     Rejection::from(BadRequest {
                         message: format!("failed to store blob: {}", e),
                     })
-                })?
-                .hash;
+                })?;
 
+            let uploaded_hash = loop {
+                let Some(event) = progress.next().await else {
+                    return Err(Rejection::from(BadRequest {
+                        message: "Unexpected end while ingesting data".to_string(),
+                    }));
+                };
+                match event.map_err(|e| {
+                    Rejection::from(BadRequest {
+                        message: format!("failed to make progress: {}", e),
+                    })
+                })? {
+                    AddProgress::AllDone { hash, .. } => {
+                        break hash;
+                    }
+                    AddProgress::Abort(err) => {
+                        return Err(Rejection::from(BadRequest {
+                            message: format!("upload aborted: {}", err),
+                        }));
+                    }
+                    _ => continue,
+                }
+            };
             info!("stored uploaded blob {} (size: {})", uploaded_hash, size);
             COUNTER_BYTES_UPLOADED.inc_by(size);
 
