@@ -35,7 +35,7 @@ impl ReadReqActor {
     fn open_read_request(
         rt: &impl Runtime,
         params: OpenReadRequestParams,
-    ) -> Result<(), ActorError> {
+    ) -> Result<Hash, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         rt.transaction(|st: &mut State, _rt| {
             st.open_read_request(
@@ -118,7 +118,6 @@ impl ActorCode for ReadReqActor {
 mod tests {
     use super::*;
 
-    use crate::state::pad_to_32_bytes;
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::test_utils::{
         expect_empty, MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, SYSTEM_ACTOR_CODE_ID,
@@ -127,7 +126,6 @@ mod tests {
     use fvm_ipld_encoding::ipld_block::IpldBlock;
     use fvm_shared::address::Address;
     use rand::RngCore;
-    use sha2::Digest;
 
     pub fn new_hash(size: usize) -> (Hash, u64) {
         let mut rng = rand::thread_rng();
@@ -185,29 +183,19 @@ mod tests {
             callback_addr: f4_eth_addr,
             callback_method,
         };
-        let result = rt.call::<ReadReqActor>(
-            Method::OpenReadRequest as u64,
-            IpldBlock::serialize_cbor(&open_params).unwrap(),
-        );
-        assert!(result.is_ok());
+        let request_id = rt
+            .call::<ReadReqActor>(
+                Method::OpenReadRequest as u64,
+                IpldBlock::serialize_cbor(&open_params).unwrap(),
+            )
+            .unwrap()
+            .unwrap()
+            .deserialize::<Hash>()
+            .unwrap();
         rt.verify();
 
         // Test checking request status
         rt.expect_validate_caller_any();
-        // Calculate the expected request ID (matches the logic in state.rs)
-        let mut hasher = sha2::Sha256::new();
-        hasher.update(
-            [
-                &pad_to_32_bytes(blob_hash.0.as_ref())[..],
-                &pad_to_32_bytes(&offset.to_be_bytes())[..],
-                &pad_to_32_bytes(&len.to_be_bytes())[..],
-                &pad_to_32_bytes(&f4_eth_addr.to_bytes())[..],
-                &pad_to_32_bytes(&callback_method.to_be_bytes())[..],
-            ]
-            .concat(),
-        );
-        let request_id = Hash(hasher.finalize().into());
-
         let status_params = GetReadRequestStatusParams(request_id);
         let result = rt
             .call::<ReadReqActor>(

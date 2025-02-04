@@ -181,6 +181,14 @@ impl TryFrom<&str> for Hash {
     }
 }
 
+impl From<u64> for Hash {
+    fn from(value: u64) -> Self {
+        let mut padded = [0u8; 32];
+        padded[24..].copy_from_slice(&value.to_be_bytes());
+        Self(padded)
+    }
+}
+
 /// Iroh node public key.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
