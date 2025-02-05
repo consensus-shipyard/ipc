@@ -49,4 +49,5 @@ jobs:
           shared-key: build
 
       - name: Run e2e tests
+        working-directory: crates
         run: cd fendermint && PROFILE=release make e2e-only
