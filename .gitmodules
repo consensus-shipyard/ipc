@@ -16,4 +16,3 @@
 [submodule "recall-contracts"]
 	path = recall-contracts
 	url = git@github.com:recallnet/contracts.git
-	branch = joe/rename
