@@ -4,7 +4,7 @@ BUILTIN_ACTORS_TAG    ?= v15.0.0
 BUILTIN_ACTORS_BUNDLE := $(PWD)/builtin-actors/output/bundle.car
 CUSTOM_ACTORS_BUNDLE  := $(PWD)/actors/output/custom_actors_bundle.car
 
-IPC_ACTORS_DIR        := $(PWD)/../contracts
+IPC_ACTORS_DIR        := $(PWD)/../../contracts
 IPC_ACTORS_OUT        := $(IPC_ACTORS_DIR)/out
 IPC_ACTORS_CODE       := $(shell find $(IPC_ACTORS_DIR) -type f \( -name "*.sol" \))
 IPC_ACTORS_GEN        := .contracts-gen
@@ -29,7 +29,7 @@ BUILDX_TAG   ?= fendermint:latest
 all: lint build test diagrams docker-build
 
 diagrams:
-	make -C  ../docs/fendermint/diagrams diagrams
+	make -C  ../../docs/fendermint/diagrams diagrams
 
 build: $(IPC_ACTORS_GEN) | protoc npm
 	cargo build --locked --release

@@ -274,11 +274,9 @@ mod tests {
 
     /// Path to the Solidity contracts, indended to be used in tests.
     fn contracts_path() -> PathBuf {
-        let contracts_path = std::env::var("FM_CONTRACTS_DIR")
+        std::env::var("FM_CONTRACTS_DIR")
             .map(std::path::PathBuf::from)
-            .unwrap_or_else(|_| workspace_dir().join("contracts").join("out"));
-
-        contracts_path
+            .unwrap_or_else(|_| workspace_dir().join("contracts").join("out"))
     }
 
     fn test_hardhat() -> Hardhat {
