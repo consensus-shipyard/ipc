@@ -19,7 +19,7 @@ use async_trait::async_trait;
 use fendermint_actor_blob_reader::{
     CloseReadRequestParams, GetOpenReadRequestsParams, GetReadRequestStatusParams,
     Method::{CloseReadRequest, GetOpenReadRequests, GetReadRequestStatus, SetReadRequestPending},
-    ReadRequestStatus, SetReadRequestPendingParams,
+    ReadRequestStatus, SetReadRequestPendingParams, BLOB_READER_ACTOR_ADDR,
 };
 use fendermint_actor_blobs_shared::{
     params::{
@@ -988,6 +988,9 @@ where
                     // Send the data to the callback address.
                     // If this fails (e.g., the callback address is not reachable),
                     // we will still close the request.
+                    //
+                    // We MUST use a non-prevliged actor (BLOB_READER_ACTOR_ADDR) to call the callback.
+                    // This is to prevent malicious user from accessing unauthorized APIs.
                     read_request_callback(&mut state, &read_request)?;
                     // Set the status of the request to fulfill.
                     let ret = close_read_request(&mut state, read_request.id)?;
@@ -1330,7 +1333,18 @@ where
     } = read_request.clone();
 
     let params = RawBytes::serialize(response)?;
-    let msg = create_implicit_message(to, method_num, params, fvm_shared::BLOCK_GAS_LIMIT);
+    let msg = Message {
+        version: Default::default(),
+        from: BLOB_READER_ACTOR_ADDR,
+        to,
+        sequence: 0,
+        value: Default::default(),
+        method_num,
+        params,
+        gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
+        gas_fee_cap: Default::default(),
+        gas_premium: Default::default(),
+    };
     state.execute_implicit(msg)?;
 
     Ok(())
