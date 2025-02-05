@@ -90,5 +90,8 @@ async function deployGatewayDiamond(
 }
 
 function gitCommitSha(): string {
+    if (process.env.COMMIT_SHA) {
+        return process.env.COMMIT_SHA;
+    }
     return require('child_process').execSync('git rev-parse --short HEAD').toString().trim()
 }
