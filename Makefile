@@ -5,6 +5,8 @@ default:
 	cd contracts && make gen
 	cd crates && (cargo build --release && ./target/release/ipc-cli --version && ./target/release/fendermint --version)
 
+# podman has a compatible API, and is better supported
+CONTAINER_FRONTEND_BIN ?= docker
 SUBTREES_RUST := crates
 SUBTREES_CONTRACTS := contracts
 SUBTREES_ALL := $(SUBTREES_RUST) $(SUBTREES_CONTRACTS)
