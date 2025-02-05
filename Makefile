@@ -7,7 +7,7 @@ default:
 
 # podman has a compatible API, and is better supported
 CONTAINER_FRONTEND_BIN ?= docker
-SUBTREES_RUST := crates
+SUBTREES_RUST := $(patsubst %, crates/%, $(ls -1 crates))
 SUBTREES_CONTRACTS := contracts
 SUBTREES_ALL := $(SUBTREES_RUST) $(SUBTREES_CONTRACTS)
 
