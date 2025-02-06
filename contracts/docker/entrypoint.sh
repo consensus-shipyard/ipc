@@ -20,7 +20,7 @@ port=8545
 
 # Start Anvil with the fixed mnemonic and custom chain settings.
 echo "Starting Anvil..."
-anvil --host 0.0.0.0 --port "$port" --chain-id "$chain_id" --mnemonic "$MNEMONIC" 2>&1 | tee /tmp/anvil.log &
+anvil --host 0.0.0.0 --port "$port" --chain-id "$chain_id" --mnemonic "$MNEMONIC" --state /out/anvil_state.json 2>&1 | tee /tmp/anvil.log &
 ANVIL_PID=$!
 echo "Anvil started with PID: $ANVIL_PID"
 
@@ -36,6 +36,18 @@ while ! curl -s http://localhost:8545 > /dev/null; do
     fi
 done
 echo "Anvil is up!"
+
+gateway_file="/out/GatewayAddress.txt"
+subnet_file="/out/SubnetAddress.txt"
+
+# Check if both files exist.
+if [ -f "$gateway_file" ] && [ -f "$subnet_file" ]; then
+  echo "Skipping deployment because $gateway_file and $subnet_file exists. Container will remain running as long as Anvil is active."
+  wait "$ANVIL_PID"
+
+  exit 0
+fi
+
 
 # Derive the first account's private key from the mnemonic using Node.js.
 echo "Deriving private key from mnemonic..."
@@ -82,8 +94,9 @@ else
       echo "Deployment successful."
       echo "GatewayAddress: $gateway_address"
       echo "SubnetAddress: $subnet_address"
-      echo "$gateway_address" > /app/GatewayAddress.txt
-      echo "$subnet_address" > /app/SubnetAddress.txt
+      mkdir -p /out
+      echo "$gateway_address" > "$gateway_file"
+      echo "$subnet_address" > "$subnet_file"
     fi
 fi
 
