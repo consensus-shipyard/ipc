@@ -110,7 +110,7 @@ importers:
         specifier: ^5.0.10
         version: 5.0.10
 
-  extras/axelar-token:
+  demos/axelar-token:
     dependencies:
       '@axelar-network/axelar-gmp-sdk-solidity':
         specifier: v5.6.4
@@ -144,7 +144,7 @@ importers:
         specifier: ^1.3.1
         version: 1.3.1(prettier@3.3.2)
 
-  extras/linked-token:
+  demos/linked-token:
     dependencies:
       '@consensus-shipyard/ipc-contracts':
         specifier: workspace:^
