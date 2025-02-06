@@ -40,8 +40,8 @@ jobs:
         with:
           path: |
             ./contracts/out
-            ./contracts/bindings
             ./contracts/cache
+            ./crates/bindings
           key: v2-contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}
 
       - uses: Swatinem/rust-cache@v2
@@ -49,5 +49,5 @@ jobs:
           shared-key: build
 
       - name: Run e2e tests
+        working-directory: crates
         run: cd fendermint && PROFILE=release make e2e-only
-
