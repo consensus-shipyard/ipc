@@ -13,7 +13,7 @@ LINES=4
 
 # Ignore auto-generated code.
 IGNORE=(
-	"crates/binding" "crates/patched_external"
+	"crates/bindings" "crates/patched_external"
 );
 
 ignore() {
