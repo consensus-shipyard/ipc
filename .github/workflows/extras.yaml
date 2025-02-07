@@ -14,7 +14,7 @@ jobs:
       fail-fast: true
     defaults:
       run:
-        working-directory: ./extras/axelar-token
+        working-directory: ./demos/axelar-token
     steps:
       - uses: actions/checkout@v4
         with:
