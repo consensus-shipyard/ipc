@@ -33,7 +33,6 @@ If you get this error, then it means that Rust could not find a version of the `
 
 This error can happen for example when upgrading to a new major/minor FVM versions without upgrading also other dependencies like `frc_dispatch` which requires fvm as well. In that case we must upgrade the `frc_dispatch` package to use the same FVM version as we are using.
 
-
 ### Unexplained transitive dependencies in wasm32 target after upgrading FVM version
 
 When upgrading FVM dependency (from 4.0 to 4.1) it resulted in our `fendermint/actors/build.rs` script to fail due Cargo including multiple new dependencies in the `wasm32` target which did not occur before and caused build errors since these new dependencies did not support Wasm target.
