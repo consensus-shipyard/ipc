@@ -5,7 +5,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 const SKIP_ENV_VAR_NAME: &str = "SKIP_BINDING_GENERATION";
-/// Generate Rust bindings from the IPC Solidity Actors ABI artifacts.
+/// Generate Rust contract-bindings from the IPC Solidity Actors ABI artifacts.
 ///p
 /// These are built by `make ipc-actors-abi`, here we just add the final step
 /// so we have better code completion with Rust Analyzer.
@@ -65,9 +65,9 @@ fn main() -> color_eyre::Result<()> {
     )?;
     writeln!(mod_f)?;
 
-    // The list of actors we need bindings for, based on how the ipc-actor uses `abigen!`.
+    // The list of actors we need contract-bindings for, based on how the ipc-actor uses `abigen!`.
     // With the diamond pattern, there is a contract that holds state, and there are these facets which have the code,
-    // so we need bindings for the facets, but well (I think) use the same address with all of them.
+    // so we need contract-bindings for the facets, but well (I think) use the same address with all of them.
     for contract_name in [
         "IDiamond",
         "DiamondLoupeFacet",

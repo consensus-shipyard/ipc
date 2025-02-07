@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-// The IPC actors have bindings in `ipc_actors_abis`.
+// The IPC actors have contract-bindings in `ipc_actors_abis`.
 // Here we define stable IDs for them, so we can deploy the
 // Solidity contracts during genesis.
 
