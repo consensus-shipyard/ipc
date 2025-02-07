@@ -1,4 +1,4 @@
-name: Extras
+name: Demos
 
 on:
   workflow_call:
@@ -8,13 +8,13 @@ env:
 
 jobs:
   examples-axelar-token:
-    name: "Extras: Axelar token"
+    name: "Demos: Axelar token"
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
     defaults:
       run:
-        working-directory: ./extras/axelar-token
+        working-directory: ./demos/axelar-token
     steps:
       - uses: actions/checkout@v4
         with:
