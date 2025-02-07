@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 use libipld::store::StoreParams;
 use libp2p::{
+    connection_limits::{self, ConnectionLimits},
     identify,
     identity::{Keypair, PublicKey},
     ping,
@@ -59,6 +60,7 @@ where
     discovery: discovery::Behaviour,
     membership: membership::Behaviour<V>,
     content: content::Behaviour<P>,
+    connection_limits: connection_limits::Behaviour,
 }
 
 // Unfortunately by using `#[derive(NetworkBehaviour)]` we cannot easily inspects events
@@ -77,6 +79,7 @@ where
         dc: DiscoveryConfig,
         mc: MembershipConfig,
         cc: ContentConfig,
+        limits: ConnectionLimits,
         store: S,
     ) -> Result<Self, ConfigError>
     where
@@ -91,6 +94,7 @@ where
             discovery: discovery::Behaviour::new(nc.clone(), dc)?,
             membership: membership::Behaviour::new(nc, mc)?,
             content: content::Behaviour::new(cc, store),
+            connection_limits: connection_limits::Behaviour::new(limits),
         })
     }
 
