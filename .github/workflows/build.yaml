@@ -52,11 +52,11 @@ jobs:
           path: |
             ./contracts/out
             ./contracts/cache
-            ./crates/bindings
+            ./crates/contract-bindings
           ## TODO maybe add the rust version and solc version to the key
           key: v2-contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}
 
-      - name: Generate ABI and bindings
+      - name: Generate ABI and contract-bindings
         run: cd contracts && make gen
 
       - name: Install Rust nightly

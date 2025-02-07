@@ -41,7 +41,7 @@ jobs:
           path: |
             ./contracts/out
             ./contracts/cache
-            ./crates/bindings
+            ./crates/contract-bindings
           key: v2-contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}
 
       - uses: Swatinem/rust-cache@v2

@@ -13,7 +13,7 @@ The image contains both the `fendermint` and `ipc-cli` executables (dispatched b
 As a pre-requisite this will ensure that the following artifacts are prepared:
 * The builtin-actors bundle is downloaded from GitHub; if you upgrade the version of these, make sure you clear out any existing artifacts or you might get interface version conflicts at runtime when the bundles are loaded.
 * The custom actor bundle is built; this prepares some JSON artifacts as well, which are needed for deployment.
-* The IPC actor bindings are generated; this is refreshed every time a Solidity artifact changes.
+* The IPC actor contract-bindings are generated; this is refreshed every time a Solidity artifact changes.
 
 The actor bundles are CAR files which are copied into the `fendermint` image, so that we don't have to procure them separately when we want to create a container.
 

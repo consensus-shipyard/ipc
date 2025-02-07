@@ -52,7 +52,7 @@ async fn test_applying_upgrades() {
 
     // this is the contract we want to deploy
     const CONTRACT_HEX: &str = include_str!("../../contracts/SimpleCoin.bin");
-    // generate type safe bindings in rust to this contract
+    // generate type safe contract-bindings in rust to this contract
     abigen!(SimpleCoin, "../contracts/SimpleCoin.abi");
     // once we deploy this contract, this is the address we expect the contract to be deployed to
     const CONTRACT_ADDRESS: &str = "f410fnz5jdky3zzcj6pejqkomkggw72pcuvkpihz2rwa";
