@@ -20,26 +20,26 @@ members = [
   "ipld/resolver",
 
   # fendermint
-  "client/abci",
-  "client/app",
-  "client/app/options",
-  "client/crypto",
-  "client/app/settings",
-  "client/eth/*",
-  "client/rocksdb",
-  "client/rpc",
-  "client/storage",
-  "client/testing",
-  "client/testing/materializer",
-  "client/testing/*-test",
-  "client/tracing",
-  "client/vm/*",
-  "client/actors",
-  "client/actors/api",
-  "client/actors/chainmetadata",
-  "client/actors/activity-tracker",
-  "client/actors/eam",
-  "client/actors/gas_market/eip1559",
+  "node/abci",
+  "node/app",
+  "node/app/options",
+  "node/crypto",
+  "node/app/settings",
+  "node/eth/*",
+  "node/rocksdb",
+  "node/rpc",
+  "node/storage",
+  "node/testing",
+  "node/testing/materializer",
+  "node/testing/*-test",
+  "node/tracing",
+  "node/vm/*",
+  "node/actors",
+  "node/actors/api",
+  "node/actors/chainmetadata",
+  "node/actors/activity-tracker",
+  "node/actors/eam",
+  "node/actors/gas_market/eip1559",
 ]
 
 [workspace.package]
@@ -183,7 +183,7 @@ ipc_ipld_resolver = { path = "ipld/resolver" }
 ipc-types = { path = "ipc/types" }
 ipc-observability = { path = "ipc/observability" }
 ipc_actors_abis = { path = "contract-bindings" }
-fendermint_actors_api = { path = "client/actors/api" }
+fendermint_actors_api = { path = "node/actors/api" }
 
 # Vendored for cross-compilation, see https://github.com/cross-rs/cross/wiki/Recipes#openssl
 # Make sure every top level build target actually imports this dependency, and don't end up
@@ -191,7 +191,7 @@ fendermint_actors_api = { path = "client/actors/api" }
 # for ARM64 on AMD64 will fail, it won't find the OpenSSL installation.
 openssl = { version = "0.10", features = ["vendored"] }
 
-# NOTE: When upgrading the FVM it may cause our client/actors/build.rs to fail as it can
+# NOTE: When upgrading the FVM it may cause our node/actors/build.rs to fail as it can
 # pull in crates as transitive dependencies that do not support Wasm architector. If this
 # happens, try removing "crypto" feature from fvm_shared dependency in contracts/contract-bindings/Cargo.toml
 # and run `cargo build`. Then add the "crypto" feature back and run `cargo build` again.
@@ -224,8 +224,8 @@ fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-act
 fil_actor_eam = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
 fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
 
-fendermint_actor_eam = { path = "./client/actors/eam" }
-fendermint_actor_activity_tracker = { path = "./client/actors/activity-tracker" }
+fendermint_actor_eam = { path = "./node/actors/eam" }
+fendermint_actor_activity_tracker = { path = "./node/actors/activity-tracker" }
 
 cid = { version = "0.10.1", default-features = false, features = [
   "serde-codec",

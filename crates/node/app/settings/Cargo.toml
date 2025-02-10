@@ -1,6 +1,6 @@
 [package]
 name = "fendermint_app_settings"
-description = "Fendermint configuration settings. The defaults are in client/app/config/default.toml"
+description = "Fendermint configuration settings. The defaults are in node/app/config/default.toml"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
