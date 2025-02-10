@@ -5,10 +5,14 @@ set -euo pipefail
 cleanup() {
   echo "Cleaning up..."
   if ps -p "${ANVIL_PID:-0}" > /dev/null 2>&1; then
-    echo "Terminating Anvil process (PID: $ANVIL_PID)"
-    kill "$ANVIL_PID" || echo "Failed to kill Anvil process"
+    echo "Sending SIGINT to Anvil process (PID: $ANVIL_PID)"
+    kill -SIGINT "$ANVIL_PID"
+    # Allow time for a graceful shutdown.
+    sleep 5
   fi
 }
+
+# Install trap to catch termination signals.
 trap cleanup EXIT INT TERM
 
 # Set MNEMONIC (from environment or default).
@@ -17,10 +21,11 @@ echo "Using MNEMONIC: $MNEMONIC"
 
 chain_id=31415926
 port=8545
+anvil_state_file=/out/anvil_state.json
 
 # Start Anvil with the fixed mnemonic and custom chain settings.
 echo "Starting Anvil..."
-anvil --host 0.0.0.0 --port "$port" --chain-id "$chain_id" --mnemonic "$MNEMONIC" --state /out/anvil_state.json 2>&1 | tee /tmp/anvil.log &
+anvil --host 0.0.0.0 --port "$port" --chain-id "$chain_id" --mnemonic "$MNEMONIC" --state "$anvil_state_file" &
 ANVIL_PID=$!
 echo "Anvil started with PID: $ANVIL_PID"
 
@@ -37,17 +42,14 @@ while ! curl -s http://localhost:8545 > /dev/null; do
 done
 echo "Anvil is up!"
 
-gateway_file="/out/GatewayAddress.txt"
-subnet_file="/out/SubnetAddress.txt"
+gateway_file="/out/gateway_address.txt"
+subnet_registry_file="/out/subnet_registry_address.txt"
 
 # Check if both files exist.
-if [ -f "$gateway_file" ] && [ -f "$subnet_file" ]; then
-  echo "Skipping deployment because $gateway_file and $subnet_file exists. Container will remain running as long as Anvil is active."
+if [ -f "$gateway_file" ] && [ -f "$subnet_registry_file" ] && [ -f "$anvil_state_file" ]; then
+  echo "Skipping deployment because $gateway_file, $subnet_registry_file and $anvil_state_file exists. Container will remain running as long as Anvil is active."
   wait "$ANVIL_PID"
-
-  exit 0
 fi
-
 
 # Derive the first account's private key from the mnemonic using Node.js.
 echo "Deriving private key from mnemonic..."
@@ -85,18 +87,18 @@ if [ $deploy_exit -ne 0 ]; then
 else
     # Attempt to extract the deployed contract addresses.
     gateway_address=$(echo "$deployment_output" | awk '/GatewayDiamond deployed at/ { print $NF }')
-    subnet_address=$(echo "$deployment_output" | awk '/SubnetRegistryDiamond deployed at/ { print $NF }')
-    if [ -z "$gateway_address" ] || [ -z "$subnet_address" ]; then
+    subnet_registry_address=$(echo "$deployment_output" | awk '/SubnetRegistryDiamond deployed at/ { print $NF }')
+    if [ -z "$gateway_address" ] || [ -z "$subnet_registry_address" ]; then
       echo "Warning: Could not extract deployed contract addresses. Full deployment output:"
       echo "$deployment_output"
       exit 1
     else
       echo "Deployment successful."
       echo "GatewayAddress: $gateway_address"
-      echo "SubnetAddress: $subnet_address"
+      echo "SubnetRegistryAddress: $subnet_registry_address"
       mkdir -p /out
       echo "$gateway_address" > "$gateway_file"
-      echo "$subnet_address" > "$subnet_file"
+      echo "$subnet_registry_address" > "$subnet_registry_file"
     fi
 fi
 
