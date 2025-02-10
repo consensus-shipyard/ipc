@@ -111,7 +111,7 @@ The ports get allocated from 30000 onward, 100 range to each node, so the last t
 #### Logs
 
 For troubleshooting we can look at the logs, either by using `docker logs` and the container name, or for the `fendermint` container we can also access the logs:
-* `less testing/materializer/tests/docker-materializer-data/testnets/layer2/root/nodes/brussels/client/logs/fendermint.2024-03-11.log`
+* `less testing/materializer/tests/docker-materializer-data/testnets/layer2/root/nodes/brussels/node/logs/fendermint.2024-03-11.log`
 * `docker logs brussels-fendermint-955632`
 
 

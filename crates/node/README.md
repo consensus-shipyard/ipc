@@ -8,15 +8,15 @@ Fendermint is an effort to implement [IPC with Tendermint Core](https://docs.goo
 
 ## Quick Start
 
-- [Local testnets](../docs/client/localnet.md)
+- [Local testnets](../docs/fendermint/localnet.md)
 
 ## Docs
 
-Please have a look in the [docs](../docs/client/README.md) to see an overview of the project, how to run the components, and previous demos.
+Please have a look in the [docs](../docs/fendermint/README.md) to see an overview of the project, how to run the components, and previous demos.
 
 ## IPC
 
-Fendermint is built with support for [IPC](https://github.com/consensus-shipyard/ipc) by design. If you are looking to deploy the infrastructure Fendermint-based IPC subnet, refer to the [IPC main repo](https://github.com/consensus-shipyard/ipc), or have a look at the [IPC infrastructure docs](../docs/client/ipc.md).
+Fendermint is built with support for [IPC](https://github.com/consensus-shipyard/ipc) by design. If you are looking to deploy the infrastructure Fendermint-based IPC subnet, refer to the [IPC main repo](https://github.com/consensus-shipyard/ipc), or have a look at the [IPC infrastructure docs](../docs/node/ipc.md).
 
 ## Testing
 
@@ -27,8 +27,8 @@ make test
 ```
 
 while the next command builds docker images and runs an end-to-end test using the
-[SimpleCoin](./client/rpc/examples/simplecoin.rs) and the
-[ethers](./client/eth/api/examples/ethers.rs) examples:
+[SimpleCoin](./node/rpc/examples/simplecoin.rs) and the
+[ethers](./node/eth/api/examples/ethers.rs) examples:
 
 ```bash
 make e2e
@@ -36,7 +36,7 @@ make e2e
 
 ## IPC Solidity Actors
 
-We generate Rust contract-bindings for the Solidity actors we need to invoke from the [contracts](../contracts/) folder, some of which are deployed during the genesis process. The contract-bindings live in [contracts/contract-bindings/](../contracts/binding), and are generated automatically during the build, or with the following command:
+We generate Rust contract-bindings for the Solidity actors we need to invoke from the [contracts](../../contracts/) folder, some of which are deployed during the genesis process. The contract-bindings live in [contracts/contract-bindings/](../contracts/binding), and are generated automatically during the build, or with the following command:
 
 ```bash
 make gen
@@ -44,7 +44,7 @@ make gen
 
 To run it, you will have to install [forge](https://book.getfoundry.sh/getting-started/installation).
 
-The list of contracts for which we generate Rust contract-bindings are in [build.rs](../contracts/contract-bindings/build.rs) and needs to be maintained by hand, for example if a new "diamond facet" is added to a contract, it has to be added here. Diamond facets also have to be added manually in [ipc.rs](./vm/actor_interface/src/ipc.rs) where the contracts which need to be deployed during genesis are described. These facets cannot be divined from the ABI description, so they have to be maintained explicitly.
+The list of contracts for which we generate Rust contract-bindings are in [build.rs](../contract-bindings/build.rs) and needs to be maintained by hand, for example if a new "diamond facet" is added to a contract, it has to be added here. Diamond facets also have to be added manually in [ipc.rs](./vm/actor_interface/src/ipc.rs) where the contracts which need to be deployed during genesis are described. These facets cannot be divined from the ABI description, so they have to be maintained explicitly.
 
 To test whether the genesis process works, we can run the following unit test:
 
@@ -65,7 +65,7 @@ See the [docker docs](./docker/README.md) for more details about the build.
 
 ### Pre-built Docker Image
 
-The CI build publishes a [Docker image](https://github.com/consensus-shipyard/client/pkgs/container/fendermint) to Github Container Registry upon a successful build on the `main` branch. This is the same image as the one used in the End-to-End tests; it contains the built-in actor bundle and IPC Solidity actors, ready to be deployed during genesis.
+The CI build publishes a [Docker image](https://github.com/consensus-shipyard/node/pkgs/container/fendermint) to Github Container Registry upon a successful build on the `main` branch. This is the same image as the one used in the End-to-End tests; it contains the built-in actor bundle and IPC Solidity actors, ready to be deployed during genesis.
 
 The image can be pulled with the following command:
 
@@ -96,12 +96,12 @@ The location of the configuration directory is determined by [Options::config_di
 
 The `--config-dir` can be used in combination with `--home-dir` and the pre-build docker image to:
 1. set `--home-dir` to a custom mounted volume where the data files can persist
-2. set `--config-dir` to `/client/config`, which is where the `runner.Dockerfile` places the `default.toml` file
+2. set `--config-dir` to `/node/config`, which is where the `runner.Dockerfile` places the `default.toml` file
 3. mount any custom config files next to `default.toml` in the container
 
 This way the `default.toml` that the image comes with is always active. Without setting `--config-dir` the operator would have to put it in the mounted `--home-dir`.
 
-Alternatively individual paths for the relative directories inside the config can be mounted, e.g. `/client/data`, `/client/snapshots`, etc.
+Alternatively individual paths for the relative directories inside the config can be mounted, e.g. `/node/data`, `/node/snapshots`, etc.
 
 ### Environment Variables
 
