@@ -296,7 +296,7 @@ where
             BehaviourEvent::Discovery(e) => self.handle_discovery_event(e),
             BehaviourEvent::Membership(e) => self.handle_membership_event(e),
             BehaviourEvent::Content(e) => self.handle_content_event(e),
-            BehaviourEvent::ConnectionLimits(_) => {},
+            BehaviourEvent::ConnectionLimits(_) => {}
         }
     }
 
