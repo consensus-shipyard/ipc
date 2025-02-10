@@ -75,7 +75,7 @@ pub struct FvmStateParams {
 
 /// Custom implementation of Debug to exclude `consensus_params` from the debug output
 /// if it is `None`. This ensures consistency between the debug output and JSON/CBOR
-/// serialization, which omits `None` values for `consensus_params`. See: client/vm/interpreter/tests/golden.rs.
+/// serialization, which omits `None` values for `consensus_params`. See: node/vm/interpreter/tests/golden.rs.
 ///
 /// This implementation is temporary and should be removed once `consensus_params` is
 /// no longer part of `FvmStateParams`.

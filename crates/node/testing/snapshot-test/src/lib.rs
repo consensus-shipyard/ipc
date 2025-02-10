@@ -16,13 +16,13 @@
 //!
 //! 1. All in one go
 //! ```text
-//! cd client/testing/snapshot-test
+//! cd node/testing/snapshot-test
 //! cargo make
 //! ```
 //!
 //! 2. One by one
 //! ```text
-//! cd client/testing/snapshot-test
+//! cd node/testing/snapshot-test
 //! cargo make setup
 //! cargo make node-1-setup
 //! cargo make node-2-setup

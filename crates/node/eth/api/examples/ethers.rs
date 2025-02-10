@@ -227,7 +227,7 @@ where
     };
 
     request("web3_clientVersion", provider.client_version().await, |v| {
-        v.starts_with("client/")
+        v.starts_with("node/")
     })?;
 
     request("net_version", provider.get_net_version().await, |v| {

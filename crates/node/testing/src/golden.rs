@@ -10,7 +10,7 @@ use std::path::Path;
 /// Path to a golden file.
 fn path(prefix: &str, name: &str, ext: &str) -> String {
     // All files will have the same name but different extension.
-    // They should be under `client/vm/message/golden`.
+    // They should be under `node/vm/message/golden`.
     let path = Path::new("golden").join(prefix).join(name);
     format!("{}.{}", path.display(), ext)
 }

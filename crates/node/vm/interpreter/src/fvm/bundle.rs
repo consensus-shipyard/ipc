@@ -32,7 +32,7 @@ pub fn bundle_path() -> PathBuf {
         .unwrap_or_else(|_| {
             workspace_dir()
                 .join("crates")
-                .join("client/builtin-actors/output")
+                .join("node/builtin-actors/output")
                 .join("bundle.car")
         })
 }
@@ -44,7 +44,7 @@ pub fn custom_actors_bundle_path() -> PathBuf {
         .unwrap_or_else(|_| {
             workspace_dir()
                 .join("crates")
-                .join("client/actors/output")
+                .join("node/actors/output")
                 .join("custom_actors_bundle.car")
         })
 }

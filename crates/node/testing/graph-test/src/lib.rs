@@ -16,13 +16,13 @@
 //!
 //! 1. All in one go
 //! ```text
-//! cd client/testing/graph-test
+//! cd node/testing/graph-test
 //! cargo make
 //! ```
 //!
 //! 2. One by one
 //! ```text
-//! cd client/testing/graph-test
+//! cd node/testing/graph-test
 //! cargo make setup
 //! cargo make test
 //! cargo make teardown
