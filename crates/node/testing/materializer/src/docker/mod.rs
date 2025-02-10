@@ -410,7 +410,7 @@ impl DockerMaterializer {
         // Use the owner of the directory for the container, so we don't get permission issues.
         let user = user_id(&subnet_dir)?;
         // Mount the subnet so we can create files there
-        let volumes = vec![(subnet_dir, "/client/subnet")];
+        let volumes = vec![(subnet_dir, "/node/subnet")];
 
         let cli_name = subnet_name.cli("fendermint");
 
@@ -443,8 +443,8 @@ impl DockerMaterializer {
         let user = user_id(&ipc_dir)?;
         // Mount the `~/.ipc` directory and all the keys to be imported.
         let volumes = vec![
-            (ipc_dir, "/client/.ipc"),
-            (accounts_dir, "/client/accounts"),
+            (ipc_dir, "/node/.ipc"),
+            (accounts_dir, "/node/accounts"),
         ];
 
         let cli_name = testnet_name.root().cli("ipc");
@@ -474,7 +474,7 @@ impl DockerMaterializer {
         let cmd = format!(
             "ipc-cli wallet import \
                 --wallet-type evm \
-                --path /client/accounts/{account_id}/secret.hex \
+                --path /node/accounts/{account_id}/secret.hex \
                 "
         );
 
@@ -937,7 +937,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         // TODO: Move --power-scale to config
         let cmd = format!(
             "genesis \
-                --genesis-file /client/subnet/genesis.json \
+                --genesis-file /node/subnet/genesis.json \
                 ipc from-parent \
                     --subnet-id {} \
                     --parent-endpoint {} \

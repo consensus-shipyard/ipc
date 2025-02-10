@@ -178,9 +178,9 @@ impl DockerNode {
         let fendermint_runner = make_runner(
             FENDERMINT_IMAGE,
             vec![
-                (keys_dir.clone(), "/client/keys"),
+                (keys_dir.clone(), "/node/keys"),
                 (cometbft_dir.clone(), "/cometbft"),
-                (node_config.genesis.path.clone(), "/client/genesis.json"),
+                (node_config.genesis.path.clone(), "/node/genesis.json"),
             ],
         );
 
@@ -208,12 +208,12 @@ impl DockerNode {
         fendermint_runner
             .run_cmd(
                 "genesis \
-                    --genesis-file /client/genesis.json \
+                    --genesis-file /node/genesis.json \
                     ipc \
                         seal-genesis \
-                        --builtin-actors-path /client/bundle.car \
-                        --custom-actors-path /client/custom_actors_bundle.car \
-                        --artifacts-path /client/contracts \
+                        --builtin-actors-path /node/bundle.car \
+                        --custom-actors-path /node/custom_actors_bundle.car \
+                        --artifacts-path /node/contracts \
                         --output-path /cometbft/config/sealed.json \
                     ",
             )
@@ -224,7 +224,7 @@ impl DockerNode {
         fendermint_runner
             .run_cmd(
                 "genesis \
-                    --genesis-file /client/genesis.json \
+                    --genesis-file /node/genesis.json \
                     into-tendermint \
                     --out /cometbft/config/genesis.json \
                     --app-state /cometbft/config/sealed.json \
@@ -242,7 +242,7 @@ impl DockerNode {
             fendermint_runner
                 .run_cmd(
                     "key into-tendermint \
-                        --secret-key /client/keys/validator_key.sk \
+                        --secret-key /node/keys/validator_key.sk \
                         --out /cometbft/config/priv_validator_key.json \
                         ",
                 )
@@ -252,13 +252,13 @@ impl DockerNode {
 
         // Create a network key for the resolver.
         fendermint_runner
-            .run_cmd("key gen --out-dir /client/keys --name network_key")
+            .run_cmd("key gen --out-dir /node/keys --name network_key")
             .await
             .context("failed to create network key")?;
 
         // Capture the fendermint node identity.
         let fendermint_peer_id = fendermint_runner
-            .run_cmd("key show-peer-id --public-key /client/keys/network_key.pk")
+            .run_cmd("key show-peer-id --public-key /node/keys/network_key.pk")
             .await
             .context("cannot show peer ID")?
             .into_iter()
@@ -284,12 +284,12 @@ impl DockerNode {
 
             env.extend(env_vars![
                 "RUST_BACKTRACE"    => 1,
-                "FM_DATA_DIR"       => "/client/data",
-                "FM_LOG_DIR"        => "/client/logs",
-                "FM_SNAPSHOTS_DIR"  => "/client/snapshots",
+                "FM_DATA_DIR"       => "/node/data",
+                "FM_LOG_DIR"        => "/node/logs",
+                "FM_SNAPSHOTS_DIR"  => "/node/snapshots",
                 "FM_CHAIN_NAME"     => genesis.chain_name.clone(),
                 "FM_IPC__SUBNET_ID" => ipc.gateway.subnet_id,
-                "FM_RESOLVER__NETWORK__LOCAL_KEY"      => "/client/keys/network_key.sk",
+                "FM_RESOLVER__NETWORK__LOCAL_KEY"      => "/node/keys/network_key.sk",
                 "FM_RESOLVER__CONNECTION__LISTEN_ADDR" => format!("/ip4/0.0.0.0/tcp/{RESOLVER_P2P_PORT}"),
                 "FM_TENDERMINT_RPC_URL" => format!("http://{cometbft_name}:{COMETBFT_RPC_PORT}"),
                 "TENDERMINT_RPC_URL"    => format!("http://{cometbft_name}:{COMETBFT_RPC_PORT}"),
@@ -302,7 +302,7 @@ impl DockerNode {
             if node_config.validator.is_some() {
                 env.extend(env_vars![
                     "FM_VALIDATOR_KEY__KIND" => "ethereum",
-                    "FM_VALIDATOR_KEY__PATH" => "/client/keys/validator_key.sk",
+                    "FM_VALIDATOR_KEY__PATH" => "/node/keys/validator_key.sk",
                 ]);
             }
 
@@ -402,10 +402,10 @@ impl DockerNode {
                 let creator = make_runner(
                     FENDERMINT_IMAGE,
                     volumes(vec![
-                        (keys_dir.clone(), "/client/keys"),
-                        (fendermint_dir.join("data"), "/client/data"),
-                        (fendermint_dir.join("logs"), "/client/logs"),
-                        (fendermint_dir.join("snapshots"), "/client/snapshots"),
+                        (keys_dir.clone(), "/node/keys"),
+                        (fendermint_dir.join("data"), "/node/data"),
+                        (fendermint_dir.join("logs"), "/node/logs"),
+                        (fendermint_dir.join("snapshots"), "/node/snapshots"),
                     ]),
                 );
 
@@ -451,7 +451,7 @@ impl DockerNode {
             None if node_config.ethapi => {
                 let creator = make_runner(
                     FENDERMINT_IMAGE,
-                    volumes(vec![(ethapi_dir.join("logs"), "/client/logs")]),
+                    volumes(vec![(ethapi_dir.join("logs"), "/node/logs")]),
                 );
 
                 let c = creator

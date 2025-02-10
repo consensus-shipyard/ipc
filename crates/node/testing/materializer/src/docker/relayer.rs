@@ -69,7 +69,7 @@ impl DockerRelayer {
         let user = user_id(&ipc_dir)?;
 
         // The CLI only logs to the output. Its log level can be configured with the general env vars.
-        let volumes = vec![(ipc_dir, "/client/.ipc")];
+        let volumes = vec![(ipc_dir, "/node/.ipc")];
 
         let creator = DockerRunner::new(
             docker,
@@ -86,7 +86,7 @@ impl DockerRelayer {
         // TODO: Do we need to use any env vars with the relayer?
         let entrypoint = split_cmd(&format!(
             "ipc-cli \
-                --config-path /client/.ipc/config.toml \
+                --config-path /node/.ipc/config.toml \
                 checkpoint relayer \
                     --subnet {} \
                     --submitter {:?} \
