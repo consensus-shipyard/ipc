@@ -5,7 +5,7 @@
 //! Example:
 //!
 //! ```text
-//! cd client/testing/smoke-test
+//! cd node/testing/smoke-test
 //! cargo make
 //! ```
 //!

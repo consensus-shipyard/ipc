@@ -395,7 +395,7 @@ mod tests {
         let default_dir = PathBuf::from("../config");
         let c = Settings::config(&default_dir, &current_dir, run_mode)?;
         // Trying to debug the following sporadic error on CI:
-        // thread 'tests::parse_test_config' panicked at client/app/settings/src/lib.rs:315:36:
+        // thread 'tests::parse_test_config' panicked at node/app/settings/src/lib.rs:315:36:
         // failed to parse Settings: failed to parse: invalid digit found in string
         // This turned out to be due to the environment variable manipulation below mixing with another test,
         // which is why `#[serial]` was moved to the top.

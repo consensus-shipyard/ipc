@@ -98,13 +98,13 @@ jobs:
           cat <<EOF > /tmp/Dockerfile
           # syntax=docker/dockerfile:1
           FROM alpine as builder
-          COPY /client/app/config /app/fendermint/app/config
+          COPY /node/app/config /app/fendermint/app/config
           COPY /target/release/fendermint /app/output/bin/fendermint
           COPY /target/release/ipc-cli /app/output/bin/ipc-cli
           EOF
 
           ## Append the runner build phase to the Dockerfile.
-          cat client/docker/runner.Dockerfile >> /tmp/Dockerfile
+          cat node/docker/runner.Dockerfile >> /tmp/Dockerfile
 
           ## Print the Dockerfile for debugging.
           echo "Dockerfile:"
