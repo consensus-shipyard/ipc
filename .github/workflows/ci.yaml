@@ -24,7 +24,7 @@ on:
 
 jobs:
   commonmark:
-    uses: ./.github/workflows/lint-commonmark.yaml
+    uses: ./.github/workflows/commonmark-lint.yaml
 
   license:
     uses: ./.github/workflows/license.yaml
