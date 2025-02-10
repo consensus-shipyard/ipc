@@ -23,6 +23,8 @@ on:
 
 
 jobs:
+  commonmark:
+    uses: ./.github/workflows/lint-commonmark.yaml
 
   license:
     uses: ./.github/workflows/license.yaml
