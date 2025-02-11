@@ -1324,7 +1324,7 @@ where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
     let ClosedReadRequest {
-        id: _,
+        id,
         blob_hash: _,
         offset: _,
         len: _,
@@ -1332,7 +1332,7 @@ where
         response,
     } = read_request.clone();
 
-    let params = RawBytes::serialize(response)?;
+    let params = RawBytes::serialize((id, response))?;
     let msg = Message {
         version: Default::default(),
         from: BLOB_READER_ACTOR_ADDR,
@@ -1345,7 +1345,19 @@ where
         gas_fee_cap: Default::default(),
         gas_premium: Default::default(),
     };
-    state.execute_implicit(msg)?;
+    let result = state.execute_implicit(msg);
+    match result {
+        Ok((apply_ret, _)) => {
+            tracing::debug!(
+                "Callback delivered for id: {:?}, exit code: {:?}",
+                id,
+                apply_ret.msg_receipt.exit_code
+            );
+        }
+        Err(e) => {
+            tracing::error!("failed to execute read request callback: {}", e);
+        }
+    }
 
     Ok(())
 }
