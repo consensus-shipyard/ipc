@@ -11,8 +11,9 @@ use std::hash::Hasher;
 pub type HashedKey = [u8; 32];
 
 #[derive(Default)]
-pub struct RuntimeHasherWrapper(pub Vec<u8>);
+struct RuntimeHasherWrapper(pub Vec<u8>);
 
+/// This Hasher impl only intercepts key bytes. Is used only together with FvmHashSha256 below.
 impl Hasher for RuntimeHasherWrapper {
     fn finish(&self) -> u64 {
         // u64 hash not used in hamt
