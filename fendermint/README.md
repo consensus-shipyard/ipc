@@ -8,11 +8,11 @@ Fendermint is an effort to implement [IPC with Tendermint Core](https://docs.goo
 
 ## Quick Start
 
-- [Local testnets](../docs/01-infra/localnet.md)
+- [Local testnets](../docs/01-setup/localnet.md)
 
 ## Docs
 
-Please have a look in the [docs](../docs/README.md) to see an overview of the project, how to run the components, and previous demos.
+Please have a look in the [docs](../docs/site/README.md) to see an overview of the project, how to run the components, and previous demos.
 
 ## IPC
 

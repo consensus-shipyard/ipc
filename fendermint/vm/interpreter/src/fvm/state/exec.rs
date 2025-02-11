@@ -3,8 +3,17 @@
 
 use std::collections::{HashMap, HashSet};
 
+use crate::fvm::activity::actor::ActorActivityTracker;
+use crate::fvm::externs::FendermintExterns;
+use crate::fvm::gas::BlockGasTracker;
+use crate::fvm::state::priority::TxnPriorityCalculator;
 use anyhow::Ok;
 use cid::Cid;
+use fendermint_actors_api::gas_market::Reading;
+use fendermint_crypto::PublicKey;
+use fendermint_vm_actor_interface::eam::EthAddress;
+use fendermint_vm_core::{chainid::HasChainID, Timestamp};
+use fendermint_vm_encoding::IsHumanReadable;
 use fendermint_vm_genesis::PowerScale;
 use fvm::{
     call_manager::DefaultCallManager,
@@ -22,15 +31,10 @@ use fvm_shared::{
 };
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-
-use crate::fvm::externs::FendermintExterns;
-use fendermint_vm_core::{chainid::HasChainID, Timestamp};
-use fendermint_vm_encoding::IsHumanReadable;
+use std::fmt;
+use tendermint::consensus::params::Params as TendermintConsensusParams;
 
 pub type BlockHash = [u8; 32];
-
-/// First 20 bytes of SHA256(PublicKey)
-pub type ValidatorId = tendermint::account::Id;
 
 pub type ActorAddressMap = HashMap<ActorID, Address>;
 
@@ -39,7 +43,7 @@ pub type ExecResult = anyhow::Result<(ApplyRet, ActorAddressMap)>;
 
 /// Parts of the state which evolve during the lifetime of the chain.
 #[serde_as]
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq)]
 pub struct FvmStateParams {
     /// Root CID of the actor state map.
     #[serde_as(as = "IsHumanReadable")]
@@ -65,6 +69,38 @@ pub struct FvmStateParams {
     /// The application protocol version.
     #[serde(default)]
     pub app_version: u64,
+    /// Tendermint consensus params.
+    pub consensus_params: Option<TendermintConsensusParams>,
+}
+
+/// Custom implementation of Debug to exclude `consensus_params` from the debug output
+/// if it is `None`. This ensures consistency between the debug output and JSON/CBOR
+/// serialization, which omits `None` values for `consensus_params`. See: fendermint/vm/interpreter/tests/golden.rs.
+///
+/// This implementation is temporary and should be removed once `consensus_params` is
+/// no longer part of `FvmStateParams`.
+///
+/// @TODO: Remove this implementation when `consensus_params` is deprecated.
+impl fmt::Debug for FvmStateParams {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut ds = f.debug_struct("FvmStateParams");
+
+        ds.field("state_root", &self.state_root)
+            .field("timestamp", &self.timestamp)
+            .field("network_version", &self.network_version)
+            .field("base_fee", &self.base_fee)
+            .field("circ_supply", &self.circ_supply)
+            .field("chain_id", &self.chain_id)
+            .field("power_scale", &self.power_scale)
+            .field("app_version", &self.app_version);
+
+        // Only include `consensus_params` in the debug output if it is `Some`.
+        if let Some(ref params) = self.consensus_params {
+            ds.field("consensus_params", params);
+        }
+
+        ds.finish()
+    }
 }
 
 /// Parts of the state which can be updated by message execution, apart from the actor state.
@@ -99,20 +135,23 @@ where
     executor: DefaultExecutor<
         DefaultKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
     >,
-
     /// Hash of the block currently being executed. For queries and checks this is empty.
     ///
     /// The main motivation to add it here was to make it easier to pass in data to the
     /// execution interpreter without having to add yet another piece to track at the app level.
     block_hash: Option<BlockHash>,
-
-    /// ID of the validator who created this block. For queries and checks this is empty.
-    validator_id: Option<ValidatorId>,
+    /// Public key of the validator who created this block. For queries, checks, and proposal
+    /// validations this is None.
+    block_producer: Option<PublicKey>,
+    /// Keeps track of block gas usage during execution, and takes care of updating
+    /// the chosen gas market strategy (by default an on-chain actor delivering EIP-1559 behaviour).
+    block_gas_tracker: BlockGasTracker,
     /// State of parameters that are outside the control of the FVM but can change and need to be persisted.
     params: FvmUpdatableParams,
-
     /// Indicate whether the parameters have been updated.
     params_dirty: bool,
+
+    txn_priority: TxnPriorityCalculator,
 }
 
 impl<DB> FvmExecState<DB>
@@ -145,13 +184,17 @@ where
 
         let engine = multi_engine.get(&nc)?;
         let externs = FendermintExterns::new(blockstore.clone(), params.state_root);
-        let machine = DefaultMachine::new(&mc, blockstore, externs)?;
-        let executor = DefaultExecutor::new(engine, machine)?;
+        let machine = DefaultMachine::new(&mc, blockstore.clone(), externs)?;
+        let mut executor = DefaultExecutor::new(engine.clone(), machine)?;
+
+        let block_gas_tracker = BlockGasTracker::create(&mut executor)?;
+        let base_fee = block_gas_tracker.base_fee().clone();
 
         Ok(Self {
             executor,
             block_hash: None,
-            validator_id: None,
+            block_producer: None,
+            block_gas_tracker,
             params: FvmUpdatableParams {
                 app_version: params.app_version,
                 base_fee: params.base_fee,
@@ -159,6 +202,7 @@ where
                 power_scale: params.power_scale,
             },
             params_dirty: false,
+            txn_priority: TxnPriorityCalculator::new(base_fee),
         })
     }
 
@@ -169,14 +213,36 @@ where
     }
 
     /// Set the validator during execution.
-    pub fn with_validator_id(mut self, validator_id: ValidatorId) -> Self {
-        self.validator_id = Some(validator_id);
+    pub fn with_block_producer(mut self, pubkey: PublicKey) -> Self {
+        self.block_producer = Some(pubkey);
         self
+    }
+
+    pub fn block_gas_tracker(&self) -> &BlockGasTracker {
+        &self.block_gas_tracker
+    }
+
+    pub fn block_gas_tracker_mut(&mut self) -> &mut BlockGasTracker {
+        &mut self.block_gas_tracker
+    }
+
+    pub fn read_gas_market(&mut self) -> anyhow::Result<Reading> {
+        BlockGasTracker::read_gas_market(&mut self.executor)
     }
 
     /// Execute message implicitly.
     pub fn execute_implicit(&mut self, msg: Message) -> ExecResult {
         self.execute_message(msg, ApplyKind::Implicit)
+    }
+
+    /// Execute message implicitly but ensures the execution is successful and returns only the ApplyRet.
+    pub fn execute_implicit_ok(&mut self, msg: Message) -> ExecResult {
+        let r = self.execute_implicit(msg)?;
+        if let Some(err) = &r.0.failure_info {
+            anyhow::bail!("failed to apply message: {}", err)
+        } else {
+            Ok(r)
+        }
     }
 
     /// Execute message explicitly.
@@ -193,7 +259,25 @@ where
         let raw_length = fvm_ipld_encoding::to_vec(&msg).map(|bz| bz.len())?;
         let ret = self.executor.execute_message(msg, kind, raw_length)?;
         let addrs = self.emitter_delegated_addresses(&ret)?;
+
+        // Record the utilization of this message if the apply type was Explicit.
+        if kind == ApplyKind::Explicit {
+            self.block_gas_tracker.record_utilization(&ret);
+        }
+
         Ok((ret, addrs))
+    }
+
+    /// Execute a function with the internal executor and return an arbitrary result.
+    pub fn execute_with_executor<F, R>(&mut self, exec_func: F) -> anyhow::Result<R>
+    where
+        F: FnOnce(
+            &mut DefaultExecutor<
+                DefaultKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
+            >,
+        ) -> anyhow::Result<R>,
+    {
+        exec_func(&mut self.executor)
     }
 
     /// Commit the state. It must not fail, but we're returning a result so that error
@@ -218,9 +302,9 @@ where
         self.block_hash
     }
 
-    /// Identity of the block creator, if we are indeed executing any blocks.
-    pub fn validator_id(&self) -> Option<ValidatorId> {
-        self.validator_id
+    /// Identity of the block producer, if we are indeed executing any blocks.
+    pub fn block_producer(&self) -> Option<PublicKey> {
+        self.block_producer
     }
 
     /// The timestamp of the currently executing block.
@@ -231,6 +315,10 @@ where
     /// Conversion between collateral and voting power.
     pub fn power_scale(&self) -> PowerScale {
         self.params.power_scale
+    }
+
+    pub fn txn_priority_calculator(&self) -> &TxnPriorityCalculator {
+        &self.txn_priority
     }
 
     pub fn app_version(&self) -> u64 {
@@ -255,6 +343,10 @@ where
     /// The [ChainID] from the network configuration.
     pub fn chain_id(&self) -> ChainID {
         self.executor.context().network.chain_id
+    }
+
+    pub fn activity_tracker(&mut self) -> ActorActivityTracker<DB> {
+        ActorActivityTracker { executor: self }
     }
 
     /// Collect all the event emitters' delegated addresses, for those who have any.
@@ -286,12 +378,19 @@ where
         self.update_params(|p| f(&mut p.app_version))
     }
 
-    /// Update the application version.
-    pub fn update_base_fee<F>(&mut self, f: F)
-    where
-        F: FnOnce(&mut TokenAmount),
-    {
-        self.update_params(|p| f(&mut p.base_fee))
+    /// Finalizes updates to the gas market based on the transactions processed by this instance.
+    /// Returns the new base fee for the next height.
+    pub fn finalize_gas_market(&mut self) -> anyhow::Result<Reading> {
+        let premium_recipient = match self.block_producer {
+            Some(pubkey) => Some(Address::from(EthAddress::new_secp256k1(
+                &pubkey.serialize(),
+            )?)),
+            None => None,
+        };
+
+        self.block_gas_tracker
+            .finalize(&mut self.executor, premium_recipient)
+            .inspect(|reading| self.update_params(|p| p.base_fee = reading.base_fee.clone()))
     }
 
     /// Update the circulating supply, effective from the next block.

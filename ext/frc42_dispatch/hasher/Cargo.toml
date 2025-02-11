@@ -1,0 +1,17 @@
+[package]
+name = "frc42_hasher"
+version = "6.0.0"
+license = "MIT OR Apache-2.0"
+description = "Filecoin FRC-0042 calling convention method hashing"
+repository = "https://github.com/helix-onchain/filecoin/"
+edition = "2021"
+
+[dependencies]
+fvm_sdk = { workspace = true, optional = true }
+fvm_shared = { workspace = true, optional = true }
+thiserror = { version = "1.0.31" }
+
+[features]
+# The fvm dependencies are optional. Useful for proc macro and similar purposes.
+default = ["use_sdk"]
+use_sdk = ["dep:fvm_sdk", "dep:fvm_shared"]

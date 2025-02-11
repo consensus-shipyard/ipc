@@ -79,16 +79,8 @@ impl<DB> GatewayCaller<DB> {
 }
 
 impl<DB: Blockstore + Clone> GatewayCaller<DB> {
-    /// Check that IPC is configured in this deployment.
-    pub fn enabled(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<bool> {
-        match state.state_tree_mut().get_actor(GATEWAY_ACTOR_ID)? {
-            None => Ok(false),
-            Some(a) => Ok(!state.builtin_actors().is_placeholder_actor(&a.code)),
-        }
-    }
-
     /// Return true if the current subnet is the root subnet.
-    pub fn is_root(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<bool> {
+    pub fn is_anchored(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<bool> {
         self.subnet_id(state).map(|id| id.route.is_empty())
     }
 
@@ -123,7 +115,8 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         state: &mut FvmExecState<DB>,
         checkpoint: checkpointing_facet::BottomUpCheckpoint,
         power_table: &[Validator<Power>],
-    ) -> anyhow::Result<()> {
+        activity: checkpointing_facet::FullActivityRollup,
+    ) -> anyhow::Result<FvmApplyRet> {
         // Construct a Merkle tree from the power table, which we can use to validate validator set membership
         // when the signatures are submitted in transactions for accumulation.
         let tree =
@@ -133,9 +126,12 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
             p.saturating_add(et::U256::from(v.power.0))
         });
 
-        self.checkpointing.call(state, |c| {
-            c.create_bottom_up_checkpoint(checkpoint, tree.root_hash().0, total_power)
-        })
+        Ok(self
+            .checkpointing
+            .call_with_return(state, |c| {
+                c.create_bottom_up_checkpoint(checkpoint, tree.root_hash().0, total_power, activity)
+            })?
+            .into_return())
     }
 
     /// Retrieve checkpoints which have not reached a quorum.

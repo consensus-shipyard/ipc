@@ -42,6 +42,7 @@ tracing-subscriber = { workspace = true }
 literally = { workspace = true }
 
 fendermint_abci = { path = "../abci" }
+fendermint_actors_api = { path = "../actors/api" }
 fendermint_app_options = { path = "./options" }
 fendermint_app_settings = { path = "./settings" }
 fendermint_crypto = { path = "../crypto" }
@@ -51,6 +52,7 @@ fendermint_rocksdb = { path = "../rocksdb" }
 fendermint_rpc = { path = "../rpc" }
 fendermint_storage = { path = "../storage" }
 fendermint_tracing = { path = "../tracing" }
+fendermint_actor_gas_market_eip1559 = { path = "../actors/gas_market/eip1559" }
 fendermint_vm_actor_interface = { path = "../vm/actor_interface" }
 fendermint_vm_core = { path = "../vm/core" }
 fendermint_vm_encoding = { path = "../vm/encoding" }

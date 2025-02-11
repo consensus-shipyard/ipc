@@ -6,7 +6,6 @@ error AlreadyRegisteredSubnet();
 error AlreadyInSet();
 error CannotConfirmFutureChanges();
 error CannotReleaseZero();
-error CannotSendCrossMsgToItself();
 error CheckpointAlreadyExists();
 error BatchAlreadyExists();
 error MaxMsgsPerBatchExceeded();
@@ -80,13 +79,20 @@ error InvalidFederationPayload();
 error DuplicatedGenesisValidator();
 error NotEnoughGenesisValidators();
 error ValidatorPowerChangeDenied();
+error MissingActivityCommitment();
+error ValidatorAlreadyClaimed();
+error InvalidActivityProof();
+error NotOwner();
 
 enum InvalidXnetMessageReason {
     Sender,
     DstSubnet,
     Nonce,
     Value,
-    Kind
+    Kind,
+    ReflexiveSend,
+    NoRoute,
+    IncompatibleSupplySource
 }
 
 string constant ERR_PERMISSIONED_AND_BOOTSTRAPPED = "Method not allowed if permissioned is enabled and subnet bootstrapped";

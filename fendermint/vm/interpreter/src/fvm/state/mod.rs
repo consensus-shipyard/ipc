@@ -1,13 +1,15 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+pub mod fevm;
+pub mod ipc;
+pub mod snapshot;
+
 mod check;
 mod exec;
-pub mod fevm;
 mod genesis;
-pub mod ipc;
+mod priority;
 mod query;
-pub mod snapshot;
 
 use std::sync::Arc;
 

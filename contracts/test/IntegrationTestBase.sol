@@ -46,6 +46,10 @@ import {GatewayFacetsHelper} from "./helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "./helpers/SubnetActorFacetsHelper.sol";
 import {DiamondFacetsHelper} from "./helpers/DiamondFacetsHelper.sol";
 
+import {FullActivityRollup, CompressedActivityRollup, Consensus} from "../contracts/structs/Activity.sol";
+import {ValidatorRewarderMap} from "../contracts/examples/ValidatorRewarderMap.sol";
+import {SubnetActorActivityFacet} from "../contracts/subnet/SubnetActorActivityFacet.sol";
+
 struct TestSubnetDefinition {
     GatewayDiamond gateway;
     address gatewayAddr;
@@ -163,6 +167,7 @@ contract TestSubnetActor is Test, TestParams {
     bytes4[] saCutterSelectors;
     bytes4[] saLouperSelectors;
     bytes4[] saOwnershipSelectors;
+    bytes4[] saActivitySelectors;
 
     SubnetActorDiamond saDiamond;
     SubnetActorMock saMock;
@@ -177,6 +182,7 @@ contract TestSubnetActor is Test, TestParams {
         saCutterSelectors = SelectorLibrary.resolveSelectors("DiamondCutFacet");
         saLouperSelectors = SelectorLibrary.resolveSelectors("DiamondLoupeFacet");
         saOwnershipSelectors = SelectorLibrary.resolveSelectors("OwnershipFacet");
+        saActivitySelectors = SelectorLibrary.resolveSelectors("SubnetActorActivityFacet");
     }
 
     function defaultSubnetActorParamsWith(
@@ -205,7 +211,8 @@ contract TestSubnetActor is Test, TestParams {
             permissionMode: PermissionMode.Collateral,
             supplySource: source,
             collateralSource: AssetHelper.native(),
-            validatorGater: address(0)
+            validatorGater: address(0),
+            validatorRewarder: address(0)
         });
         return params;
     }
@@ -229,7 +236,8 @@ contract TestSubnetActor is Test, TestParams {
             permissionMode: PermissionMode.Collateral,
             supplySource: source,
             collateralSource: collateral,
-            validatorGater: address(0)
+            validatorGater: address(0),
+            validatorRewarder: address(0)
         });
         return params;
     }
@@ -263,7 +271,8 @@ contract TestSubnetActor is Test, TestParams {
             permissionMode: PermissionMode.Collateral,
             supplySource: Asset({kind: AssetKind.ERC20, tokenAddress: tokenAddress}),
             collateralSource: AssetHelper.native(),
-            validatorGater: address(0)
+            validatorGater: address(0),
+            validatorRewarder: address(0)
         });
         return params;
     }
@@ -412,6 +421,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
                 functionSelectors: gwOwnershipSelectors
             })
         );
+
         gatewayDiamond = new GatewayDiamond(gwDiamondCut, params);
 
         return gatewayDiamond;
@@ -489,8 +499,9 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         DiamondLoupeFacet louper = new DiamondLoupeFacet();
         DiamondCutFacet cutter = new DiamondCutFacet();
         OwnershipFacet ownership = new OwnershipFacet();
+        SubnetActorActivityFacet activity = new SubnetActorActivityFacet();
 
-        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](8);
+        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](9);
 
         diamondCut[0] = (
             IDiamond.FacetCut({
@@ -556,6 +567,13 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             })
         );
 
+        diamondCut[8] = (
+            IDiamond.FacetCut({
+                facetAddress: address(activity),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: saActivitySelectors
+            })
+        );
         SubnetActorDiamond diamond = new SubnetActorDiamond(diamondCut, params, address(this));
 
         return diamond;
@@ -606,7 +624,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             permissionMode: _permissionMode,
             supplySource: AssetHelper.native(),
             collateralSource: AssetHelper.native(),
-            validatorGater: address(0)
+            validatorGater: address(0),
+            validatorRewarder: address(new ValidatorRewarderMap())
         });
         saDiamond = createSubnetActor(params);
     }
@@ -637,7 +656,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             permissionMode: _permissionMode,
             supplySource: AssetHelper.native(),
             collateralSource: AssetHelper.native(),
-            validatorGater: _validatorGater
+            validatorGater: _validatorGater,
+            validatorRewarder: address(new ValidatorRewarderMap())
         });
         saDiamond = createSubnetActor(params);
     }
@@ -782,7 +802,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
                 rawAddress: FvmAddressHelper.from(src)
             }),
             value: DEFAULT_CROSS_MSG_FEE + 1,
-            nonce: 0,
+            localNonce: 0,
+            originalNonce: 0,
             message: EMPTY_BYTES
         });
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
@@ -913,7 +934,51 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             blockHeight: h,
             blockHash: keccak256(abi.encode(h)),
             nextConfigurationNumber: nextConfigNum - 1,
-            msgs: new IpcEnvelope[](0)
+            msgs: new IpcEnvelope[](0),
+            activity: CompressedActivityRollup({
+                consensus: Consensus.CompressedSummary({
+                    stats: Consensus.AggregatedStats({
+                        totalActiveValidators: uint64(validators.length),
+                        totalNumBlocksCommitted: 3
+                    }),
+                    dataRootCommitment: Consensus.MerkleHash.wrap(bytes32(uint256(nextConfigNum)))
+                })
+            })
+        });
+
+        vm.deal(address(saDiamond), 100 ether);
+
+        bytes32 hash = keccak256(abi.encode(checkpoint));
+
+        for (uint256 i = 0; i < n; i++) {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(privKeys[i], hash);
+            signatures[i] = abi.encodePacked(r, s, v);
+        }
+
+        vm.prank(validators[0]);
+        saDiamond.checkpointer().submitCheckpoint(checkpoint, validators, signatures);
+    }
+
+    function confirmChange(
+        address[] memory validators,
+        uint256[] memory privKeys,
+        CompressedActivityRollup memory activities
+    ) internal {
+        uint256 n = validators.length;
+
+        bytes[] memory signatures = new bytes[](n);
+
+        (uint64 nextConfigNum, ) = saDiamond.getter().getConfigurationNumbers();
+
+        uint256 h = saDiamond.getter().lastBottomUpCheckpointHeight() + saDiamond.getter().bottomUpCheckPeriod();
+
+        BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
+            subnetID: saDiamond.getter().getParent().createSubnetId(address(saDiamond)),
+            blockHeight: h,
+            blockHash: keccak256(abi.encode(h)),
+            nextConfigurationNumber: nextConfigNum - 1,
+            msgs: new IpcEnvelope[](0),
+            activity: activities
         });
 
         vm.deal(address(saDiamond), 100 ether);

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {BottomUpCheckpoint, BottomUpMsgBatch, IpcEnvelope, ParentFinality} from "../structs/CrossNet.sol";
+import {FullActivityRollup} from "../structs/Activity.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 
@@ -61,8 +62,8 @@ interface IGateway {
         IpcEnvelope calldata envelope
     ) external payable returns (IpcEnvelope memory committed);
 
-    /// @notice Propagates the stored postbox item for the given cid
-    function propagate(bytes32 msgCid) external payable;
+    /// @notice Propagates all the stored messages to destination subnet
+    function propagateAll() external payable;
 
     /// @notice commit the ipc parent finality into storage
     function commitParentFinality(ParentFinality calldata finality) external;
@@ -71,6 +72,7 @@ interface IGateway {
     function createBottomUpCheckpoint(
         BottomUpCheckpoint calldata checkpoint,
         bytes32 membershipRootHash,
-        uint256 membershipWeight
+        uint256 membershipWeight,
+        FullActivityRollup calldata activity
     ) external;
 }

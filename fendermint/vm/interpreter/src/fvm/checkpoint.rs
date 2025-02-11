@@ -1,29 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::HashMap;
-use std::time::Duration;
-
-use anyhow::{anyhow, Context};
-use ethers::abi::Tokenizable;
-use tendermint::block::Height;
-use tendermint_rpc::endpoint::commit;
-use tendermint_rpc::{endpoint::validators, Client, Paging};
-
-use fvm_ipld_blockstore::Blockstore;
-use fvm_shared::{address::Address, chainid::ChainID};
-
-use fendermint_crypto::PublicKey;
-use fendermint_crypto::SecretKey;
-use fendermint_vm_actor_interface::eam::EthAddress;
-use fendermint_vm_actor_interface::ipc::BottomUpCheckpoint;
-use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
-
-use ipc_actors_abis::checkpointing_facet as checkpoint;
-use ipc_actors_abis::gateway_getter_facet as getter;
-use ipc_api::staking::ConfigurationNumber;
-use ipc_observability::{emit, serde::HexEncodableBlockHash};
-
 use super::observe::{
     CheckpointCreated, CheckpointFinalized, CheckpointSigned, CheckpointSignedRole,
 };
@@ -33,6 +10,26 @@ use super::{
     state::{ipc::GatewayCaller, FvmExecState},
     ValidatorContext,
 };
+use crate::fvm::activity::ValidatorActivityTracker;
+use crate::fvm::exec::BlockEndEvents;
+use anyhow::{anyhow, Context};
+use ethers::abi::Tokenizable;
+use fendermint_crypto::PublicKey;
+use fendermint_crypto::SecretKey;
+use fendermint_vm_actor_interface::eam::EthAddress;
+use fendermint_vm_actor_interface::ipc::BottomUpCheckpoint;
+use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
+use fvm_ipld_blockstore::Blockstore;
+use fvm_shared::{address::Address, chainid::ChainID};
+use ipc_actors_abis::checkpointing_facet as checkpoint;
+use ipc_actors_abis::gateway_getter_facet as getter;
+use ipc_api::staking::ConfigurationNumber;
+use ipc_observability::{emit, serde::HexEncodableBlockHash};
+use std::collections::HashMap;
+use std::time::Duration;
+use tendermint::block::Height;
+use tendermint_rpc::endpoint::commit;
+use tendermint_rpc::{endpoint::validators, Client, Paging};
 
 /// Validator voting power snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -50,6 +47,7 @@ pub struct PowerUpdates(pub Vec<Validator<Power>>);
 pub fn maybe_create_checkpoint<DB>(
     gateway: &GatewayCaller<DB>,
     state: &mut FvmExecState<DB>,
+    event_tracker: &mut BlockEndEvents,
 ) -> anyhow::Result<Option<(checkpoint::BottomUpCheckpoint, PowerUpdates)>>
 where
     DB: Blockstore + Sync + Send + Clone + 'static,
@@ -96,6 +94,8 @@ where
 
     let num_msgs = msgs.len();
 
+    let full_activity_rollup = state.activity_tracker().commit_activity()?;
+
     // Construct checkpoint.
     let checkpoint = BottomUpCheckpoint {
         subnet_id,
@@ -103,13 +103,20 @@ where
         block_hash,
         next_configuration_number,
         msgs,
+        activity: full_activity_rollup.compressed()?,
     };
 
     // Save the checkpoint in the ledger.
     // Pass in the current power table, because these are the validators who can sign this checkpoint.
-    gateway
-        .create_bottom_up_checkpoint(state, checkpoint.clone(), &curr_power_table.0)
+    let ret = gateway
+        .create_bottom_up_checkpoint(
+            state,
+            checkpoint.clone(),
+            &curr_power_table.0,
+            full_activity_rollup.into_inner(),
+        )
         .context("failed to store checkpoint")?;
+    event_tracker.push((ret.apply_ret.events, ret.emitters));
 
     // Figure out the power updates if there was some change in the configuration.
     let power_updates = if next_configuration_number == 0 {
@@ -242,6 +249,23 @@ where
                 block_hash: cp.block_hash,
                 next_configuration_number: cp.next_configuration_number,
                 msgs: convert_tokenizables(cp.msgs)?,
+                activity: checkpoint::CompressedActivityRollup {
+                    consensus: checkpoint::CompressedSummary {
+                        stats: checkpoint::AggregatedStats {
+                            total_active_validators: cp
+                                .activity
+                                .consensus
+                                .stats
+                                .total_active_validators,
+                            total_num_blocks_committed: cp
+                                .activity
+                                .consensus
+                                .stats
+                                .total_num_blocks_committed,
+                        },
+                        data_root_commitment: cp.activity.consensus.data_root_commitment,
+                    },
+                },
             };
 
             // We mustn't do these in parallel because of how nonces are fetched.
@@ -261,7 +285,7 @@ where
                 role: CheckpointSignedRole::Own,
                 height: height.value(),
                 hash: HexEncodableBlockHash(cp.block_hash.to_vec()),
-                validator: validator_ctx.public_key,
+                validator: validator_ctx.addr,
             });
 
             tracing::debug!(?height, "submitted checkpoint signature");
@@ -307,7 +331,7 @@ pub fn emit_trace_if_check_checkpoint_finalized<DB>(
 where
     DB: Blockstore + Clone,
 {
-    if !gateway.enabled(state)? {
+    if !gateway.is_anchored(state)? {
         return Ok(());
     }
 
@@ -348,10 +372,6 @@ fn should_create_checkpoint<DB>(
 where
     DB: Blockstore + Clone,
 {
-    if !gateway.enabled(state)? {
-        return Ok(None);
-    }
-
     let id = gateway.subnet_id(state)?;
     let is_root = id.route.is_empty();
 

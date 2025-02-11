@@ -80,6 +80,8 @@ async function deployGatewayDiamond(
     gatewayConstructorParams.networkName.root = await hre.getChainId()
     gatewayConstructorParams.commitSha = hre.ethers.utils.formatBytes32String(gitCommitSha())
 
+    console.log('deploy gateway with params', gatewayConstructorParams)
+
     const deployments = await Deployments.deploy(hre, deployer, {
         name: 'GatewayDiamond',
         args: [facets.asFacetCuts(), gatewayConstructorParams],

@@ -16,9 +16,9 @@ import {BATCH_PERIOD, MAX_MSGS_PER_BATCH} from "./structs/CrossNet.sol";
 
 error FunctionNotFound(bytes4 _functionSelector);
 
-bool constant FEATURE_MULTILEVEL_CROSSMSG = false;
+bool constant FEATURE_MULTILEVEL_CROSSMSG = true;
 bool constant FEATURE_GENERAL_PUPRPOSE_CROSSMSG = true;
-uint8 constant FEATURE_SUBNET_DEPTH = 2;
+uint8 constant FEATURE_SUBNET_DEPTH = 10;
 
 contract GatewayDiamond {
     GatewayActorStorage internal s;
