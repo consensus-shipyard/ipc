@@ -109,7 +109,7 @@ cmd! {
                     .or(objects_download)
                     .with(warp::cors().allow_any_origin()
                         .allow_headers(vec!["Content-Type"])
-                        .allow_methods(vec!["PUT", "DEL", "GET", "HEAD"]))
+                        .allow_methods(vec!["POST", "DEL", "GET", "HEAD"]))
                     .recover(handle_rejection);
 
                 if let Some(listen_addr) = settings.listen.to_socket_addrs()?.next() {
