@@ -7,6 +7,7 @@ use crate::fvm::activity::actor::ActorActivityTracker;
 use crate::fvm::externs::FendermintExterns;
 use crate::fvm::gas::BlockGasTracker;
 use crate::fvm::state::priority::TxnPriorityCalculator;
+use crate::fvm::state::read_only::FvmReadOnlyExecutor;
 use anyhow::{anyhow, Ok};
 use cid::Cid;
 use fendermint_actors_api::gas_market::Reading;
@@ -15,6 +16,7 @@ use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_core::{chainid::HasChainID, Timestamp};
 use fendermint_vm_encoding::IsHumanReadable;
 use fendermint_vm_genesis::PowerScale;
+use fvm::engine::EnginePool;
 use fvm::{
     call_manager::DefaultCallManager,
     engine::MultiEngine,
@@ -32,9 +34,7 @@ use fvm_shared::{
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::fmt;
-use fvm::engine::EnginePool;
 use tendermint::consensus::params::Params as TendermintConsensusParams;
-use crate::fvm::state::read_only::FvmReadOnlyExecutor;
 
 pub type BlockHash = [u8; 32];
 
@@ -154,7 +154,7 @@ where
     params_dirty: bool,
     /// The fvm engine pool
     engine_pool: EnginePool,
-    
+
     txn_priority: TxnPriorityCalculator,
 }
 
@@ -235,17 +235,24 @@ where
         BlockGasTracker::read_gas_market(&mut self.executor)
     }
 
-    pub fn execute_read_only(self, msg: Message) -> anyhow::Result<(anyhow::Result<ApplyRet>, Self)> {
-        let machine = self.executor.into_machine().ok_or_else(|| anyhow!("executor is poisoned"))?;
+    pub fn execute_read_only(
+        self,
+        msg: Message,
+    ) -> anyhow::Result<(anyhow::Result<ApplyRet>, Self)> {
+        let machine = self
+            .executor
+            .into_machine()
+            .ok_or_else(|| anyhow!("executor is poisoned"))?;
         let engine = self.engine_pool;
 
         let mut exec = FvmReadOnlyExecutor::new(machine, engine);
-        let r= exec.exec_message(msg);
+        let r = exec.exec_message(msg);
 
         let (machine, engine) = exec.into_inner()?;
 
         let original_state = Self {
-            executor: DefaultExecutor::new(engine.clone(), machine).expect("this method should not fail in prod"),
+            executor: DefaultExecutor::new(engine.clone(), machine)
+                .expect("this method should not fail in prod"),
             block_hash: self.block_hash,
             block_producer: self.block_producer,
             block_gas_tracker: self.block_gas_tracker,
