@@ -139,8 +139,10 @@ pub trait MachineActor {
     fn get_metadata(rt: &impl Runtime) -> Result<Metadata, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let st = rt.state::<Self::State>()?;
+        let owner = st.owner();
+        let address = resolve_delegated_address(rt, owner).unwrap_or(owner);
         Ok(Metadata {
-            owner: st.owner(),
+            owner: address,
             kind: st.kind(),
             metadata: st.metadata(),
         })
