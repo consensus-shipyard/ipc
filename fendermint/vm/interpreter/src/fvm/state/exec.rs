@@ -7,7 +7,7 @@ use crate::fvm::activity::actor::ActorActivityTracker;
 use crate::fvm::externs::FendermintExterns;
 use crate::fvm::gas::BlockGasTracker;
 use crate::fvm::state::priority::TxnPriorityCalculator;
-use anyhow::Ok;
+use anyhow::{anyhow, Ok};
 use cid::Cid;
 use fendermint_actors_api::gas_market::Reading;
 use fendermint_crypto::PublicKey;
@@ -32,7 +32,9 @@ use fvm_shared::{
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::fmt;
+use fvm::engine::EnginePool;
 use tendermint::consensus::params::Params as TendermintConsensusParams;
+use crate::fvm::state::read_only::FvmReadOnlyExecutor;
 
 pub type BlockHash = [u8; 32];
 
@@ -150,7 +152,9 @@ where
     params: FvmUpdatableParams,
     /// Indicate whether the parameters have been updated.
     params_dirty: bool,
-
+    /// The fvm engine pool
+    engine_pool: EnginePool,
+    
     txn_priority: TxnPriorityCalculator,
 }
 
@@ -202,6 +206,7 @@ where
                 power_scale: params.power_scale,
             },
             params_dirty: false,
+            engine_pool: engine,
             txn_priority: TxnPriorityCalculator::new(base_fee),
         })
     }
@@ -228,6 +233,29 @@ where
 
     pub fn read_gas_market(&mut self) -> anyhow::Result<Reading> {
         BlockGasTracker::read_gas_market(&mut self.executor)
+    }
+
+    pub fn execute_read_only(self, msg: Message) -> anyhow::Result<(anyhow::Result<ApplyRet>, Self)> {
+        let machine = self.executor.into_machine().ok_or_else(|| anyhow!("executor is poisoned"))?;
+        let engine = self.engine_pool;
+
+        let mut exec = FvmReadOnlyExecutor::new(machine, engine);
+        let r= exec.exec_message(msg);
+
+        let (machine, engine) = exec.into_inner()?;
+
+        let original_state = Self {
+            executor: DefaultExecutor::new(engine.clone(), machine).expect("this method should not fail in prod"),
+            block_hash: self.block_hash,
+            block_producer: self.block_producer,
+            block_gas_tracker: self.block_gas_tracker,
+            params: self.params,
+            params_dirty: self.params_dirty,
+            engine_pool: engine,
+            txn_priority: self.txn_priority,
+        };
+
+        Ok((r, original_state))
     }
 
     /// Execute message implicitly.
