@@ -1,6 +1,6 @@
 [package]
 name = "fendermint_actor_timehub"
-description = "Actor for time event accumulation"
+description = "Actor for timestamping data hashes"
 license.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -30,6 +30,8 @@ fendermint_actor_machine = { path = "../machine" }
 
 [dev-dependencies]
 fil_actors_runtime = { workspace = true, features = ["test_utils"] }
+fil_actors_evm_shared = { workspace = true }
+hex-literal = { workspace = true }
 
 [features]
 fil-actor = ["fil_actors_runtime/fil-actor"]
