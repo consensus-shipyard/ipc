@@ -2952,8 +2952,8 @@ dependencies = [
  "fil_actors_evm_shared",
  "fil_actors_runtime",
  "frc42_dispatch",
- "fvm_ipld_blockstore 0.2.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
  "fvm_shared",
  "hex-literal 0.4.1",
  "log",
@@ -2973,8 +2973,8 @@ dependencies = [
  "fil_actors_runtime",
  "frc42_dispatch",
  "fvm_ipld_amt",
- "fvm_ipld_blockstore 0.2.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
  "fvm_shared",
  "num-derive 0.3.3",
  "num-traits",
@@ -2992,8 +2992,8 @@ dependencies = [
  "fil_actors_evm_shared",
  "fil_actors_runtime",
  "frc42_dispatch",
- "fvm_ipld_blockstore 0.2.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
  "fvm_shared",
  "hex-literal 0.4.1",
  "log",
@@ -3013,8 +3013,8 @@ dependencies = [
  "fil_actors_evm_shared",
  "fil_actors_runtime",
  "frc42_dispatch",
- "fvm_ipld_blockstore 0.2.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
  "fvm_shared",
  "hex-literal 0.4.1",
  "log",
@@ -3036,8 +3036,8 @@ dependencies = [
  "fendermint_actor_gas_market_eip1559",
  "fil_actor_bundler",
  "fil_actors_runtime",
- "fvm_ipld_blockstore 0.2.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
  "num-traits",
  "toml 0.8.19",
 ]
@@ -3051,8 +3051,8 @@ dependencies = [
  "fil_actors_evm_shared",
  "fil_actors_runtime",
  "frc42_dispatch",
- "fvm_ipld_blockstore 0.2.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
  "fvm_shared",
  "hex-literal 0.4.1",
  "log",
@@ -3094,9 +3094,9 @@ dependencies = [
  "fendermint_vm_snapshot",
  "fendermint_vm_topdown",
  "fvm",
- "fvm_ipld_blockstore 0.2.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_car 0.7.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_car",
+ "fvm_ipld_encoding",
  "fvm_shared",
  "hex",
  "ipc-api",
@@ -3146,7 +3146,7 @@ dependencies = [
  "fendermint_materializer",
  "fendermint_vm_actor_interface",
  "fendermint_vm_genesis",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_encoding",
  "fvm_shared",
  "hex",
  "ipc-api",
@@ -3169,7 +3169,7 @@ dependencies = [
  "dirs",
  "fendermint_vm_encoding",
  "fendermint_vm_topdown",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_encoding",
  "fvm_shared",
  "ipc-api",
  "ipc-observability",
@@ -3209,8 +3209,8 @@ dependencies = [
  "fendermint_vm_interpreter",
  "fendermint_vm_message",
  "fvm",
- "fvm_ipld_blockstore 0.2.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
  "fvm_shared",
  "hex",
  "ipc-api",
@@ -3253,7 +3253,7 @@ dependencies = [
  "fendermint_vm_message",
  "fil_actors_evm_shared",
  "futures",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_encoding",
  "fvm_shared",
  "hex",
  "jsonrpc-v2",
@@ -3344,8 +3344,8 @@ dependencies = [
  "anyhow",
  "cid 0.10.1",
  "fendermint_storage",
- "fvm_ipld_blockstore 0.2.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
  "num_cpus",
  "quickcheck",
  "rocksdb",
@@ -3369,7 +3369,7 @@ dependencies = [
  "fendermint_vm_actor_interface",
  "fendermint_vm_genesis",
  "fendermint_vm_message",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_encoding",
  "fvm_shared",
  "hex",
  "lazy_static",
@@ -3396,7 +3396,7 @@ version = "0.1.0"
 name = "fendermint_storage"
 version = "0.1.0"
 dependencies = [
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_encoding",
  "im",
  "quickcheck",
  "quickcheck_macros",
@@ -3413,7 +3413,7 @@ dependencies = [
  "cid 0.10.1",
  "ethers",
  "fendermint_testing",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_encoding",
  "fvm_shared",
  "hex",
  "ipc-api",
@@ -3445,8 +3445,8 @@ dependencies = [
  "fendermint_crypto",
  "fendermint_vm_genesis",
  "fil_actors_evm_shared",
- "fvm_ipld_blockstore 0.2.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
  "fvm_ipld_hamt",
  "fvm_shared",
  "hex",
@@ -3512,7 +3512,7 @@ dependencies = [
  "fendermint_vm_core",
  "fendermint_vm_encoding",
  "fendermint_vm_genesis",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_encoding",
  "fvm_shared",
  "hex",
  "ipc-api",
@@ -3562,9 +3562,9 @@ dependencies = [
  "futures-core",
  "futures-util",
  "fvm",
- "fvm_ipld_blockstore 0.2.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_car 0.7.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_car",
+ "fvm_ipld_encoding",
  "fvm_shared",
  "hex",
  "ipc-api",
@@ -3609,7 +3609,7 @@ dependencies = [
  "fendermint_vm_actor_interface",
  "fendermint_vm_encoding",
  "fendermint_vm_message",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_encoding",
  "fvm_shared",
  "hex",
  "ipc-api",
@@ -3654,9 +3654,9 @@ dependencies = [
  "fendermint_vm_snapshot",
  "futures",
  "fvm",
- "fvm_ipld_blockstore 0.2.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_car 0.7.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_car",
+ "fvm_ipld_encoding",
  "fvm_shared",
  "im",
  "multihash 0.18.1",
@@ -3690,7 +3690,7 @@ dependencies = [
  "fendermint_tracing",
  "fendermint_vm_event",
  "fendermint_vm_genesis",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_encoding",
  "fvm_shared",
  "hex",
  "im",
@@ -3751,9 +3751,9 @@ dependencies = [
  "cid 0.10.1",
  "clap 4.5.21",
  "futures",
- "fvm_ipld_blockstore 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "fvm_ipld_car 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "fvm_ipld_encoding 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_car",
+ "fvm_ipld_encoding",
  "serde",
  "serde_ipld_dagcbor 0.4.2",
  "serde_json",
@@ -3762,14 +3762,14 @@ dependencies = [
 [[package]]
 name = "fil_actor_eam"
 version = "15.0.0-rc1"
-source = "git+https://github.com/cryptoAtwill/builtin-actors.git#10ad0be7992c822aa6464cc2c55e733b61251066"
+source = "git+https://github.com/filecoin-project/builtin-actors?tag=v15.0.0#831bf1b9fe281835409c39a8c454a68dd3200bbc"
 dependencies = [
  "anyhow",
  "cid 0.10.1",
  "fil_actors_evm_shared",
  "fil_actors_runtime",
- "fvm_ipld_blockstore 0.2.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
  "fvm_shared",
  "hex-literal 0.3.4",
  "log",
@@ -3783,10 +3783,10 @@ dependencies = [
 [[package]]
 name = "fil_actors_evm_shared"
 version = "15.0.0-rc1"
-source = "git+https://github.com/cryptoAtwill/builtin-actors.git#10ad0be7992c822aa6464cc2c55e733b61251066"
+source = "git+https://github.com/filecoin-project/builtin-actors?tag=v15.0.0#831bf1b9fe281835409c39a8c454a68dd3200bbc"
 dependencies = [
  "fil_actors_runtime",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_encoding",
  "fvm_shared",
  "hex",
  "serde",
@@ -3796,7 +3796,7 @@ dependencies = [
 [[package]]
 name = "fil_actors_runtime"
 version = "15.0.0-rc1"
-source = "git+https://github.com/cryptoAtwill/builtin-actors.git#10ad0be7992c822aa6464cc2c55e733b61251066"
+source = "git+https://github.com/filecoin-project/builtin-actors?tag=v15.0.0#831bf1b9fe281835409c39a8c454a68dd3200bbc"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
@@ -3806,8 +3806,8 @@ dependencies = [
  "cid 0.10.1",
  "fvm_ipld_amt",
  "fvm_ipld_bitfield",
- "fvm_ipld_blockstore 0.2.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
  "fvm_ipld_hamt",
  "fvm_sdk",
  "fvm_shared",
@@ -4016,7 +4016,7 @@ version = "8.0.0"
 dependencies = [
  "frc42_hasher",
  "frc42_macros",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_encoding",
  "fvm_sdk",
  "fvm_shared",
  "thiserror 1.0.69",
@@ -4242,8 +4242,8 @@ dependencies = [
  "filecoin-proofs-api",
  "fvm-wasm-instrument",
  "fvm_ipld_amt",
- "fvm_ipld_blockstore 0.2.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
  "fvm_ipld_hamt",
  "fvm_shared",
  "lazy_static",
@@ -4283,8 +4283,8 @@ source = "git+https://github.com/cryptoAtwill/ref-fvm.git#c09d9a272fe5a8e4b5cf6b
 dependencies = [
  "anyhow",
  "cid 0.10.1",
- "fvm_ipld_blockstore 0.2.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
  "itertools 0.13.0",
  "once_cell",
  "serde",
@@ -4294,59 +4294,34 @@ dependencies = [
 [[package]]
 name = "fvm_ipld_bitfield"
 version = "0.6.0"
-source = "git+https://github.com/cryptoAtwill/ref-fvm.git#c09d9a272fe5a8e4b5cf6b5982d33af7c9c4f164"
-dependencies = [
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "serde",
- "thiserror 1.0.69",
- "unsigned-varint 0.8.0",
-]
-
-[[package]]
-name = "fvm_ipld_blockstore"
-version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d064b957420f5ecc137a153baaa6c32e2eb19b674135317200b6f2537eabdbfd"
+checksum = "da94287cafa663c2e295fe45c4c9dbf5ab7b52f648568f9ae3823deaf9873a89"
 dependencies = [
- "anyhow",
- "cid 0.10.1",
- "multihash 0.18.1",
-]
-
-[[package]]
-name = "fvm_ipld_blockstore"
-version = "0.2.1"
-source = "git+https://github.com/cryptoAtwill/ref-fvm.git#c09d9a272fe5a8e4b5cf6b5982d33af7c9c4f164"
-dependencies = [
- "anyhow",
- "cid 0.10.1",
- "multihash 0.18.1",
-]
-
-[[package]]
-name = "fvm_ipld_car"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6190f03442b67b21a3d4e115c4d4dd3468aed24e27ebb074218822c1b3df41ba"
-dependencies = [
- "cid 0.10.1",
- "futures",
- "fvm_ipld_blockstore 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "fvm_ipld_encoding 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "fvm_ipld_encoding",
  "serde",
  "thiserror 1.0.69",
  "unsigned-varint 0.7.2",
 ]
 
 [[package]]
+name = "fvm_ipld_blockstore"
+version = "0.2.1"
+source = "git+https://github.com/cryptoAtwill/ref-fvm.git#c09d9a272fe5a8e4b5cf6b5982d33af7c9c4f164"
+dependencies = [
+ "anyhow",
+ "cid 0.10.1",
+ "multihash 0.18.1",
+]
+
+[[package]]
 name = "fvm_ipld_car"
 version = "0.7.1"
 source = "git+https://github.com/cryptoAtwill/ref-fvm.git#c09d9a272fe5a8e4b5cf6b5982d33af7c9c4f164"
 dependencies = [
  "cid 0.10.1",
  "futures",
- "fvm_ipld_blockstore 0.2.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
  "serde",
  "thiserror 1.0.69",
  "unsigned-varint 0.8.0",
@@ -4355,28 +4330,11 @@ dependencies = [
 [[package]]
 name = "fvm_ipld_encoding"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "90608092e31d9a06236268c58f7c36668ab4b2a48afafe3a97e08f094ad7ae50"
-dependencies = [
- "anyhow",
- "cid 0.10.1",
- "fvm_ipld_blockstore 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "multihash 0.18.1",
- "serde",
- "serde_ipld_dagcbor 0.4.2",
- "serde_repr",
- "serde_tuple",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "fvm_ipld_encoding"
-version = "0.4.0"
 source = "git+https://github.com/cryptoAtwill/ref-fvm.git#c09d9a272fe5a8e4b5cf6b5982d33af7c9c4f164"
 dependencies = [
  "anyhow",
  "cid 0.10.1",
- "fvm_ipld_blockstore 0.2.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_blockstore",
  "multihash 0.18.1",
  "serde",
  "serde_ipld_dagcbor 0.6.2",
@@ -4394,8 +4352,8 @@ dependencies = [
  "byteorder",
  "cid 0.10.1",
  "forest_hash_utils",
- "fvm_ipld_blockstore 0.2.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
  "libipld-core",
  "multihash 0.18.1",
  "once_cell",
@@ -4410,7 +4368,7 @@ version = "4.4.4"
 source = "git+https://github.com/cryptoAtwill/ref-fvm.git#c09d9a272fe5a8e4b5cf6b5982d33af7c9c4f164"
 dependencies = [
  "cid 0.10.1",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_encoding",
  "fvm_shared",
  "lazy_static",
  "log",
@@ -4432,7 +4390,7 @@ dependencies = [
  "data-encoding",
  "data-encoding-macro",
  "filecoin-proofs-api",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_encoding",
  "lazy_static",
  "libsecp256k1",
  "multihash 0.18.1",
@@ -5378,8 +5336,8 @@ dependencies = [
  "ethers",
  "fil_actors_runtime",
  "fnv",
- "fvm_ipld_blockstore 0.2.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
  "fvm_ipld_hamt",
  "fvm_shared",
  "integer-encoding",
@@ -5416,7 +5374,7 @@ dependencies = [
  "ethers-contract",
  "fil_actors_runtime",
  "futures-util",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_encoding",
  "fvm_shared",
  "hex",
  "ipc-api",
@@ -5477,7 +5435,7 @@ dependencies = [
  "ethers-contract",
  "fil_actors_runtime",
  "futures-util",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_encoding",
  "fvm_shared",
  "hex",
  "http",
@@ -5518,8 +5476,8 @@ dependencies = [
  "anyhow",
  "cid 0.10.1",
  "fvm_ipld_amt",
- "fvm_ipld_blockstore 0.2.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
  "fvm_ipld_hamt",
  "fvm_shared",
  "hex",
@@ -5584,8 +5542,8 @@ dependencies = [
  "bloom",
  "cid 0.10.1",
  "env_logger 0.10.2",
- "fvm_ipld_blockstore 0.2.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
  "fvm_ipld_hamt",
  "fvm_shared",
  "gcra",
@@ -10763,12 +10721,12 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 [[package]]
 name = "vm_api"
 version = "1.0.0"
-source = "git+https://github.com/cryptoAtwill/builtin-actors.git#10ad0be7992c822aa6464cc2c55e733b61251066"
+source = "git+https://github.com/filecoin-project/builtin-actors?tag=v15.0.0#831bf1b9fe281835409c39a8c454a68dd3200bbc"
 dependencies = [
  "anyhow",
  "cid 0.10.1",
- "fvm_ipld_blockstore 0.2.1 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
- "fvm_ipld_encoding 0.4.0 (git+https://github.com/cryptoAtwill/ref-fvm.git)",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
  "fvm_ipld_hamt",
  "fvm_shared",
  "num-derive 0.3.3",
