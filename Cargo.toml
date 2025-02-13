@@ -142,7 +142,7 @@ rand_chacha = "0.3"
 regex = "1"
 reqwest = { version = "0.11.13", features = ["json"] }
 sha2 = "0.10"
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1.0.217", features = ["derive"] }
 serde_bytes = "0.11"
 serde_json = { version = "1", features = ["raw_value"] }
 serde_yaml = { version = "0.9" }
@@ -196,18 +196,18 @@ openssl = { version = "0.10", features = ["vendored"] }
 # pull in crates as transitive dependencies that do not support Wasm architector. If this
 # happens, try removing "crypto" feature from fvm_shared dependency in contracts/binding/Cargo.toml
 # and run `cargo build`. Then add the "crypto" feature back and run `cargo build` again.
-fvm = { version = "4.4.0", features = [
+fvm = { git = "https://github.com/cryptoAtwill/ref-fvm.git", features = [
   "verify-signature",
 ], default-features = false } # no opencl feature or it fails on CI
-fvm_shared = { version = "4.4.0" }
-fvm_sdk = { version = "4.4.0" }
+fvm_shared = { git = "https://github.com/cryptoAtwill/ref-fvm.git" }
+fvm_sdk = { git = "https://github.com/cryptoAtwill/ref-fvm.git" }
 
 
-fvm_ipld_blockstore = "0.2.0"
-fvm_ipld_car = "0.7.1"
-fvm_ipld_encoding = "0.4.0"
-fvm_ipld_hamt = "0.9.0"
-fvm_ipld_amt = "0.6.2"
+fvm_ipld_blockstore = { git = "https://github.com/cryptoAtwill/ref-fvm.git" }
+fvm_ipld_car = { git = "https://github.com/cryptoAtwill/ref-fvm.git" }
+fvm_ipld_encoding = { git = "https://github.com/cryptoAtwill/ref-fvm.git" }
+fvm_ipld_hamt = { git = "https://github.com/cryptoAtwill/ref-fvm.git" }
+fvm_ipld_amt = { git = "https://github.com/cryptoAtwill/ref-fvm.git" }
 
 # Local FVM debugging
 # fvm = { path = "../ref-fvm/fvm", default-features = false }
@@ -221,9 +221,9 @@ fvm_ipld_amt = "0.6.2"
 # to cut down the time it takes to compile everything. However, some projects have a "shared" part,
 # and this copy-paste is clunky, so at least for those that have it, we should use it.
 # Keep the version here in sync with the Makefile!
-fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
-fil_actor_eam = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
-fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
+fil_actors_evm_shared = { git = "https://github.com/cryptoAtwill/builtin-actors.git" }
+fil_actor_eam = { git = "https://github.com/cryptoAtwill/builtin-actors.git" }
+fil_actors_runtime = { git = "https://github.com/cryptoAtwill/builtin-actors.git" }
 
 fendermint_actor_eam = { path = "./fendermint/actors/eam" }
 fendermint_actor_activity_tracker = { path = "./fendermint/actors/activity-tracker" }
