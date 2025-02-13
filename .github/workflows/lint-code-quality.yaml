@@ -45,6 +45,11 @@ jobs:
         toolchain: nightly-2024-07-05
         components: rustfmt,clippy
 
+    - name: Check out the project
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
     - name: Print Rust toolchain default versions
       run: |
         echo "rustup show:"
