@@ -148,14 +148,13 @@ impl<S: VoteStore> VoteTally<S> {
         self.votes.store_vote(parent_height, vote)?;
 
         // check if a new quorum is formed with the new vote
-        let is_check_quorum = self
-            .latest_quorum_formed
-            .as_ref()
+        let is_check_quorum = match self.latest_quorum_formed.as_ref() {
+            // if there is no quorum formed before, trigger finding quorum
+            None => true,
             // we only check quorum if the incoming vote height is bigger than latest quorum formed,
             // no point choosing a lower parent height
-            .map(|v| v.parent_height < parent_height)
-            // if there is quorum formed, trigger finding quorum
-            .unwrap_or(true);
+            Some(v) => v.parent_height < parent_height,
+        };
         if !is_check_quorum {
             return Ok(true);
         }
