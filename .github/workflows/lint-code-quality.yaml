@@ -30,6 +30,11 @@ jobs:
       RUSTFLAGS: -Dwarnings
 
     steps:
+    - name: Check out the project
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
     - name: Install Tools
       uses: ./.github/actions/install-tools
       with:
@@ -44,11 +49,6 @@ jobs:
       with:
         toolchain: nightly-2024-07-05
         components: rustfmt,clippy
-
-    - name: Check out the project
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
 
     - name: Print Rust toolchain default versions
       run: |
