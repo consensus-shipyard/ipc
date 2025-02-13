@@ -52,7 +52,6 @@ Once we capture the trace object (hopefully with negligible overhead), and we en
 | x    |           |                |                                    |                                                                                                                | ipc_exec_fvm_apply_execution_time_secs (histogram)                           |
 | x    |           |                |                                    |                                                                                                                | ipc_exec_fvm_call_execution_time_secs (histogram)                            |
 | x    | Tracing   | Errors         | Error while processing tracing     | TracingError{affected_event, reason}                                                                           | ipc_tracing_errors{event} (counter)                                          |
-|      |
 
 ## Fine-grained VM metrics
 

@@ -102,7 +102,3 @@ After implementing the gater contract, deploy it to the network. Then, during su
 ### 3. Enforcing Validator Actions
 
 Once the gater contract is set, it will automatically intercept validator-related actions and enforce the rules defined within the contract. This gives the subnet creator full control over who can participate and how the network is governed.
-
-### 4. Example Implementation
-
-Please see an example implementation [here]().
