@@ -37,7 +37,7 @@ env = { "CMD" = """genesis --genesis-file /data/genesis.json ipc gateway --subne
 
 [tasks.genesis-seal]
 extend = "fendermint-tool"
-env = { "CMD" = "genesis --genesis-file /data/genesis.json ipc seal-genesis --builtin-actors-path /fendermint/bundle.car --custom-actors-path /fendermint/custom_actors_bundle.car --artifacts-path /fendermint/contracts --output-path ${SEALED_GENESIS}" }
+env = { "CMD" = "genesis --genesis-file /data/genesis.json ipc seal-genesis --artifacts-path /fendermint/contracts --output-path ${SEALED_GENESIS}" }
 
 [tasks.genesis-write]
 extend = "fendermint-tool"
