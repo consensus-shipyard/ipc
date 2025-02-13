@@ -30,6 +30,21 @@ jobs:
       RUSTFLAGS: -Dwarnings
 
     steps:
+    - name: Install Tools
+      uses: ./.github/actions/install-tools
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        rust: 1.81.0
+
+    - name: Install Extra Libs
+      run: apt-get install -y build-essential clang cmake pkg-config libssl-dev protobuf-compiler git curl
+
+    - name: Install Rust nightly
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: nightly-2024-07-05
+        components: rustfmt,clippy
+
     - name: Print Rust toolchain default versions
       run: |
         echo "rustup show:"
@@ -45,4 +60,5 @@ jobs:
       run: cargo +nightly-2024-07-05 fmt --check --all
 
     - name: Check clippy
-      run: cargo clippy --release --tests --no-deps -- -D clippy::all
+      run: |
+        cargo clippy --release --tests --no-deps -- -D clippy::all
