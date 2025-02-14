@@ -5,6 +5,7 @@ use either::Either;
 use ethers::types::H160;
 use fvm_shared::{chainid::ChainID, econ::TokenAmount};
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 use url::Url;
 
 use fendermint_vm_genesis::Collateral;
@@ -222,6 +223,8 @@ pub struct NodeConfig<'a, M: Materials> {
     pub env: &'a EnvMap,
     /// Number of nodes to be expected in the subnet, including this node, or 0 if unknown.
     pub peer_count: usize,
+    /// Additional configuration for Fendermint
+    pub fendermint_additional_config: Option<PathBuf>,
 }
 
 /// Options regarding relayer configuration

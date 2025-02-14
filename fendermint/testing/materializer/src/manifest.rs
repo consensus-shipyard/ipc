@@ -7,7 +7,7 @@ use anyhow::{bail, Context};
 use fvm_shared::econ::TokenAmount;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use std::{collections::BTreeMap, path::Path};
+use std::{collections::BTreeMap, path::Path, path::PathBuf};
 use url::Url;
 
 use fs_err as fs;
@@ -48,29 +48,54 @@ pub struct Manifest {
 }
 
 impl Manifest {
-    /// Read a manifest from file. It chooses the format based on the extension.
+    /// Read a manifest from file and resolve any relative extra_config paths.
     pub fn from_file(path: &Path) -> anyhow::Result<Self> {
-        let Some(ext) = path
+        let ext = path
             .extension()
             .map(|e| e.to_string_lossy().to_ascii_lowercase())
-        else {
-            bail!("manifest file has no extension, cannot determine format");
-        };
+            .ok_or_else(|| {
+                anyhow::anyhow!("manifest file has no extension, cannot determine format")
+            })?;
 
-        let manifest = fs::read_to_string(path)
+        let manifest_str = fs::read_to_string(path)
             .with_context(|| format!("failed to read manifest from {}", path.to_string_lossy()))?;
 
-        match ext.as_str() {
-            "yaml" => serde_yaml::from_str(&manifest).context("failed to parse manifest YAML"),
-            "json" => serde_json::from_str(&manifest).context("failed to parse manifest JSON"),
-            "toml" => toml::from_str(&manifest).context("failed to parse manifest TOML"),
-            other => bail!("unknown manifest format: {other}"),
-        }
+        let mut manifest: Self = match ext.as_str() {
+            "yaml" => {
+                serde_yaml::from_str(&manifest_str).context("failed to parse manifest YAML")?
+            }
+            "json" => {
+                serde_json::from_str(&manifest_str).context("failed to parse manifest JSON")?
+            }
+            "toml" => toml::from_str(&manifest_str).context("failed to parse manifest TOML")?,
+            other => bail!("unknown manifest format: {}", other),
+        };
+
+        // Determine the base directory from the manifest file's location.
+        let base = path.parent().unwrap_or(Path::new("."));
+        manifest.resolve_paths(base)?;
+
+        Ok(manifest)
     }
 
     /// Perform sanity checks.
     pub async fn validate(&self, name: &TestnetName) -> anyhow::Result<()> {
         validate_manifest(name, self).await
+    }
+
+    /// Walk through the manifest and resolve relative fendermint_additional_config paths.
+    fn resolve_paths(&mut self, base: &Path) -> anyhow::Result<()> {
+        // For the rootnet.
+        if let Rootnet::New { nodes, .. } = &mut self.rootnet {
+            for node in nodes.values_mut() {
+                node.resolve_paths(base);
+            }
+        }
+        // For top-level subnets.
+        for subnet in self.subnets.values_mut() {
+            subnet.resolve_paths(base)?;
+        }
+        Ok(())
     }
 }
 
@@ -177,6 +202,22 @@ pub struct Subnet {
     pub subnets: SubnetMap,
 }
 
+impl Subnet {
+    /// Resolve the optional additional config paths for all nodes in this subnet,
+    /// as well as in any nested subnets.
+    pub fn resolve_paths(&mut self, base: &Path) -> anyhow::Result<()> {
+        // Resolve paths for nodes in this subnet.
+        for node in self.nodes.values_mut() {
+            node.resolve_paths(base);
+        }
+        // Recurse for any nested subnets.
+        for subnet in self.subnets.values_mut() {
+            subnet.resolve_paths(base)?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Node {
     /// Indicate whether this is a validator node or a full node.
@@ -198,6 +239,21 @@ pub struct Node {
     /// will tell us that all subnet nodes need a parent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_node: Option<ParentNode>,
+
+    /// Optional additional configuration file for the Fendermint component.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fendermint_additional_config: Option<PathBuf>,
+}
+
+impl Node {
+    /// Resolve the optional `fendermint_additional_config` path relative to `base`.
+    pub fn resolve_paths(&mut self, base: &Path) {
+        if let Some(ref mut config_path) = self.fendermint_additional_config {
+            if !config_path.is_absolute() {
+                *config_path = base.join(&*config_path);
+            }
+        }
+    }
 }
 
 /// The mode in which CometBFT is running.
