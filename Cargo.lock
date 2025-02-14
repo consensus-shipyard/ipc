@@ -3022,6 +3022,7 @@ dependencies = [
  "fendermint_actor_gas_market_eip1559",
  "fil_actor_bundler",
  "fil_actors_runtime",
+ "fs-err",
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
  "num-traits",
@@ -3079,6 +3080,7 @@ dependencies = [
  "fendermint_vm_resolver",
  "fendermint_vm_snapshot",
  "fendermint_vm_topdown",
+ "fs-err",
  "fvm",
  "fvm_ipld_blockstore",
  "fvm_ipld_car",
@@ -3238,6 +3240,7 @@ dependencies = [
  "fendermint_vm_actor_interface",
  "fendermint_vm_message",
  "fil_actors_evm_shared",
+ "fs-err",
  "futures",
  "fvm_ipld_encoding",
  "fvm_shared",
@@ -3268,6 +3271,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "ethers-core",
+ "fs-err",
  "hex",
  "serde",
  "serde_json",
@@ -3298,6 +3302,7 @@ dependencies = [
  "fendermint_vm_genesis",
  "fendermint_vm_interpreter",
  "fendermint_vm_message",
+ "fs-err",
  "futures",
  "fvm_shared",
  "hex",
@@ -3355,6 +3360,7 @@ dependencies = [
  "fendermint_vm_actor_interface",
  "fendermint_vm_genesis",
  "fendermint_vm_message",
+ "fs-err",
  "fvm_ipld_encoding",
  "fvm_shared",
  "hex",
@@ -3399,6 +3405,7 @@ dependencies = [
  "cid",
  "ethers",
  "fendermint_testing",
+ "fs-err",
  "fvm_ipld_encoding",
  "fvm_shared",
  "hex",
@@ -3545,6 +3552,7 @@ dependencies = [
  "fendermint_vm_message",
  "fendermint_vm_resolver",
  "fendermint_vm_topdown",
+ "fs-err",
  "futures-core",
  "futures-util",
  "fvm",
@@ -3638,6 +3646,7 @@ dependencies = [
  "fendermint_vm_genesis",
  "fendermint_vm_interpreter",
  "fendermint_vm_snapshot",
+ "fs-err",
  "futures",
  "fvm",
  "fvm_ipld_blockstore",
@@ -4027,6 +4036,15 @@ dependencies = [
  "quote",
  "syn 1.0.109",
  "trybuild",
+]
+
+[[package]]
+name = "fs-err"
+version = "3.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f89bda4c2a21204059a977ed3bfe746677dfd137b83c339e702b0ac91d482aa"
+dependencies = [
+ "autocfg",
 ]
 
 [[package]]
