@@ -333,6 +333,7 @@ where
             ethapi: node.ethapi,
             env,
             peer_count,
+            fendermint_additional_config: node.fendermint_additional_config.clone(),
         };
 
         let node = m

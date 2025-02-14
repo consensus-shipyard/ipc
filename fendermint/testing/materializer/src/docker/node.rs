@@ -9,6 +9,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+use tokio::try_join;
+
 use anyhow::{anyhow, bail, Context};
 use bollard::Docker;
 use ethers::{providers::Middleware, types::H160};
@@ -399,15 +401,19 @@ impl DockerNode {
         let fendermint = match fendermint {
             Some(c) => c,
             None => {
-                let creator = make_runner(
-                    FENDERMINT_IMAGE,
-                    volumes(vec![
-                        (keys_dir.clone(), "/fendermint/keys"),
-                        (fendermint_dir.join("data"), "/fendermint/data"),
-                        (fendermint_dir.join("logs"), "/fendermint/logs"),
-                        (fendermint_dir.join("snapshots"), "/fendermint/snapshots"),
-                    ]),
-                );
+                let mut volume_mappings = vec![
+                    (keys_dir.clone(), "/fendermint/keys"),
+                    (fendermint_dir.join("data"), "/fendermint/data"),
+                    (fendermint_dir.join("logs"), "/fendermint/logs"),
+                    (fendermint_dir.join("snapshots"), "/fendermint/snapshots"),
+                ];
+
+                if let Some(ref additional_config) = node_config.fendermint_additional_config {
+                    volume_mappings
+                        .push((additional_config.clone(), "/fendermint/config/dev.toml"));
+                }
+
+                let creator = make_runner(FENDERMINT_IMAGE, volumes(volume_mappings));
 
                 creator
                     .create(
@@ -480,7 +486,7 @@ impl DockerNode {
         })
     }
 
-    pub async fn start(&self, seed_nodes: &[&Self]) -> anyhow::Result<()> {
+    pub async fn start_all_containers(&self, seed_nodes: &[&Self]) -> anyhow::Result<()> {
         let cometbft_seeds = collect_seeds(seed_nodes, |n| {
             let host = &n.cometbft.hostname();
             let id = n.cometbft_node_id()?;
@@ -500,18 +506,20 @@ impl DockerNode {
 
         export_env(self.path.join(DYNAMIC_ENV), &env)?;
 
-        // Start all three containers.
-        self.fendermint.start().await?;
-        self.cometbft.start().await?;
-        if let Some(ref ethapi) = self.ethapi {
-            ethapi.start().await?;
-        }
+        // Start all three containers at the same time.
+        try_join!(self.fendermint.start(), self.cometbft.start(), async {
+            if let Some(ref ethapi) = self.ethapi {
+                ethapi.start().await
+            } else {
+                Ok(())
+            }
+        })?;
 
         Ok(())
     }
 
     /// Allow time for things to consolidate and APIs to start.
-    pub async fn wait_for_started(&self, timeout: Duration) -> anyhow::Result<bool> {
+    pub async fn wait_for_apis_to_start(&self, timeout: Duration) -> anyhow::Result<bool> {
         let start = Instant::now();
 
         loop {
