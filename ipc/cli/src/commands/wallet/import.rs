@@ -5,10 +5,10 @@
 use anyhow::bail;
 use async_trait::async_trait;
 use clap::{ArgGroup, Args};
+use fs_err as fs;
 use ipc_wallet::WalletType;
 use std::fmt::Debug;
 use std::str::FromStr;
-use fs_err as fs;
 
 use crate::{get_ipc_provider, CommandLineHandler, GlobalArguments};
 
