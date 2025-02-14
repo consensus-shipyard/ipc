@@ -12,11 +12,11 @@ use std::{
 use anyhow::{anyhow, bail, Context};
 use bollard::Docker;
 use ethers::{providers::Middleware, types::H160};
+use fs_err as fs;
 use fvm_shared::bigint::Zero;
 use lazy_static::lazy_static;
 use tendermint_rpc::Client;
 use url::Url;
-use fs_err as fs;
 
 use super::{
     container::DockerContainer,

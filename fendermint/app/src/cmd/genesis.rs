@@ -16,6 +16,8 @@ use fendermint_vm_genesis::{
 };
 use fendermint_vm_interpreter::genesis::{GenesisAppState, GenesisBuilder};
 
+use crate::fs;
+
 use crate::cmd;
 use crate::options::genesis::*;
 

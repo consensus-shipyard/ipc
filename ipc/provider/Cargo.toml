@@ -17,6 +17,7 @@ cid = { workspace = true }
 dirs = { workspace = true }
 ethers = { workspace = true }
 ethers-contract = { workspace = true }
+fs-err = { workspace = true }
 futures-util = { workspace = true }
 hex = { workspace = true }
 http = { workspace = true }

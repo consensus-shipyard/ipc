@@ -14,6 +14,8 @@ use fvm_shared::{
     address::Address, chainid::ChainID, econ::TokenAmount, message::Message, MethodNum, METHOD_SEND,
 };
 
+use fs_err as fs;
+
 use crate::B64_ENGINE;
 
 /// Factory methods for transaction payload construction.

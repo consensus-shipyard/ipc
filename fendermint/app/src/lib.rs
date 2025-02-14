@@ -13,6 +13,9 @@ mod validators;
 pub use app::{App, AppConfig};
 pub use store::{AppStore, BitswapBlockstore};
 
+#[allow(dead_code)]
+pub(crate) use fs_err as fs;
+
 // Different type from `ChainEpoch` just because we might use epoch in a more traditional sense for checkpointing.
 pub type BlockHeight = u64;
 

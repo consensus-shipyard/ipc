@@ -3,13 +3,13 @@
 
 use anyhow::anyhow;
 use fil_actor_bundler::Bundler;
+use fs_err as fs;
 use std::error::Error;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::thread;
 use toml::Value;
-use fs_err as fs;
 
 fn parse_dependencies_for_wasm32() -> anyhow::Result<Vec<(String, String)>> {
     let manifest = fs::read_to_string("Cargo.toml")?;

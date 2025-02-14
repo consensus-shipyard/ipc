@@ -1,10 +1,10 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use cid::Cid;
+use fs::File;
+use fs_err as fs;
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
-use fs_err as fs;
-use fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 
