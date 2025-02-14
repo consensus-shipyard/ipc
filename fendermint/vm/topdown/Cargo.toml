@@ -43,7 +43,6 @@ fendermint_vm_genesis = { path = "../genesis" }
 fendermint_vm_event = { path = "../event" }
 fendermint_tracing = { path = "../../tracing" }
 fendermint_crypto = { path = "../../crypto" }
-fendermint_rocksdb = { path = "../../rocksdb" }
 
 ipc-observability = { workspace = true }
 

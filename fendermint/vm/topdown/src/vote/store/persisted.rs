@@ -9,9 +9,14 @@ use fendermint_vm_genesis::ValidatorKey;
 use rocksdb::{BoundColumnFamily, IteratorMode, OptimisticTransactionDB};
 use std::sync::Arc;
 
+/// The persisted store that stores the vote received from other peers.
+/// Internally, it's making use of a in memory store for faster query response.
 pub struct PersistedVoteStore {
-    cache: InMemoryVoteStore,
-    db: Arc<OptimisticTransactionDB>,
+    /// The in memory vote store for faster look ups
+    in_memory_store: InMemoryVoteStore,
+    /// The persisted vote store for storing votes in disk
+    persisted_store: Arc<OptimisticTransactionDB>,
+    /// The namespace for the persisted store
     ns: String,
 }
 
@@ -19,9 +24,7 @@ impl PersistedVoteStore {
     pub fn new(db: Arc<OptimisticTransactionDB>, ns: String) -> Result<Self, Error> {
         // All namespaces are pre-created during open.
         if db.cf_handle(&ns).is_none() {
-            return Err(Error::PersistentVoteStore(format!(
-                "namespace {ns} does not exist"
-            )));
+            return Err(Error::PersistentVoteStoreNoNamespace(ns.to_string()));
         }
 
         let mut memory = InMemoryVoteStore::default();
@@ -29,15 +32,16 @@ impl PersistedVoteStore {
         let cf = get_cf(&db, &ns)?;
         let iter = db.iterator_cf(&cf, IteratorMode::Start);
         for item in iter {
-            let (key, value) = item.map_err(|e| Error::PersistentVoteStore(format!("{e}")))?;
+            let (key, value) = item.map_err(|e| Error::PersistentVoteStore(Box::new(e)))?;
+            let raw_key = key.get(0..8).ok_or_else(|| Error::PersistentVoteStoreInvalidKeyLength(hex::encode(key.as_ref())))?;
             let height = BlockHeight::from_be_bytes(
-                key[0..8]
+                raw_key
                     .try_into()
-                    .map_err(|e| Error::PersistentVoteStore(format!("{e}")))?,
+                    .map_err(|e| Error::PersistentVoteStore(Box::new(e)))?,
             );
 
             let vote = fvm_ipld_encoding::from_slice(value.as_ref()).map_err(|e| {
-                Error::PersistentVoteStore(format!("cannot convert value to vote: {e}"))
+                Error::PersistentVoteStore(Box::new(e))
             })?;
 
             memory.store_vote(height, vote)?;
@@ -45,8 +49,8 @@ impl PersistedVoteStore {
         drop(cf);
 
         Ok(Self {
-            cache: memory,
-            db,
+            in_memory_store: memory,
+            persisted_store: db,
             ns,
         })
     }
@@ -54,38 +58,38 @@ impl PersistedVoteStore {
 
 impl VoteStore for PersistedVoteStore {
     fn earliest_vote_height(&self) -> Result<Option<BlockHeight>, Error> {
-        self.cache.earliest_vote_height()
+        self.in_memory_store.earliest_vote_height()
     }
 
     fn latest_vote_height(&self) -> Result<Option<BlockHeight>, Error> {
-        self.cache.latest_vote_height()
+        self.in_memory_store.latest_vote_height()
     }
 
     fn store_vote(&mut self, height: BlockHeight, vote: Vote) -> Result<(), Error> {
         let bytes = fvm_ipld_encoding::to_vec(&vote)
-            .map_err(|e| Error::PersistentVoteStore(format!("{e}")))?;
+            .map_err(|e| Error::PersistentVoteStore(Box::new(e)))?;
 
-        let cf = get_cf(self.db.as_ref(), self.ns.as_str())?;
-        self.db
+        let cf = get_cf(self.persisted_store.as_ref(), self.ns.as_str())?;
+        self.persisted_store
             .put_cf(&cf, height.to_be_bytes(), bytes)
-            .map_err(|e| Error::PersistentVoteStore(format!("cannot store vote {e}")))?;
-        self.cache.store_vote(height, vote)
+            .map_err(|e| Error::PersistentVoteStore(Box::new(e)))?;
+        self.in_memory_store.store_vote(height, vote)
     }
 
     fn has_voted(&self, height: &BlockHeight, validator: &ValidatorKey) -> Result<bool, Error> {
-        self.cache.has_voted(height, validator)
+        self.in_memory_store.has_voted(height, validator)
     }
 
     fn get_votes_at_height(&self, height: BlockHeight) -> Result<VoteAgg, Error> {
-        self.cache.get_votes_at_height(height)
+        self.in_memory_store.get_votes_at_height(height)
     }
 
     fn purge_votes_at_height(&mut self, height: BlockHeight) -> Result<(), Error> {
-        let cf = get_cf(self.db.as_ref(), self.ns.as_str())?;
-        self.db
+        let cf = get_cf(self.persisted_store.as_ref(), self.ns.as_str())?;
+        self.persisted_store
             .delete_cf(&cf, height.to_be_bytes())
-            .map_err(|e| Error::PersistentVoteStore(format!("cannot remove block height {e}")))?;
-        self.cache.purge_votes_at_height(height)
+            .map_err(|e| Error::PersistentVoteStore(Box::new(e)))?;
+        self.in_memory_store.purge_votes_at_height(height)
     }
 }
 
@@ -94,5 +98,5 @@ pub(crate) fn get_cf<'a>(
     ns: &'a str,
 ) -> Result<Arc<BoundColumnFamily<'a>>, Error> {
     db.cf_handle(ns)
-        .ok_or_else(|| Error::PersistentVoteStore(format!("namespace {ns} does not exist")))
+        .ok_or_else(|| Error::PersistentVoteStoreNoNamespace(ns.to_string()))
 }

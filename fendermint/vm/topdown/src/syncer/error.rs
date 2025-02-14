@@ -5,7 +5,7 @@ use crate::BlockHeight;
 use thiserror::Error;
 
 /// The errors for top down checkpointing
-#[derive(Error, Debug, Eq, PartialEq, Clone)]
+#[derive(Error, Debug)]
 pub enum Error {
     #[error("Incoming items are not order sequentially")]
     NotSequential,
@@ -26,5 +26,7 @@ pub enum Error {
     #[error("Missing block view at height {0} for target observation height {0}")]
     MissingBlockView(BlockHeight, BlockHeight),
     #[error("persistent parent view store error: {0}")]
-    PersistentParentViewStore(String),
+    PersistentParentViewStore(Box<dyn std::error::Error + Send + Sync + 'static>),
+    #[error("persistent parent view store does not have namespace: {0}")]
+    StoreNamespaceDoesNotExist(String),
 }

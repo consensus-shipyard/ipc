@@ -3,7 +3,7 @@
 
 use crate::BlockHeight;
 
-#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("the last finalized block has not been set")]
     Uninitialized,
@@ -33,5 +33,13 @@ pub enum Error {
     UnexpectedGossipEvent(String),
 
     #[error("persistent vote store error: {0}")]
-    PersistentVoteStore(String),
+    PersistentVoteStore(Box<dyn std::error::Error + Send + Sync + 'static>),
+
+    #[error("key in persistent vote has length less than 8: {0}")]
+    PersistentVoteStoreInvalidKeyLength(String),
+
+    #[error("persistent vote store name space does not exist: {0}")]
+    PersistentVoteStoreNoNamespace(String),
+
+
 }
