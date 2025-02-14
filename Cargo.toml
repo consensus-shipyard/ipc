@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
   # contracts
-  "contract-bindings",
+  "contracts/binding",
 
   # merkle
   "ext/merkle-tree-rs",
@@ -184,7 +184,7 @@ ipc-wallet = { path = "ipc/wallet", features = ["with-ethers"] }
 ipc_ipld_resolver = { path = "ipld/resolver" }
 ipc-types = { path = "ipc/types" }
 ipc-observability = { path = "ipc/observability" }
-ipc_actors_abis = { path = "contract-bindings" }
+ipc_actors_abis = { path = "contracts/binding" }
 fendermint_actors_api = { path = "fendermint/actors/api" }
 
 # Vendored for cross-compilation, see https://github.com/cross-rs/cross/wiki/Recipes#openssl
@@ -195,7 +195,7 @@ openssl = { version = "0.10", features = ["vendored"] }
 
 # NOTE: When upgrading the FVM it may cause our fendermint/actors/build.rs to fail as it can
 # pull in crates as transitive dependencies that do not support Wasm architector. If this
-# happens, try removing "crypto" feature from fvm_shared dependency in contract-bindings/Cargo.toml
+# happens, try removing "crypto" feature from fvm_shared dependency in contracts/binding/Cargo.toml
 # and run `cargo build`. Then add the "crypto" feature back and run `cargo build` again.
 fvm = { version = "4.4.0", features = [
   "verify-signature",
