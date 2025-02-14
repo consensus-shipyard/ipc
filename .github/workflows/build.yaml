@@ -51,7 +51,7 @@ jobs:
         with:
           path: |
             ./contracts/out
-            ./contract-bindings
+            ./contracts/bindings
             ./contracts/cache
           ## TODO maybe add the rust version and solc version to the key
           key: v2-contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}

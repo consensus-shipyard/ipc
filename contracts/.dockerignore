@@ -22,8 +22,8 @@ deployments.json
 scripts/*.out
 scripts/deploy-registry.ts
 scripts/deploy-gateway.ts
-contract-bindings/src/gen
-contract-bindings/target
+binding/src
+binding/target
 subnet.registry.json
 subnet.actor.json
 

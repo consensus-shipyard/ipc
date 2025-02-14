@@ -40,7 +40,7 @@ jobs:
         with:
           path: |
             ./contracts/out
-            ./contract-bindings
+            ./contracts/bindings
             ./contracts/cache
           key: v2-contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}
 
@@ -50,3 +50,4 @@ jobs:
 
       - name: Run e2e tests
         run: cd fendermint && PROFILE=release make e2e-only
+
