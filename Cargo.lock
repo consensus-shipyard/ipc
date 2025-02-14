@@ -5385,6 +5385,7 @@ dependencies = [
  "ethers",
  "ethers-contract",
  "fil_actors_runtime",
+ "fs-err",
  "futures-util",
  "fvm_ipld_encoding",
  "fvm_shared",

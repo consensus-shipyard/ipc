@@ -4,6 +4,7 @@ use crate::{CommandLineHandler, GlobalArguments};
 use async_trait::async_trait;
 use ipc_provider::config::DEFAULT_CONFIG_TEMPLATE;
 use std::io::Write;
+use fs_err as fs;
 
 use clap::Args;
 

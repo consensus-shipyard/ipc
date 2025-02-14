@@ -5,7 +5,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use base64::{prelude::BASE64_STANDARD, Engine};
 use clap::Args;
-use fs::Permissions;
+use std::fs::Permissions;
 use fs_err as fs;
 use fvm_shared::address::Address;
 use ipc_provider::{lotus::message::wallet::WalletKeyType, IpcProvider, LotusJsonKeyType};
