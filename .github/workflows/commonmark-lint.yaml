@@ -7,19 +7,13 @@ on:
 jobs:
   lint-commonmark:
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
     - name: Check out the project
       uses: actions/checkout@v4
 
     - name: Lint all commonmark/markdown files
       uses: DavidAnson/markdownlint-cli2-action@v19
-      continue-on-error: true
       with:
         fix: true
         globs: '(scripts|crates)/**/README.md;contracts/specs/**/*.md;specs/**/*.md;docs/**/*.md'
         separator: ';'
-
-    - name: Check compliance
-      run: |
-        git diff --exit-code
