@@ -8,6 +8,7 @@ use async_stm::TVar;
 use fendermint_vm_interpreter::fvm::state::snapshot::{BlockStateParams, Snapshot};
 use fvm_ipld_blockstore::Blockstore;
 use tempfile::TempDir;
+use fs_err as fs;
 
 use crate::{
     manifest::{self, SnapshotManifest},
@@ -74,7 +75,7 @@ impl SnapshotItem {
         }
         let chunk_file = self.parts_dir().join(format!("{chunk}.part"));
 
-        let content = std::fs::read(&chunk_file)
+        let content = fs::read(&chunk_file)
             .with_context(|| format!("failed to read chunk {}", chunk_file.to_string_lossy()))?;
 
         Ok(content)
@@ -104,7 +105,7 @@ impl SnapshotItem {
         let result = Snapshot::read_car(&car_path, store, validate).await;
 
         // 3. Remove the restored file.
-        std::fs::remove_file(&car_path).context("failed to remove CAR file")?;
+        fs::remove_file(&car_path).context("failed to remove CAR file")?;
 
         // If the import failed, or it fails to validate, it will leave unwanted data in the blockstore.
         //

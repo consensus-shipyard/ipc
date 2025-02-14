@@ -184,7 +184,7 @@ async fn fevm_create(
     contract: PathBuf,
     constructor_args: Bytes,
 ) -> anyhow::Result<()> {
-    let contract_hex = std::fs::read_to_string(contract).context("failed to read contract")?;
+    let contract_hex = fs::read_to_string(contract).context("failed to read contract")?;
     let contract_bytes = hex::decode(contract_hex).context("failed to parse contract from hex")?;
     let contract_bytes = Bytes::from(contract_bytes);
 

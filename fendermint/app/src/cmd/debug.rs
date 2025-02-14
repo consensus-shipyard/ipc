@@ -64,7 +64,7 @@ async fn export_topdown_events(args: &DebugExportTopDownEventsArgs) -> anyhow::R
     .context("failed to fetch topdown events")?;
 
     let json = serde_json::to_string_pretty(&events)?;
-    std::fs::write(&args.events_file, json)?;
+    fs::write(&args.events_file, json)?;
 
     Ok(())
 }

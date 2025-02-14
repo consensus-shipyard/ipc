@@ -20,9 +20,9 @@ impl CommandLineHandler for InitConfig {
 
         let file_path = std::path::Path::new(&path);
         if let Some(parent) = file_path.parent() {
-            std::fs::create_dir_all(parent)?;
+            fs::create_dir_all(parent)?;
         }
-        let mut file = std::fs::File::create(&path).inspect_err(|e| {
+        let mut file = fs::File::create(&path).inspect_err(|e| {
             log::error!("couldn't create config file: {e}");
         })?;
         file.write_all(DEFAULT_CONFIG_TEMPLATE.as_bytes())

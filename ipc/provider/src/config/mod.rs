@@ -13,7 +13,7 @@ pub mod serialize;
 mod tests;
 
 use std::collections::HashMap;
-use std::fs;
+use fs_err as fs;
 use std::path::Path;
 
 use anyhow::{Context, Result};
