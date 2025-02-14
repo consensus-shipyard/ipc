@@ -160,7 +160,7 @@ impl Hardhat {
     fn artifact(&self, contract_src: &Path, contract_name: &str) -> anyhow::Result<Artifact> {
         let contract_path = self.contract_path(contract_src, contract_name)?;
 
-        let json = std::fs::read_to_string(&contract_path)
+        let json = fs::read_to_string(&contract_path)
             .with_context(|| format!("failed to read {contract_path:?}"))?;
 
         let artifact =

@@ -3,7 +3,8 @@
 use cid::Cid;
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
-use std::fs::File;
+use fs_err as fs;
+use fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 
@@ -28,7 +29,7 @@ fn read_or_create<T>(
 
     if !p.exists() {
         if let Some(p) = p.parent() {
-            std::fs::create_dir_all(p).expect("failed to create golden directory");
+            fs::create_dir_all(p).expect("failed to create golden directory");
         }
         let s = to_string(fallback);
         let mut f = File::create(p)

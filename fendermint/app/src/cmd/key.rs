@@ -94,7 +94,7 @@ cmd! {
     });
     let json = serde_json::to_string_pretty(&priv_validator_key)?;
 
-    std::fs::write(&self.out, json)?;
+    fs::write(&self.out, json)?;
 
     Ok(())
   }
@@ -104,7 +104,7 @@ cmd! {
     AddPeer(self) {
         let node_key = NodeKey::load_json_file(&self.node_key_file).context("failed to read node key file")?;
         let peer_id = format!("{}@{}", node_key.node_id(), self.network_addr);
-        let mut peers = std::fs::read_to_string(&self.local_peers_file).unwrap_or_default();
+        let mut peers = fs::read_to_string(&self.local_peers_file).unwrap_or_default();
 
         if peers.is_empty()  {
             peers.push_str(&peer_id);
@@ -113,7 +113,7 @@ cmd! {
             peers.push_str(peer_id.as_str());
         }
 
-        std::fs::write(&self.local_peers_file, peers).context("failed to write to the peers file")?;
+        fs::write(&self.local_peers_file, peers).context("failed to write to the peers file")?;
         Ok(())
   }
 }
@@ -160,13 +160,13 @@ fn b64_to_secret(b64: &str) -> anyhow::Result<SecretKey> {
 }
 
 pub fn read_public_key(public_key: &Path) -> anyhow::Result<PublicKey> {
-    let b64 = std::fs::read_to_string(public_key).context("failed to read public key")?;
+    let b64 = fs::read_to_string(public_key).context("failed to read public key")?;
     let pk = b64_to_public(&b64).context("failed to parse public key")?;
     Ok(pk)
 }
 
 pub fn read_secret_key_hex(private_key: &Path) -> anyhow::Result<SecretKey> {
-    let hex_str = std::fs::read_to_string(private_key).context("failed to read private key")?;
+    let hex_str = fs::read_to_string(private_key).context("failed to read private key")?;
     let mut hex_str = hex_str.trim();
     if hex_str.starts_with("0x") {
         hex_str = &hex_str[2..];
@@ -177,14 +177,14 @@ pub fn read_secret_key_hex(private_key: &Path) -> anyhow::Result<SecretKey> {
 }
 
 pub fn read_secret_key(secret_key: &Path) -> anyhow::Result<SecretKey> {
-    let b64 = std::fs::read_to_string(secret_key).context("failed to read secret key")?;
+    let b64 = fs::read_to_string(secret_key).context("failed to read secret key")?;
     let sk = b64_to_secret(&b64).context("failed to parse secret key")?;
     Ok(sk)
 }
 
 fn export(output_dir: &Path, name: &str, ext: &str, b64: &str) -> anyhow::Result<()> {
     let output_path = output_dir.join(format!("{name}.{ext}"));
-    std::fs::write(output_path, b64)?;
+    fs::write(output_path, b64)?;
     Ok(())
 }
 

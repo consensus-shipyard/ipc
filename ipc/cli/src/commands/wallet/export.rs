@@ -9,7 +9,8 @@ use fvm_shared::address::Address;
 use ipc_provider::{lotus::message::wallet::WalletKeyType, IpcProvider, LotusJsonKeyType};
 use ipc_wallet::{EvmKeyStore, PersistentKeyInfo, WalletType};
 use std::fmt::Debug;
-use std::fs::Permissions;
+use fs_err as fs;
+use fs::Permissions;
 use std::io::Write;
 use std::os::unix::fs::PermissionsExt;
 use std::str::FromStr;
@@ -82,7 +83,7 @@ impl CommandLineHandler for WalletExport {
 
         match &arguments.output {
             Some(p) => {
-                let mut file = std::fs::File::create(p)?;
+                let mut file = fs::File::create(p)?;
                 file.set_permissions(Permissions::from_mode(0o600))?;
                 file.write_all(v.as_bytes())?;
                 println!(

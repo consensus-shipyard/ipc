@@ -3,7 +3,7 @@
 // Copyright 2019-2023 ChainSafe Systems
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::fs::File;
+use fs::File;
 use std::io::Result;
 
 /// Restricts permissions on a file to user-only: 0600

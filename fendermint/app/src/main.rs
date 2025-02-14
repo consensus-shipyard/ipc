@@ -66,7 +66,7 @@ mod tests {
         // let bundle_car = actors_v10::BUNDLE_CAR;
 
         let bundle_path = bundle_path();
-        let bundle_car = std::fs::read(&bundle_path)
+        let bundle_car = fs::read(&bundle_path)
             .unwrap_or_else(|_| panic!("failed to load bundle CAR from {bundle_path:?}"));
 
         let dir = tempfile::Builder::new()

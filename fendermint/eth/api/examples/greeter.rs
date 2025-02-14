@@ -180,7 +180,7 @@ where
 
         let json = serde_json::to_string_pretty(&output).unwrap();
 
-        std::fs::write(out, json).expect("failed to write metadata");
+        fs::write(out, json).expect("failed to write metadata");
     }
 
     Ok(())

@@ -8,6 +8,7 @@ mod defaults;
 use anyhow::Context;
 pub use defaults::*;
 use serde::{de::DeserializeOwned, Serialize};
+use fs_err as fs;
 
 /// Type family of all the things a [Materializer] can create.
 ///
@@ -58,13 +59,13 @@ pub fn export(
 pub fn export_file(file_path: impl AsRef<Path>, contents: impl AsRef<str>) -> anyhow::Result<()> {
     if let Some(dir_path) = file_path.as_ref().parent() {
         if !dir_path.exists() {
-            std::fs::create_dir_all(dir_path).with_context(|| {
+            fs::create_dir_all(dir_path).with_context(|| {
                 format!("failed to create directory {}", dir_path.to_string_lossy())
             })?;
         }
     }
 
-    std::fs::write(&file_path, contents.as_ref()).with_context(|| {
+    fs::write(&file_path, contents.as_ref()).with_context(|| {
         format!(
             "failed to write to {}",
             file_path.as_ref().to_string_lossy()
@@ -78,7 +79,7 @@ pub fn export_file(file_path: impl AsRef<Path>, contents: impl AsRef<str>) -> an
 pub fn export_script(file_path: impl AsRef<Path>, contents: impl AsRef<str>) -> anyhow::Result<()> {
     export_file(&file_path, contents)?;
 
-    std::fs::set_permissions(&file_path, std::fs::Permissions::from_mode(0o774))
+    fs::set_permissions(&file_path, fs::Permissions::from_mode(0o774))
         .context("failed to set file permissions")?;
 
     Ok(())
@@ -95,7 +96,7 @@ pub fn export_json(file_path: impl AsRef<Path>, value: impl Serialize) -> anyhow
 pub fn import_json<T: DeserializeOwned>(file_path: impl AsRef<Path>) -> anyhow::Result<Option<T>> {
     let file_path = file_path.as_ref();
     if file_path.exists() {
-        let json = std::fs::read_to_string(file_path)
+        let json = fs::read_to_string(file_path)
             .with_context(|| format!("failed to read {}", file_path.to_string_lossy()))?;
 
         let value = serde_json::from_str::<T>(&json)
