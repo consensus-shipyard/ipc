@@ -101,7 +101,7 @@ lint: fmt
 
 fmt:
 	pnpm install --silent --no-save
-	pnpm exec prettier --check -w 'contracts/**/**/*.sol' 'sdk/**/**/*.sol' 'test/**/**/*.sol' 'test/**/**/*.t.sol' '**/*.{js,jsx,ts,tsx,json,css,md}'
+	pnpm exec prettier --check -w 'contracts/**/**/*.sol' 'sdk/**/**/*.sol' 'test/**/**/*.sol' 'test/**/**/*.t.sol' '**/*.{js,jsx,ts,tsx,json,css}'
 
 deps: node_modules
 
