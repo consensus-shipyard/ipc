@@ -36,6 +36,7 @@ use fendermint_rpc::{client::FendermintClient, query::QueryClient};
 use fendermint_vm_actor_interface::eam::{self, CreateReturn, EthAddress};
 
 use super::key::read_secret_key;
+use crate::fs;
 
 cmd! {
   RpcArgs(self) {

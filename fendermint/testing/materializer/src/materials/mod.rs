@@ -7,8 +7,8 @@ mod defaults;
 
 use anyhow::Context;
 pub use defaults::*;
-use serde::{de::DeserializeOwned, Serialize};
 use fs_err as fs;
+use serde::{de::DeserializeOwned, Serialize};
 
 /// Type family of all the things a [Materializer] can create.
 ///
@@ -79,7 +79,7 @@ pub fn export_file(file_path: impl AsRef<Path>, contents: impl AsRef<str>) -> an
 pub fn export_script(file_path: impl AsRef<Path>, contents: impl AsRef<str>) -> anyhow::Result<()> {
     export_file(&file_path, contents)?;
 
-    fs::set_permissions(&file_path, fs::Permissions::from_mode(0o774))
+    fs::set_permissions(&file_path, std::fs::Permissions::from_mode(0o774))
         .context("failed to set file permissions")?;
 
     Ok(())

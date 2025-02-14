@@ -8,7 +8,6 @@ use anyhow::{self, Context as AnyhowContext};
 use futures::{future, StreamExt};
 use std::path::Path;
 use tokio_util::compat::TokioAsyncReadCompatExt;
-use fs_err as fs;
 
 use fvm_ipld_car::{CarHeader, CarReader};
 
@@ -72,6 +71,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use fs_err as fs;
 
     use fendermint_vm_interpreter::fvm::bundle::bundle_path;
     use tempfile::tempdir;

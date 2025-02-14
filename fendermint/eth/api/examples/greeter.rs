@@ -13,6 +13,7 @@
 //! cargo run -p fendermint_eth_api --release --example GREETER --
 //! ```
 
+use fs_err as fs;
 use std::{fmt::Debug, path::PathBuf, sync::Arc};
 
 use anyhow::Context;

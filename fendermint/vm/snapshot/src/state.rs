@@ -6,9 +6,9 @@ use std::{fs::File, io, path::PathBuf, sync::Arc, time::SystemTime};
 use anyhow::{bail, Context};
 use async_stm::TVar;
 use fendermint_vm_interpreter::fvm::state::snapshot::{BlockStateParams, Snapshot};
+use fs_err as fs;
 use fvm_ipld_blockstore::Blockstore;
 use tempfile::TempDir;
-use fs_err as fs;
 
 use crate::{
     manifest::{self, SnapshotManifest},

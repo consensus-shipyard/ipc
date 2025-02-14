@@ -13,6 +13,7 @@ use fendermint_vm_interpreter::fvm::state::snapshot::{BlockHeight, Snapshot};
 use fendermint_vm_interpreter::fvm::state::FvmStateParams;
 use fvm_ipld_blockstore::Blockstore;
 use tendermint_rpc::Client;
+
 use fs_err as fs;
 
 pub struct SnapshotParams {
@@ -310,6 +311,7 @@ fn move_or_copy(from: &Path, to: &Path) -> anyhow::Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use super::fs;
     use std::time::Duration;
 
     use async_stm::{atomically, retry};

@@ -3,6 +3,7 @@
 
 use anyhow::{anyhow, bail, Context};
 use ethers_core::types as et;
+use fs_err as fs;
 use serde::Deserialize;
 use std::{
     cmp::Ord,

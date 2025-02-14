@@ -20,6 +20,7 @@ use fendermint_vm_genesis::{
     ipc::{GatewayParams, IpcParams},
     Account, Actor, ActorMeta, Collateral, Genesis, SignerAddr, Validator, ValidatorKey,
 };
+use fs_err as fs;
 use fvm_shared::{bigint::Zero, chainid::ChainID, econ::TokenAmount, version::NetworkVersion};
 use ipc_api::subnet_id::SubnetID;
 use ipc_provider::config::subnet::{
@@ -37,7 +38,6 @@ use std::{
     time::Duration,
 };
 use url::Url;
-use fs_err as fs;
 
 use crate::{
     manifest::Balance,

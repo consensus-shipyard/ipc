@@ -3,12 +3,12 @@
 // Copyright 2019-2023 ChainSafe Systems
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use fs::File;
+use fs_err as fs;
 use std::io::Result;
 
 /// Restricts permissions on a file to user-only: 0600
 #[cfg(unix)]
-pub fn set_user_perm(file: &File) -> Result<()> {
+pub fn set_user_perm(file: &fs::File) -> Result<()> {
     use std::os::unix::fs::PermissionsExt;
 
     use log::info;

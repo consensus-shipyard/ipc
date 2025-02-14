@@ -52,6 +52,7 @@ pub fn write_manifest(
 /// Collect all the manifests from a directory containing snapshot-directories, e.g.
 /// `snapshots/snapshot-1/manifest.json` etc.
 pub fn list_manifests(snapshot_dir: impl AsRef<Path>) -> anyhow::Result<Vec<SnapshotItem>> {
+    let snapshot_dir = snapshot_dir.as_ref();
     let contents = fs::read_dir(snapshot_dir).context("failed to read snapshot directory")?;
 
     // Collect all manifest file paths.
@@ -102,7 +103,7 @@ pub fn list_manifests(snapshot_dir: impl AsRef<Path>) -> anyhow::Result<Vec<Snap
 
 /// Calculate the Sha256 checksum of a file.
 pub fn file_checksum(path: impl AsRef<Path>) -> anyhow::Result<tendermint::Hash> {
-    let mut file = fs::File::open(&path)?;
+    let mut file = fs::File::open(path.as_ref())?;
     let mut hasher = Sha256::new();
     let _ = std::io::copy(&mut file, &mut hasher)?;
     let hash = hasher.finalize().into();

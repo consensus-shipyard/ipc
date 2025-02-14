@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::fs;
 use anyhow::{anyhow, Context};
 use fendermint_app_options::key::KeyShowPeerIdArgs;
 use fendermint_crypto::{from_b64, to_b64, PublicKey, SecretKey};

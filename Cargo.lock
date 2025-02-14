@@ -5446,6 +5446,7 @@ dependencies = [
  "ethers",
  "ethers-contract",
  "fil_actors_runtime",
+ "fs-err",
  "futures-util",
  "fvm_ipld_encoding",
  "fvm_shared",
@@ -5515,6 +5516,7 @@ dependencies = [
  "blake2b_simd",
  "bls-signatures 0.13.1",
  "ethers",
+ "fs-err",
  "fvm_shared",
  "hex",
  "ipc-types",
@@ -5540,6 +5542,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "ethers",
+ "fs-err",
  "fvm_shared",
 ]
 

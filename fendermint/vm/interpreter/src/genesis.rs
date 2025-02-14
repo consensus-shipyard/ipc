@@ -44,6 +44,8 @@ use serde_with::serde_as;
 use tokio_stream::StreamExt;
 use tokio_util::compat::TokioAsyncWriteCompatExt;
 
+use fs_err as fs;
+
 /// The sealed genesis state metadata
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
