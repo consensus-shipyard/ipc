@@ -13,7 +13,7 @@ LINES=4
 
 # Ignore auto-generated code.
 IGNORE=(
-	"contracts/binding" "ext/merkle-tree-rs"
+	"contract-bindings" "ext/merkle-tree-rs"
 );
 
 ignore() {
