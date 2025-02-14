@@ -237,8 +237,8 @@ impl BlobsActor {
     ) -> Result<(), ActorError> {
         require_caller_is_admin(rt)?;
         let subscriber = to_id_address(rt, params.subscriber, true)?;
+        let config = config::get_config(rt)?;
         rt.transaction(|st: &mut State, rt| {
-            let config = config::get_config(rt)?;
             st.set_account_status(
                 &config,
                 rt.store(),
