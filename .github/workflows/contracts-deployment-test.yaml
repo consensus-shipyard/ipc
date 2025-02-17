@@ -27,7 +27,7 @@ jobs:
       uses: foundry-rs/foundry-toolchain@v1
       with:
         cache: false
-        version: v0.2.0
+        version: v1.3.0
 
     - name: Generate Ethereum Private Key and Create .env File and run make
       run: |

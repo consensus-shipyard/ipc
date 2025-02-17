@@ -30,7 +30,7 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
         with:
           cache: false
-          version: v0.2.0
+          version: v1.3.0
 
       - name: Install Node dependencies
         run: cd contracts && pnpm i --unsafe-perm
