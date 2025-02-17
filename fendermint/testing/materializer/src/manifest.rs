@@ -53,7 +53,7 @@ pub struct Manifest {
 }
 
 impl Manifest {
-    /// Read a manifest from file and resolve any relative extra_config paths.
+    /// Read a manifest from file and resolve any relative fendermint_additional_config paths.
     pub fn from_file(path: &Path) -> anyhow::Result<Self> {
         let ext = path
             .extension()
