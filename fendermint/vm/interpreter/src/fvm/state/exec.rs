@@ -235,6 +235,23 @@ where
         self.execute_message(msg, ApplyKind::Implicit)
     }
 
+    pub fn execute_read_only(&mut self, msg: Message) -> ExecResult {
+        if let Err(e) = msg.check() {
+            return Ok(check_error(e));
+        }
+
+        let raw_length = fvm_ipld_encoding::to_vec(&msg).map(|bz| bz.len())?;
+        let ret = self.executor.execute_message_with_revert(
+            msg,
+             ApplyKind::Implicit,
+            raw_length,
+            true
+        )?;
+        let addrs = self.emitter_delegated_addresses(&ret)?;
+
+        Ok((ret, addrs))
+    }
+
     /// Execute message implicitly but ensures the execution is successful and returns only the ApplyRet.
     pub fn execute_implicit_ok(&mut self, msg: Message) -> ExecResult {
         let r = self.execute_implicit(msg)?;
