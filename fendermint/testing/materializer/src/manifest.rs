@@ -7,7 +7,12 @@ use anyhow::{bail, Context};
 use fvm_shared::econ::TokenAmount;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use std::{collections::BTreeMap, path::Path, path::PathBuf};
+use std::{
+    collections::BTreeMap,
+    fmt,
+    fmt::Debug,
+    path::{Path, PathBuf},
+};
 use url::Url;
 
 use fs_err as fs;
@@ -218,7 +223,7 @@ impl Subnet {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Node {
     /// Indicate whether this is a validator node or a full node.
     pub mode: NodeMode,
@@ -253,6 +258,27 @@ impl Node {
                 *config_path = base.join(&*config_path);
             }
         }
+    }
+}
+
+/// Custom Debug implementation for the `Node` struct.
+///
+/// This implementation omits the `fendermint_additional_config` field when it is `None`,
+/// ensuring that the debug output matches the expected format used in
+/// `fendermint/testing/src/golden.rs`'s `test_txt` function.
+impl Debug for Node {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut ds = f.debug_struct("Node");
+        ds.field("mode", &self.mode)
+            .field("ethapi", &self.ethapi)
+            .field("seed_nodes", &self.seed_nodes)
+            .field("parent_node", &self.parent_node);
+
+        if let Some(ref config) = self.fendermint_additional_config {
+            ds.field("fendermint_additional_config", config);
+        }
+
+        ds.finish()
     }
 }
 
