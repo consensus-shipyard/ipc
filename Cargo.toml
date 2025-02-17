@@ -126,7 +126,7 @@ multihash = { version = "0.18.1", default-features = false, features = [
   "sha3",
 ] }
 num-bigint = "0.4"
-num-derive = "0.3"
+num-derive = "0.3.3"
 num-traits = "0.2"
 num_enum = "0.7.2"
 paste = "1"
