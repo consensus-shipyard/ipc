@@ -51,6 +51,8 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v0.2.0
 
       - name: Restore cache
         id: cache-restore

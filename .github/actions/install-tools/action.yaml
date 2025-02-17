@@ -31,6 +31,8 @@ runs:
     # For compiling Solidity contracts
     - name: Install Foundry
       uses: foundry-rs/foundry-toolchain@v1
+      with:
+        version: v0.2.0
 
     - name: 'Install jq'
       uses: dcarbone/install-jq-action@v2.1.0
