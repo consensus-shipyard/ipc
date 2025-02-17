@@ -1,0 +1,6 @@
+[tracing.file]
+enabled = true
+level = "info"
+directory = "/fendermint/logs"
+max_log_files = 2
+rotation = "daily"

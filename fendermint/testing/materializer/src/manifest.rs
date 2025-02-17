@@ -11,8 +11,12 @@ use std::{
     collections::BTreeMap,
     fmt,
     fmt::Debug,
+    io,
+    ops::Deref,
     path::{Path, PathBuf},
 };
+
+use toml;
 use url::Url;
 
 use fs_err as fs;
@@ -53,7 +57,7 @@ pub struct Manifest {
 }
 
 impl Manifest {
-    /// Read a manifest from file and resolve any relative fendermint_additional_config paths.
+    /// Read a manifest from file.
     pub fn from_file(path: &Path) -> anyhow::Result<Self> {
         let ext = path
             .extension()
@@ -65,7 +69,7 @@ impl Manifest {
         let manifest_str = fs::read_to_string(path)
             .with_context(|| format!("failed to read manifest from {}", path.to_string_lossy()))?;
 
-        let mut manifest: Self = match ext.as_str() {
+        let mut manifest: Manifest = match ext.as_str() {
             "yaml" => {
                 serde_yaml::from_str(&manifest_str).context("failed to parse manifest YAML")?
             }
@@ -76,9 +80,11 @@ impl Manifest {
             other => bail!("unknown manifest format: {}", other),
         };
 
-        // Determine the base directory from the manifest file's location.
-        let base = path.parent().unwrap_or(Path::new("."));
-        manifest.resolve_paths(base)?;
+        // Post-process step: load the Fendermint configs if they are just `Path` variants.
+        let base_dir = path.parent().unwrap_or_else(|| std::path::Path::new("."));
+        manifest
+            .load_all_fendermint_configs(base_dir)
+            .context("failed to load Fendermint configs")?;
 
         Ok(manifest)
     }
@@ -88,18 +94,19 @@ impl Manifest {
         validate_manifest(name, self).await
     }
 
-    /// Walk through the manifest and resolve relative fendermint_additional_config paths.
-    fn resolve_paths(&mut self, base: &Path) -> anyhow::Result<()> {
-        // For the rootnet.
+    fn load_all_fendermint_configs(&mut self, base_dir: &Path) -> Result<(), std::io::Error> {
+        // rootnet
         if let Rootnet::New { nodes, .. } = &mut self.rootnet {
             for node in nodes.values_mut() {
-                node.resolve_paths(base);
+                node.load_fendermint_config(base_dir)?;
             }
         }
-        // For top-level subnets.
+
+        // subnets
         for subnet in self.subnets.values_mut() {
-            subnet.resolve_paths(base)?;
+            subnet.load_all_fendermint_configs(base_dir)?;
         }
+
         Ok(())
     }
 }
@@ -208,18 +215,88 @@ pub struct Subnet {
 }
 
 impl Subnet {
-    /// Resolve the optional additional config paths for all nodes in this subnet,
-    /// as well as in any nested subnets.
-    pub fn resolve_paths(&mut self, base: &Path) -> anyhow::Result<()> {
-        // Resolve paths for nodes in this subnet.
+    fn load_all_fendermint_configs(&mut self, base_dir: &Path) -> io::Result<()> {
         for node in self.nodes.values_mut() {
-            node.resolve_paths(base);
+            node.load_fendermint_config(base_dir)?;
         }
-        // Recurse for any nested subnets.
+
         for subnet in self.subnets.values_mut() {
-            subnet.resolve_paths(base)?;
+            subnet.load_all_fendermint_configs(base_dir)?;
         }
+
         Ok(())
+    }
+}
+
+/// A wrapper around the configuration loaded from a TOML file.
+#[derive(Clone, Debug, Serialize)]
+pub struct FendermintConfig(toml::Value);
+
+impl Deref for FendermintConfig {
+    type Target = toml::Value;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl PartialEq for FendermintConfig {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.to_string() == other.0.to_string()
+    }
+}
+
+impl Eq for FendermintConfig {}
+
+/// Represents either a path to a Fendermint config, or the loaded config itself.
+/// - `Path(PathBuf)`: path that needs to be resolved/loaded.
+/// - `Loaded(FendermintConfig)`: fully loaded TOML config.
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub enum FendermintConfigSource {
+    Path(PathBuf),
+    Loaded(FendermintConfig),
+}
+
+impl<'de> Deserialize<'de> for FendermintConfigSource {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        // Expect the input to be a path (string), store it as `Path` variant.
+        let path = PathBuf::deserialize(deserializer)?;
+        Ok(FendermintConfigSource::Path(path))
+    }
+}
+
+impl FendermintConfigSource {
+    /// If we're in the `Path` variant, load and parse the TOML file into `Loaded`.
+    /// Otherwise, return `self` unchanged.
+    pub fn load_if_path(self, base_dir: &Path) -> io::Result<Self> {
+        match self {
+            FendermintConfigSource::Path(path) => {
+                // If the path is relative, join it with the base dir.
+                let full_path = if path.is_relative() {
+                    base_dir.join(&path)
+                } else {
+                    path
+                };
+
+                let content = fs::read_to_string(&full_path)?;
+                // Convert `toml::de::Error` to `io::Error`.
+                let toml_value = toml::from_str(&content)
+                    .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+
+                Ok(FendermintConfigSource::Loaded(FendermintConfig(toml_value)))
+            }
+            FendermintConfigSource::Loaded(_) => Ok(self), // Already loaded
+        }
+    }
+
+    // Returns a reference to the loaded config if available, or `None` if not.
+    pub fn as_loaded(&self) -> Option<&FendermintConfig> {
+        match self {
+            FendermintConfigSource::Loaded(ref cfg) => Some(cfg),
+            _ => None,
+        }
     }
 }
 
@@ -245,19 +322,28 @@ pub struct Node {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_node: Option<ParentNode>,
 
-    /// Optional additional configuration file for the Fendermint component.
+    /// The user can specify a path in the manifest; after deserialization,
+    /// this becomes `FendermintConfigSource::Path(...)`.
+    /// If omitted, it's `None`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub fendermint_additional_config: Option<PathBuf>,
+    pub fendermint_additional_config: Option<FendermintConfigSource>,
 }
 
 impl Node {
-    /// Resolve the optional `fendermint_additional_config` path relative to `base`.
-    pub fn resolve_paths(&mut self, base: &Path) {
-        if let Some(ref mut config_path) = self.fendermint_additional_config {
-            if !config_path.is_absolute() {
-                *config_path = base.join(&*config_path);
-            }
+    /// Attempt to load the Fendermint config if it's currently just a path.
+    pub fn load_fendermint_config(&mut self, base_dir: &Path) -> io::Result<()> {
+        if let Some(source) = self.fendermint_additional_config.take() {
+            let loaded = source.load_if_path(base_dir)?;
+            self.fendermint_additional_config = Some(loaded);
         }
+        Ok(())
+    }
+
+    /// Returns the loaded Fendermint config if available.
+    pub fn loaded_fendermint_config(&self) -> Option<&FendermintConfig> {
+        self.fendermint_additional_config
+            .as_ref()
+            .and_then(|source| source.as_loaded())
     }
 }
 

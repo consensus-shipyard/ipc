@@ -4,6 +4,7 @@
 use std::{
     collections::BTreeMap,
     fmt::Display,
+    io,
     path::{Path, PathBuf},
     str::FromStr,
     time::{Duration, Instant},
@@ -409,9 +410,10 @@ impl DockerNode {
                     (fendermint_dir.join("snapshots"), "/fendermint/snapshots"),
                 ];
 
-                if let Some(ref additional_config) = node_config.fendermint_additional_config {
-                    volume_mappings
-                        .push((additional_config.clone(), "/fendermint/config/dev.toml"));
+                if let Some(additional_config) = node_config.fendermint_additional_config {
+                    let host_config_path =
+                        write_config_to_disk(additional_config, &fendermint_dir, "dev.toml")?;
+                    volume_mappings.push((host_config_path, "/fendermint/config/dev.toml"));
                 }
 
                 let creator = make_runner(FENDERMINT_IMAGE, volumes(volume_mappings));
@@ -670,6 +672,22 @@ fn parse_fendermint_peer_id(value: impl AsRef<str>) -> anyhow::Result<String> {
     Ok(value)
 }
 
+// Writes the given TOML configuration to a file under the provided directory.
+// The file will be named as specified by `file_name`.
+// Returns the full path to the written file.
+pub fn write_config_to_disk<P: AsRef<Path>>(
+    config: &toml::Value,
+    directory: P,
+    file_name: &str,
+) -> io::Result<PathBuf> {
+    let target_dir = directory.as_ref();
+    fs::create_dir_all(target_dir)?; // Ensure the directory exists.
+    let file_path = target_dir.join(file_name);
+    let toml_string =
+        toml::to_string_pretty(config).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    fs::write(&file_path, toml_string)?;
+    Ok(file_path)
+}
 #[cfg(test)]
 mod tests {
     use super::{DockerRunner, COMETBFT_IMAGE};

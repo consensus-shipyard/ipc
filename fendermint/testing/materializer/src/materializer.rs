@@ -5,13 +5,12 @@ use either::Either;
 use ethers::types::H160;
 use fvm_shared::{chainid::ChainID, econ::TokenAmount};
 use std::collections::BTreeMap;
-use std::path::PathBuf;
 use url::Url;
 
 use fendermint_vm_genesis::Collateral;
 
 use crate::{
-    manifest::{Balance, CheckpointConfig, EnvMap},
+    manifest::{Balance, CheckpointConfig, EnvMap, FendermintConfig},
     materials::Materials,
     AccountName, NodeName, RelayerName, ResourceHash, SubnetName, TestnetName,
 };
@@ -224,7 +223,7 @@ pub struct NodeConfig<'a, M: Materials> {
     /// Number of nodes to be expected in the subnet, including this node, or 0 if unknown.
     pub peer_count: usize,
     /// Additional configuration for Fendermint
-    pub fendermint_additional_config: Option<PathBuf>,
+    pub fendermint_additional_config: Option<&'a FendermintConfig>,
 }
 
 /// Options regarding relayer configuration
