@@ -12,6 +12,7 @@ use std::{
 use anyhow::{anyhow, bail, Context};
 use bollard::Docker;
 use ethers::{providers::Middleware, types::H160};
+use fs_err as fs;
 use fvm_shared::bigint::Zero;
 use lazy_static::lazy_static;
 use tendermint_rpc::Client;
@@ -120,7 +121,7 @@ impl DockerNode {
 
         // Directory for the node's data volumes
         let node_dir = root.as_ref().join(node_name);
-        std::fs::create_dir_all(&node_dir).context("failed to create node dir")?;
+        fs::create_dir_all(&node_dir).context("failed to create node dir")?;
 
         // Get the current user ID to use with docker containers.
         let user = user_id(&node_dir)?;
@@ -141,28 +142,28 @@ impl DockerNode {
         // Create a directory for keys
         let keys_dir = node_dir.join("keys");
         if !keys_dir.exists() {
-            std::fs::create_dir(&keys_dir)?;
+            fs::create_dir(&keys_dir)?;
         }
 
         // Create a directory for cometbft
         let cometbft_dir = node_dir.join("cometbft");
         if !cometbft_dir.exists() {
-            std::fs::create_dir(&cometbft_dir)?;
+            fs::create_dir(&cometbft_dir)?;
         }
 
         // Create a directory for fendermint
         let fendermint_dir = node_dir.join("fendermint");
         if !fendermint_dir.exists() {
-            std::fs::create_dir(&fendermint_dir)?;
-            std::fs::create_dir(fendermint_dir.join("data"))?;
-            std::fs::create_dir(fendermint_dir.join("logs"))?;
-            std::fs::create_dir(fendermint_dir.join("snapshots"))?;
+            fs::create_dir(&fendermint_dir)?;
+            fs::create_dir(fendermint_dir.join("data"))?;
+            fs::create_dir(fendermint_dir.join("logs"))?;
+            fs::create_dir(fendermint_dir.join("snapshots"))?;
         }
 
         // Create a directory for ethapi logs
         let ethapi_dir = node_dir.join("ethapi");
         if !ethapi_dir.exists() {
-            std::fs::create_dir_all(ethapi_dir.join("logs"))?;
+            fs::create_dir_all(ethapi_dir.join("logs"))?;
         }
 
         // We'll need to run some cometbft and fendermint commands.
@@ -236,7 +237,7 @@ impl DockerNode {
         // Convert validator private key to cometbft.
         if let Some(v) = node_config.validator {
             let validator_key_path = v.secret_key_path();
-            std::fs::copy(validator_key_path, keys_dir.join("validator_key.sk"))
+            fs::copy(validator_key_path, keys_dir.join("validator_key.sk"))
                 .context("failed to copy validator key")?;
 
             fendermint_runner
@@ -639,7 +640,7 @@ fn export_env(file_path: impl AsRef<Path>, env: &EnvMap) -> anyhow::Result<()> {
 }
 
 fn read_file(file_path: impl AsRef<Path>) -> anyhow::Result<String> {
-    std::fs::read_to_string(&file_path)
+    fs::read_to_string(&file_path)
         .with_context(|| format!("failed to read {}", file_path.as_ref().to_string_lossy()))
 }
 

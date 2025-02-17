@@ -14,6 +14,8 @@ use fendermint_vm_genesis::Genesis;
 use fvm_shared::address::Address;
 use ipc_api::subnet_id::SubnetID;
 
+use fs_err as fs;
+
 use super::export;
 use crate::{AccountId, AccountName, SubnetName};
 
@@ -125,7 +127,7 @@ impl DefaultAccount {
         let sk = dir.join("secret.hex");
 
         let (sk, is_new) = if sk.exists() {
-            let sk = std::fs::read_to_string(sk).context("failed to read private key")?;
+            let sk = fs::read_to_string(sk).context("failed to read private key")?;
             let sk = hex::decode(sk).context("cannot decode hex private key")?;
             let sk = SecretKey::try_from(sk).context("failed to parse secret key")?;
             (sk, false)

@@ -10,6 +10,8 @@ use serde_with::serde_as;
 use std::{collections::BTreeMap, path::Path};
 use url::Url;
 
+use fs_err as fs;
+
 use fendermint_vm_encoding::IsHumanReadable;
 use fendermint_vm_genesis::Collateral;
 
@@ -55,7 +57,7 @@ impl Manifest {
             bail!("manifest file has no extension, cannot determine format");
         };
 
-        let manifest = std::fs::read_to_string(path)
+        let manifest = fs::read_to_string(path)
             .with_context(|| format!("failed to read manifest from {}", path.to_string_lossy()))?;
 
         match ext.as_str() {

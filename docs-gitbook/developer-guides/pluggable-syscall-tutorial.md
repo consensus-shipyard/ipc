@@ -84,7 +84,7 @@ where
 
         // In this example, lets access the file system and return
         // the number of paths in /
-        let paths = std::fs::read_dir("/").unwrap();
+        let paths = fs::read_dir("/").unwrap();
         Ok(paths.count() as u64)
     }
 }
