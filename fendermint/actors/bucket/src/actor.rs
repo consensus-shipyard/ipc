@@ -5,9 +5,11 @@
 use std::collections::HashMap;
 
 use fendermint_actor_blobs_shared::state::{Blob, BlobStatus, SubscriptionId};
-use fendermint_actor_blobs_shared::{add_blob, delete_blob, get_blob, overwrite_blob};
+use fendermint_actor_blobs_shared::{
+    add_blob, delete_blob, get_blob, has_credit_approval, overwrite_blob,
+};
 use fendermint_actor_machine::events::EventBuilder;
-use fendermint_actor_machine::MachineActor;
+use fendermint_actor_machine::{require_addr_is_origin_or_caller, to_id_address, MachineActor};
 use fil_actors_evm_shared::uints::U256;
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
@@ -42,6 +44,11 @@ impl Actor {
         let metadata = params.metadata.clone();
         validate_metadata(&metadata)?;
 
+        // From should be origin or caller
+        let from = to_id_address(rt, params.from, false)?;
+        require_addr_is_origin_or_caller(rt, from)?;
+        // Access control will be enforced by the Blobs actor.  We will pass in the Bucket owner as the `subscriber`, and the blobs actor will enforce that the `from` address either is the `subscriber` or has a valid credit delegation from the `subscriber`.
+
         let sub_id = get_blob_id(&state, params.key)?;
         let sub = if let Some(object) = state.get(rt.store(), &key)? {
             // If we have existing blob
@@ -49,6 +56,7 @@ impl Actor {
                 // Overwrite if the flag is passed
                 overwrite_blob(
                     rt,
+                    from,
                     object.hash,
                     sub_id,
                     params.hash,
@@ -68,6 +76,7 @@ impl Actor {
             // No object found, just a new blob
             add_blob(
                 rt,
+                params.from,
                 sub_id,
                 params.hash,
                 Some(state.owner),
@@ -75,7 +84,6 @@ impl Actor {
                 params.recovery_hash,
                 params.size,
                 params.ttl,
-                rt.message().caller(),
             )?
         };
         // Update state
@@ -108,13 +116,18 @@ impl Actor {
     fn delete_object(rt: &impl Runtime, params: DeleteParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let state = rt.state::<State>()?;
-        let key = BytesKey(params.0.clone());
+        let from = to_id_address(rt, params.from, false)?;
+        require_addr_is_origin_or_caller(rt, from)?;
+        // Access control will be enforced by the Blobs actor.  We will pass in the Bucket owner as the `subscriber`, and the blobs actor will enforce that the `from` address either is the `subscriber` or has a valid credit delegation from the `subscriber`.
+
+        let key = BytesKey(params.key.clone());
         let object = state
             .get(rt.store(), &key)?
             .ok_or(ActorError::illegal_state("object not found".into()))?;
+
         // Delete blob for object
-        let sub_id = get_blob_id(&state, params.0)?;
-        delete_blob(rt, sub_id, object.hash, Some(state.owner))?;
+        let sub_id = get_blob_id(&state, params.key)?;
+        delete_blob(rt, from, sub_id, object.hash, Some(state.owner))?;
         // Update state
         rt.transaction(|st: &mut State, rt| st.delete(rt.store(), &key))?;
         Ok(())
@@ -172,12 +185,24 @@ impl Actor {
         rt.validate_immediate_caller_accept_any()?;
 
         let state = rt.state::<State>()?;
+
+        let from = to_id_address(rt, params.from, false)?;
+        require_addr_is_origin_or_caller(rt, from)?;
+
         let key = BytesKey(params.key.clone());
         let metadata = params.metadata.clone();
 
         let mut object = state
             .get(rt.store(), &key)?
             .ok_or(ActorError::illegal_state("object not found".into()))?;
+
+        // Only the bucket owner or someone with a credit delegation from the bucket owner can update metadata of objects in the bucket.
+        let bucket_owner = state.owner;
+        if !has_credit_approval(rt, bucket_owner, from)? {
+            return Err(actor_error!(
+                forbidden;
+                format!("Unauthorized: missing delegation from bucket owner {} to {}", bucket_owner, from)));
+        }
 
         validate_metadata_optional(&metadata)?;
 
@@ -346,9 +371,11 @@ mod tests {
     use std::collections::HashMap;
 
     use fendermint_actor_blobs_shared::params::{
-        AddBlobParams, DeleteBlobParams, GetBlobParams, OverwriteBlobParams,
+        AddBlobParams, DeleteBlobParams, GetBlobParams, GetCreditApprovalParams,
+        OverwriteBlobParams,
     };
-    use fendermint_actor_blobs_shared::state::{Subscription, SubscriptionGroup};
+    use fendermint_actor_blobs_shared::state::{CreditApproval, Subscription, SubscriptionGroup};
+    use fendermint_actor_blobs_shared::Method::GetCreditApproval;
     use fendermint_actor_blobs_shared::{Method as BlobMethod, BLOBS_ACTOR_ADDR};
     use fendermint_actor_blobs_testing::{new_hash, new_pk};
     use fendermint_actor_machine::{ConstructorParams, InitParams};
@@ -429,6 +456,7 @@ mod tests {
             size: hash.1,
             ttl: None,
             metadata: HashMap::new(),
+            from: origin,
             overwrite: false,
         };
         rt.expect_validate_caller_any();
@@ -484,6 +512,7 @@ mod tests {
             size: hash.1,
             ttl: None,
             metadata: HashMap::new(),
+            from: origin,
             overwrite: false,
         };
         rt.expect_validate_caller_any();
@@ -533,6 +562,7 @@ mod tests {
             size: hash.1,
             ttl: None,
             metadata: HashMap::new(),
+            from: origin,
             overwrite: true,
         };
         rt.expect_validate_caller_any();
@@ -589,6 +619,7 @@ mod tests {
             recovery_hash: new_hash(256).0,
             ttl: None,
             metadata: HashMap::new(),
+            from: origin,
             overwrite: false,
         };
         rt.expect_validate_caller_any();
@@ -639,6 +670,7 @@ mod tests {
             recovery_hash: new_hash(256).0,
             ttl: None,
             metadata: HashMap::new(),
+            from: origin,
             overwrite: false,
         };
         rt.expect_validate_caller_any();
@@ -667,6 +699,7 @@ mod tests {
             recovery_hash: new_hash(256).0,
             ttl: None,
             metadata: HashMap::new(),
+            from: origin,
             overwrite: false,
         };
         rt.expect_validate_caller_any();
@@ -707,7 +740,7 @@ mod tests {
         rt.verify();
 
         // Delete object
-        let delete_params = DeleteParams(key);
+        let delete_params = DeleteParams { key, from: origin };
         rt.expect_validate_caller_any();
         rt.expect_send_simple(
             BLOBS_ACTOR_ADDR,
@@ -716,6 +749,7 @@ mod tests {
                 sponsor: Some(origin),
                 hash: add_params.hash,
                 id: sub_id,
+                from: origin,
             })
             .unwrap(),
             TokenAmount::from_whole(0),
@@ -765,6 +799,7 @@ mod tests {
             recovery_hash: new_hash(256).0,
             ttl: Some(ttl),
             metadata: HashMap::new(),
+            from: origin,
             overwrite: false,
         };
         rt.expect_validate_caller_any();
@@ -870,6 +905,7 @@ mod tests {
             recovery_hash: new_hash(256).0,
             ttl: None,
             metadata: HashMap::from([("foo".into(), "bar".into()), ("foo2".into(), "bar".into())]),
+            from: origin,
             overwrite: false,
         };
         rt.expect_validate_caller_any();
@@ -912,6 +948,7 @@ mod tests {
 
         // Update metadata
         let update_object_params = UpdateObjectMetadataParams {
+            from: origin,
             key: add_params.key,
             metadata: HashMap::from([
                 ("foo".into(), Some("zar".into())),
@@ -923,6 +960,83 @@ mod tests {
         let result = rt.call::<Actor>(
             Method::UpdateObjectMetadata as u64,
             IpldBlock::serialize_cbor(&update_object_params).unwrap(),
+        );
+        assert!(result.is_ok());
+        rt.verify();
+
+        // Fail if "from" is neither origin nor caller
+        let alien_id_addr = Address::new_id(112);
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, alien_id_addr);
+        rt.set_origin(alien_id_addr);
+        rt.expect_validate_caller_any();
+        let result = rt.call::<Actor>(
+            Method::UpdateObjectMetadata as u64,
+            IpldBlock::serialize_cbor(&update_object_params).unwrap(),
+        );
+        assert!(result.is_err());
+        rt.verify();
+
+        // Fail if "from" is not the owner, and has no delegation.
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, alien_id_addr);
+        rt.set_origin(alien_id_addr);
+        rt.expect_validate_caller_any();
+        let alien_update = UpdateObjectMetadataParams {
+            from: alien_id_addr,
+            key: update_object_params.key,
+            metadata: update_object_params.metadata,
+        };
+        rt.expect_send(
+            BLOBS_ACTOR_ADDR,
+            GetCreditApproval as MethodNum,
+            IpldBlock::serialize_cbor(&GetCreditApprovalParams {
+                from: origin,
+                to: alien_id_addr,
+            })
+            .unwrap(),
+            TokenAmount::from_whole(0),
+            None,
+            SendFlags::READ_ONLY,
+            IpldBlock::serialize_cbor::<Option<CreditApproval>>(&None).unwrap(),
+            ExitCode::OK,
+            None,
+        );
+        let result = rt.call::<Actor>(
+            Method::UpdateObjectMetadata as u64,
+            IpldBlock::serialize_cbor(&alien_update).unwrap(),
+        );
+        assert!(result.is_err());
+        rt.verify();
+
+        // Allow if has delegation though
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, alien_id_addr);
+        rt.set_origin(alien_id_addr);
+        rt.expect_validate_caller_any();
+        rt.expect_send(
+            BLOBS_ACTOR_ADDR,
+            GetCreditApproval as MethodNum,
+            IpldBlock::serialize_cbor(&GetCreditApprovalParams {
+                from: origin,
+                to: alien_id_addr,
+            })
+            .unwrap(),
+            TokenAmount::from_whole(0),
+            None,
+            SendFlags::READ_ONLY,
+            // We do not care what is inside credit approval. We only care if it is present.
+            IpldBlock::serialize_cbor::<Option<CreditApproval>>(&Some(CreditApproval {
+                credit_limit: None,
+                gas_fee_limit: None,
+                expiry: None,
+                credit_used: TokenAmount::from_whole(0),
+                gas_fee_used: TokenAmount::from_whole(0),
+            }))
+            .unwrap(),
+            ExitCode::OK,
+            None,
+        );
+        let result = rt.call::<Actor>(
+            Method::UpdateObjectMetadata as u64,
+            IpldBlock::serialize_cbor(&alien_update).unwrap(),
         );
         assert!(result.is_ok());
         rt.verify();

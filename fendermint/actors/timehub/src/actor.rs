@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
-use fendermint_actor_blobs_shared::get_credit_approval;
-use fendermint_actor_machine::MachineActor;
+use fendermint_actor_blobs_shared::has_credit_approval;
+use fendermint_actor_machine::{require_addr_is_origin_or_caller, to_id_address, MachineActor};
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
     runtime::{ActorCode, Runtime},
@@ -32,27 +32,25 @@ impl TimehubActor {
         // credit approval to the caller.
         let state = rt.state::<State>()?;
         let owner = state.owner;
-        let origin = rt.message().origin();
+        let from = to_id_address(rt, params.from, false)?;
+        require_addr_is_origin_or_caller(rt, from)?;
+
         let actor_address = state.address.get()?;
-        if origin != owner {
-            let approval = get_credit_approval(rt, owner, origin)?;
-            let cur_epoch = rt.curr_epoch();
-            if approval.map_or(true, |a| a.expiry.is_some_and(|expiry| expiry < cur_epoch)) {
-                return Err(actor_error!(
-                    forbidden;
-                    format!("Unauthorized: missing credit approval from Timehub owner {} to origin {} for Timehub {}", owner, origin, actor_address)));
-            }
+        if !has_credit_approval(rt, owner, from)? {
+            return Err(actor_error!(
+                forbidden;
+                format!("Unauthorized: missing credit approval from Timehub owner {} to {} for Timehub {}", owner, from, actor_address)));
         }
 
         // Decode the raw bytes as a Cid and report any errors.
         // However, we pass opaque bytes to the store as it tries to validate and resolve any CIDs
         // it stores.
-        let _cid = Cid::try_from(params.0.as_slice()).map_err(|_err| {
+        let _cid = Cid::try_from(params.cid_bytes.as_slice()).map_err(|_err| {
             actor_error!(illegal_argument;
                     "data must be valid CID bytes")
         })?;
         let timestamp = rt.tipset_timestamp();
-        let data: RawLeaf = (timestamp, params.0);
+        let data: RawLeaf = (timestamp, params.cid_bytes);
 
         rt.transaction(|st: &mut State, rt| st.push(rt.store(), data))
     }
@@ -125,6 +123,7 @@ mod tests {
     use fendermint_actor_blobs_shared::state::CreditApproval;
     use fendermint_actor_blobs_shared::{Method as BlobMethod, BLOBS_ACTOR_ADDR};
     use fendermint_actor_machine::{ConstructorParams, InitParams};
+    use fil_actors_runtime::runtime::MessageInfo;
     use fil_actors_runtime::test_utils::{
         expect_empty, MockRuntime, ADM_ACTOR_CODE_ID, ETHACCOUNT_ACTOR_CODE_ID, INIT_ACTOR_CODE_ID,
     };
@@ -209,7 +208,10 @@ mod tests {
     fn push_cid(rt: &mut MockRuntime, cid: Cid, timestamp: u64) -> PushReturn {
         rt.expect_validate_caller_any();
         rt.tipset_timestamp = timestamp;
-        let push_params = PushParams(cid.to_bytes());
+        let push_params = PushParams {
+            cid_bytes: cid.to_bytes(),
+            from: rt.caller(),
+        };
         rt.call::<TimehubActor>(
             Method::Push as u64,
             IpldBlock::serialize_cbor(&push_params).unwrap(),
@@ -330,7 +332,10 @@ mod tests {
         // Attempt to push a CID, should fail with access control error.
         let cid = Cid::from_str("bafk2bzacecmnyfiwb52tkbwmm2dsd7ysi3nvuxl3lmspy7pl26wxj4zj7w4wi")
             .unwrap();
-        let push_params = PushParams(cid.to_bytes());
+        let push_params = PushParams {
+            cid_bytes: cid.to_bytes(),
+            from: origin,
+        };
         rt.expect_validate_caller_any();
 
         let err = rt
@@ -494,7 +499,10 @@ mod tests {
         // Attempt to push a CID, should fail with access control error.
         let cid = Cid::from_str("bafk2bzacecmnyfiwb52tkbwmm2dsd7ysi3nvuxl3lmspy7pl26wxj4zj7w4wi")
             .unwrap();
-        let push_params = PushParams(cid.to_bytes());
+        let push_params = PushParams {
+            cid_bytes: cid.to_bytes(),
+            from: rt.caller(),
+        };
         rt.expect_validate_caller_any();
 
         let err = rt

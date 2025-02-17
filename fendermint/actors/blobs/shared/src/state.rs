@@ -47,7 +47,7 @@ impl Mul<&TokenCreditRate> for TokenAmount {
     }
 }
 
-impl<'a> Div<&TokenCreditRate> for &'a Credit {
+impl Div<&TokenCreditRate> for &Credit {
     type Output = TokenAmount;
 
     fn div(self, rate: &TokenCreditRate) -> Self::Output {

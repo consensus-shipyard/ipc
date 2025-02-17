@@ -109,6 +109,7 @@ pub struct ObjectList {
 }
 
 impl State {
+    #[allow(clippy::too_many_arguments)]
     pub fn add<BS: Blockstore>(
         &mut self,
         store: &BS,
@@ -335,7 +336,7 @@ mod tests {
                 object.hash,
                 object.size,
                 object.metadata,
-                true
+                true,
             )
             .is_ok());
 

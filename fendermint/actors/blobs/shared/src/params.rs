@@ -191,6 +191,8 @@ pub struct DeleteBlobParams {
     pub hash: Hash,
     /// Identifier used to differentiate blob additions for the same subscriber.
     pub id: SubscriptionId,
+    /// Account address that initiated the deletion.
+    pub from: Address,
 }
 
 /// Params for overwriting a blob, i.e., deleting one and adding another.

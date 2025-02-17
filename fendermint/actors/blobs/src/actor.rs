@@ -100,6 +100,7 @@ impl BlobsActor {
     fn buy_credit(rt: &impl Runtime, params: BuyCreditParams) -> Result<Account, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let to = to_id_address(rt, params.0, true)?;
+
         let config = config::get_config(rt)?;
         rt.transaction(|st: &mut State, rt| {
             st.buy_credit(
@@ -123,6 +124,7 @@ impl BlobsActor {
     ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         let from = to_id_address(rt, params.from, false)?;
+
         let sponsor = if let Some(sponsor) = params.sponsor {
             Some(to_id_address(rt, sponsor, false)?)
         } else {
@@ -349,7 +351,7 @@ impl BlobsActor {
     /// and the only way to get an account is to buy credits, which requires a delegated address.   
     fn add_blob(rt: &impl Runtime, params: AddBlobParams) -> Result<Subscription, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let from = to_id_address(rt, params.from, true)?;
+        let from = to_id_address(rt, params.from, false)?;
         require_addr_is_origin_or_caller(rt, from)?;
 
         let tokens_received = rt.message().value_received();
@@ -476,16 +478,18 @@ impl BlobsActor {
     /// and the only way to get an account is to buy credits, which requires a delegated address.
     fn delete_blob(rt: &impl Runtime, params: DeleteBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let origin = rt.message().origin();
+        let from = to_id_address(rt, params.from, false)?;
+        require_addr_is_origin_or_caller(rt, from)?;
+
         let subscriber = if let Some(sponsor) = params.sponsor {
             to_id_address(rt, sponsor, false)?
         } else {
-            origin
+            from
         };
         let delete = rt.transaction(|st: &mut State, rt| {
             st.delete_blob(
                 rt.store(),
-                origin,
+                from,
                 subscriber,
                 rt.curr_epoch(),
                 params.hash,
@@ -514,11 +518,13 @@ impl BlobsActor {
         params: OverwriteBlobParams,
     ) -> Result<Subscription, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let origin = rt.message().origin();
+        let from = to_id_address(rt, params.add.from, false)?;
+        require_addr_is_origin_or_caller(rt, from)?;
+
         let subscriber = if let Some(sponsor) = params.add.sponsor {
             to_id_address(rt, sponsor, false)?
         } else {
-            origin
+            from
         };
         let config = config::get_config(rt)?;
         // The call should be atomic, hence we wrap two independent calls in a transaction.
@@ -528,7 +534,7 @@ impl BlobsActor {
             let delete = if params.old_hash != add_params.hash {
                 st.delete_blob(
                     rt.store(),
-                    origin,
+                    from,
                     subscriber,
                     rt.curr_epoch(),
                     params.old_hash,
@@ -540,7 +546,7 @@ impl BlobsActor {
             let (subscription, _) = st.add_blob(
                 &config,
                 rt.store(),
-                origin,
+                from,
                 subscriber,
                 rt.curr_epoch(),
                 add_params.hash,

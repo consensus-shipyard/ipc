@@ -107,6 +107,22 @@ pub fn get_credit_approval(
     ))?)
 }
 
+/// Returns `true` if `from` and `to` are the same address,
+/// or if `from` has a credit delegation to `to` that has not yet expired.
+pub fn has_credit_approval(
+    rt: &impl Runtime,
+    from: Address,
+    to: Address,
+) -> Result<bool, ActorError> {
+    if from != to {
+        let approval = get_credit_approval(rt, from, to)?;
+        let curr_epoch = rt.curr_epoch();
+        Ok(approval.is_some_and(|a| a.expiry.map_or(true, |e| e >= curr_epoch)))
+    } else {
+        Ok(true)
+    }
+}
+
 pub fn revoke_credit(
     rt: &impl Runtime,
     from: Address,
@@ -129,6 +145,7 @@ pub fn revoke_credit(
 #[allow(clippy::too_many_arguments)]
 pub fn add_blob(
     rt: &impl Runtime,
+    from: Address,
     sub_id: state::SubscriptionId,
     hash: state::Hash,
     sponsor: Option<Address>,
@@ -136,7 +153,6 @@ pub fn add_blob(
     metadata_hash: state::Hash,
     size: u64,
     ttl: Option<ChainEpoch>,
-    from: Address,
 ) -> Result<Subscription, ActorError> {
     let params = IpldBlock::serialize_cbor(&params::AddBlobParams {
         sponsor,
@@ -169,6 +185,7 @@ pub fn get_blob(rt: &impl Runtime, hash: state::Hash) -> Result<Option<state::Bl
 
 pub fn delete_blob(
     rt: &impl Runtime,
+    from: Address,
     sub_id: state::SubscriptionId,
     hash: state::Hash,
     sponsor: Option<Address>,
@@ -180,6 +197,7 @@ pub fn delete_blob(
             sponsor,
             hash,
             id: sub_id,
+            from,
         })?,
         rt.message().value_received(),
     ))?;
@@ -190,6 +208,7 @@ pub fn delete_blob(
 #[allow(clippy::too_many_arguments)]
 pub fn overwrite_blob(
     rt: &impl Runtime,
+    from: Address,
     old_hash: state::Hash,
     sub_id: state::SubscriptionId,
     hash: state::Hash,
@@ -212,7 +231,7 @@ pub fn overwrite_blob(
                 metadata_hash,
                 size,
                 ttl,
-                from: rt.message().caller(),
+                from,
             },
         })?,
         rt.message().value_received(),
