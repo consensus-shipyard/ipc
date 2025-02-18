@@ -4,12 +4,17 @@
 
 use cid::Cid;
 use fendermint_actor_blobs_shared::has_credit_approval;
-use fendermint_actor_machine::{require_addr_is_origin_or_caller, to_id_address, MachineActor};
+use fendermint_actor_machine::{
+    events::emit_evm_event,
+    util::{require_addr_is_origin_or_caller, to_id_address},
+    MachineActor,
+};
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
     runtime::{ActorCode, Runtime},
     ActorError,
 };
+use recall_sol_facade::timehub::event_pushed;
 use tracing::debug;
 
 use crate::{Leaf, Method, PushParams, PushReturn, State, TIMEHUB_ACTOR_NAME};
@@ -43,16 +48,20 @@ impl TimehubActor {
         }
 
         // Decode the raw bytes as a Cid and report any errors.
-        // However, we pass opaque bytes to the store as it tries to validate and resolve any CIDs
+        // However, we pass opaque bytes to the store as it tries to validate and resolve any CID
         // it stores.
-        let _cid = Cid::try_from(params.cid_bytes.as_slice()).map_err(|_err| {
+        let cid = Cid::try_from(params.cid_bytes.as_slice()).map_err(|_err| {
             actor_error!(illegal_argument;
                     "data must be valid CID bytes")
         })?;
         let timestamp = rt.tipset_timestamp();
         let data: RawLeaf = (timestamp, params.cid_bytes);
 
-        rt.transaction(|st: &mut State, rt| st.push(rt.store(), data))
+        let ret = rt.transaction(|st: &mut State, rt| st.push(rt.store(), data))?;
+
+        emit_evm_event(rt, event_pushed(ret.index, timestamp, cid.to_bytes()))?;
+
+        Ok(ret)
     }
 
     fn get_leaf_at(rt: &impl Runtime, index: u64) -> Result<Option<Leaf>, ActorError> {
@@ -119,38 +128,57 @@ impl ActorCode for TimehubActor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fendermint_actor_blobs_shared::params::GetCreditApprovalParams;
-    use fendermint_actor_blobs_shared::state::CreditApproval;
-    use fendermint_actor_blobs_shared::{Method as BlobMethod, BLOBS_ACTOR_ADDR};
-    use fendermint_actor_machine::{ConstructorParams, InitParams};
-    use fil_actors_runtime::runtime::MessageInfo;
-    use fil_actors_runtime::test_utils::{
-        expect_empty, MockRuntime, ADM_ACTOR_CODE_ID, ETHACCOUNT_ACTOR_CODE_ID, INIT_ACTOR_CODE_ID,
-    };
-    use fil_actors_runtime::{ADM_ACTOR_ADDR, INIT_ACTOR_ADDR};
-    use fvm_ipld_encoding::ipld_block::IpldBlock;
-    use fvm_shared::address::Address;
-    use fvm_shared::clock::ChainEpoch;
-    use fvm_shared::econ::TokenAmount;
-    use fvm_shared::error::ExitCode;
-    use fvm_shared::sys::SendFlags;
-    use fvm_shared::MethodNum;
+
     use std::collections::HashMap;
     use std::str::FromStr;
 
-    pub fn construct_runtime(actor_address: Address, owner: Address) -> MockRuntime {
+    use fendermint_actor_blobs_shared::{
+        params::GetCreditApprovalParams, state::CreditApproval, Method as BlobMethod,
+        BLOBS_ACTOR_ADDR,
+    };
+    use fendermint_actor_machine::{events::to_actor_event, ConstructorParams, InitParams};
+    use fil_actors_evm_shared::address::EthAddress;
+    use fil_actors_runtime::{
+        runtime::MessageInfo,
+        test_utils::{
+            expect_empty, MockRuntime, ADM_ACTOR_CODE_ID, ETHACCOUNT_ACTOR_CODE_ID,
+            INIT_ACTOR_CODE_ID,
+        },
+        ADM_ACTOR_ADDR, INIT_ACTOR_ADDR,
+    };
+    use fvm_ipld_encoding::ipld_block::IpldBlock;
+    use fvm_shared::{
+        address::Address, clock::ChainEpoch, econ::TokenAmount, error::ExitCode, sys::SendFlags,
+        MethodNum,
+    };
+    use recall_sol_facade::machine::{machine_created, machine_initialized};
+
+    pub fn construct_runtime(actor_address: Address, owner_id_addr: Address) -> MockRuntime {
+        let owner_eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000000"
+        ));
+        let owner_delegated_addr = Address::new_delegated(10, &owner_eth_addr.0).unwrap();
+
         let rt = MockRuntime {
             receiver: actor_address,
             ..Default::default()
         };
+        rt.set_delegated_address(owner_id_addr.id().unwrap(), owner_delegated_addr);
+
         rt.set_caller(*INIT_ACTOR_CODE_ID, INIT_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![INIT_ACTOR_ADDR]);
         let metadata = HashMap::new();
-
+        let event =
+            to_actor_event(machine_created(owner_delegated_addr, &metadata).unwrap()).unwrap();
+        rt.expect_emitted_event(event);
         let result = rt
             .call::<TimehubActor>(
                 Method::Constructor as u64,
-                IpldBlock::serialize_cbor(&ConstructorParams { owner, metadata }).unwrap(),
+                IpldBlock::serialize_cbor(&ConstructorParams {
+                    owner: owner_id_addr,
+                    metadata,
+                })
+                .unwrap(),
             )
             .unwrap();
         expect_empty(result);
@@ -158,6 +186,8 @@ mod tests {
 
         rt.set_caller(*ADM_ACTOR_CODE_ID, ADM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![ADM_ACTOR_ADDR]);
+        let event = to_actor_event(machine_initialized(actor_address).unwrap()).unwrap();
+        rt.expect_emitted_event(event);
         let actor_init = rt
             .call::<TimehubActor>(
                 Method::Init as u64,
@@ -205,13 +235,18 @@ mod tests {
         .unwrap()
     }
 
-    fn push_cid(rt: &mut MockRuntime, cid: Cid, timestamp: u64) -> PushReturn {
+    fn push_cid(rt: &mut MockRuntime, cid: Cid, timestamp: u64, expected_index: u64) -> PushReturn {
         rt.expect_validate_caller_any();
         rt.tipset_timestamp = timestamp;
         let push_params = PushParams {
             cid_bytes: cid.to_bytes(),
             from: rt.caller(),
         };
+        let event = to_actor_event(
+            event_pushed(expected_index, timestamp, push_params.cid_bytes.clone()).unwrap(),
+        )
+        .unwrap();
+        rt.expect_emitted_event(event);
         rt.call::<TimehubActor>(
             Method::Push as u64,
             IpldBlock::serialize_cbor(&push_params).unwrap(),
@@ -245,7 +280,7 @@ mod tests {
         let t0 = 1738787063;
         let cid0 = Cid::from_str("bafk2bzacecmnyfiwb52tkbwmm2dsd7ysi3nvuxl3lmspy7pl26wxj4zj7w4wi")
             .unwrap();
-        let result0 = push_cid(&mut rt, cid0, t0);
+        let result0 = push_cid(&mut rt, cid0, t0, 0);
 
         assert_eq!(0, result0.index);
         let expected_root0 =
@@ -270,7 +305,7 @@ mod tests {
         let t1 = t0 + 1;
         let cid1 =
             Cid::from_str("baeabeidtz333ke5c4ultzeg6jkyzgdmvduytt2so3ahozm4zqstiuwq33e").unwrap();
-        let result1 = push_cid(&mut rt, cid1, t1);
+        let result1 = push_cid(&mut rt, cid1, t1, 1);
 
         assert_eq!(1, result1.index);
         let expected_root1 =
@@ -389,7 +424,7 @@ mod tests {
         let tipset_timestamp = 1738787063;
         let cid = Cid::from_str("bafk2bzacecmnyfiwb52tkbwmm2dsd7ysi3nvuxl3lmspy7pl26wxj4zj7w4wi")
             .unwrap();
-        let result = push_cid(&mut rt, cid, tipset_timestamp);
+        let result = push_cid(&mut rt, cid, tipset_timestamp, 0);
 
         assert_eq!(0, result.index);
         let expected_root0 =
@@ -445,7 +480,7 @@ mod tests {
         let cid = Cid::from_str("bafk2bzacecmnyfiwb52tkbwmm2dsd7ysi3nvuxl3lmspy7pl26wxj4zj7w4wi")
             .unwrap();
 
-        let result = push_cid(&mut rt, cid, tipset_timestamp);
+        let result = push_cid(&mut rt, cid, tipset_timestamp, 0);
         assert_eq!(0, result.index);
         let expected_root0 =
             Cid::from_str("bafy2bzacebva5uaq4ayn6ax7zzywcqapf3w4q3oamez6sukidiqiz3m4c6osu")
@@ -467,7 +502,7 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, origin);
         rt.set_origin(origin);
 
-        // Set up that the account doing the push does has a credit approval from the Timehub owner,
+        // Set up that the account doing the push does have a credit approval from the Timehub owner,
         // but it is expired
         let epoch0: ChainEpoch = 100;
         let epoch1 = epoch0 + 1;

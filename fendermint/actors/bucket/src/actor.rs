@@ -4,13 +4,15 @@
 
 use std::collections::HashMap;
 
-use fendermint_actor_blobs_shared::state::{Blob, BlobStatus, SubscriptionId};
 use fendermint_actor_blobs_shared::{
     add_blob, delete_blob, get_blob, has_credit_approval, overwrite_blob,
+    state::{Blob, BlobStatus, SubscriptionId},
 };
-use fendermint_actor_machine::events::EventBuilder;
-use fendermint_actor_machine::{require_addr_is_origin_or_caller, to_id_address, MachineActor};
-use fil_actors_evm_shared::uints::U256;
+use fendermint_actor_machine::{
+    events::emit_evm_event,
+    util::{require_addr_is_origin_or_caller, to_id_address},
+    MachineActor,
+};
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
     runtime::{ActorCode, Runtime},
@@ -18,6 +20,7 @@ use fil_actors_runtime::{
 };
 use fvm_ipld_hamt::BytesKey;
 use fvm_shared::address::Address;
+use recall_sol_facade::bucket::{object_added, object_deleted, object_metadata_updated};
 
 use crate::shared::{
     AddParams, DeleteParams, GetParams, ListObjectsReturn, ListParams, Method, Object,
@@ -32,24 +35,28 @@ use crate::{
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
 
-const OBJECT_ADDED_EVENT: &str = "ObjectAdded(bytes32,uint256,uint256)";
-
 pub struct Actor;
 
 impl Actor {
+    /// Adds an object to a bucket.
+    ///
+    /// Access control will be enforced by the Blobs actor.
+    /// We will pass the bucket owner as the `subscriber`,
+    /// and the Blobs actor will enforce that the `from` address is either
+    /// the `subscriber` or has a valid credit delegation from the `subscriber`.
+    /// The `from` address must be the origin or the caller.
     fn add_object(rt: &impl Runtime, params: AddParams) -> Result<Object, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let state = rt.state::<State>()?;
-        let key = BytesKey(params.key.clone());
-        let metadata = params.metadata.clone();
-        validate_metadata(&metadata)?;
 
-        // From should be origin or caller
         let from = to_id_address(rt, params.from, false)?;
         require_addr_is_origin_or_caller(rt, from)?;
-        // Access control will be enforced by the Blobs actor.  We will pass in the Bucket owner as the `subscriber`, and the blobs actor will enforce that the `from` address either is the `subscriber` or has a valid credit delegation from the `subscriber`.
 
-        let sub_id = get_blob_id(&state, params.key)?;
+        let state = rt.state::<State>()?;
+        let sub_id = get_blob_id(&state, &params.key)?;
+        let key = BytesKey(params.key.clone());
+
+        validate_metadata(&params.metadata)?;
+
         let sub = if let Some(object) = state.get(rt.store(), &key)? {
             // If we have existing blob
             if params.overwrite {
@@ -86,59 +93,70 @@ impl Actor {
                 params.ttl,
             )?
         };
-        // Update state
+
         rt.transaction(|st: &mut State, rt| {
             st.add(
                 rt.store(),
                 key,
                 params.hash,
                 params.size,
-                params.metadata,
+                params.metadata.clone(),
                 params.overwrite,
             )
         })?;
 
-        EventBuilder::new(OBJECT_ADDED_EVENT)
-            .param_indexed(params.hash.0)
-            .param_indexed(U256::from(params.size))
-            .param_indexed(U256::from(sub.expiry))
-            .emit(rt)?;
+        emit_evm_event(
+            rt,
+            object_added(params.key, &params.hash.0, &params.metadata),
+        )?;
 
         Ok(Object {
             hash: params.hash,
             recovery_hash: params.recovery_hash,
             size: params.size,
             expiry: sub.expiry,
-            metadata,
+            metadata: params.metadata,
         })
     }
 
+    /// Deletes an object from a bucket.
+    ///
+    /// Access control will be enforced by the Blobs actor.
+    /// We will pass the bucket owner as the `subscriber`,
+    /// and the Blobs actor will enforce that the `from` address is either
+    /// the `subscriber` or has a valid credit delegation from the `subscriber`.
+    /// The `from` address must be the origin or the caller.
     fn delete_object(rt: &impl Runtime, params: DeleteParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let state = rt.state::<State>()?;
+
         let from = to_id_address(rt, params.from, false)?;
         require_addr_is_origin_or_caller(rt, from)?;
-        // Access control will be enforced by the Blobs actor.  We will pass in the Bucket owner as the `subscriber`, and the blobs actor will enforce that the `from` address either is the `subscriber` or has a valid credit delegation from the `subscriber`.
 
-        let key = BytesKey(params.key.clone());
+        let state = rt.state::<State>()?;
+        let sub_id = get_blob_id(&state, &params.key)?;
+        let key = BytesKey(params.key);
         let object = state
             .get(rt.store(), &key)?
             .ok_or(ActorError::illegal_state("object not found".into()))?;
 
         // Delete blob for object
-        let sub_id = get_blob_id(&state, params.key)?;
         delete_blob(rt, from, sub_id, object.hash, Some(state.owner))?;
-        // Update state
+
         rt.transaction(|st: &mut State, rt| st.delete(rt.store(), &key))?;
+
+        emit_evm_event(rt, object_deleted(key.0, &object.hash.0))?;
+
         Ok(())
     }
 
+    /// Returns an object.
     fn get_object(rt: &impl Runtime, params: GetParams) -> Result<Option<Object>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
+
         let state = rt.state::<State>()?;
         let owner = state.owner;
-        let key = BytesKey(params.0.clone());
-        let sub_id = get_blob_id(&state, params.0)?;
+        let sub_id = get_blob_id(&state, &params.0)?;
+        let key = BytesKey(params.0);
         if let Some(object_state) = state.get(rt.store(), &key)? {
             if let Some(blob) = get_blob(rt, object_state.hash)? {
                 let object = build_object(&blob, &object_state, sub_id, owner)?;
@@ -151,14 +169,16 @@ impl Actor {
         }
     }
 
+    /// Lists bucket objects.
     fn list_objects(
         rt: &impl Runtime,
         params: ListParams,
     ) -> Result<ListObjectsReturn, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
+
         let mut objects = Vec::new();
-        let state = rt.state::<State>()?;
         let start_key = params.start_key.map(BytesKey::from);
+        let state = rt.state::<State>()?;
         let (prefixes, next_key) = state.list(
             rt.store(),
             params.prefix,
@@ -170,7 +190,9 @@ impl Actor {
                 Ok(())
             },
         )?;
+
         let next_key = next_key.map(|key| key.0);
+
         Ok(ListObjectsReturn {
             objects,
             next_key,
@@ -178,25 +200,26 @@ impl Actor {
         })
     }
 
+    /// Updates object metadata.
+    ///
+    /// Only the bucket owner or an account with a credit delegation
+    /// from the bucket owner can update object metadata.
+    /// The `from` address must be the origin or the caller.
     fn update_object_metadata(
         rt: &impl Runtime,
         params: UpdateObjectMetadataParams,
     ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
-        let state = rt.state::<State>()?;
-
         let from = to_id_address(rt, params.from, false)?;
         require_addr_is_origin_or_caller(rt, from)?;
 
         let key = BytesKey(params.key.clone());
-        let metadata = params.metadata.clone();
-
+        let state = rt.state::<State>()?;
         let mut object = state
             .get(rt.store(), &key)?
             .ok_or(ActorError::illegal_state("object not found".into()))?;
 
-        // Only the bucket owner or someone with a credit delegation from the bucket owner can update metadata of objects in the bucket.
         let bucket_owner = state.owner;
         if !has_credit_approval(rt, bucket_owner, from)? {
             return Err(actor_error!(
@@ -204,10 +227,10 @@ impl Actor {
                 format!("Unauthorized: missing delegation from bucket owner {} to {}", bucket_owner, from)));
         }
 
-        validate_metadata_optional(&metadata)?;
+        validate_metadata_optional(&params.metadata)?;
 
-        rt.transaction(|st: &mut State, rt| {
-            for (key, val) in metadata {
+        let metadata = rt.transaction(|st: &mut State, rt| {
+            for (key, val) in params.metadata {
                 match val {
                     Some(v) => {
                         object
@@ -234,16 +257,21 @@ impl Actor {
                 key,
                 object.hash,
                 object.size,
-                object.metadata,
+                object.metadata.clone(),
                 true,
-            )
+            )?;
+
+            Ok(object.metadata)
         })?;
+
+        emit_evm_event(rt, object_metadata_updated(params.key, &metadata))?;
+
         Ok(())
     }
 }
 
 /// Returns a blob subscription ID specific to this machine and object key.
-fn get_blob_id(state: &State, key: Vec<u8>) -> anyhow::Result<SubscriptionId, ActorError> {
+fn get_blob_id(state: &State, key: &[u8]) -> anyhow::Result<SubscriptionId, ActorError> {
     let mut data = state.address.get()?.payload_bytes();
     data.extend(key);
     let id = blake3::hash(&data).to_hex().to_string();
@@ -368,57 +396,71 @@ impl ActorCode for Actor {
 mod tests {
     use super::*;
 
-    use std::collections::HashMap;
-
-    use fendermint_actor_blobs_shared::params::{
-        AddBlobParams, DeleteBlobParams, GetBlobParams, GetCreditApprovalParams,
-        OverwriteBlobParams,
+    use fendermint_actor_blobs_shared::{
+        params::{
+            AddBlobParams, DeleteBlobParams, GetBlobParams, GetCreditApprovalParams,
+            OverwriteBlobParams,
+        },
+        state::{CreditApproval, Hash, Subscription, SubscriptionGroup},
+        Method as BlobMethod, BLOBS_ACTOR_ADDR,
     };
-    use fendermint_actor_blobs_shared::state::{CreditApproval, Subscription, SubscriptionGroup};
-    use fendermint_actor_blobs_shared::Method::GetCreditApproval;
-    use fendermint_actor_blobs_shared::{Method as BlobMethod, BLOBS_ACTOR_ADDR};
-    use fendermint_actor_blobs_testing::{new_hash, new_pk};
-    use fendermint_actor_machine::{ConstructorParams, InitParams};
-    use fil_actors_runtime::runtime::Runtime;
+    use fendermint_actor_blobs_testing::{new_hash, new_pk, setup_logs};
+    use fendermint_actor_machine::{events::to_actor_event, ConstructorParams, InitParams};
+    use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::test_utils::{
         expect_empty, MockRuntime, ADM_ACTOR_CODE_ID, ETHACCOUNT_ACTOR_CODE_ID, INIT_ACTOR_CODE_ID,
     };
     use fil_actors_runtime::{ADM_ACTOR_ADDR, INIT_ACTOR_ADDR};
     use fvm_ipld_encoding::ipld_block::IpldBlock;
-    use fvm_shared::address::Address;
-    use fvm_shared::clock::ChainEpoch;
-    use fvm_shared::econ::TokenAmount;
-    use fvm_shared::error::ExitCode;
-    use fvm_shared::sys::SendFlags;
-    use fvm_shared::MethodNum;
+    use fvm_shared::{
+        clock::ChainEpoch, econ::TokenAmount, error::ExitCode, sys::SendFlags, MethodNum,
+    };
+    use recall_sol_facade::machine::{machine_created, machine_initialized};
 
     fn get_runtime() -> (MockRuntime, Address) {
-        let origin = Address::new_id(110);
-        let rt = construct_and_verify(origin);
-        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, origin);
-        rt.set_origin(origin);
-        (rt, origin)
+        let origin_id_addr = Address::new_id(110);
+        let rt = construct_and_verify(origin_id_addr);
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, origin_id_addr);
+        rt.set_origin(origin_id_addr);
+        (rt, origin_id_addr)
     }
 
-    fn construct_and_verify(owner: Address) -> MockRuntime {
+    fn construct_and_verify(owner_id_addr: Address) -> MockRuntime {
+        let owner_eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000000"
+        ));
+        let owner_delegated_addr = Address::new_delegated(10, &owner_eth_addr.0).unwrap();
+
         let buck_addr = Address::new_id(111);
         let rt = MockRuntime {
             receiver: buck_addr,
             ..Default::default()
         };
+        rt.set_delegated_address(owner_id_addr.id().unwrap(), owner_delegated_addr);
+
         rt.set_caller(*INIT_ACTOR_CODE_ID, INIT_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![INIT_ACTOR_ADDR]);
         let metadata = HashMap::new();
+        let event =
+            to_actor_event(machine_created(owner_delegated_addr, &metadata).unwrap()).unwrap();
+        rt.expect_emitted_event(event);
         let actor_construction = rt
             .call::<Actor>(
                 Method::Constructor as u64,
-                IpldBlock::serialize_cbor(&ConstructorParams { owner, metadata }).unwrap(),
+                IpldBlock::serialize_cbor(&ConstructorParams {
+                    owner: owner_id_addr,
+                    metadata,
+                })
+                .unwrap(),
             )
             .unwrap();
         expect_empty(actor_construction);
         rt.verify();
+
         rt.set_caller(*ADM_ACTOR_CODE_ID, ADM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![ADM_ACTOR_ADDR]);
+        let event = to_actor_event(machine_initialized(buck_addr).unwrap()).unwrap();
+        rt.expect_emitted_event(event);
         let actor_init = rt
             .call::<Actor>(
                 Method::Init as u64,
@@ -427,22 +469,27 @@ mod tests {
             .unwrap();
         expect_empty(actor_init);
         rt.verify();
+
         rt.reset();
         rt
     }
 
-    fn expect_emitted_add_event(rt: &MockRuntime, add_params: &AddParams) {
-        let event = EventBuilder::new(OBJECT_ADDED_EVENT)
-            .param_indexed(add_params.hash.0)
-            .param_indexed(U256::from(add_params.size))
-            .param_indexed(U256::from(0))
-            .build()
-            .unwrap();
+    fn expect_emitted_add_event(rt: &MockRuntime, params: &AddParams) {
+        let event = to_actor_event(
+            object_added(params.key.clone(), &params.hash.0, &params.metadata).unwrap(),
+        )
+        .unwrap();
+        rt.expect_emitted_event(event);
+    }
+
+    fn expect_emitted_delete_event(rt: &MockRuntime, params: &DeleteParams, hash: Hash) {
+        let event = to_actor_event(object_deleted(params.key.clone(), &hash.0).unwrap()).unwrap();
         rt.expect_emitted_event(event);
     }
 
     #[test]
     pub fn test_add_object() {
+        setup_logs();
         let (rt, origin) = get_runtime();
 
         // Add an object
@@ -461,7 +508,7 @@ mod tests {
         };
         rt.expect_validate_caller_any();
         let state = rt.state::<State>().unwrap();
-        let sub_id = get_blob_id(&state, key).unwrap();
+        let sub_id = get_blob_id(&state, &key).unwrap();
         rt.expect_send_simple(
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
@@ -517,7 +564,7 @@ mod tests {
         };
         rt.expect_validate_caller_any();
         let state = rt.state::<State>().unwrap();
-        let sub_id = get_blob_id(&state, key).unwrap();
+        let sub_id = get_blob_id(&state, &key).unwrap();
         rt.expect_send_simple(
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
@@ -624,7 +671,7 @@ mod tests {
         };
         rt.expect_validate_caller_any();
         let state = rt.state::<State>().unwrap();
-        let sub_id = get_blob_id(&state, key).unwrap();
+        let sub_id = get_blob_id(&state, &key).unwrap();
         rt.expect_send_simple(
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
@@ -704,7 +751,7 @@ mod tests {
         };
         rt.expect_validate_caller_any();
         let state = rt.state::<State>().unwrap();
-        let sub_id = get_blob_id(&state, key.clone()).unwrap();
+        let sub_id = get_blob_id(&state, &key).unwrap();
         rt.expect_send_simple(
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
@@ -756,6 +803,7 @@ mod tests {
             None,
             ExitCode::OK,
         );
+        expect_emitted_delete_event(&rt, &delete_params, add_params.hash);
         let result_delete = rt.call::<Actor>(
             Method::DeleteObject as u64,
             IpldBlock::serialize_cbor(&delete_params).unwrap(),
@@ -804,7 +852,7 @@ mod tests {
         };
         rt.expect_validate_caller_any();
         let state = rt.state::<State>().unwrap();
-        let sub_id = get_blob_id(&state, key.clone()).unwrap();
+        let sub_id = get_blob_id(&state, &key).unwrap();
         rt.expect_send_simple(
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
@@ -910,7 +958,7 @@ mod tests {
         };
         rt.expect_validate_caller_any();
         let state = rt.state::<State>().unwrap();
-        let sub_id = get_blob_id(&state, key.clone()).unwrap();
+        let sub_id = get_blob_id(&state, &key).unwrap();
         rt.expect_send_simple(
             BLOBS_ACTOR_ADDR,
             BlobMethod::AddBlob as MethodNum,
@@ -949,7 +997,7 @@ mod tests {
         // Update metadata
         let update_object_params = UpdateObjectMetadataParams {
             from: origin,
-            key: add_params.key,
+            key: add_params.key.clone(),
             metadata: HashMap::from([
                 ("foo".into(), Some("zar".into())),
                 ("foo2".into(), None),
@@ -957,6 +1005,15 @@ mod tests {
             ]),
         };
         rt.expect_validate_caller_any();
+        let event = to_actor_event(
+            object_metadata_updated(
+                add_params.key,
+                &HashMap::from([("foo".into(), "zar".into()), ("foo3".into(), "bar".into())]),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        rt.expect_emitted_event(event);
         let result = rt.call::<Actor>(
             Method::UpdateObjectMetadata as u64,
             IpldBlock::serialize_cbor(&update_object_params).unwrap(),
@@ -987,7 +1044,7 @@ mod tests {
         };
         rt.expect_send(
             BLOBS_ACTOR_ADDR,
-            GetCreditApproval as MethodNum,
+            BlobMethod::GetCreditApproval as MethodNum,
             IpldBlock::serialize_cbor(&GetCreditApprovalParams {
                 from: origin,
                 to: alien_id_addr,
@@ -1007,13 +1064,13 @@ mod tests {
         assert!(result.is_err());
         rt.verify();
 
-        // Allow if has delegation though
+        // Allowed if there is a delegation
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, alien_id_addr);
         rt.set_origin(alien_id_addr);
         rt.expect_validate_caller_any();
         rt.expect_send(
             BLOBS_ACTOR_ADDR,
-            GetCreditApproval as MethodNum,
+            BlobMethod::GetCreditApproval as MethodNum,
             IpldBlock::serialize_cbor(&GetCreditApprovalParams {
                 from: origin,
                 to: alien_id_addr,
@@ -1034,6 +1091,15 @@ mod tests {
             ExitCode::OK,
             None,
         );
+        let event = to_actor_event(
+            object_metadata_updated(
+                alien_update.key.clone(),
+                &HashMap::from([("foo".into(), "zar".into()), ("foo3".into(), "bar".into())]),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        rt.expect_emitted_event(event);
         let result = rt.call::<Actor>(
             Method::UpdateObjectMetadata as u64,
             IpldBlock::serialize_cbor(&alien_update).unwrap(),
@@ -1042,7 +1108,7 @@ mod tests {
         rt.verify();
 
         // Get the object and check metadata
-        let sub_id = get_blob_id(&state, key.clone()).unwrap();
+        let sub_id = get_blob_id(&state, &key).unwrap();
         let blob = Blob {
             size: add_params.size,
             subscribers: HashMap::from([(

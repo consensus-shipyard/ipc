@@ -16,8 +16,8 @@ fendermint_actor_blobs_shared = { path = "../blobs/shared" }
 fil_actors_runtime = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true }
-log = { workspace = true, features = ["std"] }
 num-traits = { workspace = true }
+recall_sol_facade = { workspace = true, features = ["config"] }
 serde = { workspace = true, features = ["derive"] }
 
 fendermint_actor_recall_config_shared = { path = "../recall_config/shared" }

@@ -516,7 +516,7 @@ impl State {
                 key.hash,
                 key.id.clone(),
             ) {
-                Ok(from_disc) => {
+                Ok((from_disc, _)) => {
                     num_deleted += 1;
                     if from_disc {
                         delete_from_disc.insert(key.hash);
@@ -1137,7 +1137,7 @@ impl State {
         current_epoch: ChainEpoch,
         hash: Hash,
         id: SubscriptionId,
-    ) -> anyhow::Result<bool, ActorError> {
+    ) -> anyhow::Result<(bool, u64), ActorError> {
         // Get or create a new account
         let mut accounts = self.accounts.hamt(store)?;
         let mut account = accounts.get_or_err(&subscriber)?;
@@ -1153,7 +1153,7 @@ impl State {
             // However, the system may have already deleted the blob due to expiration or
             // insufficient funds.
             // We could use a custom error code, but this is easier.
-            return Ok(false);
+            return Ok((false, 0));
         };
         let num_subscribers = blob.subscribers.len();
         let group =
@@ -1260,8 +1260,8 @@ impl State {
         }
         // Account for reclaimed size and move committed credit to free credit
         // If blob failed, capacity and committed credits have already been returned
+        let size = blob.size;
         if !matches!(blob.status, BlobStatus::Failed) && !sub.failed {
-            let size = blob.size;
             // If there's no new group expiry, we can reclaim capacity.
             if new_group_expiry.is_none() {
                 account.capacity_used -= &size;
@@ -1280,7 +1280,7 @@ impl State {
                             - new_group_expiry.map_or(account.last_debit_epoch, |e| {
                                 e.max(account.last_debit_epoch)
                             }),
-                        &blob.size,
+                        &size,
                     ));
                     self.credit_committed -= &reclaim_credits;
                     account.credit_committed -= &reclaim_credits;
@@ -1318,10 +1318,10 @@ impl State {
         )?;
         // Remove the source from the added queue
         self.added
-            .remove_source(store, hash, (subscriber, id.clone(), sub.source), blob.size)?;
+            .remove_source(store, hash, (subscriber, id.clone(), sub.source), size)?;
         // Remove the source from the pending queue
         self.pending
-            .remove_source(store, hash, (subscriber, id.clone(), sub.source), blob.size)?;
+            .remove_source(store, hash, (subscriber, id.clone(), sub.source), size)?;
         // Delete subscription
         group.subscriptions.remove(&id.to_string());
         debug!(
@@ -1348,7 +1348,7 @@ impl State {
         // Save accounts
         accounts.set(&subscriber, account)?;
         self.accounts.save_tracked(accounts.flush_tracked()?);
-        Ok(delete_blob)
+        Ok((delete_blob, size))
     }
 
     /// Return available capacity as a difference between `blob_capacity_total` and `capacity_used`.
@@ -1389,14 +1389,15 @@ impl State {
                         if sub.expiry - sub.added > new_ttl {
                             if new_ttl == 0 {
                                 // Delete subscription
-                                if self.delete_blob(
+                                let (from_disc, _) = self.delete_blob(
                                     store,
                                     subscriber,
                                     subscriber,
                                     current_epoch,
                                     hash,
                                     SubscriptionId::new(&id.clone())?,
-                                )? {
+                                )?;
+                                if from_disc {
                                     deleted_blobs.push(hash);
                                 };
                             } else {
@@ -2796,8 +2797,9 @@ mod tests {
         let delete_epoch = ChainEpoch::from(51);
         let res = state.delete_blob(&store, origin, subscriber, delete_epoch, hash, id1.clone());
         assert!(res.is_ok());
-        let delete_from_disk = res.unwrap();
+        let (delete_from_disk, deleted_size) = res.unwrap();
         assert!(!delete_from_disk);
+        assert_eq!(deleted_size, size);
 
         // Check the blob
         let blob = state.get_blob(&store, hash).unwrap().unwrap();
@@ -3382,7 +3384,7 @@ mod tests {
 
         // Delete the first blob
         let delete_epoch = ChainEpoch::from(config.blob_min_ttl + 20);
-        let delete_from_disc = state
+        let (delete_from_disc, deleted_size) = state
             .delete_blob(
                 &store,
                 origin,
@@ -3393,6 +3395,7 @@ mod tests {
             )
             .unwrap();
         assert!(delete_from_disc);
+        assert_eq!(size1, deleted_size);
 
         // Check stats
         let stats = state.get_stats(config, TokenAmount::zero());

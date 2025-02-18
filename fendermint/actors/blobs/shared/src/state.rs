@@ -31,6 +31,10 @@ impl TokenCreditRate {
     pub fn from(rate: impl Into<BigInt>) -> Self {
         Self { rate: rate.into() }
     }
+
+    pub fn rate(&self) -> &BigInt {
+        &self.rate
+    }
 }
 
 impl fmt::Display for TokenCreditRate {

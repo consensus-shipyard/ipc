@@ -3,14 +3,17 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use fendermint_actor_blobs_shared::state::Hash;
+use fendermint_actor_machine::events::emit_evm_event;
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
     runtime::{ActorCode, Runtime},
     ActorError, FIRST_EXPORTED_METHOD_NUMBER, SYSTEM_ACTOR_ADDR,
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
-use fvm_shared::address::Address;
-use fvm_shared::MethodNum;
+use fvm_shared::{address::Address, MethodNum};
+use recall_sol_facade::blob_reader::{
+    read_request_closed, read_request_opened, read_request_pending,
+};
 
 use crate::shared::{
     CloseReadRequestParams, GetOpenReadRequestsParams, GetReadRequestStatusParams, Method,
@@ -37,7 +40,8 @@ impl ReadReqActor {
         params: OpenReadRequestParams,
     ) -> Result<Hash, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        rt.transaction(|st: &mut State, _rt| {
+
+        let id = rt.transaction(|st: &mut State, _rt| {
             st.open_read_request(
                 params.hash,
                 params.offset,
@@ -45,7 +49,21 @@ impl ReadReqActor {
                 params.callback_addr,
                 params.callback_method,
             )
-        })
+        })?;
+
+        emit_evm_event(
+            rt,
+            read_request_opened(
+                &id.0,
+                &params.hash.0,
+                params.offset as u64,
+                params.len as u64,
+                params.callback_addr,
+                params.callback_method,
+            ),
+        )?;
+
+        Ok(id)
     }
 
     fn get_open_read_requests(
@@ -70,7 +88,10 @@ impl ReadReqActor {
         params: CloseReadRequestParams,
     ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        rt.transaction(|st: &mut State, _| st.close_read_request(params.0))
+
+        rt.transaction(|st: &mut State, _| st.close_read_request(params.0))?;
+
+        emit_evm_event(rt, read_request_closed(&params.0 .0))
     }
 
     fn set_read_request_pending(
@@ -78,7 +99,10 @@ impl ReadReqActor {
         params: SetReadRequestPendingParams,
     ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        rt.transaction(|st: &mut State, _| st.set_read_request_pending(params.0))
+
+        rt.transaction(|st: &mut State, _| st.set_read_request_pending(params.0))?;
+
+        emit_evm_event(rt, read_request_pending(&params.0 .0))
     }
 
     /// Fallback method for unimplemented method numbers.
@@ -118,13 +142,12 @@ impl ActorCode for ReadReqActor {
 mod tests {
     use super::*;
 
+    use fendermint_actor_machine::events::to_actor_event;
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::test_utils::{
         expect_empty, MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, SYSTEM_ACTOR_CODE_ID,
     };
-    use fil_actors_runtime::SYSTEM_ACTOR_ADDR;
     use fvm_ipld_encoding::ipld_block::IpldBlock;
-    use fvm_shared::address::Address;
     use rand::RngCore;
 
     pub fn new_hash(size: usize) -> (Hash, u64) {
@@ -151,6 +174,32 @@ mod tests {
         rt.verify();
         rt.reset();
         rt
+    }
+
+    fn expect_emitted_open_event(rt: &MockRuntime, params: &OpenReadRequestParams, id: &Hash) {
+        let event = to_actor_event(
+            read_request_opened(
+                &id.0,
+                &params.hash.0,
+                params.offset as u64,
+                params.len as u64,
+                params.callback_addr,
+                params.callback_method,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        rt.expect_emitted_event(event);
+    }
+
+    fn expect_emitted_pending_event(rt: &MockRuntime, params: &SetReadRequestPendingParams) {
+        let event = to_actor_event(read_request_pending(&params.0 .0).unwrap()).unwrap();
+        rt.expect_emitted_event(event);
+    }
+
+    fn expect_emitted_closed_event(rt: &MockRuntime, params: &CloseReadRequestParams) {
+        let event = to_actor_event(read_request_closed(&params.0 .0).unwrap()).unwrap();
+        rt.expect_emitted_event(event);
     }
 
     #[test]
@@ -183,6 +232,8 @@ mod tests {
             callback_addr: f4_eth_addr,
             callback_method,
         };
+        let expected_id = Hash::from(1);
+        expect_emitted_open_event(&rt, &open_params, &expected_id);
         let request_id = rt
             .call::<ReadReqActor>(
                 Method::OpenReadRequest as u64,
@@ -237,6 +288,7 @@ mod tests {
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
         let pending_params = SetReadRequestPendingParams(request_id);
+        expect_emitted_pending_event(&rt, &pending_params);
         let result = rt.call::<ReadReqActor>(
             Method::SetReadRequestPending as u64,
             IpldBlock::serialize_cbor(&pending_params).unwrap(),
@@ -264,6 +316,7 @@ mod tests {
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
         let close_params = CloseReadRequestParams(request_id);
+        expect_emitted_closed_event(&rt, &close_params);
         let result = rt.call::<ReadReqActor>(
             Method::CloseReadRequest as u64,
             IpldBlock::serialize_cbor(&close_params).unwrap(),
@@ -313,7 +366,7 @@ mod tests {
         assert!(result.is_err());
         rt.verify();
 
-        // Test closing request with with non system caller
+        // Test closing request with the non-system caller
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
         let result = rt.call::<ReadReqActor>(

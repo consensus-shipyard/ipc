@@ -21,7 +21,7 @@ pub struct RecallConfigTracker {
     pub blob_capacity: u64,
     /// The token to credit rate.
     pub token_credit_rate: TokenCreditRate,
-    /// Block interval at which to debit all credit accounts.
+    /// Epoch interval at which to debit all credit accounts.
     pub blob_credit_debit_interval: ChainEpoch,
     /// The minimum epoch duration a blob can be stored.
     pub blob_min_ttl: ChainEpoch,

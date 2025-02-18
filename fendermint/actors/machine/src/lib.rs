@@ -2,19 +2,25 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::collections::HashMap;
+
 pub use fil_actor_adm::Kind;
 use fil_actors_runtime::{
-    actor_error, runtime::builtins::Type, runtime::Runtime, ActorError, ADM_ACTOR_ADDR,
-    FIRST_EXPORTED_METHOD_NUMBER, INIT_ACTOR_ADDR,
+    actor_error, runtime::Runtime, ActorError, ADM_ACTOR_ADDR, FIRST_EXPORTED_METHOD_NUMBER,
+    INIT_ACTOR_ADDR,
 };
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{ipld_block::IpldBlock, tuple::*};
 pub use fvm_shared::METHOD_CONSTRUCTOR;
 use fvm_shared::{address::Address, MethodNum};
+use recall_sol_facade::machine::{machine_created, machine_initialized};
 use serde::{de::DeserializeOwned, Serialize};
-use std::collections::HashMap;
+
+use crate::events::emit_evm_event;
+use crate::util::{to_delegated_address, to_id_address, to_id_and_delegated_address};
 
 pub mod events;
+pub mod util;
 
 /// Params for creating a machine.
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
@@ -39,72 +45,6 @@ pub const GET_ADDRESS_METHOD: MethodNum = frc42_dispatch::method_hash!("GetAddre
 /// Get machine metadata method number.
 pub const GET_METADATA_METHOD: MethodNum = frc42_dispatch::method_hash!("GetMetadata");
 
-/// Returns an error if the address does not match the message origin or caller.
-pub fn require_addr_is_origin_or_caller(
-    rt: &impl Runtime,
-    address: Address,
-) -> Result<(), ActorError> {
-    let address = to_id_address(rt, address, false)?;
-    if address == rt.message().origin() || address == rt.message().caller() {
-        return Ok(());
-    }
-    Err(ActorError::illegal_argument(format!(
-        "address {} does not match origin or caller",
-        address
-    )))
-}
-
-/// Resolves an Account ID Address to its external delegated Address
-pub fn resolve_delegated_address(
-    rt: &impl Runtime,
-    account_address: Address,
-) -> Result<Address, ActorError> {
-    let account_id = rt
-        .resolve_address(&account_address)
-        .ok_or(ActorError::not_found(format!(
-            "actor {} not found",
-            account_address
-        )))?;
-
-    rt.lookup_delegated_address(account_id)
-        .ok_or(ActorError::not_found(format!(
-            "invalid address: actor {} is not delegated",
-            account_address
-        )))
-}
-
-/// Resolves ID address of an actor.
-/// If `require_delegated` is `true`, the address must be of type
-/// EVM (a Solidity contract), EthAccount (an Ethereum-style EOA), or Placeholder (a yet to be
-/// determined EOA or Solidity contract).
-pub fn to_id_address(
-    rt: &impl Runtime,
-    address: Address,
-    require_delegated: bool,
-) -> Result<Address, ActorError> {
-    let actor_id = rt
-        .resolve_address(&address)
-        .ok_or(ActorError::not_found(format!(
-            "actor {} not found",
-            address
-        )))?;
-    if require_delegated {
-        let code_cid = rt.get_actor_code_cid(&actor_id).ok_or_else(|| {
-            ActorError::not_found(format!("actor {} code cid not found", address))
-        })?;
-        if !matches!(
-            rt.resolve_builtin_actor_type(&code_cid),
-            Some(Type::Placeholder | Type::EVM | Type::EthAccount)
-        ) {
-            return Err(ActorError::forbidden(format!(
-                "address {} is not delegated",
-                address,
-            )));
-        }
-    }
-    Ok(Address::new_id(actor_id))
-}
-
 // TODO: Add method for changing owner from ADM actor.
 pub trait MachineActor {
     type State: MachineState + Serialize + DeserializeOwned;
@@ -112,20 +52,25 @@ pub trait MachineActor {
     /// Machine actor constructor.
     fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&INIT_ACTOR_ADDR))?;
-        params.owner.id().map_err(|_| {
-            ActorError::illegal_argument("machine owner address must be an ID address".into())
-        })?;
-        let state = Self::State::new(rt.store(), params.owner, params.metadata)?;
-        rt.create(&state)
+
+        let (id_addr, delegated_addr) = to_id_and_delegated_address(rt, params.owner)?;
+        let event = machine_created(delegated_addr, &params.metadata);
+
+        let state = Self::State::new(rt.store(), id_addr, params.metadata)?;
+        rt.create(&state)?;
+
+        emit_evm_event(rt, event)
     }
 
     /// Initializes the machine with its ID address.
     fn init(rt: &impl Runtime, params: InitParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&ADM_ACTOR_ADDR))?;
-        params.address.id().map_err(|_| {
-            ActorError::illegal_argument("machine address must be an ID address".into())
-        })?;
-        rt.transaction(|st: &mut Self::State, _| st.init(params.address))
+
+        let id_addr = to_id_address(rt, params.address, false)?;
+
+        rt.transaction(|st: &mut Self::State, _| st.init(id_addr))?;
+
+        emit_evm_event(rt, machine_initialized(id_addr))
     }
 
     /// Get machine robust address.
@@ -140,7 +85,7 @@ pub trait MachineActor {
         rt.validate_immediate_caller_accept_any()?;
         let st = rt.state::<Self::State>()?;
         let owner = st.owner();
-        let address = resolve_delegated_address(rt, owner).unwrap_or(owner);
+        let address = to_delegated_address(rt, owner).unwrap_or(owner);
         Ok(Metadata {
             owner: address,
             kind: st.kind(),

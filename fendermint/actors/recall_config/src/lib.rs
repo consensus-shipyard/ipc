@@ -3,18 +3,22 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use fendermint_actor_blobs_shared::state::TokenCreditRate;
-use fendermint_actor_machine::to_id_address;
+use fendermint_actor_machine::{
+    events::emit_evm_event,
+    util::{to_delegated_address, to_id_and_delegated_address},
+};
 use fendermint_actor_recall_config_shared::{
     Method, RecallConfig, SetAdminParams, SetConfigParams,
 };
-use fil_actors_runtime::actor_error;
-use fil_actors_runtime::runtime::{ActorCode, Runtime};
-use fil_actors_runtime::SYSTEM_ACTOR_ADDR;
-use fil_actors_runtime::{actor_dispatch, ActorError};
+use fil_actors_runtime::{
+    actor_dispatch, actor_error,
+    runtime::{ActorCode, Runtime},
+    ActorError, SYSTEM_ACTOR_ADDR,
+};
 use fvm_ipld_encoding::tuple::*;
-use fvm_shared::address::Address;
-use fvm_shared::bigint::BigInt;
-use fvm_shared::clock::ChainEpoch;
+use fvm_shared::{address::Address, clock::ChainEpoch};
+use num_traits::Signed;
+use recall_sol_facade::config::{config_admin_set, config_set};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
@@ -59,56 +63,63 @@ impl Actor {
 
     fn set_admin(rt: &impl Runtime, params: SetAdminParams) -> Result<(), ActorError> {
         Self::ensure_update_allowed(rt)?;
-        let new_admin = to_id_address(rt, params.0, false)?;
+
+        let (admin_id_addr, admin_delegated_addr) = to_id_and_delegated_address(rt, params.0)?;
+
         rt.transaction(|st: &mut State, _rt| {
-            st.admin = Some(new_admin);
+            st.admin = Some(admin_id_addr);
             Ok(())
-        })
+        })?;
+
+        emit_evm_event(rt, config_admin_set(admin_delegated_addr))?;
+
+        Ok(())
     }
 
     fn get_admin(rt: &impl Runtime) -> Result<Option<Address>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        rt.state::<State>().map(|s| s.admin)
+        match rt.state::<State>().map(|s| s.admin)? {
+            Some(admin) => {
+                let admin = to_delegated_address(rt, admin)?;
+                Ok(Some(admin))
+            }
+            None => Ok(None),
+        }
     }
 
     fn set_config(rt: &impl Runtime, params: SetConfigParams) -> Result<(), ActorError> {
         let admin_exists = Self::ensure_update_allowed(rt)?;
 
-        if params.token_credit_rate <= TokenCreditRate::from(BigInt::from(0)) {
+        if !params.token_credit_rate.rate().is_positive() {
             return Err(actor_error!(
                 illegal_argument,
                 "token credit rate must be positive"
             ));
         }
-
         if params.blob_capacity == 0 {
             return Err(actor_error!(
                 illegal_argument,
                 "blob capacity must be positive"
             ));
         }
-
         if params.blob_credit_debit_interval <= 0 {
             return Err(actor_error!(
                 illegal_argument,
                 "credit debit interval must be positive"
             ));
         }
-
         if params.blob_min_ttl <= 0 {
             return Err(actor_error!(
                 illegal_argument,
                 "minimum TTL must be positive"
             ));
         }
-
         if params.blob_default_ttl <= 0 {
             return Err(actor_error!(
                 illegal_argument,
                 "default TTL must be positive"
             ));
         }
-
         if params.blob_default_ttl < params.blob_min_ttl {
             return Err(actor_error!(
                 illegal_argument,
@@ -116,20 +127,39 @@ impl Actor {
             ));
         }
 
-        let new_admin = if !admin_exists {
+        let (admin_id_addr, admin_delegated_addr) = if !admin_exists {
             // The first caller becomes admin
-            let new_admin = to_id_address(rt, rt.message().caller(), false)?;
-            Some(new_admin)
+            let addrs = to_id_and_delegated_address(rt, rt.message().caller())?;
+            (Some(addrs.0), Some(addrs.1))
         } else {
-            None
+            (None, None)
         };
+
         rt.transaction(|st: &mut State, _rt| {
-            if let Some(new_admin) = new_admin {
-                st.admin = Some(new_admin);
+            if let Some(admin) = admin_id_addr {
+                st.admin = Some(admin);
             }
-            st.config = params;
+            st.config = params.clone();
             Ok(())
         })?;
+
+        if let Some(admin) = admin_delegated_addr {
+            emit_evm_event(rt, config_admin_set(admin))?;
+        }
+        emit_evm_event(
+            rt,
+            config_set(
+                params.blob_capacity,
+                params
+                    .token_credit_rate
+                    .rate()
+                    .to_biguint()
+                    .unwrap_or_default(),
+                params.blob_credit_debit_interval as u64,
+                params.blob_min_ttl as u64,
+                params.blob_default_ttl as u64,
+            ),
+        )?;
 
         Ok(())
     }
@@ -180,22 +210,21 @@ impl ActorCode for Actor {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Actor, ConstructorParams, Method};
-    use fendermint_actor_blobs_shared::state::TokenCreditRate;
+    use super::*;
+
+    use fendermint_actor_machine::events::to_actor_event;
     use fendermint_actor_recall_config_shared::{RecallConfig, RECALL_CONFIG_ACTOR_ID};
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::test_utils::{
         expect_empty, MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, SYSTEM_ACTOR_CODE_ID,
     };
-    use fil_actors_runtime::SYSTEM_ACTOR_ADDR;
     use fvm_ipld_encoding::ipld_block::IpldBlock;
-    use fvm_shared::address::Address;
     use fvm_shared::bigint::BigInt;
-    use fvm_shared::clock::ChainEpoch;
+    use fvm_shared::error::ExitCode;
 
     pub fn construct_and_verify(
-        token_credit_rate: TokenCreditRate,
         blob_capacity: u64,
+        token_credit_rate: TokenCreditRate,
         blob_credit_debit_interval: i32,
         initial_blob_min_ttl: ChainEpoch,
         initial_blob_default_ttl: ChainEpoch,
@@ -212,8 +241,8 @@ mod tests {
             .call::<Actor>(
                 Method::Constructor as u64,
                 IpldBlock::serialize_cbor(&ConstructorParams {
-                    initial_token_credit_rate: token_credit_rate,
                     initial_blob_capacity: blob_capacity,
+                    initial_token_credit_rate: token_credit_rate,
                     initial_blob_credit_debit_interval: ChainEpoch::from(
                         blob_credit_debit_interval,
                     ),
@@ -231,36 +260,32 @@ mod tests {
     }
 
     #[test]
-    fn test_get_config() {
+    fn test_get_initial_admin() {
         let rt = construct_and_verify(
-            TokenCreditRate::from(BigInt::from(5)),
             1024,
+            TokenCreditRate::from(BigInt::from(5)),
             3600,
             3600,
             3600,
         );
 
         rt.expect_validate_caller_any();
-        let recall_config = rt
-            .call::<Actor>(Method::GetConfig as u64, None)
+        let admin = rt
+            .call::<Actor>(Method::GetAdmin as u64, None)
             .unwrap()
             .unwrap()
-            .deserialize::<RecallConfig>()
+            .deserialize::<Option<Address>>()
             .unwrap();
+        rt.verify();
 
-        assert_eq!(
-            recall_config.token_credit_rate,
-            TokenCreditRate::from(BigInt::from(5))
-        );
-        assert_eq!(recall_config.blob_capacity, 1024);
-        assert_eq!(recall_config.blob_credit_debit_interval, 3600);
+        assert!(admin.is_none());
     }
 
     #[test]
-    fn test_set_config() {
+    fn test_set_admin() {
         let rt = construct_and_verify(
-            TokenCreditRate::from(BigInt::from(5)),
             1024,
+            TokenCreditRate::from(BigInt::from(5)),
             3600,
             3600,
             3600,
@@ -271,23 +296,164 @@ mod tests {
             "CAFEB0BA00000000000000000000000000000000"
         ));
         let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
-
         rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
-        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
 
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.expect_validate_caller_any();
+        let event = to_actor_event(config_admin_set(f4_eth_addr).unwrap()).unwrap();
+        rt.expect_emitted_event(event);
+        let params = SetAdminParams(f4_eth_addr);
         let result = rt.call::<Actor>(
-            Method::SetConfig as u64,
-            IpldBlock::serialize_cbor(&RecallConfig {
-                blob_capacity: 2048,
-                token_credit_rate: TokenCreditRate::from(BigInt::from(10)),
-                blob_credit_debit_interval: ChainEpoch::from(1800),
-                blob_min_ttl: ChainEpoch::from(2 * 60 * 60),
-                blob_default_ttl: ChainEpoch::from(24 * 60 * 60),
-            })
-            .unwrap(),
+            Method::SetAdmin as u64,
+            IpldBlock::serialize_cbor(&params).unwrap(),
         );
         assert!(result.is_ok());
+        rt.verify();
+
+        rt.expect_validate_caller_any();
+        let admin = rt
+            .call::<Actor>(Method::GetAdmin as u64, None)
+            .unwrap()
+            .unwrap()
+            .deserialize::<Option<Address>>()
+            .unwrap();
+        rt.verify();
+
+        assert_eq!(admin, Some(f4_eth_addr));
+
+        // Reset admin
+        let new_id_addr = Address::new_id(111);
+        let new_eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000001"
+        ));
+        let new_f4_eth_addr = Address::new_delegated(10, &new_eth_addr.0).unwrap();
+        rt.set_delegated_address(new_id_addr.id().unwrap(), new_f4_eth_addr);
+
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr); // current admin
+        rt.expect_validate_caller_addr(vec![id_addr]);
+        let event = to_actor_event(config_admin_set(new_f4_eth_addr).unwrap()).unwrap();
+        rt.expect_emitted_event(event);
+        let params = SetAdminParams(new_f4_eth_addr);
+        let result = rt.call::<Actor>(
+            Method::SetAdmin as u64,
+            IpldBlock::serialize_cbor(&params).unwrap(),
+        );
+        assert!(result.is_ok());
+        rt.verify();
+
+        rt.expect_validate_caller_any();
+        let admin = rt
+            .call::<Actor>(Method::GetAdmin as u64, None)
+            .unwrap()
+            .unwrap()
+            .deserialize::<Option<Address>>()
+            .unwrap();
+        rt.verify();
+
+        assert_eq!(admin, Some(new_f4_eth_addr));
+    }
+
+    #[test]
+    fn test_set_admin_unauthorized() {
+        let rt = construct_and_verify(
+            1024,
+            TokenCreditRate::from(BigInt::from(5)),
+            3600,
+            3600,
+            3600,
+        );
+
+        let id_addr = Address::new_id(110);
+        let eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000000"
+        ));
+        let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
+        rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
+
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
+        rt.expect_validate_caller_any();
+        let event = to_actor_event(config_admin_set(f4_eth_addr).unwrap()).unwrap();
+        rt.expect_emitted_event(event);
+        let params = SetAdminParams(f4_eth_addr);
+        let result = rt.call::<Actor>(
+            Method::SetAdmin as u64,
+            IpldBlock::serialize_cbor(&params).unwrap(),
+        );
+        assert!(result.is_ok());
+        rt.verify();
+
+        // Try to set again with a different caller
+        let unauthorized_id_addr = Address::new_id(111);
+        let unauthorized_eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000001"
+        ));
+        let unauthorized_f4_eth_addr =
+            Address::new_delegated(10, &unauthorized_eth_addr.0).unwrap();
+        rt.set_delegated_address(unauthorized_id_addr.id().unwrap(), unauthorized_f4_eth_addr);
+
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, unauthorized_id_addr); // unauthorized caller
+        rt.expect_validate_caller_addr(vec![id_addr]); // expect current admin
+        let params = SetAdminParams(unauthorized_f4_eth_addr);
+        let result = rt.call::<Actor>(
+            Method::SetAdmin as u64,
+            IpldBlock::serialize_cbor(&params).unwrap(),
+        );
+        rt.verify();
+
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().exit_code(), ExitCode::USR_FORBIDDEN);
+    }
+
+    #[test]
+    fn test_set_config() {
+        let rt = construct_and_verify(
+            1024,
+            TokenCreditRate::from(BigInt::from(5)),
+            3600,
+            3600,
+            3600,
+        );
+
+        let id_addr = Address::new_id(110);
+        let eth_addr = EthAddress(hex_literal::hex!(
+            "CAFEB0BA00000000000000000000000000000000"
+        ));
+        let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
+        rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
+
+        rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
+        rt.expect_validate_caller_any();
+        let event = to_actor_event(config_admin_set(f4_eth_addr).unwrap()).unwrap();
+        rt.expect_emitted_event(event);
+        let params = RecallConfig {
+            blob_capacity: 2048,
+            token_credit_rate: TokenCreditRate::from(BigInt::from(10)),
+            blob_credit_debit_interval: ChainEpoch::from(1800),
+            blob_min_ttl: ChainEpoch::from(2 * 60 * 60),
+            blob_default_ttl: ChainEpoch::from(24 * 60 * 60),
+        };
+        let event = to_actor_event(
+            config_set(
+                params.blob_capacity,
+                params
+                    .token_credit_rate
+                    .rate()
+                    .to_biguint()
+                    .unwrap_or_default(),
+                params.blob_credit_debit_interval as u64,
+                params.blob_min_ttl as u64,
+                params.blob_default_ttl as u64,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        rt.expect_emitted_event(event);
+        let result = rt.call::<Actor>(
+            Method::SetConfig as u64,
+            IpldBlock::serialize_cbor(&params).unwrap(),
+        );
+        assert!(result.is_ok());
+        rt.verify();
 
         rt.expect_validate_caller_any();
         let recall_config = rt
@@ -296,18 +462,30 @@ mod tests {
             .unwrap()
             .deserialize::<RecallConfig>()
             .unwrap();
+        rt.verify();
 
+        assert_eq!(recall_config.blob_capacity, 2048);
         assert_eq!(
             recall_config.token_credit_rate,
             TokenCreditRate::from(BigInt::from(10))
         );
-        assert_eq!(recall_config.blob_capacity, 2048);
         assert_eq!(recall_config.blob_credit_debit_interval, 1800);
         assert_eq!(recall_config.blob_min_ttl, ChainEpoch::from(2 * 60 * 60));
         assert_eq!(
             recall_config.blob_default_ttl,
             ChainEpoch::from(24 * 60 * 60)
         );
+
+        rt.expect_validate_caller_any();
+        let admin = rt
+            .call::<Actor>(Method::GetAdmin as u64, None)
+            .unwrap()
+            .unwrap()
+            .deserialize::<Option<Address>>()
+            .unwrap();
+        rt.verify();
+
+        assert_eq!(admin, Some(f4_eth_addr));
     }
 
     #[test]
@@ -404,8 +582,8 @@ mod tests {
         ];
 
         let rt = construct_and_verify(
-            TokenCreditRate::from(BigInt::from(5)),
             1024,
+            TokenCreditRate::from(BigInt::from(5)),
             3600,
             3600,
             3600,
@@ -416,8 +594,8 @@ mod tests {
             "CAFEB0BA00000000000000000000000000000000"
         ));
         let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
-
         rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
+
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
 
         // Now test all invalid configurations
@@ -427,11 +605,41 @@ mod tests {
                 Method::SetConfig as u64,
                 IpldBlock::serialize_cbor(&test_case.config).unwrap(),
             );
+            rt.verify();
             assert!(
                 result.is_err(),
                 "expected case \"{}\" to fail but it succeeded",
                 test_case.name
             );
         }
+    }
+
+    #[test]
+    fn test_get_config() {
+        let rt = construct_and_verify(
+            1024,
+            TokenCreditRate::from(BigInt::from(5)),
+            3600,
+            3600,
+            3600,
+        );
+
+        rt.expect_validate_caller_any();
+        let recall_config = rt
+            .call::<Actor>(Method::GetConfig as u64, None)
+            .unwrap()
+            .unwrap()
+            .deserialize::<RecallConfig>()
+            .unwrap();
+        rt.verify();
+
+        assert_eq!(recall_config.blob_capacity, 1024);
+        assert_eq!(
+            recall_config.token_credit_rate,
+            TokenCreditRate::from(BigInt::from(5))
+        );
+        assert_eq!(recall_config.blob_credit_debit_interval, 3600);
+        assert_eq!(recall_config.blob_min_ttl, 3600);
+        assert_eq!(recall_config.blob_default_ttl, 3600);
     }
 }

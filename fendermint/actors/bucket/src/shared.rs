@@ -20,6 +20,7 @@ pub const BUCKET_ACTOR_NAME: &str = "bucket";
 pub const MAX_METADATA_ENTRIES: u32 = 20;
 pub const MAX_METADATA_KEY_SIZE: u32 = 32;
 pub const MAX_METADATA_VALUE_SIZE: u32 = 128;
+
 #[derive(FromPrimitive)]
 #[repr(u64)]
 pub enum Method {

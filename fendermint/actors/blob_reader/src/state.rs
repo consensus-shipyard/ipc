@@ -4,13 +4,13 @@
 
 use std::collections::HashMap;
 
+use fendermint_actor_blobs_shared::state::Hash;
 use fil_actors_runtime::ActorError;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::{address::Address, MethodNum};
 use log::info;
 
 use crate::shared::{ReadRequest, ReadRequestStatus};
-use fendermint_actor_blobs_shared::state::Hash;
 
 const MAX_READ_REQUEST_LEN: u32 = 1024 * 1024; // 1MB
 
