@@ -67,21 +67,27 @@ impl Manifest {
             })?;
 
         let manifest_str = fs::read_to_string(path)
-            .with_context(|| format!("failed to read manifest from {}", path.to_string_lossy()))?;
+            .with_context(|| format!("failed to read manifest from '{}'", path.display()))?;
+
+        let parse_err = |format_name: &str| {
+            format!("failed to parse {} from '{}'", format_name, path.display())
+        };
 
         let mut manifest: Manifest = match ext.as_str() {
-            "yaml" => {
-                serde_yaml::from_str(&manifest_str).context("failed to parse manifest YAML")?
-            }
-            "json" => {
-                serde_json::from_str(&manifest_str).context("failed to parse manifest JSON")?
-            }
-            "toml" => toml::from_str(&manifest_str).context("failed to parse manifest TOML")?,
-            other => bail!("unknown manifest format: {}", other),
+            "yaml" => serde_yaml::from_str(&manifest_str).with_context(|| parse_err("YAML"))?,
+            "json" => serde_json::from_str(&manifest_str).with_context(|| parse_err("JSON"))?,
+            "toml" => toml::from_str(&manifest_str).with_context(|| parse_err("TOML"))?,
+            other => bail!("Unknown manifest format: {}", other),
         };
 
         // Post-process step: load the Fendermint configs if they are just `Path` variants.
-        let base_dir = path.parent().unwrap_or_else(|| std::path::Path::new("."));
+        let base_dir = path.parent().ok_or_else(|| {
+            anyhow::anyhow!(
+                "no parent directory for '{}'. This usually means the path is '/'",
+                path.display()
+            )
+        })?;
+
         manifest
             .load_all_fendermint_configs(base_dir)
             .context("failed to load Fendermint configs")?;
