@@ -6,3 +6,5 @@ node_modules/
 # we migrated from npm to pnpm.
 package-lock.json
 .vscode
+
+.pnpm-store
