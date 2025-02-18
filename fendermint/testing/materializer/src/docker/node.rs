@@ -4,10 +4,13 @@
 use std::{
     collections::BTreeMap,
     fmt::Display,
+    io,
     path::{Path, PathBuf},
     str::FromStr,
     time::{Duration, Instant},
 };
+
+use tokio::try_join;
 
 use anyhow::{anyhow, bail, Context};
 use bollard::Docker;
@@ -400,15 +403,20 @@ impl DockerNode {
         let fendermint = match fendermint {
             Some(c) => c,
             None => {
-                let creator = make_runner(
-                    FENDERMINT_IMAGE,
-                    volumes(vec![
-                        (keys_dir.clone(), "/fendermint/keys"),
-                        (fendermint_dir.join("data"), "/fendermint/data"),
-                        (fendermint_dir.join("logs"), "/fendermint/logs"),
-                        (fendermint_dir.join("snapshots"), "/fendermint/snapshots"),
-                    ]),
-                );
+                let mut volume_mappings = vec![
+                    (keys_dir.clone(), "/fendermint/keys"),
+                    (fendermint_dir.join("data"), "/fendermint/data"),
+                    (fendermint_dir.join("logs"), "/fendermint/logs"),
+                    (fendermint_dir.join("snapshots"), "/fendermint/snapshots"),
+                ];
+
+                if let Some(additional_config) = node_config.fendermint_additional_config {
+                    let host_config_path =
+                        write_config_to_disk(additional_config, &fendermint_dir, "dev.toml")?;
+                    volume_mappings.push((host_config_path, "/fendermint/config/dev.toml"));
+                }
+
+                let creator = make_runner(FENDERMINT_IMAGE, volumes(volume_mappings));
 
                 creator
                     .create(
@@ -481,7 +489,7 @@ impl DockerNode {
         })
     }
 
-    pub async fn start(&self, seed_nodes: &[&Self]) -> anyhow::Result<()> {
+    pub async fn start_all_containers(&self, seed_nodes: &[&Self]) -> anyhow::Result<()> {
         let cometbft_seeds = collect_seeds(seed_nodes, |n| {
             let host = &n.cometbft.hostname();
             let id = n.cometbft_node_id()?;
@@ -501,18 +509,20 @@ impl DockerNode {
 
         export_env(self.path.join(DYNAMIC_ENV), &env)?;
 
-        // Start all three containers.
-        self.fendermint.start().await?;
-        self.cometbft.start().await?;
-        if let Some(ref ethapi) = self.ethapi {
-            ethapi.start().await?;
-        }
+        // Start all three containers at the same time.
+        try_join!(self.fendermint.start(), self.cometbft.start(), async {
+            if let Some(ref ethapi) = self.ethapi {
+                ethapi.start().await
+            } else {
+                Ok(())
+            }
+        })?;
 
         Ok(())
     }
 
     /// Allow time for things to consolidate and APIs to start.
-    pub async fn wait_for_started(&self, timeout: Duration) -> anyhow::Result<bool> {
+    pub async fn wait_for_apis_to_start(&self, timeout: Duration) -> anyhow::Result<bool> {
         let start = Instant::now();
 
         loop {
@@ -662,6 +672,22 @@ fn parse_fendermint_peer_id(value: impl AsRef<str>) -> anyhow::Result<String> {
     Ok(value)
 }
 
+// Writes the given TOML configuration to a file under the provided directory.
+// The file will be named as specified by `file_name`.
+// Returns the full path to the written file.
+pub fn write_config_to_disk<P: AsRef<Path>>(
+    config: &toml::Value,
+    directory: P,
+    file_name: &str,
+) -> io::Result<PathBuf> {
+    let target_dir = directory.as_ref();
+    fs::create_dir_all(target_dir)?; // Ensure the directory exists.
+    let file_path = target_dir.join(file_name);
+    let toml_string =
+        toml::to_string_pretty(config).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    fs::write(&file_path, toml_string)?;
+    Ok(file_path)
+}
 #[cfg(test)]
 mod tests {
     use super::{DockerRunner, COMETBFT_IMAGE};
