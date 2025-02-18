@@ -190,6 +190,7 @@ async fn simple_lifecycle() {
 
     let votes = client.query_votes(parent_height2).await.unwrap().unwrap();
     assert_eq!(votes.len(), 1);
+    while client.find_quorum().await.unwrap().is_none() {}
     let r = client.find_quorum().await.unwrap().unwrap();
     assert_eq!(r.payload().parent_height(), parent_height2);
 

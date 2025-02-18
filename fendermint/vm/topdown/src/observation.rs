@@ -29,7 +29,7 @@ pub struct ObservationConfig {
     pub max_observation_range: Option<BlockHeight>,
 }
 
-/// The content that validators gossip among each other.
+/// The parent subnet data fetch through RPC endpoint
 #[derive(Serialize, Deserialize, Hash, Debug, Clone, Eq, PartialEq, Arbitrary)]
 pub struct Observation {
     pub(crate) parent_subnet_height: u64,
@@ -132,7 +132,11 @@ impl CertifiedObservation {
         let (pk2, _) = self.signature.recover(p.as_slice())?;
 
         if pk1 != pk2 {
-            return Err(anyhow!("public keys not aligned"));
+            return Err(anyhow!(
+                "public keys not aligned {}, {}",
+                hex::encode(pk1.serialize()),
+                hex::encode(pk2.serialize())
+            ));
         }
 
         Ok(ValidatorKey::new(pk1))

@@ -30,6 +30,9 @@ pub(crate) struct VoteTally<S> {
 
     /// The quorum threshold ratio required for a quorum
     quorum_ratio: Ratio<Weight>,
+
+    /// The latest observation with a quorum formed
+    latest_quorum_formed: Option<ECDSACertificate<Observation>>,
 }
 
 impl<S: VoteStore> VoteTally<S> {
@@ -46,12 +49,17 @@ impl<S: VoteStore> VoteTally<S> {
                 store.purge_votes_at_height(i)?;
             }
         }
-        Ok(Self {
+
+        let mut s = Self {
             power_table: HashMap::from_iter(power_table),
             votes: store,
             last_finalized_height,
             quorum_ratio: Ratio::new(2, 3),
-        })
+            latest_quorum_formed: None,
+        };
+        s.latest_quorum_formed = s.find_quorum()?;
+
+        Ok(s)
     }
 
     /// Check that a validator key is currently part of the power table.
@@ -160,33 +168,44 @@ impl<S: VoteStore> VoteTally<S> {
 
         self.votes.store_vote(parent_height, vote)?;
 
+        // check if a new quorum is formed with the new vote
+        let is_check_quorum = match self.latest_quorum_formed.as_ref() {
+            // if there is no quorum formed before, trigger finding quorum
+            None => true,
+            // we only check quorum if the incoming vote height is bigger than latest quorum formed,
+            // no point choosing a lower parent height
+            Some(v) => v.payload().parent_height() < parent_height,
+        };
+        if !is_check_quorum {
+            return Ok(true);
+        }
+
+        if let Some(ob) = self.check_quorum_at_height(parent_height)? {
+            self.latest_quorum_formed = Some(ob);
+        }
+
         Ok(true)
+    }
+
+    pub fn get_latest_quorum(&mut self) -> Option<ECDSACertificate<Observation>> {
+        if let Some(ref v) = self.latest_quorum_formed {
+            if self.last_finalized_height < v.payload().parent_height() {
+                return Some(v.clone());
+            }
+        }
+        None
     }
 
     /// Find a block on the (from our perspective) finalized chain that gathered enough votes from validators.
     pub fn find_quorum(&self) -> Result<Option<ECDSACertificate<Observation>>, Error> {
-        let quorum_threshold = self.quorum_threshold();
         let Some(max_height) = self.votes.latest_vote_height()? else {
             tracing::info!("vote store has no vote yet, skip finding quorum");
             return Ok(None);
         };
 
         for h in ((self.last_finalized_height + 1)..=max_height).rev() {
-            let votes = self.votes.get_votes_at_height(h)?;
-
-            for (observation, weight) in votes.observation_weights(&self.power_table) {
-                tracing::info!(
-                    height = h,
-                    observation = observation.to_string(),
-                    weight,
-                    quorum_threshold,
-                    "observation and weight"
-                );
-
-                if weight >= quorum_threshold {
-                    let cert = votes.generate_cert(self.ordered_validators(), observation)?;
-                    return Ok(Some(cert));
-                }
+            if let Some(q) = self.check_quorum_at_height(h)? {
+                return Ok(Some(q));
             }
 
             tracing::info!(height = h, "no quorum found");
@@ -253,6 +272,31 @@ impl<S: VoteStore> VoteTally<S> {
         });
 
         sorted_powers
+    }
+
+    fn check_quorum_at_height(
+        &self,
+        block_height: BlockHeight,
+    ) -> Result<Option<ECDSACertificate<Observation>>, Error> {
+        let quorum_threshold = self.quorum_threshold();
+        let votes = self.votes.get_votes_at_height(block_height)?;
+
+        if let Some((observation, weight)) = votes.max_observation_weight(&self.power_table) {
+            tracing::info!(
+                height = block_height,
+                observation = observation.to_string(),
+                weight,
+                quorum_threshold,
+                "observation and weight"
+            );
+
+            if weight >= quorum_threshold {
+                let cert = votes.generate_cert(self.ordered_validators(), observation)?;
+                return Ok(Some(cert));
+            }
+        }
+
+        Ok(None)
     }
 }
 

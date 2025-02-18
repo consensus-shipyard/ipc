@@ -103,8 +103,11 @@ impl<'a> VoteAgg<'a> {
         self.0.into_values().cloned().collect()
     }
 
-    pub fn observation_weights(&self, power_table: &PowerTable) -> Vec<(&Observation, Weight)> {
-        let mut votes: Vec<(&Observation, Weight)> = Vec::new();
+    pub fn max_observation_weight(
+        &self,
+        power_table: &PowerTable,
+    ) -> Option<(&Observation, Weight)> {
+        let mut votes: HashMap<&Observation, Weight> = HashMap::new();
 
         for (validator, v) in self.0.iter() {
             let power = power_table.get(validator).cloned().unwrap_or(0);
@@ -112,14 +115,14 @@ impl<'a> VoteAgg<'a> {
                 continue;
             }
 
-            if let Some(w) = votes.iter_mut().find(|w| w.0 == v.observation()) {
-                w.1 += power;
-            } else {
-                votes.push((v.observation(), power))
-            }
+            let ob = v.observation();
+            votes.entry(ob).and_modify(|w| *w += power).or_insert(power);
         }
 
         votes
+            .iter()
+            .max_by(|a, b| a.1.cmp(b.1))
+            .map(|(k, v)| (*k, *v))
     }
 
     /// Generate a cert from the ordered validator keys and the target observation as payload
@@ -212,10 +215,11 @@ mod tests {
             .unwrap(),
         );
 
-        let agg = VoteAgg(HashMap::from_iter(votes.iter().map(|v| (v.voter(), v))));
-        let mut weights = agg.observation_weights(&HashMap::from_iter(powers));
-        weights.sort_by(|a, b| a.1.cmp(&b.1));
-
-        assert_eq!(weights, vec![(&observation1, 1), (&observation2, 2),])
+        let agg = VoteAgg(votes.iter().collect());
+        let (ob, weight) = agg
+            .max_observation_weight(&HashMap::from_iter(powers))
+            .unwrap();
+        assert_eq!(ob, &observation2);
+        assert_eq!(weight, 2);
     }
 }
