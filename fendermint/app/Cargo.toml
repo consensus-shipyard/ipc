@@ -66,8 +66,7 @@ fendermint_vm_resolver = { path = "../vm/resolver" }
 fendermint_vm_snapshot = { path = "../vm/snapshot" }
 fendermint_vm_topdown = { path = "../vm/topdown" }
 
-
-
+fs-err = { workspace = true }
 fvm = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
 fvm_ipld_car = { workspace = true }

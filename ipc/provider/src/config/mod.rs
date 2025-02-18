@@ -12,8 +12,8 @@ pub mod serialize;
 #[cfg(test)]
 mod tests;
 
+use fs_err as fs;
 use std::collections::HashMap;
-use std::fs;
 use std::path::Path;
 
 use anyhow::{Context, Result};

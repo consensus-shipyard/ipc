@@ -3,9 +3,10 @@
 // Copyright 2019-2023 ChainSafe Systems
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use fs::{create_dir, File};
+use fs_err as fs;
 use std::{
     fmt::Display,
-    fs::{self, create_dir, File},
     io::{BufReader, BufWriter, ErrorKind, Read, Write},
     path::{Path, PathBuf},
 };

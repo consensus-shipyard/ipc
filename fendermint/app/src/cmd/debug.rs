@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::fs;
 use anyhow::{anyhow, Context};
 use fendermint_app_options::debug::{
     DebugArgs, DebugCommands, DebugExportTopDownEventsArgs, DebugIpcCommands,
@@ -64,7 +65,7 @@ async fn export_topdown_events(args: &DebugExportTopDownEventsArgs) -> anyhow::R
     .context("failed to fetch topdown events")?;
 
     let json = serde_json::to_string_pretty(&events)?;
-    std::fs::write(&args.events_file, json)?;
+    fs::write(&args.events_file, json)?;
 
     Ok(())
 }

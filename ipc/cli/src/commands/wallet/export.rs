@@ -5,6 +5,7 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use base64::{prelude::BASE64_STANDARD, Engine};
 use clap::Args;
+use fs_err as fs;
 use fvm_shared::address::Address;
 use ipc_provider::{lotus::message::wallet::WalletKeyType, IpcProvider, LotusJsonKeyType};
 use ipc_wallet::{EvmKeyStore, PersistentKeyInfo, WalletType};
@@ -82,7 +83,7 @@ impl CommandLineHandler for WalletExport {
 
         match &arguments.output {
             Some(p) => {
-                let mut file = std::fs::File::create(p)?;
+                let mut file = fs::File::create(p)?;
                 file.set_permissions(Permissions::from_mode(0o600))?;
                 file.write_all(v.as_bytes())?;
                 println!(

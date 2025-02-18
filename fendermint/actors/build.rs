@@ -3,6 +3,7 @@
 
 use anyhow::anyhow;
 use fil_actor_bundler::Bundler;
+use fs_err as fs;
 use std::error::Error;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -11,7 +12,7 @@ use std::thread;
 use toml::Value;
 
 fn parse_dependencies_for_wasm32() -> anyhow::Result<Vec<(String, String)>> {
-    let manifest = std::fs::read_to_string("Cargo.toml")?;
+    let manifest = fs::read_to_string("Cargo.toml")?;
     let document = manifest.parse::<Value>()?;
 
     let dependencies = document
@@ -108,7 +109,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // make sure the output dir exists
-    std::fs::create_dir_all("output")
+    fs::create_dir_all("output")
         .expect("failed to create output dir for the custom_actors_bundle.car file");
 
     let dst = Path::new("output/custom_actors_bundle.car");

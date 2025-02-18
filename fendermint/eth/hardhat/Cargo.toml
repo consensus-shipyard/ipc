@@ -12,5 +12,6 @@ license.workspace = true
 anyhow = { workspace = true }
 ethers-core = { workspace = true }
 hex = { workspace = true }
+fs-err = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

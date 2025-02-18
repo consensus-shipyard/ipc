@@ -20,6 +20,7 @@ use fendermint_vm_genesis::{
     ipc::{GatewayParams, IpcParams},
     Account, Actor, ActorMeta, Collateral, Genesis, SignerAddr, Validator, ValidatorKey,
 };
+use fs_err as fs;
 use fvm_shared::{bigint::Zero, chainid::ChainID, econ::TokenAmount, version::NetworkVersion};
 use ipc_api::subnet_id::SubnetID;
 use ipc_provider::config::subnet::{
@@ -260,7 +261,7 @@ impl DockerMaterializer {
         }
 
         let dir = self.dir.join(testnet_name.path());
-        if let Err(e) = std::fs::remove_dir_all(&dir) {
+        if let Err(e) = fs::remove_dir_all(&dir) {
             if !e.to_string().contains("No such file") {
                 bail!(
                     "failed to remove testnet directory {}: {e:?}",
@@ -438,7 +439,7 @@ impl DockerMaterializer {
         let ipc_dir = self.ipc_dir(testnet_name);
         let accounts_dir = self.accounts_dir(testnet_name);
         // Create a `~/.ipc` directory, as expected by default by the `ipc-cli`.
-        std::fs::create_dir_all(&ipc_dir).context("failed to create .ipc dir")?;
+        fs::create_dir_all(&ipc_dir).context("failed to create .ipc dir")?;
         // Use the owner of the directory for the container, so we don't get permission issues.
         let user = user_id(&ipc_dir)?;
         // Mount the `~/.ipc` directory and all the keys to be imported.
@@ -787,7 +788,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
 
         // Check if we have already created the subnet.
         if subnet_id_file.exists() {
-            let subnet_id = std::fs::read_to_string(&subnet_id_file)
+            let subnet_id = fs::read_to_string(&subnet_id_file)
                 .context("failed to read subnet ID from file")?;
 
             let subnet_id = SubnetID::from_str(&subnet_id).with_context(|| {

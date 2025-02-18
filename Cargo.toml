@@ -80,6 +80,7 @@ ethers = { version = "2.0.13", features = ["abigen", "ws"] }
 ethers-core = { version = "2.0.13" }
 ethers-contract = "2.0.13"
 fnv = "1.0"
+fs-err = "3.1"
 futures = "0.3"
 futures-core = "0.3"
 futures-util = "0.3"
