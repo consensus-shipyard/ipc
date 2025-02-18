@@ -243,9 +243,9 @@ where
         let raw_length = fvm_ipld_encoding::to_vec(&msg).map(|bz| bz.len())?;
         let ret = self.executor.execute_message_with_revert(
             msg,
-             ApplyKind::Implicit,
+            ApplyKind::Implicit,
             raw_length,
-            true
+            true,
         )?;
         let addrs = self.emitter_delegated_addresses(&ret)?;
 
