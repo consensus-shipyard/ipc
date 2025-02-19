@@ -33,6 +33,7 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use num_traits::Zero;
 use std::sync::Arc;
+use fendermint_vm_message::chain::ValidatorMessage;
 
 /// A resolution pool for bottom-up and top-down checkpoints.
 pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
@@ -230,6 +231,9 @@ where
                 ChainMessage::Signed(signed) => {
                     block_gas_usage += signed.message.gas_limit;
                 }
+                ChainMessage::Validator(v) => match v {
+                    ValidatorMessage::SignBottomUpCheckpoint(_) => {}
+                }
                 _ => {}
             };
         }
@@ -416,6 +420,15 @@ where
                     Ok(((env, state), ChainMessageApplyRet::Ipc(ret)))
                 }
             },
+            ChainMessage::Validator(v) => match v {
+                ValidatorMessage::SignBottomUpCheckpoint(signed) => {
+                    let chain_id = state.chain_id();
+                    signed.verify(&chain_id)?;
+
+                    signed.message
+
+                }
+            }
         }
     }
 

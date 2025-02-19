@@ -16,7 +16,7 @@ use fvm_shared::econ::TokenAmount;
 use fvm_shared::MethodNum;
 
 use fendermint_vm_actor_interface::eam::CreateReturn;
-use fendermint_vm_message::chain::ChainMessage;
+use fendermint_vm_message::chain::{ChainMessage, ValidatorMessage};
 
 use crate::message::{GasParams, SignedMessageFactory};
 use crate::query::{QueryClient, QueryResponse};
@@ -94,6 +94,29 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
     ) -> anyhow::Result<M::Response<Vec<u8>>> {
         let mf = self.message_factory_mut();
         let msg = mf.fevm_invoke(contract, calldata, value, gas_params)?;
+        let fut = self.perform(msg, decode_fevm_invoke);
+        let res = fut.await?;
+        Ok(res)
+    }
+
+    /// For validators to invoke a validator specific method.
+    async fn validator_invoke(
+        &mut self,
+        contract: Address,
+        calldata: Bytes,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<M::Response<Vec<u8>>> {
+        let mf = self.message_factory_mut();
+
+        let msg = mf.create_chain_message(
+            contract,
+            calldata,
+            value,
+            gas_params,
+            |s| ChainMessage::Validator(ValidatorMessage::SignBottomUpCheckpoint(s))
+        )?;
+
         let fut = self.perform(msg, decode_fevm_invoke);
         let res = fut.await?;
         Ok(res)
