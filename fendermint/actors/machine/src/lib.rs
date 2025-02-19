@@ -54,12 +54,14 @@ pub trait MachineActor {
         rt.validate_immediate_caller_is(std::iter::once(&INIT_ACTOR_ADDR))?;
 
         let (id_addr, delegated_addr) = to_id_and_delegated_address(rt, params.owner)?;
-        let event = machine_created(delegated_addr, &params.metadata);
 
         let state = Self::State::new(rt.store(), id_addr, params.metadata)?;
         rt.create(&state)?;
 
-        emit_evm_event(rt, event)
+        emit_evm_event(
+            rt,
+            machine_created(state.kind() as u8, delegated_addr, &state.metadata()),
+        )
     }
 
     /// Initializes the machine with its ID address.
@@ -68,9 +70,12 @@ pub trait MachineActor {
 
         let id_addr = to_id_address(rt, params.address, false)?;
 
-        rt.transaction(|st: &mut Self::State, _| st.init(id_addr))?;
+        let kind = rt.transaction(|st: &mut Self::State, _| {
+            st.init(id_addr)?;
+            Ok(st.kind())
+        })?;
 
-        emit_evm_event(rt, machine_initialized(id_addr))
+        emit_evm_event(rt, machine_initialized(kind as u8, id_addr))
     }
 
     /// Get machine robust address.

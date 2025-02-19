@@ -405,7 +405,7 @@ mod tests {
         Method as BlobMethod, BLOBS_ACTOR_ADDR,
     };
     use fendermint_actor_blobs_testing::{new_hash, new_pk, setup_logs};
-    use fendermint_actor_machine::{events::to_actor_event, ConstructorParams, InitParams};
+    use fendermint_actor_machine::{events::to_actor_event, ConstructorParams, InitParams, Kind};
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::test_utils::{
         expect_empty, MockRuntime, ADM_ACTOR_CODE_ID, ETHACCOUNT_ACTOR_CODE_ID, INIT_ACTOR_CODE_ID,
@@ -441,8 +441,10 @@ mod tests {
         rt.set_caller(*INIT_ACTOR_CODE_ID, INIT_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![INIT_ACTOR_ADDR]);
         let metadata = HashMap::new();
-        let event =
-            to_actor_event(machine_created(owner_delegated_addr, &metadata).unwrap()).unwrap();
+        let event = to_actor_event(
+            machine_created(Kind::Bucket as u8, owner_delegated_addr, &metadata).unwrap(),
+        )
+        .unwrap();
         rt.expect_emitted_event(event);
         let actor_construction = rt
             .call::<Actor>(
@@ -459,7 +461,8 @@ mod tests {
 
         rt.set_caller(*ADM_ACTOR_CODE_ID, ADM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![ADM_ACTOR_ADDR]);
-        let event = to_actor_event(machine_initialized(buck_addr).unwrap()).unwrap();
+        let event =
+            to_actor_event(machine_initialized(Kind::Bucket as u8, buck_addr).unwrap()).unwrap();
         rt.expect_emitted_event(event);
         let actor_init = rt
             .call::<Actor>(

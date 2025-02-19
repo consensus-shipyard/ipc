@@ -136,7 +136,7 @@ mod tests {
         params::GetCreditApprovalParams, state::CreditApproval, Method as BlobMethod,
         BLOBS_ACTOR_ADDR,
     };
-    use fendermint_actor_machine::{events::to_actor_event, ConstructorParams, InitParams};
+    use fendermint_actor_machine::{events::to_actor_event, ConstructorParams, InitParams, Kind};
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::{
         runtime::MessageInfo,
@@ -168,8 +168,10 @@ mod tests {
         rt.set_caller(*INIT_ACTOR_CODE_ID, INIT_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![INIT_ACTOR_ADDR]);
         let metadata = HashMap::new();
-        let event =
-            to_actor_event(machine_created(owner_delegated_addr, &metadata).unwrap()).unwrap();
+        let event = to_actor_event(
+            machine_created(Kind::Timehub as u8, owner_delegated_addr, &metadata).unwrap(),
+        )
+        .unwrap();
         rt.expect_emitted_event(event);
         let result = rt
             .call::<TimehubActor>(
@@ -186,7 +188,9 @@ mod tests {
 
         rt.set_caller(*ADM_ACTOR_CODE_ID, ADM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![ADM_ACTOR_ADDR]);
-        let event = to_actor_event(machine_initialized(actor_address).unwrap()).unwrap();
+        let event =
+            to_actor_event(machine_initialized(Kind::Timehub as u8, actor_address).unwrap())
+                .unwrap();
         rt.expect_emitted_event(event);
         let actor_init = rt
             .call::<TimehubActor>(
