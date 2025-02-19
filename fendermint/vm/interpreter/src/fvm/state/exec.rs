@@ -34,6 +34,7 @@ use serde_with::serde_as;
 use std::fmt;
 use tendermint::consensus::params::Params as TendermintConsensusParams;
 
+const ALWAYS_REVERT: bool = true;
 pub type BlockHash = [u8; 32];
 
 pub type ActorAddressMap = HashMap<ActorID, Address>;
@@ -240,12 +241,12 @@ where
             return Ok(check_error(e));
         }
 
-        let raw_length = fvm_ipld_encoding::to_vec(&msg).map(|bz| bz.len())?;
+        let raw_length = message_raw_length(&msg)?;
         let ret = self.executor.execute_message_with_revert(
             msg,
             ApplyKind::Implicit,
             raw_length,
-            true,
+            ALWAYS_REVERT,
         )?;
         let addrs = self.emitter_delegated_addresses(&ret)?;
 
@@ -273,7 +274,7 @@ where
         }
 
         // TODO: We could preserve the message length by changing the input type.
-        let raw_length = fvm_ipld_encoding::to_vec(&msg).map(|bz| bz.len())?;
+        let raw_length = message_raw_length(&msg)?;
         let ret = self.executor.execute_message(msg, kind, raw_length)?;
         let addrs = self.emitter_delegated_addresses(&ret)?;
 
@@ -465,4 +466,8 @@ fn check_error(e: anyhow::Error) -> (ApplyRet, ActorAddressMap) {
         events: Vec::new(),
     };
     (ret, Default::default())
+}
+
+fn message_raw_length(msg: &Message) -> anyhow::Result<usize> {
+    Ok(fvm_ipld_encoding::to_vec(msg).map(|bz| bz.len())?)
 }
