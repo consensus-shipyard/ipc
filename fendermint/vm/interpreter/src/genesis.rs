@@ -458,7 +458,7 @@ impl GenesisBuilder {
             .create_custom_actor(
                 fendermint_actor_blob_reader::BLOB_READER_ACTOR_NAME,
                 blob_reader::BLOB_READER_ACTOR_ID,
-                &fendermint_actor_blob_reader::State::default(),
+                &fendermint_actor_blob_reader::State::new(&state.store())?,
                 TokenAmount::zero(),
                 None,
             )

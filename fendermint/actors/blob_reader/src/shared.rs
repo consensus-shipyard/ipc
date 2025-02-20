@@ -17,7 +17,7 @@ pub const BLOB_READER_ACTOR_ID: ActorID = 67;
 pub const BLOB_READER_ACTOR_ADDR: Address = Address::new_id(BLOB_READER_ACTOR_ID);
 
 /// The status of a read request.
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, Default)]
 pub enum ReadRequestStatus {
     /// Read request is open and waiting to be processed
     #[default]
@@ -36,7 +36,7 @@ impl fmt::Display for ReadRequestStatus {
 }
 
 /// A request to read blob data.
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
+#[derive(Clone, Debug, PartialEq, Serialize_tuple, Deserialize_tuple)]
 pub struct ReadRequest {
     /// The hash of the blob to read data from.
     pub blob_hash: Hash,
@@ -97,3 +97,5 @@ pub struct SetReadRequestPendingParams(pub Hash);
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct GetReadRequestStatusParams(pub Hash);
+
+pub type OpenReadRequestTuple = (Hash, Hash, u32, u32, Address, u64);

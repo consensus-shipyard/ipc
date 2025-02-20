@@ -2,30 +2,40 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::HashMap;
-
 use fendermint_actor_blobs_shared::state::Hash;
 use fil_actors_runtime::ActorError;
+use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::*;
-use fvm_shared::{address::Address, MethodNum};
+use fvm_shared::address::Address;
 use log::info;
 
-use crate::shared::{ReadRequest, ReadRequestStatus};
+use crate::shared::{OpenReadRequestTuple, ReadRequest, ReadRequestStatus};
+use recall_ipld::hamt;
+use recall_ipld::hamt::map::TrackedFlushResult;
 
 const MAX_READ_REQUEST_LEN: u32 = 1024 * 1024; // 1MB
 
 /// The state represents all read requests.
-#[derive(Debug, Default, Serialize_tuple, Deserialize_tuple)]
+#[derive(Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct State {
-    /// Map of read requests by request ID.
-    pub read_requests: HashMap<Hash, ReadRequest>,
+    /// ReadRequests Hamt.
+    pub read_requests: ReadRequests,
     /// Counter to sequence the requests
     pub request_id_counter: u64,
 }
 
 impl State {
-    pub fn open_read_request(
+    pub fn new<BS: Blockstore>(store: &BS) -> Result<Self, ActorError> {
+        let read_requests = ReadRequests::new(store)?;
+        Ok(State {
+            read_requests,
+            request_id_counter: 0,
+        })
+    }
+
+    pub fn open_read_request<BS: Blockstore>(
         &mut self,
+        store: &BS,
         blob_hash: Hash,
         offset: u32,
         len: u32,
@@ -51,51 +61,73 @@ impl State {
         };
         info!("opening a read request onchain: {:?}", request_id);
         // will create a new request even if the request parameters are the same
-        self.read_requests.insert(request_id, read_request);
+        let mut read_requests = self.read_requests.hamt(store)?;
+        self.read_requests
+            .save_tracked(read_requests.set_and_flush_tracked(&request_id, read_request)?);
         Ok(request_id)
     }
 
-    pub fn close_read_request(&mut self, request_id: Hash) -> Result<(), ActorError> {
-        if self.get_read_request_status(request_id).is_none() {
+    pub fn close_read_request<BS: Blockstore>(
+        &mut self,
+        store: &BS,
+        request_id: Hash,
+    ) -> Result<(), ActorError> {
+        if self.get_read_request_status(store, request_id)?.is_none() {
             return Err(ActorError::not_found(
                 "cannot close read request, it does not exist".to_string(),
             ));
         }
+
         // remove the closed request
-        self.read_requests.remove(&request_id);
+        let mut read_requests = self.read_requests.hamt(store)?;
+        self.read_requests
+            .save_tracked(read_requests.delete_and_flush_tracked(&request_id)?.0);
         Ok(())
     }
 
-    pub fn get_open_read_requests(
+    pub fn get_open_read_requests<BS: Blockstore>(
         &self,
+        store: BS,
         size: u32,
-    ) -> Vec<(Hash, Hash, u32, u32, Address, MethodNum)> {
-        self.read_requests
-            .iter()
-            .filter(|(_, request)| matches!(request.status, ReadRequestStatus::Open))
-            .take(size as usize)
-            .map(|element| {
-                (
-                    *element.0,
-                    element.1.blob_hash,
-                    element.1.offset,
-                    element.1.len,
-                    element.1.callback_addr,
-                    element.1.callback_method,
-                )
-            })
-            .collect::<Vec<_>>()
+    ) -> Result<Vec<OpenReadRequestTuple>, ActorError> {
+        let read_requests = self.read_requests.hamt(store)?;
+
+        let mut requests = Vec::new();
+        read_requests.for_each(|id, request| {
+            if matches!(request.status, ReadRequestStatus::Open) && (requests.len() as u32) < size {
+                requests.push((
+                    id,
+                    request.blob_hash,
+                    request.offset,
+                    request.len,
+                    request.callback_addr,
+                    request.callback_method,
+                ))
+            }
+
+            Ok(())
+        })?;
+        Ok(requests)
     }
 
-    pub fn get_read_request_status(&self, id: Hash) -> Option<ReadRequestStatus> {
-        self.read_requests.get(&id).map(|r| r.status.clone())
+    pub fn get_read_request_status<BS: Blockstore>(
+        &self,
+        store: BS,
+        id: Hash,
+    ) -> Result<Option<ReadRequestStatus>, ActorError> {
+        let read_requests = self.read_requests.hamt(store)?;
+        Ok(read_requests.get(&id)?.map(|r| r.status.clone()))
     }
 
     /// Set a read request status to pending.
-    pub fn set_read_request_pending(&mut self, id: Hash) -> Result<(), ActorError> {
-        let request = self
-            .read_requests
-            .get_mut(&id)
+    pub fn set_read_request_pending<BS: Blockstore>(
+        &mut self,
+        store: BS,
+        id: Hash,
+    ) -> Result<(), ActorError> {
+        let mut read_requests = self.read_requests.hamt(store)?;
+        let mut request = read_requests
+            .get(&id)?
             .ok_or_else(|| ActorError::not_found(format!("read request {} not found", id)))?;
 
         if !matches!(request.status, ReadRequestStatus::Open) {
@@ -106,11 +138,39 @@ impl State {
         }
 
         request.status = ReadRequestStatus::Pending;
+        self.read_requests
+            .save_tracked(read_requests.set_and_flush_tracked(&id, request)?);
+
         Ok(())
     }
 
     fn next_request_id(&mut self) -> Hash {
         self.request_id_counter += 1;
         Hash::from(self.request_id_counter)
+    }
+}
+
+#[derive(Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct ReadRequests {
+    pub root: hamt::Root<Hash, ReadRequest>,
+    size: u64,
+}
+
+impl ReadRequests {
+    pub fn new<BS: Blockstore>(store: &BS) -> Result<Self, ActorError> {
+        let root = hamt::Root::<Hash, ReadRequest>::new(store, "read_requests")?;
+        Ok(Self { root, size: 0 })
+    }
+
+    pub fn hamt<BS: Blockstore>(
+        &self,
+        store: BS,
+    ) -> Result<hamt::map::Hamt<BS, Hash, ReadRequest>, ActorError> {
+        self.root.hamt(store, self.size)
+    }
+
+    pub fn save_tracked(&mut self, tracked_flush_result: TrackedFlushResult<Hash, ReadRequest>) {
+        self.root = tracked_flush_result.root;
+        self.size = tracked_flush_result.size;
     }
 }

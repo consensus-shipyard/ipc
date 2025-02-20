@@ -2,6 +2,11 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::shared::{
+    CloseReadRequestParams, GetOpenReadRequestsParams, GetReadRequestStatusParams, Method,
+    OpenReadRequestParams, OpenReadRequestTuple, ReadRequestStatus, SetReadRequestPendingParams,
+    State, BLOB_READER_ACTOR_NAME,
+};
 use fendermint_actor_blobs_shared::state::Hash;
 use fendermint_actor_machine::events::emit_evm_event;
 use fil_actors_runtime::{
@@ -15,14 +20,6 @@ use recall_sol_facade::blob_reader::{
     read_request_closed, read_request_opened, read_request_pending,
 };
 
-use crate::shared::{
-    CloseReadRequestParams, GetOpenReadRequestsParams, GetReadRequestStatusParams, Method,
-    OpenReadRequestParams, ReadRequestStatus, SetReadRequestPendingParams, State,
-    BLOB_READER_ACTOR_NAME,
-};
-
-type OpenReadRequestTuple = (Hash, Hash, u32, u32, Address, u64);
-
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(ReadReqActor);
 
@@ -31,7 +28,7 @@ pub struct ReadReqActor;
 impl ReadReqActor {
     fn constructor(rt: &impl Runtime) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        let state = State::default();
+        let state = State::new(rt.store())?;
         rt.create(&state)
     }
 
@@ -43,6 +40,7 @@ impl ReadReqActor {
 
         let id = rt.transaction(|st: &mut State, _rt| {
             st.open_read_request(
+                rt.store(),
                 params.hash,
                 params.offset,
                 params.len,
@@ -71,7 +69,8 @@ impl ReadReqActor {
         params: GetOpenReadRequestsParams,
     ) -> Result<Vec<OpenReadRequestTuple>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        Ok(rt.state::<State>()?.get_open_read_requests(params.0))
+        rt.state::<State>()?
+            .get_open_read_requests(rt.store(), params.0)
     }
 
     fn get_read_request_status(
@@ -79,7 +78,9 @@ impl ReadReqActor {
         params: GetReadRequestStatusParams,
     ) -> Result<Option<ReadRequestStatus>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
-        let status = rt.state::<State>()?.get_read_request_status(params.0);
+        let status = rt
+            .state::<State>()?
+            .get_read_request_status(rt.store(), params.0)?;
         Ok(status)
     }
 
@@ -88,9 +89,7 @@ impl ReadReqActor {
         params: CloseReadRequestParams,
     ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-
-        rt.transaction(|st: &mut State, _| st.close_read_request(params.0))?;
-
+        rt.transaction(|st: &mut State, _| st.close_read_request(rt.store(), params.0))?;
         emit_evm_event(rt, read_request_closed(&params.0 .0))
     }
 
@@ -100,8 +99,7 @@ impl ReadReqActor {
     ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
-        rt.transaction(|st: &mut State, _| st.set_read_request_pending(params.0))?;
-
+        rt.transaction(|st: &mut State, _| st.set_read_request_pending(rt.store(), params.0))?;
         emit_evm_event(rt, read_request_pending(&params.0 .0))
     }
 

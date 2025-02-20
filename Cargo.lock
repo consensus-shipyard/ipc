@@ -3382,6 +3382,7 @@ dependencies = [
  "fil_actors_evm_shared",
  "fil_actors_runtime",
  "frc42_dispatch",
+ "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
  "fvm_shared",
  "hex-literal 0.4.1",
@@ -3390,6 +3391,7 @@ dependencies = [
  "num-derive 0.3.3",
  "num-traits",
  "rand",
+ "recall_ipld",
  "recall_sol_facade",
  "serde",
 ]
