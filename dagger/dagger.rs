@@ -3,11 +3,7 @@ use std::sync::Arc;
 
 use color_eyre::eyre::{self, bail, eyre, Result};
 use dagger_sdk::{
-    logging::{StdLogger, TracingLogger},
-    Container, ContainerBuildOpts, ContainerBuildOptsBuilder, ContainerWithEnvVariableOptsBuilder,
-    ContainerWithExecOpts, ContainerWithExecOptsBuilder, ContainerWithMountedCacheOpts,
-    ContainerWithMountedCacheOptsBuilder, ContainerWithMountedDirectoryOpts, DaggerConn, Directory,
-    File, HostDirectoryOpts, Service,
+    logging::{StdLogger, TracingLogger}, CacheVolume, Container, ContainerBuildOpts, ContainerBuildOptsBuilder, ContainerWithEnvVariableOptsBuilder, ContainerWithExecOpts, ContainerWithExecOptsBuilder, ContainerWithMountedCacheOpts, ContainerWithMountedCacheOptsBuilder, ContainerWithMountedDirectoryOpts, DaggerConn, Directory, File, HostDirectoryOpts, Service
 };
 use fs_err as fs;
 use rand::Rng;
@@ -95,8 +91,9 @@ fn host_repo_root_dir(client: &DaggerConn) -> Directory {
     repo_root_dir
 }
 
-fn define_contracts_container(client: DaggerConn) -> Result<Container> {
-    let d = host_repo_root_dir(&client);
+fn define_contracts_container(client: DaggerConn, hrrd: Directory, hccd: Directory) -> Result<Container> {
+    let compiled_contracts_dir = "/workdir/compiled_contracts";
+ 
     let opts = ContainerBuildOptsBuilder::default()
         .dockerfile("contracts/docker/builder.Dockerfile")
         .build()?;
@@ -104,26 +101,26 @@ fn define_contracts_container(client: DaggerConn) -> Result<Container> {
     Ok(client
         .container()
         .from("docker.io/library/node:latest")
-        .with_mounted_directory("/workdir", d.clone())
+        .with_mounted_directory("/workdir", hrrd.clone())
+        .with_mounted_directory(compiled_contracts_dir, hccd.clone())
         .with_exec(cmd("apt-get update -y"))
         .with_exec(cmd("apt-get install -y curl which"))
         // .build_opts(d.clone(), opts)
         .with_workdir("/workdir/contracts")
         .with_exec(cmd("ls -al"))
         .with_exec(cmd("npm install -g pnpm"))
+        .with_exec(cmd("pnpm install"))
         .with_exec(vec!["sh", "-c", "curl -L https://foundry.paradigm.xyz | bash && /root/.foundry/bin/foundryup --install 0.3.0"])
         .with_exec(cmd("git submodule update --init --recursive"))
-        .with_exec(cmd("mkdir -p /workdir/compiled_contracts"))
+        .with_exec(cmd(format!("mkdir -p {compiled_contracts_dir}")))
         .with_env_variable_opts("PATH", "${PATH}:/root/.foundry/bin", ContainerWithEnvVariableOptsBuilder::default().expand(true).build()?)
         .with_exec_opts(cmd("echo \"${PATH}\""), ContainerWithExecOptsBuilder::default().expand(true).build()?)
         .with_exec(cmd("which forge"))
-        .with_exec(cmd("forge build -C ./src/ --lib-paths ./lib/ --via-ir --sizes --skip test --out=out"))
+        .with_exec(cmd(format!("/root/.foundry/bin/forge build -C ./src/ --lib-paths ./lib/ --via-ir --sizes --skip test --out={compiled_contracts_dir}")))
     )
 }
 
-fn define_crates_container(client: DaggerConn) -> Result<Container> {
-    let d = host_repo_root_dir(&client);
-
+fn define_crates_container(client: DaggerConn, hrrd: Directory, hccd: Directory) -> Result<Container> {
     let opts = ContainerBuildOptsBuilder::default()
         .dockerfile("fendermint/docker/builder.local.Dockerfile")
         .build()?;
@@ -131,9 +128,8 @@ fn define_crates_container(client: DaggerConn) -> Result<Container> {
     Ok(client
         .container()
         .from("docker.io/rust:bookworm")
-        .with_mounted_directory("/workdir", d.clone())
-        // TODO
-        // .with_mounted_directory("/output", output_dir.clone())
+        .with_mounted_directory("/workdir", hrrd.clone())
+        .with_mounted_directory("/workdir/_compiled_contracts", hccd)
         .with_workdir("/workdir")
         .with_exec(cmd("apt-get update"))
         .with_exec(cmd(
@@ -148,16 +144,15 @@ async fn prepare_fendermint_two_stage_build(client: DaggerConn) -> eyre::Result<
 
     let fendermint_dir = client.host().directory("fendermint");
 
-    fs::create_dir_all("output")?;
-    let output_dir = client.host().directory("output");
+    fs::create_dir_all("_compiled_contracts")?;
+    let hrrd = host_repo_root_dir(&client);
+    let hccd = hrrd.directory("_compiled_contracts");
 
-    let contracts_gen = define_contracts_container(client.clone())?;
+    let contracts_gen = define_contracts_container(client.clone(), hrrd.clone(), hccd.clone())?;
     run(&contracts_gen).await?;
-    let output = contracts_gen.file("/output");
-    let output = contracts_gen.file("output");
 
-    let crates_def = define_crates_container(client.clone())?.with_file("/foo", output); // TODO more files
-
+    let crates_def = define_crates_container(client.clone(), hrrd.clone(), hccd.clone())?;
+    
     run(&crates_def).await?;
     let f_fendermint = contracts_gen.file("fendermint");
     let f_ipc = contracts_gen.file("ipc-cli");
