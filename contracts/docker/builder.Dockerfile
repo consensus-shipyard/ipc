@@ -15,10 +15,13 @@ RUN curl -L https://foundry.paradigm.xyz | bash && \
 ENV PATH="/root/.foundry/bin:$PATH"
 
 # Set working directory.
-WORKDIR /app
+WORKDIR /workdir
 
-# Copy the entire repository.
 COPY . .
+
+RUN ls -al .
+
+WORKDIR /workdir/contracts
 
 # Install Node dependencies (skip lifecycle scripts if desired).
 RUN npm install --ignore-scripts
