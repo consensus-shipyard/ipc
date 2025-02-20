@@ -30,13 +30,13 @@ pub enum ChainMessage {
     Ipc(IpcMessage),
 
     /// The validator messages for IPC to function correctly.
-    Validator(ValidatorMessage)
+    Validator(ValidatorMessage),
 }
 
 /// The messages sent from validators that perform various on chain duties.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ValidatorMessage {
-    SignBottomUpCheckpoint(SignedMessage)
+    SignBottomUpCheckpoint(SignedMessage),
 }
 
 #[cfg(feature = "arb")]

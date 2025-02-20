@@ -3,7 +3,7 @@
 
 use std::marker::PhantomData;
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use bytes::Bytes;
 use fendermint_vm_message::query::{FvmQueryHeight, GasEstimate};
@@ -21,6 +21,8 @@ use fendermint_vm_message::chain::{ChainMessage, ValidatorMessage};
 use crate::message::{GasParams, SignedMessageFactory};
 use crate::query::{QueryClient, QueryResponse};
 use crate::response::{decode_bytes, decode_fevm_create, decode_fevm_invoke};
+use ethers::contract::EthCall;
+const SOLIDITY_SELECTOR_BYTES: usize = 8;
 
 /// Abstracting away what the return value is based on whether
 /// we broadcast transactions in sync, async or commit mode.
@@ -109,13 +111,19 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
     ) -> anyhow::Result<M::Response<Vec<u8>>> {
         let mf = self.message_factory_mut();
 
-        let msg = mf.create_chain_message(
-            contract,
-            calldata,
-            value,
-            gas_params,
-            |s| ChainMessage::Validator(ValidatorMessage::SignBottomUpCheckpoint(s))
-        )?;
+        if calldata.len() < SOLIDITY_SELECTOR_BYTES {
+            return Err(anyhow!("invalid validator calldata"));
+        }
+
+        let sig_selector =
+            ipc_actors_abis::checkpointing_facet::AddCheckpointSignatureCall::selector();
+        if calldata[0..SOLIDITY_SELECTOR_BYTES] != sig_selector {
+            return Err(anyhow!("method not found"));
+        }
+
+        let msg = mf.create_chain_message(contract, calldata, value, gas_params, |s| {
+            ChainMessage::Validator(ValidatorMessage::SignBottomUpCheckpoint(s))
+        })?;
 
         let fut = self.perform(msg, decode_fevm_invoke);
         let res = fut.await?;

@@ -4,6 +4,7 @@ use crate::fvm::state::ipc::GatewayCaller;
 use crate::fvm::store::ReadOnlyBlockstore;
 use crate::fvm::{topdown, EndBlockOutput, FvmApplyRet};
 use crate::selector::{GasLimitSelector, MessageSelector};
+use crate::validator::execute_bottom_up_signature;
 use crate::{
     fvm::state::FvmExecState,
     fvm::FvmMessage,
@@ -16,6 +17,7 @@ use async_trait::async_trait;
 use fendermint_tracing::emit;
 use fendermint_vm_actor_interface::ipc;
 use fendermint_vm_event::ParentFinalityMissingQuorum;
+use fendermint_vm_message::chain::ValidatorMessage;
 use fendermint_vm_message::ipc::ParentFinality;
 use fendermint_vm_message::{
     chain::ChainMessage,
@@ -33,11 +35,6 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use num_traits::Zero;
 use std::sync::Arc;
-use fvm::executor::{ApplyKind, default_gas_hook, ExecutionOptions};
-use fvm::gas::GasOutputs;
-use fvm_shared::ActorID;
-use fvm_shared::receipt::Receipt;
-use fendermint_vm_message::chain::ValidatorMessage;
 
 /// A resolution pool for bottom-up and top-down checkpoints.
 pub type CheckpointPool = ResolvePool<CheckpointPoolItem>;
@@ -237,7 +234,7 @@ where
                 }
                 ChainMessage::Validator(v) => match v {
                     ValidatorMessage::SignBottomUpCheckpoint(_) => {}
-                }
+                },
                 _ => {}
             };
         }
@@ -426,52 +423,10 @@ where
             },
             ChainMessage::Validator(v) => match v {
                 ValidatorMessage::SignBottomUpCheckpoint(signed) => {
-                    let chain_id = state.chain_id();
-                    if let Err(e) = signed.verify(&chain_id) {
-                        return Ok(((env, state), ChainMessageApplyRet::Signed(Err(crate::signed::InvalidSignature(e.to_string())))));
-                    }
-
-                    // technically we need to check the sender is actually a validator,
-                    // but the contract is checking it, delegates to the contract.
-                    let domain_hash = signed.domain_hash(&chain_id)?;
-                    let msg = signed.message;
-
-                    let custom_hook = |sender_id: ActorID, receipt: &Receipt, gas_output: &GasOutputs| {
-                        // validator message execution ok, refund all gas to the validator
-                        if receipt.exit_code.is_success() {
-                            let total =  &gas_output.base_fee_burn
-                            + &gas_output.miner_tip+
-                                &gas_output.over_estimation_burn
-                            + &gas_output.refund;
-                            return vec![(sender_id, total)];
-                        }
-
-                        // the execution fails for the validator, fallback to default gas hook from fvm
-                        default_gas_hook(sender_id, receipt, gas_output)
-                    };
-
-                    let options = ExecutionOptions {
-                        always_revert: false,
-                        txn_gas_hook: custom_hook,
-                    };
-
-                    let (apply_ret, emitters) = state.execute_with_options(
-                        msg.clone(), ApplyKind::Explicit, options
-                    )?;
-                    let ret = crate::signed::SignedMessageApplyRet {
-                        fvm: FvmApplyRet {
-                            apply_ret,
-                            from: msg.from,
-                            to: msg.to,
-                            method_num: msg.method_num,
-                            gas_limit: msg.gas_limit,
-                            emitters,
-                        },
-                        domain_hash,
-                    };
-                    Ok(((env, state), ChainMessageApplyRet::Signed(Ok(ret))))
+                    let ret = execute_bottom_up_signature(&mut state, signed)?;
+                    Ok(((env, state), ret))
                 }
-            }
+            },
         }
     }
 
@@ -557,15 +512,17 @@ where
                         Ok((state, Err(IllegalMessage)))
                     }
                 }
-            },
-            ChainMessage::Validator(v) => match v { ValidatorMessage::SignBottomUpCheckpoint(msg) => {
-                let (state, ret) = self
-                    .inner
-                    .check(state, VerifiableMessage::Signed(msg), is_recheck)
-                    .await?;
+            }
+            ChainMessage::Validator(v) => match v {
+                ValidatorMessage::SignBottomUpCheckpoint(msg) => {
+                    let (state, ret) = self
+                        .inner
+                        .check(state, VerifiableMessage::Signed(msg), is_recheck)
+                        .await?;
 
-                Ok((state, Ok(ret)))
-            } }
+                    Ok((state, Ok(ret)))
+                }
+            },
         }
     }
 }
