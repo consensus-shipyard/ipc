@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import "forge-std/Test.sol";
 import "elliptic-curve-solidity/contracts/EllipticCurve.sol";
 import {IPCAddress, Asset} from "../../contracts/structs/Subnet.sol";
-import {CallMsg, IpcMsgKind, IpcEnvelope} from "../../contracts/structs/CrossNet.sol";
+import {CallMsg, IpcMsgKind, IpcEnvelope, ResultMsg} from "../../contracts/structs/CrossNet.sol";
 import {IIpcHandler} from "../../sdk/interfaces/IIpcHandler.sol";
 import {METHOD_SEND, EMPTY_BYTES} from "../../contracts/constants/Constants.sol";
 
@@ -167,7 +167,8 @@ library TestUtils {
                 to: to,
                 value: value,
                 message: abi.encode(message),
-                nonce: nonce
+                originalNonce: 0,
+                localNonce: nonce
             });
     }
 }
@@ -225,4 +226,31 @@ contract MockIpcContractPayable is IIpcHandler {
     }
 
     receive() external payable {}
+}
+
+contract MockFallbackContract {
+    fallback() external payable {}
+}
+
+contract MockIpcContractResult is IIpcHandler {
+    ResultMsg _result;
+    bool _hasResult;
+
+    function handleIpcMessage(IpcEnvelope calldata envelope) external payable returns (bytes memory) {
+        if (envelope.kind == IpcMsgKind.Result) {
+            _result = abi.decode(envelope.message, (ResultMsg));
+            _hasResult = true;
+            return EMPTY_BYTES;
+        }
+
+        return EMPTY_BYTES;
+    }
+
+    function hasResult() public view returns (bool) {
+        return _hasResult;
+    }
+
+    function result() public view returns (ResultMsg memory) {
+        return _result;
+    }
 }

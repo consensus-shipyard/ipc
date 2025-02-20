@@ -1,0 +1,40 @@
+# Cache and build artifacts
+cache/
+cache_hardhat/
+crytic-export/
+out/
+node_modules
+artifacts
+solidity-files-cache.json
+typechain
+
+# IDE and editor folders/files
+.vscode
+.idea
+
+# Environment and config files
+.env
+
+# Deployment and script outputs
+broadcast/
+deployments/
+deployments.json
+scripts/*.out
+scripts/deploy-registry.ts
+scripts/deploy-gateway.ts
+contract-bindings/src/gen
+contract-bindings/target
+subnet.registry.json
+subnet.actor.json
+
+# Coverage and reports
+coverage_report
+lcov.info
+report.md
+report.json
+
+# Temporary files
+*.un~
+
+# Licenses
+LICENSE-*

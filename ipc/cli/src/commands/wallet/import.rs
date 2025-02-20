@@ -5,6 +5,7 @@
 use anyhow::bail;
 use async_trait::async_trait;
 use clap::{ArgGroup, Args};
+use fs_err as fs;
 use ipc_wallet::WalletType;
 use std::fmt::Debug;
 use std::str::FromStr;
@@ -35,7 +36,7 @@ impl CommandLineHandler for WalletImport {
         } else {
             // Get keyinfo from file or stdin
             let keyinfo = if arguments.path.is_some() {
-                std::fs::read_to_string(arguments.path.as_ref().unwrap())?
+                fs::read_to_string(arguments.path.as_ref().unwrap())?
             } else {
                 // FIXME: Accept keyinfo from stdin
                 bail!("stdin not supported yet")

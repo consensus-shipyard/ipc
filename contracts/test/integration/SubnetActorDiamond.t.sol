@@ -1584,7 +1584,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             gatewayAddress,
             ConsensusType.Fendermint,
             DEFAULT_MIN_VALIDATOR_STAKE,
-            DEFAULT_MIN_VALIDATORS,
+            2,
             DEFAULT_CHECKPOINT_PERIOD,
             DEFAULT_MAJORITY_PERCENTAGE,
             PermissionMode.Federated,

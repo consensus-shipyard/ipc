@@ -367,7 +367,7 @@ mod tests {
             TokenAmount::from_atto(100),
         )
         .unwrap();
-        msg.nonce = nonce;
+        msg.local_nonce = nonce;
         msg
     }
 

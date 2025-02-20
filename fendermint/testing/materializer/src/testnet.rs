@@ -346,6 +346,7 @@ where
             ethapi: node.ethapi,
             env,
             peer_count,
+            fendermint_additional_config: node.loaded_fendermint_config(),
         };
 
         let node = m

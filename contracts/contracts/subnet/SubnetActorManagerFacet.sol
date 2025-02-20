@@ -24,6 +24,9 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
     using LibValidatorSet for ValidatorSet;
     using Address for address payable;
 
+    event ValidatorGaterUpdated(address oldGater, address newGater);
+    event NewBootstrapNode(string netAddress, address owner);
+
     /// @notice method to add some initial balance into a subnet that hasn't yet bootstrapped.
     /// @dev This balance is added to user addresses in genesis, and becomes part of the genesis
     /// circulating supply.
@@ -73,8 +76,13 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
         }
     }
 
+    /// @notice Sets the validator gater contract implementation
+    /// @param gater The addresse of validator gater implementation.
     function setValidatorGater(address gater) external notKilled {
         LibDiamond.enforceIsContractOwner();
+
+        emit ValidatorGaterUpdated(s.validatorGater, gater);
+
         s.validatorGater = gater;
     }
 
@@ -255,7 +263,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             // check if the validator had some initial balance and return it if not bootstrapped
             uint256 genesisBalance = s.genesisBalance[msg.sender];
             if (genesisBalance != 0) {
-                s.genesisBalance[msg.sender] == 0;
+                delete s.genesisBalance[msg.sender];
                 s.genesisCircSupply -= genesisBalance;
                 LibSubnetActor.rmAddressFromBalanceKey(msg.sender);
                 s.collateralSource.transferFunds(payable(msg.sender), genesisBalance);
@@ -284,7 +292,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
 
     /// @notice Add a bootstrap node.
     /// @param netAddress The network address of the new bootstrap node.
-    function addBootstrapNode(string memory netAddress) external whenNotPaused {
+    function addBootstrapNode(string calldata netAddress) external whenNotPaused {
         if (!s.validatorSet.isActiveValidator(msg.sender)) {
             revert NotValidator(msg.sender);
         }
@@ -294,5 +302,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
         s.bootstrapNodes[msg.sender] = netAddress;
         // slither-disable-next-line unused-return
         s.bootstrapOwners.add(msg.sender);
+
+        emit NewBootstrapNode(netAddress, msg.sender);
     }
 }

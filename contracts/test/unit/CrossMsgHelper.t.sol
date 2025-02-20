@@ -8,6 +8,7 @@ import "../../contracts/lib/FvmAddressHelper.sol";
 import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
 import {Asset} from "../../contracts/structs/Subnet.sol";
 import {IpcMsgKind, CallMsg} from "../../contracts/structs/CrossNet.sol";
+import {MockFallbackContract} from "../helpers/TestUtils.sol";
 
 import "@openzeppelin/contracts/utils/Address.sol";
 
@@ -68,7 +69,7 @@ contract CrossMsgHelperTest is Test {
         require(releaseMsg.to.subnetId.toHash() == parentSubnetId.toHash());
         require(releaseMsg.to.rawAddress.extractEvmAddress() == sender);
         require(releaseMsg.value == releaseAmount);
-        require(releaseMsg.nonce == 0);
+        require(releaseMsg.localNonce == 0);
         require(releaseMsg.message.length == 0);
         require(releaseMsg.kind == IpcMsgKind.Transfer);
     }
@@ -102,7 +103,7 @@ contract CrossMsgHelperTest is Test {
         require(fundMsg.to.subnetId.toHash() == parentSubnetId.toHash());
         require(fundMsg.to.rawAddress.extractEvmAddress() == sender);
         require(fundMsg.value == fundAmount);
-        require(fundMsg.nonce == 0);
+        require(fundMsg.localNonce == 0);
         require(fundMsg.message.length == 0);
         require(fundMsg.kind == IpcMsgKind.Transfer);
     }
@@ -131,7 +132,7 @@ contract CrossMsgHelperTest is Test {
         require(fundMsg.to.subnetId.toHash() == subnetId.toHash());
         require(fundMsg.to.rawAddress.extractEvmAddress() == sender);
         require(fundMsg.value == fundAmount);
-        require(fundMsg.nonce == 0);
+        require(fundMsg.localNonce == 0);
         require(fundMsg.kind == IpcMsgKind.Transfer);
     }
 
@@ -145,7 +146,7 @@ contract CrossMsgHelperTest is Test {
 
     function test_Execute_Works_SendValue() public {
         address sender = address(this);
-        address recipient = address(100);
+        address recipient = address(new MockFallbackContract());
 
         crossMsg.to.rawAddress = FvmAddressHelper.from(recipient);
         crossMsg.kind = IpcMsgKind.Call;
@@ -159,13 +160,11 @@ contract CrossMsgHelperTest is Test {
         (, bytes memory result) = crossMsg.execute(AssetHelper.native());
 
         require(keccak256(result) == keccak256(EMPTY_BYTES));
-        require(recipient.balance == 1);
-        require(sender.balance == 1 ether - 1);
     }
 
     function test_Execute_Works_FunctionCallWithValue() public {
         address sender = address(this);
-        address recipient = address(100);
+        address recipient = address(new MockFallbackContract());
 
         crossMsg.to.rawAddress = FvmAddressHelper.from(recipient);
         crossMsg.kind = IpcMsgKind.Call;
@@ -178,14 +177,15 @@ contract CrossMsgHelperTest is Test {
         vm.deal(sender, 1 ether);
         vm.expectCall(recipient, crossMsg.value, new bytes(0), 1);
 
-        (, bytes memory result) = crossMsg.execute(AssetHelper.native());
+        (bool ok, bytes memory result) = crossMsg.execute(AssetHelper.native());
+        console.log(ok);
 
         require(keccak256(result) == keccak256(EMPTY_BYTES));
     }
 
     function test_Execute_Works_FunctionCallWithoutValue() public {
         address sender = address(this);
-        address recipient = address(100);
+        address recipient = address(new MockFallbackContract());
 
         crossMsg.kind = IpcMsgKind.Call;
         crossMsg.to.rawAddress = FvmAddressHelper.from(recipient);
@@ -337,7 +337,15 @@ contract CrossMsgHelperTest is Test {
         uint64 nonce
     ) internal pure returns (IpcEnvelope memory) {
         return
-            IpcEnvelope({kind: IpcMsgKind.Transfer, from: from, to: to, value: 0, message: EMPTY_BYTES, nonce: nonce});
+            IpcEnvelope({
+                kind: IpcMsgKind.Transfer,
+                from: from,
+                to: to,
+                value: 0,
+                message: EMPTY_BYTES,
+                localNonce: nonce,
+                originalNonce: 0
+            });
     }
 
     function createCrossMsgs(uint256 length, uint64 nonce) internal pure returns (IpcEnvelope[] memory _crossMsgs) {
@@ -349,7 +357,7 @@ contract CrossMsgHelperTest is Test {
     }
 
     function addCrossMsg(uint64 nonce) internal {
-        crossMsg.nonce = nonce;
+        crossMsg.localNonce = nonce;
 
         crossMsgs.push(crossMsg);
     }

@@ -44,6 +44,8 @@ use serde_with::serde_as;
 use tokio_stream::StreamExt;
 use tokio_util::compat::TokioAsyncWriteCompatExt;
 
+use fs_err as fs;
+
 /// The sealed genesis state metadata
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -227,14 +229,14 @@ impl GenesisBuilder {
     }
 
     async fn init_state(&self) -> anyhow::Result<FvmGenesisState<MemoryBlockstore>> {
-        let bundle = std::fs::read(&self.builtin_actors_path).with_context(|| {
+        let bundle = fs::read(&self.builtin_actors_path).with_context(|| {
             format!(
                 "failed to read builtin actors bundle: {}",
                 self.builtin_actors_path.to_string_lossy()
             )
         })?;
 
-        let custom_actors_bundle = std::fs::read(&self.custom_actors_path).with_context(|| {
+        let custom_actors_bundle = fs::read(&self.custom_actors_path).with_context(|| {
             format!(
                 "failed to read custom actors bundle: {}",
                 self.custom_actors_path.to_string_lossy()

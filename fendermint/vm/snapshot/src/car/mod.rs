@@ -71,6 +71,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use fs_err as fs;
 
     use fendermint_vm_interpreter::fvm::bundle::bundle_path;
     use tempfile::tempdir;
@@ -81,7 +82,7 @@ mod tests {
     #[tokio::test]
     async fn split_bundle_car() {
         let bundle_path = bundle_path();
-        let bundle_bytes = std::fs::read(&bundle_path).unwrap();
+        let bundle_bytes = fs::read(&bundle_path).unwrap();
 
         let tmp = tempdir().unwrap();
         let target_count = 10;
@@ -91,7 +92,7 @@ mod tests {
             .await
             .expect("failed to split CAR file");
 
-        let mut chunks = std::fs::read_dir(tmp.path())
+        let mut chunks = fs::read_dir(tmp.path())
             .unwrap()
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
@@ -102,13 +103,13 @@ mod tests {
         let chunks = chunks
             .into_iter()
             .map(|c| {
-                let chunk_size = std::fs::metadata(c.path()).unwrap().len() as usize;
+                let chunk_size = fs::metadata(c.path()).unwrap().len() as usize;
                 (c, chunk_size)
             })
             .collect::<Vec<_>>();
 
         let chunks_bytes = chunks.iter().fold(Vec::new(), |mut acc, (c, _)| {
-            let bz = std::fs::read(c.path()).unwrap();
+            let bz = fs::read(c.path()).unwrap();
             acc.extend(bz);
             acc
         });

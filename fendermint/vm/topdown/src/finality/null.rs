@@ -276,7 +276,7 @@ impl FinalityWithNull {
         if !top_down_msgs.is_empty() {
             // make sure incoming top down messages are ordered by nonce sequentially
             tracing::debug!(?top_down_msgs);
-            ensure_sequential(&top_down_msgs, |msg| msg.nonce)?;
+            ensure_sequential(&top_down_msgs, |msg| msg.local_nonce)?;
         };
         if !validator_changes.is_empty() {
             tracing::debug!(?validator_changes, "validator changes");

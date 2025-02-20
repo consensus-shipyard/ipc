@@ -14,7 +14,7 @@ import {NotRegisteredSubnet, SubnetNotActive, SubnetNotFound, InvalidSubnet, Che
 import {BatchNotCreated, InvalidBatchEpoch, BatchAlreadyExists, NotEnoughSubnetCircSupply, InvalidCheckpointEpoch} from "../../errors/IPCErrors.sol";
 
 import {CrossMsgHelper} from "../../lib/CrossMsgHelper.sol";
-import {IpcEnvelope, SubnetID} from "../../structs/CrossNet.sol";
+import {IpcEnvelope, SubnetID, IpcMsgKind} from "../../structs/CrossNet.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
 
 import {ActivityRollupRecorded, FullActivityRollup} from "../../structs/Activity.sol";
@@ -22,6 +22,9 @@ import {ActivityRollupRecorded, FullActivityRollup} from "../../structs/Activity
 contract CheckpointingFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
+
+    /// @dev Emitted when a checkpoint is committed to gateway.
+    event CheckpointCommitted(address indexed subnet, uint256 subnetHeight);
 
     /// @notice submit a verified checkpoint in the gateway to trigger side-effects.
     /// @dev this method is called by the corresponding subnet actor.
@@ -43,6 +46,8 @@ contract CheckpointingFacet is GatewayActorModifiers {
         LibGateway.checkMsgLength(checkpoint.msgs);
 
         execBottomUpMsgs(checkpoint.msgs, subnet);
+
+        emit CheckpointCommitted({subnet: checkpoint.subnetID.getAddress(), subnetHeight: checkpoint.blockHeight});
     }
 
     /// @notice creates a new bottom-up checkpoint
@@ -129,7 +134,9 @@ contract CheckpointingFacet is GatewayActorModifiers {
         uint256 crossMsgLength = msgs.length;
 
         for (uint256 i; i < crossMsgLength; ) {
-            totalValue += msgs[i].value;
+            if (msgs[i].kind != IpcMsgKind.Call) {
+                totalValue += msgs[i].value;
+            }
             unchecked {
                 ++i;
             }

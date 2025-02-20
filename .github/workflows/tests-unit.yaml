@@ -22,14 +22,14 @@ jobs:
         uses: ./.github/actions/install-tools
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          rust: stable
+          rust: 1.81.0
 
       - name: Cache Solidity ABI artifacts
         uses: actions/cache@v4
         with:
           path: | 
             ./contracts/out
-            ./contracts/bindings
+            ./contract-bindings
             ./contracts/cache
           key: v2-contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}
 
@@ -39,4 +39,3 @@ jobs:
 
       - name: Run unit tests
         run: make test-rust
-

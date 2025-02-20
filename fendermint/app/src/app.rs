@@ -420,12 +420,15 @@ where
 
     /// Replaces the current validators cache with a new one.
     async fn refresh_validators_cache(&self) -> Result<()> {
-        let mut state = self
-            .read_only_view(None)?
-            .ok_or_else(|| anyhow!("exec state should be present"))?;
+        // TODO: This should be read only state, but we can't use the read-only view here
+        // because it hasn't been committed to state store yet.
+        self.modify_exec_state(|mut s| async {
+            let mut cache = self.validators_cache.lock().await;
+            *cache = Some(ValidatorCache::new_from_state(&mut s.1)?);
+            Ok((s, ()))
+        })
+        .await?;
 
-        let mut cache = self.validators_cache.lock().await;
-        *cache = Some(ValidatorCache::new_from_state(&mut state)?);
         Ok(())
     }
 
@@ -643,9 +646,6 @@ where
             .await
             .context("error running check")?;
 
-        // Update the check state.
-        *guard = Some(state);
-
         let mut mpool_received_trace = MpoolReceived::default();
 
         let response = match result {
@@ -655,10 +655,15 @@ where
                 Ok(Err(InvalidSignature(d))) => invalid_check_tx(AppError::InvalidSignature, d),
                 Ok(Ok(ret)) => {
                     mpool_received_trace.message = Some(Message::from(&ret.message));
-                    to_check_tx(ret)
+
+                    let priority = state.txn_priority_calculator().priority(&ret.message);
+                    to_check_tx(ret, priority)
                 }
             },
         };
+
+        // Update the check state.
+        *guard = Some(state);
 
         mpool_received_trace.accept = response.code.is_ok();
         if !mpool_received_trace.accept {

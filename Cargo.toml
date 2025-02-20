@@ -2,10 +2,12 @@
 resolver = "2"
 members = [
   # contracts
-  "contracts/binding",
+  "contract-bindings",
 
   # merkle
   "ext/merkle-tree-rs",
+  "ext/libp2p-bitswap",
+  "ext/frc42_dispatch",
 
   # ipc
   "ipc/cli",
@@ -78,10 +80,11 @@ ethers = { version = "2.0.13", features = ["abigen", "ws"] }
 ethers-core = { version = "2.0.13" }
 ethers-contract = "2.0.13"
 fnv = "1.0"
+fs-err = "3.1"
 futures = "0.3"
 futures-core = "0.3"
 futures-util = "0.3"
-gcra = "0.4"
+gcra = "0.6.0"
 hex = "0.4"
 hex-literal = "0.4.1"
 http = "0.2.12"
@@ -113,8 +116,7 @@ libp2p = { version = "0.53", default-features = false, features = [
   "plaintext",
 ] }
 libp2p-mplex = { version = "0.41" }
-# libp2p-bitswap = "0.25.1"
-libp2p-bitswap = { git = "https://github.com/consensus-shipyard/libp2p-bitswap.git", branch = "chore-upgrade-libipld" } # Updated to libipld 0.16
+libp2p-bitswap = { path = "ext/libp2p-bitswap" }
 libsecp256k1 = "0.7"
 literally = "0.1.3"
 log = "0.4"
@@ -183,7 +185,7 @@ ipc-wallet = { path = "ipc/wallet", features = ["with-ethers"] }
 ipc_ipld_resolver = { path = "ipld/resolver" }
 ipc-types = { path = "ipc/types" }
 ipc-observability = { path = "ipc/observability" }
-ipc_actors_abis = { path = "contracts/binding" }
+ipc_actors_abis = { path = "contract-bindings" }
 fendermint_actors_api = { path = "fendermint/actors/api" }
 
 # Vendored for cross-compilation, see https://github.com/cross-rs/cross/wiki/Recipes#openssl
@@ -194,9 +196,11 @@ openssl = { version = "0.10", features = ["vendored"] }
 
 # NOTE: When upgrading the FVM it may cause our fendermint/actors/build.rs to fail as it can
 # pull in crates as transitive dependencies that do not support Wasm architector. If this
-# happens, try removing "crypto" feature from fvm_shared dependency in contracts/binding/Cargo.toml
+# happens, try removing "crypto" feature from fvm_shared dependency in contract-bindings/Cargo.toml
 # and run `cargo build`. Then add the "crypto" feature back and run `cargo build` again.
-fvm = { version = "4.4.0", features = ["verify-signature"], default-features = false } # no opencl feature or it fails on CI
+fvm = { version = "4.4.0", features = [
+  "verify-signature",
+], default-features = false } # no opencl feature or it fails on CI
 fvm_shared = { version = "4.4.0" }
 fvm_sdk = { version = "4.4.0" }
 
@@ -224,14 +228,14 @@ fil_actor_eam = { git = "https://github.com/filecoin-project/builtin-actors", ta
 fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
 
 fendermint_actor_eam = { path = "./fendermint/actors/eam" }
-fendermint_actor_activity_tracker= { path = "./fendermint/actors/activity-tracker" }
+fendermint_actor_activity_tracker = { path = "./fendermint/actors/activity-tracker" }
 
 cid = { version = "0.10.1", default-features = false, features = [
   "serde-codec",
   "std",
 ] }
 
-frc42_dispatch = { git = "https://github.com/filecoin-project/actors-utils", rev = "0f8365151f44785f7bead4e5500258fd5c8944e6" }
+frc42_dispatch = { path = "./ext/frc42_dispatch" }
 
 # Using the same tendermint-rs dependency as tower-abci. From both we are interested in v037 modules.
 tower-abci = { version = "0.7" }
@@ -245,10 +249,6 @@ tendermint-rpc = { version = "0.31", features = [
 ] }
 tendermint-proto = { version = "0.31" }
 
-[patch.crates-io]
-# Use stable-only features.
-gcra = { git = "https://github.com/consensus-shipyard/gcra-rs.git", branch = "main" }
-
 [profile.wasm]
 inherits = "release"
 panic = "abort"
@@ -258,4 +258,3 @@ opt-level = "z"
 strip = true
 codegen-units = 1
 incremental = false
-
