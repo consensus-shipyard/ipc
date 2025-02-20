@@ -4,7 +4,8 @@ use std::sync::Arc;
 use color_eyre::eyre::{self, bail, eyre, Result};
 use dagger_sdk::{
     logging::{StdLogger, TracingLogger},
-    Container, ContainerBuildOpts, ContainerBuildOptsBuilder, ContainerWithMountedCacheOpts,
+    Container, ContainerBuildOpts, ContainerBuildOptsBuilder, ContainerWithEnvVariableOptsBuilder,
+    ContainerWithExecOpts, ContainerWithExecOptsBuilder, ContainerWithMountedCacheOpts,
     ContainerWithMountedCacheOptsBuilder, ContainerWithMountedDirectoryOpts, DaggerConn, Directory,
     File, HostDirectoryOpts, Service,
 };
@@ -105,12 +106,19 @@ fn define_contracts_container(client: DaggerConn) -> Result<Container> {
         .from("docker.io/library/node:latest")
         .with_mounted_directory("/workdir", d.clone())
         .with_exec(cmd("apt-get update -y"))
-        .with_exec(cmd("apt-get install -y curl"))
+        .with_exec(cmd("apt-get install -y curl which"))
         // .build_opts(d.clone(), opts)
         .with_workdir("/workdir/contracts")
+        .with_exec(cmd("ls -al"))
         .with_exec(cmd("npm install -g pnpm"))
         .with_exec(vec!["sh", "-c", "curl -L https://foundry.paradigm.xyz | bash && /root/.foundry/bin/foundryup --install 0.3.0"])
-        .with_exec(cmd("make gen")))
+        .with_exec(cmd("git submodule update --init --recursive"))
+        .with_exec(cmd("mkdir -p /workdir/compiled_contracts"))
+        .with_env_variable_opts("PATH", "${PATH}:/root/.foundry/bin", ContainerWithEnvVariableOptsBuilder::default().expand(true).build()?)
+        .with_exec_opts(cmd("echo \"${PATH}\""), ContainerWithExecOptsBuilder::default().expand(true).build()?)
+        .with_exec(cmd("which forge"))
+        .with_exec(cmd("forge build -C ./src/ --lib-paths ./lib/ --via-ir --sizes --skip test --out=out"))
+    )
 }
 
 fn define_crates_container(client: DaggerConn) -> Result<Container> {
