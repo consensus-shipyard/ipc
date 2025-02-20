@@ -33,6 +33,10 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use num_traits::Zero;
 use std::sync::Arc;
+use fvm::executor::{ApplyKind, default_gas_hook, ExecutionOptions};
+use fvm::gas::GasOutputs;
+use fvm_shared::ActorID;
+use fvm_shared::receipt::Receipt;
 use fendermint_vm_message::chain::ValidatorMessage;
 
 /// A resolution pool for bottom-up and top-down checkpoints.
@@ -423,10 +427,49 @@ where
             ChainMessage::Validator(v) => match v {
                 ValidatorMessage::SignBottomUpCheckpoint(signed) => {
                     let chain_id = state.chain_id();
-                    signed.verify(&chain_id)?;
+                    if let Err(e) = signed.verify(&chain_id) {
+                        return Ok(((env, state), ChainMessageApplyRet::Signed(Err(crate::signed::InvalidSignature(e.to_string())))));
+                    }
 
-                    signed.message
+                    // technically we need to check the sender is actually a validator,
+                    // but the contract is checking it, delegates to the contract.
+                    let domain_hash = signed.domain_hash(&chain_id)?;
+                    let msg = signed.message;
 
+                    let custom_hook = |sender_id: ActorID, receipt: &Receipt, gas_output: &GasOutputs| {
+                        // validator message execution ok, refund all gas to the validator
+                        if receipt.exit_code.is_success() {
+                            let total =  &gas_output.base_fee_burn
+                            + &gas_output.miner_tip+
+                                &gas_output.over_estimation_burn
+                            + &gas_output.refund;
+                            return vec![(sender_id, total)];
+                        }
+
+                        // the execution fails for the validator, fallback to default gas hook from fvm
+                        default_gas_hook(sender_id, receipt, gas_output)
+                    };
+
+                    let options = ExecutionOptions {
+                        always_revert: false,
+                        txn_gas_hook: custom_hook,
+                    };
+
+                    let (apply_ret, emitters) = state.execute_with_options(
+                        msg.clone(), ApplyKind::Explicit, options
+                    )?;
+                    let ret = crate::signed::SignedMessageApplyRet {
+                        fvm: FvmApplyRet {
+                            apply_ret,
+                            from: msg.from,
+                            to: msg.to,
+                            method_num: msg.method_num,
+                            gas_limit: msg.gas_limit,
+                            emitters,
+                        },
+                        domain_hash,
+                    };
+                    Ok(((env, state), ChainMessageApplyRet::Signed(Ok(ret))))
                 }
             }
         }
@@ -514,7 +557,15 @@ where
                         Ok((state, Err(IllegalMessage)))
                     }
                 }
-            }
+            },
+            ChainMessage::Validator(v) => match v { ValidatorMessage::SignBottomUpCheckpoint(msg) => {
+                let (state, ret) = self
+                    .inner
+                    .check(state, VerifiableMessage::Signed(msg), is_recheck)
+                    .await?;
+
+                Ok((state, Ok(ret)))
+            } }
         }
     }
 }
@@ -581,6 +632,7 @@ fn messages_selection<DB: Blockstore + Clone + 'static>(
         .into_iter()
         .map(|msg| match msg {
             ChainMessage::Signed(inner) => Ok(inner),
+            ChainMessage::Validator(ValidatorMessage::SignBottomUpCheckpoint(i)) => Ok(i),
             ChainMessage::Ipc(_) => Err(anyhow!("should not have ipc messages in user proposals")),
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
