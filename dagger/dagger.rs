@@ -3,7 +3,12 @@ use std::sync::Arc;
 
 use color_eyre::eyre::{self, bail, eyre, Result};
 use dagger_sdk::{
-    logging::{StdLogger, TracingLogger}, CacheVolume, Container, ContainerBuildOpts, ContainerBuildOptsBuilder, ContainerWithEnvVariableOptsBuilder, ContainerWithExecOpts, ContainerWithExecOptsBuilder, ContainerWithMountedCacheOpts, ContainerWithMountedCacheOptsBuilder, ContainerWithMountedDirectoryOpts, DaggerConn, Directory, File, HostDirectoryOpts, Service
+    logging::{StdLogger, TracingLogger},
+    CacheVolume, Container, ContainerBuildOpts, ContainerBuildOptsBuilder,
+    ContainerWithEnvVariableOptsBuilder, ContainerWithExecOpts, ContainerWithExecOptsBuilder,
+    ContainerWithFileOpts, ContainerWithFileOptsBuilder, ContainerWithMountedCacheOpts,
+    ContainerWithMountedCacheOptsBuilder, ContainerWithMountedDirectoryOpts, DaggerConn, Directory,
+    File, HostDirectoryOpts, Service,
 };
 use fs_err as fs;
 use rand::Rng;
@@ -91,43 +96,79 @@ fn host_repo_root_dir(client: &DaggerConn) -> Directory {
     repo_root_dir
 }
 
-fn define_contracts_container(client: DaggerConn, hrrd: Directory, hccd: Directory) -> Result<Container> {
+fn with_caches(container: Container, client: &DaggerConn) -> Container {
+    let cache_volume_aptititude = client.cache_volume("apt-cache");
+    let cache_volume_var_cache = client.cache_volume("apt-lists");
+    let cache_volume_cargo = client.cache_volume("cargo");
+    let cache_volume_rustup = client.cache_volume("rustup");
+    let cache_volume_target = client.cache_volume("target");
+    let cache_volume_solidity = client.cache_volume("solidity");
+    let cache_volume_node_modules = client.cache_volume("npm");
+    let cache_volume_pnpm_store = client.cache_volume("pnpm");
+    let cache_volume_npm_store = client.cache_volume("pnpm");
+
+    let container = container.with_mounted_cache("/root/.npm", cache_volume_npm_store.clone());
+    let container =
+        container.with_mounted_cache("/workdir/.pnpm-store", cache_volume_pnpm_store.clone());
+    let container =
+        container.with_mounted_cache("/workdir/node_modules", cache_volume_node_modules.clone());
+    let container = container.with_mounted_cache("/var/cache", cache_volume_var_cache.clone());
+    let container = container.with_mounted_cache("/var/lib/apt/", cache_volume_aptititude.clone());
+    let container = container.with_mounted_cache("/workdir/target", cache_volume_target.clone());
+    let container = container.with_mounted_cache(
+        "/workdir/_compiled_contracts",
+        cache_volume_solidity.clone(),
+    );
+    let container = container.with_mounted_cache("/root/.cargo", cache_volume_cargo.clone());
+    let container = container.with_mounted_cache("/root/.rustup", cache_volume_rustup.clone());
+
+    container
+}
+
+fn define_contracts_container(
+    client: DaggerConn,
+    hrrd: Directory,
+    hccd: Directory,
+) -> Result<Container> {
     let compiled_contracts_dir = "/workdir/compiled_contracts";
- 
+
     let opts = ContainerBuildOptsBuilder::default()
         .dockerfile("contracts/docker/builder.Dockerfile")
         .build()?;
 
-    Ok(client
-        .container()
-        .from("docker.io/library/node:latest")
-        .with_mounted_directory("/workdir", hrrd.clone())
-        .with_mounted_directory(compiled_contracts_dir, hccd.clone())
-        .with_exec(cmd("apt-get update -y"))
-        .with_exec(cmd("apt-get install -y curl which"))
-        // .build_opts(d.clone(), opts)
-        .with_workdir("/workdir/contracts")
-        .with_exec(cmd("ls -al"))
-        .with_exec(cmd("npm install -g pnpm"))
-        .with_exec(cmd("pnpm install"))
-        .with_exec(vec!["sh", "-c", "curl -L https://foundry.paradigm.xyz | bash && /root/.foundry/bin/foundryup --install 0.3.0"])
-        .with_exec(cmd("git submodule update --init --recursive"))
-        .with_exec(cmd(format!("mkdir -p {compiled_contracts_dir}")))
-        .with_env_variable_opts("PATH", "${PATH}:/root/.foundry/bin", ContainerWithEnvVariableOptsBuilder::default().expand(true).build()?)
-        .with_exec_opts(cmd("echo \"${PATH}\""), ContainerWithExecOptsBuilder::default().expand(true).build()?)
-        .with_exec(cmd("which forge"))
-        .with_exec(cmd(format!("/root/.foundry/bin/forge build -C ./src/ --lib-paths ./lib/ --via-ir --sizes --skip test --out={compiled_contracts_dir}")))
-    )
+    let container =     with_caches(client
+    .container().from("docker.io/library/node:latest")
+    , &client)
+    .with_mounted_directory("/workdir", hrrd.clone())
+    .with_mounted_directory(compiled_contracts_dir, hccd.clone())
+    .with_exec(cmd("apt-get update -y"))
+    .with_exec(cmd("apt-get install -y curl which"))
+    // .build_opts(d.clone(), opts)
+    .with_workdir("/workdir/contracts")
+    .with_exec(cmd("ls -al"))
+    .with_exec(cmd("npm install -g pnpm"))
+    .with_exec(cmd("pnpm install"))
+    .with_exec(vec!["sh", "-c", "curl -L https://foundry.paradigm.xyz | bash && /root/.foundry/bin/foundryup --install 0.3.0"])
+    .with_exec(cmd("git submodule update --init --recursive"))
+    .with_exec(cmd(format!("mkdir -p {compiled_contracts_dir}")))
+    .with_env_variable_opts("PATH", "${PATH}:/root/.foundry/bin", ContainerWithEnvVariableOptsBuilder::default().expand(true).build()?)
+    .with_exec_opts(cmd("echo \"${PATH}\""), ContainerWithExecOptsBuilder::default().expand(true).build()?)
+    .with_exec(cmd("which forge"))
+    .with_exec(cmd(format!("/root/.foundry/bin/forge -vvv build -C ./src/ --lib-paths ./lib/ --via-ir --sizes --skip test --out={compiled_contracts_dir}")));
+
+    Ok(container)
 }
 
-fn define_crates_container(client: DaggerConn, hrrd: Directory, hccd: Directory) -> Result<Container> {
+fn define_crates_container(
+    client: DaggerConn,
+    hrrd: Directory,
+    hccd: Directory,
+) -> Result<Container> {
     let opts = ContainerBuildOptsBuilder::default()
         .dockerfile("fendermint/docker/builder.local.Dockerfile")
         .build()?;
 
-    Ok(client
-        .container()
-        .from("docker.io/rust:bookworm")
+    let container = with_caches(client.container().from("docker.io/rust:bookworm"), &client)
         .with_mounted_directory("/workdir", hrrd.clone())
         .with_mounted_directory("/workdir/_compiled_contracts", hccd)
         .with_workdir("/workdir")
@@ -135,13 +176,15 @@ fn define_crates_container(client: DaggerConn, hrrd: Directory, hccd: Directory)
         .with_exec(cmd(
             "apt-get install -y build-essential clang cmake protobuf-compiler",
         ))
-        .with_exec(cmd("cargo b -p fendermint_app")))
+        .with_exec(cmd("cargo b -p fendermint_app -p ipc-cli"))
+        .with_exec(cmd("ls -al /workdir/target/debug"))
+        .with_exec(cmd("ls -al output"));
+
+    Ok(container)
     // .build_opts(d.clone(), opts))
 }
 
 async fn prepare_fendermint_two_stage_build(client: DaggerConn) -> eyre::Result<Container> {
-    let repo_root_dir = host_repo_root_dir(&client);
-
     let fendermint_dir = client.host().directory("fendermint");
 
     fs::create_dir_all("_compiled_contracts")?;
@@ -152,46 +195,44 @@ async fn prepare_fendermint_two_stage_build(client: DaggerConn) -> eyre::Result<
     run(&contracts_gen).await?;
 
     let crates_def = define_crates_container(client.clone(), hrrd.clone(), hccd.clone())?;
-    
     run(&crates_def).await?;
-    let f_fendermint = contracts_gen.file("fendermint");
-    let f_ipc = contracts_gen.file("ipc-cli");
 
-    // let cache_volume_aptititude = client.cache_volume("aptitude");
-    // let cache_volume_cargo = client.cache_volume("cargo");
-    // let cache_volume_rustup = client.cache_volume("rustup");
-    // let cache_volume_target = client.cache_volume("target");
-    // let cache_volume_solidity = client.cache_volume("solidity");
+    let f_fendermint = crates_def.file("/workdir/target/debug/fendermint");
+    let f_ipc = crates_def.file("/workdir/target/debug/ipc-cli");
 
-    println!("Extracting .car files from container");
+    let car_extra = contracts_gen.file("/workdir/_compiled_contracts/custom_extra_actors.car");
+    let car_builtin = contracts_gen.file("/workdir/_compiled_contracts/output/builtin_actors.car");
 
-    let car_extra = contracts_gen.file("/app/output/custom_extra_actors.car");
-    let car_builtin = contracts_gen.file("/app/output/builtin_actors.car");
-
+    let container = client.container();
     let runner = client
         .container()
-        .with_file("/usr/local/bin/fendermint", f_fendermint)
-        .with_file("/usr/local/bin/ipc-cli", f_ipc)
-        .with_file("/tmp/extra.car", car_extra)
-        .with_file("/tmp/builtin.car", car_builtin)
+        .with_file_opts(
+            "/usr/local/bin/fendermint",
+            f_fendermint,
+            ContainerWithFileOptsBuilder::default()
+                .permissions(0755_isize)
+                .build()?,
+        )
+        .with_file_opts(
+            "/usr/local/bin/ipc-cli",
+            f_ipc,
+            ContainerWithFileOptsBuilder::default()
+                .permissions(0755_isize)
+                .build()?,
+        )
+        .with_exec(cmd("ls -al"))
+        // .with_file("/workdir/extra.car", car_extra)
+        // .with_file("/workdir/builtin.car", car_builtin)
         .build_opts(
-            repo_root_dir.clone(),
+            hrrd,
             ContainerBuildOptsBuilder::default()
-                .dockerfile("docker/runner.Dockerfile")
+                .dockerfile("fendermint/docker/runner.Dockerfile")
                 .build()?,
         );
     run(&runner).await?;
 
     Ok(runner)
 }
-
-// async fn end_to_end_tests(client: DaggerConn) -> eyre::Result<()> {
-//     let container = prepare_fendermint_container(client).await?;
-//     // container.with_service_binding("joe", service)
-//     run(&container.with_workdir("contracts").with_exec(vec!["make", "gen"])).await;
-//     run(&container.with_workdir("fendermint").with_env_variable("PROFILE", "release").with_exec(vec!["make", "e2e-only"])).await;
-//     Ok(())
-// }
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
