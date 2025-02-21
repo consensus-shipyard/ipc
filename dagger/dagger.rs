@@ -5,6 +5,7 @@ use color_eyre::eyre::{self, bail, eyre, Result};
 use dagger_sdk::{
     logging::{StdLogger, TracingLogger},
     CacheVolume, Container, ContainerBuildOpts, ContainerBuildOptsBuilder,
+    ContainerWithEntrypointOpts, ContainerWithEntrypointOptsBuilder,
     ContainerWithEnvVariableOptsBuilder, ContainerWithExecOpts, ContainerWithExecOptsBuilder,
     ContainerWithFileOpts, ContainerWithFileOptsBuilder, ContainerWithMountedCacheOpts,
     ContainerWithMountedCacheOptsBuilder, ContainerWithMountedDirectoryOpts, DaggerConn, Directory,
@@ -13,7 +14,8 @@ use dagger_sdk::{
 use fs_err as fs;
 use rand::Rng;
 
-async fn run(container: &Container) -> eyre::Result<()> {
+/// Execute the lazily prepared container definition and convert to a `Result`
+async fn run(container: &Container) -> Result<()> {
     let out_fut = container.stdout();
     let err_fut = container.stderr();
     let exit_code_fut = container.exit_code();
@@ -30,61 +32,16 @@ async fn run(container: &Container) -> eyre::Result<()> {
     }
 }
 
-async fn prepare_anvil_service(client: DaggerConn) -> eyre::Result<Service> {
-    let context_dir = client.host().directory("./contracts/");
-
-    let container = client.container().build_opts(
-        context_dir,
-        ContainerBuildOptsBuilder::default()
-            .dockerfile("docker/Dockerfile")
-            .build()?,
-    );
-
-    let out_fut = container.stdout();
-    let err_fut = container.stderr();
-    let exit_code_fut = container.exit_code();
-    let (out, err, exit_code) = tokio::join!(out_fut, err_fut, exit_code_fut);
-    let out = dbg!(out?);
-    let err = dbg!(err?);
-
-    Ok(container.as_service())
-}
-
-async fn prepare_ipc_cli(client: DaggerConn) -> eyre::Result<Container> {
-    let context_dir = client.host().directory("fendermint/");
-
-    let container = client.container().build_opts(
-        context_dir,
-        ContainerBuildOptsBuilder::default()
-            .dockerfile("docker/runner.Dockerfile")
-            .build()?,
-    );
-
-    Ok(container)
-}
-
-async fn test_service() -> eyre::Result<()> {
-    todo!();
-    Ok(())
-}
-
-async fn prepare_fendermint_container(client: DaggerConn) -> eyre::Result<Container> {
-    let context_dir = client.host().directory("fendermint");
-
-    let container = client.container().build_opts(
-        context_dir,
-        ContainerBuildOptsBuilder::default()
-            .dockerfile("docker/runner.Dockerfile")
-            .build()?,
-    );
-
-    Ok(container)
-}
-
+/// Simplify execution, split at whitespace
+///
+/// Note: Does not consider nested `"` nor escaping `\"`!
 fn cmd(s: impl AsRef<str>) -> Vec<String> {
     Vec::from_iter(s.as_ref().split_whitespace().map(|x| x.to_string()))
 }
 
+/// Simplify access to the CWD
+///
+/// TODO: Should be the cargo manifest directory!
 fn host_repo_root_dir(client: &DaggerConn) -> Directory {
     let repo_root_dir = client.host().directory_opts(
         ".",
@@ -96,6 +53,11 @@ fn host_repo_root_dir(client: &DaggerConn) -> Directory {
     repo_root_dir
 }
 
+/// Register these caches as early as possible
+///
+/// The ordering matters.
+///
+/// TODO: `forge`/`solc` still recompiles all solidity contracts.
 fn with_caches(container: Container, client: &DaggerConn) -> Container {
     let cache_volume_aptititude = client.cache_volume("apt-cache");
     let cache_volume_var_cache = client.cache_volume("apt-lists");
@@ -125,6 +87,7 @@ fn with_caches(container: Container, client: &DaggerConn) -> Container {
     container
 }
 
+/// Create a container definition which is able to compile the contracts
 fn define_contracts_container(
     client: DaggerConn,
     hrrd: Directory,
@@ -136,14 +99,13 @@ fn define_contracts_container(
         .dockerfile("contracts/docker/builder.Dockerfile")
         .build()?;
 
-    let container =     with_caches(client
+    let container = with_caches(client
     .container().from("docker.io/library/node:latest")
     , &client)
     .with_mounted_directory("/workdir", hrrd.clone())
     .with_mounted_directory(compiled_contracts_dir, hccd.clone())
     .with_exec(cmd("apt-get update -y"))
     .with_exec(cmd("apt-get install -y curl which"))
-    // .build_opts(d.clone(), opts)
     .with_workdir("/workdir/contracts")
     .with_exec(cmd("ls -al"))
     .with_exec(cmd("npm install -g pnpm"))
@@ -152,9 +114,10 @@ fn define_contracts_container(
     .with_exec(cmd("git submodule update --init --recursive"))
     .with_exec(cmd(format!("mkdir -p {compiled_contracts_dir}")))
     .with_env_variable_opts("PATH", "${PATH}:/root/.foundry/bin", ContainerWithEnvVariableOptsBuilder::default().expand(true).build()?)
-    .with_exec_opts(cmd("echo \"${PATH}\""), ContainerWithExecOptsBuilder::default().expand(true).build()?)
     .with_exec(cmd("which forge"))
-    .with_exec(cmd(format!("/root/.foundry/bin/forge -vvv build -C ./src/ --lib-paths ./lib/ --via-ir --sizes --skip test --out={compiled_contracts_dir}")));
+    // actually build the contracts
+    // TODO investigate caching issue further
+    .with_exec(cmd(format!("forge -vvv build -C ./src/ --lib-paths ./lib/ --via-ir --sizes --skip test --out={compiled_contracts_dir}")));
 
     Ok(container)
 }
@@ -176,20 +139,21 @@ fn define_crates_container(
         .with_exec(cmd(
             "apt-get install -y build-essential clang cmake protobuf-compiler",
         ))
+        // actually build the rust binaries
         .with_exec(cmd("cargo b -p fendermint_app -p ipc-cli"))
+        // see what was created
         .with_exec(cmd("ls -al /workdir/target/debug"))
         .with_exec(cmd("ls -al output"));
 
     Ok(container)
-    // .build_opts(d.clone(), opts))
 }
 
-async fn prepare_fendermint_two_stage_build(client: DaggerConn) -> eyre::Result<Container> {
+async fn prepare_fendermint_two_stage_build(client: DaggerConn) -> Result<Container> {
     let fendermint_dir = client.host().directory("fendermint");
 
     fs::create_dir_all("_compiled_contracts")?;
     let hrrd = host_repo_root_dir(&client);
-    let hccd = hrrd.directory("_compiled_contracts");
+    let hccd = hrrd.directory("fendermint/actors/output");
 
     let contracts_gen = define_contracts_container(client.clone(), hrrd.clone(), hccd.clone())?;
     run(&contracts_gen).await?;
@@ -200,13 +164,14 @@ async fn prepare_fendermint_two_stage_build(client: DaggerConn) -> eyre::Result<
     let f_fendermint = crates_def.file("/workdir/target/debug/fendermint");
     let f_ipc = crates_def.file("/workdir/target/debug/ipc-cli");
 
-    let car_extra = contracts_gen.file("/workdir/_compiled_contracts/custom_extra_actors.car");
-    let car_builtin = contracts_gen.file("/workdir/_compiled_contracts/output/builtin_actors.car");
+    let car_extra = contracts_gen.file("/workdir/fendermint/actors/output/custom_extra_actors.car");
 
+    // prepare the to-be-published "runner" container
     let container = client.container();
-    let runner = client
-        .container()
-        .with_file_opts(
+    let runner = with_caches(client
+    .container()
+    .from("docker.io/debian:bookworm-slim"), &client)
+    .with_file_opts(
             "/usr/local/bin/fendermint",
             f_fendermint,
             ContainerWithFileOptsBuilder::default()
@@ -221,21 +186,36 @@ async fn prepare_fendermint_two_stage_build(client: DaggerConn) -> eyre::Result<
                 .build()?,
         )
         .with_exec(cmd("ls -al"))
-        // .with_file("/workdir/extra.car", car_extra)
-        // .with_file("/workdir/builtin.car", car_builtin)
-        .build_opts(
-            hrrd,
-            ContainerBuildOptsBuilder::default()
-                .dockerfile("fendermint/docker/runner.Dockerfile")
-                .build()?,
-        );
+        .with_exec(vec!["sh", "-c", "apt-get update && \
+            apt-get install -y libssl3 ca-certificates curl && \
+            rm -rf /var/lib/apt/lists/*"])
+        .with_env_variable("FM_HOME_DIR", "/fendermint")
+        .with_exposed_port(26658)
+        .with_exposed_port(8445)
+        .with_exposed_port(9184)
+        .with_entrypoint(cmd("docker-entry.sh"))
+        .with_default_terminal_cmd(cmd("run"))
+        // TODO STOPSIGNAL SIGTERM
+        .with_env_variable("FM_ABCI__LISTEN__HOST", "0.0.0.0")
+        .with_env_variable("FM_ETH__LISTEN__HOST", "0.0.0.0")
+        .with_env_variable("FM_METRICS__LISTEN__HOST", "0.0.0.0")        
+        .with_exec(cmd("mkdir -p /fendermint/logs"))
+        .with_exec(cmd("chmod 777 /fendermint/logs"))
+        .with_file("/usr/local/bin/docker-entry.sh", hrrd.file("fendermint/docker/docker-entry.sh"))
+        .with_file("/fendermint/custom_actors_bundle.car", car_extra)
+        // TODO FIXME - this is insane
+        .with_exec(cmd("mkdir -p /fendermint/builtin-actors/output"))
+        .with_exec_opts(cmd("curl -L -o /fendermint/builtin-actors/output/bundle.car https://github.com/filecoin-project/builtin-actors/releases/download/${BUILTIN_ACTORS_TAG}/builtin-actors-mainnet.car"), ContainerWithExecOptsBuilder::default().expand(true).build()?)
+        .with_directory("/fendermint/contracts", hrrd.directory("contracts/out"))
+        .with_file("/fendermint/config", hrrd.file("fendermint/app/config"));
+
     run(&runner).await?;
 
     Ok(runner)
 }
 
 #[tokio::main]
-async fn main() -> eyre::Result<()> {
+async fn main() -> Result<()> {
     color_eyre::install()?;
     // dagger_sdk::logging::default_logging()?;
 
