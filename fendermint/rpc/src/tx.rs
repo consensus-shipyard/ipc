@@ -22,7 +22,7 @@ use crate::message::{GasParams, SignedMessageFactory};
 use crate::query::{QueryClient, QueryResponse};
 use crate::response::{decode_bytes, decode_fevm_create, decode_fevm_invoke};
 use ethers::contract::EthCall;
-const SOLIDITY_SELECTOR_BYTES: usize = 8;
+const SOLIDITY_SELECTOR_BYTES: usize = 4;
 
 /// Abstracting away what the return value is based on whether
 /// we broadcast transactions in sync, async or commit mode.

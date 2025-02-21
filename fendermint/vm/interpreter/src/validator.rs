@@ -14,7 +14,7 @@ use fvm_ipld_encoding::BytesDe;
 use fvm_shared::receipt::Receipt;
 use fvm_shared::ActorID;
 
-const SOLIDITY_SELECTOR_BYTES: usize = 8;
+const SOLIDITY_SELECTOR_BYTES: usize = 4;
 
 pub(crate) fn execute_bottom_up_signature<DB: Blockstore + Clone + 'static>(
     state: &mut FvmExecState<DB>,
