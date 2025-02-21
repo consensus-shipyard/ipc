@@ -191,7 +191,7 @@ impl SignedMessageFactory {
         Ok(chain)
     }
 
-    /// Send a validator message to the fendermint
+    /// Send a validator message to the node
     pub fn create_chain_message<T, F: Fn(SignedMessage) -> T>(
         &mut self,
         to: Address,

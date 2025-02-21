@@ -16,6 +16,7 @@ use fvm_shared::ActorID;
 
 const SOLIDITY_SELECTOR_BYTES: usize = 4;
 
+/// Executes the add bottom up checkpoint signature call from a validator.
 pub(crate) fn execute_bottom_up_signature<DB: Blockstore + Clone + 'static>(
     state: &mut FvmExecState<DB>,
     signed: SignedMessage,

@@ -112,7 +112,7 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
         let mf = self.message_factory_mut();
 
         if calldata.len() < SOLIDITY_SELECTOR_BYTES {
-            return Err(anyhow!("invalid validator calldata"));
+            return Err(anyhow!("invalid validator calldata, expected at least {} but found only {}", SOLIDITY_SELECTOR_BYTES, calldata.len()));
         }
 
         let sig_selector =
