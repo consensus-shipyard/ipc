@@ -5,11 +5,11 @@ use color_eyre::eyre::{self, bail, eyre, Result};
 use dagger_sdk::{
     logging::{StdLogger, TracingLogger},
     CacheVolume, Container, ContainerBuildOpts, ContainerBuildOptsBuilder,
-    ContainerWithEntrypointOpts, ContainerWithEntrypointOptsBuilder,
-    ContainerWithEnvVariableOptsBuilder, ContainerWithExecOpts, ContainerWithExecOptsBuilder,
-    ContainerWithFileOpts, ContainerWithFileOptsBuilder, ContainerWithMountedCacheOpts,
-    ContainerWithMountedCacheOptsBuilder, ContainerWithMountedDirectoryOpts, DaggerConn, Directory,
-    File, HostDirectoryOpts, Service,
+    ContainerWithDirectoryOpts, ContainerWithDirectoryOptsBuilder, ContainerWithEntrypointOpts,
+    ContainerWithEntrypointOptsBuilder, ContainerWithEnvVariableOptsBuilder, ContainerWithExecOpts,
+    ContainerWithExecOptsBuilder, ContainerWithFileOpts, ContainerWithFileOptsBuilder,
+    ContainerWithMountedCacheOpts, ContainerWithMountedCacheOptsBuilder,
+    ContainerWithMountedDirectoryOpts, DaggerConn, Directory, File, HostDirectoryOpts, Service,
 };
 use fs_err as fs;
 use rand::Rng;
@@ -164,7 +164,8 @@ async fn prepare_fendermint_two_stage_build(client: DaggerConn) -> Result<Contai
     let f_fendermint = crates_def.file("/workdir/target/debug/fendermint");
     let f_ipc = crates_def.file("/workdir/target/debug/ipc-cli");
 
-    let car_extra = contracts_gen.file("/workdir/fendermint/actors/output/custom_extra_actors.car");
+    let car_extra =
+        contracts_gen.file("/workdir/fendermint/actors/output/custom_actors_bundle.car");
 
     // prepare the to-be-published "runner" container
     let container = client.container();
@@ -207,7 +208,7 @@ async fn prepare_fendermint_two_stage_build(client: DaggerConn) -> Result<Contai
         .with_exec(cmd("mkdir -p /fendermint/builtin-actors/output"))
         .with_exec_opts(cmd("curl -L -o /fendermint/builtin-actors/output/bundle.car https://github.com/filecoin-project/builtin-actors/releases/download/${BUILTIN_ACTORS_TAG}/builtin-actors-mainnet.car"), ContainerWithExecOptsBuilder::default().expand(true).build()?)
         .with_directory("/fendermint/contracts", hrrd.directory("contracts/out"))
-        .with_file("/fendermint/config", hrrd.file("fendermint/app/config"));
+        .with_directory_opts("/fendermint/config", hrrd.directory("fendermint/app/config"), ContainerWithDirectoryOptsBuilder::default().exclude(vec![".git", ".gitignore", ".*"]).build()?);
 
     run(&runner).await?;
 
