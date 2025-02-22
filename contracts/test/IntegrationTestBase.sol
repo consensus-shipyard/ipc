@@ -809,7 +809,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
                 rawAddress: FvmAddressHelper.from(src)
             }),
             value: DEFAULT_CROSS_MSG_FEE + 1,
-            nonce: 0,
+            localNonce: 0,
+            originalNonce: 0,
             message: EMPTY_BYTES
         });
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);

@@ -206,41 +206,78 @@ pub mod gateway_manager_facet {
                                 name: ::std::borrow::ToOwned::to_owned("message"),
                                 kind: ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
                                     ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                ::std::boxed::Box::new(
-                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                ),
-                                            ),
-                                        ],),
-                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                        ],),
-                                    ],),
-                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                ::std::boxed::Box::new(
-                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                ),
-                                            ),
-                                        ],),
-                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                        ],),
-                                    ],),
+                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                     ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                     ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                ::std::boxed::Box::new(
+                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                ),
+                                            ),
+                                        ],),
+                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                        ],),
+                                    ],),
+                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                ::std::boxed::Box::new(
+                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                ),
+                                            ),
+                                        ],),
+                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                        ],),
+                                    ],),
                                     ::ethers::core::abi::ethabi::ParamType::Bytes,
                                 ],),
                                 indexed: false,
                             },
+                            ::ethers::core::abi::ethabi::EventParam {
+                                name: ::std::borrow::ToOwned::to_owned("id"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
+                                indexed: true,
+                            },
                         ],
+                        anonymous: false,
+                    },],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("QueuedBottomUpMessage"),
+                    ::std::vec![::ethers::core::abi::ethabi::Event {
+                        name: ::std::borrow::ToOwned::to_owned("QueuedBottomUpMessage",),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::EventParam {
+                            name: ::std::borrow::ToOwned::to_owned("id"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
+                            indexed: true,
+                        },],
+                        anonymous: false,
+                    },],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("SubnetDestroyed"),
+                    ::std::vec![::ethers::core::abi::ethabi::Event {
+                        name: ::std::borrow::ToOwned::to_owned("SubnetDestroyed"),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::EventParam {
+                            name: ::std::borrow::ToOwned::to_owned("id"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                ::ethers::core::abi::ethabi::ParamType::Array(
+                                    ::std::boxed::Box::new(
+                                        ::ethers::core::abi::ethabi::ParamType::Address,
+                                    ),
+                                ),
+                            ],),
+                            indexed: false,
+                        },],
                         anonymous: false,
                     },],
                 ),
@@ -512,6 +549,20 @@ pub mod gateway_manager_facet {
         pub fn new_top_down_message_filter(
             &self,
         ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, NewTopDownMessageFilter>
+        {
+            self.0.event()
+        }
+        ///Gets the contract's `QueuedBottomUpMessage` event
+        pub fn queued_bottom_up_message_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, QueuedBottomUpMessageFilter>
+        {
+            self.0.event()
+        }
+        ///Gets the contract's `SubnetDestroyed` event
+        pub fn subnet_destroyed_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, SubnetDestroyedFilter>
         {
             self.0.event()
         }
@@ -1135,18 +1186,51 @@ pub mod gateway_manager_facet {
     )]
     #[ethevent(
         name = "NewTopDownMessage",
-        abi = "NewTopDownMessage(address,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes))"
+        abi = "NewTopDownMessage(address,(uint8,uint64,uint64,uint256,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),bytes),bytes32)"
     )]
     pub struct NewTopDownMessageFilter {
         #[ethevent(indexed)]
         pub subnet: ::ethers::core::types::Address,
         pub message: IpcEnvelope,
+        #[ethevent(indexed)]
+        pub id: [u8; 32],
+    }
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethevent(name = "QueuedBottomUpMessage", abi = "QueuedBottomUpMessage(bytes32)")]
+    pub struct QueuedBottomUpMessageFilter {
+        #[ethevent(indexed)]
+        pub id: [u8; 32],
+    }
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethevent(name = "SubnetDestroyed", abi = "SubnetDestroyed((uint64,address[]))")]
+    pub struct SubnetDestroyedFilter {
+        pub id: SubnetID,
     }
     ///Container type for all of the contract's events
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum GatewayManagerFacetEvents {
         NewBottomUpMsgBatchFilter(NewBottomUpMsgBatchFilter),
         NewTopDownMessageFilter(NewTopDownMessageFilter),
+        QueuedBottomUpMessageFilter(QueuedBottomUpMessageFilter),
+        SubnetDestroyedFilter(SubnetDestroyedFilter),
     }
     impl ::ethers::contract::EthLogDecode for GatewayManagerFacetEvents {
         fn decode_log(
@@ -1160,6 +1244,14 @@ pub mod gateway_manager_facet {
             if let Ok(decoded) = NewTopDownMessageFilter::decode_log(log) {
                 return Ok(GatewayManagerFacetEvents::NewTopDownMessageFilter(decoded));
             }
+            if let Ok(decoded) = QueuedBottomUpMessageFilter::decode_log(log) {
+                return Ok(GatewayManagerFacetEvents::QueuedBottomUpMessageFilter(
+                    decoded,
+                ));
+            }
+            if let Ok(decoded) = SubnetDestroyedFilter::decode_log(log) {
+                return Ok(GatewayManagerFacetEvents::SubnetDestroyedFilter(decoded));
+            }
             Err(::ethers::core::abi::Error::InvalidData)
         }
     }
@@ -1168,6 +1260,8 @@ pub mod gateway_manager_facet {
             match self {
                 Self::NewBottomUpMsgBatchFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NewTopDownMessageFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::QueuedBottomUpMessageFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::SubnetDestroyedFilter(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
     }
@@ -1179,6 +1273,16 @@ pub mod gateway_manager_facet {
     impl ::core::convert::From<NewTopDownMessageFilter> for GatewayManagerFacetEvents {
         fn from(value: NewTopDownMessageFilter) -> Self {
             Self::NewTopDownMessageFilter(value)
+        }
+    }
+    impl ::core::convert::From<QueuedBottomUpMessageFilter> for GatewayManagerFacetEvents {
+        fn from(value: QueuedBottomUpMessageFilter) -> Self {
+            Self::QueuedBottomUpMessageFilter(value)
+        }
+    }
+    impl ::core::convert::From<SubnetDestroyedFilter> for GatewayManagerFacetEvents {
+        fn from(value: SubnetDestroyedFilter) -> Self {
+            Self::SubnetDestroyedFilter(value)
         }
     }
     ///Container type for all input parameters for the `addStake` function with signature `addStake(uint256)` and selector `0xeb4f16b5`
@@ -1424,7 +1528,7 @@ pub mod gateway_manager_facet {
         pub subnet_id: SubnetID,
         pub raw_address: FvmAddress,
     }
-    ///`IpcEnvelope(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)`
+    ///`IpcEnvelope(uint8,uint64,uint64,uint256,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),bytes)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -1437,10 +1541,11 @@ pub mod gateway_manager_facet {
     )]
     pub struct IpcEnvelope {
         pub kind: u8,
+        pub local_nonce: u64,
+        pub original_nonce: u64,
+        pub value: ::ethers::core::types::U256,
         pub to: Ipcaddress,
         pub from: Ipcaddress,
-        pub nonce: u64,
-        pub value: ::ethers::core::types::U256,
         pub message: ::ethers::core::types::Bytes,
     }
     ///`SubnetID(uint64,address[])`

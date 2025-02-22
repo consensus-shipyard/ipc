@@ -27,6 +27,8 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     using AssetHelper for Asset;
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
+    event SubnetDestroyed(SubnetID id);
+
     /// @notice register a subnet in the gateway. It is called by a subnet when it reaches the threshold stake
     /// @dev The subnet can optionally pass a genesis circulating supply that would be pre-allocated in the
     /// subnet from genesis (without having to wait for the subnet to be spawned to propagate the funds).
@@ -35,13 +37,6 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         // subnets in the root
         if (s.networkName.route.length + 1 >= s.maxTreeDepth) {
             revert MethodNotAllowed(ERR_CHILD_SUBNET_NOT_ALLOWED);
-        }
-
-        if (genesisCircSupply > 0) {
-            SubnetActorGetterFacet(msg.sender).supplySource().lock(genesisCircSupply);
-        }
-        if (collateral > 0) {
-            SubnetActorGetterFacet(msg.sender).collateralSource().lock(collateral);
         }
 
         SubnetID memory subnetId = s.networkName.createSubnetId(msg.sender);
@@ -58,6 +53,13 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
 
         s.subnetKeys.add(subnetId.toHash());
         s.totalSubnets += 1;
+
+        if (genesisCircSupply > 0) {
+            SubnetActorGetterFacet(msg.sender).supplySource().lock(genesisCircSupply);
+        }
+        if (collateral > 0) {
+            SubnetActorGetterFacet(msg.sender).collateralSource().lock(collateral);
+        }
     }
 
     /// @notice addStake - add collateral for an existing subnet
@@ -72,7 +74,6 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         SubnetActorGetterFacet(msg.sender).collateralSource().lock(amount);
 
         (bool registered, Subnet storage subnet) = LibGateway.getSubnet(msg.sender);
-
         if (!registered) {
             revert NotRegisteredSubnet();
         }
@@ -126,6 +127,8 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
 
         s.subnetKeys.remove(id);
         SubnetActorGetterFacet(msg.sender).collateralSource().transferFunds(payable(msg.sender), stake);
+
+        emit SubnetDestroyed(subnet.id);
     }
 
     /// @notice credits the received value to the specified address in the specified child subnet.
@@ -141,7 +144,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
             revert InvalidXnetMessage(InvalidXnetMessageReason.Value);
         }
         // slither-disable-next-line unused-return
-        (bool registered, ) = LibGateway.getSubnet(subnetId);
+        (bool registered, Subnet storage subnet) = LibGateway.getSubnet(subnetId);
         if (!registered) {
             revert NotRegisteredSubnet();
         }
@@ -158,7 +161,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         });
 
         // commit top-down message.
-        LibGateway.commitTopDownMsg(crossMsg);
+        LibGateway.commitTopDownMsg(subnet, crossMsg);
     }
 
     /// @notice Sends funds to a specified subnet receiver using ERC20 tokens.
@@ -174,7 +177,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
             revert InvalidXnetMessage(InvalidXnetMessageReason.Value);
         }
         // slither-disable-next-line unused-return
-        (bool registered, ) = LibGateway.getSubnet(subnetId);
+        (bool registered, Subnet storage subnet) = LibGateway.getSubnet(subnetId);
         if (!registered) {
             revert NotRegisteredSubnet();
         }
@@ -199,7 +202,7 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         });
 
         // Commit top-down message.
-        LibGateway.commitTopDownMsg(crossMsg);
+        LibGateway.commitTopDownMsg(subnet, crossMsg);
     }
 
     /// @notice release() burns the received value locally in subnet and commits a bottom-up message to release the assets in the parent.

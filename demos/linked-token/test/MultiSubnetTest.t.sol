@@ -184,7 +184,7 @@ contract MultiSubnetTest is IntegrationTestBase {
         ipcTokenReplica.setLinkedContract(address(ipcTokenController));
     }
 
-    function testMultiSubnet_Native_FundFromParentToChild_USDCBridge() public {
+    function testMultiSubnet_Native_FundFromParentToChild_USDCBridgeBaisc() public {
         _testLinkedTokenBridge();
     }
 
@@ -291,7 +291,8 @@ contract MultiSubnetTest is IntegrationTestBase {
             to: lockAndTransferEnvelope.to,
             value: 0,
             message: lockAndTransferEnvelope.message,
-            nonce: 0 // nonce will be updated by LibGateway.commitCrossMessage
+            originalNonce: 0,
+            localNonce: 0 // localNonce will be updated by LibGateway.commitCrossMessage
         });
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);

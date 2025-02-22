@@ -94,7 +94,8 @@ macro_rules! cross_msg_types {
                     to: $module::Ipcaddress::try_from(value.to)
                         .map_err(|e| anyhow!("cannot convert `to`` ipc address due to: {e:}"))?,
                     value: val,
-                    nonce: value.nonce,
+                    local_nonce: value.local_nonce,
+                    original_nonce: value.original_nonce,
                     message: ethers::core::types::Bytes::from(value.message),
                 };
                 Ok(c)
@@ -111,7 +112,8 @@ macro_rules! cross_msg_types {
                     value: eth_to_fil_amount(&value.value)?,
                     kind: IpcMsgKind::try_from(value.kind)?,
                     message: value.message.to_vec(),
-                    nonce: value.nonce,
+                    local_nonce: value.local_nonce,
+                    original_nonce: value.original_nonce,
                 };
                 Ok(s)
             }

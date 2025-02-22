@@ -16,16 +16,10 @@ pub mod gateway_messenger_facet {
             constructor: ::core::option::Option::None,
             functions: ::core::convert::From::from([
                 (
-                    ::std::borrow::ToOwned::to_owned("propagate"),
+                    ::std::borrow::ToOwned::to_owned("propagateAll"),
                     ::std::vec![::ethers::core::abi::ethabi::Function {
-                        name: ::std::borrow::ToOwned::to_owned("propagate"),
-                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
-                            name: ::std::borrow::ToOwned::to_owned("msgCid"),
-                            kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
-                            internal_type: ::core::option::Option::Some(
-                                ::std::borrow::ToOwned::to_owned("bytes32"),
-                            ),
-                        },],
+                        name: ::std::borrow::ToOwned::to_owned("propagateAll"),
+                        inputs: ::std::vec![],
                         outputs: ::std::vec![],
                         constant: ::core::option::Option::None,
                         state_mutability: ::ethers::core::abi::ethabi::StateMutability::Payable,
@@ -39,36 +33,37 @@ pub mod gateway_messenger_facet {
                             name: ::std::borrow::ToOwned::to_owned("envelope"),
                             kind: ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
                                 ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                        ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                        ::ethers::core::abi::ethabi::ParamType::Array(
-                                            ::std::boxed::Box::new(
-                                                ::ethers::core::abi::ethabi::ParamType::Address,
-                                            ),
-                                        ),
-                                    ],),
-                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                        ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                        ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                    ],),
-                                ],),
-                                ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                        ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                        ::ethers::core::abi::ethabi::ParamType::Array(
-                                            ::std::boxed::Box::new(
-                                                ::ethers::core::abi::ethabi::ParamType::Address,
-                                            ),
-                                        ),
-                                    ],),
-                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                        ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                        ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                    ],),
-                                ],),
+                                ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                 ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                 ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                        ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                        ::ethers::core::abi::ethabi::ParamType::Array(
+                                            ::std::boxed::Box::new(
+                                                ::ethers::core::abi::ethabi::ParamType::Address,
+                                            ),
+                                        ),
+                                    ],),
+                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                        ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                        ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                    ],),
+                                ],),
+                                ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                        ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                        ::ethers::core::abi::ethabi::ParamType::Array(
+                                            ::std::boxed::Box::new(
+                                                ::ethers::core::abi::ethabi::ParamType::Address,
+                                            ),
+                                        ),
+                                    ],),
+                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                        ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                        ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                    ],),
+                                ],),
                                 ::ethers::core::abi::ethabi::ParamType::Bytes,
                             ],),
                             internal_type: ::core::option::Option::Some(
@@ -79,36 +74,37 @@ pub mod gateway_messenger_facet {
                             name: ::std::borrow::ToOwned::to_owned("committed"),
                             kind: ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
                                 ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                        ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                        ::ethers::core::abi::ethabi::ParamType::Array(
-                                            ::std::boxed::Box::new(
-                                                ::ethers::core::abi::ethabi::ParamType::Address,
-                                            ),
-                                        ),
-                                    ],),
-                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                        ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                        ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                    ],),
-                                ],),
-                                ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                        ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                        ::ethers::core::abi::ethabi::ParamType::Array(
-                                            ::std::boxed::Box::new(
-                                                ::ethers::core::abi::ethabi::ParamType::Address,
-                                            ),
-                                        ),
-                                    ],),
-                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                        ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                        ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                    ],),
-                                ],),
+                                ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                 ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                 ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                        ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                        ::ethers::core::abi::ethabi::ParamType::Array(
+                                            ::std::boxed::Box::new(
+                                                ::ethers::core::abi::ethabi::ParamType::Address,
+                                            ),
+                                        ),
+                                    ],),
+                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                        ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                        ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                    ],),
+                                ],),
+                                ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                        ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                        ::ethers::core::abi::ethabi::ParamType::Array(
+                                            ::std::boxed::Box::new(
+                                                ::ethers::core::abi::ethabi::ParamType::Address,
+                                            ),
+                                        ),
+                                    ],),
+                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                        ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                        ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                    ],),
+                                ],),
                                 ::ethers::core::abi::ethabi::ParamType::Bytes,
                             ],),
                             internal_type: ::core::option::Option::Some(
@@ -121,6 +117,18 @@ pub mod gateway_messenger_facet {
                 ),
             ]),
             events: ::core::convert::From::from([
+                (
+                    ::std::borrow::ToOwned::to_owned("MessagePropagatedFromPostbox"),
+                    ::std::vec![::ethers::core::abi::ethabi::Event {
+                        name: ::std::borrow::ToOwned::to_owned("MessagePropagatedFromPostbox",),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::EventParam {
+                            name: ::std::borrow::ToOwned::to_owned("id"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
+                            indexed: false,
+                        },],
+                        anonymous: false,
+                    },],
+                ),
                 (
                     ::std::borrow::ToOwned::to_owned("NewBottomUpMsgBatch"),
                     ::std::vec![::ethers::core::abi::ethabi::Event {
@@ -147,46 +155,90 @@ pub mod gateway_messenger_facet {
                                 name: ::std::borrow::ToOwned::to_owned("message"),
                                 kind: ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
                                     ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                ::std::boxed::Box::new(
-                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                ),
-                                            ),
-                                        ],),
-                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                        ],),
-                                    ],),
-                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                ::std::boxed::Box::new(
-                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                ),
-                                            ),
-                                        ],),
-                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                        ],),
-                                    ],),
+                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                     ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                     ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                ::std::boxed::Box::new(
+                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                ),
+                                            ),
+                                        ],),
+                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                        ],),
+                                    ],),
+                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                ::std::boxed::Box::new(
+                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                ),
+                                            ),
+                                        ],),
+                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                        ],),
+                                    ],),
                                     ::ethers::core::abi::ethabi::ParamType::Bytes,
                                 ],),
                                 indexed: false,
+                            },
+                            ::ethers::core::abi::ethabi::EventParam {
+                                name: ::std::borrow::ToOwned::to_owned("id"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
+                                indexed: true,
                             },
                         ],
                         anonymous: false,
                     },],
                 ),
+                (
+                    ::std::borrow::ToOwned::to_owned("QueuedBottomUpMessage"),
+                    ::std::vec![::ethers::core::abi::ethabi::Event {
+                        name: ::std::borrow::ToOwned::to_owned("QueuedBottomUpMessage",),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::EventParam {
+                            name: ::std::borrow::ToOwned::to_owned("id"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
+                            indexed: true,
+                        },],
+                        anonymous: false,
+                    },],
+                ),
             ]),
             errors: ::core::convert::From::from([
+                (
+                    ::std::borrow::ToOwned::to_owned("AddressEmptyCode"),
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("AddressEmptyCode"),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("target"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("address"),
+                            ),
+                        },],
+                    },],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("AddressInsufficientBalance"),
+                    ::std::vec![::ethers::core::abi::ethabi::AbiError {
+                        name: ::std::borrow::ToOwned::to_owned("AddressInsufficientBalance",),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("account"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("address"),
+                            ),
+                        },],
+                    },],
+                ),
                 (
                     ::std::borrow::ToOwned::to_owned("CallFailed"),
                     ::std::vec![::ethers::core::abi::ethabi::AbiError {
@@ -195,9 +247,9 @@ pub mod gateway_messenger_facet {
                     },],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("CannotSendCrossMsgToItself"),
+                    ::std::borrow::ToOwned::to_owned("FailedInnerCall"),
                     ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("CannotSendCrossMsgToItself",),
+                        name: ::std::borrow::ToOwned::to_owned("FailedInnerCall"),
                         inputs: ::std::vec![],
                     },],
                 ),
@@ -235,10 +287,16 @@ pub mod gateway_messenger_facet {
                     },],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("NotRegisteredSubnet"),
+                    ::std::borrow::ToOwned::to_owned("SafeERC20FailedOperation"),
                     ::std::vec![::ethers::core::abi::ethabi::AbiError {
-                        name: ::std::borrow::ToOwned::to_owned("NotRegisteredSubnet",),
-                        inputs: ::std::vec![],
+                        name: ::std::borrow::ToOwned::to_owned("SafeERC20FailedOperation",),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name: ::std::borrow::ToOwned::to_owned("token"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("address"),
+                            ),
+                        },],
                     },],
                 ),
             ]),
@@ -286,23 +344,30 @@ pub mod gateway_messenger_facet {
                 client,
             ))
         }
-        ///Calls the contract's `propagate` (0x25bf0db6) function
-        pub fn propagate(
-            &self,
-            msg_cid: [u8; 32],
-        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
+        ///Calls the contract's `propagateAll` (0x7f7999f4) function
+        pub fn propagate_all(&self) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
-                .method_hash([37, 191, 13, 182], msg_cid)
+                .method_hash([127, 121, 153, 244], ())
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `sendContractXnetMessage` (0x3eeb723f) function
+        ///Calls the contract's `sendContractXnetMessage` (0x2c85ec2c) function
         pub fn send_contract_xnet_message(
             &self,
             envelope: IpcEnvelope,
         ) -> ::ethers::contract::builders::ContractCall<M, IpcEnvelope> {
             self.0
-                .method_hash([62, 235, 114, 63], (envelope,))
+                .method_hash([44, 133, 236, 44], (envelope,))
                 .expect("method not found (this should never happen)")
+        }
+        ///Gets the contract's `MessagePropagatedFromPostbox` event
+        pub fn message_propagated_from_postbox_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            MessagePropagatedFromPostboxFilter,
+        > {
+            self.0.event()
         }
         ///Gets the contract's `NewBottomUpMsgBatch` event
         pub fn new_bottom_up_msg_batch_filter(
@@ -315,6 +380,13 @@ pub mod gateway_messenger_facet {
         pub fn new_top_down_message_filter(
             &self,
         ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, NewTopDownMessageFilter>
+        {
+            self.0.event()
+        }
+        ///Gets the contract's `QueuedBottomUpMessage` event
+        pub fn queued_bottom_up_message_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, QueuedBottomUpMessageFilter>
         {
             self.0.event()
         }
@@ -334,6 +406,39 @@ pub mod gateway_messenger_facet {
             Self::new(contract.address(), contract.client())
         }
     }
+    ///Custom Error type `AddressEmptyCode` with signature `AddressEmptyCode(address)` and selector `0x9996b315`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(name = "AddressEmptyCode", abi = "AddressEmptyCode(address)")]
+    pub struct AddressEmptyCode {
+        pub target: ::ethers::core::types::Address,
+    }
+    ///Custom Error type `AddressInsufficientBalance` with signature `AddressInsufficientBalance(address)` and selector `0xcd786059`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthError,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[etherror(
+        name = "AddressInsufficientBalance",
+        abi = "AddressInsufficientBalance(address)"
+    )]
+    pub struct AddressInsufficientBalance {
+        pub account: ::ethers::core::types::Address,
+    }
     ///Custom Error type `CallFailed` with signature `CallFailed()` and selector `0x3204506f`
     #[derive(
         Clone,
@@ -347,7 +452,7 @@ pub mod gateway_messenger_facet {
     )]
     #[etherror(name = "CallFailed", abi = "CallFailed()")]
     pub struct CallFailed;
-    ///Custom Error type `CannotSendCrossMsgToItself` with signature `CannotSendCrossMsgToItself()` and selector `0xbcccd7fc`
+    ///Custom Error type `FailedInnerCall` with signature `FailedInnerCall()` and selector `0x1425ea42`
     #[derive(
         Clone,
         ::ethers::contract::EthError,
@@ -358,11 +463,8 @@ pub mod gateway_messenger_facet {
         Eq,
         Hash,
     )]
-    #[etherror(
-        name = "CannotSendCrossMsgToItself",
-        abi = "CannotSendCrossMsgToItself()"
-    )]
-    pub struct CannotSendCrossMsgToItself;
+    #[etherror(name = "FailedInnerCall", abi = "FailedInnerCall()")]
+    pub struct FailedInnerCall;
     ///Custom Error type `InsufficientFunds` with signature `InsufficientFunds()` and selector `0x356680b7`
     #[derive(
         Clone,
@@ -406,7 +508,7 @@ pub mod gateway_messenger_facet {
     pub struct MethodNotAllowed {
         pub reason: ::std::string::String,
     }
-    ///Custom Error type `NotRegisteredSubnet` with signature `NotRegisteredSubnet()` and selector `0xe991abd0`
+    ///Custom Error type `SafeERC20FailedOperation` with signature `SafeERC20FailedOperation(address)` and selector `0x5274afe7`
     #[derive(
         Clone,
         ::ethers::contract::EthError,
@@ -417,17 +519,24 @@ pub mod gateway_messenger_facet {
         Eq,
         Hash,
     )]
-    #[etherror(name = "NotRegisteredSubnet", abi = "NotRegisteredSubnet()")]
-    pub struct NotRegisteredSubnet;
+    #[etherror(
+        name = "SafeERC20FailedOperation",
+        abi = "SafeERC20FailedOperation(address)"
+    )]
+    pub struct SafeERC20FailedOperation {
+        pub token: ::ethers::core::types::Address,
+    }
     ///Container type for all of the contract's custom errors
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum GatewayMessengerFacetErrors {
+        AddressEmptyCode(AddressEmptyCode),
+        AddressInsufficientBalance(AddressInsufficientBalance),
         CallFailed(CallFailed),
-        CannotSendCrossMsgToItself(CannotSendCrossMsgToItself),
+        FailedInnerCall(FailedInnerCall),
         InsufficientFunds(InsufficientFunds),
         InvalidXnetMessage(InvalidXnetMessage),
         MethodNotAllowed(MethodNotAllowed),
-        NotRegisteredSubnet(NotRegisteredSubnet),
+        SafeERC20FailedOperation(SafeERC20FailedOperation),
         /// The standard solidity revert string, with selector
         /// Error(string) -- 0x08c379a0
         RevertString(::std::string::String),
@@ -442,13 +551,20 @@ pub mod gateway_messenger_facet {
             {
                 return Ok(Self::RevertString(decoded));
             }
+            if let Ok(decoded) = <AddressEmptyCode as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::AddressEmptyCode(decoded));
+            }
+            if let Ok(decoded) =
+                <AddressInsufficientBalance as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::AddressInsufficientBalance(decoded));
+            }
             if let Ok(decoded) = <CallFailed as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::CallFailed(decoded));
             }
-            if let Ok(decoded) =
-                <CannotSendCrossMsgToItself as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::CannotSendCrossMsgToItself(decoded));
+            if let Ok(decoded) = <FailedInnerCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+                return Ok(Self::FailedInnerCall(decoded));
             }
             if let Ok(decoded) = <InsufficientFunds as ::ethers::core::abi::AbiDecode>::decode(data)
             {
@@ -464,9 +580,9 @@ pub mod gateway_messenger_facet {
                 return Ok(Self::MethodNotAllowed(decoded));
             }
             if let Ok(decoded) =
-                <NotRegisteredSubnet as ::ethers::core::abi::AbiDecode>::decode(data)
+                <SafeERC20FailedOperation as ::ethers::core::abi::AbiDecode>::decode(data)
             {
-                return Ok(Self::NotRegisteredSubnet(decoded));
+                return Ok(Self::SafeERC20FailedOperation(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData.into())
         }
@@ -474,16 +590,18 @@ pub mod gateway_messenger_facet {
     impl ::ethers::core::abi::AbiEncode for GatewayMessengerFacetErrors {
         fn encode(self) -> ::std::vec::Vec<u8> {
             match self {
-                Self::CallFailed(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::CannotSendCrossMsgToItself(element) => {
+                Self::AddressEmptyCode(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::AddressInsufficientBalance(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::CallFailed(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::FailedInnerCall(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::InsufficientFunds(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::InvalidXnetMessage(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::MethodNotAllowed(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::NotRegisteredSubnet(element) => {
+                Self::SafeERC20FailedOperation(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::RevertString(s) => ::ethers::core::abi::AbiEncode::encode(s),
@@ -494,10 +612,16 @@ pub mod gateway_messenger_facet {
         fn valid_selector(selector: [u8; 4]) -> bool {
             match selector {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
-                _ if selector == <CallFailed as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <AddressEmptyCode as ::ethers::contract::EthError>::selector() => {
+                    true
+                }
                 _ if selector
-                    == <CannotSendCrossMsgToItself as ::ethers::contract::EthError>::selector() =>
+                    == <AddressInsufficientBalance as ::ethers::contract::EthError>::selector() =>
                 {
+                    true
+                }
+                _ if selector == <CallFailed as ::ethers::contract::EthError>::selector() => true,
+                _ if selector == <FailedInnerCall as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector
@@ -514,7 +638,7 @@ pub mod gateway_messenger_facet {
                     true
                 }
                 _ if selector
-                    == <NotRegisteredSubnet as ::ethers::contract::EthError>::selector() =>
+                    == <SafeERC20FailedOperation as ::ethers::contract::EthError>::selector() =>
                 {
                     true
                 }
@@ -525,12 +649,14 @@ pub mod gateway_messenger_facet {
     impl ::core::fmt::Display for GatewayMessengerFacetErrors {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
+                Self::AddressEmptyCode(element) => ::core::fmt::Display::fmt(element, f),
+                Self::AddressInsufficientBalance(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CallFailed(element) => ::core::fmt::Display::fmt(element, f),
-                Self::CannotSendCrossMsgToItself(element) => ::core::fmt::Display::fmt(element, f),
+                Self::FailedInnerCall(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InsufficientFunds(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidXnetMessage(element) => ::core::fmt::Display::fmt(element, f),
                 Self::MethodNotAllowed(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NotRegisteredSubnet(element) => ::core::fmt::Display::fmt(element, f),
+                Self::SafeERC20FailedOperation(element) => ::core::fmt::Display::fmt(element, f),
                 Self::RevertString(s) => ::core::fmt::Display::fmt(s, f),
             }
         }
@@ -540,14 +666,24 @@ pub mod gateway_messenger_facet {
             Self::RevertString(value)
         }
     }
+    impl ::core::convert::From<AddressEmptyCode> for GatewayMessengerFacetErrors {
+        fn from(value: AddressEmptyCode) -> Self {
+            Self::AddressEmptyCode(value)
+        }
+    }
+    impl ::core::convert::From<AddressInsufficientBalance> for GatewayMessengerFacetErrors {
+        fn from(value: AddressInsufficientBalance) -> Self {
+            Self::AddressInsufficientBalance(value)
+        }
+    }
     impl ::core::convert::From<CallFailed> for GatewayMessengerFacetErrors {
         fn from(value: CallFailed) -> Self {
             Self::CallFailed(value)
         }
     }
-    impl ::core::convert::From<CannotSendCrossMsgToItself> for GatewayMessengerFacetErrors {
-        fn from(value: CannotSendCrossMsgToItself) -> Self {
-            Self::CannotSendCrossMsgToItself(value)
+    impl ::core::convert::From<FailedInnerCall> for GatewayMessengerFacetErrors {
+        fn from(value: FailedInnerCall) -> Self {
+            Self::FailedInnerCall(value)
         }
     }
     impl ::core::convert::From<InsufficientFunds> for GatewayMessengerFacetErrors {
@@ -565,10 +701,27 @@ pub mod gateway_messenger_facet {
             Self::MethodNotAllowed(value)
         }
     }
-    impl ::core::convert::From<NotRegisteredSubnet> for GatewayMessengerFacetErrors {
-        fn from(value: NotRegisteredSubnet) -> Self {
-            Self::NotRegisteredSubnet(value)
+    impl ::core::convert::From<SafeERC20FailedOperation> for GatewayMessengerFacetErrors {
+        fn from(value: SafeERC20FailedOperation) -> Self {
+            Self::SafeERC20FailedOperation(value)
         }
+    }
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethevent(
+        name = "MessagePropagatedFromPostbox",
+        abi = "MessagePropagatedFromPostbox(bytes32)"
+    )]
+    pub struct MessagePropagatedFromPostboxFilter {
+        pub id: [u8; 32],
     }
     #[derive(
         Clone,
@@ -597,23 +750,47 @@ pub mod gateway_messenger_facet {
     )]
     #[ethevent(
         name = "NewTopDownMessage",
-        abi = "NewTopDownMessage(address,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes))"
+        abi = "NewTopDownMessage(address,(uint8,uint64,uint64,uint256,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),bytes),bytes32)"
     )]
     pub struct NewTopDownMessageFilter {
         #[ethevent(indexed)]
         pub subnet: ::ethers::core::types::Address,
         pub message: IpcEnvelope,
+        #[ethevent(indexed)]
+        pub id: [u8; 32],
+    }
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethevent(name = "QueuedBottomUpMessage", abi = "QueuedBottomUpMessage(bytes32)")]
+    pub struct QueuedBottomUpMessageFilter {
+        #[ethevent(indexed)]
+        pub id: [u8; 32],
     }
     ///Container type for all of the contract's events
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum GatewayMessengerFacetEvents {
+        MessagePropagatedFromPostboxFilter(MessagePropagatedFromPostboxFilter),
         NewBottomUpMsgBatchFilter(NewBottomUpMsgBatchFilter),
         NewTopDownMessageFilter(NewTopDownMessageFilter),
+        QueuedBottomUpMessageFilter(QueuedBottomUpMessageFilter),
     }
     impl ::ethers::contract::EthLogDecode for GatewayMessengerFacetEvents {
         fn decode_log(
             log: &::ethers::core::abi::RawLog,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::Error> {
+            if let Ok(decoded) = MessagePropagatedFromPostboxFilter::decode_log(log) {
+                return Ok(
+                    GatewayMessengerFacetEvents::MessagePropagatedFromPostboxFilter(decoded),
+                );
+            }
             if let Ok(decoded) = NewBottomUpMsgBatchFilter::decode_log(log) {
                 return Ok(GatewayMessengerFacetEvents::NewBottomUpMsgBatchFilter(
                     decoded,
@@ -624,15 +801,29 @@ pub mod gateway_messenger_facet {
                     decoded,
                 ));
             }
+            if let Ok(decoded) = QueuedBottomUpMessageFilter::decode_log(log) {
+                return Ok(GatewayMessengerFacetEvents::QueuedBottomUpMessageFilter(
+                    decoded,
+                ));
+            }
             Err(::ethers::core::abi::Error::InvalidData)
         }
     }
     impl ::core::fmt::Display for GatewayMessengerFacetEvents {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
+                Self::MessagePropagatedFromPostboxFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::NewBottomUpMsgBatchFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NewTopDownMessageFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::QueuedBottomUpMessageFilter(element) => ::core::fmt::Display::fmt(element, f),
             }
+        }
+    }
+    impl ::core::convert::From<MessagePropagatedFromPostboxFilter> for GatewayMessengerFacetEvents {
+        fn from(value: MessagePropagatedFromPostboxFilter) -> Self {
+            Self::MessagePropagatedFromPostboxFilter(value)
         }
     }
     impl ::core::convert::From<NewBottomUpMsgBatchFilter> for GatewayMessengerFacetEvents {
@@ -645,7 +836,12 @@ pub mod gateway_messenger_facet {
             Self::NewTopDownMessageFilter(value)
         }
     }
-    ///Container type for all input parameters for the `propagate` function with signature `propagate(bytes32)` and selector `0x25bf0db6`
+    impl ::core::convert::From<QueuedBottomUpMessageFilter> for GatewayMessengerFacetEvents {
+        fn from(value: QueuedBottomUpMessageFilter) -> Self {
+            Self::QueuedBottomUpMessageFilter(value)
+        }
+    }
+    ///Container type for all input parameters for the `propagateAll` function with signature `propagateAll()` and selector `0x7f7999f4`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -656,11 +852,9 @@ pub mod gateway_messenger_facet {
         Eq,
         Hash,
     )]
-    #[ethcall(name = "propagate", abi = "propagate(bytes32)")]
-    pub struct PropagateCall {
-        pub msg_cid: [u8; 32],
-    }
-    ///Container type for all input parameters for the `sendContractXnetMessage` function with signature `sendContractXnetMessage((uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes))` and selector `0x3eeb723f`
+    #[ethcall(name = "propagateAll", abi = "propagateAll()")]
+    pub struct PropagateAllCall;
+    ///Container type for all input parameters for the `sendContractXnetMessage` function with signature `sendContractXnetMessage((uint8,uint64,uint64,uint256,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),bytes))` and selector `0x2c85ec2c`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -673,7 +867,7 @@ pub mod gateway_messenger_facet {
     )]
     #[ethcall(
         name = "sendContractXnetMessage",
-        abi = "sendContractXnetMessage((uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes))"
+        abi = "sendContractXnetMessage((uint8,uint64,uint64,uint256,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),bytes))"
     )]
     pub struct SendContractXnetMessageCall {
         pub envelope: IpcEnvelope,
@@ -681,7 +875,7 @@ pub mod gateway_messenger_facet {
     ///Container type for all of the contract's call
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum GatewayMessengerFacetCalls {
-        Propagate(PropagateCall),
+        PropagateAll(PropagateAllCall),
         SendContractXnetMessage(SendContractXnetMessageCall),
     }
     impl ::ethers::core::abi::AbiDecode for GatewayMessengerFacetCalls {
@@ -689,8 +883,9 @@ pub mod gateway_messenger_facet {
             data: impl AsRef<[u8]>,
         ) -> ::core::result::Result<Self, ::ethers::core::abi::AbiError> {
             let data = data.as_ref();
-            if let Ok(decoded) = <PropagateCall as ::ethers::core::abi::AbiDecode>::decode(data) {
-                return Ok(Self::Propagate(decoded));
+            if let Ok(decoded) = <PropagateAllCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::PropagateAll(decoded));
             }
             if let Ok(decoded) =
                 <SendContractXnetMessageCall as ::ethers::core::abi::AbiDecode>::decode(data)
@@ -703,7 +898,7 @@ pub mod gateway_messenger_facet {
     impl ::ethers::core::abi::AbiEncode for GatewayMessengerFacetCalls {
         fn encode(self) -> Vec<u8> {
             match self {
-                Self::Propagate(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::PropagateAll(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::SendContractXnetMessage(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -713,14 +908,14 @@ pub mod gateway_messenger_facet {
     impl ::core::fmt::Display for GatewayMessengerFacetCalls {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::Propagate(element) => ::core::fmt::Display::fmt(element, f),
+                Self::PropagateAll(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SendContractXnetMessage(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
     }
-    impl ::core::convert::From<PropagateCall> for GatewayMessengerFacetCalls {
-        fn from(value: PropagateCall) -> Self {
-            Self::Propagate(value)
+    impl ::core::convert::From<PropagateAllCall> for GatewayMessengerFacetCalls {
+        fn from(value: PropagateAllCall) -> Self {
+            Self::PropagateAll(value)
         }
     }
     impl ::core::convert::From<SendContractXnetMessageCall> for GatewayMessengerFacetCalls {
@@ -728,7 +923,7 @@ pub mod gateway_messenger_facet {
             Self::SendContractXnetMessage(value)
         }
     }
-    ///Container type for all return fields from the `sendContractXnetMessage` function with signature `sendContractXnetMessage((uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes))` and selector `0x3eeb723f`
+    ///Container type for all return fields from the `sendContractXnetMessage` function with signature `sendContractXnetMessage((uint8,uint64,uint64,uint256,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),bytes))` and selector `0x2c85ec2c`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -772,7 +967,7 @@ pub mod gateway_messenger_facet {
         pub subnet_id: SubnetID,
         pub raw_address: FvmAddress,
     }
-    ///`IpcEnvelope(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)`
+    ///`IpcEnvelope(uint8,uint64,uint64,uint256,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),bytes)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -785,10 +980,11 @@ pub mod gateway_messenger_facet {
     )]
     pub struct IpcEnvelope {
         pub kind: u8,
+        pub local_nonce: u64,
+        pub original_nonce: u64,
+        pub value: ::ethers::core::types::U256,
         pub to: Ipcaddress,
         pub from: Ipcaddress,
-        pub nonce: u64,
-        pub value: ::ethers::core::types::U256,
         pub message: ::ethers::core::types::Bytes,
     }
     ///`SubnetID(uint64,address[])`

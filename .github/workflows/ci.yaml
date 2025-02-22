@@ -63,7 +63,7 @@ jobs:
     secrets: inherit
 
   extras:
-    uses: ./.github/workflows/extras.yaml
+    uses: ./.github/workflows/demos.yaml
     needs: [ contracts-prettier ]
     secrets: inherit
 

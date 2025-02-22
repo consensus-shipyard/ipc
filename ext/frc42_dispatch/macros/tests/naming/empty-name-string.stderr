@@ -1,0 +1,7 @@
+error: proc macro panicked
+ --> tests/naming/empty-name-string.rs:5:18
+  |
+5 |     let _str_hash = method_hash!("");
+  |                     ^^^^^^^^^^^^^^^^
+  |
+  = help: message: called `Result::unwrap()` on an `Err` value: EmptyString

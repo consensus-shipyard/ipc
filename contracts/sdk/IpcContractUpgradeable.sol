@@ -90,7 +90,8 @@ abstract contract IpcExchangeUpgradeable is Initializable, IIpcHandler, OwnableU
                 kind: IpcMsgKind.Call,
                 from: to, // TODO: will anyway be replaced by sendContractXnetMessage.
                 to: to,
-                nonce: 0, // TODO: will be replaced.
+                localNonce: 0, // TODO: will be replaced.
+                originalNonce: 0, // TODO: will be replaced.
                 value: value,
                 message: abi.encode(callMsg)
             })

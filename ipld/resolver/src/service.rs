@@ -22,6 +22,7 @@ use iroh::net::NodeAddr;
 use iroh_manager::IrohManager;
 use libipld::store::StoreParams;
 use libipld::Cid;
+use libp2p::connection_limits::ConnectionLimits;
 use libp2p::futures::StreamExt;
 use libp2p::swarm::SwarmEvent;
 use libp2p::{
@@ -177,35 +178,29 @@ where
     {
         let peer_id = config.network.local_peer_id();
         let transport = transport(config.network.local_key.clone());
+
+        // NOTE: Hardcoded values from Forest. Will leave them as is until we know we need to change.
+        let limits = ConnectionLimits::default()
+            .with_max_pending_incoming(Some(10))
+            .with_max_pending_outgoing(Some(30))
+            .with_max_established_incoming(Some(config.connection.max_incoming))
+            .with_max_established_outgoing(None) // Allow bitswap to connect to subnets we did not anticipate when we started.
+            .with_max_established_per_peer(Some(5));
+
         let behaviour = Behaviour::new(
             config.network,
             config.discovery,
             config.membership,
             config.content,
+            limits,
             store,
         )?;
 
-        // NOTE: Hardcoded values from Forest. Will leave them as is until we know we need to change.
+        let swarm_config = libp2p::swarm::Config::with_tokio_executor()
+            .with_notify_handler_buffer_size(std::num::NonZeroUsize::new(20).expect("Not zero"))
+            .with_per_connection_event_buffer_size(64);
 
-        // TODO: Where this these go? Used to be `SwarmBuilder::connection_limits`
-        // let _limits = ConnectionLimits::default()
-        //     .with_max_pending_incoming(Some(10))
-        //     .with_max_pending_outgoing(Some(30))
-        //     .with_max_established_incoming(Some(config.connection.max_incoming))
-        //     .with_max_established_outgoing(None) // Allow bitswap to connect to subnets we did not anticipate when we started.
-        //     .with_max_established_per_peer(Some(5));
-
-        //.connection_limits(limits)
-        //.notify_handler_buffer_size(std::num::NonZeroUsize::new(20).expect("Not zero"))
-        //.connection_event_buffer_size(64)
-        //.build();
-
-        let mut swarm = Swarm::new(
-            transport,
-            behaviour,
-            peer_id,
-            libp2p::swarm::Config::with_tokio_executor(),
-        );
+        let mut swarm = Swarm::new(transport, behaviour, peer_id, swarm_config);
 
         for addr in config.connection.external_addresses {
             swarm.add_external_address(addr)
@@ -319,6 +314,7 @@ where
             BehaviourEvent::Discovery(e) => self.handle_discovery_event(e),
             BehaviourEvent::Membership(e) => self.handle_membership_event(e),
             BehaviourEvent::Content(e) => self.handle_content_event(e),
+            BehaviourEvent::ConnectionLimits(_) => {}
         }
     }
 

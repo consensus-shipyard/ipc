@@ -1,0 +1,7 @@
+error: proc macro panicked
+ --> tests/naming/illegal-chars.rs:5:18
+  |
+5 |     let _str_hash = method_hash!("Bad!Method!Name!");
+  |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = help: message: called `Result::unwrap()` on an `Err` value: IllegalName(IllegalCharacters)

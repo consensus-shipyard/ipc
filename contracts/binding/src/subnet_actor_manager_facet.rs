@@ -272,6 +272,25 @@ pub mod subnet_actor_manager_facet {
                     },],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("NewBootstrapNode"),
+                    ::std::vec![::ethers::core::abi::ethabi::Event {
+                        name: ::std::borrow::ToOwned::to_owned("NewBootstrapNode"),
+                        inputs: ::std::vec![
+                            ::ethers::core::abi::ethabi::EventParam {
+                                name: ::std::borrow::ToOwned::to_owned("netAddress"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::String,
+                                indexed: false,
+                            },
+                            ::ethers::core::abi::ethabi::EventParam {
+                                name: ::std::borrow::ToOwned::to_owned("owner"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                indexed: false,
+                            },
+                        ],
+                        anonymous: false,
+                    },],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("NewStakingChangeRequest"),
                     ::std::vec![::ethers::core::abi::ethabi::Event {
                         name: ::std::borrow::ToOwned::to_owned("NewStakingChangeRequest",),
@@ -360,6 +379,25 @@ pub mod subnet_actor_manager_facet {
                             kind: ::ethers::core::abi::ethabi::ParamType::Address,
                             indexed: false,
                         },],
+                        anonymous: false,
+                    },],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("ValidatorGaterUpdated"),
+                    ::std::vec![::ethers::core::abi::ethabi::Event {
+                        name: ::std::borrow::ToOwned::to_owned("ValidatorGaterUpdated",),
+                        inputs: ::std::vec![
+                            ::ethers::core::abi::ethabi::EventParam {
+                                name: ::std::borrow::ToOwned::to_owned("oldGater"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                indexed: false,
+                            },
+                            ::ethers::core::abi::ethabi::EventParam {
+                                name: ::std::borrow::ToOwned::to_owned("newGater"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                indexed: false,
+                            },
+                        ],
                         anonymous: false,
                     },],
                 ),
@@ -795,6 +833,13 @@ pub mod subnet_actor_manager_facet {
         {
             self.0.event()
         }
+        ///Gets the contract's `NewBootstrapNode` event
+        pub fn new_bootstrap_node_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, NewBootstrapNodeFilter>
+        {
+            self.0.event()
+        }
         ///Gets the contract's `NewStakingChangeRequest` event
         pub fn new_staking_change_request_filter(
             &self,
@@ -829,6 +874,13 @@ pub mod subnet_actor_manager_facet {
         pub fn unpaused_filter(
             &self,
         ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, UnpausedFilter> {
+            self.0.event()
+        }
+        ///Gets the contract's `ValidatorGaterUpdated` event
+        pub fn validator_gater_updated_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, ValidatorGaterUpdatedFilter>
+        {
             self.0.event()
         }
         ///Gets the contract's `WaitingValidatorCollateralUpdated` event
@@ -1891,6 +1943,21 @@ pub mod subnet_actor_manager_facet {
         Eq,
         Hash,
     )]
+    #[ethevent(name = "NewBootstrapNode", abi = "NewBootstrapNode(string,address)")]
+    pub struct NewBootstrapNodeFilter {
+        pub net_address: ::std::string::String,
+        pub owner: ::ethers::core::types::Address,
+    }
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
     #[ethevent(
         name = "NewStakingChangeRequest",
         abi = "NewStakingChangeRequest(uint8,address,bytes,uint64)"
@@ -1973,6 +2040,24 @@ pub mod subnet_actor_manager_facet {
         Hash,
     )]
     #[ethevent(
+        name = "ValidatorGaterUpdated",
+        abi = "ValidatorGaterUpdated(address,address)"
+    )]
+    pub struct ValidatorGaterUpdatedFilter {
+        pub old_gater: ::ethers::core::types::Address,
+        pub new_gater: ::ethers::core::types::Address,
+    }
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethevent(
         name = "WaitingValidatorCollateralUpdated",
         abi = "WaitingValidatorCollateralUpdated(address,uint256)"
     )]
@@ -2001,11 +2086,13 @@ pub mod subnet_actor_manager_facet {
         ActiveValidatorLeftFilter(ActiveValidatorLeftFilter),
         ActiveValidatorReplacedFilter(ActiveValidatorReplacedFilter),
         NewActiveValidatorFilter(NewActiveValidatorFilter),
+        NewBootstrapNodeFilter(NewBootstrapNodeFilter),
         NewStakingChangeRequestFilter(NewStakingChangeRequestFilter),
         NewWaitingValidatorFilter(NewWaitingValidatorFilter),
         PausedFilter(PausedFilter),
         SubnetBootstrappedFilter(SubnetBootstrappedFilter),
         UnpausedFilter(UnpausedFilter),
+        ValidatorGaterUpdatedFilter(ValidatorGaterUpdatedFilter),
         WaitingValidatorCollateralUpdatedFilter(WaitingValidatorCollateralUpdatedFilter),
         WaitingValidatorLeftFilter(WaitingValidatorLeftFilter),
     }
@@ -2031,6 +2118,11 @@ pub mod subnet_actor_manager_facet {
                     decoded,
                 ));
             }
+            if let Ok(decoded) = NewBootstrapNodeFilter::decode_log(log) {
+                return Ok(SubnetActorManagerFacetEvents::NewBootstrapNodeFilter(
+                    decoded,
+                ));
+            }
             if let Ok(decoded) = NewStakingChangeRequestFilter::decode_log(log) {
                 return Ok(SubnetActorManagerFacetEvents::NewStakingChangeRequestFilter(decoded));
             }
@@ -2049,6 +2141,11 @@ pub mod subnet_actor_manager_facet {
             }
             if let Ok(decoded) = UnpausedFilter::decode_log(log) {
                 return Ok(SubnetActorManagerFacetEvents::UnpausedFilter(decoded));
+            }
+            if let Ok(decoded) = ValidatorGaterUpdatedFilter::decode_log(log) {
+                return Ok(SubnetActorManagerFacetEvents::ValidatorGaterUpdatedFilter(
+                    decoded,
+                ));
             }
             if let Ok(decoded) = WaitingValidatorCollateralUpdatedFilter::decode_log(log) {
                 return Ok(
@@ -2074,6 +2171,7 @@ pub mod subnet_actor_manager_facet {
                     ::core::fmt::Display::fmt(element, f)
                 }
                 Self::NewActiveValidatorFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::NewBootstrapNodeFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NewStakingChangeRequestFilter(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
@@ -2081,6 +2179,7 @@ pub mod subnet_actor_manager_facet {
                 Self::PausedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SubnetBootstrappedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::UnpausedFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::ValidatorGaterUpdatedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::WaitingValidatorCollateralUpdatedFilter(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
@@ -2110,6 +2209,11 @@ pub mod subnet_actor_manager_facet {
             Self::NewActiveValidatorFilter(value)
         }
     }
+    impl ::core::convert::From<NewBootstrapNodeFilter> for SubnetActorManagerFacetEvents {
+        fn from(value: NewBootstrapNodeFilter) -> Self {
+            Self::NewBootstrapNodeFilter(value)
+        }
+    }
     impl ::core::convert::From<NewStakingChangeRequestFilter> for SubnetActorManagerFacetEvents {
         fn from(value: NewStakingChangeRequestFilter) -> Self {
             Self::NewStakingChangeRequestFilter(value)
@@ -2133,6 +2237,11 @@ pub mod subnet_actor_manager_facet {
     impl ::core::convert::From<UnpausedFilter> for SubnetActorManagerFacetEvents {
         fn from(value: UnpausedFilter) -> Self {
             Self::UnpausedFilter(value)
+        }
+    }
+    impl ::core::convert::From<ValidatorGaterUpdatedFilter> for SubnetActorManagerFacetEvents {
+        fn from(value: ValidatorGaterUpdatedFilter) -> Self {
+            Self::ValidatorGaterUpdatedFilter(value)
         }
     }
     impl ::core::convert::From<WaitingValidatorCollateralUpdatedFilter>

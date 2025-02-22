@@ -40,6 +40,30 @@ pub mod lib_gateway {
                     },],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("MessagePropagatedFromPostbox"),
+                    ::std::vec![::ethers::core::abi::ethabi::Event {
+                        name: ::std::borrow::ToOwned::to_owned("MessagePropagatedFromPostbox",),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::EventParam {
+                            name: ::std::borrow::ToOwned::to_owned("id"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
+                            indexed: false,
+                        },],
+                        anonymous: false,
+                    },],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("MessageStoredInPostbox"),
+                    ::std::vec![::ethers::core::abi::ethabi::Event {
+                        name: ::std::borrow::ToOwned::to_owned("MessageStoredInPostbox",),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::EventParam {
+                            name: ::std::borrow::ToOwned::to_owned("id"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
+                            indexed: true,
+                        },],
+                        anonymous: false,
+                    },],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("NewBottomUpMsgBatch"),
                     ::std::vec![::ethers::core::abi::ethabi::Event {
                         name: ::std::borrow::ToOwned::to_owned("NewBottomUpMsgBatch",),
@@ -65,41 +89,59 @@ pub mod lib_gateway {
                                 name: ::std::borrow::ToOwned::to_owned("message"),
                                 kind: ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
                                     ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                ::std::boxed::Box::new(
-                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                ),
-                                            ),
-                                        ],),
-                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                        ],),
-                                    ],),
-                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                ::std::boxed::Box::new(
-                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                ),
-                                            ),
-                                        ],),
-                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
-                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                        ],),
-                                    ],),
+                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                     ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                     ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                ::std::boxed::Box::new(
+                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                ),
+                                            ),
+                                        ],),
+                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                        ],),
+                                    ],),
+                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                ::std::boxed::Box::new(
+                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                ),
+                                            ),
+                                        ],),
+                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                        ],),
+                                    ],),
                                     ::ethers::core::abi::ethabi::ParamType::Bytes,
                                 ],),
                                 indexed: false,
                             },
+                            ::ethers::core::abi::ethabi::EventParam {
+                                name: ::std::borrow::ToOwned::to_owned("id"),
+                                kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
+                                indexed: true,
+                            },
                         ],
+                        anonymous: false,
+                    },],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("QueuedBottomUpMessage"),
+                    ::std::vec![::ethers::core::abi::ethabi::Event {
+                        name: ::std::borrow::ToOwned::to_owned("QueuedBottomUpMessage",),
+                        inputs: ::std::vec![::ethers::core::abi::ethabi::EventParam {
+                            name: ::std::borrow::ToOwned::to_owned("id"),
+                            kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize,),
+                            indexed: true,
+                        },],
                         anonymous: false,
                     },],
                 ),
@@ -113,12 +155,12 @@ pub mod lib_gateway {
     pub static LIBGATEWAY_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
         ::ethers::contract::Lazy::new(__abi);
     #[rustfmt::skip]
-    const __BYTECODE: &[u8] = b"`\x80\x80`@R4`\x17W`:\x90\x81`\x1D\x8290\x81PP\xF3[`\0\x80\xFD\xFE`\0\x80\xFD\xFE\xA2dipfsX\"\x12 \xFA\xD61M\x13Df\xA0'\xF5\xDD\x8A\xBEc\xF2\x11\xEF9a\xDE\xE1\xC2\xAE\xE6p\n4W\xBF\xB6\xEA\x9FdsolcC\0\x08\x17\x003";
+    const __BYTECODE: &[u8] = b"`\x80\x80`@R4`\x17W`9\x90\x81`\x1C\x8290\x81PP\xF3[_\x80\xFD\xFE_\x80\xFD\xFE\xA2dipfsX\"\x12 \x95\xF2jh\xB1%7\x7F#\xE4\xA6S\x98m\xC2\x87eCmz\x8A\xD0\x81\xAEM\xEDxuP\xACF?dsolcC\0\x08\x17\x003";
     /// The bytecode of the contract.
     pub static LIBGATEWAY_BYTECODE: ::ethers::core::types::Bytes =
         ::ethers::core::types::Bytes::from_static(__BYTECODE);
     #[rustfmt::skip]
-    const __DEPLOYED_BYTECODE: &[u8] = b"`\0\x80\xFD\xFE\xA2dipfsX\"\x12 \xFA\xD61M\x13Df\xA0'\xF5\xDD\x8A\xBEc\xF2\x11\xEF9a\xDE\xE1\xC2\xAE\xE6p\n4W\xBF\xB6\xEA\x9FdsolcC\0\x08\x17\x003";
+    const __DEPLOYED_BYTECODE: &[u8] = b"_\x80\xFD\xFE\xA2dipfsX\"\x12 \x95\xF2jh\xB1%7\x7F#\xE4\xA6S\x98m\xC2\x87eCmz\x8A\xD0\x81\xAEM\xEDxuP\xACF?dsolcC\0\x08\x17\x003";
     /// The deployed bytecode of the contract.
     pub static LIBGATEWAY_DEPLOYED_BYTECODE: ::ethers::core::types::Bytes =
         ::ethers::core::types::Bytes::from_static(__DEPLOYED_BYTECODE);
@@ -205,6 +247,23 @@ pub mod lib_gateway {
         {
             self.0.event()
         }
+        ///Gets the contract's `MessagePropagatedFromPostbox` event
+        pub fn message_propagated_from_postbox_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<
+            ::std::sync::Arc<M>,
+            M,
+            MessagePropagatedFromPostboxFilter,
+        > {
+            self.0.event()
+        }
+        ///Gets the contract's `MessageStoredInPostbox` event
+        pub fn message_stored_in_postbox_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, MessageStoredInPostboxFilter>
+        {
+            self.0.event()
+        }
         ///Gets the contract's `NewBottomUpMsgBatch` event
         pub fn new_bottom_up_msg_batch_filter(
             &self,
@@ -216,6 +275,13 @@ pub mod lib_gateway {
         pub fn new_top_down_message_filter(
             &self,
         ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, NewTopDownMessageFilter>
+        {
+            self.0.event()
+        }
+        ///Gets the contract's `QueuedBottomUpMessage` event
+        pub fn queued_bottom_up_message_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, QueuedBottomUpMessageFilter>
         {
             self.0.event()
         }
@@ -257,6 +323,41 @@ pub mod lib_gateway {
         Eq,
         Hash,
     )]
+    #[ethevent(
+        name = "MessagePropagatedFromPostbox",
+        abi = "MessagePropagatedFromPostbox(bytes32)"
+    )]
+    pub struct MessagePropagatedFromPostboxFilter {
+        pub id: [u8; 32],
+    }
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethevent(
+        name = "MessageStoredInPostbox",
+        abi = "MessageStoredInPostbox(bytes32)"
+    )]
+    pub struct MessageStoredInPostboxFilter {
+        #[ethevent(indexed)]
+        pub id: [u8; 32],
+    }
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
     #[ethevent(name = "NewBottomUpMsgBatch", abi = "NewBottomUpMsgBatch(uint256)")]
     pub struct NewBottomUpMsgBatchFilter {
         #[ethevent(indexed)]
@@ -274,19 +375,39 @@ pub mod lib_gateway {
     )]
     #[ethevent(
         name = "NewTopDownMessage",
-        abi = "NewTopDownMessage(address,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes))"
+        abi = "NewTopDownMessage(address,(uint8,uint64,uint64,uint256,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),bytes),bytes32)"
     )]
     pub struct NewTopDownMessageFilter {
         #[ethevent(indexed)]
         pub subnet: ::ethers::core::types::Address,
         pub message: IpcEnvelope,
+        #[ethevent(indexed)]
+        pub id: [u8; 32],
+    }
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethevent(name = "QueuedBottomUpMessage", abi = "QueuedBottomUpMessage(bytes32)")]
+    pub struct QueuedBottomUpMessageFilter {
+        #[ethevent(indexed)]
+        pub id: [u8; 32],
     }
     ///Container type for all of the contract's events
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum LibGatewayEvents {
         MembershipUpdatedFilter(MembershipUpdatedFilter),
+        MessagePropagatedFromPostboxFilter(MessagePropagatedFromPostboxFilter),
+        MessageStoredInPostboxFilter(MessageStoredInPostboxFilter),
         NewBottomUpMsgBatchFilter(NewBottomUpMsgBatchFilter),
         NewTopDownMessageFilter(NewTopDownMessageFilter),
+        QueuedBottomUpMessageFilter(QueuedBottomUpMessageFilter),
     }
     impl ::ethers::contract::EthLogDecode for LibGatewayEvents {
         fn decode_log(
@@ -295,11 +416,22 @@ pub mod lib_gateway {
             if let Ok(decoded) = MembershipUpdatedFilter::decode_log(log) {
                 return Ok(LibGatewayEvents::MembershipUpdatedFilter(decoded));
             }
+            if let Ok(decoded) = MessagePropagatedFromPostboxFilter::decode_log(log) {
+                return Ok(LibGatewayEvents::MessagePropagatedFromPostboxFilter(
+                    decoded,
+                ));
+            }
+            if let Ok(decoded) = MessageStoredInPostboxFilter::decode_log(log) {
+                return Ok(LibGatewayEvents::MessageStoredInPostboxFilter(decoded));
+            }
             if let Ok(decoded) = NewBottomUpMsgBatchFilter::decode_log(log) {
                 return Ok(LibGatewayEvents::NewBottomUpMsgBatchFilter(decoded));
             }
             if let Ok(decoded) = NewTopDownMessageFilter::decode_log(log) {
                 return Ok(LibGatewayEvents::NewTopDownMessageFilter(decoded));
+            }
+            if let Ok(decoded) = QueuedBottomUpMessageFilter::decode_log(log) {
+                return Ok(LibGatewayEvents::QueuedBottomUpMessageFilter(decoded));
             }
             Err(::ethers::core::abi::Error::InvalidData)
         }
@@ -308,14 +440,31 @@ pub mod lib_gateway {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
                 Self::MembershipUpdatedFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::MessagePropagatedFromPostboxFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
+                Self::MessageStoredInPostboxFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::NewBottomUpMsgBatchFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NewTopDownMessageFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::QueuedBottomUpMessageFilter(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
     }
     impl ::core::convert::From<MembershipUpdatedFilter> for LibGatewayEvents {
         fn from(value: MembershipUpdatedFilter) -> Self {
             Self::MembershipUpdatedFilter(value)
+        }
+    }
+    impl ::core::convert::From<MessagePropagatedFromPostboxFilter> for LibGatewayEvents {
+        fn from(value: MessagePropagatedFromPostboxFilter) -> Self {
+            Self::MessagePropagatedFromPostboxFilter(value)
+        }
+    }
+    impl ::core::convert::From<MessageStoredInPostboxFilter> for LibGatewayEvents {
+        fn from(value: MessageStoredInPostboxFilter) -> Self {
+            Self::MessageStoredInPostboxFilter(value)
         }
     }
     impl ::core::convert::From<NewBottomUpMsgBatchFilter> for LibGatewayEvents {
@@ -326,6 +475,11 @@ pub mod lib_gateway {
     impl ::core::convert::From<NewTopDownMessageFilter> for LibGatewayEvents {
         fn from(value: NewTopDownMessageFilter) -> Self {
             Self::NewTopDownMessageFilter(value)
+        }
+    }
+    impl ::core::convert::From<QueuedBottomUpMessageFilter> for LibGatewayEvents {
+        fn from(value: QueuedBottomUpMessageFilter) -> Self {
+            Self::QueuedBottomUpMessageFilter(value)
         }
     }
     ///`FvmAddress(uint8,bytes)`
@@ -358,7 +512,7 @@ pub mod lib_gateway {
         pub subnet_id: SubnetID,
         pub raw_address: FvmAddress,
     }
-    ///`IpcEnvelope(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)`
+    ///`IpcEnvelope(uint8,uint64,uint64,uint256,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),bytes)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -371,10 +525,11 @@ pub mod lib_gateway {
     )]
     pub struct IpcEnvelope {
         pub kind: u8,
+        pub local_nonce: u64,
+        pub original_nonce: u64,
+        pub value: ::ethers::core::types::U256,
         pub to: Ipcaddress,
         pub from: Ipcaddress,
-        pub nonce: u64,
-        pub value: ::ethers::core::types::U256,
         pub message: ::ethers::core::types::Bytes,
     }
     ///`Membership((uint256,address,bytes)[],uint64)`

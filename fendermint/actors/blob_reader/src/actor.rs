@@ -15,7 +15,7 @@ use fil_actors_runtime::{
     ActorError, FIRST_EXPORTED_METHOD_NUMBER, SYSTEM_ACTOR_ADDR,
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
-use fvm_shared::{address::Address, MethodNum};
+use fvm_shared::MethodNum;
 use recall_sol_facade::blob_reader::{
     read_request_closed, read_request_opened, read_request_pending,
 };
@@ -146,6 +146,7 @@ mod tests {
         expect_empty, MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, SYSTEM_ACTOR_CODE_ID,
     };
     use fvm_ipld_encoding::ipld_block::IpldBlock;
+    use fvm_shared::address::Address;
     use rand::RngCore;
 
     pub fn new_hash(size: usize) -> (Hash, u64) {

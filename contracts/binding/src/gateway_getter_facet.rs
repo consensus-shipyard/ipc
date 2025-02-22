@@ -100,48 +100,49 @@ pub mod gateway_getter_facet {
                                                     ::ethers::core::abi::ethabi::ParamType::Tuple(
                                                         ::std::vec![
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                ::std::vec![
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                                ::std::boxed::Box::new(
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                                ),
-                                                                            ),
-                                                                        ],
-                                                                    ),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                        ],
-                                                                    ),
-                                                                ],
-                                                            ),
-                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                ::std::vec![
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                                ::std::boxed::Box::new(
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                                ),
-                                                                            ),
-                                                                        ],
-                                                                    ),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                        ],
-                                                                    ),
-                                                                ],
-                                                            ),
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                                ::std::boxed::Box::new(
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                                ),
+                                                                            ),
+                                                                        ],
+                                                                    ),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                                        ],
+                                                                    ),
+                                                                ],
+                                                            ),
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                                ::std::boxed::Box::new(
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                                ),
+                                                                            ),
+                                                                        ],
+                                                                    ),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                                        ],
+                                                                    ),
+                                                                ],
+                                                            ),
                                                             ::ethers::core::abi::ethabi::ParamType::Bytes,
                                                         ],
                                                     ),
@@ -213,48 +214,49 @@ pub mod gateway_getter_facet {
                                                     ::ethers::core::abi::ethabi::ParamType::Tuple(
                                                         ::std::vec![
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                ::std::vec![
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                                ::std::boxed::Box::new(
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                                ),
-                                                                            ),
-                                                                        ],
-                                                                    ),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                        ],
-                                                                    ),
-                                                                ],
-                                                            ),
-                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                ::std::vec![
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                                ::std::boxed::Box::new(
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                                ),
-                                                                            ),
-                                                                        ],
-                                                                    ),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                        ],
-                                                                    ),
-                                                                ],
-                                                            ),
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                                ::std::boxed::Box::new(
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                                ),
+                                                                            ),
+                                                                        ],
+                                                                    ),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                                        ],
+                                                                    ),
+                                                                ],
+                                                            ),
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                                ::std::boxed::Box::new(
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                                ),
+                                                                            ),
+                                                                        ],
+                                                                    ),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                                        ],
+                                                                    ),
+                                                                ],
+                                                            ),
                                                             ::ethers::core::abi::ethabi::ParamType::Bytes,
                                                         ],
                                                     ),
@@ -475,48 +477,49 @@ pub mod gateway_getter_facet {
                                                     ::ethers::core::abi::ethabi::ParamType::Tuple(
                                                         ::std::vec![
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                ::std::vec![
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                                ::std::boxed::Box::new(
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                                ),
-                                                                            ),
-                                                                        ],
-                                                                    ),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                        ],
-                                                                    ),
-                                                                ],
-                                                            ),
-                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                ::std::vec![
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                                ::std::boxed::Box::new(
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                                ),
-                                                                            ),
-                                                                        ],
-                                                                    ),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                        ],
-                                                                    ),
-                                                                ],
-                                                            ),
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                                ::std::boxed::Box::new(
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                                ),
+                                                                            ),
+                                                                        ],
+                                                                    ),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                                        ],
+                                                                    ),
+                                                                ],
+                                                            ),
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                                ::std::boxed::Box::new(
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                                ),
+                                                                            ),
+                                                                        ],
+                                                                    ),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                                        ],
+                                                                    ),
+                                                                ],
+                                                            ),
                                                             ::ethers::core::abi::ethabi::ParamType::Bytes,
                                                         ],
                                                     ),
@@ -657,48 +660,49 @@ pub mod gateway_getter_facet {
                                                     ::ethers::core::abi::ethabi::ParamType::Tuple(
                                                         ::std::vec![
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                ::std::vec![
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                                ::std::boxed::Box::new(
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                                ),
-                                                                            ),
-                                                                        ],
-                                                                    ),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                        ],
-                                                                    ),
-                                                                ],
-                                                            ),
-                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                ::std::vec![
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                                ::std::boxed::Box::new(
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                                ),
-                                                                            ),
-                                                                        ],
-                                                                    ),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                        ],
-                                                                    ),
-                                                                ],
-                                                            ),
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                                ::std::boxed::Box::new(
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                                ),
+                                                                            ),
+                                                                        ],
+                                                                    ),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                                        ],
+                                                                    ),
+                                                                ],
+                                                            ),
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                                ::std::boxed::Box::new(
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                                ),
+                                                                            ),
+                                                                        ],
+                                                                    ),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                                        ],
+                                                                    ),
+                                                                ],
+                                                            ),
                                                             ::ethers::core::abi::ethabi::ParamType::Bytes,
                                                         ],
                                                     ),
@@ -851,48 +855,49 @@ pub mod gateway_getter_facet {
                                                             ::ethers::core::abi::ethabi::ParamType::Tuple(
                                                                 ::std::vec![
                                                                     ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                                ::std::vec![
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                                        ::std::boxed::Box::new(
-                                                                                            ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                                        ),
-                                                                                    ),
-                                                                                ],
-                                                                            ),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                                ::std::vec![
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                                ],
-                                                                            ),
-                                                                        ],
-                                                                    ),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                                ::std::vec![
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                                        ::std::boxed::Box::new(
-                                                                                            ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                                        ),
-                                                                                    ),
-                                                                                ],
-                                                                            ),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                                ::std::vec![
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                                ],
-                                                                            ),
-                                                                        ],
-                                                                    ),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                                                     ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                                                     ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                                ::std::vec![
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                                        ::std::boxed::Box::new(
+                                                                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                                        ),
+                                                                                    ),
+                                                                                ],
+                                                                            ),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                                ::std::vec![
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                                                ],
+                                                                            ),
+                                                                        ],
+                                                                    ),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                                ::std::vec![
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                                        ::std::boxed::Box::new(
+                                                                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                                        ),
+                                                                                    ),
+                                                                                ],
+                                                                            ),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                                ::std::vec![
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                                                ],
+                                                                            ),
+                                                                        ],
+                                                                    ),
                                                                     ::ethers::core::abi::ethabi::ParamType::Bytes,
                                                                 ],
                                                             ),
@@ -1415,53 +1420,78 @@ pub mod gateway_getter_facet {
                                     kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
                                         ::std::vec![
                                             ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                ::std::vec![
-                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                        ::std::vec![
-                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                ::std::boxed::Box::new(
-                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                ),
-                                                            ),
-                                                        ],
-                                                    ),
-                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                        ::std::vec![
-                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                        ],
-                                                    ),
-                                                ],
-                                            ),
-                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                ::std::vec![
-                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                        ::std::vec![
-                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                ::std::boxed::Box::new(
-                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                ),
-                                                            ),
-                                                        ],
-                                                    ),
-                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                        ::std::vec![
-                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                        ],
-                                                    ),
-                                                ],
-                                            ),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                             ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                             ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                ::std::vec![
+                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                        ::std::vec![
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                ::std::boxed::Box::new(
+                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                ),
+                                                            ),
+                                                        ],
+                                                    ),
+                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                        ::std::vec![
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                        ],
+                                                    ),
+                                                ],
+                                            ),
+                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                ::std::vec![
+                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                        ::std::vec![
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                ::std::boxed::Box::new(
+                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                ),
+                                                            ),
+                                                        ],
+                                                    ),
+                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                        ::std::vec![
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                        ],
+                                                    ),
+                                                ],
+                                            ),
                                             ::ethers::core::abi::ethabi::ParamType::Bytes,
                                         ],
                                     ),
                                     internal_type: ::core::option::Option::Some(
                                         ::std::borrow::ToOwned::to_owned("struct IpcEnvelope"),
+                                    ),
+                                },
+                            ],
+                            constant: ::core::option::Option::None,
+                            state_mutability: ::ethers::core::abi::ethabi::StateMutability::View,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("postboxMsgs"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Function {
+                            name: ::std::borrow::ToOwned::to_owned("postboxMsgs"),
+                            inputs: ::std::vec![],
+                            outputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::Param {
+                                    name: ::std::string::String::new(),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Array(
+                                        ::std::boxed::Box::new(
+                                            ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                        ),
+                                    ),
+                                    internal_type: ::core::option::Option::Some(
+                                        ::std::borrow::ToOwned::to_owned("bytes32[]"),
                                     ),
                                 },
                             ],
@@ -1848,6 +1878,14 @@ pub mod gateway_getter_facet {
         ) -> ::ethers::contract::builders::ContractCall<M, IpcEnvelope> {
             self.0
                 .method_hash([140, 253, 120, 231], id)
+                .expect("method not found (this should never happen)")
+        }
+        ///Calls the contract's `postboxMsgs` (0x7474d79f) function
+        pub fn postbox_msgs(
+            &self,
+        ) -> ::ethers::contract::builders::ContractCall<M, ::std::vec::Vec<[u8; 32]>> {
+            self.0
+                .method_hash([116, 116, 215, 159], ())
                 .expect("method not found (this should never happen)")
         }
         ///Calls the contract's `subnets` (0x02e30f9a) function
@@ -2330,6 +2368,19 @@ pub mod gateway_getter_facet {
     pub struct PostboxCall {
         pub id: [u8; 32],
     }
+    ///Container type for all input parameters for the `postboxMsgs` function with signature `postboxMsgs()` and selector `0x7474d79f`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(name = "postboxMsgs", abi = "postboxMsgs()")]
+    pub struct PostboxMsgsCall;
     ///Container type for all input parameters for the `subnets` function with signature `subnets(bytes32)` and selector `0x02e30f9a`
     #[derive(
         Clone,
@@ -2392,6 +2443,7 @@ pub mod gateway_getter_facet {
         MajorityPercentage(MajorityPercentageCall),
         MaxMsgsPerBottomUpBatch(MaxMsgsPerBottomUpBatchCall),
         Postbox(PostboxCall),
+        PostboxMsgs(PostboxMsgsCall),
         Subnets(SubnetsCall),
         TotalSubnets(TotalSubnetsCall),
     }
@@ -2548,6 +2600,9 @@ pub mod gateway_getter_facet {
             if let Ok(decoded) = <PostboxCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Postbox(decoded));
             }
+            if let Ok(decoded) = <PostboxMsgsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
+                return Ok(Self::PostboxMsgs(decoded));
+            }
             if let Ok(decoded) = <SubnetsCall as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::Subnets(decoded));
             }
@@ -2630,6 +2685,7 @@ pub mod gateway_getter_facet {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::Postbox(element) => ::ethers::core::abi::AbiEncode::encode(element),
+                Self::PostboxMsgs(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::Subnets(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::TotalSubnets(element) => ::ethers::core::abi::AbiEncode::encode(element),
             }
@@ -2681,6 +2737,7 @@ pub mod gateway_getter_facet {
                 Self::MajorityPercentage(element) => ::core::fmt::Display::fmt(element, f),
                 Self::MaxMsgsPerBottomUpBatch(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Postbox(element) => ::core::fmt::Display::fmt(element, f),
+                Self::PostboxMsgs(element) => ::core::fmt::Display::fmt(element, f),
                 Self::Subnets(element) => ::core::fmt::Display::fmt(element, f),
                 Self::TotalSubnets(element) => ::core::fmt::Display::fmt(element, f),
             }
@@ -2839,6 +2896,11 @@ pub mod gateway_getter_facet {
     impl ::core::convert::From<PostboxCall> for GatewayGetterFacetCalls {
         fn from(value: PostboxCall) -> Self {
             Self::Postbox(value)
+        }
+    }
+    impl ::core::convert::From<PostboxMsgsCall> for GatewayGetterFacetCalls {
+        fn from(value: PostboxMsgsCall) -> Self {
+            Self::PostboxMsgs(value)
         }
     }
     impl ::core::convert::From<SubnetsCall> for GatewayGetterFacetCalls {
@@ -3236,6 +3298,18 @@ pub mod gateway_getter_facet {
     pub struct PostboxReturn {
         pub storable_msg: IpcEnvelope,
     }
+    ///Container type for all return fields from the `postboxMsgs` function with signature `postboxMsgs()` and selector `0x7474d79f`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct PostboxMsgsReturn(pub ::std::vec::Vec<[u8; 32]>);
     ///Container type for all return fields from the `subnets` function with signature `subnets(bytes32)` and selector `0x02e30f9a`
     #[derive(
         Clone,
@@ -3262,7 +3336,7 @@ pub mod gateway_getter_facet {
         Hash,
     )]
     pub struct TotalSubnetsReturn(pub u64);
-    ///`BottomUpCheckpoint((uint64,address[]),uint256,bytes32,uint64,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)[],(((uint64,uint64),bytes32)))`
+    ///`BottomUpCheckpoint((uint64,address[]),uint256,bytes32,uint64,(uint8,uint64,uint64,uint256,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),bytes)[],(((uint64,uint64),bytes32)))`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -3281,7 +3355,7 @@ pub mod gateway_getter_facet {
         pub msgs: ::std::vec::Vec<IpcEnvelope>,
         pub activity: CompressedActivityRollup,
     }
-    ///`BottomUpMsgBatch((uint64,address[]),uint256,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)[])`
+    ///`BottomUpMsgBatch((uint64,address[]),uint256,(uint8,uint64,uint64,uint256,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),bytes)[])`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -3371,7 +3445,7 @@ pub mod gateway_getter_facet {
         pub subnet_id: SubnetID,
         pub raw_address: FvmAddress,
     }
-    ///`IpcEnvelope(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)`
+    ///`IpcEnvelope(uint8,uint64,uint64,uint256,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),bytes)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -3384,10 +3458,11 @@ pub mod gateway_getter_facet {
     )]
     pub struct IpcEnvelope {
         pub kind: u8,
+        pub local_nonce: u64,
+        pub original_nonce: u64,
+        pub value: ::ethers::core::types::U256,
         pub to: Ipcaddress,
         pub from: Ipcaddress,
-        pub nonce: u64,
-        pub value: ::ethers::core::types::U256,
         pub message: ::ethers::core::types::Bytes,
     }
     ///`Membership((uint256,address,bytes)[],uint64)`

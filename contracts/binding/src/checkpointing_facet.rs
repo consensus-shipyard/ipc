@@ -94,48 +94,49 @@ pub mod checkpointing_facet {
                                                     ::ethers::core::abi::ethabi::ParamType::Tuple(
                                                         ::std::vec![
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                ::std::vec![
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                                ::std::boxed::Box::new(
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                                ),
-                                                                            ),
-                                                                        ],
-                                                                    ),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                        ],
-                                                                    ),
-                                                                ],
-                                                            ),
-                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                ::std::vec![
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                                ::std::boxed::Box::new(
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                                ),
-                                                                            ),
-                                                                        ],
-                                                                    ),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                        ],
-                                                                    ),
-                                                                ],
-                                                            ),
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                                ::std::boxed::Box::new(
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                                ),
+                                                                            ),
+                                                                        ],
+                                                                    ),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                                        ],
+                                                                    ),
+                                                                ],
+                                                            ),
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                                ::std::boxed::Box::new(
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                                ),
+                                                                            ),
+                                                                        ],
+                                                                    ),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                                        ],
+                                                                    ),
+                                                                ],
+                                                            ),
                                                             ::ethers::core::abi::ethabi::ParamType::Bytes,
                                                         ],
                                                     ),
@@ -201,48 +202,49 @@ pub mod checkpointing_facet {
                                                     ::ethers::core::abi::ethabi::ParamType::Tuple(
                                                         ::std::vec![
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                ::std::vec![
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                                ::std::boxed::Box::new(
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                                ),
-                                                                            ),
-                                                                        ],
-                                                                    ),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                        ],
-                                                                    ),
-                                                                ],
-                                                            ),
-                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                ::std::vec![
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                                ::std::boxed::Box::new(
-                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                                ),
-                                                                            ),
-                                                                        ],
-                                                                    ),
-                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                                        ::std::vec![
-                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                                        ],
-                                                                    ),
-                                                                ],
-                                                            ),
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                                             ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                                ::std::boxed::Box::new(
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                                ),
+                                                                            ),
+                                                                        ],
+                                                                    ),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                                        ],
+                                                                    ),
+                                                                ],
+                                                            ),
+                                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                ::std::vec![
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                                ::std::boxed::Box::new(
+                                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                                ),
+                                                                            ),
+                                                                        ],
+                                                                    ),
+                                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                                        ::std::vec![
+                                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                                        ],
+                                                                    ),
+                                                                ],
+                                                            ),
                                                             ::ethers::core::abi::ethabi::ParamType::Bytes,
                                                         ],
                                                     ),
@@ -405,6 +407,51 @@ pub mod checkpointing_facet {
                     ],
                 ),
                 (
+                    ::std::borrow::ToOwned::to_owned("CheckpointCommitted"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "CheckpointCommitted",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("subnet"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Address,
+                                    indexed: true,
+                                },
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("subnetHeight"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(
+                                        256usize,
+                                    ),
+                                    indexed: false,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("MessageStoredInPostbox"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "MessageStoredInPostbox",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("id"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(
+                                        32usize,
+                                    ),
+                                    indexed: true,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
+                ),
+                (
                     ::std::borrow::ToOwned::to_owned("NewBottomUpMsgBatch"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::Event {
@@ -440,52 +487,80 @@ pub mod checkpointing_facet {
                                     kind: ::ethers::core::abi::ethabi::ParamType::Tuple(
                                         ::std::vec![
                                             ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                ::std::vec![
-                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                        ::std::vec![
-                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                ::std::boxed::Box::new(
-                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                ),
-                                                            ),
-                                                        ],
-                                                    ),
-                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                        ::std::vec![
-                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                        ],
-                                                    ),
-                                                ],
-                                            ),
-                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                ::std::vec![
-                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                        ::std::vec![
-                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
-                                                            ::ethers::core::abi::ethabi::ParamType::Array(
-                                                                ::std::boxed::Box::new(
-                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
-                                                                ),
-                                                            ),
-                                                        ],
-                                                    ),
-                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
-                                                        ::std::vec![
-                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
-                                                        ],
-                                                    ),
-                                                ],
-                                            ),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                             ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
                                             ::ethers::core::abi::ethabi::ParamType::Uint(256usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                ::std::vec![
+                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                        ::std::vec![
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                ::std::boxed::Box::new(
+                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                ),
+                                                            ),
+                                                        ],
+                                                    ),
+                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                        ::std::vec![
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                        ],
+                                                    ),
+                                                ],
+                                            ),
+                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                ::std::vec![
+                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                        ::std::vec![
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                                            ::ethers::core::abi::ethabi::ParamType::Array(
+                                                                ::std::boxed::Box::new(
+                                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                                ),
+                                                            ),
+                                                        ],
+                                                    ),
+                                                    ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                        ::std::vec![
+                                                            ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
+                                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                        ],
+                                                    ),
+                                                ],
+                                            ),
                                             ::ethers::core::abi::ethabi::ParamType::Bytes,
                                         ],
                                     ),
                                     indexed: false,
+                                },
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("id"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(
+                                        32usize,
+                                    ),
+                                    indexed: true,
+                                },
+                            ],
+                            anonymous: false,
+                        },
+                    ],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("QueuedBottomUpMessage"),
+                    ::std::vec![
+                        ::ethers::core::abi::ethabi::Event {
+                            name: ::std::borrow::ToOwned::to_owned(
+                                "QueuedBottomUpMessage",
+                            ),
+                            inputs: ::std::vec![
+                                ::ethers::core::abi::ethabi::EventParam {
+                                    name: ::std::borrow::ToOwned::to_owned("id"),
+                                    kind: ::ethers::core::abi::ethabi::ParamType::FixedBytes(
+                                        32usize,
+                                    ),
+                                    indexed: true,
                                 },
                             ],
                             anonymous: false,
@@ -570,17 +645,6 @@ pub mod checkpointing_facet {
                 ),
             ]),
             errors: ::core::convert::From::from([
-                (
-                    ::std::borrow::ToOwned::to_owned("CannotSendCrossMsgToItself"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "CannotSendCrossMsgToItself",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
-                ),
                 (
                     ::std::borrow::ToOwned::to_owned("CheckpointAlreadyExists"),
                     ::std::vec![
@@ -686,25 +750,6 @@ pub mod checkpointing_facet {
                     ],
                 ),
                 (
-                    ::std::borrow::ToOwned::to_owned("InvalidXnetMessage"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned("InvalidXnetMessage"),
-                            inputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("reason"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::Uint(8usize),
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned(
-                                            "enum InvalidXnetMessageReason",
-                                        ),
-                                    ),
-                                },
-                            ],
-                        },
-                    ],
-                ),
-                (
                     ::std::borrow::ToOwned::to_owned("MaxMsgsPerBatchExceeded"),
                     ::std::vec![
                         ::ethers::core::abi::ethabi::AbiError {
@@ -712,23 +757,6 @@ pub mod checkpointing_facet {
                                 "MaxMsgsPerBatchExceeded",
                             ),
                             inputs: ::std::vec![],
-                        },
-                    ],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("MethodNotAllowed"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned("MethodNotAllowed"),
-                            inputs: ::std::vec![
-                                ::ethers::core::abi::ethabi::Param {
-                                    name: ::std::borrow::ToOwned::to_owned("reason"),
-                                    kind: ::ethers::core::abi::ethabi::ParamType::String,
-                                    internal_type: ::core::option::Option::Some(
-                                        ::std::borrow::ToOwned::to_owned("string"),
-                                    ),
-                                },
-                            ],
                         },
                     ],
                 ),
@@ -755,17 +783,6 @@ pub mod checkpointing_facet {
                         ::ethers::core::abi::ethabi::AbiError {
                             name: ::std::borrow::ToOwned::to_owned(
                                 "NotEnoughSubnetCircSupply",
-                            ),
-                            inputs: ::std::vec![],
-                        },
-                    ],
-                ),
-                (
-                    ::std::borrow::ToOwned::to_owned("NotRegisteredSubnet"),
-                    ::std::vec![
-                        ::ethers::core::abi::ethabi::AbiError {
-                            name: ::std::borrow::ToOwned::to_owned(
-                                "NotRegisteredSubnet",
                             ),
                             inputs: ::std::vec![],
                         },
@@ -880,16 +897,16 @@ pub mod checkpointing_facet {
                 )
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `commitCheckpoint` (0xa0316672) function
+        ///Calls the contract's `commitCheckpoint` (0x9db11d8c) function
         pub fn commit_checkpoint(
             &self,
             checkpoint: BottomUpCheckpoint,
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
-                .method_hash([160, 49, 102, 114], (checkpoint,))
+                .method_hash([157, 177, 29, 140], (checkpoint,))
                 .expect("method not found (this should never happen)")
         }
-        ///Calls the contract's `createBottomUpCheckpoint` (0xd8b46025) function
+        ///Calls the contract's `createBottomUpCheckpoint` (0x6326379f) function
         pub fn create_bottom_up_checkpoint(
             &self,
             checkpoint: BottomUpCheckpoint,
@@ -899,7 +916,7 @@ pub mod checkpointing_facet {
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash(
-                    [216, 180, 96, 37],
+                    [99, 38, 55, 159],
                     (
                         checkpoint,
                         membership_root_hash,
@@ -925,6 +942,20 @@ pub mod checkpointing_facet {
         {
             self.0.event()
         }
+        ///Gets the contract's `CheckpointCommitted` event
+        pub fn checkpoint_committed_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, CheckpointCommittedFilter>
+        {
+            self.0.event()
+        }
+        ///Gets the contract's `MessageStoredInPostbox` event
+        pub fn message_stored_in_postbox_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, MessageStoredInPostboxFilter>
+        {
+            self.0.event()
+        }
         ///Gets the contract's `NewBottomUpMsgBatch` event
         pub fn new_bottom_up_msg_batch_filter(
             &self,
@@ -936,6 +967,13 @@ pub mod checkpointing_facet {
         pub fn new_top_down_message_filter(
             &self,
         ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, NewTopDownMessageFilter>
+        {
+            self.0.event()
+        }
+        ///Gets the contract's `QueuedBottomUpMessage` event
+        pub fn queued_bottom_up_message_filter(
+            &self,
+        ) -> ::ethers::contract::builders::Event<::std::sync::Arc<M>, M, QueuedBottomUpMessageFilter>
         {
             self.0.event()
         }
@@ -969,22 +1007,6 @@ pub mod checkpointing_facet {
             Self::new(contract.address(), contract.client())
         }
     }
-    ///Custom Error type `CannotSendCrossMsgToItself` with signature `CannotSendCrossMsgToItself()` and selector `0xbcccd7fc`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(
-        name = "CannotSendCrossMsgToItself",
-        abi = "CannotSendCrossMsgToItself()"
-    )]
-    pub struct CannotSendCrossMsgToItself;
     ///Custom Error type `CheckpointAlreadyExists` with signature `CheckpointAlreadyExists()` and selector `0xb8a1eae1`
     #[derive(
         Clone,
@@ -1121,21 +1143,6 @@ pub mod checkpointing_facet {
     )]
     #[etherror(name = "InvalidSubnet", abi = "InvalidSubnet()")]
     pub struct InvalidSubnet;
-    ///Custom Error type `InvalidXnetMessage` with signature `InvalidXnetMessage(uint8)` and selector `0xbc0f01cf`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(name = "InvalidXnetMessage", abi = "InvalidXnetMessage(uint8)")]
-    pub struct InvalidXnetMessage {
-        pub reason: u8,
-    }
     ///Custom Error type `MaxMsgsPerBatchExceeded` with signature `MaxMsgsPerBatchExceeded()` and selector `0x351c7007`
     #[derive(
         Clone,
@@ -1149,21 +1156,6 @@ pub mod checkpointing_facet {
     )]
     #[etherror(name = "MaxMsgsPerBatchExceeded", abi = "MaxMsgsPerBatchExceeded()")]
     pub struct MaxMsgsPerBatchExceeded;
-    ///Custom Error type `MethodNotAllowed` with signature `MethodNotAllowed(string)` and selector `0x015538b1`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(name = "MethodNotAllowed", abi = "MethodNotAllowed(string)")]
-    pub struct MethodNotAllowed {
-        pub reason: ::std::string::String,
-    }
     ///Custom Error type `NotAuthorized` with signature `NotAuthorized(address)` and selector `0x4a0bfec1`
     #[derive(
         Clone,
@@ -1193,19 +1185,6 @@ pub mod checkpointing_facet {
         abi = "NotEnoughSubnetCircSupply()"
     )]
     pub struct NotEnoughSubnetCircSupply;
-    ///Custom Error type `NotRegisteredSubnet` with signature `NotRegisteredSubnet()` and selector `0xe991abd0`
-    #[derive(
-        Clone,
-        ::ethers::contract::EthError,
-        ::ethers::contract::EthDisplay,
-        Default,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-    )]
-    #[etherror(name = "NotRegisteredSubnet", abi = "NotRegisteredSubnet()")]
-    pub struct NotRegisteredSubnet;
     ///Custom Error type `NotSystemActor` with signature `NotSystemActor()` and selector `0xf0d97f3b`
     #[derive(
         Clone,
@@ -1274,7 +1253,6 @@ pub mod checkpointing_facet {
     ///Container type for all of the contract's custom errors
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum CheckpointingFacetErrors {
-        CannotSendCrossMsgToItself(CannotSendCrossMsgToItself),
         CheckpointAlreadyExists(CheckpointAlreadyExists),
         CheckpointNotCreated(CheckpointNotCreated),
         FailedAddIncompleteQuorum(FailedAddIncompleteQuorum),
@@ -1285,12 +1263,9 @@ pub mod checkpointing_facet {
         InvalidRetentionHeight(InvalidRetentionHeight),
         InvalidSignature(InvalidSignature),
         InvalidSubnet(InvalidSubnet),
-        InvalidXnetMessage(InvalidXnetMessage),
         MaxMsgsPerBatchExceeded(MaxMsgsPerBatchExceeded),
-        MethodNotAllowed(MethodNotAllowed),
         NotAuthorized(NotAuthorized),
         NotEnoughSubnetCircSupply(NotEnoughSubnetCircSupply),
-        NotRegisteredSubnet(NotRegisteredSubnet),
         NotSystemActor(NotSystemActor),
         QuorumAlreadyProcessed(QuorumAlreadyProcessed),
         SignatureReplay(SignatureReplay),
@@ -1309,11 +1284,6 @@ pub mod checkpointing_facet {
                 <::std::string::String as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::RevertString(decoded));
-            }
-            if let Ok(decoded) =
-                <CannotSendCrossMsgToItself as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::CannotSendCrossMsgToItself(decoded));
             }
             if let Ok(decoded) =
                 <CheckpointAlreadyExists as ::ethers::core::abi::AbiDecode>::decode(data)
@@ -1363,18 +1333,9 @@ pub mod checkpointing_facet {
                 return Ok(Self::InvalidSubnet(decoded));
             }
             if let Ok(decoded) =
-                <InvalidXnetMessage as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::InvalidXnetMessage(decoded));
-            }
-            if let Ok(decoded) =
                 <MaxMsgsPerBatchExceeded as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::MaxMsgsPerBatchExceeded(decoded));
-            }
-            if let Ok(decoded) = <MethodNotAllowed as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::MethodNotAllowed(decoded));
             }
             if let Ok(decoded) = <NotAuthorized as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NotAuthorized(decoded));
@@ -1383,11 +1344,6 @@ pub mod checkpointing_facet {
                 <NotEnoughSubnetCircSupply as ::ethers::core::abi::AbiDecode>::decode(data)
             {
                 return Ok(Self::NotEnoughSubnetCircSupply(decoded));
-            }
-            if let Ok(decoded) =
-                <NotRegisteredSubnet as ::ethers::core::abi::AbiDecode>::decode(data)
-            {
-                return Ok(Self::NotRegisteredSubnet(decoded));
             }
             if let Ok(decoded) = <NotSystemActor as ::ethers::core::abi::AbiDecode>::decode(data) {
                 return Ok(Self::NotSystemActor(decoded));
@@ -1414,9 +1370,6 @@ pub mod checkpointing_facet {
     impl ::ethers::core::abi::AbiEncode for CheckpointingFacetErrors {
         fn encode(self) -> ::std::vec::Vec<u8> {
             match self {
-                Self::CannotSendCrossMsgToItself(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
                 Self::CheckpointAlreadyExists(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
@@ -1443,18 +1396,11 @@ pub mod checkpointing_facet {
                 }
                 Self::InvalidSignature(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::InvalidSubnet(element) => ::ethers::core::abi::AbiEncode::encode(element),
-                Self::InvalidXnetMessage(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
                 Self::MaxMsgsPerBatchExceeded(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
-                Self::MethodNotAllowed(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::NotAuthorized(element) => ::ethers::core::abi::AbiEncode::encode(element),
                 Self::NotEnoughSubnetCircSupply(element) => {
-                    ::ethers::core::abi::AbiEncode::encode(element)
-                }
-                Self::NotRegisteredSubnet(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
                 Self::NotSystemActor(element) => ::ethers::core::abi::AbiEncode::encode(element),
@@ -1474,11 +1420,6 @@ pub mod checkpointing_facet {
         fn valid_selector(selector: [u8; 4]) -> bool {
             match selector {
                 [0x08, 0xc3, 0x79, 0xa0] => true,
-                _ if selector
-                    == <CannotSendCrossMsgToItself as ::ethers::contract::EthError>::selector() =>
-                {
-                    true
-                }
                 _ if selector
                     == <CheckpointAlreadyExists as ::ethers::contract::EthError>::selector() =>
                 {
@@ -1527,16 +1468,8 @@ pub mod checkpointing_facet {
                     true
                 }
                 _ if selector
-                    == <InvalidXnetMessage as ::ethers::contract::EthError>::selector() =>
-                {
-                    true
-                }
-                _ if selector
                     == <MaxMsgsPerBatchExceeded as ::ethers::contract::EthError>::selector() =>
                 {
-                    true
-                }
-                _ if selector == <MethodNotAllowed as ::ethers::contract::EthError>::selector() => {
                     true
                 }
                 _ if selector == <NotAuthorized as ::ethers::contract::EthError>::selector() => {
@@ -1544,11 +1477,6 @@ pub mod checkpointing_facet {
                 }
                 _ if selector
                     == <NotEnoughSubnetCircSupply as ::ethers::contract::EthError>::selector() =>
-                {
-                    true
-                }
-                _ if selector
-                    == <NotRegisteredSubnet as ::ethers::contract::EthError>::selector() =>
                 {
                     true
                 }
@@ -1578,7 +1506,6 @@ pub mod checkpointing_facet {
     impl ::core::fmt::Display for CheckpointingFacetErrors {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
             match self {
-                Self::CannotSendCrossMsgToItself(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CheckpointAlreadyExists(element) => ::core::fmt::Display::fmt(element, f),
                 Self::CheckpointNotCreated(element) => ::core::fmt::Display::fmt(element, f),
                 Self::FailedAddIncompleteQuorum(element) => ::core::fmt::Display::fmt(element, f),
@@ -1591,12 +1518,9 @@ pub mod checkpointing_facet {
                 Self::InvalidRetentionHeight(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidSignature(element) => ::core::fmt::Display::fmt(element, f),
                 Self::InvalidSubnet(element) => ::core::fmt::Display::fmt(element, f),
-                Self::InvalidXnetMessage(element) => ::core::fmt::Display::fmt(element, f),
                 Self::MaxMsgsPerBatchExceeded(element) => ::core::fmt::Display::fmt(element, f),
-                Self::MethodNotAllowed(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotAuthorized(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotEnoughSubnetCircSupply(element) => ::core::fmt::Display::fmt(element, f),
-                Self::NotRegisteredSubnet(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NotSystemActor(element) => ::core::fmt::Display::fmt(element, f),
                 Self::QuorumAlreadyProcessed(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SignatureReplay(element) => ::core::fmt::Display::fmt(element, f),
@@ -1609,11 +1533,6 @@ pub mod checkpointing_facet {
     impl ::core::convert::From<::std::string::String> for CheckpointingFacetErrors {
         fn from(value: String) -> Self {
             Self::RevertString(value)
-        }
-    }
-    impl ::core::convert::From<CannotSendCrossMsgToItself> for CheckpointingFacetErrors {
-        fn from(value: CannotSendCrossMsgToItself) -> Self {
-            Self::CannotSendCrossMsgToItself(value)
         }
     }
     impl ::core::convert::From<CheckpointAlreadyExists> for CheckpointingFacetErrors {
@@ -1666,19 +1585,9 @@ pub mod checkpointing_facet {
             Self::InvalidSubnet(value)
         }
     }
-    impl ::core::convert::From<InvalidXnetMessage> for CheckpointingFacetErrors {
-        fn from(value: InvalidXnetMessage) -> Self {
-            Self::InvalidXnetMessage(value)
-        }
-    }
     impl ::core::convert::From<MaxMsgsPerBatchExceeded> for CheckpointingFacetErrors {
         fn from(value: MaxMsgsPerBatchExceeded) -> Self {
             Self::MaxMsgsPerBatchExceeded(value)
-        }
-    }
-    impl ::core::convert::From<MethodNotAllowed> for CheckpointingFacetErrors {
-        fn from(value: MethodNotAllowed) -> Self {
-            Self::MethodNotAllowed(value)
         }
     }
     impl ::core::convert::From<NotAuthorized> for CheckpointingFacetErrors {
@@ -1689,11 +1598,6 @@ pub mod checkpointing_facet {
     impl ::core::convert::From<NotEnoughSubnetCircSupply> for CheckpointingFacetErrors {
         fn from(value: NotEnoughSubnetCircSupply) -> Self {
             Self::NotEnoughSubnetCircSupply(value)
-        }
-    }
-    impl ::core::convert::From<NotRegisteredSubnet> for CheckpointingFacetErrors {
-        fn from(value: NotRegisteredSubnet) -> Self {
-            Self::NotRegisteredSubnet(value)
         }
     }
     impl ::core::convert::From<NotSystemActor> for CheckpointingFacetErrors {
@@ -1749,6 +1653,43 @@ pub mod checkpointing_facet {
         Eq,
         Hash,
     )]
+    #[ethevent(
+        name = "CheckpointCommitted",
+        abi = "CheckpointCommitted(address,uint256)"
+    )]
+    pub struct CheckpointCommittedFilter {
+        #[ethevent(indexed)]
+        pub subnet: ::ethers::core::types::Address,
+        pub subnet_height: ::ethers::core::types::U256,
+    }
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethevent(
+        name = "MessageStoredInPostbox",
+        abi = "MessageStoredInPostbox(bytes32)"
+    )]
+    pub struct MessageStoredInPostboxFilter {
+        #[ethevent(indexed)]
+        pub id: [u8; 32],
+    }
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
     #[ethevent(name = "NewBottomUpMsgBatch", abi = "NewBottomUpMsgBatch(uint256)")]
     pub struct NewBottomUpMsgBatchFilter {
         #[ethevent(indexed)]
@@ -1766,12 +1707,29 @@ pub mod checkpointing_facet {
     )]
     #[ethevent(
         name = "NewTopDownMessage",
-        abi = "NewTopDownMessage(address,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes))"
+        abi = "NewTopDownMessage(address,(uint8,uint64,uint64,uint256,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),bytes),bytes32)"
     )]
     pub struct NewTopDownMessageFilter {
         #[ethevent(indexed)]
         pub subnet: ::ethers::core::types::Address,
         pub message: IpcEnvelope,
+        #[ethevent(indexed)]
+        pub id: [u8; 32],
+    }
+    #[derive(
+        Clone,
+        ::ethers::contract::EthEvent,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethevent(name = "QueuedBottomUpMessage", abi = "QueuedBottomUpMessage(bytes32)")]
+    pub struct QueuedBottomUpMessageFilter {
+        #[ethevent(indexed)]
+        pub id: [u8; 32],
     }
     #[derive(
         Clone,
@@ -1817,8 +1775,11 @@ pub mod checkpointing_facet {
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum CheckpointingFacetEvents {
         ActivityRollupRecordedFilter(ActivityRollupRecordedFilter),
+        CheckpointCommittedFilter(CheckpointCommittedFilter),
+        MessageStoredInPostboxFilter(MessageStoredInPostboxFilter),
         NewBottomUpMsgBatchFilter(NewBottomUpMsgBatchFilter),
         NewTopDownMessageFilter(NewTopDownMessageFilter),
+        QueuedBottomUpMessageFilter(QueuedBottomUpMessageFilter),
         QuorumReachedFilter(QuorumReachedFilter),
         QuorumWeightUpdatedFilter(QuorumWeightUpdatedFilter),
     }
@@ -1831,11 +1792,24 @@ pub mod checkpointing_facet {
                     decoded,
                 ));
             }
+            if let Ok(decoded) = CheckpointCommittedFilter::decode_log(log) {
+                return Ok(CheckpointingFacetEvents::CheckpointCommittedFilter(decoded));
+            }
+            if let Ok(decoded) = MessageStoredInPostboxFilter::decode_log(log) {
+                return Ok(CheckpointingFacetEvents::MessageStoredInPostboxFilter(
+                    decoded,
+                ));
+            }
             if let Ok(decoded) = NewBottomUpMsgBatchFilter::decode_log(log) {
                 return Ok(CheckpointingFacetEvents::NewBottomUpMsgBatchFilter(decoded));
             }
             if let Ok(decoded) = NewTopDownMessageFilter::decode_log(log) {
                 return Ok(CheckpointingFacetEvents::NewTopDownMessageFilter(decoded));
+            }
+            if let Ok(decoded) = QueuedBottomUpMessageFilter::decode_log(log) {
+                return Ok(CheckpointingFacetEvents::QueuedBottomUpMessageFilter(
+                    decoded,
+                ));
             }
             if let Ok(decoded) = QuorumReachedFilter::decode_log(log) {
                 return Ok(CheckpointingFacetEvents::QuorumReachedFilter(decoded));
@@ -1852,8 +1826,13 @@ pub mod checkpointing_facet {
                 Self::ActivityRollupRecordedFilter(element) => {
                     ::core::fmt::Display::fmt(element, f)
                 }
+                Self::CheckpointCommittedFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::MessageStoredInPostboxFilter(element) => {
+                    ::core::fmt::Display::fmt(element, f)
+                }
                 Self::NewBottomUpMsgBatchFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::NewTopDownMessageFilter(element) => ::core::fmt::Display::fmt(element, f),
+                Self::QueuedBottomUpMessageFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::QuorumReachedFilter(element) => ::core::fmt::Display::fmt(element, f),
                 Self::QuorumWeightUpdatedFilter(element) => ::core::fmt::Display::fmt(element, f),
             }
@@ -1864,6 +1843,16 @@ pub mod checkpointing_facet {
             Self::ActivityRollupRecordedFilter(value)
         }
     }
+    impl ::core::convert::From<CheckpointCommittedFilter> for CheckpointingFacetEvents {
+        fn from(value: CheckpointCommittedFilter) -> Self {
+            Self::CheckpointCommittedFilter(value)
+        }
+    }
+    impl ::core::convert::From<MessageStoredInPostboxFilter> for CheckpointingFacetEvents {
+        fn from(value: MessageStoredInPostboxFilter) -> Self {
+            Self::MessageStoredInPostboxFilter(value)
+        }
+    }
     impl ::core::convert::From<NewBottomUpMsgBatchFilter> for CheckpointingFacetEvents {
         fn from(value: NewBottomUpMsgBatchFilter) -> Self {
             Self::NewBottomUpMsgBatchFilter(value)
@@ -1872,6 +1861,11 @@ pub mod checkpointing_facet {
     impl ::core::convert::From<NewTopDownMessageFilter> for CheckpointingFacetEvents {
         fn from(value: NewTopDownMessageFilter) -> Self {
             Self::NewTopDownMessageFilter(value)
+        }
+    }
+    impl ::core::convert::From<QueuedBottomUpMessageFilter> for CheckpointingFacetEvents {
+        fn from(value: QueuedBottomUpMessageFilter) -> Self {
+            Self::QueuedBottomUpMessageFilter(value)
         }
     }
     impl ::core::convert::From<QuorumReachedFilter> for CheckpointingFacetEvents {
@@ -1905,7 +1899,7 @@ pub mod checkpointing_facet {
         pub weight: ::ethers::core::types::U256,
         pub signature: ::ethers::core::types::Bytes,
     }
-    ///Container type for all input parameters for the `commitCheckpoint` function with signature `commitCheckpoint(((uint64,address[]),uint256,bytes32,uint64,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)[],(((uint64,uint64),bytes32))))` and selector `0xa0316672`
+    ///Container type for all input parameters for the `commitCheckpoint` function with signature `commitCheckpoint(((uint64,address[]),uint256,bytes32,uint64,(uint8,uint64,uint64,uint256,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),bytes)[],(((uint64,uint64),bytes32))))` and selector `0x9db11d8c`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -1918,12 +1912,12 @@ pub mod checkpointing_facet {
     )]
     #[ethcall(
         name = "commitCheckpoint",
-        abi = "commitCheckpoint(((uint64,address[]),uint256,bytes32,uint64,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)[],(((uint64,uint64),bytes32))))"
+        abi = "commitCheckpoint(((uint64,address[]),uint256,bytes32,uint64,(uint8,uint64,uint64,uint256,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),bytes)[],(((uint64,uint64),bytes32))))"
     )]
     pub struct CommitCheckpointCall {
         pub checkpoint: BottomUpCheckpoint,
     }
-    ///Container type for all input parameters for the `createBottomUpCheckpoint` function with signature `createBottomUpCheckpoint(((uint64,address[]),uint256,bytes32,uint64,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)[],(((uint64,uint64),bytes32))),bytes32,uint256,(((uint64,uint64),(address,uint64)[])))` and selector `0xd8b46025`
+    ///Container type for all input parameters for the `createBottomUpCheckpoint` function with signature `createBottomUpCheckpoint(((uint64,address[]),uint256,bytes32,uint64,(uint8,uint64,uint64,uint256,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),bytes)[],(((uint64,uint64),bytes32))),bytes32,uint256,(((uint64,uint64),(address,uint64)[])))` and selector `0x6326379f`
     #[derive(
         Clone,
         ::ethers::contract::EthCall,
@@ -1936,7 +1930,7 @@ pub mod checkpointing_facet {
     )]
     #[ethcall(
         name = "createBottomUpCheckpoint",
-        abi = "createBottomUpCheckpoint(((uint64,address[]),uint256,bytes32,uint64,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)[],(((uint64,uint64),bytes32))),bytes32,uint256,(((uint64,uint64),(address,uint64)[])))"
+        abi = "createBottomUpCheckpoint(((uint64,address[]),uint256,bytes32,uint64,(uint8,uint64,uint64,uint256,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),bytes)[],(((uint64,uint64),bytes32))),bytes32,uint256,(((uint64,uint64),(address,uint64)[])))"
     )]
     pub struct CreateBottomUpCheckpointCall {
         pub checkpoint: BottomUpCheckpoint,
@@ -2044,7 +2038,7 @@ pub mod checkpointing_facet {
             Self::PruneBottomUpCheckpoints(value)
         }
     }
-    ///`BottomUpCheckpoint((uint64,address[]),uint256,bytes32,uint64,(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)[],(((uint64,uint64),bytes32)))`
+    ///`BottomUpCheckpoint((uint64,address[]),uint256,bytes32,uint64,(uint8,uint64,uint64,uint256,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),bytes)[],(((uint64,uint64),bytes32)))`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -2181,7 +2175,7 @@ pub mod checkpointing_facet {
         pub subnet_id: SubnetID,
         pub raw_address: FvmAddress,
     }
-    ///`IpcEnvelope(uint8,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),uint64,uint256,bytes)`
+    ///`IpcEnvelope(uint8,uint64,uint64,uint256,((uint64,address[]),(uint8,bytes)),((uint64,address[]),(uint8,bytes)),bytes)`
     #[derive(
         Clone,
         ::ethers::contract::EthAbiType,
@@ -2194,10 +2188,11 @@ pub mod checkpointing_facet {
     )]
     pub struct IpcEnvelope {
         pub kind: u8,
+        pub local_nonce: u64,
+        pub original_nonce: u64,
+        pub value: ::ethers::core::types::U256,
         pub to: Ipcaddress,
         pub from: Ipcaddress,
-        pub nonce: u64,
-        pub value: ::ethers::core::types::U256,
         pub message: ::ethers::core::types::Bytes,
     }
     ///`SubnetID(uint64,address[])`
