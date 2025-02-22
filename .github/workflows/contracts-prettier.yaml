@@ -8,14 +8,6 @@ jobs:
   prettier:
     runs-on: ubuntu-latest
     steps:
-      - uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: |
-            ${{ secrets.IPC_DEPLOY_KEY }}
-            ${{ secrets.BUILTIN_ACTORS_DEPLOY_KEY }}
-            ${{ secrets.CONTRACTS_DEPLOY_KEY }}
-            ${{ secrets.ENTANGLEMENT_DEPLOY_KEY }}
-
       - name: Checkout
         uses: actions/checkout@v4
 

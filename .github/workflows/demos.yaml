@@ -16,13 +16,6 @@ jobs:
       run:
         working-directory: ./demos/axelar-token
     steps:
-      - uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: |
-            ${{ secrets.IPC_DEPLOY_KEY }}
-            ${{ secrets.BUILTIN_ACTORS_DEPLOY_KEY }}
-            ${{ secrets.CONTRACTS_DEPLOY_KEY }}
-            ${{ secrets.ENTANGLEMENT_DEPLOY_KEY }}
       - uses: actions/checkout@v4
         with:
           submodules: recursive
