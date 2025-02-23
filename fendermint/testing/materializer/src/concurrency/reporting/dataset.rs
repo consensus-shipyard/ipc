@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use std::fmt::{Display, Formatter};
+use statrs::statistics::{Data, OrderStatistics, Distribution, Max, Min};
 
 #[derive(Debug, Default)]
 pub struct Metrics {
@@ -10,6 +11,25 @@ pub struct Metrics {
     pub max: f64,
     pub min: f64,
     pub percentile_90: f64,
+}
+
+impl From<Vec<f64>> for Metrics {
+    fn from(mut data: Vec<f64>) -> Self {
+        if data.is_empty() {
+            return Metrics::default();
+        }
+
+        data.sort_by(|a, b| a.partial_cmp(b).unwrap()); // Sort once before using Data
+        let mut data = Data::new(data);
+
+        Metrics {
+            mean: data.mean().unwrap(),
+            median: data.median(),
+            max: data.max(),
+            min: data.min(),
+            percentile_90: data.percentile(90),
+        }
+    }
 }
 
 impl Display for Metrics {
@@ -22,51 +42,13 @@ impl Display for Metrics {
     }
 }
 
-impl Metrics {
-    pub fn format_median(&self) -> String {
-        format!("median: {:.2}", self.median)
-    }
-}
-
-pub fn calc_metrics(data: Vec<f64>) -> Metrics {
-    if data.is_empty() {
-        return Metrics::default();
-    }
-
-    let mut sorted_data = data.clone();
-    sorted_data.sort_by(|a, b| a.partial_cmp(b).unwrap());
-
-    let count = sorted_data.len();
-    let mean: f64 = sorted_data.iter().sum::<f64>() / count as f64;
-
-    let median = if count % 2 == 0 {
-        (sorted_data[count / 2 - 1] + sorted_data[count / 2]) / 2.0
-    } else {
-        sorted_data[count / 2]
-    };
-
-    let max = *sorted_data.last().unwrap();
-    let min = *sorted_data.first().unwrap();
-
-    let percentile_90_index = ((count as f64) * 0.9).ceil() as usize - 1;
-    let percentile_90 = sorted_data[percentile_90_index];
-
-    Metrics {
-        mean,
-        median,
-        max,
-        min,
-        percentile_90,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::super::FLOAT_TOLERANCE;
     use super::*;
 
     #[test]
-    fn test_calc_dataset_metrics() {
+    fn test_metrics() {
         let data = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
 
         let expected_mean = 5.5;
@@ -75,7 +57,7 @@ mod tests {
         let expected_min = 1.0;
         let expected_percentile_90 = 9.0;
 
-        let metrics = calc_metrics(data);
+        let metrics: Metrics = data.into();
 
         assert!((metrics.mean - expected_mean).abs() < FLOAT_TOLERANCE);
         assert!((metrics.median - expected_median).abs() < FLOAT_TOLERANCE);

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use super::{
-    dataset::{calc_metrics, Metrics},
+    dataset::{Metrics},
     tps::calc_tps,
     TestResult,
 };
@@ -124,13 +124,13 @@ impl Display for ExecutionSummary {
             let mut row = vec![];
             row.push(summary.cfg.max_concurrency.to_string());
             row.push(summary.cfg.duration.as_secs().to_string());
-            row.push(summary.tps.format_median());
+            row.push(format!("median: {:.2}", summary.tps.median));
 
             for key in &latencies {
                 let latency = summary
                     .latencies
                     .get(key)
-                    .map_or(String::from("-"), |metrics| metrics.format_median() + "s");
+                    .map_or(String::from("-"), |metrics| format!("median: {:.2}s", metrics.median));
                 row.push(latency);
             }
 
@@ -174,10 +174,10 @@ impl StepSummary {
 
         let latencies = latencies
             .into_iter()
-            .map(|(key, dataset)| (key, calc_metrics(dataset)))
+            .map(|(key, dataset)| (key, dataset.into()))
             .collect();
 
-        let tps = calc_metrics(calc_tps(blocks));
+        let tps: Metrics = calc_tps(blocks).into();
 
         Self {
             cfg,
