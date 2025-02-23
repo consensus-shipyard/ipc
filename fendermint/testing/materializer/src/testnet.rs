@@ -142,11 +142,7 @@ where
 
     pub fn account_mod_nth(&self, v: usize) -> &M::Account {
         let nth = v % self.accounts.len();
-        self.accounts
-            .iter()
-            .nth(nth)
-            .map(|(_, account)| account)
-            .unwrap()
+        self.accounts.values().nth(nth).unwrap()
     }
 
     pub fn accounts(&self) -> &BTreeMap<AccountId, M::Account> {
