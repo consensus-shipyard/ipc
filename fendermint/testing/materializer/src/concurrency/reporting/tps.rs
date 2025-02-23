@@ -6,22 +6,24 @@ use ethers::prelude::{Block, H256, U256};
 pub fn calc_tps(blocks: Vec<Block<H256>>) -> Vec<f64> {
     let mut tps = Vec::new();
 
-    let offset = 1; // The first block is skipped for lacking a block interval.
-    for i in offset..blocks.len() {
-        let prev_block = &blocks[i - 1];
-        let curr_block = &blocks[i];
+    for pair in blocks.windows(2) {
+        let prev = &pair[0];
+        let curr = &pair[1];
 
-        let interval = curr_block.timestamp.saturating_sub(prev_block.timestamp);
+        let interval = curr.timestamp.saturating_sub(prev.timestamp);
 
         if interval.le(&U256::zero()) {
             continue;
         }
 
         let interval = interval.as_u64() as f64;
-        let tx_count = curr_block.transactions.len() as f64;
+        let tx_count = curr.transactions.len() as f64;
         let block_tps = tx_count / interval;
         tps.push(block_tps);
     }
+
+
+
     tps
 }
 
