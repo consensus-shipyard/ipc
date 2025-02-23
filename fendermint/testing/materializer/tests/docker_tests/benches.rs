@@ -9,10 +9,7 @@ use ethers::core::types::Bytes;
 use ethers::prelude::{Block, H256};
 use ethers::types::{Address, U256};
 use ethers::{
-    core::k256::ecdsa::SigningKey,
-    middleware::SignerMiddleware,
-    providers::{JsonRpcClient, Middleware, PendingTransaction, Provider},
-    signers::{Signer, Wallet},
+    providers::{Middleware, PendingTransaction},
     types::{Eip1559TransactionRequest, H160},
 };
 use fendermint_materializer::concurrency::collect::collect_blocks;
@@ -22,32 +19,15 @@ use fendermint_materializer::concurrency::cancellation_flag::CancellationFlag;
 use fendermint_materializer::concurrency::TestOutput;
 use fendermint_materializer::{
     concurrency::{self, config::Execution},
-    materials::DefaultAccount,
     HasEthApi,
 };
 use futures::FutureExt;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use crate::docker_tests::make_middleware;
 
 const MANIFEST: &str = "benches.yaml";
-
-pub type TestMiddleware<C> = SignerMiddleware<Provider<C>, Wallet<SigningKey>>;
-
-/// Create a middleware that will assign nonces and sign the message.
-async fn make_middleware<C>(
-    provider: Provider<C>,
-    sender: &DefaultAccount,
-    chain_id: U256,
-) -> anyhow::Result<TestMiddleware<C>>
-where
-    C: JsonRpcClient,
-{
-    let wallet: Wallet<SigningKey> = Wallet::from_bytes(sender.secret_key().serialize().as_ref())?
-        .with_chain_id(chain_id.as_u64());
-
-    Ok(SignerMiddleware::new(provider, wallet))
-}
 
 #[serial_test::serial]
 #[tokio::test]
@@ -100,7 +80,7 @@ async fn test_native_coin_transfer() -> Result<(), anyhow::Error> {
             let recipient = testnet.account_mod_nth(input.test_id + 1);
             println!("running (test_id={})", input.test_id);
 
-            let middleware = make_middleware(provider, sender, chain_id)
+            let middleware = make_middleware(provider, sender, Some(chain_id))
                 .await
                 .context("make_middleware")?;
 
@@ -227,7 +207,7 @@ async fn test_contract_deployment() -> Result<(), anyhow::Error> {
             let sender = testnet.account_mod_nth(input.test_id);
             println!("running (test_id={})", input.test_id);
 
-            let middleware = make_middleware(provider, sender, chain_id)
+            let middleware = make_middleware(provider, sender, Some(chain_id))
                 .await
                 .context("make_middleware")?;
             let middleware = Arc::new(middleware);
@@ -326,7 +306,7 @@ async fn test_contract_call() -> Result<(), anyhow::Error> {
         let nonce_manager = nonce_manager.clone();
         let contract_addresses = contract_addresses.clone();
         handles.push(tokio::spawn(async move {
-            let middleware = make_middleware(provider, &account, chain_id)
+            let middleware = make_middleware(provider, &account, Some(chain_id))
                 .await
                 .context("make_middleware")?;
             let middleware = Arc::new(middleware);
@@ -423,7 +403,7 @@ async fn test_contract_call() -> Result<(), anyhow::Error> {
 
             println!("running (test_id={})", input.test_id);
 
-            let middleware = make_middleware(provider, sender, chain_id)
+            let middleware = make_middleware(provider, sender, Some(chain_id))
                 .await
                 .context("make_middleware")?;
             let middleware = Arc::new(middleware);

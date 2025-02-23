@@ -4,37 +4,15 @@ use crate::make_testnet;
 use anyhow::{bail, Context};
 use ethers::prelude::transaction::eip2718::TypedTransaction;
 use ethers::{
-    core::k256::ecdsa::SigningKey,
-    middleware::SignerMiddleware,
-    providers::{JsonRpcClient, Middleware, PendingTransaction, Provider},
-    signers::{Signer, Wallet},
+    providers::{Middleware, PendingTransaction},
+    signers::{Signer},
     types::{Eip1559TransactionRequest, H160},
 };
-use fendermint_materializer::{manifest::Rootnet, materials::DefaultAccount, HasEthApi};
+use fendermint_materializer::{manifest::Rootnet, HasEthApi};
 use std::time::{Duration, Instant};
+use crate::docker_tests::make_middleware;
 
 const MANIFEST: &str = "standalone.yaml";
-
-pub type TestMiddleware<C> = SignerMiddleware<Provider<C>, Wallet<SigningKey>>;
-
-/// Create a middleware that will assign nonces and sign the message.
-async fn make_middleware<C>(
-    provider: Provider<C>,
-    sender: &DefaultAccount,
-) -> anyhow::Result<TestMiddleware<C>>
-where
-    C: JsonRpcClient,
-{
-    let chain_id = provider
-        .get_chainid()
-        .await
-        .context("failed to get chain ID")?;
-
-    let wallet: Wallet<SigningKey> = Wallet::from_bytes(sender.secret_key().serialize().as_ref())?
-        .with_chain_id(chain_id.as_u64());
-
-    Ok(SignerMiddleware::new(provider, wallet))
-}
 
 /// Test that a transaction sent to the mempool can be retrieved by its ethereum hash
 /// from the ethereum API instance it was sent to even before it is included in the block.
@@ -58,7 +36,7 @@ async fn test_sent_tx_found_in_mempool() -> Result<(), anyhow::Error> {
             .ethapi_http_provider()?
             .expect("ethapi should be enabled");
 
-        let middleware = make_middleware(provider, bob)
+        let middleware = make_middleware(provider, bob, None)
             .await
             .context("failed to set up middleware")?;
 
@@ -112,7 +90,7 @@ async fn test_out_of_order_mempool() {
             .ethapi_http_provider()?
             .expect("ethapi should be enabled");
 
-        let middleware = make_middleware(provider, bob)
+        let middleware = make_middleware(provider, bob, None)
             .await
             .context("failed to set up middleware")?;
 
