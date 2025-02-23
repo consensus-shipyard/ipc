@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::concurrency::signal::Signal;
+use crate::concurrency::cancellation_flag::CancellationFlag;
 use ethers::prelude::H256;
 use ethers::providers::Http;
 use ethers::providers::{Middleware, Provider};
@@ -12,7 +12,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 
 pub async fn collect_blocks<F>(
-    cancel: Arc<Signal>,
+    cancel: Arc<CancellationFlag>,
     provider: Provider<Http>,
     assert: F,
 ) -> anyhow::Result<HashMap<u64, Block<H256>>>
@@ -21,7 +21,7 @@ where
 {
     let mut blocks = HashMap::new();
     loop {
-        if cancel.received() {
+        if cancel.is_cancelled() {
             break;
         }
 

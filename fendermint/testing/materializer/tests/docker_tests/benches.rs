@@ -18,7 +18,7 @@ use ethers::{
 use fendermint_materializer::concurrency::collect::collect_blocks;
 use fendermint_materializer::concurrency::nonce_manager::NonceManager;
 use fendermint_materializer::concurrency::reporting::summary::ExecutionSummary;
-use fendermint_materializer::concurrency::signal::Signal;
+use fendermint_materializer::concurrency::cancellation_flag::CancellationFlag;
 use fendermint_materializer::concurrency::TestOutput;
 use fendermint_materializer::{
     concurrency::{self, config::Execution},
@@ -66,7 +66,7 @@ async fn test_native_coin_transfer() -> Result<(), anyhow::Error> {
         .await
         .context("failed to get chain ID")?;
 
-    let cancel = Arc::new(Signal::new());
+    let cancel = Arc::new(CancellationFlag::new());
 
     // Set up background blocks collector.
     let blocks_collector = {
@@ -161,7 +161,7 @@ async fn test_native_coin_transfer() -> Result<(), anyhow::Error> {
     })
     .await;
 
-    cancel.send();
+    cancel.cancel();
     let blocks = blocks_collector.await??;
     let summary = ExecutionSummary::new(cfg.clone(), blocks, results);
     summary.print();
@@ -194,7 +194,7 @@ async fn test_contract_deployment() -> Result<(), anyhow::Error> {
         .await
         .context("failed to get chain ID")?;
 
-    let cancel = Arc::new(Signal::new());
+    let cancel = Arc::new(CancellationFlag::new());
 
     // Set up background blocks collector.
     let blocks_collector = {
@@ -290,7 +290,7 @@ async fn test_contract_deployment() -> Result<(), anyhow::Error> {
     })
     .await;
 
-    cancel.send();
+    cancel.cancel();
     let blocks = blocks_collector.await??;
     let summary = ExecutionSummary::new(cfg.clone(), blocks, results);
     summary.print();
@@ -387,7 +387,7 @@ async fn test_contract_call() -> Result<(), anyhow::Error> {
         .unwrap();
     let block_gas_limit = U256::from(10_000_000_000u64);
     let max_tx_gas_limit = U256::from(3_000_000u64);
-    let cancel = Arc::new(Signal::new());
+    let cancel = Arc::new(CancellationFlag::new());
 
     // Set up background blocks collector.
     let blocks_collector = {
@@ -480,7 +480,7 @@ async fn test_contract_call() -> Result<(), anyhow::Error> {
     })
     .await;
 
-    cancel.send();
+    cancel.cancel();
     let blocks = blocks_collector.await??;
     let summary = ExecutionSummary::new(cfg.clone(), blocks, results);
     summary.print();

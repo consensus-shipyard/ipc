@@ -5,7 +5,7 @@ pub mod collect;
 pub mod config;
 pub mod nonce_manager;
 pub mod reporting;
-pub mod signal;
+pub mod cancellation_flag;
 
 use crate::bencher::Bencher;
 use crate::concurrency::reporting::TestResult;
