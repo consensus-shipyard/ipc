@@ -11,8 +11,7 @@ pub fn calc_tps(blocks: Vec<Block<H256>>) -> Vec<f64> {
         let curr = &pair[1];
 
         let interval = curr.timestamp.saturating_sub(prev.timestamp);
-
-        if interval.le(&U256::zero()) {
+        if interval.is_zero() {
             continue;
         }
 
