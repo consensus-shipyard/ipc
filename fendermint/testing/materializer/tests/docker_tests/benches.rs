@@ -164,7 +164,7 @@ async fn test_native_coin_transfer() -> Result<(), anyhow::Error> {
     cancel.cancel();
     let blocks = blocks_collector.await??;
     let summary = ExecutionSummary::new(cfg.clone(), blocks, results);
-    summary.print();
+    println!("summary:\n{}", summary);
 
     let res = summary.to_result();
     let Ok(testnet) = Arc::try_unwrap(testnet) else {
@@ -293,7 +293,7 @@ async fn test_contract_deployment() -> Result<(), anyhow::Error> {
     cancel.cancel();
     let blocks = blocks_collector.await??;
     let summary = ExecutionSummary::new(cfg.clone(), blocks, results);
-    summary.print();
+    println!("summary:\n{}", summary);
 
     let res = summary.to_result();
     let Ok(testnet) = Arc::try_unwrap(testnet) else {
@@ -483,7 +483,7 @@ async fn test_contract_call() -> Result<(), anyhow::Error> {
     cancel.cancel();
     let blocks = blocks_collector.await??;
     let summary = ExecutionSummary::new(cfg.clone(), blocks, results);
-    summary.print();
+    println!("summary:\n{}", summary);
 
     let res = summary.to_result();
     let Ok(testnet) = Arc::try_unwrap(testnet) else {

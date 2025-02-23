@@ -11,7 +11,7 @@ use crate::concurrency::config::ExecutionStep;
 use anyhow::anyhow;
 use ethers::prelude::{Block, H256};
 use std::collections::{HashMap, HashSet};
-use std::io;
+use std::fmt::{Display, Formatter};
 
 #[derive(Debug)]
 pub struct ExecutionSummary {
@@ -54,43 +54,6 @@ impl ExecutionSummary {
             errs.extend(cloned_errs);
         }
         errs
-    }
-
-    pub fn print(&self) {
-        let mut data = vec![];
-
-        let latencies: HashSet<String> = self
-            .summaries
-            .iter()
-            .flat_map(|summary| summary.latencies.keys().cloned())
-            .collect();
-
-        let mut header = vec![
-            "max_concurrency".to_string(),
-            "duration".to_string(),
-            "TPS".to_string(),
-        ];
-        header.extend(latencies.iter().map(|key| format!("latency ({}) ", key)));
-        data.push(header);
-
-        for summary in self.summaries.iter() {
-            let mut row = vec![];
-            row.push(summary.cfg.max_concurrency.to_string());
-            row.push(summary.cfg.duration.as_secs().to_string());
-            row.push(summary.tps.format_median());
-
-            for key in &latencies {
-                let latency = summary
-                    .latencies
-                    .get(key)
-                    .map_or(String::from("-"), |metrics| metrics.format_median() + "s");
-                row.push(latency);
-            }
-
-            data.push(row);
-        }
-
-        text_tables::render(&mut io::stdout(), data).unwrap();
     }
 
     fn map_results_to_txs(results: &[Vec<TestResult>]) -> Vec<Vec<H256>> {
@@ -137,6 +100,47 @@ impl ExecutionSummary {
         }
 
         step_mapped_blocks
+    }
+}
+
+impl Display for ExecutionSummary {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut data = vec![];
+        let latencies: HashSet<String> = self
+            .summaries
+            .iter()
+            .flat_map(|summary| summary.latencies.keys().cloned())
+            .collect();
+
+        let mut header = vec![
+            "max_concurrency".to_string(),
+            "duration".to_string(),
+            "TPS".to_string(),
+        ];
+        header.extend(latencies.iter().map(|key| format!("latency ({}) ", key)));
+        data.push(header);
+
+        for summary in self.summaries.iter() {
+            let mut row = vec![];
+            row.push(summary.cfg.max_concurrency.to_string());
+            row.push(summary.cfg.duration.as_secs().to_string());
+            row.push(summary.tps.format_median());
+
+            for key in &latencies {
+                let latency = summary
+                    .latencies
+                    .get(key)
+                    .map_or(String::from("-"), |metrics| metrics.format_median() + "s");
+                row.push(latency);
+            }
+
+            data.push(row);
+        }
+
+        let mut output = Vec::new();
+        text_tables::render(&mut output, data).unwrap();
+        let output_str = String::from_utf8(output).unwrap();
+        write!(f, "{}", output_str)
     }
 }
 
