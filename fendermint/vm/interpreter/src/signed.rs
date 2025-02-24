@@ -102,6 +102,10 @@ impl SyntheticMessage {
             .verify(&data, &self.message.from)
             .map_err(SignedMessageError::InvalidSignature)
     }
+
+    pub fn into_message(self) -> FvmMessage {
+        self.message
+    }
 }
 
 /// Interpreter working on signed messages, validating their signature before sending
