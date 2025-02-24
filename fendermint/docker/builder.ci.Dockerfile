@@ -35,7 +35,7 @@ FROM --platform=$BUILDPLATFORM ubuntu:jammy as builder
 
 RUN apt-get update && \
   apt-get install -y build-essential clang cmake protobuf-compiler curl \
-  openssl libssl-dev pkg-config git-core
+  openssl libssl-dev pkg-config
 
 # Get Rust
 RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y
@@ -68,13 +68,8 @@ RUN if [ "${TARGETARCH}" = "arm64" ]; then \
 # Copy the stripped source code.
 COPY --from=stripper /app /app
 
-COPY root-config /root/
-RUN sed -E 's|/home/ghrunner[0-9]?|/root|g' -i.bak /root/.ssh/config
-ENV CARGO_NET_GIT_FETCH_WITH_CLI=true
-
 # Build the dependencies.
 RUN \
-  --mount=type=ssh \
   --mount=type=cache,target=/root/.cargo/registry,sharing=locked \
   --mount=type=cache,target=/root/.cargo/git,sharing=locked \
   --mount=type=cache,target=/app/target,sharing=locked \
@@ -90,7 +85,6 @@ RUN \
   cargo build --locked --release -p fendermint_app --target ${ARCH}-unknown-linux-gnu ; \
   cargo build --locked --release -p ipc-cli --target ${ARCH}-unknown-linux-gnu
 
-
 # Now copy the full source.
 COPY . .
 
@@ -99,7 +93,6 @@ RUN find . -type f \( -wholename "**/src/lib.rs" -o -wholename "**/src/main.rs" 
 
 # Do the final build.
 RUN \
-  --mount=type=ssh \
   --mount=type=cache,target=/root/.cargo/registry,sharing=locked \
   --mount=type=cache,target=/root/.cargo/git,sharing=locked \
   --mount=type=cache,target=/app/target,sharing=locked \

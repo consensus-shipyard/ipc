@@ -7,7 +7,6 @@ on:
 env:
   PROFILE: "ci"
   CARGO_TERM_COLOR: always
-  CARGO_NET_GIT_FETCH_WITH_CLI: true
 
 jobs:
 
@@ -25,11 +24,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
-
-      - name: Collect Git and SSH config files in a directory that is part of the Docker build context
-        run: |
-          mkdir root-config
-          cp -r ~/.gitconfig ~/.ssh root-config/
 
       - name: Install Tools
         uses: ./.github/actions/install-tools

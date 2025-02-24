@@ -88,7 +88,7 @@ docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(CUSTOM_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 docker-build: docker-deps $(FENDERMINT_CODE)
 	if [ "$(PROFILE)" = "ci" ]; then \
 		cat docker/builder.ci.Dockerfile docker/runner.Dockerfile > docker/Dockerfile ; \
-		docker buildx build --ssh default \
+		docker buildx build \
 			$(BUILDX_STORE) \
 			$(BUILDX_FLAGS) \
 			-f docker/Dockerfile \
@@ -96,7 +96,7 @@ docker-build: docker-deps $(FENDERMINT_CODE)
 	else \
 		cat docker/builder.local.Dockerfile docker/runner.Dockerfile > docker/Dockerfile ; \
 		DOCKER_BUILDKIT=1 \
-		docker build --ssh default \
+		docker build \
 			$(BUILDX_STORE) \
 			-f docker/Dockerfile \
 			-t fendermint:latest $(PWD)/..; \
