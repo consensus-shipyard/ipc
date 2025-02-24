@@ -14,7 +14,9 @@ use futures::FutureExt;
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Instant;
-use tokio::sync::Semaphore;
+use futures::stream::FuturesUnordered;
+use tokio::sync::{Semaphore};
+use futures::{StreamExt};
 
 #[derive(Debug)]
 pub struct TestInput {
@@ -37,8 +39,7 @@ where
     let mut results = Vec::new();
     for (step_id, step) in cfg.steps.iter().enumerate() {
         let semaphore = Arc::new(Semaphore::new(step.max_concurrency));
-        let mut handles = Vec::new();
-        let step_results = Arc::new(tokio::sync::Mutex::new(Vec::new()));
+        let mut tasks = FuturesUnordered::new();
         let execution_start = Instant::now();
         loop {
             if execution_start.elapsed() > step.duration {
@@ -48,33 +49,30 @@ where
             let bencher = Bencher::new();
             let test_input = TestInput { test_id, bencher };
             let task = test_factory(test_input).boxed();
-            let step_results = step_results.clone();
-            let handle = tokio::spawn(async move {
+            tasks.push(tokio::spawn(async move {
                 let test_output = task.await;
+                drop(permit);
                 let (bencher, tx_hash, err) = match test_output {
                     Ok(test_output) => (Some(test_output.bencher), Some(test_output.tx_hash), None),
                     Err(err) => (None, None, Some(err)),
                 };
-                step_results.lock().await.push(TestResult {
+                TestResult {
                     test_id,
                     step_id,
                     bencher,
                     tx_hash,
                     err,
-                });
-                drop(permit);
-            });
-            handles.push(handle);
+                }
+            }));
             test_id += 1;
         }
 
-        // Exhaust unfinished handles.
-        for handle in handles {
-            handle.await.unwrap();
+        // Collect results as tasks complete (unordered).
+        let mut step_results = Vec::new();
+        while let Some(Ok(result)) = tasks.next().await {
+            step_results.push(result);
         }
-
-        let step_results = Arc::try_unwrap(step_results).unwrap().into_inner();
-        results.push(step_results)
+        results.push(step_results);
     }
     results
 }
