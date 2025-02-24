@@ -19,6 +19,7 @@ env_logger = "0.10.0"
 ethers = { workspace = true }
 ethers-contract = { workspace = true }
 fil_actors_runtime = { workspace = true }
+fs-err = { workspace = true }
 futures-util = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true }

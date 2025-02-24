@@ -16,6 +16,8 @@ use fendermint_vm_genesis::{
 };
 use fendermint_vm_interpreter::genesis::{GenesisAppState, GenesisBuilder};
 
+use crate::fs;
+
 use crate::cmd;
 use crate::options::genesis::*;
 
@@ -54,7 +56,7 @@ cmd! {
     };
 
     let json = serde_json::to_string_pretty(&genesis)?;
-    std::fs::write(genesis_file, json)?;
+    fs::write(genesis_file, json)?;
 
     Ok(())
   }
@@ -195,7 +197,7 @@ fn add_validator(genesis_file: &PathBuf, args: &GenesisAddValidatorArgs) -> anyh
 }
 
 fn read_genesis(genesis_file: &PathBuf) -> anyhow::Result<Genesis> {
-    let json = std::fs::read_to_string(genesis_file).context("failed to read genesis")?;
+    let json = fs::read_to_string(genesis_file).context("failed to read genesis")?;
     let genesis = serde_json::from_str::<Genesis>(&json).context("failed to parse genesis")?;
     Ok(genesis)
 }
@@ -207,7 +209,7 @@ where
     let genesis = read_genesis(genesis_file)?;
     let genesis = f(genesis)?;
     let json = serde_json::to_string_pretty(&genesis)?;
-    std::fs::write(genesis_file, json)?;
+    fs::write(genesis_file, json)?;
     Ok(())
 }
 
@@ -232,7 +234,7 @@ fn into_tendermint(genesis_file: &PathBuf, args: &GenesisIntoTendermintArgs) -> 
     let genesis = read_genesis(genesis_file)?;
     let app_state: Option<String> = match args.app_state {
         Some(ref path) if path.exists() => {
-            Some(GenesisAppState::v1(std::fs::read(path)?).compress_and_encode()?)
+            Some(GenesisAppState::v1(fs::read(path)?).compress_and_encode()?)
         }
         _ => None,
     };
@@ -273,7 +275,7 @@ fn into_tendermint(genesis_file: &PathBuf, args: &GenesisIntoTendermintArgs) -> 
         app_state,
     };
     let tmg_json = serde_json::to_string_pretty(&tmg)?;
-    std::fs::write(&args.out, tmg_json)?;
+    fs::write(&args.out, tmg_json)?;
     Ok(())
 }
 
@@ -385,7 +387,7 @@ async fn new_genesis_from_parent(
     }
 
     let json = serde_json::to_string_pretty(&genesis)?;
-    std::fs::write(genesis_file, json)?;
+    fs::write(genesis_file, json)?;
 
     Ok(())
 }

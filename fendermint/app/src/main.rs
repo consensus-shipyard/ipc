@@ -4,6 +4,7 @@
 pub use fendermint_app_options as options;
 pub use fendermint_app_settings as settings;
 
+use fs_err as fs;
 use ipc_observability::traces::create_temporary_subscriber;
 use tracing::subscriber;
 
@@ -50,6 +51,7 @@ async fn main() {
 
 #[cfg(test)]
 mod tests {
+    use super::fs;
     use cid::Cid;
     use fendermint_rocksdb::{RocksDb, RocksDbConfig};
     use fendermint_vm_interpreter::fvm::bundle::bundle_path;
@@ -66,7 +68,7 @@ mod tests {
         // let bundle_car = actors_v10::BUNDLE_CAR;
 
         let bundle_path = bundle_path();
-        let bundle_car = std::fs::read(&bundle_path)
+        let bundle_car = fs::read(&bundle_path)
             .unwrap_or_else(|_| panic!("failed to load bundle CAR from {bundle_path:?}"));
 
         let dir = tempfile::Builder::new()

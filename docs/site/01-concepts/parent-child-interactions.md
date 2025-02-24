@@ -19,7 +19,6 @@ Checkpointed history of a child subnet cannot be reverted as long as a parent su
 
 In case of subnet failure, checkpointing enables participants (e.g., former users of the failed subnet) to agree on picking up an older version of the child subnet’s state from before the occurrence of the failure and, say, use that version as the initial state of a new, more robust subnet.\
 
-
 ### Checkpointing fees
 
 There are a number of fees that are paid during checkpointing:
