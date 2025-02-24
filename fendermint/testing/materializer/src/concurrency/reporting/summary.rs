@@ -24,8 +24,8 @@ impl ExecutionSummary {
         blocks: HashMap<u64, Block<H256>>,
         results: Vec<Vec<TestResult>>,
     ) -> Self {
-        let step_txs = Self::map_results_to_txs(&results);
-        let step_blocks = Self::map_blocks_to_steps(blocks, step_txs);
+        let step_tx_hashes = Self::extract_tx_hashes(&results);
+        let step_blocks = Self::map_blocks_to_steps(blocks, step_tx_hashes);
 
         let mut summaries = Vec::new();
         for (i, results) in results.into_iter().enumerate() {
@@ -56,7 +56,8 @@ impl ExecutionSummary {
         errs
     }
 
-    fn map_results_to_txs(results: &[Vec<TestResult>]) -> Vec<Vec<H256>> {
+    /// Extracts transaction hashes from test results and groups them by steps.
+    fn extract_tx_hashes(results: &[Vec<TestResult>]) -> Vec<Vec<H256>> {
         results
             .iter()
             .map(|step_results| {
@@ -68,14 +69,15 @@ impl ExecutionSummary {
             .collect()
     }
 
+    /// Maps blocks to their corresponding steps based on the transactions they contain.
     pub fn map_blocks_to_steps(
         blocks: HashMap<u64, Block<H256>>,
-        step_txs: Vec<Vec<H256>>,
+        step_tx_hashes: Vec<Vec<H256>>,
     ) -> Vec<Vec<Block<H256>>> {
         let mut sorted_blocks: Vec<_> = blocks.into_iter().collect();
         sorted_blocks.sort_by_key(|(block_number, _)| *block_number);
 
-        let mut step_mapped_blocks: Vec<Vec<Block<H256>>> = vec![Vec::new(); step_txs.len()];
+        let mut step_mapped_blocks: Vec<Vec<Block<H256>>> = vec![Vec::new(); step_tx_hashes.len()];
 
         for (_, block) in sorted_blocks {
             // Determine the max step_id based on the transactions in the block
@@ -83,8 +85,8 @@ impl ExecutionSummary {
                 .transactions
                 .iter()
                 .filter_map(|tx_hash| {
-                    step_txs.iter().enumerate().find_map(|(step_id, txs)| {
-                        if txs.contains(tx_hash) {
+                    step_tx_hashes.iter().enumerate().find_map(|(step_id, tx_hashes)| {
+                        if tx_hashes.contains(tx_hash) {
                             Some(step_id)
                         } else {
                             None

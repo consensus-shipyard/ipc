@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use ethers::prelude::{Block, H256, U256};
+use ethers::prelude::{Block, H256};
 
 pub fn calc_tps(blocks: Vec<Block<H256>>) -> Vec<f64> {
     let mut tps = Vec::new();
