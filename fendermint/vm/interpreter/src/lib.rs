@@ -2,11 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use async_trait::async_trait;
 
+mod check;
+mod verify;
+
 pub mod bytes;
 pub mod chain;
 pub mod fvm;
 pub mod genesis;
 pub mod signed;
+
+pub mod interpreter;
 
 #[cfg(feature = "arb")]
 mod arb;

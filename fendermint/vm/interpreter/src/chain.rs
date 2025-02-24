@@ -3,7 +3,6 @@
 use crate::fvm::state::ipc::GatewayCaller;
 use crate::fvm::store::ReadOnlyBlockstore;
 use crate::fvm::{topdown, EndBlockOutput, FvmApplyRet};
-use crate::selector::{GasLimitSelector, MessageSelector};
 use crate::{
     fvm::state::FvmExecState,
     fvm::FvmMessage,
@@ -116,7 +115,7 @@ where
         (chain_env, state): Self::State,
         mut msgs: Vec<Self::Message>,
     ) -> anyhow::Result<Vec<Self::Message>> {
-        msgs = messages_selection(msgs, &state)?;
+        // msgs = messages_selection(msgs, &state)?;
 
         // Collect resolved CIDs ready to be proposed from the pool.
         let ckpts = atomically(|| chain_env.checkpoint_pool.collect_resolved()).await;
@@ -553,32 +552,4 @@ fn relayed_bottom_up_ckpt_to_fvm(
         .context("failed to create syntetic message")?;
 
     Ok(msg)
-}
-
-/// Selects messages to be executed. Currently, this is a static function whose main purpose is to
-/// coordinate various selectors. However, it does not have formal semantics for doing so, e.g.
-/// do we daisy-chain selectors, do we parallelize, how do we treat rejections and acceptances?
-/// It hasn't been well thought out yet. When we refactor the whole *Interpreter stack, we will
-/// revisit this and make the selection function properly pluggable.
-fn messages_selection<DB: Blockstore + Clone + 'static>(
-    msgs: Vec<ChainMessage>,
-    state: &FvmExecState<DB>,
-) -> anyhow::Result<Vec<ChainMessage>> {
-    let mut user_msgs = msgs
-        .into_iter()
-        .map(|msg| match msg {
-            ChainMessage::Signed(inner) => Ok(inner),
-            ChainMessage::Ipc(_) => Err(anyhow!("should not have ipc messages in user proposals")),
-        })
-        .collect::<anyhow::Result<Vec<_>>>()?;
-
-    // Currently only one selector, we can potentially extend to more selectors
-    // This selector enforces that the total cumulative gas limit of all messages is less than the
-    // currently active block gas limit.
-    let selectors = vec![GasLimitSelector {}];
-    for s in selectors {
-        user_msgs = s.select_messages(state, user_msgs)
-    }
-
-    Ok(user_msgs.into_iter().map(ChainMessage::Signed).collect())
 }

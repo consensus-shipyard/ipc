@@ -3,42 +3,67 @@
 
 //! Gas related message selection
 
-use crate::fvm::state::FvmExecState;
-use fendermint_vm_message::signed::SignedMessage;
-use fvm_ipld_blockstore::Blockstore;
+use fendermint_vm_message::{chain::ChainMessage, ipc::IpcMessage};
 
-/// Implement this trait to perform message selection
-pub trait MessageSelector {
-    fn select_messages<DB: Blockstore + Clone + 'static>(
-        &self,
-        state: &FvmExecState<DB>,
-        msgs: Vec<SignedMessage>,
-    ) -> Vec<SignedMessage>;
+pub trait GasLimit {
+    fn gas_limit(&self) -> u64;
 }
 
-pub(crate) struct GasLimitSelector;
-
-impl MessageSelector for GasLimitSelector {
-    fn select_messages<DB: Blockstore + Clone + 'static>(
-        &self,
-        state: &FvmExecState<DB>,
-        mut msgs: Vec<SignedMessage>,
-    ) -> Vec<SignedMessage> {
-        let total_gas_limit = state.block_gas_tracker().available();
-
-        // Sort by gas limit descending
-        msgs.sort_by(|a, b| b.message.gas_limit.cmp(&a.message.gas_limit));
-
-        let mut total_gas_limit_consumed = 0;
-        msgs.into_iter()
-            .take_while(|msg| {
-                let gas_limit = msg.message.gas_limit;
-                let accepted = total_gas_limit_consumed + gas_limit <= total_gas_limit;
-                if accepted {
-                    total_gas_limit_consumed += gas_limit;
+impl GasLimit for ChainMessage {
+    fn gas_limit(&self) -> u64 {
+        match self {
+            ChainMessage::Signed(s) => s.message.gas_limit,
+            ChainMessage::Ipc(ipc) => match ipc {
+                IpcMessage::BottomUpResolve(relayed) => relayed.message.gas_limit,
+                other => {
+                    // This should never happen as only messages above can be in the mempool.
+                    // But if it does, let's not panic and just return 0 gas limit which should not temper
+                    // with the block gas limit.
+                    tracing::warn!(
+                        error = "unexpected IpcMessage variant encountered",
+                        message = ?other
+                    );
+                    0
                 }
-                accepted
-            })
-            .collect()
+            },
+        }
     }
+}
+
+/// Generic helper: select items until the accumulated weight exceeds `max`.
+/// Returns a tuple of (selected items, accumulated weight).
+pub fn select_until<T, F>(items: Vec<T>, max: u64, weight: F) -> (Vec<T>, u64)
+where
+    F: Fn(&T) -> u64,
+{
+    let mut total: u64 = 0;
+    let mut out = Vec::new();
+    for item in items {
+        let w = weight(&item);
+        if total.saturating_add(w) > max {
+            break;
+        }
+        total += w;
+        out.push(item);
+    }
+    (out, total)
+}
+
+/// Select messages by gas limit.
+/// This function sorts the messages in descending order by gas limit and
+/// then selects them until the accumulated gas limit would exceed `total_gas_limit`.
+pub fn select_messages_by_gas_limit<T: GasLimit>(mut msgs: Vec<T>, total_gas_limit: u64) -> Vec<T> {
+    // Sort by gas limit descending.
+    msgs.sort_by(|a, b| b.gas_limit().cmp(&a.gas_limit()));
+
+    select_until(msgs, total_gas_limit, |msg| msg.gas_limit()).0
+}
+
+/// Select transactions until the total size (in bytes) exceeds `max_tx_bytes`.
+pub fn select_messages_until_total_bytes<T: AsRef<[u8]>>(
+    txs: Vec<T>,
+    max_tx_bytes: usize,
+) -> (Vec<T>, usize) {
+    let (selected, total) = select_until(txs, max_tx_bytes as u64, |tx| tx.as_ref().len() as u64);
+    (selected, total as usize)
 }

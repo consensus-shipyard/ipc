@@ -2,11 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
+use fendermint_vm_actor_interface::ipc;
+use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{
-    address::Address, clock::ChainEpoch, crypto::signature::Signature, econ::TokenAmount,
+    address::Address, chainid::ChainID, clock::ChainEpoch, crypto::signature::Signature,
+    econ::TokenAmount, message::Message,
 };
 use ipc_api::subnet_id::SubnetID;
+
 use serde::{Deserialize, Serialize};
+
+use crate::cid as ipc_cid;
+use crate::signed::{chain_id_bytes, SignedMessageError};
+use num_traits::Zero;
 
 /// Messages involved in InterPlanetary Consensus.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -55,6 +63,35 @@ pub struct SignedRelayedMessage<T> {
     pub message: RelayedMessage<T>,
     /// The signature of the relayer, for cost and reward attribution.
     pub signature: Signature,
+}
+
+impl SignedRelayedMessage<CertifiedMessage<BottomUpCheckpoint>> {
+    pub fn verify(&self, chain_id: &ChainID) -> Result<(), SignedMessageError> {
+        let message_cid = ipc_cid(&self.message)?;
+        let mut data = message_cid.to_bytes();
+        data.extend(chain_id_bytes(chain_id).iter());
+
+        self.signature
+            .verify(&data, &self.message.relayer)
+            .map_err(SignedMessageError::InvalidSignature)
+    }
+
+    pub fn message(&self) -> Message {
+        let params = RawBytes::default();
+
+        Message {
+            version: 0,
+            from: self.message.relayer,
+            to: ipc::GATEWAY_ACTOR_ADDR,
+            sequence: self.message.sequence,
+            value: TokenAmount::zero(),
+            method_num: ipc::gateway::METHOD_INVOKE_CONTRACT,
+            params,
+            gas_limit: self.message.gas_limit,
+            gas_fee_cap: self.message.gas_fee_cap.clone(),
+            gas_premium: self.message.gas_premium.clone(),
+        }
+    }
 }
 
 /// A message with a quorum certificate from a group of validators.
