@@ -30,6 +30,7 @@ pub fn calc_tps(blocks: Vec<Block<H256>>) -> Vec<f64> {
 mod tests {
     use super::super::FLOAT_TOLERANCE;
     use super::*;
+    use ethers::prelude::{U256};
 
     #[test]
     fn test_calc_tps() {

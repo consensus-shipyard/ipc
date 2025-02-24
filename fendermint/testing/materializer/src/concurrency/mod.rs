@@ -12,7 +12,6 @@ use crate::concurrency::reporting::TestResult;
 use ethers::types::H256;
 use futures::FutureExt;
 use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::Semaphore;
@@ -29,9 +28,10 @@ pub struct TestOutput {
     pub tx_hash: H256,
 }
 
-pub async fn execute<F>(cfg: config::Execution, test_factory: F) -> Vec<Vec<TestResult>>
+pub async fn execute<F, Fut>(cfg: config::Execution, test_factory: F) -> Vec<Vec<TestResult>>
 where
-    F: Fn(TestInput) -> Pin<Box<dyn Future<Output = anyhow::Result<TestOutput>> + Send>>,
+    F: Fn(TestInput) -> Fut,
+    Fut: Future<Output = anyhow::Result<TestOutput>> + Send + 'static,
 {
     let mut test_id = 0;
     let mut results = Vec::new();
