@@ -1,18 +1,12 @@
-use std::path::Path;
 use std::sync::Arc;
 
-use color_eyre::eyre::{self, bail, eyre, Result};
+use color_eyre::eyre::{bail, Result};
 use dagger_sdk::{
-    logging::{StdLogger, TracingLogger},
-    CacheVolume, Container, ContainerBuildOpts, ContainerBuildOptsBuilder,
-    ContainerWithDirectoryOpts, ContainerWithDirectoryOptsBuilder, ContainerWithEntrypointOpts,
-    ContainerWithEntrypointOptsBuilder, ContainerWithEnvVariableOptsBuilder, ContainerWithExecOpts,
-    ContainerWithExecOptsBuilder, ContainerWithFileOpts, ContainerWithFileOptsBuilder,
-    ContainerWithMountedCacheOpts, ContainerWithMountedCacheOptsBuilder,
-    ContainerWithMountedDirectoryOpts, DaggerConn, Directory, File, HostDirectoryOpts, Service,
+    logging::StdLogger, Container, ContainerBuildOptsBuilder, ContainerWithDirectoryOptsBuilder,
+    ContainerWithEnvVariableOptsBuilder, ContainerWithExecOptsBuilder,
+    ContainerWithFileOptsBuilder, DaggerConn, Directory, HostDirectoryOpts,
 };
 use fs_err as fs;
-use rand::Rng;
 
 /// Execute the lazily prepared container definition and convert to a `Result`
 async fn run(container: &Container) -> Result<()> {
@@ -20,8 +14,8 @@ async fn run(container: &Container) -> Result<()> {
     let err_fut = container.stderr();
     let exit_code_fut = container.exit_code();
     let (out, err, exit_code) = tokio::join!(out_fut, err_fut, exit_code_fut);
-    let out = out.inspect_err(|e| eprintln!("dagger err(stdout): {}", e.to_string()));
-    let err = err.inspect_err(|e| eprintln!("dagger err(stderr): {}", e.to_string()));
+    let out = out.inspect_err(|e| eprintln!("dagger err(stdout): {}", e));
+    let err = err.inspect_err(|e| eprintln!("dagger err(stderr): {}", e));
     let exit_code = exit_code?;
     out?;
     err?;
@@ -43,14 +37,13 @@ fn cmd(s: impl AsRef<str>) -> Vec<String> {
 ///
 /// TODO: Should be the cargo manifest directory!
 fn host_repo_root_dir(client: &DaggerConn) -> Directory {
-    let repo_root_dir = client.host().directory_opts(
+    client.host().directory_opts(
         ".",
         HostDirectoryOpts {
             exclude: Some(vec!["node_modules", "target"]),
             include: None,
         },
-    );
-    repo_root_dir
+    )
 }
 
 /// Register these caches as early as possible
@@ -82,9 +75,8 @@ fn with_caches(container: Container, client: &DaggerConn) -> Container {
         cache_volume_solidity.clone(),
     );
     let container = container.with_mounted_cache("/root/.cargo", cache_volume_cargo.clone());
-    let container = container.with_mounted_cache("/root/.rustup", cache_volume_rustup.clone());
 
-    container
+    container.with_mounted_cache("/root/.rustup", cache_volume_rustup.clone())
 }
 
 /// Create a container definition which is able to compile the contracts
