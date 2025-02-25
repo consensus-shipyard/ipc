@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use color_eyre::eyre::{bail, Result};
 use dagger_sdk::{
-    logging::StdLogger, Container, ContainerBuildOptsBuilder, ContainerWithDirectoryOptsBuilder,
+    logging::StdLogger, Container, ContainerWithDirectoryOptsBuilder,
     ContainerWithEnvVariableOptsBuilder, ContainerWithExecOptsBuilder,
     ContainerWithFileOptsBuilder, DaggerConn, Directory, HostDirectoryOpts,
 };
@@ -60,9 +60,9 @@ fn with_caches(container: Container, client: &DaggerConn) -> Container {
     let cache_volume_rustup = client.cache_volume("rustup");
     let cache_volume_target = client.cache_volume("target");
     let cache_volume_solidity = client.cache_volume("solidity");
-    let cache_volume_node_modules = client.cache_volume("npm");
+    let cache_volume_node_modules = client.cache_volume("node_modules");
     let cache_volume_pnpm_store = client.cache_volume("pnpm");
-    let cache_volume_npm_store = client.cache_volume("pnpm");
+    let cache_volume_npm_store = client.cache_volume("npm");
 
     let container = container.with_mounted_cache("/root/.npm", cache_volume_npm_store.clone());
     let container =
@@ -88,10 +88,6 @@ fn define_contracts_container(
     hccd: Directory,
 ) -> Result<Container> {
     let compiled_contracts_dir = "/workdir/compiled_contracts";
-
-    let opts = ContainerBuildOptsBuilder::default()
-        .dockerfile("contracts/docker/builder.Dockerfile")
-        .build()?;
 
     let container = with_caches(client
     .container().from("docker.io/library/node:latest")
@@ -121,10 +117,6 @@ fn define_crates_container(
     hrrd: Directory,
     hccd: Directory,
 ) -> Result<Container> {
-    let opts = ContainerBuildOptsBuilder::default()
-        .dockerfile("fendermint/docker/builder.local.Dockerfile")
-        .build()?;
-
     let container = with_caches(client.container().from("docker.io/rust:bookworm"), &client)
         .with_mounted_directory("/workdir", hrrd.clone())
         .with_mounted_directory("/workdir/_compiled_contracts", hccd)
@@ -143,8 +135,6 @@ fn define_crates_container(
 }
 
 async fn prepare_fendermint_two_stage_build(client: DaggerConn) -> Result<Container> {
-    let fendermint_dir = client.host().directory("fendermint");
-
     fs::create_dir_all("_compiled_contracts")?;
     let hrrd = host_repo_root_dir(&client);
     let hccd = hrrd.directory("fendermint/actors/output");
@@ -162,7 +152,6 @@ async fn prepare_fendermint_two_stage_build(client: DaggerConn) -> Result<Contai
         contracts_gen.file("/workdir/fendermint/actors/output/custom_actors_bundle.car");
 
     // prepare the to-be-published "runner" container
-    let container = client.container();
     let runner = with_caches(client
     .container()
     .from("docker.io/debian:bookworm-slim"), &client)
@@ -170,14 +159,14 @@ async fn prepare_fendermint_two_stage_build(client: DaggerConn) -> Result<Contai
             "/usr/local/bin/fendermint",
             f_fendermint,
             ContainerWithFileOptsBuilder::default()
-                .permissions(0755_isize)
+                .permissions(0o755_isize)
                 .build()?,
         )
         .with_file_opts(
             "/usr/local/bin/ipc-cli",
             f_ipc,
             ContainerWithFileOptsBuilder::default()
-                .permissions(0755_isize)
+                .permissions(0o755_isize)
                 .build()?,
         )
         .with_exec(cmd("ls -al"))
@@ -205,6 +194,10 @@ async fn prepare_fendermint_two_stage_build(client: DaggerConn) -> Result<Contai
         .with_directory_opts("/fendermint/config", hrrd.directory("fendermint/app/config"), ContainerWithDirectoryOptsBuilder::default().exclude(vec![".git", ".gitignore", ".*"]).build()?);
 
     run(&runner).await?;
+
+    // TODO extract file and publish gh release IFF tagged
+    // TODO
+    // TODO runner.publish(address).await?;
 
     Ok(runner)
 }
