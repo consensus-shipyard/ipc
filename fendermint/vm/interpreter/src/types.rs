@@ -68,3 +68,17 @@ pub struct EndBlockOutput {
     /// The end block events to be recorded
     pub events: BlockEndEvents,
 }
+
+/// Decision to accept or reject a batch of messages for process method.
+pub enum ProcessDecision {
+    /// The batch of messages meets the criteria and should be included in the block.
+    Accept,
+    /// The batch of messages does not meet the criteria and should be rejected.
+    Reject,
+}
+
+// TODO Karel - handle this type in the check function instead
+// pub enum CheckDecision {
+//     Accept(FvmCheckRet),
+//     Reject,
+// }

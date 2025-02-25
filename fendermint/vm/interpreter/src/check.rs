@@ -57,8 +57,6 @@ pub fn check_nonce_and_sufficient_balance(
 }
 
 /// Looks up an actor by address in the state tree.
-///
-/// Returns `Ok(Some(actor))` if found, or `Ok(None)` if the actor doesn't exist.
 fn lookup_actor(
     state: &FvmExecState<ReadOnlyBlockstore<Arc<impl Blockstore + Clone + 'static>>>,
     address: &Address,
