@@ -33,6 +33,13 @@ impl VerifiableMessage {
             VerifiableMessage::BottomUp(inner) => inner.verify(chain_id),
         }
     }
+
+    pub fn gas_limit(&self) -> u64 {
+        match self {
+            VerifiableMessage::Signed(inner) => inner.message.gas_limit,
+            VerifiableMessage::BottomUp(inner) => inner.message.gas_limit,
+        }
+    }
 }
 
 impl TryFrom<ChainMessage> for VerifiableMessage {
@@ -45,6 +52,17 @@ impl TryFrom<ChainMessage> for VerifiableMessage {
                 IpcMessage::BottomUpResolve(inner) => Ok(VerifiableMessage::BottomUp(inner)),
                 other => Err(IllegalMessage(format!("{:?}", other))),
             },
+        }
+    }
+}
+
+impl From<VerifiableMessage> for ChainMessage {
+    fn from(vm: VerifiableMessage) -> Self {
+        match vm {
+            VerifiableMessage::Signed(inner) => ChainMessage::Signed(inner),
+            VerifiableMessage::BottomUp(inner) => {
+                ChainMessage::Ipc(IpcMessage::BottomUpResolve(inner))
+            }
         }
     }
 }

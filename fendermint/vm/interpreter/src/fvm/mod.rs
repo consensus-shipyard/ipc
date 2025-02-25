@@ -3,7 +3,7 @@
 
 mod broadcast;
 mod check;
-mod checkpoint;
+pub mod checkpoint;
 mod exec;
 mod externs;
 pub mod observe;
