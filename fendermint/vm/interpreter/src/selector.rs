@@ -5,6 +5,8 @@
 
 use fendermint_vm_message::{chain::ChainMessage, ipc::IpcMessage};
 
+use crate::verify::VerifiableMessage;
+
 pub trait GasLimit {
     fn gas_limit(&self) -> u64;
 }
@@ -52,7 +54,10 @@ where
 /// Select messages by gas limit.
 /// This function sorts the messages in descending order by gas limit and
 /// then selects them until the accumulated gas limit would exceed `total_gas_limit`.
-pub fn select_messages_by_gas_limit<T: GasLimit>(mut msgs: Vec<T>, total_gas_limit: u64) -> Vec<T> {
+pub fn select_messages_by_gas_limit(
+    mut msgs: Vec<VerifiableMessage>,
+    total_gas_limit: u64,
+) -> Vec<VerifiableMessage> {
     // Sort by gas limit descending.
     msgs.sort_by(|a, b| b.gas_limit().cmp(&a.gas_limit()));
 

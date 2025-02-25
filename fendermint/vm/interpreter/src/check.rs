@@ -7,39 +7,7 @@ use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{address::Address, error::ExitCode};
 use std::sync::Arc;
 
-/// Transaction check results are expressed by the exit code, so that they would
-/// result in the same error code if they were applied.
-pub struct FvmCheckRet {
-    pub sender: Address,
-    pub gas_limit: u64,
-    pub exit_code: ExitCode,
-    pub info: Option<String>,
-    pub message: FvmMessage,
-}
-
-impl FvmCheckRet {
-    /// Constructs a new check result from a message, an exit code, and optional info.
-    pub fn new(msg: &FvmMessage, exit_code: ExitCode, info: Option<String>) -> Self {
-        Self {
-            sender: msg.from,
-            gas_limit: msg.gas_limit,
-            exit_code,
-            info,
-            message: msg.clone(),
-        }
-    }
-
-    /// Constructs a new check result from a message with OK exit code and no info.
-    pub fn new_ok(msg: &FvmMessage) -> Self {
-        Self {
-            sender: msg.from,
-            gas_limit: msg.gas_limit,
-            exit_code: ExitCode::OK,
-            info: None,
-            message: msg.clone(),
-        }
-    }
-}
+use crate::types::*;
 
 /// Checks the actor state (balance and sequence) for the sender of message.
 pub fn check_nonce_and_sufficient_balance(
