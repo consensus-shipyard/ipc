@@ -74,6 +74,7 @@ where
     /// If this is a validator node, this should be the key we can use to sign transactions.
     validator_ctx: Option<ValidatorContext<C>>,
 
+    // Gateway caller for IPC gateway interactions
     gateway_caller: GatewayCaller<DB>,
 }
 
@@ -91,6 +92,7 @@ where
             tendermint_client,
             pool: resolve_pool,
             validator_ctx,
+            // TODO Karel - no default - better make it mockable?
             gateway_caller: GatewayCaller::default(),
         }
     }
@@ -108,6 +110,10 @@ where
         })
         .await;
         is_resolved
+    }
+
+    pub async fn add_checkpoint(&self, item: CheckpointPoolItem) {
+        atomically(|| self.pool.add(item.clone(), false)).await;
     }
 
     // Checks the bottom up checkpoint pool and returns the messages that represent the checkpoints for execution
