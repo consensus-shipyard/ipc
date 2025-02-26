@@ -1,4 +1,4 @@
-use crate::fvm::FvmMessage;
+use crate::fvm::{FvmApplyRet, FvmMessage};
 use fvm::executor::ApplyRet;
 use fvm_shared::{address::Address, error::ExitCode};
 use fvm_shared::{ActorID, MethodNum, BLOCK_GAS_LIMIT};

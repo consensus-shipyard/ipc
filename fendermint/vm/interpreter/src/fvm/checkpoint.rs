@@ -36,6 +36,7 @@ use tendermint_rpc::{endpoint::validators, Client, Paging};
 pub struct PowerTable(pub Vec<Validator<Power>>);
 
 /// Changes in the power table.
+/// TODO Karel - this should be moved to some common types module or at least to re-export.
 #[derive(Debug, Clone, Default)]
 pub struct PowerUpdates(pub Vec<Validator<Power>>);
 

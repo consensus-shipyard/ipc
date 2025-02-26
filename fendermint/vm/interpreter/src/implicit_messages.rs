@@ -8,6 +8,8 @@ use fvm_shared::address::Address;
 use fvm_shared::BLOCK_GAS_LIMIT;
 use tendermint::consensus::params;
 
+// TODO Karel - rename this module?
+
 use crate::fvm::FvmMessage;
 
 // Arbitrarily large gas limit for cron (matching how Forest does it, which matches Lotus).
@@ -67,7 +69,7 @@ pub fn execute_cron_message<DB: Blockstore + Clone + 'static + Send + Sync>(
 }
 
 /// Attempts to push chain metadata if a block hash is available.
-pub fn push_chain_metadata_if_possible<DB: Blockstore + Clone + 'static + Send + Sync>(
+pub fn push_block_to_chainmeta_actor_if_possible<DB: Blockstore + Clone + 'static + Send + Sync>(
     state: &mut FvmExecState<DB>,
     height: u64,
 ) -> anyhow::Result<Option<ApplyResponse>> {
