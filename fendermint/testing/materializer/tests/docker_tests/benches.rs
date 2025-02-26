@@ -61,11 +61,7 @@ async fn test_native_coin_transfer() -> Result<(), anyhow::Error> {
     };
 
     // Drive concurrency.
-    let cfg = Execution::new()
-        .add_step(1, 5)
-        .add_step(10, 5)
-        .add_step(100, 5)
-        .add_step(150, 5);
+    let cfg = Execution::new_baseline();
     let testnet = Arc::new(testnet);
     let testnet_clone = testnet.clone();
     let nonce_manager = Arc::new(NonceManager::new());
@@ -189,11 +185,7 @@ async fn test_contract_deployment() -> Result<(), anyhow::Error> {
     };
 
     // Drive concurrency.
-    let cfg = Execution::new()
-        .add_step(1, 5)
-        .add_step(10, 5)
-        .add_step(100, 5)
-        .add_step(150, 5);
+    let cfg = Execution::new_baseline();
     let testnet = Arc::new(testnet);
     let testnet_clone = testnet.clone();
     let nonce_manager = Arc::new(NonceManager::new());
@@ -382,11 +374,7 @@ async fn test_contract_call() -> Result<(), anyhow::Error> {
     };
 
     // Drive concurrency.
-    let cfg = Execution::new()
-        .add_step(1, 5)
-        .add_step(10, 5)
-        .add_step(100, 5)
-        .add_step(150, 5);
+    let cfg = Execution::new_baseline();
     let testnet = Arc::new(testnet);
     let testnet_clone = testnet.clone();
     let contract_addresses = Arc::new(contract_addresses);

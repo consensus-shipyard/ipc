@@ -116,6 +116,7 @@ impl Display for ExecutionSummary {
         let mut header = vec![
             "max_concurrency".to_string(),
             "duration".to_string(),
+            "error rate".to_string(),
             "TPS".to_string(),
         ];
         header.extend(latencies.iter().map(|key| format!("latency ({}) ", key)));
@@ -123,8 +124,16 @@ impl Display for ExecutionSummary {
 
         for summary in self.summaries.iter() {
             let mut row = vec![];
+            let num_errs = summary.errs.len();
+            let err_rate = if num_errs > 0 {
+                (num_errs as f64 / summary.num_runs as f64 * 100.0).round() as usize
+            } else {
+                0
+            };
+
             row.push(summary.cfg.max_concurrency.to_string());
             row.push(summary.cfg.duration.as_secs().to_string());
+            row.push(format!("{}%", err_rate));
             row.push(format!("median: {:.2}", summary.tps.median));
 
             for key in &latencies {
@@ -150,6 +159,7 @@ impl Display for ExecutionSummary {
 #[derive(Debug)]
 pub struct StepSummary {
     pub cfg: ExecutionStep,
+    pub num_runs: usize,
     pub latencies: HashMap<String, Metrics>,
     pub tps: Metrics,
     pub errs: Vec<anyhow::Error>,
@@ -157,6 +167,7 @@ pub struct StepSummary {
 
 impl StepSummary {
     fn new(cfg: ExecutionStep, results: Vec<TestResult>, blocks: Vec<Block<H256>>) -> Self {
+        let num_runs = results.len();
         let mut latencies: HashMap<String, Vec<f64>> = HashMap::new();
         let mut errs = Vec::new();
 
@@ -184,6 +195,7 @@ impl StepSummary {
 
         Self {
             cfg,
+            num_runs,
             latencies,
             tps,
             errs,

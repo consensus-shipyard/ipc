@@ -9,6 +9,7 @@ pub mod reporting;
 
 use crate::bencher::Bencher;
 use crate::concurrency::reporting::TestResult;
+use anyhow::anyhow;
 use ethers::types::H256;
 use futures::stream::FuturesUnordered;
 use futures::FutureExt;
@@ -17,6 +18,7 @@ use std::future::Future;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::Semaphore;
+use tokio::time::timeout;
 
 #[derive(Debug)]
 pub struct TestInput {
@@ -50,12 +52,23 @@ where
             let test_input = TestInput { test_id, bencher };
             let task = test_factory(test_input).boxed();
             tasks.push(tokio::spawn(async move {
-                let test_output = task.await;
-                drop(permit);
-                let (bencher, tx_hash, err) = match test_output {
-                    Ok(test_output) => (Some(test_output.bencher), Some(test_output.tx_hash), None),
-                    Err(err) => (None, None, Some(err)),
+                let timeout_result = match cfg.timeout {
+                    Some(timeout_duration) => timeout(timeout_duration, task).await,
+                    None => Ok(task.await),
                 };
+
+                drop(permit);
+
+                let (bencher, tx_hash, err) = match timeout_result {
+                    Err(_) => (None, None, Some(anyhow!("test timed out"))),
+                    Ok(test_result) => match test_result {
+                        Err(err) => (None, None, Some(err)),
+                        Ok(test_output) => {
+                            (Some(test_output.bencher), Some(test_output.tx_hash), None)
+                        }
+                    },
+                };
+
                 TestResult {
                     test_id,
                     step_id,
