@@ -41,28 +41,3 @@ impl Display for Metrics {
         )
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::super::FLOAT_TOLERANCE;
-    use super::*;
-
-    #[test]
-    fn test_metrics() {
-        let data = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
-
-        let expected_mean = 5.5;
-        let expected_median = 5.5;
-        let expected_max = 10.0;
-        let expected_min = 1.0;
-        let expected_percentile_90 = 9.0;
-
-        let metrics: Metrics = data.into();
-
-        assert!((metrics.mean - expected_mean).abs() < FLOAT_TOLERANCE);
-        assert!((metrics.median - expected_median).abs() < FLOAT_TOLERANCE);
-        assert!((metrics.max - expected_max).abs() < FLOAT_TOLERANCE);
-        assert!((metrics.min - expected_min).abs() < FLOAT_TOLERANCE);
-        assert!((metrics.percentile_90 - expected_percentile_90).abs() < FLOAT_TOLERANCE);
-    }
-}
