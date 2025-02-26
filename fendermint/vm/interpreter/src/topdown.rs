@@ -15,13 +15,13 @@ use fendermint_vm_message::ipc::ParentFinality;
 
 type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxyWithLatency>>>;
 
-pub struct TopDownCheckpointResolver {
+pub struct TopDownManager {
     provider: TopDownFinalityProvider,
     votes: VoteTally,
 }
 
-impl TopDownCheckpointResolver {
-    pub async fn check_valid(&self, finality: ParentFinality) -> bool {
+impl TopDownManager {
+    pub async fn is_finality_valid(&self, finality: ParentFinality) -> bool {
         let prop = IPCParentFinality {
             height: finality.height as u64,
             block_hash: finality.block_hash,
@@ -35,7 +35,7 @@ impl TopDownCheckpointResolver {
     /// both the next parent's proposal and the quorum of votes. If either the parent's proposal or the quorum is missing,
     /// the function returns `None`. When both are available, it selects the finality with the lower block height and wraps
     /// it into a `ChainMessage` for top-down execution.
-    pub async fn resolve_message_from_finality_and_quorum(&self) -> Option<ChainMessage> {
+    pub async fn message_from_finality_or_quorum(&self) -> Option<ChainMessage> {
         // Prepare top down proposals.
         // Before we try to find a quorum, pause incoming votes. This is optional but if there are lots of votes coming in it might hold up proposals.
         atomically(|| self.votes.pause_votes_until_find_quorum()).await;

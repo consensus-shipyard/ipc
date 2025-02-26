@@ -13,12 +13,12 @@ use crate::types::*;
 pub fn check_nonce_and_sufficient_balance(
     state: &FvmExecState<ReadOnlyBlockstore<Arc<impl Blockstore + Clone + 'static>>>,
     msg: &FvmMessage,
-) -> anyhow::Result<FvmCheckRet> {
+) -> anyhow::Result<CheckResponse> {
     // Look up the actor associated with the sender's address.
     let actor = match lookup_actor(&state, &msg.from)? {
         Some(actor) => actor,
         None => {
-            return Ok(FvmCheckRet::new(
+            return Ok(CheckResponse::new(
                 msg,
                 ExitCode::SYS_SENDER_STATE_INVALID,
                 None,
@@ -31,7 +31,7 @@ pub fn check_nonce_and_sufficient_balance(
 
     // Check for sufficient balance.
     if actor.balance < balance_needed {
-        return Ok(FvmCheckRet::new(
+        return Ok(CheckResponse::new(
             msg,
             ExitCode::SYS_SENDER_STATE_INVALID,
             Some(format!(
@@ -43,7 +43,7 @@ pub fn check_nonce_and_sufficient_balance(
 
     // Check for a nonce match.
     if actor.sequence != msg.sequence {
-        return Ok(FvmCheckRet::new(
+        return Ok(CheckResponse::new(
             msg,
             ExitCode::SYS_SENDER_STATE_INVALID,
             Some(format!(
@@ -53,7 +53,7 @@ pub fn check_nonce_and_sufficient_balance(
         ));
     }
 
-    Ok(FvmCheckRet::new(msg, ExitCode::OK, None))
+    Ok(CheckResponse::new(msg, ExitCode::OK, None))
 }
 
 /// Looks up an actor by address in the state tree.
