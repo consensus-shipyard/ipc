@@ -32,6 +32,10 @@ pub struct RecallConfig {
     pub blob_min_ttl: ChainEpoch,
     /// The default epoch duration a blob is stored.
     pub blob_default_ttl: ChainEpoch,
+    /// Maximum number of blobs to delete in a single batch during debit.
+    pub blob_delete_batch_size: u64,
+    /// Maximum number of accounts to process in a single batch during debit.
+    pub account_debit_batch_size: u64,
 }
 
 impl Default for RecallConfig {
@@ -45,6 +49,8 @@ impl Default for RecallConfig {
             blob_credit_debit_interval: ChainEpoch::from(60 * 10), // ~10 min
             blob_min_ttl: ChainEpoch::from(60 * 60),               // ~1 hour
             blob_default_ttl: ChainEpoch::from(60 * 60 * 24),      // ~1 day
+            blob_delete_batch_size: 100,
+            account_debit_batch_size: 1000,
         }
     }
 }

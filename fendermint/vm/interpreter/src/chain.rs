@@ -849,24 +849,6 @@ where
                     let msg =
                         create_implicit_message(to, method_num, Default::default(), gas_limit);
                     let (apply_ret, emitters) = state.execute_implicit(msg)?;
-
-                    let info = apply_ret
-                        .failure_info
-                        .clone()
-                        .map(|i| i.to_string())
-                        .filter(|s| !s.is_empty());
-                    tracing::info!(
-                        exit_code = apply_ret.msg_receipt.exit_code.value(),
-                        from = from.to_string(),
-                        to = to.to_string(),
-                        method_num = method_num,
-                        gas_limit = gas_limit,
-                        gas_used = apply_ret.msg_receipt.gas_used,
-                        info = info.unwrap_or_default(),
-                        "implicit tx delivered"
-                    );
-                    tracing::debug!("chain interpreter debited accounts");
-
                     let ret = FvmApplyRet {
                         apply_ret,
                         from,

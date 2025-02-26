@@ -27,6 +27,10 @@ pub struct RecallConfigTracker {
     pub blob_min_ttl: ChainEpoch,
     /// The default epoch duration a blob is stored.
     pub blob_default_ttl: ChainEpoch,
+    /// The number of blobs to delete in a single batch.
+    pub blob_delete_batch_size: u64,
+    /// The number of accounts to debit in a single batch.
+    pub account_debit_batch_size: u64,
 }
 
 impl RecallConfigTracker {
@@ -37,6 +41,8 @@ impl RecallConfigTracker {
             blob_credit_debit_interval: Zero::zero(),
             blob_min_ttl: Zero::zero(),
             blob_default_ttl: Zero::zero(),
+            blob_delete_batch_size: Zero::zero(),
+            account_debit_batch_size: Zero::zero(),
         };
 
         let reading = Self::read_recall_config(executor)?;
@@ -46,6 +52,8 @@ impl RecallConfigTracker {
         ret.blob_credit_debit_interval = reading.blob_credit_debit_interval;
         ret.blob_min_ttl = reading.blob_min_ttl;
         ret.blob_default_ttl = reading.blob_default_ttl;
+        ret.blob_delete_batch_size = reading.blob_delete_batch_size;
+        ret.account_debit_batch_size = reading.account_debit_batch_size;
 
         Ok(ret)
     }

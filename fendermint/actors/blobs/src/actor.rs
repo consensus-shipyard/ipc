@@ -382,11 +382,16 @@ impl BlobsActor {
     /// TODO: Take a start key and page limit to avoid out-of-gas errors.
     fn debit_accounts(rt: &impl Runtime) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-
+        let config = get_config(rt)?;
         let mut credit_debited = Credit::zero();
         let (deletes, num_accounts) = rt.transaction(|st: &mut State, rt| {
             let initial_credit_debited = st.credit_debited.clone();
-            let deletes = st.debit_accounts(rt.store(), rt.curr_epoch())?;
+            let deletes = st.debit_accounts(
+                rt.store(),
+                rt.curr_epoch(),
+                config.blob_delete_batch_size,
+                config.account_debit_batch_size,
+            )?;
             credit_debited = &st.credit_debited - initial_credit_debited;
             let num_accounts = st.accounts.len();
             Ok((deletes, num_accounts))
