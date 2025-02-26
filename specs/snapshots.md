@@ -4,7 +4,7 @@ The snapshot mechanism in CometBFT allows a node to join a network and sync not 
 
 # Snapshot methods in ABCI
 
-The ABCI spec itself has a few methods dedicated for snapshots, all working over P2P. CometBFT cannot specify what a snapshot is, given it has no idea what the transactions or the ledger looks like. The snaphots itself is basically a blob that the application has to handle, but the requests and responses have some metadata that we can make use of in the [`Snapshot`](https://docs.cometbft.com/v0.37/spec/abci/abci++_methods#snapshot) type. Regardless of format, CometBFT expects that snapshots can be downloaded in chunks (e.g. 1-16MB pieces).
+The ABCI spec itself has a few methods dedicated for snapshots, all working over P2P. CometBFT cannot specify what a snapshot is, given it has no idea what the transactions or the ledger looks like. The snapshots itself is basically a blob that the application has to handle, but the requests and responses have some metadata that we can make use of in the [`Snapshot`](https://docs.cometbft.com/v0.37/spec/abci/abci++_methods#snapshot) type. Regardless of format, CometBFT expects that snapshots can be downloaded in chunks (e.g. 1-16MB pieces).
 
 - [`ListSnapshots`](https://docs.cometbft.com/v0.37/spec/abci/abci++_methods#listsnapshots): Return a list of the metadata of recently made snapshots to a remote node that wants to join the network.
 - [`OfferSnapshot`](https://docs.cometbft.com/v0.37/spec/abci/abci++_methods#offersnapshot): CometBFT offers to the application the choice whether to accept or reject a snapshot, based on its metadata such as its format or sender. If the offer is accepted, CometBFT will start downloading chunks.

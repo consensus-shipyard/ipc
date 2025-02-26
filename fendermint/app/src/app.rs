@@ -988,10 +988,10 @@ where
     async fn list_snapshots(&self) -> AbciResult<response::ListSnapshots> {
         if let Some(ref client) = self.snapshots {
             let snapshots = atomically(|| client.list_snapshots()).await;
-            tracing::info!(snapshot_count = snapshots.len(), "listing snaphots");
+            tracing::info!(snapshot_count = snapshots.len(), "listing snapshots");
             Ok(to_snapshots(snapshots)?)
         } else {
-            tracing::info!("listing snaphots disabled");
+            tracing::info!("listing snapshots disabled");
             Ok(Default::default())
         }
     }
