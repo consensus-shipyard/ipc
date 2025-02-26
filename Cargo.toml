@@ -36,6 +36,7 @@ members = [
   "fendermint/tracing",
   "fendermint/vm/*",
   "fendermint/actors",
+  "fendermint/actors-car",
   "fendermint/actors/api",
   "fendermint/actors/chainmetadata",
   "fendermint/actors/activity-tracker",
