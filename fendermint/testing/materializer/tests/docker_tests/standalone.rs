@@ -1,16 +1,16 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
+use crate::docker_tests::make_middleware;
 use crate::make_testnet;
 use anyhow::{bail, Context};
 use ethers::prelude::transaction::eip2718::TypedTransaction;
 use ethers::{
     providers::{Middleware, PendingTransaction},
-    signers::{Signer},
+    signers::Signer,
     types::{Eip1559TransactionRequest, H160},
 };
 use fendermint_materializer::{manifest::Rootnet, HasEthApi};
 use std::time::{Duration, Instant};
-use crate::docker_tests::make_middleware;
 
 const MANIFEST: &str = "standalone.yaml";
 

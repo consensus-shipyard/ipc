@@ -1,8 +1,8 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use statrs::statistics::{Data, Distribution, Max, Min, OrderStatistics};
 use std::fmt::{Display, Formatter};
-use statrs::statistics::{Data, OrderStatistics, Distribution, Max, Min};
 
 #[derive(Debug, Default)]
 pub struct Metrics {

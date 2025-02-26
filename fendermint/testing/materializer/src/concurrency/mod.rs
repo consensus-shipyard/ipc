@@ -1,22 +1,22 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+pub mod cancellation_flag;
 pub mod collect;
 pub mod config;
 pub mod nonce_manager;
 pub mod reporting;
-pub mod cancellation_flag;
 
 use crate::bencher::Bencher;
 use crate::concurrency::reporting::TestResult;
 use ethers::types::H256;
+use futures::stream::FuturesUnordered;
 use futures::FutureExt;
+use futures::StreamExt;
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Instant;
-use futures::stream::FuturesUnordered;
-use tokio::sync::{Semaphore};
-use futures::{StreamExt};
+use tokio::sync::Semaphore;
 
 #[derive(Debug)]
 pub struct TestInput {

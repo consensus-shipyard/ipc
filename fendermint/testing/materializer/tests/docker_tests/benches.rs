@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::docker_tests::make_middleware;
 use crate::make_testnet;
 use anyhow::{anyhow, bail, Context};
 use ethers::abi::Abi;
@@ -12,10 +13,10 @@ use ethers::{
     providers::{Middleware, PendingTransaction},
     types::{Eip1559TransactionRequest, H160},
 };
+use fendermint_materializer::concurrency::cancellation_flag::CancellationFlag;
 use fendermint_materializer::concurrency::collect::collect_blocks;
 use fendermint_materializer::concurrency::nonce_manager::NonceManager;
 use fendermint_materializer::concurrency::reporting::summary::ExecutionSummary;
-use fendermint_materializer::concurrency::cancellation_flag::CancellationFlag;
 use fendermint_materializer::concurrency::TestOutput;
 use fendermint_materializer::{
     concurrency::{self, config::Execution},
@@ -25,7 +26,6 @@ use futures::FutureExt;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use crate::docker_tests::make_middleware;
 
 const MANIFEST: &str = "benches.yaml";
 

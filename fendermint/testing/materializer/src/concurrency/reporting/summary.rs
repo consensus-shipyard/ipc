@@ -1,11 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use super::{
-    dataset::{Metrics},
-    tps::calc_tps,
-    TestResult,
-};
+use super::{dataset::Metrics, tps::calc_tps, TestResult};
 use crate::concurrency::config;
 use crate::concurrency::config::ExecutionStep;
 use anyhow::anyhow;
@@ -85,13 +81,16 @@ impl ExecutionSummary {
                 .transactions
                 .iter()
                 .filter_map(|tx_hash| {
-                    step_tx_hashes.iter().enumerate().find_map(|(step_id, tx_hashes)| {
-                        if tx_hashes.contains(tx_hash) {
-                            Some(step_id)
-                        } else {
-                            None
-                        }
-                    })
+                    step_tx_hashes
+                        .iter()
+                        .enumerate()
+                        .find_map(|(step_id, tx_hashes)| {
+                            if tx_hashes.contains(tx_hash) {
+                                Some(step_id)
+                            } else {
+                                None
+                            }
+                        })
                 })
                 .max();
 
@@ -132,7 +131,9 @@ impl Display for ExecutionSummary {
                 let latency = summary
                     .latencies
                     .get(key)
-                    .map_or(String::from("-"), |metrics| format!("median: {:.2}s", metrics.median));
+                    .map_or(String::from("-"), |metrics| {
+                        format!("median: {:.2}s", metrics.median)
+                    });
                 row.push(latency);
             }
 

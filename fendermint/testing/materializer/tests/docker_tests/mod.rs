@@ -4,12 +4,12 @@
 //! so that they can be annotated with the `#[serial]` macro and run one by one,
 //! sharing their materializer state.
 
-use anyhow::{Context};
+use anyhow::Context;
 use ethers::core::k256::ecdsa::SigningKey;
 use ethers::middleware::{Middleware, SignerMiddleware};
 use ethers::prelude::{JsonRpcClient, Provider, Signer, Wallet};
+use ethers::types::U256;
 use fendermint_materializer::materials::DefaultAccount;
-use ethers::types::{U256};
 
 // Tests using the manifest bearing their name.
 pub mod benches;
