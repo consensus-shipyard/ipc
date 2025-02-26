@@ -11,7 +11,7 @@ use crate::fvm::checkpoint::PowerUpdates;
 
 /// Transaction check results are expressed by the exit code, so that they would
 /// result in the same error code if they were applied.
-pub struct FvmCheckRet {
+pub struct CheckResponse {
     pub sender: Address,
     pub gas_limit: u64,
     pub exit_code: ExitCode,
@@ -19,7 +19,7 @@ pub struct FvmCheckRet {
     pub message: FvmMessage,
 }
 
-impl FvmCheckRet {
+impl CheckResponse {
     /// Constructs a new check result from a message, an exit code, and optional info.
     pub fn new(msg: &FvmMessage, exit_code: ExitCode, info: Option<String>) -> Self {
         Self {
@@ -52,7 +52,7 @@ pub type BlockEndEvents = Vec<Event>;
 /// might not be available to the caller, because of the message lookups
 /// and transformations that happen along the way, e.g. where we need
 /// a field, we might just have a CID.
-pub struct FvmApplyRet {
+pub struct ApplyResponse {
     pub apply_ret: ApplyRet,
     pub from: Address,
     pub to: Address,
@@ -62,7 +62,7 @@ pub struct FvmApplyRet {
     pub emitters: Emitters,
 }
 
-pub struct EndBlockOutput {
+pub struct EndBlockResponse {
     pub power_updates: PowerUpdates,
     pub gas_market: Reading,
     /// The end block events to be recorded
