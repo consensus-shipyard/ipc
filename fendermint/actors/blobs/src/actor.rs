@@ -2,8 +2,7 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::{HashMap, HashSet};
-use std::str::FromStr;
+use std::collections::HashSet;
 
 use fendermint_actor_blobs_shared::params::{
     AddBlobParams, ApproveCreditParams, BuyCreditParams, DeleteBlobParams, FinalizeBlobParams,
@@ -13,8 +12,8 @@ use fendermint_actor_blobs_shared::params::{
     SetSponsorParams, TrimBlobExpiriesParams, UpdateGasAllowanceParams,
 };
 use fendermint_actor_blobs_shared::state::{
-    Account, Blob, BlobStatus, Credit, CreditApproval, GasAllowance, Hash, PublicKey, Subscription,
-    SubscriptionId,
+    AccountInfo, Blob, BlobStatus, Credit, CreditApproval, GasAllowance, Hash, PublicKey,
+    Subscription, SubscriptionId,
 };
 use fendermint_actor_blobs_shared::Method;
 use fendermint_actor_machine::events::emit_evm_event;
@@ -82,7 +81,7 @@ impl BlobsActor {
     /// Buy credit with token.
     ///
     /// The recipient address must be delegated (only delegated addresses can own credit).
-    fn buy_credit(rt: &impl Runtime, params: BuyCreditParams) -> Result<Account, ActorError> {
+    fn buy_credit(rt: &impl Runtime, params: BuyCreditParams) -> Result<AccountInfo, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
         let (id_addr, delegated_addr) = to_id_and_delegated_address(rt, params.0)?;
@@ -108,7 +107,7 @@ impl BlobsActor {
             credit_purchased(delegated_addr, token_to_biguint(Some(credit_amount))),
         )?;
 
-        Ok(account)
+        AccountInfo::from(account, rt)
     }
 
     /// Updates gas allowance for the `from` address.
@@ -306,7 +305,7 @@ impl BlobsActor {
     fn get_account(
         rt: &impl Runtime,
         params: GetAccountParams,
-    ) -> Result<Option<Account>, ActorError> {
+    ) -> Result<Option<AccountInfo>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
         let from = to_id_address(rt, params.0, false)?;
@@ -315,16 +314,13 @@ impl BlobsActor {
             .state::<State>()?
             .get_account(rt.store(), from)?
             .map(|mut account| {
-                // Iterate over the approvals maps and resolve all the addresses to their external form
-                account.approvals_to = resolve_approvals_addresses(rt, account.approvals_to)?;
-                account.approvals_from = resolve_approvals_addresses(rt, account.approvals_from)?;
                 // Resolve the credit sponsor
                 account.credit_sponsor = account
                     .credit_sponsor
                     .map(|sponsor| to_delegated_address(rt, sponsor))
                     .transpose()?;
 
-                Ok(account)
+                AccountInfo::from(account, rt)
             });
 
         account.transpose()
@@ -793,28 +789,6 @@ fn delete_from_disc(hash: Hash) -> Result<(), ActorError> {
     }
 }
 
-/// Takes a map of credit approvals keyed by account ID addresses and resolves the keys into
-/// external addresses instead.
-fn resolve_approvals_addresses(
-    rt: &impl Runtime,
-    approvals: HashMap<String, CreditApproval>,
-) -> Result<HashMap<String, CreditApproval>, ActorError> {
-    let mut resolved_approvals = HashMap::new();
-    for (account_key, approval) in approvals.into_iter() {
-        let account_address = Address::from_str(&account_key).map_err(|err| {
-            ActorError::serialization(format!(
-                "Failed to parse address {} from approvals map: {:?}",
-                account_key, err
-            ))
-        })?;
-
-        let external_account_address = to_delegated_address(rt, account_address)?;
-        resolved_approvals.insert(external_account_address.to_string(), approval);
-    }
-
-    Ok(resolved_approvals)
-}
-
 impl ActorCode for BlobsActor {
     type Methods = Method;
 
@@ -988,7 +962,7 @@ mod tests {
             )
             .unwrap()
             .unwrap()
-            .deserialize::<Account>()
+            .deserialize::<AccountInfo>()
             .unwrap();
         assert_eq!(result.credit_free, expected_credits);
         assert_eq!(result.gas_allowance, expected_gas_allowance);
@@ -1009,7 +983,7 @@ mod tests {
             )
             .unwrap()
             .unwrap()
-            .deserialize::<Account>()
+            .deserialize::<AccountInfo>()
             .unwrap();
         assert_eq!(result.credit_free, expected_credits);
         assert_eq!(result.gas_allowance, expected_gas_allowance);
@@ -1030,7 +1004,7 @@ mod tests {
             )
             .unwrap()
             .unwrap()
-            .deserialize::<Account>()
+            .deserialize::<AccountInfo>()
             .unwrap();
         assert_eq!(result.credit_free, expected_credits);
         assert_eq!(result.gas_allowance, expected_gas_allowance);

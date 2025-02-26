@@ -138,12 +138,12 @@ where
 
     pub fn get_or_create<F>(&self, key: &K, create_fn: F) -> Result<V, ActorError>
     where
-        F: FnOnce() -> V,
+        F: FnOnce() -> Result<V, ActorError>,
     {
         if let Some(value) = self.map.get(key)? {
             Ok(value.clone())
         } else {
-            Ok(create_fn())
+            Ok(create_fn()?)
         }
     }
 

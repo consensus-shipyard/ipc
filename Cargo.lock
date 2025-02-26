@@ -3541,8 +3541,10 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "data-encoding",
+ "fendermint_actor_machine",
  "fil_actors_runtime",
  "frc42_dispatch",
+ "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
  "fvm_shared",
  "num-derive 0.3.3",

@@ -6,12 +6,17 @@ use std::collections::HashMap;
 use std::fmt;
 use std::ops::{Div, Mul};
 
+use fendermint_actor_machine::util::to_delegated_address;
+use fil_actors_runtime::runtime::Runtime;
 use fil_actors_runtime::ActorError;
+use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
+use recall_ipld::hamt;
+use recall_ipld::hamt::map::TrackedFlushResult;
 use recall_ipld::hamt::MapKey;
 use serde::{Deserialize, Serialize};
 
@@ -73,7 +78,7 @@ impl Ord for TokenCreditRate {
 }
 
 /// The stored representation of a credit account.
-#[derive(Clone, Debug, Default, PartialEq, Serialize_tuple, Deserialize_tuple)]
+#[derive(Clone, Debug, PartialEq, Serialize_tuple, Deserialize_tuple)]
 pub struct Account {
     /// Total size of all blobs managed by the account.
     pub capacity_used: u64,
@@ -86,9 +91,9 @@ pub struct Account {
     /// The chain epoch of the last debit.
     pub last_debit_epoch: ChainEpoch,
     /// Credit approvals to other accounts from this account, keyed by receiver.
-    pub approvals_to: HashMap<String, CreditApproval>,
+    pub approvals_to: CreditApprovals,
     /// Credit approvals to this account from other accounts, keyed by sender.
-    pub approvals_from: HashMap<String, CreditApproval>,
+    pub approvals_from: CreditApprovals,
     /// The maximum allowed TTL for actor's blobs.
     pub max_ttl: ChainEpoch,
     /// The total token value an account has used to buy credits.
@@ -96,12 +101,22 @@ pub struct Account {
 }
 
 impl Account {
-    pub fn new(current_epoch: ChainEpoch, max_ttl: ChainEpoch) -> Self {
-        Self {
+    pub fn new<BS: Blockstore>(
+        store: &BS,
+        current_epoch: ChainEpoch,
+        max_ttl: ChainEpoch,
+    ) -> Result<Self, ActorError> {
+        Ok(Self {
             last_debit_epoch: current_epoch,
             max_ttl,
-            ..Default::default()
-        }
+            capacity_used: 0,
+            credit_free: Credit::default(),
+            credit_committed: Credit::default(),
+            credit_sponsor: None,
+            approvals_to: CreditApprovals::new(store)?,
+            approvals_from: CreditApprovals::new(store)?,
+            gas_allowance: TokenAmount::default(),
+        })
     }
 }
 
@@ -412,6 +427,100 @@ impl fmt::Display for TtlStatus {
             TtlStatus::Reduced => write!(f, "reduced"),
             TtlStatus::Extended => write!(f, "extended"),
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize_tuple, Deserialize_tuple)]
+pub struct CreditApprovals {
+    pub root: hamt::Root<Address, CreditApproval>,
+    size: u64,
+}
+
+impl CreditApprovals {
+    pub fn new<BS: Blockstore>(store: &BS) -> Result<Self, ActorError> {
+        let root = hamt::Root::<Address, CreditApproval>::new(store, "credit_approvals")?;
+        Ok(Self { root, size: 0 })
+    }
+
+    pub fn hamt<BS: Blockstore>(
+        &self,
+        store: BS,
+    ) -> Result<hamt::map::Hamt<BS, Address, CreditApproval>, ActorError> {
+        self.root.hamt(store, self.size)
+    }
+    pub fn save_tracked(
+        &mut self,
+        tracked_flush_result: TrackedFlushResult<Address, CreditApproval>,
+    ) {
+        self.root = tracked_flush_result.root;
+        self.size = tracked_flush_result.size
+    }
+
+    pub fn len(&self) -> u64 {
+        self.size
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.size == 0
+    }
+}
+
+/// The return type used for Account.
+#[derive(Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct AccountInfo {
+    /// Total size of all blobs managed by the account.
+    pub capacity_used: u64,
+    /// Current free credit in byte-blocks that can be used for new commitments.
+    pub credit_free: Credit,
+    /// Current committed credit in byte-blocks that will be used for debits.
+    pub credit_committed: Credit,
+    /// Optional default sponsor account address.
+    pub credit_sponsor: Option<Address>,
+    /// The chain epoch of the last debit.
+    pub last_debit_epoch: ChainEpoch,
+    /// Credit approvals to other accounts from this account, keyed by receiver.
+    pub approvals_to: HashMap<String, CreditApproval>,
+    /// Credit approvals to this account from other accounts, keyed by sender.
+    pub approvals_from: HashMap<String, CreditApproval>,
+    /// The maximum allowed TTL for actor's blobs.
+    pub max_ttl: ChainEpoch,
+    /// The total token value an account has used to buy credits.
+    pub gas_allowance: TokenAmount,
+}
+
+impl AccountInfo {
+    pub fn from(account: Account, rt: &impl Runtime) -> Result<Self, ActorError> {
+        let mut approvals_to = HashMap::new();
+        account
+            .approvals_to
+            .hamt(rt.store())?
+            .for_each(|address, approval| {
+                let external_account_address = to_delegated_address(rt, address)?;
+                approvals_to.insert(external_account_address.to_string(), approval.clone());
+                Ok(())
+            })?;
+
+        let mut approvals_from = HashMap::new();
+        account
+            .approvals_from
+            .hamt(rt.store())?
+            .for_each(|address, approval| {
+                let external_account_address = to_delegated_address(rt, address)?;
+                approvals_from.insert(external_account_address.to_string(), approval.clone());
+                Ok(())
+            })?;
+
+        Ok(AccountInfo {
+            capacity_used: account.capacity_used,
+            credit_free: account.credit_free,
+            credit_committed: account.credit_committed,
+            credit_sponsor: account.credit_sponsor,
+            last_debit_epoch: account.last_debit_epoch,
+            approvals_to,
+            approvals_from,
+            max_ttl: account.max_ttl,
+            gas_allowance: account.gas_allowance,
+        })
     }
 }
 
