@@ -1,4 +1,5 @@
 use ethers::core::k256::elliptic_curve::rand_core::le;
+use ethers::etherscan::verify;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -9,14 +10,17 @@ use crate::fvm::upgrades::UpgradeScheduler;
 use tendermint_rpc::Client;
 
 use crate::selector::{select_messages_by_gas_limit, select_messages_until_total_bytes};
+use fendermint_vm_topdown::voting::ValidatorKey;
 
 use crate::check::check_nonce_and_sufficient_balance;
-use crate::implicit_messages::{execute_cron_message, push_chain_metadata_if_possible};
+use crate::implicit_messages::{execute_cron_message, push_block_to_chainmeta_actor_if_possible};
 use crate::types::*;
 
 use crate::fvm::activity::ValidatorActivityTracker;
-use crate::fvm::PowerUpdates;
+use crate::fvm::{FvmApplyRet, PowerUpdates};
 use crate::verify::{IllegalMessage, VerifiableMessage};
+
+use crate::fvm::observe::{MsgExec, MsgExecPurpose};
 use fendermint_vm_message::signed::SignedMessageError;
 
 use anyhow::Context;
@@ -24,10 +28,14 @@ use anyhow::Context;
 use fendermint_vm_message::chain::ChainMessage;
 use fendermint_vm_message::ipc::IpcMessage;
 
+use fendermint_vm_actor_interface::system as system_actor;
+
 use fvm_ipld_blockstore::Blockstore;
 
 use crate::bottomup::BottomUpManager;
 use crate::topdown::TopDownManager;
+
+use ipc_observability::{emit, measure_time, observe::TracingError, Traceable};
 
 #[derive(Error, Debug)]
 pub enum InterpreterError {
@@ -45,13 +53,13 @@ where
     C: Client + Clone + Send + Sync + 'static,
 {
     bottom_up_manager: BottomUpManager<DB, C>,
-    top_down_manager: TopDownManager,
+    top_down_manager: TopDownManager<DB>,
 
     /// Upgrade scheduler stores all the upgrades to be executed at given heights.
     upgrade_scheduler: UpgradeScheduler<DB>,
 
-    /// Indicate whether the chain metadata should be pushed into the ledger.
-    push_chain_meta: bool,
+    /// Indicate whether some block metadata should be pushed to chainmetadata actor.
+    push_block_data_to_chainmeta_actor: bool,
     /// Maximum number of messages to allow in a block.
     max_msgs_per_block: usize,
     /// Should we reject proposals with malformed transactions we cannot parse.
@@ -65,9 +73,9 @@ where
 {
     pub fn new(
         bottom_up_resolver: BottomUpManager<DB, C>,
-        top_down_resolver: TopDownManager,
+        top_down_resolver: TopDownManager<DB>,
         upgrade_scheduler: UpgradeScheduler<DB>,
-        push_chain_meta: bool,
+        push_block_data_to_chainmeta_actor: bool,
         max_msgs_per_block: usize,
         reject_malformed_proposal: bool,
     ) -> Self {
@@ -75,13 +83,14 @@ where
             bottom_up_manager: bottom_up_resolver,
             top_down_manager: top_down_resolver,
             upgrade_scheduler,
-            push_chain_meta,
+            push_block_data_to_chainmeta_actor: push_block_data_to_chainmeta_actor,
             max_msgs_per_block,
             reject_malformed_proposal,
         }
     }
 
-    pub async fn check(
+    /// Check that the message is valid for inclusion in a mempool
+    pub async fn check_message(
         &self,
         state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
         msg: Vec<u8>,
@@ -118,7 +127,8 @@ where
         Ok(check_ret)
     }
 
-    pub async fn prepare(
+    /// Prepare messages for inclusion in a block
+    pub async fn prepare_messages(
         &self,
         state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
         msgs: Vec<Vec<u8>>,
@@ -196,7 +206,8 @@ where
         Ok((all_messages, total_bytes))
     }
 
-    pub async fn process(
+    /// Process messages prepared messages to check they can be included in a block
+    pub async fn process_messages(
         &self,
         state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
         msgs: Vec<Vec<u8>>,
@@ -261,7 +272,7 @@ where
         Ok(ProcessDecision::Accept)
     }
 
-    async fn begin(
+    async fn begin_block(
         &self,
         mut state: FvmExecState<DB>,
     ) -> anyhow::Result<(FvmExecState<DB>, ApplyResponse)> {
@@ -275,14 +286,14 @@ where
         let cron_apply_ret = execute_cron_message(&mut state, height)?;
 
         // Push the current block hash to the chainmetadata actor if possible
-        if self.push_chain_meta {
-            push_chain_metadata_if_possible(&mut state, height)?;
+        if self.push_block_data_to_chainmeta_actor {
+            push_block_to_chainmeta_actor_if_possible(&mut state, height)?;
         }
 
         Ok((state, cron_apply_ret))
     }
 
-    async fn end(
+    async fn end_block(
         &self,
         mut state: FvmExecState<DB>,
     ) -> anyhow::Result<(FvmExecState<DB>, EndBlockResponse)> {
@@ -313,6 +324,13 @@ where
         // Finalize the gas market.
         let next_gas_market = state.finalize_gas_market()?;
 
+        // Update any component that needs to know about changes in the power table.
+        if !power_updates.0.is_empty() {
+            self.top_down_manager
+                .update_voting_power_table(&power_updates)
+                .await;
+        }
+
         // Assemble and return the response.
         let response = EndBlockResponse {
             power_updates,
@@ -320,6 +338,126 @@ where
             events: block_end_events,
         };
         Ok((state, response))
+    }
+
+    async fn deliver_message(
+        &self,
+        mut state: FvmExecState<DB>,
+        msg: Vec<u8>,
+    ) -> anyhow::Result<(FvmExecState<DB>, ApplyResponse)> {
+        let chain_msg = match fvm_ipld_encoding::from_slice::<ChainMessage>(&msg) {
+            Ok(msg) => msg,
+            Err(e) => {
+                // If decoding fails, log a warning if we are configured to reject malformed proposals.
+                if self.reject_malformed_proposal {
+                    tracing::warn!(
+                        error = e.to_string(),
+                        "failed to decode delivered message as ChainMessage; This may indicate a node issue."
+                    );
+                }
+
+                return Err(InterpreterError::InvalidMessage(e.to_string()).into());
+            }
+        };
+
+        match chain_msg {
+            ChainMessage::Signed(msg) => {
+                let verifiable_message = VerifiableMessage::Signed(msg);
+                verifiable_message.verify(&state.chain_id())?;
+
+                let response = self
+                    .execute_signed_message(&mut state, verifiable_message)
+                    .await?;
+
+                Ok((state, response))
+            }
+            ChainMessage::Ipc(msg) => match msg {
+                IpcMessage::BottomUpResolve(msg) => {
+                    let certified_msg = msg.message.message.clone();
+                    let verifiable_message = VerifiableMessage::BottomUp(msg);
+                    verifiable_message.verify(&state.chain_id())?;
+
+                    let response = self
+                        .execute_signed_message(&mut state, verifiable_message)
+                        .await?;
+
+                    // TODO Karel - this might not be necessary
+                    // If successful, add the CID to the background resolution pool.
+                    let is_success = response.apply_ret.msg_receipt.exit_code.is_success();
+                    if is_success {
+                        // For now try to get it from the child subnet. If the same comes up for execution, include own.
+                        self.bottom_up_manager
+                            .add_checkpoint(certified_msg.into())
+                            .await;
+                    }
+
+                    Ok((state, response))
+                }
+                IpcMessage::BottomUpExec(_) => {
+                    todo!("#197: implement BottomUp checkpoint execution")
+                }
+                IpcMessage::TopDownExec(p) => {
+                    let response = self
+                        .top_down_manager
+                        .execute_topdown_msg(&mut state, p)
+                        .await?;
+
+                    Ok((state, response))
+                }
+            },
+        }
+    }
+
+    async fn execute_signed_message(
+        &self,
+        mut state: &mut FvmExecState<DB>,
+        msg: VerifiableMessage,
+    ) -> anyhow::Result<ApplyResponse> {
+        let msg = msg.message();
+
+        // Execute the message and measure execution time.
+        let (apply_ret, emitters, execution_time) = if msg.from == system_actor::SYSTEM_ACTOR_ADDR {
+            // For the system actor, use the implicit execution path.
+            let (execution_result, execution_time) =
+                measure_time(|| state.execute_implicit(msg.clone()));
+            let (apply_ret, emitters) = execution_result?;
+
+            (apply_ret, emitters, execution_time)
+        } else {
+            // For other actors, ensure sufficient gas and then use the explicit execution path.
+            if let Err(err) = state.block_gas_tracker().ensure_sufficient_gas(&msg) {
+                // This is panic-worthy, but we suppress it to avoid liveness issues.
+                // Consider maybe record as evidence for the validator slashing?
+                tracing::warn!("insufficient block gas; continuing to avoid halt, but this should've not happened: {}", err);
+            }
+
+            let (execution_result, execution_time) =
+                measure_time(|| state.execute_explicit(msg.clone()));
+            let (apply_ret, emitters) = execution_result?;
+
+            (apply_ret, emitters, execution_time)
+        };
+
+        let exit_code = apply_ret.msg_receipt.exit_code.value();
+
+        let response = ApplyResponse {
+            apply_ret,
+            from: msg.from,
+            to: msg.to,
+            method_num: msg.method_num,
+            gas_limit: msg.gas_limit,
+            emitters,
+        };
+
+        emit(MsgExec {
+            purpose: MsgExecPurpose::Apply,
+            height: state.block_height(),
+            message: msg,
+            duration: execution_time.as_secs_f64(),
+            exit_code,
+        });
+
+        Ok(response)
     }
 
     /// Attempts to perform an upgrade if one is scheduled for the current block height,
