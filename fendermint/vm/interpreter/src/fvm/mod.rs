@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-mod broadcast;
+pub mod broadcast;
 mod check;
 pub mod checkpoint;
 mod exec;
@@ -39,14 +39,14 @@ pub type BlockGasLimit = u64;
 #[derive(Clone)]
 pub struct ValidatorContext<C> {
     /// The secret key the validator uses to produce blocks.
-    secret_key: SecretKey,
+    pub secret_key: SecretKey,
     /// The public key identifying the validator (corresponds to the secret key.)
-    public_key: PublicKey,
+    pub public_key: PublicKey,
     /// The address associated with the public key.
-    addr: Address,
+    pub addr: Address,
     /// Used to broadcast transactions. It might use a different secret key for
     /// signing transactions than the validator's block producing key.
-    broadcaster: Broadcaster<C>,
+    pub broadcaster: Broadcaster<C>,
 }
 
 impl<C> ValidatorContext<C> {
