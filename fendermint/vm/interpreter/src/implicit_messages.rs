@@ -24,7 +24,7 @@ fn execute_implicit_message<DB: Blockstore + Clone + 'static + Send + Sync>(
     gas_limit: u64,
     method_num: u64,
     params: RawBytes,
-) -> anyhow::Result<FvmApplyRet> {
+) -> anyhow::Result<ApplyResponse> {
     let msg = FvmMessage {
         from,
         to,
@@ -42,7 +42,7 @@ fn execute_implicit_message<DB: Blockstore + Clone + 'static + Send + Sync>(
     if let Some(err) = apply_ret.failure_info {
         anyhow::bail!("failed to apply system message: {}", err);
     }
-    Ok(FvmApplyRet {
+    Ok(ApplyResponse {
         apply_ret,
         emitters,
         from,
@@ -56,7 +56,7 @@ fn execute_implicit_message<DB: Blockstore + Clone + 'static + Send + Sync>(
 pub fn execute_cron_message<DB: Blockstore + Clone + 'static + Send + Sync>(
     state: &mut FvmExecState<DB>,
     height: u64,
-) -> anyhow::Result<FvmApplyRet> {
+) -> anyhow::Result<ApplyResponse> {
     let from = system::SYSTEM_ACTOR_ADDR;
     let to = cron::CRON_ACTOR_ADDR;
     let method_num = cron::Method::EpochTick as u64;
@@ -67,10 +67,10 @@ pub fn execute_cron_message<DB: Blockstore + Clone + 'static + Send + Sync>(
 }
 
 /// Attempts to push chain metadata if a block hash is available.
-pub fn maybe_push_chain_metadata<DB: Blockstore + Clone + 'static + Send + Sync>(
+pub fn push_chain_metadata_if_possible<DB: Blockstore + Clone + 'static + Send + Sync>(
     state: &mut FvmExecState<DB>,
     height: u64,
-) -> anyhow::Result<Option<FvmApplyRet>> {
+) -> anyhow::Result<Option<ApplyResponse>> {
     let from = system::SYSTEM_ACTOR_ADDR;
     let to = chainmetadata::CHAINMETADATA_ACTOR_ADDR;
     let method_num = fendermint_actor_chainmetadata::Method::PushBlockHash as u64;
