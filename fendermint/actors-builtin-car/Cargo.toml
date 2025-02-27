@@ -1,0 +1,17 @@
+[package]
+name = "actors-builtin-fetch"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+license-file.workspace = true
+
+[build-dependencies]
+reqwest = { version = "0.12", features = ["rustls-tls", "stream"] }
+tokio = { version = "1", features = ["full"] }
+fs-err = { workspace = true }
+sha2 = { workspace = true }
+tempfile = { workspace = true }
+color-eyre = { workspace = true }
+futures-util = { workspace = true }
+bytes = { workspace = true }
