@@ -33,7 +33,7 @@ use super::{
     fevm::{ContractCaller, MockProvider, NoRevert},
     FvmExecState,
 };
-use crate::fvm::FvmApplyRet;
+use crate::types::ApplyResponse;
 
 #[derive(Clone)]
 pub struct GatewayCaller<DB> {
@@ -116,7 +116,7 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         checkpoint: checkpointing_facet::BottomUpCheckpoint,
         power_table: &[Validator<Power>],
         activity: checkpointing_facet::FullActivityRollup,
-    ) -> anyhow::Result<FvmApplyRet> {
+    ) -> anyhow::Result<ApplyResponse> {
         // Construct a Merkle tree from the power table, which we can use to validate validator set membership
         // when the signatures are submitted in transactions for accumulation.
         let tree =
@@ -282,7 +282,7 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         &self,
         state: &mut FvmExecState<DB>,
         cross_messages: Vec<IpcEnvelope>,
-    ) -> anyhow::Result<FvmApplyRet> {
+    ) -> anyhow::Result<ApplyResponse> {
         let messages = cross_messages
             .into_iter()
             .map(xnet_messaging_facet::IpcEnvelope::try_from)

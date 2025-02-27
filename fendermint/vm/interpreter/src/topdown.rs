@@ -9,18 +9,21 @@ use fendermint_vm_topdown::proxy::IPCProviderProxyWithLatency;
 use fendermint_vm_topdown::voting::ValidatorKey;
 use fendermint_vm_topdown::voting::VoteTally;
 use fendermint_vm_topdown::{
-    CachedFinalityProvider, IPCParentFinality, ParentFinalityProvider, ParentViewProvider, Toggle,
+    BlockHeight, CachedFinalityProvider, IPCParentFinality, ParentFinalityProvider,
+    ParentViewProvider, Toggle,
 };
 use fvm_shared::clock::ChainEpoch;
 use std::sync::Arc;
 
 use crate::fvm::state::ipc::GatewayCaller;
 use crate::fvm::state::FvmExecState;
-use crate::fvm::topdown::{commit_finality, execute_topdown_msgs};
 use anyhow::{bail, Context};
 use fvm_ipld_blockstore::Blockstore;
 
 use crate::types::ApplyResponse;
+use ipc_api::cross::IpcEnvelope;
+
+use crate::fvm::state::ipc::tokens_to_mint;
 
 type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxyWithLatency>>>;
 
@@ -52,7 +55,7 @@ where
     /// both the next parent's proposal and the quorum of votes. If either the parent's proposal or the quorum is missing,
     /// the function returns `None`. When both are available, it selects the finality with the lower block height and wraps
     /// it into a `ChainMessage` for top-down execution.
-    pub async fn message_from_finality_or_quorum(&self) -> Option<ChainMessage> {
+    pub async fn chain_message_from_finality_or_quorum(&self) -> Option<ChainMessage> {
         // Prepare top down proposals.
         // Before we try to find a quorum, pause incoming votes. This is optional but if there are lots of votes coming in it might hold up proposals.
         atomically(|| self.votes.pause_votes_until_find_quorum()).await;
@@ -133,14 +136,10 @@ where
             "chain interpreter received topdown exec proposal",
         );
 
-        let (prev_height, prev_finality) = commit_finality(
-            &self.gateway_caller,
-            &mut state,
-            finality.clone(),
-            &self.provider,
-        )
-        .await
-        .context("failed to commit finality")?;
+        let (prev_height, prev_finality) = self
+            .commit_finality(&mut state, finality.clone())
+            .await
+            .context("failed to commit finality")?;
 
         tracing::debug!(
             previous_committed_height = prev_height,
@@ -195,7 +194,8 @@ where
             "chain interpreter received topdown msgs",
         );
 
-        let ret = execute_topdown_msgs(&self.gateway_caller, &mut state, msgs)
+        let ret = self
+            .execute_topdown_msgs(&mut state, msgs)
             .await
             .context("failed to execute top down messages")?;
 
@@ -236,5 +236,51 @@ where
             gas_limit: ret.gas_limit,
             emitters: ret.emitters,
         })
+    }
+
+    /// Commit the parent finality. Returns the height that the previous parent finality is committed and
+    /// the committed finality itself. If there is no parent finality committed, genesis epoch is returned.
+    async fn commit_finality(
+        &self,
+        state: &mut FvmExecState<DB>,
+        finality: IPCParentFinality,
+    ) -> anyhow::Result<(BlockHeight, Option<IPCParentFinality>)> {
+        let (prev_height, prev_finality) = if let Some(prev_finality) = self
+            .gateway_caller
+            .commit_parent_finality(state, finality)?
+        {
+            (prev_finality.height, Some(prev_finality))
+        } else {
+            (self.provider.genesis_epoch()?, None)
+        };
+
+        tracing::debug!(
+            "commit finality parsed: prev_height {prev_height}, prev_finality: {prev_finality:?}"
+        );
+
+        Ok((prev_height, prev_finality))
+    }
+
+    /// Execute the top down messages implicitly. Before the execution, mint to the gateway of the funds
+    /// transferred in the messages, and increase the circulating supply with the incoming value.
+    async fn execute_topdown_msgs(
+        &self,
+        state: &mut FvmExecState<DB>,
+        messages: Vec<IpcEnvelope>,
+    ) -> anyhow::Result<ApplyResponse> {
+        let minted_tokens = tokens_to_mint(&messages);
+        tracing::debug!(token = minted_tokens.to_string(), "tokens to mint in child");
+
+        if !minted_tokens.is_zero() {
+            self.gateway_caller
+                .mint_to_gateway(state, minted_tokens.clone())
+                .context("failed to mint to gateway")?;
+
+            state.update_circ_supply(|circ_supply| {
+                *circ_supply += minted_tokens;
+            });
+        }
+
+        self.gateway_caller.apply_cross_messages(state, messages)
     }
 }

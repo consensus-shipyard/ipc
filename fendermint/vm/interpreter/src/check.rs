@@ -5,13 +5,15 @@ use anyhow::Ok;
 use fvm::state_tree::ActorState;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{address::Address, error::ExitCode};
-use std::sync::Arc;
+
+// TODO Karel - move this elsewhere. Probably to main interpreter implementation?
+// Or implement it here but as part of the main struct?
 
 use crate::types::*;
 
 /// Checks the actor state (balance and sequence) for the sender of message.
-pub fn check_nonce_and_sufficient_balance(
-    state: &FvmExecState<ReadOnlyBlockstore<Arc<impl Blockstore + Clone + 'static>>>,
+pub fn check_nonce_and_sufficient_balance<DB: Blockstore + Clone + 'static>(
+    state: &FvmExecState<ReadOnlyBlockstore<DB>>,
     msg: &FvmMessage,
 ) -> anyhow::Result<CheckResponse> {
     // Look up the actor associated with the sender's address.
@@ -57,8 +59,8 @@ pub fn check_nonce_and_sufficient_balance(
 }
 
 /// Looks up an actor by address in the state tree.
-fn lookup_actor(
-    state: &FvmExecState<ReadOnlyBlockstore<Arc<impl Blockstore + Clone + 'static>>>,
+fn lookup_actor<DB: Blockstore + Clone + 'static>(
+    state: &FvmExecState<ReadOnlyBlockstore<DB>>,
     address: &Address,
 ) -> anyhow::Result<Option<ActorState>> {
     let state_tree = state.state_tree();

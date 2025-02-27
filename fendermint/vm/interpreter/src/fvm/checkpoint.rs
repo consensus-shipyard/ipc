@@ -11,7 +11,7 @@ use super::{
     ValidatorContext,
 };
 use crate::fvm::activity::ValidatorActivityTracker;
-use crate::fvm::exec::BlockEndEvents;
+use crate::types::BlockEndEvents;
 use anyhow::{anyhow, Context};
 use ethers::abi::Tokenizable;
 use fendermint_crypto::PublicKey;
