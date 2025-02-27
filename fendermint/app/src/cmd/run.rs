@@ -15,7 +15,7 @@ use fendermint_vm_interpreter::fvm::observe::register_metrics as register_interp
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
 use fendermint_vm_interpreter::{
     bytes::{BytesMessageInterpreter, ProposalPrepareMode},
-    chain::{ChainMessageInterpreter, CheckpointPool},
+    chain::ChainMessageInterpreter,
     fvm::{Broadcaster, FvmMessageInterpreter, ValidatorContext},
     signed::SignedMessageInterpreter,
 };
@@ -164,7 +164,6 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     let state_store =
         NamespaceBlockstore::new(db.clone(), ns.state_store).context("error creating state DB")?;
 
-    let checkpoint_pool = CheckpointPool::new();
     let parent_finality_votes = VoteTally::empty();
 
     let topdown_enabled = settings.topdown_enabled();
@@ -188,13 +187,6 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         client
             .add_provided_subnet(own_subnet_id.clone())
             .context("error adding own provided subnet.")?;
-
-        let resolver = IpldResolver::new(
-            client.clone(),
-            checkpoint_pool.queue(),
-            settings.resolver.retry_delay,
-            own_subnet_id.clone(),
-        );
 
         if topdown_enabled {
             if let Some(key) = validator_keypair {
@@ -233,9 +225,6 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
                 tracing::error!("IPLD Resolver Service failed: {e:#}")
             }
         });
-
-        tracing::info!("starting the IPLD Resolver...");
-        tokio::spawn(async move { resolver.run().await });
     } else {
         tracing::info!("IPLD Resolver disabled.")
     }
@@ -309,7 +298,6 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         state_store,
         interpreter,
         ChainEnv {
-            checkpoint_pool,
             parent_finality_provider: parent_finality_provider.clone(),
             parent_finality_votes: parent_finality_votes.clone(),
         },

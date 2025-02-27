@@ -14,6 +14,8 @@ use fendermint_vm_topdown::IPCParentFinality;
 use fvm_ipld_blockstore::Blockstore;
 use std::sync::Arc;
 
+use tendermint_rpc::Client as TendermintClient;
+
 use serde::{Deserialize, Serialize};
 
 /// All the things that can be voted on in a subnet.
@@ -24,17 +26,18 @@ pub enum AppVote {
 }
 
 /// Queries the LATEST COMMITTED parent finality from the storage
-pub struct AppParentFinalityQuery<DB, SS, S, I>
+pub struct AppParentFinalityQuery<DB, SS, S, TC>
 where
-    SS: Blockstore + Clone + 'static,
+    SS: Blockstore + Clone + 'static + Send + Sync,
+    TC: TendermintClient + Clone + Send + Sync + 'static,
     S: KVStore,
 {
     /// The app to get state
-    app: App<DB, SS, S, I>,
+    app: App<DB, SS, S, TC>,
     gateway_caller: GatewayCaller<ReadOnlyBlockstore<Arc<SS>>>,
 }
 
-impl<DB, SS, S, I> AppParentFinalityQuery<DB, SS, S, I>
+impl<DB, SS, S, TC> AppParentFinalityQuery<DB, SS, S, TC>
 where
     S: KVStore
         + Codec<AppState>
@@ -42,9 +45,10 @@ where
         + Encode<BlockHeight>
         + Codec<FvmStateParams>,
     DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
-    SS: Blockstore + 'static + Clone,
+    SS: Blockstore + Clone + 'static + Send + Sync,
+    TC: TendermintClient + Clone + Send + Sync + 'static,
 {
-    pub fn new(app: App<DB, SS, S, I>) -> Self {
+    pub fn new(app: App<DB, SS, S, TC>) -> Self {
         Self {
             app,
             gateway_caller: GatewayCaller::default(),
@@ -62,7 +66,7 @@ where
     }
 }
 
-impl<DB, SS, S, I> ParentFinalityStateQuery for AppParentFinalityQuery<DB, SS, S, I>
+impl<DB, SS, S, TC> ParentFinalityStateQuery for AppParentFinalityQuery<DB, SS, S, TC>
 where
     S: KVStore
         + Codec<AppState>
@@ -70,7 +74,8 @@ where
         + Encode<BlockHeight>
         + Codec<FvmStateParams>,
     DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
-    SS: Blockstore + 'static + Clone,
+    SS: Blockstore + Clone + 'static + Send + Sync,
+    TC: TendermintClient + Clone + Send + Sync + 'static,
 {
     fn get_latest_committed_finality(&self) -> anyhow::Result<Option<IPCParentFinality>> {
         self.with_exec_state(|mut exec_state| {

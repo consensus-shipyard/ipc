@@ -2,12 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 pub mod broadcast;
-mod check;
 pub mod checkpoint;
-mod exec;
 mod externs;
 pub mod observe;
-mod query;
 pub mod state;
 pub mod store;
 pub mod upgrades;
@@ -17,16 +14,12 @@ pub mod bundle;
 
 pub mod activity;
 pub(crate) mod gas;
-pub(crate) mod topdown;
 
-pub use check::FvmCheckRet;
 pub use checkpoint::PowerUpdates;
-pub use exec::{EndBlockOutput, FvmApplyRet};
 use fendermint_crypto::{PublicKey, SecretKey};
 pub use fendermint_vm_message::query::FvmQuery;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::address::Address;
-pub use query::FvmQueryRet;
 use tendermint_rpc::Client;
 
 pub use self::broadcast::Broadcaster;
