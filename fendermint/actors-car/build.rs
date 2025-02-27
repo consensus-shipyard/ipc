@@ -15,17 +15,17 @@
 // limitations under the License.
 
 use cargo_metadata::{DependencyKind, MetadataCommand};
+use color_eyre::eyre::{bail, eyre, OptionExt, Result};
 use fil_actor_bundler::Bundler;
 use fs_err as fs;
+use std::collections::HashSet;
 use std::io::{BufRead, BufReader};
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
 use toml::Value;
-use color_eyre::eyre::{bail, eyre, OptionExt, Result};
 use tracing::info;
-use std::collections::HashSet;
-use std::ops::Deref;
 
 fn parse_dependencies_of_umbrella_crate(manifest_path: &Path) -> Result<Vec<(String, PathBuf)>> {
     let manifest = dbg!(fs::read_to_string(manifest_path))?;
@@ -43,9 +43,9 @@ fn parse_dependencies_of_umbrella_crate(manifest_path: &Path) -> Result<Vec<(Str
 
     let mut ret = Vec::with_capacity(dependencies.len());
     for (name, details) in dependencies.iter() {
-        let Some(path) = details
-            .get("path")
-            .and_then(Value::as_str) else { continue };
+        let Some(path) = details.get("path").and_then(Value::as_str) else {
+            continue;
+        };
         ret.push((name.clone(), std::path::PathBuf::from(path)));
     }
 
@@ -60,38 +60,38 @@ pub fn rerun_if_changed(path: &Path) {
 /// a `HashSet`.
 #[derive(Debug)]
 struct DeduplicatePackage<'a> {
-	package: &'a cargo_metadata::Package,
-	identifier: String,
+    package: &'a cargo_metadata::Package,
+    identifier: String,
 }
 impl<'a> From<&'a cargo_metadata::Package> for DeduplicatePackage<'a> {
-	fn from(package: &'a cargo_metadata::Package) -> Self {
-		Self {
-			package,
-			identifier: format!("{}{}{:?}", package.name, package.version, package.source),
-		}
-	}
+    fn from(package: &'a cargo_metadata::Package) -> Self {
+        Self {
+            package,
+            identifier: format!("{}{}{:?}", package.name, package.version, package.source),
+        }
+    }
 }
 
 impl<'a> std::hash::Hash for DeduplicatePackage<'a> {
-	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-		self.identifier.hash(state);
-	}
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.identifier.hash(state);
+    }
 }
 
 impl<'a> PartialEq for DeduplicatePackage<'a> {
-	fn eq(&self, other: &Self) -> bool {
-		self.identifier == other.identifier
-	}
+    fn eq(&self, other: &Self) -> bool {
+        self.identifier == other.identifier
+    }
 }
 
 impl<'a> Eq for DeduplicatePackage<'a> {}
 
 impl<'a> Deref for DeduplicatePackage<'a> {
-	type Target = cargo_metadata::Package;
+    type Target = cargo_metadata::Package;
 
-	fn deref(&self) -> &Self::Target {
-		self.package
-	}
+    fn deref(&self) -> &Self::Target {
+        self.package
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -104,39 +104,49 @@ struct Actor {
 /// Bundle all indidivual wasm blobs together
 fn bundle_wasm_blobs_into_car(actor_wasm_blobs: &[Actor], dst: &Path) -> Result<PathBuf> {
     let mut bundler = Bundler::new(dst);
-    for (Actor { package_name: pkg, wasm_blob_path: path, ..}, id) in actor_wasm_blobs.iter().zip(1u32..) {
-
+    for (
+        Actor {
+            package_name: pkg,
+            wasm_blob_path: path,
+            ..
+        },
+        id,
+    ) in actor_wasm_blobs.iter().zip(1u32..)
+    {
         // This actor version doesn't force synthetic CIDs; it uses genuine
         // content-addressed CIDs.
         let forced_cid = None;
 
         let actor_name = pkg
             .strip_prefix("fendermint_actor_")
-            .ok_or_eyre(
-                format!("expected fendermint_actor_ prefix in actor package name; got: {pkg}")
-            )?
+            .ok_or_eyre(format!(
+                "expected fendermint_actor_ prefix in actor package name; got: {pkg}"
+            ))?
             .to_owned();
 
         let cid = bundler
-            .add_from_file(id, actor_name, forced_cid, &path)
-            .map_err(|err| eyre!(
+            .add_from_file(id, actor_name, forced_cid, path)
+            .map_err(|err| {
+                eyre!(
                     "failed to add file {:?} to bundle for actor {}: {}",
-                    path, id, err
-            ))?;
-        info!(
-            "added {} ({}) to bundle with CID {}",
-            pkg, id, cid
-        );
+                    path,
+                    id,
+                    err
+                )
+            })?;
+        info!("added {} ({}) to bundle with CID {}", pkg, id, cid);
     }
-    
-    bundler.finish().map_err(|e| eyre!("Failed to finish bundle builder: {e}"))?;
-    
+
+    bundler
+        .finish()
+        .map_err(|e| eyre!("Failed to finish bundle builder: {e}"))?;
+
     Ok(dst.to_path_buf())
 }
 
 fn create_metadata_command(path: impl Into<PathBuf>) -> MetadataCommand {
-	let mut metadata_command = MetadataCommand::new();
-	metadata_command.manifest_path(path);
+    let mut metadata_command = MetadataCommand::new();
+    metadata_command.manifest_path(path);
     // metadata_command.other_options(vec!["--offline".to_owned()]);
     metadata_command
 }
@@ -145,50 +155,60 @@ fn create_metadata_command(path: impl Into<PathBuf>) -> MetadataCommand {
 ///
 /// If the `Cargo.lock` cannot be found, we emit a warning and return `None`.
 fn find_cargo_lock(out_dir: &Path) -> Option<PathBuf> {
-	fn find_impl(mut path: PathBuf) -> Option<PathBuf> {
-		loop {
-			if path.join("Cargo.lock").exists() {
-				return Some(path.join("Cargo.lock"))
-			}
+    fn find_impl(mut path: PathBuf) -> Option<PathBuf> {
+        loop {
+            if path.join("Cargo.lock").exists() {
+                return Some(path.join("Cargo.lock"));
+            }
 
-			if !path.pop() {
-				return None
-			}
-		}
-	}
+            if !path.pop() {
+                return None;
+            }
+        }
+    }
 
-	if let Some(path) = find_impl(out_dir.to_path_buf()) {
-		return Some(path)
-	}
+    if let Some(path) = find_impl(out_dir.to_path_buf()) {
+        return Some(path);
+    }
 
-	None
+    None
 }
 
 /// Track files and paths related to the given package to rerun `build.rs` on any relevant change.
 fn package_rerun_if_changed(package: &DeduplicatePackage) {
-	let mut manifest_path = package.manifest_path.clone();
-	if manifest_path.ends_with("Cargo.toml") {
-		manifest_path.pop();
-	}
+    let mut manifest_path = package.manifest_path.clone();
+    if manifest_path.ends_with("Cargo.toml") {
+        manifest_path.pop();
+    }
 
-	ignore::Walk::new(&manifest_path)
-		.into_iter()
-		.filter(|p| {
-			// Ignore this entry if it is a directory that contains a `Cargo.toml` that is not the
-			// `Cargo.toml` related to the current package. This is done to ignore sub-crates of a
-			// crate. If such a sub-crate is a dependency, it will be processed independently
-			// anyway.
+    ignore::Walk::new(&manifest_path)
+        .filter(|p| {
+            // Ignore this entry if it is a directory that contains a `Cargo.toml` that is not the
+            // `Cargo.toml` related to the current package. This is done to ignore sub-crates of a
+            // crate. If such a sub-crate is a dependency, it will be processed independently
+            // anyway.
             let Ok(p) = p else { return false };
             let p = p.path();
-			p == manifest_path || !p.is_dir() || !p.join("Cargo.toml").exists()
-		})
-		.filter_map(|p| p.ok().map(|p| p.into_path()))
-		.filter(|p| p.extension().map(|e| e == "rs" || e == "toml").unwrap_or_default())
-		.for_each(|ref x| rerun_if_changed(x));
+            p == manifest_path || !p.is_dir() || !p.join("Cargo.toml").exists()
+        })
+        .filter_map(|p| p.ok().map(|p| p.into_path()))
+        .filter(|p| {
+            p.extension()
+                .map(|e| e == "rs" || e == "toml")
+                .unwrap_or_default()
+        })
+        .for_each(|ref x| rerun_if_changed(x));
 }
 
-fn build_all_wasm_blobs(actors: &[Actor], manifest_path: &Path, cargo: &Path, out_dir: &Path) -> Result<Vec<Actor>> {
-    let package_args = actors.iter().map(|actor|format!("-p={}", actor.package_name));
+fn build_all_wasm_blobs(
+    actors: &[Actor],
+    manifest_path: &Path,
+    cargo: &Path,
+    out_dir: &Path,
+) -> Result<Vec<Actor>> {
+    let package_args = actors
+        .iter()
+        .map(|actor| format!("-p={}", actor.package_name));
 
     // Cargo build command for all test_actors at once.
     let mut cmd = Command::new(cargo);
@@ -202,7 +222,7 @@ fn build_all_wasm_blobs(actors: &[Actor], manifest_path: &Path, cargo: &Path, ou
         .stderr(Stdio::piped())
         // We are supposed to only generate artifacts under OUT_DIR,
         // so set OUT_DIR as the target directory for this build.
-        .env("CARGO_TARGET_DIR", &out_dir)
+        .env("CARGO_TARGET_DIR", out_dir)
         // As we are being called inside a build-script, this env variable is set. However, we set
         // our own `RUSTFLAGS` and thus, we need to remove this. Otherwise cargo favors this
         // env variable.
@@ -241,61 +261,62 @@ fn print_cargo_rerun_if_dependency_instructions(
     cargo_manifest: &Path,
     out_dir: &Path,
 ) -> Result<()> {
-	// Rerun `build.rs` if the `Cargo.lock` changes
-	let cargo_lock = find_cargo_lock(out_dir).ok_or_eyre("Couldn't find Cargo.lock")?;
+    // Rerun `build.rs` if the `Cargo.lock` changes
+    let cargo_lock = find_cargo_lock(out_dir).ok_or_eyre("Couldn't find Cargo.lock")?;
     rerun_if_changed(&cargo_lock);
 
     let workspace = cargo_lock.parent().unwrap();
 
-	let metadata = create_metadata_command(workspace.join("Cargo.toml"))
-		.exec()?;
+    let metadata = create_metadata_command(workspace.join("Cargo.toml")).exec()?;
 
-	let package = metadata
-		.packages
-		.iter()
-		.find(|p| p.manifest_path == cargo_manifest).ok_or_eyre("Detected a circular dependency. The crate depends on itself..")?;
+    let package = metadata
+        .packages
+        .iter()
+        .find(|p| p.manifest_path == cargo_manifest)
+        .ok_or_eyre("Detected a circular dependency. The crate depends on itself..")?;
 
-	// Start with the dependencies of the crate we want to compile for wasm.
-	let mut dependencies = Vec::from_iter(package.dependencies.iter());
+    // Start with the dependencies of the crate we want to compile for wasm.
+    let mut dependencies = Vec::from_iter(package.dependencies.iter());
 
-	// Collect all packages by follow the dependencies of all packages we find.
-	let mut packages = HashSet::new();
-	packages.insert(DeduplicatePackage::from(package));
-    
-	while let Some(dependency) = dependencies.pop() {
-		// Ignore all dev dependencies
-		if dependency.kind == DependencyKind::Development {
-			continue
-		}
+    // Collect all packages by follow the dependencies of all packages we find.
+    let mut packages = HashSet::new();
+    packages.insert(DeduplicatePackage::from(package));
 
-		let path_or_git_dep =
-			dependency.source.as_ref().map(|s| s.starts_with("git+")).unwrap_or(true);
+    while let Some(dependency) = dependencies.pop() {
+        // Ignore all dev dependencies
+        if dependency.kind == DependencyKind::Development {
+            continue;
+        }
 
-		let maybe_package = metadata
-			.packages
-			.iter()
-			.filter(|p| !p.manifest_path.starts_with(&workspace))
-			.find(|p| {
-				// Check that the name matches and that the version matches or this is
-				// a git or path dep. A git or path dependency can only occur once, so we don't
-				// need to check the version.
-				(path_or_git_dep || dependency.req.matches(&p.version)) && dependency.name == p.name
-			});
+        let path_or_git_dep = dependency
+            .source
+            .as_ref()
+            .map(|s| s.starts_with("git+"))
+            .unwrap_or(true);
 
-		if let Some(package) = maybe_package {
-			if packages.insert(DeduplicatePackage::from(package)) {
-				dependencies.extend(package.dependencies.iter());
-			}
-		}
-	}
+        let maybe_package = metadata
+            .packages
+            .iter()
+            .filter(|p| !p.manifest_path.starts_with(workspace))
+            .find(|p| {
+                // Check that the name matches and that the version matches or this is
+                // a git or path dep. A git or path dependency can only occur once, so we don't
+                // need to check the version.
+                (path_or_git_dep || dependency.req.matches(&p.version)) && dependency.name == p.name
+            });
 
-	// Make sure that if any file/folder of a dependency change, we need to rerun the `build.rs`
-	packages.iter().for_each(package_rerun_if_changed);
+        if let Some(package) = maybe_package {
+            if packages.insert(DeduplicatePackage::from(package)) {
+                dependencies.extend(package.dependencies.iter());
+            }
+        }
+    }
+
+    // Make sure that if any file/folder of a dependency change, we need to rerun the `build.rs`
+    packages.iter().for_each(package_rerun_if_changed);
 
     Ok(())
 }
-
-
 
 fn main() -> Result<()> {
     // Cargo executable location.
@@ -310,40 +331,35 @@ fn main() -> Result<()> {
         .map(|p| p.join("bundle"))
         .ok_or_eyre("Must have OUT_DIR defined, this is only ever run from build.rs")?;
 
-    let manifest_path_dir = std::env::var_os("CARGO_MANIFEST_DIR").ok_or_eyre("CARGO_MANIFEST_DIR unset")?;
     let manifest_path_dir =
-        Path::new(&manifest_path_dir);
+        std::env::var_os("CARGO_MANIFEST_DIR").ok_or_eyre("CARGO_MANIFEST_DIR unset")?;
+    let manifest_path_dir = Path::new(&manifest_path_dir);
     let actors_manifest_path = manifest_path_dir
-            .parent().unwrap()
-            .join("actors")
-            .join("Cargo.toml");
+        .parent()
+        .unwrap()
+        .join("actors")
+        .join("Cargo.toml");
 
-    let wasm_blob_dir = out_dir
-        .join("wasm32-unknown-unknown")
-        .join("wasm");
+    let wasm_blob_dir = out_dir.join("wasm32-unknown-unknown").join("wasm");
 
     let actors = parse_dependencies_of_umbrella_crate(&actors_manifest_path)?;
-    let actors = Vec::from_iter(
-        actors
-        .iter()
-        .map(|(name, crate_path)| Actor {
-            package_name: name.as_str().to_owned(),
-            wasm_blob_path: wasm_blob_dir.join(name.as_str()).with_extension("wasm"),
-            crate_path: crate_path.clone(),
-        })
-    );
+    let actors = Vec::from_iter(actors.iter().map(|(name, crate_path)| Actor {
+        package_name: name.as_str().to_owned(),
+        wasm_blob_path: wasm_blob_dir.join(name.as_str()).with_extension("wasm"),
+        crate_path: crate_path.clone(),
+    }));
 
     print_cargo_rerun_if_dependency_instructions(&actors_manifest_path, &out_dir)?;
-    
-    build_all_wasm_blobs(&actors, &actors_manifest_path, &cargo, &out_dir)?;
-    
+
+    build_all_wasm_blobs(&actors, &actors_manifest_path, cargo, &out_dir)?;
+
     let bundle_car_dest_dir = actors_manifest_path.parent().unwrap().join("output");
 
-    fs_err::create_dir_all(&bundle_car_dest_dir)?; 
+    fs_err::create_dir_all(&bundle_car_dest_dir)?;
     let bundle_car_path = bundle_car_dest_dir.join("custom_actors_bundle.car");
-    
+
     rerun_if_changed(&bundle_car_path);
-    
+
     bundle_wasm_blobs_into_car(&actors, &bundle_car_path)?;
 
     Ok(())
