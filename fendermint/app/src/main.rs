@@ -54,7 +54,6 @@ mod tests {
     use super::fs;
     use cid::Cid;
     use fendermint_rocksdb::{RocksDb, RocksDbConfig};
-    use fendermint_vm_interpreter::fvm::bundle::bundle_path;
     use fvm::machine::Manifest;
     use fvm_ipld_car::load_car_unchecked;
     use fvm_ipld_encoding::CborStore;
@@ -67,9 +66,7 @@ mod tests {
         // Not loading the actors from the library any more. It would be possible, as long as dependencies are aligned.
         // let bundle_car = actors_v10::BUNDLE_CAR;
 
-        let bundle_path = bundle_path();
-        let bundle_car = fs::read(&bundle_path)
-            .unwrap_or_else(|_| panic!("failed to load bundle CAR from {bundle_path:?}"));
+        let bundle_car = actors_builtin_car::CAR;
 
         let dir = tempfile::Builder::new()
             .tempdir()
@@ -81,7 +78,7 @@ mod tests {
         };
         let db = open_db();
 
-        let cids = load_car_unchecked(&db, bundle_car.as_slice())
+        let cids = load_car_unchecked(&db, bundle_car)
             .await
             .expect("error loading bundle CAR");
 

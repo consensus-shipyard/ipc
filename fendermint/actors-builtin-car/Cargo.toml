@@ -1,5 +1,5 @@
 [package]
-name = "actors-builtin-fetch"
+name = "actors-builtin-car"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
