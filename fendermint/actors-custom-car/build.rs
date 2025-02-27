@@ -357,9 +357,9 @@ fn main() -> Result<()> {
 
     fs_err::create_dir_all(&bundle_car_dest_dir)?;
     let bundle_car_path = bundle_car_dest_dir.join("custom_actors_bundle.car");
-    
+
     rerun_if_changed(&bundle_car_path);
-    
+
     bundle_wasm_blobs_into_car(&actors, &bundle_car_path)?;
 
     Ok(())
