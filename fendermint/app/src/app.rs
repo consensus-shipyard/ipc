@@ -23,21 +23,16 @@ use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
 };
 use fendermint_vm_core::Timestamp;
-use fendermint_vm_interpreter::bytes::{
-    BytesMessageApplyRes, BytesMessageCheckRes, BytesMessageQuery, BytesMessageQueryRes,
-};
-use fendermint_vm_interpreter::chain::{ChainEnv, ChainMessageApplyRet, IllegalMessage};
 use fendermint_vm_interpreter::fvm::state::{
     empty_state_tree, CheckStateRef, FvmExecState, FvmQueryState, FvmStateParams,
     FvmUpdatableParams,
 };
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
-use fendermint_vm_interpreter::fvm::{EndBlockOutput, FvmApplyRet};
 use fendermint_vm_interpreter::genesis::{read_genesis_car, GenesisAppState};
-use fendermint_vm_interpreter::signed::InvalidSignature;
-use fendermint_vm_interpreter::{
-    CheckInterpreter, ExecInterpreter, ProposalInterpreter, QueryInterpreter,
-};
+
+use fendermint_vm_interpreter::interpreter::{InterpreterError, MessagesInterpreter};
+use fendermint_vm_interpreter::types::{ApplyResponse, EndBlockResponse, Query};
+
 use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_snapshot::{SnapshotClient, SnapshotError};
 use fvm::engine::MultiEngine;
@@ -53,6 +48,8 @@ use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
 use tendermint::consensus::params::Params as TendermintConsensusParams;
 use tracing::instrument;
+
+use tendermint_rpc::Client as TendermintClient;
 
 #[derive(Serialize)]
 #[repr(u8)]
@@ -118,10 +115,11 @@ pub struct AppConfig<S: KVStore> {
 
 /// Handle ABCI requests.
 #[derive(Clone)]
-pub struct App<DB, SS, S, I>
+pub struct App<DB, SS, S, TC>
 where
-    SS: Blockstore + Clone + 'static,
+    SS: Blockstore + Clone + 'static + Send + Sync,
     S: KVStore,
+    TC: TendermintClient + Clone + Send + Sync + 'static,
 {
     /// Database backing all key-value operations.
     db: Arc<DB>,
@@ -148,10 +146,9 @@ where
     /// so that we can retrospectively execute FVM messages at past block heights
     /// in read-only mode.
     state_hist: KVCollection<S, BlockHeight, FvmStateParams>,
-    /// Interpreter for block lifecycle events.
-    interpreter: Arc<I>,
-    /// Environment-like dependencies for the interpreter.
-    chain_env: ChainEnv,
+    /// Interpreter for messages and the block lifecycle events.
+    messages_interpreter: Arc<MessagesInterpreter<SS, TC>>,
+
     /// Interface to the snapshotter, if enabled.
     snapshots: Option<SnapshotClient>,
     /// State accumulating changes during block execution.
@@ -166,7 +163,7 @@ where
     validators_cache: Arc<tokio::sync::Mutex<Option<ValidatorCache>>>,
 }
 
-impl<DB, SS, S, I> App<DB, SS, S, I>
+impl<DB, SS, S, TC> App<DB, SS, S, TC>
 where
     S: KVStore
         + Codec<AppState>
@@ -174,14 +171,14 @@ where
         + Encode<BlockHeight>
         + Codec<FvmStateParams>,
     DB: KVWritable<S> + KVReadable<S> + Clone + 'static,
-    SS: Blockstore + Clone + 'static,
+    SS: Blockstore + Clone + 'static + Send + Sync,
+    TC: TendermintClient + Clone + Send + Sync + 'static,
 {
     pub fn new(
         config: AppConfig<S>,
         db: DB,
         state_store: SS,
-        interpreter: I,
-        chain_env: ChainEnv,
+        interpreter: MessagesInterpreter<SS, TC>,
         snapshots: Option<SnapshotClient>,
     ) -> Result<Self> {
         let app = Self {
@@ -192,11 +189,10 @@ where
             namespace: config.app_namespace,
             state_hist: KVCollection::new(config.state_hist_namespace),
             state_hist_size: config.state_hist_size,
-            interpreter: Arc::new(interpreter),
-            chain_env,
+            messages_interpreter: Arc::new(interpreter),
             snapshots,
             exec_state: Arc::new(tokio::sync::Mutex::new(None)),
-            check_state: Arc::new(tokio::sync::Mutex::new(None)),
+            check_state: Arc::new(tokio::sync::RwLock::new(None)),
             validators_cache: Arc::new(tokio::sync::Mutex::new(None)),
         };
         app.init_committed_state()?;
@@ -204,7 +200,7 @@ where
     }
 }
 
-impl<DB, SS, S, I> App<DB, SS, S, I>
+impl<DB, SS, S, TC> App<DB, SS, S, TC>
 where
     S: KVStore
         + Codec<AppState>
@@ -212,7 +208,8 @@ where
         + Encode<BlockHeight>
         + Codec<FvmStateParams>,
     DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
-    SS: Blockstore + 'static + Clone,
+    SS: Blockstore + 'static + Clone + Send + Sync,
+    TC: TendermintClient + Clone + Send + Sync + 'static,
 {
     /// Get an owned clone of the state store.
     fn state_store_clone(&self) -> SS {
@@ -330,14 +327,14 @@ where
     /// Take the execution state, update it, put it back, return the output.
     async fn modify_exec_state<T, F, R>(&self, f: F) -> Result<T>
     where
-        F: FnOnce((ChainEnv, FvmExecState<SS>)) -> R,
-        R: Future<Output = Result<((ChainEnv, FvmExecState<SS>), T)>>,
+        F: FnOnce(FvmExecState<SS>) -> R,
+        R: Future<Output = Result<(FvmExecState<SS>, T)>>,
     {
         let mut guard = self.exec_state.lock().await;
         let state = guard.take().expect("exec state empty");
 
         // NOTE: There is no need to save the `ChainEnv`; it's shared with other, meant for cloning.
-        let ((_env, state), ret) = f((self.chain_env.clone(), state)).await?;
+        let (state, ret) = f(state).await?;
 
         *guard = Some(state);
 
@@ -451,6 +448,34 @@ where
             .context("Validator cache is not available")?
             .get_validator(id)
     }
+
+    async fn get_check_state(&self) -> anyhow::Result<Arc<FvmExecState<ReadOnlyBlockstore<DB>>>> {
+        // Acquire the lock and check if the state is already available.
+        let mut guard = self.check_state.lock().await;
+        if let Some(state) = guard.as_ref() {
+            return Ok(state.clone());
+        }
+
+        // Release the lock while doing the expensive refresh.
+        drop(guard);
+
+        // Prepare the new exec state.
+        let db = self.state_store_clone();
+        let committed = self.committed_state()?;
+        let new_state = FvmExecState::new(
+            ReadOnlyBlockstore::new(db),
+            self.multi_engine.as_ref(),
+            committed.block_height.try_into()?,
+            committed.state_params,
+        )
+        .context("error creating check state")?;
+        let arc_new_state = Arc::new(new_state);
+
+        // Set the new state.
+        let mut guard = self.check_state.lock().await;
+        *guard = Some(arc_new_state.clone());
+        Ok(arc_new_state)
+    }
 }
 
 // NOTE: The `Application` interface doesn't allow failures at the moment. The protobuf
@@ -459,7 +484,7 @@ where
 // the `tower-abci` library would throw an exception when it tried to convert a
 // `Response::Exception` into a `ConsensusResponse` for example.
 #[async_trait]
-impl<DB, SS, S, I> Application for App<DB, SS, S, I>
+impl<DB, SS, S, TC> Application for App<DB, SS, S, TC>
 where
     S: KVStore
         + Codec<AppState>
@@ -469,27 +494,7 @@ where
     S::Namespace: Sync + Send,
     DB: KVWritable<S> + KVReadable<S> + Clone + Send + Sync + 'static,
     SS: Blockstore + Clone + Send + Sync + 'static,
-    I: ProposalInterpreter<
-        State = (ChainEnv, FvmExecState<ReadOnlyBlockstore<Arc<SS>>>),
-        Message = Vec<u8>,
-    >,
-    I: ExecInterpreter<
-        State = (ChainEnv, FvmExecState<SS>),
-        Message = Vec<u8>,
-        BeginOutput = FvmApplyRet,
-        DeliverOutput = BytesMessageApplyRes,
-        EndOutput = EndBlockOutput,
-    >,
-    I: CheckInterpreter<
-        State = FvmExecState<ReadOnlyBlockstore<SS>>,
-        Message = Vec<u8>,
-        Output = BytesMessageCheckRes,
-    >,
-    I: QueryInterpreter<
-        State = FvmQueryState<SS>,
-        Query = BytesMessageQuery,
-        Output = BytesMessageQueryRes,
-    >,
+    TC: TendermintClient + Clone + Send + Sync + 'static,
 {
     /// Provide information about the ABCI application.
     async fn info(&self, _request: request::Info) -> AbciResult<response::Info> {
@@ -596,16 +601,16 @@ where
         )
         .context("error creating query state")?;
 
-        let qry = (request.path, request.data.to_vec());
+        let qry = Query {
+            path: request.path,
+            params: request.data.to_vec(),
+        };
 
-        let (_, result) = self
-            .interpreter
-            .query(state, qry)
-            .await
-            .context("error running query")?;
+        // TODO Karel - revisit the error handling. Should it ever ? or this handling below is fine?
+        let result = self.messages_interpreter.query(state, qry).await;
 
         let response = match result {
-            Err(e) => invalid_query(AppError::InvalidEncoding, e.description),
+            Err(e) => invalid_query(AppError::InvalidEncoding, e.to_string()),
             Ok(result) => to_query(result, block_height)?,
         };
         Ok(response)
@@ -613,57 +618,44 @@ where
 
     /// Check the given transaction before putting it into the local mempool.
     async fn check_tx(&self, request: request::CheckTx) -> AbciResult<response::CheckTx> {
-        // Keep the guard through the check, so there can be only one at a time.
-        let mut guard = self.check_state.lock().await;
+        let state = self
+            .get_check_state()
+            .await
+            .context("error getting check state")?;
 
-        let state = match guard.take() {
-            Some(state) => state,
-            None => {
-                let db = self.state_store_clone();
-                let state = self.committed_state()?;
-
-                // This would create a partial state, but some client scenarios need the full one.
-                // FvmCheckState::new(db, state.state_root(), state.chain_id())
-                //     .context("error creating check state")?
-
-                FvmExecState::new(
-                    ReadOnlyBlockstore::new(db),
-                    self.multi_engine.as_ref(),
-                    state.block_height.try_into()?,
-                    state.state_params,
-                )
-                .context("error creating check state")?
-            }
-        };
-
-        let (state, result) = self
-            .interpreter
-            .check(
+        let result = self
+            .messages_interpreter
+            .check_message(
                 state,
                 request.tx.to_vec(),
                 request.kind == CheckTxKind::Recheck,
             )
-            .await
-            .context("error running check")?;
+            .await;
 
         let mut mpool_received_trace = MpoolReceived::default();
 
         let response = match result {
-            Err(e) => invalid_check_tx(AppError::InvalidEncoding, e.description),
-            Ok(result) => match result {
-                Err(IllegalMessage) => invalid_check_tx(AppError::IllegalMessage, "".to_owned()),
-                Ok(Err(InvalidSignature(d))) => invalid_check_tx(AppError::InvalidSignature, d),
-                Ok(Ok(ret)) => {
-                    mpool_received_trace.message = Some(Message::from(&ret.message));
-
-                    let priority = state.txn_priority_calculator().priority(&ret.message);
-                    to_check_tx(ret, priority)
+            Err(e) => match e {
+                InterpreterError::IllegalMessage(s) => {
+                    invalid_check_tx(AppError::IllegalMessage, s)
                 }
+                InterpreterError::InvalidSignature(e) => {
+                    invalid_check_tx(AppError::InvalidSignature, e.to_string())
+                }
+                InterpreterError::InvalidMessage(s) => {
+                    invalid_check_tx(AppError::InvalidEncoding, s)
+                }
+                // TODO Karel - revisit the error handling. Should it ever return an error?
+                InterpreterError::Other(e) => return Err(e.context("error running check").into()),
             },
-        };
+            Ok(response) => {
+                mpool_received_trace.message = Some(Message::from(&response.message));
 
-        // Update the check state.
-        *guard = Some(state);
+                let priority = state.txn_priority_calculator().priority(&response.message);
+                let check_tx = to_check_tx(response, priority);
+                check_tx
+            }
+        };
 
         mpool_received_trace.accept = response.code.is_ok();
         if !mpool_received_trace.accept {
@@ -691,7 +683,7 @@ where
             .ok_or_else(|| anyhow!("exec state should be present"))?;
 
         let txs = self
-            .interpreter
+            .messages_interpreter
             .prepare((self.chain_env.clone(), state), txs)
             .await
             .context("failed to prepare proposal")?;
@@ -730,7 +722,7 @@ where
             .ok_or_else(|| anyhow!("exec state should be present"))?;
 
         let accept = self
-            .interpreter
+            .messages_interpreter
             .process((self.chain_env.clone(), state), txs)
             .await
             .context("failed to process proposal")?;
@@ -804,7 +796,7 @@ where
         self.put_exec_state(state).await;
 
         let ret = self
-            .modify_exec_state(|s| self.interpreter.begin(s))
+            .modify_exec_state(|s| self.messages_interpreter.begin(s))
             .await
             .context("begin failed")?;
 
@@ -816,7 +808,7 @@ where
         let msg = request.tx.to_vec();
         let (result, block_hash) = self
             .modify_exec_state(|s| async {
-                let ((env, state), res) = self.interpreter.deliver(s, msg).await?;
+                let ((env, state), res) = self.messages_interpreter.deliver(s, msg).await?;
                 let block_hash = state.block_hash();
                 Ok(((env, state), (res, block_hash)))
             })
@@ -852,12 +844,12 @@ where
         tracing::debug!(height = request.height, "end block");
 
         // End the interpreter for this block.
-        let EndBlockOutput {
+        let EndBlockResponse {
             power_updates,
             gas_market,
             events,
         } = self
-            .modify_exec_state(|s| self.interpreter.end(s))
+            .modify_exec_state(|s| self.messages_interpreter.end(s))
             .await
             .context("end failed")?;
 

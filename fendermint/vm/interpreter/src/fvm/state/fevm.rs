@@ -5,7 +5,7 @@ use std::any::type_name;
 use std::fmt::Debug;
 use std::{marker::PhantomData, sync::Arc};
 
-use crate::fvm::FvmApplyRet;
+use crate::types::ApplyResponse;
 use anyhow::{anyhow, bail, Context};
 use ethers::abi::{AbiDecode, AbiEncode, Detokenize};
 use ethers::core::types as et;
@@ -58,7 +58,7 @@ where
 }
 
 pub struct ContractCallerReturn<T> {
-    ret: FvmApplyRet,
+    ret: ApplyResponse,
     call: MockContractCall<T>,
 }
 
@@ -77,7 +77,7 @@ impl<T: Detokenize> ContractCallerReturn<T> {
         Ok(value)
     }
 
-    pub fn into_return(self) -> FvmApplyRet {
+    pub fn into_return(self) -> ApplyResponse {
         self.ret
     }
 }
@@ -300,7 +300,7 @@ where
                 error,
             }))
         } else {
-            let ret = FvmApplyRet {
+            let ret = ApplyResponse {
                 apply_ret: ret,
                 from,
                 to: self.addr,

@@ -1,36 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-//! Gas related message selection
-
-use fendermint_vm_message::{chain::ChainMessage, ipc::IpcMessage};
-
-use crate::verify::VerifiableMessage;
-
-pub trait GasLimit {
-    fn gas_limit(&self) -> u64;
-}
-
-impl GasLimit for ChainMessage {
-    fn gas_limit(&self) -> u64 {
-        match self {
-            ChainMessage::Signed(s) => s.message.gas_limit,
-            ChainMessage::Ipc(ipc) => match ipc {
-                IpcMessage::BottomUpResolve(relayed) => relayed.message.gas_limit,
-                other => {
-                    // This should never happen as only messages above can be in the mempool.
-                    // But if it does, let's not panic and just return 0 gas limit which should not temper
-                    // with the block gas limit.
-                    tracing::warn!(
-                        error = "unexpected IpcMessage variant encountered",
-                        message = ?other
-                    );
-                    0
-                }
-            },
-        }
-    }
-}
+use fendermint_vm_message::signed::SignedMessage;
 
 /// Generic helper: select items until the accumulated weight exceeds `max`.
 /// Returns a tuple of (selected items, accumulated weight).
@@ -55,13 +26,13 @@ where
 /// This function sorts the messages in descending order by gas limit and
 /// then selects them until the accumulated gas limit would exceed `total_gas_limit`.
 pub fn select_messages_by_gas_limit(
-    mut msgs: Vec<VerifiableMessage>,
+    mut msgs: Vec<SignedMessage>,
     total_gas_limit: u64,
-) -> Vec<VerifiableMessage> {
+) -> Vec<SignedMessage> {
     // Sort by gas limit descending.
-    msgs.sort_by(|a, b| b.gas_limit().cmp(&a.gas_limit()));
+    msgs.sort_by(|a, b| b.message.gas_limit.cmp(&a.message.gas_limit));
 
-    select_until(msgs, total_gas_limit, |msg| msg.gas_limit()).0
+    select_until(msgs, total_gas_limit, |msg| msg.message.gas_limit).0
 }
 
 /// Select transactions until the total size (in bytes) exceeds `max_tx_bytes`.
