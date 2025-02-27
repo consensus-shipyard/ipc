@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! Download filecoin's builtin actors car file
 
-use std::io::{Write, Read};
+use bytes::buf::Buf;
+use color_eyre::eyre::{self, bail, Result, WrapErr};
 use fs_err as fs;
-use color_eyre::eyre::{self, bail, WrapErr, Result};
-use sha2::Digest;
 use futures_util::stream::StreamExt;
+use sha2::Digest;
+use std::io::{Read, Write};
 use std::path::Path;
 use tempfile::NamedTempFile;
-use bytes::buf::Buf;
 
 const BUILTIN_ACTORS_TAG: &str = "v15.0.0";
 
@@ -18,7 +18,10 @@ const FORCE_RERUN: &str = "IPC_BUILTIN_ACTORS_FORCE_FETCH";
 const VERSION_OVERRIDE: &str = "IPC_BUILTIN_ACTORS_VERSION_OVERRIDE";
 
 /// Handle `Interrupt` errors, call a closure for each read kb piece
-fn read_file_piecewise<R: Read, F: FnMut(&[u8]) -> Result<()>>(mut reader: R, mut f: F) -> Result<()> {
+fn read_file_piecewise<R: Read, F: FnMut(&[u8]) -> Result<()>>(
+    mut reader: R,
+    mut f: F,
+) -> Result<()> {
     let mut buf = [0u8; 1024];
     loop {
         match reader.read(&mut buf[..]) {
@@ -28,12 +31,10 @@ fn read_file_piecewise<R: Read, F: FnMut(&[u8]) -> Result<()>>(mut reader: R, mu
             Ok(n) => {
                 f(&buf[..n])?;
             }
-            Err(e) => {
-                match e.kind() {
-                    std::io::ErrorKind::Interrupted => continue,
-                    _ => return Err(e.into()),
-                }
-            }
+            Err(e) => match e.kind() {
+                std::io::ErrorKind::Interrupted => continue,
+                _ => return Err(e.into()),
+            },
         }
     }
 }
@@ -50,20 +51,20 @@ fn file_digest(reader: impl Read) -> Result<Checksum> {
 }
 
 /// Convert a slice to an array
-/// 
+///
 /// The slice must have the exact length of the array size `N`.
-fn slice_to_array<const N: usize>(bytes: &[u8]) -> Result<[u8;N]> {
+fn slice_to_array<const N: usize>(bytes: &[u8]) -> Result<[u8; N]> {
     if bytes.len() != N {
         bail!("Length mismatch, execpted {}, but got {}", N, bytes.len());
     }
-    let mut buf = [0u8;N];
+    let mut buf = [0u8; N];
     buf.copy_from_slice(&bytes[..N]);
     Ok(buf)
 }
 
 /// Digest wrapping type
 #[derive(Debug, PartialEq, Eq, Hash)]
-struct Checksum([u8;32]);
+struct Checksum([u8; 32]);
 
 impl TryFrom<&[u8]> for Checksum {
     type Error = eyre::Error;
@@ -76,17 +77,19 @@ fn tempfile(out_dir: &Path) -> Result<NamedTempFile> {
     let t = NamedTempFile::new_in(out_dir)?;
     Ok(t)
 }
- 
+
 /// Download the file piecewise to a temporary file and calculate the digest
-async fn download_builtin_actors_bundle(tag: impl AsRef<str>, out_dir: &Path) -> Result<(NamedTempFile, Checksum)> {
+async fn download_builtin_actors_bundle(
+    tag: impl AsRef<str>,
+    out_dir: &Path,
+) -> Result<(NamedTempFile, Checksum)> {
     let tag = tag.as_ref();
     let mut tmp = tempfile(out_dir)?;
-        
+
     let url = format!("https://github.com/filecoin-project/builtin-actors/releases/download/{tag}/builtin-actors-mainnet.car");
     let url = reqwest::Url::parse(&url)?;
 
-    let response = reqwest::get(url)
-        .await?;
+    let response = reqwest::get(url).await?;
     let mut stream = response.bytes_stream();
     // concurrently compute the sha2 & write to temp file
     let mut sha = sha2::Sha256::default();
@@ -101,8 +104,7 @@ async fn download_builtin_actors_bundle(tag: impl AsRef<str>, out_dir: &Path) ->
     }
     let digest = sha.finalize();
     let digest = Checksum::try_from(digest.as_slice())?;
-    Ok((tmp,digest))
-
+    Ok((tmp, digest))
 }
 
 #[tokio::main]
@@ -115,13 +117,13 @@ async fn main() -> color_eyre::eyre::Result<()> {
     println!("cargo:rerun_if_changed=build.rs");
     println!("cargo:rerun_if_env_changed={}", FORCE_RERUN);
     println!("cargo:rerun_if_env_changed={}", VERSION_OVERRIDE);
-    
+
     println!("cargo:rerun_if_changed={}", builtin_car_path.display());
- 
-    let tag = std::env::var(VERSION_OVERRIDE).unwrap_or_else(|_e| BUILTIN_ACTORS_TAG.to_owned());    
- 
+
+    let tag = std::env::var(VERSION_OVERRIDE).unwrap_or_else(|_e| BUILTIN_ACTORS_TAG.to_owned());
+
     let (tmp, tmp_digest) = download_builtin_actors_bundle(tag, &out_dir).await?;
-    
+
     match fs::File::open(&builtin_car_path) {
         Ok(f) => {
             // compare digests, if mismatch, replace existing with the downloaded file
@@ -136,15 +138,18 @@ async fn main() -> color_eyre::eyre::Result<()> {
         Err(e) => {
             if let std::io::ErrorKind::NotFound = e.kind() {
                 // the file is not found, so a simple rename is good enough
-                fs::rename(tmp.path(), &builtin_car_path)?;    
+                fs::rename(tmp.path(), &builtin_car_path)?;
             } else {
                 // other errors always must lead to an error
                 bail!(e)
             }
         }
     }
-    
-    println!("Builtin actors file is ready for inclusion: {}", builtin_car_path.display());
+
+    println!(
+        "Builtin actors file is ready for inclusion: {}",
+        builtin_car_path.display()
+    );
 
     Ok(())
 }
