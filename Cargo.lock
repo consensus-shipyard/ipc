@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "actors-builtin-fetch"
+name = "actors-builtin-car"
 version = "0.1.0"
 dependencies = [
  "bytes",
@@ -3180,6 +3180,7 @@ dependencies = [
 name = "fendermint_app"
 version = "0.1.0"
 dependencies = [
+ "actors-builtin-car",
  "anyhow",
  "async-stm",
  "async-trait",
@@ -3187,6 +3188,7 @@ dependencies = [
  "cid",
  "fendermint_abci",
  "fendermint_actor_gas_market_eip1559",
+ "fendermint_actors",
  "fendermint_actors_api",
  "fendermint_app_options",
  "fendermint_app_settings",
