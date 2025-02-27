@@ -10,7 +10,7 @@ import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {LibDiamond} from "../lib/LibDiamond.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
-import {LibValidatorSet, LibStaking} from "../lib/LibStaking.sol";
+import {LibValidatorSet, LibPower} from "../lib/LibPower.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {LibSubnetActor} from "../lib/LibSubnetActor.sol";
@@ -140,7 +140,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             revert CollateralIsZero();
         }
 
-        if (LibStaking.isValidator(msg.sender)) {
+        if (LibPower.isValidator(msg.sender)) {
             revert MethodNotAllowed(ERR_VALIDATOR_JOINED);
         }
 
@@ -164,14 +164,41 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             // in the gateway
 
             // confirm validators deposit immediately
-            LibStaking.setMetadataWithConfirm(msg.sender, publicKey);
-            LibStaking.depositWithConfirm(msg.sender, amount);
+            LibPower.setMetadataWithConfirm(msg.sender, publicKey);
+            LibPower.depositWithConfirm(msg.sender, amount);
+
+            _patchGenesisValidators(msg.sender);
 
             LibSubnetActor.bootstrapSubnetIfNeeded();
         } else {
             // if the subnet has been bootstrapped, join with postponed confirmation.
-            LibStaking.setValidatorMetadata(msg.sender, publicKey);
-            LibStaking.deposit(msg.sender, amount);
+            LibPower.setValidatorMetadata(msg.sender, publicKey);
+            LibPower.deposit(msg.sender, amount);
+        }
+    }
+
+    function _patchGenesisValidators(address validator) internal {
+// add to initial validators avoiding duplicates if it
+        // is a genesis validator.
+        bool alreadyValidator;
+        uint256 length = s.genesisValidators.length;
+        for (uint256 i; i < length; ) {
+            if (s.genesisValidators[i].addr == validator) {
+                alreadyValidator = true;
+                break;
+            }
+            unchecked {
+                ++i;
+            }
+        }
+        if (!alreadyValidator) {
+            uint256 collateral = s.validatorSet.validators[validator].currentPower;
+            Validator memory val = Validator({
+                addr: validator,
+                weight: collateral,
+                metadata: s.validatorSet.validators[validator].metadata
+            });
+            s.genesisValidators.push(val);
         }
     }
 
@@ -188,20 +215,21 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             revert CollateralIsZero();
         }
 
-        if (!LibStaking.isValidator(msg.sender)) {
+        if (!LibPower.isValidator(msg.sender)) {
             revert MethodNotAllowed(ERR_VALIDATOR_NOT_JOINED);
         }
 
-        uint256 collateral = LibStaking.totalValidatorCollateral(msg.sender);
+        uint256 collateral = LibPower.totalValidatorCollateral(msg.sender);
         LibSubnetActor.gateValidatorPowerDelta(msg.sender, collateral, collateral + amount);
 
         s.collateralSource.lock(amount);
 
         if (!s.bootstrapped) {
-            LibStaking.depositWithConfirm(msg.sender, amount);
+            LibPower.depositWithConfirm(msg.sender, amount);
+            _patchGenesisValidators(msg.sender);
             LibSubnetActor.bootstrapSubnetIfNeeded();
         } else {
-            LibStaking.deposit(msg.sender, amount);
+            LibPower.deposit(msg.sender, amount);
         }
     }
 
@@ -217,7 +245,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             revert CannotReleaseZero();
         }
 
-        uint256 collateral = LibStaking.totalValidatorCollateral(msg.sender);
+        uint256 collateral = LibPower.totalValidatorCollateral(msg.sender);
 
         if (collateral == 0) {
             revert NotValidator(msg.sender);
@@ -229,10 +257,10 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
         LibSubnetActor.gateValidatorPowerDelta(msg.sender, collateral, collateral - amount);
 
         if (!s.bootstrapped) {
-            LibStaking.withdrawWithConfirm(msg.sender, amount);
+            LibPower.withdrawWithConfirm(msg.sender, amount);
             s.collateralSource.transferFunds(payable(msg.sender), amount);
         } else {
-            LibStaking.withdraw(msg.sender, amount);
+            LibPower.withdraw(msg.sender, amount);
         }
     }
 
@@ -248,7 +276,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
         }
 
         // remove bootstrap nodes added by this validator
-        uint256 amount = LibStaking.totalValidatorCollateral(msg.sender);
+        uint256 amount = LibPower.totalValidatorCollateral(msg.sender);
         if (amount == 0) {
             revert NotValidator(msg.sender);
         }
@@ -270,17 +298,17 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             }
 
             // interaction must be performed after checks and changes
-            LibStaking.withdrawWithConfirm(msg.sender, amount);
+            LibPower.withdrawWithConfirm(msg.sender, amount);
             s.collateralSource.transferFunds(payable(msg.sender), amount);
             return;
         }
-        LibStaking.withdraw(msg.sender, amount);
+        LibPower.withdraw(msg.sender, amount);
     }
 
     /// @notice method that allows to kill the subnet when all validators left.
     /// @dev It is not a privileged operation.
     function kill() external notKilled {
-        if (LibStaking.totalValidators() != 0) {
+        if (LibPower.totalValidators() != 0) {
             revert NotAllValidatorsHaveLeft();
         }
         if (!s.bootstrapped) {

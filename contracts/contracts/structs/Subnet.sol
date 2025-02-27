@@ -23,35 +23,35 @@ struct Subnet {
     SubnetID id;
 }
 
-/// @notice Subnet staking operations.
-enum StakingOperation {
-    Deposit,
-    Withdraw,
-    SetMetadata,
-    SetFederatedPower
+/// @notice Subnet validator power update operations types.
+enum PowerOperation {
+    /// @dev Update the power to the new specified value
+    SetPower,
+    /// @dev Update the metadata associated with the power 
+    SetMetadata
 }
 
-/// @notice The change request to validator staking.
-struct StakingChange {
-    StakingOperation op;
+/// @notice The power change operation detail.
+struct PowerChange {
+    PowerOperation op;
     bytes payload;
     address validator;
 }
 
 /// @notice The change associated with its corresponding configuration number.
-struct StakingChangeRequest {
-    StakingChange change;
+struct PowerChangeRequest {
+    PowerChange change;
     uint64 configurationNumber;
 }
 
 /// @notice The collection of staking changes.
-struct StakingChangeLog {
+struct PowerChangeLog {
     /// @notice The next configuration number to assign to new changes.
     uint64 nextConfigurationNumber;
     /// @notice The starting configuration number stored.
     uint64 startConfigurationNumber;
     /// The details of the changes, mapping of configuration number to changes.
-    mapping(uint64 => StakingChange) changes;
+    mapping(uint64 => PowerChange) changes;
 }
 
 /// @notice Each staking release amount and time.
@@ -80,14 +80,15 @@ struct StakingReleaseQueue {
 }
 
 /// @notice Keeping track of the validator information.
-/// @dev There are two types of collaterals:
-///     - Confirmed: The amount of collateral actually confirmed in child subnet;
-///     - Total: Aside from Confirmed, there is also the collateral has been supplied, but not yet confirmed in child.
+/// @notice When a power change request is triggered, the effects are applied to next power and 
+/// @notice after a complete topdown and bottom up cycle, it will be updated to current power which means
+/// @notice the child subnet as acknowledged this change.
 struct ValidatorInfo {
-    /// The power set by contract admin
-    uint256 federatedPower;
-    uint256 confirmedCollateral;
-    uint256 totalCollateral;
+    /// The current voting power the validator has in the child subnet.
+    uint256 currentPower;
+    /// The power of a validator that is awaiting child subnet confirmation.
+    /// TODO: this should be deprecated
+    uint256 nextPower;
     /// The metadata associated with the validator, i.e. off-chain network address.
     /// This information is not important to the protocol, off-chain should know how
     /// to parse or decode the bytes.
@@ -130,8 +131,8 @@ struct ValidatorSet {
     /// The total number of active validators allowed.
     uint16 activeLimit;
     /// The total collateral confirmed.
-    uint256 totalConfirmedCollateral;
-    /// The mapping of each validator address to its information.
+    uint256 currentTotalPower;
+    /// The mapping of each validator address to their details.
     mapping(address => ValidatorInfo) validators;
     /// @notice The active validators tracked using min priority queue.
     MinPQ activeValidators;
@@ -142,7 +143,7 @@ struct ValidatorSet {
 /// @notice Tracks the parent validator changes and apply them in the child.
 struct ParentValidatorsTracker {
     ValidatorSet validators;
-    StakingChangeLog changes;
+    PowerChangeLog changes;
 }
 
 /// @notice An IPC address type.
@@ -155,6 +156,9 @@ struct IPCAddress {
 struct Validator {
     uint256 weight;
     address addr;
+    /// The metadata associated with the validator, i.e. off-chain network address.
+    /// This information is not important to the protocol, off-chain should know how
+    /// to parse or decode the bytes.
     bytes metadata;
 }
 

@@ -11,7 +11,7 @@ import {InvalidCollateral, InvalidSubmissionPeriod, InvalidMajorityPercentage} f
 import {LibDiamond} from "./lib/LibDiamond.sol";
 import {LibGateway} from "./lib/LibGateway.sol";
 import {SubnetID} from "./structs/Subnet.sol";
-import {LibStaking} from "./lib/LibStaking.sol";
+import {LibPower} from "./lib/LibPower.sol";
 import {BATCH_PERIOD, MAX_MSGS_PER_BATCH} from "./structs/CrossNet.sol";
 
 error FunctionNotFound(bytes4 _functionSelector);
@@ -69,10 +69,10 @@ contract GatewayDiamond {
 
         s.validatorsTracker.validators.activeLimit = params.activeValidatorsLimit;
         // Start the next configuration number from 1, 0 is reserved for no change and the genesis membership
-        s.validatorsTracker.changes.nextConfigurationNumber = LibStaking.INITIAL_CONFIGURATION_NUMBER;
+        s.validatorsTracker.changes.nextConfigurationNumber = LibPower.INITIAL_CONFIGURATION_NUMBER;
         // The startConfiguration number is also 1 to match with nextConfigurationNumber, indicating we have
         // empty validator change logs
-        s.validatorsTracker.changes.startConfigurationNumber = LibStaking.INITIAL_CONFIGURATION_NUMBER;
+        s.validatorsTracker.changes.startConfigurationNumber = LibPower.INITIAL_CONFIGURATION_NUMBER;
         // set initial validators and update membership
         Membership memory initial = Membership({configurationNumber: 0, validators: params.genesisValidators});
         LibGateway.updateMembership(initial);

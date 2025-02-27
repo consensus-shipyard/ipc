@@ -9,7 +9,7 @@ import {SubnetActorStorage} from "../lib/LibSubnetActorStorage.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {LibStaking} from "../lib/LibStaking.sol";
+import {LibPower} from "../lib/LibPower.sol";
 
 contract SubnetActorGetterFacet {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -120,55 +120,51 @@ contract SubnetActorGetterFacet {
 
     /// @notice Returns detailed information about all active validators.
     function getActiveValidators() external view returns (address[] memory) {
-        return LibStaking.listActiveValidators();
+        return LibPower.listActiveValidators();
     }
 
     /// @notice Returns detailed information about all waiting validators.
     function getWaitingValidators() external view returns (address[] memory) {
-        return LibStaking.listWaitingValidators();
+        return LibPower.listWaitingValidators();
     }
 
     /// @notice Returns the total number of validators (active and waiting).
     function getTotalValidatorsNumber() external view returns (uint16) {
-        return LibStaking.totalValidators();
+        return LibPower.totalValidators();
     }
 
     /// @notice Returns the number of active validators.
     function getActiveValidatorsNumber() external view returns (uint16) {
-        return LibStaking.totalActiveValidators();
+        return LibPower.totalActiveValidators();
     }
 
     /// @notice Returns the total amount of confirmed collateral across all validators.
-    function getTotalConfirmedCollateral() external view returns (uint256) {
-        return LibStaking.getTotalConfirmedCollateral();
+    function getTotalCurrentPower() external view returns (uint256) {
+        return LibPower.getTotalCurrentPower();
     }
 
-    /// @notice Returns the total collateral held by all validators.
-    function getTotalCollateral() external view returns (uint256) {
-        return LibStaking.getTotalCollateral();
-    }
 
     /// @notice Returns the total collateral amount for a specific validator.
     /// @param validator The address of the validator for which collateral is queried.
     function getTotalValidatorCollateral(address validator) external view returns (uint256) {
-        return LibStaking.totalValidatorCollateral(validator);
+        return LibPower.totalValidatorCollateral(validator);
     }
 
     /// @notice Checks if the validator address is in an active state.
     /// @param validator The address of the checked validator
-    function getPower(address validator) external view returns (uint256) {
-        return LibStaking.getPower(validator);
+    function getCurrentPower(address validator) external view returns (uint256) {
+        return LibPower.getCurrentPower(validator);
     }
 
     /// @notice Checks if the validator address is an active validator
     function isActiveValidator(address validator) external view returns (bool) {
-        return LibStaking.isActiveValidator(validator);
+        return LibPower.isActiveValidator(validator);
     }
 
     /// @notice Checks if the validator is in a waiting state.
     /// @param validator The address of the checked validator.
     function isWaitingValidator(address validator) external view returns (bool) {
-        return LibStaking.isWaitingValidator(validator);
+        return LibPower.isWaitingValidator(validator);
     }
 
     /// @notice returns the committed bottom-up checkpoint at specific epoch.

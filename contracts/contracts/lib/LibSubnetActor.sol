@@ -8,7 +8,7 @@ import {IGateway} from "../interfaces/IGateway.sol";
 import {IValidatorGater} from "../interfaces/IValidatorGater.sol";
 import {Validator, ValidatorSet, PermissionMode, SubnetID, Asset} from "../structs/Subnet.sol";
 import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
-import {LibValidatorSet, LibStaking} from "../lib/LibStaking.sol";
+import {LibValidatorSet, LibPower} from "../lib/LibPower.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {LibSubnetActorStorage, SubnetActorStorage} from "./LibSubnetActorStorage.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
@@ -70,7 +70,7 @@ library LibSubnetActor {
         uint256 length = validators.length;
 
         for (uint256 i; i < length; ) {
-            uint256 oldPower = LibStaking.getPower(validators[i]);
+            uint256 oldPower = LibPower.getCurrentPower(validators[i]);
             gater.interceptPowerDelta(subnet, validators[i], oldPower, newPowers[i]);
 
             unchecked {
@@ -84,15 +84,15 @@ library LibSubnetActor {
     function bootstrapSubnetIfNeeded() internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
 
-        uint256 totalCollateral = LibStaking.getTotalConfirmedCollateral();
+        uint256 nextPower = LibPower.getTotalCurrentPower();
 
-        if (totalCollateral >= s.minActivationCollateral) {
-            if (LibStaking.totalActiveValidators() >= s.minValidators) {
+        if (nextPower >= s.minActivationCollateral) {
+            if (LibPower.totalActiveValidators() >= s.minValidators) {
                 s.bootstrapped = true;
                 emit SubnetBootstrapped(s.genesisValidators);
 
                 // register adding the genesis circulating supply (if it exists)
-                registerInGateway(totalCollateral);
+                registerInGateway(nextPower);
             }
         }
     }
@@ -135,12 +135,12 @@ library LibSubnetActor {
 
             // performing deduplication
             // validator should have no power when first added
-            if (LibStaking.getPower(validators[i]) > 0) {
+            if (LibPower.getCurrentPower(validators[i]) > 0) {
                 revert DuplicatedGenesisValidator();
             }
 
-            LibStaking.setMetadataWithConfirm(validators[i], publicKeys[i]);
-            LibStaking.setFederatedPowerWithConfirm(validators[i], powers[i]);
+            LibPower.setMetadataWithConfirm(validators[i], publicKeys[i]);
+            LibPower.setPowerWithConfirm(validators[i], powers[i]);
 
             s.genesisValidators.push(Validator({addr: validators[i], weight: powers[i], metadata: publicKeys[i]}));
 
@@ -191,7 +191,7 @@ library LibSubnetActor {
 
             // no need to do deduplication as set directly set the power, there wont be any addition of
             // federated power.
-            LibStaking.setFederatedPower({validator: validators[i], metadata: publicKeys[i], amount: powers[i]});
+            LibPower.setFederatedPower({validator: validators[i], metadata: publicKeys[i], newPower: powers[i]});
 
             unchecked {
                 ++i;
