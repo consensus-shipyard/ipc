@@ -1,9 +1,11 @@
-use crate::fvm::{FvmApplyRet, FvmMessage};
+use crate::fvm::FvmMessage;
+use cid::Cid;
 use fvm::executor::ApplyRet;
 use fvm_shared::{address::Address, error::ExitCode};
 use fvm_shared::{ActorID, MethodNum, BLOCK_GAS_LIMIT};
 
 use fendermint_actors_api::gas_market::Reading;
+use fendermint_vm_message::query::{ActorState, GasEstimate, StateParams};
 use fvm_shared::event::StampedEvent;
 use std::collections::HashMap;
 
@@ -67,6 +69,27 @@ pub struct EndBlockResponse {
     pub gas_market: Reading,
     /// The end block events to be recorded
     pub events: BlockEndEvents,
+}
+
+/// Close to what the ABCI sends: (Path, Bytes).
+pub struct Query {
+    pub path: String,
+    pub params: Vec<u8>,
+}
+
+pub enum QueryResponse {
+    /// Bytes from the IPLD store result, if found.
+    Ipld(Option<Vec<u8>>),
+    /// The full state of an actor, if found.
+    ActorState(Option<Box<(ActorID, ActorState)>>),
+    /// The results of a read-only message application.
+    Call(Box<ApplyResponse>),
+    /// The estimated gas limit.
+    EstimateGas(GasEstimate),
+    /// Current state parameters.
+    StateParams(StateParams),
+    /// Builtin actors known by the system.
+    BuiltinActors(Vec<(String, Cid)>),
 }
 
 /// Decision to accept or reject a batch of messages for process method.

@@ -30,6 +30,12 @@ pub enum ChainMessage {
     Ipc(IpcMessage),
 }
 
+impl From<SignedMessage> for ChainMessage {
+    fn from(msg: SignedMessage) -> Self {
+        ChainMessage::Signed(msg)
+    }
+}
+
 #[cfg(feature = "arb")]
 mod arb {
 
