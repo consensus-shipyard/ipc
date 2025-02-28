@@ -86,19 +86,12 @@ where
 
 #[cfg(test)]
 mod tests {
-
-    use fendermint_vm_interpreter::fvm::bundle::bundle_path;
     use futures::{AsyncRead, StreamExt};
     use fvm_ipld_blockstore::MemoryBlockstore;
     use fvm_ipld_car::{load_car, CarReader};
     use tokio_util::compat::TokioAsyncReadCompatExt;
 
     use super::BlockStreamer;
-
-    async fn bundle_file() -> tokio_util::compat::Compat<tokio::fs::File> {
-        let bundle_path = bundle_path();
-        tokio::fs::File::open(bundle_path).await.unwrap().compat()
-    }
 
     /// Check that a CAR file can be loaded from a byte reader.
     async fn check_load_car<R>(reader: R)
@@ -130,8 +123,7 @@ mod tests {
     /// Sanity check that the test bundle can be loaded with the normal facilities from a file.
     #[tokio::test]
     async fn load_bundle_from_file() {
-        let bundle_file = bundle_file().await;
-        check_load_car(bundle_file).await;
+        check_load_car(&mut fendermint_actors::CAR).await;
     }
 
     #[tokio::test]
