@@ -20,7 +20,7 @@ use crate::fvm::state::FvmExecState;
 use anyhow::{bail, Context};
 use fvm_ipld_blockstore::Blockstore;
 
-use crate::types::ApplyResponse;
+use crate::types::AppliedMessage;
 use ipc_api::cross::IpcEnvelope;
 
 use crate::fvm::state::ipc::tokens_to_mint;
@@ -124,7 +124,7 @@ where
         &self,
         mut state: &mut FvmExecState<DB>,
         finality: ParentFinality,
-    ) -> anyhow::Result<ApplyResponse> {
+    ) -> anyhow::Result<AppliedMessage> {
         if !self.provider.is_enabled() {
             bail!("cannot execute IPC top-down message: parent provider disabled");
         }
@@ -227,15 +227,7 @@ where
             "chain interpreter has set new"
         );
 
-        // TODO Karel - the execute function should return apply response instead
-        Ok(ApplyResponse {
-            apply_ret: ret.apply_ret,
-            from: ret.from,
-            to: ret.to,
-            method_num: ret.method_num,
-            gas_limit: ret.gas_limit,
-            emitters: ret.emitters,
-        })
+        Ok(ret)
     }
 
     /// Commit the parent finality. Returns the height that the previous parent finality is committed and
@@ -267,7 +259,7 @@ where
         &self,
         state: &mut FvmExecState<DB>,
         messages: Vec<IpcEnvelope>,
-    ) -> anyhow::Result<ApplyResponse> {
+    ) -> anyhow::Result<AppliedMessage> {
         let minted_tokens = tokens_to_mint(&messages);
         tracing::debug!(token = minted_tokens.to_string(), "tokens to mint in child");
 

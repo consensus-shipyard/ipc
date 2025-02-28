@@ -125,9 +125,9 @@ where
     }
 
     /// Check that the message is valid for inclusion in a mempool
-    pub async fn check_message(
+    pub fn check_message(
         &self,
-        state: Arc<FvmExecState<ReadOnlyBlockstore<DB>>>,
+        state: &FvmExecState<ReadOnlyBlockstore<DB>>,
         msg: Vec<u8>,
         is_recheck: bool,
     ) -> anyhow::Result<CheckResponse, CheckMessageError> {
@@ -287,8 +287,8 @@ where
 
     pub async fn begin_block(
         &self,
-        mut state: &mut FvmExecState<DB>,
-    ) -> anyhow::Result<ApplyResponse> {
+        mut state: FvmExecState<DB>,
+    ) -> anyhow::Result<(FvmExecState<DB>, AppliedMessage)> {
         // Block height (FVM epoch) as sequence is intentional
         let height = state.block_height() as u64;
 
@@ -310,7 +310,7 @@ where
                 .context("failed to push block data to chainmetadata")?;
         }
 
-        Ok(cron_apply_ret)
+        Ok((state, cron_apply_ret))
     }
 
     pub async fn end_block(
@@ -362,35 +362,65 @@ where
         &self,
         mut state: FvmExecState<DB>,
         msg: Vec<u8>,
-    ) -> anyhow::Result<ApplyResponse, ApplyMessageError> {
+    ) -> Result<(FvmExecState<DB>, ApplyMessageResponse), (FvmExecState<DB>, ApplyMessageError)>
+    {
+        // Try to decode the message.
         let chain_msg = match fvm_ipld_encoding::from_slice::<ChainMessage>(&msg) {
             Ok(msg) => msg,
             Err(e) => {
-                // If decoding fails, log a warning if we are configured to reject malformed proposals.
                 if self.reject_malformed_proposal {
                     tracing::warn!(
                         error = e.to_string(),
-                        "failed to decode delivered message as ChainMessage; This may indicate a node issue."
+                        "failed to decode delivered message as ChainMessage; this may indicate a node issue."
                     );
                 }
-
-                return Err(ApplyMessageError::InvalidMessage(e.to_string()));
+                // Return error along with the current state.
+                return Err((state, ApplyMessageError::InvalidMessage(e.to_string())));
             }
         };
 
         match chain_msg {
             ChainMessage::Signed(msg) => {
-                msg.verify(&state.chain_id())?;
-                let response = self.execute_signed_message(&mut state, msg).await?;
-                Ok(response)
+                if let Err(e) = msg.verify(&state.chain_id()) {
+                    return Err((state, ApplyMessageError::InvalidSignature(e)));
+                }
+
+                let domain_hash = match msg.domain_hash(&state.chain_id()) {
+                    Ok(hash) => hash,
+                    Err(e) => return Err((state, ApplyMessageError::Other(e.into()))),
+                };
+
+                let applied_message = match self.execute_signed_message(&mut state, msg).await {
+                    Ok(resp) => resp,
+                    Err(e) => return Err((state, ApplyMessageError::Other(e.into()))),
+                };
+
+                Ok((
+                    state,
+                    ApplyMessageResponse {
+                        applied_message,
+                        domain_hash,
+                    },
+                ))
             }
-            ChainMessage::Ipc(msg) => match msg {
+            ChainMessage::Ipc(ipc_msg) => match ipc_msg {
                 IpcMessage::TopDownExec(p) => {
-                    let response = self
+                    let applied_message = match self
                         .top_down_manager
                         .execute_topdown_msg(&mut state, p)
-                        .await?;
-                    Ok(response)
+                        .await
+                    {
+                        Ok(resp) => resp,
+                        Err(e) => return Err((state, ApplyMessageError::Other(e.into()))),
+                    };
+
+                    Ok((
+                        state,
+                        ApplyMessageResponse {
+                            applied_message,
+                            domain_hash: None,
+                        },
+                    ))
                 }
             },
         }
@@ -457,7 +487,7 @@ where
                     exit_code,
                 });
 
-                let response = ApplyResponse {
+                let response = AppliedMessage {
                     apply_ret,
                     from,
                     to,
@@ -521,7 +551,7 @@ where
         &self,
         state: &mut FvmExecState<DB>,
         msg: SignedMessage,
-    ) -> anyhow::Result<ApplyResponse> {
+    ) -> anyhow::Result<AppliedMessage> {
         let msg = msg.into_message();
 
         // Execute the message and measure execution time.
@@ -550,7 +580,7 @@ where
 
         let exit_code = apply_ret.msg_receipt.exit_code.value();
 
-        let response = ApplyResponse {
+        let response = AppliedMessage {
             apply_ret,
             from: msg.from,
             to: msg.to,

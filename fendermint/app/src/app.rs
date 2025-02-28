@@ -34,8 +34,9 @@ use fendermint_vm_interpreter::interpreter::{
     ApplyMessageError, CheckMessageError, MessagesInterpreter,
 };
 use fendermint_vm_interpreter::types::{
-    ApplyResponse, EndBlockResponse, ProcessMessageDecision, Query,
+    AppliedMessage, ApplyMessageResponse, EndBlockResponse, ProcessDecision, Query,
 };
+use fendermint_vm_message::signed::DomainHash;
 
 use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_snapshot::{SnapshotClient, SnapshotError};
@@ -197,7 +198,7 @@ where
             messages_interpreter: Arc::new(interpreter),
             snapshots,
             exec_state: Arc::new(tokio::sync::Mutex::new(None)),
-            check_state: Arc::new(tokio::sync::RwLock::new(None)),
+            check_state: Arc::new(tokio::sync::Mutex::new(None)),
             validators_cache: Arc::new(tokio::sync::Mutex::new(None)),
         };
         app.init_committed_state()?;
@@ -329,16 +330,20 @@ where
         guard.take().expect("exec state empty")
     }
 
-    /// Locks the execution state, applies the async closure to mutate it, and returns the result.
-    async fn modify_exec_state<T, F, Fut>(&self, f: F) -> Result<T>
+    /// Take the execution state, update it, put it back, return the output.
+    async fn modify_exec_state<T, F, R>(&self, f: F) -> Result<T>
     where
-        F: FnOnce(&mut FvmExecState<SS>) -> Fut,
-        Fut: Future<Output = Result<T>>,
+        F: FnOnce(FvmExecState<SS>) -> R,
+        R: Future<Output = Result<(FvmExecState<SS>, T)>>,
     {
         let mut guard = self.exec_state.lock().await;
-        let state = guard.as_mut().expect("exec state empty");
+        let state = guard.take().expect("exec state empty");
 
-        f(state).await
+        let (state, ret) = f(state).await?;
+
+        *guard = Some(state);
+
+        Ok(ret)
     }
 
     /// Get a read-only view from the current FVM execution state, optionally passing a new BlockContext.
@@ -449,32 +454,24 @@ where
             .get_validator(id)
     }
 
-    async fn get_check_state(&self) -> anyhow::Result<Arc<FvmExecState<ReadOnlyBlockstore<DB>>>> {
-        // Acquire the lock and check if the state is already available.
-        let mut guard = self.check_state.lock().await;
-        if let Some(state) = guard.as_ref() {
-            return Ok(state.clone());
+    /// Apply a message to via the interpreter and return the response.
+    // TODo Karel - explain why we have this.
+    async fn apply_message(
+        &self,
+        msg: Vec<u8>,
+    ) -> Result<(ApplyMessageResponse, Option<BlockHash>), ApplyMessageError> {
+        let state = self.take_exec_state().await;
+
+        match self.messages_interpreter.apply_message(state, msg).await {
+            Ok((new_state, response)) => {
+                self.put_exec_state(new_state).await;
+                Ok((response, new_state.block_hash()))
+            }
+            Err((new_state, err)) => {
+                self.put_exec_state(new_state).await;
+                Err(err)
+            }
         }
-
-        // Release the lock while doing the expensive new set state operation.
-        drop(guard);
-
-        // Prepare the new exec state.
-        let db = self.state_store_clone();
-        let committed = self.committed_state()?;
-        let new_state = FvmExecState::new(
-            ReadOnlyBlockstore::new(db),
-            self.multi_engine.as_ref(),
-            committed.block_height.try_into()?,
-            committed.state_params,
-        )
-        .context("error creating check state")?;
-        let arc_new_state = Arc::new(new_state);
-
-        // Set the new state.
-        let mut guard = self.check_state.lock().await;
-        *guard = Some(arc_new_state.clone());
-        Ok(arc_new_state)
     }
 }
 
@@ -618,19 +615,32 @@ where
 
     /// Check the given transaction before putting it into the local mempool.
     async fn check_tx(&self, request: request::CheckTx) -> AbciResult<response::CheckTx> {
-        let state = self
-            .get_check_state()
-            .await
-            .context("error getting check state")?;
+        let state = {
+            let mut guard = self.check_state.lock().await;
+            // If there’s already a state, take it; otherwise create one.
+            guard.take().unwrap_or_else(|| {
+                let db = self.state_store_clone();
+                let committed = self
+                    .committed_state()
+                    .expect("committed state must be available");
+                FvmExecState::new(
+                    ReadOnlyBlockstore::new(db),
+                    self.multi_engine.as_ref(),
+                    committed
+                        .block_height
+                        .try_into()
+                        .expect("valid block height"),
+                    committed.state_params,
+                )
+                .expect("error creating check state")
+            })
+        };
 
-        let result = self
-            .messages_interpreter
-            .check_message(
-                state,
-                request.tx.to_vec(),
-                request.kind == CheckTxKind::Recheck,
-            )
-            .await;
+        let result = self.messages_interpreter.check_message(
+            &state,
+            request.tx.to_vec(),
+            request.kind == CheckTxKind::Recheck,
+        );
 
         let mut mpool_received_trace = MpoolReceived::default();
 
@@ -684,13 +694,13 @@ where
             .read_only_view(Some(request.height.value()))?
             .ok_or_else(|| anyhow!("exec state should be present"))?;
 
-        let txs = self
+        let (txs, size) = self
             .messages_interpreter
             .prepare_messages_for_block(state, txs, request.max_tx_bytes.try_into().unwrap())
             .await
             .context("failed to prepare proposal")?;
 
-        let txs = txs.into_iter().map(bytes::Bytes::from).collect();
+        let txs: Vec<bytes::Bytes> = txs.into_iter().map(bytes::Bytes::from).collect();
 
         emit(BlockProposalSent {
             validator: &request.proposer_address,
@@ -726,7 +736,7 @@ where
             .await
             .context("failed to process proposal")?;
 
-        let accept = process_decision == ProcessMessageDecision::Accept;
+        let accept = process_decision == ProcessDecision::Accept;
 
         emit(BlockProposalReceived {
             height: request.height.value(),
@@ -807,36 +817,22 @@ where
     /// Apply a transaction to the application's state.
     async fn deliver_tx(&self, request: request::DeliverTx) -> AbciResult<response::DeliverTx> {
         let msg = request.tx.to_vec();
+        let result = self.apply_message(msg).await;
 
-        let response = {
-            // Acquire the execution state lock.
-            let mut guard = self.exec_state.lock().await;
-
-            // Apply the message and get the inner result.
-            let result = self
-                .messages_interpreter
-                .apply_message(&mut *guard, msg)
-                .await;
-
-            match result {
-                Ok(apply_response) => {
-                    // Get the block hash from the updated state.
-                    let block_hash = guard.block_hash();
-                    // Build and return the DeliverTx response.
-
-                    // TODO Karel - add domain_hash for signed message.
-                    to_deliver_tx(apply_response, None, block_hash)
-                }
-                Err(e) => match e {
-                    ApplyMessageError::InvalidSignature(e) => {
-                        invalid_deliver_tx(AppError::InvalidSignature, e.to_string())
-                    }
-                    ApplyMessageError::InvalidMessage(s) => {
-                        invalid_deliver_tx(AppError::InvalidEncoding, s)
-                    }
-                    Err(ApplyMessageError::Other(e)) => return Err(e.into()),
-                },
+        let response = match result {
+            Ok((apply_response, block_hash)) => {
+                // TODO Karel - the domain hash is on the response now so no need to pass it here
+                to_deliver_tx(apply_response, apply_response.domain_hash, block_hash)
             }
+            Err(e) => match e {
+                ApplyMessageError::InvalidSignature(e) => {
+                    invalid_deliver_tx(AppError::InvalidSignature, e.to_string())
+                }
+                ApplyMessageError::InvalidMessage(s) => {
+                    invalid_deliver_tx(AppError::InvalidEncoding, s)
+                }
+                ApplyMessageError::Other(e) => return Err(e.into())?,
+            },
         };
 
         if response.code != 0.into() {

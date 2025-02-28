@@ -1,5 +1,6 @@
 use crate::fvm::FvmMessage;
 use cid::Cid;
+use fendermint_vm_message::signed::DomainHash;
 use fvm::executor::ApplyRet;
 use fvm_shared::{address::Address, error::ExitCode};
 use fvm_shared::{ActorID, MethodNum, BLOCK_GAS_LIMIT};
@@ -50,11 +51,17 @@ pub type Emitters = HashMap<ActorID, Address>;
 pub type Event = (Vec<StampedEvent>, Emitters);
 pub type BlockEndEvents = Vec<Event>;
 
+pub struct ApplyMessageResponse {
+    pub applied_message: AppliedMessage,
+    pub domain_hash: Option<DomainHash>,
+}
+
+// TODO Karel - move this somewhere else? Since it is generic return type and not tight to apply_messages
 /// The return value extended with some things from the message that
 /// might not be available to the caller, because of the message lookups
 /// and transformations that happen along the way, e.g. where we need
 /// a field, we might just have a CID.
-pub struct ApplyResponse {
+pub struct AppliedMessage {
     pub apply_ret: ApplyRet,
     pub from: Address,
     pub to: Address,
@@ -83,7 +90,7 @@ pub enum QueryResponse {
     /// The full state of an actor, if found.
     ActorState(Option<Box<(ActorID, ActorState)>>),
     /// The results of a read-only message application.
-    Call(Box<ApplyResponse>),
+    Call(Box<AppliedMessage>),
     /// The estimated gas limit.
     EstimateGas(GasEstimate),
     /// Current state parameters.
