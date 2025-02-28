@@ -24,11 +24,11 @@ impl Bencher {
         self.start_time = Some(Instant::now());
     }
 
-    pub fn mempool(&mut self) {
+    pub fn record_mempool(&mut self) {
         self.set_latency("mempool".to_string());
     }
 
-    pub fn block_inclusion(&mut self, block_number: u64) {
+    pub fn record_block_inclusion(&mut self, block_number: u64) {
         self.set_latency("block_inclusion".to_string());
         self.block_inclusion = Some(block_number);
     }

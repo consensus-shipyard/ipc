@@ -114,7 +114,7 @@ async fn test_native_coin_transfer() -> Result<(), anyhow::Error> {
                     bail!("failed to get pending transaction: {e}")
                 }
             }
-            input.bencher.mempool();
+            input.bencher.record_mempool();
 
             let receipt = pending
                 .interval(Duration::from_millis(50))
@@ -126,7 +126,7 @@ async fn test_native_coin_transfer() -> Result<(), anyhow::Error> {
                 receipt.block_number, input.test_id
             );
             let block_number = receipt.block_number.unwrap().as_u64();
-            input.bencher.block_inclusion(block_number);
+            input.bencher.record_block_inclusion(block_number);
 
             Ok(TestOutput {
                 bencher: input.bencher,
@@ -235,7 +235,7 @@ async fn test_contract_deployment() -> Result<(), anyhow::Error> {
                     bail!("failed to get pending transaction: {e}")
                 }
             }
-            input.bencher.mempool();
+            input.bencher.record_mempool();
 
             let receipt = pending
                 .interval(Duration::from_millis(50))
@@ -251,7 +251,7 @@ async fn test_contract_deployment() -> Result<(), anyhow::Error> {
                 receipt.block_number, contract_address, input.test_id
             );
             let block_number = receipt.block_number.unwrap().as_u64();
-            input.bencher.block_inclusion(block_number);
+            input.bencher.record_block_inclusion(block_number);
 
             Ok(TestOutput {
                 bencher: input.bencher,
@@ -425,7 +425,7 @@ async fn test_contract_call() -> Result<(), anyhow::Error> {
                     bail!("failed to get pending transaction: {e}")
                 }
             }
-            input.bencher.mempool();
+            input.bencher.record_mempool();
 
             let receipt = pending
                 .interval(Duration::from_millis(50))
@@ -437,7 +437,7 @@ async fn test_contract_call() -> Result<(), anyhow::Error> {
                 receipt.block_number, input.test_id
             );
             let block_number = receipt.block_number.unwrap().as_u64();
-            input.bencher.block_inclusion(block_number);
+            input.bencher.record_block_inclusion(block_number);
 
             Ok(TestOutput {
                 bencher: input.bencher,
