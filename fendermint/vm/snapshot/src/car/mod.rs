@@ -5,9 +5,8 @@
 //! See https://ipld.io/specs/transport/car/carv1/
 
 use anyhow::{self, Context as AnyhowContext};
-use futures::{future, StreamExt};
-use std::{borrow::Cow, path::Path};
-use tokio_util::compat::TokioAsyncReadCompatExt;
+use futures::{future, io::Cursor, StreamExt};
+use std::path::Path;
 
 use fvm_ipld_car::{CarHeader, CarReader};
 
@@ -23,20 +22,25 @@ mod streamer;
 ///
 /// Returns the number of chunks created.
 pub async fn split<F>(
-    input_car: std::borrow::Cow<'static, [u8]>,
-    output_dir: &Path,
+    input_car: impl Into<std::borrow::Cow<'static, [u8]>>,
+    output_dir: &'_ Path,
     max_size: usize,
     file_name: F,
 ) -> anyhow::Result<usize>
 where
-    F: Fn(usize) -> String + Send + Sync + 'static,
+    F: Fn(usize) -> String,
+    F: Send + Sync + 'static,
 {
-    let reader: CarReader<_> = CarReader::new_unchecked(input_car.as_ref())
+    let input_car = input_car.into();
+    let output_dir = output_dir.to_path_buf();
+
+    let input_car = Cursor::new(input_car);
+    let reader: CarReader<_> = CarReader::new_unchecked(input_car)
         .await
         .context("failed to open CAR reader")?;
 
     // Create a Writer that opens new files when the maximum is reached.
-    let mut writer = ChunkWriter::new(output_dir.into(), max_size, file_name);
+    let mut writer = ChunkWriter::new(output_dir, max_size, file_name);
 
     let header = CarHeader::new(reader.header.roots.clone(), reader.header.version);
 
