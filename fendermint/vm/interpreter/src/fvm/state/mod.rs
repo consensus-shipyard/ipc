@@ -21,5 +21,4 @@ pub use query::FvmQueryState;
 use super::store::ReadOnlyBlockstore;
 
 /// We use full state even for checking, to support certain client scenarios.
-pub type CheckStateRef<DB> =
-    Arc<tokio::sync::Mutex<Option<Arc<FvmExecState<ReadOnlyBlockstore<DB>>>>>>;
+pub type CheckStateRef<DB> = Arc<tokio::sync::Mutex<Option<FvmExecState<ReadOnlyBlockstore<DB>>>>>;
