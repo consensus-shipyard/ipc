@@ -38,9 +38,14 @@ fn cmd(s: impl AsRef<str>) -> Vec<String> {
 /// Simplify access to the CWD
 ///
 /// TODO: Should be the cargo manifest directory!
-fn host_repo_root_dir(client: &DaggerConn) -> Directory {
+fn hrrd(client: &DaggerConn) -> Directory {
+    dir(client, ".")
+}
+
+// TODO: caching of dagger requires to _not_ use `.directory().directory()`-chaining
+fn dir(client: &DaggerConn, path: &str) -> Directory {
     client.host().directory_opts(
-        ".",
+        path,
         HostDirectoryOpts {
             exclude: Some(vec!["node_modules", "target"]),
             include: None,
@@ -82,18 +87,14 @@ fn with_caches(container: Container, client: &DaggerConn) -> Container {
 }
 
 /// Create a container definition which is able to compile the contracts
-fn define_contracts_container(
-    client: DaggerConn,
-    hrrd: Directory,
-    hccd: Directory,
-) -> Result<Container> {
+fn define_contracts_container(client: DaggerConn) -> Result<Container> {
     let compiled_contracts_dir = "/workdir/compiled_contracts";
 
     let container = with_caches(client
     .container().from("docker.io/library/node:latest")
     , &client)
-    .with_mounted_directory("/workdir", hrrd.clone())
-    .with_mounted_directory(compiled_contracts_dir, hccd.clone())
+    .with_mounted_directory("/workdir", hrrd(&client))
+    .with_mounted_directory(compiled_contracts_dir, hccd(&client))
     .with_exec(cmd("apt-get update -y"))
     .with_exec(cmd("apt-get install -y curl which"))
     .with_workdir("/workdir/contracts")
@@ -112,14 +113,10 @@ fn define_contracts_container(
     Ok(container)
 }
 
-fn define_crates_container(
-    client: DaggerConn,
-    hrrd: Directory,
-    hccd: Directory,
-) -> Result<Container> {
+fn define_crates_container(client: DaggerConn) -> Result<Container> {
     let container = with_caches(client.container().from("docker.io/rust:bookworm"), &client)
-        .with_mounted_directory("/workdir", hrrd.clone())
-        .with_mounted_directory("/workdir/_compiled_contracts", hccd)
+        .with_mounted_directory("/workdir", hrrd(&client))
+        .with_mounted_directory("/workdir/_compiled_contracts", hccd(&client))
         .with_workdir("/workdir")
         .with_exec(cmd("apt-get update"))
         .with_exec(cmd(
@@ -134,15 +131,20 @@ fn define_crates_container(
     Ok(container)
 }
 
+fn hccd(client: &DaggerConn) -> Directory {
+    dir(client, "fendermint/actors/output")
+}
+
 async fn prepare_fendermint_two_stage_build(client: DaggerConn) -> Result<Container> {
     fs::create_dir_all("_compiled_contracts")?;
-    let hrrd = host_repo_root_dir(&client);
-    let hccd = hrrd.directory("fendermint/actors/output");
 
-    let contracts_gen = define_contracts_container(client.clone(), hrrd.clone(), hccd.clone())?;
+    let contracts_out = dir(&client, "./contracts/out");
+    let node_app_config = dir(&client, "./fendermint/app/config");
+
+    let contracts_gen = define_contracts_container(client.clone())?;
     run(&contracts_gen).await?;
 
-    let crates_def = define_crates_container(client.clone(), hrrd.clone(), hccd.clone())?;
+    let crates_def = define_crates_container(client.clone())?;
     run(&crates_def).await?;
 
     let f_fendermint = crates_def.file("/workdir/target/debug/fendermint");
@@ -185,13 +187,13 @@ async fn prepare_fendermint_two_stage_build(client: DaggerConn) -> Result<Contai
         .with_env_variable("FM_METRICS__LISTEN__HOST", "0.0.0.0")        
         .with_exec(cmd("mkdir -p /fendermint/logs"))
         .with_exec(cmd("chmod 777 /fendermint/logs"))
-        .with_file("/usr/local/bin/docker-entry.sh", hrrd.file("fendermint/docker/docker-entry.sh"))
+        .with_file("/usr/local/bin/docker-entry.sh", hrrd(&client).file("fendermint/docker/docker-entry.sh"))
         .with_file("/fendermint/custom_actors_bundle.car", car_extra)
         // TODO FIXME - this is insane
         .with_exec(cmd("mkdir -p /fendermint/builtin-actors/output"))
         .with_exec_opts(cmd("curl -L -o /fendermint/builtin-actors/output/bundle.car https://github.com/filecoin-project/builtin-actors/releases/download/${BUILTIN_ACTORS_TAG}/builtin-actors-mainnet.car"), ContainerWithExecOptsBuilder::default().expand(true).build()?)
-        .with_directory("/fendermint/contracts", hrrd.directory("contracts/out"))
-        .with_directory_opts("/fendermint/config", hrrd.directory("fendermint/app/config"), ContainerWithDirectoryOptsBuilder::default().exclude(vec![".git", ".gitignore", ".*"]).build()?);
+        .with_directory("/fendermint/contracts", contracts_out)
+        .with_directory_opts("/fendermint/config", node_app_config, ContainerWithDirectoryOptsBuilder::default().exclude(vec![".git", ".gitignore", ".*"]).build()?);
 
     run(&runner).await?;
 
