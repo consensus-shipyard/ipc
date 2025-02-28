@@ -3686,7 +3686,6 @@ dependencies = [
  "fendermint_vm_message",
  "fendermint_vm_resolver",
  "fendermint_vm_topdown",
- "fs-err",
  "futures-core",
  "futures-util",
  "fvm",
@@ -3770,11 +3769,13 @@ dependencies = [
 name = "fendermint_vm_snapshot"
 version = "0.1.0"
 dependencies = [
+ "actors-builtin-car",
  "anyhow",
  "arbitrary",
  "async-stm",
  "cid",
  "dircpy",
+ "fendermint_actors",
  "fendermint_testing",
  "fendermint_vm_core",
  "fendermint_vm_genesis",
