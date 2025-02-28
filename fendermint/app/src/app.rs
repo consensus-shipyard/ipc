@@ -30,8 +30,12 @@ use fendermint_vm_interpreter::fvm::state::{
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
 use fendermint_vm_interpreter::genesis::{read_genesis_car, GenesisAppState};
 
-use fendermint_vm_interpreter::interpreter::{InterpreterError, MessagesInterpreter};
-use fendermint_vm_interpreter::types::{ApplyResponse, EndBlockResponse, Query};
+use fendermint_vm_interpreter::interpreter::{
+    ApplyMessageError, CheckMessageError, MessagesInterpreter,
+};
+use fendermint_vm_interpreter::types::{
+    ApplyResponse, EndBlockResponse, ProcessMessageDecision, Query,
+};
 
 use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_snapshot::{SnapshotClient, SnapshotError};
@@ -42,6 +46,7 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
 use ipc_observability::{emit, serde::HexEncodableBlockHash};
+use libp2p::futures::TryFutureExt;
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use tendermint::abci::request::CheckTxKind;
@@ -324,21 +329,16 @@ where
         guard.take().expect("exec state empty")
     }
 
-    /// Take the execution state, update it, put it back, return the output.
-    async fn modify_exec_state<T, F, R>(&self, f: F) -> Result<T>
+    /// Locks the execution state, applies the async closure to mutate it, and returns the result.
+    async fn modify_exec_state<T, F, Fut>(&self, f: F) -> Result<T>
     where
-        F: FnOnce(FvmExecState<SS>) -> R,
-        R: Future<Output = Result<(FvmExecState<SS>, T)>>,
+        F: FnOnce(&mut FvmExecState<SS>) -> Fut,
+        Fut: Future<Output = Result<T>>,
     {
         let mut guard = self.exec_state.lock().await;
-        let state = guard.take().expect("exec state empty");
+        let state = guard.as_mut().expect("exec state empty");
 
-        // NOTE: There is no need to save the `ChainEnv`; it's shared with other, meant for cloning.
-        let (state, ret) = f(state).await?;
-
-        *guard = Some(state);
-
-        Ok(ret)
+        f(state).await
     }
 
     /// Get a read-only view from the current FVM execution state, optionally passing a new BlockContext.
@@ -456,7 +456,7 @@ where
             return Ok(state.clone());
         }
 
-        // Release the lock while doing the expensive refresh.
+        // Release the lock while doing the expensive new set state operation.
         drop(guard);
 
         // Prepare the new exec state.
@@ -601,14 +601,14 @@ where
         )
         .context("error creating query state")?;
 
-        let qry = Query {
+        let query = Query {
             path: request.path,
             params: request.data.to_vec(),
         };
 
-        // TODO Karel - revisit the error handling. Should it ever ? or this handling below is fine?
-        let result = self.messages_interpreter.query(state, qry).await;
+        let result = self.messages_interpreter.query(state, query).await;
 
+        // TODO Karel - probably should not be InvalidEncoding here?
         let response = match result {
             Err(e) => invalid_query(AppError::InvalidEncoding, e.to_string()),
             Ok(result) => to_query(result, block_height)?,
@@ -636,17 +636,19 @@ where
 
         let response = match result {
             Err(e) => match e {
-                InterpreterError::IllegalMessage(s) => {
+                CheckMessageError::IllegalMessage(s) => {
                     invalid_check_tx(AppError::IllegalMessage, s)
                 }
-                InterpreterError::InvalidSignature(e) => {
+                CheckMessageError::InvalidSignature(e) => {
                     invalid_check_tx(AppError::InvalidSignature, e.to_string())
                 }
-                InterpreterError::InvalidMessage(s) => {
+                CheckMessageError::InvalidMessage(s) => {
                     invalid_check_tx(AppError::InvalidEncoding, s)
                 }
                 // TODO Karel - revisit the error handling. Should it ever return an error?
-                InterpreterError::Other(e) => return Err(e.context("error running check").into()),
+                CheckMessageError::Other(e) => {
+                    return Err(e.context("message check has failed").into())
+                }
             },
             Ok(response) => {
                 mpool_received_trace.message = Some(Message::from(&response.message));
@@ -684,14 +686,11 @@ where
 
         let txs = self
             .messages_interpreter
-            .prepare((self.chain_env.clone(), state), txs)
+            .prepare_messages_for_block(state, txs, request.max_tx_bytes.try_into().unwrap())
             .await
             .context("failed to prepare proposal")?;
 
         let txs = txs.into_iter().map(bytes::Bytes::from).collect();
-        // TODO: This seems leaky placed here, should be done in `interpreter`, that's where it's ipc
-        // TODO: aware, here might have filtered more important messages.
-        let (txs, size) = take_until_max_size(txs, request.max_tx_bytes.try_into().unwrap());
 
         emit(BlockProposalSent {
             validator: &request.proposer_address,
@@ -721,11 +720,13 @@ where
             .read_only_view(Some(request.height.value()))?
             .ok_or_else(|| anyhow!("exec state should be present"))?;
 
-        let accept = self
+        let process_decision = self
             .messages_interpreter
-            .process((self.chain_env.clone(), state), txs)
+            .attest_block_messages(state, txs)
             .await
             .context("failed to process proposal")?;
+
+        let accept = process_decision == ProcessMessageDecision::Accept;
 
         emit(BlockProposalReceived {
             height: request.height.value(),
@@ -796,7 +797,7 @@ where
         self.put_exec_state(state).await;
 
         let ret = self
-            .modify_exec_state(|s| self.messages_interpreter.begin(s))
+            .modify_exec_state(|s| self.messages_interpreter.begin_block(s))
             .await
             .context("begin failed")?;
 
@@ -806,26 +807,36 @@ where
     /// Apply a transaction to the application's state.
     async fn deliver_tx(&self, request: request::DeliverTx) -> AbciResult<response::DeliverTx> {
         let msg = request.tx.to_vec();
-        let (result, block_hash) = self
-            .modify_exec_state(|s| async {
-                let ((env, state), res) = self.messages_interpreter.deliver(s, msg).await?;
-                let block_hash = state.block_hash();
-                Ok(((env, state), (res, block_hash)))
-            })
-            .await
-            .context("deliver failed")?;
 
-        let response = match result {
-            Err(e) => invalid_deliver_tx(AppError::InvalidEncoding, e.description),
-            Ok(ret) => match ret {
-                ChainMessageApplyRet::Signed(Err(InvalidSignature(d))) => {
-                    invalid_deliver_tx(AppError::InvalidSignature, d)
+        let response = {
+            // Acquire the execution state lock.
+            let mut guard = self.exec_state.lock().await;
+
+            // Apply the message and get the inner result.
+            let result = self
+                .messages_interpreter
+                .apply_message(&mut *guard, msg)
+                .await;
+
+            match result {
+                Ok(apply_response) => {
+                    // Get the block hash from the updated state.
+                    let block_hash = guard.block_hash();
+                    // Build and return the DeliverTx response.
+
+                    // TODO Karel - add domain_hash for signed message.
+                    to_deliver_tx(apply_response, None, block_hash)
                 }
-                ChainMessageApplyRet::Signed(Ok(ret)) => {
-                    to_deliver_tx(ret.fvm, ret.domain_hash, block_hash)
-                }
-                ChainMessageApplyRet::Ipc(ret) => to_deliver_tx(ret, None, block_hash),
-            },
+                Err(e) => match e {
+                    ApplyMessageError::InvalidSignature(e) => {
+                        invalid_deliver_tx(AppError::InvalidSignature, e.to_string())
+                    }
+                    ApplyMessageError::InvalidMessage(s) => {
+                        invalid_deliver_tx(AppError::InvalidEncoding, s)
+                    }
+                    Err(ApplyMessageError::Other(e)) => return Err(e.into()),
+                },
+            }
         };
 
         if response.code != 0.into() {
@@ -849,7 +860,7 @@ where
             gas_market,
             events,
         } = self
-            .modify_exec_state(|s| self.messages_interpreter.end(s))
+            .modify_exec_state(|s| self.messages_interpreter.end_block(s))
             .await
             .context("end failed")?;
 
