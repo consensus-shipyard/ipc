@@ -241,7 +241,8 @@ where
         // They can be listed in the right order with e.g. `ls | sort -n`
         // Alternatively we could pad them with zeroes based on the original file size and the chunk size,
         // but this way it will be easier to return them based on a numeric index.
-        let chunks_count = car::split(&snapshot_path, &parts_path, self.chunk_size, |idx| {
+        let snapshot_bytes = fs::read(snapshot_path)?;
+        let chunks_count = car::split(snapshot_bytes, &parts_path, self.chunk_size, |idx| {
             format!("{idx}.part")
         })
         .await

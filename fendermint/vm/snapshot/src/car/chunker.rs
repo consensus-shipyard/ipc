@@ -47,7 +47,9 @@ pub struct ChunkWriter {
 impl ChunkWriter {
     pub fn new<F>(output_dir: PathBuf, max_size: usize, file_name: F) -> Self
     where
-        F: Fn(usize) -> String + Send + Sync + 'static,
+        F: Fn(usize) -> String,
+        F: Send + Sync,
+        F: 'static,
     {
         Self {
             output_dir,

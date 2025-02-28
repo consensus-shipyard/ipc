@@ -89,7 +89,6 @@ mod tests {
     use futures::{AsyncRead, StreamExt};
     use fvm_ipld_blockstore::MemoryBlockstore;
     use fvm_ipld_car::{load_car, CarReader};
-    use tokio_util::compat::TokioAsyncReadCompatExt;
 
     use super::BlockStreamer;
 
@@ -123,12 +122,13 @@ mod tests {
     /// Sanity check that the test bundle can be loaded with the normal facilities from a file.
     #[tokio::test]
     async fn load_bundle_from_file() {
-        check_load_car(&mut fendermint_actors::CAR).await;
+        let mut car_bundle = fendermint_actors::CAR;
+        check_load_car(&mut car_bundle).await;
     }
 
     #[tokio::test]
     async fn block_streamer_from_file() {
-        let bundle_file = bundle_file().await;
+        let bundle_file = fendermint_actors::CAR;
         check_block_streamer(bundle_file).await;
     }
 }
