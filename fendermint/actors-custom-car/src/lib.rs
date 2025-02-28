@@ -5,7 +5,7 @@ mod manifest;
 pub use manifest::Manifest;
 
 /// Included bytes for custom actor bundle, ~1.3M in size
-pub const CUSTOM_ACTORS: &[u8] = include_bytes!(concat!(
+pub const CAR: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../actors/output/",
     "custom_actors_bundle.car"

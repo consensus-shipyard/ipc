@@ -13,7 +13,7 @@ use fendermint_vm_interpreter::fvm::EndBlockOutput;
 use fendermint_vm_interpreter::genesis::{create_test_genesis_state, GenesisOutput};
 use fendermint_vm_interpreter::{
     fvm::{
-        bundle::{bundle_path, contracts_path, custom_actors_bundle_path},
+        bundle::contracts_path,
         state::{FvmExecState, FvmStateParams, FvmUpdatableParams},
         store::memory::MemoryBlockstore,
         FvmApplyRet, FvmMessage,
@@ -31,13 +31,11 @@ pub async fn create_test_exec_state(
     GenesisOutput,
     MemoryBlockstore,
 )> {
-    let bundle_path = bundle_path();
-    let custom_actors_bundle_path = custom_actors_bundle_path();
     let artifacts_path = contracts_path();
 
     let (state, out) = create_test_genesis_state(
-        bundle_path,
-        custom_actors_bundle_path,
+        actors_builtin_car::CAR,
+        fendermint_actors::CAR,
         artifacts_path,
         genesis,
     )

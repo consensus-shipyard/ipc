@@ -51,7 +51,6 @@ async fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::fs;
     use cid::Cid;
     use fendermint_rocksdb::{RocksDb, RocksDbConfig};
     use fvm::machine::Manifest;

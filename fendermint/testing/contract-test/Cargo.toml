@@ -35,6 +35,9 @@ fendermint_vm_interpreter = { path = "../../vm/interpreter", features = [
     "bundle", "test-util"
 ] }
 
+fendermint_actors = { path = "../../actors-custom-car"}
+actors-builtin-car = { path = "../../actors-builtin-car"}
+
 [dev-dependencies]
 arbitrary = { workspace = true }
 arbtest = { workspace = true }
