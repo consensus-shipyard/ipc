@@ -5,7 +5,7 @@ use anyhow::{anyhow, bail, Context};
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Power, Validator};
 use fendermint_vm_interpreter::fvm::state::{BlockHash, FvmStateParams};
-use fendermint_vm_interpreter::types::{ApplyResponse, CheckResponse, QueryResponse};
+use fendermint_vm_interpreter::types::{AppliedMessage, CheckResponse, QueryResponse};
 use fendermint_vm_message::signed::DomainHash;
 use fendermint_vm_snapshot::{SnapshotItem, SnapshotManifest};
 use fvm_shared::{address::Address, error::ExitCode, event::StampedEvent, ActorID};
@@ -63,7 +63,7 @@ pub fn invalid_query(err: AppError, description: String) -> response::Query {
 }
 
 pub fn to_deliver_tx(
-    ret: ApplyResponse,
+    ret: AppliedMessage,
     domain_hash: Option<DomainHash>,
     block_hash: Option<BlockHash>,
 ) -> response::DeliverTx {
@@ -143,7 +143,7 @@ pub fn to_check_tx(ret: CheckResponse, priority: i64) -> response::CheckTx {
 }
 
 /// Map the return values from cron operations.
-pub fn to_begin_block(ret: ApplyResponse) -> response::BeginBlock {
+pub fn to_begin_block(ret: AppliedMessage) -> response::BeginBlock {
     let events = to_events("event", ret.apply_ret.events, ret.emitters);
 
     response::BeginBlock { events }
