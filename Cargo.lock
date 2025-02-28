@@ -3292,6 +3292,7 @@ dependencies = [
 name = "fendermint_contract_test"
 version = "0.1.0"
 dependencies = [
+ "actors-builtin-car",
  "anyhow",
  "arbitrary",
  "arbtest",
@@ -3301,6 +3302,7 @@ dependencies = [
  "cid",
  "ethers",
  "fendermint_actor_gas_market_eip1559",
+ "fendermint_actors",
  "fendermint_actors_api",
  "fendermint_crypto",
  "fendermint_rpc",
