@@ -165,13 +165,13 @@ pub enum GenesisIpcCommands {
 
 #[derive(Args, Debug, Clone)]
 pub struct SealGenesisArgs {
-    /// The built in actors bundle path
+    /// The built in actors bundle path, override the builtin default
     #[arg(long, short)]
-    pub builtin_actors_path: PathBuf,
+    pub builtin_actors_path: Option<PathBuf>,
 
-    /// The custom actors bundle path
+    /// The custom actors bundle path, overrides the builtin default
     #[arg(long, short)]
-    pub custom_actors_path: PathBuf,
+    pub custom_actors_path: Option<PathBuf>,
 
     /// The solidity artifacts output path. If you are using ipc-monorepo, it should be the `out` folder
     /// of `make build`

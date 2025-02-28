@@ -307,9 +307,24 @@ fn set_ipc_gateway(genesis_file: &PathBuf, args: &GenesisIpcGatewayArgs) -> anyh
 async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> anyhow::Result<()> {
     let genesis_params = read_genesis(genesis_file)?;
 
+    fn actors_car_blob(
+        path: Option<&PathBuf>,
+        fallback: &'static [u8],
+    ) -> anyhow::Result<std::borrow::Cow<'static, [u8]>> {
+        let actors = path
+            .map(|p| fs_err::read(p))
+            .transpose()?
+            .map(std::borrow::Cow::Owned)
+            .unwrap_or_else(|| std::borrow::Cow::Borrowed(fallback));
+        Ok(actors)
+    }
+    let custom_actors = actors_car_blob(args.custom_actors_path.as_ref(), fendermint_actors::CAR)?;
+    let builtin_actors =
+        actors_car_blob(args.builtin_actors_path.as_ref(), actors_builtin_car::CAR)?;
+
     let builder = GenesisBuilder::new(
-        args.builtin_actors_path.clone(),
-        args.custom_actors_path.clone(),
+        builtin_actors.as_ref(),
+        custom_actors.as_ref(),
         args.artifacts_path.clone(),
         genesis_params,
     );

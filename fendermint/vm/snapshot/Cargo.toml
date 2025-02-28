@@ -41,12 +41,15 @@ fendermint_vm_interpreter = { path = "../interpreter" }
 fendermint_vm_core = { path = "../core", optional = true }
 fendermint_testing = { path = "../../testing", features = ["arb"], optional = true }
 
+
 [dev-dependencies]
 fvm = { workspace = true }
 fendermint_testing = { path = "../../testing", features = ["golden"] }
 fendermint_vm_interpreter = { path = "../interpreter", features = ["bundle", "test-util"] }
 fendermint_vm_genesis = { path = "../genesis", features = ["arb"] }
 fendermint_vm_snapshot = { path = ".", features = ["arb"] }
+fendermint_actors = { path = "../../actors-custom-car" }
+actors-builtin-car = { path = "../../actors-builtin-car" }
 
 [features]
 default = []
