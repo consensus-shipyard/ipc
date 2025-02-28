@@ -6,11 +6,16 @@ import {MaxPQ, LibMaxPQ} from "../../contracts/lib/priority/LibMaxPQ.sol";
 import {LibValidatorSet} from "../../contracts/lib/LibPower.sol";
 import {ValidatorSet} from "../../contracts/structs/Subnet.sol";
 
-library LibValidatorSetTest {
+library LibValidatorSetTestUtil {
     using LibValidatorSet for ValidatorSet;
 
     function confirmDeposit(ValidatorSet storage self, address validator, uint256 amount) internal {
         uint256 oldCollateral = self.getCurrentPower(validator);
         self.confirmPower(validator, oldCollateral + amount);
+    }
+
+    function confirmWithdraw(ValidatorSet storage self, address validator, uint256 amount) internal {
+        uint256 oldCollateral = self.getCurrentPower(validator);
+        self.confirmPower(validator, oldCollateral - amount);
     }
 }

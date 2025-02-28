@@ -11,7 +11,7 @@ import {InvalidCollateral, InvalidSubmissionPeriod, InvalidMajorityPercentage} f
 import {LibDiamond} from "./lib/LibDiamond.sol";
 import {LibGateway} from "./lib/LibGateway.sol";
 import {SubnetID} from "./structs/Subnet.sol";
-import {LibPower} from "./lib/LibPower.sol";
+import {LibPower, LibValidatorSet} from "./lib/LibPower.sol";
 import {BATCH_PERIOD, MAX_MSGS_PER_BATCH} from "./structs/CrossNet.sol";
 
 error FunctionNotFound(bytes4 _functionSelector);
@@ -77,6 +77,23 @@ contract GatewayDiamond {
         // set initial validators and update membership
         Membership memory initial = Membership({configurationNumber: 0, validators: params.genesisValidators});
         LibGateway.updateMembership(initial);
+
+        // Add genesis validators to the parent validators tracker.
+        uint256 vLength = params.genesisValidators.length;
+        for (uint256 i; i < vLength; ) {
+            address addr = params.genesisValidators[i].addr;
+
+            // LibValidatorSet setMetadata take a calldata as parameter, but metadata is "memory"
+            // directly setting the metadata instead
+            s.validatorsTracker.validators.validators[addr].metadata = params.genesisValidators[i].metadata;
+
+            uint256 amount = params.genesisValidators[i].weight;
+            LibValidatorSet.setPowerWithConfirm(s.validatorsTracker.validators, addr, amount);
+
+            unchecked {
+                ++i;
+            }
+        }
     }
 
     function _fallback() internal {

@@ -105,16 +105,6 @@ library LibValidatorSet {
     event ActiveValidatorLeft(address validator);
     event WaitingValidatorLeft(address validator);
 
-    /// @notice Get the total confirmed collateral of the validators.
-    function getTotalCurrentPower(ValidatorSet storage validators) internal view returns (uint256 collateral) {
-        collateral = validators.currentTotalPower;
-    }
-
-    /// @notice Get the total active validators.
-    function totalActiveValidators(ValidatorSet storage validators) internal view returns (uint16 total) {
-        total = validators.activeValidators.getSize();
-    }
-
     /// @notice Get the confirmed collateral of the validator.
     function getCurrentPower(
         ValidatorSet storage validators,
@@ -184,10 +174,6 @@ library LibValidatorSet {
         return self.activeValidators.contains(validator);
     }
 
-    function getNextPower(ValidatorSet storage validators, address validator) internal view returns(uint256) {
-        return validators.validators[validator].nextPower;
-    }
-
     /***********************************************************************
      * Internal helper functions, should not be called by external functions
      ***********************************************************************/
@@ -226,6 +212,12 @@ library LibValidatorSet {
         return newPower;
     }
 
+    /// @notice Set the validator federated power directly without queueing the request
+    function setPowerWithConfirm(ValidatorSet storage validators, address validator, uint256 power) internal {
+        setPower(validators, validator, power);
+        confirmPower(validators, validator, power);
+    }
+
     /// @notice Validator's power update was confirmed in the child subnet
     /// TODO: rename this to setPower and remove setPower when staking is shifted out of LibPower
     /// @return the old power of the validator
@@ -248,32 +240,6 @@ library LibValidatorSet {
         self.currentTotalPower = self.currentTotalPower + power - oldPower;
 
         return oldPower;
-    }
-
-    // TODO: remove this, currently only for tests
-    function confirmDeposit(ValidatorSet storage self, address validator, uint256 amount) internal {
-        uint256 newCollateral = self.validators[validator].currentPower + amount;
-        self.validators[validator].currentPower = newCollateral;
-
-        self.currentTotalPower += amount;
-
-        increaseReshuffle({self: self, maybeActive: validator, newPower: newCollateral});
-    }
-
-    // TODO: remove this, currently only for tests
-    function confirmWithdraw(ValidatorSet storage self, address validator, uint256 amount) internal {
-        uint256 newCollateral = self.validators[validator].currentPower - amount;
-        uint256 nextPower = self.validators[validator].nextPower;
-
-        if (newCollateral == 0 && nextPower == 0) {
-            delete self.validators[validator];
-        } else {
-            self.validators[validator].currentPower = newCollateral;
-        }
-
-        reduceReshuffle({self: self, validator: validator, newPower: newCollateral});
-
-        self.currentTotalPower -= amount;
     }
 
     /// @notice Reshuffles the active and waiting validators when an increase in power is confirmed
@@ -409,7 +375,7 @@ library LibPower {
     /// @notice Checks if the validator is an active validator
     function isActiveValidator(address validator) internal view returns (bool) {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        return s.validatorSet.activeValidators.contains(validator);
+        return s.validatorSet.isActiveValidator(validator);
     }
 
     /// @notice Checks if the validator is a waiting validator
@@ -430,7 +396,7 @@ library LibPower {
 
     function totalActiveValidators() internal view returns (uint16) {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        return s.validatorSet.totalActiveValidators();
+        return s.validatorSet.activeValidators.getSize();
     }
 
     /// @notice Gets the total number of validators, including active and waiting
@@ -453,7 +419,7 @@ library LibPower {
 
     function getTotalCurrentPower() internal view returns (uint256) {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        return s.validatorSet.getTotalCurrentPower();
+        return s.validatorSet.currentTotalPower;
     }
 
     /// @notice Gets the total collateral the validators has staked.
@@ -468,8 +434,7 @@ library LibPower {
     /// @notice Set the validator federated power directly without queueing the request
     function setPowerWithConfirm(address validator, uint256 power) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        s.validatorSet.setPower(validator, power);
-        s.validatorSet.confirmPower(validator, power);
+        s.validatorSet.setPowerWithConfirm(validator, power);
     }
 
     /// @notice Set the validator metadata directly without queueing the request
