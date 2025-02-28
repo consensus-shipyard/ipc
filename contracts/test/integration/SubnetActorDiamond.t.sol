@@ -176,14 +176,11 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         // ======== Step. Confirm join operation ======
         collateral += DEFAULT_MIN_VALIDATOR_STAKE;
         confirmChange(validator1, privKey1);
-        require(gatewayAddress.balance == collateral, "gw balance is incorrect after validator2 joining");
+        require(gatewayAddress.balance == collateral, "gw balance is incorrect after validator2 confirmed joining");
 
         v = saDiamond.getter().getValidator(validator2);
         require(v.nextPower == DEFAULT_MIN_VALIDATOR_STAKE, "unexpected total collateral after confirm join");
-        require(
-            v.currentPower == DEFAULT_MIN_VALIDATOR_STAKE,
-            "unexpected confirmed collateral after confirm join"
-        );
+        require(v.currentPower == DEFAULT_MIN_VALIDATOR_STAKE, "unexpected confirmed collateral after confirm join");
         require(saDiamond.getter().isActiveValidator(validator1), "not active validator1");
         require(!saDiamond.getter().isWaitingValidator(validator1), "waiting validator1");
         require(saDiamond.getter().isActiveValidator(validator2), "not active validator2");
@@ -192,10 +189,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         require(saDiamond.getter().getWaitingValidators().length == 0, "not 0 waiting validators");
 
         (nextConfigNum, startConfigNum) = saDiamond.getter().getConfigurationNumbers();
-        require(
-            nextConfigNum == LibPower.INITIAL_CONFIGURATION_NUMBER + 2,
-            "next config num not 3 after confirm join"
-        );
+        require(nextConfigNum == LibPower.INITIAL_CONFIGURATION_NUMBER + 2, "next config num not 3 after confirm join");
         require(
             startConfigNum == LibPower.INITIAL_CONFIGURATION_NUMBER + 2,
             "start config num not 3 after confirm join"
@@ -225,17 +219,11 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         v = saDiamond.getter().getValidator(validator1);
         require(v.nextPower == validator1Stake + stake, "unexpected total collateral after confirm stake");
-        require(
-            v.currentPower == validator1Stake + stake,
-            "unexpected confirmed collateral after confirm stake"
-        );
+        require(v.currentPower == validator1Stake + stake, "unexpected confirmed collateral after confirm stake");
 
         v = saDiamond.getter().getValidator(validator2);
         require(v.nextPower == DEFAULT_MIN_VALIDATOR_STAKE, "unexpected total collateral after confirm stake");
-        require(
-            v.currentPower == DEFAULT_MIN_VALIDATOR_STAKE,
-            "unexpected confirmed collateral after confirm stake"
-        );
+        require(v.currentPower == DEFAULT_MIN_VALIDATOR_STAKE, "unexpected confirmed collateral after confirm stake");
 
         (nextConfigNum, startConfigNum) = saDiamond.getter().getConfigurationNumbers();
         require(

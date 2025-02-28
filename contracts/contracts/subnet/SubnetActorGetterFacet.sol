@@ -143,7 +143,6 @@ contract SubnetActorGetterFacet {
         return LibPower.getTotalCurrentPower();
     }
 
-
     /// @notice Returns the total collateral amount for a specific validator.
     /// @param validator The address of the validator for which collateral is queried.
     function getTotalValidatorCollateral(address validator) external view returns (uint256) {

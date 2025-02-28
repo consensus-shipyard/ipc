@@ -30,13 +30,15 @@ const networkDefinition = (chainId: number, url: string) => ({
     saveDeployments: true,
 })
 
+const isDisableVIAIR = process.env.VIAIR_DISABLED === 'true'
+
 let config: HardhatUserConfig = {
     solidity: {
         compilers: [
             {
                 version: '0.8.23',
                 settings: {
-                    viaIR: true,
+                    viaIR: !isDisableVIAIR,
                     optimizer: {
                         enabled: true,
                         runs: 200,

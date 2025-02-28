@@ -228,17 +228,26 @@ library LibValidatorSet {
 
     /// @notice Validator's power update was confirmed in the child subnet
     /// TODO: rename this to setPower and remove setPower when staking is shifted out of LibPower
-    function confirmPower(ValidatorSet storage self, address validator, uint256 power) internal {
-        uint256 existingPower = self.validators[validator].currentPower;
+    /// @return the old power of the validator
+    function confirmPower(ValidatorSet storage self, address validator, uint256 power) internal returns(uint256) {
+        uint256 oldPower = self.validators[validator].currentPower;
         self.validators[validator].currentPower = power;
 
-        if (existingPower == power) {
-            return;
-        } else if (existingPower < power) {
+        if (oldPower == power) {
+            return oldPower;
+        } else if (oldPower < power) {
+            // oldPower < power, that mean validator power increased, should add (power - oldPower) to currentTotalPower
+            // which is self.currentTotalPower + (power - oldPower)
             increaseReshuffle({self: self, maybeActive: validator, newPower: power});
         } else {
+            // oldPower > power, that mean validator power dropped, should minus (oldPower - power)
+            // which is self.currentTotalPower - (oldPower - power)
             reduceReshuffle({self: self, validator: validator, newPower: power});
         }
+
+        self.currentTotalPower = self.currentTotalPower + power - oldPower;
+
+        return oldPower;
     }
 
     // TODO: remove this, currently only for tests
@@ -473,7 +482,7 @@ library LibPower {
     /// TODO: shift this logic to lib staking
     function depositWithConfirm(address validator, uint256 amount) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        
+
         uint256 newPower = s.validatorSet.increasePower(validator, amount);
         s.validatorSet.confirmPower(validator, newPower);
     }
@@ -523,6 +532,10 @@ library LibPower {
     }
 
     // =============== Other functions ================
+    function getConfigurationNumbers() internal view returns(uint64, uint64) {
+        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
+        return (s.changeSet.nextConfigurationNumber, s.changeSet.startConfigurationNumber);
+    }
 
     /// @notice Claim the released collateral
     function claimCollateral(address validator) internal returns(uint256 amount) {
@@ -531,59 +544,68 @@ library LibPower {
         emit CollateralClaimed(validator, amount);
     }
 
-    function getConfigurationNumbers() internal view returns(uint64, uint64) {
-        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        return (s.changeSet.nextConfigurationNumber, s.changeSet.startConfigurationNumber);
+    /// @notice Handles the release of collateral or new deposit of collateral
+    function handleCollateral(SubnetActorStorage storage s, address validator, uint256 oldCollateral, uint256 newCollateral) internal {
+        if (s.validatorSet.permissionMode != PermissionMode.Collateral) {
+            return;
+        }
+
+        if (oldCollateral == newCollateral) {
+            return;
+        }
+
+        if (oldCollateral > newCollateral) {
+            uint256 amount = oldCollateral - newCollateral;
+            s.releaseQueue.addNewRelease(validator, amount);
+            IGateway(s.ipcGatewayAddr).releaseStake(amount);
+        } else {
+            uint256 amount = newCollateral - oldCollateral;
+            address gateway = s.ipcGatewayAddr;
+
+            uint256 msgValue = s.collateralSource.makeAvailable(gateway, amount);
+            IGateway(gateway).addStake{value: msgValue}(amount);
+        }
     }
 
     /// @notice Confirm the changes in bottom up checkpoint submission, only call this in bottom up checkpoint execution.
     function confirmChange(uint64 configurationNumber) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        PowerChangeLog storage changeSet = s.changeSet;
 
-        if (configurationNumber >= changeSet.nextConfigurationNumber) {
+        if (configurationNumber >= s.changeSet.nextConfigurationNumber) {
             revert CannotConfirmFutureChanges();
-        } else if (configurationNumber < changeSet.startConfigurationNumber) {
+        } else if (configurationNumber < s.changeSet.startConfigurationNumber) {
             return;
         }
 
-        uint64 start = changeSet.startConfigurationNumber;
+        uint64 start = s.changeSet.startConfigurationNumber;
         for (uint64 i = start; i <= configurationNumber; ) {
-            PowerChange storage change = changeSet.getChange(i);
-            address validator = change.validator;
+            PowerChange storage change = s.changeSet.getChange(i);
 
             if (change.op == PowerOperation.SetMetadata) {
-                s.validatorSet.validators[validator].metadata = change.payload;
+                s.validatorSet.validators[change.validator].metadata = change.payload;
             } else if (change.op == PowerOperation.SetPower) {
                 (uint256 power) = abi.decode(change.payload, (uint256));
-                s.validatorSet.confirmPower(validator, power);
+                address validator = change.validator;
+                uint256 oldPower = s.validatorSet.confirmPower(validator, power);
+
+                // TODO: Ideally lib power should not be aware of permission mode,
+                // TODO: but the current subnet actor design is putting both
+                // TODO: collateral and federated power update mode in one contract.
+                // TODO: Unless the permission modes are break into different facets,
+                // TODO: `handleCollateral` is needed.
+                handleCollateral(s, validator, oldPower, power);
+
             } else {
-                // uint256 amount = abi.decode(change.payload, (uint256));
-                // address gateway = s.ipcGatewayAddr;
-
-                // if (change.op == PowerOperation.Withdraw) {
-                //     s.validatorSet.confirmWithdraw(validator, amount);
-                //     s.releaseQueue.addNewRelease(validator, amount);
-                //     IGateway(gateway).releaseStake(amount);
-                // } else if (change.op == PowerOperation.Deposit)  {
-                //     s.validatorSet.confirmDeposit(validator, amount);
-                //     uint256 msgValue = s.collateralSource.makeAvailable(gateway, amount);
-                //     IGateway(gateway).addStake{value: msgValue}(amount);
-                // } else {
-                    
-                // }
-
-                revert("Unknown power operation");
+                revert("Power operation not supported");
             }
 
-            changeSet.purgeChange(i);
+            s.changeSet.purgeChange(i);
             unchecked {
                 ++i;
             }
         }
 
-        changeSet.startConfigurationNumber = configurationNumber + 1;
-
+        s.changeSet.startConfigurationNumber = configurationNumber + 1;
         emit ConfigurationNumberConfirmed(configurationNumber);
     }
 }
@@ -643,14 +665,7 @@ library LibValidatorTracking {
                 (uint256 power) = abi.decode(change.payload, (uint256));
                 self.validators.confirmPower(validator, power);
             } else {
-                // uint256 amount = abi.decode(change.payload, (uint256));
-
-                // if (change.op == PowerOperation.Withdraw) {
-                //     self.validators.confirmWithdraw(validator, amount);
-                // } else {
-                //     self.validators.confirmDeposit(validator, amount);
-                // }
-                revert("Unknown power operation");
+                revert("Power operation not supported");
             }
 
             self.changes.purgeChange(i);

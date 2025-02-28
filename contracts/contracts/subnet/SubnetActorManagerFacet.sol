@@ -178,7 +178,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
     }
 
     function _patchGenesisValidators(address validator) internal {
-// add to initial validators avoiding duplicates if it
+        // add to initial validators avoiding duplicates if it
         // is a genesis validator.
         bool alreadyValidator;
         uint256 length = s.genesisValidators.length;

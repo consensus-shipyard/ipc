@@ -6,6 +6,7 @@ import {MaxPQ, LibMaxPQ} from "../../contracts/lib/priority/LibMaxPQ.sol";
 import {MinPQ, LibMinPQ} from "../../contracts/lib/priority/LibMinPQ.sol";
 import {LibValidatorSet} from "../../contracts/lib/LibPower.sol";
 import {ValidatorSet} from "../../contracts/structs/Subnet.sol";
+import {LibValidatorSetTest} from "./LibValidatorSetTest.t.sol";
 
 contract LibValidatorSetTest is Test {
     using LibValidatorSet for ValidatorSet;

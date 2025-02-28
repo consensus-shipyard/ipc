@@ -73,6 +73,7 @@ contract GatewayDiamond {
         // The startConfiguration number is also 1 to match with nextConfigurationNumber, indicating we have
         // empty validator change logs
         s.validatorsTracker.changes.startConfigurationNumber = LibPower.INITIAL_CONFIGURATION_NUMBER;
+
         // set initial validators and update membership
         Membership memory initial = Membership({configurationNumber: 0, validators: params.genesisValidators});
         LibGateway.updateMembership(initial);

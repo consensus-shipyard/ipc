@@ -27,7 +27,7 @@ struct Subnet {
 enum PowerOperation {
     /// @dev Update the power to the new specified value
     SetPower,
-    /// @dev Update the metadata associated with the power 
+    /// @dev Update the metadata associated with the power
     SetMetadata
 }
 
@@ -80,7 +80,7 @@ struct StakingReleaseQueue {
 }
 
 /// @notice Keeping track of the validator information.
-/// @notice When a power change request is triggered, the effects are applied to next power and 
+/// @notice When a power change request is triggered, the effects are applied to next power and
 /// @notice after a complete topdown and bottom up cycle, it will be updated to current power which means
 /// @notice the child subnet as acknowledged this change.
 struct ValidatorInfo {

@@ -6,6 +6,7 @@ import {console} from "forge-std/console.sol";
 import {MaxPQ, LibMaxPQ} from "../../contracts/lib/priority/LibMaxPQ.sol";
 import {LibValidatorSet} from "../../contracts/lib/LibPower.sol";
 import {ValidatorSet} from "../../contracts/structs/Subnet.sol";
+import {LibValidatorSetTest} from "./LibValidatorSetTest.t.sol";
 
 contract LibMaxPQTest is Test {
     using LibValidatorSet for ValidatorSet;
