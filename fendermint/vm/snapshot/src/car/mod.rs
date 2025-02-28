@@ -6,7 +6,7 @@
 
 use anyhow::{self, Context as AnyhowContext};
 use futures::{future, StreamExt};
-use std::path::Path;
+use std::{borrow::Cow, path::Path};
 use tokio_util::compat::TokioAsyncReadCompatExt;
 
 use fvm_ipld_car::{CarHeader, CarReader};
@@ -23,7 +23,7 @@ mod streamer;
 ///
 /// Returns the number of chunks created.
 pub async fn split<F>(
-    input_file: &Path,
+    input_car: std::borrow::Cow<'static, [u8]>,
     output_dir: &Path,
     max_size: usize,
     file_name: F,
@@ -31,11 +31,7 @@ pub async fn split<F>(
 where
     F: Fn(usize) -> String + Send + Sync + 'static,
 {
-    let file = tokio::fs::File::open(input_file)
-        .await
-        .with_context(|| format!("failed to open CAR file: {}", input_file.to_string_lossy()))?;
-
-    let reader: CarReader<_> = CarReader::new_unchecked(file.compat())
+    let reader: CarReader<_> = CarReader::new_unchecked(input_car.as_ref())
         .await
         .context("failed to open CAR reader")?;
 
@@ -51,11 +47,7 @@ where
         Ok(b) => future::ready(Some(b)),
         Err(e) => {
             // TODO: It would be better to stop if there are errors.
-            tracing::warn!(
-                error = e.to_string(),
-                file = input_file.to_string_lossy().to_string(),
-                "CAR block failure"
-            );
+            tracing::warn!(error = e.to_string(), "CAR block failure");
             future::ready(None)
         }
     });
@@ -73,7 +65,6 @@ where
 mod tests {
     use fs_err as fs;
 
-    use fendermint_vm_interpreter::fvm::bundle::bundle_path;
     use tempfile::tempdir;
 
     use super::split;
@@ -81,14 +72,13 @@ mod tests {
     /// Load the actor bundle CAR file, split it into chunks, then restore and compare to the original.
     #[tokio::test]
     async fn split_bundle_car() {
-        let bundle_path = bundle_path();
-        let bundle_bytes = fs::read(&bundle_path).unwrap();
+        let bundle_bytes = fendermint_actors::CAR;
 
         let tmp = tempdir().unwrap();
         let target_count = 10;
         let max_size = bundle_bytes.len() / target_count;
 
-        let chunks_count = split(&bundle_path, tmp.path(), max_size, |idx| idx.to_string())
+        let chunks_count = split(bundle_bytes, tmp.path(), max_size, |idx| idx.to_string())
             .await
             .expect("failed to split CAR file");
 
