@@ -49,9 +49,20 @@ use fvm_shared::{
 use num_traits::Zero;
 
 #[derive(Error, Debug)]
-pub enum InterpreterError {
+pub enum CheckMessageError {
     #[error("illegal message: {0}")]
     IllegalMessage(String),
+    #[error("invalid message: {0}")]
+    InvalidMessage(String),
+    #[error("invalid signature")]
+    InvalidSignature(#[from] SignedMessageError),
+    #[error("other error: {0}")]
+    Other(#[from] anyhow::Error),
+}
+
+// TODO Karel - make this DRY. Maybe use macro?
+#[derive(Error, Debug)]
+pub enum ApplyMessageError {
     #[error("invalid message: {0}")]
     InvalidMessage(String),
     #[error("invalid signature")]
@@ -119,24 +130,25 @@ where
         state: Arc<FvmExecState<ReadOnlyBlockstore<DB>>>,
         msg: Vec<u8>,
         is_recheck: bool,
-    ) -> anyhow::Result<CheckResponse, InterpreterError> {
+    ) -> anyhow::Result<CheckResponse, CheckMessageError> {
         let verifiable_msg = ipld_decode_signed_message(&msg)?;
         let fvm_msg = verifiable_msg.message();
 
         // Check that the message is valid
         fvm_msg
             .check()
-            .map_err(|e| InterpreterError::InvalidMessage(e.to_string()))?;
+            .map_err(|e| CheckMessageError::InvalidMessage(e.to_string()))?;
 
         // For recheck, we don't need to check the signature or the nonce and balance
         if is_recheck {
             return Ok(CheckResponse::new_ok(&fvm_msg));
         }
 
+        // Check nonce and balance
+        let check_ret = check_nonce_and_sufficient_balance(&state, &fvm_msg)?;
+
         // Check that the signature is valid
         verifiable_msg.verify(&state.chain_id())?;
-
-        let check_ret = check_nonce_and_sufficient_balance(&state, &fvm_msg)?;
 
         tracing::info!(
             exit_code = check_ret.exit_code.value(),
@@ -152,7 +164,7 @@ where
     }
 
     /// Prepare messages for inclusion in a block
-    pub async fn prepare_messages(
+    pub async fn prepare_messages_for_block(
         &self,
         state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
         msgs: Vec<Vec<u8>>,
@@ -217,7 +229,7 @@ where
     }
 
     /// Process messages prepared messages to check they can be included in a block
-    pub async fn process_messages(
+    pub async fn attest_block_messages(
         &self,
         state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
         msgs: Vec<Vec<u8>>,
@@ -228,7 +240,7 @@ where
                 block_msgs = msgs.len(),
                 "rejecting block: too many messages"
             );
-            return Ok(ProcessDecision::Accept);
+            return Ok(ProcessDecision::Reject);
         }
 
         // Decode raw messages into ChainMessages.
@@ -275,29 +287,36 @@ where
 
     pub async fn begin_block(
         &self,
-        mut state: FvmExecState<DB>,
-    ) -> anyhow::Result<(FvmExecState<DB>, ApplyResponse)> {
+        mut state: &mut FvmExecState<DB>,
+    ) -> anyhow::Result<ApplyResponse> {
         // Block height (FVM epoch) as sequence is intentional
         let height = state.block_height() as u64;
 
         // Check for upgrades in the upgrade_scheduler
-        self.perform_upgrade_if_needed(&mut state)?;
+        tracing::debug!("trying to perform upgrade");
+        self.perform_upgrade_if_needed(&mut state)
+            .context("failed to perform upgrade")?;
 
         // Execute cron message in the cron actor
-        let cron_apply_ret = execute_cron_message(&mut state, height)?;
+        tracing::debug!("triggering cron event");
+        let cron_apply_ret =
+            execute_cron_message(&mut state, height).context("failed to trigger cron event")?;
 
         // Push the current block hash to the chainmetadata actor if possible
         if self.push_block_data_to_chainmeta_actor {
-            push_block_to_chainmeta_actor_if_possible(&mut state, height)?;
+            tracing::debug!("pushing block data to chainmetadata actor");
+
+            push_block_to_chainmeta_actor_if_possible(&mut state, height)
+                .context("failed to push block data to chainmetadata")?;
         }
 
-        Ok((state, cron_apply_ret))
+        Ok(cron_apply_ret)
     }
 
     pub async fn end_block(
         &self,
-        mut state: FvmExecState<DB>,
-    ) -> anyhow::Result<(FvmExecState<DB>, EndBlockResponse)> {
+        mut state: &mut FvmExecState<DB>,
+    ) -> anyhow::Result<EndBlockResponse> {
         // Record the block commitment if a block producer exists.
         if let Some(pubkey) = state.block_producer() {
             state.activity_tracker().record_block_committed(pubkey)?;
@@ -308,9 +327,8 @@ where
             .bottom_up_manager
             .create_checkpoint_if_needed(&mut state)?;
 
-        // Process the checkpoint outcome, casting signatures if applicable.
+        // Process the checkpoint outcome, cast signatures for incomplete checkpoints if applicable.
         let (power_updates, block_end_events) = if let Some(outcome) = checkpoint_outcome {
-            // Broadcast signatures asynchronously for validators.
             self.bottom_up_manager
                 .cast_validator_signatures_for_incomplete_checkpoints(
                     outcome.checkpoint,
@@ -332,20 +350,19 @@ where
                 .await;
         }
 
-        // Assemble and return the response.
         let response = EndBlockResponse {
             power_updates,
             gas_market: next_gas_market,
             events: block_end_events,
         };
-        Ok((state, response))
+        Ok(response)
     }
 
-    pub async fn deliver_message(
+    pub async fn apply_message(
         &self,
         mut state: FvmExecState<DB>,
         msg: Vec<u8>,
-    ) -> anyhow::Result<(FvmExecState<DB>, ApplyResponse)> {
+    ) -> anyhow::Result<ApplyResponse, ApplyMessageError> {
         let chain_msg = match fvm_ipld_encoding::from_slice::<ChainMessage>(&msg) {
             Ok(msg) => msg,
             Err(e) => {
@@ -357,17 +374,15 @@ where
                     );
                 }
 
-                return Err(InterpreterError::InvalidMessage(e.to_string()).into());
+                return Err(ApplyMessageError::InvalidMessage(e.to_string()));
             }
         };
 
         match chain_msg {
             ChainMessage::Signed(msg) => {
                 msg.verify(&state.chain_id())?;
-
                 let response = self.execute_signed_message(&mut state, msg).await?;
-
-                Ok((state, response))
+                Ok(response)
             }
             ChainMessage::Ipc(msg) => match msg {
                 IpcMessage::TopDownExec(p) => {
@@ -375,8 +390,7 @@ where
                         .top_down_manager
                         .execute_topdown_msg(&mut state, p)
                         .await?;
-
-                    Ok((state, response))
+                    Ok(response)
                 }
             },
         }
@@ -744,13 +758,13 @@ fn ipld_encode_message<T: serde::Serialize>(msg: T) -> anyhow::Result<Vec<u8>> {
 fn ipld_decode_signed_message(msg: &[u8]) -> anyhow::Result<SignedMessage> {
     // Decode the raw bytes into a ChainMessage.
     let chain_msg = fvm_ipld_encoding::from_slice::<ChainMessage>(msg).map_err(|e| {
-        InterpreterError::InvalidMessage(
+        CheckMessageError::InvalidMessage(
             "failed to IPLD decode message as ChainMessage".to_string(),
         )
     })?;
 
     match chain_msg {
         ChainMessage::Signed(msg) => Ok(msg),
-        other => Err(InterpreterError::IllegalMessage(format!("{:?}", other)).into()),
+        other => Err(CheckMessageError::IllegalMessage(format!("{:?}", other)).into()),
     }
 }

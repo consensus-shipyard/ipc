@@ -17,15 +17,14 @@ pub fn check_nonce_and_sufficient_balance<DB: Blockstore + Clone + 'static>(
     msg: &FvmMessage,
 ) -> anyhow::Result<CheckResponse> {
     // Look up the actor associated with the sender's address.
-    let actor = match lookup_actor(&state, &msg.from)? {
-        Some(actor) => actor,
-        None => {
-            return Ok(CheckResponse::new(
-                msg,
-                ExitCode::SYS_SENDER_STATE_INVALID,
-                None,
-            ))
-        }
+    let actor = if let Some(actor) = lookup_actor(&state, &msg.from)? {
+        actor
+    } else {
+        return Ok(CheckResponse::new(
+            msg,
+            ExitCode::SYS_SENDER_STATE_INVALID,
+            None,
+        ));
     };
 
     // Calculate the required balance.
@@ -65,14 +64,16 @@ fn lookup_actor<DB: Blockstore + Clone + 'static>(
 ) -> anyhow::Result<Option<ActorState>> {
     let state_tree = state.state_tree();
 
-    let id = match state_tree.lookup_id(address)? {
-        Some(id) => id,
-        None => return Ok(None),
+    let id = if let Some(id) = state_tree.lookup_id(address)? {
+        id
+    } else {
+        return Ok(None);
     };
 
-    let actor = match state_tree.get_actor(id)? {
-        Some(actor) => actor,
-        None => return Ok(None),
+    let actor = if let Some(actor) = state_tree.get_actor(id)? {
+        actor
+    } else {
+        return Ok(None);
     };
 
     Ok(Some(actor))
