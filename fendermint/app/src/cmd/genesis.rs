@@ -312,7 +312,7 @@ async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> anyhow:
         fallback: &'static [u8],
     ) -> anyhow::Result<std::borrow::Cow<'static, [u8]>> {
         let actors = path
-            .map(|p| fs_err::read(p))
+            .map(fs_err::read)
             .transpose()?
             .map(std::borrow::Cow::Owned)
             .unwrap_or_else(|| std::borrow::Cow::Borrowed(fallback));
