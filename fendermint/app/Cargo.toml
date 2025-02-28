@@ -13,6 +13,7 @@ async-trait = { workspace = true }
 bytes = { workspace = true }
 cid = { workspace = true }
 hex = { workspace = true }
+fs-err = { workspace = true }
 k256 = { workspace = true }
 lazy_static = { workspace = true }
 libipld = { workspace = true }
@@ -71,7 +72,6 @@ actors-builtin-car =  { path = "../actors-builtin-car"}
 fendermint_actors = { path = "../actors-custom-car"}
 
 
-fs-err = { workspace = true }
 fvm = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
 fvm_ipld_car = { workspace = true }

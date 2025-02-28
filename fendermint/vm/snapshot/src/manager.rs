@@ -317,7 +317,7 @@ mod tests {
     use async_stm::{atomically, retry};
     use fendermint_vm_genesis::Genesis;
     use fendermint_vm_interpreter::fvm::{
-        bundle::{bundle_path, contracts_path, custom_actors_bundle_path},
+        bundle::contracts_path,
         state::{snapshot::Snapshot, FvmStateParams},
         store::memory::MemoryBlockstore,
     };
@@ -445,8 +445,8 @@ mod tests {
         let genesis = Genesis::arbitrary(&mut g);
 
         let (state, out) = create_test_genesis_state(
-            bundle_path(),
-            custom_actors_bundle_path(),
+            actors_builtin_car::CAR,
+            fendermint_actors::CAR,
             contracts_path(),
             genesis,
         )
