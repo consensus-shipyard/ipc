@@ -111,16 +111,17 @@ where
     where
         F: FnOnce(&mut FvmExecState<ReadOnlyBlockstore<DB>>) -> anyhow::Result<T>,
     {
-        if self.pending {
-            // XXX: This will block all `check_tx` from going through and also all other queries.
-            let mut guard = self.check_state.lock().await;
+        // TODO Karel - revisit this pending, Is it needed? If yes, for what?
+        // if self.pending {
+        //     // XXX: This will block all `check_tx` from going through and also all other queries.
+        //     let mut guard = self.check_state.lock().await;
 
-            if let Some(ref mut exec_state) = *guard {
-                let res = self.with_revert(exec_state, f);
-                drop(guard);
-                return res.map(|r| (self, r));
-            }
-        }
+        //     if let Some(ref mut exec_state) = *guard {
+        //         let res = self.with_revert(exec_state, f);
+        //         drop(guard);
+        //         return res.map(|r| (self, r));
+        //     }
+        // }
 
         // Not using pending, or there is no pending state.
         let mut cache = self.exec_state.borrow_mut();
