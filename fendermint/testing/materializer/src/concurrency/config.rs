@@ -15,8 +15,12 @@ impl Execution {
             .with_timeout(Duration::from_secs(10))
             .add_step(1, 5)
             .add_step(10, 5)
+            .add_step(50, 5)
             .add_step(100, 5)
-            .add_step(150, 5)
+            .add_step(200, 5)
+            .add_step(300, 5)
+            .add_step(400, 5)
+            .add_step(500, 5)
     }
 
     pub fn add_step(mut self, max_concurrency: usize, secs: u64) -> Self {
