@@ -7,17 +7,12 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 
+#[derive(Default)]
 pub struct NonceManager {
     nonces: Arc<RwLock<HashMap<H160, Arc<Mutex<U256>>>>>,
 }
 
 impl NonceManager {
-    pub fn new() -> Self {
-        NonceManager {
-            nonces: Arc::new(RwLock::new(HashMap::new())),
-        }
-    }
-
     pub async fn get_and_increment(&self, addr: H160) -> U256 {
         if let Some(nonce_lock) = self.nonces.read().await.get(&addr) {
             let mut nonce = nonce_lock.lock().await;

@@ -64,7 +64,7 @@ async fn test_native_coin_transfer() -> Result<(), anyhow::Error> {
     let cfg = Execution::new_baseline();
     let testnet = Arc::new(testnet);
     let testnet_clone = testnet.clone();
-    let nonce_manager = Arc::new(NonceManager::new());
+    let nonce_manager = Arc::new(NonceManager::default());
 
     let results = concurrency::execute(cfg.clone(), move |mut input| {
         let testnet = testnet_clone.clone();
@@ -188,7 +188,7 @@ async fn test_contract_deployment() -> Result<(), anyhow::Error> {
     let cfg = Execution::new_baseline();
     let testnet = Arc::new(testnet);
     let testnet_clone = testnet.clone();
-    let nonce_manager = Arc::new(NonceManager::new());
+    let nonce_manager = Arc::new(NonceManager::default());
 
     let results = concurrency::execute(cfg.clone(), move |mut input| {
         let testnet = testnet_clone.clone();
@@ -288,7 +288,7 @@ async fn test_contract_call() -> Result<(), anyhow::Error> {
         .get_chainid()
         .await
         .context("failed to get chain ID")?;
-    let nonce_manager = Arc::new(NonceManager::new());
+    let nonce_manager = Arc::new(NonceManager::default());
 
     // Pre-test: deploy contract for each account.
     let contract_addresses = Arc::new(Mutex::new(HashMap::new()));
