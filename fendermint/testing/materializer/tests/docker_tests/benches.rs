@@ -66,7 +66,7 @@ async fn test_native_coin_transfer() -> Result<(), anyhow::Error> {
     let testnet_clone = testnet.clone();
     let nonce_manager = Arc::new(NonceManager::default());
 
-    let results = concurrency::execute(cfg.clone(), move |mut input| {
+    let results = concurrency::run_concurrent(cfg.clone(), move |mut input| {
         let testnet = testnet_clone.clone();
         let nonce_manager = nonce_manager.clone();
         let provider = provider.clone();
@@ -190,7 +190,7 @@ async fn test_contract_deployment() -> Result<(), anyhow::Error> {
     let testnet_clone = testnet.clone();
     let nonce_manager = Arc::new(NonceManager::default());
 
-    let results = concurrency::execute(cfg.clone(), move |mut input| {
+    let results = concurrency::run_concurrent(cfg.clone(), move |mut input| {
         let testnet = testnet_clone.clone();
         let nonce_manager = nonce_manager.clone();
         let provider = provider.clone();
@@ -379,7 +379,7 @@ async fn test_contract_call() -> Result<(), anyhow::Error> {
     let testnet_clone = testnet.clone();
     let contract_addresses = Arc::new(contract_addresses);
 
-    let results = concurrency::execute(cfg.clone(), move |mut input| {
+    let results = concurrency::run_concurrent(cfg.clone(), move |mut input| {
         let testnet = testnet_clone.clone();
         let contract_addresses = contract_addresses.clone();
         let nonce_manager = nonce_manager.clone();

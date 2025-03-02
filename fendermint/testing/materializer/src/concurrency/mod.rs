@@ -32,7 +32,7 @@ pub struct TestOutput {
     pub tx_hash: H256,
 }
 
-pub async fn execute<F, Fut>(cfg: config::Execution, test_factory: F) -> Vec<Vec<TestResult>>
+pub async fn run_concurrent<F, Fut>(cfg: config::Execution, test_factory: F) -> Vec<Vec<TestResult>>
 where
     F: Fn(TestInput) -> Fut,
     Fut: Future<Output = anyhow::Result<TestOutput>> + Send + 'static,
@@ -43,10 +43,8 @@ where
         let semaphore = Arc::new(Semaphore::new(step.max_concurrency));
         let mut tasks = FuturesUnordered::new();
         let execution_start = Instant::now();
-        loop {
-            if execution_start.elapsed() > step.duration {
-                break;
-            }
+
+        while execution_start.elapsed() < step.duration {
             let permit = semaphore.clone().acquire_owned().await.unwrap();
             let bencher = Bencher::new();
             let test_input = TestInput { test_id, bencher };
