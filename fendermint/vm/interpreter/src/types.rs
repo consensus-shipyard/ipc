@@ -1,19 +1,20 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
+
+use crate::fvm::bottomup::PowerUpdates;
 use crate::fvm::FvmMessage;
 use cid::Cid;
-use fendermint_vm_message::signed::DomainHash;
-use fvm::executor::ApplyRet;
-use fvm_shared::{address::Address, error::ExitCode};
-use fvm_shared::{ActorID, MethodNum, BLOCK_GAS_LIMIT};
-
 use fendermint_actors_api::gas_market::Reading;
 use fendermint_vm_message::query::{ActorState, GasEstimate, StateParams};
-use fvm_shared::event::StampedEvent;
+use fendermint_vm_message::signed::DomainHash;
+use fvm::executor::ApplyRet;
+use fvm_shared::{address::Address, error::ExitCode, event::StampedEvent, ActorID, MethodNum};
 use std::collections::HashMap;
 
-use crate::fvm::checkpoint::PowerUpdates;
-
-/// Transaction check results are expressed by the exit code, so that they would
-/// result in the same error code if they were applied.
+/// Response for checking a transaction.
+/// The check result is expressed by an exit code (and optional info) so that
+/// it would result in the same error code if the message were applied.
+#[derive(Debug, Clone)]
 pub struct CheckResponse {
     pub sender: Address,
     pub gas_limit: u64,
@@ -46,52 +47,74 @@ impl CheckResponse {
     }
 }
 
-pub type Emitters = HashMap<ActorID, Address>;
-
-pub type Event = (Vec<StampedEvent>, Emitters);
-pub type BlockEndEvents = Vec<Event>;
-
-pub struct ApplyMessageResponse {
-    pub applied_message: AppliedMessage,
-    pub domain_hash: Option<DomainHash>,
-}
-
-// TODO Karel - move this somewhere else? Since it is generic return type and not tight to apply_messages
-/// The return value extended with some things from the message that
-/// might not be available to the caller, because of the message lookups
-/// and transformations that happen along the way, e.g. where we need
-/// a field, we might just have a CID.
+/// Represents the result of applying a message.
+#[derive(Debug, Clone)]
 pub struct AppliedMessage {
     pub apply_ret: ApplyRet,
     pub from: Address,
     pub to: Address,
     pub method_num: MethodNum,
     pub gas_limit: u64,
-    /// Delegated addresses of event emitters, if they have one.
+    /// Delegated addresses of event emitters, if available.
     pub emitters: Emitters,
 }
 
+/// Response from applying a message.
+#[derive(Debug, Clone)]
+pub struct ApplyMessageResponse {
+    pub applied_message: AppliedMessage,
+    /// Domain-specific transaction hash for EVM compatibility.
+    pub domain_hash: Option<DomainHash>,
+}
+
+/// Response from beginning a block.
+#[derive(Debug, Clone)]
+pub struct BeginBlockResponse {
+    pub applied_cron_message: AppliedMessage,
+}
+
+/// Response from ending a block.
+#[derive(Debug, Clone)]
 pub struct EndBlockResponse {
     pub power_updates: PowerUpdates,
     pub gas_market: Reading,
-    /// The end block events to be recorded
+    /// End-block events to be recorded.
     pub events: BlockEndEvents,
 }
 
-/// Close to what the ABCI sends: (Path, Bytes).
+/// Response for preparing messages for a block.
+#[derive(Debug, Clone)]
+pub struct PrepareMessagesResponse {
+    pub messages: Vec<Vec<u8>>,
+    pub total_bytes: usize,
+}
+
+/// Decision for attesting a batch of messages.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AttestMessagesResponse {
+    /// The batch meets the criteria and should be accepted.
+    Accept,
+    /// The batch does not meet the criteria and should be rejected.
+    Reject,
+}
+
+/// Query request (similar to what ABCI sends: a path and parameters as bytes).
+#[derive(Debug, Clone)]
 pub struct Query {
     pub path: String,
     pub params: Vec<u8>,
 }
 
+/// Responses to queries.
+#[derive(Debug, Clone)]
 pub enum QueryResponse {
     /// Bytes from the IPLD store result, if found.
     Ipld(Option<Vec<u8>>),
-    /// The full state of an actor, if found.
+    /// Full state of an actor, if found.
     ActorState(Option<Box<(ActorID, ActorState)>>),
-    /// The results of a read-only message application.
+    /// The result of a read-only message application.
     Call(Box<AppliedMessage>),
-    /// The estimated gas limit.
+    /// Estimated gas limit.
     EstimateGas(GasEstimate),
     /// Current state parameters.
     StateParams(StateParams),
@@ -99,16 +122,11 @@ pub enum QueryResponse {
     BuiltinActors(Vec<(String, Cid)>),
 }
 
-/// Decision to accept or reject a batch of messages for process method.
-pub enum ProcessDecision {
-    /// The batch of messages meets the criteria and should be included in the block.
-    Accept,
-    /// The batch of messages does not meet the criteria and should be rejected.
-    Reject,
-}
+/// Mapping of actor IDs to addresses (for event emitters).
+pub type Emitters = HashMap<ActorID, Address>;
 
-// TODO Karel - handle this type in the check function instead
-// pub enum CheckDecision {
-//     Accept(FvmCheckRet),
-//     Reject,
-// }
+/// A block event, consisting of stamped events and their associated emitters.
+pub type Event = (Vec<StampedEvent>, Emitters);
+
+/// A collection of block events.
+pub type BlockEndEvents = Vec<Event>;

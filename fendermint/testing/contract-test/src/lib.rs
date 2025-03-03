@@ -11,6 +11,8 @@ use fendermint_crypto::PublicKey;
 use fendermint_vm_genesis::Genesis;
 use fendermint_vm_interpreter::fvm::EndBlockOutput;
 use fendermint_vm_interpreter::genesis::{create_test_genesis_state, GenesisOutput};
+use fendermint_vm_interpreter::genesis::{create_test_genesis_state, GenesisOutput};
+use fendermint_vm_interpreter::types::{ApplyMessageResponse, EndBlockResponse};
 use fendermint_vm_interpreter::{
     fvm::{
         bundle::contracts_path,
