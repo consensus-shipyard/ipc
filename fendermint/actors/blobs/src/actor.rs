@@ -489,10 +489,8 @@ impl BlobsActor {
     ) -> Result<Option<BlobStatus>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
         let subscriber = to_id_address(rt, params.subscriber, false)?;
-        let status =
-            rt.state::<State>()?
-                .get_blob_status(rt.store(), subscriber, params.hash, params.id);
-        Ok(status)
+        rt.state::<State>()?
+            .get_blob_status(rt.store(), subscriber, params.hash, params.id)
     }
 
     /// Returns a list of [`BlobRequest`]s that are currenlty in the [`BlobStatus::Added`] state.
@@ -1415,7 +1413,6 @@ mod tests {
             Method::AddBlob as u64,
             IpldBlock::serialize_cbor(&add_params).unwrap(),
         );
-        dbg!(result.clone().err());
         assert!(result.is_ok());
         rt.verify();
 

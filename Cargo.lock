@@ -3586,6 +3586,7 @@ dependencies = [
  "num-traits",
  "quickcheck",
  "quickcheck_macros",
+ "recall_ipld",
  "recall_sol_facade",
  "serde",
 ]

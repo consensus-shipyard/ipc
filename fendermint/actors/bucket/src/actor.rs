@@ -18,6 +18,7 @@ use fil_actors_runtime::{
     runtime::{ActorCode, Runtime},
     ActorError,
 };
+use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_hamt::BytesKey;
 use fvm_shared::address::Address;
 use recall_sol_facade::bucket::{object_added, object_deleted, object_metadata_updated};
@@ -159,7 +160,7 @@ impl Actor {
         let key = BytesKey(params.0);
         if let Some(object_state) = state.get(rt.store(), &key)? {
             if let Some(blob) = get_blob(rt, object_state.hash)? {
-                let object = build_object(&blob, &object_state, sub_id, owner)?;
+                let object = build_object(rt.store(), &blob, &object_state, sub_id, owner)?;
                 Ok(object)
             } else {
                 Ok(None)
@@ -279,7 +280,8 @@ fn get_blob_id(state: &State, key: &[u8]) -> anyhow::Result<SubscriptionId, Acto
 }
 
 /// Build an object from its state and blob.
-fn build_object(
+fn build_object<BS: Blockstore>(
+    store: &BS,
     blob: &Blob,
     object_state: &ObjectState,
     sub_id: SubscriptionId,
@@ -287,16 +289,14 @@ fn build_object(
 ) -> anyhow::Result<Option<Object>, ActorError> {
     match blob.status {
         BlobStatus::Resolved => {
-            let group = blob
-                .subscribers
-                .get(&subscriber.to_string())
-                .ok_or_else(|| {
-                    ActorError::illegal_state(format!(
-                        "owner {} is not subscribed to blob {}; this should not happen",
-                        subscriber, object_state.hash
-                    ))
-                })?;
-            let (expiry, _) = group.max_expiries(&sub_id, None);
+            let subscribers = blob.subscribers.hamt(store)?;
+            let group = subscribers.get(&subscriber)?.ok_or_else(|| {
+                ActorError::illegal_state(format!(
+                    "owner {} is not subscribed to blob {}; this should not happen",
+                    subscriber, object_state.hash
+                ))
+            })?;
+            let (expiry, _) = group.max_expiries(store, &sub_id, None)?;
             if let Some(expiry) = expiry {
                 Ok(Some(Object {
                     hash: object_state.hash,
@@ -401,12 +401,13 @@ mod tests {
             AddBlobParams, DeleteBlobParams, GetBlobParams, GetCreditApprovalParams,
             OverwriteBlobParams,
         },
-        state::{CreditApproval, Hash, Subscription, SubscriptionGroup},
+        state::{BlobSubscribers, CreditApproval, Hash, Subscription, SubscriptionGroup},
         Method as BlobMethod, BLOBS_ACTOR_ADDR,
     };
     use fendermint_actor_blobs_testing::{new_hash, new_pk, setup_logs};
     use fendermint_actor_machine::{events::to_actor_event, ConstructorParams, InitParams, Kind};
     use fil_actors_evm_shared::address::EthAddress;
+    use fil_actors_runtime::runtime::Runtime;
     use fil_actors_runtime::test_utils::{
         expect_empty, MockRuntime, ADM_ACTOR_CODE_ID, ETHACCOUNT_ACTOR_CODE_ID, INIT_ACTOR_CODE_ID,
     };
@@ -885,27 +886,40 @@ mod tests {
         .unwrap();
         rt.verify();
 
+        let store = rt.store();
+        let blob_subscribers = BlobSubscribers::new(store).unwrap();
+
+        let mut subscribers = blob_subscribers.hamt(store).unwrap();
+
         // Get the object
-        let blob = Blob {
+        let mut blob = Blob {
             size: add_params.size,
-            subscribers: HashMap::from([(
-                origin.to_string(),
-                SubscriptionGroup {
-                    subscriptions: HashMap::from([(
-                        sub_id.to_string(),
-                        Subscription {
-                            added: 0,
-                            expiry: ttl,
-                            source: add_params.source,
-                            delegate: Some(origin),
-                            failed: false,
-                        },
-                    )]),
-                },
-            )]),
+            subscribers: blob_subscribers,
             status: BlobStatus::Resolved,
             metadata_hash: add_params.recovery_hash,
         };
+
+        let mut group = SubscriptionGroup::new(store).unwrap();
+        let mut group_hamt = group.hamt(store).unwrap();
+
+        group.save_tracked(
+            group_hamt
+                .set_and_flush_tracked(
+                    &sub_id,
+                    Subscription {
+                        added: 0,
+                        expiry: ChainEpoch::from(3600),
+                        source: add_params.source,
+                        delegate: Some(origin),
+                        failed: false,
+                    },
+                )
+                .unwrap(),
+        );
+
+        blob.subscribers
+            .save_tracked(subscribers.set_and_flush_tracked(&origin, group).unwrap());
+
         rt.expect_validate_caller_any();
         rt.expect_send(
             BLOBS_ACTOR_ADDR,
@@ -1111,27 +1125,39 @@ mod tests {
         rt.verify();
 
         // Get the object and check metadata
+        let store = rt.store();
+        let blob_subscribers = BlobSubscribers::new(store).unwrap();
+        let mut subscribers = blob_subscribers.hamt(store).unwrap();
+
         let sub_id = get_blob_id(&state, &key).unwrap();
-        let blob = Blob {
+        let mut blob = Blob {
             size: add_params.size,
-            subscribers: HashMap::from([(
-                origin.to_string(),
-                SubscriptionGroup {
-                    subscriptions: HashMap::from([(
-                        sub_id.to_string(),
-                        Subscription {
-                            added: 0,
-                            expiry: ChainEpoch::from(3600),
-                            source: add_params.source,
-                            delegate: Some(origin),
-                            failed: false,
-                        },
-                    )]),
-                },
-            )]),
+            subscribers: blob_subscribers,
             status: BlobStatus::Resolved,
             metadata_hash: add_params.recovery_hash,
         };
+
+        let mut group = SubscriptionGroup::new(store).unwrap();
+        let mut group_hamt = group.hamt(store).unwrap();
+
+        group.save_tracked(
+            group_hamt
+                .set_and_flush_tracked(
+                    &sub_id,
+                    Subscription {
+                        added: 0,
+                        expiry: ChainEpoch::from(3600),
+                        source: add_params.source,
+                        delegate: Some(origin),
+                        failed: false,
+                    },
+                )
+                .unwrap(),
+        );
+
+        blob.subscribers
+            .save_tracked(subscribers.set_and_flush_tracked(&origin, group).unwrap());
+
         rt.expect_validate_caller_any();
         rt.expect_send(
             BLOBS_ACTOR_ADDR,

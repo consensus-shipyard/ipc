@@ -253,6 +253,10 @@ where
         Ok(())
     }
 
+    pub fn iter(&self) -> hamt::Iter<BS, V, hamt::BytesKey, Hasher> {
+        self.hamt.iter()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.hamt.is_empty()
     }
@@ -281,6 +285,16 @@ impl MapKey for Vec<u8> {
 
     fn to_bytes(&self) -> Result<Vec<u8>, String> {
         Ok(self.clone())
+    }
+}
+
+impl MapKey for String {
+    fn from_bytes(b: &[u8]) -> Result<Self, String> {
+        String::from_utf8(b.to_vec()).map_err(|e| e.to_string())
+    }
+
+    fn to_bytes(&self) -> Result<Vec<u8>, String> {
+        Ok(self.as_bytes().to_vec())
     }
 }
 

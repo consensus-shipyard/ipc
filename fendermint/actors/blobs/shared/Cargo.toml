@@ -14,7 +14,6 @@ crate-type = ["cdylib", "lib"]
 [dependencies]
 anyhow = { workspace = true }
 data-encoding = { workspace = true }
-fendermint_actor_machine = { path = "../../machine" }
 fil_actors_runtime = { workspace = true }
 frc42_dispatch = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
@@ -24,6 +23,7 @@ num-derive = { workspace = true }
 num-traits = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
+fendermint_actor_machine = { path = "../../machine" }
 recall_ipld = { path = "../../../../recall/ipld" }
 
 [features]

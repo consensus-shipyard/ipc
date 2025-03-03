@@ -7,5 +7,5 @@ mod core;
 pub mod map;
 
 pub use core::MapKey;
-pub use fvm_ipld_hamt::BytesKey;
+pub use fvm_ipld_hamt::{BytesKey, Error};
 pub use map::Root;
