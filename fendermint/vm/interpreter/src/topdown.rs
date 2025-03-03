@@ -41,6 +41,14 @@ impl<DB> TopDownManager<DB>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
+    pub fn new(provider: TopDownFinalityProvider, votes: VoteTally) -> Self {
+        Self {
+            provider,
+            votes,
+            gateway_caller: GatewayCaller::default(),
+        }
+    }
+
     pub async fn is_finality_valid(&self, finality: ParentFinality) -> bool {
         let prop = IPCParentFinality {
             height: finality.height as u64,

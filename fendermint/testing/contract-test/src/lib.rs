@@ -9,17 +9,14 @@ use std::{future::Future, sync::Arc};
 
 use fendermint_crypto::PublicKey;
 use fendermint_vm_genesis::Genesis;
-use fendermint_vm_interpreter::fvm::EndBlockOutput;
-use fendermint_vm_interpreter::genesis::{create_test_genesis_state, GenesisOutput};
-use fendermint_vm_interpreter::{
-    fvm::{
-        bundle::{bundle_path, contracts_path, custom_actors_bundle_path},
-        state::{FvmExecState, FvmStateParams, FvmUpdatableParams},
-        store::memory::MemoryBlockstore,
-        FvmApplyRet, FvmMessage,
-    },
-    ExecInterpreter,
+use fendermint_vm_interpreter::fvm::{
+    bundle::{bundle_path, contracts_path, custom_actors_bundle_path},
+    state::{FvmExecState, FvmStateParams, FvmUpdatableParams},
+    store::memory::MemoryBlockstore,
+    FvmMessage,
 };
+use fendermint_vm_interpreter::genesis::{create_test_genesis_state, GenesisOutput};
+use fendermint_vm_interpreter::types::{ApplyMessageResponse, EndBlockResponse};
 use fvm::engine::MultiEngine;
 
 pub mod ipc;
