@@ -41,8 +41,8 @@ members = [
   "fendermint/actors/activity-tracker",
   "fendermint/actors/eam",
   "fendermint/actors/gas_market/eip1559",
-  "dagger",
 ]
+exclude = ["dagger"]
 
 [workspace.package]
 authors = ["Protocol Labs"]

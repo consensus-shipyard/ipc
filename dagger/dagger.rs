@@ -47,58 +47,83 @@ fn dir(client: &DaggerConn, path: &str) -> Directory {
     client.host().directory_opts(
         path,
         HostDirectoryOpts {
-            exclude: Some(vec!["node_modules", "target"]),
+            exclude: Some(vec!["node_modules", "target", "dagger"]),
             include: None,
         },
     )
 }
 
-/// Register these caches as early as possible
-///
-/// The ordering matters.
-///
-/// TODO: `forge`/`solc` still recompiles all solidity contracts.
-fn with_caches(container: Container, client: &DaggerConn) -> Container {
-    let cache_volume_aptititude = client.cache_volume("apt-cache");
-    let cache_volume_var_cache = client.cache_volume("apt-lists");
-    let cache_volume_cargo = client.cache_volume("cargo");
-    let cache_volume_rustup = client.cache_volume("rustup");
-    let cache_volume_target = client.cache_volume("target");
-    let cache_volume_solidity = client.cache_volume("solidity");
-    let cache_volume_node_modules = client.cache_volume("node_modules");
-    let cache_volume_pnpm_store = client.cache_volume("pnpm");
-    let cache_volume_npm_store = client.cache_volume("npm");
+trait WithCache {
+    fn cache_node(self, client: &DaggerConn) -> Self;
+    fn cache_rust(self, client: &DaggerConn) -> Self;
+    fn cache_apt(self, client: &DaggerConn) -> Self;
+}
 
-    let container = container.with_mounted_cache("/root/.npm", cache_volume_npm_store.clone());
-    let container =
-        container.with_mounted_cache("/workdir/.pnpm-store", cache_volume_pnpm_store.clone());
-    let container =
-        container.with_mounted_cache("/workdir/node_modules", cache_volume_node_modules.clone());
-    let container = container.with_mounted_cache("/var/cache", cache_volume_var_cache.clone());
-    let container = container.with_mounted_cache("/var/lib/apt/", cache_volume_aptititude.clone());
-    let container = container.with_mounted_cache("/workdir/target", cache_volume_target.clone());
-    let container = container.with_mounted_cache(
-        "/workdir/_compiled_contracts",
-        cache_volume_solidity.clone(),
-    );
-    let container = container.with_mounted_cache("/root/.cargo", cache_volume_cargo.clone());
+impl WithCache for Container {
+    fn cache_node(mut self, client: &DaggerConn) -> Container {
+        let cache_volume_solidity = client.cache_volume("solidity");
+        let cache_volume_node_modules = client.cache_volume("node_modules");
+        let cache_volume_pnpm_store = client.cache_volume("pnpm");
+        let cache_volume_npm_store = client.cache_volume("npm");
 
-    container.with_mounted_cache("/root/.rustup", cache_volume_rustup.clone())
+        let container = self;
+        let container = container.with_mounted_cache("/root/.npm", cache_volume_npm_store.clone());
+        let container =
+            container.with_mounted_cache("/workdir/.pnpm-store", cache_volume_pnpm_store.clone());
+        let container = container
+            .with_mounted_cache("/workdir/node_modules", cache_volume_node_modules.clone());
+        let container = container.with_mounted_cache(
+            "/workdir/_compiled_contracts",
+            cache_volume_solidity.clone(),
+        );
+
+        container
+    }
+
+    fn cache_rust(mut self, client: &DaggerConn) -> Container {
+        let cache_volume_cargo = client.cache_volume("cargo");
+        let cache_volume_rustup = client.cache_volume("rustup");
+        let cache_volume_rustup_downloads = client.cache_volume("rustup_downloads");
+        let cache_volume_target = client.cache_volume("target");
+
+        let container = self;
+        let container =
+            container.with_mounted_cache("/workdir/target", cache_volume_target.clone());
+        let container = container.with_mounted_cache("/root/.rustup", cache_volume_rustup.clone());
+        let container = container.with_mounted_cache("/root/.cargo", cache_volume_cargo.clone());
+        let container = container
+            .with_mounted_cache("/usr/local/rustup", cache_volume_rustup_downloads.clone());
+
+        container
+    }
+
+    fn cache_apt(mut self, client: &DaggerConn) -> Container {
+        let cache_volume_aptititude = client.cache_volume("apt-cache");
+        let cache_volume_var_cache = client.cache_volume("apt-lists");
+
+        let container = self;
+        let container = container.with_mounted_cache("/var/cache", cache_volume_var_cache.clone());
+        let container =
+            container.with_mounted_cache("/var/lib/apt/", cache_volume_aptititude.clone());
+
+        container
+    }
 }
 
 /// Create a container definition which is able to compile the contracts
 fn define_contracts_container(client: DaggerConn) -> Result<Container> {
     let compiled_contracts_dir = "/workdir/compiled_contracts";
 
-    let container = with_caches(client
-    .container().from("docker.io/library/node:latest")
-    , &client)
+    let container = client.container()
+        .from("docker.io/library/node:latest")
     .with_mounted_directory("/workdir", hrrd(&client))
     .with_mounted_directory(compiled_contracts_dir, hccd(&client))
+    .cache_apt(&client)
     .with_exec(cmd("apt-get update -y"))
     .with_exec(cmd("apt-get install -y curl which"))
     .with_workdir("/workdir/contracts")
     .with_exec(cmd("ls -al"))
+    .cache_node(&client)
     .with_exec(cmd("npm install -g pnpm"))
     .with_exec(cmd("pnpm install"))
     .with_exec(vec!["sh", "-c", "curl -L https://foundry.paradigm.xyz | bash && /root/.foundry/bin/foundryup --install 0.3.0"])
@@ -114,14 +139,18 @@ fn define_contracts_container(client: DaggerConn) -> Result<Container> {
 }
 
 fn define_crates_container(client: DaggerConn) -> Result<Container> {
-    let container = with_caches(client.container().from("docker.io/rust:bookworm"), &client)
+    let container = client
+        .container()
+        .from("docker.io/rust:bookworm")
         .with_mounted_directory("/workdir", hrrd(&client))
         .with_mounted_directory("/workdir/_compiled_contracts", hccd(&client))
         .with_workdir("/workdir")
+        .cache_apt(&client)
         .with_exec(cmd("apt-get update"))
         .with_exec(cmd(
             "apt-get install -y build-essential clang cmake protobuf-compiler",
         ))
+        .cache_rust(&client)
         // actually build the rust binaries
         .with_exec(cmd("cargo b -p fendermint_app -p ipc-cli"))
         // see what was created
@@ -154,11 +183,11 @@ async fn prepare_fendermint_two_stage_build(client: DaggerConn) -> Result<Contai
         contracts_gen.file("/workdir/fendermint/actors/output/custom_actors_bundle.car");
 
     // prepare the to-be-published "runner" container
-    let runner = with_caches(client
-    .container()
-    .from("docker.io/debian:bookworm-slim"), &client)
-    .with_file_opts(
-            "/usr/local/bin/fendermint",
+    let runner = client
+        .container()
+        .from("docker.io/debian:bookworm-slim")
+        .with_file_opts(
+                "/usr/local/bin/fendermint",
             f_fendermint,
             ContainerWithFileOptsBuilder::default()
                 .permissions(0o755_isize)
@@ -172,9 +201,9 @@ async fn prepare_fendermint_two_stage_build(client: DaggerConn) -> Result<Contai
                 .build()?,
         )
         .with_exec(cmd("ls -al"))
+        .cache_apt(&client)
         .with_exec(vec!["sh", "-c", "apt-get update && \
-            apt-get install -y libssl3 ca-certificates curl && \
-            rm -rf /var/lib/apt/lists/*"])
+            apt-get install -y libssl3 ca-certificates curl"])
         .with_env_variable("FM_HOME_DIR", "/fendermint")
         .with_exposed_port(26658)
         .with_exposed_port(8445)
