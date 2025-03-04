@@ -13,7 +13,6 @@ use ethers::{
     providers::{Middleware, PendingTransaction},
     types::{Eip1559TransactionRequest, H160},
 };
-use fendermint_materializer::concurrency::cancellation_flag::CancellationFlag;
 use fendermint_materializer::concurrency::collect::collect_blocks;
 use fendermint_materializer::concurrency::nonce_manager::NonceManager;
 use fendermint_materializer::concurrency::reporting::summary::ExecutionSummary;
@@ -26,6 +25,8 @@ use futures::FutureExt;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use tokio::select;
+use tokio_util::sync::CancellationToken;
 
 const MANIFEST: &str = "benches.yaml";
 
@@ -46,18 +47,18 @@ async fn test_native_coin_transfer() -> Result<(), anyhow::Error> {
         .await
         .context("failed to get chain ID")?;
 
-    let cancel = Arc::new(CancellationFlag::new());
+    let token = CancellationToken::new();
 
     // Set up background blocks collector.
     let blocks_collector = {
-        let cancel = cancel.clone();
+        let token = token.clone();
         let provider = provider.clone();
         let assert = move |block: &Block<H256>| {
             // Make sure block gas limit isn't the bottleneck.
             let unused_gas_limit = block_gas_limit - block.gas_limit;
             assert!(unused_gas_limit >= max_tx_gas_limit);
         };
-        tokio::spawn(collect_blocks(cancel, provider, assert))
+        tokio::spawn(collect_blocks(token, provider, assert))
     };
 
     // Drive concurrency.
@@ -116,11 +117,16 @@ async fn test_native_coin_transfer() -> Result<(), anyhow::Error> {
             }
             input.bencher.record_mempool();
 
-            let receipt = pending
-                .interval(Duration::from_millis(50))
-                .confirmations(1)
-                .await?
-                .ok_or(anyhow!("fd"))?;
+            let receipt = select! {
+                    receipt = pending
+                        .interval(Duration::from_millis(50))
+                        .confirmations(1) => {
+                            receipt?.ok_or(anyhow!("failed to resolve pending transaction"))
+                    }
+                    _ = input.token.cancelled() => {
+                        Err(anyhow!("cancelled"))
+                    }
+            }?;
             println!(
                 "tx included in block {:?} (test_id={})",
                 receipt.block_number, input.test_id
@@ -137,7 +143,7 @@ async fn test_native_coin_transfer() -> Result<(), anyhow::Error> {
     })
     .await;
 
-    cancel.cancel();
+    token.cancel();
     let blocks = blocks_collector.await??;
     let summary = ExecutionSummary::new(cfg.clone(), blocks, results);
     println!("summary:\n{}", summary);
@@ -146,8 +152,11 @@ async fn test_native_coin_transfer() -> Result<(), anyhow::Error> {
     let Ok(testnet) = Arc::try_unwrap(testnet) else {
         bail!("Arc::try_unwrap(testnet)");
     };
+    if let Err(err) = &res {
+        println!("errors:\n{}", err)
+    }
     cleanup(res.is_err(), testnet).await;
-    res
+    Ok(())
 }
 
 abigen!(SimpleCoin, "../../testing/contracts/SimpleCoin.abi");
@@ -170,18 +179,18 @@ async fn test_contract_deployment() -> Result<(), anyhow::Error> {
         .await
         .context("failed to get chain ID")?;
 
-    let cancel = Arc::new(CancellationFlag::new());
+    let token = CancellationToken::new();
 
     // Set up background blocks collector.
     let blocks_collector = {
-        let cancel = cancel.clone();
+        let token = token.clone();
         let provider = provider.clone();
         let assert = move |block: &Block<H256>| {
             // Make sure block gas limit isn't the bottleneck.
             let unused_gas_limit = block_gas_limit - block.gas_limit;
             assert!(unused_gas_limit >= max_tx_gas_limit);
         };
-        tokio::spawn(collect_blocks(cancel, provider, assert))
+        tokio::spawn(collect_blocks(token, provider, assert))
     };
 
     // Drive concurrency.
@@ -237,11 +246,16 @@ async fn test_contract_deployment() -> Result<(), anyhow::Error> {
             }
             input.bencher.record_mempool();
 
-            let receipt = pending
-                .interval(Duration::from_millis(50))
-                .confirmations(1)
-                .await?
-                .ok_or(anyhow::anyhow!("contract not deployed"))?;
+            let receipt = select! {
+                    receipt = pending
+                        .interval(Duration::from_millis(50))
+                        .confirmations(1) => {
+                            receipt?.ok_or(anyhow!("failed to resolve pending transaction"))
+                    }
+                    _ = input.token.cancelled() => {
+                        Err(anyhow!("cancelled"))
+                    }
+            }?;
             let contract_address = receipt
                 .contract_address
                 .ok_or(anyhow::anyhow!("contract not deployed"))?;
@@ -262,7 +276,7 @@ async fn test_contract_deployment() -> Result<(), anyhow::Error> {
     })
     .await;
 
-    cancel.cancel();
+    token.cancel();
     let blocks = blocks_collector.await??;
     let summary = ExecutionSummary::new(cfg.clone(), blocks, results);
     println!("summary:\n{}", summary);
@@ -271,8 +285,11 @@ async fn test_contract_deployment() -> Result<(), anyhow::Error> {
     let Ok(testnet) = Arc::try_unwrap(testnet) else {
         bail!("Arc::try_unwrap(testnet)");
     };
+    if let Err(err) = &res {
+        println!("errors:\n{}", err)
+    }
     cleanup(res.is_err(), testnet).await;
-    res
+    Ok(())
 }
 
 #[serial_test::serial]
@@ -359,18 +376,18 @@ async fn test_contract_call() -> Result<(), anyhow::Error> {
         .unwrap();
     let block_gas_limit = U256::from(10_000_000_000u64);
     let max_tx_gas_limit = U256::from(3_000_000u64);
-    let cancel = Arc::new(CancellationFlag::new());
+    let token = CancellationToken::new();
 
     // Set up background blocks collector.
     let blocks_collector = {
-        let cancel = cancel.clone();
+        let token = token.clone();
         let provider = provider.clone();
         let assert = move |block: &Block<H256>| {
             // Make sure block gas limit isn't the bottleneck.
             let unused_gas_limit = block_gas_limit - block.gas_limit;
             assert!(unused_gas_limit >= max_tx_gas_limit);
         };
-        tokio::spawn(collect_blocks(cancel, provider, assert))
+        tokio::spawn(collect_blocks(token, provider, assert))
     };
 
     // Drive concurrency.
@@ -427,11 +444,16 @@ async fn test_contract_call() -> Result<(), anyhow::Error> {
             }
             input.bencher.record_mempool();
 
-            let receipt = pending
-                .interval(Duration::from_millis(50))
-                .confirmations(1)
-                .await?
-                .ok_or(anyhow::anyhow!("failed to wait pending tx"))?;
+            let receipt = select! {
+                    receipt = pending
+                        .interval(Duration::from_millis(50))
+                        .confirmations(1) => {
+                            receipt?.ok_or(anyhow!("failed to resolve pending transaction"))
+                    }
+                    _ = input.token.cancelled() => {
+                        Err(anyhow!("cancelled"))
+                    }
+            }?;
             println!(
                 "send tx included in block {:?} (test_id={})",
                 receipt.block_number, input.test_id
@@ -448,7 +470,7 @@ async fn test_contract_call() -> Result<(), anyhow::Error> {
     })
     .await;
 
-    cancel.cancel();
+    token.cancel();
     let blocks = blocks_collector.await??;
     let summary = ExecutionSummary::new(cfg.clone(), blocks, results);
     println!("summary:\n{}", summary);
@@ -457,6 +479,9 @@ async fn test_contract_call() -> Result<(), anyhow::Error> {
     let Ok(testnet) = Arc::try_unwrap(testnet) else {
         bail!("Arc::try_unwrap(testnet)");
     };
+    if let Err(err) = &res {
+        println!("errors:\n{}", err)
+    }
     cleanup(res.is_err(), testnet).await;
-    res
+    Ok(())
 }

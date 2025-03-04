@@ -33,6 +33,7 @@ tracing = { workspace = true }
 text-tables = { workspace = true }
 url = { workspace = true }
 statrs = { workspace = true }
+tokio-util = { workspace = true }
 
 arbitrary = { workspace = true, optional = true }
 quickcheck = { workspace = true, optional = true }

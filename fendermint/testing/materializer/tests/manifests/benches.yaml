@@ -118,3 +118,4 @@ rootnet:
         validator: "1"
       seed_nodes: []
       ethapi: true
+      fendermint_additional_config: ./test.toml

@@ -3373,6 +3373,7 @@ dependencies = [
  "tendermint-rpc",
  "text-tables",
  "tokio",
+ "tokio-util 0.7.12",
  "toml 0.8.19",
  "tracing",
  "url",
