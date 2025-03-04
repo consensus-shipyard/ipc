@@ -12,6 +12,8 @@ use std::path::Path;
 use tempfile::NamedTempFile;
 
 const BUILTIN_ACTORS_TAG: &str = "v15.0.0";
+const BUILTIN_ACTORS_SHA256SUM: &str =
+    "fd7e442bb52ee2e0079053eaf4f75670257f2084b6315826e084c2b483deee4a";
 
 const FORCE_RERUN: &str = "IPC_BUILTIN_ACTORS_FORCE_FETCH";
 
@@ -72,6 +74,13 @@ impl TryFrom<&[u8]> for Checksum {
         Ok(Checksum(slice_to_array::<32>(value)?))
     }
 }
+use std::fmt;
+
+impl fmt::Display for Checksum {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", const_hex::encode(&self.0[..]))
+    }
+}
 
 fn tempfile(out_dir: &Path) -> Result<NamedTempFile> {
     let t = NamedTempFile::new_in(out_dir)?;
@@ -109,45 +118,58 @@ async fn download_builtin_actors_bundle(
 
 #[tokio::main]
 async fn main() -> color_eyre::eyre::Result<()> {
+    println!("cargo::warning=Fetching builtin filecoin actors");
+
     let out_dir = std::env::var("OUT_DIR").wrap_err("Missing OUT_DIR env")?;
     let out_dir = std::path::PathBuf::from(out_dir);
 
     let builtin_car_path = out_dir.join("builtin_actors.car");
 
-    println!("cargo:rerun_if_changed=build.rs");
-    println!("cargo:rerun_if_env_changed={}", FORCE_RERUN);
-    println!("cargo:rerun_if_env_changed={}", VERSION_OVERRIDE);
+    println!("cargo::rerun-if-changed=build.rs");
+    println!("cargo::rerun-if-env-changed={}", FORCE_RERUN);
+    println!("cargo::rerun-if-env-changed={}", VERSION_OVERRIDE);
 
-    println!("cargo:rerun_if_changed={}", builtin_car_path.display());
+    println!("cargo::rerun-if-changed={}", builtin_car_path.display());
 
     let tag = std::env::var(VERSION_OVERRIDE).unwrap_or_else(|_e| BUILTIN_ACTORS_TAG.to_owned());
 
-    let (tmp, tmp_digest) = download_builtin_actors_bundle(tag, &out_dir).await?;
-
-    match fs::File::open(&builtin_car_path) {
+    let download = match fs::File::open(&builtin_car_path) {
         Ok(f) => {
             // compare digests, if mismatch, replace existing with the downloaded file
             let actual = file_digest(f)?;
-            if tmp_digest != actual {
+            if BUILTIN_ACTORS_SHA256SUM != actual.to_string() {
+                println!(
+                    "cargo::warning=Builtin actors local file {} mismatched expected digest {}, re-downloading..",
+                    actual,
+                    BUILTIN_ACTORS_SHA256SUM
+                );
                 fs::remove_file(&builtin_car_path)?;
-                fs::rename(tmp.path(), &builtin_car_path)?;
+                true
             } else {
-                println!("Nothing to do, identical file is already present");
+                println!("cargo::warning=Nothing to do, identical file is already present");
+                false
             }
         }
         Err(e) => {
             if let std::io::ErrorKind::NotFound = e.kind() {
                 // the file is not found, so a simple rename is good enough
-                fs::rename(tmp.path(), &builtin_car_path)?;
+                true
             } else {
                 // other errors always must lead to an error
                 bail!(e)
             }
         }
+    };
+    if download {
+        let (tmp, tmp_digest) = download_builtin_actors_bundle(tag, &out_dir).await?;
+        if tmp_digest.to_string() != BUILTIN_ACTORS_SHA256SUM {
+            bail!("Mismatch of hardcoded sha256sum and actual digest")
+        }
+        fs::rename(tmp.path(), &builtin_car_path)?;
     }
 
     println!(
-        "Builtin actors file is ready for inclusion: {}",
+        "cargo::warning=Builtin actors file is ready for inclusion: {}",
         builtin_car_path.display()
     );
 
