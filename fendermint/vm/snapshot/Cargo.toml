@@ -48,7 +48,7 @@ fendermint_testing = { path = "../../testing", features = ["golden"] }
 fendermint_vm_interpreter = { path = "../interpreter", features = ["bundle", "test-util"] }
 fendermint_vm_genesis = { path = "../genesis", features = ["arb"] }
 fendermint_vm_snapshot = { path = ".", features = ["arb"] }
-fendermint_actors = { path = "../../actors-custom-car" }
+actors-custom-car = { path = "../../actors-custom-car" }
 actors-builtin-car = { path = "../../actors-builtin-car" }
 
 [features]

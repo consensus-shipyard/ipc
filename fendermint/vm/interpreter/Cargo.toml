@@ -9,7 +9,7 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-fendermint_actors_api = { workspace = true }
+actors-custom-api = { workspace = true }
 fendermint_vm_actor_interface = { path = "../actor_interface" }
 fendermint_vm_core = { path = "../core" }
 fendermint_vm_event = { path = "../event" }
@@ -22,7 +22,7 @@ fendermint_crypto = { path = "../../crypto" }
 fendermint_eth_hardhat = { path = "../../eth/hardhat" }
 fendermint_rpc = { path = "../../rpc" }
 fendermint_tracing = { path = "../../tracing" }
-fendermint_actors = { path = "../../actors-custom-car" }
+actors-custom-car = { path = "../../actors-custom-car" }
 fendermint_actor_chainmetadata = { path = "../../actors/chainmetadata" }
 fendermint_actor_activity_tracker = { path = "../../actors/activity-tracker" }
 fendermint_actor_gas_market_eip1559 = { path = "../../actors/gas_market/eip1559" }
