@@ -17,7 +17,7 @@ use async_trait::async_trait;
 use cid::Cid;
 use fendermint_abci::util::take_until_max_size;
 use fendermint_abci::{AbciResult, Application};
-use fendermint_actors_api::gas_market::Reading;
+use actors_custom_api::gas_market::Reading;
 use fendermint_crypto::PublicKey;
 use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,

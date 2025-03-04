@@ -447,7 +447,7 @@ mod tests {
 
         let (state, out) = create_test_genesis_state(
             actors_builtin_car::CAR,
-            fendermint_actors::CAR,
+            actors_custom_car::CAR,
             contracts_path(),
             genesis,
         )
