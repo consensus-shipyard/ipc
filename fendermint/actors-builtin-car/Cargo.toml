@@ -1,6 +1,6 @@
 [package]
 name = "actors-builtin-car"
-version = "0.1.0"
+version = "0.2.0"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -14,3 +14,4 @@ tempfile = { workspace = true }
 color-eyre = { workspace = true }
 futures-util = { workspace = true }
 bytes = { workspace = true }
+const-hex = "1"
