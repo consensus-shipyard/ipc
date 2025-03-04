@@ -1,3 +1,9 @@
 #! /usr/bin/env sh
 
-cargo run --manifest-path dagger/Cargo.toml
+# since the `dagger` has to be excluded for caching efficiencies
+# we explicitly give the manifst path, which allows us to
+# run `./ci` from the root of the repository.
+
+# In CI it is favorable to build the binary only once.
+
+cargo run --manifest-path dagger/Cargo.toml -- ${@}

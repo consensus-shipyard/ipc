@@ -17,3 +17,4 @@ rand = "*"
 toml = "*"
 serde = "*"
 fs-err = "*"
+clap = { version = "4", features = ["derive"] }
