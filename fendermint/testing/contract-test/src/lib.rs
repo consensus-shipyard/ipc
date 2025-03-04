@@ -35,7 +35,7 @@ pub async fn create_test_exec_state(
 
     let (state, out) = create_test_genesis_state(
         actors_builtin_car::CAR,
-        fendermint_actors::CAR,
+        actors_custom_car::CAR,
         artifacts_path,
         genesis,
     )

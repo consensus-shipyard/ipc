@@ -76,7 +76,7 @@ mod tests {
     /// Load the actor bundle CAR file, split it into chunks, then restore and compare to the original.
     #[tokio::test]
     async fn split_bundle_car() {
-        let bundle_bytes = fendermint_actors::CAR;
+        let bundle_bytes = actors_custom_car::CAR;
 
         let tmp = tempdir().unwrap();
         let target_count = 10;

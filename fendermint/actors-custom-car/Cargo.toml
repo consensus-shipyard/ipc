@@ -1,6 +1,6 @@
 [package]
 # TODO rename to actors-custom-car
-name = "fendermint_actors"
+name = "actors-custom-car"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true

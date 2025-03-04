@@ -1,5 +1,5 @@
 [package]
-name = "fendermint_actors_api"
+name = "actors-custom-api"
 description = "API and interface types for pluggable actors."
 license.workspace = true
 edition.workspace = true

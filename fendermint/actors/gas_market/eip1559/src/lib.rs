@@ -1,7 +1,7 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use fendermint_actors_api::gas_market::Gas;
+use actors_custom_api::gas_market::Gas;
 use fil_actors_runtime::actor_error;
 use fil_actors_runtime::runtime::{ActorCode, Runtime};
 use fil_actors_runtime::SYSTEM_ACTOR_ADDR;
@@ -53,8 +53,8 @@ pub enum Method {
     SetConstants = frc42_dispatch::method_hash!("SetConstants"),
 
     // Standard methods.
-    CurrentReading = fendermint_actors_api::gas_market::Method::CurrentReading as u64,
-    UpdateUtilization = fendermint_actors_api::gas_market::Method::UpdateUtilization as u64,
+    CurrentReading = actors_custom_api::gas_market::Method::CurrentReading as u64,
+    UpdateUtilization = actors_custom_api::gas_market::Method::UpdateUtilization as u64,
 }
 
 impl Actor {
@@ -87,14 +87,14 @@ impl Actor {
     }
 }
 
-impl fendermint_actors_api::gas_market::GasMarket for Actor {
+impl actors_custom_api::gas_market::GasMarket for Actor {
     fn current_reading(
         rt: &impl Runtime,
-    ) -> Result<fendermint_actors_api::gas_market::Reading, ActorError> {
+    ) -> Result<actors_custom_api::gas_market::Reading, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
         let st = rt.state::<State>()?;
-        Ok(fendermint_actors_api::gas_market::Reading {
+        Ok(actors_custom_api::gas_market::Reading {
             block_gas_limit: st.constants.block_gas_limit,
             base_fee: st.base_fee,
         })
@@ -102,13 +102,13 @@ impl fendermint_actors_api::gas_market::GasMarket for Actor {
 
     fn update_utilization(
         rt: &impl Runtime,
-        utilization: fendermint_actors_api::gas_market::Utilization,
-    ) -> Result<fendermint_actors_api::gas_market::Reading, ActorError> {
+        utilization: actors_custom_api::gas_market::Utilization,
+    ) -> Result<actors_custom_api::gas_market::Reading, ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         rt.transaction(|st: &mut State, _rt| {
             st.base_fee = st.next_base_fee(utilization.block_gas_used);
-            Ok(fendermint_actors_api::gas_market::Reading {
+            Ok(actors_custom_api::gas_market::Reading {
                 block_gas_limit: st.constants.block_gas_limit,
                 base_fee: st.base_fee.clone(),
             })
@@ -163,7 +163,7 @@ impl State {
 
 // This import is necessary so that the actor_dispatch macro can find the methods on the GasMarket
 // trait, implemented by Self.
-use fendermint_actors_api::gas_market::GasMarket;
+use actors_custom_api::gas_market::GasMarket;
 
 impl ActorCode for Actor {
     type Methods = Method;
@@ -185,7 +185,7 @@ impl ActorCode for Actor {
 #[cfg(test)]
 mod tests {
     use crate::{Actor, Constants, ConstructorParams, Method, State};
-    use fendermint_actors_api::gas_market::{Reading, Utilization};
+    use actors_custom_api::gas_market::{Reading, Utilization};
     use fil_actors_runtime::test_utils::{expect_empty, MockRuntime, SYSTEM_ACTOR_CODE_ID};
     use fil_actors_runtime::SYSTEM_ACTOR_ADDR;
     use fvm_ipld_encoding::ipld_block::IpldBlock;

@@ -11,7 +11,7 @@ use crate::fvm::activity::ValidatorActivityTracker;
 use crate::ExecInterpreter;
 use anyhow::Context;
 use async_trait::async_trait;
-use fendermint_actors_api::gas_market::Reading;
+use actors_custom_api::gas_market::Reading;
 use fendermint_vm_actor_interface::{chainmetadata, cron, system};
 use fvm::executor::ApplyRet;
 use fvm_ipld_blockstore::Blockstore;

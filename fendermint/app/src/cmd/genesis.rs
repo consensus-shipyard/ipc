@@ -318,7 +318,7 @@ async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> anyhow:
             .unwrap_or_else(|| std::borrow::Cow::Borrowed(fallback));
         Ok(actors)
     }
-    let custom_actors = actors_car_blob(args.custom_actors_path.as_ref(), fendermint_actors::CAR)?;
+    let custom_actors = actors_car_blob(args.custom_actors_path.as_ref(), actors_custom_car::CAR)?;
     let builtin_actors =
         actors_car_blob(args.builtin_actors_path.as_ref(), actors_builtin_car::CAR)?;
 

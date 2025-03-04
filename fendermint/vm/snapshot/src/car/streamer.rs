@@ -122,13 +122,13 @@ mod tests {
     /// Sanity check that the test bundle can be loaded with the normal facilities from a file.
     #[tokio::test]
     async fn load_bundle_from_file() {
-        let mut car_bundle = fendermint_actors::CAR;
+        let mut car_bundle = actors_custom_car::CAR;
         check_load_car(&mut car_bundle).await;
     }
 
     #[tokio::test]
     async fn block_streamer_from_file() {
-        let bundle_file = fendermint_actors::CAR;
+        let bundle_file = actors_custom_car::CAR;
         check_block_streamer(bundle_file).await;
     }
 }
