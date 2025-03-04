@@ -14,10 +14,11 @@ dependencies = [
 
 [[package]]
 name = "actors-builtin-car"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bytes",
  "color-eyre 0.5.11",
+ "const-hex",
  "fs-err",
  "futures-util",
  "reqwest 0.12.12",
