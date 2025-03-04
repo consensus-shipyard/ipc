@@ -103,7 +103,7 @@ gateway_addr = "0x1AEe8A878a22280fc2753b3C63571C8F895D2FE3"
 registry_addr = "0x0b4e239FF21b40120cDa817fba77bD1B366c1bcD"
 ```
 
-To be able to interact with Calibration and run new subnets, some FIL should be provided to, at least, the wallet that will be used by the `ipc-cli` to interact with IPC. You can request some tFIL for your address through the [Calibration Faucet](https://faucet.calibration.fildev.network/funds.html).
+To be able to interact with Calibration and run new subnets, some FIL should be provided to, at least, the wallet that will be used by the `ipc-cli` to interact with IPC. You can request some tFIL for your address through the [Calibration Faucet](https://docs.filecoin.io/networks/calibration#resources).
 
 ## Help
 
