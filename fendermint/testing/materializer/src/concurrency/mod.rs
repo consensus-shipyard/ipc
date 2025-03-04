@@ -15,9 +15,9 @@ use futures::FutureExt;
 use futures::StreamExt;
 use std::future::Future;
 use std::sync::Arc;
-use std::time::{Instant};
+use std::time::Instant;
 use tokio::sync::Semaphore;
-use tokio::time::{timeout};
+use tokio::time::timeout;
 
 #[derive(Debug)]
 pub struct TestInput {
