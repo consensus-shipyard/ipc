@@ -1,6 +1,3 @@
-// Copyright 2022-2024 Protocol Labs
-// SPDX-License-Identifier: Apache-2.0, MIT
-
 use crate::fvm::PowerUpdates;
 use async_stm::atomically;
 use fendermint_tracing::emit;

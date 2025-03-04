@@ -17,24 +17,6 @@ mod chain {
       }
     }
 
-    golden_cbor! { "chain", ipc_bottom_up_resolve, |g| {
-        loop {
-            if let msg @ ChainMessage::Ipc(IpcMessage::BottomUpResolve(_)) = ChainMessage::arbitrary(g) {
-                return msg
-            }
-        }
-      }
-    }
-
-    golden_cbor! { "chain", ipc_bottom_up_exec, |g| {
-        loop {
-            if let msg @ ChainMessage::Ipc(IpcMessage::BottomUpExec(_)) = ChainMessage::arbitrary(g) {
-                return msg
-            }
-        }
-      }
-    }
-
     golden_cbor! { "chain", ipc_top_down, |g| {
         loop {
             if let msg @ ChainMessage::Ipc(IpcMessage::TopDownExec(_)) = ChainMessage::arbitrary(g) {
