@@ -160,9 +160,9 @@ pub struct GenesisOutput {
 pub struct GenesisBuilder<'a> {
     /// Hardhat like util to deploy ipc contracts
     hardhat: Hardhat,
-    /// The built in actors bundle path
+    /// The builtin actors bundle
     builtin_actors: &'a [u8],
-    /// The custom actors bundle path
+    /// The custom actors bundle
     custom_actors: &'a [u8],
 
     /// Genesis params
