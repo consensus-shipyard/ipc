@@ -423,7 +423,6 @@ library LibPower {
     }
 
     /// @notice Gets the total collateral the validators has staked.
-    /// TODO: shift this out of lib power and into staking
     function totalValidatorCollateral(address validator) internal view returns (uint256) {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
         return s.validatorSet.validators[validator].nextPower;
@@ -444,7 +443,6 @@ library LibPower {
     }
 
     /// @notice Confirm the deposit directly without going through the confirmation process
-    /// TODO: shift this logic to lib staking
     function depositWithConfirm(address validator, uint256 amount) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
 
@@ -455,7 +453,6 @@ library LibPower {
     /// @notice Confirm the withdraw directly without going through the confirmation process
     /// and releasing from the gateway.
     /// @dev only use for non-bootstrapped subnets
-    /// TODO: shift this logic to lib staking
     function withdrawWithConfirm(address validator, uint256 amount) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
 
@@ -561,7 +558,7 @@ library LibPower {
                 handleCollateral(s, validator, oldPower, power);
 
             } else {
-                revert("Power operation not supported");
+                revert("Unrecognized power operation");
             }
 
             s.changeSet.purgeChange(i);
@@ -630,7 +627,7 @@ library LibValidatorTracking {
                 (uint256 power) = abi.decode(change.payload, (uint256));
                 self.validators.confirmPower(validator, power);
             } else {
-                revert("Power operation not supported");
+                revert("Unrecognized power operation");
             }
 
             self.changes.purgeChange(i);

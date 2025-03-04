@@ -30,6 +30,10 @@ const networkDefinition = (chainId: number, url: string) => ({
     saveDeployments: true,
 })
 
+// A boolean flag for whether to disable viaIR for solidity optimization.
+// With viaIR enabled, it will generally lead to a smaller and optimized contract, but sometimes
+// it will cause stack too deep issues. Currently in test, viaIR actually creates stack too deep.
+// Dynamically disable viaIR for test, it's not required for tests as well.
 const isDisableVIAIR = process.env.VIAIR_DISABLED === 'true'
 
 let config: HardhatUserConfig = {
