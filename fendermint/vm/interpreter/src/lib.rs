@@ -4,7 +4,7 @@
 pub mod errors;
 pub mod fvm;
 pub mod genesis;
-pub(crate) mod selector;
+pub(crate) mod selectors;
 pub mod types;
 
 #[cfg(feature = "arb")]

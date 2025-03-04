@@ -26,7 +26,7 @@ use crate::fvm::{
     upgrades::UpgradeScheduler,
     FvmMessage,
 };
-use crate::selector::{select_messages_by_gas_limit, select_messages_until_total_bytes};
+use crate::selectors::{select_messages_by_gas_limit, select_messages_until_total_bytes};
 use crate::types::*;
 use crate::MessagesInterpreter;
 use fvm_shared::state::ActorState;
