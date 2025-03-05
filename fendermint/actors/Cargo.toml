@@ -1,30 +1,18 @@
 [package]
-name = "fendermint_actors"
+name = "actors-umbrella"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Depend on all individual actors to be included."
 
+# we use the list of dependencies
+# to determine which ones to include in the `.car` file
+# and filter for the `fendermint_actor_` prefix
+# the all-in-one wasmblob is NOT used, nor should it be compiled,
+# neither for the host nor target arch
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 fendermint_actor_activity_tracker = { path = "activity-tracker", features = ["fil-actor"] }
 fendermint_actor_chainmetadata = { path = "chainmetadata", features = ["fil-actor"] }
 fendermint_actor_gas_market_eip1559 = { path = "gas_market/eip1559", features = ["fil-actor"] }
 fendermint_actor_eam = { path = "eam", features = ["fil-actor"] }
-
-[dependencies]
-cid = { workspace = true }
-anyhow = { workspace = true }
-fvm_ipld_blockstore = { workspace = true }
-fvm_ipld_encoding = { workspace = true }
-fendermint_actor_chainmetadata = { path = "chainmetadata" }
-fendermint_actor_eam = { path = "eam" }
-fendermint_actor_gas_market_eip1559 = { path = "gas_market/eip1559" }
-fs-err = { workspace = true }
-
-[build-dependencies]
-anyhow = { workspace = true }
-fil_actors_runtime = { workspace = true, features = ["test_utils"] }
-fil_actor_bundler = "6.1.0"
-fs-err = { workspace = true }
-num-traits = { workspace = true }
-toml = "0.8.19"

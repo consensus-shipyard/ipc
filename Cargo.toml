@@ -36,6 +36,8 @@ members = [
   "fendermint/tracing",
   "fendermint/vm/*",
   "fendermint/actors",
+  "fendermint/actors-custom-car",
+  "fendermint/actors-builtin-car",
   "fendermint/actors/api",
   "fendermint/actors/chainmetadata",
   "fendermint/actors/activity-tracker",
@@ -69,6 +71,7 @@ blake2b_simd = "1.0"
 bloom = "0.3"
 bytes = "1.4"
 clap = { version = "4.1", features = ["derive", "env", "string"] }
+color-eyre = "0.5.11"
 byteorder = "1.5.0"
 config = "0.13"
 dirs = "5.0"
@@ -187,7 +190,7 @@ ipc_ipld_resolver = { path = "ipld/resolver" }
 ipc-types = { path = "ipc/types" }
 ipc-observability = { path = "ipc/observability" }
 ipc_actors_abis = { path = "contract-bindings" }
-fendermint_actors_api = { path = "fendermint/actors/api" }
+actors-custom-api = { path = "fendermint/actors/api" }
 
 # Vendored for cross-compilation, see https://github.com/cross-rs/cross/wiki/Recipes#openssl
 # Make sure every top level build target actually imports this dependency, and don't end up
