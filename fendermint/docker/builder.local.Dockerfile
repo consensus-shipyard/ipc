@@ -18,7 +18,7 @@ ARG RUST_VERSION=1.81.0
 RUN --mount=type=cache,target=target \
   --mount=type=cache,target=$RUSTUP_HOME,from=rust,source=$RUSTUP_HOME \
   --mount=type=cache,target=$CARGO_HOME,from=rust,source=$CARGO_HOME \
+  rustup toolchain install ${RUST_VERSION} --no-self-update &&\
   rustup target add wasm32-unknown-unknown &&\
-  rustup toolchain install ${RUST_VERSION}-x86_64-unknown-linux-gnu --no-self-update &&\
   cargo install --locked --root output --path fendermint/app &&\
   cargo install --locked --root output --path ipc/cli
