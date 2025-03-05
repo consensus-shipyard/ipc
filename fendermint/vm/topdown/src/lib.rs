@@ -18,7 +18,7 @@ use async_trait::async_trait;
 use ethers::utils::hex;
 use fvm_shared::clock::ChainEpoch;
 use ipc_api::cross::IpcEnvelope;
-use ipc_api::staking::StakingChangeRequest;
+use ipc_api::staking::PowerChangeRequest;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
@@ -145,7 +145,7 @@ pub trait ParentViewProvider {
         &self,
         from: BlockHeight,
         to: BlockHeight,
-    ) -> anyhow::Result<Vec<StakingChangeRequest>>;
+    ) -> anyhow::Result<Vec<PowerChangeRequest>>;
     /// Get the top down messages from and to height.
     async fn top_down_msgs_from(
         &self,

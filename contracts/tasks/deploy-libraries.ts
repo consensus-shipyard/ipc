@@ -13,7 +13,7 @@ task(
         const contracts = [
             { name: 'AccountHelper' },
             { name: 'SubnetIDHelper' },
-            { name: 'LibStaking' },
+            { name: 'LibPower' },
             { name: 'LibQuorum' },
             { name: 'CrossMsgHelper', libraries: ['SubnetIDHelper'] },
         ]

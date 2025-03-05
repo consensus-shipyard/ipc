@@ -14,7 +14,7 @@ import {IDiamondCut} from "../../contracts/interfaces/IDiamondCut.sol";
 import {QuorumInfo} from "../../contracts/structs/Quorum.sol";
 import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../../contracts/structs/CrossNet.sol";
 import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
-import {SubnetID, Subnet, IPCAddress, Validator, StakingChange, StakingChangeRequest, Asset, StakingOperation} from "../../contracts/structs/Subnet.sol";
+import {SubnetID, Subnet, IPCAddress, Validator, PowerChange, PowerChangeRequest, Asset, PowerOperation} from "../../contracts/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
 import {FvmAddressHelper} from "../../contracts/lib/FvmAddressHelper.sol";
 import {CrossMsgHelper} from "../../contracts/lib/CrossMsgHelper.sol";
@@ -929,15 +929,15 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         address val1 = vm.addr(100);
         address val2 = vm.addr(101);
         uint256 amount = 10000;
-        StakingChangeRequest[] memory changes = new StakingChangeRequest[](2);
+        PowerChangeRequest[] memory changes = new PowerChangeRequest[](2);
 
-        changes[0] = StakingChangeRequest({
+        changes[0] = PowerChangeRequest({
             configurationNumber: 1,
-            change: StakingChange({validator: val1, op: StakingOperation.Deposit, payload: abi.encode(amount)})
+            change: PowerChange({validator: val1, op: PowerOperation.SetPower, payload: abi.encode(amount)})
         });
-        changes[1] = StakingChangeRequest({
+        changes[1] = PowerChangeRequest({
             configurationNumber: 2,
-            change: StakingChange({validator: val2, op: StakingOperation.Deposit, payload: abi.encode(amount)})
+            change: PowerChange({validator: val2, op: PowerOperation.SetPower, payload: abi.encode(amount)})
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
@@ -955,11 +955,11 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         vm.stopPrank();
 
         // new change with a validator leaving
-        changes = new StakingChangeRequest[](1);
+        changes = new PowerChangeRequest[](1);
 
-        changes[0] = StakingChangeRequest({
+        changes[0] = PowerChangeRequest({
             configurationNumber: 3,
-            change: StakingChange({validator: val1, op: StakingOperation.Withdraw, payload: abi.encode(amount)})
+            change: PowerChange({validator: val1, op: PowerOperation.SetPower, payload: abi.encode(0)})
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);

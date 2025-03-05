@@ -8,8 +8,8 @@ use std::time::Duration;
 
 use ethers_contract::{ContractError, EthLogDecode, LogMeta};
 use ipc_actors_abis::{
-    checkpointing_facet, gateway_getter_facet, gateway_manager_facet, lib_gateway, lib_quorum,
-    lib_staking_change_log, register_subnet_facet, subnet_actor_activity_facet,
+    checkpointing_facet, gateway_getter_facet, gateway_manager_facet, lib_gateway,
+    lib_power_change_log, lib_quorum, register_subnet_facet, subnet_actor_activity_facet,
     subnet_actor_checkpointing_facet, subnet_actor_getter_facet, subnet_actor_manager_facet,
     subnet_actor_reward_facet,
 };
@@ -52,7 +52,7 @@ use ipc_api::checkpoint::{
 };
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::merkle::MerkleGen;
-use ipc_api::staking::{StakingChangeRequest, ValidatorInfo, ValidatorStakingInfo};
+use ipc_api::staking::{PowerChangeRequest, ValidatorInfo, ValidatorStakingInfo};
 use ipc_api::subnet::ConstructParams;
 use ipc_api::subnet_id::SubnetID;
 use ipc_observability::lazy_static;
@@ -202,7 +202,7 @@ impl TopDownFinalityQuery for EthSubnetManager {
         &self,
         subnet_id: &SubnetID,
         epoch: ChainEpoch,
-    ) -> Result<TopDownQueryPayload<Vec<StakingChangeRequest>>> {
+    ) -> Result<TopDownQueryPayload<Vec<PowerChangeRequest>>> {
         let address = contract_address_from_subnet(subnet_id)?;
         tracing::info!("querying validator changes in evm subnet contract: {address:}");
 
@@ -212,7 +212,7 @@ impl TopDownFinalityQuery for EthSubnetManager {
         );
 
         let ev = contract
-            .event::<lib_staking_change_log::NewStakingChangeRequestFilter>()
+            .event::<lib_power_change_log::NewPowerChangeRequestFilter>()
             .from_block(epoch as u64)
             .to_block(epoch as u64)
             .address(ValueOrArray::Value(contract.address()));
@@ -227,7 +227,7 @@ impl TopDownFinalityQuery for EthSubnetManager {
             } else {
                 hash = Some(meta.block_hash);
             }
-            changes.push(StakingChangeRequest::try_from(event)?);
+            changes.push(PowerChangeRequest::try_from(event)?);
         }
 
         let block_hash = if let Some(h) = hash {

@@ -7,7 +7,7 @@ use crate::{eth_to_fil_amount, ethers_address_to_fil_address};
 use ethers::utils::hex;
 use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
-use ipc_actors_abis::{lib_staking_change_log, subnet_actor_getter_facet};
+use ipc_actors_abis::{lib_power_change_log, subnet_actor_getter_facet};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
@@ -16,37 +16,35 @@ pub type ConfigurationNumber = u64;
 #[derive(Clone, Debug, num_enum::TryFromPrimitive, Deserialize, Serialize)]
 #[non_exhaustive]
 #[repr(u8)]
-pub enum StakingOperation {
-    Deposit = 0,
-    Withdraw = 1,
-    SetMetadata = 2,
-    SetFederatedPower = 3,
+pub enum PowerOperation {
+    SetMetadata = 0,
+    SetPower = 1,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct StakingChangeRequest {
+pub struct PowerChangeRequest {
     pub configuration_number: ConfigurationNumber,
-    pub change: StakingChange,
+    pub change: PowerChange,
 }
 
 /// The change request to validator staking
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct StakingChange {
-    pub op: StakingOperation,
+pub struct PowerChange {
+    pub op: PowerOperation,
     pub payload: Vec<u8>,
     pub validator: Address,
 }
 
-impl TryFrom<lib_staking_change_log::NewStakingChangeRequestFilter> for StakingChangeRequest {
+impl TryFrom<lib_power_change_log::NewPowerChangeRequestFilter> for PowerChangeRequest {
     type Error = anyhow::Error;
 
     fn try_from(
-        value: lib_staking_change_log::NewStakingChangeRequestFilter,
+        value: lib_power_change_log::NewPowerChangeRequestFilter,
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             configuration_number: value.configuration_number,
-            change: StakingChange {
-                op: StakingOperation::try_from(value.op)?,
+            change: PowerChange {
+                op: PowerOperation::try_from(value.op)?,
                 payload: value.payload.to_vec(),
                 validator: ethers_address_to_fil_address(&value.validator)?,
             },
@@ -57,8 +55,8 @@ impl TryFrom<lib_staking_change_log::NewStakingChangeRequestFilter> for StakingC
 /// The staking validator information
 #[derive(Clone, Debug)]
 pub struct ValidatorStakingInfo {
-    confirmed_collateral: TokenAmount,
-    total_collateral: TokenAmount,
+    current_power: TokenAmount,
+    next_power: TokenAmount,
     metadata: Vec<u8>,
 }
 
@@ -66,9 +64,9 @@ impl Display for ValidatorStakingInfo {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "ValidatorStaking(confirmed_collateral: {}, total_collateral: {}, metadata: 0x{})",
-            self.confirmed_collateral,
-            self.total_collateral,
+            "ValidatorStaking(current_power: {}, next_power: {}, metadata: 0x{})",
+            self.current_power,
+            self.next_power,
             hex::encode(&self.metadata)
         )
     }
@@ -79,8 +77,8 @@ impl TryFrom<subnet_actor_getter_facet::ValidatorInfo> for ValidatorStakingInfo 
 
     fn try_from(value: subnet_actor_getter_facet::ValidatorInfo) -> Result<Self, Self::Error> {
         Ok(Self {
-            confirmed_collateral: eth_to_fil_amount(&value.confirmed_collateral)?,
-            total_collateral: eth_to_fil_amount(&value.total_collateral)?,
+            current_power: eth_to_fil_amount(&value.current_power)?,
+            next_power: eth_to_fil_amount(&value.next_power)?,
             metadata: value.metadata.to_vec(),
         })
     }

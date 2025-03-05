@@ -27,7 +27,7 @@ use ipc_actors_abis::top_down_finality_facet::TopDownFinalityFacet;
 use ipc_actors_abis::xnet_messaging_facet::XnetMessagingFacet;
 use ipc_actors_abis::{checkpointing_facet, top_down_finality_facet, xnet_messaging_facet};
 use ipc_api::cross::IpcEnvelope;
-use ipc_api::staking::{ConfigurationNumber, StakingChangeRequest};
+use ipc_api::staking::{ConfigurationNumber, PowerChangeRequest};
 
 use super::{
     fevm::{ContractCaller, MockProvider, NoRevert},
@@ -249,7 +249,7 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
     pub fn store_validator_changes(
         &self,
         state: &mut FvmExecState<DB>,
-        changes: Vec<StakingChangeRequest>,
+        changes: Vec<PowerChangeRequest>,
     ) -> anyhow::Result<()> {
         if changes.is_empty() {
             return Ok(());
@@ -257,7 +257,7 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
 
         let mut change_requests = vec![];
         for c in changes {
-            change_requests.push(top_down_finality_facet::StakingChangeRequest::try_from(c)?);
+            change_requests.push(top_down_finality_facet::PowerChangeRequest::try_from(c)?);
         }
 
         self.topdown

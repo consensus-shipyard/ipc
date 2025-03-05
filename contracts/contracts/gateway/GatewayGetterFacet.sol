@@ -6,7 +6,7 @@ import {QuorumInfo} from "../structs/Quorum.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {Membership} from "../structs/Subnet.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
-import {LibStaking} from "../lib/LibStaking.sol";
+import {LibPower} from "../lib/LibPower.sol";
 import {LibQuorum} from "../lib/LibQuorum.sol";
 import {GatewayActorStorage} from "../lib/LibGatewayActorStorage.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
@@ -24,7 +24,7 @@ contract GatewayGetterFacet {
     /// @notice Returns the next and start configuration numbers in the validator changes.
     /// The configuration numbers are from changes made in the parent.
     function getValidatorConfigurationNumbers() external view returns (uint64, uint64) {
-        return LibStaking.getConfigurationNumbers();
+        return LibPower.getConfigurationNumbers();
     }
 
     /// @notice Returns code commit SHA where this contract is from.

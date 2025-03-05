@@ -5,10 +5,10 @@ import {IGateway} from "../interfaces/IGateway.sol";
 import {LibSubnetActorStorage, SubnetActorStorage} from "./LibSubnetActorStorage.sol";
 import {LibMaxPQ, MaxPQ} from "./priority/LibMaxPQ.sol";
 import {LibMinPQ, MinPQ} from "./priority/LibMinPQ.sol";
-import {LibStakingChangeLog} from "./LibStakingChangeLog.sol";
+import {LibPowerChangeLog} from "./LibPowerChangeLog.sol";
 import {AssetHelper} from "./AssetHelper.sol";
-import {PermissionMode, StakingReleaseQueue, StakingChangeLog, StakingChange, StakingChangeRequest, StakingOperation, StakingRelease, ValidatorSet, AddressStakingReleases, ParentValidatorsTracker, Validator, Asset} from "../structs/Subnet.sol";
-import {WithdrawExceedingCollateral, NotValidator, CannotConfirmFutureChanges, NoCollateralToWithdraw, AddressShouldBeValidator, InvalidConfigurationNumber} from "../errors/IPCErrors.sol";
+import {PermissionMode, StakingReleaseQueue, PowerChangeLog, PowerChange, PowerChangeRequest, PowerOperation, StakingRelease, ValidatorSet, AddressStakingReleases, ParentValidatorsTracker, Validator, Asset} from "../structs/Subnet.sol";
+import {PowerReductionMoreThanTotal, NotValidator, CannotConfirmFutureChanges, NoCollateralToWithdraw, AddressShouldBeValidator, InvalidConfigurationNumber} from "../errors/IPCErrors.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 library LibAddressStakingReleases {
@@ -105,34 +105,12 @@ library LibValidatorSet {
     event ActiveValidatorLeft(address validator);
     event WaitingValidatorLeft(address validator);
 
-    /// @notice Get the total voting power for the validator
-    function getPower(
-        ValidatorSet storage validators,
-        address validator
-    ) internal view returns(uint256 power) {
-        if (validators.permissionMode == PermissionMode.Federated) {
-            power = validators.validators[validator].federatedPower;
-        } else {
-            power = validators.validators[validator].confirmedCollateral;
-        }
-    }
-
-    /// @notice Get the total confirmed collateral of the validators.
-    function getTotalConfirmedCollateral(ValidatorSet storage validators) internal view returns (uint256 collateral) {
-        collateral = validators.totalConfirmedCollateral;
-    }
-
-    /// @notice Get the total active validators.
-    function totalActiveValidators(ValidatorSet storage validators) internal view returns (uint16 total) {
-        total = validators.activeValidators.getSize();
-    }
-
     /// @notice Get the confirmed collateral of the validator.
-    function getConfirmedCollateral(
+    function getCurrentPower(
         ValidatorSet storage validators,
         address validator
     ) internal view returns (uint256 collateral) {
-        collateral = validators.validators[validator].confirmedCollateral;
+        collateral = validators.validators[validator].currentPower;
     }
 
     function listActiveValidators(ValidatorSet storage validators) internal view returns (address[] memory addresses) {
@@ -159,31 +137,17 @@ library LibValidatorSet {
         return addresses;
     }
 
-    /// @notice Get the total collateral of *active* validators.
-    function getTotalActivePower(ValidatorSet storage validators) internal view returns (uint256 collateral) {
+    /// @notice Get the total current power of *active* validators.
+    function getTotalActivePower(ValidatorSet storage validators) internal view returns (uint256 power) {
         uint16 size = validators.activeValidators.getSize();
         for (uint16 i = 1; i <= size; ) {
             address validator = validators.activeValidators.getAddress(i);
-            collateral += getPower(validators, validator);
+            power += getCurrentPower(validators, validator);
             unchecked {
                 ++i;
             }
         }
     }
-
-    /// @notice Get the total collateral of the *waiting* and *active* validators.
-    function getTotalCollateral(ValidatorSet storage validators) internal view returns (uint256 collateral) {
-        uint16 size = validators.waitingValidators.getSize();
-        for (uint16 i = 1; i <= size; ) {
-            address validator = validators.waitingValidators.getAddress(i);
-            collateral += getConfirmedCollateral(validators, validator);
-            unchecked {
-                ++i;
-            }
-        }
-        collateral += getTotalConfirmedCollateral(validators);
-    }
-
 
     /// @notice Get the total power of the validators.
     /// The function reverts if at least one validator is not in the active validator set.
@@ -198,7 +162,7 @@ library LibValidatorSet {
             if (!isActiveValidator(validators, addresses[i])) {
                 revert NotValidator(addresses[i]);
             }
-            activePowerTable[i] = getPower(validators, addresses[i]);
+            activePowerTable[i] = getCurrentPower(validators, addresses[i]);
             unchecked {
                 ++i;
             }
@@ -210,67 +174,72 @@ library LibValidatorSet {
         return self.activeValidators.contains(validator);
     }
 
+    /***********************************************************************
+     * Internal helper functions, should not be called by external functions
+     ***********************************************************************/
+    
     /// @notice Set validator data
     function setMetadata(ValidatorSet storage validators, address validator, bytes calldata metadata) internal {
         validators.validators[validator].metadata = metadata;
     }
 
-    /***********************************************************************
-     * Internal helper functions, should not be called by external functions
-     ***********************************************************************/
+    /// @notice Increase the next power of a validator
+    function increasePower(ValidatorSet storage validators, address validator, uint256 change) internal returns(uint256) {
+        uint256 total = validators.validators[validator].nextPower;
 
-    /// @notice Validator increases its total collateral by amount.
-    function recordDeposit(ValidatorSet storage validators, address validator, uint256 amount) internal {
-        validators.validators[validator].totalCollateral += amount;
+        total += change;
+        validators.validators[validator].nextPower = total;
+
+        return total;
     }
 
-    /// @notice Validator reduces its total collateral by amount.
-    function recordWithdraw(ValidatorSet storage validators, address validator, uint256 amount) internal {
-        uint256 total = validators.validators[validator].totalCollateral;
-        if (total < amount) {
-            revert WithdrawExceedingCollateral();
+    /// @notice Decrease the next power of a validator
+    function decreasePower(ValidatorSet storage validators, address validator, uint256 change) internal returns(uint256) {
+        uint256 total = validators.validators[validator].nextPower;
+        if (total < change) {
+            revert PowerReductionMoreThanTotal(total, change);
         }
 
-        total -= amount;
-        validators.validators[validator].totalCollateral = total;
+        total -= change;
+        validators.validators[validator].nextPower = total;
+
+        return total;
     }
 
-    /// @notice Validator's federated power was updated by admin
-    function confirmFederatedPower(ValidatorSet storage self, address validator, uint256 power) internal {
-        uint256 existingPower = self.validators[validator].federatedPower;
-        self.validators[validator].federatedPower = power;
+    /// @notice Update the validator's next power to a new value
+    function setPower(ValidatorSet storage validators, address validator, uint256 newPower) internal returns(uint256) {
+        validators.validators[validator].nextPower = newPower;
+        return newPower;
+    }
 
-        if (existingPower == power) {
-            return;
-        } else if (existingPower < power) {
+    /// @notice Set the validator federated power directly without queueing the request
+    function setPowerWithConfirm(ValidatorSet storage validators, address validator, uint256 power) internal {
+        setPower(validators, validator, power);
+        confirmPower(validators, validator, power);
+    }
+
+    /// @notice Validator's power update was confirmed in the child subnet
+    /// TODO: rename this to setPower and remove setPower when staking is shifted out of LibPower
+    /// @return the old power of the validator
+    function confirmPower(ValidatorSet storage self, address validator, uint256 power) internal returns(uint256) {
+        uint256 oldPower = self.validators[validator].currentPower;
+        self.validators[validator].currentPower = power;
+
+        if (oldPower == power) {
+            return oldPower;
+        } else if (oldPower < power) {
+            // oldPower < power, that mean validator power increased, should add (power - oldPower) to currentTotalPower
+            // which is self.currentTotalPower + (power - oldPower)
             increaseReshuffle({self: self, maybeActive: validator, newPower: power});
         } else {
+            // oldPower > power, that mean validator power dropped, should minus (oldPower - power)
+            // which is self.currentTotalPower - (oldPower - power)
             reduceReshuffle({self: self, validator: validator, newPower: power});
         }
-    }
 
-    function confirmDeposit(ValidatorSet storage self, address validator, uint256 amount) internal {
-        uint256 newCollateral = self.validators[validator].confirmedCollateral + amount;
-        self.validators[validator].confirmedCollateral = newCollateral;
+        self.currentTotalPower = self.currentTotalPower + power - oldPower;
 
-        self.totalConfirmedCollateral += amount;
-
-        increaseReshuffle({self: self, maybeActive: validator, newPower: newCollateral});
-    }
-
-    function confirmWithdraw(ValidatorSet storage self, address validator, uint256 amount) internal {
-        uint256 newCollateral = self.validators[validator].confirmedCollateral - amount;
-        uint256 totalCollateral = self.validators[validator].totalCollateral;
-
-        if (newCollateral == 0 && totalCollateral == 0) {
-            delete self.validators[validator];
-        } else {
-            self.validators[validator].confirmedCollateral = newCollateral;
-        }
-
-        reduceReshuffle({self: self, validator: validator, newPower: newCollateral});
-
-        self.totalConfirmedCollateral -= amount;
+        return oldPower;
     }
 
     /// @notice Reshuffles the active and waiting validators when an increase in power is confirmed
@@ -381,9 +350,9 @@ library LibValidatorSet {
     }
 }
 
-library LibStaking {
+library LibPower {
     using LibStakingReleaseQueue for StakingReleaseQueue;
-    using LibStakingChangeLog for StakingChangeLog;
+    using LibPowerChangeLog for PowerChangeLog;
     using LibValidatorSet for ValidatorSet;
     using AssetHelper for Asset;
     using LibMaxPQ for MaxPQ;
@@ -396,17 +365,17 @@ library LibStaking {
     event CollateralClaimed(address validator, uint256 amount);
 
     // =============== Getters =============
-    function getPower(
+    function getCurrentPower(
         address validator
     ) internal view returns(uint256 power) {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        return s.validatorSet.getPower(validator);
+        return s.validatorSet.getCurrentPower(validator);
     }
 
     /// @notice Checks if the validator is an active validator
     function isActiveValidator(address validator) internal view returns (bool) {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        return s.validatorSet.activeValidators.contains(validator);
+        return s.validatorSet.isActiveValidator(validator);
     }
 
     /// @notice Checks if the validator is a waiting validator
@@ -419,22 +388,15 @@ library LibStaking {
     /// @param addr The address to check for validator status.
     /// @return A boolean indicating whether the address is a validator.
     function isValidator(address addr) internal view returns (bool) {
-        return hasStaked(addr);
-    }
-
-    /// @notice Checks if the validator has staked before.
-    /// @param validator The address to check for staking status.
-    /// @return A boolean indicating whether the validator has staked.
-    function hasStaked(address validator) internal view returns (bool) {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
 
-        // gas-opt: original check: totalCollateral > 0
-        return s.validatorSet.validators[validator].totalCollateral != 0;
+        // gas-opt: original check: nextPower > 0
+        return s.validatorSet.validators[addr].nextPower != 0;
     }
 
     function totalActiveValidators() internal view returns (uint16) {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        return s.validatorSet.totalActiveValidators();
+        return s.validatorSet.activeValidators.getSize();
     }
 
     /// @notice Gets the total number of validators, including active and waiting
@@ -455,28 +417,23 @@ library LibStaking {
         return s.validatorSet.listWaitingValidators();
     }
 
-    function getTotalConfirmedCollateral() internal view returns (uint256) {
+    function getTotalCurrentPower() internal view returns (uint256) {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        return s.validatorSet.getTotalConfirmedCollateral();
-    }
-
-    function getTotalCollateral() internal view returns (uint256) {
-        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        return s.validatorSet.getTotalConfirmedCollateral();
+        return s.validatorSet.currentTotalPower;
     }
 
     /// @notice Gets the total collateral the validators has staked.
     function totalValidatorCollateral(address validator) internal view returns (uint256) {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        return s.validatorSet.validators[validator].totalCollateral;
+        return s.validatorSet.validators[validator].nextPower;
     }
 
     // =============== Operations directly confirm =============
 
     /// @notice Set the validator federated power directly without queueing the request
-    function setFederatedPowerWithConfirm(address validator, uint256 power) internal {
+    function setPowerWithConfirm(address validator, uint256 power) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        s.validatorSet.confirmFederatedPower(validator, power);
+        s.validatorSet.setPowerWithConfirm(validator, power);
     }
 
     /// @notice Set the validator metadata directly without queueing the request
@@ -489,35 +446,8 @@ library LibStaking {
     function depositWithConfirm(address validator, uint256 amount) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
 
-        // record deposit that updates the total collateral
-        s.validatorSet.recordDeposit(validator, amount);
-        // confirm deposit that updates the confirmed collateral
-        s.validatorSet.confirmDeposit(validator, amount);
-
-        if (!s.bootstrapped) {
-            // add to initial validators avoiding duplicates if it
-            // is a genesis validator.
-            bool alreadyValidator;
-            uint256 length = s.genesisValidators.length;
-            for (uint256 i; i < length; ) {
-                if (s.genesisValidators[i].addr == validator) {
-                    alreadyValidator = true;
-                    break;
-                }
-                unchecked {
-                    ++i;
-                }
-            }
-            if (!alreadyValidator) {
-                uint256 collateral = s.validatorSet.validators[validator].confirmedCollateral;
-                Validator memory val = Validator({
-                    addr: validator,
-                    weight: collateral,
-                    metadata: s.validatorSet.validators[validator].metadata
-                });
-                s.genesisValidators.push(val);
-            }
-        }
+        uint256 newPower = s.validatorSet.increasePower(validator, amount);
+        s.validatorSet.confirmPower(validator, newPower);
     }
 
     /// @notice Confirm the withdraw directly without going through the confirmation process
@@ -526,17 +456,19 @@ library LibStaking {
     function withdrawWithConfirm(address validator, uint256 amount) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
 
-        // record deposit that updates the total collateral
-        s.validatorSet.recordWithdraw(validator, amount);
-        // confirm deposit that updates the confirmed collateral
-        s.validatorSet.confirmWithdraw(validator, amount);
+        uint256 newPower = s.validatorSet.decreasePower(validator, amount);
+        s.validatorSet.confirmPower(validator, newPower);
     }
 
     // ================= Operations that are queued ==============
     /// @notice Set the federated power of the validator
-    function setFederatedPower(address validator, bytes calldata metadata, uint256 amount) internal {
+    function setFederatedPower(address validator, bytes calldata metadata, uint256 newPower) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        s.changeSet.federatedPowerRequest({validator: validator, metadata: metadata, power: amount});
+
+        s.validatorSet.setPower(validator, newPower);
+
+        s.changeSet.setPowerRequest(validator, newPower);
+        s.changeSet.metadataRequest(validator, metadata);
     }
 
     /// @notice Set the validator metadata
@@ -549,19 +481,23 @@ library LibStaking {
     function deposit(address validator, uint256 amount) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
 
-        s.changeSet.depositRequest(validator, amount);
-        s.validatorSet.recordDeposit(validator, amount);
+        uint256 nextPower = s.validatorSet.increasePower(validator, amount);
+        s.changeSet.setPowerRequest(validator, nextPower);
     }
 
     /// @notice Withdraw the collateral
     function withdraw(address validator, uint256 amount) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
 
-        s.changeSet.withdrawRequest(validator, amount);
-        s.validatorSet.recordWithdraw(validator, amount);
+        uint256 nextPower = s.validatorSet.decreasePower(validator, amount);
+        s.changeSet.setPowerRequest(validator, nextPower);
     }
 
     // =============== Other functions ================
+    function getConfigurationNumbers() internal view returns(uint64, uint64) {
+        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
+        return (s.changeSet.nextConfigurationNumber, s.changeSet.startConfigurationNumber);
+    }
 
     /// @notice Claim the released collateral
     function claimCollateral(address validator) internal returns(uint256 amount) {
@@ -570,58 +506,68 @@ library LibStaking {
         emit CollateralClaimed(validator, amount);
     }
 
-    function getConfigurationNumbers() internal view returns(uint64, uint64) {
-        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        return (s.changeSet.nextConfigurationNumber, s.changeSet.startConfigurationNumber);
+    /// @notice Handles the release of collateral or new deposit of collateral
+    function handleCollateral(SubnetActorStorage storage s, address validator, uint256 oldCollateral, uint256 newCollateral) internal {
+        if (s.validatorSet.permissionMode != PermissionMode.Collateral) {
+            return;
+        }
+
+        if (oldCollateral == newCollateral) {
+            return;
+        }
+
+        if (oldCollateral > newCollateral) {
+            uint256 amount = oldCollateral - newCollateral;
+            s.releaseQueue.addNewRelease(validator, amount);
+            IGateway(s.ipcGatewayAddr).releaseStake(amount);
+        } else {
+            uint256 amount = newCollateral - oldCollateral;
+            address gateway = s.ipcGatewayAddr;
+
+            uint256 msgValue = s.collateralSource.makeAvailable(gateway, amount);
+            IGateway(gateway).addStake{value: msgValue}(amount);
+        }
     }
 
     /// @notice Confirm the changes in bottom up checkpoint submission, only call this in bottom up checkpoint execution.
     function confirmChange(uint64 configurationNumber) internal {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        StakingChangeLog storage changeSet = s.changeSet;
 
-        if (configurationNumber >= changeSet.nextConfigurationNumber) {
+        if (configurationNumber >= s.changeSet.nextConfigurationNumber) {
             revert CannotConfirmFutureChanges();
-        } else if (configurationNumber < changeSet.startConfigurationNumber) {
+        } else if (configurationNumber < s.changeSet.startConfigurationNumber) {
             return;
         }
 
-        uint64 start = changeSet.startConfigurationNumber;
+        uint64 start = s.changeSet.startConfigurationNumber;
         for (uint64 i = start; i <= configurationNumber; ) {
-            StakingChange storage change = changeSet.getChange(i);
-            address validator = change.validator;
+            PowerChange storage change = s.changeSet.getChange(i);
 
-            if (change.op == StakingOperation.SetMetadata) {
-                s.validatorSet.validators[validator].metadata = change.payload;
-            } else if (change.op == StakingOperation.SetFederatedPower) {
-                (bytes memory metadata, uint256 power) = abi.decode(change.payload, (bytes, uint256));
-                s.validatorSet.validators[validator].metadata = metadata;
-                s.validatorSet.confirmFederatedPower(validator, power);
+            if (change.op == PowerOperation.SetMetadata) {
+                s.validatorSet.validators[change.validator].metadata = change.payload;
+            } else if (change.op == PowerOperation.SetPower) {
+                (uint256 power) = abi.decode(change.payload, (uint256));
+                address validator = change.validator;
+                uint256 oldPower = s.validatorSet.confirmPower(validator, power);
+
+                // TODO: Ideally lib power should not be aware of permission mode,
+                // TODO: but the current subnet actor design is putting both
+                // TODO: collateral and federated power update mode in one contract.
+                // TODO: Unless the permission modes are break into different facets,
+                // TODO: `handleCollateral` is needed.
+                handleCollateral(s, validator, oldPower, power);
+
             } else {
-                uint256 amount = abi.decode(change.payload, (uint256));
-                address gateway = s.ipcGatewayAddr;
-
-                if (change.op == StakingOperation.Withdraw) {
-                    s.validatorSet.confirmWithdraw(validator, amount);
-                    s.releaseQueue.addNewRelease(validator, amount);
-                    IGateway(gateway).releaseStake(amount);
-                } else if (change.op == StakingOperation.Deposit)  {
-                    s.validatorSet.confirmDeposit(validator, amount);
-                    uint256 msgValue = s.collateralSource.makeAvailable(gateway, amount);
-                    IGateway(gateway).addStake{value: msgValue}(amount);
-                } else {
-                    revert("Unknown staking operation");
-                }
+                revert("Unrecognized power operation");
             }
 
-            changeSet.purgeChange(i);
+            s.changeSet.purgeChange(i);
             unchecked {
                 ++i;
             }
         }
 
-        changeSet.startConfigurationNumber = configurationNumber + 1;
-
+        s.changeSet.startConfigurationNumber = configurationNumber + 1;
         emit ConfigurationNumberConfirmed(configurationNumber);
     }
 }
@@ -630,9 +576,9 @@ library LibStaking {
 /// Should be used in the child gateway to store changes until they can be applied.
 library LibValidatorTracking {
     using LibValidatorSet for ValidatorSet;
-    using LibStakingChangeLog for StakingChangeLog;
+    using LibPowerChangeLog for PowerChangeLog;
 
-    function storeChange(ParentValidatorsTracker storage self, StakingChangeRequest calldata changeRequest) internal {
+    function storeChange(ParentValidatorsTracker storage self, PowerChangeRequest calldata changeRequest) internal {
         uint64 configurationNumber = self.changes.recordChange({
             validator: changeRequest.change.validator,
             op: changeRequest.change.op,
@@ -646,7 +592,7 @@ library LibValidatorTracking {
 
     function batchStoreChange(
         ParentValidatorsTracker storage self,
-        StakingChangeRequest[] calldata changeRequests
+        PowerChangeRequest[] calldata changeRequests
     ) internal {
         uint256 length = changeRequests.length;
         if (length == 0) {
@@ -672,23 +618,16 @@ library LibValidatorTracking {
         uint64 start = self.changes.startConfigurationNumber;
 
         for (uint64 i = start; i <= configurationNumber; ) {
-            StakingChange storage change = self.changes.getChange(i);
+            PowerChange storage change = self.changes.getChange(i);
             address validator = change.validator;
 
-            if (change.op == StakingOperation.SetMetadata) {
+            if (change.op == PowerOperation.SetMetadata) {
                 self.validators.validators[validator].metadata = change.payload;
-            } else if (change.op == StakingOperation.SetFederatedPower) {
-                (bytes memory metadata, uint256 power) = abi.decode(change.payload, (bytes, uint256));
-                self.validators.validators[validator].metadata = metadata;
-                self.validators.confirmFederatedPower(validator, power);
+            } else if (change.op == PowerOperation.SetPower) {
+                (uint256 power) = abi.decode(change.payload, (uint256));
+                self.validators.confirmPower(validator, power);
             } else {
-                uint256 amount = abi.decode(change.payload, (uint256));
-
-                if (change.op == StakingOperation.Withdraw) {
-                    self.validators.confirmWithdraw(validator, amount);
-                } else {
-                    self.validators.confirmDeposit(validator, amount);
-                }
+                revert("Unrecognized power operation");
             }
 
             self.changes.purgeChange(i);

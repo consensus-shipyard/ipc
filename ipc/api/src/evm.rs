@@ -7,8 +7,8 @@ use crate::address::IPCAddress;
 use crate::checkpoint::BottomUpMsgBatch;
 use crate::checkpoint::{consensus, BottomUpCheckpoint, CompressedActivityRollup};
 use crate::cross::{IpcEnvelope, IpcMsgKind};
-use crate::staking::StakingChange;
-use crate::staking::StakingChangeRequest;
+use crate::staking::PowerChange;
+use crate::staking::PowerChangeRequest;
 use crate::subnet::{Asset, AssetKind};
 use crate::subnet_id::SubnetID;
 use crate::{eth_to_fil_amount, ethers_address_to_fil_address};
@@ -346,11 +346,11 @@ pub fn fil_to_eth_amount(amount: &TokenAmount) -> anyhow::Result<U256> {
     Ok(U256::from_dec_str(&str)?)
 }
 
-impl TryFrom<StakingChange> for top_down_finality_facet::StakingChange {
+impl TryFrom<PowerChange> for top_down_finality_facet::PowerChange {
     type Error = anyhow::Error;
 
-    fn try_from(value: StakingChange) -> Result<Self, Self::Error> {
-        Ok(top_down_finality_facet::StakingChange {
+    fn try_from(value: PowerChange) -> Result<Self, Self::Error> {
+        Ok(top_down_finality_facet::PowerChange {
             op: value.op as u8,
             payload: ethers::core::types::Bytes::from(value.payload),
             validator: payload_to_evm_address(value.validator.payload())?,
@@ -358,12 +358,12 @@ impl TryFrom<StakingChange> for top_down_finality_facet::StakingChange {
     }
 }
 
-impl TryFrom<StakingChangeRequest> for top_down_finality_facet::StakingChangeRequest {
+impl TryFrom<PowerChangeRequest> for top_down_finality_facet::PowerChangeRequest {
     type Error = anyhow::Error;
 
-    fn try_from(value: StakingChangeRequest) -> Result<Self, Self::Error> {
-        Ok(top_down_finality_facet::StakingChangeRequest {
-            change: top_down_finality_facet::StakingChange::try_from(value.change)?,
+    fn try_from(value: PowerChangeRequest) -> Result<Self, Self::Error> {
+        Ok(top_down_finality_facet::PowerChangeRequest {
+            change: top_down_finality_facet::PowerChange::try_from(value.change)?,
             configuration_number: value.configuration_number,
         })
     }

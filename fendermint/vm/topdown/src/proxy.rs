@@ -8,7 +8,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use ipc_api::cross::IpcEnvelope;
-use ipc_api::staking::StakingChangeRequest;
+use ipc_api::staking::PowerChangeRequest;
 use ipc_api::subnet_id::SubnetID;
 use ipc_observability::emit;
 use ipc_provider::manager::{GetBlockHashResult, TopDownQueryPayload};
@@ -39,7 +39,7 @@ pub trait ParentQueryProxy {
     async fn get_validator_changes(
         &self,
         height: BlockHeight,
-    ) -> anyhow::Result<TopDownQueryPayload<Vec<StakingChangeRequest>>>;
+    ) -> anyhow::Result<TopDownQueryPayload<Vec<PowerChangeRequest>>>;
 }
 
 /// The proxy to the subnet's parent
@@ -105,7 +105,7 @@ impl ParentQueryProxy for IPCProviderProxy {
     async fn get_validator_changes(
         &self,
         height: BlockHeight,
-    ) -> anyhow::Result<TopDownQueryPayload<Vec<StakingChangeRequest>>> {
+    ) -> anyhow::Result<TopDownQueryPayload<Vec<PowerChangeRequest>>> {
         self.ipc_provider
             .get_validator_changeset(&self.child_subnet, height as ChainEpoch)
             .await
@@ -178,7 +178,7 @@ impl ParentQueryProxy for IPCProviderProxyWithLatency {
     async fn get_validator_changes(
         &self,
         height: BlockHeight,
-    ) -> anyhow::Result<TopDownQueryPayload<Vec<StakingChangeRequest>>> {
+    ) -> anyhow::Result<TopDownQueryPayload<Vec<PowerChangeRequest>>> {
         emit_event_with_latency(
             &self.inner.parent_subnet.to_string(),
             "get_validator_changeset",

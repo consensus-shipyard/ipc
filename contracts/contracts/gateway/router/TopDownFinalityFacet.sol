@@ -3,13 +3,13 @@ pragma solidity ^0.8.23;
 
 import {GatewayActorModifiers} from "../../lib/LibGatewayActorStorage.sol";
 import {ParentFinality} from "../../structs/CrossNet.sol";
-import {PermissionMode, Validator, ValidatorInfo, StakingChangeRequest, Membership} from "../../structs/Subnet.sol";
+import {PermissionMode, Validator, ValidatorInfo, PowerChangeRequest, Membership} from "../../structs/Subnet.sol";
 import {LibGateway} from "../../lib/LibGateway.sol";
 
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 
 import {ParentValidatorsTracker, ValidatorSet} from "../../structs/Subnet.sol";
-import {LibValidatorTracking, LibValidatorSet} from "../../lib/LibStaking.sol";
+import {LibValidatorTracking, LibValidatorSet} from "../../lib/LibPower.sol";
 
 contract TopDownFinalityFacet is GatewayActorModifiers {
     using FilAddress for address;
@@ -31,7 +31,7 @@ contract TopDownFinalityFacet is GatewayActorModifiers {
 
     /// @notice Store the validator change requests from parent.
     /// @param changeRequests - the validator changes
-    function storeValidatorChanges(StakingChangeRequest[] calldata changeRequests) external systemActorOnly {
+    function storeValidatorChanges(PowerChangeRequest[] calldata changeRequests) external systemActorOnly {
         s.validatorsTracker.batchStoreChange(changeRequests);
     }
 
@@ -69,7 +69,7 @@ contract TopDownFinalityFacet is GatewayActorModifiers {
             ValidatorInfo storage info = s.validatorsTracker.validators.validators[addr];
 
             // Extract the consensus weight for validator.
-            uint256 weight = info.confirmedCollateral + info.federatedPower;
+            uint256 weight = info.currentPower;
 
             vs[i] = Validator({weight: weight, addr: addr, metadata: info.metadata});
             unchecked {

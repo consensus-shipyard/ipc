@@ -75,14 +75,14 @@ contract SubnetActorInvariants is StdInvariant, IntegrationTestBase {
         assertEq(
             ETH_SUPPLY,
             address(subnetActorHandler).balance +
-                saDiamond.getter().getTotalCollateral() +
+                saDiamond.getter().getTotalCurrentPower() +
                 subnetActorHandler.ghost_unstakedSum(),
             "subnet actor: unexpected stake"
         );
         assertEq(
             ETH_SUPPLY,
             address(subnetActorHandler).balance +
-                saDiamond.getter().getTotalConfirmedCollateral() +
+                saDiamond.getter().getTotalCurrentPower() +
                 subnetActorHandler.ghost_unstakedSum(),
             "subnet actor: unexpected stake"
         );
@@ -102,7 +102,7 @@ contract SubnetActorInvariants is StdInvariant, IntegrationTestBase {
     /// @notice The value resulting from all stake and unstake operations is equal to the total confirmed collateral.
     function invariant_SA_03_sum_of_stake_equals_collateral() public {
         assertEq(
-            saDiamond.getter().getTotalConfirmedCollateral(),
+            saDiamond.getter().getTotalCurrentPower(),
             subnetActorHandler.ghost_stakedSum() - subnetActorHandler.ghost_unstakedSum()
         );
     }
@@ -141,8 +141,8 @@ contract SubnetActorInvariants is StdInvariant, IntegrationTestBase {
             sumOfCollaterals += saDiamond.getter().getTotalValidatorCollateral(validators[i]);
         }
 
-        uint256 totalCollateral = saDiamond.getter().getTotalConfirmedCollateral();
+        uint256 nextPower = saDiamond.getter().getTotalCurrentPower();
 
-        assertEq(sumOfCollaterals, totalCollateral, "unexpected sum of validators collateral");
+        assertEq(sumOfCollaterals, nextPower, "unexpected sum of validators collateral");
     }
 }

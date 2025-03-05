@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {LibValidatorSet} from "../LibStaking.sol";
+import {LibValidatorSet} from "../LibPower.sol";
 import {ValidatorSet} from "../../structs/Subnet.sol";
 import {PQ, LibPQ} from "./LibPQ.sol";
 
@@ -36,7 +36,7 @@ library LibMinPQ {
 
         self.inner.size = size;
 
-        uint256 power = validators.getPower(validator);
+        uint256 power = validators.getCurrentPower(validator);
         swim({self: self, validators: validators, pos: size, value: power});
     }
 
@@ -51,7 +51,7 @@ library LibMinPQ {
         self.inner.size = size - 1;
         self.inner.del(size);
 
-        uint256 power = self.inner.getPower(validators, 1);
+        uint256 power = self.inner.getCurrentPower(validators, 1);
         sink({self: self, validators: validators, pos: 1, value: power});
     }
 
@@ -71,25 +71,25 @@ library LibMinPQ {
         }
 
         // swim pos up in case exchanged index is smaller
-        uint256 val = self.inner.getPower(validators, pos);
+        uint256 val = self.inner.getCurrentPower(validators, pos);
         swim({self: self, validators: validators, pos: pos, value: val});
 
         // sink pos down in case updated pos is larger
-        val = self.inner.getPower(validators, pos);
+        val = self.inner.getCurrentPower(validators, pos);
         sink({self: self, validators: validators, pos: pos, value: val});
     }
 
     /// @notice Reheapify the heap when the collateral of a key has increased.
     function increaseReheapify(MinPQ storage self, ValidatorSet storage validators, address validator) internal {
         uint16 pos = self.inner.getPosOrRevert(validator);
-        uint256 val = validators.getPower(validator);
+        uint256 val = validators.getCurrentPower(validator);
         sink({self: self, validators: validators, pos: pos, value: val});
     }
 
     /// @notice Reheapify the heap when the collateral of a key has decreased.
     function decreaseReheapify(MinPQ storage self, ValidatorSet storage validators, address validator) internal {
         uint16 pos = self.inner.getPosOrRevert(validator);
-        uint256 val = validators.getPower(validator);
+        uint256 val = validators.getCurrentPower(validator);
         swim({self: self, validators: validators, pos: pos, value: val});
     }
 
@@ -99,7 +99,7 @@ library LibMinPQ {
         self.inner.requireNotEmpty();
 
         address addr = self.inner.posToAddress[1];
-        uint256 power = validators.getPower(addr);
+        uint256 power = validators.getCurrentPower(addr);
         return (addr, power);
     }
 
@@ -113,7 +113,7 @@ library LibMinPQ {
         while (pos > 1) {
             // parentPos = pos / 2;
             parentPos = pos >> 1;
-            parentPower = self.inner.getPower(validators, parentPos);
+            parentPower = self.inner.getCurrentPower(validators, parentPos);
 
             // parent power is not more than that of the current child, heap condition met.
             if (!firstValueLarger(parentPower, value)) {
@@ -141,7 +141,7 @@ library LibMinPQ {
                     pos2: childPos + 1
                 });
             } else {
-                childPower = self.inner.getPower(validators, childPos);
+                childPower = self.inner.getCurrentPower(validators, childPos);
             }
 
             // parent, current idx, is not more than its two children, min heap condition is met.
@@ -162,8 +162,8 @@ library LibMinPQ {
         uint16 pos1,
         uint16 pos2
     ) internal view returns (uint16, uint256) {
-        uint256 value1 = self.inner.getPower(validators, pos1);
-        uint256 value2 = self.inner.getPower(validators, pos2);
+        uint256 value1 = self.inner.getCurrentPower(validators, pos1);
+        uint256 value2 = self.inner.getCurrentPower(validators, pos2);
 
         if (!firstValueLarger(value1, value2)) {
             return (pos1, value1);

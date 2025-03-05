@@ -12,7 +12,7 @@ use fvm_shared::{
 use ipc_api::checkpoint::consensus::ValidatorData;
 use ipc_api::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
 use ipc_api::evm::payload_to_evm_address;
-use ipc_api::staking::{StakingChangeRequest, ValidatorInfo};
+use ipc_api::staking::{PowerChangeRequest, ValidatorInfo};
 use ipc_api::subnet::{Asset, PermissionMode};
 use ipc_api::{
     cross::IpcEnvelope,
@@ -607,7 +607,7 @@ impl IpcProvider {
         &self,
         subnet: &SubnetID,
         epoch: ChainEpoch,
-    ) -> anyhow::Result<TopDownQueryPayload<Vec<StakingChangeRequest>>> {
+    ) -> anyhow::Result<TopDownQueryPayload<Vec<PowerChangeRequest>>> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
         let conn = self.get_connection(&parent)?;
 

@@ -148,7 +148,7 @@ impl<DB: Blockstore + Clone> SubnetCaller<DB> {
         addr: &EthAddress,
     ) -> anyhow::Result<TokenAmount> {
         self.get_validator(state, addr)
-            .map(|i| from_eth::to_fvm_tokens(&i.confirmed_collateral))
+            .map(|i| from_eth::to_fvm_tokens(&i.current_power))
     }
 
     /// Get the total (unconfirmed) collateral of a validator.
@@ -158,7 +158,7 @@ impl<DB: Blockstore + Clone> SubnetCaller<DB> {
         addr: &EthAddress,
     ) -> anyhow::Result<TokenAmount> {
         self.get_validator(state, addr)
-            .map(|i| from_eth::to_fvm_tokens(&i.total_collateral))
+            .map(|i| from_eth::to_fvm_tokens(&i.next_power))
     }
 
     /// Get the `(next, start)` configuration number pair.

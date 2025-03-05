@@ -9,7 +9,7 @@ use crate::{
 use anyhow::anyhow;
 use async_stm::{Stm, StmResult};
 use ipc_api::cross::IpcEnvelope;
-use ipc_api::staking::StakingChangeRequest;
+use ipc_api::staking::PowerChangeRequest;
 
 /// The parent finality provider could have all functionalities disabled.
 #[derive(Clone)]
@@ -54,7 +54,7 @@ impl<P: ParentViewProvider + Send + Sync + 'static> ParentViewProvider for Toggl
         &self,
         from: BlockHeight,
         to: BlockHeight,
-    ) -> anyhow::Result<Vec<StakingChangeRequest>> {
+    ) -> anyhow::Result<Vec<PowerChangeRequest>> {
         match self.inner.as_ref() {
             Some(p) => p.validator_changes_from(from, to).await,
             None => Err(anyhow!("provider is toggled off")),
