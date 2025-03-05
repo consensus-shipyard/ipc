@@ -8,7 +8,7 @@ import {LibMinPQ, MinPQ} from "./priority/LibMinPQ.sol";
 import {LibPowerChangeLog} from "./LibPowerChangeLog.sol";
 import {AssetHelper} from "./AssetHelper.sol";
 import {PermissionMode, StakingReleaseQueue, PowerChangeLog, PowerChange, PowerChangeRequest, PowerOperation, StakingRelease, ValidatorSet, AddressStakingReleases, ParentValidatorsTracker, Validator, Asset} from "../structs/Subnet.sol";
-import {CannotDecreasePower, NotValidator, CannotConfirmFutureChanges, NoCollateralToWithdraw, AddressShouldBeValidator, InvalidConfigurationNumber} from "../errors/IPCErrors.sol";
+import {PowerReductionMoreThanTotal, NotValidator, CannotConfirmFutureChanges, NoCollateralToWithdraw, AddressShouldBeValidator, InvalidConfigurationNumber} from "../errors/IPCErrors.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 library LibAddressStakingReleases {
@@ -197,7 +197,7 @@ library LibValidatorSet {
     function decreasePower(ValidatorSet storage validators, address validator, uint256 change) internal returns(uint256) {
         uint256 total = validators.validators[validator].nextPower;
         if (total < change) {
-            revert CannotDecreasePower(total, change);
+            revert PowerReductionMoreThanTotal(total, change);
         }
 
         total -= change;

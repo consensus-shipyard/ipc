@@ -66,7 +66,7 @@ error SignatureReplay();
 error SubnetAlreadyKilled();
 error SubnetNotActive();
 error SubnetNotFound();
-error CannotDecreasePower(uint256 total, uint256 change);
+error PowerReductionMoreThanTotal(uint256 total, uint256 change);
 error ZeroMembershipWeight();
 error SubnetAlreadyBootstrapped();
 error SubnetNotBootstrapped();
