@@ -8,7 +8,7 @@
 # The goal of this step is to copy the `Cargo.toml` and `Cargo.lock` files _without_ the source code,
 # so that we can run a step in `builder` that compiles the dependencies only. To do so we first
 # copy the whole codebase then get rid of everything except the dependencies and do a build.
-FROM --platform=$BUILDPLATFORM ubuntu:jammy as stripper
+FROM --platform=$BUILDPLATFORM ubuntu:jammy AS stripper
 
 WORKDIR /app
 
@@ -31,7 +31,7 @@ RUN echo "fn main() { println!(\"I'm the dummy.\"); }" > fendermint/app/src/main
 # with the `ubuntu` base and Rust installed.
 # Using the `jammy` version because `latest` gave a GLIBC_2.38 not found with the `debian:bookworm` runner.
 # See version at https://packages.debian.org/search?searchon=sourcenames&keywords=glibc and https://launchpad.net/ubuntu/+source/glibc
-FROM --platform=$BUILDPLATFORM ubuntu:jammy as builder
+FROM --platform=$BUILDPLATFORM ubuntu:jammy AS builder
 
 RUN apt-get update && \
   apt-get install -y build-essential clang cmake protobuf-compiler curl \
@@ -62,7 +62,7 @@ ARG TARGETARCH
 RUN if [ "${TARGETARCH}" = "arm64" ]; then \
   apt-get install -y g++-aarch64-linux-gnu libc6-dev-arm64-cross; \
   rustup target add aarch64-unknown-linux-gnu; \
-  rustup toolchain install ${RUST_VERSION}-aarch64-unknown-linux-gnu; \
+  rustup toolchain install ${RUST_VERSION}-aarch64-unknown-linux-gnu --force-non-host; \
   fi
 
 # Copy the stripped source code.
@@ -78,7 +78,7 @@ RUN \
   amd64) ARCH='x86_64'  ;; \
   arm64) ARCH='aarch64'; \
       rustup target add aarch64-unknown-linux-gnu; \
-      rustup toolchain install stable-aarch64-unknown-linux-gnu ;; \
+      rustup toolchain install ${RUST_VERSION}-aarch64-unknown-linux-gnu --force-non-host ;; \
   *) echo >&2 "unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
   esac; \
   rustup show ; \
@@ -101,7 +101,7 @@ RUN \
   amd64) ARCH='x86_64'  ;; \
   arm64) ARCH='aarch64'; \
     rustup target add aarch64-unknown-linux-gnu; \
-    rustup toolchain install stable-aarch64-unknown-linux-gnu ;; \
+    rustup toolchain install ${RUST_VERSION}-aarch64-unknown-linux-gnu --force-non-host ;; \
   esac; \
   rustup show ; \
   cargo install --locked --root output --path fendermint/app --target ${ARCH}-unknown-linux-gnu ; \
