@@ -474,6 +474,8 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
 
     echo "$deploy_validator_rewarder_token_out"
     echo ""
+    # note: this is consistently going to be
+    # 0x09635F643e140090A9A8Dcd712eD6285858ceBef for localnet
     VALIDATOR_REWARDER_ADDRESS=$(echo "$deploy_validator_rewarder_token_out" | sed -n 's/.*contract ValidatorRewarder *\([^ ]*\).*/\1/p')
 
     # fund the all anvil accounts with 10100 RECALL (note the extra 100 RECALL)
@@ -510,7 +512,7 @@ echo ""
 echo "$deploy_validator_gater_token_out"
 echo ""
 # note: this is consistently going to be
-# 0xf5059a5D33d5853360D16C683c16e67980206f36 for localnet
+# 0x70e0bA845a1A0F2DA3359C97E0285013525FFC49 for localnet
 VALIDATOR_GATER_ADDRESS=$(echo "$deploy_validator_gater_token_out" | sed -n 's/.*contract ValidatorGater *\([^ ]*\).*/\1/p')
 echo "Parent validator gater address: $VALIDATOR_GATER_ADDRESS"
 cd "$IPC_FOLDER"
@@ -753,6 +755,7 @@ sleep 3 # briefly wait for the relayer to start
 echo "$temp_evm_keystore" > "${IPC_CONFIG_FOLDER}"/evm_keystore.json
 
 # move localnet funds to subnet
+BLOB_MANAGER_ADDRESS=""
 BUCKET_MANAGER_ADDRESS=""
 CREDIT_MANAGER_ADDRESS=""
 if [[ $local_deploy = true ]]; then
@@ -780,43 +783,65 @@ if [[ $local_deploy = true ]]; then
     sleep 5
   done
   echo "Deposited RECALL for test accounts"
-  # buy 5000 credits if the recall CLI is installed
-  if [[ -n $(which recall) ]]; then
-    echo "Buying credits for test accounts..."
-    credit_amount="5000"
-    for i in {0..9}
-    do
-      private_key=$(jq .["$i"].private_key < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
-      RECALL_PRIVATE_KEY="${private_key}" RECALL_NETWORK=localnet recall account credit buy "${credit_amount}"
-    done
-    echo "Bought subnet credits for test accounts"
-  else
-    echo "Recall CLI not installed...skipping credit funding"
-  fi
   echo
-  
+
   # Deploy the bucket and credit manager contracts
   # Note: due to validators also submitting checkpoints, it's impossible to get around nonce issues
   # with validator accounts. So, we deploy the bucket and credit manager contracts via the last evm
   # account. Ideally, we would use validator 0 and somehow avoid nonce clashes.
   deployer_pk=$(jq .[9].private_key < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
   cd "${IPC_FOLDER}/recall-contracts"
-  echo "$DASHES deploy bucket and credit manager output $DASHES"
+  echo "$DASHES Deploy blob, bucket, and credit manager contracts $DASHES"
   deploy_blob_manager_token_out="$(forge script script/BlobManager.s.sol --private-key "${deployer_pk}" --rpc-url http://localhost:"${ETHAPI_HOST_PORTS[0]}" --tc DeployScript --sig 'run()' --broadcast --timeout 120 -g 100000 -vv)"
   deploy_bucket_manager_token_out="$(forge script script/BucketManager.s.sol --private-key "${deployer_pk}" --rpc-url http://localhost:"${ETHAPI_HOST_PORTS[0]}" --tc DeployScript --sig 'run()' --broadcast --timeout 120 -g 100000 -vv)"
   deploy_credit_manager_token_out="$(forge script script/CreditManager.s.sol --private-key "${deployer_pk}" --rpc-url http://localhost:"${ETHAPI_HOST_PORTS[0]}" --tc DeployScript --sig 'run()' --broadcast --timeout 120 -g 100000 -vv)"
   echo ""
+  echo "Blob manager output:"
+  echo "$deploy_blob_manager_token_out"
+  echo "Bucket manager output:"
   echo "$deploy_bucket_manager_token_out"
+  echo "Credit manager output:"
   echo "$deploy_credit_manager_token_out"
   echo ""
-  # note: these are consistently going to be 0xe1Aa25618fA0c7A1CFDab5d6B456af611873b629 and
-  # 0xf7Cd8fa9b94DB2Aa972023b379c7f72c65E4De9D, respectively, for localnet
+  # note: these are consistently going to be the following addresses on localnet:
+  # - Blob: 0x8ce361602B935680E8DeC218b820ff5056BeB7af
+  # - Bucket: 0xeD1DB453C3156Ff3155a97AD217b3087D5Dc5f6E
+  # - Credit: 0x196dBCBb54b8ec4958c959D8949EBFE87aC2Aaaf
   BLOB_MANAGER_ADDRESS=$(echo "$deploy_blob_manager_token_out" | sed -n 's/.*contract BlobManager *\([^ ]*\).*/\1/p')
   BUCKET_MANAGER_ADDRESS=$(echo "$deploy_bucket_manager_token_out" | sed -n 's/.*contract BucketManager *\([^ ]*\).*/\1/p')
   CREDIT_MANAGER_ADDRESS=$(echo "$deploy_credit_manager_token_out" | sed -n 's/.*contract CreditManager *\([^ ]*\).*/\1/p')
   echo "Blob manager address: ${BLOB_MANAGER_ADDRESS}"
   echo "Bucket manager address: ${BUCKET_MANAGER_ADDRESS}"
   echo "Credit manager address: ${CREDIT_MANAGER_ADDRESS}"
+  echo
+
+  # buy 5000 credits for each account
+  echo "Buying credits for test accounts..."
+  credit_amount="5000"
+  max_retries=5
+  for i in {0..9}
+  do
+    private_key=$(jq .["$i"].private_key < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
+    attempt=1
+    # due to potential nonce race conditions with the first three accounts, we need to retry the
+    # transaction until it succeeds—else, we'll continue and simply skip the account since it's not
+    # recommended to use the validator accounts during development, anyways
+    while [ $attempt -le $max_retries ]; do
+      if cast send --rpc-url http://localhost:"${ETHAPI_HOST_PORTS[0]}" $CREDIT_MANAGER_ADDRESS "buyCredit()" --value "${credit_amount}ether" --private-key $private_key 2>/dev/null; then
+        echo "Successfully bought credits for account $i"
+        break
+      else
+        if [ $attempt -eq $max_retries ]; then
+          echo "Failed to buy credits for account $i after $max_retries attempts"
+        else
+          echo "Attempt $attempt failed for account $i, retrying..."
+          sleep 1
+        fi
+        ((attempt++))
+      fi
+    done
+  done
+  echo "Bought subnet credits for test accounts"
   echo
   echo "${DASHES} Subnet setup complete ${DASHES}"
   echo
@@ -876,9 +901,9 @@ Subnet registry:           0x74539671a1d2f1c8f200826baba665179f53a1b7
 EOF
 
 if [[ $local_deploy = true ]]; then
-  echo "Subnet blob manager:    ${BLOB_MANAGER_ADDRESS}"
-  echo "Subnet bucket manager:  ${BUCKET_MANAGER_ADDRESS}"
-  echo "Subnet credit manager:  ${CREDIT_MANAGER_ADDRESS}"
+  echo "Subnet blob manager:       ${BLOB_MANAGER_ADDRESS}"
+  echo "Subnet bucket manager:     ${BUCKET_MANAGER_ADDRESS}"
+  echo "Subnet credit manager:     ${CREDIT_MANAGER_ADDRESS}"
   echo
   echo "Account balances:"
   addr=$(jq .[3].address < "${IPC_CONFIG_FOLDER}"/evm_keystore.json | tr -d '"')
@@ -887,11 +912,12 @@ if [[ $local_deploy = true ]]; then
   subnet_native=$(cast balance --rpc-url http://localhost:"${ETHAPI_HOST_PORTS[0]}" --ether "${addr}" | awk '{printf "%.2f", $1}')
   echo "Parent native: ${parent_native%.*} ETH"
   echo "Parent RECALL:   ${parent_recall%.*} RECALL"
-  echo "Subnet native: ${subnet_native%.*} RECALL"
-  if [[ -n $(which recall) ]]; then
-    credit_balance=$(RECALL_NETWORK=localnet recall account info --address "${addr}" | jq '.credit.credit_free' | tr -d '"')
-    echo "Subnet credits: ${credit_balance}"
-  fi
+  echo "Subnet native:  ${subnet_native%.*} RECALL"
+  # get credit balance (i.e., to help verify the credit purchases above worked)
+  account_info_output=$(cast call --rpc-url http://localhost:"${ETHAPI_HOST_PORTS[0]}" $CREDIT_MANAGER_ADDRESS "getAccount(address)" "${addr}")
+  account_info=$(cast abi-decode "getAccount(address)((uint64,uint256,uint256,address,uint64,(address,(uint256,uint256,uint64,uint256,uint256))[],(address,(uint256,uint256,uint64,uint256,uint256))[],uint64,uint256))" "$account_info_output")
+  credit_balance=$(echo "$account_info" | awk -F',' '{gsub(/[^0-9]/, "", $2); print substr($2, 1, length($2)-18)}')
+  echo "Subnet credits: ${credit_balance}"
   echo
   echo "Accounts:"
   for i in {0..9}
