@@ -7,7 +7,7 @@ use crate::finality::{
 use crate::{BlockHash, BlockHeight, Config, Error, IPCParentFinality, SequentialKeyCache};
 use async_stm::{abort, atomically, Stm, StmResult, TVar};
 use ipc_api::cross::IpcEnvelope;
-use ipc_api::staking::StakingChangeRequest;
+use ipc_api::staking::PowerChangeRequest;
 use std::cmp::min;
 
 use fendermint_tracing::emit;
@@ -46,7 +46,7 @@ impl FinalityWithNull {
     pub async fn validator_changes(
         &self,
         height: BlockHeight,
-    ) -> anyhow::Result<Option<Vec<StakingChangeRequest>>> {
+    ) -> anyhow::Result<Option<Vec<PowerChangeRequest>>> {
         let r = atomically(|| self.handle_null_block(height, validator_changes, Vec::new)).await;
         Ok(r)
     }
@@ -270,7 +270,7 @@ impl FinalityWithNull {
         &self,
         height: BlockHeight,
         block_hash: BlockHash,
-        validator_changes: Vec<StakingChangeRequest>,
+        validator_changes: Vec<PowerChangeRequest>,
         top_down_msgs: Vec<IpcEnvelope>,
     ) -> StmResult<(), Error> {
         if !top_down_msgs.is_empty() {

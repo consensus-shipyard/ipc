@@ -139,7 +139,8 @@ coverage: node_modules | forge
 prepare: test/helpers/SelectorLibrary.sol fmt lint test slither
 
 test/helpers/SelectorLibrary.sol: | forge
-	pnpm exec hardhat gen-selector-library
+    # viaIR is causing stack too deep in optimization for tests, but not in prod for `confirmChange`, disable for tests
+	VIAIR_DISABLED=true pnpm exec hardhat gen-selector-library
 	pnpm exec prettier -w test/helpers/SelectorLibrary.sol
 
 # Forge is used by the ipc-solidity-actors compilation steps.
