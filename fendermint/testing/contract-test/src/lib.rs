@@ -4,13 +4,13 @@
 use anyhow::{anyhow, Context, Result};
 use byteorder::{BigEndian, WriteBytesExt};
 use fendermint_vm_core::Timestamp;
+use fendermint_vm_message::chain::ChainMessage;
 use fvm_shared::clock::ChainEpoch;
 use std::{future::Future, sync::Arc};
 
 use fendermint_crypto::PublicKey;
 use fendermint_vm_genesis::Genesis;
 use fendermint_vm_interpreter::fvm::EndBlockOutput;
-use fendermint_vm_interpreter::genesis::{create_test_genesis_state, GenesisOutput};
 use fendermint_vm_interpreter::genesis::{create_test_genesis_state, GenesisOutput};
 use fendermint_vm_interpreter::types::{ApplyMessageResponse, EndBlockResponse};
 use fendermint_vm_interpreter::{
@@ -23,7 +23,7 @@ use fendermint_vm_interpreter::{
     ExecInterpreter,
 };
 use fvm::engine::MultiEngine;
-
+use fvm_ipld_encoding::{self};
 pub mod ipc;
 
 pub async fn create_test_exec_state(
@@ -62,13 +62,7 @@ pub struct Tester<I> {
 
 impl<I> Tester<I>
 where
-    I: ExecInterpreter<
-        State = FvmExecState<MemoryBlockstore>,
-        Message = FvmMessage,
-        BeginOutput = FvmApplyRet,
-        DeliverOutput = FvmApplyRet,
-        EndOutput = EndBlockOutput,
-    >,
+    I: MessagesInterpreter<MemoryBlockstore>,
 {
     pub async fn new(interpreter: I, genesis: Genesis) -> anyhow::Result<Self> {
         let (exec_state, out, store) = create_test_exec_state(genesis).await?;
@@ -141,34 +135,39 @@ where
 
         self.put_exec_state(state).await;
 
-        let _res = self
-            .modify_exec_state(|s| self.interpreter.begin(s))
-            .await?;
+        let mut state = self.take_exec_state().await;
+
+        self.interpreter.begin_block(&mut state).await?;
+
+        self.put_exec_state(state).await;
 
         Ok(())
     }
 
-    pub async fn execute_msgs(&self, msgs: Vec<FvmMessage>) -> Result<()> {
-        self.modify_exec_state(|mut s| async {
-            for msg in msgs {
-                let (a, out) = self.interpreter.deliver(s, msg).await?;
-                if let Some(e) = out.apply_ret.failure_info {
-                    println!("failed: {}", e);
-                    return Err(anyhow!("err in msg deliver"));
-                }
-                s = a;
+    pub async fn execute_msgs(&self, msgs: Vec<ChainMessage>) -> Result<()> {
+        let mut state = self.take_exec_state().await;
+
+        for msg in msgs {
+            let msg = fvm_ipld_encoding::to_vec(&msg).context("failed to serialize msg")?;
+
+            let response = self.interpreter.apply_message(&mut state, msg).await?;
+            if let Some(e) = response.applied_message.apply_ret.failure_info {
+                println!("failed: {}", e);
+                return Err(anyhow!("err in msg deliver"));
             }
-            Ok((s, ()))
-        })
-        .await
-        .context("execute msgs failed")
+        }
+
+        self.put_exec_state(state).await;
+
+        Ok(())
     }
 
     pub async fn end_block(&self, _block_height: ChainEpoch) -> Result<()> {
-        let _ret = self
-            .modify_exec_state(|s| self.interpreter.end(s))
-            .await
-            .context("end failed")?;
+        let mut state = self.take_exec_state().await;
+
+        self.interpreter.end_block(&mut state).await?;
+
+        self.put_exec_state(state).await;
 
         Ok(())
     }

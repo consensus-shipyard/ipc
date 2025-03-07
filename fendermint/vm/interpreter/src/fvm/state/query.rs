@@ -22,7 +22,7 @@ use num_traits::Zero;
 
 use crate::fvm::{store::ReadOnlyBlockstore, FvmMessage};
 
-use super::{CheckStateRef, FvmExecState, FvmStateParams};
+use super::{FvmExecState, FvmStateParams};
 
 /// The state over which we run queries. These can interrogate the IPLD block store or the state tree.
 pub struct FvmQueryState<DB>
@@ -41,10 +41,6 @@ where
     state_params: FvmStateParams,
     /// Lazy loaded execution state.
     exec_state: RefCell<Option<FvmExecState<ReadOnlyBlockstore<DB>>>>,
-    /// Lazy locked check state.
-    check_state: CheckStateRef<DB>,
-    /// Whether to try ot use the check state or not.
-    pending: bool,
 }
 
 impl<DB> FvmQueryState<DB>
@@ -56,8 +52,6 @@ where
         multi_engine: Arc<MultiEngine>,
         block_height: ChainEpoch,
         state_params: FvmStateParams,
-        check_state: CheckStateRef<DB>,
-        pending: bool,
     ) -> anyhow::Result<Self> {
         // Sanity check that the blockstore contains the supplied state root.
         if !blockstore
@@ -76,8 +70,6 @@ where
             block_height,
             state_params,
             exec_state: RefCell::new(None),
-            check_state,
-            pending,
         };
 
         Ok(state)
@@ -111,18 +103,6 @@ where
     where
         F: FnOnce(&mut FvmExecState<ReadOnlyBlockstore<DB>>) -> anyhow::Result<T>,
     {
-        // TODO Karel - revisit this pending, Is it needed? If yes, for what?
-        // if self.pending {
-        //     // XXX: This will block all `check_tx` from going through and also all other queries.
-        //     let mut guard = self.check_state.lock().await;
-
-        //     if let Some(ref mut exec_state) = *guard {
-        //         let res = self.with_revert(exec_state, f);
-        //         drop(guard);
-        //         return res.map(|r| (self, r));
-        //     }
-        // }
-
         // Not using pending, or there is no pending state.
         let mut cache = self.exec_state.borrow_mut();
 
@@ -228,10 +208,6 @@ where
 
     pub fn block_height(&self) -> ChainEpoch {
         self.block_height
-    }
-
-    pub fn pending(&self) -> bool {
-        self.pending
     }
 }
 

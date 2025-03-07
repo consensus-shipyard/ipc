@@ -30,6 +30,7 @@ use crate::fvm::state::ipc::tokens_to_mint;
 
 type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxyWithLatency>>>;
 
+#[derive(Clone)]
 pub struct TopDownManager<DB>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
