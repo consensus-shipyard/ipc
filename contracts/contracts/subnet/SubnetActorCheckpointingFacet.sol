@@ -8,7 +8,7 @@ import {Validator, ValidatorSet} from "../structs/Subnet.sol";
 import {MultisignatureChecker} from "../lib/LibMultisignatureChecker.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
-import {LibValidatorSet, LibStaking} from "../lib/LibStaking.sol";
+import {LibValidatorSet, LibPower} from "../lib/LibPower.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {LibSubnetActor} from "../lib/LibSubnetActor.sol";
 import {Pausable} from "../lib/LibPausable.sol";
@@ -48,7 +48,7 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
 
         LibActivity.recordActivityRollup(checkpoint.subnetID, uint64(checkpoint.blockHeight), checkpoint.activity);
         // confirming the changes in membership in the child
-        LibStaking.confirmChange(checkpoint.nextConfigurationNumber);
+        LibPower.confirmChange(checkpoint.nextConfigurationNumber);
 
         // Propagate cross messages from checkpoint to other subnets
         IGateway(s.ipcGatewayAddr).propagateAll();

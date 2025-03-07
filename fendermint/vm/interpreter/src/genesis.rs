@@ -44,8 +44,6 @@ use serde_with::serde_as;
 use tokio_stream::StreamExt;
 use tokio_util::compat::TokioAsyncWriteCompatExt;
 
-use fs_err as fs;
-
 /// The sealed genesis state metadata
 #[serde_as]
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
@@ -159,29 +157,29 @@ pub struct GenesisOutput {
     pub validators: Vec<Validator<Power>>,
 }
 
-pub struct GenesisBuilder {
+pub struct GenesisBuilder<'a> {
     /// Hardhat like util to deploy ipc contracts
     hardhat: Hardhat,
-    /// The built in actors bundle path
-    builtin_actors_path: PathBuf,
-    /// The custom actors bundle path
-    custom_actors_path: PathBuf,
+    /// The builtin actors bundle
+    builtin_actors: &'a [u8],
+    /// The custom actors bundle
+    custom_actors: &'a [u8],
 
     /// Genesis params
     genesis_params: Genesis,
 }
 
-impl GenesisBuilder {
+impl<'a> GenesisBuilder<'a> {
     pub fn new(
-        builtin_actors_path: PathBuf,
-        custom_actors_path: PathBuf,
+        builtin_actors: &'a [u8],
+        custom_actors: &'a [u8],
         artifacts_path: PathBuf,
         genesis_params: Genesis,
     ) -> Self {
         Self {
             hardhat: Hardhat::new(artifacts_path),
-            builtin_actors_path,
-            custom_actors_path,
+            builtin_actors,
+            custom_actors,
             genesis_params,
         }
     }
@@ -229,27 +227,13 @@ impl GenesisBuilder {
     }
 
     async fn init_state(&self) -> anyhow::Result<FvmGenesisState<MemoryBlockstore>> {
-        let bundle = fs::read(&self.builtin_actors_path).with_context(|| {
-            format!(
-                "failed to read builtin actors bundle: {}",
-                self.builtin_actors_path.to_string_lossy()
-            )
-        })?;
-
-        let custom_actors_bundle = fs::read(&self.custom_actors_path).with_context(|| {
-            format!(
-                "failed to read custom actors bundle: {}",
-                self.custom_actors_path.to_string_lossy()
-            )
-        })?;
-
         let store = MemoryBlockstore::new();
 
         FvmGenesisState::new(
             store,
             Arc::new(MultiEngine::new(1)),
-            &bundle,
-            &custom_actors_bundle,
+            self.builtin_actors,
+            self.custom_actors,
         )
         .await
         .context("failed to create genesis state")
@@ -778,14 +762,14 @@ fn circ_supply(g: &Genesis) -> TokenAmount {
 
 #[cfg(any(feature = "test-util", test))]
 pub async fn create_test_genesis_state(
-    bundle_path: PathBuf,
-    custom_actors_bundle_path: PathBuf,
+    builtin_actors_bundle: &[u8],
+    custom_actors_bundle: &[u8],
     ipc_path: PathBuf,
     genesis_params: Genesis,
 ) -> anyhow::Result<(FvmGenesisState<MemoryBlockstore>, GenesisOutput)> {
     let builder = GenesisBuilder::new(
-        bundle_path,
-        custom_actors_bundle_path,
+        builtin_actors_bundle,
+        custom_actors_bundle,
         ipc_path,
         genesis_params,
     );

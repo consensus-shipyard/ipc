@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {LibValidatorSet} from "../LibStaking.sol";
+import {LibValidatorSet} from "../LibPower.sol";
 import {ValidatorSet} from "../../structs/Subnet.sol";
 import {PQEmpty, PQDoesNotContainAddress} from "../../errors/IPCErrors.sol";
 
@@ -51,22 +51,13 @@ library LibPQ {
         delete self.addressToPos[addr];
     }
 
-    function getPower(
+    function getCurrentPower(
         PQ storage self,
         ValidatorSet storage validators,
         uint16 pos
     ) internal view returns (uint256) {
         address addr = self.posToAddress[pos];
-        return validators.getPower(addr);
-    }
-
-    function getConfirmedCollateral(
-        PQ storage self,
-        ValidatorSet storage validators,
-        uint16 pos
-    ) internal view returns (uint256) {
-        address addr = self.posToAddress[pos];
-        return validators.getConfirmedCollateral(addr);
+        return validators.getCurrentPower(addr);
     }
 
     function exchange(PQ storage self, uint16 pos1, uint16 pos2) internal {
