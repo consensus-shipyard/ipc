@@ -202,9 +202,10 @@ where
     /// Fetch the current nonce to be used in the next message.
     async fn sequence(&self) -> anyhow::Result<u64> {
         // Using the `Pending` state to query just in case there are other transactions initiated by the validator.
+        // TODO Karel - it was like this: .actor_state(&self.addr, FvmQueryHeight::Pending)
         let res = self
             .client
-            .actor_state(&self.addr, FvmQueryHeight::Pending)
+            .actor_state(&self.addr, FvmQueryHeight::Committed)
             .await
             .context("failed to get broadcaster actor state")?;
 

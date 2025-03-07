@@ -27,6 +27,14 @@ pub enum ApplyMessageError {
     Other(#[from] Error),
 }
 
+#[derive(Error, Debug)]
+pub enum QueryError {
+    #[error("invalid query: {0}")]
+    InvalidQuery(String),
+    #[error("other error: {0}")]
+    Other(#[from] Error),
+}
+
 macro_rules! anyhow_wrapper_error {
     ($($name:ident),* $(,)?) => {
         $(
@@ -44,5 +52,4 @@ anyhow_wrapper_error!(
     EndBlockError,
     PrepareMessagesError,
     AttestMessagesError,
-    QueryError,
 );
