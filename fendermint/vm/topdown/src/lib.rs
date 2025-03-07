@@ -162,8 +162,7 @@ pub trait ParentFinalityProvider: ParentViewProvider {
     /// Called when finality is committed
     fn set_new_finality(
         &self,
-        finality: IPCParentFinality,
-        previous_finality: Option<IPCParentFinality>,
+        finality: IPCParentFinality
     ) -> Stm<()>;
 }
 

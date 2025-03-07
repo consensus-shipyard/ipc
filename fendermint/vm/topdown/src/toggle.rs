@@ -85,9 +85,8 @@ impl<P: ParentFinalityProvider + Send + Sync + 'static> ParentFinalityProvider f
     fn set_new_finality(
         &self,
         finality: IPCParentFinality,
-        previous_finality: Option<IPCParentFinality>,
     ) -> Stm<()> {
-        self.perform_or_else(|p| p.set_new_finality(finality, previous_finality), ())
+        self.perform_or_else(|p| p.set_new_finality(finality), ())
     }
 }
 
