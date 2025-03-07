@@ -160,10 +160,7 @@ pub trait ParentFinalityProvider: ParentViewProvider {
     /// Check if the target proposal is valid
     fn check_proposal(&self, proposal: &IPCParentFinality) -> Stm<bool>;
     /// Called when finality is committed
-    fn set_new_finality(
-        &self,
-        finality: IPCParentFinality
-    ) -> Stm<()>;
+    fn set_new_finality(&self, finality: IPCParentFinality) -> Stm<()>;
 }
 
 /// If res is null round error, returns the default value from f()

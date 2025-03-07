@@ -103,10 +103,7 @@ impl FinalityWithNull {
         self.check_block_hash(proposal)
     }
 
-    pub fn set_new_finality(
-        &self,
-        finality: IPCParentFinality,
-    ) -> Stm<()> {
+    pub fn set_new_finality(&self, finality: IPCParentFinality) -> Stm<()> {
         // the height to clear
         let height = finality.height;
 
