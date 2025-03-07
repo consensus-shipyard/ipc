@@ -421,10 +421,7 @@ mod tests {
         );
 
         // Test set new finality
-        atomically(|| {
-            provider.set_new_finality(f.clone())
-        })
-        .await;
+        atomically(|| provider.set_new_finality(f.clone())).await;
 
         assert_eq!(
             atomically(|| provider.last_committed_finality()).await,
