@@ -422,7 +422,6 @@ mod tests {
 
         // Test set new finality
         atomically(|| {
-            let last = provider.last_committed_finality.read_clone()?;
             provider.set_new_finality(f.clone())
         })
         .await;
