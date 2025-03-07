@@ -10,7 +10,6 @@ use fendermint_actor_recall_config_shared::RecallConfig;
 use fendermint_vm_actor_interface::recall_config::RECALL_CONFIG_ACTOR_ADDR;
 use fendermint_vm_actor_interface::system;
 use fvm::executor::{ApplyKind, ApplyRet, Executor};
-use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use num_traits::Zero;
 
@@ -37,7 +36,7 @@ impl RecallConfigTracker {
     pub fn create<E: Executor>(executor: &mut E) -> anyhow::Result<RecallConfigTracker> {
         let mut ret = Self {
             blob_capacity: Zero::zero(),
-            token_credit_rate: TokenCreditRate::from(BigInt::zero()),
+            token_credit_rate: TokenCreditRate::from(0usize),
             blob_credit_debit_interval: Zero::zero(),
             blob_min_ttl: Zero::zero(),
             blob_default_ttl: Zero::zero(),

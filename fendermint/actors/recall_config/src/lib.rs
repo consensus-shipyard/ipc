@@ -16,8 +16,9 @@ use fil_actors_runtime::{
     ActorError, SYSTEM_ACTOR_ADDR,
 };
 use fvm_ipld_encoding::tuple::*;
+use fvm_shared::bigint::BigUint;
 use fvm_shared::{address::Address, clock::ChainEpoch};
-use num_traits::Signed;
+use num_traits::Zero;
 use recall_sol_facade::config::{config_admin_set, config_set};
 
 #[cfg(feature = "fil-actor")]
@@ -94,7 +95,7 @@ impl Actor {
     fn set_config(rt: &impl Runtime, params: SetConfigParams) -> Result<(), ActorError> {
         let admin_exists = Self::ensure_update_allowed(rt)?;
 
-        if !params.token_credit_rate.rate().is_positive() {
+        if params.token_credit_rate.rate() <= &BigUint::zero() {
             return Err(actor_error!(
                 illegal_argument,
                 "token credit rate must be positive"
@@ -166,11 +167,7 @@ impl Actor {
             rt,
             config_set(
                 params.blob_capacity,
-                params
-                    .token_credit_rate
-                    .rate()
-                    .to_biguint()
-                    .unwrap_or_default(),
+                params.token_credit_rate.rate().clone(),
                 params.blob_credit_debit_interval as u64,
                 params.blob_min_ttl as u64,
                 params.blob_default_ttl as u64,
@@ -237,7 +234,6 @@ mod tests {
         expect_empty, MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, SYSTEM_ACTOR_CODE_ID,
     };
     use fvm_ipld_encoding::ipld_block::IpldBlock;
-    use fvm_shared::bigint::BigInt;
     use fvm_shared::error::ExitCode;
 
     pub fn construct_and_verify(
@@ -281,13 +277,7 @@ mod tests {
 
     #[test]
     fn test_get_initial_admin() {
-        let rt = construct_and_verify(
-            1024,
-            TokenCreditRate::from(BigInt::from(5)),
-            3600,
-            3600,
-            3600,
-        );
+        let rt = construct_and_verify(1024, TokenCreditRate::from(5usize), 3600, 3600, 3600);
 
         rt.expect_validate_caller_any();
         let admin = rt
@@ -303,13 +293,7 @@ mod tests {
 
     #[test]
     fn test_set_admin() {
-        let rt = construct_and_verify(
-            1024,
-            TokenCreditRate::from(BigInt::from(5)),
-            3600,
-            3600,
-            3600,
-        );
+        let rt = construct_and_verify(1024, TokenCreditRate::from(5usize), 3600, 3600, 3600);
 
         let id_addr = Address::new_id(110);
         let eth_addr = EthAddress(hex_literal::hex!(
@@ -373,13 +357,7 @@ mod tests {
 
     #[test]
     fn test_set_admin_unauthorized() {
-        let rt = construct_and_verify(
-            1024,
-            TokenCreditRate::from(BigInt::from(5)),
-            3600,
-            3600,
-            3600,
-        );
+        let rt = construct_and_verify(1024, TokenCreditRate::from(5usize), 3600, 3600, 3600);
 
         let id_addr = Address::new_id(110);
         let eth_addr = EthAddress(hex_literal::hex!(
@@ -422,13 +400,7 @@ mod tests {
 
     #[test]
     fn test_set_config() {
-        let rt = construct_and_verify(
-            1024,
-            TokenCreditRate::from(BigInt::from(5)),
-            3600,
-            3600,
-            3600,
-        );
+        let rt = construct_and_verify(1024, TokenCreditRate::from(5usize), 3600, 3600, 3600);
 
         let id_addr = Address::new_id(110);
         let eth_addr = EthAddress(hex_literal::hex!(
@@ -445,7 +417,7 @@ mod tests {
 
         let config = RecallConfig {
             blob_capacity: 2048,
-            token_credit_rate: TokenCreditRate::from(BigInt::from(10)),
+            token_credit_rate: TokenCreditRate::from(10usize),
             blob_credit_debit_interval: ChainEpoch::from(1800),
             blob_min_ttl: ChainEpoch::from(2 * 60 * 60),
             blob_default_ttl: ChainEpoch::from(24 * 60 * 60),
@@ -455,11 +427,7 @@ mod tests {
         let config_event = to_actor_event(
             config_set(
                 config.blob_capacity,
-                config
-                    .token_credit_rate
-                    .rate()
-                    .to_biguint()
-                    .unwrap_or_default(),
+                config.token_credit_rate.rate().clone(),
                 config.blob_credit_debit_interval as u64,
                 config.blob_min_ttl as u64,
                 config.blob_default_ttl as u64,
@@ -490,7 +458,7 @@ mod tests {
         assert_eq!(recall_config.blob_capacity, 2048);
         assert_eq!(
             recall_config.token_credit_rate,
-            TokenCreditRate::from(BigInt::from(10))
+            TokenCreditRate::from(10usize)
         );
         assert_eq!(recall_config.blob_credit_debit_interval, 1800);
         assert_eq!(recall_config.blob_min_ttl, ChainEpoch::from(2 * 60 * 60));
@@ -520,7 +488,7 @@ mod tests {
 
         let valid_config = RecallConfig {
             blob_capacity: 2048,
-            token_credit_rate: TokenCreditRate::from(BigInt::from(10)),
+            token_credit_rate: TokenCreditRate::from(10usize),
             blob_credit_debit_interval: ChainEpoch::from(1800),
             blob_min_ttl: ChainEpoch::from(2 * 60 * 60),
             blob_default_ttl: ChainEpoch::from(24 * 60 * 60),
@@ -533,14 +501,7 @@ mod tests {
             TestCase {
                 name: "token credit rate cannot be zero",
                 config: RecallConfig {
-                    token_credit_rate: TokenCreditRate::from(BigInt::from(0)),
-                    ..valid_config.clone()
-                },
-            },
-            TestCase {
-                name: "token credit rate cannot be negative",
-                config: RecallConfig {
-                    token_credit_rate: TokenCreditRate::from(BigInt::from(-1)),
+                    token_credit_rate: TokenCreditRate::from(0usize),
                     ..valid_config.clone()
                 },
             },
@@ -606,13 +567,7 @@ mod tests {
             },
         ];
 
-        let rt = construct_and_verify(
-            1024,
-            TokenCreditRate::from(BigInt::from(5)),
-            3600,
-            3600,
-            3600,
-        );
+        let rt = construct_and_verify(1024, TokenCreditRate::from(5usize), 3600, 3600, 3600);
 
         let id_addr = Address::new_id(110);
         let eth_addr = EthAddress(hex_literal::hex!(
@@ -641,13 +596,7 @@ mod tests {
 
     #[test]
     fn test_get_config() {
-        let rt = construct_and_verify(
-            1024,
-            TokenCreditRate::from(BigInt::from(5)),
-            3600,
-            3600,
-            3600,
-        );
+        let rt = construct_and_verify(1024, TokenCreditRate::from(5usize), 3600, 3600, 3600);
 
         rt.expect_validate_caller_any();
         let recall_config = rt
@@ -661,7 +610,7 @@ mod tests {
         assert_eq!(recall_config.blob_capacity, 1024);
         assert_eq!(
             recall_config.token_credit_rate,
-            TokenCreditRate::from(BigInt::from(5))
+            TokenCreditRate::from(5usize)
         );
         assert_eq!(recall_config.blob_credit_debit_interval, 3600);
         assert_eq!(recall_config.blob_min_ttl, 3600);

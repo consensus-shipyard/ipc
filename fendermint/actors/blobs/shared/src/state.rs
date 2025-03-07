@@ -13,7 +13,7 @@ use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
-use fvm_shared::bigint::BigInt;
+use fvm_shared::bigint::{BigInt, BigUint};
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use recall_ipld::{hamt, hamt::map::TrackedFlushResult, hamt::MapKey};
@@ -26,17 +26,17 @@ pub type Credit = TokenAmount;
 /// TokenCreditRate determines how much atto credits can be bought by a certain amount of RECALL.
 #[derive(Clone, Default, Debug, serde::Serialize, serde::Deserialize, Eq, PartialEq)]
 pub struct TokenCreditRate {
-    rate: BigInt,
+    rate: BigUint,
 }
 
 impl TokenCreditRate {
     pub const RATIO: u128 = 10u128.pow(18);
 
-    pub fn from(rate: impl Into<BigInt>) -> Self {
+    pub fn from(rate: impl Into<BigUint>) -> Self {
         Self { rate: rate.into() }
     }
 
-    pub fn rate(&self) -> &BigInt {
+    pub fn rate(&self) -> &BigUint {
         &self.rate
     }
 }
@@ -51,7 +51,8 @@ impl Mul<&TokenCreditRate> for TokenAmount {
     type Output = Credit;
 
     fn mul(self, rate: &TokenCreditRate) -> Self::Output {
-        (self * &rate.rate).div_floor(TokenCreditRate::RATIO)
+        let rate = BigInt::from(rate.rate.clone());
+        (self * rate).div_floor(TokenCreditRate::RATIO)
     }
 }
 
@@ -645,61 +646,61 @@ mod tests {
         let test_cases = vec![
             TestCase {
                 tokens: TokenAmount::from_whole(1),
-                rate: TokenCreditRate::from(BigInt::from(1)),
+                rate: TokenCreditRate::from(1usize),
                 expected: "0.000000000000000001",
                 description: "lower bound: 1 RECALL buys 1 atto credit",
             },
             TestCase {
-                tokens: TokenAmount::from_nano(BigInt::from(500000000)), // 0.5 RECALL
-                rate: TokenCreditRate::from(BigInt::from(1)),
+                tokens: TokenAmount::from_nano(500000000), // 0.5 RECALL
+                rate: TokenCreditRate::from(1usize),
                 expected: "0.0",
                 description: "crossing lower bound. 0.5 RECALL cannot buy 1 atto credit",
             },
             TestCase {
-                tokens: TokenAmount::from_whole(BigInt::from(1)),
-                rate: TokenCreditRate::from(BigInt::from(2)),
+                tokens: TokenAmount::from_whole(1),
+                rate: TokenCreditRate::from(2usize),
                 expected: "0.000000000000000002",
                 description: "1 RECALL buys 2 atto credits",
             },
             TestCase {
-                tokens: TokenAmount::from_whole(BigInt::from(1)),
-                rate: TokenCreditRate::from(BigInt::from(10u64.pow(18))),
+                tokens: TokenAmount::from_whole(1),
+                rate: TokenCreditRate::from(10u64.pow(18)),
                 expected: "1.0",
                 description: "1 RECALL buys 1 whole credit",
             },
             TestCase {
-                tokens: TokenAmount::from_whole(BigInt::from(50)),
-                rate: TokenCreditRate::from(BigInt::from(10u64.pow(18))),
+                tokens: TokenAmount::from_whole(50),
+                rate: TokenCreditRate::from(10u64.pow(18)),
                 expected: "50.0",
                 description: "50 RECALL buys 50 whole credits",
             },
             TestCase {
-                tokens: TokenAmount::from_nano(BigInt::from(233432100u64)),
-                rate: TokenCreditRate::from(BigInt::from(10u64.pow(18))),
+                tokens: TokenAmount::from_nano(233432100u64),
+                rate: TokenCreditRate::from(10u64.pow(18)),
                 expected: "0.2334321",
                 description: "0.2334321 RECALL buys 0.2334321 credits",
             },
             TestCase {
-                tokens: TokenAmount::from_nano(BigInt::from(233432100u64)),
-                rate: TokenCreditRate::from(BigInt::from(10u128.pow(36))),
+                tokens: TokenAmount::from_nano(233432100u64),
+                rate: TokenCreditRate::from(10u128.pow(36)),
                 expected: "233432100000000000.0",
                 description: "0.2334321 RECALL buys 233432100000000000 credits",
             },
             TestCase {
-                tokens: TokenAmount::from_atto(BigInt::from(1)), // 1 attoRECALL
-                rate: TokenCreditRate::from(BigInt::from(10u128.pow(36))),
+                tokens: TokenAmount::from_atto(1), // 1 attoRECALL
+                rate: TokenCreditRate::from(10u128.pow(36)),
                 expected: "1.0",
                 description: "1 atto RECALL buys 1 credit",
             },
             TestCase {
-                tokens: TokenAmount::from_whole(BigInt::from(1)),
-                rate: TokenCreditRate::from(BigInt::from(10u128.pow(18)).div(4)),
+                tokens: TokenAmount::from_whole(1),
+                rate: TokenCreditRate::from(10u128.pow(18).div(4)),
                 expected: "0.25",
                 description: "1 RECALL buys 0.25 credit",
             },
             TestCase {
-                tokens: TokenAmount::from_whole(BigInt::from(1)),
-                rate: TokenCreditRate::from(BigInt::from(10u128.pow(18)).div(3)),
+                tokens: TokenAmount::from_whole(1),
+                rate: TokenCreditRate::from(10u128.pow(18).div(3)),
                 expected: "0.333333333333333333",
                 description: "1 RECALL buys 0.333333333333333333 credit",
             },

@@ -7,7 +7,6 @@ use fil_actors_runtime::runtime::Runtime;
 use fil_actors_runtime::{deserialize_block, extract_send_result, ActorError};
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
-use fvm_shared::bigint::BigInt;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::sys::SendFlags;
@@ -43,7 +42,7 @@ impl Default for RecallConfig {
         Self {
             blob_capacity: 10 * 1024 * 1024 * 1024 * 1024, // 10 TiB
             // 1 RECALL buys 1e18 credits ~ 1 RECALL buys 1e36 atto credits.
-            token_credit_rate: TokenCreditRate::from(BigInt::from(10u128.pow(36))),
+            token_credit_rate: TokenCreditRate::from(10u128.pow(36)),
             // This needs to be low enough to avoid out-of-gas errors.
             // TODO: Stress test with max-throughput (~100 blobs/s)
             blob_credit_debit_interval: ChainEpoch::from(60 * 10), // ~10 min
