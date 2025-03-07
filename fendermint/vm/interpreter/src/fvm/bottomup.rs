@@ -37,7 +37,6 @@ use tendermint_rpc::{endpoint::validators, Client, Paging};
 pub struct PowerTable(pub Vec<Validator<Power>>);
 
 /// Changes in the power table.
-/// TODO Karel - this should be moved to some common types module or at least to re-export.
 #[derive(Debug, Clone, Default)]
 pub struct PowerUpdates(pub Vec<Validator<Power>>);
 
@@ -47,6 +46,7 @@ pub struct CheckpointOutcome {
     pub block_end_events: BlockEndEvents,
 }
 
+#[derive(Clone)]
 pub struct BottomUpManager<DB, C>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
@@ -70,7 +70,6 @@ where
         Self {
             tendermint_client,
             validator_ctx,
-            // TODO Karel - no default - better make it mockable?
             gateway_caller: GatewayCaller::default(),
         }
     }

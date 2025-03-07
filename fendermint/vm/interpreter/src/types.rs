@@ -21,28 +21,36 @@ pub struct CheckResponse {
     pub exit_code: ExitCode,
     pub info: Option<String>,
     pub message: FvmMessage,
+    pub priority: i64,
 }
 
 impl CheckResponse {
     /// Constructs a new check result from a message, an exit code, and optional info.
-    pub fn new(msg: &FvmMessage, exit_code: ExitCode, info: Option<String>) -> Self {
+    pub fn new(
+        msg: &FvmMessage,
+        exit_code: ExitCode,
+        info: Option<String>,
+        priority: Option<i64>,
+    ) -> Self {
         Self {
             sender: msg.from,
             gas_limit: msg.gas_limit,
             exit_code,
             info,
             message: msg.clone(),
+            priority: priority.unwrap_or(0),
         }
     }
 
     /// Constructs a new check result from a message with OK exit code and no info.
-    pub fn new_ok(msg: &FvmMessage) -> Self {
+    pub fn new_ok(msg: &FvmMessage, priority: i64) -> Self {
         Self {
             sender: msg.from,
             gas_limit: msg.gas_limit,
             exit_code: ExitCode::OK,
             info: None,
             message: msg.clone(),
+            priority,
         }
     }
 }

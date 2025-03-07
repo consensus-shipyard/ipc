@@ -3,7 +3,11 @@
 
 mod staking;
 
+use std::sync::Arc;
+
+use anyhow::Chain;
 use async_trait::async_trait;
+use ethers::types::Sign;
 use fendermint_actor_gas_market_eip1559::Constants;
 use fendermint_contract_test::Tester;
 use fendermint_crypto::{PublicKey, SecretKey};
@@ -12,9 +16,17 @@ use fendermint_vm_actor_interface::gas_market::GAS_MARKET_ACTOR_ADDR;
 use fendermint_vm_actor_interface::system::SYSTEM_ACTOR_ADDR;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Account, Actor, ActorMeta, Genesis, PermissionMode, SignerAddr};
+use fendermint_vm_interpreter::fvm::bottomup::BottomUpManager;
 use fendermint_vm_interpreter::fvm::store::memory::MemoryBlockstore;
+use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeScheduler};
-use fendermint_vm_interpreter::fvm::FvmMessageInterpreter;
+use fendermint_vm_interpreter::fvm::FvmMessagesInterpreter;
+use fendermint_vm_message::chain::{self, ChainMessage};
+use fendermint_vm_message::signed::{OriginKind, SignedMessage};
+use fendermint_vm_topdown::voting::VoteTally;
+use fendermint_vm_topdown::Toggle;
+use fvm_shared::chainid::ChainID;
+
 use fvm::executor::{ApplyKind, Executor};
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
@@ -28,13 +40,14 @@ use rand::SeedableRng;
 use tendermint_rpc::Client;
 
 lazy_static! {
-    static ref ADDR: Address =
-        Address::new_secp256k1(&rand_secret_key().public_key().serialize()).unwrap();
-    static ref ADDR2: Address =
-        Address::new_secp256k1(&rand_secret_key().public_key().serialize()).unwrap();
+    static ref SECRET: SecretKey = rand_secret_key();
+    static ref SECRET2: SecretKey = rand_secret_key();
+    static ref ADDR: Address = Address::new_secp256k1(&SECRET.public_key().serialize()).unwrap();
+    static ref ADDR2: Address = Address::new_secp256k1(&SECRET2.public_key().serialize()).unwrap();
 }
+
 const CHAIN_NAME: &str = "mychain";
-type I = FvmMessageInterpreter<MemoryBlockstore, NeverCallClient>;
+type I = FvmMessagesInterpreter<MemoryBlockstore, NeverCallClient>;
 
 // returns a seeded secret key which is guaranteed to be the same every time
 fn rand_secret_key() -> SecretKey {
@@ -52,8 +65,21 @@ async fn tester_with_upgrader(
 ) -> (Tester<I>, PublicKey) {
     let validator = rand_secret_key().public_key();
 
-    let interpreter: FvmMessageInterpreter<MemoryBlockstore, _> =
-        FvmMessageInterpreter::new(NeverCallClient, None, 1.05, 1.05, false, upgrade_scheduler);
+    let bottom_up_manager = BottomUpManager::new(NeverCallClient, None);
+    let finality_provider = Arc::new(Toggle::disabled());
+    let vote_tally = VoteTally::empty();
+    let top_down_manager = TopDownManager::new(finality_provider, vote_tally);
+
+    let interpreter: FvmMessagesInterpreter<MemoryBlockstore, _> = FvmMessagesInterpreter::new(
+        bottom_up_manager,
+        top_down_manager,
+        upgrade_scheduler,
+        false,
+        200,
+        false,
+        1.05,
+        1.05,
+    );
 
     let genesis = Genesis {
         chain_name: CHAIN_NAME.to_string(),
@@ -87,34 +113,49 @@ async fn tester_with_upgrader(
 async fn test_gas_market_base_fee_oscillation() {
     let (mut tester, _) = default_tester().await;
 
+    let chain_id = ChainID::from(tester.state_params().chain_id);
     let num_msgs = 10;
     let block_gas_limit = 6178630;
     let base_gas_limit = block_gas_limit / num_msgs;
 
     let messages = (0..num_msgs)
-        .map(|i| Message {
-            version: 0,
-            from: *ADDR,
-            to: Address::new_id(10),
-            sequence: i,
-            value: TokenAmount::from_atto(1),
-            method_num: 0,
-            params: Default::default(),
-            gas_limit: base_gas_limit,
-            gas_fee_cap: Default::default(),
-            gas_premium: TokenAmount::from_atto(1),
+        .map(|i| {
+            let msg = Message {
+                version: 0,
+                from: *ADDR,
+                to: Address::new_id(10),
+                sequence: i,
+                value: TokenAmount::from_atto(1),
+                method_num: 0,
+                params: Default::default(),
+                gas_limit: base_gas_limit,
+                gas_fee_cap: Default::default(),
+                gas_premium: TokenAmount::from_atto(1),
+            };
+            ChainMessage::Signed(SignedMessage::new_secp256k1(msg, &SECRET, &chain_id).unwrap())
         })
-        .collect::<Vec<Message>>();
+        .collect::<Vec<ChainMessage>>();
 
     let producer = rand_secret_key().public_key();
 
     // block 1: set the gas constants
     let height = 1;
     tester.begin_block(height, producer).await.unwrap();
+
     tester
-        .execute_msgs(vec![custom_gas_limit(block_gas_limit)])
+        .modify_exec_state(|mut state| async {
+            state.execute_with_executor(|executor| {
+                // cannot capture updated_block_gas_limit due to Upgrade::new wanting a fn pointer.
+                let msg = custom_gas_limit(block_gas_limit);
+                executor.execute_message(msg, ApplyKind::Implicit, 0)?;
+                Ok(())
+            })?;
+
+            Ok((state, ()))
+        })
         .await
         .unwrap();
+
     tester.end_block(height).await.unwrap();
     tester.commit().await.unwrap();
 
@@ -170,25 +211,29 @@ async fn test_gas_market_premium_distribution() {
     let (mut tester, validator) = default_tester().await;
     let evm_address = Address::from(EthAddress::new_secp256k1(&validator.serialize()).unwrap());
 
+    let chain_id = ChainID::from(tester.state_params().chain_id);
     let num_msgs = 10;
     let total_gas_limit = 62306300;
     let premium = 1;
     let base_gas_limit = total_gas_limit / num_msgs;
 
     let messages = (0..num_msgs)
-        .map(|i| Message {
-            version: 0,
-            from: *ADDR,
-            to: *ADDR2,
-            sequence: i,
-            value: TokenAmount::from_atto(1),
-            method_num: 0,
-            params: Default::default(),
-            gas_limit: base_gas_limit,
-            gas_fee_cap: TokenAmount::from_atto(base_gas_limit),
-            gas_premium: TokenAmount::from_atto(premium),
+        .map(|i| {
+            let msg = Message {
+                version: 0,
+                from: *ADDR,
+                to: *ADDR2,
+                sequence: i,
+                value: TokenAmount::from_atto(1),
+                method_num: 0,
+                params: Default::default(),
+                gas_limit: base_gas_limit,
+                gas_fee_cap: TokenAmount::from_atto(base_gas_limit),
+                gas_premium: TokenAmount::from_atto(premium),
+            };
+            ChainMessage::Signed(SignedMessage::new_secp256k1(msg, &SECRET, &chain_id).unwrap())
         })
-        .collect::<Vec<Message>>();
+        .collect::<Vec<ChainMessage>>();
 
     let proposer = rand_secret_key().public_key();
 

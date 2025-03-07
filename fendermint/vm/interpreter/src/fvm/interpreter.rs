@@ -37,6 +37,7 @@ use crate::fvm::executions::{
     execute_cron_message, execute_signed_message, push_block_to_chainmeta_actor_if_possible,
 };
 
+#[derive(Clone)]
 pub struct FvmMessagesInterpreter<DB, C>
 where
     DB: Blockstore + Clone + Send + Sync + 'static,
@@ -108,7 +109,8 @@ where
             None => {
                 return Ok(CheckResponse::new(
                     msg,
-                    ExitCode::SYS_SENDER_STATE_INVALID,
+                    ExitCode::SYS_SENDER_INVALID,
+                    None,
                     None,
                 ))
             }
@@ -118,11 +120,12 @@ where
         if actor.balance < balance_needed {
             return Ok(CheckResponse::new(
                 msg,
-                ExitCode::SYS_SENDER_STATE_INVALID,
+                ExitCode::SYS_INSUFFICIENT_FUNDS,
                 Some(format!(
                     "actor balance {} less than needed {}",
                     actor.balance, balance_needed
                 )),
+                None,
             ));
         }
 
@@ -134,10 +137,12 @@ where
                     "expected sequence {}, got {}",
                     actor.sequence, msg.sequence
                 )),
+                None,
             ));
         }
 
-        Ok(CheckResponse::new(msg, ExitCode::OK, None))
+        let priority = state.txn_priority_calculator().priority(&msg);
+        Ok(CheckResponse::new_ok(msg, priority))
     }
 
     fn lookup_actor(
@@ -168,19 +173,20 @@ where
         msg: Vec<u8>,
         is_recheck: bool,
     ) -> Result<CheckResponse, CheckMessageError> {
-        let verifiable_msg = ipld_decode_signed_message(&msg)?;
-        let fvm_msg = verifiable_msg.message();
+        let signed_msg = ipld_decode_signed_message(&msg)?;
+        let fvm_msg = signed_msg.message();
 
         fvm_msg
             .check()
             .map_err(|e| CheckMessageError::InvalidMessage(e.to_string()))?;
 
         if is_recheck {
-            return Ok(CheckResponse::new_ok(&fvm_msg));
+            let priority = state.txn_priority_calculator().priority(&fvm_msg);
+            return Ok(CheckResponse::new_ok(&fvm_msg, priority));
         }
 
         let check_ret = self.check_nonce_and_sufficient_balance(&state, &fvm_msg)?;
-        verifiable_msg.verify(&state.chain_id())?;
+        signed_msg.verify(&state.chain_id())?;
 
         tracing::info!(
             exit_code = check_ret.exit_code.value(),
@@ -292,7 +298,6 @@ where
                 ChainMessage::Signed(signed) => {
                     block_gas_usage += signed.message.gas_limit;
                 }
-                _ => {}
             }
         }
 
@@ -305,8 +310,8 @@ where
 
     async fn begin_block(
         &self,
-        mut state: FvmExecState<DB>,
-    ) -> Result<(FvmExecState<DB>, BeginBlockResponse), BeginBlockError> {
+        mut state: &mut FvmExecState<DB>,
+    ) -> Result<BeginBlockResponse, BeginBlockError> {
         let height = state.block_height() as u64;
 
         tracing::debug!("trying to perform upgrade");
@@ -323,18 +328,15 @@ where
                 .context("failed to push block data to chainmetadata")?;
         }
 
-        Ok((
-            state,
-            BeginBlockResponse {
-                applied_cron_message: cron_applied_message,
-            },
-        ))
+        Ok(BeginBlockResponse {
+            applied_cron_message: cron_applied_message,
+        })
     }
 
     async fn end_block(
         &self,
-        mut state: FvmExecState<DB>,
-    ) -> Result<(FvmExecState<DB>, EndBlockResponse), EndBlockError> {
+        mut state: &mut FvmExecState<DB>,
+    ) -> Result<EndBlockResponse, EndBlockError> {
         if let Some(pubkey) = state.block_producer() {
             state.activity_tracker().record_block_committed(pubkey)?;
         }
@@ -368,14 +370,14 @@ where
             gas_market: next_gas_market,
             events: block_end_events,
         };
-        Ok((state, response))
+        Ok(response)
     }
 
     async fn apply_message(
         &self,
-        mut state: FvmExecState<DB>,
+        mut state: &mut FvmExecState<DB>,
         msg: Vec<u8>,
-    ) -> Result<(FvmExecState<DB>, ApplyMessageResponse), ApplyMessageError> {
+    ) -> Result<ApplyMessageResponse, ApplyMessageError> {
         let chain_msg = match fvm_ipld_encoding::from_slice::<ChainMessage>(&msg) {
             Ok(msg) => msg,
             Err(e) => {
@@ -396,13 +398,10 @@ where
                 }
                 let applied_message = execute_signed_message(&mut state, msg.clone()).await?;
                 let domain_hash = msg.domain_hash(&state.chain_id())?;
-                Ok((
-                    state,
-                    ApplyMessageResponse {
-                        applied_message,
-                        domain_hash,
-                    },
-                ))
+                Ok(ApplyMessageResponse {
+                    applied_message,
+                    domain_hash,
+                })
             }
             ChainMessage::Ipc(ipc_msg) => match ipc_msg {
                 IpcMessage::TopDownExec(p) => {
@@ -410,13 +409,10 @@ where
                         .top_down_manager
                         .execute_topdown_msg(&mut state, p)
                         .await?;
-                    Ok((
-                        state,
-                        ApplyMessageResponse {
-                            applied_message,
-                            domain_hash: None,
-                        },
-                    ))
+                    Ok(ApplyMessageResponse {
+                        applied_message,
+                        domain_hash: None,
+                    })
                 }
             },
         }
@@ -429,7 +425,8 @@ where
     ) -> Result<QueryResponse, QueryError> {
         let query = if query.path.as_str() == "/store" {
             let cid = fvm_ipld_encoding::from_slice::<Cid>(&query.params)
-                .context("failed to decode CID")?;
+                .context("failed to decode CID")
+                .map_err(|e| QueryError::InvalidQuery(e.to_string()))?;
             FvmQuery::Ipld(cid)
         } else {
             fvm_ipld_encoding::from_slice::<FvmQuery>(&query.params)
@@ -441,7 +438,6 @@ where
                 let data = state.store_get(&cid)?;
                 tracing::info!(
                     height = state.block_height(),
-                    pending = state.pending(),
                     cid = cid.to_string(),
                     found = data.is_some(),
                     "query IPLD"
@@ -452,7 +448,6 @@ where
                 let (state, ret) = state.actor_state(&address).await?;
                 tracing::info!(
                     height = state.block_height(),
-                    pending = state.pending(),
                     addr = address.to_string(),
                     found = ret.is_some(),
                     "query actor state"
@@ -488,7 +483,6 @@ where
             FvmQuery::EstimateGas(mut msg) => {
                 tracing::info!(
                     height = state.block_height(),
-                    pending = state.pending(),
                     to = msg.to.to_string(),
                     from = msg.from.to_string(),
                     method_num = msg.method_num,

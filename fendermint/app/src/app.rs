@@ -23,16 +23,14 @@ use fendermint_storage::{
 };
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_interpreter::fvm::state::{
-    empty_state_tree, BlockHash, CheckStateRef, FvmExecState, FvmQueryState, FvmStateParams,
-    FvmUpdatableParams,
+    empty_state_tree, FvmExecState, FvmQueryState, FvmStateParams, FvmUpdatableParams,
 };
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
 use fendermint_vm_interpreter::genesis::{read_genesis_car, GenesisAppState};
 
-use fendermint_vm_interpreter::errors::{ApplyMessageError, CheckMessageError};
+use fendermint_vm_interpreter::errors::{ApplyMessageError, CheckMessageError, QueryError};
 use fendermint_vm_interpreter::types::{
-    AppliedMessage, ApplyMessageResponse, AttestMessagesResponse, EndBlockResponse,
-    PrepareMessagesResponse, Query,
+    ApplyMessageResponse, AttestMessagesResponse, EndBlockResponse, Query,
 };
 use fendermint_vm_interpreter::MessagesInterpreter;
 
@@ -51,8 +49,6 @@ use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
 use tendermint::consensus::params::Params as TendermintConsensusParams;
 use tracing::instrument;
-
-use tendermint_rpc::Client as TendermintClient;
 
 #[derive(Serialize)]
 #[repr(u8)]
@@ -156,8 +152,6 @@ where
     snapshots: Option<SnapshotClient>,
     /// State accumulating changes during block execution.
     exec_state: Arc<tokio::sync::Mutex<Option<FvmExecState<SS>>>>,
-    /// Projected (partial) state accumulating during transaction checks.
-    check_state: CheckStateRef<SS>,
     /// How much history to keep.
     ///
     /// Zero means unlimited.
@@ -195,7 +189,6 @@ where
             messages_interpreter: Arc::new(interpreter),
             snapshots,
             exec_state: Arc::new(tokio::sync::Mutex::new(None)),
-            check_state: Arc::new(tokio::sync::Mutex::new(None)),
             validators_cache: Arc::new(tokio::sync::Mutex::new(None)),
         };
         app.init_committed_state()?;
@@ -450,24 +443,6 @@ where
             .context("Validator cache is not available")?
             .get_validator(id)
     }
-
-    /// Apply a message to via the interpreter and return the response.
-    // TODo Karel - explain why we have this.
-    async fn apply_message(
-        &self,
-        msg: Vec<u8>,
-    ) -> Result<(ApplyMessageResponse, Option<BlockHash>), ApplyMessageError> {
-        let state = self.take_exec_state().await;
-
-        match self.messages_interpreter.apply_message(state, msg).await {
-            Ok((new_state, response)) => {
-                let block_hash = new_state.block_hash();
-                self.put_exec_state(new_state).await;
-                Ok((response, block_hash))
-            }
-            Err(err) => Err(err),
-        }
-    }
 }
 
 // NOTE: The `Application` interface doesn't allow failures at the moment. The protobuf
@@ -588,8 +563,6 @@ where
             self.multi_engine.clone(),
             block_height.try_into()?,
             state_params,
-            self.check_state.clone(),
-            height == FvmQueryHeight::Pending,
         )
         .context("error creating query state")?;
 
@@ -599,11 +572,12 @@ where
         };
 
         let result = self.messages_interpreter.query(state, query).await;
-
-        // TODO Karel - probably should not be InvalidEncoding here?
         let response = match result {
-            Err(e) => invalid_query(AppError::InvalidEncoding, e.to_string()),
             Ok(result) => to_query(result, block_height)?,
+            Err(QueryError::InvalidQuery(e)) => {
+                invalid_query(AppError::InvalidEncoding, e.to_string())
+            }
+            Err(QueryError::Other(e)) => Err(e).context("failed to query message")?,
         };
         Ok(response)
     }
@@ -626,28 +600,20 @@ where
         let mut mpool_received_trace = MpoolReceived::default();
 
         let response = match result {
-            Err(e) => match e {
-                CheckMessageError::IllegalMessage(s) => {
-                    invalid_check_tx(AppError::IllegalMessage, s)
-                }
-                CheckMessageError::InvalidSignature(e) => {
-                    invalid_check_tx(AppError::InvalidSignature, e.to_string())
-                }
-                CheckMessageError::InvalidMessage(s) => {
-                    invalid_check_tx(AppError::InvalidEncoding, s)
-                }
-                // TODO Karel - revisit the error handling. Should it ever return an error?
-                CheckMessageError::Other(e) => {
-                    return Err(e.context("message check has failed").into())
-                }
-            },
             Ok(response) => {
                 mpool_received_trace.message = Some(Message::from(&response.message));
-
-                let priority = state.txn_priority_calculator().priority(&response.message);
-                let check_tx = to_check_tx(response, priority);
-                check_tx
+                to_check_tx(response)
             }
+            Err(CheckMessageError::IllegalMessage(s)) => {
+                invalid_check_tx(AppError::IllegalMessage, s)
+            }
+            Err(CheckMessageError::InvalidSignature(e)) => {
+                invalid_check_tx(AppError::InvalidSignature, e.to_string())
+            }
+            Err(CheckMessageError::InvalidMessage(s)) => {
+                invalid_check_tx(AppError::InvalidEncoding, s)
+            }
+            Err(CheckMessageError::Other(e)) => Err(e).context("failed to check message")?,
         };
 
         mpool_received_trace.accept = response.code.is_ok();
@@ -782,46 +748,55 @@ where
             .get_validator_from_cache(&request.header.proposer_address)
             .await?;
 
-        let state = FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
-            .context("error creating new state")?
-            .with_block_hash(block_hash)
-            .with_block_producer(validator);
+        let mut state =
+            FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
+                .context("error creating new state")?
+                .with_block_hash(block_hash)
+                .with_block_producer(validator);
 
-        tracing::debug!("initialized exec state");
+        tracing::debug!("initialized new exec state");
+
+        let response = self
+            .messages_interpreter
+            .begin_block(&mut state)
+            .await
+            .context("failed to begin block")?;
 
         self.put_exec_state(state).await;
 
-        let ret = self
-            .modify_exec_state(|s| {
-                self.messages_interpreter.begin_block(s);
-            })
-            .await
-            .context("begin failed")?;
-
-        Ok(to_begin_block(ret))
+        Ok(to_begin_block(response.applied_cron_message))
     }
 
     /// Apply a transaction to the application's state.
     async fn deliver_tx(&self, request: request::DeliverTx) -> AbciResult<response::DeliverTx> {
         let msg = request.tx.to_vec();
-        let result = self.apply_message(msg).await;
+
+        let (result, block_hash) = {
+            let mut guard = self.exec_state.lock().await;
+            let mut state = guard.take().expect("exec state empty");
+
+            let result = self
+                .messages_interpreter
+                .apply_message(&mut state, msg)
+                .await;
+            let block_hash = state.block_hash();
+
+            *guard = Some(state);
+            (result, block_hash)
+        };
 
         let response = match result {
-            Ok((apply_response, block_hash)) => to_deliver_tx(
-                apply_response.applied_message,
-                apply_response.domain_hash,
-                block_hash,
-            ),
-            Err(e) => match e {
-                ApplyMessageError::InvalidSignature(e) => {
-                    invalid_deliver_tx(AppError::InvalidSignature, e.to_string())
-                }
-                ApplyMessageError::InvalidMessage(s) => {
-                    invalid_deliver_tx(AppError::InvalidEncoding, s)
-                }
-                // TODO Karel - is it ok to return error here? Are all possible errors handled in `ApplyMessageError`
-                ApplyMessageError::Other(e) => return Err(e)?,
-            },
+            Ok(ApplyMessageResponse {
+                applied_message,
+                domain_hash,
+            }) => to_deliver_tx(applied_message, domain_hash, block_hash),
+            Err(ApplyMessageError::InvalidSignature(err)) => {
+                invalid_deliver_tx(AppError::InvalidSignature, err.to_string())
+            }
+            Err(ApplyMessageError::InvalidMessage(s)) => {
+                invalid_deliver_tx(AppError::InvalidEncoding, s)
+            }
+            Err(ApplyMessageError::Other(e)) => Err(e).context("failed to apply message")?,
         };
 
         if response.code != 0.into() {
@@ -839,15 +814,21 @@ where
     async fn end_block(&self, request: request::EndBlock) -> AbciResult<response::EndBlock> {
         tracing::debug!(height = request.height, "end block");
 
-        // End the interpreter for this block.
+        let response = {
+            let mut guard = self.exec_state.lock().await;
+            let mut state = guard.take().expect("exec state empty");
+
+            let result = self.messages_interpreter.end_block(&mut state).await;
+            *guard = Some(state);
+
+            result?
+        };
+
         let EndBlockResponse {
             power_updates,
             gas_market,
             events,
-        } = self
-            .modify_exec_state(|s| self.messages_interpreter.end_block(s))
-            .await
-            .context("end failed")?;
+        } = response;
 
         // Convert the incoming power updates to Tendermint validator updates.
         let validator_updates =
@@ -954,10 +935,6 @@ where
 
         // Commit app state to the datastore.
         self.set_committed_state(state)?;
-
-        // Reset check state.
-        let mut guard = self.check_state.lock().await;
-        *guard = None;
 
         emit(BlockCommitted {
             height: block_height,

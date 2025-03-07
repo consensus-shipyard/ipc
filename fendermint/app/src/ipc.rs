@@ -14,7 +14,7 @@ use fendermint_vm_topdown::IPCParentFinality;
 use fvm_ipld_blockstore::Blockstore;
 use std::sync::Arc;
 
-use tendermint_rpc::Client as TendermintClient;
+use fendermint_vm_interpreter::MessagesInterpreter;
 
 use serde::{Deserialize, Serialize};
 
@@ -26,18 +26,18 @@ pub enum AppVote {
 }
 
 /// Queries the LATEST COMMITTED parent finality from the storage
-pub struct AppParentFinalityQuery<DB, SS, S, TC>
+pub struct AppParentFinalityQuery<DB, SS, S, I>
 where
     SS: Blockstore + Clone + 'static + Send + Sync,
-    TC: TendermintClient + Clone + Send + Sync + 'static,
     S: KVStore,
+    I: MessagesInterpreter<SS> + Send + Sync,
 {
     /// The app to get state
-    app: App<DB, SS, S, TC>,
+    app: App<DB, SS, S, I>,
     gateway_caller: GatewayCaller<ReadOnlyBlockstore<Arc<SS>>>,
 }
 
-impl<DB, SS, S, TC> AppParentFinalityQuery<DB, SS, S, TC>
+impl<DB, SS, S, I> AppParentFinalityQuery<DB, SS, S, I>
 where
     S: KVStore
         + Codec<AppState>
@@ -46,9 +46,9 @@ where
         + Codec<FvmStateParams>,
     DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
     SS: Blockstore + Clone + 'static + Send + Sync,
-    TC: TendermintClient + Clone + Send + Sync + 'static,
+    I: MessagesInterpreter<SS> + Send + Sync,
 {
-    pub fn new(app: App<DB, SS, S, TC>) -> Self {
+    pub fn new(app: App<DB, SS, S, I>) -> Self {
         Self {
             app,
             gateway_caller: GatewayCaller::default(),
@@ -66,7 +66,7 @@ where
     }
 }
 
-impl<DB, SS, S, TC> ParentFinalityStateQuery for AppParentFinalityQuery<DB, SS, S, TC>
+impl<DB, SS, S, I> ParentFinalityStateQuery for AppParentFinalityQuery<DB, SS, S, I>
 where
     S: KVStore
         + Codec<AppState>
@@ -75,7 +75,7 @@ where
         + Codec<FvmStateParams>,
     DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
     SS: Blockstore + Clone + 'static + Send + Sync,
-    TC: TendermintClient + Clone + Send + Sync + 'static,
+    I: MessagesInterpreter<SS> + Send + Sync,
 {
     fn get_latest_committed_finality(&self) -> anyhow::Result<Option<IPCParentFinality>> {
         self.with_exec_state(|mut exec_state| {
