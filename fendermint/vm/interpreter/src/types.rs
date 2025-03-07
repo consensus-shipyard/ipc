@@ -3,8 +3,8 @@
 
 use crate::fvm::bottomup::PowerUpdates;
 use crate::fvm::FvmMessage;
+use actors_custom_api::gas_market::Reading;
 use cid::Cid;
-use fendermint_actors_api::gas_market::Reading;
 use fendermint_vm_message::query::{ActorState, GasEstimate, StateParams};
 use fendermint_vm_message::signed::DomainHash;
 use fvm::executor::ApplyRet;
