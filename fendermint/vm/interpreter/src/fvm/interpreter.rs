@@ -274,29 +274,24 @@ where
             return Ok(AttestMessagesResponse::Reject);
         }
 
-        let mut chain_msgs = Vec::with_capacity(msgs.len());
+        let mut block_gas_usage = 0;
         for msg in msgs {
             match fvm_ipld_encoding::from_slice::<ChainMessage>(&msg) {
-                Ok(chain_msg) => chain_msgs.push(chain_msg),
+                Ok(chain_msg) => match chain_msg {
+                    ChainMessage::Ipc(IpcMessage::TopDownExec(finality)) => {
+                        if !self.top_down_manager.is_finality_valid(finality).await {
+                            return Ok(AttestMessagesResponse::Reject);
+                        }
+                    }
+                    ChainMessage::Signed(signed) => {
+                        block_gas_usage += signed.message.gas_limit;
+                    }
+                },
                 Err(e) => {
                     tracing::warn!(error = %e, "failed to decode message in proposal as ChainMessage");
                     if self.reject_malformed_proposal {
                         return Ok(AttestMessagesResponse::Reject);
                     }
-                }
-            }
-        }
-
-        let mut block_gas_usage = 0;
-        for msg in chain_msgs {
-            match msg {
-                ChainMessage::Ipc(IpcMessage::TopDownExec(finality)) => {
-                    if !self.top_down_manager.is_finality_valid(finality).await {
-                        return Ok(AttestMessagesResponse::Reject);
-                    }
-                }
-                ChainMessage::Signed(signed) => {
-                    block_gas_usage += signed.message.gas_limit;
                 }
             }
         }
