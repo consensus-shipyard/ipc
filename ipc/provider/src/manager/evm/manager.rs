@@ -1194,8 +1194,21 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
         let call = contract.submit_checkpoint(checkpoint, signatories, signatures);
         let call = extend_call_with_pending_block(call).await?;
 
+        if let Some(calldata) = call.calldata() {
+            tracing::info!(
+                calldata = calldata.to_string(),
+                "submit checkpoint raw call data"
+            );
+        }
+
         let pending_tx = call.send().await?;
+        tracing::info!(
+            hash = hex::encode(pending_tx.tx_hash().as_bytes()),
+            "sent submit bottom up checkpoint with txn"
+        );
+
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
+
         block_number_from_receipt(receipt)
     }
 
