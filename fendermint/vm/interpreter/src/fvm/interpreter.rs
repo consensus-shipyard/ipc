@@ -60,6 +60,7 @@ where
     DB: Blockstore + Clone + Send + Sync + 'static,
     C: TendermintClient + Clone + Send + Sync + 'static,
 {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         bottom_up_manager: BottomUpManager<DB, C>,
         top_down_manager: TopDownManager<DB>,
@@ -141,7 +142,7 @@ where
             ));
         }
 
-        let priority = state.txn_priority_calculator().priority(&msg);
+        let priority = state.txn_priority_calculator().priority(msg);
         Ok(CheckResponse::new_ok(msg, priority))
     }
 
@@ -181,11 +182,11 @@ where
             .map_err(|e| CheckMessageError::InvalidMessage(e.to_string()))?;
 
         if is_recheck {
-            let priority = state.txn_priority_calculator().priority(&fvm_msg);
-            return Ok(CheckResponse::new_ok(&fvm_msg, priority));
+            let priority = state.txn_priority_calculator().priority(fvm_msg);
+            return Ok(CheckResponse::new_ok(fvm_msg, priority));
         }
 
-        let check_ret = self.check_nonce_and_sufficient_balance(&state, &fvm_msg)?;
+        let check_ret = self.check_nonce_and_sufficient_balance(&state, fvm_msg)?;
         signed_msg.verify(&state.chain_id())?;
 
         tracing::info!(
@@ -305,21 +306,21 @@ where
 
     async fn begin_block(
         &self,
-        mut state: &mut FvmExecState<DB>,
+        state: &mut FvmExecState<DB>,
     ) -> Result<BeginBlockResponse, BeginBlockError> {
         let height = state.block_height() as u64;
 
         tracing::debug!("trying to perform upgrade");
-        self.perform_upgrade_if_needed(&mut state)
+        self.perform_upgrade_if_needed(state)
             .context("failed to perform upgrade")?;
 
         tracing::debug!("triggering cron event");
         let cron_applied_message =
-            execute_cron_message(&mut state, height).context("failed to trigger cron event")?;
+            execute_cron_message(state, height).context("failed to trigger cron event")?;
 
         if self.push_block_data_to_chainmeta_actor {
             tracing::debug!("pushing block data to chainmetadata actor");
-            push_block_to_chainmeta_actor_if_possible(&mut state, height)
+            push_block_to_chainmeta_actor_if_possible(state, height)
                 .context("failed to push block data to chainmetadata")?;
         }
 
@@ -330,22 +331,17 @@ where
 
     async fn end_block(
         &self,
-        mut state: &mut FvmExecState<DB>,
+        state: &mut FvmExecState<DB>,
     ) -> Result<EndBlockResponse, EndBlockError> {
         if let Some(pubkey) = state.block_producer() {
             state.activity_tracker().record_block_committed(pubkey)?;
         }
 
-        let checkpoint_outcome = self
-            .bottom_up_manager
-            .create_checkpoint_if_needed(&mut state)?;
+        let checkpoint_outcome = self.bottom_up_manager.create_checkpoint_if_needed(state)?;
 
         let (power_updates, block_end_events) = if let Some(outcome) = checkpoint_outcome {
             self.bottom_up_manager
-                .cast_validator_signatures_for_incomplete_checkpoints(
-                    outcome.checkpoint,
-                    &mut state,
-                )
+                .cast_validator_signatures_for_incomplete_checkpoints(outcome.checkpoint, state)
                 .await?;
             (outcome.power_updates, outcome.block_end_events)
         } else {
@@ -370,7 +366,7 @@ where
 
     async fn apply_message(
         &self,
-        mut state: &mut FvmExecState<DB>,
+        state: &mut FvmExecState<DB>,
         msg: Vec<u8>,
     ) -> Result<ApplyMessageResponse, ApplyMessageError> {
         let chain_msg = match fvm_ipld_encoding::from_slice::<ChainMessage>(&msg) {
@@ -391,7 +387,7 @@ where
                 if let Err(e) = msg.verify(&state.chain_id()) {
                     return Err(ApplyMessageError::InvalidSignature(e));
                 }
-                let applied_message = execute_signed_message(&mut state, msg.clone()).await?;
+                let applied_message = execute_signed_message(state, msg.clone()).await?;
                 let domain_hash = msg.domain_hash(&state.chain_id())?;
                 Ok(ApplyMessageResponse {
                     applied_message,
@@ -400,10 +396,8 @@ where
             }
             ChainMessage::Ipc(ipc_msg) => match ipc_msg {
                 IpcMessage::TopDownExec(p) => {
-                    let applied_message = self
-                        .top_down_manager
-                        .execute_topdown_msg(&mut state, p)
-                        .await?;
+                    let applied_message =
+                        self.top_down_manager.execute_topdown_msg(state, p).await?;
                     Ok(ApplyMessageResponse {
                         applied_message,
                         domain_hash: None,
