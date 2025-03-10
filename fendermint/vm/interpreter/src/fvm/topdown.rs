@@ -88,11 +88,7 @@ where
         .await;
 
         // If there is no parent proposal, exit early.
-        let parent = if let Some(parent) = parent {
-            parent
-        } else {
-            return None;
-        };
+        let parent = parent?;
 
         // Require a quorum; if it's missing, log and exit.
         let quorum = if let Some(quorum) = quorum {
@@ -134,7 +130,7 @@ where
     // TODO Karel - separate this huge function and clean up
     pub async fn execute_topdown_msg(
         &self,
-        mut state: &mut FvmExecState<DB>,
+        state: &mut FvmExecState<DB>,
         finality: ParentFinality,
     ) -> anyhow::Result<AppliedMessage> {
         if !self.provider.is_enabled() {
@@ -149,7 +145,7 @@ where
         );
 
         let (prev_height, prev_finality) = self
-            .commit_finality(&mut state, finality.clone())
+            .commit_finality(state, finality.clone())
             .await
             .context("failed to commit finality")?;
 
@@ -189,7 +185,7 @@ where
         );
 
         self.gateway_caller
-            .store_validator_changes(&mut state, validator_changes)
+            .store_validator_changes(state, validator_changes)
             .context("failed to store validator changes")?;
 
         // error happens if we cannot get the cross messages from ipc agent after retries
@@ -207,7 +203,7 @@ where
         );
 
         let ret = self
-            .execute_topdown_msgs(&mut state, msgs)
+            .execute_topdown_msgs(state, msgs)
             .await
             .context("failed to execute top down messages")?;
 
