@@ -17,8 +17,6 @@ use crate::fvm::observe::{MsgExec, MsgExecPurpose};
 
 use crate::fvm::FvmMessage;
 
-// Arbitrarily large gas limit for cron (matching how Forest does it, which matches Lotus).
-// XXX: Our blocks are not necessarily expected to be 30 seconds apart, so the gas limit might be wrong.
 const GAS_LIMIT: u64 = BLOCK_GAS_LIMIT * 10000;
 
 /// Helper to build and execute an implicit system message.

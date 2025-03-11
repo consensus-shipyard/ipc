@@ -270,16 +270,12 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         parent_finality_votes.clone(),
     );
 
-    // TODO Karel - maybe it can be removed since it's hardcoded?
-    let reject_malformed_proposal = false;
-
     let interpreter = FvmMessagesInterpreter::new(
         bottom_up_manager,
         top_down_manager,
         UpgradeScheduler::new(),
         testing_settings.map_or(true, |t| t.push_chain_meta),
         settings.abci.block_max_msgs,
-        reject_malformed_proposal,
         settings.fvm.gas_overestimation_rate,
         settings.fvm.gas_search_step,
     );
