@@ -1,26 +1,8 @@
 name: Contracts
 
+# This workflow is triggered from the main CI workflow.
 on:
-  push:
-    branches:
-      - main
-    # Pattern matched against refs/tags
-    tags:
-      # Push events to every git tag not containing /
-      # NOTE: '**' would match tags with / in them, e.g. "foo/bar",
-      # but we want to use the tag as a docker tag as well, so it's best avoided.
-      - '*'
-
-  pull_request:
-    branches:
-      - '**'
-    # To add ready_for_review as a trigger we need to list all the defaults.
-    types:
-      - opened
-      - reopened
-      - synchronize
-      - ready_for_review
-
+  workflow_call:
 
 jobs:
   contracts-prettier:
