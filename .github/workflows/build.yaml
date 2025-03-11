@@ -57,7 +57,7 @@ jobs:
           key: v2-contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}
 
       - name: Generate ABI and contract-bindings
-        run: cd contracts && make gen
+        run: make -C contracts gen
 
       - name: Install Rust nightly
         uses: dtolnay/rust-toolchain@master
@@ -88,7 +88,6 @@ jobs:
       - name: Build all (including tests, benches, examples)
         working-directory: crates/node
         run: |
-          make $PWD/builtin-actors/output/bundle.car
           cargo build --locked --release --all-targets
 
       - name: Build Docker image for e2e tests
@@ -112,7 +111,7 @@ jobs:
           ## Create the temporary .dockerignore file.
           cat <<EOF > /tmp/Dockerfile.dockerignore
           target
-          !crates/target/release/fendermint
+          !crates/target/release/node
           !crates/target/release/ipc-cli
           contracts/cache
           contracts/node-modules

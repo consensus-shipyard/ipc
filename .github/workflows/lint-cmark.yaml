@@ -1,4 +1,4 @@
-name: "Commonmark/Markdown: Lint"
+name: "Lint cmark/markdown files"
 
 # This workflow is triggered from the main CI workflow.
 on:

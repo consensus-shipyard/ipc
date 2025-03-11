@@ -1,0 +1,50 @@
+name: Contracts
+
+on:
+  push:
+    branches:
+      - main
+    # Pattern matched against refs/tags
+    tags:
+      # Push events to every git tag not containing /
+      # NOTE: '**' would match tags with / in them, e.g. "foo/bar",
+      # but we want to use the tag as a docker tag as well, so it's best avoided.
+      - '*'
+
+  pull_request:
+    branches:
+      - '**'
+    # To add ready_for_review as a trigger we need to list all the defaults.
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
+
+jobs:
+  contracts-prettier:
+    uses: ./.github/workflows/contracts-prettier.yaml
+
+  contracts-deployment-test:
+    uses: ./.github/workflows/contracts-deployment-test.yaml
+    needs: [contracts-prettier]
+
+  contracts-test:
+    uses: ./.github/workflows/contracts-test.yaml
+    needs: [contracts-prettier]
+
+  contracts-storage:
+    uses: ./.github/workflows/contracts-storage.yaml
+    needs: [contracts-prettier]
+
+## This causes too much unpredictable noise, turning our builds red whenever a new vulnerability is found.
+## It's better to have a separate workflow for auditing, and have it run on a schedule.
+## However, given this code is purely used for tooling and not for production, it's not a big deal.
+#  contracts-pnpm-audit:
+#    uses: ./.github/workflows/contracts-pnpm-audit.yaml
+#    needs: [contracts-prettier]
+
+  contracts-sast:
+    uses: ./.github/workflows/contracts-sast.yaml
+    needs: [contracts-prettier]
