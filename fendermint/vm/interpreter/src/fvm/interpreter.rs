@@ -232,7 +232,7 @@ where
             .collect::<Result<Vec<Vec<u8>>>>()?;
 
         if all_msgs.len() > self.max_msgs_per_block {
-            tracing::warn!(
+            tracing::info!(
                 max_msgs = self.max_msgs_per_block,
                 total_msgs = all_msgs.len(),
                 "truncating proposal due to message count limit"
@@ -245,7 +245,7 @@ where
             select_messages_until_total_bytes(all_msgs, max_transaction_bytes as usize);
 
         if let Some(delta) = input_msg_count.checked_sub(all_messages.len()) {
-            tracing::warn!(
+            tracing::info!(
                 removed_msgs = delta,
                 max_bytes = max_transaction_bytes,
                 "some messages were removed from the proposal because they exceed the limit"

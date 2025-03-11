@@ -64,19 +64,12 @@ pub async fn execute_signed_message<DB: Blockstore + Clone + 'static + Send + Sy
 ) -> anyhow::Result<AppliedMessage> {
     let msg = msg.into_message();
 
-    // Select execution path based on sender.
-    let (apply_ret, emitters, execution_time) = if msg.from == system_actor::SYSTEM_ACTOR_ADDR {
-        let (result, exec_time) = measure_time(|| state.execute_implicit(msg.clone()));
-        let (apply_ret, emitters) = result?;
-        (apply_ret, emitters, exec_time)
-    } else {
-        if let Err(err) = state.block_gas_tracker().ensure_sufficient_gas(&msg) {
-            tracing::warn!("insufficient block gas; continuing to avoid halt: {}", err);
-        }
-        let (result, exec_time) = measure_time(|| state.execute_explicit(msg.clone()));
-        let (apply_ret, emitters) = result?;
-        (apply_ret, emitters, exec_time)
-    };
+    if let Err(err) = state.block_gas_tracker().ensure_sufficient_gas(&msg) {
+        tracing::warn!("insufficient block gas; continuing to avoid halt: {}", err);
+    }
+
+    let (result, execution_time) = measure_time(|| state.execute_explicit(msg.clone()));
+    let (apply_ret, emitters) = result?;
 
     let exit_code = apply_ret.msg_receipt.exit_code.value();
 
