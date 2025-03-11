@@ -5,9 +5,7 @@ mod staking;
 
 use std::sync::Arc;
 
-use anyhow::Chain;
 use async_trait::async_trait;
-use ethers::types::Sign;
 use fendermint_actor_gas_market_eip1559::Constants;
 use fendermint_contract_test::Tester;
 use fendermint_crypto::{PublicKey, SecretKey};
@@ -21,8 +19,8 @@ use fendermint_vm_interpreter::fvm::store::memory::MemoryBlockstore;
 use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeScheduler};
 use fendermint_vm_interpreter::fvm::FvmMessagesInterpreter;
-use fendermint_vm_message::chain::{self, ChainMessage};
-use fendermint_vm_message::signed::{OriginKind, SignedMessage};
+use fendermint_vm_message::chain::ChainMessage;
+use fendermint_vm_message::signed::SignedMessage;
 use fendermint_vm_topdown::voting::VoteTally;
 use fendermint_vm_topdown::Toggle;
 use fvm_shared::chainid::ChainID;
@@ -76,7 +74,6 @@ async fn tester_with_upgrader(
         upgrade_scheduler,
         false,
         200,
-        false,
         1.05,
         1.05,
     );

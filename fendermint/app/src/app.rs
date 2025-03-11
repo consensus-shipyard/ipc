@@ -101,11 +101,11 @@ impl AppState {
     }
 }
 
-pub struct AppConfig<S: KVStore> {
+pub struct AppConfig<KV: KVStore> {
     /// Namespace to store the current app state.
-    pub app_namespace: S::Namespace,
+    pub app_namespace: KV::Namespace,
     /// Namespace to store the app state history.
-    pub state_hist_namespace: S::Namespace,
+    pub state_hist_namespace: KV::Namespace,
     /// Size of state history to keep; 0 means unlimited.
     pub state_hist_size: u64,
     /// Block height where we should gracefully stop the node
@@ -114,11 +114,11 @@ pub struct AppConfig<S: KVStore> {
 
 /// Handle ABCI requests.
 #[derive(Clone)]
-pub struct App<DB, SS, S, I>
+pub struct App<DB, BS, KV, MI>
 where
-    SS: Blockstore + Clone + 'static + Send + Sync,
-    S: KVStore,
-    I: MessagesInterpreter<SS> + Send + Sync,
+    BS: Blockstore + Clone + 'static + Send + Sync,
+    KV: KVStore,
+    MI: MessagesInterpreter<BS> + Send + Sync,
 {
     /// Database backing all key-value operations.
     db: Arc<DB>,
@@ -127,13 +127,13 @@ where
     /// Must be kept separate from storage that can be influenced by network operations such as Bitswap;
     /// nodes must be able to run transactions deterministically. By contrast the Bitswap store should
     /// be able to read its own storage area as well as state storage, to serve content from both.
-    state_store: Arc<SS>,
+    state_store: Arc<BS>,
     /// Wasm engine cache.
     multi_engine: Arc<MultiEngine>,
     /// Block height where we should gracefully stop the node
     halt_height: i64,
     /// Namespace to store app state.
-    namespace: S::Namespace,
+    namespace: KV::Namespace,
     /// Collection of past state parameters.
     ///
     /// We store the state hash for the height of the block where it was committed,
@@ -144,14 +144,14 @@ where
     /// The state also contains things like timestamp and the network version,
     /// so that we can retrospectively execute FVM messages at past block heights
     /// in read-only mode.
-    state_hist: KVCollection<S, BlockHeight, FvmStateParams>,
+    state_hist: KVCollection<KV, BlockHeight, FvmStateParams>,
     /// Interpreter for messages and the block lifecycle events.
-    messages_interpreter: Arc<I>,
+    messages_interpreter: Arc<MI>,
 
     /// Interface to the snapshotter, if enabled.
     snapshots: Option<SnapshotClient>,
     /// State accumulating changes during block execution.
-    exec_state: Arc<tokio::sync::Mutex<Option<FvmExecState<SS>>>>,
+    exec_state: Arc<tokio::sync::Mutex<Option<FvmExecState<BS>>>>,
     /// How much history to keep.
     ///
     /// Zero means unlimited.
@@ -160,22 +160,22 @@ where
     validators_cache: Arc<tokio::sync::Mutex<Option<ValidatorCache>>>,
 }
 
-impl<DB, SS, S, I> App<DB, SS, S, I>
+impl<DB, BS, KV, MI> App<DB, BS, KV, MI>
 where
-    S: KVStore
+    KV: KVStore
         + Codec<AppState>
         + Encode<AppStoreKey>
         + Encode<BlockHeight>
         + Codec<FvmStateParams>,
-    DB: KVWritable<S> + KVReadable<S> + Clone + 'static,
-    SS: Blockstore + Clone + 'static + Send + Sync,
-    I: MessagesInterpreter<SS> + Send + Sync,
+    DB: KVWritable<KV> + KVReadable<KV> + Clone + 'static,
+    BS: Blockstore + Clone + 'static + Send + Sync,
+    MI: MessagesInterpreter<BS> + Send + Sync,
 {
     pub fn new(
-        config: AppConfig<S>,
+        config: AppConfig<KV>,
         db: DB,
-        state_store: SS,
-        interpreter: I,
+        state_store: BS,
+        interpreter: MI,
         snapshots: Option<SnapshotClient>,
     ) -> Result<Self> {
         let app = Self {
@@ -196,19 +196,19 @@ where
     }
 }
 
-impl<DB, SS, S, I> App<DB, SS, S, I>
+impl<DB, BS, KV, MI> App<DB, BS, KV, MI>
 where
-    S: KVStore
+    KV: KVStore
         + Codec<AppState>
         + Encode<AppStoreKey>
         + Encode<BlockHeight>
         + Codec<FvmStateParams>,
-    DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
-    SS: Blockstore + 'static + Clone + Send + Sync,
-    I: MessagesInterpreter<SS> + Send + Sync,
+    DB: KVWritable<KV> + KVReadable<KV> + 'static + Clone,
+    BS: Blockstore + 'static + Clone + Send + Sync,
+    MI: MessagesInterpreter<BS> + Send + Sync,
 {
     /// Get an owned clone of the state store.
-    fn state_store_clone(&self) -> SS {
+    fn state_store_clone(&self) -> BS {
         self.state_store.as_ref().clone()
     }
 
@@ -308,14 +308,14 @@ where
     }
 
     /// Put the execution state during block execution. Has to be empty.
-    async fn put_exec_state(&self, state: FvmExecState<SS>) {
+    async fn put_exec_state(&self, state: FvmExecState<BS>) {
         let mut guard = self.exec_state.lock().await;
         assert!(guard.is_none(), "exec state not empty");
         *guard = Some(state);
     }
 
     /// Take the execution state during block execution. Has to be non-empty.
-    async fn take_exec_state(&self) -> FvmExecState<SS> {
+    async fn take_exec_state(&self) -> FvmExecState<BS> {
         let mut guard = self.exec_state.lock().await;
         guard.take().expect("exec state empty")
     }
@@ -323,8 +323,8 @@ where
     /// Take the execution state, update it, put it back, return the output.
     async fn modify_exec_state<T, F, R>(&self, f: F) -> Result<T>
     where
-        F: FnOnce(FvmExecState<SS>) -> R,
-        R: Future<Output = Result<(FvmExecState<SS>, T)>>,
+        F: FnOnce(FvmExecState<BS>) -> R,
+        R: Future<Output = Result<(FvmExecState<BS>, T)>>,
     {
         let mut guard = self.exec_state.lock().await;
         let state = guard.take().expect("exec state empty");
@@ -342,7 +342,7 @@ where
     pub fn read_only_view(
         &self,
         height: Option<BlockHeight>,
-    ) -> Result<Option<FvmExecState<ReadOnlyBlockstore<Arc<SS>>>>> {
+    ) -> Result<Option<FvmExecState<ReadOnlyBlockstore<Arc<BS>>>>> {
         let app_state = match self.get_committed_state()? {
             Some(app_state) => app_state,
             None => return Ok(None),
@@ -451,17 +451,17 @@ where
 // the `tower-abci` library would throw an exception when it tried to convert a
 // `Response::Exception` into a `ConsensusResponse` for example.
 #[async_trait]
-impl<DB, SS, S, I> Application for App<DB, SS, S, I>
+impl<DB, BS, KV, MI> Application for App<DB, BS, KV, MI>
 where
-    S: KVStore
+    KV: KVStore
         + Codec<AppState>
         + Encode<AppStoreKey>
         + Encode<BlockHeight>
         + Codec<FvmStateParams>,
-    S::Namespace: Sync + Send,
-    DB: KVWritable<S> + KVReadable<S> + Clone + Send + Sync + 'static,
-    SS: Blockstore + Clone + Send + Sync + 'static,
-    I: MessagesInterpreter<SS> + Send + Sync,
+    KV::Namespace: Sync + Send,
+    DB: KVWritable<KV> + KVReadable<KV> + Clone + Send + Sync + 'static,
+    BS: Blockstore + Clone + Send + Sync + 'static,
+    MI: MessagesInterpreter<BS> + Send + Sync,
 {
     /// Provide information about the ABCI application.
     async fn info(&self, _request: request::Info) -> AbciResult<response::Info> {
@@ -647,11 +647,7 @@ where
             .await
             .context("failed to prepare proposal")?;
 
-        let txs: Vec<bytes::Bytes> = response
-            .messages
-            .into_iter()
-            .map(bytes::Bytes::from)
-            .collect();
+        let txs = Vec::from_iter(response.messages.into_iter().map(bytes::Bytes::from));
 
         emit(BlockProposalSent {
             validator: &request.proposer_address,

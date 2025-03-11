@@ -49,7 +49,6 @@ where
 
     push_block_data_to_chainmeta_actor: bool,
     max_msgs_per_block: usize,
-    reject_malformed_proposal: bool,
 
     gas_overestimation_rate: f64,
     gas_search_step: f64,
@@ -60,14 +59,12 @@ where
     DB: Blockstore + Clone + Send + Sync + 'static,
     C: TendermintClient + Clone + Send + Sync + 'static,
 {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         bottom_up_manager: BottomUpManager<DB, C>,
         top_down_manager: TopDownManager<DB>,
         upgrade_scheduler: UpgradeScheduler<DB>,
         push_block_data_to_chainmeta_actor: bool,
         max_msgs_per_block: usize,
-        reject_malformed_proposal: bool,
         gas_overestimation_rate: f64,
         gas_search_step: f64,
     ) -> Self {
@@ -77,7 +74,6 @@ where
             upgrade_scheduler,
             push_block_data_to_chainmeta_actor,
             max_msgs_per_block,
-            reject_malformed_proposal,
             gas_overestimation_rate,
             gas_search_step,
         }
@@ -248,11 +244,11 @@ where
         let (all_messages, total_bytes) =
             select_messages_until_total_bytes(all_msgs, max_transaction_bytes as usize);
 
-        if all_messages.len() < input_msg_count {
+        if let Some(delta) = input_msg_count.checked_sub(all_messages.len()) {
             tracing::warn!(
-                removed_msgs = input_msg_count - all_messages.len(),
+                removed_msgs = delta,
                 max_bytes = max_transaction_bytes,
-                "some messages were removed from the proposal because they exceed the byte limit"
+                "some messages were removed from the proposal because they exceed the limit"
             );
         }
 
@@ -290,9 +286,7 @@ where
                 },
                 Err(e) => {
                     tracing::warn!(error = %e, "failed to decode message in proposal as ChainMessage");
-                    if self.reject_malformed_proposal {
-                        return Ok(AttestMessagesResponse::Reject);
-                    }
+                    return Ok(AttestMessagesResponse::Reject);
                 }
             }
         }
@@ -372,12 +366,10 @@ where
         let chain_msg = match fvm_ipld_encoding::from_slice::<ChainMessage>(&msg) {
             Ok(msg) => msg,
             Err(e) => {
-                if self.reject_malformed_proposal {
-                    tracing::warn!(
-                        error = e.to_string(),
-                        "failed to decode delivered message as ChainMessage; may indicate a node issue"
-                    );
-                }
+                tracing::warn!(
+                    error = e.to_string(),
+                    "failed to decode delivered message as ChainMessage; may indicate a node issue"
+                );
                 return Err(ApplyMessageError::InvalidMessage(e.to_string()));
             }
         };

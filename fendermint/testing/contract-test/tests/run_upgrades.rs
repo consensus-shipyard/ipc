@@ -210,7 +210,6 @@ async fn test_applying_upgrades() {
         upgrade_scheduler,
         false,
         200,
-        false,
         1.05,
         1.05,
     );
