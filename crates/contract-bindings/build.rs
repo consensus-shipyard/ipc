@@ -46,13 +46,13 @@ fn main() -> color_eyre::Result<()> {
     println!("cargo:warn=Running binding generation...");
 
     // Where are the Solidity artifacts.
-    let workspace_dir = crate_dir
+    let workspace_dir = dbg!(fs_err::canonicalize(crate_dir
         .clone()
         .parent()
-        .expect("Parent dir should exist, since we are part of a workspace")
+        .expect("Structure is such that we are 2 levels from the root, one level up should work")
         .parent()
-        .expect("Structure is such that we are two levels from the root")
-        .to_path_buf();
+        .expect("Structure is such that we are 2 levels from the root, two levels up should work")
+        .to_path_buf()))?;
 
     let contracts_dir = workspace_dir.join("contracts");
 

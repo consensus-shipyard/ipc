@@ -2,13 +2,17 @@
 # instead of making an even more compilicated common one, let's delegate to them.
 
 default:
-	cd contracts && make gen
-	cd crates && (cargo build --release && ./target/release/ipc-cli --version && ./target/release/fendermint --version)
+	make contracts
+	make crates
 
-SUBTREES_RUST := $(patsubst %, crates/%, $(ls -1 crates))
-SUBTREES_CONTRACTS := contracts
-SUBTREES_ALL := $(SUBTREES_RUST) $(SUBTREES_CONTRACTS)
+crates: contracts
+	cargo build --manifest-path=./crates/Cargo.toml --locked --release
+	./target/release/ipc-cli --version
+	./target/release/fendermint --version
 
+contracts:
+	make -C contracts gen
+ 
 test: test-rust test-contracts
 
 test-rust: $(patsubst %, test/%, $(SUBTREES_RUST))

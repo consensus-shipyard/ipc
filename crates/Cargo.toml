@@ -188,7 +188,7 @@ ipc_ipld_resolver = { path = "ipld/resolver" }
 ipc-types = { path = "ipc/types" }
 ipc-observability = { path = "ipc/observability" }
 ipc_actors_abis = { path = "contract-bindings" }
-actors-custom-api = { path = "fendermint/actors/api" }
+actors-custom-api = { path = "node/actors/api" }
 
 # Vendored for cross-compilation, see https://github.com/cross-rs/cross/wiki/Recipes#openssl
 # Make sure every top level build target actually imports this dependency, and don't end up
