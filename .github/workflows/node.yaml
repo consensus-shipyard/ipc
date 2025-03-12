@@ -1,4 +1,4 @@
-name: Build IPC
+name: Build the node
 
 # This workflow is triggered from the main CI workflow.
 on:
