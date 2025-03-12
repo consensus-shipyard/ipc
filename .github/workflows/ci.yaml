@@ -44,19 +44,19 @@ jobs:
     uses: ./.github/workflows/tests-unit.yaml
     secrets: inherit
     needs:
-      - build
+      - node
 
   e2e-tests:
     uses: ./.github/workflows/tests-e2e.yaml
     secrets: inherit
     needs:
-      - build
+      - node
 
   fevm-contract-tests:
     uses: ./.github/workflows/fevm-contract-tests.yaml
     secrets: inherit
     needs:
-      - build
+      - node
     if: >-
       github.ref == 'refs/heads/main' ||
       github.ref_type == 'tag'
@@ -73,6 +73,6 @@ jobs:
       github.ref_type == 'tag'
     needs:
       - fevm-contract-tests
-      - build
+      - node
       - unit-tests
       - e2e-tests
