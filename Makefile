@@ -2,20 +2,24 @@
 # instead of making an even more compilicated common one, let's delegate to them.
 
 # these targets check internally if anything changed
-.PHONY: crates contracts
+.PHONY: crates contracts fmt
 
 default:
+	make fmt
 	make contracts
 	make crates
 
 crates: contracts
-	cd crates
 	cargo build --locked --manifest-path ./crates/Cargo.toml --release
 	./crates/target/release/ipc-cli --version
 	./crates/target/release/fendermint --version
 
 contracts:
 	make -C contracts gen
+
+fmt: 
+	cd crates && cargo +nightly-2023-12-07 fmt
+	# taplo fmt
  
 test: test-rust test-contracts
 
