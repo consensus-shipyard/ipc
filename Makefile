@@ -18,7 +18,7 @@ contracts:
 	make -C contracts gen
 
 fmt: 
-	cd crates && cargo +nightly-2023-12-07 fmt
+	cd crates && cargo +nightly-2024-07-05 fmt --check --all
 	# taplo fmt
  
 test: test-rust test-contracts
