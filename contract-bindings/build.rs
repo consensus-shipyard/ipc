@@ -197,9 +197,6 @@ fn error_mapping_gen(mod_f: &mut fs_err::File, all_contracts: &[&str]) -> color_
     let extend_map_code = all_contracts
         .iter()
         .map(|s| {
-            // Need to convert contract name to
-            // `errors.extend(crate::gen::gateway_manager_facet::gateway_manager_facet::GATEWAYMANAGERFACET_ABI.errors.clone());`
-
             let snake_case = camel_to_snake(s);
             let upper_case = s.to_uppercase();
             format!("[{snake_case}, {upper_case}_ABI]")
