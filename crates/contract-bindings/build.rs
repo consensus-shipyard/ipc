@@ -56,8 +56,7 @@ fn main() -> color_eyre::Result<()> {
             .parent()
             .expect(
                 "Structure is such that we are 2 levels from the root, two levels up should work",
-            )
-            .to_path_buf(),
+            ),
     )?;
 
     let contracts_dir = workspace_dir.join("contracts");
