@@ -8,6 +8,7 @@ env:
   CARGO_INCREMENTAL: "0"
   SCCACHE_CACHE_SIZE: 10G
   # TODO use RUSTC_WRAPPER=sccache and double check if the ones below are still required
+  RUSTC_WRAPPER: "sccache"
   CC: "sccache clang"
   CXX: "sccache clang++"
   PROFILE: "ci"

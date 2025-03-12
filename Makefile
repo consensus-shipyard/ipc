@@ -5,8 +5,8 @@
 .PHONY: crates contracts fmt
 
 default:
-	make fmt
 	make contracts
+	make fmt
 	make crates
 
 crates: contracts
