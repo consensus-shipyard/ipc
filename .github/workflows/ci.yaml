@@ -72,7 +72,7 @@ jobs:
       github.ref == 'refs/heads/main' ||
       github.ref_type == 'tag'
     needs:
-      - contracts-test # generates the ABI artifacts (although fendermint can do on its own too)
+      - fevm-contract-tests
       - build
       - unit-tests
       - e2e-tests
