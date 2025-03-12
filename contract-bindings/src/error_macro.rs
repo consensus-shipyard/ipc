@@ -5,6 +5,8 @@ macro_rules! gen_contract_error_mapping {
             use anyhow::anyhow;
             use ethers::utils::hex;
 
+            const SOLIDITY_SELECTOR_BYTE_SIZE: usize = 4;
+
             lazy_static::lazy_static! {
                 static ref MAP: std::collections::BTreeMap<String, ethers::abi::ethabi::AbiError> = {
                     let mut errors: std::collections::BTreeMap<String, Vec<ethers::abi::ethabi::AbiError>> = Default::default();
@@ -16,15 +18,13 @@ macro_rules! gen_contract_error_mapping {
                     let mut selector_indexed = std::collections::BTreeMap::default();
                     for (_, v) in errors.iter() {
                         for i in v {
-                            let selector = ethers::utils::hex::encode(&i.signature().0[0..4]);
+                            let selector = ethers::utils::hex::encode(&i.signature().0[0..SOLIDITY_SELECTOR_BYTE_SIZE]);
                             selector_indexed.insert(selector, i.clone());
                         }
                     }
                     selector_indexed
                 };
             }
-
-            const SOLIDITY_SELECTOR_BYTE_SIZE: usize = 4;
 
             pub struct ContractErrorParser {}
 
