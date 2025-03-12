@@ -3,7 +3,7 @@
 
 use async_trait::async_trait;
 use ethers::providers::{Http, HttpClientError, JsonRpcClient};
-use ipc_actors_abis::ContractErrorParser;
+use ipc_actors_abis::error_parser::ContractErrorParser;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::fmt::{Debug, Formatter};
@@ -39,7 +39,7 @@ impl JsonRpcClient for FvmHttp {
             .request(method, params)
             .await
             .map_err(|client_error| match client_error {
-                HttpClientError::JsonRpcError(mut e) => {
+                HttpClientError::JsonRpcError(e) => {
                     let Some(raw_error) = e.data.as_ref() else {
                         return HttpClientError::JsonRpcError(e);
                     };
@@ -52,7 +52,8 @@ impl JsonRpcClient for FvmHttp {
                         return HttpClientError::JsonRpcError(e);
                     };
 
-                    e.message = format!("contract reverted with {}", name);
+                    tracing::error!("contract reverted with error: {name}");
+
                     HttpClientError::JsonRpcError(e)
                 }
                 e => e,

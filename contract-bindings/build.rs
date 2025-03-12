@@ -153,6 +153,7 @@ fn main() -> color_eyre::Result<()> {
         )?;
     }
 
+    writeln!(mod_f, "\n\n")?;
     error_mapping_gen(&mut mod_f, &all_contracts)?;
 
     mod_f.flush()?;
@@ -191,49 +192,21 @@ fn camel_to_snake(name: &str) -> String {
 }
 
 fn error_mapping_gen(mod_f: &mut fs_err::File, all_contracts: &[&str]) -> color_eyre::Result<()> {
-    writeln!(mod_f, "\n")?;
+    writeln!(mod_f, "crate::gen_contract_error_mapping!(")?;
 
-    let extend_map_code = all_contracts.
-        iter()
+    let extend_map_code = all_contracts
+        .iter()
         .map(|s| {
             // Need to convert contract name to
             // `errors.extend(crate::gen::gateway_manager_facet::gateway_manager_facet::GATEWAYMANAGERFACET_ABI.errors.clone());`
 
             let snake_case = camel_to_snake(s);
             let upper_case = s.to_uppercase();
-            format!(
-                "errors.extend(crate::gen::{snake_case}::{snake_case}::{upper_case}_ABI.errors.clone());"
-            )
+            format!("[{snake_case}, {upper_case}_ABI]")
         })
         .collect::<Vec<_>>()
-        .join("\n");
-
-    let v =
-        "
-        pub mod error_map {
-            lazy_static::lazy_static! {
-                pub(crate) static ref MAP: std::collections::BTreeMap<String, ethers::abi::ethabi::AbiError> = {
-                    let mut errors: std::collections::BTreeMap<String, Vec<ethers::abi::ethabi::AbiError>> = Default::default();
-
-                    // code generated with errors added to the map
-                    {{{}}}
-
-                    // the above `errors` is actually indexed by name, now index by selector
-
-                    let mut selector_indexed = std::collections::BTreeMap::default();
-                    for (_, v) in errors.iter() {
-                        for i in v {
-                            let selector = ethers::utils::hex::encode(&i.signature().0[0..4]);
-                            selector_indexed.insert(selector, i.clone());
-                        }
-                    }
-                    selector_indexed
-                };
-            }
-        }
-        ".replace("{{{}}}", &extend_map_code);
-
-    writeln!(mod_f, "{}", v)?;
-
+        .join(",\n");
+    writeln!(mod_f, "{}", extend_map_code)?;
+    writeln!(mod_f, ");")?;
     Ok(())
 }

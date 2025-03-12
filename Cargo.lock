@@ -5840,6 +5840,7 @@ dependencies = [
  "lazy_static",
  "prettyplease",
  "syn 2.0.87",
+ "tracing",
 ]
 
 [[package]]

@@ -12,6 +12,7 @@ fvm_shared = { workspace = true }
 anyhow = { workspace = true }
 fs-err = { workspace = true }
 lazy_static = { workspace = true }
+tracing = { workspace = true }
 
 [build-dependencies]
 ethers = { workspace = true, features = ["abigen", "ws"] }
