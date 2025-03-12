@@ -9,8 +9,9 @@ use std::{convert::Infallible, net::ToSocketAddrs, num::ParseIntError};
 use anyhow::anyhow;
 use anyhow::Context;
 use bytes::Buf;
-use entangler::{ChunkRange, Config, Entangler};
+use entangler::{ChunkRange, Config, EntanglementResult, Entangler};
 use entangler_storage::iroh::IrohStorage as EntanglerIrohStorage;
+use fendermint_actor_blobs_shared::state::Hash as BlobHash;
 use fendermint_actor_bucket::{GetParams, Object};
 use fendermint_app_settings::objects::ObjectsSettings;
 use fendermint_rpc::{client::FendermintClient, message::GasParams, QueryClient};
@@ -22,7 +23,7 @@ use fvm_shared::{
 };
 use ipc_api::ethers_address_to_fil_address;
 use iroh::{
-    blobs::{provider::AddProgress, util::SetTagOption, Hash},
+    blobs::{hashseq::HashSeq, util::SetTagOption, Hash},
     client::blobs::BlobStatus,
     net::NodeAddr,
 };
@@ -32,6 +33,7 @@ use prometheus::{register_histogram, register_int_counter, Histogram, IntCounter
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tracing::info;
+use uuid::Uuid;
 use warp::{
     filters::multipart::Part,
     http::{HeaderMap, HeaderValue, StatusCode},
@@ -317,6 +319,8 @@ async fn handle_object_upload(
         }));
     }
 
+    let upload_id = Uuid::new_v4();
+
     // Handle the two upload cases
     let hash = match (parser.source, parser.data_part) {
         // Case 1: Source node provided - download from the source
@@ -329,7 +333,8 @@ async fn handle_object_upload(
                     }))
                 }
             };
-            let tag = iroh::blobs::Tag(format!("temp-{hash}").into());
+
+            let tag = iroh::blobs::Tag(format!("temp-{hash}-{upload_id}").into());
             let progress = iroh
                 .blobs()
                 .download_with_opts(
@@ -380,42 +385,41 @@ async fn handle_object_upload(
                     })
             });
 
-            let mut progress = iroh
-                .blobs()
-                .add_stream(stream, SetTagOption::Auto)
-                .await
-                .map_err(|e| {
-                    Rejection::from(BadRequest {
-                        message: format!("failed to store blob: {}", e),
-                    })
-                })?;
+            let batch = iroh.blobs().batch().await.map_err(|e| {
+                Rejection::from(BadRequest {
+                    message: format!("failed to store blob: {}", e),
+                })
+            })?;
+            let temp_tag = batch.add_stream(stream).await.map_err(|e| {
+                Rejection::from(BadRequest {
+                    message: format!("failed to store blob: {}", e),
+                })
+            })?;
 
-            let uploaded_hash = loop {
-                let Some(event) = progress.next().await else {
-                    return Err(Rejection::from(BadRequest {
-                        message: "Unexpected end while ingesting data".to_string(),
-                    }));
-                };
-                match event.map_err(|e| {
-                    Rejection::from(BadRequest {
-                        message: format!("failed to make progress: {}", e),
-                    })
-                })? {
-                    AddProgress::AllDone { hash, .. } => {
-                        break hash;
-                    }
-                    AddProgress::Abort(err) => {
-                        return Err(Rejection::from(BadRequest {
-                            message: format!("upload aborted: {}", err),
-                        }));
-                    }
-                    _ => continue,
-                }
+            let hash = *temp_tag.hash();
+            let new_tag = iroh::blobs::Tag(format!("temp-{hash}-{upload_id}").into());
+            batch.persist_to(temp_tag, new_tag).await.map_err(|e| {
+                Rejection::from(BadRequest {
+                    message: format!("failed to persist blob: {}", e),
+                })
+            })?;
+
+            drop(batch);
+
+            let status = iroh.blobs().status(hash).await.map_err(|e| {
+                Rejection::from(BadRequest {
+                    message: format!("failed to check blob status: {}", e),
+                })
+            })?;
+            let BlobStatus::Complete { size } = status else {
+                return Err(Rejection::from(BadRequest {
+                    message: "failed to store data".to_string(),
+                }));
             };
-            info!("stored uploaded blob {} (size: {})", uploaded_hash, size);
             COUNTER_BYTES_UPLOADED.inc_by(size);
+            info!("stored uploaded blob {} (size: {})", hash, size);
 
-            uploaded_hash
+            hash
         }
 
         (Some(_), Some(_)) => {
@@ -431,25 +435,85 @@ async fn handle_object_upload(
         }
     };
 
-    let ent = new_entangler(iroh).map_err(|e| {
+    let ent = new_entangler(iroh.clone()).map_err(|e| {
         Rejection::from(BadRequest {
             message: format!("failed to create entangler: {}", e),
         })
     })?;
-    let metadata_hash = ent.entangle_uploaded(hash.to_string()).await.map_err(|e| {
+    let ent_result = ent.entangle_uploaded(hash.to_string()).await.map_err(|e| {
         Rejection::from(BadRequest {
             message: format!("failed to entangle uploaded data: {}", e),
         })
     })?;
 
+    let hash_seq_hash = tag_entangled_data(&iroh, &ent_result, upload_id)
+        .await
+        .map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("failed to tag entangled data: {}", e),
+            })
+        })?;
+
     COUNTER_BLOBS_UPLOADED.inc();
     HISTOGRAM_UPLOAD_TIME.observe(start_time.elapsed().as_secs_f64());
 
     let response = UploadResponse {
-        hash: hash.to_string(),
-        metadata_hash,
+        hash: hash_seq_hash.to_string(),
+        metadata_hash: ent_result.metadata_hash,
     };
     Ok(warp::reply::json(&response))
+}
+
+async fn tag_entangled_data(
+    iroh: &iroh::client::Iroh,
+    ent_result: &EntanglementResult,
+    upload_id: Uuid,
+) -> Result<Hash, anyhow::Error> {
+    let orig_hash = Hash::from_str(ent_result.orig_hash.as_str())?;
+    let metadata_hash = Hash::from_str(ent_result.metadata_hash.as_str())?;
+
+    // collect all hashes related to the blob, but ignore the metadata hash, as we want to make
+    // sure that the metadata hash is the second hash in the sequence after the original hash
+    let upload_hashes = ent_result
+        .upload_results
+        .iter()
+        .map(|r| Hash::from_str(&r.hash))
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .filter(|h| h != &metadata_hash)
+        .collect::<Vec<_>>();
+
+    let mut hashes = vec![orig_hash.clone(), metadata_hash];
+    hashes.extend(upload_hashes);
+
+    let batch = iroh.blobs().batch().await?;
+
+    // make a hash sequence object from the hashes and upload it to iroh
+    let hash_seq = hashes.into_iter().collect::<HashSeq>();
+    let temp_tag = batch.add_bytes(hash_seq).await?;
+
+    let hash_seq_hash = *temp_tag.hash();
+    // this tag will be replaced later by the validator to "stored-seq-{hash_seq_hash}"
+    let hash_seq_tag = iroh::blobs::Tag(format!("temp-seq-{hash_seq_hash}").into());
+    batch.persist_to(temp_tag, hash_seq_tag).await?;
+
+    drop(batch);
+
+    // delete all tags returned by the entangler
+    for ent_upload_result in &ent_result.upload_results {
+        let tag_value = ent_upload_result
+            .info
+            .get("tag")
+            .ok_or_else(|| anyhow!("Missing tag in entanglement upload result"))?;
+        let tag = iroh::blobs::Tag::from(tag_value.clone());
+        iroh.tags().delete(tag).await?;
+    }
+
+    // remove upload tags
+    let orig_tag = iroh::blobs::Tag(format!("temp-{orig_hash}-{upload_id}").into());
+    iroh.tags().delete(orig_tag).await?;
+
+    Ok(hash_seq_hash)
 }
 
 fn new_entangler(
@@ -530,23 +594,13 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
 
     match maybe_object {
         Some(object) => {
-            let hash = Hash::from_bytes(object.hash.0);
-            let status = iroh.blobs().status(hash).await.map_err(|e| {
-                Rejection::from(BadRequest {
-                    message: format!("failed to read object: {} {}", hash, e),
-                })
-            })?;
-            let BlobStatus::Complete { size } = status else {
-                return Err(Rejection::from(BadRequest {
-                    message: format!("object {} is not available", hash),
-                }));
-            };
-            // Sanity check size
-            if size.is_zero() {
-                return Err(Rejection::from(BadRequest {
-                    message: format!("object {} has zero size", hash),
-                }));
-            }
+            let (hash, size) = extract_blob_hash_and_size(&iroh, &object.hash)
+                .await
+                .map_err(|e| {
+                    Rejection::from(BadRequest {
+                        message: e.to_string(),
+                    })
+                })?;
 
             let ent = new_entangler(iroh).map_err(|e| {
                 Rejection::from(BadRequest {
@@ -681,6 +735,72 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
     }
 }
 
+async fn extract_blob_hash_and_size(
+    iroh: &iroh::client::Iroh,
+    object_hash: &BlobHash,
+) -> Result<(Hash, u64), anyhow::Error> {
+    let hash_seq_hash = Hash::from_bytes(object_hash.0);
+    let status = iroh.blobs().status(hash_seq_hash).await.map_err(|e| {
+        anyhow!(
+            "failed to get status for hash sequence object: {} {}",
+            hash_seq_hash,
+            e
+        )
+    })?;
+
+    let BlobStatus::Complete { size } = status else {
+        return Err(anyhow!(
+            "hash sequence object {} is not available",
+            hash_seq_hash
+        ));
+    };
+
+    if size.is_zero() {
+        return Err(anyhow!(
+            "hash sequence object {} has zero size",
+            hash_seq_hash
+        ));
+    }
+
+    let res = iroh
+        .blobs()
+        .read_to_bytes(hash_seq_hash)
+        .await
+        .map_err(|e| {
+            anyhow!(
+                "failed to read hash sequence object: {} {}",
+                hash_seq_hash,
+                e
+            )
+        })?;
+
+    let hash_seq = HashSeq::try_from(res).map_err(|e| {
+        anyhow!(
+            "failed to parse hash sequence object: {} {}",
+            hash_seq_hash,
+            e
+        )
+    })?;
+
+    let blob_hash = hash_seq.get(0).ok_or_else(|| {
+        anyhow!(
+            "failed to get hash with index 0 from hash sequence object: {}",
+            hash_seq_hash
+        )
+    })?;
+
+    let status = iroh
+        .blobs()
+        .status(blob_hash)
+        .await
+        .map_err(|e| anyhow!("failed to read object: {} {}", blob_hash, e))?;
+
+    let BlobStatus::Complete { size } = status else {
+        return Err(anyhow!("object {} is not available", blob_hash));
+    };
+    Ok((blob_hash, size))
+}
+
 /// Parse an f/eth-address from string.
 pub fn parse_address(s: &str) -> anyhow::Result<Address> {
     let addr = Network::Mainnet
@@ -764,29 +884,13 @@ async fn os_get<F: QueryClient + Send + Sync>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fendermint_rpc::FendermintClient;
+    use async_trait::async_trait;
+    use bytes::Bytes;
+    use fendermint_vm_message::query::FvmQuery;
     use rand_chacha::rand_core::{RngCore, SeedableRng};
     use rand_chacha::ChaCha8Rng;
-    use tendermint_rpc::{Method, MockClient, MockRequestMethodMatcher};
-
-    // Used to mocking Actor State
-    const ABCI_QUERY_RESPONSE_DOWNLOAD: &str = r#"{
-        "jsonrpc": "2.0",
-        "id": "",
-        "result": {
-         "response": {
-            "code": 0,
-            "log": "",
-            "info": "",
-            "index": "0",
-            "key": "",
-            "value": "mQEIEhizARiFGJgYIBgYGNcYGBhJGBgYgRgYGO8YGBinCgwYGBiICxgYGI0YGBiMGBgYGRgYGIUYGBjQGBgYdRgYGNsYGBjLGBgY9hgYGHkYGBi5GBgYmhgYGF8YGBiZFBgYGOUYGBiqGBgY+RgYGGsYGBiDGBgYGhgYGJ4YGBgkGJgYIBgYGOwYGBhRGBgYoBgYGNEYGBhyGBgY2RgYGOcYGBhlGBgYpxgYGDMYGBjKExgYGOsYGBgYGBgY8hgYGN0YGBjNGBgYbRgYGMwYGBhOGBgYKhgYGPcYGBgoGBgYixgYGBgYGBjJGBgYXRgYGDQYGBiJABgYGIcYGBj3CxgZFRg2GKIYYxhmGG8YbxhjGGIYYRhyGGwYYxhvGG4YdBhlGG4YdBgtGHQYeRhwGGUYeBgYGGEYcBhwGGwYaRhjGGEYdBhpGG8YbhgvGG8YYxh0GGUYdBgtGHMYdBhyGGUYYRhtGDAYzBjgGL8CGDoYSwoHGG0YZRhzGHMYYRhnGGUSDQoEGGYYchhvGG0SAxh0GDAYMBgYARIYMQoCGHQYbxIYKRh0GDIYZxhvGGMYcBhuGGwYcRhpGGwYeBh5GG0Ydhh3GDQYdhhuGGwYaBg0GG4YcBhuGGQYeRh4GGoYYxhsGDMYMxh5GGgYdRhjGHQYaRhjGGkYGAE=",
-            "proof": null,
-            "height": "6017",
-            "codespace": ""
-            }
-        }
-     }"#;
+    use std::collections::HashMap;
+    use tendermint_rpc::endpoint::abci_query::AbciQuery;
 
     fn setup_logs() {
         use tracing_subscriber::layer::SubscriberExt;
@@ -802,6 +906,101 @@ mod tests {
             .with(EnvFilter::from_default_env())
             .try_init()
             .ok();
+    }
+
+    // A mock QueryClient that returns a predefined Object
+    struct MockQueryClient {
+        object: Option<Object>,
+    }
+
+    impl MockQueryClient {
+        fn new(object: Object) -> Self {
+            Self {
+                object: Some(object),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl QueryClient for MockQueryClient {
+        async fn os_get_call(
+            &mut self,
+            _address: Address,
+            _params: GetParams,
+            _value: TokenAmount,
+            _gas_params: GasParams,
+            _height: FvmQueryHeight,
+        ) -> anyhow::Result<Option<Object>> {
+            Ok(self.object.take())
+        }
+
+        async fn perform(&self, _: FvmQuery, _: FvmQueryHeight) -> anyhow::Result<AbciQuery> {
+            Ok(AbciQuery::default())
+        }
+    }
+
+    fn new_mock_client_with_predefined_object(
+        hash_seq_hash: Hash,
+        metadata_iroh_hash: Hash,
+    ) -> MockQueryClient {
+        let object = Object {
+            hash: BlobHash(hash_seq_hash.as_bytes().clone()),
+            recovery_hash: BlobHash(metadata_iroh_hash.as_bytes().clone()),
+            metadata: HashMap::from([
+                ("foo".to_string(), "bar".to_string()),
+                (
+                    "content-type".to_string(),
+                    "application/octet-stream".to_string(),
+                ),
+            ]),
+            size: 11,
+            expiry: 86400,
+        };
+
+        MockQueryClient::new(object)
+    }
+
+    /// Prepares test data for object download tests by uploading data, creating entanglement,
+    /// and properly tagging the hash sequence
+    async fn simulate_blob_upload(
+        iroh: &iroh::client::Iroh,
+        data: impl Into<Bytes>,
+    ) -> (Hash, Hash) {
+        let data = data.into(); // Convert to Bytes first, which implements Send
+        let ent = new_entangler(iroh.clone()).unwrap();
+        let ent_result = ent.upload(data).await.unwrap();
+
+        let metadata = ent
+            .download_metadata(ent_result.metadata_hash.as_str())
+            .await
+            .unwrap();
+
+        let hash_seq = vec![
+            Hash::from_str(ent_result.orig_hash.as_str()).unwrap(),
+            Hash::from_str(ent_result.metadata_hash.as_str()).unwrap(),
+        ]
+        .into_iter()
+        .chain(
+            metadata
+                .parity_hashes
+                .values()
+                .map(|hash| Hash::from_str(hash).unwrap()),
+        )
+        .collect::<HashSeq>();
+
+        let batch = iroh.blobs().batch().await.unwrap();
+        let temp_tag = batch.add_bytes(hash_seq).await.unwrap();
+        let hash_seq_hash = *temp_tag.hash();
+
+        // Add a tag to the hash sequence as expected by the system
+        let tag_name = format!("temp-seq-{hash_seq_hash}");
+        let hash_seq_tag = iroh::blobs::Tag(tag_name.into());
+        batch.persist_to(temp_tag, hash_seq_tag).await.unwrap();
+        drop(batch);
+
+        let metadata_iroh_hash = Hash::from_str(ent_result.metadata_hash.as_str()).unwrap();
+
+        (hash_seq_hash, metadata_iroh_hash)
     }
 
     #[tokio::test]
@@ -935,18 +1134,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_handle_object_download_get() {
-        let matcher = MockRequestMethodMatcher::default().map(
-            Method::AbciQuery,
-            Ok(ABCI_QUERY_RESPONSE_DOWNLOAD.to_string()),
-        );
-        let client = FendermintClient::new(MockClient::new(matcher).0);
+        setup_logs();
+
         let iroh = iroh::node::Node::memory().spawn().await.unwrap();
-        let _hash = iroh
-            .blobs()
-            .add_bytes(&b"hello world"[..])
-            .await
-            .unwrap()
-            .hash;
+
+        let (hash_seq_hash, metadata_iroh_hash) =
+            simulate_blob_upload(&iroh, &b"hello world"[..]).await;
+
+        let mock_client = new_mock_client_with_predefined_object(hash_seq_hash, metadata_iroh_hash);
 
         let result = handle_object_download(
             "t2mnd5jkuvmsaf457ympnf3monalh3vothdd5njoy".into(),
@@ -958,11 +1153,12 @@ mod tests {
             "GET".to_string(),
             None,
             HeightQuery { height: Some(1) },
-            client,
+            mock_client,
             iroh.client().clone(),
         )
         .await;
-        assert!(result.is_ok());
+
+        assert!(result.is_ok(), "{:#?}", result.err());
         let response = result.unwrap().into_response();
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(
@@ -974,6 +1170,7 @@ mod tests {
                 .unwrap(),
             "application/octet-stream"
         );
+
         let body = warp::hyper::body::to_bytes(response.into_body())
             .await
             .unwrap();
@@ -982,18 +1179,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_handle_object_download_with_range() {
-        let matcher = MockRequestMethodMatcher::default().map(
-            Method::AbciQuery,
-            Ok(ABCI_QUERY_RESPONSE_DOWNLOAD.to_string()),
-        );
-        let client = FendermintClient::new(MockClient::new(matcher).0);
+        setup_logs();
+
         let iroh = iroh::node::Node::memory().spawn().await.unwrap();
-        let _hash = iroh
-            .blobs()
-            .add_bytes(&b"hello world"[..])
-            .await
-            .unwrap()
-            .hash;
+
+        let (hash_seq_hash, metadata_iroh_hash) =
+            simulate_blob_upload(&iroh, &b"hello world"[..]).await;
+
+        let mock_client = new_mock_client_with_predefined_object(hash_seq_hash, metadata_iroh_hash);
 
         let result = handle_object_download(
             "t2mnd5jkuvmsaf457ympnf3monalh3vothdd5njoy".into(),
@@ -1005,7 +1198,7 @@ mod tests {
             "GET".to_string(),
             Some("bytes=0-4".to_string()),
             HeightQuery { height: Some(1) },
-            client,
+            mock_client,
             iroh.client().clone(),
         )
         .await;
@@ -1020,18 +1213,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_handle_object_download_head() {
-        let matcher = MockRequestMethodMatcher::default().map(
-            Method::AbciQuery,
-            Ok(ABCI_QUERY_RESPONSE_DOWNLOAD.to_string()),
-        );
-        let client = FendermintClient::new(MockClient::new(matcher).0);
+        setup_logs();
+
         let iroh = iroh::node::Node::memory().spawn().await.unwrap();
-        let _hash = iroh
-            .blobs()
-            .add_bytes(&b"hello world"[..])
-            .await
-            .unwrap()
-            .hash;
+
+        let (hash_seq_hash, metadata_iroh_hash) =
+            simulate_blob_upload(&iroh, &b"hello world"[..]).await;
+
+        let mock_client = new_mock_client_with_predefined_object(hash_seq_hash, metadata_iroh_hash);
 
         let result = handle_object_download(
             "t2mnd5jkuvmsaf457ympnf3monalh3vothdd5njoy".into(),
@@ -1043,12 +1232,12 @@ mod tests {
             "HEAD".to_string(),
             None,
             HeightQuery { height: Some(1) },
-            client,
+            mock_client,
             iroh.client().clone(),
         )
         .await;
 
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "{:#?}", result.err());
         let response = result.unwrap().into_response();
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(response.headers().get("Content-Length").unwrap(), "11");

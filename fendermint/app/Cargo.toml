@@ -48,6 +48,7 @@ tower-abci = { workspace = true }
 tracing = { workspace = true }
 tracing-appender = { workspace = true }
 tracing-subscriber = { workspace = true }
+uuid = { workspace = true }
 warp = { workspace = true }
 
 fendermint_abci = { path = "../abci" }

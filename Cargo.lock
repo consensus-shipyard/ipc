@@ -83,7 +83,7 @@ version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "891477e0c6a8957309ee5c45a6368af3ae14bb510732d2684ffa19af310920f9"
 dependencies = [
- "getrandom",
+ "getrandom 0.2.15",
  "once_cell",
  "version_check",
 ]
@@ -95,7 +95,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e89da841a80418a9b391ebaea17f5c112ffaaa96f621d2c285b5174da76b9011"
 dependencies = [
  "cfg-if",
- "getrandom",
+ "getrandom 0.2.15",
  "once_cell",
  "version_check",
  "zerocopy",
@@ -1001,7 +1001,7 @@ version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b62ddb9cb1ec0a098ad4bbf9344d0713fa193ae1a80af55febcff2627b6a00c1"
 dependencies = [
- "getrandom",
+ "getrandom 0.2.15",
  "instant",
  "rand",
 ]
@@ -2852,7 +2852,7 @@ dependencies = [
 [[package]]
 name = "entangler"
 version = "0.1.0"
-source = "git+https://github.com/recallnet/entanglement.git?rev=c578aa2973c8c31cecb26a92546051a3ec03de89#c578aa2973c8c31cecb26a92546051a3ec03de89"
+source = "git+https://github.com/recallnet/entanglement.git?rev=c13e1a5c17ecfae2ac5f8953e5d7ac7f8793cc3e#c13e1a5c17ecfae2ac5f8953e5d7ac7f8793cc3e"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2998,7 +2998,7 @@ dependencies = [
  "sha2 0.10.8",
  "sha3",
  "thiserror 1.0.69",
- "uuid",
+ "uuid 0.8.2",
 ]
 
 [[package]]
@@ -3850,6 +3850,7 @@ dependencies = [
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+ "uuid 1.15.1",
  "warp",
 ]
 
@@ -5325,8 +5326,20 @@ dependencies = [
  "cfg-if",
  "js-sys",
  "libc",
- "wasi",
+ "wasi 0.11.0+wasi-snapshot-preview1",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "getrandom"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "43a49c392881ce6d5c3b8cb70f98717b7c07aabbdff06687b9030dbfbe2725f8"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "wasi 0.13.3+wasi-0.2.2",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
@@ -6775,7 +6788,7 @@ dependencies = [
  "data-encoding",
  "derive_more",
  "ed25519-dalek",
- "getrandom",
+ "getrandom 0.2.15",
  "hex",
  "iroh-blake3",
  "once_cell",
@@ -7454,7 +7467,7 @@ dependencies = [
  "either",
  "futures",
  "futures-timer",
- "getrandom",
+ "getrandom 0.2.15",
  "instant",
  "libp2p-allow-block-list",
  "libp2p-connection-limits",
@@ -7587,7 +7600,7 @@ dependencies = [
  "fnv",
  "futures",
  "futures-ticker",
- "getrandom",
+ "getrandom 0.2.15",
  "hex_fmt",
  "instant",
  "libp2p-core",
@@ -8311,7 +8324,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2886843bf800fba2e3377cff24abf6379b4c4d5c6681eaf9ea5b0d15090450bd"
 dependencies = [
  "libc",
- "wasi",
+ "wasi 0.11.0+wasi-snapshot-preview1",
  "windows-sys 0.52.0",
 ]
 
@@ -8436,7 +8449,7 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a51313c5820b0b02bd422f4b44776fbf47961755c74ce64afc73bfad10226c3"
 dependencies = [
- "getrandom",
+ "getrandom 0.2.15",
 ]
 
 [[package]]
@@ -10032,7 +10045,7 @@ dependencies = [
  "libc",
  "once_cell",
  "raw-cpuid",
- "wasi",
+ "wasi 0.11.0+wasi-snapshot-preview1",
  "web-sys",
  "winapi",
 ]
@@ -10175,7 +10188,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2fe5ef3495d7d2e377ff17b1a8ce2ee2ec2a18cde8b6ad6619d65d0701c135d"
 dependencies = [
  "bytes",
- "getrandom",
+ "getrandom 0.2.15",
  "rand",
  "ring 0.17.8",
  "rustc-hash 2.1.0",
@@ -10255,7 +10268,7 @@ version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
- "getrandom",
+ "getrandom 0.2.15",
 ]
 
 [[package]]
@@ -10474,7 +10487,7 @@ version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba009ff324d1fc1b900bd1fdb31564febe58a8ccc8a6fdbb93b543d33b13ca43"
 dependencies = [
- "getrandom",
+ "getrandom 0.2.15",
  "libredox",
  "thiserror 1.0.69",
 ]
@@ -10730,7 +10743,7 @@ checksum = "c17fa4cb658e3583423e915b9f3acc01cceaee1860e33d59ebae66adc3a2dc0d"
 dependencies = [
  "cc",
  "cfg-if",
- "getrandom",
+ "getrandom 0.2.15",
  "libc",
  "spin 0.9.8",
  "untrusted 0.9.0",
@@ -11980,7 +11993,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 [[package]]
 name = "storage"
 version = "0.1.0"
-source = "git+https://github.com/recallnet/entanglement.git?rev=c578aa2973c8c31cecb26a92546051a3ec03de89#c578aa2973c8c31cecb26a92546051a3ec03de89"
+source = "git+https://github.com/recallnet/entanglement.git?rev=c13e1a5c17ecfae2ac5f8953e5d7ac7f8793cc3e#c13e1a5c17ecfae2ac5f8953e5d7ac7f8793cc3e"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -11993,6 +12006,7 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.11",
  "tokio",
+ "uuid 1.15.1",
 ]
 
 [[package]]
@@ -12625,7 +12639,7 @@ dependencies = [
  "bytes",
  "flex-error",
  "futures",
- "getrandom",
+ "getrandom 0.2.15",
  "http 0.2.12",
  "hyper 0.14.31",
  "hyper-proxy",
@@ -12645,7 +12659,7 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
- "uuid",
+ "uuid 0.8.2",
  "walkdir",
 ]
 
@@ -13537,8 +13551,17 @@ version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
 dependencies = [
- "getrandom",
+ "getrandom 0.2.15",
  "serde",
+]
+
+[[package]]
+name = "uuid"
+version = "1.15.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0f540e3240398cce6128b64ba83fdbdd86129c16a3aa1a3a252efd66eb3d587"
+dependencies = [
+ "getrandom 0.3.1",
 ]
 
 [[package]]
@@ -13662,6 +13685,15 @@ name = "wasi"
 version = "0.11.0+wasi-snapshot-preview1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c8d87e72b64a3b4db28d11ce29237c246188f4f51057d65a7eab63b7987e423"
+
+[[package]]
+name = "wasi"
+version = "0.13.3+wasi-0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26816d2e1a4a36a2940b96c5296ce403917633dff8f3440e9b236ed6f6bacad2"
+dependencies = [
+ "wit-bindgen-rt",
+]
 
 [[package]]
 name = "wasm-bindgen"
@@ -14428,6 +14460,15 @@ checksum = "524e57b2c537c0f9b1e69f1965311ec12182b4122e45035b1508cd24d2adadb1"
 dependencies = [
  "cfg-if",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "wit-bindgen-rt"
+version = "0.33.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3268f3d866458b787f390cf61f4bbb563b922d091359f9608842999eaee3943c"
+dependencies = [
+ "bitflags 2.6.0",
 ]
 
 [[package]]
