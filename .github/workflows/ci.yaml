@@ -37,8 +37,8 @@ jobs:
   contracts:
     uses: ./.github/workflows/contracts.yaml
 
-  build:
-    uses: ./.github/workflows/build.yaml
+  node:
+    uses: ./.github/workflows/node.yaml
 
   unit-tests:
     uses: ./.github/workflows/tests-unit.yaml
