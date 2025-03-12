@@ -35,7 +35,7 @@ FROM --platform=$BUILDPLATFORM ubuntu:jammy AS builder
 
 RUN apt-get update && \
   apt-get install -y build-essential clang cmake protobuf-compiler curl \
-  openssl libssl-dev pkg-config
+  openssl libssl-dev pkg-config libclang-dev
 
 # Get Rust
 RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y

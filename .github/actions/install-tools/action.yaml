@@ -19,6 +19,10 @@ runs:
         toolchain: ${{ inputs.rust }}
         components: rustfmt,clippy
 
+    - name: Install bindgen dep libclang-dev
+      shell: sh
+      run: apt-get update && apt-get install -y libclang-dev
+
     - name: Install Cargo Make
       uses: davidB/rust-cargo-make@v1
 

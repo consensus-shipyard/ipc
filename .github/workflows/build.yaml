@@ -97,7 +97,7 @@ jobs:
           # syntax=docker/dockerfile:1
           FROM alpine as builder
           COPY /crates/node/app/config /app/fendermint/app/config
-          COPY /crates/target/release/fendermint /app/output/bin/fendermint
+          COPY /crates/target/release/node /app/output/bin/fendermint
           COPY /crates/target/release/ipc-cli /app/output/bin/ipc-cli
           EOF
 

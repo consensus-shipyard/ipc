@@ -4,7 +4,7 @@
 FROM rust:bookworm AS builder
 
 RUN apt-get update && \
-  apt-get install -y build-essential clang cmake protobuf-compiler && \
+  apt-get install -y build-essential libclang-dev clang cmake protobuf-compiler && \
   rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
