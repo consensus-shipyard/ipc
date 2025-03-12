@@ -31,7 +31,8 @@ jobs:
 
   demos:
     uses: ./.github/workflows/demos.yaml
-    needs: [contracts-prettier]
+    needs:
+      - contracts
 
   contracts:
     uses: ./.github/workflows/contracts.yaml
