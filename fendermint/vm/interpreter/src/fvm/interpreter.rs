@@ -168,6 +168,7 @@ where
         let balance_needed = msg.gas_fee_cap.clone() * msg.gas_limit;
 
         let state_tree = state.state_tree_mut();
+
         actor.sequence += 1;
         actor.balance -= balance_needed;
         state_tree.set_actor(actor_id, actor);
@@ -222,10 +223,13 @@ where
         }
 
         let check_ret = self.check_nonce_and_sufficient_balance(state, fvm_msg)?;
-        signed_msg.verify(&state.chain_id())?;
 
-        // TODO - remove this once a new pending state solution is implemented
-        self.update_nonce_and_balance(state, fvm_msg)?;
+        if check_ret.is_ok() {
+            signed_msg.verify(&state.chain_id())?;
+
+            // TODO - remove this once a new pending state solution is implemented
+            self.update_nonce_and_balance(state, fvm_msg)?;
+        }
 
         tracing::info!(
             exit_code = check_ret.exit_code.value(),

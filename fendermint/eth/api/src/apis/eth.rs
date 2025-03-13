@@ -661,7 +661,6 @@ where
     // Use the broadcast version which waits for basic checks to complete,
     // but not the execution results - those will have to be polled with get_transaction_receipt.
     let res: tx_sync::Response = data.tm().broadcast_tx_sync(bz).await?;
-    println!("--- res: {:#?}", res);
     if res.code.is_ok() {
         data.tx_cache.insert(msghash, (tx, sig));
 
@@ -684,7 +683,6 @@ where
         // in which case this have just been appended to the list.
         if let Some(oos) = OutOfSequence::try_parse(exit_code, &res.log) {
             let is_admissible = oos.is_admissible(data.max_nonce_gap);
-            println!("--- is_admissible: {}, {:#?}", is_admissible, oos);
 
             tracing::debug!(eth_hash = ?msghash, expected = oos.expected, got = oos.got, is_admissible, "out-of-sequence transaction received");
 
