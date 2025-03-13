@@ -3,22 +3,22 @@ macro_rules! gen_contract_error_mapping {
     ($([$snake_case:tt, $abi:tt]),* $(,)?) => {
         pub mod error_parser {
             use anyhow::anyhow;
-            use ethers::utils::hex;
 
             const SOLIDITY_SELECTOR_BYTE_SIZE: usize = 4;
 
             lazy_static::lazy_static! {
-                static ref MAP: std::collections::BTreeMap<String, ethers::abi::ethabi::AbiError> = {
-                    let mut errors: std::collections::BTreeMap<String, Vec<ethers::abi::ethabi::AbiError>> = Default::default();
+                static ref MAP: ::std::collections::BTreeMap<String, ethers::abi::ethabi::AbiError> = {
+                    let mut errors: ::std::collections::BTreeMap<String, Vec<ethers::abi::ethabi::AbiError>> = Default::default();
 
                     $(
                         errors.extend($crate::gen::$snake_case::$snake_case::$abi.errors.clone());
                     )*
                     // the above `errors` is actually indexed by name, now index by selector
-                    let mut selector_indexed = std::collections::BTreeMap::default();
+                    let mut selector_indexed = ::std::collections::BTreeMap::default();
                     for (_, v) in errors.iter() {
                         for i in v {
-                            let selector = ethers::utils::hex::encode(&i.signature().0[0..SOLIDITY_SELECTOR_BYTE_SIZE]);
+                            // solidity selector is only the first 4 bytes of the signature
+                            let selector = const_hex::hex::encode(&i.signature().0[0..SOLIDITY_SELECTOR_BYTE_SIZE]);
                             selector_indexed.insert(selector, i.clone());
                         }
                     }
@@ -31,10 +31,10 @@ macro_rules! gen_contract_error_mapping {
             impl ContractErrorParser {
                 pub fn parse_from_bytes(bytes: &[u8]) -> anyhow::Result<Option<String>> {
                     if bytes.len() < SOLIDITY_SELECTOR_BYTE_SIZE {
-                        return Err(anyhow!("error bytes too short: {}", hex::encode(bytes)));
+                        return Err(anyhow!("error bytes too short: {}", const_hex::hex::encode(bytes)));
                     }
 
-                    let str = hex::encode(&bytes[0..4]);
+                    let str = const_hex::hex::encode(&bytes[0..4]);
 
                     let Some(error) = MAP.get(&str) else {
                         return Ok(None);
@@ -48,7 +48,7 @@ macro_rules! gen_contract_error_mapping {
                 }
 
                 pub fn parse_from_hex_str(err: &str) -> anyhow::Result<Option<String>> {
-                    let bytes = hex::decode(err)?;
+                    let bytes = const_hex::hex::decode(err)?;
                     Self::parse_from_bytes(bytes.as_slice())
                 }
             }
@@ -59,7 +59,7 @@ macro_rules! gen_contract_error_mapping {
 #[cfg(test)]
 mod tests {
     use crate::error_parser::ContractErrorParser;
-    use ethers::utils::hex;
+    use const_hex::hex;
 
     #[test]
     fn test_parse_error_ok() {
