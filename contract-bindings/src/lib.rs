@@ -1,7 +1,7 @@
 #[macro_use]
 mod convert;
 
-mod error_macro;
+pub mod error_parser;
 mod gen;
 
 pub use self::gen::*;

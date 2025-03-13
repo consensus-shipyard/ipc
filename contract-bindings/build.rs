@@ -193,12 +193,12 @@ fn camel_to_snake(name: &str) -> String {
 
 /// generate the mapping between contract error selectors to the ethers abi error type for parsing
 /// potential contract errors.
-/// This function generates a rust file that creates the error mapping, see `gen_contract_error_mapping`
+/// This function generates a rust file that creates the error mapping, see [`ipc_actors_abis::extend_contract_error_mapping`]
 /// macro for how it works internally.
-/// This function imports `gen_contract_error_mapping` and loops all the contract names to watch and
+/// This function will write the macro call [`ipc_actors_abis::extend_contract_error_mapping`] and loops all the contract names to watch and
 /// fill the macro rule.
-fn error_mapping_gen(mod_f: &mut fs_err::File, all_contracts: &[&str]) -> color_eyre::Result<()> {
-    writeln!(mod_f, "crate::gen_contract_error_mapping!(")?;
+fn error_mapping_gen(mod_f: &mut impl Write, all_contracts: &[&str]) -> color_eyre::Result<()> {
+    writeln!(mod_f, "crate::extend_contract_error_mapping!(")?;
 
     let map_name_to_macro_rule = |s| format!("[{}, {}_ABI]", camel_to_snake(s), s.to_uppercase());
 
