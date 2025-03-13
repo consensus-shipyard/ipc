@@ -77,19 +77,21 @@ jobs:
           echo "glibc version"
           ldd --version
 
-      # - name: Check fmt (nightly)
-      #   working-directory: crates
-      #   run: |
-      #     pwd
-      #     ls -al
-      #     cargo +nightly-2024-07-05 fmt --check --all
+      - name: Check fmt (nightly)
+        working-directory: crates
+        run: |
+          pwd
+          ls -al
+          git rev-parse HEAD
+          cargo +nightly-2024-07-05 fmt --check --all
 
-      # - name: Check clippy
-      #   working-directory: crates
-      #   run: |
-      #     pwd
-      #     ls -al
-      #     cargo clippy --release --tests --no-deps -- -D clippy::all
+      - name: Check clippy
+        working-directory: crates
+        run: |
+          git rev-parse HEAD
+          pwd
+          ls -al
+          cargo clippy --release --tests --no-deps -- -D clippy::all
 
       - name: Build all (including tests, benches, examples)
         working-directory: crates/node
