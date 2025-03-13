@@ -49,6 +49,7 @@ jobs:
         with:
           ## Share the cache between jobs. If we don't set this, each job will have its own cache.
           shared-key: build
+          workspaces: "crates"
 
       - name: Cache Solidity ABI artifacts
         uses: actions/cache@v4
