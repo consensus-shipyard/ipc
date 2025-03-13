@@ -30,9 +30,8 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 20
-
-      - name: Where we're at?
-        run: |
+      - run: |
+          git checkout HEAD
           git rev-parse HEAD
 
       - name: Install Tools
