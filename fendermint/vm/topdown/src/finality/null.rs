@@ -103,13 +103,7 @@ impl FinalityWithNull {
         self.check_block_hash(proposal)
     }
 
-    pub fn set_new_finality(
-        &self,
-        finality: IPCParentFinality,
-        previous_finality: Option<IPCParentFinality>,
-    ) -> Stm<()> {
-        debug_assert!(previous_finality == self.last_committed_finality.read_clone()?);
-
+    pub fn set_new_finality(&self, finality: IPCParentFinality) -> Stm<()> {
         // the height to clear
         let height = finality.height;
 
@@ -427,11 +421,7 @@ mod tests {
         );
 
         // Test set new finality
-        atomically(|| {
-            let last = provider.last_committed_finality.read_clone()?;
-            provider.set_new_finality(f.clone(), last)
-        })
-        .await;
+        atomically(|| provider.set_new_finality(f.clone())).await;
 
         assert_eq!(
             atomically(|| provider.last_committed_finality()).await,
