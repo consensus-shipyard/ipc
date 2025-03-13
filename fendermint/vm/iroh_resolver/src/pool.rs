@@ -86,6 +86,7 @@ pub struct ResolveTask {
 pub enum TaskType {
     ResolveBlob {
         source: ResolveSource,
+        size: u64,
     },
     CloseReadRequest {
         blob_hash: Hash,
@@ -264,6 +265,7 @@ mod tests {
     struct TestItem {
         hash: Hash,
         source: NodeId,
+        size: u64,
     }
 
     impl TestItem {
@@ -273,7 +275,11 @@ mod tests {
             rng.fill(&mut data);
             let hash = Hash::new(data);
             let source = SecretKey::generate().public();
-            Self { hash, source }
+            Self {
+                hash,
+                source,
+                size: 256,
+            }
         }
     }
 
@@ -287,6 +293,7 @@ mod tests {
         fn from(value: &TestItem) -> Self {
             Self::ResolveBlob {
                 source: ResolveSource { id: value.source },
+                size: value.size,
             }
         }
     }

@@ -120,7 +120,12 @@ where
 pub trait ResolverIroh {
     /// Send a hash for resolution from an Iroh node, await its completion,
     /// then return the result, to be inspected by the caller.
-    async fn resolve_iroh(&self, hash: Hash, node_addr: NodeAddr) -> anyhow::Result<ResolveResult>;
+    async fn resolve_iroh(
+        &self,
+        hash: Hash,
+        size: u64,
+        node_addr: NodeAddr,
+    ) -> anyhow::Result<ResolveResult>;
 }
 
 #[async_trait]
@@ -128,9 +133,14 @@ impl<V> ResolverIroh for Client<V>
 where
     V: Sync + Send + 'static,
 {
-    async fn resolve_iroh(&self, hash: Hash, node_addr: NodeAddr) -> anyhow::Result<ResolveResult> {
+    async fn resolve_iroh(
+        &self,
+        hash: Hash,
+        size: u64,
+        node_addr: NodeAddr,
+    ) -> anyhow::Result<ResolveResult> {
         let (tx, rx) = oneshot::channel();
-        let req = Request::ResolveIroh(hash, node_addr, tx);
+        let req = Request::ResolveIroh(hash, size, node_addr, tx);
         self.send_request(req)?;
         let res = rx.await?;
         Ok(res)

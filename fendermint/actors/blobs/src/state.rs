@@ -25,6 +25,9 @@ use log::{debug, warn};
 use num_traits::{ToPrimitive, Zero};
 use recall_ipld::hamt::{BytesKey, MapKey};
 
+type BlobSourcesResult =
+    anyhow::Result<Vec<(Hash, u64, HashSet<(Address, SubscriptionId, PublicKey)>)>, ActorError>;
+
 mod accounts;
 mod blobs;
 mod expiries;
@@ -1038,23 +1041,32 @@ impl State {
     }
 
     #[allow(clippy::type_complexity)]
-    pub fn get_added_blobs<BS: Blockstore>(
-        &self,
-        store: &BS,
-        size: u32,
-    ) -> anyhow::Result<Vec<(Hash, HashSet<(Address, SubscriptionId, PublicKey)>)>, ActorError>
-    {
-        self.added.take_page(store, size)
+    pub fn get_added_blobs<BS: Blockstore>(&self, store: &BS, size: u32) -> BlobSourcesResult {
+        let blobs = self.blobs.hamt(store)?;
+        self.added
+            .take_page(store, size)?
+            .into_iter()
+            .map(|(hash, sources)| {
+                let blob = blobs
+                    .get(&hash)?
+                    .ok_or_else(|| ActorError::not_found(format!("blob {} not found", hash)))?;
+                Ok((hash, blob.size, sources))
+            })
+            .collect()
     }
 
-    #[allow(clippy::type_complexity)]
-    pub fn get_pending_blobs<BS: Blockstore>(
-        &self,
-        store: &BS,
-        size: u32,
-    ) -> anyhow::Result<Vec<(Hash, HashSet<(Address, SubscriptionId, PublicKey)>)>, ActorError>
-    {
-        self.pending.take_page(store, size)
+    pub fn get_pending_blobs<BS: Blockstore>(&self, store: &BS, size: u32) -> BlobSourcesResult {
+        let blobs = self.blobs.hamt(store)?;
+        self.pending
+            .take_page(store, size)?
+            .into_iter()
+            .map(|(hash, sources)| {
+                let blob = blobs
+                    .get(&hash)?
+                    .ok_or_else(|| ActorError::not_found(format!("blob {} not found", hash)))?;
+                Ok((hash, blob.size, sources))
+            })
+            .collect()
     }
 
     pub fn set_blob_pending<BS: Blockstore>(
@@ -1062,6 +1074,7 @@ impl State {
         store: &BS,
         subscriber: Address,
         hash: Hash,
+        size: u64,
         id: SubscriptionId,
         source: PublicKey,
     ) -> anyhow::Result<(), ActorError> {
@@ -1072,6 +1085,13 @@ impl State {
             // The blob may have been deleted before it was set to pending
             return Ok(());
         };
+        // check if the blob's size matches the size provided when it was added
+        if blob.size != size {
+            return Err(ActorError::assertion_failed(format!(
+                "blob {} size mismatch (expected: {}; actual: {})",
+                hash, size, blob.size
+            )));
+        }
         blob.status = BlobStatus::Pending;
         // Add the source to the pending queue
         self.pending
@@ -2267,7 +2287,7 @@ mod tests {
         assert_eq!(stats.bytes_added, size);
 
         // Set to status pending
-        let res = state.set_blob_pending(&store, subscriber, hash, id1.clone(), source);
+        let res = state.set_blob_pending(&store, subscriber, hash, size, id1.clone(), source);
         assert!(res.is_ok());
         let stats = state.get_stats(config, TokenAmount::zero());
         assert_eq!(stats.num_blobs, 1);
@@ -2831,7 +2851,7 @@ mod tests {
         assert_eq!(account.capacity_used, size);
 
         // Set to status pending
-        let res = state.set_blob_pending(&store, subscriber, hash, id1.clone(), source);
+        let res = state.set_blob_pending(&store, subscriber, hash, size, id1.clone(), source);
         assert!(res.is_ok());
 
         // Check stats
@@ -3206,8 +3226,14 @@ mod tests {
         assert!(res.is_ok());
 
         // Set to status pending
-        let res =
-            state.set_blob_pending(&store, subscriber, hash, SubscriptionId::default(), source);
+        let res = state.set_blob_pending(
+            &store,
+            subscriber,
+            hash,
+            size,
+            SubscriptionId::default(),
+            source,
+        );
         assert!(res.is_ok());
 
         // Finalize as resolved
@@ -3271,8 +3297,14 @@ mod tests {
         assert!(res.is_ok());
 
         // Set to status pending
-        let res =
-            state.set_blob_pending(&store, subscriber, hash, SubscriptionId::default(), source);
+        let res = state.set_blob_pending(
+            &store,
+            subscriber,
+            hash,
+            size,
+            SubscriptionId::default(),
+            source,
+        );
         assert!(res.is_ok());
 
         // Finalize as failed
@@ -3404,8 +3436,14 @@ mod tests {
         assert_eq!(state.capacity_used, account.capacity_used);
 
         // Set to status pending
-        let res =
-            state.set_blob_pending(&store, subscriber, hash, SubscriptionId::default(), source);
+        let res = state.set_blob_pending(
+            &store,
+            subscriber,
+            hash,
+            size,
+            SubscriptionId::default(),
+            source,
+        );
         assert!(res.is_ok());
 
         // Finalize as failed
@@ -3554,6 +3592,7 @@ mod tests {
             &store,
             subscriber,
             hash1,
+            size1,
             SubscriptionId::default(),
             source1,
         );
@@ -4028,7 +4067,7 @@ mod tests {
                     )
                     .unwrap();
                 state
-                    .set_blob_pending(&store, addr, hash, id.clone(), source)
+                    .set_blob_pending(&store, addr, hash, size, id.clone(), source)
                     .unwrap();
                 state
                     .finalize_blob(
@@ -4210,7 +4249,7 @@ mod tests {
                     )
                     .unwrap();
                 state
-                    .set_blob_pending(&store, addr, hash, id.clone(), source)
+                    .set_blob_pending(&store, addr, hash, size, id.clone(), source)
                     .unwrap();
                 state
                     .finalize_blob(
@@ -4364,7 +4403,7 @@ mod tests {
                 )
                 .unwrap();
             state
-                .set_blob_pending(&store, account1, hash, id.clone(), source)
+                .set_blob_pending(&store, account1, hash, size, id.clone(), source)
                 .unwrap();
             state
                 .finalize_blob(
@@ -4400,7 +4439,7 @@ mod tests {
                 )
                 .unwrap();
             state
-                .set_blob_pending(&store, account2, hash, id.clone(), source)
+                .set_blob_pending(&store, account2, hash, size, id.clone(), source)
                 .unwrap();
             state
                 .finalize_blob(
@@ -4636,7 +4675,14 @@ mod tests {
                         // Simulate the chain putting this blob into pending state, which is
                         // required before finalization.
                         state
-                            .set_blob_pending(&store, *user, blob.hash, sub_id.clone(), *source)
+                            .set_blob_pending(
+                                &store,
+                                *user,
+                                blob.hash,
+                                blob.size,
+                                sub_id.clone(),
+                                *source,
+                            )
                             .unwrap();
                         state
                             .finalize_blob(

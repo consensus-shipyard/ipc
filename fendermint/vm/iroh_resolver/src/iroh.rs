@@ -103,8 +103,11 @@ fn start_resolve<V>(
     tokio::spawn(async move {
         tracing::debug!(hash = ?task.hash(), "starting iroh blob resolve");
         match task.task_type() {
-            TaskType::ResolveBlob { source } => {
-                match client.resolve_iroh(task.hash(), source.id.into()).await {
+            TaskType::ResolveBlob { source, size } => {
+                match client
+                    .resolve_iroh(task.hash(), size, source.id.into())
+                    .await
+                {
                     Err(e) => {
                         tracing::error!(
                             error = e.to_string(),

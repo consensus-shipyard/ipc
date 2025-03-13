@@ -56,7 +56,7 @@ pub struct BlobsActor;
 
 /// The return type used when fetching "added" or "pending" blobs.
 /// See `get_added_blobs` and `get_pending_blobs` for more information.
-type BlobRequest = (Hash, HashSet<(Address, SubscriptionId, PublicKey)>);
+type BlobRequest = (Hash, u64, HashSet<(Address, SubscriptionId, PublicKey)>);
 
 impl BlobsActor {
     /// Creates a new `[BlobsActor]` state.
@@ -532,6 +532,7 @@ impl BlobsActor {
                 rt.store(),
                 subscriber_id_addr,
                 params.hash,
+                params.size,
                 params.id,
                 params.source,
             )

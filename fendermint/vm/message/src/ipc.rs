@@ -128,6 +128,8 @@ pub struct FinalizedBlob {
     pub subscriber: Address,
     /// The blake3 hash of the blob.
     pub hash: Hash,
+    /// The size of the blob.
+    pub size: u64,
     /// Identifier used to differentiate blob additions for the same subscriber.
     pub id: SubscriptionId,
     /// The node ID of the source node serving validators the blob.
@@ -143,6 +145,8 @@ pub struct PendingBlob {
     pub subscriber: Address,
     /// The blake3 hash of the blob.
     pub hash: Hash,
+    /// The size of the blob.
+    pub size: u64,
     /// Identifier used to differentiate blob additions for the same subscriber.
     pub id: SubscriptionId,
     /// The node ID of the source node serving validators the blob.

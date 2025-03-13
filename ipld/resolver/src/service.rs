@@ -110,7 +110,7 @@ pub(crate) enum Request<V> {
     PinSubnet(SubnetID),
     UnpinSubnet(SubnetID),
     Resolve(Cid, SubnetID, ResponseChannel),
-    ResolveIroh(Hash, NodeAddr, ResponseChannel),
+    ResolveIroh(Hash, u64, NodeAddr, ResponseChannel),
     ResolveIrohRead(Hash, u32, u32, ReadRequestResponseChannel),
     RateLimitUsed(PeerId, usize),
     UpdateRateLimit(u32),
@@ -468,8 +468,8 @@ where
             Request::Resolve(cid, subnet_id, response_channel) => {
                 self.start_query(cid, subnet_id, response_channel)
             }
-            Request::ResolveIroh(hash, node_addr, response_channel) => {
-                self.start_iroh_query(hash, node_addr, response_channel)
+            Request::ResolveIroh(hash, size, node_addr, response_channel) => {
+                self.start_iroh_query(hash, size, node_addr, response_channel)
             }
             Request::ResolveIrohRead(hash, offset, len, response_channel) => {
                 self.start_iroh_read_query(hash, offset, len, response_channel)
@@ -521,6 +521,7 @@ where
     fn start_iroh_query(
         &mut self,
         hash: Hash,
+        size: u64,
         node_addr: NodeAddr,
         response_channel: ResponseChannel,
     ) {
@@ -528,7 +529,7 @@ where
         tokio::spawn(async move {
             match iroh.client().await {
                 Ok(client) => {
-                    let res = download_blob(client, hash, node_addr).await;
+                    let res = download_blob(client, hash, size, node_addr).await;
                     match res {
                         Ok(_) => send_resolve_result(response_channel, Ok(())),
                         Err(e) => send_resolve_result(response_channel, Err(anyhow!(e))),
@@ -669,7 +670,12 @@ pub fn build_transport(local_key: Keypair) -> Boxed<(PeerId, StreamMuxerBox)> {
         .boxed()
 }
 
-async fn download_blob(iroh: Iroh, hash: Hash, node_addr: NodeAddr) -> anyhow::Result<()> {
+async fn download_blob(
+    iroh: Iroh,
+    hash: Hash,
+    size: u64,
+    node_addr: NodeAddr,
+) -> anyhow::Result<()> {
     // Use an explicit tag so we can keep track of it
     // TODO: this needs to be tagged with a "user id"
     let tag = iroh::blobs::Tag(format!("stored-seq-{hash}").into());
@@ -686,6 +692,14 @@ async fn download_blob(iroh: Iroh, hash: Hash, node_addr: NodeAddr) -> anyhow::R
         )
         .await?
         .await?;
+
+    if res.local_size + res.downloaded_size != size {
+        return Err(anyhow!(
+            "downloaded blob size {} does not match expected size {}",
+            res.local_size + res.downloaded_size,
+            size
+        ));
+    }
 
     debug!("downloaded blob {}: {:?}", hash, res);
 

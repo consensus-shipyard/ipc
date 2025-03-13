@@ -162,6 +162,8 @@ pub struct SetBlobPendingParams {
     pub subscriber: Address,
     /// Blob blake3 hash.
     pub hash: Hash,
+    /// Blob size.
+    pub size: u64,
     /// Identifier used to differentiate blob additions for the same subscriber.
     pub id: SubscriptionId,
 }

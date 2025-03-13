@@ -72,7 +72,7 @@ pub type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProvider
 pub type BlobPool = IrohResolvePool<BlobPoolItem>;
 pub type ReadRequestPool = IrohResolvePool<ReadRequestPoolItem>;
 
-type AddedBlobItem = (Hash, HashSet<(Address, SubscriptionId, PublicKey)>);
+type AddedBlobItem = (Hash, u64, HashSet<(Address, SubscriptionId, PublicKey)>);
 type OpenReadRequestItem = (Hash, Hash, u32, u32, Address, MethodNum);
 
 /// These are the extra state items that the chain interpreter needs,
@@ -121,6 +121,7 @@ impl From<&CheckpointPoolItem> for ResolveKey {
 pub struct BlobPoolItem {
     subscriber: Address,
     hash: Hash,
+    size: u64,
     id: SubscriptionId,
     source: NodeId,
 }
@@ -135,6 +136,7 @@ impl From<&BlobPoolItem> for IrohTaskType {
     fn from(value: &BlobPoolItem) -> Self {
         Self::ResolveBlob {
             source: IrohResolveSource { id: value.source },
+            size: value.size,
         }
     }
 }
@@ -302,11 +304,12 @@ where
         })?;
 
         // Create IPC messages to add blobs to the pool
-        for (hash, sources) in added_blobs {
+        for (hash, size, sources) in added_blobs {
             for (subscriber, id, source) in sources {
                 msgs.push(ChainMessage::Ipc(IpcMessage::BlobPending(PendingBlob {
                     subscriber,
                     hash,
+                    size,
                     id: id.clone(),
                     source,
                 })));
@@ -348,11 +351,12 @@ where
                 })
                 .await;
                 if is_globally_finalized {
-                    tracing::debug!(hash = ?item.hash, "blob has quorum; adding tx to chain");
+                    tracing::debug!(hash = ?item.hash, size = item.size, "blob has quorum; adding tx to chain");
                     blobs.push(ChainMessage::Ipc(IpcMessage::BlobFinalized(
                         FinalizedBlob {
                             subscriber: item.subscriber,
                             hash: item.hash,
+                            size: item.size,
                             id: item.id.clone(),
                             source: item.source,
                             succeeded,
@@ -569,6 +573,7 @@ where
                     let item = BlobPoolItem {
                         subscriber: blob.subscriber,
                         hash: blob.hash,
+                        size: blob.size,
                         id: blob.id,
                         source: blob.source,
                     };
@@ -871,6 +876,7 @@ where
                         source,
                         subscriber: blob.subscriber,
                         hash,
+                        size: blob.size,
                         id: blob.id.clone(),
                     };
                     let params = RawBytes::serialize(params)?;
@@ -887,6 +893,7 @@ where
                         env.blob_pool.add(BlobPoolItem {
                             subscriber: blob.subscriber,
                             hash: blob.hash,
+                            size: blob.size,
                             id: blob.id.clone(),
                             source: blob.source,
                         })
