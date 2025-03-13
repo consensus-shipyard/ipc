@@ -6,7 +6,7 @@ on:
 
 jobs:
   build:
-    name: Build IPC
+    name: Build IPC Node
     runs-on: ubuntu-22.04
     env:
       RUST_BACKTRACE: full
@@ -92,7 +92,10 @@ jobs:
 
       - name: Build Docker image for e2e tests
         run: |
-          ## Create the temporary Dockerfile.
+          pwd
+          ls -al
+          ## Create the temporary Dockerfile
+          ## to use a trampoline inclusion of the artifacts
           cat <<EOF > /tmp/Dockerfile
           # syntax=docker/dockerfile:1
           FROM alpine AS builder
@@ -111,7 +114,7 @@ jobs:
           ## Create the temporary .dockerignore file.
           cat <<EOF > /tmp/Dockerfile.dockerignore
           crates/target
-          !crates/target/release/node
+          !crates/target/release/fendermint
           !crates/target/release/ipc-cli
           contracts/cache
           contracts/node-modules
