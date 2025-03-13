@@ -79,11 +79,17 @@ jobs:
 
       - name: Check fmt (nightly)
         working-directory: crates
-        run: cargo +nightly-2024-07-05 fmt --check --all
+        run: |
+          pwd
+          ls -al
+          cargo +nightly-2024-07-05 fmt --check --all
 
       - name: Check clippy
         working-directory: crates
-        run: cargo clippy --release --tests --no-deps -- -D clippy::all
+        run: |
+          pwd
+          ls -al
+          cargo clippy --release --tests --no-deps -- -D clippy::all
 
       - name: Build all (including tests, benches, examples)
         working-directory: crates/node
