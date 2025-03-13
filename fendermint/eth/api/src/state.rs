@@ -261,12 +261,10 @@ where
             et::BlockId::Number(bn) => match bn {
                 // The client might be asking by height of a block, expecting to see the results.
                 et::BlockNumber::Number(height) => Ok(FvmQueryHeight::from(height.as_u64() + 1)),
-                et::BlockNumber::Finalized
-                | et::BlockNumber::Latest
-                | et::BlockNumber::Safe
-                | et::BlockNumber::Pending => Ok(FvmQueryHeight::Committed),
-                // TODO Karel - this is wrong - we should probably have a pending state too??
-                // et::BlockNumber::Pending => Ok(FvmQueryHeight::Pending),
+                et::BlockNumber::Finalized | et::BlockNumber::Latest | et::BlockNumber::Safe => {
+                    Ok(FvmQueryHeight::Committed)
+                }
+                et::BlockNumber::Pending => Ok(FvmQueryHeight::Pending),
                 et::BlockNumber::Earliest => Ok(FvmQueryHeight::Height(1)),
             },
             et::BlockId::Hash(h) => {

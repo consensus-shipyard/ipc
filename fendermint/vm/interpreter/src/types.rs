@@ -53,6 +53,10 @@ impl CheckResponse {
             priority,
         }
     }
+
+    pub fn is_ok(&self) -> bool {
+        self.exit_code == ExitCode::OK
+    }
 }
 
 /// Represents the result of applying a message.

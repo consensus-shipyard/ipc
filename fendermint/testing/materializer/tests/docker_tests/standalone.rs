@@ -127,6 +127,8 @@ async fn test_out_of_order_mempool() {
 
             let rlp = tx.rlp_signed(&sig);
 
+            println!("----- submitting tx {} nonce: {}", i, tx.nonce().unwrap());
+
             let pending_tx: PendingTransaction<_> = middleware
                 .send_raw_transaction(rlp)
                 .await

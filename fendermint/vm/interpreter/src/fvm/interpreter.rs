@@ -30,12 +30,18 @@ use crate::selectors::{select_messages_by_gas_limit, select_messages_until_total
 use crate::types::*;
 use crate::MessagesInterpreter;
 use fvm_shared::state::ActorState;
+use fvm_shared::ActorID;
 use ipc_observability::emit;
 use std::convert::TryInto;
 
 use crate::fvm::executions::{
     execute_cron_message, execute_signed_message, push_block_to_chainmeta_actor_if_possible,
 };
+
+struct Actor {
+    id: ActorID,
+    state: ActorState,
+}
 
 #[derive(Clone)]
 pub struct FvmMessagesInterpreter<DB, C>
@@ -98,10 +104,13 @@ where
 
     fn check_nonce_and_sufficient_balance(
         &self,
-        state: &FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
+        state: &FvmExecState<ReadOnlyBlockstore<DB>>,
         msg: &FvmMessage,
     ) -> Result<CheckResponse> {
-        let actor = match self.lookup_actor(state, &msg.from)? {
+        let Actor {
+            id: _,
+            state: actor,
+        } = match self.lookup_actor(state, &msg.from)? {
             Some(actor) => actor,
             None => {
                 return Ok(CheckResponse::new(
@@ -142,19 +151,49 @@ where
         Ok(CheckResponse::new_ok(msg, priority))
     }
 
+    // Increment sequence and balance
+    // TODO - remove this once a new pending state solution is implemented
+    fn update_nonce_and_balance(
+        &self,
+        state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
+        msg: &FvmMessage,
+    ) -> Result<()> {
+        let Actor {
+            id: actor_id,
+            state: mut actor,
+        } = self
+            .lookup_actor(state, &msg.from)?
+            .expect("actor must exist");
+
+        let balance_needed = msg.gas_fee_cap.clone() * msg.gas_limit;
+
+        let state_tree = state.state_tree_mut();
+        actor.sequence += 1;
+        actor.balance -= balance_needed;
+        state_tree.set_actor(actor_id, actor);
+
+        Ok(())
+    }
+
     fn lookup_actor(
         &self,
-        state: &FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
+        state: &FvmExecState<ReadOnlyBlockstore<DB>>,
         address: &Address,
-    ) -> Result<Option<ActorState>> {
+    ) -> Result<Option<Actor>> {
         let state_tree = state.state_tree();
         let id = match state_tree.lookup_id(address)? {
             Some(id) => id,
             None => return Ok(None),
         };
 
-        let actor = state_tree.get_actor(id)?;
-        Ok(actor)
+        let state = match state_tree.get_actor(id)? {
+            Some(id) => id,
+            None => return Ok(None),
+        };
+
+        let actor = Actor { id, state };
+
+        Ok(Some(actor))
     }
 }
 
@@ -166,7 +205,7 @@ where
 {
     async fn check_message(
         &self,
-        state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
+        state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
         msg: Vec<u8>,
         is_recheck: bool,
     ) -> Result<CheckResponse, CheckMessageError> {
@@ -182,8 +221,11 @@ where
             return Ok(CheckResponse::new_ok(fvm_msg, priority));
         }
 
-        let check_ret = self.check_nonce_and_sufficient_balance(&state, fvm_msg)?;
+        let check_ret = self.check_nonce_and_sufficient_balance(state, fvm_msg)?;
         signed_msg.verify(&state.chain_id())?;
+
+        // TODO - remove this once a new pending state solution is implemented
+        self.update_nonce_and_balance(state, fvm_msg)?;
 
         tracing::info!(
             exit_code = check_ret.exit_code.value(),

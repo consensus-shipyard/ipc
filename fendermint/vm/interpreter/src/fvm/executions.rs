@@ -4,7 +4,6 @@
 use crate::fvm::state::FvmExecState;
 use crate::types::*;
 use anyhow::Context;
-use fendermint_vm_actor_interface::system as system_actor;
 use fendermint_vm_actor_interface::{chainmetadata, cron, system};
 use fendermint_vm_message::signed::SignedMessage;
 use fvm_ipld_blockstore::Blockstore;

@@ -17,6 +17,11 @@ pub enum FvmQueryHeight {
     /// Choose whatever the latest committed state is.
     #[default]
     Committed,
+    /// Take pending changes (ie. the "check state") into account,
+    /// or if there are not pending changes then use the latest commit.
+    ///
+    /// This option is less performant because a shared state needs to be locked.
+    Pending,
     /// Run it on some historical block height, if it's still available.
     /// Otherwise use the latest commit.
     Height(u64),
@@ -26,6 +31,9 @@ impl From<u64> for FvmQueryHeight {
     fn from(value: u64) -> Self {
         match value {
             0 => FvmQueryHeight::Committed,
+            // Tendermint's `Height` type makes sure it fits in `i64`.
+            // 0 is used as default height in queries; we can use MAX for pending.
+            n if n >= i64::MAX as u64 => FvmQueryHeight::Pending,
             n => FvmQueryHeight::Height(n),
         }
     }
@@ -35,6 +43,7 @@ impl From<FvmQueryHeight> for u64 {
     fn from(value: FvmQueryHeight) -> Self {
         match value {
             FvmQueryHeight::Committed => 0,
+            FvmQueryHeight::Pending => i64::MAX as u64,
             FvmQueryHeight::Height(n) => n,
         }
     }

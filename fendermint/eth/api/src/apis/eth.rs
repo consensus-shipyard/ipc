@@ -466,6 +466,8 @@ pub async fn get_transaction_count<C>(
 where
     C: Client + Sync + Send,
 {
+    println!("-------- get_transaction_count: {} {:?}", addr, block_id);
+
     let addr = to_fvm_address(addr);
     let height = data.query_height(block_id).await?;
     let res = data.client.actor_state(&addr, height).await?;
@@ -473,6 +475,7 @@ where
     match res.value {
         Some((_, state)) => {
             let nonce = state.sequence;
+            println!("nonce: {}", nonce);
             Ok(et::U64::from(nonce))
         }
         None => Ok(et::U64::zero()),
@@ -658,6 +661,7 @@ where
     // Use the broadcast version which waits for basic checks to complete,
     // but not the execution results - those will have to be polled with get_transaction_receipt.
     let res: tx_sync::Response = data.tm().broadcast_tx_sync(bz).await?;
+    println!("--- res: {:#?}", res);
     if res.code.is_ok() {
         data.tx_cache.insert(msghash, (tx, sig));
 
@@ -680,6 +684,7 @@ where
         // in which case this have just been appended to the list.
         if let Some(oos) = OutOfSequence::try_parse(exit_code, &res.log) {
             let is_admissible = oos.is_admissible(data.max_nonce_gap);
+            println!("--- is_admissible: {}, {:#?}", is_admissible, oos);
 
             tracing::debug!(eth_hash = ?msghash, expected = oos.expected, got = oos.got, is_admissible, "out-of-sequence transaction received");
 

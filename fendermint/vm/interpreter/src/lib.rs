@@ -26,7 +26,7 @@ where
 {
     async fn check_message(
         &self,
-        state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
+        state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
         msg: Vec<u8>,
         is_recheck: bool,
     ) -> Result<CheckResponse, CheckMessageError>;

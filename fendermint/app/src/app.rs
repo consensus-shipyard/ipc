@@ -23,7 +23,8 @@ use fendermint_storage::{
 };
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_interpreter::fvm::state::{
-    empty_state_tree, FvmExecState, FvmQueryState, FvmStateParams, FvmUpdatableParams,
+    empty_state_tree, CheckStateRef, FvmExecState, FvmQueryState, FvmStateParams,
+    FvmUpdatableParams,
 };
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
 use fendermint_vm_interpreter::genesis::{read_genesis_car, GenesisAppState};
@@ -152,6 +153,8 @@ where
     snapshots: Option<SnapshotClient>,
     /// State accumulating changes during block execution.
     exec_state: Arc<tokio::sync::Mutex<Option<FvmExecState<BS>>>>,
+    /// Projected (partial) state accumulating during transaction checks.
+    check_state: CheckStateRef<BS>,
     /// How much history to keep.
     ///
     /// Zero means unlimited.
@@ -189,6 +192,7 @@ where
             messages_interpreter: Arc::new(interpreter),
             snapshots,
             exec_state: Arc::new(tokio::sync::Mutex::new(None)),
+            check_state: Arc::new(tokio::sync::Mutex::new(None)),
             validators_cache: Arc::new(tokio::sync::Mutex::new(None)),
         };
         app.init_committed_state()?;
@@ -563,6 +567,8 @@ where
             self.multi_engine.clone(),
             block_height.try_into()?,
             state_params,
+            self.check_state.clone(),
+            height == FvmQueryHeight::Pending,
         )
         .context("error creating query state")?;
 
@@ -584,14 +590,29 @@ where
 
     /// Check the given transaction before putting it into the local mempool.
     async fn check_tx(&self, request: request::CheckTx) -> AbciResult<response::CheckTx> {
-        let state = self
-            .read_only_view(None)?
-            .ok_or_else(|| anyhow!("exec state should be present"))?;
+        // Keep the guard through the check, so there can be only one at a time.
+        let mut guard = self.check_state.lock().await;
+
+        let mut state = match guard.take() {
+            Some(state) => state,
+            None => {
+                let db = self.state_store_clone();
+                let state = self.committed_state()?;
+
+                FvmExecState::new(
+                    ReadOnlyBlockstore::new(db),
+                    self.multi_engine.as_ref(),
+                    state.block_height.try_into()?,
+                    state.state_params,
+                )
+                .context("error creating check state")?
+            }
+        };
 
         let result = self
             .messages_interpreter
             .check_message(
-                state,
+                &mut state,
                 request.tx.to_vec(),
                 request.kind == CheckTxKind::Recheck,
             )
@@ -616,12 +637,16 @@ where
             Err(CheckMessageError::Other(e)) => Err(e).context("failed to check message")?,
         };
 
+        // Update the check state.
+        *guard = Some(state);
+
         mpool_received_trace.accept = response.code.is_ok();
         if !mpool_received_trace.accept {
             mpool_received_trace.reason = Some(format!("{:?} - {}", response.code, response.info));
         }
 
         emit(mpool_received_trace);
+
         Ok(response)
     }
 
@@ -931,6 +956,10 @@ where
 
         // Commit app state to the datastore.
         self.set_committed_state(state)?;
+
+        // Reset check state.
+        let mut guard = self.check_state.lock().await;
+        *guard = None;
 
         emit(BlockCommitted {
             height: block_height,
