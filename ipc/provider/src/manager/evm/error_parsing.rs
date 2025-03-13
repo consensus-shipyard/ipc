@@ -48,7 +48,7 @@ impl JsonRpcClient for FvmHttp {
                         return HttpClientError::JsonRpcError(e);
                     };
 
-                    let Ok(Some(name)) = ContractErrorParser::parse_from_hex_str(err_str) else {
+                    let Ok(name) = ContractErrorParser::parse_from_hex_str(err_str) else {
                         return HttpClientError::JsonRpcError(e);
                     };
 

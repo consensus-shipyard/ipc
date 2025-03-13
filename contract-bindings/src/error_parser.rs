@@ -33,38 +33,45 @@ pub fn extend_errors(
     }
 }
 
+#[derive(Debug, PartialEq, thiserror::Error)]
+pub enum ParseContractError {
+    #[error("error bytes shorter than 4 bytes for solidity contract selector")]
+    ErrorBytesTooShort,
+    #[error("error string not hex format: {0}")]
+    ErrorNotHexStr(String),
+    #[error("error selector not found in contract error map: {selector}")]
+    ErrorNotFound { selector: String },
+}
+
 pub struct ContractErrorParser {}
 
 impl ContractErrorParser {
-    pub fn parse_from_bytes(bytes: &[u8]) -> anyhow::Result<Option<String>> {
+    pub fn parse_from_bytes(bytes: &[u8]) -> Result<String, ParseContractError> {
         if bytes.len() < SOLIDITY_SELECTOR_BYTE_SIZE {
-            return Err(anyhow::anyhow!(
-                "error bytes too short: {}",
-                const_hex::hex::encode(bytes)
-            ));
+            return Err(ParseContractError::ErrorBytesTooShort);
         }
 
-        let str = const_hex::hex::encode(&bytes[0..4]);
+        let selector = const_hex::hex::encode(&bytes[0..4]);
 
-        let Some(error) = crate::gen::MAP.get(&str) else {
-            return Ok(None);
+        let Some(error) = crate::gen::MAP.get(&selector) else {
+            return Err(ParseContractError::ErrorNotFound{ selector });
         };
         if let Err(e) = error.decode(bytes) {
-            tracing::warn!("contract error selector found: {str}, but decode failed: {e}");
+            tracing::warn!("contract error selector found: {selector}, but decode failed: {e}");
         }
 
-        Ok(Some(error.name.clone()))
+        Ok(error.name.clone())
     }
 
-    pub fn parse_from_hex_str(err: &str) -> anyhow::Result<Option<String>> {
-        let bytes = const_hex::hex::decode(err)?;
+    pub fn parse_from_hex_str(err: &str) -> Result<String, ParseContractError> {
+        let bytes = const_hex::hex::decode(err).map_err(|e| ParseContractError::ErrorNotHexStr(e.to_string()))?;
         Self::parse_from_bytes(bytes.as_slice())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::error_parser::ContractErrorParser;
+    use crate::error_parser::{ContractErrorParser, ParseContractError};
     use const_hex::hex;
 
     #[test]
@@ -74,7 +81,7 @@ mod tests {
 
         assert_eq!(
             ContractErrorParser::parse_from_bytes(err_bytes.as_ref()).unwrap(),
-            Some("BottomUpCheckpointAlreadySubmitted".into())
+            "BottomUpCheckpointAlreadySubmitted".to_string()
         );
 
         // selector for "FunctionNotFound" error
@@ -84,7 +91,7 @@ mod tests {
 
         assert_eq!(
             ContractErrorParser::parse_from_bytes(err_bytes.as_ref()).unwrap(),
-            Some("FunctionNotFound".into())
+            "FunctionNotFound".to_string()
         );
     }
 
@@ -94,8 +101,8 @@ mod tests {
         let err_bytes = hex::decode("a6bb62dd").unwrap();
 
         assert_eq!(
-            ContractErrorParser::parse_from_bytes(err_bytes.as_ref()).unwrap(),
-            None
+            ContractErrorParser::parse_from_bytes(err_bytes.as_ref()),
+            Err(ParseContractError::ErrorNotFound { selector: "a6bb62dd".to_string() })
         );
     }
 }
