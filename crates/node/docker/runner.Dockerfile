@@ -31,8 +31,6 @@ RUN mkdir /fendermint/logs
 RUN chmod 777 /fendermint/logs
 
 COPY /crates/node/docker/docker-entry.sh /usr/local/bin/docker-entry.sh
-COPY /crates/node/builtin-actors/output/bundle.car $FM_HOME_DIR/bundle.car
-COPY /crates/node/actors/output/custom_actors_bundle.car $FM_HOME_DIR/custom_actors_bundle.car
 COPY /contracts/out $FM_HOME_DIR/contracts
 COPY --from=builder /app/fendermint/app/config $FM_HOME_DIR/config
 COPY --from=builder /app/output/bin/fendermint /usr/local/bin/fendermint

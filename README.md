@@ -41,8 +41,8 @@ cd ipc
 make
 
 # building will generate the following binaries
-./target/release/ipc-cli --version
-./target/release/fendermint --version
+./crates/target/release/ipc-cli --version
+./crates/target/release/fendermint --version
 ```
 
 ## Run tests
