@@ -34,7 +34,7 @@ jobs:
 
     steps:
       - name: Check out the project
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Tools
         uses: ./.github/actions/install-tools
