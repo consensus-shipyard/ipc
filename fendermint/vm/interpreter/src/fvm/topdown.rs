@@ -216,8 +216,7 @@ where
         let proposer_ref = proposer.as_deref();
 
         atomically(|| {
-            self.provider
-                .set_new_finality(finality.clone(), prev_finality.clone())?;
+            self.provider.set_new_finality(finality.clone())?;
 
             self.votes.set_finalized(
                 finality.height,

@@ -466,8 +466,6 @@ pub async fn get_transaction_count<C>(
 where
     C: Client + Sync + Send,
 {
-    println!("-------- get_transaction_count: {} {:?}", addr, block_id);
-
     let addr = to_fvm_address(addr);
     let height = data.query_height(block_id).await?;
     let res = data.client.actor_state(&addr, height).await?;
@@ -475,7 +473,6 @@ where
     match res.value {
         Some((_, state)) => {
             let nonce = state.sequence;
-            println!("nonce: {}", nonce);
             Ok(et::U64::from(nonce))
         }
         None => Ok(et::U64::zero()),
@@ -509,6 +506,7 @@ where
         .state_params(FvmQueryHeight::Height(header.header.height.value()))
         .await?;
     let msg = to_chain_message(&tx_res.tx)?;
+
     if let ChainMessage::Signed(msg) = msg {
         let receipt = to_eth_receipt(
             &msg,

@@ -151,9 +151,9 @@ where
         Ok(CheckResponse::new_ok(msg, priority))
     }
 
-    // Increment sequence and balance
+    // Increment sequence
     // TODO - remove this once a new pending state solution is implemented
-    fn update_nonce_and_balance(
+    fn update_nonce(
         &self,
         state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
         msg: &FvmMessage,
@@ -165,12 +165,9 @@ where
             .lookup_actor(state, &msg.from)?
             .expect("actor must exist");
 
-        let balance_needed = msg.gas_fee_cap.clone() * msg.gas_limit;
-
         let state_tree = state.state_tree_mut();
 
         actor.sequence += 1;
-        actor.balance -= balance_needed;
         state_tree.set_actor(actor_id, actor);
 
         Ok(())
@@ -228,7 +225,7 @@ where
             signed_msg.verify(&state.chain_id())?;
 
             // TODO - remove this once a new pending state solution is implemented
-            self.update_nonce_and_balance(state, fvm_msg)?;
+            self.update_nonce(state, fvm_msg)?;
         }
 
         tracing::info!(
@@ -291,11 +288,13 @@ where
             select_messages_until_total_bytes(all_msgs, max_transaction_bytes as usize);
 
         if let Some(delta) = input_msg_count.checked_sub(all_messages.len()) {
-            tracing::info!(
-                removed_msgs = delta,
-                max_bytes = max_transaction_bytes,
-                "some messages were removed from the proposal because they exceed the limit"
-            );
+            if delta > 0 {
+                tracing::info!(
+                    removed_msgs = delta,
+                    max_bytes = max_transaction_bytes,
+                    "some messages were removed from the proposal because they exceed the limit"
+                );
+            }
         }
 
         Ok(PrepareMessagesResponse {
@@ -425,6 +424,7 @@ where
                 if let Err(e) = msg.verify(&state.chain_id()) {
                     return Err(ApplyMessageError::InvalidSignature(e));
                 }
+
                 let applied_message = execute_signed_message(state, msg.clone()).await?;
                 let domain_hash = msg.domain_hash(&state.chain_id())?;
                 Ok(ApplyMessageResponse {
