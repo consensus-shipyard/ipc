@@ -37,7 +37,7 @@ jobs:
           ls -al
           git checkout HEAD
           git rev-parse HEAD
-          git log -n 10
+          git --no-pager log -n 10
 
       - name: Install Tools
         uses: ./.github/actions/install-tools
