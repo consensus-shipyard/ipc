@@ -63,7 +63,7 @@ fn main() -> color_eyre::Result<()> {
     // The list of actors we need contract-bindings for, based on how the ipc-actor uses `abigen!`.
     // With the diamond pattern, there is a contract that holds state, and there are these facets which have the code,
     // so we need contract-bindings for the facets, but well (I think) use the same address with all of them.
-    for contract_name in [
+    let all_contracts = [
         "IDiamond",
         "DiamondLoupeFacet",
         "DiamondCutFacet",
@@ -89,7 +89,9 @@ fn main() -> color_eyre::Result<()> {
         "LibPowerChangeLog",
         "LibGateway",
         "LibQuorum",
-    ] {
+    ];
+
+    for contract_name in all_contracts {
         let contract_name_path = PathBuf::from(contract_name);
         let module_name = camel_to_snake(contract_name);
 
@@ -151,6 +153,9 @@ fn main() -> color_eyre::Result<()> {
         )?;
     }
 
+    writeln!(mod_f, "\n\n")?;
+    error_mapping_gen(&mut mod_f, &all_contracts)?;
+
     mod_f.flush()?;
     mod_f.sync_all()?;
 
@@ -184,4 +189,26 @@ fn camel_to_snake(name: &str) -> String {
         }
     }
     out
+}
+
+/// generate the mapping between contract error selectors to the ethers abi error type for parsing
+/// potential contract errors.
+/// This function generates a rust file that creates the error mapping, see [`ipc_actors_abis::extend_contract_error_mapping`]
+/// macro for how it works internally.
+/// This function will write the macro call [`ipc_actors_abis::extend_contract_error_mapping`] and loops all the contract names to watch and
+/// fill the macro rule.
+fn error_mapping_gen(mod_f: &mut impl Write, all_contracts: &[&str]) -> color_eyre::Result<()> {
+    writeln!(mod_f, "crate::extend_contract_error_mapping!(")?;
+
+    let map_name_to_macro_rule = |s| format!("[{}, {}_ABI]", camel_to_snake(s), s.to_uppercase());
+
+    let extend_map_code = all_contracts
+        .iter()
+        .map(|s| map_name_to_macro_rule(s))
+        .collect::<Vec<_>>()
+        .join(",\n");
+
+    writeln!(mod_f, "{}", extend_map_code)?;
+    writeln!(mod_f, ");")?;
+    Ok(())
 }
