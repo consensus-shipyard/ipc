@@ -24,26 +24,3 @@ pub fn contracts_path() -> PathBuf {
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|_| cargo_workspace_dir().join("contracts").join("out"))
 }
-
-pub fn actor_bundles_dir() -> PathBuf {
-    let p = cargo_workspace_dir()
-        .join("node")
-        .join("actors")
-        .join("output");
-    fs::create_dir_all(&p).expect("Must be able to create directories");
-    p
-}
-
-/// Path to the builtin-actor bundle, indended to be used in tests.
-pub fn bundle_path() -> PathBuf {
-    std::env::var("FM_BUILTIN_ACTORS_BUNDLE")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|_| actor_bundles_dir().join("bundle.car"))
-}
-
-/// Path to the in-repo custom actor bundle, intended to be used in tests.
-pub fn custom_actors_bundle_path() -> PathBuf {
-    std::env::var("FM_CUSTOM_ACTORS_BUNDLE")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|_| actor_bundles_dir().join("custom_actors_bundle.car"))
-}

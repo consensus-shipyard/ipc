@@ -1,12 +1,8 @@
 .PHONY: all build test lint license check-fmt check-clippy actor-bundle
 
 CONTAINER_FRONTEND_BIN?= docker
-BUILTIN_ACTORS_TAG    ?= v15.0.0
-BUILTIN_ACTORS_BUNDLE := $(PWD)/builtin-actors/output/bundle.car
-CUSTOM_ACTORS_BUNDLE  := $(PWD)/actors/output/custom_actors_bundle.car
 
 IPC_ACTORS_DIR        := $(PWD)/../../contracts
-IPC_ACTORS_OUT        := $(IPC_ACTORS_DIR)/out
 IPC_ACTORS_CODE       := $(shell find $(IPC_ACTORS_DIR) -type f \( -name "*.sol" \))
 IPC_ACTORS_GEN        := .contracts-gen
 
@@ -41,9 +37,6 @@ install: $(IPC_ACTORS_GEN)
 # Using --release for testing because wasm can otherwise be slow.
 # Excluding the materializer tests because they rely on docker; we could test with --lib
 test: $(BUILTIN_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
-	FM_BUILTIN_ACTORS_BUNDLE=$(BUILTIN_ACTORS_BUNDLE) \
-	FM_CUSTOM_ACTORS_BUNDLE=$(CUSTOM_ACTORS_BUNDLE) \
-	FM_CONTRACTS_DIR=$(IPC_ACTORS_OUT) \
 	cargo test --locked --release $(shell echo $(PACKAGE) | sed 's/--package fendermint_materializer//g')
 
 # Not using --release beause the build has been done in docker and the wasm code runs inside the container.
@@ -63,8 +56,6 @@ endif
 
 clean:
 	cargo clean
-	rm $(BUILTIN_ACTORS_BUNDLE)
-	rm $(CUSTOM_ACTORS_BUNDLE)
 	rm -rf testing/materializer/tests/docker-materializer
 
 lint: \
@@ -84,8 +75,6 @@ docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(CUSTOM_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 	rm -rf docker/.artifacts
 	mkdir -p docker/.artifacts/contracts
 	cp -r $(IPC_ACTORS_OUT)/* docker/.artifacts/contracts
-	cp $(BUILTIN_ACTORS_BUNDLE) docker/.artifacts
-	cp $(CUSTOM_ACTORS_BUNDLE) docker/.artifacts
 
 # To use `buildx` locally to produce multiplatform images, one needs to run `docker buildx create --use`.
 # After that it looks like even the regular docker build needs the `--load` parameter, which hopefully
@@ -112,17 +101,6 @@ docker-build: docker-deps $(FENDERMINT_CODE)
 # which means we are not tied to the release cycle of both FVM _and_ actors;
 # so long as they work together.
 actor-bundle: $(BUILTIN_ACTORS_BUNDLE) $(CUSTOM_ACTORS_BUNDLE)
-
-compile-abi: $(IPC_ACTORS_GEN)
-
-# Download a released builtin-actors bundle CAR file.
-$(BUILTIN_ACTORS_BUNDLE):
-	mkdir -p $(dir $@)
-	curl -L -o $@ https://github.com/filecoin-project/builtin-actors/releases/download/$(BUILTIN_ACTORS_TAG)/builtin-actors-mainnet.car
-
-# Build a bundle CAR for the custom actors in this repo.
-$(CUSTOM_ACTORS_BUNDLE):
-	cargo build --release -p fendermint_actors
 
 # Regenerate the ABI artifacts if we don't have them already, or they changed.
 $(IPC_ACTORS_GEN): $(IPC_ACTORS_CODE)
