@@ -1,15 +1,92 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::io::Write;
-use std::path::PathBuf;
+use std::io::{BufReader, Write};
+use std::path::{Path, PathBuf};
+use std::process::Stdio;
+
+use std::sync::mpsc;
 
 const SKIP_ENV_VAR_NAME: &str = "SKIP_BINDING_GENERATION";
+
+async fn run_forge_build(out: &Path) -> color_eyre::Result<()> {
+    let forge = which::which("forge")?;
+
+    let mut cmd = std::process::Command::new(forge);
+    cmd.args(
+        format!(
+            "build -C ./src/ --lib-paths lib/ --via-ir --sizes --skip test --out={}",
+            out.display()
+        )
+        .split(" "),
+    );
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+
+    #[derive(Debug)]
+    enum What {
+        Stderr(String),
+        Stdout(String),
+        Exit(std::io::Result<()>),
+    }
+
+    let (tx, rx) = mpsc::channel();
+    let mut child = cmd.spawn()?;
+    let stdout = child.stdout.take().unwrap();
+    let stderr = child.stderr.take().unwrap();
+    let tx = tx.clone();
+
+    fn read_on(
+        tx: mpsc::Sender<What>,
+        mut reader: impl std::io::BufRead,
+        what: impl Fn(String) -> What,
+    ) {
+        let mut buf = String::with_capacity(1024);
+        loop {
+            match reader.read_line(&mut buf) {
+                Ok(0) => {
+                    let _ = tx.send(What::Exit(Ok(())));
+                    break;
+                }
+                Ok(_n) => {
+                    let _ = tx.send(what(buf.trim().to_string()));
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                e => {
+                    let _ = tx.send(What::Exit(e.map(|_| ())));
+                    break;
+                }
+            }
+        }
+    }
+    let tx_cc = tx.clone();
+    let jh1 = tokio::task::spawn_blocking(move || {
+        read_on(tx_cc, BufReader::new(stderr), What::Stderr)
+    });
+    let jh2 = tokio::task::spawn_blocking(move || {
+        read_on(tx, BufReader::new(stdout), What::Stdout)
+    });
+    while let Ok(x) = rx.recv() {
+        match x {
+            What::Stderr(msg) => println!("cargo:warning=forge(stdERR) {msg}"),
+            What::Stdout(msg) => println!("cargo:warning=forge(stdOUT) {msg}"),
+            What::Exit(res) => {
+                res?;
+                break;
+            }
+        }
+    }
+    jh1.await?;
+    jh2.await?;
+
+    Ok(())
+}
+
 /// Generate Rust contract-bindings from the IPC Solidity Actors ABI artifacts.
 ///p
 /// These are built by `make ipc-actors-abi`, here we just add the final step
 /// so we have better code completion with Rust Analyzer.
-fn main() -> color_eyre::Result<()> {
+#[tokio::main]
+async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
 
     // Run with `cargo build -vv` to see output from any `eprintln!` or `println!`.
@@ -37,13 +114,13 @@ fn main() -> color_eyre::Result<()> {
         let val = val.trim();
         if val == "true" || val == "1" || val.is_empty() {
             println!(
-                "cargo:warn=Skipping binding generation since {} is set by the user",
+                "cargo:warning=Skipping binding generation since {} is set by the user",
                 SKIP_ENV_VAR_NAME
             );
             return Ok(());
         }
     }
-    println!("cargo:warn=Running binding generation...");
+    println!("cargo:warning=Running binding generation...");
 
     // Where are the Solidity artifacts.
     let workspace_dir = fs_err::canonicalize(
@@ -60,6 +137,9 @@ fn main() -> color_eyre::Result<()> {
     )?;
 
     let contracts_dir = workspace_dir.join("contracts");
+
+    // build the contracts from solidity
+    run_forge_build(contracts_dir.join("out").as_path()).await?;
 
     fs_err::create_dir_all(&gen_dir)?;
     let mut mod_f = fs_err::File::create(&mod_path)?;

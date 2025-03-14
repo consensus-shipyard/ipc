@@ -5839,6 +5839,8 @@ dependencies = [
  "fvm_shared",
  "prettyplease",
  "syn 2.0.87",
+ "tokio",
+ "which",
 ]
 
 [[package]]
