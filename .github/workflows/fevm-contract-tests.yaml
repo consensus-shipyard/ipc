@@ -9,14 +9,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Test Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           submodules: 'recursive'
           repository: 'consensus-shipyard/fevm-contract-tests'
           path: 'fevm-contract-tests'
 
       - name: Checkout Fendermint
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: 'consensus-shipyard/ipc'
           submodules: 'recursive'

@@ -1,0 +1,32 @@
+name: Contracts
+
+# This workflow is triggered from the main CI workflow.
+on:
+  workflow_call:
+
+jobs:
+  contracts-prettier:
+    uses: ./.github/workflows/contracts-prettier.yaml
+
+  contracts-deployment-test:
+    uses: ./.github/workflows/contracts-deployment-test.yaml
+    needs: [contracts-prettier]
+
+  contracts-test:
+    uses: ./.github/workflows/contracts-test.yaml
+    needs: [contracts-prettier]
+
+  contracts-storage:
+    uses: ./.github/workflows/contracts-storage.yaml
+    needs: [contracts-prettier]
+
+## This causes too much unpredictable noise, turning our builds red whenever a new vulnerability is found.
+## It's better to have a separate workflow for auditing, and have it run on a schedule.
+## However, given this code is purely used for tooling and not for production, it's not a big deal.
+#  contracts-pnpm-audit:
+#    uses: ./.github/workflows/contracts-pnpm-audit.yaml
+#    needs: [contracts-prettier]
+
+  contracts-sast:
+    uses: ./.github/workflows/contracts-sast.yaml
+    needs: [contracts-prettier]

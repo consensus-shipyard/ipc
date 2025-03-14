@@ -39,7 +39,7 @@ jobs:
         with:
           ref: ${{ github.ref_name }}
           submodules: recursive
-          fetch-depth: 0
+          fetch-depth: 1
 
       - uses: pnpm/action-setup@v2
 

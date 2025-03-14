@@ -11,7 +11,7 @@ jobs:
     if: ${{ !github.event.pull_request.draft }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - uses: pnpm/action-setup@v2
       - name: Setup Node
         uses: actions/setup-node@v4

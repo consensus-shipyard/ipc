@@ -24,62 +24,39 @@ on:
 
 jobs:
   commonmark:
-    uses: ./.github/workflows/commonmark-lint.yaml
+    uses: ./.github/workflows/lint-cmark.yaml
 
   license:
-    uses: ./.github/workflows/license.yaml
-
-  contracts-prettier:
-    uses: ./.github/workflows/contracts-prettier.yaml
-
-  contracts-deployment-test:
-    uses: ./.github/workflows/contracts-deployment-test.yaml
-    needs: [contracts-prettier]
-
-  contracts-test:
-    uses: ./.github/workflows/contracts-test.yaml
-    needs: [contracts-prettier]
-
-  contracts-storage:
-    uses: ./.github/workflows/contracts-storage.yaml
-    needs: [contracts-prettier]
-
-## This causes too much unpredictable noise, turning our builds red whenever a new vulnerability is found.
-## It's better to have a separate workflow for auditing, and have it run on a schedule.
-## However, given this code is purely used for tooling and not for production, it's not a big deal.
-#  contracts-pnpm-audit:
-#    uses: ./.github/workflows/contracts-pnpm-audit.yaml
-#    needs: [contracts-prettier]
-
-  contracts-sast:
-    uses: ./.github/workflows/contracts-sast.yaml
-    needs: [contracts-prettier]
+    uses: ./.github/workflows/lint-license.yaml
 
   demos:
     uses: ./.github/workflows/demos.yaml
-    needs: [contracts-prettier]
+    needs:
+      - contracts
 
-  build:
-    uses: ./.github/workflows/build.yaml
-    needs: [license]
+  contracts:
+    uses: ./.github/workflows/contracts.yaml
+
+  node:
+    uses: ./.github/workflows/node.yaml
 
   unit-tests:
     uses: ./.github/workflows/tests-unit.yaml
     secrets: inherit
     needs:
-      - build
+      - node
 
   e2e-tests:
     uses: ./.github/workflows/tests-e2e.yaml
     secrets: inherit
     needs:
-      - build
+      - node
 
   fevm-contract-tests:
     uses: ./.github/workflows/fevm-contract-tests.yaml
     secrets: inherit
     needs:
-      - build
+      - node
     if: >-
       github.ref == 'refs/heads/main' ||
       github.ref_type == 'tag'
@@ -95,7 +72,7 @@ jobs:
       github.ref == 'refs/heads/main' ||
       github.ref_type == 'tag'
     needs:
-      - contracts-test # generates the ABI artifacts (although fendermint can do on its own too)
-      - build
+      - fevm-contract-tests
+      - node
       - unit-tests
       - e2e-tests

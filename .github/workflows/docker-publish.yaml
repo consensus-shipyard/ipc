@@ -7,6 +7,8 @@ on:
 env:
   CARGO_INCREMENTAL: "0"
   SCCACHE_CACHE_SIZE: 10G
+  # TODO use RUSTC_WRAPPER=sccache and double check if the ones below are still required
+  RUSTC_WRAPPER: "sccache"
   CC: "sccache clang"
   CXX: "sccache clang++"
   PROFILE: "ci"
@@ -20,7 +22,7 @@ jobs:
       matrix:
         image:
           - name: fendermint
-            path: fendermint
+            path: crates/node
             needs_deps: true
           - name: ipc-contracts
             path: contracts
@@ -32,7 +34,7 @@ jobs:
 
     steps:
       - name: Check out the project
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Tools
         uses: ./.github/actions/install-tools
