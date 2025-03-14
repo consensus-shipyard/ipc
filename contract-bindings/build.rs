@@ -5,7 +5,6 @@ use std::io::Write;
 use std::path::PathBuf;
 
 const SKIP_ENV_VAR_NAME: &str = "SKIP_BINDING_GENERATION";
-
 /// Generate Rust contract-bindings from the IPC Solidity Actors ABI artifacts.
 ///p
 /// These are built by `make ipc-actors-abi`, here we just add the final step
@@ -47,7 +46,18 @@ fn main() -> color_eyre::Result<()> {
     println!("cargo:warn=Running binding generation...");
 
     // Where are the Solidity artifacts.
-    let workspace_dir = crate_dir.parent().expect("Should exist").to_path_buf();
+    let workspace_dir = fs_err::canonicalize(
+        crate_dir
+            .clone()
+            .parent()
+            .expect(
+                "Structure is such that we are 2 levels from the root, one level up should work",
+            )
+            .parent()
+            .expect(
+                "Structure is such that we are 2 levels from the root, two levels up should work",
+            ),
+    )?;
 
     let contracts_dir = workspace_dir.join("contracts");
 
