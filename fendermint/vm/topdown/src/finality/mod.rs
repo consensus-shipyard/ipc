@@ -130,7 +130,7 @@ mod tests {
                 height: target_block,
                 block_hash: vec![1u8; 32],
             };
-            provider.set_new_finality(finality.clone(), Some(genesis_finality()))?;
+            provider.set_new_finality(finality.clone())?;
 
             // all cache should be cleared
             let r = provider.next_proposal()?;
@@ -154,13 +154,10 @@ mod tests {
 
             // inject data
             provider.new_parent_view(target_block, Some((vec![1u8; 32], vec![], vec![])))?;
-            provider.set_new_finality(
-                IPCParentFinality {
-                    height: target_block - 1,
-                    block_hash: vec![1u8; 32],
-                },
-                Some(genesis_finality()),
-            )?;
+            provider.set_new_finality(IPCParentFinality {
+                height: target_block - 1,
+                block_hash: vec![1u8; 32],
+            })?;
 
             let finality = IPCParentFinality {
                 height: target_block,

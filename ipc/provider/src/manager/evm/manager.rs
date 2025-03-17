@@ -383,7 +383,7 @@ impl SubnetManager for EthSubnetManager {
 
         let txn = extend_call_with_pending_block(txn).await?;
 
-        txn.send().await?;
+        txn.send().await?.await?;
         Ok(())
     }
 

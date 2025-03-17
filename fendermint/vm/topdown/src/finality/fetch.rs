@@ -119,12 +119,8 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> ParentFinalityProvider
         self.inner.check_proposal(proposal)
     }
 
-    fn set_new_finality(
-        &self,
-        finality: IPCParentFinality,
-        previous_finality: Option<IPCParentFinality>,
-    ) -> Stm<()> {
-        self.inner.set_new_finality(finality, previous_finality)
+    fn set_new_finality(&self, finality: IPCParentFinality) -> Stm<()> {
+        self.inner.set_new_finality(finality)
     }
 }
 

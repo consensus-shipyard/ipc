@@ -3328,6 +3328,7 @@ dependencies = [
  "fendermint_vm_genesis",
  "fendermint_vm_interpreter",
  "fendermint_vm_message",
+ "fendermint_vm_topdown",
  "fvm",
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
