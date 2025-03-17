@@ -8,11 +8,11 @@ use crate::error::Error;
 use crate::BlockHash;
 use async_stm::{abort, StmResult};
 use ipc_api::cross::IpcEnvelope;
-use ipc_api::staking::StakingChangeRequest;
+use ipc_api::staking::PowerChangeRequest;
 
 pub use fetch::CachedFinalityProvider;
 
-pub(crate) type ParentViewPayload = (BlockHash, Vec<StakingChangeRequest>, Vec<IpcEnvelope>);
+pub(crate) type ParentViewPayload = (BlockHash, Vec<PowerChangeRequest>, Vec<IpcEnvelope>);
 
 fn ensure_sequential<T, F: Fn(&T) -> u64>(msgs: &[T], f: F) -> StmResult<(), Error> {
     if msgs.is_empty() {
@@ -31,7 +31,7 @@ fn ensure_sequential<T, F: Fn(&T) -> u64>(msgs: &[T], f: F) -> StmResult<(), Err
     Ok(())
 }
 
-pub(crate) fn validator_changes(p: &ParentViewPayload) -> Vec<StakingChangeRequest> {
+pub(crate) fn validator_changes(p: &ParentViewPayload) -> Vec<PowerChangeRequest> {
     p.1.clone()
 }
 
@@ -48,7 +48,7 @@ mod tests {
     use async_stm::atomically_or_err;
     use async_trait::async_trait;
     use ipc_api::cross::IpcEnvelope;
-    use ipc_api::staking::StakingChangeRequest;
+    use ipc_api::staking::PowerChangeRequest;
     use ipc_provider::manager::{GetBlockHashResult, TopDownQueryPayload};
     use std::sync::Arc;
     use tokio::time::Duration;
@@ -82,7 +82,7 @@ mod tests {
         async fn get_validator_changes(
             &self,
             _height: BlockHeight,
-        ) -> anyhow::Result<TopDownQueryPayload<Vec<StakingChangeRequest>>> {
+        ) -> anyhow::Result<TopDownQueryPayload<Vec<PowerChangeRequest>>> {
             Ok(TopDownQueryPayload {
                 value: vec![],
                 block_hash: vec![],
@@ -130,7 +130,7 @@ mod tests {
                 height: target_block,
                 block_hash: vec![1u8; 32],
             };
-            provider.set_new_finality(finality.clone(), Some(genesis_finality()))?;
+            provider.set_new_finality(finality.clone())?;
 
             // all cache should be cleared
             let r = provider.next_proposal()?;
@@ -154,13 +154,10 @@ mod tests {
 
             // inject data
             provider.new_parent_view(target_block, Some((vec![1u8; 32], vec![], vec![])))?;
-            provider.set_new_finality(
-                IPCParentFinality {
-                    height: target_block - 1,
-                    block_hash: vec![1u8; 32],
-                },
-                Some(genesis_finality()),
-            )?;
+            provider.set_new_finality(IPCParentFinality {
+                height: target_block - 1,
+                block_hash: vec![1u8; 32],
+            })?;
 
             let finality = IPCParentFinality {
                 height: target_block,

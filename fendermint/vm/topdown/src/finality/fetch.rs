@@ -10,7 +10,7 @@ use crate::{
 };
 use async_stm::{Stm, StmResult};
 use ipc_api::cross::IpcEnvelope;
-use ipc_api::staking::StakingChangeRequest;
+use ipc_api::staking::PowerChangeRequest;
 use std::sync::Arc;
 
 /// The finality provider that performs io to the parent if not found in cache
@@ -71,7 +71,7 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> ParentViewProvider for CachedF
         &self,
         from: BlockHeight,
         to: BlockHeight,
-    ) -> anyhow::Result<Vec<StakingChangeRequest>> {
+    ) -> anyhow::Result<Vec<PowerChangeRequest>> {
         let mut v = vec![];
         for h in from..=to {
             let mut r = self.validator_changes(h).await?;
@@ -119,12 +119,8 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> ParentFinalityProvider
         self.inner.check_proposal(proposal)
     }
 
-    fn set_new_finality(
-        &self,
-        finality: IPCParentFinality,
-        previous_finality: Option<IPCParentFinality>,
-    ) -> Stm<()> {
-        self.inner.set_new_finality(finality, previous_finality)
+    fn set_new_finality(&self, finality: IPCParentFinality) -> Stm<()> {
+        self.inner.set_new_finality(finality)
     }
 }
 
@@ -143,7 +139,7 @@ impl<T: ParentQueryProxy + Send + Sync + 'static> CachedFinalityProvider<T> {
     async fn validator_changes(
         &self,
         height: BlockHeight,
-    ) -> anyhow::Result<Vec<StakingChangeRequest>> {
+    ) -> anyhow::Result<Vec<PowerChangeRequest>> {
         let r = self.inner.validator_changes(height).await?;
 
         if let Some(v) = r {
@@ -252,7 +248,7 @@ mod tests {
     use fvm_shared::address::Address;
     use fvm_shared::econ::TokenAmount;
     use ipc_api::cross::IpcEnvelope;
-    use ipc_api::staking::{StakingChange, StakingChangeRequest, StakingOperation};
+    use ipc_api::staking::{PowerChange, PowerChangeRequest, PowerOperation};
     use ipc_api::subnet_id::SubnetID;
     use ipc_provider::manager::{GetBlockHashResult, TopDownQueryPayload};
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -323,7 +319,7 @@ mod tests {
         async fn get_validator_changes(
             &self,
             height: BlockHeight,
-        ) -> anyhow::Result<TopDownQueryPayload<Vec<StakingChangeRequest>>> {
+        ) -> anyhow::Result<TopDownQueryPayload<Vec<PowerChangeRequest>>> {
             let r = self.blocks.get_value(height).cloned().unwrap();
             if r.is_none() {
                 return Err(anyhow!(NULL_ROUND_ERR_MSG));
@@ -371,11 +367,11 @@ mod tests {
         msg
     }
 
-    fn new_validator_changes(configuration_number: u64) -> StakingChangeRequest {
-        StakingChangeRequest {
+    fn new_validator_changes(configuration_number: u64) -> PowerChangeRequest {
+        PowerChangeRequest {
             configuration_number,
-            change: StakingChange {
-                op: StakingOperation::Deposit,
+            change: PowerChange {
+                op: PowerOperation::SetPower,
                 payload: vec![],
                 validator: Address::new_id(1),
             },

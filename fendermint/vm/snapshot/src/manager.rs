@@ -241,7 +241,8 @@ where
         // They can be listed in the right order with e.g. `ls | sort -n`
         // Alternatively we could pad them with zeroes based on the original file size and the chunk size,
         // but this way it will be easier to return them based on a numeric index.
-        let chunks_count = car::split(&snapshot_path, &parts_path, self.chunk_size, |idx| {
+        let snapshot_bytes = fs::read(snapshot_path)?;
+        let chunks_count = car::split(snapshot_bytes, &parts_path, self.chunk_size, |idx| {
             format!("{idx}.part")
         })
         .await
@@ -317,7 +318,7 @@ mod tests {
     use async_stm::{atomically, retry};
     use fendermint_vm_genesis::Genesis;
     use fendermint_vm_interpreter::fvm::{
-        bundle::{bundle_path, contracts_path, custom_actors_bundle_path},
+        bundle::contracts_path,
         state::{snapshot::Snapshot, FvmStateParams},
         store::memory::MemoryBlockstore,
     };
@@ -445,8 +446,8 @@ mod tests {
         let genesis = Genesis::arbitrary(&mut g);
 
         let (state, out) = create_test_genesis_state(
-            bundle_path(),
-            custom_actors_bundle_path(),
+            actors_builtin_car::CAR,
+            actors_custom_car::CAR,
             contracts_path(),
             genesis,
         )

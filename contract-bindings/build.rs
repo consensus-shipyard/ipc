@@ -85,8 +85,8 @@ fn main() -> color_eyre::Result<()> {
         "SubnetRegistryDiamond",
         "RegisterSubnetFacet",
         "SubnetGetterFacet",
-        "LibStaking",
-        "LibStakingChangeLog",
+        "LibPower",
+        "LibPowerChangeLog",
         "LibGateway",
         "LibQuorum",
     ] {

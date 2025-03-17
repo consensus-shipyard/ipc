@@ -11,6 +11,7 @@ use crate::{ipc::IpcMessage, signed::SignedMessage};
 /// signed by BLS signatures are aggregated to the block level, and their original
 /// signatures are stripped from the messages, to save space. Tendermint Core will
 /// not do this for us (perhaps with ABCI++ Vote Extensions we could do it), though.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ChainMessage {
     /// A message that can be passed on to the FVM as-is.
@@ -37,6 +38,12 @@ pub enum ChainMessage {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ValidatorMessage {
     SignBottomUpCheckpoint(SignedMessage),
+}
+
+impl From<SignedMessage> for ChainMessage {
+    fn from(msg: SignedMessage) -> Self {
+        ChainMessage::Signed(msg)
+    }
 }
 
 #[cfg(feature = "arb")]

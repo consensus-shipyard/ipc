@@ -36,6 +36,8 @@ members = [
   "fendermint/tracing",
   "fendermint/vm/*",
   "fendermint/actors",
+  "fendermint/actors-custom-car",
+  "fendermint/actors-builtin-car",
   "fendermint/actors/api",
   "fendermint/actors/chainmetadata",
   "fendermint/actors/activity-tracker",
@@ -69,6 +71,7 @@ blake2b_simd = "1.0"
 bloom = "0.3"
 bytes = "1.4"
 clap = { version = "4.1", features = ["derive", "env", "string"] }
+color-eyre = "0.5.11"
 byteorder = "1.5.0"
 config = "0.13"
 dirs = "5.0"
@@ -141,6 +144,7 @@ quickcheck_macros = "1"
 rand = "0.8"
 rand_chacha = "0.3"
 regex = "1"
+statrs = "0.18.0"
 reqwest = { version = "0.11.13", features = ["json"] }
 sha2 = "0.10"
 serde = { version = "1.0.217", features = ["derive"] }
@@ -174,6 +178,7 @@ tracing-subscriber = { version = "0.3", features = [
   "registry",
 ] }
 tracing-appender = "0.2.3"
+text-tables = "0.3.1"
 url = { version = "2.4.1", features = ["serde"] }
 zeroize = "1.6"
 
@@ -185,7 +190,7 @@ ipc_ipld_resolver = { path = "ipld/resolver" }
 ipc-types = { path = "ipc/types" }
 ipc-observability = { path = "ipc/observability" }
 ipc_actors_abis = { path = "contract-bindings" }
-fendermint_actors_api = { path = "fendermint/actors/api" }
+actors-custom-api = { path = "fendermint/actors/api" }
 
 # Vendored for cross-compilation, see https://github.com/cross-rs/cross/wiki/Recipes#openssl
 # Make sure every top level build target actually imports this dependency, and don't end up
@@ -247,14 +252,14 @@ tendermint-rpc = { version = "0.31", features = [
 tendermint-proto = { version = "0.31" }
 
 [patch.crates-io]
-fvm = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "customize-gas" }
-fvm_shared = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "customize-gas" }
-fvm_sdk = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "customize-gas" }
-fvm_ipld_blockstore = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "customize-gas" }
-fvm_ipld_car = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "customize-gas" }
-fvm_ipld_encoding = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "customize-gas" }
-fvm_ipld_hamt = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "customize-gas" }
-fvm_ipld_amt = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "customize-gas" }
+fvm = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_shared = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_sdk = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_ipld_blockstore = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_ipld_car = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_ipld_encoding = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_ipld_hamt = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_ipld_amt = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
 
 [profile.wasm]
 inherits = "release"

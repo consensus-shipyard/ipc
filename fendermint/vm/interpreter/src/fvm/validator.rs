@@ -1,10 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::chain::ChainMessageApplyRet;
+use crate::errors::ApplyMessageError;
 use crate::fvm::state::FvmExecState;
-use crate::fvm::FvmApplyRet;
-use crate::signed::InvalidSignature;
+use crate::types::{AppliedMessage, ApplyMessageResponse};
 use ethers::contract::EthCall;
 use fendermint_vm_message::signed::SignedMessage;
 use fvm::executor::{default_gas_hook, ApplyKind, ExecutionOptions};
@@ -20,13 +19,11 @@ const SOLIDITY_SELECTOR_BYTES: usize = 4;
 pub(crate) fn execute_bottom_up_signature<DB: Blockstore + Clone + 'static>(
     state: &mut FvmExecState<DB>,
     signed: SignedMessage,
-) -> anyhow::Result<ChainMessageApplyRet> {
+) -> Result<ApplyMessageResponse, ApplyMessageError> {
     let chain_id = state.chain_id();
-    if let Err(e) = signed.verify(&chain_id) {
-        return Ok(ChainMessageApplyRet::Signed(Err(
-            crate::signed::InvalidSignature(e.to_string()),
-        )));
-    }
+    signed
+        .verify(&chain_id)
+        .map_err(ApplyMessageError::InvalidSignature)?;
 
     // technically we need to check the sender is actually a validator,
     // but the contract is checking it, delegates to the contract.
@@ -36,14 +33,15 @@ pub(crate) fn execute_bottom_up_signature<DB: Blockstore + Clone + 'static>(
     // check the message signature matches, that means we are actually calling submit signature
     let method_selector =
         ipc_actors_abis::checkpointing_facet::AddCheckpointSignatureCall::selector();
-    let calldata = msg.params.deserialize::<BytesDe>()?.0;
+    let calldata = msg.params.deserialize::<BytesDe>()
+        .map_err(|e| ApplyMessageError::InvalidMessage(e.to_string()))?.0;
 
     if calldata.len() < SOLIDITY_SELECTOR_BYTES
         || method_selector != calldata[0..SOLIDITY_SELECTOR_BYTES]
     {
-        return Ok(ChainMessageApplyRet::Signed(Err(InvalidSignature(
+        return Err(ApplyMessageError::InvalidMessage(
             "not calling submitting bottom up signature".to_string(),
-        ))));
+        ));
     }
 
     let custom_hook = |sender_id: ActorID, receipt: &Receipt, gas_output: &GasOutputs| {
@@ -67,8 +65,8 @@ pub(crate) fn execute_bottom_up_signature<DB: Blockstore + Clone + 'static>(
 
     let (apply_ret, emitters) =
         state.execute_with_options(msg.clone(), ApplyKind::Explicit, options)?;
-    let ret = crate::signed::SignedMessageApplyRet {
-        fvm: FvmApplyRet {
+    Ok(ApplyMessageResponse {
+        applied_message: AppliedMessage {
             apply_ret,
             from: msg.from,
             to: msg.to,
@@ -77,6 +75,5 @@ pub(crate) fn execute_bottom_up_signature<DB: Blockstore + Clone + 'static>(
             emitters,
         },
         domain_hash,
-    };
-    Ok(ChainMessageApplyRet::Signed(Ok(ret)))
+    })
 }

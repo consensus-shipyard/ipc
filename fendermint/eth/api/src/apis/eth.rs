@@ -506,6 +506,7 @@ where
         .state_params(FvmQueryHeight::Height(header.header.height.value()))
         .await?;
     let msg = to_chain_message(&tx_res.tx)?;
+
     if let ChainMessage::Signed(msg) = msg {
         let receipt = to_eth_receipt(
             &msg,

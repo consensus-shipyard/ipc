@@ -11,7 +11,7 @@ use ipc_api::checkpoint::{
     Signature,
 };
 use ipc_api::cross::IpcEnvelope;
-use ipc_api::staking::{StakingChangeRequest, ValidatorInfo};
+use ipc_api::staking::{PowerChangeRequest, ValidatorInfo};
 use ipc_api::subnet::{Asset, ConstructParams, PermissionMode};
 use ipc_api::subnet_id::SubnetID;
 use ipc_api::validator::Validator;
@@ -241,7 +241,7 @@ pub trait TopDownFinalityQuery: Send + Sync {
         &self,
         subnet_id: &SubnetID,
         epoch: ChainEpoch,
-    ) -> Result<TopDownQueryPayload<Vec<StakingChangeRequest>>>;
+    ) -> Result<TopDownQueryPayload<Vec<PowerChangeRequest>>>;
     /// Returns the latest parent finality committed in a child subnet
     async fn latest_parent_finality(&self) -> Result<ChainEpoch>;
 }
