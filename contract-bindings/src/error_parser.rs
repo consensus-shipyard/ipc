@@ -1,6 +1,12 @@
 use ethers::abi::ethabi::AbiError;
 use std::collections::BTreeMap;
-
+/// Macro to extend the contract error mapping by aggregating errors from multiple contracts.
+/// Each contract is specified as a pair: `[snake_case, ABI_IDENTIFIER]` where:
+/// - `snake_case` is the contract name converted to snake case.
+/// - `ABI_IDENTIFIER` is the contract name in uppercase with `_ABI` appended.
+///
+/// This macro builds a lazily initialized static map (`MAP`) that associates Solidity error selectors 
+/// (first 4 bytes of an error signature, hex-encoded) with their corresponding `AbiError`.
 #[macro_export]
 macro_rules! extend_contract_error_mapping {
     ($([$snake_case:tt, $abi:tt]),* $(,)?) => {
@@ -19,7 +25,11 @@ macro_rules! extend_contract_error_mapping {
 }
 
 const SOLIDITY_SELECTOR_BYTE_SIZE: usize = 4;
-
+/// Extends the provided error map with errors from a contract’s error collection.
+/// For each error, it extracts the Solidity selector (first 4 bytes of the error signature),
+/// hex-encodes it, and maps that selector to a clone of the `AbiError`.
+///
+/// If a selector already exists in the map, a warning is logged.
 pub fn extend_errors(
     map: &mut BTreeMap<String, AbiError>,
     contract_errors: BTreeMap<String, Vec<AbiError>>,
