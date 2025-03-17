@@ -10,24 +10,24 @@ use std::fmt::{Debug, Formatter};
 
 /// A fvm contract revert parsing util
 #[derive(Clone)]
-pub struct FvmHttp {
+pub struct ErrorParserHttp {
     inner: Http,
 }
 
-impl From<Http> for FvmHttp {
+impl From<Http> for ErrorParserHttp {
     fn from(inner: Http) -> Self {
         Self { inner }
     }
 }
 
-impl Debug for FvmHttp {
+impl Debug for ErrorParserHttp {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.inner.fmt(f)
     }
 }
 
 #[async_trait]
-impl JsonRpcClient for FvmHttp {
+impl JsonRpcClient for ErrorParserHttp {
     type Error = <Http as JsonRpcClient>::Error;
 
     async fn request<T, R>(&self, method: &str, params: T) -> Result<R, Self::Error>

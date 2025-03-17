@@ -25,10 +25,10 @@ pub fn extend_errors(
     contract_errors: BTreeMap<String, Vec<AbiError>>,
 ) {
     for (_, v) in contract_errors.iter() {
-        for i in v {
+        for e in v {
             // solidity selector is only the first 4 bytes of the signature
-            let selector = const_hex::hex::encode(&i.signature().0[0..SOLIDITY_SELECTOR_BYTE_SIZE]);
-            map.insert(selector, i.clone());
+            let selector = const_hex::hex::encode(&e.signature().0[0..SOLIDITY_SELECTOR_BYTE_SIZE]);
+            map.insert(selector, e.clone());
         }
     }
 }
@@ -54,7 +54,7 @@ impl ContractErrorParser {
         let selector = const_hex::hex::encode(&bytes[0..4]);
 
         let Some(error) = crate::gen::MAP.get(&selector) else {
-            return Err(ParseContractError::ErrorNotFound{ selector });
+            return Err(ParseContractError::ErrorNotFound { selector });
         };
         if let Err(e) = error.decode(bytes) {
             tracing::warn!("contract error selector found: {selector}, but decode failed: {e}");
@@ -64,7 +64,8 @@ impl ContractErrorParser {
     }
 
     pub fn parse_from_hex_str(err: &str) -> Result<String, ParseContractError> {
-        let bytes = const_hex::hex::decode(err).map_err(|e| ParseContractError::ErrorNotHexStr(e.to_string()))?;
+        let bytes = const_hex::hex::decode(err)
+            .map_err(|e| ParseContractError::ErrorNotHexStr(e.to_string()))?;
         Self::parse_from_bytes(bytes.as_slice())
     }
 }
@@ -102,7 +103,9 @@ mod tests {
 
         assert_eq!(
             ContractErrorParser::parse_from_bytes(err_bytes.as_ref()),
-            Err(ParseContractError::ErrorNotFound { selector: "a6bb62dd".to_string() })
+            Err(ParseContractError::ErrorNotFound {
+                selector: "a6bb62dd".to_string()
+            })
         );
     }
 }
