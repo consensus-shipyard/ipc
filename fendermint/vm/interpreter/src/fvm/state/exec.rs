@@ -35,7 +35,7 @@ use serde_with::serde_as;
 use std::fmt;
 use tendermint::consensus::params::Params as TendermintConsensusParams;
 
-const ALWAYS_REVERT: bool = true;
+const REVERT_TRANSACTION: bool = true;
 pub type BlockHash = [u8; 32];
 
 pub type ActorAddressMap = HashMap<ActorID, Address>;
@@ -243,11 +243,12 @@ where
         }
 
         let raw_length = message_raw_length(&msg)?;
+        // we are always reverting the txn for read only execution, no in memory updates as well
         let ret = self.executor.execute_message_with_revert(
             msg,
             ApplyKind::Implicit,
             raw_length,
-            ALWAYS_REVERT,
+            REVERT_TRANSACTION,
         )?;
         let addrs = self.emitter_delegated_addresses(&ret)?;
 
