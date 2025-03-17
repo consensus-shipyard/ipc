@@ -14,10 +14,10 @@ use cid::Cid;
 use ethers::abi::Tokenize;
 use ethers::core::types as et;
 use fendermint_actor_eam::PermissionModeParams;
+use fendermint_eth_deployer::{collect_contracts, contract_src};
 use fendermint_eth_hardhat::{ContractSourceAndName, Hardhat, FQN};
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
-use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use fendermint_vm_actor_interface::{
     account, activity, burntfunds, chainmetadata, cron, eam, gas_market, init, ipc, reward, system,
     EMPTY_ARR,
@@ -274,7 +274,7 @@ impl<'a> GenesisBuilder<'a> {
         // STAGE 0: Declare the built-in EVM contracts we'll have to deploy.
         // ipc_entrypoints contains the external user facing contracts
         // all_ipc_contracts contains ipc_entrypoints + util contracts
-        let (all_ipc_contracts, ipc_entrypoints) = self.collect_contracts()?;
+        let (all_ipc_contracts, ipc_entrypoints) = collect_contracts(&self.hardhat)?;
 
         // STAGE 1: First we initialize native built-in actors.
         // System actor
@@ -486,34 +486,6 @@ impl<'a> GenesisBuilder<'a> {
 
         Ok(out)
     }
-
-    fn collect_contracts(&self) -> anyhow::Result<(Vec<ContractSourceAndName>, EthContractMap)> {
-        let mut all_contracts = Vec::new();
-        let mut top_level_contracts = EthContractMap::default();
-
-        top_level_contracts.extend(IPC_CONTRACTS.clone());
-
-        all_contracts.extend(top_level_contracts.keys());
-        all_contracts.extend(
-            top_level_contracts
-                .values()
-                .flat_map(|c| c.facets.iter().map(|f| f.name)),
-        );
-        // Collect dependencies of the main IPC actors.
-        let mut eth_libs = self
-            .hardhat
-            .dependencies(
-                &all_contracts
-                    .iter()
-                    .map(|n| (contract_src(n), *n))
-                    .collect::<Vec<_>>(),
-            )
-            .context("failed to collect EVM contract dependencies")?;
-
-        // Only keep library dependencies, not contracts with constructors.
-        eth_libs.retain(|(_, d)| !top_level_contracts.contains_key(d.as_str()));
-        Ok((eth_libs, top_level_contracts))
-    }
 }
 
 // Configuration for deploying IPC contracts.
@@ -610,10 +582,6 @@ fn deploy_contracts(
     Ok(())
 }
 
-fn contract_src(name: &str) -> PathBuf {
-    PathBuf::from(format!("{name}.sol"))
-}
-
 struct ContractDeployer<'a, DB> {
     hardhat: &'a Hardhat,
     top_contracts: &'a EthContractMap,
@@ -645,13 +613,13 @@ where
     ) -> anyhow::Result<()> {
         let fqn = self.hardhat.fqn(lib_src.as_ref(), lib_name);
 
-        let bytecode = self
+        let artifact = self
             .hardhat
-            .bytecode(&lib_src, lib_name, &self.lib_addrs)
+            .prepare_deployment_artifact(&lib_src, lib_name, &self.lib_addrs)
             .with_context(|| format!("failed to load library bytecode {fqn}"))?;
 
         let eth_addr = state
-            .create_evm_actor(*next_id, bytecode)
+            .create_evm_actor(*next_id, artifact.bytecode)
             .with_context(|| format!("failed to create library actor {fqn}"))?;
 
         let id_addr = et::Address::from(EthAddress::from_id(*next_id).0);
@@ -688,13 +656,18 @@ where
         let contract_id = contract.actor_id;
         let contract_src = contract_src(contract_name);
 
-        let bytecode = self
+        let artifact = self
             .hardhat
-            .bytecode(contract_src, contract_name, &self.lib_addrs)
+            .prepare_deployment_artifact(contract_src, contract_name, &self.lib_addrs)
             .with_context(|| format!("failed to load {contract_name} bytecode"))?;
 
         let eth_addr = state
-            .create_evm_actor_with_cons(contract_id, &contract.abi, bytecode, constructor_params)
+            .create_evm_actor_with_cons(
+                contract_id,
+                &contract.abi,
+                artifact.bytecode,
+                constructor_params,
+            )
             .with_context(|| format!("failed to create {contract_name} actor"))?;
 
         let id_addr = et::Address::from(EthAddress::from_id(contract_id).0);

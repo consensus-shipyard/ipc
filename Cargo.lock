@@ -3420,6 +3420,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_eth_deployer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ethers",
+ "ethers-core",
+ "fendermint_eth_hardhat",
+ "fendermint_vm_actor_interface",
+ "fendermint_vm_genesis",
+ "fs-err",
+ "hex",
+ "ipc-api",
+ "ipc_actors_abis",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber 0.3.19",
+]
+
+[[package]]
 name = "fendermint_eth_hardhat"
 version = "0.1.0"
 dependencies = [
@@ -3696,6 +3717,7 @@ dependencies = [
  "fendermint_actor_eam",
  "fendermint_actor_gas_market_eip1559",
  "fendermint_crypto",
+ "fendermint_eth_deployer",
  "fendermint_eth_hardhat",
  "fendermint_rpc",
  "fendermint_testing",
@@ -5701,6 +5723,8 @@ dependencies = [
  "env_logger 0.10.2",
  "ethers",
  "ethers-contract",
+ "fendermint_eth_deployer",
+ "fendermint_eth_hardhat",
  "fil_actors_runtime",
  "fs-err",
  "futures-util",

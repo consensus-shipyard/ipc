@@ -1,0 +1,26 @@
+[package]
+name = "fendermint_eth_deployer"
+description = "Utilities to deploy contracts on EVM chains"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = { workspace = true }
+ethers-core = { workspace = true }
+hex = { workspace = true }
+fs-err = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+ipc_actors_abis = { workspace = true }
+fendermint_vm_actor_interface = { path = "../../vm/actor_interface" }
+fendermint_eth_hardhat = { path = "../hardhat" }
+fendermint_vm_genesis = { path = "../../vm/genesis", features = ["arb"] }
+ethers = { workspace = true }
+tracing = { workspace = true }
+ipc-api = { workspace = true }
+tokio = { workspace = true }
+tracing-subscriber = { workspace = true }
