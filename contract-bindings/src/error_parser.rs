@@ -25,7 +25,11 @@ macro_rules! extend_contract_error_mapping {
 }
 
 const SOLIDITY_SELECTOR_BYTE_SIZE: usize = 4;
-
+/// Extends the provided error map with errors from a contract’s error collection.
+/// For each error, it extracts the Solidity selector (first 4 bytes of the error signature),
+/// hex-encodes it, and maps that selector to a clone of the `AbiError`.
+///
+/// If a selector already exists in the map, a warning is logged.
 pub fn extend_errors(
     map: &mut BTreeMap<String, AbiError>,
     contract_errors: BTreeMap<String, Vec<AbiError>>,
