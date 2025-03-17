@@ -7,7 +7,7 @@ use crate::finality::{
 use crate::{BlockHash, BlockHeight, Config, Error, IPCParentFinality, SequentialKeyCache};
 use async_stm::{abort, atomically, Stm, StmResult, TVar};
 use ipc_api::cross::IpcEnvelope;
-use ipc_api::staking::StakingChangeRequest;
+use ipc_api::staking::PowerChangeRequest;
 use std::cmp::min;
 
 use fendermint_tracing::emit;
@@ -46,7 +46,7 @@ impl FinalityWithNull {
     pub async fn validator_changes(
         &self,
         height: BlockHeight,
-    ) -> anyhow::Result<Option<Vec<StakingChangeRequest>>> {
+    ) -> anyhow::Result<Option<Vec<PowerChangeRequest>>> {
         let r = atomically(|| self.handle_null_block(height, validator_changes, Vec::new)).await;
         Ok(r)
     }
@@ -103,13 +103,7 @@ impl FinalityWithNull {
         self.check_block_hash(proposal)
     }
 
-    pub fn set_new_finality(
-        &self,
-        finality: IPCParentFinality,
-        previous_finality: Option<IPCParentFinality>,
-    ) -> Stm<()> {
-        debug_assert!(previous_finality == self.last_committed_finality.read_clone()?);
-
+    pub fn set_new_finality(&self, finality: IPCParentFinality) -> Stm<()> {
         // the height to clear
         let height = finality.height;
 
@@ -270,7 +264,7 @@ impl FinalityWithNull {
         &self,
         height: BlockHeight,
         block_hash: BlockHash,
-        validator_changes: Vec<StakingChangeRequest>,
+        validator_changes: Vec<PowerChangeRequest>,
         top_down_msgs: Vec<IpcEnvelope>,
     ) -> StmResult<(), Error> {
         if !top_down_msgs.is_empty() {
@@ -427,11 +421,7 @@ mod tests {
         );
 
         // Test set new finality
-        atomically(|| {
-            let last = provider.last_committed_finality.read_clone()?;
-            provider.set_new_finality(f.clone(), last)
-        })
-        .await;
+        atomically(|| provider.set_new_finality(f.clone())).await;
 
         assert_eq!(
             atomically(|| provider.last_committed_finality()).await,

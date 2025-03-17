@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import {ConsensusType} from "../enums/ConsensusType.sol";
 import {NotGateway, SubnetAlreadyKilled} from "../errors/IPCErrors.sol";
 import {BottomUpCheckpoint, BottomUpMsgBatchInfo} from "../structs/CrossNet.sol";
-import {SubnetID, ValidatorSet, StakingChangeLog, StakingReleaseQueue, Asset, Validator, PermissionMode} from "../structs/Subnet.sol";
+import {SubnetID, ValidatorSet, PowerChangeLog, StakingReleaseQueue, Asset, Validator, PermissionMode} from "../structs/Subnet.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
     struct SubnetActorStorage {
@@ -47,7 +47,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
         /// @notice the list of validators staking
         ValidatorSet validatorSet;
         /// @notice Contains the list of changes to validator set. Configuration number is associated at each change.
-        StakingChangeLog changeSet;
+        PowerChangeLog changeSet;
         /// @notice The staking release queue that only allow transfer of collateral after certain locking period.
         StakingReleaseQueue releaseQueue;
         /// =============

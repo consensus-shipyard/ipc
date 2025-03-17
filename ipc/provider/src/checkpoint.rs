@@ -164,7 +164,7 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                 continue;
             }
 
-            tracing::debug!("found reached events at height : {h}");
+            tracing::info!("found reached events at height : {h}");
 
             for event in events {
                 // Note that the event will be emitted later than the checkpoint height.
@@ -172,7 +172,7 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                 // in fendermint at height 403. This means the event.height == 400 which is
                 // already committed.
                 if event.height <= last_checkpoint_epoch {
-                    tracing::debug!("event height already committed: {}", event.height);
+                    tracing::info!("event height already committed: {}", event.height);
                     continue;
                 }
 
