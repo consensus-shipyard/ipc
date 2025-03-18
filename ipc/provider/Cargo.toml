@@ -47,11 +47,11 @@ fvm_shared = { workspace = true, features  = ["crypto"] }
 
 merkle-tree-rs = { path = "../../ext/merkle-tree-rs" }
 
-ipc-types = { workspace = true }
-ipc-wallet = { workspace = true, features = ["with-ethers"] }
-ipc-api = { workspace = true }
-ipc_actors_abis = { workspace = true }
-ipc-observability = { workspace = true }
+ipc-types = { path = "../../ipc/types" }
+ipc-wallet = { path = "../../ipc/wallet", features = ["with-ethers"] }
+ipc-api = { path = "../../ipc/api" }
+ipc_actors_abis = { path = "../../contract-bindings" }
+ipc-observability = { path = "../../ipc/observability" }
 prometheus = { workspace = true }
 
 [dev-dependencies]

@@ -183,16 +183,6 @@ text-tables = "0.3.1"
 url = { version = "2.4.1", features = ["serde"] }
 zeroize = "1.6"
 
-# Workspace deps
-ipc-api = { path = "ipc/api" }
-ipc-provider = { path = "ipc/provider" }
-ipc-wallet = { path = "ipc/wallet", features = ["with-ethers"] }
-ipc_ipld_resolver = { path = "ipld/resolver" }
-ipc-types = { path = "ipc/types" }
-ipc-observability = { path = "ipc/observability" }
-ipc_actors_abis = { path = "contract-bindings" }
-actors-custom-api = { path = "fendermint/actors/api" }
-
 # Vendored for cross-compilation, see https://github.com/cross-rs/cross/wiki/Recipes#openssl
 # Make sure every top level build target actually imports this dependency, and don't end up
 # depending on the same _without_ the "vendored" feature, because then the Docker build for
