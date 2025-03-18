@@ -29,8 +29,8 @@ ethers = { workspace = true }
 tracing = { workspace = true }
 serde_with = { workspace = true, features = ["hex"] }
 
-ipc_actors_abis = { workspace = true }
-ipc-types = { workspace = true }
+ipc_actors_abis = { path = "../../contract-bindings" }
+ipc-types = { path = "../../ipc/types" }
 merkle-tree-rs = { path = "../../ext/merkle-tree-rs" }
 
 [dev-dependencies]

@@ -9,7 +9,7 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-actors-custom-api = { workspace = true }
+actors-custom-api = { path = "../../actors/api" }
 fendermint_vm_actor_interface = { path = "../actor_interface" }
 fendermint_vm_core = { path = "../core" }
 fendermint_vm_event = { path = "../event" }
@@ -28,10 +28,10 @@ fendermint_actor_activity_tracker = { path = "../../actors/activity-tracker" }
 fendermint_actor_gas_market_eip1559 = { path = "../../actors/gas_market/eip1559" }
 fendermint_actor_eam = { workspace = true }
 fendermint_testing = { path = "../../testing", optional = true }
-ipc_actors_abis = { workspace = true }
+ipc_actors_abis = { path = "../../../contract-bindings" }
 
-ipc-api = { workspace = true }
-ipc-observability = { workspace = true }
+ipc-api = { path = "../../../ipc/api" }
+ipc-observability = { path = "../../../ipc/observability" }
 
 async-trait = { workspace = true }
 async-stm = { workspace = true }

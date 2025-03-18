@@ -14,4 +14,4 @@ num-traits = { workspace = true }
 
 cid = { workspace = true }
 fvm_shared = { workspace = true }
-ipc-api = { workspace = true }
+ipc-api = { path = "../../../ipc/api" }

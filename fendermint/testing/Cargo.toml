@@ -24,7 +24,7 @@ rand = { workspace = true, optional = true }
 cid = { workspace = true, optional = true }
 fvm_ipld_encoding = { workspace = true, optional = true }
 fvm_shared = { workspace = true, optional = true, features = ["arb"] }
-ipc-api = { workspace = true, optional = true }
+ipc-api = { path = "../../ipc/api", optional = true }
 fs-err = { workspace = true }
 
 [dev-dependencies]
