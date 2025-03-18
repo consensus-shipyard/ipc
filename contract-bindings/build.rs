@@ -31,10 +31,8 @@ fn main() -> color_eyre::Result<()> {
     let gen_dir = crate_dir.join("src").join("gen");
     let mod_path = gen_dir.join("mod.rs");
 
-    for entry in fs_err::read_dir("src")? {
-        if let Ok(entry) = entry {
-            println!("cargo:rerun-if-changed={}", entry.path().display());
-        }
+    for entry in (fs_err::read_dir("src")?).flatten() {
+        println!("cargo:rerun-if-changed={}", entry.path().display());
     }
 
     // Maybe we want to skip the build and use the files as-is, could be imported as crate.
