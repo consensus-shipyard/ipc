@@ -222,9 +222,6 @@ fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-act
 fil_actor_eam = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
 fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
 
-fendermint_actor_eam = { path = "./fendermint/actors/eam" }
-fendermint_actor_activity_tracker = { path = "./fendermint/actors/activity-tracker" }
-
 cid = { version = "0.10.1", default-features = false, features = [
   "serde-codec",
   "std",

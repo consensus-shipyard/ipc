@@ -177,7 +177,7 @@ async fn main() -> color_eyre::eyre::Result<()> {
 
     echo!(
         "builtin",
-        red,
+        blue,
         "Builtin actors file is ready for inclusion: {}",
         builtin_car_path.display()
     );
