@@ -51,7 +51,6 @@ jobs:
         with:
           path: |
             ./contracts/out
-            ./contract-bindings
             ./contracts/cache
           ## TODO maybe add the rust version and solc version to the key
           key: v2-contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}
@@ -77,7 +76,7 @@ jobs:
           ldd --version
           echo "contract-bindings/src"
           ls contract-bindings/src
-          cat contract-bindings/lib.rs
+          cat contract-bindings/src/lib.rs
 
       - name: Check fmt (nightly)
         run: cargo +nightly-2024-07-05 fmt --check --all
