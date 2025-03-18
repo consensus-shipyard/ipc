@@ -51,6 +51,5 @@ ipc-api = { path = "../../ipc/api" }
 ipc-types = { path = "../../ipc/types" }
 tracing-subscriber.workspace = true
 
-# TODO Karel - IPC should probably not depend on Fendermint - consider refactoring
 fendermint_eth_hardhat = { path = "../../fendermint/eth/hardhat" }
 fendermint_eth_deployer = { path = "../../fendermint/eth/deployer" }

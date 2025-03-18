@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 mod error_parsing;
-mod gas_estimator_middleware;
 pub mod gas_estimator_middleware;
 mod manager;
 
