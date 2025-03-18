@@ -53,9 +53,10 @@ pub struct EthContractDeployer {
 
 impl EthContractDeployer {
     /// Creates a new `EthContractDeployer` instance.
-    pub fn new(hardhat: Hardhat, url: &str, private_key: &str, chain_id: u64) -> Result<Self> {
+    pub fn new(hardhat: Hardhat, url: &str, private_key: &[u8], chain_id: u64) -> Result<Self> {
         let provider = Provider::<Http>::try_from(url).context("failed to create HTTP provider")?;
-        let wallet: LocalWallet = private_key.parse().context("invalid private key")?;
+        let wallet: LocalWallet =
+            LocalWallet::from_bytes(private_key).context("invalid private key")?;
         let wallet = wallet.with_chain_id(chain_id);
         let signer = SignerMiddleware::new(provider, wallet);
         let client = Eip1559GasEstimatorMiddleware::new(signer);
@@ -153,7 +154,7 @@ impl EthContractDeployer {
         T: Tokenize,
     {
         let factory = ContractFactory::new(
-            artifact.abi.into(),
+            artifact.abi,
             artifact.bytecode.into(),
             self.provider.clone(),
         );
