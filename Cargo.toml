@@ -74,6 +74,7 @@ clap = { version = "4.1", features = ["derive", "env", "string"] }
 color-eyre = "0.5.11"
 byteorder = "1.5.0"
 config = "0.13"
+const-hex = "1.14.0"
 dirs = "5.0"
 dircpy = "0.3.19"
 either = "1.10"
@@ -192,7 +193,9 @@ openssl = { version = "0.10", features = ["vendored"] }
 # pull in crates as transitive dependencies that do not support Wasm architector. If this
 # happens, try removing "crypto" feature from fvm_shared dependency in contract-bindings/Cargo.toml
 # and run `cargo build`. Then add the "crypto" feature back and run `cargo build` again.
-fvm = { version = "4.4.0", features = ["verify-signature"], default-features = false } # no opencl feature or it fails on CI
+fvm = { version = "4.4.0", features = [
+  "verify-signature",
+], default-features = false } # no opencl feature or it fails on CI
 fvm_shared = { version = "4.4.0" }
 fvm_sdk = { version = "4.4.0" }
 

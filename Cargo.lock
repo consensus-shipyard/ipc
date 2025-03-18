@@ -5844,11 +5844,15 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "color-eyre 0.6.3",
+ "const-hex",
  "ethers",
  "fs-err",
  "fvm_shared",
+ "lazy_static",
  "prettyplease",
  "syn 2.0.100",
+ "thiserror 1.0.69",
+ "tracing",
 ]
 
 [[package]]
