@@ -14,6 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use build_rs_utils::echo;
 use cargo_metadata::{DependencyKind, MetadataCommand};
 use color_eyre::eyre::{bail, eyre, OptionExt, Result};
 use fil_actor_bundler::Bundler;
@@ -237,12 +238,12 @@ fn build_all_wasm_blobs(
     let stderr = child.stderr.take().expect("no stderr");
     let j1 = thread::spawn(move || {
         for line in BufReader::new(stderr).lines() {
-            println!("cargo:warning={:?}", line.unwrap());
+            echo!("custom-actor-car", cyan, "{}", line.unwrap());
         }
     });
     let j2 = thread::spawn(move || {
         for line in BufReader::new(stdout).lines() {
-            println!("cargo:warning={:?}", line.unwrap());
+            echo!("custom-actor-car", cyan, "{}", line.unwrap());
         }
     });
 

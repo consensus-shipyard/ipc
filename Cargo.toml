@@ -43,6 +43,8 @@ members = [
   "fendermint/actors/activity-tracker",
   "fendermint/actors/eam",
   "fendermint/actors/gas_market/eip1559",
+
+  "build-rs-utils",
 ]
 
 [workspace.package]
@@ -52,8 +54,6 @@ license = "MIT OR Apache-2.0"
 license-file = "LICENSE-APACHE"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-## dummy trigger ci
 
 [workspace.dependencies]
 time = "0.3.33"
@@ -221,9 +221,6 @@ fvm_ipld_amt = "0.6.2"
 fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
 fil_actor_eam = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
 fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
-
-fendermint_actor_eam = { path = "./fendermint/actors/eam" }
-fendermint_actor_activity_tracker = { path = "./fendermint/actors/activity-tracker" }
 
 cid = { version = "0.10.1", default-features = false, features = [
   "serde-codec",

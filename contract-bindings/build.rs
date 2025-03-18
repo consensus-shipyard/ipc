@@ -4,6 +4,8 @@
 use std::io::Write;
 use std::path::PathBuf;
 
+use build_rs_utils::echo;
+
 const SKIP_ENV_VAR_NAME: &str = "SKIP_BINDING_GENERATION";
 
 /// Generate Rust contract-bindings from the IPC Solidity Actors ABI artifacts.
@@ -40,14 +42,16 @@ fn main() -> color_eyre::Result<()> {
     if let Ok(val) = std::env::var(SKIP_ENV_VAR_NAME) {
         let val = val.trim();
         if val == "true" || val == "1" || val.is_empty() {
-            println!(
-                "cargo:warn=Skipping binding generation since {} is set by the user",
+            echo!(
+                "contract-bindinns",
+                yellow,
+                "Skipping binding generation since {} is set by the user",
                 SKIP_ENV_VAR_NAME
             );
             return Ok(());
         }
     }
-    println!("cargo:warn=Running binding generation...");
+    echo!("contract-bindings", yellow, "Running binding generation...");
 
     // Where are the Solidity artifacts.
     let workspace_dir = crate_dir.parent().expect("Should exist").to_path_buf();
