@@ -14,7 +14,7 @@ use cid::Cid;
 use ethers::abi::Tokenize;
 use ethers::core::types as et;
 use fendermint_actor_eam::PermissionModeParams;
-use fendermint_eth_deployer::{collect_contracts, contract_src};
+use fendermint_eth_deployer::utils as deployer_utils;
 use fendermint_eth_hardhat::{ContractSourceAndName, Hardhat, FQN};
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
@@ -40,7 +40,7 @@ use crate::fvm::state::{FvmGenesisState, FvmStateParams};
 use crate::fvm::store::memory::MemoryBlockstore;
 use fendermint_vm_genesis::ipc::{GatewayParams, IpcParams};
 use serde::{Deserialize, Serialize};
-use serde_with::serde_as;
+use serde_with::{de, serde_as};
 use tokio_stream::StreamExt;
 use tokio_util::compat::TokioAsyncWriteCompatExt;
 
@@ -274,7 +274,8 @@ impl<'a> GenesisBuilder<'a> {
         // STAGE 0: Declare the built-in EVM contracts we'll have to deploy.
         // ipc_entrypoints contains the external user facing contracts
         // all_ipc_contracts contains ipc_entrypoints + util contracts
-        let (all_ipc_contracts, ipc_entrypoints) = collect_contracts(&self.hardhat)?;
+        let (all_ipc_contracts, ipc_entrypoints) =
+            deployer_utils::collect_contracts(&self.hardhat)?;
 
         // STAGE 1: First we initialize native built-in actors.
         // System actor
@@ -654,7 +655,7 @@ where
     {
         let contract = self.top_contract(contract_name)?;
         let contract_id = contract.actor_id;
-        let contract_src = contract_src(contract_name);
+        let contract_src = deployer_utils::contract_src(contract_name);
 
         let artifact = self
             .hardhat
@@ -687,36 +688,12 @@ where
 
     /// Collect Facet Cuts for the diamond pattern, where the facet address comes from already deployed library facets.
     fn facets(&self, contract_name: &str) -> anyhow::Result<Vec<FacetCut>> {
-        let contract = self.top_contract(contract_name)?;
-        let mut facet_cuts = Vec::new();
-
-        for facet in contract.facets.iter() {
-            let facet_name = facet.name;
-            let facet_src = contract_src(facet_name);
-            let facet_fqn = self.hardhat.fqn(&facet_src, facet_name);
-
-            let facet_addr = self
-                .lib_addrs
-                .get(&facet_fqn)
-                .ok_or_else(|| anyhow!("facet {facet_name} has not been deployed"))?;
-
-            let method_sigs = facet
-                .abi
-                .functions()
-                .filter(|f| f.signature() != "init(bytes)")
-                .map(|f| f.short_signature())
-                .collect();
-
-            let facet_cut = FacetCut {
-                facet_address: *facet_addr,
-                action: 0, // Add
-                function_selectors: method_sigs,
-            };
-
-            facet_cuts.push(facet_cut);
-        }
-
-        Ok(facet_cuts)
+        deployer_utils::collect_facets(
+            contract_name,
+            self.hardhat,
+            self.top_contracts,
+            &self.lib_addrs,
+        )
     }
 
     fn top_contract(&self, contract_name: &str) -> anyhow::Result<&EthContract> {

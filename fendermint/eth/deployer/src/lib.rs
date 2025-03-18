@@ -1,8 +1,12 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+//! Deployer for Ethereum contracts and libraries.
+
+pub mod utils;
+
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Context, Result};
@@ -10,68 +14,37 @@ use ethers::abi::Tokenize;
 use ethers::contract::ContractFactory;
 use ethers::core::types as eth_types;
 use ethers::prelude::*;
-use k256::ecdsa::SigningKey;
-
-use fendermint_eth_hardhat::{ContractSourceAndName, Hardhat, FQN};
-use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
+use fendermint_eth_hardhat::{ContractSourceAndName, DeploymentArtifact, Hardhat, FQN};
+use fendermint_vm_actor_interface::diamond::EthContractMap;
 use fendermint_vm_actor_interface::ipc;
-use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use fendermint_vm_genesis::ipc::GatewayParams;
 use ipc_actors_abis::i_diamond::FacetCut;
+use ipc_provider::manager::evm::gas_estimator_middleware::Eip1559GasEstimatorMiddleware;
+use k256::ecdsa::SigningKey;
 
-/// Helper to construct a contract source path (e.g. "MyContract.sol").
-pub fn contract_src(name: &str) -> PathBuf {
-    PathBuf::from(format!("{name}.sol"))
-}
+use crate::utils::{collect_contracts, collect_facets, contract_src};
 
-/// Collects library and top-level contracts.
-pub fn collect_contracts(
-    hardhat: &Hardhat,
-) -> Result<(Vec<ContractSourceAndName>, EthContractMap)> {
-    let mut all_contracts = Vec::new();
-    let mut top_level_contracts = EthContractMap::default();
+type SignerWithFeeEstimator =
+    Arc<Eip1559GasEstimatorMiddleware<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>>;
 
-    // Populate top-level contracts from predefined IPC contracts.
-    top_level_contracts.extend(IPC_CONTRACTS.clone());
-
-    // Collect contract names from top-level contracts and their facets.
-    all_contracts.extend(top_level_contracts.keys());
-    all_contracts.extend(
-        top_level_contracts
-            .values()
-            .flat_map(|c| c.facets.iter().map(|f| f.name)),
-    );
-
-    // Get dependencies, but only keep library contracts.
-    let mut eth_libs = hardhat
-        .dependencies(
-            &all_contracts
-                .iter()
-                .map(|n| (contract_src(n), *n))
-                .collect::<Vec<_>>(),
-        )
-        .context("failed to collect EVM contract dependencies")?;
-    eth_libs.retain(|(_, d)| !top_level_contracts.contains_key(d.as_str()));
-    Ok((eth_libs, top_level_contracts))
-}
-
-/// Deploys Ethereum contracts and libraries.
+/// Responsible for deploying Ethereum contracts and libraries.
 pub struct EthContractDeployer {
     hardhat: Hardhat,
     ipc_contracts: Vec<ContractSourceAndName>,
     top_contracts: EthContractMap,
     lib_addrs: HashMap<FQN, eth_types::Address>,
-    provider: Arc<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>,
+    provider: SignerWithFeeEstimator,
     chain_id: u64,
 }
 
 impl EthContractDeployer {
-    /// Creates a new deployer instance.
+    /// Creates a new `EthContractDeployer` instance.
     pub fn new(hardhat: Hardhat, url: &str, private_key: &str, chain_id: u64) -> Result<Self> {
         let provider = Provider::<Http>::try_from(url).context("failed to create HTTP provider")?;
         let wallet: LocalWallet = private_key.parse().context("invalid private key")?;
         let wallet = wallet.with_chain_id(chain_id);
-        let client = SignerMiddleware::new(provider, wallet);
+        let signer = SignerMiddleware::new(provider, wallet);
+        let client = Eip1559GasEstimatorMiddleware::new(signer);
 
         let (ipc_contracts, top_contracts) =
             collect_contracts(&hardhat).context("failed to collect contracts")?;
@@ -86,36 +59,46 @@ impl EthContractDeployer {
         })
     }
 
+    /// Deploys all contracts:
+    /// first libraries, then the gateway and registry contracts.
+    pub async fn deploy(&mut self) -> Result<()> {
+        // Deploy all required libraries.
+        for (lib_src, lib_name) in self.ipc_contracts.clone() {
+            self.deploy_library(&lib_src, &lib_name)
+                .await
+                .with_context(|| format!("failed to deploy library {lib_name}"))?;
+        }
+
+        // Deploy the IPC Gateway contract.
+        let gateway_addr = self.deploy_gateway().await?;
+
+        // Deploy the IPC SubnetRegistry contract.
+        self.deploy_registry(gateway_addr).await?;
+
+        Ok(())
+    }
+
     /// Deploys a library contract.
     ///
-    /// Reads the library artifact, replaces placeholders with the correct addresses,
+    /// Reads the library artifact, substitutes placeholders with correct addresses,
     /// deploys the library, and records its address.
-    async fn deploy_library(&mut self, lib_src: impl AsRef<Path>, lib_name: &str) -> Result<()> {
-        let fqn = self.hardhat.fqn(lib_src.as_ref(), lib_name);
-        tracing::info!("Deploying library {lib_name}");
+    async fn deploy_library(&mut self, lib_src: &Path, lib_name: &str) -> Result<()> {
+        let fqn = self.hardhat.fqn(lib_src, lib_name);
+        tracing::info!("Deploying library: {}", lib_name);
 
         let artifact = self
             .hardhat
-            .prepare_deployment_artifact(&lib_src, lib_name, &self.lib_addrs)
+            .prepare_deployment_artifact(lib_src, lib_name, &self.lib_addrs)
             .with_context(|| format!("failed to load library bytecode for {fqn}"))?;
 
-        let factory = ContractFactory::new(
-            artifact.abi.into(),
-            artifact.bytecode.into(),
-            self.provider.clone(),
-        );
-        let contract = factory.deploy(())?.send().await?;
-        let eth_addr = contract.address();
-        tracing::info!(?eth_addr, lib_name, "Library deployed successfully");
+        let address = self.deploy_artifact(artifact, ()).await?;
 
-        self.lib_addrs.insert(fqn, eth_addr);
+        tracing::info!(?address, "Library deployed successfully");
+        self.lib_addrs.insert(fqn, address);
         Ok(())
     }
 
     /// Deploys a top-level contract with the given constructor parameters.
-    ///
-    /// The function prepares the artifact, creates a contract factory, deploys the contract,
-    /// and returns its Ethereum address.
     async fn deploy_contract<T>(
         &self,
         contract_name: &str,
@@ -125,25 +108,63 @@ impl EthContractDeployer {
         T: Tokenize,
     {
         let src = contract_src(contract_name);
-        tracing::info!("Deploying top-level contract {contract_name}");
+        tracing::info!("Deploying top-level contract: {}", contract_name);
 
         let artifact = self
             .hardhat
             .prepare_deployment_artifact(&src, contract_name, &self.lib_addrs)
             .with_context(|| format!("failed to load {contract_name} bytecode"))?;
 
+        let address = self.deploy_artifact(artifact, constructor_params).await?;
+        tracing::info!(?address, "Contract deployed successfully");
+
+        Ok(address)
+    }
+
+    /// Deploys the provided deployment artifact with constructor parameters.
+    async fn deploy_artifact<T>(
+        &self,
+        artifact: DeploymentArtifact,
+        constructor_params: T,
+    ) -> Result<eth_types::Address>
+    where
+        T: Tokenize,
+    {
         let factory = ContractFactory::new(
             artifact.abi.into(),
             artifact.bytecode.into(),
             self.provider.clone(),
         );
-        let contract = factory.deploy(constructor_params)?.send().await?;
-        let eth_addr = contract.address();
-        tracing::info!(?eth_addr, contract_name, "Contract deployed successfully");
 
-        Ok(eth_addr)
+        let deployer = factory
+            .deploy(constructor_params)
+            .context("failed to create deployer")?;
+
+        // Send the transaction and wait for the receipt.
+        let pending_tx = deployer
+            .client()
+            .send_transaction(
+                deployer.tx.clone(),
+                Some(BlockId::Number(BlockNumber::Pending)),
+            )
+            .await?;
+
+        tracing::info!(tx_hash = ?pending_tx, "Transaction sent, awaiting confirmation");
+
+        let receipt = pending_tx
+            .confirmations(1)
+            .retries(200)
+            .await?
+            .ok_or_else(|| anyhow!("failed to get transaction receipt"))?;
+
+        let address = receipt
+            .contract_address
+            .ok_or_else(|| anyhow!("transaction receipt missing contract address"))?;
+
+        Ok(address)
     }
 
+    /// Deploys the gateway contract.
     async fn deploy_gateway(&self) -> Result<eth_types::Address> {
         use ipc::gateway::{
             ConstructorParameters as GatewayConstructor, CONTRACT_NAME as GATEWAY_NAME,
@@ -155,7 +176,7 @@ impl EthContractDeployer {
             .context("failed to create gateway constructor parameters")?;
 
         let facets = self
-            .facets(GATEWAY_NAME)
+            .collect_facets(GATEWAY_NAME)
             .context("failed to collect gateway facets")?;
 
         self.deploy_contract(GATEWAY_NAME, (facets, params))
@@ -163,6 +184,7 @@ impl EthContractDeployer {
             .context("failed to deploy gateway contract")
     }
 
+    /// Deploys the registry contract.
     async fn deploy_registry(
         &self,
         gateway_addr: eth_types::Address,
@@ -172,10 +194,18 @@ impl EthContractDeployer {
         };
 
         let mut facets = self
-            .facets(REGISTRY_NAME)
+            .collect_facets(REGISTRY_NAME)
             .context("failed to collect registry facets")?;
 
-        // Extract facets based on expected order.
+        // Ensure there are enough facets.
+        if facets.len() < 9 {
+            return Err(anyhow!(
+                "expected at least 9 facets for registry contract, got {}",
+                facets.len()
+            ));
+        }
+
+        // Destructure the first 9 facets.
         let getter_facet = facets.remove(0);
         let manager_facet = facets.remove(0);
         let rewarder_facet = facets.remove(0);
@@ -186,7 +216,12 @@ impl EthContractDeployer {
         let ownership_facet = facets.remove(0);
         let activity_facet = facets.remove(0);
 
-        debug_assert_eq!(facets.len(), 2, "SubnetRegistry should have 2 extra facets");
+        if facets.len() != 2 {
+            return Err(anyhow!(
+                "expected 2 extra facets for registry contract, got {}",
+                facets.len()
+            ));
+        }
 
         let params = RegistryConstructor {
             gateway: gateway_addr,
@@ -216,90 +251,13 @@ impl EthContractDeployer {
             .context("failed to deploy registry contract")
     }
 
-    /// Deploys all contracts: first libraries, then top-level contracts.
-    ///
-    /// Deploys library contracts (which update the internal address map) and then deploys
-    /// the gateway and registry contracts.
-    pub async fn deploy(&mut self) -> Result<()> {
-        // Deploy all required libraries.
-        for (lib_src, lib_name) in self.ipc_contracts.clone() {
-            self.deploy_library(lib_src, &lib_name)
-                .await
-                .with_context(|| format!("failed to deploy library {lib_name}"))?;
-        }
-
-        // Deploy the IPC Gateway contract.
-        let gateway_addr = self.deploy_gateway().await?;
-
-        // Deploy the IPC SubnetRegistry contract.
-        self.deploy_registry(gateway_addr).await?;
-
-        Ok(())
-    }
-
-    /// Collects facet cuts for the diamond pattern based on the deployed library addresses.
-    fn facets(&self, contract_name: &str) -> Result<Vec<FacetCut>> {
-        let contract = self.top_contract(contract_name)?;
-        let mut facet_cuts = Vec::new();
-
-        for facet in contract.facets.iter() {
-            let facet_name = facet.name;
-            let src = contract_src(facet_name);
-            let facet_fqn = self.hardhat.fqn(&src, facet_name);
-
-            let facet_addr = self
-                .lib_addrs
-                .get(&facet_fqn)
-                .ok_or_else(|| anyhow!("facet {facet_name} has not been deployed"))?;
-
-            let function_selectors = facet
-                .abi
-                .functions()
-                .filter(|f| f.signature() != "init(bytes)")
-                .map(|f| f.short_signature())
-                .collect();
-
-            facet_cuts.push(FacetCut {
-                facet_address: *facet_addr,
-                action: 0, // 0 indicates an "Add" operation.
-                function_selectors,
-            });
-        }
-
-        Ok(facet_cuts)
-    }
-
-    /// Retrieves a top-level contract by name.
-    fn top_contract(&self, contract_name: &str) -> Result<&EthContract> {
-        self.top_contracts
-            .get(contract_name)
-            .ok_or_else(|| anyhow!("unknown top contract name: {contract_name}"))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::EthContractDeployer;
-    use fendermint_eth_hardhat::Hardhat;
-    use std::path::PathBuf;
-    use tracing_subscriber;
-
-    #[tokio::test]
-    async fn deploy_contracts_test() {
-        // Initialize tracing subscriber to print logs during tests.
-        let _ = tracing_subscriber::fmt()
-            .with_max_level(tracing::Level::INFO)
-            .try_init();
-
-        let hardhat = Hardhat::new(PathBuf::from("/Users/karlem/work/ipc/contracts/out"));
-        let mut deployer = EthContractDeployer::new(
-            hardhat,
-            "http://localhost:8545",
-            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
-            31337,
+    /// Collects facet cuts for the diamond pattern for a specified top-level contract.
+    fn collect_facets(&self, contract_name: &str) -> Result<Vec<FacetCut>> {
+        collect_facets(
+            contract_name,
+            &self.hardhat,
+            &self.top_contracts,
+            &self.lib_addrs,
         )
-        .expect("failed to create deployer");
-
-        deployer.deploy().await.expect("deployment failed");
     }
 }
