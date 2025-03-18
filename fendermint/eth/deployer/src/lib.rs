@@ -27,6 +27,16 @@ use crate::utils::{collect_contracts, collect_facets, contract_src};
 type SignerWithFeeEstimator =
     Arc<Eip1559GasEstimatorMiddleware<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>>;
 
+pub struct DeployedContracts {
+    pub registry: eth_types::Address,
+    pub gateway: eth_types::Address,
+}
+
+#[repr(u8)]
+pub enum SubnetCreationPrivilege {
+    Unrestricted = 0,
+    Owner = 1,
+}
 /// Responsible for deploying Ethereum contracts and libraries.
 pub struct EthContractDeployer {
     hardhat: Hardhat,
@@ -61,7 +71,10 @@ impl EthContractDeployer {
 
     /// Deploys all contracts:
     /// first libraries, then the gateway and registry contracts.
-    pub async fn deploy(&mut self) -> Result<()> {
+    pub async fn deploy_all(
+        &mut self,
+        subnet_creation_privilege: SubnetCreationPrivilege,
+    ) -> Result<DeployedContracts> {
         // Deploy all required libraries.
         for (lib_src, lib_name) in self.ipc_contracts.clone() {
             self.deploy_library(&lib_src, &lib_name)
@@ -73,9 +86,14 @@ impl EthContractDeployer {
         let gateway_addr = self.deploy_gateway().await?;
 
         // Deploy the IPC SubnetRegistry contract.
-        self.deploy_registry(gateway_addr).await?;
+        let registry_addr = self
+            .deploy_registry(gateway_addr, subnet_creation_privilege)
+            .await?;
 
-        Ok(())
+        Ok(DeployedContracts {
+            registry: registry_addr,
+            gateway: gateway_addr,
+        })
     }
 
     /// Deploys a library contract.
@@ -149,7 +167,7 @@ impl EthContractDeployer {
             )
             .await?;
 
-        tracing::info!(tx_hash = ?pending_tx, "Transaction sent, awaiting confirmation");
+        tracing::info!(tx_hash = ?pending_tx.tx_hash(), "Transaction sent, awaiting confirmation");
 
         let receipt = pending_tx
             .confirmations(1)
@@ -188,6 +206,7 @@ impl EthContractDeployer {
     async fn deploy_registry(
         &self,
         gateway_addr: eth_types::Address,
+        subnet_creation_privilege: SubnetCreationPrivilege,
     ) -> Result<eth_types::Address> {
         use ipc::registry::{
             ConstructorParameters as RegistryConstructor, CONTRACT_NAME as REGISTRY_NAME,
@@ -243,7 +262,7 @@ impl EthContractDeployer {
             subnet_actor_diamond_loupe_selectors: diamond_loupe_facet.function_selectors,
             subnet_actor_ownership_selectors: ownership_facet.function_selectors,
             subnet_actor_activity_selectors: activity_facet.function_selectors,
-            creation_privileges: 0, // 0: Unrestricted, 1: Owner.
+            creation_privileges: subnet_creation_privilege as u8,
         };
 
         self.deploy_contract(REGISTRY_NAME, (facets, params))

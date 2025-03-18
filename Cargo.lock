@@ -5788,7 +5788,6 @@ dependencies = [
  "dirs",
  "ethers",
  "ethers-contract",
- "ethers-core",
  "fil_actors_runtime",
  "fs-err",
  "futures-util",

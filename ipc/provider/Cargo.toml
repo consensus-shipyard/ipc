@@ -53,7 +53,6 @@ ipc-api = { path = "../../ipc/api" }
 ipc_actors_abis = { path = "../../contract-bindings" }
 ipc-observability = { path = "../../ipc/observability" }
 prometheus = { workspace = true }
-ethers-core = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
