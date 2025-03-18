@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 /// (first 4 bytes of an error signature, hex-encoded) with their corresponding `AbiError`.
 #[macro_export]
 macro_rules! extend_contract_error_mapping {
-    ($([$snake_case:tt, $abi:tt]),* $(,)?) => {
+    ($([$snake_case:ident, $abi:ident]),* $(,)?) => {
         lazy_static::lazy_static! {
             pub(crate) static ref MAP: ::std::collections::BTreeMap<String,  ethers::abi::ethabi::AbiError> = {
                 let mut errors = ::std::collections::BTreeMap::default();
