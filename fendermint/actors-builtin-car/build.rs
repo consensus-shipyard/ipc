@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! Download filecoin's builtin actors car file
 
+use build_rs_utils::echo;
 use bytes::buf::Buf;
 use color_eyre::eyre::{self, bail, Result, WrapErr};
 use fs_err as fs;
@@ -118,7 +119,7 @@ async fn download_builtin_actors_bundle(
 
 #[tokio::main]
 async fn main() -> color_eyre::eyre::Result<()> {
-    println!("cargo::warning=Fetching builtin filecoin actors");
+    echo!("builtin", blue, "Fetching builtin filecoin actors");
 
     let out_dir = std::env::var("OUT_DIR").wrap_err("Missing OUT_DIR env")?;
     let out_dir = std::path::PathBuf::from(out_dir);
@@ -138,15 +139,21 @@ async fn main() -> color_eyre::eyre::Result<()> {
             // compare digests, if mismatch, replace existing with the downloaded file
             let actual = file_digest(f)?;
             if BUILTIN_ACTORS_SHA256SUM != actual.to_string() {
-                println!(
-                    "cargo::warning=Builtin actors local file {} mismatched expected digest {}, re-downloading..",
+                echo!(
+                    "builtin",
+                    blue,
+                    "Builtin actors local file {} mismatched expected digest {}, re-downloading..",
                     actual,
                     BUILTIN_ACTORS_SHA256SUM
                 );
                 fs::remove_file(&builtin_car_path)?;
                 true
             } else {
-                println!("cargo::warning=Nothing to do, identical file is already present");
+                echo!(
+                    "builtin",
+                    blue,
+                    "Nothing to do, identical file is already present"
+                );
                 false
             }
         }
@@ -168,8 +175,10 @@ async fn main() -> color_eyre::eyre::Result<()> {
         fs::rename(tmp.path(), &builtin_car_path)?;
     }
 
-    println!(
-        "cargo::warning=Builtin actors file is ready for inclusion: {}",
+    echo!(
+        "builtin",
+        red,
+        "Builtin actors file is ready for inclusion: {}",
         builtin_car_path.display()
     );
 

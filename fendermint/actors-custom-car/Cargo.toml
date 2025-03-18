@@ -27,3 +27,4 @@ toml = "0.8.19"
 cargo_metadata = "0.19"
 ignore = "0.4"
 tracing = "0.1"
+build-rs-utils = { path = "../../build-rs-utils" }
