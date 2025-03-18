@@ -30,7 +30,12 @@ fn main() -> color_eyre::Result<()> {
     // PathBuf::from(std::env::var("OUT_DIR")?);
     let gen_dir = crate_dir.join("src").join("gen");
     let mod_path = gen_dir.join("mod.rs");
-    println!("cargo:rerun-if-changed={}", mod_path.display());
+
+    for entry in fs_err::read_dir("src")? {
+        if let Ok(entry) = entry {
+            println!("cargo:rerun-if-changed={}", entry.path().display());
+        }
+    }
 
     // Maybe we want to skip the build and use the files as-is, could be imported as crate.
     // Enabled by default so that in the monorepo we don't have to worry about stale code.
