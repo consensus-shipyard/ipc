@@ -40,7 +40,7 @@ use crate::fvm::state::{FvmGenesisState, FvmStateParams};
 use crate::fvm::store::memory::MemoryBlockstore;
 use fendermint_vm_genesis::ipc::{GatewayParams, IpcParams};
 use serde::{Deserialize, Serialize};
-use serde_with::{de, serde_as};
+use serde_with::serde_as;
 use tokio_stream::StreamExt;
 use tokio_util::compat::TokioAsyncWriteCompatExt;
 

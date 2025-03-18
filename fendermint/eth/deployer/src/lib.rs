@@ -24,6 +24,10 @@ use k256::ecdsa::SigningKey;
 
 use crate::utils::{collect_contracts, collect_facets, contract_src};
 
+// 200 is used because some networks like the Calibration network and mainnet can be slow,
+// and the transaction deployment can fail even though the transaction is mined.
+const TRANSACTION_RECEIPT_RETRIES: usize = 200;
+
 type SignerWithFeeEstimator =
     Arc<Eip1559GasEstimatorMiddleware<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>>;
 
@@ -171,7 +175,7 @@ impl EthContractDeployer {
 
         let receipt = pending_tx
             .confirmations(1)
-            .retries(200)
+            .retries(TRANSACTION_RECEIPT_RETRIES)
             .await?
             .ok_or_else(|| anyhow!("failed to get transaction receipt"))?;
 
