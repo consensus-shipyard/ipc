@@ -25,6 +25,7 @@ libipld = { workspace = true }
 libp2p = { workspace = true }
 libp2p-bitswap = { workspace = true }
 literally = { workspace = true }
+mime_guess = { workspace = true }
 multiaddr = { workspace = true }
 num-traits = { workspace = true }
 openssl = { workspace = true }

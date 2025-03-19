@@ -2,6 +2,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::path::Path;
 use std::str::FromStr;
 use std::time::Instant;
 use std::{convert::Infallible, net::ToSocketAddrs, num::ParseIntError};
@@ -28,6 +29,7 @@ use iroh::{
 };
 use iroh_manager::{get_blob_hash_and_size, IrohManager};
 use lazy_static::lazy_static;
+use mime_guess::get_mime_extensions_str;
 use prometheus::{register_histogram, register_int_counter, Histogram, IntCounter};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -638,7 +640,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
     let path = tail.as_str();
     let key: Vec<u8> = path.into();
     let start_time = Instant::now();
-    let maybe_object = os_get(client, address, GetParams(key), height)
+    let maybe_object = os_get(client, address, GetParams(key.clone()), height)
         .await
         .map_err(|e| {
             Rejection::from(BadRequest {
@@ -764,16 +766,25 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                 header_map.insert("Accept-Ranges", HeaderValue::from_str("bytes").unwrap());
             }
             header_map.insert("Content-Length", HeaderValue::from(object_range.len));
+
+            let content_type = object
+                .metadata
+                .get("content-type")
+                .map(|v| v.clone())
+                .unwrap_or("application/octet-stream".to_string());
             header_map.insert(
                 "Content-Type",
-                HeaderValue::from_str(
-                    object
-                        .metadata
-                        .get("content-type")
-                        .unwrap_or(&"application/octet-stream".to_string()),
-                )
-                .unwrap(),
+                HeaderValue::from_str(&content_type).unwrap(),
             );
+
+            let key_str = String::from_utf8_lossy(&key);
+            if let Some(val) = get_filename_with_extension(&key_str, &content_type) {
+                let disposition = format!("attachment; filename=\"{}\"", val);
+                header_map.insert(
+                    "Content-Disposition",
+                    HeaderValue::from_str(&disposition).unwrap(),
+                );
+            }
 
             let headers = response.headers_mut();
             headers.extend(header_map);
@@ -866,6 +877,19 @@ async fn os_get<F: QueryClient + Send + Sync>(
         .await?;
 
     Ok(return_data)
+}
+
+fn get_filename_with_extension(filename: &str, content_type: &str) -> Option<String> {
+    let path = Path::new(filename);
+
+    // Checks if filename already has extension
+    if let Some(_) = path.extension().and_then(|ext| ext.to_str()) {
+        return Some(filename.to_string());
+    }
+
+    get_mime_extensions_str(content_type)?
+        .first()
+        .map(|ext| format!("{}.{}", filename, ext.to_string()))
 }
 
 #[cfg(test)]

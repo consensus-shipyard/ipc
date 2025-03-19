@@ -3824,6 +3824,7 @@ dependencies = [
  "libp2p",
  "libp2p-bitswap",
  "literally",
+ "mime_guess",
  "multiaddr",
  "num-traits",
  "openssl",
