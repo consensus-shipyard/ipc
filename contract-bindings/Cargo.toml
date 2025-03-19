@@ -23,3 +23,5 @@ syn = { version = "2" }
 fs-err = { version = "3" }
 color-eyre = "0.6"
 build-rs-utils = { path = "../build-rs-utils" }
+tokio = { workspace = true }
+which = "7"

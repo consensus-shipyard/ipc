@@ -7,4 +7,3 @@ license.workspace = true
 
 [dependencies]
 owo-colors = "4"
-build-print = "0.1.1"
