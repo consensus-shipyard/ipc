@@ -31,3 +31,15 @@ lint: license $(patsubst %, lint/%, $(SUBTREES_ALL))
 
 markdownlint:
 	$(MARKDOWNLINT_CLI) --fix $$(find . -iwholename './crates/**/README.md' -or -iwholename './contracts/**/*.md' -or -iwholename './specs/**/*.md' -or -iwholename './docs*/**/*.md')
+
+fmt:
+	cd crates && cargo +nightly fmt
+
+check-fmt:
+	cd crates && cargo +nightly fmt --check
+
+clippy:
+	cd crates && cargo clippy --workspace --tests --no-deps --fix --allow-dirty --allow-staged -- -D clippy::all
+
+check-clippy:
+	cd crates && cargo clippy --workspace --tests --no-deps -- -D clippy::all
