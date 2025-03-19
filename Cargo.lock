@@ -16,6 +16,7 @@ dependencies = [
 name = "actors-builtin-car"
 version = "0.2.0"
 dependencies = [
+ "build-rs-utils",
  "bytes",
  "color-eyre 0.5.11",
  "const-hex",
@@ -52,6 +53,7 @@ name = "actors-custom-car"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "build-rs-utils",
  "cargo_metadata 0.19.2",
  "cid 0.10.1",
  "color-eyre 0.5.11",
@@ -1239,6 +1241,20 @@ checksum = "531a9155a481e2ee699d4f98f43c0ca4ff8ee1bfd55c31e9e98fb29d2b176fe0"
 dependencies = [
  "memchr",
  "serde",
+]
+
+[[package]]
+name = "build-print"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4a2128d00b7061b82b72844a351e80acd29e05afc60e9261e2ac90dca9ecc2ac"
+
+[[package]]
+name = "build-rs-utils"
+version = "0.1.0"
+dependencies = [
+ "build-print",
+ "owo-colors 4.2.0",
 ]
 
 [[package]]
@@ -5843,12 +5859,17 @@ name = "ipc_actors_abis"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "build-rs-utils",
  "color-eyre 0.6.3",
+ "const-hex",
  "ethers",
  "fs-err",
  "fvm_shared",
+ "lazy_static",
  "prettyplease",
  "syn 2.0.100",
+ "thiserror 1.0.69",
+ "tracing",
 ]
 
 [[package]]
@@ -7611,6 +7632,12 @@ name = "owo-colors"
 version = "3.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1b04fb49957986fdce4d6ee7a65027d55d4b6d2265e5848bbb507b58ccfdb6f"
+
+[[package]]
+name = "owo-colors"
+version = "4.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1036865bb9422d3300cf723f657c2851d0e9ab12567854b1f4eba3d77decf564"
 
 [[package]]
 name = "pairing"

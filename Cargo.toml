@@ -43,6 +43,8 @@ members = [
   "fendermint/actors/activity-tracker",
   "fendermint/actors/eam",
   "fendermint/actors/gas_market/eip1559",
+
+  "build-rs-utils",
 ]
 
 [workspace.package]
@@ -52,8 +54,6 @@ license = "MIT OR Apache-2.0"
 license-file = "LICENSE-APACHE"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-## dummy trigger ci
 
 [workspace.dependencies]
 time = "0.3.33"
@@ -74,6 +74,7 @@ clap = { version = "4.1", features = ["derive", "env", "string"] }
 color-eyre = "0.5.11"
 byteorder = "1.5.0"
 config = "0.13"
+const-hex = "1.14.0"
 dirs = "5.0"
 dircpy = "0.3.19"
 either = "1.10"
@@ -192,7 +193,9 @@ openssl = { version = "0.10", features = ["vendored"] }
 # pull in crates as transitive dependencies that do not support Wasm architector. If this
 # happens, try removing "crypto" feature from fvm_shared dependency in contract-bindings/Cargo.toml
 # and run `cargo build`. Then add the "crypto" feature back and run `cargo build` again.
-fvm = { version = "4.4.0", features = ["verify-signature"], default-features = false } # no opencl feature or it fails on CI
+fvm = { version = "4.4.0", features = [
+  "verify-signature",
+], default-features = false } # no opencl feature or it fails on CI
 fvm_shared = { version = "4.4.0" }
 fvm_sdk = { version = "4.4.0" }
 
@@ -218,9 +221,6 @@ fvm_ipld_amt = "0.6.2"
 fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
 fil_actor_eam = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
 fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
-
-fendermint_actor_eam = { path = "./fendermint/actors/eam" }
-fendermint_actor_activity_tracker = { path = "./fendermint/actors/activity-tracker" }
 
 cid = { version = "0.10.1", default-features = false, features = [
   "serde-codec",

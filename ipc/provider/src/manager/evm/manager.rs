@@ -42,6 +42,7 @@ use ethers::signers::{LocalWallet, Wallet};
 use ethers::types::{Eip1559TransactionRequest, ValueOrArray, H256, U256};
 
 use super::gas_estimator_middleware::Eip1559GasEstimatorMiddleware;
+use crate::manager::evm::error_parsing::ErrorParserHttp;
 use ethers::middleware::Middleware;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
@@ -61,7 +62,7 @@ use num_traits::ToPrimitive;
 use std::result;
 
 pub type SignerWithFeeEstimatorMiddleware =
-    Eip1559GasEstimatorMiddleware<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>;
+    Eip1559GasEstimatorMiddleware<SignerMiddleware<Provider<ErrorParserHttp>, Wallet<SigningKey>>>;
 
 /// Default polling time used by the Ethers provider to check for pending
 /// transactions and events. Default is 7, and for our child subnets we
@@ -89,7 +90,7 @@ struct IPCContractInfo {
     gateway_addr: ethers::types::Address,
     registry_addr: ethers::types::Address,
     chain_id: u64,
-    provider: Provider<Http>,
+    provider: Provider<ErrorParserHttp>,
 }
 
 //TODO receive clarity on this implementation
@@ -1035,7 +1036,7 @@ impl EthSubnetManager {
         gateway_addr: ethers::types::Address,
         registry_addr: ethers::types::Address,
         chain_id: u64,
-        provider: Provider<Http>,
+        provider: Provider<ErrorParserHttp>,
         keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
     ) -> Self {
         Self {
@@ -1140,7 +1141,7 @@ impl EthSubnetManager {
 
         let client = client.build()?;
 
-        let provider = Http::new_with_client(url, client);
+        let provider = Http::new_with_client(url, client).into();
 
         let mut provider = Provider::new(provider);
         // set polling interval for provider to fit fast child subnets block times.
