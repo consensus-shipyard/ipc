@@ -202,7 +202,8 @@ fn package_rerun_if_changed(package: &DeduplicatePackage) {
 }
 
 fn build_all_wasm_blobs(
-    workspace_dir: &Path,
+    channel: &str,
+    target: &str,
     actors: &[Actor],
     cwd: &Path,
     manifest_path: &Path,
@@ -218,19 +219,7 @@ fn build_all_wasm_blobs(
     let package_args = actors
         .iter()
         .map(|actor| format!("-p={}", actor.package_name));
-    // one cannot specify the file, so parse it and use the toolchain explicity
-    let toolchain_file_path = workspace_dir.join("rust-toolchain.toml");
-    let toolchain_file = fs_err::read_to_string(&toolchain_file_path)?;
-    let toolchain: toml::Table = toml::from_str(&toolchain_file)?;
-    let toolchain = toolchain
-        .get("toolchain")
-        .ok_or_else(|| eyre!("Missing toolchain in {}", toolchain_file_path.display()))?;
-    let channel: &toml::Value = toolchain
-        .get("channel")
-        .ok_or_else(|| eyre!("Missing channel in {}", toolchain_file_path.display()))?;
-    let channel: String = channel.clone().try_into()?;
 
-    let target = "wasm32-unknown-unknown";
     echo!("actors-custom-car", purple, "Target: {channel} {target}");
 
     let rustup = which::which("rustup")?;
@@ -238,7 +227,7 @@ fn build_all_wasm_blobs(
     // Cargo build command for all test_actors at once.
     let mut cmd = Command::new(rustup);
     cmd.arg("run")
-        .arg(channel)
+        .arg(&channel)
         .arg("cargo")
         .arg("build")
         .current_dir(cwd)
@@ -376,7 +365,32 @@ fn main() -> Result<()> {
         .join("Cargo.toml");
     let workspace_dir = fs_err::canonicalize(package_dir.parent().unwrap().parent().unwrap())?;
 
-    let wasm_blob_dir = out_dir.join("wasm32-unknown-unknown").join("wasm");
+    let target = "wasm32-unknown-unknown";
+
+    // one cannot specify the file, so parse it and use the toolchain explicity
+    let toolchain_file_path = workspace_dir.join("rust-toolchain.toml");
+    let toolchain_file = fs_err::read_to_string(&toolchain_file_path)?;
+    let toolchain: toml::Table = toml::from_str(&toolchain_file)?;
+    let toolchain = toolchain
+        .get("toolchain")
+        .ok_or_else(|| eyre!("Missing toolchain in {}", toolchain_file_path.display()))?;
+    let channel: &toml::Value = toolchain
+        .get("channel")
+        .ok_or_else(|| eyre!("Missing channel in {}", toolchain_file_path.display()))?;
+    let channel: String = channel.clone().try_into()?;
+    // we use the `channel` as additional prefix to avoid compilation errors on
+    // `rustc` upgrades in `rust-toolchain.toml`
+    let out_dir = out_dir.join(&channel);
+
+    // the joins represent the subdirectories under which `cargo` creates the actual WASM aritifacts
+    let wasm_blob_dir = out_dir.join(target).join("wasm");
+
+    echo!(
+        "actors-custom-car",
+        purple,
+        "Writing wasm blob to {}",
+        wasm_blob_dir.display()
+    );
 
     let actors = parse_dependencies_of_umbrella_crate(&actors_manifest_path)?;
     let actors = Vec::from_iter(actors.iter().map(|(name, crate_path)| Actor {
@@ -388,7 +402,8 @@ fn main() -> Result<()> {
     print_cargo_rerun_if_dependency_instructions(&actors_manifest_path, &out_dir)?;
 
     build_all_wasm_blobs(
-        &workspace_dir,
+        &channel,
+        &target,
         &actors,
         &workspace_dir,
         &actors_manifest_path,
