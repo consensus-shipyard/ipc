@@ -3817,6 +3817,7 @@ dependencies = [
  "ipc_ipld_resolver",
  "iroh",
  "iroh-base",
+ "iroh_manager",
  "k256 0.11.6",
  "lazy_static",
  "libipld",
@@ -6701,6 +6702,7 @@ dependencies = [
  "log",
  "lru_time_cache",
  "multihash 0.18.1",
+ "num-traits",
  "prometheus",
  "quickcheck",
  "quickcheck_macros",
@@ -7121,6 +7123,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "iroh",
+ "num-traits",
 ]
 
 [[package]]

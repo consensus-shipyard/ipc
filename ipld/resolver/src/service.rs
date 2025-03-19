@@ -19,7 +19,7 @@ use iroh::blobs::Hash;
 use iroh::client::blobs::ReadAtLen;
 use iroh::client::Iroh;
 use iroh::net::NodeAddr;
-use iroh_manager::IrohManager;
+use iroh_manager::{get_blob_hash_and_size, IrohManager};
 use libipld::store::StoreParams;
 use libipld::Cid;
 use libp2p::connection_limits::ConnectionLimits;
@@ -672,20 +672,19 @@ pub fn build_transport(local_key: Keypair) -> Boxed<(PeerId, StreamMuxerBox)> {
 
 async fn download_blob(
     iroh: Iroh,
-    hash: Hash,
+    seq_hash: Hash,
     size: u64,
     node_addr: NodeAddr,
 ) -> anyhow::Result<()> {
+    // Download top-level blob
     // Use an explicit tag so we can keep track of it
-    // TODO: this needs to be tagged with a "user id"
-    let tag = iroh::blobs::Tag(format!("stored-seq-{hash}").into());
-    let res = iroh
-        .blobs()
+    let tag = iroh::blobs::Tag(format!("stored-seq-{seq_hash}").into());
+    iroh.blobs()
         .download_with_opts(
-            hash,
+            seq_hash,
             iroh::client::blobs::DownloadOptions {
-                format: iroh::blobs::BlobFormat::Raw,
-                nodes: vec![node_addr],
+                format: iroh::blobs::BlobFormat::HashSeq,
+                nodes: vec![node_addr.clone()],
                 tag: iroh::blobs::util::SetTagOption::Named(tag),
                 mode: iroh::client::blobs::DownloadMode::Queued,
             },
@@ -693,25 +692,27 @@ async fn download_blob(
         .await?
         .await?;
 
-    if res.local_size + res.downloaded_size != size {
+    // Verify downloaded size of user blob matches the expected size
+    let (_, size_actual) = get_blob_hash_and_size(&iroh, seq_hash).await?;
+    if size != size_actual {
         return Err(anyhow!(
             "downloaded blob size {} does not match expected size {}",
-            res.local_size + res.downloaded_size,
+            size_actual,
             size
         ));
     }
 
-    debug!("downloaded blob {}: {:?}", hash, res);
-
     // Delete the temporary tag (this might fail as not all nodes will have one).
-    // TODO: this needs to be tagged with a "user id"
-    let tag = iroh::blobs::Tag(format!("temp-seq-{hash}").into());
+    let tag = iroh::blobs::Tag(format!("temp-seq-{seq_hash}").into());
     iroh.tags().delete(tag).await.ok();
+
+    debug!("downloaded blob {}", seq_hash);
 
     Ok(())
 }
 
 async fn read_blob(iroh: Iroh, hash: Hash, offset: u32, len: u32) -> anyhow::Result<bytes::Bytes> {
+    let (hash, _) = get_blob_hash_and_size(&iroh, hash).await?;
     let len = ReadAtLen::AtMost(len as u64);
     let res = iroh
         .blobs()

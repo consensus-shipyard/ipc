@@ -94,6 +94,8 @@ ipc-observability = { workspace = true }
 entangler = { workspace = true }
 entangler_storage = { workspace = true }
 
+iroh_manager = { path = "../../recall/iroh_manager" }
+
 [dev-dependencies]
 tempfile = { workspace = true }
 iroh-base = { workspace = true }

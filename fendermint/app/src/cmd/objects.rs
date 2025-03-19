@@ -11,7 +11,6 @@ use anyhow::Context;
 use bytes::Buf;
 use entangler::{ChunkRange, Config, EntanglementResult, Entangler};
 use entangler_storage::iroh::IrohStorage as EntanglerIrohStorage;
-use fendermint_actor_blobs_shared::state::Hash as BlobHash;
 use fendermint_actor_bucket::{GetParams, Object};
 use fendermint_app_settings::objects::ObjectsSettings;
 use fendermint_rpc::{client::FendermintClient, message::GasParams, QueryClient};
@@ -27,12 +26,12 @@ use iroh::{
     client::blobs::BlobStatus,
     net::NodeAddr,
 };
+use iroh_manager::{get_blob_hash_and_size, IrohManager};
 use lazy_static::lazy_static;
-use num_traits::Zero;
 use prometheus::{register_histogram, register_int_counter, Histogram, IntCounter};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tracing::info;
+use tracing::{debug, info};
 use uuid::Uuid;
 use warp::{
     filters::multipart::Part,
@@ -71,28 +70,23 @@ cmd! {
                 }
 
                 let client = FendermintClient::new_http(tendermint_url, None)?;
-
-                let iroh_addr = iroh_addr
-                    .to_socket_addrs()?
-                    .next()
-                    .ok_or(anyhow!("failed to convert iroh_addr to a socket address"))?;
-                let iroh_client = iroh::client::Iroh::connect_addr(iroh_addr).await?;
+                let iroh_manager = IrohManager::from_addr(Some(iroh_addr));
 
                 // Admin routes
                 let health = warp::path!("health")
                     .and(warp::get()).and_then(handle_health);
                 let node_addr = warp::path!("v1" / "node" )
                 .and(warp::get())
-                .and(with_iroh(iroh_client.clone()))
-                .and_then(handle_node_addr);
+                .and(with_iroh(iroh_manager.clone()))
+                .and_then(handle_node_addr_with_manager);
 
                 // Objects routes
                 let objects_upload = warp::path!("v1" / "objects" )
                 .and(warp::post())
-                .and(with_iroh(iroh_client.clone()))
+                .and(with_iroh(iroh_manager.clone()))
                 .and(warp::multipart::form().max_length(settings.max_object_size + 1024 * 1024)) // max_object_size + 1MB for form overhead
                 .and(with_max_size(settings.max_object_size))
-                .and_then(handle_object_upload);
+                .and_then(handle_object_upload_with_manager);
 
                 let objects_download = warp::path!("v1" / "objects" / String / ..)
                 .and(warp::path::tail())
@@ -102,8 +96,8 @@ cmd! {
                 .and(warp::header::optional::<String>("Range"))
                 .and(warp::query::<HeightQuery>())
                 .and(with_client(client.clone()))
-                .and(with_iroh(iroh_client.clone()))
-                .and_then(handle_object_download);
+                .and(with_iroh(iroh_manager.clone()))
+                .and_then(handle_object_download_with_manager);
 
                 let router = health
                     .or(node_addr)
@@ -132,8 +126,8 @@ fn with_client(
 }
 
 fn with_iroh(
-    client: iroh::client::Iroh,
-) -> impl Filter<Extract = (iroh::client::Iroh,), Error = Infallible> + Clone {
+    client: IrohManager,
+) -> impl Filter<Extract = (IrohManager,), Error = Infallible> + Clone {
     warp::any().map(move || client.clone())
 }
 
@@ -229,7 +223,7 @@ impl ObjectParser {
                 }
                 // Ignore but accept signature-related fields for backward compatibility
                 "chain_id" | "msg" => {
-                    // Just read and discard the data
+                    // Read and discard the data
                     let _ = object_parser.read_part(part).await?;
                 }
                 _ => {
@@ -278,6 +272,15 @@ async fn handle_health() -> Result<impl Reply, Rejection> {
     Ok(warp::reply::reply())
 }
 
+async fn handle_node_addr_with_manager(mut iroh: IrohManager) -> Result<impl Reply, Rejection> {
+    let iroh_client = iroh.client().await.map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("failed to load iroh client: {}", e),
+        })
+    })?;
+    handle_node_addr(iroh_client).await
+}
+
 async fn handle_node_addr(iroh: iroh::client::Iroh) -> Result<impl Reply, Rejection> {
     let node_addr = iroh.net().node_addr().await.map_err(|e| {
         Rejection::from(BadRequest {
@@ -291,6 +294,19 @@ async fn handle_node_addr(iroh: iroh::client::Iroh) -> Result<impl Reply, Reject
 struct UploadResponse {
     hash: String,
     metadata_hash: String,
+}
+
+async fn handle_object_upload_with_manager(
+    mut iroh: IrohManager,
+    form_data: warp::multipart::FormData,
+    max_size: u64,
+) -> Result<impl Reply, Rejection> {
+    let iroh_client = iroh.client().await.map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("failed to load iroh client: {}", e),
+        })
+    })?;
+    handle_object_upload(iroh_client, form_data, max_size).await
 }
 
 async fn handle_object_upload(
@@ -483,16 +499,28 @@ async fn tag_entangled_data(
         .filter(|h| h != &metadata_hash)
         .collect::<Vec<_>>();
 
-    let mut hashes = vec![orig_hash.clone(), metadata_hash];
+    let mut hashes = vec![orig_hash, metadata_hash];
     hashes.extend(upload_hashes);
+
+    let hashes_str = hashes
+        .iter()
+        .map(|h| h.to_string())
+        .collect::<Vec<_>>()
+        .join(", ");
 
     let batch = iroh.blobs().batch().await?;
 
     // make a hash sequence object from the hashes and upload it to iroh
     let hash_seq = hashes.into_iter().collect::<HashSeq>();
     let temp_tag = batch.add_bytes(hash_seq).await?;
-
     let hash_seq_hash = *temp_tag.hash();
+
+    debug!(
+        "storing hash sequence: {} ({})",
+        hash_seq_hash.to_string(),
+        hashes_str
+    );
+
     // this tag will be replaced later by the validator to "stored-seq-{hash_seq_hash}"
     let hash_seq_tag = iroh::blobs::Tag(format!("temp-seq-{hash_seq_hash}").into());
     batch.persist_to(temp_tag, hash_seq_tag).await?;
@@ -564,6 +592,32 @@ pub(crate) struct ObjectRange {
     body: Body,
 }
 
+async fn handle_object_download_with_manager<F: QueryClient + Send + Sync>(
+    address: String,
+    tail: Tail,
+    method: String,
+    range: Option<String>,
+    height_query: HeightQuery,
+    client: F,
+    mut iroh: IrohManager,
+) -> Result<impl Reply, Rejection> {
+    let iroh_client = iroh.client().await.map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("failed to load iroh client: {}", e),
+        })
+    })?;
+    handle_object_download(
+        address,
+        tail,
+        method,
+        range,
+        height_query,
+        client,
+        iroh_client,
+    )
+    .await
+}
+
 async fn handle_object_download<F: QueryClient + Send + Sync>(
     address: String,
     tail: Tail,
@@ -594,13 +648,12 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
 
     match maybe_object {
         Some(object) => {
-            let (hash, size) = extract_blob_hash_and_size(&iroh, &object.hash)
-                .await
-                .map_err(|e| {
-                    Rejection::from(BadRequest {
-                        message: e.to_string(),
-                    })
-                })?;
+            let hash = Hash::from_bytes(object.hash.0);
+            let (hash, size) = get_blob_hash_and_size(&iroh, hash).await.map_err(|e| {
+                Rejection::from(BadRequest {
+                    message: e.to_string(),
+                })
+            })?;
 
             let ent = new_entangler(iroh).map_err(|e| {
                 Rejection::from(BadRequest {
@@ -735,72 +788,6 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
     }
 }
 
-async fn extract_blob_hash_and_size(
-    iroh: &iroh::client::Iroh,
-    object_hash: &BlobHash,
-) -> Result<(Hash, u64), anyhow::Error> {
-    let hash_seq_hash = Hash::from_bytes(object_hash.0);
-    let status = iroh.blobs().status(hash_seq_hash).await.map_err(|e| {
-        anyhow!(
-            "failed to get status for hash sequence object: {} {}",
-            hash_seq_hash,
-            e
-        )
-    })?;
-
-    let BlobStatus::Complete { size } = status else {
-        return Err(anyhow!(
-            "hash sequence object {} is not available",
-            hash_seq_hash
-        ));
-    };
-
-    if size.is_zero() {
-        return Err(anyhow!(
-            "hash sequence object {} has zero size",
-            hash_seq_hash
-        ));
-    }
-
-    let res = iroh
-        .blobs()
-        .read_to_bytes(hash_seq_hash)
-        .await
-        .map_err(|e| {
-            anyhow!(
-                "failed to read hash sequence object: {} {}",
-                hash_seq_hash,
-                e
-            )
-        })?;
-
-    let hash_seq = HashSeq::try_from(res).map_err(|e| {
-        anyhow!(
-            "failed to parse hash sequence object: {} {}",
-            hash_seq_hash,
-            e
-        )
-    })?;
-
-    let blob_hash = hash_seq.get(0).ok_or_else(|| {
-        anyhow!(
-            "failed to get hash with index 0 from hash sequence object: {}",
-            hash_seq_hash
-        )
-    })?;
-
-    let status = iroh
-        .blobs()
-        .status(blob_hash)
-        .await
-        .map_err(|e| anyhow!("failed to read object: {} {}", blob_hash, e))?;
-
-    let BlobStatus::Complete { size } = status else {
-        return Err(anyhow!("object {} is not available", blob_hash));
-    };
-    Ok((blob_hash, size))
-}
-
 /// Parse an f/eth-address from string.
 pub fn parse_address(s: &str) -> anyhow::Result<Address> {
     let addr = Network::Mainnet
@@ -886,6 +873,7 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use bytes::Bytes;
+    use fendermint_actor_blobs_shared::state::Hash as BlobHash;
     use fendermint_vm_message::query::FvmQuery;
     use rand_chacha::rand_core::{RngCore, SeedableRng};
     use rand_chacha::ChaCha8Rng;
@@ -944,8 +932,8 @@ mod tests {
         metadata_iroh_hash: Hash,
     ) -> MockQueryClient {
         let object = Object {
-            hash: BlobHash(hash_seq_hash.as_bytes().clone()),
-            recovery_hash: BlobHash(metadata_iroh_hash.as_bytes().clone()),
+            hash: BlobHash(*hash_seq_hash.as_bytes()),
+            recovery_hash: BlobHash(*metadata_iroh_hash.as_bytes()),
             metadata: HashMap::from([
                 ("foo".to_string(), "bar".to_string()),
                 (
@@ -1019,7 +1007,7 @@ mod tests {
         let client_node_addr = client_iroh.net().node_addr().await.unwrap();
         let size = 11;
 
-        // Create multipart form for source-based upload
+        // Create the multipart form for source-based upload
         let boundary = "--abcdef1234--";
         let mut body = Vec::new();
         let form_data = format!(

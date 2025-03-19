@@ -172,7 +172,10 @@ pub fn add_blob(
     ))?)
 }
 
-pub fn get_blob(rt: &impl Runtime, hash: state::Hash) -> Result<Option<state::Blob>, ActorError> {
+pub fn get_blob(
+    rt: &impl Runtime,
+    hash: state::Hash,
+) -> Result<Option<state::BlobInfo>, ActorError> {
     deserialize_block(extract_send_result(rt.send(
         &BLOBS_ACTOR_ADDR,
         Method::GetBlob as MethodNum,

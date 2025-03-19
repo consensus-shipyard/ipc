@@ -120,6 +120,66 @@ impl Account {
     }
 }
 
+/// The return type used for Account.
+#[derive(Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct AccountInfo {
+    /// Total size of all blobs managed by the account.
+    pub capacity_used: u64,
+    /// Current free credit in byte-blocks that can be used for new commitments.
+    pub credit_free: Credit,
+    /// Current committed credit in byte-blocks that will be used for debits.
+    pub credit_committed: Credit,
+    /// Optional default sponsor account address.
+    pub credit_sponsor: Option<Address>,
+    /// The chain epoch of the last debit.
+    pub last_debit_epoch: ChainEpoch,
+    /// Credit approvals to other accounts from this account, keyed by receiver.
+    pub approvals_to: HashMap<Address, CreditApproval>,
+    /// Credit approvals to this account from other accounts, keyed by sender.
+    pub approvals_from: HashMap<Address, CreditApproval>,
+    /// The maximum allowed TTL for actor's blobs.
+    pub max_ttl: ChainEpoch,
+    /// The total token value an account has used to buy credits.
+    pub gas_allowance: TokenAmount,
+}
+
+impl AccountInfo {
+    pub fn from(rt: &impl Runtime, account: Account) -> Result<Self, ActorError> {
+        let store = rt.store();
+        let mut approvals_to = HashMap::new();
+        account
+            .approvals_to
+            .hamt(store)?
+            .for_each(|address, approval| {
+                let external_account_address = to_delegated_address(rt, address)?;
+                approvals_to.insert(external_account_address, approval.clone());
+                Ok(())
+            })?;
+
+        let mut approvals_from = HashMap::new();
+        account
+            .approvals_from
+            .hamt(store)?
+            .for_each(|address, approval| {
+                let external_account_address = to_delegated_address(rt, address)?;
+                approvals_from.insert(external_account_address, approval.clone());
+                Ok(())
+            })?;
+
+        Ok(AccountInfo {
+            capacity_used: account.capacity_used,
+            credit_free: account.credit_free,
+            credit_committed: account.credit_committed,
+            credit_sponsor: account.credit_sponsor,
+            last_debit_epoch: account.last_debit_epoch,
+            approvals_to,
+            approvals_from,
+            max_ttl: account.max_ttl,
+            gas_allowance: account.gas_allowance,
+        })
+    }
+}
+
 /// A credit approval from one account to another.
 #[derive(Debug, Clone, PartialEq, Serialize_tuple, Deserialize_tuple)]
 pub struct CreditApproval {
@@ -236,6 +296,41 @@ pub struct Blob {
     pub subscribers: BlobSubscribers,
     /// Blob status.
     pub status: BlobStatus,
+}
+
+/// The return type used for Blob.
+#[derive(Debug, Serialize_tuple, Deserialize_tuple)]
+pub struct BlobInfo {
+    /// The size of the content.
+    pub size: u64,
+    /// Blob metadata that contains information for blob recovery.
+    pub metadata_hash: Hash,
+    /// Active subscribers (accounts) that are paying for the blob to expiry.
+    pub subscribers: HashMap<SubscriptionId, ChainEpoch>,
+    /// Blob status.
+    pub status: BlobStatus,
+}
+
+impl BlobInfo {
+    /// Returns [`BlobInfo`] from [`Blob`].
+    /// TODO: HAMTs should carry max expiry such that we don't full scan here.
+    pub fn from(rt: &impl Runtime, blob: Blob) -> Result<Self, ActorError> {
+        let store = rt.store();
+        let mut subscribers = HashMap::new();
+        blob.subscribers.hamt(store)?.for_each(|_, group| {
+            group.hamt(store)?.for_each(|id, sub| {
+                subscribers.insert(id, sub.expiry);
+                Ok(())
+            })?;
+            Ok(())
+        })?;
+        Ok(Self {
+            size: blob.size,
+            metadata_hash: blob.metadata_hash,
+            subscribers,
+            status: blob.status,
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize_tuple, Deserialize_tuple)]
@@ -558,65 +653,6 @@ impl CreditApprovals {
 
     pub fn is_empty(&self) -> bool {
         self.size == 0
-    }
-}
-
-/// The return type used for Account.
-#[derive(Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct AccountInfo {
-    /// Total size of all blobs managed by the account.
-    pub capacity_used: u64,
-    /// Current free credit in byte-blocks that can be used for new commitments.
-    pub credit_free: Credit,
-    /// Current committed credit in byte-blocks that will be used for debits.
-    pub credit_committed: Credit,
-    /// Optional default sponsor account address.
-    pub credit_sponsor: Option<Address>,
-    /// The chain epoch of the last debit.
-    pub last_debit_epoch: ChainEpoch,
-    /// Credit approvals to other accounts from this account, keyed by receiver.
-    pub approvals_to: HashMap<String, CreditApproval>,
-    /// Credit approvals to this account from other accounts, keyed by sender.
-    pub approvals_from: HashMap<String, CreditApproval>,
-    /// The maximum allowed TTL for actor's blobs.
-    pub max_ttl: ChainEpoch,
-    /// The total token value an account has used to buy credits.
-    pub gas_allowance: TokenAmount,
-}
-
-impl AccountInfo {
-    pub fn from(account: Account, rt: &impl Runtime) -> Result<Self, ActorError> {
-        let mut approvals_to = HashMap::new();
-        account
-            .approvals_to
-            .hamt(rt.store())?
-            .for_each(|address, approval| {
-                let external_account_address = to_delegated_address(rt, address)?;
-                approvals_to.insert(external_account_address.to_string(), approval.clone());
-                Ok(())
-            })?;
-
-        let mut approvals_from = HashMap::new();
-        account
-            .approvals_from
-            .hamt(rt.store())?
-            .for_each(|address, approval| {
-                let external_account_address = to_delegated_address(rt, address)?;
-                approvals_from.insert(external_account_address.to_string(), approval.clone());
-                Ok(())
-            })?;
-
-        Ok(AccountInfo {
-            capacity_used: account.capacity_used,
-            credit_free: account.credit_free,
-            credit_committed: account.credit_committed,
-            credit_sponsor: account.credit_sponsor,
-            last_debit_epoch: account.last_debit_epoch,
-            approvals_to,
-            approvals_from,
-            max_ttl: account.max_ttl,
-            gas_allowance: account.gas_allowance,
-        })
     }
 }
 

@@ -641,7 +641,7 @@ async fn dispatch_vote(
             }
         }
         AppVote::BlobFinality(f) => {
-            debug!(hash = ?f.hash, success = ?f.success, "received vote for blob finality");
+            debug!(hash = %f.hash, success = ?f.success, "received vote for blob finality");
             match atomically_or_err(|| {
                 parent_finality_votes.add_blob_vote(
                     vote.public_key.clone(),
@@ -676,7 +676,7 @@ async fn dispatch_vote(
             }
         }
         AppVote::ReadRequestClosed(r) => {
-            debug!(hash = ?r.hash, "received vote for read request completion");
+            debug!(hash = %r.hash, "received vote for read request completion");
             match atomically_or_err(|| {
                 parent_finality_votes.add_blob_vote(
                     vote.public_key.clone(),

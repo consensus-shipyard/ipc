@@ -7,4 +7,5 @@ license.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
+num-traits = { workspace = true }
 iroh = { workspace = true }

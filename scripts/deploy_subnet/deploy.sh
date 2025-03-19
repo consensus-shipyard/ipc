@@ -520,8 +520,8 @@ cd "$IPC_FOLDER"
 # Approve each validator to stake
 for i in {0..2}
 do
-  # Approve power min 1 RECALL max 10 RECALL
-  cast send --private-key "$pk" --rpc-url "$rpc_url" --timeout 120 "$VALIDATOR_GATER_ADDRESS" "approve(address,uint256,uint256)" "${wallet_addresses[i]}" 1000000000000000000 100000000000000000000
+  # Approve power min 1 RECALL max 100 RECALL
+  cast send --private-key "$pk" --rpc-url "$rpc_url" --timeout 120 "$VALIDATOR_GATER_ADDRESS" "approve(address,uint256,uint256)" "${wallet_addresses[i]}" 1000000000000000000 1000000000000000000000
 done
 echo "Approved validators to stake"
 
@@ -589,7 +589,7 @@ do
   echo "Joining subnet ${subnet_id} for validator ${wallet_addresses[i]}"
   # Approve subnet contract to lock up to 10 RECALL from collateral contract (which is also the supply source contract)
   vpk=$(cat "${IPC_CONFIG_FOLDER}"/validator_"$i".sk)
-  cast send --private-key "$vpk" --rpc-url "$rpc_url" --timeout 120 "$SUPPLY_SOURCE_ADDRESS" "approve(address,uint256)" "$subnet_eth_addr" 10000000000000000000
+  cast send --private-key "$vpk" --rpc-url "$rpc_url" --timeout 120 "$SUPPLY_SOURCE_ADDRESS" "approve(address,uint256)" "$subnet_eth_addr" 100000000000000000000
   # Join and stake 10 RECALL
   ipc-cli subnet join --from "${wallet_addresses[i]}" --subnet "$subnet_id" --collateral 10
 done
@@ -827,7 +827,7 @@ if [[ $local_deploy = true ]]; then
     # transaction until it succeeds—else, we'll continue and simply skip the account since it's not
     # recommended to use the validator accounts during development, anyways
     while [ $attempt -le $max_retries ]; do
-      if cast send --rpc-url http://localhost:"${ETHAPI_HOST_PORTS[0]}" $CREDIT_MANAGER_ADDRESS "buyCredit()" --value "${credit_amount}ether" --private-key $private_key 2>/dev/null; then
+      if cast send --rpc-url http://localhost:"${ETHAPI_HOST_PORTS[0]}" "$CREDIT_MANAGER_ADDRESS" "buyCredit()" --value "${credit_amount}ether" --private-key "$private_key" 2>/dev/null; then
         echo "Successfully bought credits for account $i"
         break
       else
@@ -914,7 +914,7 @@ if [[ $local_deploy = true ]]; then
   echo "Parent RECALL:   ${parent_recall%.*} RECALL"
   echo "Subnet native:  ${subnet_native%.*} RECALL"
   # get credit balance (i.e., to help verify the credit purchases above worked)
-  account_info_output=$(cast call --rpc-url http://localhost:"${ETHAPI_HOST_PORTS[0]}" $CREDIT_MANAGER_ADDRESS "getAccount(address)" "${addr}")
+  account_info_output=$(cast call --rpc-url http://localhost:"${ETHAPI_HOST_PORTS[0]}" "$CREDIT_MANAGER_ADDRESS" "getAccount(address)" "${addr}")
   account_info=$(cast abi-decode "getAccount(address)((uint64,uint256,uint256,address,uint64,(address,(uint256,uint256,uint64,uint256,uint256))[],(address,(uint256,uint256,uint64,uint256,uint256))[],uint64,uint256))" "$account_info_output")
   credit_balance=$(echo "$account_info" | awk -F',' '{gsub(/[^0-9]/, "", $2); print substr($2, 1, length($2)-18)}')
   echo "Subnet credits: ${credit_balance}"

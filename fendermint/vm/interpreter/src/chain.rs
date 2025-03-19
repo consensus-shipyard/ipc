@@ -338,7 +338,7 @@ where
             state.state_tree_mut().begin_transaction();
             for item in local_finalized_blobs.iter() {
                 if is_blob_finalized(&mut state, item.subscriber, item.hash, item.id.clone())? {
-                    tracing::debug!(hash = ?item.hash, "blob already finalized on chain; removing from pool");
+                    tracing::debug!(hash = %item.hash, "blob already finalized on chain; removing from pool");
                     atomically(|| chain_env.blob_pool.remove_task(item)).await;
                     // Remove the result from the pool
                     atomically(|| chain_env.blob_pool.remove_result(item)).await;
@@ -351,7 +351,7 @@ where
                 })
                 .await;
                 if is_globally_finalized {
-                    tracing::debug!(hash = ?item.hash, size = item.size, "blob has quorum; adding tx to chain");
+                    tracing::debug!(hash = %item.hash, size = item.size, "blob has quorum; adding tx to chain");
                     blobs.push(ChainMessage::Ipc(IpcMessage::BlobFinalized(
                         FinalizedBlob {
                             subscriber: item.subscriber,
@@ -533,7 +533,7 @@ where
                     // Check that blobs that are being enqueued are still in "added" state in the actor
                     // Once we enqueue a blob, the actor will transition it to "pending" state.
                     if !is_blob_added(&mut state, blob.subscriber, blob.hash, blob.id)? {
-                        tracing::debug!(hash = ?blob.hash, "blob is not added onchain; rejecting proposal");
+                        tracing::debug!(hash = %blob.hash, "blob is not added onchain; rejecting proposal");
                         return Ok(false);
                     }
                 }
@@ -545,7 +545,7 @@ where
                         is_blob_finalized(state, blob.subscriber, blob.hash, blob.id.clone())
                     })?;
                     if is_blob_finalized {
-                        tracing::debug!(hash = ?blob.hash, "blob is already finalized on chain; rejecting proposal");
+                        tracing::debug!(hash = %blob.hash, "blob is already finalized on chain; rejecting proposal");
                         return Ok(false);
                     }
 
@@ -556,12 +556,12 @@ where
                     })
                     .await;
                     if !is_globally_finalized {
-                        tracing::debug!(hash = ?blob.hash, "blob is not globally finalized; rejecting proposal");
+                        tracing::debug!(hash = %blob.hash, "blob is not globally finalized; rejecting proposal");
                         return Ok(false);
                     }
                     if blob.succeeded != succeeded {
                         tracing::debug!(
-                            hash = ?blob.hash,
+                            hash = %blob.hash,
                             quorum = ?succeeded,
                             message = ?blob.succeeded,
                             "blob finalization mismatch; rejecting proposal"
@@ -584,12 +584,12 @@ where
                         })
                         .await;
                     if is_locally_finalized {
-                        tracing::debug!(hash = ?blob.hash, "blob is locally finalized; removing from pool");
+                        tracing::debug!(hash = %blob.hash, "blob is locally finalized; removing from pool");
                         atomically(|| chain_env.blob_pool.remove_task(&item)).await;
                         // Remove the result from the pool
                         atomically(|| chain_env.blob_pool.remove_result(&item)).await;
                     } else {
-                        tracing::debug!(hash = ?blob.hash, "blob is not locally finalized");
+                        tracing::debug!(hash = %blob.hash, "blob is not locally finalized");
                     }
                 }
                 ChainMessage::Ipc(IpcMessage::ReadRequestPending(read_request)) => {
@@ -608,7 +608,7 @@ where
                         get_read_request_status(state, read_request.id)
                     })?;
                     if !matches!(status, Some(ReadRequestStatus::Pending)) {
-                        tracing::info!(hash = ?read_request.id, "only pending read requests can be closed; rejecting proposal");
+                        tracing::info!(hash = %read_request.id, "only pending read requests can be closed; rejecting proposal");
                         return Ok(false);
                     }
 
@@ -626,7 +626,7 @@ where
                     })
                     .await;
                     if !is_globally_finalized {
-                        tracing::info!(hash = ?read_request.id, "read request is not globally finalized; rejecting proposal");
+                        tracing::info!(hash = %read_request.id, "read request is not globally finalized; rejecting proposal");
                         return Ok(false);
                     }
 
@@ -884,7 +884,7 @@ where
                     let (apply_ret, emitters) = state.execute_implicit(msg)?;
 
                     tracing::debug!(
-                        hash = ?blob.hash,
+                        hash = %blob.hash,
                         "chain interpreter has set blob to pending"
                     );
 
@@ -933,7 +933,7 @@ where
                     let (apply_ret, emitters) = state.execute_implicit(msg)?;
 
                     tracing::debug!(
-                        hash = ?blob.hash,
+                        hash = %blob.hash,
                         "chain interpreter has finalized blob"
                     );
 
@@ -985,7 +985,7 @@ where
                     let ret = close_read_request(&mut state, read_request.id)?;
 
                     tracing::debug!(
-                        hash = ?read_request.id,
+                        hash = %read_request.id,
                         "read request is closed"
                     );
 

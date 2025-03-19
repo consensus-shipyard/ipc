@@ -101,7 +101,7 @@ fn start_resolve<V>(
     V: Clone + Send + Sync + Serialize + DeserializeOwned + 'static,
 {
     tokio::spawn(async move {
-        tracing::debug!(hash = ?task.hash(), "starting iroh blob resolve");
+        tracing::debug!(hash = %task.hash(), "starting iroh blob resolve");
         match task.task_type() {
             TaskType::ResolveBlob { source, size } => {
                 match client
@@ -117,7 +117,7 @@ fn start_resolve<V>(
                         // By not quitting, we should see this error every time there is a new task, which is at least a constant reminder.
                     }
                     Ok(Ok(())) => {
-                        tracing::debug!(hash = ?task.hash(), "iroh blob resolved");
+                        tracing::debug!(hash = %task.hash(), "iroh blob resolved");
                         atomically(|| task.set_resolved()).await;
                         if add_own_vote(
                             task.hash(),
@@ -276,7 +276,7 @@ where
 async fn reenqueue(task: ResolveTask, queue: ResolveQueue, retry_delay: Duration) -> bool {
     if atomically(|| task.add_attempt()).await {
         tracing::error!(
-            hash = ?task.hash(),
+            hash = %task.hash(),
             "iroh blob resolution failed; retrying later"
         );
         schedule_retry(task, queue, retry_delay).await;

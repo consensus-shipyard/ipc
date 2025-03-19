@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 use fendermint_actor_blobs_shared::{
     add_blob, delete_blob, get_blob, has_credit_approval, overwrite_blob,
-    state::{Blob, BlobStatus, SubscriptionId},
+    state::{BlobInfo, BlobStatus, SubscriptionId},
 };
 use fendermint_actor_machine::{
     events::emit_evm_event,
@@ -18,7 +18,6 @@ use fil_actors_runtime::{
     runtime::{ActorCode, Runtime},
     ActorError,
 };
-use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_hamt::BytesKey;
 use fvm_shared::address::Address;
 use recall_sol_facade::bucket::{object_added, object_deleted, object_metadata_updated};
@@ -59,8 +58,9 @@ impl Actor {
         validate_metadata(&params.metadata)?;
 
         let sub = if let Some(object) = state.get(rt.store(), &key)? {
-            // If we have existing blob
-            if params.overwrite {
+            // If we have existing blob and it's not expired
+            let expired = object.expiry <= rt.curr_epoch();
+            if params.overwrite || expired {
                 // Overwrite if the flag is passed
                 overwrite_blob(
                     rt,
@@ -101,6 +101,7 @@ impl Actor {
                 key,
                 params.hash,
                 params.size,
+                sub.expiry,
                 params.metadata.clone(),
                 params.overwrite,
             )
@@ -160,7 +161,7 @@ impl Actor {
         let key = BytesKey(params.0);
         if let Some(object_state) = state.get(rt.store(), &key)? {
             if let Some(blob) = get_blob(rt, object_state.hash)? {
-                let object = build_object(rt.store(), &blob, &object_state, sub_id, owner)?;
+                let object = build_object(&blob, &object_state, sub_id, owner)?;
                 Ok(object)
             } else {
                 Ok(None)
@@ -177,6 +178,7 @@ impl Actor {
     ) -> Result<ListObjectsReturn, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
+        let current_epoch = rt.curr_epoch();
         let mut objects = Vec::new();
         let start_key = params.start_key.map(BytesKey::from);
         let state = rt.state::<State>()?;
@@ -187,7 +189,9 @@ impl Actor {
             start_key.as_ref(),
             params.limit,
             |key: Vec<u8>, object_state: ObjectState| -> anyhow::Result<(), ActorError> {
-                objects.push((key, object_state));
+                if object_state.expiry > current_epoch {
+                    objects.push((key, object_state));
+                }
                 Ok(())
             },
         )?;
@@ -258,6 +262,7 @@ impl Actor {
                 key,
                 object.hash,
                 object.size,
+                object.expiry,
                 object.metadata.clone(),
                 true,
             )?;
@@ -280,37 +285,27 @@ fn get_blob_id(state: &State, key: &[u8]) -> anyhow::Result<SubscriptionId, Acto
 }
 
 /// Build an object from its state and blob.
-fn build_object<BS: Blockstore>(
-    store: &BS,
-    blob: &Blob,
+fn build_object(
+    blob: &BlobInfo,
     object_state: &ObjectState,
     sub_id: SubscriptionId,
     subscriber: Address,
 ) -> anyhow::Result<Option<Object>, ActorError> {
     match blob.status {
         BlobStatus::Resolved => {
-            let subscribers = blob.subscribers.hamt(store)?;
-            let group = subscribers.get(&subscriber)?.ok_or_else(|| {
+            blob.subscribers.get(&sub_id).cloned().ok_or_else(|| {
                 ActorError::illegal_state(format!(
                     "owner {} is not subscribed to blob {}; this should not happen",
                     subscriber, object_state.hash
                 ))
             })?;
-            let (expiry, _) = group.max_expiries(store, &sub_id, None)?;
-            if let Some(expiry) = expiry {
-                Ok(Some(Object {
-                    hash: object_state.hash,
-                    recovery_hash: blob.metadata_hash,
-                    size: blob.size,
-                    expiry,
-                    metadata: object_state.metadata.clone(),
-                }))
-            } else {
-                Err(ActorError::illegal_state(format!(
-                    "subscription group is empty for blob {}; this should not happen",
-                    object_state.hash,
-                )))
-            }
+            Ok(Some(Object {
+                hash: object_state.hash,
+                recovery_hash: blob.metadata_hash,
+                size: blob.size,
+                expiry: object_state.expiry,
+                metadata: object_state.metadata.clone(),
+            }))
         }
         BlobStatus::Added | BlobStatus::Pending | BlobStatus::Failed => Ok(None),
     }
@@ -401,7 +396,7 @@ mod tests {
             AddBlobParams, DeleteBlobParams, GetBlobParams, GetCreditApprovalParams,
             OverwriteBlobParams,
         },
-        state::{BlobSubscribers, CreditApproval, Hash, Subscription, SubscriptionGroup},
+        state::{CreditApproval, Hash, Subscription},
         Method as BlobMethod, BLOBS_ACTOR_ADDR,
     };
     use fendermint_actor_blobs_testing::{new_hash, new_pk, setup_logs};
@@ -691,7 +686,14 @@ mod tests {
             })
             .unwrap(),
             TokenAmount::from_whole(0),
-            IpldBlock::serialize_cbor(&Subscription::default()).unwrap(),
+            IpldBlock::serialize_cbor(&Subscription {
+                added: 0,
+                expiry: ChainEpoch::from(3600),
+                source: add_params.source,
+                delegate: None,
+                failed: false,
+            })
+            .unwrap(),
             ExitCode::OK,
         );
         expect_emitted_add_event(&rt, &add_params);
@@ -872,7 +874,14 @@ mod tests {
             })
             .unwrap(),
             TokenAmount::from_whole(0),
-            IpldBlock::serialize_cbor(&Subscription::default()).unwrap(),
+            IpldBlock::serialize_cbor(&Subscription {
+                added: 0,
+                expiry: ttl,
+                source: add_params.source,
+                delegate: None,
+                failed: false,
+            })
+            .unwrap(),
             ExitCode::OK,
         );
         expect_emitted_add_event(&rt, &add_params);
@@ -886,39 +895,13 @@ mod tests {
         .unwrap();
         rt.verify();
 
-        let store = rt.store();
-        let blob_subscribers = BlobSubscribers::new(store).unwrap();
-
-        let mut subscribers = blob_subscribers.hamt(store).unwrap();
-
         // Get the object
-        let mut blob = Blob {
+        let blob = BlobInfo {
             size: add_params.size,
-            subscribers: blob_subscribers,
+            subscribers: HashMap::from([(sub_id, ttl)]),
             status: BlobStatus::Resolved,
             metadata_hash: add_params.recovery_hash,
         };
-
-        let mut group = SubscriptionGroup::new(store).unwrap();
-        let mut group_hamt = group.hamt(store).unwrap();
-
-        group.save_tracked(
-            group_hamt
-                .set_and_flush_tracked(
-                    &sub_id,
-                    Subscription {
-                        added: 0,
-                        expiry: ChainEpoch::from(3600),
-                        source: add_params.source,
-                        delegate: Some(origin),
-                        failed: false,
-                    },
-                )
-                .unwrap(),
-        );
-
-        blob.subscribers
-            .save_tracked(subscribers.set_and_flush_tracked(&origin, group).unwrap());
 
         rt.expect_validate_caller_any();
         rt.expect_send(
@@ -962,13 +945,14 @@ mod tests {
         // Add an object
         let hash = new_hash(256);
         let key = vec![0, 1, 2];
+        let ttl = ChainEpoch::from(3600);
         let add_params: AddParams = AddParams {
             source: new_pk(),
             key: key.clone(),
             hash: hash.0,
             size: hash.1,
             recovery_hash: new_hash(256).0,
-            ttl: None,
+            ttl: Some(ttl),
             metadata: HashMap::from([("foo".into(), "bar".into()), ("foo2".into(), "bar".into())]),
             from: origin,
             overwrite: false,
@@ -984,14 +968,21 @@ mod tests {
                 source: add_params.source,
                 hash: add_params.hash,
                 metadata_hash: add_params.recovery_hash,
-                id: sub_id,
+                id: sub_id.clone(),
                 size: add_params.size,
                 ttl: add_params.ttl,
                 from: origin,
             })
             .unwrap(),
             TokenAmount::from_whole(0),
-            IpldBlock::serialize_cbor(&Subscription::default()).unwrap(),
+            IpldBlock::serialize_cbor(&Subscription {
+                added: 0,
+                expiry: ttl,
+                source: add_params.source,
+                delegate: None,
+                failed: false,
+            })
+            .unwrap(),
             ExitCode::OK,
         );
         expect_emitted_add_event(&rt, &add_params);
@@ -1004,7 +995,6 @@ mod tests {
             .unwrap()
             .deserialize::<Object>()
             .unwrap();
-        let state = rt.state::<State>().unwrap();
         assert_eq!(add_params.hash, result.hash);
         assert_eq!(add_params.metadata, result.metadata);
         assert_eq!(add_params.recovery_hash, result.recovery_hash);
@@ -1125,39 +1115,12 @@ mod tests {
         rt.verify();
 
         // Get the object and check metadata
-        let store = rt.store();
-        let blob_subscribers = BlobSubscribers::new(store).unwrap();
-        let mut subscribers = blob_subscribers.hamt(store).unwrap();
-
-        let sub_id = get_blob_id(&state, &key).unwrap();
-        let mut blob = Blob {
+        let blob = BlobInfo {
             size: add_params.size,
-            subscribers: blob_subscribers,
+            subscribers: HashMap::from([(sub_id, ttl)]),
             status: BlobStatus::Resolved,
             metadata_hash: add_params.recovery_hash,
         };
-
-        let mut group = SubscriptionGroup::new(store).unwrap();
-        let mut group_hamt = group.hamt(store).unwrap();
-
-        group.save_tracked(
-            group_hamt
-                .set_and_flush_tracked(
-                    &sub_id,
-                    Subscription {
-                        added: 0,
-                        expiry: ChainEpoch::from(3600),
-                        source: add_params.source,
-                        delegate: Some(origin),
-                        failed: false,
-                    },
-                )
-                .unwrap(),
-        );
-
-        blob.subscribers
-            .save_tracked(subscribers.set_and_flush_tracked(&origin, group).unwrap());
-
         rt.expect_validate_caller_any();
         rt.expect_send(
             BLOBS_ACTOR_ADDR,

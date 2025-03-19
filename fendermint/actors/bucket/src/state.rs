@@ -12,7 +12,7 @@ use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::*;
 use fvm_ipld_hamt::{BytesKey, Config, Hamt};
-use fvm_shared::address::Address;
+use fvm_shared::{address::Address, clock::ChainEpoch};
 use serde::{Deserialize, Serialize};
 
 const MAX_LIST_LIMIT: usize = 1000;
@@ -95,6 +95,8 @@ pub struct ObjectState {
     pub hash: Hash,
     /// The object size.
     pub size: u64,
+    /// Expiry block.
+    pub expiry: ChainEpoch,
     /// User-defined object metadata (e.g., last modified timestamp, etc.).
     pub metadata: HashMap<String, String>,
 }
@@ -116,6 +118,7 @@ impl State {
         key: BytesKey,
         hash: Hash,
         size: u64,
+        expiry: ChainEpoch,
         metadata: HashMap<String, String>,
         overwrite: bool,
     ) -> anyhow::Result<Cid, ActorError> {
@@ -124,6 +127,7 @@ impl State {
         let object = ObjectState {
             hash,
             size,
+            expiry,
             metadata,
         };
         if overwrite {
@@ -226,6 +230,7 @@ mod tests {
             let hash = new_hash(u16::arbitrary(g) as usize);
             ObjectState {
                 hash: hash.0,
+                expiry: i64::arbitrary(g),
                 size: u64::arbitrary(g),
                 metadata: HashMap::arbitrary(g),
             }
@@ -240,11 +245,12 @@ mod tests {
         ObjectState {
             hash,
             size,
+            expiry: 123456789,
             metadata,
         }
     }
 
-    const OBJECT_ONE_CID: &str = "bafy2bzacealtpdigmoweehfr3573mdks5r3eaj4djoh7dzcdl7zdbkxnx2kds";
+    const OBJECT_ONE_CID: &str = "bafy2bzacea5tbd4x6okckdkb2yl7wbyjqpxkow6whr46dswwv5xj7va4uro2g";
 
     fn object_two() -> ObjectState {
         let (hash, size) = new_hash_from_vec([6, 7, 8, 9, 10, 11].to_vec());
@@ -254,6 +260,7 @@ mod tests {
         ObjectState {
             hash,
             size,
+            expiry: 123456789,
             metadata,
         }
     }
@@ -266,6 +273,7 @@ mod tests {
         ObjectState {
             hash,
             size,
+            expiry: 123456789,
             metadata,
         }
     }
@@ -335,6 +343,7 @@ mod tests {
                 BytesKey(vec![1, 2, 3]),
                 object.hash,
                 object.size,
+                object.expiry,
                 object.metadata,
                 true,
             )
@@ -354,6 +363,7 @@ mod tests {
                 key.clone(),
                 object.hash,
                 object.size,
+                object.expiry,
                 object.metadata,
                 true,
             )
@@ -372,7 +382,15 @@ mod tests {
         let key = BytesKey(vec![1, 2, 3]);
         let md = object.metadata.clone();
         state
-            .add(&store, key.clone(), object.hash, object.size, md, true)
+            .add(
+                &store,
+                key.clone(),
+                object.hash,
+                object.size,
+                object.expiry,
+                md,
+                true,
+            )
             .unwrap();
         let result = state.get(&store, &key);
 
@@ -391,6 +409,7 @@ mod tests {
             baz_key.clone(),
             object.hash,
             object.size,
+            object.expiry,
             object.metadata,
             false,
         )?;
@@ -401,6 +420,7 @@ mod tests {
             bar_key.clone(),
             object.hash,
             object.size,
+            object.expiry,
             object.metadata,
             false,
         )?;
@@ -412,6 +432,7 @@ mod tests {
             other_key.clone(),
             hash.0,
             8,
+            123456789,
             HashMap::<String, String>::new(),
             false,
         )?;
@@ -422,6 +443,7 @@ mod tests {
             jpeg_key.clone(),
             object.hash,
             object.size,
+            object.expiry,
             object.metadata,
             false,
         )?;
@@ -459,6 +481,7 @@ mod tests {
                     key.clone(),
                     object.hash,
                     object.size,
+                    object.expiry,
                     object.metadata,
                     false,
                 )
@@ -498,6 +521,7 @@ mod tests {
                     key.clone(),
                     object.hash,
                     object.size,
+                    object.expiry,
                     object.metadata,
                     false,
                 )
@@ -566,6 +590,7 @@ mod tests {
                 jpeg_key.clone(),
                 hash.0,
                 8,
+                123456789,
                 HashMap::<String, String>::new(),
                 false,
             )
@@ -578,6 +603,7 @@ mod tests {
                 bar_key.clone(),
                 hash.0,
                 8,
+                123456789,
                 HashMap::<String, String>::new(),
                 false,
             )
@@ -590,6 +616,7 @@ mod tests {
                 baz_key.clone(),
                 hash.0,
                 8,
+                123456789,
                 HashMap::<String, String>::new(),
                 false,
             )
@@ -642,6 +669,7 @@ mod tests {
                 one.clone(),
                 hash.0,
                 8,
+                123456789,
                 HashMap::<String, String>::new(),
                 false,
             )
@@ -654,6 +682,7 @@ mod tests {
                 two.clone(),
                 hash.0,
                 8,
+                123456789,
                 HashMap::<String, String>::new(),
                 false,
             )

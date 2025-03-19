@@ -444,6 +444,9 @@ where
                 } else {
                     power_table.get(vk).cloned().unwrap_or_default()
                 };
+
+                tracing::debug!("voter; key={}, power={}", vk.to_string(), power);
+
                 if *resolved {
                     resolved_weight += power;
                 } else {
@@ -451,6 +454,14 @@ where
                 }
             }
         }
+
+        tracing::debug!(
+            resolved_weight,
+            failed_weight,
+            quorum_threshold,
+            "blob quorum; votes={}",
+            votes_for_blob.len()
+        );
 
         if resolved_weight >= quorum_threshold {
             Ok((true, true))
