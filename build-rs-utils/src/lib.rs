@@ -1,7 +1,10 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-pub use build_print::*;
 pub use owo_colors::*;
+
+pub fn rerun_if_changed(path: &std::path::Path) {
+    ::std::println!("cargo:rerun-if-changed={}", path.display());
+}
 
 #[macro_export]
 macro_rules! build_print {
@@ -57,6 +60,4 @@ macro_rules! echo {
             $crate::build_print!($component.yellow(), $($arg)*)
         }
     };
-
-
 }

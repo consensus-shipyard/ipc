@@ -1,18 +1,129 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::io::Write;
-use std::path::PathBuf;
+use std::io::{BufReader, Write};
+use std::path::{Path, PathBuf};
+use std::process::Stdio;
+use std::sync::mpsc;
 
 use build_rs_utils::echo;
+use color_eyre::eyre::eyre;
 
 const SKIP_ENV_VAR_NAME: &str = "SKIP_BINDING_GENERATION";
 
+fn find_program(name: &str) -> color_eyre::Result<PathBuf> {
+    let binary = which::which(name).map_err(|e| eyre!("Could not find binary `{name}`: {e}"))?;
+    Ok(binary)
+}
+
+#[allow(dead_code)]
+async fn run_forge_test(_contracts_dir: &Path, _out: &Path) -> color_eyre::Result<()> {
+    // forge test -vvv --ffi
+    todo!("forge test -vvv --ffi")
+}
+
+/// Run `forge build`
+async fn run_forge_build(contracts_dir: &Path, out: &Path) -> color_eyre::Result<()> {
+    // Re-run on any change `contracts_dir` directory and subtree
+    println!("cargo:rerun-if-changed={}", contracts_dir.display());
+
+    let forge = find_program("forge")?;
+
+    fs_err::create_dir_all(out)?;
+
+    let mut cmd = std::process::Command::new(forge);
+    cmd.current_dir(contracts_dir);
+    cmd.args(
+        format!(
+            "build -C ./src/ --lib-paths lib/ --via-ir --sizes --skip test --out={}",
+            out.display()
+        )
+        .split(" "),
+    );
+    run_command_with_stdio("forge", cmd).await
+}
+
+/// `pnpm install`
+///
+/// It's a pre-requisite to make `forge build` work
+async fn run_pnpm_install(cwd: &Path) -> color_eyre::Result<()> {
+    let pnpm = find_program("pnpm")?;
+    let mut cmd = std::process::Command::new(pnpm);
+    cmd.current_dir(cwd);
+    cmd.arg("install");
+    run_command_with_stdio("pnpm", cmd).await
+}
+
+async fn run_command_with_stdio(
+    name: &'static str,
+    mut cmd: std::process::Command,
+) -> color_eyre::Result<()> {
+    // handle concurrent output lines
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+
+    #[derive(Debug)]
+    enum What {
+        Stderr(String),
+        Stdout(String),
+        Exit(std::io::Result<()>),
+    }
+
+    let (tx, rx) = mpsc::channel();
+    let mut child = cmd.spawn()?;
+    let stdout = child.stdout.take().unwrap();
+    let stderr = child.stderr.take().unwrap();
+    let tx = tx.clone();
+
+    fn read_on(
+        tx: mpsc::Sender<What>,
+        mut reader: impl std::io::BufRead,
+        what: impl Fn(String) -> What,
+    ) {
+        let mut buf = String::with_capacity(1024);
+        loop {
+            match reader.read_line(&mut buf) {
+                Ok(0) => {
+                    let _ = tx.send(What::Exit(Ok(())));
+                    break;
+                }
+                Ok(_n) => {
+                    let _ = tx.send(what(buf.trim().to_string()));
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+                e => {
+                    let _ = tx.send(What::Exit(e.map(|_| ())));
+                    break;
+                }
+            }
+        }
+    }
+    let tx_cc = tx.clone();
+    let jh1 =
+        tokio::task::spawn_blocking(move || read_on(tx_cc, BufReader::new(stderr), What::Stderr));
+    let jh2 =
+        tokio::task::spawn_blocking(move || read_on(tx, BufReader::new(stdout), What::Stdout));
+    while let Ok(x) = rx.recv() {
+        match x {
+            What::Stderr(msg) => println!("cargo:warning={name}(stdERR) {msg}"),
+            What::Stdout(msg) => println!("cargo:warning={name}(stdOUT) {msg}"),
+            What::Exit(res) => {
+                res?;
+                break;
+            }
+        }
+    }
+    jh1.await?;
+    jh2.await?;
+
+    Ok(())
+}
+
 /// Generate Rust contract-bindings from the IPC Solidity Actors ABI artifacts.
-///p
+///
 /// These are built by `make ipc-actors-abi`, here we just add the final step
 /// so we have better code completion with Rust Analyzer.
-fn main() -> color_eyre::Result<()> {
+#[tokio::main]
+async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
 
     // Run with `cargo build -vv` to see output from any `eprintln!` or `println!`.
@@ -33,9 +144,7 @@ fn main() -> color_eyre::Result<()> {
     let gen_dir = crate_dir.join("src").join("gen");
     let mod_path = gen_dir.join("mod.rs");
 
-    for entry in (fs_err::read_dir("src")?).flatten() {
-        println!("cargo:rerun-if-changed={}", entry.path().display());
-    }
+    println!("cargo:rerun-if-changed={}", crate_dir.join("src").display());
 
     // Maybe we want to skip the build and use the files as-is, could be imported as crate.
     // Enabled by default so that in the monorepo we don't have to worry about stale code.
@@ -54,9 +163,15 @@ fn main() -> color_eyre::Result<()> {
     echo!("contract-bindings", yellow, "Running binding generation...");
 
     // Where are the Solidity artifacts.
-    let workspace_dir = crate_dir.parent().expect("Should exist").to_path_buf();
+    let workspace_dir = fs_err::canonicalize(crate_dir.clone().parent().expect(
+        "Structure is such that we are 2 levels from the root, two levels up should work",
+    ))?;
 
     let contracts_dir = workspace_dir.join("contracts");
+
+    // build the contracts from solidity
+    run_pnpm_install(&contracts_dir).await?;
+    run_forge_build(&contracts_dir, contracts_dir.join(&out).as_path()).await?;
 
     fs_err::create_dir_all(&gen_dir)?;
     let mut mod_f = fs_err::File::create(&mod_path)?;
