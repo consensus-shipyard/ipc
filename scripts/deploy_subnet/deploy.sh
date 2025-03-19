@@ -457,7 +457,7 @@ if [[ -z "${PARENT_GATEWAY_ADDRESS+x}" || -z "${PARENT_REGISTRY_ADDRESS+x}" ]]; 
   if [ $local_deploy == true ]; then
     cd "${IPC_FOLDER}/recall-contracts"
     # use the same account validator 0th account to deploy supply source token
-    deploy_supply_source_token_out="$(forge script script/Recall.s.sol --private-key "${pk}" --rpc-url "${rpc_url}" --tc DeployScript --sig 'run(string)' local --broadcast --timeout 120 -vv)"
+    deploy_supply_source_token_out="$(forge script script/Recall.s.sol --private-key "${pk}" --rpc-url "${rpc_url}" --tc DeployScript --sig 'run()' --broadcast --timeout 120 -vv)"
     echo "$DASHES deploy supply source token output $DASHES"
     echo ""
     echo "$deploy_supply_source_token_out"
