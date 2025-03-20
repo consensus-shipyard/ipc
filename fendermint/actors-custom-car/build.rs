@@ -227,7 +227,7 @@ fn build_all_wasm_blobs(
     // Cargo build command for all test_actors at once.
     let mut cmd = Command::new(rustup);
     cmd.arg("run")
-        .arg(&channel)
+        .arg(channel)
         .arg("cargo")
         .arg("build")
         .current_dir(cwd)
@@ -403,7 +403,7 @@ fn main() -> Result<()> {
 
     build_all_wasm_blobs(
         &channel,
-        &target,
+        target,
         &actors,
         &workspace_dir,
         &actors_manifest_path,
