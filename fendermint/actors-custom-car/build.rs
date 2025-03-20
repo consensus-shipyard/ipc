@@ -29,8 +29,8 @@ use toml::Value;
 use tracing::info;
 
 fn parse_dependencies_of_umbrella_crate(manifest_path: &Path) -> Result<Vec<(String, PathBuf)>> {
-    let manifest = dbg!(fs::read_to_string(manifest_path))?;
-    let document = dbg!(manifest.parse::<Value>()?);
+    let manifest = fs::read_to_string(manifest_path)?;
+    let document = manifest.parse::<Value>()?;
 
     let dependencies = document
         .get("target")
@@ -202,20 +202,38 @@ fn package_rerun_if_changed(package: &DeduplicatePackage) {
 }
 
 fn build_all_wasm_blobs(
+    channel: &str,
+    target: &str,
     actors: &[Actor],
+    cwd: &Path,
     manifest_path: &Path,
-    cargo: &Path,
     out_dir: &Path,
 ) -> Result<Vec<Actor>> {
+    echo!(
+        "actors-custom-car",
+        purple,
+        "Building {} actors",
+        actors.len()
+    );
+
     let package_args = actors
         .iter()
         .map(|actor| format!("-p={}", actor.package_name));
 
+    echo!("actors-custom-car", purple, "Target: {channel} {target}");
+
+    let rustup = which::which("rustup")?;
+
     // Cargo build command for all test_actors at once.
-    let mut cmd = Command::new(cargo);
-    cmd.arg("build")
+    let mut cmd = Command::new(rustup);
+    cmd.arg("run")
+        .arg(channel)
+        .arg("cargo")
+        .arg("build")
+        .current_dir(cwd)
         .args(package_args)
-        .arg("--target=wasm32-unknown-unknown")
+        .arg("--target")
+        .arg(target)
         .arg("--profile=wasm")
         .arg("--features=fil-actor")
         .arg(format!("--manifest-path={}", manifest_path.display()))
@@ -228,6 +246,13 @@ fn build_all_wasm_blobs(
         // our own `RUSTFLAGS` and thus, we need to remove this. Otherwise cargo favors this
         // env variable.
         .env_remove("CARGO_ENCODED_RUSTFLAGS");
+
+    echo!(
+        "actors-custom-car",
+        purple,
+        "Executing WASM compilation command: {:?}",
+        &cmd
+    );
 
     // Launch the command.
     let mut child = cmd.spawn()?;
@@ -258,6 +283,8 @@ fn build_all_wasm_blobs(
 }
 
 /// Use the `Cargo.lock` file to find the workspace manifest and extract dependency information
+///
+/// Requires `rustup` to be installed.
 fn print_cargo_rerun_if_dependency_instructions(
     cargo_manifest: &Path,
     out_dir: &Path,
@@ -320,10 +347,6 @@ fn print_cargo_rerun_if_dependency_instructions(
 }
 
 fn main() -> Result<()> {
-    // Cargo executable location.
-    let cargo = std::env::var_os("CARGO").ok_or_eyre("no CARGO env var")?;
-    let cargo = Path::new(&cargo);
-
     // Rust provided out dir, used as intermediate place to store a) wasm target dir b) their outputs
     // the final `.car` file will sit under `dst`.
     let out_dir = std::env::var_os("OUT_DIR")
@@ -332,16 +355,42 @@ fn main() -> Result<()> {
         .map(|p| p.join("bundle"))
         .ok_or_eyre("Must have OUT_DIR defined, this is only ever run from build.rs")?;
 
-    let manifest_path_dir =
+    let package_dir =
         std::env::var_os("CARGO_MANIFEST_DIR").ok_or_eyre("CARGO_MANIFEST_DIR unset")?;
-    let manifest_path_dir = Path::new(&manifest_path_dir);
-    let actors_manifest_path = manifest_path_dir
+    let package_dir = Path::new(&package_dir);
+    let actors_manifest_path = package_dir
         .parent()
         .unwrap()
         .join("actors")
         .join("Cargo.toml");
+    let workspace_dir = fs_err::canonicalize(package_dir.parent().unwrap().parent().unwrap())?;
 
-    let wasm_blob_dir = out_dir.join("wasm32-unknown-unknown").join("wasm");
+    let target = "wasm32-unknown-unknown";
+
+    // one cannot specify the file, so parse it and use the toolchain explicity
+    let toolchain_file_path = workspace_dir.join("rust-toolchain.toml");
+    let toolchain_file = fs_err::read_to_string(&toolchain_file_path)?;
+    let toolchain: toml::Table = toml::from_str(&toolchain_file)?;
+    let toolchain = toolchain
+        .get("toolchain")
+        .ok_or_else(|| eyre!("Missing toolchain in {}", toolchain_file_path.display()))?;
+    let channel: &toml::Value = toolchain
+        .get("channel")
+        .ok_or_else(|| eyre!("Missing channel in {}", toolchain_file_path.display()))?;
+    let channel: String = channel.clone().try_into()?;
+    // we use the `channel` as additional prefix to avoid compilation errors on
+    // `rustc` upgrades in `rust-toolchain.toml`
+    let out_dir = out_dir.join(&channel);
+
+    // the joins represent the subdirectories under which `cargo` creates the actual WASM aritifacts
+    let wasm_blob_dir = out_dir.join(target).join("wasm");
+
+    echo!(
+        "actors-custom-car",
+        purple,
+        "Writing wasm blob to {}",
+        wasm_blob_dir.display()
+    );
 
     let actors = parse_dependencies_of_umbrella_crate(&actors_manifest_path)?;
     let actors = Vec::from_iter(actors.iter().map(|(name, crate_path)| Actor {
@@ -352,7 +401,14 @@ fn main() -> Result<()> {
 
     print_cargo_rerun_if_dependency_instructions(&actors_manifest_path, &out_dir)?;
 
-    build_all_wasm_blobs(&actors, &actors_manifest_path, cargo, &out_dir)?;
+    build_all_wasm_blobs(
+        &channel,
+        target,
+        &actors,
+        &workspace_dir,
+        &actors_manifest_path,
+        &out_dir,
+    )?;
 
     let bundle_car_dest_dir = actors_manifest_path.parent().unwrap().join("output");
 
