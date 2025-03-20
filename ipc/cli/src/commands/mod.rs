@@ -6,6 +6,7 @@ mod checkpoint;
 mod config;
 mod crossmsg;
 // mod daemon;
+mod deploy;
 mod subnet;
 mod util;
 mod validator;
@@ -31,8 +32,10 @@ use std::path::Path;
 use std::str::FromStr;
 
 use crate::commands::config::ConfigCommandsArgs;
+use crate::commands::deploy::{DeployCommand, DeployCommandArgs};
 use crate::commands::validator::ValidatorCommandsArgs;
 use crate::commands::wallet::WalletCommandsArgs;
+use crate::CommandLineHandler;
 use subnet::SubnetCommandsArgs;
 
 /// We only support up to 9 decimal digits for transaction
@@ -50,6 +53,7 @@ enum Commands {
     Checkpoint(CheckpointCommandsArgs),
     Util(UtilCommandsArgs),
     Validator(ValidatorCommandsArgs),
+    Deploy(DeployCommandArgs),
 }
 
 #[derive(Debug, Parser)]
@@ -137,6 +141,7 @@ pub async fn cli() -> anyhow::Result<()> {
                 Commands::Checkpoint(args) => args.handle(global).await,
                 Commands::Util(args) => args.handle(global).await,
                 Commands::Validator(args) => args.handle(global).await,
+                Commands::Deploy(args) => DeployCommand::handle(global, args).await,
             };
 
             r.with_context(|| format!("error processing command {:?}", args.command))
