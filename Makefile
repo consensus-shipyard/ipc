@@ -2,6 +2,8 @@
 # instead of making an even more compilicated common one, let's delegate to them.
 
 default:
+	# to be removed, only needed for unit-tests and end2end tests which don't have pnpm installed right now
+	cd contracts && make gen
 	cargo build --release
 	./target/release/ipc-cli --version
 	./target/release/fendermint --version
