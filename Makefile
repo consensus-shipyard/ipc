@@ -2,7 +2,6 @@
 # instead of making an even more compilicated common one, let's delegate to them.
 
 default:
-	cd contracts && make gen
 	cargo build --release
 	./target/release/ipc-cli --version
 	./target/release/fendermint --version
@@ -13,7 +12,8 @@ SUBTREES_ALL := $(SUBTREES_RUST) $(SUBTREES_CONTRACTS)
 
 test: test-rust test-contracts
 
-test-rust: $(patsubst %, test/%, $(SUBTREES_RUST))
+test-rust:
+	cargo test --release --workspace
 
 test-contracts: $(patsubst %, test/%, $(SUBTREES_CONTRACTS))
 
@@ -33,13 +33,16 @@ markdownlint:
 	$(MARKDOWNLINT_CLI) --fix $$(find . -iwholename './crates/**/README.md' -or -iwholename './contracts/**/*.md' -or -iwholename './specs/**/*.md' -or -iwholename './docs*/**/*.md')
 
 fmt:
-	cd crates && cargo +nightly fmt
+	cargo +nightly fmt
 
 check-fmt:
-	cd crates && cargo +nightly fmt --check
+	cargo +nightly fmt --check
 
 clippy:
-	cd crates && cargo clippy --workspace --tests --no-deps --fix --allow-dirty --allow-staged -- -D clippy::all
+	cargo clippy --workspace --tests --no-deps --fix --allow-dirty --allow-staged -- -D clippy::all
 
 check-clippy:
-	cd crates && cargo clippy --workspace --tests --no-deps -- -D clippy::all
+	cargo clippy --workspace --tests --no-deps -- -D clippy::all
+
+
+.PHONY: clippy check-clippy fmt check-fmt markdownlint license test test-rust test-contracts
