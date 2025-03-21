@@ -47,6 +47,17 @@ jobs:
         with:
           shared-key: build
 
+      - uses: pnpm/action-setup@v2
+
+      - name: Set up node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '21'
+          cache: 'pnpm'
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
       - name: Run e2e tests
         run: |
           set -e
