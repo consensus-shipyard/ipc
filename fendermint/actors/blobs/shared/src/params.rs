@@ -215,7 +215,7 @@ pub struct TrimBlobExpiriesParams {
     pub starting_hash: Option<Hash>,
     /// Limit of blobs to trim expiries for.
     /// This specifies the maximum number of blobs that will be examined for trimming.
-    pub limit: Option<usize>,
+    pub limit: Option<u32>,
 }
 
 /// The stats of the blob actor.

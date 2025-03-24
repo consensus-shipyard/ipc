@@ -22,9 +22,11 @@ fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true }
 num-derive = { workspace = true }
 num-traits = { workspace = true }
-recall_sol_facade = { workspace = true, features = ["timehub"] }
 serde = { workspace = true, features = ["derive"] }
 tracing = { workspace = true, features = ["log"] }
+
+recall_sol_facade = { workspace = true, features = ["timehub"] }
+recall_actor_sdk = { path = "../../../recall/actor_sdk" }
 
 fendermint_actor_blobs_shared = { path = "../blobs/shared" }
 fendermint_actor_machine = { path = "../machine" }

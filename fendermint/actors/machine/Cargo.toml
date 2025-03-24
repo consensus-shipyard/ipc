@@ -19,6 +19,7 @@ fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true }
 recall_sol_facade = { workspace = true, features = ["machine"] }
 serde = { workspace = true, features = ["derive"] }
+recall_actor_sdk = { path = "../../../recall/actor_sdk" }
 
 [dev-dependencies]
 fil_actors_runtime = { workspace = true, features = ["test_utils"] }

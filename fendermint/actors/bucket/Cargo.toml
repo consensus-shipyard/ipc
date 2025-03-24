@@ -29,6 +29,7 @@ serde = { workspace = true, features = ["derive"] }
 fendermint_actor_blobs_shared = { path = "../blobs/shared" }
 fendermint_actor_machine = { path = "../machine" }
 recall_ipld = { path = "../../../recall/ipld" }
+recall_actor_sdk = { path = "../../../recall/actor_sdk" }
 
 [dev-dependencies]
 fil_actors_evm_shared = { workspace = true }

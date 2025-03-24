@@ -13,14 +13,14 @@ use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{ipld_block::IpldBlock, tuple::*};
 pub use fvm_shared::METHOD_CONSTRUCTOR;
 use fvm_shared::{address::Address, MethodNum};
-use recall_sol_facade::machine::{machine_created, machine_initialized};
+use recall_actor_sdk::{
+    emit_evm_event, to_delegated_address, to_id_address, to_id_and_delegated_address,
+};
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::events::emit_evm_event;
-use crate::util::{to_delegated_address, to_id_address, to_id_and_delegated_address};
+use crate::sol_facade::{MachineCreated, MachineInitialized};
 
-pub mod events;
-pub mod util;
+pub mod sol_facade;
 
 /// Params for creating a machine.
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
@@ -60,7 +60,7 @@ pub trait MachineActor {
 
         emit_evm_event(
             rt,
-            machine_created(state.kind() as u8, delegated_addr, &state.metadata()),
+            MachineCreated::new(state.kind(), delegated_addr, &state.metadata()),
         )
     }
 
@@ -75,7 +75,7 @@ pub trait MachineActor {
             Ok(st.kind())
         })?;
 
-        emit_evm_event(rt, machine_initialized(kind as u8, id_addr))
+        emit_evm_event(rt, MachineInitialized::new(kind, id_addr))
     }
 
     /// Get machine robust address.

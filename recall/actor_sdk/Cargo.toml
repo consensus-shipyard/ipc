@@ -12,3 +12,9 @@ crate-type = ["cdylib", "lib"]
 fvm_shared = { workspace = true }
 fvm_sdk = { workspace = true }
 num-traits = { workspace = true }
+fil_actors_runtime = { workspace = true }
+recall_sol_facade = { workspace = true, features = [] }
+anyhow = { workspace = true }
+fvm_ipld_encoding = { workspace = true }
+serde = { workspace = true }
+fil_actors_evm_shared = { workspace = true }

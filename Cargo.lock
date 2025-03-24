@@ -3492,6 +3492,7 @@ dependencies = [
 name = "fendermint_actor_blob_reader"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "fendermint_actor_blobs_shared",
  "fendermint_actor_machine",
  "fil_actors_evm_shared",
@@ -3506,6 +3507,7 @@ dependencies = [
  "num-derive 0.3.3",
  "num-traits",
  "rand",
+ "recall_actor_sdk",
  "recall_ipld",
  "recall_sol_facade",
  "serde",
@@ -3541,7 +3543,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "data-encoding",
- "fendermint_actor_machine",
  "fil_actors_runtime",
  "frc42_dispatch",
  "fvm_ipld_blockstore",
@@ -3586,6 +3587,7 @@ dependencies = [
  "num-traits",
  "quickcheck",
  "quickcheck_macros",
+ "recall_actor_sdk",
  "recall_ipld",
  "recall_sol_facade",
  "serde",
@@ -3662,6 +3664,7 @@ dependencies = [
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
  "fvm_shared",
+ "recall_actor_sdk",
  "recall_sol_facade",
  "serde",
 ]
@@ -3670,6 +3673,7 @@ dependencies = [
 name = "fendermint_actor_recall_config"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "fendermint_actor_blobs_shared",
  "fendermint_actor_machine",
  "fendermint_actor_recall_config_shared",
@@ -3679,6 +3683,7 @@ dependencies = [
  "fvm_shared",
  "hex-literal 0.4.1",
  "num-traits",
+ "recall_actor_sdk",
  "recall_sol_facade",
  "serde",
 ]
@@ -3715,6 +3720,7 @@ dependencies = [
  "hex-literal 0.4.1",
  "num-derive 0.3.3",
  "num-traits",
+ "recall_actor_sdk",
  "recall_sol_facade",
  "serde",
  "tracing",
@@ -10362,9 +10368,15 @@ dependencies = [
 name = "recall_actor_sdk"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "fil_actors_evm_shared",
+ "fil_actors_runtime",
+ "fvm_ipld_encoding",
  "fvm_sdk",
  "fvm_shared",
  "num-traits",
+ "recall_sol_facade",
+ "serde",
 ]
 
 [[package]]

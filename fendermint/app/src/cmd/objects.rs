@@ -770,7 +770,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
             let content_type = object
                 .metadata
                 .get("content-type")
-                .map(|v| v.clone())
+                .cloned()
                 .unwrap_or("application/octet-stream".to_string());
             header_map.insert(
                 "Content-Type",
@@ -883,13 +883,13 @@ fn get_filename_with_extension(filename: &str, content_type: &str) -> Option<Str
     let path = Path::new(filename);
 
     // Checks if filename already has extension
-    if let Some(_) = path.extension().and_then(|ext| ext.to_str()) {
+    if path.extension().and_then(|ext| ext.to_str()).is_some() {
         return Some(filename.to_string());
     }
 
     get_mime_extensions_str(content_type)?
         .first()
-        .map(|ext| format!("{}.{}", filename, ext.to_string()))
+        .map(|ext| format!("{}.{}", filename, ext))
 }
 
 #[cfg(test)]

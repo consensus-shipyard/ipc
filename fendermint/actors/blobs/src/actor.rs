@@ -2,8 +2,6 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::collections::HashSet;
-
 use fendermint_actor_blobs_shared::params::{
     AddBlobParams, ApproveCreditParams, BuyCreditParams, DeleteBlobParams, FinalizeBlobParams,
     GetAccountParams, GetAddedBlobsParams, GetBlobParams, GetBlobStatusParams,
@@ -12,15 +10,9 @@ use fendermint_actor_blobs_shared::params::{
     SetSponsorParams, TrimBlobExpiriesParams, UpdateGasAllowanceParams,
 };
 use fendermint_actor_blobs_shared::state::{
-    AccountInfo, BlobInfo, BlobStatus, Credit, CreditApproval, GasAllowance, Hash, PublicKey,
-    Subscription, SubscriptionId,
+    BlobInfo, BlobRequest, BlobStatus, Credit, CreditApproval, GasAllowance, Hash, Subscription,
 };
 use fendermint_actor_blobs_shared::Method;
-use fendermint_actor_machine::events::emit_evm_event;
-use fendermint_actor_machine::util::{
-    require_addr_is_origin_or_caller, to_delegated_address, to_id_address,
-    to_id_and_delegated_address, token_to_biguint,
-};
 use fendermint_actor_recall_config_shared::{get_config, require_caller_is_admin};
 use fil_actors_runtime::{
     actor_dispatch, actor_error, extract_send_result,
@@ -28,16 +20,17 @@ use fil_actors_runtime::{
     ActorError, FIRST_EXPORTED_METHOD_NUMBER, SYSTEM_ACTOR_ADDR,
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
-use fvm_shared::{address::Address, econ::TokenAmount, error::ExitCode, MethodNum, METHOD_SEND};
+use fvm_shared::{econ::TokenAmount, error::ExitCode, MethodNum, METHOD_SEND};
 use num_traits::Zero;
-use recall_sol_facade::{
-    blobs::{blob_added, blob_deleted, blob_finalized, blob_pending},
-    credit::{
-        credit_approved, credit_debited as credit_debited_event, credit_purchased, credit_revoked,
-    },
-    gas::{gas_sponsor_set, gas_sponsor_unset},
+use recall_actor_sdk::{
+    emit_evm_event, require_addr_is_origin_or_caller, to_delegated_address, to_id_address,
+    to_id_and_delegated_address, InputData, InvokeContractParams, InvokeContractReturn,
 };
 
+use crate::sol_facade::credit::{CreditApproved, CreditDebited, CreditPurchased, CreditRevoked};
+use crate::sol_facade::gas::{GasSponsorSet, GasSponsorUnset};
+use crate::sol_facade::{blobs as sol_blobs, credit as sol_credit, AbiCall, AbiCallRuntime};
+use crate::state::AccountInfo;
 use crate::{State, BLOBS_ACTOR_NAME};
 
 #[cfg(feature = "fil-actor")]
@@ -53,10 +46,6 @@ fil_actors_runtime::wasm_trampoline!(BlobsActor);
 /// For simplicity, this actor currently manages both blobs and credit.
 /// A future version of the protocol will likely separate them in some way.
 pub struct BlobsActor;
-
-/// The return type used when fetching "added" or "pending" blobs.
-/// See `get_added_blobs` and `get_pending_blobs` for more information.
-type BlobRequest = (Hash, u64, HashSet<(Address, SubscriptionId, PublicKey)>);
 
 impl BlobsActor {
     /// Creates a new `[BlobsActor]` state.
@@ -102,10 +91,7 @@ impl BlobsActor {
             Ok(account)
         })?;
 
-        emit_evm_event(
-            rt,
-            credit_purchased(delegated_addr, token_to_biguint(Some(credit_amount))),
-        )?;
+        emit_evm_event(rt, CreditPurchased::new(delegated_addr, credit_amount))?;
 
         AccountInfo::from(rt, account)
     }
@@ -205,18 +191,15 @@ impl BlobsActor {
             Err(e) => Err(e),
         }?;
 
-        let event_credit_limit = token_to_biguint(approval.credit_limit.clone());
-        let event_fas_fee_limit = token_to_biguint(approval.gas_fee_limit.clone());
-        let event_expiry = approval.expiry.unwrap_or_default() as u64;
         emit_evm_event(
             rt,
-            credit_approved(
-                from_delegated_addr,
-                to_delegated_addr,
-                event_credit_limit,
-                event_fas_fee_limit,
-                event_expiry,
-            ),
+            CreditApproved {
+                from: from_delegated_addr,
+                to: to_delegated_addr,
+                credit_limit: approval.credit_limit.clone(),
+                gas_fee_limit: approval.gas_fee_limit.clone(),
+                expiry: approval.expiry,
+            },
         )?;
 
         Ok(approval)
@@ -238,7 +221,10 @@ impl BlobsActor {
             st.revoke_credit(rt.store(), from_id_addr, to_id_addr)
         })?;
 
-        emit_evm_event(rt, credit_revoked(from_delegated_addr, to_delegated_addr))?;
+        emit_evm_event(
+            rt,
+            CreditRevoked::new(from_delegated_addr, to_delegated_addr),
+        )?;
 
         Ok(())
     }
@@ -268,9 +254,9 @@ impl BlobsActor {
         })?;
 
         if let Some(sponsor) = sponsor_delegated_addr {
-            emit_evm_event(rt, gas_sponsor_set(sponsor))?;
+            emit_evm_event(rt, GasSponsorSet::mew(sponsor))?;
         } else {
-            emit_evm_event(rt, gas_sponsor_unset())?;
+            emit_evm_event(rt, GasSponsorUnset::new())?;
         }
 
         Ok(())
@@ -319,6 +305,7 @@ impl BlobsActor {
                     .credit_sponsor
                     .map(|sponsor| to_delegated_address(rt, sponsor))
                     .transpose()?;
+
                 AccountInfo::from(rt, account)
             });
 
@@ -403,7 +390,11 @@ impl BlobsActor {
         // TODO: Wire more_accounts param when pagination work is done.
         emit_evm_event(
             rt,
-            credit_debited_event(token_to_biguint(Some(credit_debited)), num_accounts, false),
+            CreditDebited {
+                amount: credit_debited,
+                num_accounts,
+                more_accounts: false,
+            },
         )?;
 
         Ok(())
@@ -462,13 +453,13 @@ impl BlobsActor {
 
         emit_evm_event(
             rt,
-            blob_added(
-                subscriber_delegated_addr,
-                &params.hash.0,
-                params.size,
-                sub.expiry as u64,
-                capacity_used,
-            ),
+            sol_blobs::BlobAdded {
+                subscriber: subscriber_delegated_addr,
+                hash: &params.hash,
+                size: params.size,
+                expiry: sub.expiry,
+                bytes_used: capacity_used,
+            },
         )?;
 
         Ok(sub)
@@ -541,7 +532,11 @@ impl BlobsActor {
 
         emit_evm_event(
             rt,
-            blob_pending(subscriber_delegated_addr, &params.hash.0, &params.source.0),
+            sol_blobs::BlobPending {
+                subscriber: subscriber_delegated_addr,
+                hash: &params.hash,
+                source: &params.source,
+            },
         )
     }
 
@@ -573,7 +568,11 @@ impl BlobsActor {
 
         emit_evm_event(
             rt,
-            blob_finalized(subscriber_delegated_addr, &params.hash.0, event_resolved),
+            sol_blobs::BlobFinalized {
+                subscriber: subscriber_delegated_addr,
+                hash: &params.hash,
+                resolved: event_resolved,
+            },
         )
     }
 
@@ -616,12 +615,12 @@ impl BlobsActor {
 
         emit_evm_event(
             rt,
-            blob_deleted(
-                subscriber_delegated_addr,
-                &params.hash.0,
+            sol_blobs::BlobDeleted {
+                subscriber: subscriber_delegated_addr,
+                hash: &params.hash,
                 size,
-                capacity_released,
-            ),
+                bytes_released: capacity_released,
+            },
         )?;
 
         Ok(())
@@ -707,23 +706,23 @@ impl BlobsActor {
         if overwrite {
             emit_evm_event(
                 rt,
-                blob_deleted(
-                    subscriber_delegated_addr,
-                    &params.old_hash.0,
-                    delete_size,
-                    capacity_released,
-                ),
+                sol_blobs::BlobDeleted {
+                    subscriber: subscriber_delegated_addr,
+                    hash: &params.old_hash,
+                    size: delete_size,
+                    bytes_released: capacity_released,
+                },
             )?;
         }
         emit_evm_event(
             rt,
-            blob_added(
-                subscriber_delegated_addr,
-                &add_hash.0,
-                add_size,
-                sub.expiry as u64,
-                capacity_used,
-            ),
+            sol_blobs::BlobAdded {
+                subscriber: subscriber_delegated_addr,
+                hash: &add_hash,
+                size: add_size,
+                expiry: sub.expiry,
+                bytes_used: capacity_used,
+            },
         )?;
 
         Ok(sub)
@@ -760,6 +759,110 @@ impl BlobsActor {
         }
 
         Ok((processed, next_key))
+    }
+
+    fn invoke_contract(
+        rt: &impl Runtime,
+        params: InvokeContractParams,
+    ) -> Result<InvokeContractReturn, ActorError> {
+        let input_data: InputData = params.try_into()?;
+        if sol_blobs::can_handle(&input_data) {
+            let output_data = match sol_blobs::parse_input(&input_data)? {
+                sol_blobs::Calls::addBlob(call) => {
+                    let params = call.params(rt)?;
+                    Self::add_blob(rt, params)?;
+                    call.returns(())
+                }
+                sol_blobs::Calls::deleteBlob(call) => {
+                    let params = call.params(rt)?;
+                    Self::delete_blob(rt, params)?;
+                    call.returns(())
+                }
+                sol_blobs::Calls::getBlob(call) => {
+                    let params: GetBlobParams = call.params()?;
+                    let blob = Self::get_blob(rt, params)?;
+                    call.returns(blob)?
+                }
+                sol_blobs::Calls::getStats(call) => {
+                    let stats = Self::get_stats(rt)?;
+                    call.returns(stats)
+                }
+                sol_blobs::Calls::overwriteBlob(call) => {
+                    let params = call.params(rt)?;
+                    Self::overwrite_blob(rt, params)?;
+                    call.returns(())
+                }
+                sol_blobs::Calls::trimBlobExpiries(call) => {
+                    let params = call.params();
+                    let cursor = Self::trim_blob_expiries(rt, params)?;
+                    call.returns(cursor)
+                }
+            };
+            Ok(InvokeContractReturn { output_data })
+        } else if sol_credit::can_handle(&input_data) {
+            let output_data = match sol_credit::parse_input(&input_data)? {
+                sol_credit::Calls::buyCredit_0(call) => {
+                    // function buyCredit() external payable;
+                    let params = call.params(rt);
+                    Self::buy_credit(rt, params)?;
+                    call.returns(())
+                }
+                sol_credit::Calls::buyCredit_1(call) => {
+                    // function buyCredit(address recipient) external payable;
+                    let params = call.params();
+                    Self::buy_credit(rt, params)?;
+                    call.returns(())
+                }
+                sol_credit::Calls::approveCredit_0(call) => {
+                    let params = call.params(rt);
+                    Self::approve_credit(rt, params)?;
+                    call.returns(())
+                }
+                sol_credit::Calls::approveCredit_1(call) => {
+                    let params = call.params(rt);
+                    Self::approve_credit(rt, params)?;
+                    call.returns(())
+                }
+                sol_credit::Calls::approveCredit_2(call) => {
+                    let params = call.params(rt);
+                    Self::approve_credit(rt, params)?;
+                    call.returns(())
+                }
+                sol_credit::Calls::revokeCredit_0(call) => {
+                    let params = call.params(rt);
+                    Self::revoke_credit(rt, params)?;
+                    call.returns(())
+                }
+                sol_credit::Calls::revokeCredit_1(call) => {
+                    let params = call.params(rt);
+                    Self::revoke_credit(rt, params)?;
+                    call.returns(())
+                }
+                sol_credit::Calls::setAccountSponsor(call) => {
+                    let params = call.params(rt);
+                    Self::set_account_sponsor(rt, params)?;
+                    call.returns(())
+                }
+                sol_credit::Calls::getAccount(call) => {
+                    let params = call.params();
+                    let account_info = Self::get_account(rt, params)?;
+                    call.returns(account_info)?
+                }
+                sol_credit::Calls::getCreditApproval(call) => {
+                    let params = call.params();
+                    let credit_approval = Self::get_credit_approval(rt, params)?;
+                    call.returns(credit_approval)
+                }
+                sol_credit::Calls::setAccountStatus(call) => {
+                    let params = call.params()?;
+                    Self::set_account_status(rt, params)?;
+                    call.returns(())
+                }
+            };
+            Ok(InvokeContractReturn { output_data })
+        } else {
+            Err(actor_error!(illegal_argument, "invalid call".to_string()))
+        }
     }
 
     /// Fallback method for unimplemented method numbers.
@@ -832,6 +935,8 @@ impl ActorCode for BlobsActor {
 
         // Metrics methods
         GetStats => get_stats,
+        // EVM interop
+        InvokeContract => invoke_contract,
         _ => fallback,
     }
 }
@@ -840,15 +945,17 @@ impl ActorCode for BlobsActor {
 mod tests {
     use super::*;
 
+    use fendermint_actor_blobs_shared::state::SubscriptionId;
     use fendermint_actor_blobs_testing::{new_hash, new_pk};
-    use fendermint_actor_machine::events::to_actor_event;
     use fendermint_actor_recall_config_shared::{RecallConfig, RECALL_CONFIG_ACTOR_ADDR};
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::test_utils::{
         expect_empty, MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, EVM_ACTOR_CODE_ID,
         SYSTEM_ACTOR_CODE_ID,
     };
+    use fvm_shared::address::Address;
     use fvm_shared::{bigint::BigInt, clock::ChainEpoch, sys::SendFlags};
+    use recall_actor_sdk::to_actor_event;
 
     pub fn construct_and_verify() -> MockRuntime {
         let rt = MockRuntime {
@@ -885,9 +992,7 @@ mod tests {
         params: &BuyCreditParams,
         amount: TokenAmount,
     ) {
-        let event =
-            to_actor_event(credit_purchased(params.0, token_to_biguint(Some(amount))).unwrap())
-                .unwrap();
+        let event = to_actor_event(CreditPurchased::new(params.0, amount)).unwrap();
         rt.expect_emitted_event(event);
     }
 
@@ -899,17 +1004,19 @@ mod tests {
         gas_fee_limit: Option<TokenAmount>,
         expiry: ChainEpoch,
     ) {
-        let credit_limit = token_to_biguint(credit_limit);
-        let gas_fee_limit = token_to_biguint(gas_fee_limit);
-        let event = to_actor_event(
-            credit_approved(from, to, credit_limit, gas_fee_limit, expiry as u64).unwrap(),
-        )
+        let event = to_actor_event(CreditApproved {
+            from,
+            to,
+            credit_limit,
+            gas_fee_limit,
+            expiry: Some(expiry),
+        })
         .unwrap();
         rt.expect_emitted_event(event);
     }
 
     fn expect_emitted_revoke_event(rt: &MockRuntime, from: Address, to: Address) {
-        let event = to_actor_event(credit_revoked(from, to).unwrap()).unwrap();
+        let event = to_actor_event(CreditRevoked::new(from, to)).unwrap();
         rt.expect_emitted_event(event);
     }
 
@@ -920,16 +1027,13 @@ mod tests {
         subscriber: Address,
         used: u64,
     ) {
-        let event = to_actor_event(
-            blob_added(
-                subscriber,
-                &params.hash.0,
-                params.size,
-                (params.ttl.unwrap_or(86400) + current_epoch) as u64,
-                used,
-            )
-            .unwrap(),
-        )
+        let event = to_actor_event(sol_blobs::BlobAdded {
+            subscriber,
+            hash: &params.hash,
+            size: params.size,
+            expiry: params.ttl.unwrap_or(86400) + current_epoch,
+            bytes_used: used,
+        })
         .unwrap();
         rt.expect_emitted_event(event);
     }

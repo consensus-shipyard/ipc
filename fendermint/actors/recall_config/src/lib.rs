@@ -3,10 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use fendermint_actor_blobs_shared::state::TokenCreditRate;
-use fendermint_actor_machine::{
-    events::emit_evm_event,
-    util::{to_delegated_address, to_id_and_delegated_address},
-};
 use fendermint_actor_recall_config_shared::{
     Method, RecallConfig, SetAdminParams, SetConfigParams,
 };
@@ -19,7 +15,11 @@ use fvm_ipld_encoding::tuple::*;
 use fvm_shared::bigint::BigUint;
 use fvm_shared::{address::Address, clock::ChainEpoch};
 use num_traits::Zero;
-use recall_sol_facade::config::{config_admin_set, config_set};
+use recall_actor_sdk::{emit_evm_event, to_delegated_address, to_id_and_delegated_address};
+
+use crate::sol_facade::{ConfigAdminSet, ConfigSet};
+
+mod sol_facade;
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(Actor);
@@ -76,7 +76,7 @@ impl Actor {
             Ok(())
         })?;
 
-        emit_evm_event(rt, config_admin_set(admin_delegated_addr))?;
+        emit_evm_event(rt, ConfigAdminSet::new(admin_delegated_addr))?;
 
         Ok(())
     }
@@ -161,19 +161,19 @@ impl Actor {
         })?;
 
         if let Some(admin) = admin_delegated_addr {
-            emit_evm_event(rt, config_admin_set(admin))?;
+            emit_evm_event(rt, ConfigAdminSet::new(admin))?;
         }
         emit_evm_event(
             rt,
-            config_set(
-                params.blob_capacity,
-                params.token_credit_rate.rate().clone(),
-                params.blob_credit_debit_interval as u64,
-                params.blob_min_ttl as u64,
-                params.blob_default_ttl as u64,
-                params.blob_delete_batch_size,
-                params.account_debit_batch_size,
-            ),
+            ConfigSet {
+                blob_capacity: params.blob_capacity,
+                token_credit_rate: params.token_credit_rate,
+                blob_credit_debit_interval: params.blob_credit_debit_interval,
+                blob_min_ttl: params.blob_min_ttl,
+                blob_default_ttl: params.blob_default_ttl,
+                blob_delete_batch_size: params.blob_delete_batch_size,
+                account_debit_batch_size: params.account_debit_batch_size,
+            },
         )?;
 
         Ok(())
@@ -227,7 +227,6 @@ impl ActorCode for Actor {
 mod tests {
     use super::*;
 
-    use fendermint_actor_machine::events::to_actor_event;
     use fendermint_actor_recall_config_shared::{RecallConfig, RECALL_CONFIG_ACTOR_ID};
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::test_utils::{
@@ -235,6 +234,7 @@ mod tests {
     };
     use fvm_ipld_encoding::ipld_block::IpldBlock;
     use fvm_shared::error::ExitCode;
+    use recall_actor_sdk::to_actor_event;
 
     pub fn construct_and_verify(
         blob_capacity: u64,
@@ -304,7 +304,7 @@ mod tests {
 
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.expect_validate_caller_any();
-        let event = to_actor_event(config_admin_set(f4_eth_addr).unwrap()).unwrap();
+        let event = to_actor_event(ConfigAdminSet::new(f4_eth_addr)).unwrap();
         rt.expect_emitted_event(event);
         let result = rt.call::<Actor>(
             Method::SetAdmin as u64,
@@ -334,7 +334,7 @@ mod tests {
 
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr); // current admin
         rt.expect_validate_caller_addr(vec![id_addr]);
-        let event = to_actor_event(config_admin_set(new_f4_eth_addr).unwrap()).unwrap();
+        let event = to_actor_event(ConfigAdminSet::new(new_f4_eth_addr)).unwrap();
         rt.expect_emitted_event(event);
         let result = rt.call::<Actor>(
             Method::SetAdmin as u64,
@@ -368,7 +368,7 @@ mod tests {
 
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.expect_validate_caller_any();
-        let event = to_actor_event(config_admin_set(f4_eth_addr).unwrap()).unwrap();
+        let event = to_actor_event(ConfigAdminSet::new(f4_eth_addr)).unwrap();
         rt.expect_emitted_event(event);
         let result = rt.call::<Actor>(
             Method::SetAdmin as u64,
@@ -412,7 +412,7 @@ mod tests {
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.expect_validate_caller_any();
 
-        let admin_event = to_actor_event(config_admin_set(f4_eth_addr).unwrap()).unwrap();
+        let admin_event = to_actor_event(ConfigAdminSet::new(f4_eth_addr)).unwrap();
         rt.expect_emitted_event(admin_event);
 
         let config = RecallConfig {
@@ -424,18 +424,15 @@ mod tests {
             blob_delete_batch_size: 100,
             account_debit_batch_size: 100,
         };
-        let config_event = to_actor_event(
-            config_set(
-                config.blob_capacity,
-                config.token_credit_rate.rate().clone(),
-                config.blob_credit_debit_interval as u64,
-                config.blob_min_ttl as u64,
-                config.blob_default_ttl as u64,
-                config.blob_delete_batch_size,
-                config.account_debit_batch_size,
-            )
-            .unwrap(),
-        )
+        let config_event = to_actor_event(ConfigSet {
+            blob_capacity: config.blob_capacity,
+            token_credit_rate: config.token_credit_rate.clone(),
+            blob_credit_debit_interval: config.blob_credit_debit_interval,
+            blob_min_ttl: config.blob_min_ttl,
+            blob_default_ttl: config.blob_default_ttl,
+            blob_delete_batch_size: config.blob_delete_batch_size,
+            account_debit_batch_size: config.account_debit_batch_size,
+        })
         .unwrap();
         rt.expect_emitted_event(config_event);
 

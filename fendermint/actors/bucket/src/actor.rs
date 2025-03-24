@@ -8,11 +8,7 @@ use fendermint_actor_blobs_shared::{
     add_blob, delete_blob, get_blob, has_credit_approval, overwrite_blob,
     state::{BlobInfo, BlobStatus, SubscriptionId},
 };
-use fendermint_actor_machine::{
-    events::emit_evm_event,
-    util::{require_addr_is_origin_or_caller, to_id_address},
-    MachineActor,
-};
+use fendermint_actor_machine::MachineActor;
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
     runtime::{ActorCode, Runtime},
@@ -20,12 +16,13 @@ use fil_actors_runtime::{
 };
 use fvm_ipld_hamt::BytesKey;
 use fvm_shared::address::Address;
-use recall_sol_facade::bucket::{object_added, object_deleted, object_metadata_updated};
+use recall_actor_sdk::{emit_evm_event, require_addr_is_origin_or_caller, to_id_address};
 
 use crate::shared::{
     AddParams, DeleteParams, GetParams, ListObjectsReturn, ListParams, Method, Object,
     BUCKET_ACTOR_NAME,
 };
+use crate::sol_facade::{ObjectAdded, ObjectDeleted, ObjectMetadataUpdated};
 use crate::state::{ObjectState, State};
 use crate::{
     UpdateObjectMetadataParams, MAX_METADATA_ENTRIES, MAX_METADATA_KEY_SIZE,
@@ -109,7 +106,7 @@ impl Actor {
 
         emit_evm_event(
             rt,
-            object_added(params.key, &params.hash.0, &params.metadata),
+            ObjectAdded::new(&params.key, &params.hash, &params.metadata),
         )?;
 
         Ok(Object {
@@ -146,7 +143,7 @@ impl Actor {
 
         rt.transaction(|st: &mut State, rt| st.delete(rt.store(), &key))?;
 
-        emit_evm_event(rt, object_deleted(key.0, &object.hash.0))?;
+        emit_evm_event(rt, ObjectDeleted::new(&key, &object.hash))?;
 
         Ok(())
     }
@@ -270,7 +267,7 @@ impl Actor {
             Ok(object.metadata)
         })?;
 
-        emit_evm_event(rt, object_metadata_updated(params.key, &metadata))?;
+        emit_evm_event(rt, ObjectMetadataUpdated::new(&params.key, &metadata))?;
 
         Ok(())
     }
@@ -400,7 +397,8 @@ mod tests {
         Method as BlobMethod, BLOBS_ACTOR_ADDR,
     };
     use fendermint_actor_blobs_testing::{new_hash, new_pk, setup_logs};
-    use fendermint_actor_machine::{events::to_actor_event, ConstructorParams, InitParams, Kind};
+    use fendermint_actor_machine::sol_facade::{MachineCreated, MachineInitialized};
+    use fendermint_actor_machine::{ConstructorParams, InitParams, Kind};
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::runtime::Runtime;
     use fil_actors_runtime::test_utils::{
@@ -411,7 +409,7 @@ mod tests {
     use fvm_shared::{
         clock::ChainEpoch, econ::TokenAmount, error::ExitCode, sys::SendFlags, MethodNum,
     };
-    use recall_sol_facade::machine::{machine_created, machine_initialized};
+    use recall_actor_sdk::to_actor_event;
 
     fn get_runtime() -> (MockRuntime, Address) {
         let origin_id_addr = Address::new_id(110);
@@ -437,9 +435,11 @@ mod tests {
         rt.set_caller(*INIT_ACTOR_CODE_ID, INIT_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![INIT_ACTOR_ADDR]);
         let metadata = HashMap::new();
-        let event = to_actor_event(
-            machine_created(Kind::Bucket as u8, owner_delegated_addr, &metadata).unwrap(),
-        )
+        let event = to_actor_event(MachineCreated::new(
+            Kind::Bucket,
+            owner_delegated_addr,
+            &metadata,
+        ))
         .unwrap();
         rt.expect_emitted_event(event);
         let actor_construction = rt
@@ -457,8 +457,7 @@ mod tests {
 
         rt.set_caller(*ADM_ACTOR_CODE_ID, ADM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![ADM_ACTOR_ADDR]);
-        let event =
-            to_actor_event(machine_initialized(Kind::Bucket as u8, buck_addr).unwrap()).unwrap();
+        let event = to_actor_event(MachineInitialized::new(Kind::Bucket, buck_addr)).unwrap();
         rt.expect_emitted_event(event);
         let actor_init = rt
             .call::<Actor>(
@@ -474,15 +473,17 @@ mod tests {
     }
 
     fn expect_emitted_add_event(rt: &MockRuntime, params: &AddParams) {
-        let event = to_actor_event(
-            object_added(params.key.clone(), &params.hash.0, &params.metadata).unwrap(),
-        )
+        let event = to_actor_event(ObjectAdded::new(
+            &params.key,
+            &params.hash,
+            &params.metadata,
+        ))
         .unwrap();
         rt.expect_emitted_event(event);
     }
 
     fn expect_emitted_delete_event(rt: &MockRuntime, params: &DeleteParams, hash: Hash) {
-        let event = to_actor_event(object_deleted(params.key.clone(), &hash.0).unwrap()).unwrap();
+        let event = to_actor_event(ObjectDeleted::new(&params.key, &hash)).unwrap();
         rt.expect_emitted_event(event);
     }
 
@@ -1012,13 +1013,10 @@ mod tests {
             ]),
         };
         rt.expect_validate_caller_any();
-        let event = to_actor_event(
-            object_metadata_updated(
-                add_params.key,
-                &HashMap::from([("foo".into(), "zar".into()), ("foo3".into(), "bar".into())]),
-            )
-            .unwrap(),
-        )
+        let event = to_actor_event(ObjectMetadataUpdated {
+            key: &add_params.key,
+            metadata: &HashMap::from([("foo".into(), "zar".into()), ("foo3".into(), "bar".into())]),
+        })
         .unwrap();
         rt.expect_emitted_event(event);
         let result = rt.call::<Actor>(
@@ -1098,13 +1096,10 @@ mod tests {
             ExitCode::OK,
             None,
         );
-        let event = to_actor_event(
-            object_metadata_updated(
-                alien_update.key.clone(),
-                &HashMap::from([("foo".into(), "zar".into()), ("foo3".into(), "bar".into())]),
-            )
-            .unwrap(),
-        )
+        let event = to_actor_event(ObjectMetadataUpdated {
+            key: &alien_update.key,
+            metadata: &HashMap::from([("foo".into(), "zar".into()), ("foo3".into(), "bar".into())]),
+        })
         .unwrap();
         rt.expect_emitted_event(event);
         let result = rt.call::<Actor>(

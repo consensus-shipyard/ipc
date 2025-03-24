@@ -55,6 +55,8 @@ pub enum Method {
 
     // Metrics methods
     GetStats = frc42_dispatch::method_hash!("GetStats"),
+    // EVM Interop
+    InvokeContract = frc42_dispatch::method_hash!("InvokeEVM"),
 }
 
 pub fn buy_credit(rt: &impl Runtime, to: Address) -> Result<Account, ActorError> {

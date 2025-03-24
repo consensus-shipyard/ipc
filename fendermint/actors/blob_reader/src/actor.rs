@@ -2,13 +2,7 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::shared::{
-    CloseReadRequestParams, GetOpenReadRequestsParams, GetReadRequestStatusParams, Method,
-    OpenReadRequestParams, OpenReadRequestTuple, ReadRequestStatus, SetReadRequestPendingParams,
-    State, BLOB_READER_ACTOR_NAME,
-};
 use fendermint_actor_blobs_shared::state::Hash;
-use fendermint_actor_machine::events::emit_evm_event;
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
     runtime::{ActorCode, Runtime},
@@ -16,9 +10,14 @@ use fil_actors_runtime::{
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::MethodNum;
-use recall_sol_facade::blob_reader::{
-    read_request_closed, read_request_opened, read_request_pending,
+use recall_actor_sdk::emit_evm_event;
+
+use crate::shared::{
+    CloseReadRequestParams, GetOpenReadRequestsParams, GetReadRequestStatusParams, Method,
+    OpenReadRequestParams, OpenReadRequestTuple, ReadRequestStatus, SetReadRequestPendingParams,
+    State, BLOB_READER_ACTOR_NAME,
 };
+use crate::sol_facade::{ReadRequestClosed, ReadRequestOpened, ReadRequestPending};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(ReadReqActor);
@@ -51,14 +50,14 @@ impl ReadReqActor {
 
         emit_evm_event(
             rt,
-            read_request_opened(
-                &id.0,
-                &params.hash.0,
-                params.offset as u64,
-                params.len as u64,
-                params.callback_addr,
-                params.callback_method,
-            ),
+            ReadRequestOpened {
+                id: &id,
+                blob_hash: &params.hash,
+                read_offset: params.offset.into(),
+                read_length: params.len.into(),
+                callback: params.callback_addr,
+                method_num: params.callback_method,
+            },
         )?;
 
         Ok(id)
@@ -90,7 +89,7 @@ impl ReadReqActor {
     ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
         rt.transaction(|st: &mut State, _| st.close_read_request(rt.store(), params.0))?;
-        emit_evm_event(rt, read_request_closed(&params.0 .0))
+        emit_evm_event(rt, ReadRequestClosed::new(&params.0))
     }
 
     fn set_read_request_pending(
@@ -100,7 +99,7 @@ impl ReadReqActor {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         rt.transaction(|st: &mut State, _| st.set_read_request_pending(rt.store(), params.0))?;
-        emit_evm_event(rt, read_request_pending(&params.0 .0))
+        emit_evm_event(rt, ReadRequestPending::new(&params.0))
     }
 
     /// Fallback method for unimplemented method numbers.
@@ -139,8 +138,8 @@ impl ActorCode for ReadReqActor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sol_facade::ReadRequestClosed;
 
-    use fendermint_actor_machine::events::to_actor_event;
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::test_utils::{
         expect_empty, MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, SYSTEM_ACTOR_CODE_ID,
@@ -148,6 +147,7 @@ mod tests {
     use fvm_ipld_encoding::ipld_block::IpldBlock;
     use fvm_shared::address::Address;
     use rand::RngCore;
+    use recall_actor_sdk::to_actor_event;
 
     pub fn new_hash(size: usize) -> (Hash, u64) {
         let mut rng = rand::thread_rng();
@@ -176,28 +176,25 @@ mod tests {
     }
 
     fn expect_emitted_open_event(rt: &MockRuntime, params: &OpenReadRequestParams, id: &Hash) {
-        let event = to_actor_event(
-            read_request_opened(
-                &id.0,
-                &params.hash.0,
-                params.offset as u64,
-                params.len as u64,
-                params.callback_addr,
-                params.callback_method,
-            )
-            .unwrap(),
-        )
+        let event = to_actor_event(ReadRequestOpened {
+            id,
+            blob_hash: &params.hash,
+            read_offset: params.offset.into(),
+            read_length: params.len.into(),
+            callback: params.callback_addr,
+            method_num: params.callback_method,
+        })
         .unwrap();
         rt.expect_emitted_event(event);
     }
 
     fn expect_emitted_pending_event(rt: &MockRuntime, params: &SetReadRequestPendingParams) {
-        let event = to_actor_event(read_request_pending(&params.0 .0).unwrap()).unwrap();
+        let event = to_actor_event(ReadRequestPending::new(&params.0)).unwrap();
         rt.expect_emitted_event(event);
     }
 
     fn expect_emitted_closed_event(rt: &MockRuntime, params: &CloseReadRequestParams) {
-        let event = to_actor_event(read_request_closed(&params.0 .0).unwrap()).unwrap();
+        let event = to_actor_event(ReadRequestClosed::new(&params.0)).unwrap();
         rt.expect_emitted_event(event);
     }
 

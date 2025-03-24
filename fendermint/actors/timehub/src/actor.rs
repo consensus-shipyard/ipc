@@ -4,19 +4,16 @@
 
 use cid::Cid;
 use fendermint_actor_blobs_shared::has_credit_approval;
-use fendermint_actor_machine::{
-    events::emit_evm_event,
-    util::{require_addr_is_origin_or_caller, to_id_address},
-    MachineActor,
-};
+use fendermint_actor_machine::MachineActor;
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
     runtime::{ActorCode, Runtime},
     ActorError,
 };
-use recall_sol_facade::timehub::event_pushed;
+use recall_actor_sdk::{emit_evm_event, require_addr_is_origin_or_caller, to_id_address};
 use tracing::debug;
 
+use crate::sol_facade::EventPushed;
 use crate::{Leaf, Method, PushParams, PushReturn, State, TIMEHUB_ACTOR_NAME};
 
 #[cfg(feature = "fil-actor")]
@@ -59,7 +56,7 @@ impl TimehubActor {
 
         let ret = rt.transaction(|st: &mut State, rt| st.push(rt.store(), data))?;
 
-        emit_evm_event(rt, event_pushed(ret.index, timestamp, cid.to_bytes()))?;
+        emit_evm_event(rt, EventPushed::new(ret.index, timestamp, cid))?;
 
         Ok(ret)
     }
@@ -128,6 +125,7 @@ impl ActorCode for TimehubActor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sol_facade::EventPushed;
 
     use std::collections::HashMap;
     use std::str::FromStr;
@@ -136,7 +134,8 @@ mod tests {
         params::GetCreditApprovalParams, state::CreditApproval, Method as BlobMethod,
         BLOBS_ACTOR_ADDR,
     };
-    use fendermint_actor_machine::{events::to_actor_event, ConstructorParams, InitParams, Kind};
+    use fendermint_actor_machine::sol_facade::{MachineCreated, MachineInitialized};
+    use fendermint_actor_machine::{ConstructorParams, InitParams, Kind};
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::{
         runtime::MessageInfo,
@@ -151,7 +150,7 @@ mod tests {
         address::Address, clock::ChainEpoch, econ::TokenAmount, error::ExitCode, sys::SendFlags,
         MethodNum,
     };
-    use recall_sol_facade::machine::{machine_created, machine_initialized};
+    use recall_actor_sdk::to_actor_event;
 
     pub fn construct_runtime(actor_address: Address, owner_id_addr: Address) -> MockRuntime {
         let owner_eth_addr = EthAddress(hex_literal::hex!(
@@ -168,9 +167,11 @@ mod tests {
         rt.set_caller(*INIT_ACTOR_CODE_ID, INIT_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![INIT_ACTOR_ADDR]);
         let metadata = HashMap::new();
-        let event = to_actor_event(
-            machine_created(Kind::Timehub as u8, owner_delegated_addr, &metadata).unwrap(),
-        )
+        let event = to_actor_event(MachineCreated::new(
+            Kind::Timehub,
+            owner_delegated_addr,
+            &metadata,
+        ))
         .unwrap();
         rt.expect_emitted_event(event);
         let result = rt
@@ -188,9 +189,7 @@ mod tests {
 
         rt.set_caller(*ADM_ACTOR_CODE_ID, ADM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![ADM_ACTOR_ADDR]);
-        let event =
-            to_actor_event(machine_initialized(Kind::Timehub as u8, actor_address).unwrap())
-                .unwrap();
+        let event = to_actor_event(MachineInitialized::new(Kind::Timehub, actor_address)).unwrap();
         rt.expect_emitted_event(event);
         let actor_init = rt
             .call::<TimehubActor>(
@@ -246,10 +245,7 @@ mod tests {
             cid_bytes: cid.to_bytes(),
             from: rt.caller(),
         };
-        let event = to_actor_event(
-            event_pushed(expected_index, timestamp, push_params.cid_bytes.clone()).unwrap(),
-        )
-        .unwrap();
+        let event = to_actor_event(EventPushed::new(expected_index, timestamp, cid)).unwrap();
         rt.expect_emitted_event(event);
         rt.call::<TimehubActor>(
             Method::Push as u64,
