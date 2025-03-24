@@ -11,6 +11,10 @@ ethers = { workspace = true, features = ["abigen", "ws"] }
 fvm_shared = { workspace = true }
 anyhow = { workspace = true }
 fs-err = { workspace = true }
+lazy_static = { workspace = true }
+tracing = { workspace = true }
+const-hex = { workspace = true }
+thiserror = { workspace = true }
 
 [build-dependencies]
 ethers = { workspace = true, features = ["abigen", "ws"] }
@@ -18,3 +22,4 @@ prettyplease = { version = "0.2" }
 syn = { version = "2" }
 fs-err = { version = "3" }
 color-eyre = "0.6"
+build-rs-utils = { path = "../build-rs-utils" }

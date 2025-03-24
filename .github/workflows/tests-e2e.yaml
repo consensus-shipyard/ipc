@@ -40,7 +40,6 @@ jobs:
         with:
           path: |
             ./contracts/out
-            ./contract-bindings
             ./contracts/cache
           key: v2-contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}
 

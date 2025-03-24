@@ -16,6 +16,7 @@ dependencies = [
 name = "actors-builtin-car"
 version = "0.2.0"
 dependencies = [
+ "build-rs-utils",
  "bytes",
  "color-eyre 0.5.11",
  "const-hex",
@@ -52,6 +53,7 @@ name = "actors-custom-car"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "build-rs-utils",
  "cargo_metadata 0.19.2",
  "cid 0.10.1",
  "color-eyre 0.5.11",
@@ -68,6 +70,7 @@ dependencies = [
  "num-traits",
  "toml 0.8.20",
  "tracing",
+ "which 7.0.2",
 ]
 
 [[package]]
@@ -1239,6 +1242,20 @@ checksum = "531a9155a481e2ee699d4f98f43c0ca4ff8ee1bfd55c31e9e98fb29d2b176fe0"
 dependencies = [
  "memchr",
  "serde",
+]
+
+[[package]]
+name = "build-print"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4a2128d00b7061b82b72844a351e80acd29e05afc60e9261e2ac90dca9ecc2ac"
+
+[[package]]
+name = "build-rs-utils"
+version = "0.1.0"
+dependencies = [
+ "build-print",
+ "owo-colors 4.2.0",
 ]
 
 [[package]]
@@ -2584,6 +2601,12 @@ dependencies = [
  "quote",
  "syn 2.0.100",
 ]
+
+[[package]]
+name = "env_home"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7f84e12ccf0a7ddc17a6c41c93326024c42920d7ee630d04950e6926645c0fe"
 
 [[package]]
 name = "env_logger"
@@ -5844,12 +5867,17 @@ name = "ipc_actors_abis"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "build-rs-utils",
  "color-eyre 0.6.3",
+ "const-hex",
  "ethers",
  "fs-err",
  "fvm_shared",
+ "lazy_static",
  "prettyplease",
  "syn 2.0.100",
+ "thiserror 1.0.69",
+ "tracing",
 ]
 
 [[package]]
@@ -7614,6 +7642,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1b04fb49957986fdce4d6ee7a65027d55d4b6d2265e5848bbb507b58ccfdb6f"
 
 [[package]]
+name = "owo-colors"
+version = "4.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1036865bb9422d3300cf723f657c2851d0e9ab12567854b1f4eba3d77decf564"
+
+[[package]]
 name = "pairing"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8325,7 +8359,7 @@ dependencies = [
  "prost-types 0.9.0",
  "regex",
  "tempfile",
- "which",
+ "which 4.4.2",
 ]
 
 [[package]]
@@ -11760,6 +11794,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "which"
+version = "7.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2774c861e1f072b3aadc02f8ba886c26ad6321567ecc294c935434cad06f1283"
+dependencies = [
+ "either",
+ "env_home",
+ "rustix 0.38.44",
+ "winsafe",
+]
+
+[[package]]
 name = "wide"
 version = "0.7.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12128,6 +12174,12 @@ dependencies = [
  "cfg-if",
  "windows-sys 0.48.0",
 ]
+
+[[package]]
+name = "winsafe"
+version = "0.0.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d135d17ab770252ad95e9a872d365cf3090e3be864a34ab46f48555993efc904"
 
 [[package]]
 name = "wit-bindgen-rt"

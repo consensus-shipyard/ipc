@@ -26,9 +26,9 @@ tracing = { workspace = true }
 
 fvm_shared = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
-ipc-api = { workspace = true }
-ipc-provider = { workspace = true }
-ipc-observability = { workspace = true }
+ipc-api = { path = "../../../ipc/api" }
+ipc-provider = { path = "../../../ipc/provider" }
+ipc-observability = { path = "../../../ipc/observability" }
 
 fendermint_vm_encoding = { path = "../../vm/encoding" }
 fendermint_vm_topdown = { path = "../../vm/topdown" }
