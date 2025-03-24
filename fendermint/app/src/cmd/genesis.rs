@@ -24,8 +24,6 @@ use crate::options::genesis::*;
 
 use super::key::read_public_key;
 
-const DEFAULT_POWER_SCALE: PowerScale = 3;
-
 cmd! {
   GenesisArgs(self) {
     let genesis_file = self.genesis_file.clone();
@@ -363,7 +361,7 @@ async fn new_genesis_from_parent(
         genesis_info.permission_mode,
         ipc_api::subnet::PermissionMode::Collateral
     ) {
-        args.power_scale.unwrap_or(DEFAULT_POWER_SCALE)
+        args.collateral_to_power_decimal_places
     } else {
         TokenAmount::DECIMALS as PowerScale
     };
