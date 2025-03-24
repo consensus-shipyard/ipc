@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
   # contracts
-  "contracts/binding",
+  "contract-bindings",
 
   # merkle
   "ext/merkle-tree-rs",
@@ -36,11 +36,15 @@ members = [
   "fendermint/tracing",
   "fendermint/vm/*",
   "fendermint/actors",
+  "fendermint/actors-custom-car",
+  "fendermint/actors-builtin-car",
   "fendermint/actors/api",
   "fendermint/actors/chainmetadata",
   "fendermint/actors/activity-tracker",
   "fendermint/actors/eam",
   "fendermint/actors/gas_market/eip1559",
+
+  "build-rs-utils",
 ]
 
 [workspace.package]
@@ -50,8 +54,6 @@ license = "MIT OR Apache-2.0"
 license-file = "LICENSE-APACHE"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-## dummy trigger ci
 
 [workspace.dependencies]
 time = "0.3.33"
@@ -69,8 +71,10 @@ blake2b_simd = "1.0"
 bloom = "0.3"
 bytes = "1.4"
 clap = { version = "4.1", features = ["derive", "env", "string"] }
+color-eyre = "0.5.11"
 byteorder = "1.5.0"
 config = "0.13"
+const-hex = "1.14.0"
 dirs = "5.0"
 dircpy = "0.3.19"
 either = "1.10"
@@ -80,6 +84,7 @@ ethers = { version = "2.0.13", features = ["abigen", "ws"] }
 ethers-core = { version = "2.0.13" }
 ethers-contract = "2.0.13"
 fnv = "1.0"
+fs-err = "3.1"
 futures = "0.3"
 futures-core = "0.3"
 futures-util = "0.3"
@@ -126,7 +131,7 @@ multihash = { version = "0.18.1", default-features = false, features = [
   "sha3",
 ] }
 num-bigint = "0.4"
-num-derive = "0.3"
+num-derive = "0.4"
 num-traits = "0.2"
 num_enum = "0.7.2"
 paste = "1"
@@ -140,9 +145,10 @@ quickcheck_macros = "1"
 rand = "0.8"
 rand_chacha = "0.3"
 regex = "1"
+statrs = "0.18.0"
 reqwest = { version = "0.11.13", features = ["json"] }
 sha2 = "0.10"
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1.0.217", features = ["derive"] }
 serde_bytes = "0.11"
 serde_json = { version = "1", features = ["raw_value"] }
 serde_yaml = { version = "0.9" }
@@ -173,18 +179,9 @@ tracing-subscriber = { version = "0.3", features = [
   "registry",
 ] }
 tracing-appender = "0.2.3"
+text-tables = "0.3.1"
 url = { version = "2.4.1", features = ["serde"] }
 zeroize = "1.6"
-
-# Workspace deps
-ipc-api = { path = "ipc/api" }
-ipc-provider = { path = "ipc/provider" }
-ipc-wallet = { path = "ipc/wallet", features = ["with-ethers"] }
-ipc_ipld_resolver = { path = "ipld/resolver" }
-ipc-types = { path = "ipc/types" }
-ipc-observability = { path = "ipc/observability" }
-ipc_actors_abis = { path = "contracts/binding" }
-fendermint_actors_api = { path = "fendermint/actors/api" }
 
 # Vendored for cross-compilation, see https://github.com/cross-rs/cross/wiki/Recipes#openssl
 # Make sure every top level build target actually imports this dependency, and don't end up
@@ -194,9 +191,11 @@ openssl = { version = "0.10", features = ["vendored"] }
 
 # NOTE: When upgrading the FVM it may cause our fendermint/actors/build.rs to fail as it can
 # pull in crates as transitive dependencies that do not support Wasm architector. If this
-# happens, try removing "crypto" feature from fvm_shared dependency in contracts/binding/Cargo.toml
+# happens, try removing "crypto" feature from fvm_shared dependency in contract-bindings/Cargo.toml
 # and run `cargo build`. Then add the "crypto" feature back and run `cargo build` again.
-fvm = { version = "4.4.0", features = ["verify-signature"], default-features = false } # no opencl feature or it fails on CI
+fvm = { version = "4.4.0", features = [
+  "verify-signature",
+], default-features = false } # no opencl feature or it fails on CI
 fvm_shared = { version = "4.4.0" }
 fvm_sdk = { version = "4.4.0" }
 
@@ -223,9 +222,6 @@ fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-act
 fil_actor_eam = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
 fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
 
-fendermint_actor_eam = { path = "./fendermint/actors/eam" }
-fendermint_actor_activity_tracker= { path = "./fendermint/actors/activity-tracker" }
-
 cid = { version = "0.10.1", default-features = false, features = [
   "serde-codec",
   "std",
@@ -245,6 +241,16 @@ tendermint-rpc = { version = "0.31", features = [
 ] }
 tendermint-proto = { version = "0.31" }
 
+[patch.crates-io]
+fvm = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_shared = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_sdk = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_ipld_blockstore = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_ipld_car = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_ipld_encoding = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_ipld_hamt = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_ipld_amt = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+
 [profile.wasm]
 inherits = "release"
 panic = "abort"
@@ -254,4 +260,3 @@ opt-level = "z"
 strip = true
 codegen-units = 1
 incremental = false
-

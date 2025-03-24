@@ -13,6 +13,7 @@ async-trait = { workspace = true }
 bytes = { workspace = true }
 cid = { workspace = true }
 hex = { workspace = true }
+fs-err = { workspace = true }
 k256 = { workspace = true }
 lazy_static = { workspace = true }
 libipld = { workspace = true }
@@ -42,7 +43,7 @@ tracing-subscriber = { workspace = true }
 literally = { workspace = true }
 
 fendermint_abci = { path = "../abci" }
-fendermint_actors_api = { path = "../actors/api" }
+actors-custom-api = { path = "../actors/api" }
 fendermint_app_options = { path = "./options" }
 fendermint_app_settings = { path = "./settings" }
 fendermint_crypto = { path = "../crypto" }
@@ -66,6 +67,9 @@ fendermint_vm_resolver = { path = "../vm/resolver" }
 fendermint_vm_snapshot = { path = "../vm/snapshot" }
 fendermint_vm_topdown = { path = "../vm/topdown" }
 
+# .car file wrapped in a crate
+actors-builtin-car =  { path = "../actors-builtin-car"}
+actors-custom-car = { path = "../actors-custom-car"}
 
 
 fvm = { workspace = true }
@@ -73,10 +77,10 @@ fvm_ipld_blockstore = { workspace = true }
 fvm_ipld_car = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true }
-ipc-api = { workspace = true }
-ipc-provider = { workspace = true }
-ipc_ipld_resolver = { workspace = true }
-ipc-observability = { workspace = true }
+ipc-api = { path = "../../ipc/api" }
+ipc-provider = { path = "../../ipc/provider" }
+ipc_ipld_resolver = { path = "../../ipld/resolver" }
+ipc-observability = { path = "../../ipc/observability" }
 
 [dev-dependencies]
 tempfile = { workspace = true }

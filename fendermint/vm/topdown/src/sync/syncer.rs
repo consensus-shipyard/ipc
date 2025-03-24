@@ -407,7 +407,7 @@ mod tests {
     use async_trait::async_trait;
     use fendermint_vm_genesis::{Power, Validator};
     use ipc_api::cross::IpcEnvelope;
-    use ipc_api::staking::StakingChangeRequest;
+    use ipc_api::staking::PowerChangeRequest;
     use ipc_provider::manager::{GetBlockHashResult, TopDownQueryPayload};
     use std::sync::Arc;
 
@@ -473,7 +473,7 @@ mod tests {
         async fn get_validator_changes(
             &self,
             height: BlockHeight,
-        ) -> anyhow::Result<TopDownQueryPayload<Vec<StakingChangeRequest>>> {
+        ) -> anyhow::Result<TopDownQueryPayload<Vec<PowerChangeRequest>>> {
             Ok(TopDownQueryPayload {
                 value: vec![],
                 block_hash: self.blocks.get_value(height).cloned().unwrap().unwrap(),

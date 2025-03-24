@@ -17,6 +17,8 @@ use fendermint_vm_genesis::{
 };
 use fendermint_vm_interpreter::genesis::{GenesisAppState, GenesisBuilder};
 
+use crate::fs;
+
 use crate::cmd;
 use crate::options::genesis::*;
 
@@ -57,7 +59,7 @@ cmd! {
     };
 
     let json = serde_json::to_string_pretty(&genesis)?;
-    std::fs::write(genesis_file, json)?;
+    fs::write(genesis_file, json)?;
 
     Ok(())
   }
@@ -198,7 +200,7 @@ fn add_validator(genesis_file: &PathBuf, args: &GenesisAddValidatorArgs) -> anyh
 }
 
 fn read_genesis(genesis_file: &PathBuf) -> anyhow::Result<Genesis> {
-    let json = std::fs::read_to_string(genesis_file).context("failed to read genesis")?;
+    let json = fs::read_to_string(genesis_file).context("failed to read genesis")?;
     let genesis = serde_json::from_str::<Genesis>(&json).context("failed to parse genesis")?;
     Ok(genesis)
 }
@@ -210,7 +212,7 @@ where
     let genesis = read_genesis(genesis_file)?;
     let genesis = f(genesis)?;
     let json = serde_json::to_string_pretty(&genesis)?;
-    std::fs::write(genesis_file, json)?;
+    fs::write(genesis_file, json)?;
     Ok(())
 }
 
@@ -235,7 +237,7 @@ fn into_tendermint(genesis_file: &PathBuf, args: &GenesisIntoTendermintArgs) -> 
     let genesis = read_genesis(genesis_file)?;
     let app_state: Option<String> = match args.app_state {
         Some(ref path) if path.exists() => {
-            Some(GenesisAppState::v1(std::fs::read(path)?).compress_and_encode()?)
+            Some(GenesisAppState::v1(fs::read(path)?).compress_and_encode()?)
         }
         _ => None,
     };
@@ -276,7 +278,7 @@ fn into_tendermint(genesis_file: &PathBuf, args: &GenesisIntoTendermintArgs) -> 
         app_state,
     };
     let tmg_json = serde_json::to_string_pretty(&tmg)?;
-    std::fs::write(&args.out, tmg_json)?;
+    fs::write(&args.out, tmg_json)?;
     Ok(())
 }
 
@@ -308,9 +310,24 @@ fn set_ipc_gateway(genesis_file: &PathBuf, args: &GenesisIpcGatewayArgs) -> anyh
 async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> anyhow::Result<()> {
     let genesis_params = read_genesis(genesis_file)?;
 
+    fn actors_car_blob(
+        path: Option<&PathBuf>,
+        fallback: &'static [u8],
+    ) -> anyhow::Result<std::borrow::Cow<'static, [u8]>> {
+        let actors = path
+            .map(fs_err::read)
+            .transpose()?
+            .map(std::borrow::Cow::Owned)
+            .unwrap_or_else(|| std::borrow::Cow::Borrowed(fallback));
+        Ok(actors)
+    }
+    let custom_actors = actors_car_blob(args.custom_actors_path.as_ref(), actors_custom_car::CAR)?;
+    let builtin_actors =
+        actors_car_blob(args.builtin_actors_path.as_ref(), actors_builtin_car::CAR)?;
+
     let builder = GenesisBuilder::new(
-        args.builtin_actors_path.clone(),
-        args.custom_actors_path.clone(),
+        builtin_actors.as_ref(),
+        custom_actors.as_ref(),
         args.artifacts_path.clone(),
         genesis_params,
     );
@@ -397,7 +414,7 @@ async fn new_genesis_from_parent(
     }
 
     let json = serde_json::to_string_pretty(&genesis)?;
-    std::fs::write(genesis_file, json)?;
+    fs::write(genesis_file, json)?;
 
     Ok(())
 }

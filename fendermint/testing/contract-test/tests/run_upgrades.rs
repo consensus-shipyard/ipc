@@ -11,6 +11,7 @@ use fendermint_rpc::response::decode_fevm_return_data;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use ethers::contract::abigen;
 use fvm_shared::address::Address;
@@ -24,9 +25,13 @@ use fendermint_vm_actor_interface::eam;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Account, Actor, ActorMeta, Genesis, PermissionMode, SignerAddr};
+use fendermint_vm_interpreter::fvm::bottomup::BottomUpManager;
 use fendermint_vm_interpreter::fvm::store::memory::MemoryBlockstore;
+use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeScheduler};
-use fendermint_vm_interpreter::fvm::FvmMessageInterpreter;
+use fendermint_vm_interpreter::fvm::FvmMessagesInterpreter;
+use fendermint_vm_topdown::voting::VoteTally;
+use fendermint_vm_topdown::Toggle;
 
 // returns a seeded secret key which is guaranteed to be the same every time
 fn my_secret_key() -> SecretKey {
@@ -194,8 +199,20 @@ async fn test_applying_upgrades() {
         )
         .unwrap();
 
-    let interpreter: FvmMessageInterpreter<MemoryBlockstore, _> =
-        FvmMessageInterpreter::new(NeverCallClient, None, 1.05, 1.05, false, upgrade_scheduler);
+    let bottom_up_manager = BottomUpManager::new(NeverCallClient, None);
+    let finality_provider = Arc::new(Toggle::disabled());
+    let vote_tally = VoteTally::empty();
+    let top_down_manager = TopDownManager::new(finality_provider, vote_tally);
+
+    let interpreter: FvmMessagesInterpreter<MemoryBlockstore, _> = FvmMessagesInterpreter::new(
+        bottom_up_manager,
+        top_down_manager,
+        upgrade_scheduler,
+        false,
+        200,
+        1.05,
+        1.05,
+    );
 
     let genesis = Genesis {
         chain_name: CHAIN_NAME.to_string(),

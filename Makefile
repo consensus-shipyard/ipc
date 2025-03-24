@@ -28,3 +28,6 @@ license:
 	./scripts/add_license.sh
 
 lint: license $(patsubst %, lint/%, $(SUBTREES_ALL))
+
+markdownlint:
+	$(MARKDOWNLINT_CLI) --fix $$(find . -iwholename './crates/**/README.md' -or -iwholename './contracts/**/*.md' -or -iwholename './specs/**/*.md' -or -iwholename './docs*/**/*.md')

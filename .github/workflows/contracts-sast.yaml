@@ -37,6 +37,7 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
         with:
           cache: false
+          version: v0.3.0
 
       - name: Install aderyn
         run: cargo install aderyn
@@ -56,7 +57,7 @@ jobs:
         run: aderyn --version
 
       - name: Run aderyn
-        run: cd contracts && aderyn ./ -o report.json
+        run: cd contracts && aderyn --skip-update-check ./ -o report.json
 
       - name: Check results
         run: cd contracts && ./tools/check_aderyn.sh

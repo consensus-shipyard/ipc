@@ -22,7 +22,7 @@ jobs:
         uses: ./.github/actions/install-tools
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          rust: 1.81.0
+          rust: 1.83.0
 
       - name: Download Docker image
         uses: actions/download-artifact@v4
@@ -40,7 +40,6 @@ jobs:
         with:
           path: |
             ./contracts/out
-            ./contracts/bindings
             ./contracts/cache
           key: v2-contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}
 
@@ -49,5 +48,9 @@ jobs:
           shared-key: build
 
       - name: Run e2e tests
-        run: cd fendermint && PROFILE=release make e2e-only
-
+        run: |
+          set -e
+          cd contracts
+          make gen
+          cd ../fendermint
+          PROFILE=release make e2e-only

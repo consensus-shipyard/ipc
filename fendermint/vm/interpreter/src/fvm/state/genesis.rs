@@ -3,10 +3,10 @@
 
 use std::sync::Arc;
 
+use actors_custom_car::Manifest as CustomActorManifest;
 use anyhow::{anyhow, bail, Context};
 use cid::{multihash::Code, Cid};
 use ethers::{abi::Tokenize, core::abi::Abi};
-use fendermint_actors::Manifest as CustomActorManifest;
 use fendermint_vm_actor_interface::{
     account::{self, ACCOUNT_ACTOR_CODE_ID},
     eam::{self, EthAddress},

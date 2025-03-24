@@ -1,0 +1,31 @@
+[package]
+# TODO rename to actors-custom-car
+name = "actors-custom-car"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cid = { workspace = true }
+anyhow = { workspace = true }
+fvm_ipld_blockstore = { workspace = true }
+fvm_ipld_encoding = { workspace = true }
+# only included for their static names (!)
+fendermint_actor_activity_tracker = { path = "../actors/activity-tracker" }
+fendermint_actor_chainmetadata = { path = "../actors/chainmetadata" }
+fendermint_actor_gas_market_eip1559 = { path = "../actors/gas_market/eip1559" }
+fendermint_actor_eam = { path = "../actors/eam" }
+
+[build-dependencies]
+color-eyre = { workspace = true }
+fs-err = { workspace = true }
+fil_actors_runtime = { workspace = true, features = ["test_utils"] }
+fil_actor_bundler = "6.1.0"
+num-traits = { workspace = true }
+toml = "0.8.19"
+cargo_metadata = "0.19"
+ignore = "0.4"
+tracing = "0.1"
+build-rs-utils = { path = "../../build-rs-utils" }
+which = "7"

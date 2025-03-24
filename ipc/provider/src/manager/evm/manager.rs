@@ -8,8 +8,8 @@ use std::time::Duration;
 
 use ethers_contract::{ContractError, EthLogDecode, LogMeta};
 use ipc_actors_abis::{
-    checkpointing_facet, gateway_getter_facet, gateway_manager_facet, lib_gateway, lib_quorum,
-    lib_staking_change_log, register_subnet_facet, subnet_actor_activity_facet,
+    checkpointing_facet, gateway_getter_facet, gateway_manager_facet, lib_gateway,
+    lib_power_change_log, lib_quorum, register_subnet_facet, subnet_actor_activity_facet,
     subnet_actor_checkpointing_facet, subnet_actor_getter_facet, subnet_actor_manager_facet,
     subnet_actor_reward_facet,
 };
@@ -42,6 +42,7 @@ use ethers::signers::{LocalWallet, Wallet};
 use ethers::types::{Eip1559TransactionRequest, ValueOrArray, H256, U256};
 
 use super::gas_estimator_middleware::Eip1559GasEstimatorMiddleware;
+use crate::manager::evm::error_parsing::ErrorParserHttp;
 use ethers::middleware::Middleware;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
@@ -52,7 +53,7 @@ use ipc_api::checkpoint::{
 };
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::merkle::MerkleGen;
-use ipc_api::staking::{StakingChangeRequest, ValidatorInfo, ValidatorStakingInfo};
+use ipc_api::staking::{PowerChangeRequest, ValidatorInfo, ValidatorStakingInfo};
 use ipc_api::subnet::ConstructParams;
 use ipc_api::subnet_id::SubnetID;
 use ipc_observability::lazy_static;
@@ -61,7 +62,7 @@ use num_traits::ToPrimitive;
 use std::result;
 
 pub type SignerWithFeeEstimatorMiddleware =
-    Eip1559GasEstimatorMiddleware<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>;
+    Eip1559GasEstimatorMiddleware<SignerMiddleware<Provider<ErrorParserHttp>, Wallet<SigningKey>>>;
 
 /// Default polling time used by the Ethers provider to check for pending
 /// transactions and events. Default is 7, and for our child subnets we
@@ -89,7 +90,7 @@ struct IPCContractInfo {
     gateway_addr: ethers::types::Address,
     registry_addr: ethers::types::Address,
     chain_id: u64,
-    provider: Provider<Http>,
+    provider: Provider<ErrorParserHttp>,
 }
 
 //TODO receive clarity on this implementation
@@ -202,7 +203,7 @@ impl TopDownFinalityQuery for EthSubnetManager {
         &self,
         subnet_id: &SubnetID,
         epoch: ChainEpoch,
-    ) -> Result<TopDownQueryPayload<Vec<StakingChangeRequest>>> {
+    ) -> Result<TopDownQueryPayload<Vec<PowerChangeRequest>>> {
         let address = contract_address_from_subnet(subnet_id)?;
         tracing::info!("querying validator changes in evm subnet contract: {address:}");
 
@@ -212,7 +213,7 @@ impl TopDownFinalityQuery for EthSubnetManager {
         );
 
         let ev = contract
-            .event::<lib_staking_change_log::NewStakingChangeRequestFilter>()
+            .event::<lib_power_change_log::NewPowerChangeRequestFilter>()
             .from_block(epoch as u64)
             .to_block(epoch as u64)
             .address(ValueOrArray::Value(contract.address()));
@@ -227,7 +228,7 @@ impl TopDownFinalityQuery for EthSubnetManager {
             } else {
                 hash = Some(meta.block_hash);
             }
-            changes.push(StakingChangeRequest::try_from(event)?);
+            changes.push(PowerChangeRequest::try_from(event)?);
         }
 
         let block_hash = if let Some(h) = hash {
@@ -382,7 +383,7 @@ impl SubnetManager for EthSubnetManager {
 
         let txn = extend_call_with_pending_block(txn).await?;
 
-        txn.send().await?;
+        txn.send().await?.await?;
         Ok(())
     }
 
@@ -1036,7 +1037,7 @@ impl EthSubnetManager {
         gateway_addr: ethers::types::Address,
         registry_addr: ethers::types::Address,
         chain_id: u64,
-        provider: Provider<Http>,
+        provider: Provider<ErrorParserHttp>,
         keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
     ) -> Self {
         Self {
@@ -1141,7 +1142,7 @@ impl EthSubnetManager {
 
         let client = client.build()?;
 
-        let provider = Http::new_with_client(url, client);
+        let provider = Http::new_with_client(url, client).into();
 
         let mut provider = Provider::new(provider);
         // set polling interval for provider to fit fast child subnets block times.
@@ -1195,8 +1196,21 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
         let call = contract.submit_checkpoint(checkpoint, signatories, signatures);
         let call = extend_call_with_pending_block(call).await?;
 
+        if let Some(calldata) = call.calldata() {
+            tracing::info!(
+                calldata = calldata.to_string(),
+                "submit checkpoint raw call data"
+            );
+        }
+
         let pending_tx = call.send().await?;
+        tracing::info!(
+            hash = hex::encode(pending_tx.tx_hash().as_bytes()),
+            "sent submit bottom up checkpoint with txn"
+        );
+
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
+
         block_number_from_receipt(receipt)
     }
 

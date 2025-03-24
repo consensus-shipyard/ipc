@@ -4,11 +4,13 @@ pragma solidity ^0.8.23;
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
 import {MinPQ, LibMinPQ} from "../../contracts/lib/priority/LibMinPQ.sol";
-import {LibValidatorSet} from "../../contracts/lib/LibStaking.sol";
+import {LibValidatorSet} from "../../contracts/lib/LibPower.sol";
 import {ValidatorSet} from "../../contracts/structs/Subnet.sol";
+import {LibValidatorSetTestUtil} from "./LibValidatorSetTest.t.sol";
 
 contract LibMinPQTest is Test {
     using LibValidatorSet for ValidatorSet;
+    using LibValidatorSetTestUtil for ValidatorSet;
     using LibMinPQ for MinPQ;
 
     MinPQ private minPQ;
@@ -22,7 +24,7 @@ contract LibMinPQTest is Test {
         uint16 size = minPQ.getSize();
         for (uint16 i = 1; i <= size; i++) {
             address addr = minPQ.inner.posToAddress[i];
-            uint256 collateral = validators.getConfirmedCollateral(addr);
+            uint256 collateral = validators.getCurrentPower(addr);
             console.log("idx", i, addr, collateral);
         }
     }

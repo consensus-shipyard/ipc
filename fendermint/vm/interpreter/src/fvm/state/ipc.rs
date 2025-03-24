@@ -27,13 +27,13 @@ use ipc_actors_abis::top_down_finality_facet::TopDownFinalityFacet;
 use ipc_actors_abis::xnet_messaging_facet::XnetMessagingFacet;
 use ipc_actors_abis::{checkpointing_facet, top_down_finality_facet, xnet_messaging_facet};
 use ipc_api::cross::IpcEnvelope;
-use ipc_api::staking::{ConfigurationNumber, StakingChangeRequest};
+use ipc_api::staking::{ConfigurationNumber, PowerChangeRequest};
 
 use super::{
     fevm::{ContractCaller, MockProvider, NoRevert},
     FvmExecState,
 };
-use crate::fvm::FvmApplyRet;
+use crate::types::AppliedMessage;
 
 #[derive(Clone)]
 pub struct GatewayCaller<DB> {
@@ -116,7 +116,7 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         checkpoint: checkpointing_facet::BottomUpCheckpoint,
         power_table: &[Validator<Power>],
         activity: checkpointing_facet::FullActivityRollup,
-    ) -> anyhow::Result<FvmApplyRet> {
+    ) -> anyhow::Result<AppliedMessage> {
         // Construct a Merkle tree from the power table, which we can use to validate validator set membership
         // when the signatures are submitted in transactions for accumulation.
         let tree =
@@ -249,7 +249,7 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
     pub fn store_validator_changes(
         &self,
         state: &mut FvmExecState<DB>,
-        changes: Vec<StakingChangeRequest>,
+        changes: Vec<PowerChangeRequest>,
     ) -> anyhow::Result<()> {
         if changes.is_empty() {
             return Ok(());
@@ -257,7 +257,7 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
 
         let mut change_requests = vec![];
         for c in changes {
-            change_requests.push(top_down_finality_facet::StakingChangeRequest::try_from(c)?);
+            change_requests.push(top_down_finality_facet::PowerChangeRequest::try_from(c)?);
         }
 
         self.topdown
@@ -282,7 +282,7 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         &self,
         state: &mut FvmExecState<DB>,
         cross_messages: Vec<IpcEnvelope>,
-    ) -> anyhow::Result<FvmApplyRet> {
+    ) -> anyhow::Result<AppliedMessage> {
         let messages = cross_messages
             .into_iter()
             .map(xnet_messaging_facet::IpcEnvelope::try_from)

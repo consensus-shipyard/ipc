@@ -34,7 +34,7 @@ jobs:
         uses: ./.github/actions/install-tools
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          rust: 1.81.0
+          rust: 1.83.0
 
       - name: Install Node.js
         uses: actions/setup-node@v2
@@ -51,7 +51,6 @@ jobs:
         with:
           path: |
             ./contracts/out
-            ./contracts/bindings
             ./contracts/cache
           ## TODO maybe add the rust version and solc version to the key
           key: v2-contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}
@@ -75,6 +74,9 @@ jobs:
           cargo -V
           echo "glibc version"
           ldd --version
+          echo "contract-bindings/src"
+          ls contract-bindings/src
+          cat contract-bindings/src/lib.rs
 
       - name: Check fmt (nightly)
         run: cargo +nightly-2024-07-05 fmt --check --all

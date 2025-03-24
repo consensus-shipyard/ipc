@@ -11,24 +11,24 @@ Visit the [IPC project page](https://www.ipc.space/) for news and guides.
 On Linux (links and instructions for Ubuntu):
 
 - Install system packages: `sudo apt install build-essential clang cmake pkg-config libssl-dev protobuf-compiler git curl`.
-- Install Rust. See [instructions](https://www.rust-lang.org/tools/install).
+- Install [rust](https://www.rust-lang.org/tools/install).
 - Install cargo-make: `cargo install --force cargo-make`.
-- Install Docker. See [instructions](https://docs.docker.com/engine/install/ubuntu/).
-- Install Foundry. See [instructions](https://book.getfoundry.sh/getting-started/installation).
+- Install [docker](https://docs.docker.com/engine/install/ubuntu/).
+- Install [foundry](https://book.getfoundry.sh/getting-started/installation).
 
 On MacOS:
 
 - Install Xcode from App Store or terminal: xcode-select --install
-- Install Homebrew: https://brew.sh/
+- Install [homebrew](https://brew.sh/)
 - Install dependencies: brew install jq
-- Install Rust: https://www.rust-lang.org/tools/install (if you have homebrew installed rust, you may need to uninstall that if you get errors in the build)
+- Install [rust](https://www.rust-lang.org/tools/install) (if you have homebrew installed rust, you may need to uninstall that if you get errors in the build)
 - Install Cargo make: cargo install --force cargo-make
-- Install docker: https://docs.docker.com/desktop/install/mac-install/
-- Install foundry: https://book.getfoundry.sh/getting-started/installation
+- Install [docker](https://docs.docker.com/desktop/install/mac-install/)
+- Install [foundry](https://book.getfoundry.sh/getting-started/installation)
 
 ## Building
 
-```
+```sh
 # make sure that rust has the wasm32 target
 rustup target add wasm32-unknown-unknown
 
@@ -47,7 +47,7 @@ make
 
 ## Run tests
 
-```
+```sh
 make test
 ```
 
@@ -77,11 +77,11 @@ If you are a developer, see:
 
 ## Connecting to a rootnet
 
-You can deploy an IPC hierarchy from any compatible rootnet. The recommended option is to use Filecoin Calibration, but you can also deploy your own.
+You can deploy an IPC hierarchy from any compatible rootnet. The recommended option is to use _Filecoin Calibration_, but you can also deploy your own.
 
-### Running a subnet in Calibration
+### Running a subnet in _Calibration_
 
-Calibration is the primary testnet for Filecoin. It already hosts the IPC actors and can be used as a rootnet on which to deploy new subnets.
+_Calibration_ is the primary testnet for Filecoin. It already hosts the IPC actors and can be used as a rootnet on which to deploy new subnets.
 
 In order to use the `ipc-cli` with Calibration we need to have access to a full node syncing with the network. The easiest way to achieve this is to use a [public RPC](https://docs.filecoin.io/networks/calibration/rpcs/). You also need the addresses of the deployed contracts.
 
@@ -89,7 +89,7 @@ If it is the first time that you use your `ipc-cli`, to initialize cli configura
 
 The suggested configuration for the `ipc-cli` is:
 
-```
+```toml
 keystore_path = "~/.ipc"
 
 # Filecoin Calibration

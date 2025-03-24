@@ -22,7 +22,7 @@ serde_json = "1.0"
 
 ```rust
 use merkle_tree_rs::standard::StandardMerkleTree;
-use std::fs;
+use fs_err as fs;
 
 fn main() {
     let values = vec![
@@ -59,7 +59,7 @@ Assume we're looking to generate a proof for the entry that corresponds to addre
 
 ```rust
     use merkle_tree_rs::standard::StandardMerkleTree;
-    use std::fs;
+    use fs_err as fs;
 
     fn main() {
         let tree_json = fs::read_to_string("tree.json").unwrap();

@@ -15,6 +15,7 @@ base64 = { workspace = true }
 blake2b_simd = { workspace = true }
 bls-signatures = { version = "0.13.0", default-features = false, features = ["blst"] }
 ethers = { workspace = true, optional = true }
+fs-err = { workspace = true }
 fvm_shared = { workspace = true, features = ["crypto"] }
 hex = { workspace = true }
 libc = "0.2"
@@ -28,7 +29,7 @@ thiserror = { workspace = true }
 xsalsa20poly1305 = "0.9"
 zeroize = "1.6.0"
 
-ipc-types = { workspace = true }
+ipc-types = { path = "../../ipc/types" }
 
 [dev-dependencies]
 tempfile = { workspace = true }
@@ -39,4 +40,3 @@ quickcheck_macros = { workspace = true }
 
 [features]
 with-ethers = ["ethers"]
-

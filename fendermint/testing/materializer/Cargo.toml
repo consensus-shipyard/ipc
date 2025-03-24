@@ -15,6 +15,7 @@ async-trait = { workspace = true }
 bollard = { workspace = true }
 either = { workspace = true }
 ethers = { workspace = true }
+fs-err = { workspace = true }
 futures = { workspace = true }
 fvm_shared = { workspace = true }
 hex = { workspace = true }
@@ -29,14 +30,17 @@ tendermint-rpc = { workspace = true }
 tokio = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true }
+text-tables = { workspace = true }
 url = { workspace = true }
+statrs = { workspace = true }
+tokio-util = { workspace = true }
 
 arbitrary = { workspace = true, optional = true }
 quickcheck = { workspace = true, optional = true }
 
 ipc-api = { path = "../../../ipc/api" }
 ipc-provider = { path = "../../../ipc/provider" }
-ipc_actors_abis = { path = "../../../contracts/binding" }
+ipc_actors_abis = { path = "../../../contract-bindings" }
 
 fendermint_crypto = { path = "../../crypto" }
 fendermint_vm_actor_interface = { path = "../../vm/actor_interface" }
