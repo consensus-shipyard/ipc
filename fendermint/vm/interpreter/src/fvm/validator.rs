@@ -33,8 +33,11 @@ pub(crate) fn execute_bottom_up_signature<DB: Blockstore + Clone + 'static>(
     // check the message signature matches, that means we are actually calling submit signature
     let method_selector =
         ipc_actors_abis::checkpointing_facet::AddCheckpointSignatureCall::selector();
-    let calldata = msg.params.deserialize::<BytesDe>()
-        .map_err(|e| ApplyMessageError::InvalidMessage(e.to_string()))?.0;
+    let calldata = msg
+        .params
+        .deserialize::<BytesDe>()
+        .map_err(|e| ApplyMessageError::InvalidMessage(e.to_string()))?
+        .0;
 
     if calldata.len() < SOLIDITY_SELECTOR_BYTES
         || method_selector != calldata[0..SOLIDITY_SELECTOR_BYTES]

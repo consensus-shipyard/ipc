@@ -113,7 +113,7 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
 
         if calldata.len() < SOLIDITY_SELECTOR_BYTES {
             return Err(anyhow!(
-                "invalid validator calldata, expected at least {} but found only {}",
+                "invalid validator calldata, expected at least {} bytes but found only {} bytes",
                 SOLIDITY_SELECTOR_BYTES,
                 calldata.len()
             ));
