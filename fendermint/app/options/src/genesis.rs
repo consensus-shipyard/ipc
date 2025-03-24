@@ -235,8 +235,8 @@ pub struct GenesisFromParentArgs {
     #[arg(long, short = 'f', value_parser = parse_token_amount, default_value = "1000")]
     pub base_fee: TokenAmount,
 
-    /// Number of decimals to use during converting FIL to Power. Only configurable if the subnet
-    /// is collateral based.
-    #[arg(long, default_value = "Some(3)")]
-    pub power_scale: Option<i8>,
+    /// The number of decimal places used when converting the collateral source token to Power.
+    /// This setting is applicable only if the subnet is collateral-based.
+    #[arg(long, default_value_t = 3)]
+    pub collateral_to_power_decimal_places: i8,
 }
