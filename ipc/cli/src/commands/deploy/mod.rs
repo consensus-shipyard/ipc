@@ -99,7 +99,7 @@ pub(crate) struct DeployCommandArgs {
     #[arg(short, long, required = true, help = "Ethereum chain ID")]
     chain_id: u64,
 
-    /// Directory containing the contract files.
+    /// Directory containing the compiled contract files.
     #[arg(
         short,
         long,
