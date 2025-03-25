@@ -21,6 +21,13 @@ pub type ContractName = String;
 
 pub type ContractSourceAndName = (ContractSource, ContractName);
 
+/// Artifact from Hardhat build artifacts.
+#[derive(Debug)]
+pub struct DeploymentArtifact {
+    pub bytecode: Vec<u8>,
+    pub abi: ethers_core::abi::Abi,
+}
+
 /// Fully Qualified Name of a contract, e.g. `"src/lib/SubnetIDHelper.sol:SubnetIDHelper"`.
 pub type FQN = String;
 
@@ -53,12 +60,12 @@ impl Hardhat {
     ///
     /// The contract source is expected to be the logical path to a Solidity contract,
     /// including the extension, ie. a [ContractSource].
-    pub fn bytecode(
+    pub fn prepare_deployment_artifact(
         &self,
         contract_src: impl AsRef<Path>,
         contract_name: &str,
         libraries: &HashMap<FQN, et::Address>,
-    ) -> anyhow::Result<Vec<u8>> {
+    ) -> anyhow::Result<DeploymentArtifact> {
         let artifact = self.artifact(contract_src.as_ref(), contract_name)?;
 
         // Get the bytecode which is in hex format with placeholders for library references.
@@ -94,7 +101,10 @@ impl Hardhat {
         let bytecode = hex::decode(bytecode.trim_start_matches("0x"))
             .context("failed to decode contract from hex")?;
 
-        Ok(bytecode)
+        Ok(DeploymentArtifact {
+            bytecode,
+            abi: artifact.abi.clone(),
+        })
     }
 
     /// Traverse the linked references and return the library contracts to be deployed in topological order.
@@ -174,6 +184,7 @@ impl Hardhat {
 #[derive(Deserialize)]
 struct Artifact {
     pub bytecode: Bytecode,
+    pub abi: ethers_core::abi::Abi,
 }
 
 impl Artifact {
@@ -307,7 +318,11 @@ mod tests {
 
         // This one requires a subset of above libraries.
         let _bytecode = hardhat
-            .bytecode("GatewayManagerFacet.sol", "GatewayManagerFacet", &libraries)
+            .prepare_deployment_artifact(
+                "GatewayManagerFacet.sol",
+                "GatewayManagerFacet",
+                &libraries,
+            )
             .unwrap();
     }
 
@@ -316,7 +331,7 @@ mod tests {
         let hardhat = test_hardhat();
 
         // Not giving any dependency should result in a failure.
-        let result = hardhat.bytecode(
+        let result = hardhat.prepare_deployment_artifact(
             "SubnetActorDiamond.sol",
             "SubnetActorDiamond",
             &Default::default(),
@@ -370,16 +385,18 @@ mod tests {
         let mut libs = HashMap::default();
 
         for (s, c) in lib_deps {
-            hardhat.bytecode(&s, &c, &libs).unwrap_or_else(|e| {
-                panic!("failed to produce library bytecode in topo order for {c}: {e}")
-            });
+            hardhat
+                .prepare_deployment_artifact(&s, &c, &libs)
+                .unwrap_or_else(|e| {
+                    panic!("failed to produce library bytecode in topo order for {c}: {e}")
+                });
             // Pretend that we deployed it.
             libs.insert(hardhat.fqn(&s, &c), et::Address::default());
         }
 
         for (src, name) in root_contracts {
             hardhat
-                .bytecode(src, name, &libs)
+                .prepare_deployment_artifact(src, name, &libs)
                 .expect("failed to produce contract bytecode in topo order");
         }
     }
