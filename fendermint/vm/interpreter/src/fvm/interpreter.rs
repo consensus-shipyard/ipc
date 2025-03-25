@@ -26,7 +26,9 @@ use crate::fvm::{
     upgrades::UpgradeScheduler,
     FvmMessage,
 };
-use crate::selectors::{select_messages_by_gas_limit, select_messages_until_total_bytes};
+use crate::selectors::{
+    select_messages_above_base_fee, select_messages_by_gas_limit, select_messages_until_total_bytes,
+};
 use crate::types::*;
 use crate::MessagesInterpreter;
 use fvm_shared::state::ActorState;
@@ -258,6 +260,9 @@ where
             })
             .collect::<Vec<_>>();
 
+        let signed_msgs =
+            select_messages_above_base_fee(signed_msgs, state.block_gas_tracker().base_fee());
+
         let total_gas_limit = state.block_gas_tracker().available();
         let signed_msgs_iter = select_messages_by_gas_limit(signed_msgs, total_gas_limit)
             .into_iter()
@@ -317,6 +322,7 @@ where
         }
 
         let mut block_gas_usage = 0;
+        let base_fee = state.block_gas_tracker().base_fee();
         for msg in msgs {
             match fvm_ipld_encoding::from_slice::<ChainMessage>(&msg) {
                 Ok(chain_msg) => match chain_msg {
@@ -326,6 +332,14 @@ where
                         }
                     }
                     ChainMessage::Signed(signed) => {
+                        if signed.message.gas_fee_cap < *base_fee {
+                            tracing::warn!(
+                                fee_cap = signed.message.gas_fee_cap.to_string(),
+                                base_fee = base_fee.to_string(),
+                                "msg fee cap less than base fee"
+                            );
+                            return Ok(AttestMessagesResponse::Reject);
+                        }
                         block_gas_usage += signed.message.gas_limit;
                     }
                 },
