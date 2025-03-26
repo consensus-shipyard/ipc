@@ -14,6 +14,8 @@ jobs:
   publish:
     name: Publish artifacts
     runs-on: self-hosted
+    outputs:
+      commit-hash: ${{ steps.prep.outputs.COMMIT_HASH }}
 
     permissions:
       packages: write
@@ -59,6 +61,7 @@ jobs:
 
           # Get the short commit hash (first 7 characters of GITHUB_SHA).
           COMMIT_HASH=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "COMMIT_HASH=$COMMIT_HASH" >> $GITHUB_OUTPUT
 
           # Format the version string as sha-[short-commit-hash].
           VERSION="sha-$COMMIT_HASH"
@@ -75,3 +78,22 @@ jobs:
           export BUILDX_STORE="--push"
           export BUILDX_FLAGS="--platform linux/amd64,linux/arm64"
           cd fendermint && make docker-build
+
+  # Publish Localnet image using the Fendermint image built above
+  publish_localnet:
+    name: Publish Localnet image
+    runs-on: self-hosted
+    needs: publish
+    steps:
+      - name: Trigger localnet image publish in recall-deploy
+        run: |
+          echo "Using Fendermint commit hash: ${{ needs.publish.outputs.commit-hash }}"
+          curl -X POST --location "https://api.github.com/repos/recallnet/recall-deploy/dispatches" \
+          --header "Authorization: token ${{ secrets.PA_TOKEN }}" \
+          --header "Accept: application/vnd.github.v3+json" \
+          --data '{
+            "event_type": "remote-trigger",
+            "client_payload": {
+              "fendermint-sha": "${{ needs.publish.outputs.commit-hash }}"
+            }
+          }'
