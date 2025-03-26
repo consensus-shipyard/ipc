@@ -4,11 +4,14 @@ extern crate core;
 // SPDX-License-Identifier: Apache-2.0, MIT
 mod app;
 pub mod ipc;
+pub mod keys;
 pub mod metrics;
 pub mod observe;
+pub mod service;
 mod store;
 mod tmconv;
 mod validators;
+pub use fs_err as fs;
 
 pub use app::{App, AppConfig};
 pub use store::{AppStore, BitswapBlockstore};

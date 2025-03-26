@@ -4,11 +4,12 @@
 pub use fendermint_app_options as options;
 pub use fendermint_app_settings as settings;
 
-use fs_err as fs;
 use ipc_observability::traces::create_temporary_subscriber;
 use tracing::subscriber;
 
 mod cmd;
+
+pub use fendermint_app::*;
 
 /// Install a panic handler that prints stuff to the logs, otherwise it only shows up in the console.
 fn init_panic_handler() {
