@@ -40,18 +40,49 @@ impl RotationKind {
         }
     }
 }
-
 #[serde_as]
-#[derive(Debug, Deserialize, Clone, Default)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct TracingSettings {
+    #[serde(default = "default_console_settings")]
     pub console: Option<ConsoleLayerSettings>,
+
+    #[serde(default)] // still optional
     pub file: Option<FileLayerSettings>,
 }
 
 #[serde_as]
-#[derive(Debug, Deserialize, Clone, Default)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct ConsoleLayerSettings {
+    #[serde(default = "default_log_level")]
     pub level: Option<String>,
+}
+
+fn default_log_level() -> Option<String> {
+    Some("info".to_string())
+}
+
+fn default_console_settings() -> Option<ConsoleLayerSettings> {
+    Some(ConsoleLayerSettings {
+        level: default_log_level(),
+    })
+}
+
+// If you still want to `#[derive(Default)]`:
+impl Default for ConsoleLayerSettings {
+    fn default() -> Self {
+        Self {
+            level: default_log_level(),
+        }
+    }
+}
+
+impl Default for TracingSettings {
+    fn default() -> Self {
+        Self {
+            console: default_console_settings(),
+            file: None,
+        }
+    }
 }
 
 #[serde_as]

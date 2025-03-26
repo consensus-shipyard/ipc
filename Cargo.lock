@@ -5833,6 +5833,58 @@ dependencies = [
 ]
 
 [[package]]
+name = "ipc-runner"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-channel 1.9.0",
+ "async-trait",
+ "base64 0.21.7",
+ "bytes",
+ "cid 0.10.1",
+ "clap 4.5.32",
+ "clap_complete",
+ "env_logger 0.10.2",
+ "ethers",
+ "ethers-contract",
+ "fendermint_app",
+ "fendermint_app_settings",
+ "fil_actors_runtime",
+ "fs-err",
+ "futures-util",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "hex",
+ "ipc-api",
+ "ipc-observability",
+ "ipc-provider",
+ "ipc-types",
+ "ipc-wallet",
+ "libsecp256k1",
+ "log",
+ "num-bigint",
+ "num-derive 0.3.3",
+ "num-traits",
+ "openssl",
+ "prometheus",
+ "prometheus_exporter",
+ "reqwest 0.11.27",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "serde_tuple",
+ "strum",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-tungstenite 0.18.0",
+ "toml 0.7.8",
+ "tracing",
+ "tracing-subscriber 0.3.19",
+ "url",
+ "zeroize",
+]
+
+[[package]]
 name = "ipc-types"
 version = "0.1.0"
 dependencies = [
