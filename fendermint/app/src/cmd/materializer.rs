@@ -19,7 +19,7 @@ use ipc_observability::traces::set_global_tracing_subscriber;
 
 use crate::cmd;
 
-use super::key::{read_secret_key, read_secret_key_hex};
+use crate::keys::{read_secret_key, read_secret_key_hex};
 
 cmd! {
   MaterializerArgs(self) {

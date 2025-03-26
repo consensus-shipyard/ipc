@@ -21,7 +21,7 @@ use crate::fs;
 use crate::cmd;
 use crate::options::genesis::*;
 
-use super::key::read_public_key;
+use crate::keys::read_public_key;
 
 cmd! {
   GenesisArgs(self) {

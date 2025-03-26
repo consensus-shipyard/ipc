@@ -7,6 +7,7 @@ mod config;
 mod crossmsg;
 // mod daemon;
 mod deploy;
+mod node;
 mod subnet;
 mod util;
 mod validator;
