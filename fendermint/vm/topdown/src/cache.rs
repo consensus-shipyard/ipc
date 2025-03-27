@@ -46,16 +46,8 @@ impl<K: PrimInt + Debug, V> SequentialKeyCache<K, V> {
         }
     }
 
-    pub fn increment(&self) -> K {
-        self.increment
-    }
-
     pub fn size(&self) -> usize {
         self.data.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.data.is_empty()
     }
 
     pub fn upper_bound(&self) -> Option<K> {
@@ -88,68 +80,11 @@ impl<K: PrimInt + Debug, V> SequentialKeyCache<K, V> {
         self.data.get(index).map(|entry| &entry.1)
     }
 
-    pub fn values_from(&self, start: K) -> ValueIter<K, V> {
-        if self.is_empty() {
-            return ValueIter {
-                i: self.data.iter(),
-            };
-        }
-
-        let lower = self.lower_bound().unwrap();
-        // safe to unwrap as index must be uint
-        let index = ((start.max(lower) - lower) / self.increment)
-            .to_usize()
-            .unwrap();
-
-        ValueIter {
-            i: self.data.range(index..),
-        }
-    }
-
-    pub fn values_within(&self, start: K, end: K) -> ValueIter<K, V> {
-        if self.is_empty() {
-            return ValueIter {
-                i: self.data.iter(),
-            };
-        }
-
-        let lower = self.lower_bound().unwrap();
-        let upper = self.upper_bound().unwrap();
-        // safe to unwrap as index must be uint
-        let end_idx = ((end.min(upper) - lower) / self.increment)
-            .to_usize()
-            .unwrap();
-        let start_idx = ((start.max(lower) - lower) / self.increment)
-            .to_usize()
-            .unwrap();
-
-        ValueIter {
-            i: self.data.range(start_idx..=end_idx),
-        }
-    }
-
-    pub fn values(&self) -> ValueIter<K, V> {
-        ValueIter {
-            i: self.data.iter(),
-        }
-    }
-
     /// Removes the all the keys below the target value, exclusive.
     pub fn remove_key_below(&mut self, key: K) {
         while let Some((k, _)) = self.data.front() {
             if *k < key {
                 self.data.pop_front();
-                continue;
-            }
-            break;
-        }
-    }
-
-    /// Removes the all the keys above the target value, exclusive.
-    pub fn remove_key_above(&mut self, key: K) {
-        while let Some((k, _)) = self.data.back() {
-            if *k > key {
-                self.data.pop_back();
                 continue;
             }
             break;
@@ -182,10 +117,6 @@ impl<K: PrimInt + Debug, V> SequentialKeyCache<K, V> {
         } else {
             Err(SequentialAppendError::AlreadyInserted)
         }
-    }
-
-    pub fn clear(&mut self) {
-        self.data = VecDeque::new();
     }
 }
 
