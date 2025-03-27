@@ -2,30 +2,28 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! The inner type of parent syncer
 
-use crate::finality::ParentViewPayload;
+use crate::finality::{FinalityWithNull, ParentViewPayload};
 use crate::proxy::ParentQueryProxy;
 use crate::sync::{query_starting_finality, ParentFinalityStateQuery};
-use crate::voting::{self, VoteTally};
-use crate::{
-    is_null_round_str, BlockHash, BlockHeight, CachedFinalityProvider, Config, Error, Toggle,
-};
+use crate::{is_null_round_str, BlockHash, BlockHeight, Config, Error, IPCParentFinality};
 use anyhow::anyhow;
-use async_stm::{atomically, atomically_or_err, StmError};
 use ethers::utils::hex;
-use libp2p::futures::TryFutureExt;
-use std::sync::Arc;
+use std::sync::{Arc};
+use tokio::sync::{Mutex, MutexGuard};
 use tracing::instrument;
-
+use libp2p::futures::TryFutureExt;
 use crate::observe::ParentFinalityAcquired;
 use ipc_observability::{emit, serde::HexEncodableBlockHash};
+
+/// Will try to sync 10 parent block per `sync` call
+const SYNC_BATCH_SIZE: usize = 10;
 
 /// Parent syncer that constantly poll parent. This struct handles lotus null blocks and deferred
 /// execution. For ETH based parent, it should work out of the box as well.
 pub(crate) struct LotusParentSyncer<T, P> {
     config: Config,
     parent_proxy: Arc<P>,
-    provider: Arc<Toggle<CachedFinalityProvider<P>>>,
-    vote_tally: VoteTally,
+    data_cache: Arc<Mutex<FinalityWithNull>>,
     query: Arc<T>,
 
     /// For testing purposes, we can sync one block at a time.
@@ -45,39 +43,52 @@ where
     pub fn new(
         config: Config,
         parent_proxy: Arc<P>,
-        provider: Arc<Toggle<CachedFinalityProvider<P>>>,
-        vote_tally: VoteTally,
+        data_cache: Arc<Mutex<FinalityWithNull>>,
         query: Arc<T>,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             config,
             parent_proxy,
-            provider,
-            vote_tally,
+            data_cache,
             query,
             sync_many: true,
         })
     }
 
+    pub async fn set_committed(&self, checkpoint: IPCParentFinality) {
+        let mut cache = self.data_cache.lock().await;
+        cache.finalized_checkpoint(checkpoint);
+    }
+
+    pub async fn get_vote_below_height(&self, height: BlockHeight) -> Option<ParentViewPayload> {
+        let mut cache = self.data_cache.lock().await;
+        let Some(h) = cache.first_non_null_block(height) else {
+            return None;
+        };
+        cache.get_payload_at_height(h).cloned()
+    }
+
     /// Insert the height into cache when we see a new non null block
-    pub async fn sync(&mut self) -> anyhow::Result<()> {
+    pub async fn sync(&self) -> anyhow::Result<()> {
         let chain_head = if let Some(h) = self.finalized_chain_head().await? {
             h
         } else {
             return Ok(());
         };
 
+        let mut data_cache = self.data_cache.lock().await;
+
         let (mut latest_height_fetched, mut first_non_null_parent_hash) =
-            self.latest_cached_data().await;
+            data_cache.latest_cached_data();
         tracing::debug!(chain_head, latest_height_fetched, "syncing heights");
 
         if latest_height_fetched > chain_head {
-            tracing::warn!(
+            tracing::error!(
                 chain_head,
                 latest_height_fetched,
                 "chain head went backwards, potential reorg detected from height"
             );
-            return self.reset().await;
+            return Err(anyhow!("parent reorg detected, latest_height_fetched {latest_height_fetched:}, chain_head: {chain_head:}"));
         }
 
         if latest_height_fetched == chain_head {
@@ -89,31 +100,22 @@ where
             return Ok(());
         }
 
-        loop {
-            if self.exceed_cache_size_limit().await {
+        let max_cache_blocks = self.config.max_cache_blocks();
+
+        for _ in 0..SYNC_BATCH_SIZE {
+            if data_cache.exceed_cache_size_limit(max_cache_blocks) {
                 tracing::debug!("exceeded cache size limit");
                 break;
             }
 
-            first_non_null_parent_hash = match self
-                .poll_next(latest_height_fetched + 1, first_non_null_parent_hash)
-                .await
-            {
-                Ok(h) => h,
-                Err(Error::ParentChainReorgDetected) => {
-                    tracing::warn!("potential reorg detected, clear cache and retry");
-                    self.reset().await?;
-                    break;
-                }
-                Err(e) => return Err(anyhow!(e)),
-            };
+            first_non_null_parent_hash = self
+                .poll_next(&mut data_cache, latest_height_fetched + 1, first_non_null_parent_hash)
+                .await?;
 
             latest_height_fetched += 1;
 
             if latest_height_fetched == chain_head {
                 tracing::debug!("reached the tip of the chain");
-                break;
-            } else if !self.sync_many {
                 break;
             }
         }
@@ -127,56 +129,10 @@ where
     T: ParentFinalityStateQuery + Send + Sync + 'static,
     P: ParentQueryProxy + Send + Sync + 'static,
 {
-    async fn exceed_cache_size_limit(&self) -> bool {
-        let max_cache_blocks = self.config.max_cache_blocks();
-        atomically(|| self.provider.cached_blocks()).await > max_cache_blocks
-    }
-
-    /// Get the latest data stored in the cache to pull the next block
-    async fn latest_cached_data(&self) -> (BlockHeight, BlockHash) {
-        // we are getting the latest height fetched in cache along with the first non null block
-        // that is stored in cache.
-        // we are doing two fetches in one `atomically` as if we get the data in two `atomically`,
-        // the cache might be updated in between the two calls. `atomically` should guarantee atomicity.
-        atomically(|| {
-            let latest_height = if let Some(h) = self.provider.latest_height()? {
-                h
-            } else {
-                unreachable!("guaranteed to have latest height, report bug please")
-            };
-
-            // first try to get the first non null block before latest_height + 1, i.e. from cache
-            let prev_non_null_height =
-                if let Some(height) = self.provider.first_non_null_block(latest_height)? {
-                    tracing::debug!(height, "first non null block in cache");
-                    height
-                } else if let Some(p) = self.provider.last_committed_finality()? {
-                    tracing::debug!(
-                        height = p.height,
-                        "first non null block not in cache, use latest finality"
-                    );
-                    p.height
-                } else {
-                    unreachable!("guaranteed to have last committed finality, report bug please")
-                };
-
-            let hash = if let Some(h) = self.provider.block_hash(prev_non_null_height)? {
-                h
-            } else {
-                unreachable!(
-                    "guaranteed to have hash as the height {} is found",
-                    prev_non_null_height
-                )
-            };
-
-            Ok((latest_height, hash))
-        })
-        .await
-    }
-
     /// Poll the next block height. Returns finalized and executed block data.
     async fn poll_next(
-        &mut self,
+        &self,
+        data_cache: &mut MutexGuard<'_, FinalityWithNull>,
         height: BlockHeight,
         parent_block_hash: BlockHash,
     ) -> Result<BlockHash, Error> {
@@ -196,14 +152,7 @@ where
                         "detected null round at height, inserted None to cache"
                     );
 
-                    atomically_or_err::<_, Error, _>(|| {
-                        self.provider.new_parent_view(height, None)?;
-                        self.vote_tally
-                            .add_block(height, None)
-                            .map_err(map_voting_err)?;
-                        Ok(())
-                    })
-                    .await?;
+                    data_cache.new_parent_view(height, None)?;
 
                     emit(ParentFinalityAcquired {
                         source: "Parent syncer",
@@ -236,7 +185,7 @@ where
             return Err(Error::ParentChainReorgDetected);
         }
 
-        let data = self.fetch_data(height, block_hash_res.block_hash).await?;
+        let data = fetch_data(self.parent_proxy.as_ref(), height, block_hash_res.block_hash).await?;
 
         tracing::debug!(
             height,
@@ -245,18 +194,8 @@ where
             "fetched data"
         );
 
-        atomically_or_err::<_, Error, _>(|| {
-            // This is here so we see if there is abnormal amount of retries for some reason.
-            tracing::debug!(height, "adding data to the cache");
-
-            self.provider.new_parent_view(height, Some(data.clone()))?;
-            self.vote_tally
-                .add_block(height, Some(data.0.clone()))
-                .map_err(map_voting_err)?;
-            tracing::debug!(height, "non-null block pushed to cache");
-            Ok(())
-        })
-        .await?;
+        data_cache.new_parent_view(height, Some(data.clone()))?;
+        tracing::debug!(height, "non-null block pushed to cache");
 
         emit(ParentFinalityAcquired {
             source: "Parent syncer",
@@ -272,14 +211,6 @@ where
         Ok(data.0)
     }
 
-    async fn fetch_data(
-        &self,
-        height: BlockHeight,
-        block_hash: BlockHash,
-    ) -> Result<ParentViewPayload, Error> {
-        fetch_data(self.parent_proxy.as_ref(), height, block_hash).await
-    }
-
     async fn finalized_chain_head(&self) -> anyhow::Result<Option<BlockHeight>> {
         let parent_chain_head_height = self.parent_proxy.get_chain_head_height().await?;
         // sanity check
@@ -292,26 +223,6 @@ where
         Ok(Some(
             parent_chain_head_height - self.config.chain_head_delay,
         ))
-    }
-
-    /// Reset the cache in the face of a reorg
-    async fn reset(&self) -> anyhow::Result<()> {
-        let finality = query_starting_finality(&self.query, &self.parent_proxy).await?;
-        atomically(|| self.provider.reset(finality.clone())).await;
-        Ok(())
-    }
-}
-
-fn map_voting_err(e: StmError<voting::Error>) -> StmError<Error> {
-    match e {
-        StmError::Abort(e) => {
-            tracing::error!(
-                error = e.to_string(),
-                "failed to append block to voting tally"
-            );
-            StmError::Abort(Error::NotSequential)
-        }
-        StmError::Control(c) => StmError::Control(c),
     }
 }
 
@@ -399,17 +310,17 @@ mod tests {
     use crate::sync::ParentFinalityStateQuery;
     use crate::voting::VoteTally;
     use crate::{
-        BlockHash, BlockHeight, CachedFinalityProvider, Config, IPCParentFinality,
-        SequentialKeyCache, Toggle, NULL_ROUND_ERR_MSG,
+        BlockHash, BlockHeight, Config, IPCParentFinality,
+        SequentialKeyCache, NULL_ROUND_ERR_MSG,
     };
     use anyhow::anyhow;
-    use async_stm::atomically;
     use async_trait::async_trait;
     use fendermint_vm_genesis::{Power, Validator};
     use ipc_api::cross::IpcEnvelope;
     use ipc_api::staking::PowerChangeRequest;
     use ipc_provider::manager::{GetBlockHashResult, TopDownQueryPayload};
     use std::sync::Arc;
+    use crate::finality::FinalityWithNull;
 
     /// How far behind the tip of the chain do we consider blocks final in the tests.
     const FINALITY_DELAY: u64 = 2;
@@ -421,9 +332,6 @@ mod tests {
     impl ParentFinalityStateQuery for TestParentFinalityStateQuery {
         fn get_latest_committed_finality(&self) -> anyhow::Result<Option<IPCParentFinality>> {
             Ok(Some(self.latest_finality.clone()))
-        }
-        fn get_power_table(&self) -> anyhow::Result<Option<Vec<Validator<Power>>>> {
-            Ok(Some(vec![]))
         }
     }
 
@@ -488,6 +396,7 @@ mod tests {
         let config = Config {
             chain_head_delay: FINALITY_DELAY,
             polling_interval: Default::default(),
+            vote_interval: Default::default(),
             exponential_back_off: Default::default(),
             exponential_retry_limit: 0,
             max_proposal_range: Some(1),
@@ -501,24 +410,14 @@ mod tests {
             block_hash: vec![0; 32],
         };
 
-        let vote_tally = VoteTally::new(
-            vec![],
-            (
-                committed_finality.height,
-                committed_finality.block_hash.clone(),
-            ),
-        );
-
-        let provider = CachedFinalityProvider::new(
+        let provider = FinalityWithNull::new(
             config.clone(),
-            genesis_epoch,
-            Some(committed_finality.clone()),
-            proxy.clone(),
+            committed_finality.clone()
         );
         let mut syncer = LotusParentSyncer::new(
             config,
             proxy,
-            Arc::new(Toggle::enabled(provider)),
+            Arc::new(provider),
             vote_tally,
             Arc::new(TestParentFinalityStateQuery {
                 latest_finality: committed_finality,
@@ -561,7 +460,7 @@ mod tests {
 
         for h in 101..=104 {
             syncer.sync().await.unwrap();
-            let p = atomically(|| syncer.provider.latest_height()).await;
+            let p = syncer.data_cache.latest_height();
             assert_eq!(p, Some(h));
         }
     }
@@ -588,7 +487,7 @@ mod tests {
         for h in 101..=109 {
             syncer.sync().await.unwrap();
             assert_eq!(
-                atomically(|| syncer.provider.latest_height()).await,
+                syncer.data_cache.latest_height(),
                 Some(h)
             );
         }

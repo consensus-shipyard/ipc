@@ -183,6 +183,10 @@ impl<K: PrimInt + Debug, V> SequentialKeyCache<K, V> {
             Err(SequentialAppendError::AlreadyInserted)
         }
     }
+
+    pub fn clear(&mut self) {
+        self.data = VecDeque::new();
+    }
 }
 
 pub struct ValueIter<'a, K, V> {
