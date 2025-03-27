@@ -1,10 +1,11 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::finality::{ensure_sequential, ParentViewPayload};
 use crate::{BlockHash, BlockHeight, Error, IPCParentFinality, SequentialKeyCache};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::PowerChangeRequest;
+
+pub type ParentViewPayload = (BlockHash, Vec<PowerChangeRequest>, Vec<IpcEnvelope>);
 
 /// Finality provider that can handle null blocks
 #[derive(Clone)]
@@ -53,7 +54,7 @@ impl FinalityWithNull {
     }
 
     pub fn exceed_cache_size_limit(&self, limit: BlockHeight) -> bool {
-        self.cached_blocks() > limit
+        self.blocks.size() as BlockHeight > limit
     }
 
     pub fn last_committed_checkpoint(&self) -> IPCParentFinality {
@@ -75,11 +76,6 @@ impl FinalityWithNull {
     pub fn finalized_checkpoint(&mut self, checkpoint: IPCParentFinality) {
         self.blocks.remove_key_below(checkpoint.height + 1);
         self.committed_checkpoint = checkpoint;
-    }
-
-    /// Returns the number of blocks cached.
-    pub(crate) fn cached_blocks(&self) -> BlockHeight {
-        self.blocks.size() as BlockHeight
     }
 
     pub(crate) fn block_hash_at_height(&self, height: BlockHeight) -> Option<BlockHash> {
@@ -143,6 +139,23 @@ impl FinalityWithNull {
             .append(height, None)
             .map_err(Error::NonSequentialParentViewInsert)
     }
+}
+
+fn ensure_sequential<T, F: Fn(&T) -> u64>(msgs: &[T], f: F) -> Result<(), Error> {
+    if msgs.is_empty() {
+        return Ok(());
+    }
+
+    let first = msgs.first().unwrap();
+    let mut nonce = f(first);
+    for msg in msgs.iter().skip(1) {
+        if nonce + 1 != f(msg) {
+            return Err(Error::NotSequential);
+        }
+        nonce += 1;
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -218,7 +231,7 @@ mod tests {
             (103, Some((vec![3; 32], vec![], vec![]))), // delayed height + final height
             (104, Some((vec![4; 32], vec![], vec![]))),
             (105, Some((vec![4; 32], vec![], vec![]))), // cache latest height, first non null block
-                                                        // max proposal height is 106
+            // max proposal height is 106
         ];
         let provider = new_provider(parent_blocks).await;
 
@@ -244,7 +257,7 @@ mod tests {
             (108, None),
             (109, None),
             (110, Some((vec![4; 32], vec![], vec![]))), // cache latest height
-                                                        // max proposal height is 112
+            // max proposal height is 112
         ];
         let mut provider = new_provider(parent_blocks).await;
         provider.config.max_proposal_range = Some(8);
@@ -265,7 +278,7 @@ mod tests {
             (108, None), // delayed block
             (109, Some((vec![8; 32], vec![], vec![]))),
             (110, Some((vec![10; 32], vec![], vec![]))), // cache latest height, first non null block
-                                                         // max proposal height is 112
+            // max proposal height is 112
         ];
         let mut provider = new_provider(parent_blocks).await;
         provider.config.max_proposal_range = Some(10);
@@ -286,7 +299,7 @@ mod tests {
             (108, None),                                // delayed block
             (109, None),
             (110, Some((vec![10; 32], vec![], vec![]))), // cache latest height, first non null block
-                                                         // max proposal height is 112
+            // max proposal height is 112
         ];
         let mut provider = new_provider(parent_blocks).await;
         provider.config.max_proposal_range = Some(10);
