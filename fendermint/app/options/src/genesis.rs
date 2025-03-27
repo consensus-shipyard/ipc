@@ -173,10 +173,10 @@ pub struct SealGenesisArgs {
     #[arg(long, short)]
     pub custom_actors_path: Option<PathBuf>,
 
-    /// The solidity artifacts output path. If you are using ipc-monorepo, it should be the `out` folder
-    /// of `make build`
+    /// The solidity artifacts output path. If you are using `ipc-monorepo`,
+    /// it should be the `out` folder of `make build`
     #[arg(long, short)]
-    pub artifacts_path: PathBuf,
+    pub artifacts_path: Option<PathBuf>,
 
     /// The sealed genesis state output path, i.e. finalized genesis state CAR file dump path
     #[arg(long, short)]

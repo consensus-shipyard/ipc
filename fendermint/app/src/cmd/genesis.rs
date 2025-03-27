@@ -3,6 +3,7 @@
 
 use anyhow::{anyhow, Context};
 use fendermint_crypto::PublicKey;
+use fendermint_eth_hardhat::{SolidityActorContracts, SolidityActorContractsLoader};
 use fvm_shared::address::Address;
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
@@ -318,14 +319,23 @@ async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> anyhow:
             .unwrap_or_else(|| std::borrow::Cow::Borrowed(fallback));
         Ok(actors)
     }
+
+    // use the builtin, or use the override provided by CLI
     let custom_actors = actors_car_blob(args.custom_actors_path.as_ref(), actors_custom_car::CAR)?;
     let builtin_actors =
         actors_car_blob(args.builtin_actors_path.as_ref(), actors_builtin_car::CAR)?;
-
+    let sol_actor_contracts = if let Some(artifacts_path) = args.artifacts_path.as_ref() {
+        SolidityActorContractsLoader::load_directory(&args.artifacts_path)
+    } else {
+        // XXX TODO
+        todo!("XXX FIXME");
+        Ok(())
+    }?;
+    
     let builder = GenesisBuilder::new(
         builtin_actors.as_ref(),
         custom_actors.as_ref(),
-        args.artifacts_path.clone(),
+        sol_actor_contracts,
         genesis_params,
     );
 

@@ -1,8 +1,15 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+//! Provides a "linker" for artifacts created by `forge build` in the hardhat directory structure
+//! 
+//! The hardhat directory structure is a folder `Foo.sol` with a contained `Foo.json`.
+//! The JSON file encodes the `ABI` in field `abi` as well as input variables and their types.
+//! There are more fields, such as `bytecode`, `deployedBytecode` and `linkReferences` - the latter can be referenced from within the `bytecode`.
+
 use anyhow::{anyhow, bail, Context};
 use ethers_core::types as et;
+use fendermint_vm_actor_interface::diamond::EthContractMap;
 use fs_err as fs;
 use serde::Deserialize;
 use std::{
@@ -11,6 +18,9 @@ use std::{
     hash::Hash,
     path::{Path, PathBuf},
 };
+
+#[cfg(test)]
+mod tests;
 
 /// Contract source as it appears in dependencies, e.g. `"src/lib/SubnetIDHelper.sol"`, or "Gateway.sol".
 /// It is assumed to contain the file extension.
@@ -29,29 +39,105 @@ pub struct DeploymentArtifact {
 }
 
 /// Fully Qualified Name of a contract, e.g. `"src/lib/SubnetIDHelper.sol:SubnetIDHelper"`.
-pub type FQN = String;
+pub type FullyQualifiedName = String;
 
 /// Dependency tree for libraries.
 ///
 /// Using a [BTreeMap] for deterministic ordering.
 type DependencyTree<T> = BTreeMap<T, HashSet<T>>;
 
-/// Utility to link bytecode from Hardhat build artifacts.
-#[derive(Clone, Debug)]
-pub struct Hardhat {
-    /// Directory with Hardhat build artifacts, the full-fat JSON files
-    /// that contain ABI, bytecode, link references, etc.
-    contracts_dir: PathBuf,
+/// Hold all compiled and linked bytes in memory
+#[derive(Debug, Clone)]
+pub struct SolidityActorContracts {
+    /// that contain ABI, bytecode, link references, etc. keyed by their name.
+    top_level_contracts: EthContractMap,
+    /// Eth libs that are not top level contracts
+    eth_libs: EthContractMap, 
 }
 
-impl Hardhat {
-    pub fn new(contracts_dir: PathBuf) -> Self {
-        Self { contracts_dir }
+impl SolidityActorContracts {
+    /// Obtain the compiled top level contract
+    pub fn get_lib(fqn_contract_name: &str) -> Option<> {
+        self.eth_libs.get(fqn_contract_name)
+    }
+
+    /// Obtain the compiled top level contract
+    pub fn get_top_level(fqn_contract_name: &str) -> Option<> {
+        self.top_level_contracts.get(fqn_contract_name)
+    }
+}
+
+/// Utility to link bytecode from `forge build` process build artifacts.
+#[derive(Clone, Debug)]
+pub struct SolidityActorContractsLoader {
+    contract_dir: PathBuf,
+}
+
+impl SolidityActorContractsLoader {
+    /// Load the contracts from the hardhat format disk
+    ///
+    /// The output directory used with `forge build` the full-fat JSON files
+    /// that contain ABI, bytecode, link references, etc.
+    fn load_directory_inner(&self) -> Result<SolidityActorContracts> {
+        fn contract_src(name: &str) -> PathBuf {
+            PathBuf::from(format!("{name}.sol"))
+        }
+
+        let mut all_contracts = Vec::new();
+        let mut top_level_contracts = EthContractMap::default();
+
+        top_level_contracts.extend(IPC_CONTRACTS.clone());
+
+        all_contracts.extend(top_level_contracts.keys());
+        all_contracts.extend(
+            top_level_contracts
+                .values()
+                .flat_map(|c| c.facets.iter().map(|f| f.name)),
+        );
+        // Collect dependencies of the main IPC actors.
+        let mut eth_libs = Vec::<_>::from_iter(self
+            .hardhat
+            .dependencies(
+                &all_contracts
+                    .iter()
+                    .map(|n| (contract_src(n), *n))
+                    ),
+            )
+            .context("failed to collect EVM contract dependencies")?;
+
+        // Only keep library dependencies, not contracts with constructors.
+        eth_libs.retain(|(_, d)| !top_level_contracts.contains_key(d.as_str()));
+        
+        Ok(SolidityActorContracts {
+            top_level_contracts,
+            eth_libs,
+        })
+    }
+    
+    
+    /// A new loader
+    pub fn load_directory(contract_dir: &Path) -> Result<SolidityActorContracts> {
+        let loader = Self{ contract_dir: contract_dir.to_path_buf() };
+        self.load_directory_inner()
     }
 
     /// Fully qualified name of a source and contract.
-    pub fn fqn(&self, contract_source: &Path, contract_name: &str) -> String {
-        format!("{}:{}", contract_source.to_string_lossy(), contract_name)
+    pub fn fully_qualified_name(&self, contract_path: &Path, contract_name: &str) -> String {
+        format!("{}:{}", contract_path.to_string_lossy(), contract_name)
+    }
+    
+    /// Construct bytecode from the compiled contract path
+    /// 
+    /// Also replaces all linked libraries
+    #[deprecated("Should decouple IO from logic ops")]
+    pub fn bytecode(
+        &self,
+        contract_path: impl AsRef<Path>,
+        contract_name: &str,
+        libraries: &HashMap<FullyQualifiedName, et::Address>,
+    ) -> anyhow::Result<Vec<u8>> {
+        let contract_bytes = fs_err::read(contract_path.as_ref())?;
+        self.resolve_library_references(&contract_bytes, contract_name, libraries)
     }
 
     /// Read the bytecode of the contract and replace all links in it with library addresses,
@@ -59,13 +145,13 @@ impl Hardhat {
     /// plugin does it.
     ///
     /// The contract source is expected to be the logical path to a Solidity contract,
-    /// including the extension, ie. a [ContractSource].
-    pub fn prepare_deployment_artifact(
+    /// including the extension, i.e. a [`ContractSource`].
+    pub fn resolve_library_references(
         &self,
-        contract_src: impl AsRef<Path>,
+        contract_bytes: &[u8],
         contract_name: &str,
-        libraries: &HashMap<FQN, et::Address>,
-    ) -> anyhow::Result<DeploymentArtifact> {
+        libraries: &HashMap<FullyQualifiedName, et::Address>,
+    ) -> anyhow::Result<Vec<u8>> {
         let artifact = self.artifact(contract_src.as_ref(), contract_name)?;
 
         // Get the bytecode which is in hex format with placeholders for library references.
@@ -75,10 +161,10 @@ impl Hardhat {
         // Here we differ slightly from the TypeScript version in that we don't return an error
         // for entries in the library address map that we end up not needing, so we can afford
         // to know less about which contract needs which exact references when we call them,
-        for (lib_src, lib_name) in artifact.libraries_needed() {
+        for (lib_bytes, lib_name) in artifact.libraries_needed() {
             // References can be given with Fully Qualified Name, or just the contract name,
             // but they must be unique and unambiguous.
-            let fqn = self.fqn(&lib_src, &lib_name);
+            let fqn = self.fully_qualified_name(&lib_name, &lib_path);
 
             let lib_addr = match (libraries.get(&fqn), libraries.get(&lib_name)) {
                 (None, None) => {
@@ -91,7 +177,7 @@ impl Hardhat {
 
             let lib_addr = hex::encode(lib_addr.0);
 
-            for pos in artifact.library_positions(&lib_src, &lib_name) {
+            for pos in artifact.library_positions(&lib_bytes, &lib_name) {
                 let start = 2 + pos.start * 2;
                 let end = start + pos.length * 2;
                 bytecode.replace_range(start..end, &lib_addr);
@@ -168,7 +254,7 @@ impl Hardhat {
     }
 
     /// Parse the Hardhat artifact of a contract.
-    fn artifact(&self, contract_src: &Path, contract_name: &str) -> anyhow::Result<Artifact> {
+    fn artifact(&self, contract_name: &str, contract_src: &Path) -> anyhow::Result<Artifact> {
         let contract_path = self.contract_path(contract_src, contract_name)?;
 
         let json = fs::read_to_string(&contract_path)
@@ -188,17 +274,18 @@ struct Artifact {
 }
 
 impl Artifact {
-    // Collect the libraries this contract needs.
+    // Collect the libraries this contract needs
     pub fn libraries_needed(&self) -> Vec<(ContractSource, ContractName)> {
-        self.bytecode
+        Vec::from_iter(
+            self.bytecode
             .link_references
             .iter()
-            .flat_map(|(lib_src, links)| {
+            .flat_map(|(lib_src_path, links)| {
                 links
                     .keys()
-                    .map(|lib_name| (lib_src.to_owned(), lib_name.to_owned()))
+                    .map(|lib_name| (lib_src_path.to_owned(), lib_name.to_owned()))
             })
-            .collect()
+        )
     }
 
     pub fn library_positions(
@@ -257,173 +344,4 @@ where
     }
 
     Ok(sorted)
-}
-
-#[cfg(test)]
-mod tests {
-    use ethers_core::types as et;
-    use std::collections::HashMap;
-    use std::path::{Path, PathBuf};
-    use std::str::FromStr;
-
-    use crate::{topo_sort, DependencyTree};
-
-    use super::Hardhat;
-
-    fn workspace_dir() -> PathBuf {
-        let output = std::process::Command::new(env!("CARGO"))
-            .arg("locate-project")
-            .arg("--workspace")
-            .arg("--message-format=plain")
-            .output()
-            .unwrap()
-            .stdout;
-        let cargo_path = Path::new(std::str::from_utf8(&output).unwrap().trim());
-        cargo_path.parent().unwrap().to_path_buf()
-    }
-
-    /// Path to the Solidity contracts, indended to be used in tests.
-    fn contracts_path() -> PathBuf {
-        let contracts_path = std::env::var("FM_CONTRACTS_DIR").unwrap_or_else(|_| {
-            workspace_dir()
-                .join("contracts/out")
-                .to_string_lossy()
-                .into_owned()
-        });
-
-        PathBuf::from_str(&contracts_path).expect("malformed contracts path")
-    }
-
-    fn test_hardhat() -> Hardhat {
-        Hardhat::new(contracts_path())
-    }
-
-    // These are all the libraries based on the `scripts/deploy-libraries.ts` in `ipc-solidity-actors`.
-    const IPC_DEPS: [&str; 4] = [
-        "AccountHelper",
-        "SubnetIDHelper",
-        "CrossMsgHelper",
-        "LibQuorum",
-    ];
-
-    #[test]
-    fn bytecode_linking() {
-        let hardhat = test_hardhat();
-
-        let mut libraries = HashMap::new();
-
-        for lib in IPC_DEPS {
-            libraries.insert(lib.to_owned(), et::Address::default());
-        }
-
-        // This one requires a subset of above libraries.
-        let _bytecode = hardhat
-            .prepare_deployment_artifact(
-                "GatewayManagerFacet.sol",
-                "GatewayManagerFacet",
-                &libraries,
-            )
-            .unwrap();
-    }
-
-    #[test]
-    fn bytecode_missing_link() {
-        let hardhat = test_hardhat();
-
-        // Not giving any dependency should result in a failure.
-        let result = hardhat.prepare_deployment_artifact(
-            "SubnetActorDiamond.sol",
-            "SubnetActorDiamond",
-            &Default::default(),
-        );
-
-        assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("failed to resolve library"));
-    }
-
-    #[test]
-    fn library_dependencies() {
-        let hardhat = test_hardhat();
-
-        let root_contracts: Vec<(String, &str)> = vec![
-            "GatewayDiamond",
-            "GatewayManagerFacet",
-            "CheckpointingFacet",
-            "TopDownFinalityFacet",
-            "XnetMessagingFacet",
-            "GatewayGetterFacet",
-            "GatewayMessengerFacet",
-            "SubnetActorGetterFacet",
-            "SubnetActorManagerFacet",
-            "SubnetActorRewardFacet",
-            "SubnetActorCheckpointingFacet",
-            "SubnetActorPauseFacet",
-        ]
-        .into_iter()
-        .map(|c| (format!("{c}.sol"), c))
-        .collect();
-
-        // Name our top level contracts and gather all required libraries.
-        let mut lib_deps = hardhat
-            .dependencies(&root_contracts)
-            .expect("failed to compute dependencies");
-
-        // For the sake of testing, let's remove top libraries from the dependency list.
-        lib_deps.retain(|(_, d)| !root_contracts.iter().any(|(_, c)| c == d));
-
-        eprintln!("IPC dependencies: {lib_deps:?}");
-
-        assert_eq!(
-            lib_deps.len(),
-            IPC_DEPS.len(),
-            "should discover the same dependencies as expected"
-        );
-
-        let mut libs = HashMap::default();
-
-        for (s, c) in lib_deps {
-            hardhat
-                .prepare_deployment_artifact(&s, &c, &libs)
-                .unwrap_or_else(|e| {
-                    panic!("failed to produce library bytecode in topo order for {c}: {e}")
-                });
-            // Pretend that we deployed it.
-            libs.insert(hardhat.fqn(&s, &c), et::Address::default());
-        }
-
-        for (src, name) in root_contracts {
-            hardhat
-                .prepare_deployment_artifact(src, name, &libs)
-                .expect("failed to produce contract bytecode in topo order");
-        }
-    }
-
-    #[test]
-    fn topo_sorting() {
-        let mut tree: DependencyTree<u8> = Default::default();
-
-        for (k, ds) in [
-            (1, vec![]),
-            (2, vec![1]),
-            (3, vec![1, 2]),
-            (4, vec![3]),
-            (5, vec![4, 2]),
-        ] {
-            tree.entry(k).or_default().extend(ds);
-        }
-
-        let sorted = topo_sort(tree.clone()).unwrap();
-
-        assert_eq!(sorted.len(), 5);
-
-        for (i, k) in sorted.iter().enumerate() {
-            for d in &tree[k] {
-                let j = sorted.iter().position(|x| x == d).unwrap();
-                assert!(j < i);
-            }
-        }
-    }
 }
