@@ -1,5 +1,5 @@
 [package]
-name = "fendermint_eth_hardhat"
+name = "fendermint_eth_hardhat_builtin"
 description = "Utilities to deal with Hardhat build artifacts"
 version = "0.1.0"
 authors.workspace = true
@@ -15,7 +15,6 @@ hex = { workspace = true }
 fs-err = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-fendermint_vm_actor_interface = { path = "../../vm/actor_interface" }
 
 [build-dependencies]
 color-eyre = { workspace = true }
@@ -27,3 +26,4 @@ ignore = "0.4"
 tracing = "0.1"
 build-rs-utils = { path = "../../../build-rs-utils" }
 which = "7"
+fendermint_eth_hardhat = { path = "../hardhat" }

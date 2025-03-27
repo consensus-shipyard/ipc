@@ -3216,6 +3216,7 @@ dependencies = [
  "fendermint_app_settings",
  "fendermint_crypto",
  "fendermint_eth_api",
+ "fendermint_eth_hardhat",
  "fendermint_materializer",
  "fendermint_rocksdb",
  "fendermint_rpc",
@@ -3446,11 +3447,41 @@ name = "fendermint_eth_hardhat"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "build-rs-utils",
+ "cargo_metadata 0.19.2",
+ "color-eyre 0.5.11",
  "ethers-core",
+ "fendermint_vm_actor_interface",
  "fs-err",
  "hex",
+ "ignore",
+ "num-traits",
  "serde",
  "serde_json",
+ "toml 0.8.20",
+ "tracing",
+ "which 7.0.2",
+]
+
+[[package]]
+name = "fendermint_eth_hardhat_builtin"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "build-rs-utils",
+ "cargo_metadata 0.19.2",
+ "color-eyre 0.5.11",
+ "ethers-core",
+ "fendermint_eth_hardhat",
+ "fs-err",
+ "hex",
+ "ignore",
+ "num-traits",
+ "serde",
+ "serde_json",
+ "toml 0.8.20",
+ "tracing",
+ "which 7.0.2",
 ]
 
 [[package]]
@@ -3720,6 +3751,7 @@ dependencies = [
  "fendermint_crypto",
  "fendermint_eth_deployer",
  "fendermint_eth_hardhat",
+ "fendermint_eth_hardhat_builtin",
  "fendermint_rpc",
  "fendermint_testing",
  "fendermint_tracing",
