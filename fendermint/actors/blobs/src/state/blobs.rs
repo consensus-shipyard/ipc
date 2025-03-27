@@ -130,7 +130,7 @@ impl BlobsProgressCollection {
         let mut page = Vec::with_capacity(size as usize);
         map.for_each_ranged(None, Some(size as usize), |hash, set| {
             page.push((hash, set.clone()));
-            Ok(())
+            Ok(true)
         })?;
         page.shrink_to_fit();
         Ok(page)

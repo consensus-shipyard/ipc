@@ -216,7 +216,7 @@ where
         mut f: F,
     ) -> Result<(usize, Option<K>), ActorError>
     where
-        F: FnMut(K, &V) -> Result<(), ActorError>,
+        F: FnMut(K, &V) -> Result<bool, ActorError>,
     {
         self.map.for_each_ranged(starting_key, max, &mut f)
     }

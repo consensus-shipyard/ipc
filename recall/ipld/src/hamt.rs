@@ -6,6 +6,8 @@
 mod core;
 pub mod map;
 
+pub use core::DEFAULT_HAMT_CONFIG;
 pub use core::MapKey;
+pub use core::Map;
 pub use fvm_ipld_hamt::{BytesKey, Error};
 pub use map::Root;

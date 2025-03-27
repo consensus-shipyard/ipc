@@ -6,18 +6,19 @@
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
+use crate::hamt::BytesKey;
+use crate::Hasher;
 use anyhow::anyhow;
 use cid::Cid;
 use fil_actors_runtime::{ActorError, AsActorError};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_hamt as hamt;
+use fvm_ipld_hamt::Error;
 use fvm_shared::address::Address;
 use fvm_shared::error::ExitCode;
 use integer_encoding::VarInt;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-
-use crate::Hasher;
 
 /// Wraps a HAMT to provide a convenient map API.
 /// Any errors are returned with exit code indicating illegal state.
@@ -28,7 +29,7 @@ where
     K: MapKey,
     V: DeserializeOwned + Serialize,
 {
-    hamt: hamt::Hamt<BS, V, hamt::BytesKey, Hasher>,
+    hamt: hamt::Hamt<BS, V, BytesKey, Hasher>,
     name: String,
     key_type: PhantomData<K>,
 }
@@ -198,9 +199,9 @@ where
         // Note the result type of F uses ActorError.
         // The implementation will extract and propagate any ActorError
         // wrapped in a hamt::Error::Dynamic.
-        F: FnMut(K, &V) -> Result<(), ActorError>,
+        F: FnMut(K, &V) -> Result<bool, ActorError>,
     {
-        match self.hamt.for_each_ranged(starting_key, max, |k, v| {
+        match self.inner_for_each_ranged(starting_key, max, |k, v| {
             let key = K::from_bytes(k).context_code(ExitCode::USR_ILLEGAL_STATE, "invalid key")?;
             f(key, v).map_err(|e| anyhow!(e))
         }) {
@@ -217,6 +218,43 @@ where
             }
             Err(hamt_err) => self.map_hamt_error(hamt_err),
         }
+    }
+
+    fn inner_for_each_ranged<F>(
+        &self,
+        starting_key: Option<&hamt::BytesKey>,
+        max: Option<usize>,
+        mut f: F,
+    ) -> Result<(usize, Option<hamt::BytesKey>), Error>
+    where
+        F: FnMut(&hamt::BytesKey, &V) -> anyhow::Result<bool>,
+    {
+        let mut iter = match starting_key {
+            Some(key) => self.hamt.iter_from(key)?,
+            None => self.hamt.iter(),
+        }
+        .fuse();
+
+        let mut traversed = 0usize;
+        let limit = max.unwrap_or(usize::MAX);
+        loop {
+            if traversed >= limit {
+                break;
+            }
+
+            match iter.next() {
+                Some(res) => {
+                    let (k, v) = res?;
+                    if !(f)(k, v)? {
+                        continue;
+                    }
+                    traversed += 1;
+                }
+                None => break,
+            }
+        }
+        let next = iter.next().transpose()?.map(|kv| kv.0).cloned();
+        Ok((traversed, next))
     }
 
     /// Iterates over key-value pairs in the map starting at a key up to an ending_key (included).

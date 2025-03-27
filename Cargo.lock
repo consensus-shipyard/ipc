@@ -3580,7 +3580,6 @@ dependencies = [
  "frc42_dispatch",
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
- "fvm_ipld_hamt",
  "fvm_shared",
  "hex-literal 0.4.1",
  "num-derive 0.3.3",
