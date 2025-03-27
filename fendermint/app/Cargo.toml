@@ -48,6 +48,7 @@ fendermint_app_options = { path = "./options" }
 fendermint_app_settings = { path = "./settings" }
 fendermint_crypto = { path = "../crypto" }
 fendermint_eth_api = { path = "../eth/api" }
+fendermint_eth_hardhat = { path = "../eth/hardhat" }
 fendermint_materializer = { path = "../testing/materializer" }
 fendermint_rocksdb = { path = "../rocksdb" }
 fendermint_rpc = { path = "../rpc" }
@@ -62,6 +63,7 @@ fendermint_vm_genesis = { path = "../vm/genesis" }
 fendermint_vm_interpreter = { path = "../vm/interpreter", features = [
     "bundle",
 ] }
+
 fendermint_vm_message = { path = "../vm/message" }
 fendermint_vm_resolver = { path = "../vm/resolver" }
 fendermint_vm_snapshot = { path = "../vm/snapshot" }
