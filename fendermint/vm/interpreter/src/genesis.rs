@@ -14,7 +14,7 @@ use cid::Cid;
 use ethers::abi::Tokenize;
 use ethers::core::types as et;
 use fendermint_actor_eam::PermissionModeParams;
-use fendermint_eth_hardhat::{ContractSourceAndName, Hardhat, FQN};
+use fendermint_eth_hardhat::{ContractSourceAndName, FullyQualifiedName, SolidityActorContractsLoader, FQN};
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
@@ -159,7 +159,7 @@ pub struct GenesisOutput {
 
 pub struct GenesisBuilder<'a> {
     /// Hardhat like util to deploy ipc contracts
-    hardhat: Hardhat,
+    hardhat: SolidityActorContracts,
     /// The builtin actors bundle
     builtin_actors: &'a [u8],
     /// The custom actors bundle
@@ -173,11 +173,11 @@ impl<'a> GenesisBuilder<'a> {
     pub fn new(
         builtin_actors: &'a [u8],
         custom_actors: &'a [u8],
-        artifacts_path: PathBuf,
+        artifacts: SolidityActorContracts,
         genesis_params: Genesis,
     ) -> Self {
         Self {
-            hardhat: Hardhat::new(artifacts_path),
+            hardhat: artifacts,
             builtin_actors,
             custom_actors,
             genesis_params,
@@ -194,6 +194,8 @@ impl<'a> GenesisBuilder<'a> {
             .await
     }
 
+    /// Write a `.car` file to file
+    // TODO write to an arbitrary IO buffer and provider a wrapper for writing to a file
     async fn write_car(
         &self,
         state_root: Cid,
@@ -488,31 +490,7 @@ impl<'a> GenesisBuilder<'a> {
     }
 
     fn collect_contracts(&self) -> anyhow::Result<(Vec<ContractSourceAndName>, EthContractMap)> {
-        let mut all_contracts = Vec::new();
-        let mut top_level_contracts = EthContractMap::default();
-
-        top_level_contracts.extend(IPC_CONTRACTS.clone());
-
-        all_contracts.extend(top_level_contracts.keys());
-        all_contracts.extend(
-            top_level_contracts
-                .values()
-                .flat_map(|c| c.facets.iter().map(|f| f.name)),
-        );
-        // Collect dependencies of the main IPC actors.
-        let mut eth_libs = self
-            .hardhat
-            .dependencies(
-                &all_contracts
-                    .iter()
-                    .map(|n| (contract_src(n), *n))
-                    .collect::<Vec<_>>(),
-            )
-            .context("failed to collect EVM contract dependencies")?;
-
-        // Only keep library dependencies, not contracts with constructors.
-        eth_libs.retain(|(_, d)| !top_level_contracts.contains_key(d.as_str()));
-        Ok((eth_libs, top_level_contracts))
+        self.hardhat.collect_contracts()
     }
 }
 
@@ -521,7 +499,7 @@ impl<'a> GenesisBuilder<'a> {
 struct DeployConfig<'a> {
     ipc_params: Option<&'a IpcParams>,
     chain_id: ChainID,
-    hardhat: &'a Hardhat,
+    hardhat: &'a SolidityActorContractsLoader,
 }
 
 fn deploy_contracts(
@@ -558,7 +536,7 @@ fn deploy_contracts(
             .facets(ipc::gateway::CONTRACT_NAME)
             .context("failed to collect gateway facets")?;
 
-        deployer.deploy_contract(state, ipc::gateway::CONTRACT_NAME, (facets, params))?
+        deployer.deploy_top_level_contract(state, ipc::gateway::CONTRACT_NAME, (facets, params))?
     };
 
     // IPC SubnetRegistry actor.
@@ -604,7 +582,7 @@ fn deploy_contracts(
             creation_privileges: 0,
         };
 
-        deployer.deploy_contract(state, ipc::registry::CONTRACT_NAME, (facets, params))?;
+        deployer.deploy_top_level_contract(state, ipc::registry::CONTRACT_NAME, (facets, params))?;
     }
 
     Ok(())
@@ -615,7 +593,7 @@ fn contract_src(name: &str) -> PathBuf {
 }
 
 struct ContractDeployer<'a, DB> {
-    hardhat: &'a Hardhat,
+    hardhat: &'a SolidityActorContracts,
     top_contracts: &'a EthContractMap,
     // Assign dynamic ID addresses to libraries, but use fixed addresses for the top level contracts.
     lib_addrs: HashMap<FQN, et::Address>,
@@ -626,7 +604,7 @@ impl<'a, DB> ContractDeployer<'a, DB>
 where
     DB: Blockstore + 'static + Clone,
 {
-    pub fn new(hardhat: &'a Hardhat, top_contracts: &'a EthContractMap) -> Self {
+    pub fn new(hardhat: &'a SolidityActorContracts, top_contracts: &'a EthContractMap) -> Self {
         Self {
             hardhat,
             top_contracts,
@@ -640,14 +618,14 @@ where
         &mut self,
         state: &mut FvmGenesisState<DB>,
         next_id: &mut u64,
-        lib_src: impl AsRef<Path>,
+        lib_fqn: FullyQualifiedName,
         lib_name: &str,
     ) -> anyhow::Result<()> {
-        let fqn = self.hardhat.fqn(lib_src.as_ref(), lib_name);
+        let fqn = self.hardhat.fully_qualified_name(lib_fqn.as_ref(), lib_name);
 
         let bytecode = self
             .hardhat
-            .bytecode(&lib_src, lib_name, &self.lib_addrs)
+            .get(&lib_fqn)
             .with_context(|| format!("failed to load library bytecode {fqn}"))?;
 
         let eth_addr = state
@@ -675,7 +653,7 @@ where
     }
 
     /// Construct the bytecode of a top-level contract and deploy it with some constructor parameters.
-    fn deploy_contract<T>(
+    fn deploy_top_level_contract<T>(
         &self,
         state: &mut FvmGenesisState<DB>,
         contract_name: &str,
@@ -690,7 +668,7 @@ where
 
         let bytecode = self
             .hardhat
-            .bytecode(contract_src, contract_name, &self.lib_addrs)
+            .get_top_level(contract_src, contract_name, &self.lib_addrs)
             .with_context(|| format!("failed to load {contract_name} bytecode"))?;
 
         let eth_addr = state
@@ -764,13 +742,15 @@ fn circ_supply(g: &Genesis) -> TokenAmount {
 pub async fn create_test_genesis_state(
     builtin_actors_bundle: &[u8],
     custom_actors_bundle: &[u8],
-    ipc_path: PathBuf,
+    sol_actor_artifacts: SolidityActorContracts,
     genesis_params: Genesis,
 ) -> anyhow::Result<(FvmGenesisState<MemoryBlockstore>, GenesisOutput)> {
+    use fendermint_eth_hardhat::SolidityActorContracts;
+
     let builder = GenesisBuilder::new(
         builtin_actors_bundle,
         custom_actors_bundle,
-        ipc_path,
+        sol_actor_artifacts,
         genesis_params,
     );
 
