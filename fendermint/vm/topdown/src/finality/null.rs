@@ -1,17 +1,10 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::sync::{Arc, RwLock};
-use crate::finality::{
-    ensure_sequential, ParentViewPayload,
-};
-use crate::{BlockHash, BlockHeight, Config, Error, IPCParentFinality, SequentialKeyCache};
+use crate::finality::{ensure_sequential, ParentViewPayload};
+use crate::{BlockHash, BlockHeight, Error, IPCParentFinality, SequentialKeyCache};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::PowerChangeRequest;
-
-use fendermint_tracing::emit;
-use fendermint_vm_event::ParentFinalityCommitted;
-
 
 /// Finality provider that can handle null blocks
 #[derive(Clone)]
@@ -21,9 +14,7 @@ pub struct FinalityWithNull {
 }
 
 impl FinalityWithNull {
-    pub fn new(
-        committed_checkpoint: IPCParentFinality,
-    ) -> anyhow::Result<Self> {
+    pub fn new(committed_checkpoint: IPCParentFinality) -> anyhow::Result<Self> {
         Ok(Self {
             blocks: SequentialKeyCache::sequential(),
             committed_checkpoint,
@@ -37,18 +28,17 @@ impl FinalityWithNull {
         let latest_height = self.latest_height();
 
         // first try to get the first non null block before latest_height + 1, i.e. from cache
-        let prev_non_null_height =
-            if let Some(height) = self.first_non_null_block(latest_height) {
-                tracing::debug!(height, "first non null block in cache");
-                height
-            } else {
-                let p = self.last_committed_checkpoint();
-                tracing::debug!(
-                        height = p.height,
-                        "first non null block not in cache, use latest finality"
-                    );
-                p.height
-            };
+        let prev_non_null_height = if let Some(height) = self.first_non_null_block(latest_height) {
+            tracing::debug!(height, "first non null block in cache");
+            height
+        } else {
+            let p = self.last_committed_checkpoint();
+            tracing::debug!(
+                height = p.height,
+                "first non null block not in cache, use latest finality"
+            );
+            p.height
+        };
 
         let hash = if let Some(h) = self.block_hash_at_height(prev_non_null_height) {
             h
@@ -109,9 +99,7 @@ impl FinalityWithNull {
     }
 
     pub fn get_payload_at_height(&self, height: BlockHeight) -> Option<&ParentViewPayload> {
-        let Some(h) = self.blocks.get_value(height) else {
-            return None;
-        };
+        let h = self.blocks.get_value(height)?;
         h.as_ref()
     }
 
@@ -209,18 +197,12 @@ mod tests {
             height: 104,
             block_hash: vec![4; 32],
         };
-        assert_eq!(
-            provider.next_proposal(),
-            Some(f.clone())
-        );
+        assert_eq!(provider.next_proposal(), Some(f.clone()));
 
         // Test set new finality
         provider.finalized_checkpoint(f.clone());
 
-        assert_eq!(
-            provider.last_committed_checkpoint(),
-            f.clone()
-        );
+        assert_eq!(provider.last_committed_checkpoint(), f.clone());
 
         // this ensures sequential insertion is still valid
         provider.new_parent_view(108, None).unwrap()

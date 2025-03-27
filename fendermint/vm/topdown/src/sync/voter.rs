@@ -1,9 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::{BlockHeight, IPCParentFinality};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::PowerChangeRequest;
-use crate::{BlockHeight, IPCParentFinality};
 
 pub struct TopdownVoter {}
 
@@ -21,7 +21,7 @@ impl TopdownVoter {
         &self,
         _parent_block_height: BlockHeight,
         _xnet_msgs: Vec<IpcEnvelope>,
-        _power_changes: Vec<PowerChangeRequest>
+        _power_changes: Vec<PowerChangeRequest>,
     ) -> anyhow::Result<()> {
         todo!()
     }

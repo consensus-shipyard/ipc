@@ -11,11 +11,8 @@ pub mod proxy;
 
 pub mod observe;
 
-use async_trait::async_trait;
 use ethers::utils::hex;
 use fvm_shared::clock::ChainEpoch;
-use ipc_api::cross::IpcEnvelope;
-use ipc_api::staking::PowerChangeRequest;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
@@ -29,10 +26,7 @@ pub type BlockHash = Bytes;
 
 /// The null round error message
 pub(crate) const NULL_ROUND_ERR_MSG: &str = "requested epoch was a null round";
-/// Default topdown proposal height range
-pub(crate) const DEFAULT_MAX_PROPOSAL_RANGE: BlockHeight = 100;
 pub(crate) const DEFAULT_MAX_CACHE_BLOCK: BlockHeight = 500;
-pub(crate) const DEFAULT_PROPOSAL_DELAY: BlockHeight = 2;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {

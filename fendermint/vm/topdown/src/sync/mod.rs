@@ -10,15 +10,14 @@ use crate::proxy::ParentQueryProxy;
 use crate::sync::syncer::LotusParentSyncer;
 use crate::sync::tendermint::TendermintAwareSyncer;
 use crate::{Config, IPCParentFinality};
-use anyhow::anyhow;
 use ethers::utils::hex;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
 
-pub use syncer::fetch_topdown_events;
 use crate::finality::{FinalityWithNull, ParentViewPayload};
 use crate::sync::voter::TopdownVoter;
+pub use syncer::fetch_topdown_events;
 
 /// Query the parent finality from the child block chain state.
 ///
@@ -80,14 +79,12 @@ where
 }
 
 /// Start the parent finality listener in the background
-pub fn launch_topdown_process<T, C, P>(
+pub fn launch_topdown_process<C, P>(
     config: Config,
     view_provider: Arc<Mutex<FinalityWithNull>>,
     parent_proxy: Arc<P>,
-    query: Arc<T>,
     tendermint_client: C,
 ) where
-    T: ParentFinalityStateQuery + Send + Sync + 'static,
     C: tendermint_rpc::Client + Send + Sync + 'static,
     P: ParentQueryProxy + Send + Sync + 'static,
 {
@@ -96,9 +93,8 @@ pub fn launch_topdown_process<T, C, P>(
     let mut vote_interval = tokio::time::interval(config.vote_interval);
     vote_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
-    let lotus_syncer =
-        LotusParentSyncer::new(config, parent_proxy, view_provider, query)
-            .expect("cannot create lotus parent syncer");
+    let lotus_syncer = LotusParentSyncer::new(config, parent_proxy, view_provider)
+        .expect("cannot create lotus parent syncer");
     let tendermint_syncer = Arc::new(TendermintAwareSyncer::new(lotus_syncer, tendermint_client));
 
     let syncer = tendermint_syncer.clone();
@@ -106,15 +102,14 @@ pub fn launch_topdown_process<T, C, P>(
         loop {
             sync_interval.tick().await;
 
-            if let Err(e) =  syncer.sync().await {
+            if let Err(e) = syncer.sync().await {
                 tracing::error!(error = e.to_string(), "sync with parent encountered error");
                 continue;
             }
         }
-
     });
 
-    let voter = TopdownVoter{};
+    let voter = TopdownVoter {};
 
     // setup voting loop
     tokio::spawn(async move {
@@ -126,15 +121,14 @@ pub fn launch_topdown_process<T, C, P>(
                 continue;
             }
         }
-
     });
 }
 
-async fn voting<T, C, P>(
-    syncer: &Arc<TendermintAwareSyncer<T, C, P>>,
+async fn voting<C, P>(
+    syncer: &Arc<TendermintAwareSyncer<C, P>>,
     voter: &TopdownVoter,
-) -> anyhow::Result<()> where
-    T: ParentFinalityStateQuery + Send + Sync + 'static,
+) -> anyhow::Result<()>
+where
     C: tendermint_rpc::Client + Send + Sync + 'static,
     P: ParentQueryProxy + Send + Sync + 'static,
 {
@@ -150,23 +144,23 @@ async fn voting<T, C, P>(
     vote_with_payload(syncer, voter, block).await
 }
 
-async fn try_vote_for_liveness<T, C, P>(
-    syncer: &Arc<TendermintAwareSyncer<T, C, P>>,
+async fn try_vote_for_liveness<C, P>(
+    syncer: &Arc<TendermintAwareSyncer<C, P>>,
     voter: &TopdownVoter,
-) -> anyhow::Result<()> where
-    T: ParentFinalityStateQuery + Send + Sync + 'static,
+) -> anyhow::Result<()>
+where
     C: tendermint_rpc::Client + Send + Sync + 'static,
     P: ParentQueryProxy + Send + Sync + 'static,
 {
     todo!()
 }
 
-async fn vote_with_payload<T, C, P>(
-    syncer: &Arc<TendermintAwareSyncer<T, C, P>>,
+async fn vote_with_payload<C, P>(
+    syncer: &Arc<TendermintAwareSyncer<C, P>>,
     voter: &TopdownVoter,
     payload: ParentViewPayload,
-) -> anyhow::Result<()> where
-    T: ParentFinalityStateQuery + Send + Sync + 'static,
+) -> anyhow::Result<()>
+where
     C: tendermint_rpc::Client + Send + Sync + 'static,
     P: ParentQueryProxy + Send + Sync + 'static,
 {

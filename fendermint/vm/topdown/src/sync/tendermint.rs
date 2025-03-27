@@ -2,26 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! The tendermint aware syncer
 
+use crate::finality::ParentViewPayload;
 use crate::proxy::ParentQueryProxy;
 use crate::sync::syncer::LotusParentSyncer;
-use crate::sync::ParentFinalityStateQuery;
-use anyhow::Context;
 use crate::{BlockHeight, IPCParentFinality};
-use crate::finality::ParentViewPayload;
+use anyhow::Context;
 
 /// Tendermint aware syncer
-pub(crate) struct TendermintAwareSyncer<T, C, P> {
-    inner: LotusParentSyncer<T, P>,
+pub(crate) struct TendermintAwareSyncer<C, P> {
+    inner: LotusParentSyncer<P>,
     tendermint_client: C,
 }
 
-impl<T, C, P> TendermintAwareSyncer<T, C, P>
+impl<C, P> TendermintAwareSyncer<C, P>
 where
-    T: ParentFinalityStateQuery + Send + Sync + 'static,
     C: tendermint_rpc::Client + Send + Sync + 'static,
     P: ParentQueryProxy + Send + Sync + 'static,
 {
-    pub fn new(inner: LotusParentSyncer<T, P>, tendermint_client: C) -> Self {
+    pub fn new(inner: LotusParentSyncer<P>, tendermint_client: C) -> Self {
         Self {
             inner,
             tendermint_client,
