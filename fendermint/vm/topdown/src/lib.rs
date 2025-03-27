@@ -8,12 +8,9 @@ pub mod sync;
 
 pub mod convert;
 pub mod proxy;
-mod toggle;
-pub mod voting;
 
 pub mod observe;
 
-use async_stm::Stm;
 use async_trait::async_trait;
 use ethers::utils::hex;
 use fvm_shared::clock::ChainEpoch;
@@ -25,8 +22,6 @@ use std::time::Duration;
 
 pub use crate::cache::{SequentialAppendError, SequentialKeyCache, ValueIter};
 pub use crate::error::Error;
-pub use crate::finality::CachedFinalityProvider;
-pub use crate::toggle::Toggle;
 
 pub type BlockHeight = u64;
 pub type Bytes = Vec<u8>;
@@ -48,57 +43,24 @@ pub struct Config {
     pub chain_head_delay: BlockHeight,
     /// Parent syncing cron period, in seconds
     pub polling_interval: Duration,
-    /// Top down exponential back off retry base
-    pub exponential_back_off: Duration,
-    /// The max number of retries for exponential backoff before giving up
-    pub exponential_retry_limit: usize,
-    /// The max number of blocks one should make the topdown proposal
-    pub max_proposal_range: Option<BlockHeight>,
+    /// Parent voting cron period, in seconds
+    pub vote_interval: Duration,
     /// Max number of blocks that should be stored in cache
     pub max_cache_blocks: Option<BlockHeight>,
-    pub proposal_delay: Option<BlockHeight>,
 }
 
 impl Config {
     pub fn new(
         chain_head_delay: BlockHeight,
         polling_interval: Duration,
-        exponential_back_off: Duration,
-        exponential_retry_limit: usize,
+        vote_interval: Duration,
     ) -> Self {
         Self {
             chain_head_delay,
             polling_interval,
-            exponential_back_off,
-            exponential_retry_limit,
-            max_proposal_range: None,
+            vote_interval,
             max_cache_blocks: None,
-            proposal_delay: None,
         }
-    }
-
-    pub fn with_max_proposal_range(mut self, max_proposal_range: BlockHeight) -> Self {
-        self.max_proposal_range = Some(max_proposal_range);
-        self
-    }
-
-    pub fn with_proposal_delay(mut self, proposal_delay: BlockHeight) -> Self {
-        self.proposal_delay = Some(proposal_delay);
-        self
-    }
-
-    pub fn with_max_cache_blocks(mut self, max_cache_blocks: BlockHeight) -> Self {
-        self.max_cache_blocks = Some(max_cache_blocks);
-        self
-    }
-
-    pub fn max_proposal_range(&self) -> BlockHeight {
-        self.max_proposal_range
-            .unwrap_or(DEFAULT_MAX_PROPOSAL_RANGE)
-    }
-
-    pub fn proposal_delay(&self) -> BlockHeight {
-        self.proposal_delay.unwrap_or(DEFAULT_PROPOSAL_DELAY)
     }
 
     pub fn max_cache_blocks(&self) -> BlockHeight {
@@ -134,33 +96,6 @@ impl Display for IPCParentFinality {
             hex::encode(&self.block_hash)
         )
     }
-}
-
-#[async_trait]
-pub trait ParentViewProvider {
-    /// Obtain the genesis epoch of the current subnet in the parent
-    fn genesis_epoch(&self) -> anyhow::Result<BlockHeight>;
-    /// Get the validator changes from and to height.
-    async fn validator_changes_from(
-        &self,
-        from: BlockHeight,
-        to: BlockHeight,
-    ) -> anyhow::Result<Vec<PowerChangeRequest>>;
-    /// Get the top down messages from and to height.
-    async fn top_down_msgs_from(
-        &self,
-        from: BlockHeight,
-        to: BlockHeight,
-    ) -> anyhow::Result<Vec<IpcEnvelope>>;
-}
-
-pub trait ParentFinalityProvider: ParentViewProvider {
-    /// Latest proposal for parent finality
-    fn next_proposal(&self) -> Stm<Option<IPCParentFinality>>;
-    /// Check if the target proposal is valid
-    fn check_proposal(&self, proposal: &IPCParentFinality) -> Stm<bool>;
-    /// Called when finality is committed
-    fn set_new_finality(&self, finality: IPCParentFinality) -> Stm<()>;
 }
 
 /// If res is null round error, returns the default value from f()

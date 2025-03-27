@@ -214,10 +214,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
             topdown_config.polling_interval,
             topdown_config.exponential_back_off,
             topdown_config.exponential_retry_limit,
-        )
-        .with_proposal_delay(topdown_config.proposal_delay)
-        .with_max_proposal_range(topdown_config.max_proposal_range);
-
+        );
         if let Some(v) = topdown_config.max_cache_blocks {
             info!(value = v, "setting max cache blocks");
             config = config.with_max_cache_blocks(v);
@@ -292,25 +289,6 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         interpreter,
         snapshots,
     )?;
-
-    if let Some((agent_proxy, config)) = ipc_tuple {
-        let app_parent_finality_query = AppParentFinalityQuery::new(app.clone());
-        tokio::spawn(async move {
-            match launch_polling_syncer(
-                app_parent_finality_query,
-                config,
-                parent_finality_provider,
-                parent_finality_votes,
-                agent_proxy,
-                tendermint_client,
-            )
-            .await
-            {
-                Ok(_) => {}
-                Err(e) => tracing::error!("cannot launch polling syncer: {e}"),
-            }
-        });
-    }
 
     // Start the metrics on a background thread.
     if let Some(registry) = metrics_registry {

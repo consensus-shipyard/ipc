@@ -6,6 +6,8 @@ use crate::proxy::ParentQueryProxy;
 use crate::sync::syncer::LotusParentSyncer;
 use crate::sync::ParentFinalityStateQuery;
 use anyhow::Context;
+use crate::{BlockHeight, IPCParentFinality};
+use crate::finality::ParentViewPayload;
 
 /// Tendermint aware syncer
 pub(crate) struct TendermintAwareSyncer<T, C, P> {
@@ -26,9 +28,17 @@ where
         }
     }
 
+    pub async fn set_committed(&self, checkpoint: IPCParentFinality) {
+        self.inner.set_committed(checkpoint).await
+    }
+
+    pub async fn get_vote_below_height(&self, height: BlockHeight) -> Option<ParentViewPayload> {
+        self.inner.get_vote_below_height(height).await
+    }
+
     /// Sync with the parent, unless CometBFT is still catching up with the network,
     /// in which case we'll get the changes from the subnet peers in the blocks.
-    pub async fn sync(&mut self) -> anyhow::Result<()> {
+    pub async fn sync(&self) -> anyhow::Result<()> {
         if self.is_syncing_peer().await? {
             tracing::debug!("syncing with peer, skip parent finality syncing this round");
             return Ok(());

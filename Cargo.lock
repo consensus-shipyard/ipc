@@ -3862,7 +3862,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "arbitrary",
- "async-stm",
  "async-trait",
  "bytes",
  "cid 0.10.1",
