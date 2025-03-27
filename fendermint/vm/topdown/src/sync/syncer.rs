@@ -3,55 +3,41 @@
 //! The inner type of parent syncer
 
 use crate::finality::{FinalityWithNull, ParentViewPayload};
+use crate::observe::ParentFinalityAcquired;
 use crate::proxy::ParentQueryProxy;
-use crate::sync::{query_starting_finality, ParentFinalityStateQuery};
 use crate::{is_null_round_str, BlockHash, BlockHeight, Config, Error, IPCParentFinality};
 use anyhow::anyhow;
 use ethers::utils::hex;
-use std::sync::{Arc};
+use ipc_observability::{emit, serde::HexEncodableBlockHash};
+use libp2p::futures::TryFutureExt;
+use std::sync::Arc;
 use tokio::sync::{Mutex, MutexGuard};
 use tracing::instrument;
-use libp2p::futures::TryFutureExt;
-use crate::observe::ParentFinalityAcquired;
-use ipc_observability::{emit, serde::HexEncodableBlockHash};
 
 /// Will try to sync 10 parent block per `sync` call
 const SYNC_BATCH_SIZE: usize = 10;
 
 /// Parent syncer that constantly poll parent. This struct handles lotus null blocks and deferred
 /// execution. For ETH based parent, it should work out of the box as well.
-pub(crate) struct LotusParentSyncer<T, P> {
+pub(crate) struct LotusParentSyncer<P> {
     config: Config,
     parent_proxy: Arc<P>,
     data_cache: Arc<Mutex<FinalityWithNull>>,
-    query: Arc<T>,
-
-    /// For testing purposes, we can sync one block at a time.
-    /// Not part of `Config` as it's a very niche setting;
-    /// if enabled it would slow down catching up with parent
-    /// history to a crawl, or one would have to increase
-    /// the polling frequence to where it's impractical after
-    /// we have caught up.
-    sync_many: bool,
 }
 
-impl<T, P> LotusParentSyncer<T, P>
+impl<P> LotusParentSyncer<P>
 where
-    T: ParentFinalityStateQuery + Send + Sync + 'static,
     P: ParentQueryProxy + Send + Sync + 'static,
 {
     pub fn new(
         config: Config,
         parent_proxy: Arc<P>,
         data_cache: Arc<Mutex<FinalityWithNull>>,
-        query: Arc<T>,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             config,
             parent_proxy,
             data_cache,
-            query,
-            sync_many: true,
         })
     }
 
@@ -61,10 +47,8 @@ where
     }
 
     pub async fn get_vote_below_height(&self, height: BlockHeight) -> Option<ParentViewPayload> {
-        let mut cache = self.data_cache.lock().await;
-        let Some(h) = cache.first_non_null_block(height) else {
-            return None;
-        };
+        let cache = self.data_cache.lock().await;
+        let h = cache.first_non_null_block(height)?;
         cache.get_payload_at_height(h).cloned()
     }
 
@@ -109,7 +93,11 @@ where
             }
 
             first_non_null_parent_hash = self
-                .poll_next(&mut data_cache, latest_height_fetched + 1, first_non_null_parent_hash)
+                .poll_next(
+                    &mut data_cache,
+                    latest_height_fetched + 1,
+                    first_non_null_parent_hash,
+                )
                 .await?;
 
             latest_height_fetched += 1;
@@ -124,9 +112,8 @@ where
     }
 }
 
-impl<T, P> LotusParentSyncer<T, P>
+impl<P> LotusParentSyncer<P>
 where
-    T: ParentFinalityStateQuery + Send + Sync + 'static,
     P: ParentQueryProxy + Send + Sync + 'static,
 {
     /// Poll the next block height. Returns finalized and executed block data.
@@ -185,7 +172,12 @@ where
             return Err(Error::ParentChainReorgDetected);
         }
 
-        let data = fetch_data(self.parent_proxy.as_ref(), height, block_hash_res.block_hash).await?;
+        let data = fetch_data(
+            self.parent_proxy.as_ref(),
+            height,
+            block_hash_res.block_hash,
+        )
+        .await?;
 
         tracing::debug!(
             height,
@@ -305,13 +297,13 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::finality::FinalityWithNull;
     use crate::proxy::ParentQueryProxy;
     use crate::sync::syncer::LotusParentSyncer;
     use crate::sync::ParentFinalityStateQuery;
     use crate::voting::VoteTally;
     use crate::{
-        BlockHash, BlockHeight, Config, IPCParentFinality,
-        SequentialKeyCache, NULL_ROUND_ERR_MSG,
+        BlockHash, BlockHeight, Config, IPCParentFinality, SequentialKeyCache, NULL_ROUND_ERR_MSG,
     };
     use anyhow::anyhow;
     use async_trait::async_trait;
@@ -320,7 +312,6 @@ mod tests {
     use ipc_api::staking::PowerChangeRequest;
     use ipc_provider::manager::{GetBlockHashResult, TopDownQueryPayload};
     use std::sync::Arc;
-    use crate::finality::FinalityWithNull;
 
     /// How far behind the tip of the chain do we consider blocks final in the tests.
     const FINALITY_DELAY: u64 = 2;
@@ -410,20 +401,8 @@ mod tests {
             block_hash: vec![0; 32],
         };
 
-        let provider = FinalityWithNull::new(
-            config.clone(),
-            committed_finality.clone()
-        );
-        let mut syncer = LotusParentSyncer::new(
-            config,
-            proxy,
-            Arc::new(provider),
-            vote_tally,
-            Arc::new(TestParentFinalityStateQuery {
-                latest_finality: committed_finality,
-            }),
-        )
-        .unwrap();
+        let provider = FinalityWithNull::new(committed_finality.clone()).unwrap();
+        let mut syncer = LotusParentSyncer::new(config, proxy, Arc::new(provider)).unwrap();
 
         // Some tests expect to sync one block at a time.
         syncer.sync_many = sync_many;
@@ -486,10 +465,7 @@ mod tests {
 
         for h in 101..=109 {
             syncer.sync().await.unwrap();
-            assert_eq!(
-                syncer.data_cache.latest_height(),
-                Some(h)
-            );
+            assert_eq!(syncer.data_cache.latest_height(), Some(h));
         }
     }
 }
