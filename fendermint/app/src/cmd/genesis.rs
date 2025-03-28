@@ -327,8 +327,9 @@ async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> anyhow:
     let sol_actor_contracts = if let Some(artifacts_path) = args.artifacts_path.as_ref() {
         SolidityActorContractsLoader::load_directory(&args.artifacts_path)
     } else {
-        // XXX TODO
-        let x: SolidityActorContracts = todo!("XXX FIXME");
+        let x = SolidityActorContracts::from_json(
+            fendermint_eth_hardhat_builtin::BUILTIN_SOL_ACTOR_ARTIFACTS,
+        )?;
         Ok(x)
     }?;
 
