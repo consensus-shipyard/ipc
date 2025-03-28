@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! Download filecoin's builtin actors car file
 
-use build_rs_utils::echo;
+use build_rs_utils::{echo, rerun_if_changed, rerun_if_env_changed};
 use bytes::buf::Buf;
 use color_eyre::eyre::{self, bail, Result, WrapErr};
 use fs_err as fs;
@@ -126,11 +126,11 @@ async fn main() -> color_eyre::eyre::Result<()> {
 
     let builtin_car_path = out_dir.join("builtin_actors.car");
 
-    println!("cargo::rerun-if-changed=build.rs");
-    println!("cargo::rerun-if-env-changed={}", FORCE_RERUN);
-    println!("cargo::rerun-if-env-changed={}", VERSION_OVERRIDE);
+    rerun_if_changed("build.rs");
+    rerun_if_env_changed(VERSION_OVERRIDE);
+    rerun_if_env_changed(FORCE_RERUN);
 
-    println!("cargo::rerun-if-changed={}", builtin_car_path.display());
+    rerun_if_changed(&builtin_car_path);
 
     let tag = std::env::var(VERSION_OVERRIDE).unwrap_or_else(|_e| BUILTIN_ACTORS_TAG.to_owned());
 
