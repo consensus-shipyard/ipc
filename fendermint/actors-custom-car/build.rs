@@ -53,7 +53,6 @@ fn parse_dependencies_of_umbrella_crate(manifest_path: &Path) -> Result<Vec<(Str
     Ok(ret)
 }
 
-
 /// Custom wrapper for a [`cargo_metadata::Package`] to store it in
 /// a `HashSet`.
 #[derive(Debug)]
@@ -233,7 +232,8 @@ fn build_all_wasm_blobs(
         .arg(target)
         .arg("--profile=wasm")
         .arg("--features=fil-actor")
-        .arg(format!("--manifest-path={}", manifest_path.display()))
+        .arg("--manifest-path")
+        .arg(&manifest_path)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         // We are supposed to only generate artifacts under OUT_DIR,

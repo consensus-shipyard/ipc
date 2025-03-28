@@ -123,7 +123,6 @@ pub async fn run_command_with_stdio(
                     break;
                 }
                 Ok(_n) => {
-                    
                     for line in buf.lines() {
                         let _ = tx.send(what(line.trim().to_string()));
                     }
@@ -141,13 +140,17 @@ pub async fn run_command_with_stdio(
         tokio::task::spawn_blocking(move || read_on(tx_cc, BufReader::new(stderr), What::Stderr));
     let jh2 =
         tokio::task::spawn_blocking(move || read_on(tx, BufReader::new(stdout), What::Stdout));
-    
+
     // deduplication - some tools print the identical text/line multiple times
     let mut previous_stdout_line = None;
     let mut previous_stderr_line = None;
-    
+
     fn deduplicate(msg: String, previous: &mut Option<String>) -> Option<String> {
-        let vis = msg.as_str().rsplit("\x1b[2K\r").next().unwrap_or_else(|| msg.as_str());
+        let vis = msg
+            .as_str()
+            .rsplit("\x1b[2K\r")
+            .next()
+            .unwrap_or_else(|| msg.as_str());
         if previous.as_ref().map(|x| x.as_str()) == Some(vis) {
             return None;
         }
@@ -155,15 +158,19 @@ pub async fn run_command_with_stdio(
         previous.replace(vis.clone());
         Some(vis)
     }
-    
+
     while let Ok(x) = rx.recv() {
         match x {
             What::Stderr(msg) => {
-                let Some(msg) = deduplicate(msg, &mut previous_stderr_line) else { continue };
+                let Some(msg) = deduplicate(msg, &mut previous_stderr_line) else {
+                    continue;
+                };
                 echo!(name, cyan, "(err) {}", msg);
             }
             What::Stdout(msg) => {
-                let Some(msg) = deduplicate(msg, &mut previous_stdout_line) else { continue };
+                let Some(msg) = deduplicate(msg, &mut previous_stdout_line) else {
+                    continue;
+                };
                 echo!(name, purple, "(out) {}", msg);
             }
             What::Exit(res) => {
