@@ -70,7 +70,7 @@ fendermint_vm_snapshot = { path = "../vm/snapshot" }
 fendermint_vm_topdown = { path = "../vm/topdown" }
 
 # pre-built and linekd solidity actor contracts
-federmint_eth_hardhat_builtin =  { path = "../eth/hardhat-builtin"}
+fendermint_eth_hardhat_builtin =  { path = "../eth/hardhat-builtin"}
 
 # .car file wrapped in a crate
 actors-builtin-car =  { path = "../actors-builtin-car"}

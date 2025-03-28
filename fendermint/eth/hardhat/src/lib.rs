@@ -9,7 +9,7 @@
 
 use anyhow::{anyhow, bail, Context};
 use ethers_core::types as et;
-use fendermint_vm_actor_interface::diamond::EthContractMap;
+use fendermint_vm_actor_interface::{diamond::EthContractMap, ipc::IPC_CONTRACTS};
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -129,7 +129,7 @@ impl SolidityActorContractsLoader {
         let loader = Self {
             contract_dir: contract_dir.to_path_buf(),
         };
-        self.load_directory_inner()
+        loader.load_directory_inner()
     }
 
     /// Fully qualified name of a source and contract.
@@ -163,7 +163,7 @@ impl SolidityActorContractsLoader {
         contract_name: &str,
         libraries: &HashMap<FullyQualifiedName, et::Address>,
     ) -> anyhow::Result<Vec<u8>> {
-        let artifact = self.artifact(contract_src.as_ref(), contract_name)?;
+        let artifact = self.artifact(contract_name, contract_src.as_ref())?;
 
         // Get the bytecode which is in hex format with placeholders for library references.
         let mut bytecode = artifact.bytecode.object.clone();
@@ -172,7 +172,7 @@ impl SolidityActorContractsLoader {
         // Here we differ slightly from the TypeScript version in that we don't return an error
         // for entries in the library address map that we end up not needing, so we can afford
         // to know less about which contract needs which exact references when we call them,
-        for (lib_bytes, lib_name) in artifact.libraries_needed() {
+        for (lib_path, lib_name) in artifact.libraries_needed() {
             // References can be given with Fully Qualified Name, or just the contract name,
             // but they must be unique and unambiguous.
             let fqn = self.fully_qualified_name(&lib_name, &lib_path);
@@ -188,7 +188,7 @@ impl SolidityActorContractsLoader {
 
             let lib_addr = hex::encode(lib_addr.0);
 
-            for pos in artifact.library_positions(&lib_bytes, &lib_name) {
+            for pos in artifact.library_positions(&lib_path, &lib_name) {
                 let start = 2 + pos.start * 2;
                 let end = start + pos.length * 2;
                 bytecode.replace_range(start..end, &lib_addr);
