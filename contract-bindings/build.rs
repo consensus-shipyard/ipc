@@ -1,12 +1,10 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::io::{BufReader, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
-use std::sync::mpsc;
 
-use build_rs_utils::echo;
+use build_rs_utils::{echo, rerun_if_changed, rerun_if_env_changed, run_command_with_stdio};
 use color_eyre::eyre::eyre;
 
 const SKIP_ENV_VAR_NAME: &str = "SKIP_BINDING_GENERATION";
@@ -29,7 +27,7 @@ async fn run_forge_build(contracts_dir: &Path, out: &Path) -> color_eyre::Result
 
     let forge = find_program("forge")?;
 
-    fs_err::create_dir_all(out)?;
+    fs_err::create_dir_all(&out)?;
 
     let mut cmd = std::process::Command::new(forge);
     cmd.current_dir(contracts_dir);
@@ -65,10 +63,11 @@ async fn main() -> color_eyre::Result<()> {
     // Run with `cargo build -vv` to see output from any `eprintln!` or `println!`.
     // FIXME use a crate printer
 
-    println!("cargo:rerun-if-env-changed={}", SKIP_ENV_VAR_NAME);
-    println!("cargo:rerun-if-changed=build.rs");
+    rerun_if_env_changed(SKIP_ENV_VAR_NAME);
+    rerun_if_changed("build.rs");
+
     let out = std::env::var("OUTPUT").unwrap_or_else(|_| "out".to_owned());
-    println!("cargo:rerun-if-changed={}", out);
+    rerun_if_changed(&out);
 
     let crate_dir = std::env::var("CARGO_MANIFEST_DIR").expect("Building with cargo provides this");
     let crate_dir = PathBuf::from(crate_dir);
@@ -80,7 +79,7 @@ async fn main() -> color_eyre::Result<()> {
     let gen_dir = crate_dir.join("src").join("gen");
     let mod_path = gen_dir.join("mod.rs");
 
-    println!("cargo:rerun-if-changed={}", crate_dir.join("src").display());
+    rerun_if_changed(crate_dir.join("src"));
 
     // Maybe we want to skip the build and use the files as-is, could be imported as crate.
     // Enabled by default so that in the monorepo we don't have to worry about stale code.
@@ -88,7 +87,7 @@ async fn main() -> color_eyre::Result<()> {
         let val = val.trim();
         if val == "true" || val == "1" || val.is_empty() {
             echo!(
-                "contract-bindinns",
+                "contract-bindings",
                 yellow,
                 "Skipping binding generation since {} is set by the user",
                 SKIP_ENV_VAR_NAME

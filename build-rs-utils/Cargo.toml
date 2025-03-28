@@ -7,3 +7,5 @@ license.workspace = true
 
 [dependencies]
 owo-colors = "4"
+color-eyre = "0.6"
+tokio = { version = "1", features = ["rt"] }

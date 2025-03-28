@@ -328,10 +328,10 @@ async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> anyhow:
         SolidityActorContractsLoader::load_directory(&args.artifacts_path)
     } else {
         // XXX TODO
-        todo!("XXX FIXME");
-        Ok(())
+        let x: SolidityActorContracts = todo!("XXX FIXME");
+        Ok(x)
     }?;
-    
+
     let builder = GenesisBuilder::new(
         builtin_actors.as_ref(),
         custom_actors.as_ref(),

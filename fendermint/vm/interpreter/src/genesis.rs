@@ -15,7 +15,9 @@ use ethers::abi::Tokenize;
 use ethers::core::types as et;
 use fendermint_actor_eam::PermissionModeParams;
 use fendermint_eth_deployer::utils as deployer_utils;
-use fendermint_eth_hardhat::{ContractSourceAndName, FullyQualifiedName, SolidityActorContractsLoader, FQN};
+use fendermint_eth_hardhat::{
+    ContractSourceAndName, FullyQualifiedName, SolidityActorContractsLoader, FQN,
+};
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::{
@@ -583,7 +585,11 @@ fn deploy_contracts(
             creation_privileges: 0,
         };
 
-        deployer.deploy_top_level_contract(state, ipc::registry::CONTRACT_NAME, (facets, params))?;
+        deployer.deploy_top_level_contract(
+            state,
+            ipc::registry::CONTRACT_NAME,
+            (facets, params),
+        )?;
     }
 
     Ok(())
@@ -618,7 +624,9 @@ where
         lib_fqn: FullyQualifiedName,
         lib_name: &str,
     ) -> anyhow::Result<()> {
-        let fqn = self.hardhat.fully_qualified_name(lib_fqn.as_ref(), lib_name);
+        let fqn = self
+            .hardhat
+            .fully_qualified_name(lib_fqn.as_ref(), lib_name);
 
         let artifact = self
             .hardhat
