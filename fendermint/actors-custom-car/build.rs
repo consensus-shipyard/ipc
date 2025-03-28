@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use build_rs_utils::echo;
+use build_rs_utils::{echo, rerun_if_changed, rerun_if_env_changed};
 use cargo_metadata::{DependencyKind, MetadataCommand};
 use color_eyre::eyre::{bail, eyre, OptionExt, Result};
 use fil_actor_bundler::Bundler;
@@ -53,9 +53,6 @@ fn parse_dependencies_of_umbrella_crate(manifest_path: &Path) -> Result<Vec<(Str
     Ok(ret)
 }
 
-pub fn rerun_if_changed(path: &Path) {
-    println!("cargo:rerun-if-changed={}", path.display());
-}
 
 /// Custom wrapper for a [`cargo_metadata::Package`] to store it in
 /// a `HashSet`.

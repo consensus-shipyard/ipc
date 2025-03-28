@@ -124,7 +124,10 @@ fn library_dependencies() {
                 panic!("failed to produce library bytecode in topo order for {c}: {e}")
             });
         // Pretend that we deployed it.
-        libs.insert(hardhat.fully_qualified_name(&c, &bytes), et::Address::default());
+        libs.insert(
+            hardhat.fully_qualified_name(&c, &bytes),
+            et::Address::default(),
+        );
     }
 
     for (src, name) in root_contracts {

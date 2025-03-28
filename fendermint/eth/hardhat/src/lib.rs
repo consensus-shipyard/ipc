@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 //! Provides a "linker" for artifacts created by `forge build` in the hardhat directory structure
-//! 
+//!
 //! The hardhat directory structure is a folder `Foo.sol` with a contained `Foo.json`.
 //! The JSON file encodes the `ABI` in field `abi` as well as input variables and their types.
 //! There are more fields, such as `bytecode`, `deployedBytecode` and `linkReferences` - the latter can be referenced from within the `bytecode`.
@@ -11,7 +11,7 @@ use anyhow::{anyhow, bail, Context};
 use ethers_core::types as et;
 use fendermint_vm_actor_interface::diamond::EthContractMap;
 use fs_err as fs;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{
     cmp::Ord,
     collections::{BTreeMap, HashMap, HashSet, VecDeque},
@@ -40,23 +40,37 @@ pub type FullyQualifiedName = String;
 type DependencyTree<T> = BTreeMap<T, HashSet<T>>;
 
 /// Hold all compiled and linked bytes in memory
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SolidityActorContracts {
     /// that contain ABI, bytecode, link references, etc. keyed by their name.
     top_level_contracts: EthContractMap,
     /// Eth libs that are not top level contracts
-    eth_libs: EthContractMap, 
+    eth_libs: EthContractMap,
 }
 
 impl SolidityActorContracts {
     /// Obtain the compiled top level contract
-    pub fn get_lib(fqn_contract_name: &str) -> Option<> {
+    pub fn get_lib(&self, fqn_contract_name: &str) -> Option {
         self.eth_libs.get(fqn_contract_name)
     }
 
     /// Obtain the compiled top level contract
-    pub fn get_top_level(fqn_contract_name: &str) -> Option<> {
+    pub fn get_top_level(&self, fqn_contract_name: &str) -> Option {
         self.top_level_contracts.get(fqn_contract_name)
+    }
+
+    /// Wrap it into a json object
+    ///
+    /// Used for storing and in-binary inclusion
+    pub fn from_json(reader: impl std::io::Read) -> Result<Self> {
+        Ok(serde_json::from_reader(reader)?)
+    }
+
+    /// Wrap it into a json object
+    ///
+    pub fn to_json(&self) -> Result<String> {
+        let s = serde_json::to_string_pretty(self)?;
+        Ok(s)
     }
 }
 
@@ -88,29 +102,26 @@ impl SolidityActorContractsLoader {
                 .flat_map(|c| c.facets.iter().map(|f| f.name)),
         );
         // Collect dependencies of the main IPC actors.
-        let mut eth_libs = Vec::<_>::from_iter(self
-            .hardhat
-            .dependencies(
-                &all_contracts
-                    .iter()
-                    .map(|n| (contract_src(n), *n))
-                    ),
-            )
-            .context("failed to collect EVM contract dependencies")?;
+        let mut eth_libs = Vec::<_>::from_iter(
+            self.hardhat
+                .dependencies(&all_contracts.iter().map(|n| (contract_src(n), *n))),
+        )
+        .context("failed to collect EVM contract dependencies")?;
 
         // Only keep library dependencies, not contracts with constructors.
         eth_libs.retain(|(_, d)| !top_level_contracts.contains_key(d.as_str()));
-        
+
         Ok(SolidityActorContracts {
             top_level_contracts,
             eth_libs,
         })
     }
-    
-    
+
     /// A new loader
     pub fn load_directory(contract_dir: &Path) -> Result<SolidityActorContracts> {
-        let loader = Self{ contract_dir: contract_dir.to_path_buf() };
+        let loader = Self {
+            contract_dir: contract_dir.to_path_buf(),
+        };
         self.load_directory_inner()
     }
 
@@ -118,9 +129,9 @@ impl SolidityActorContractsLoader {
     pub fn fully_qualified_name(&self, contract_path: &Path, contract_name: &str) -> String {
         format!("{}:{}", contract_path.to_string_lossy(), contract_name)
     }
-    
+
     /// Construct bytecode from the compiled contract path
-    /// 
+    ///
     /// Also replaces all linked libraries
     #[deprecated("Should decouple IO from logic ops")]
     pub fn bytecode(
@@ -267,13 +278,13 @@ impl Artifact {
     pub fn libraries_needed(&self) -> Vec<(ContractSource, ContractName)> {
         Vec::from_iter(
             self.bytecode
-            .link_references
-            .iter()
-            .flat_map(|(lib_src_path, links)| {
-                links
-                    .keys()
-                    .map(|lib_name| (lib_src_path.to_owned(), lib_name.to_owned()))
-            })
+                .link_references
+                .iter()
+                .flat_map(|(lib_src_path, links)| {
+                    links
+                        .keys()
+                        .map(|lib_name| (lib_src_path.to_owned(), lib_name.to_owned()))
+                }),
         )
     }
 
