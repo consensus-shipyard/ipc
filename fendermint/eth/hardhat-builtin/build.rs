@@ -24,7 +24,11 @@ fn main() -> Result<()> {
 
     fs_err::write(compiled_handover_path, sol_contracts_json.as_bytes())?;
 
-    echo!("solidity", yellow, "Prepared solidity top-level and libs actor contracts for inclusion");
+    echo!(
+        "solidity",
+        yellow,
+        "Prepared solidity top-level and libs actor contracts for inclusion"
+    );
 
     Ok(())
 }
