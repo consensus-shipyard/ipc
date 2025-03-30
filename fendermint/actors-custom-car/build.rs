@@ -14,7 +14,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use build_rs_utils::{echo, rerun_if_changed, rerun_if_env_changed};
+use build_rs_utils::{echo, rerun_if_changed};
 use cargo_metadata::{DependencyKind, MetadataCommand};
 use color_eyre::eyre::{bail, eyre, OptionExt, Result};
 use fil_actor_bundler::Bundler;

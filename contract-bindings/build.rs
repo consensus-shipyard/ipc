@@ -23,11 +23,11 @@ async fn run_forge_test(_contracts_dir: &Path, _out: &Path) -> color_eyre::Resul
 /// Run `forge build`
 async fn run_forge_build(contracts_dir: &Path, out: &Path) -> color_eyre::Result<()> {
     // Re-run on any change `contracts_dir` directory and subtree
-    rerun_if_changed(contracts_dir.display());
+    rerun_if_changed(&contracts_dir);
 
-    const FORGE_VERBOSITY_EVN_NAME: &str = "CONTRACT_BINDINGS_FORGE_BUILD_VERBOSITY";
-    rerun_if_env_changed(FORGE_VERBOSITY_EVN_NAME);
-    let verbosity = std::env::var(FORGE_VERBOSITY_EVN_NAME).unwrap_or_else("-q".to_owned());
+    const FORGE_VERBOSITY_ENV_NAME: &str = "CONTRACT_BINDINGS_FORGE_BUILD_VERBOSITY";
+    rerun_if_env_changed(FORGE_VERBOSITY_ENV_NAME);
+    let verbosity = std::env::var(FORGE_VERBOSITY_ENV_NAME).unwrap_or_else(|_| "-q".to_owned());
 
     let forge = find_program("forge")?;
 

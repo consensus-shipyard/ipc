@@ -2,25 +2,29 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use build_rs_utils::{echo, rerun_if_changed};
-use color_eyre::{bail, Result};
-
-const CONTRACTS_FORGE_BUILD_OUT_DIR: &str =
-    concat!(env!("CARGO_WORKSPACE_DIR"), "/../../contracts/out/");
+use color_eyre::eyre::{Result, WrapErr};
 
 use fendermint_eth_hardhat as hardhat;
 
 fn main() -> Result<()> {
     // must be in sync with `lib.rs`
-    let compiled_handover_path = std::env::var("OUT_DIR").ok_or_eyre("Must have set OUT_DIR")?;
-    let compiled_handover_path = std::path::Path::new(compiled_handover_path).join("super.json");
+    let compiled_handover_path = std::env::var("OUT_DIR").context("Must have set OUT_DIR")?;
+    let compiled_handover_path =
+        std::path::Path::new(compiled_handover_path.as_str()).join("super.json");
+
+    // FIXME TODO
+    let contracts_forge_build_out_dir =
+        std::env::var("CARGO_WORKSPACE_DIR").context("Must have set CARGO_WORKSPACE_DIR")?;
+    let contracts_forge_build_out_dir =
+        std::path::Path::new(contracts_forge_build_out_dir.as_str()).join("/../../contracts/out/");
 
     rerun_if_changed("build.rs");
-    rerun_if_changed(CONTRACTS_FORGE_BUILD_OUT_DIR);
-    rerun_if_changed(compiled_handover_path);
+    rerun_if_changed(&contracts_forge_build_out_dir);
+    rerun_if_changed(&compiled_handover_path);
 
     let sol_contracts =
-        hardhat::SolidityActorContractsLoader::load_directory(CONTRACTS_FORGE_BUILD_OUT_DIR)?;
-    let sol_contracts_json = sol_contracts.to_json();
+        hardhat::SolidityActorContractsLoader::load_directory(&contracts_forge_build_out_dir)?;
+    let sol_contracts_json = sol_contracts.to_json()?;
 
     fs_err::write(compiled_handover_path, sol_contracts_json.as_bytes())?;
 
