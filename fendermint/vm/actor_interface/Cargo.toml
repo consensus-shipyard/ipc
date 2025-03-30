@@ -10,6 +10,7 @@ license.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
+ethabi = { version = "18", features = ["full-serde"]}
 ethers = { workspace = true }
 hex = { workspace = true }
 lazy_static = { workspace = true }

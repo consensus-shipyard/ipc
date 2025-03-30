@@ -6,12 +6,12 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 anyhow = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }
+# only needed for a dependency resolution hack
+serde_json = { workspace = true }
 num-traits = { workspace = true }
 arbitrary = { workspace = true, optional = true }
 quickcheck = { workspace = true, optional = true }

@@ -161,7 +161,7 @@ pub struct GenesisOutput {
 
 pub struct GenesisBuilder<'a> {
     /// Hardhat like util to deploy ipc contracts
-    hardhat: SolidityActorContracts,
+    solidity_actor_contracts: SolidityActorContracts<'a>,
     /// The builtin actors bundle
     builtin_actors: &'a [u8],
     /// The custom actors bundle
@@ -175,11 +175,11 @@ impl<'a> GenesisBuilder<'a> {
     pub fn new(
         builtin_actors: &'a [u8],
         custom_actors: &'a [u8],
-        artifacts: SolidityActorContracts,
+        solidity_actor_contracts: SolidityActorContracts<'a>,
         genesis_params: Genesis,
     ) -> Self {
         Self {
-            hardhat: artifacts,
+            solidity_actor_contracts,
             builtin_actors,
             custom_actors,
             genesis_params,
@@ -476,7 +476,7 @@ impl<'a> GenesisBuilder<'a> {
         let config = DeployConfig {
             ipc_params: genesis.ipc.as_ref(),
             chain_id: out.chain_id,
-            hardhat: &self.hardhat,
+            hardhat: &self.solidity_actor_contracts,
         };
 
         deploy_contracts(
@@ -492,7 +492,7 @@ impl<'a> GenesisBuilder<'a> {
     }
 
     fn collect_contracts(&self) -> anyhow::Result<(Vec<ContractSourceAndName>, EthContractMap)> {
-        self.hardhat.collect_contracts()
+        self.solidity_actor_contracts.collect_contracts()
     }
 }
 
@@ -627,17 +627,21 @@ where
         lib_fqn: FullyQualifiedName,
         lib_name: &str,
     ) -> anyhow::Result<()> {
-        let fqn = self
+        let artifact_w_yet_to_resolve_lib_refs = self
             .hardhat
-            .fully_qualified_name(lib_fqn.as_ref(), lib_name);
-
-        let bytecode = self
-            .hardhat
-            .get(&lib_fqn)
+            .get_lib(&lib_fqn)
             .with_context(|| format!("failed to load library bytecode {fqn}"))?;
 
+        // we can only link here, since we don't have
+        // all the libraries _deployed_ addresses any earlier
+        let code = self.hardhat.resolve_library_references(
+            artifact_w_yet_to_resolve_lib_refs,
+            lib_name,
+            self.lib_addrs,
+        )?;
+
         let eth_addr = state
-            .create_evm_actor(*next_id, bytecode)
+            .create_evm_actor(*next_id, code)
             .with_context(|| format!("failed to create library actor {fqn}"))?;
 
         let id_addr = et::Address::from(EthAddress::from_id(*next_id).0);
@@ -674,13 +678,19 @@ where
         let contract_id = contract.actor_id;
         let contract_src = contract_src(contract_name);
 
-        let bytecode = self
+        let artifact_w_yet_to_resolve_libs = self
             .hardhat
             .get_top_level(contract_src, contract_name, &self.lib_addrs)
             .with_context(|| format!("failed to load {contract_name} bytecode"))?;
 
+        let code = self.hardhat.resolve_library_references(
+            artifact_w_yet_to_resolve_libs,
+            contract_name,
+            &self.lib_addrs,
+        )?;
+
         let eth_addr = state
-            .create_evm_actor_with_cons(contract_id, &contract.abi, bytecode, constructor_params)
+            .create_evm_actor_with_cons(contract_id, &contract.abi, code, constructor_params)
             .with_context(|| format!("failed to create {contract_name} actor"))?;
 
         let id_addr = et::Address::from(EthAddress::from_id(contract_id).0);
