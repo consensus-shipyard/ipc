@@ -41,39 +41,39 @@ lazy_static! {
                     abi: ia::gateway_diamond::GATEWAYDIAMOND_ABI.to_owned(),
                     facets: vec![
                         EthFacet {
-                            name: "GatewayGetterFacet",
+                            name: "GatewayGetterFacet".to_string(),
                             abi: ia::gateway_getter_facet::GATEWAYGETTERFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "GatewayManagerFacet",
+                            name: "GatewayManagerFacet".to_string(),
                             abi: ia::gateway_manager_facet::GATEWAYMANAGERFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "TopDownFinalityFacet",
+                            name: "TopDownFinalityFacet".to_string(),
                             abi: ia::top_down_finality_facet::TOPDOWNFINALITYFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "CheckpointingFacet",
+                            name: "CheckpointingFacet".to_string(),
                             abi: ia::checkpointing_facet::CHECKPOINTINGFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "GatewayMessengerFacet",
+                            name: "GatewayMessengerFacet".to_string(),
                             abi: ia::gateway_messenger_facet::GATEWAYMESSENGERFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "XnetMessagingFacet",
+                            name: "XnetMessagingFacet".to_string(),
                             abi: ia::xnet_messaging_facet::XNETMESSAGINGFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "DiamondLoupeFacet",
+                            name: "DiamondLoupeFacet".to_string(),
                             abi: ia::diamond_loupe_facet::DIAMONDLOUPEFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "DiamondCutFacet",
+                            name: "DiamondCutFacet".to_string(),
                             abi: ia::diamond_cut_facet::DIAMONDCUTFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "OwnershipFacet",
+                            name: "OwnershipFacet".to_string(),
                             abi: ia::ownership_facet::OWNERSHIPFACET_ABI.to_owned(),
                         },
                     ],
@@ -87,39 +87,39 @@ lazy_static! {
                     facets: vec![
                         // The registry incorporates the SubnetActor facets, although these aren't expected differently in the constructor.
                         EthFacet {
-                            name: "SubnetActorGetterFacet",
+                            name: "SubnetActorGetterFacet".to_string(),
                             abi: ia::subnet_actor_getter_facet::SUBNETACTORGETTERFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "SubnetActorManagerFacet",
+                            name: "SubnetActorManagerFacet".to_string(),
                             abi: ia::subnet_actor_manager_facet::SUBNETACTORMANAGERFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "SubnetActorRewardFacet",
+                            name: "SubnetActorRewardFacet".to_string(),
                             abi: ia::subnet_actor_reward_facet::SUBNETACTORREWARDFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "SubnetActorCheckpointingFacet",
+                            name: "SubnetActorCheckpointingFacet".to_string(),
                             abi: ia::subnet_actor_checkpointing_facet::SUBNETACTORCHECKPOINTINGFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "SubnetActorPauseFacet",
+                            name: "SubnetActorPauseFacet".to_string(),
                             abi: ia::subnet_actor_pause_facet::SUBNETACTORPAUSEFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "DiamondLoupeFacet",
+                            name: "DiamondLoupeFacet".to_string(),
                             abi: ia::diamond_loupe_facet::DIAMONDLOUPEFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "DiamondCutFacet",
+                            name: "DiamondCutFacet".to_string(),
                             abi: ia::diamond_cut_facet::DIAMONDCUTFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "OwnershipFacet",
+                            name: "OwnershipFacet".to_string(),
                             abi: ia::ownership_facet::OWNERSHIPFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "SubnetActorActivityFacet",
+                            name: "SubnetActorActivityFacet".to_string(),
                             abi: ia::subnet_actor_activity_facet::SUBNETACTORACTIVITYFACET_ABI
                                 .to_owned(),
                         },
@@ -127,12 +127,12 @@ lazy_static! {
                         // The registry has its own facets:
                         // https://github.com/consensus-shipyard/ipc-solidity-actors/blob/b01a2dffe367745f55111a65536a3f6fea9165f5/scripts/deploy-registry.template.ts#L58-L67
                         EthFacet {
-                            name: "RegisterSubnetFacet",
+                            name: "RegisterSubnetFacet".to_string(),
                             abi: ia::register_subnet_facet::REGISTERSUBNETFACET_ABI
                                 .to_owned(),
                         },
                         EthFacet {
-                            name: "SubnetGetterFacet",
+                            name: "SubnetGetterFacet".to_string(),
                             abi: ia::subnet_getter_facet::SUBNETGETTERFACET_ABI.to_owned(),
                         },
                     ],
@@ -158,35 +158,35 @@ lazy_static! {
                     abi: ia::subnet_actor_diamond::SUBNETACTORDIAMOND_ABI.to_owned(),
                     facets: vec![
                         EthFacet {
-                            name: "SubnetActorGetterFacet",
+                            name: "SubnetActorGetterFacet".to_string(),
                             abi: ia::subnet_actor_getter_facet::SUBNETACTORGETTERFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "SubnetActorManagerFacet",
+                            name: "SubnetActorManagerFacet".to_string(),
                             abi: ia::subnet_actor_manager_facet::SUBNETACTORMANAGERFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "SubnetActorRewardFacet",
+                            name: "SubnetActorRewardFacet".to_string(),
                             abi: ia::subnet_actor_reward_facet::SUBNETACTORREWARDFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "SubnetActorCheckpointingFacet",
+                            name: "SubnetActorCheckpointingFacet".to_string(),
                             abi: ia::subnet_actor_checkpointing_facet::SUBNETACTORCHECKPOINTINGFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "SubnetActorPauseFacet",
+                            name: "SubnetActorPauseFacet".to_string(),
                             abi: ia::subnet_actor_pause_facet::SUBNETACTORPAUSEFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "DiamondLoupeFacet",
+                            name: "DiamondLoupeFacet".to_string(),
                             abi: ia::diamond_loupe_facet::DIAMONDLOUPEFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "DiamondCutFacet",
+                            name: "DiamondCutFacet".to_string(),
                             abi: ia::diamond_cut_facet::DIAMONDCUTFACET_ABI.to_owned(),
                         },
                         EthFacet {
-                            name: "OwnershipFacet",
+                            name: "OwnershipFacet".to_string(),
                             abi: ia::ownership_facet::OWNERSHIPFACET_ABI.to_owned(),
                         },
                     ],
