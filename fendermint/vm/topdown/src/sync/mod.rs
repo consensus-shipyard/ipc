@@ -4,27 +4,27 @@
 
 mod syncer;
 mod tendermint;
-mod voter;
 
 use crate::proxy::ParentQueryProxy;
 use crate::sync::syncer::LotusParentSyncer;
 use crate::sync::tendermint::TendermintAwareSyncer;
-use crate::{Config, IPCParentFinality};
+use crate::{Config, ParentState};
 use ethers::utils::hex;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
+use async_trait::async_trait;
 
-use crate::finality::{FinalityWithNull, ParentViewPayload};
-use crate::sync::voter::TopdownVoter;
+use crate::finality::{ParentViewPayload, TopdownData};
 pub use syncer::fetch_topdown_events;
+use crate::observe::BlockHeight;
 
 /// Query the parent finality from the child block chain state.
 ///
 /// It returns `None` from queries until the ledger has been initialized.
 pub trait ParentFinalityStateQuery {
     /// Get the latest committed finality from the state
-    fn get_latest_committed_finality(&self) -> anyhow::Result<Option<IPCParentFinality>>;
+    fn get_latest_topdown_parent_state(&self) -> anyhow::Result<Option<ParentState>>;
 }
 
 /// Queries the starting finality for polling. First checks the committed finality, if none, that
@@ -32,13 +32,13 @@ pub trait ParentFinalityStateQuery {
 async fn query_starting_finality<T, P>(
     query: &Arc<T>,
     parent_client: &Arc<P>,
-) -> anyhow::Result<IPCParentFinality>
+) -> anyhow::Result<ParentState>
 where
     T: ParentFinalityStateQuery + Send + Sync + 'static,
     P: ParentQueryProxy + Send + Sync + 'static,
 {
     loop {
-        let mut finality = match query.get_latest_committed_finality() {
+        let mut finality = match query.get_latest_topdown_parent_state() {
             Ok(Some(finality)) => finality,
             Ok(None) => {
                 tracing::debug!("app not ready for query yet");
@@ -64,7 +64,7 @@ where
                 "obtained genesis block hash",
             );
 
-            finality = IPCParentFinality {
+            finality = ParentState {
                 height: genesis_epoch,
                 block_hash: r.block_hash,
             };
@@ -79,21 +79,26 @@ where
 }
 
 /// Start the parent finality listener in the background
-pub fn launch_topdown_process<C, P>(
+pub fn launch_topdown_process<T, C, P, V>(
     config: Config,
-    view_provider: Arc<Mutex<FinalityWithNull>>,
+    view_provider: Arc<Mutex<TopdownData>>,
+    query: Arc<T>,
     parent_proxy: Arc<P>,
     tendermint_client: C,
+    topdown_voter: V,
 ) where
+    T: ParentFinalityStateQuery + Send + Sync + 'static,
     C: tendermint_rpc::Client + Send + Sync + 'static,
     P: ParentQueryProxy + Send + Sync + 'static,
+    V: TopdownVoter + Send + Sync + 'static,
 {
     let mut sync_interval = tokio::time::interval(config.polling_interval);
     sync_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
     let mut vote_interval = tokio::time::interval(config.vote_interval);
     vote_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
-    let lotus_syncer = LotusParentSyncer::new(config, parent_proxy, view_provider)
+    let lotus_syncer = LotusParentSyncer::new(config, parent_proxy.clone(), view_provider)
         .expect("cannot create lotus parent syncer");
     let tendermint_syncer = Arc::new(TendermintAwareSyncer::new(lotus_syncer, tendermint_client));
 
@@ -109,14 +114,12 @@ pub fn launch_topdown_process<C, P>(
         }
     });
 
-    let voter = TopdownVoter {};
-
     // setup voting loop
     tokio::spawn(async move {
         loop {
             vote_interval.tick().await;
 
-            if let Err(e) = voting(&tendermint_syncer, &voter).await {
+            if let Err(e) = voting(&tendermint_syncer, &topdown_voter, &query, &parent_proxy).await {
                 tracing::error!(error = e.to_string(), "sync with parent encountered error");
                 continue;
             }
@@ -124,21 +127,34 @@ pub fn launch_topdown_process<C, P>(
     });
 }
 
-async fn voting<C, P>(
+async fn voting<T, C, P, V>(
     syncer: &Arc<TendermintAwareSyncer<C, P>>,
-    voter: &TopdownVoter,
+    voter: &V,
+    query: &Arc<T>,
+    parent_proxy: &Arc<P>,
 ) -> anyhow::Result<()>
 where
+    T: ParentFinalityStateQuery + Send + Sync + 'static,
     C: tendermint_rpc::Client + Send + Sync + 'static,
     P: ParentQueryProxy + Send + Sync + 'static,
+    V: TopdownVoter + Send + Sync + 'static,
 {
-    let finalized_checkpoint = voter.latest_finalized_checkpoint().await?;
+    let finalized_checkpoint = query_starting_finality(query, parent_proxy).await?;
     syncer.set_committed(finalized_checkpoint).await;
 
     let latest_height = syncer.latest_height().await;
-    let Some(block) = syncer.get_vote_below_height(latest_height).await else {
+    let Some((h, block)) = syncer.get_vote_below_height(latest_height).await else {
         tracing::debug!("topdown syncer not fetched new data");
         return Ok(());
     };
-    voter.vote(block).await
+    voter.vote(h, block).await
+}
+
+#[async_trait]
+pub trait TopdownVoter {
+    async fn vote(
+        &self,
+        height: BlockHeight,
+        parent_view_payload: ParentViewPayload,
+    ) -> anyhow::Result<()>;
 }

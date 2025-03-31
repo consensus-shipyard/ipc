@@ -17,19 +17,6 @@ pub enum ChainMessage {
     /// A message that can be passed on to the FVM as-is.
     Signed(SignedMessage),
 
-    /// Messages involved in InterPlanetaryConsensus, which are basically top-down and bottom-up
-    /// checkpoints that piggy-back on the Tendermint voting mechanism for finality and CID resolution.
-    ///
-    /// Possible mechanisms include:
-    /// * Proposing "for resolution" - A message with a CID proposed for async resolution. These would be bottom-up
-    ///     messages that need to be relayed, so they also include some relayer identity and signature, for rewards.
-    /// * Proposing "for execution" - A message with a CID with proven availability and finality, ready to be executed.
-    ///     Such messages are proposed by the validators themselves, and their execution might trigger rewards for others.
-    ///
-    /// Because of the involvement of data availability voting and CID resolution, these messages require support
-    /// from the application, which is why they are handled in a special way.
-    Ipc(IpcMessage),
-
     /// The validator messages for IPC to function correctly.
     Validator(ValidatorMessage),
 }
@@ -38,6 +25,7 @@ pub enum ChainMessage {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ValidatorMessage {
     SignBottomUpCheckpoint(SignedMessage),
+    TopdownPropose(SignedMessage),
 }
 
 impl From<SignedMessage> for ChainMessage {

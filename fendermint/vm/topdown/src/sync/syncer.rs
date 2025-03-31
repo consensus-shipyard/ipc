@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! The inner type of parent syncer
 
-use crate::finality::{FinalityWithNull, ParentViewPayload};
+use crate::finality::{TopdownData, ParentViewPayload};
 use crate::observe::ParentFinalityAcquired;
 use crate::proxy::ParentQueryProxy;
-use crate::{is_null_round_str, BlockHash, BlockHeight, Config, Error, IPCParentFinality};
+use crate::{is_null_round_str, BlockHash, BlockHeight, Config, Error, ParentState};
 use anyhow::anyhow;
 use ethers::utils::hex;
 use ipc_observability::{emit, serde::HexEncodableBlockHash};
@@ -22,7 +22,7 @@ const SYNC_BATCH_SIZE: usize = 10;
 pub(crate) struct LotusParentSyncer<P> {
     config: Config,
     parent_proxy: Arc<P>,
-    data_cache: Arc<Mutex<FinalityWithNull>>,
+    data_cache: Arc<Mutex<TopdownData>>,
 }
 
 impl<P> LotusParentSyncer<P>
@@ -32,7 +32,7 @@ where
     pub fn new(
         config: Config,
         parent_proxy: Arc<P>,
-        data_cache: Arc<Mutex<FinalityWithNull>>,
+        data_cache: Arc<Mutex<TopdownData>>,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             config,
@@ -41,15 +41,15 @@ where
         })
     }
 
-    pub async fn set_committed(&self, checkpoint: IPCParentFinality) {
+    pub async fn set_committed(&self, checkpoint: ParentState) {
         let mut cache = self.data_cache.lock().await;
         cache.finalized_checkpoint(checkpoint);
     }
 
-    pub async fn get_vote_below_height(&self, height: BlockHeight) -> Option<ParentViewPayload> {
+    pub async fn get_vote_below_height(&self, height: BlockHeight) -> Option<(BlockHeight, ParentViewPayload)> {
         let cache = self.data_cache.lock().await;
         let h = cache.first_non_null_block(height)?;
-        cache.get_payload_at_height(h).cloned()
+        (cache.get_payload_at_height(h).cloned().map(|v| (h, v)))
     }
 
     pub async fn latest_height(&self) -> BlockHeight {
@@ -124,7 +124,7 @@ where
     /// Poll the next block height. Returns finalized and executed block data.
     async fn poll_next(
         &self,
-        data_cache: &mut MutexGuard<'_, FinalityWithNull>,
+        data_cache: &mut MutexGuard<'_, TopdownData>,
         height: BlockHeight,
         parent_block_hash: BlockHash,
     ) -> Result<BlockHash, Error> {
@@ -302,13 +302,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::finality::FinalityWithNull;
+    use crate::finality::TopdownData;
     use crate::proxy::ParentQueryProxy;
     use crate::sync::syncer::LotusParentSyncer;
     use crate::sync::ParentFinalityStateQuery;
     use crate::voting::VoteTally;
     use crate::{
-        BlockHash, BlockHeight, Config, IPCParentFinality, SequentialKeyCache, NULL_ROUND_ERR_MSG,
+        BlockHash, BlockHeight, Config, ParentState, SequentialKeyCache, NULL_ROUND_ERR_MSG,
     };
     use anyhow::anyhow;
     use async_trait::async_trait;
@@ -322,11 +322,11 @@ mod tests {
     const FINALITY_DELAY: u64 = 2;
 
     struct TestParentFinalityStateQuery {
-        latest_finality: IPCParentFinality,
+        latest_finality: ParentState,
     }
 
     impl ParentFinalityStateQuery for TestParentFinalityStateQuery {
-        fn get_latest_committed_finality(&self) -> anyhow::Result<Option<IPCParentFinality>> {
+        fn get_latest_topdown_parent_state(&self) -> anyhow::Result<Option<ParentState>> {
             Ok(Some(self.latest_finality.clone()))
         }
     }
@@ -401,12 +401,12 @@ mod tests {
         };
         let genesis_epoch = blocks.lower_bound().unwrap();
         let proxy = Arc::new(TestParentProxy { blocks });
-        let committed_finality = IPCParentFinality {
+        let committed_finality = ParentState {
             height: genesis_epoch,
             block_hash: vec![0; 32],
         };
 
-        let provider = FinalityWithNull::new(committed_finality.clone()).unwrap();
+        let provider = TopdownData::new(committed_finality.clone()).unwrap();
         let mut syncer = LotusParentSyncer::new(config, proxy, Arc::new(provider)).unwrap();
 
         // Some tests expect to sync one block at a time.

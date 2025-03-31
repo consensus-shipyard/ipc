@@ -22,6 +22,8 @@ use crate::message::{GasParams, SignedMessageFactory};
 use crate::query::{QueryClient, QueryResponse};
 use crate::response::{decode_bytes, decode_fevm_create, decode_fevm_invoke};
 use ethers::contract::EthCall;
+use fendermint_vm_message::signed::SignedMessage;
+
 const SOLIDITY_SELECTOR_BYTES: usize = 4;
 
 /// Abstracting away what the return value is based on whether
@@ -102,12 +104,13 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
     }
 
     /// For validators to invoke a validator specific method.
-    async fn validator_invoke(
+    async fn validator_invoke<F: Sync + Fn(SignedMessage) -> ChainMessage>(
         &mut self,
         contract: Address,
         calldata: Bytes,
         value: TokenAmount,
         gas_params: GasParams,
+        f: &F
     ) -> anyhow::Result<M::Response<Vec<u8>>> {
         let mf = self.message_factory_mut();
 
@@ -125,9 +128,7 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
             return Err(anyhow!("method not found"));
         }
 
-        let msg = mf.create_chain_message(contract, calldata, value, gas_params, |s| {
-            ChainMessage::Validator(ValidatorMessage::SignBottomUpCheckpoint(s))
-        })?;
+        let msg = mf.create_chain_message(contract, calldata, value, gas_params, f)?;
 
         let fut = self.perform(msg, decode_fevm_invoke);
         let res = fut.await?;

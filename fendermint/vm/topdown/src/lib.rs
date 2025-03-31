@@ -3,10 +3,9 @@
 
 mod cache;
 mod error;
-mod finality;
+pub mod finality;
 pub mod sync;
 
-pub mod convert;
 pub mod proxy;
 
 pub mod observe;
@@ -64,7 +63,7 @@ impl Config {
 
 /// The finality view for IPC parent at certain height.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct IPCParentFinality {
+pub struct ParentState {
     /// The latest chain height
     pub height: BlockHeight,
     /// The block hash. For FVM, it is a Cid. For Evm, it is bytes32 as one can now potentially
@@ -72,7 +71,7 @@ pub struct IPCParentFinality {
     pub block_hash: BlockHash,
 }
 
-impl IPCParentFinality {
+impl ParentState {
     pub fn new(height: ChainEpoch, hash: BlockHash) -> Self {
         Self {
             height: height as BlockHeight,
@@ -81,7 +80,7 @@ impl IPCParentFinality {
     }
 }
 
-impl Display for IPCParentFinality {
+impl Display for ParentState {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,

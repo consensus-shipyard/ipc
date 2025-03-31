@@ -16,7 +16,6 @@ use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Account, Actor, ActorMeta, Genesis, PermissionMode, SignerAddr};
 use fendermint_vm_interpreter::fvm::bottomup::BottomUpManager;
 use fendermint_vm_interpreter::fvm::store::memory::MemoryBlockstore;
-use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeScheduler};
 use fendermint_vm_interpreter::fvm::FvmMessagesInterpreter;
 use fendermint_vm_message::chain::ChainMessage;
@@ -64,13 +63,9 @@ async fn tester_with_upgrader(
     let validator = rand_secret_key().public_key();
 
     let bottom_up_manager = BottomUpManager::new(NeverCallClient, None);
-    let finality_provider = Arc::new(Toggle::disabled());
-    let vote_tally = VoteTally::empty();
-    let top_down_manager = TopDownManager::new(finality_provider, vote_tally);
 
     let interpreter: FvmMessagesInterpreter<MemoryBlockstore, _> = FvmMessagesInterpreter::new(
         bottom_up_manager,
-        top_down_manager,
         upgrade_scheduler,
         false,
         200,

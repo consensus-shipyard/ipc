@@ -4,7 +4,7 @@
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically_or_err;
 use fendermint_abci::ApplicationService;
-use fendermint_app::ipc::{AppParentFinalityQuery, AppVote};
+use fendermint_app::ipc::{AppParentFinalityQuery};
 use fendermint_app::{App, AppConfig, AppStore, BitswapBlockstore};
 use fendermint_app_settings::AccountKind;
 use fendermint_crypto::SecretKey;
@@ -13,15 +13,11 @@ use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::fvm::bottomup::BottomUpManager;
 use fendermint_vm_interpreter::fvm::interpreter::FvmMessagesInterpreter;
 use fendermint_vm_interpreter::fvm::observe::register_metrics as register_interpreter_metrics;
-use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
 use fendermint_vm_interpreter::fvm::{Broadcaster, ValidatorContext};
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::observe::register_metrics as register_topdown_metrics;
 use fendermint_vm_topdown::proxy::{IPCProviderProxy, IPCProviderProxyWithLatency};
-use fendermint_vm_topdown::sync::launch_polling_syncer;
-use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
-use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
 use fvm_shared::address::{current_network, Address, Network};
 use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
 use ipc_observability::observe::register_metrics as register_default_metrics;
@@ -141,99 +137,24 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     let state_store =
         NamespaceBlockstore::new(db.clone(), ns.state_store).context("error creating state DB")?;
 
-    let parent_finality_votes = VoteTally::empty();
-
     let topdown_enabled = settings.topdown_enabled();
 
-    // If enabled, start a resolver that communicates with the application through the resolve pool.
-    if settings.resolver_enabled() {
-        let mut service =
-            make_resolver_service(&settings, db.clone(), state_store.clone(), ns.bit_store)?;
-
-        // Register all metrics from the IPLD resolver stack
-        if let Some(ref registry) = metrics_registry {
-            service
-                .register_metrics(registry)
-                .context("failed to register IPLD resolver metrics")?;
-        }
-
-        let client = service.client();
-
-        let own_subnet_id = settings.ipc.subnet_id.clone();
-
-        client
-            .add_provided_subnet(own_subnet_id.clone())
-            .context("error adding own provided subnet.")?;
-
-        if topdown_enabled {
-            if let Some(key) = validator_keypair {
-                let parent_finality_votes = parent_finality_votes.clone();
-
-                tracing::info!("starting the parent finality vote gossip loop...");
-                tokio::spawn(async move {
-                    publish_vote_loop(
-                        parent_finality_votes,
-                        settings.ipc.vote_interval,
-                        settings.ipc.vote_timeout,
-                        key,
-                        own_subnet_id,
-                        client,
-                        |height, block_hash| {
-                            AppVote::ParentFinality(IPCParentFinality { height, block_hash })
-                        },
-                    )
-                    .await
-                });
-            }
-        } else {
-            tracing::info!("parent finality vote gossip disabled");
-        }
-
-        tracing::info!("subscribing to gossip...");
-        let rx = service.subscribe();
-        let parent_finality_votes = parent_finality_votes.clone();
-        tokio::spawn(async move {
-            dispatch_resolver_events(rx, parent_finality_votes, topdown_enabled).await;
-        });
-
-        tracing::info!("starting the IPLD Resolver Service...");
-        tokio::spawn(async move {
-            if let Err(e) = service.run().await {
-                tracing::error!("IPLD Resolver Service failed: {e:#}")
-            }
-        });
-    } else {
-        tracing::info!("IPLD Resolver disabled.")
-    }
-
-    let (parent_finality_provider, ipc_tuple) = if topdown_enabled {
+    if topdown_enabled {
         info!("topdown finality enabled");
         let topdown_config = settings.ipc.topdown_config()?;
-        let mut config = fendermint_vm_topdown::Config::new(
-            topdown_config.chain_head_delay,
-            topdown_config.polling_interval,
-            topdown_config.exponential_back_off,
-            topdown_config.exponential_retry_limit,
-        );
-        if let Some(v) = topdown_config.max_cache_blocks {
-            info!(value = v, "setting max cache blocks");
-            config = config.with_max_cache_blocks(v);
-        }
 
-        let ipc_provider = {
-            let p = make_ipc_provider_proxy(&settings)?;
-            Arc::new(IPCProviderProxyWithLatency::new(p))
-        };
+        todo!("setup topdown voting")
+        // let mut config = fendermint_vm_topdown::Config::new(
+        //     topdown_config.chain_head_delay,
+        //     topdown_config.polling_interval,
+        //     topdown_config.polling_interval,
+        // );
+        // if let Some(v) = topdown_config.max_cache_blocks {
+        //     info!(value = v, "setting max cache blocks");
+        //     config = config.with_max_cache_blocks(v);
+        // }
 
-        let finality_provider =
-            CachedFinalityProvider::uninitialized(config.clone(), ipc_provider.clone()).await?;
-
-        let p = Arc::new(Toggle::enabled(finality_provider));
-        (p, Some((ipc_provider, config)))
-    } else {
-        info!("topdown finality disabled");
-        (Arc::new(Toggle::disabled()), None)
-    };
+    }
 
     // Start a snapshot manager in the background.
     let snapshots = if settings.snapshots.enabled {
@@ -262,14 +183,8 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     };
 
     let bottom_up_manager = BottomUpManager::new(tendermint_client.clone(), validator_ctx);
-    let top_down_manager = TopDownManager::new(
-        parent_finality_provider.clone(),
-        parent_finality_votes.clone(),
-    );
-
     let interpreter = FvmMessagesInterpreter::new(
         bottom_up_manager,
-        top_down_manager,
         UpgradeScheduler::new(),
         testing_settings.map_or(true, |t| t.push_chain_meta),
         settings.abci.block_max_msgs,
@@ -356,29 +271,9 @@ fn open_db(settings: &Settings, ns: &Namespaces) -> anyhow::Result<RocksDb> {
     Ok(db)
 }
 
-fn make_resolver_service(
-    settings: &Settings,
-    db: RocksDb,
-    state_store: NamespaceBlockstore,
-    bit_store_ns: String,
-) -> anyhow::Result<ipc_ipld_resolver::Service<libipld::DefaultParams, AppVote>> {
-    // Blockstore for Bitswap.
-    let bit_store = NamespaceBlockstore::new(db, bit_store_ns).context("error creating bit DB")?;
-
-    // Blockstore for Bitswap with a fallback on the actor store for reads.
-    let bitswap_store = BitswapBlockstore::new(state_store, bit_store);
-
-    let config = to_resolver_config(settings).context("error creating resolver config")?;
-
-    let service = ipc_ipld_resolver::Service::new(config, bitswap_store)
-        .context("error creating IPLD Resolver Service")?;
-
-    Ok(service)
-}
-
 fn make_ipc_provider_proxy(settings: &Settings) -> anyhow::Result<IPCProviderProxy> {
     let topdown_config = settings.ipc.topdown_config()?;
-    let subnet = ipc_provider::config::Subnet {
+    let subnets = vec![ipc_provider::config::Subnet {
         id: settings
             .ipc
             .subnet_id
@@ -395,65 +290,11 @@ fn make_ipc_provider_proxy(settings: &Settings) -> anyhow::Result<IPCProviderPro
             registry_addr: topdown_config.parent_registry,
             gateway_addr: topdown_config.parent_gateway,
         }),
-    };
-    info!("init ipc provider with subnet: {}", subnet.id);
+    }];
+    info!("init ipc provider with subnet: {}", subnets[0].id);
 
-    let ipc_provider = IpcProvider::new_with_subnet(None, subnet)?;
+    let ipc_provider = IpcProvider::new_with_subnets(None, subnets)?;
     IPCProviderProxy::new(ipc_provider, settings.ipc.subnet_id.clone())
-}
-
-fn to_resolver_config(settings: &Settings) -> anyhow::Result<ipc_ipld_resolver::Config> {
-    use ipc_ipld_resolver::{
-        Config, ConnectionConfig, ContentConfig, DiscoveryConfig, MembershipConfig, NetworkConfig,
-    };
-
-    let r = &settings.resolver;
-
-    let local_key: Keypair = {
-        let path = r.network.local_key(settings.home_dir());
-        let sk = read_secret_key(&path)?;
-        let sk = secp256k1::SecretKey::try_from_bytes(sk.serialize())?;
-        secp256k1::Keypair::from(sk).into()
-    };
-
-    let network_name = format!(
-        "ipld-resolver-{}-{}",
-        settings.ipc.subnet_id.root_id(),
-        r.network.network_name
-    );
-
-    let config = Config {
-        connection: ConnectionConfig {
-            listen_addr: r.connection.listen_addr.clone(),
-            external_addresses: r.connection.external_addresses.clone(),
-            expected_peer_count: r.connection.expected_peer_count,
-            max_incoming: r.connection.max_incoming,
-            max_peers_per_query: r.connection.max_peers_per_query,
-            event_buffer_capacity: r.connection.event_buffer_capacity,
-        },
-        network: NetworkConfig {
-            local_key,
-            network_name,
-        },
-        discovery: DiscoveryConfig {
-            static_addresses: r.discovery.static_addresses.clone(),
-            target_connections: r.discovery.target_connections,
-            enable_kademlia: r.discovery.enable_kademlia,
-        },
-        membership: MembershipConfig {
-            static_subnets: r.membership.static_subnets.clone(),
-            max_subnets: r.membership.max_subnets,
-            publish_interval: r.membership.publish_interval,
-            min_time_between_publish: r.membership.min_time_between_publish,
-            max_provider_age: r.membership.max_provider_age,
-        },
-        content: ContentConfig {
-            rate_limit_bytes: r.content.rate_limit_bytes,
-            rate_limit_period: r.content.rate_limit_period,
-        },
-    };
-
-    Ok(config)
 }
 
 fn to_address(sk: &SecretKey, kind: &AccountKind) -> anyhow::Result<Address> {
@@ -461,68 +302,5 @@ fn to_address(sk: &SecretKey, kind: &AccountKind) -> anyhow::Result<Address> {
     match kind {
         AccountKind::Regular => Ok(Address::new_secp256k1(&pk)?),
         AccountKind::Ethereum => Ok(Address::from(EthAddress::new_secp256k1(&pk)?)),
-    }
-}
-
-async fn dispatch_resolver_events(
-    mut rx: tokio::sync::broadcast::Receiver<ResolverEvent<AppVote>>,
-    parent_finality_votes: VoteTally,
-    topdown_enabled: bool,
-) {
-    loop {
-        match rx.recv().await {
-            Ok(event) => match event {
-                ResolverEvent::ReceivedPreemptive(_, _) => {}
-                ResolverEvent::ReceivedVote(vote) => {
-                    dispatch_vote(*vote, &parent_finality_votes, topdown_enabled).await;
-                }
-            },
-            Err(RecvError::Lagged(n)) => {
-                tracing::warn!("the resolver service skipped {n} gossip events")
-            }
-            Err(RecvError::Closed) => {
-                tracing::error!("the resolver service stopped receiving gossip");
-                return;
-            }
-        }
-    }
-}
-
-async fn dispatch_vote(
-    vote: VoteRecord<AppVote>,
-    parent_finality_votes: &VoteTally,
-    topdown_enabled: bool,
-) {
-    match vote.content {
-        AppVote::ParentFinality(f) => {
-            if !topdown_enabled {
-                tracing::debug!("ignoring vote; topdown disabled");
-                return;
-            }
-            let res = atomically_or_err(|| {
-                parent_finality_votes.add_vote(
-                    vote.public_key.clone(),
-                    f.height,
-                    f.block_hash.clone(),
-                )
-            })
-            .await;
-
-            match res {
-                Err(e @ VoteError::Equivocation(_, _, _, _)) => {
-                    tracing::warn!(error = e.to_string(), "failed to handle vote");
-                }
-                Err(e @ (
-                      VoteError::Uninitialized // early vote, we're not ready yet
-                    | VoteError::UnpoweredValidator(_) // maybe arrived too early or too late, or spam
-                    | VoteError::UnexpectedBlock(_, _) // won't happen here
-                )) => {
-                    tracing::debug!(error = e.to_string(), "failed to handle vote");
-                }
-                _ => {
-                    tracing::debug!("vote handled");
-                }
-            };
-        }
     }
 }

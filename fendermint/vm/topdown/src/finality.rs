@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::{BlockHash, BlockHeight, Error, IPCParentFinality, SequentialKeyCache};
+use crate::{BlockHash, BlockHeight, Error, ParentState, SequentialKeyCache};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::PowerChangeRequest;
 
@@ -9,13 +9,13 @@ pub type ParentViewPayload = (BlockHash, Vec<PowerChangeRequest>, Vec<IpcEnvelop
 
 /// Finality provider that can handle null blocks
 #[derive(Clone)]
-pub struct FinalityWithNull {
+pub struct TopdownData {
     blocks: SequentialKeyCache<BlockHeight, Option<ParentViewPayload>>,
-    committed_checkpoint: IPCParentFinality,
+    committed_checkpoint: ParentState,
 }
 
-impl FinalityWithNull {
-    pub fn new(committed_checkpoint: IPCParentFinality) -> anyhow::Result<Self> {
+impl TopdownData {
+    pub fn new(committed_checkpoint: ParentState) -> anyhow::Result<Self> {
         Ok(Self {
             blocks: SequentialKeyCache::sequential(),
             committed_checkpoint,
@@ -57,7 +57,7 @@ impl FinalityWithNull {
         self.blocks.size() as BlockHeight > limit
     }
 
-    pub fn last_committed_checkpoint(&self) -> IPCParentFinality {
+    pub fn last_committed_checkpoint(&self) -> ParentState {
         self.committed_checkpoint.clone()
     }
 
@@ -73,7 +73,7 @@ impl FinalityWithNull {
         }
     }
 
-    pub fn finalized_checkpoint(&mut self, checkpoint: IPCParentFinality) {
+    pub fn finalized_checkpoint(&mut self, checkpoint: ParentState) {
         self.blocks.remove_key_below(checkpoint.height + 1);
         self.committed_checkpoint = checkpoint;
     }
@@ -160,13 +160,13 @@ fn ensure_sequential<T, F: Fn(&T) -> u64>(msgs: &[T], f: F) -> Result<(), Error>
 
 #[cfg(test)]
 mod tests {
-    use super::FinalityWithNull;
+    use super::TopdownData;
     use crate::finality::ParentViewPayload;
-    use crate::{BlockHeight, Config, IPCParentFinality};
+    use crate::{BlockHeight, Config, ParentState};
 
     async fn new_provider(
         mut blocks: Vec<(BlockHeight, Option<ParentViewPayload>)>,
-    ) -> FinalityWithNull {
+    ) -> TopdownData {
         let config = Config {
             chain_head_delay: 2,
             polling_interval: Default::default(),
@@ -177,14 +177,14 @@ mod tests {
             max_cache_blocks: None,
             proposal_delay: Some(2),
         };
-        let committed_finality = IPCParentFinality {
+        let committed_finality = ParentState {
             height: blocks[0].0,
             block_hash: vec![0; 32],
         };
 
         blocks.remove(0);
 
-        let mut f = FinalityWithNull::new(committed_finality).unwrap();
+        let mut f = TopdownData::new(committed_finality).unwrap();
         for (h, p) in blocks {
             f.new_parent_view(h, p.clone()).unwrap();
         }
@@ -206,7 +206,7 @@ mod tests {
         ];
         let mut provider = new_provider(parent_blocks).await;
 
-        let f = IPCParentFinality {
+        let f = ParentState {
             height: 104,
             block_hash: vec![4; 32],
         };
@@ -237,7 +237,7 @@ mod tests {
 
         assert_eq!(
             provider.next_proposal(),
-            Some(IPCParentFinality {
+            Some(ParentState {
                 height: 103,
                 block_hash: vec![3; 32]
             })
@@ -306,7 +306,7 @@ mod tests {
 
         assert_eq!(
             provider.next_proposal(),
-            Some(IPCParentFinality {
+            Some(ParentState {
                 height: 107,
                 block_hash: vec![7; 32]
             })
@@ -334,7 +334,7 @@ mod tests {
 
         assert_eq!(
             provider.next_proposal(),
-            Some(IPCParentFinality {
+            Some(ParentState {
                 height: 107,
                 block_hash: vec![7; 32]
             })

@@ -36,9 +36,9 @@ cmd! {
 async fn export_topdown_events(args: &DebugExportTopDownEventsArgs) -> anyhow::Result<()> {
     // Configuration for the child subnet on the parent network,
     // based on how it's done in `run.rs` and the `genesis ipc from-parent` command.
-    let parent_provider = IpcProvider::new_with_subnet(
+    let parent_provider = IpcProvider::new_with_subnets(
         None,
-        ipc_provider::config::Subnet {
+        vec![ipc_provider::config::Subnet {
             id: args
                 .subnet_id
                 .parent()
@@ -50,7 +50,7 @@ async fn export_topdown_events(args: &DebugExportTopDownEventsArgs) -> anyhow::R
                 registry_addr: args.parent_registry,
                 gateway_addr: args.parent_gateway,
             }),
-        },
+        }],
     )?;
 
     let parent_proxy = IPCProviderProxy::new(parent_provider, args.subnet_id.clone())

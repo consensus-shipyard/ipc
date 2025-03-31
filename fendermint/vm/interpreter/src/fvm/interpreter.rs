@@ -17,7 +17,6 @@ use tendermint_rpc::Client as TendermintClient;
 use crate::errors::*;
 use crate::fvm::bottomup::{BottomUpManager, PowerUpdates};
 use crate::fvm::gas_estimation::{estimate_gassed_msg, gas_search};
-use crate::fvm::topdown::TopDownManager;
 use crate::fvm::{
     activity::ValidatorActivityTracker,
     observe::{MsgExec, MsgExecPurpose},
@@ -37,7 +36,7 @@ use std::convert::TryInto;
 use crate::fvm::executions::{
     execute_cron_message, execute_signed_message, push_block_to_chainmeta_actor_if_possible,
 };
-use crate::fvm::validator::execute_bottom_up_signature;
+use crate::fvm::validator::{execute_bottom_up_signature, execute_topdown_propose};
 
 struct Actor {
     id: ActorID,
@@ -51,7 +50,6 @@ where
     C: TendermintClient + Clone + Send + Sync + 'static,
 {
     bottom_up_manager: BottomUpManager<DB, C>,
-    top_down_manager: TopDownManager<DB>,
     upgrade_scheduler: UpgradeScheduler<DB>,
 
     push_block_data_to_chainmeta_actor: bool,
@@ -68,7 +66,6 @@ where
 {
     pub fn new(
         bottom_up_manager: BottomUpManager<DB, C>,
-        top_down_manager: TopDownManager<DB>,
         upgrade_scheduler: UpgradeScheduler<DB>,
         push_block_data_to_chainmeta_actor: bool,
         max_msgs_per_block: usize,
@@ -77,7 +74,6 @@ where
     ) -> Self {
         Self {
             bottom_up_manager,
-            top_down_manager,
             upgrade_scheduler,
             push_block_data_to_chainmeta_actor,
             max_msgs_per_block,
@@ -260,18 +256,8 @@ where
             .collect::<Vec<_>>();
 
         let total_gas_limit = state.block_gas_tracker().available();
-        let signed_msgs_iter = select_messages_by_gas_limit(signed_msgs, total_gas_limit)
+        let mut all_msgs = select_messages_by_gas_limit(signed_msgs, total_gas_limit)
             .into_iter()
-            .map(Into::into);
-
-        let top_down_iter = self
-            .top_down_manager
-            .chain_message_from_finality_or_quorum()
-            .await
-            .into_iter();
-
-        let mut all_msgs = top_down_iter
-            .chain(signed_msgs_iter)
             .map(|msg| fvm_ipld_encoding::to_vec(&msg).context("failed to encode message as IPLD"))
             .collect::<Result<Vec<Vec<u8>>>>()?;
 
@@ -321,11 +307,6 @@ where
         for msg in msgs {
             match fvm_ipld_encoding::from_slice::<ChainMessage>(&msg) {
                 Ok(chain_msg) => match chain_msg {
-                    ChainMessage::Ipc(IpcMessage::TopDownExec(finality)) => {
-                        if !self.top_down_manager.is_finality_valid(finality).await {
-                            return Ok(AttestMessagesResponse::Reject);
-                        }
-                    }
                     ChainMessage::Signed(signed) => {
                         block_gas_usage += signed.message.gas_limit;
                     }
@@ -391,12 +372,6 @@ where
 
         let next_gas_market = state.finalize_gas_market()?;
 
-        if !power_updates.0.is_empty() {
-            self.top_down_manager
-                .update_voting_power_table(&power_updates)
-                .await;
-        }
-
         let response = EndBlockResponse {
             power_updates,
             gas_market: next_gas_market,
@@ -434,19 +409,12 @@ where
                     domain_hash,
                 })
             }
-            ChainMessage::Ipc(ipc_msg) => match ipc_msg {
-                IpcMessage::TopDownExec(p) => {
-                    let applied_message =
-                        self.top_down_manager.execute_topdown_msg(state, p).await?;
-                    Ok(ApplyMessageResponse {
-                        applied_message,
-                        domain_hash: None,
-                    })
-                }
-            },
             ChainMessage::Validator(v) => match v {
                 ValidatorMessage::SignBottomUpCheckpoint(signed) => {
                     execute_bottom_up_signature(state, signed)
+                }
+                ValidatorMessage::TopdownPropose(signed) => {
+                    execute_topdown_propose(state, signed)
                 }
             },
         }

@@ -18,14 +18,15 @@ use fendermint_vm_actor_interface::{
 use fendermint_vm_genesis::{Collateral, Power, PowerScale, Validator, ValidatorKey};
 use fendermint_vm_message::conv::{from_eth, from_fvm};
 use fendermint_vm_message::signed::sign_secp256k1;
-use fendermint_vm_topdown::IPCParentFinality;
+use fendermint_vm_topdown::ParentState;
 
 use ipc_actors_abis::checkpointing_facet::CheckpointingFacet;
 use ipc_actors_abis::gateway_getter_facet::GatewayGetterFacet;
 use ipc_actors_abis::gateway_getter_facet::{self as getter, gateway_getter_facet};
 use ipc_actors_abis::top_down_finality_facet::TopDownFinalityFacet;
+use ipc_actors_abis::top_down_voting_facet::{TopDownVotingFacet};
 use ipc_actors_abis::xnet_messaging_facet::XnetMessagingFacet;
-use ipc_actors_abis::{checkpointing_facet, top_down_finality_facet, xnet_messaging_facet};
+use ipc_actors_abis::{checkpointing_facet, top_down_finality_facet, top_down_voting_facet, xnet_messaging_facet};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::{ConfigurationNumber, PowerChangeRequest};
 
@@ -49,6 +50,11 @@ pub struct GatewayCaller<DB> {
         TopDownFinalityFacet<MockProvider>,
         top_down_finality_facet::TopDownFinalityFacetErrors,
     >,
+    topdown_voting: ContractCaller<
+        DB,
+        TopDownVotingFacet<MockProvider>,
+        top_down_voting_facet::TopDownVotingFacetErrors,
+    >,
     xnet: ContractCaller<DB, XnetMessagingFacet<MockProvider>, NoRevert>,
 }
 
@@ -69,6 +75,7 @@ impl<DB> GatewayCaller<DB> {
             getter: ContractCaller::new(addr, GatewayGetterFacet::new),
             checkpointing: ContractCaller::new(addr, CheckpointingFacet::new),
             topdown: ContractCaller::new(addr, TopDownFinalityFacet::new),
+            topdown_voting: ContractCaller::new(addr, TopDownVotingFacet::new),
             xnet: ContractCaller::new(addr, XnetMessagingFacet::new),
         }
     }
@@ -180,8 +187,21 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         Ok((membership.configuration_number, power_table))
     }
 
+    pub fn propose_calldata(
+        &self,
+        checkpoint: top_down_voting_facet::TopdownCheckpoint,
+    ) -> anyhow::Result<et::Bytes> {
+        let call = self.topdown_voting.contract().propose(checkpoint);
+
+        let calldata = call
+            .calldata()
+            .ok_or_else(|| anyhow!("cannot get calldata for propose topdown"))?;
+
+        Ok(calldata)
+    }
+
     /// Construct the input parameters for adding a signature to the checkpoint.
-    ///
+    ///x
     /// This will need to be broadcasted as a transaction.
     pub fn add_checkpoint_signature_calldata(
         &self,
@@ -226,44 +246,6 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         Ok(calldata)
     }
 
-    /// Commit the parent finality to the gateway and returns the previously committed finality.
-    /// None implies there is no previously committed finality.
-    pub fn commit_parent_finality(
-        &self,
-        state: &mut FvmExecState<DB>,
-        finality: IPCParentFinality,
-    ) -> anyhow::Result<Option<IPCParentFinality>> {
-        let evm_finality = top_down_finality_facet::ParentFinality::try_from(finality)?;
-
-        let (has_committed, prev_finality) = self
-            .topdown
-            .call(state, |c| c.commit_parent_finality(evm_finality))?;
-
-        Ok(if !has_committed {
-            None
-        } else {
-            Some(IPCParentFinality::from(prev_finality))
-        })
-    }
-
-    pub fn store_validator_changes(
-        &self,
-        state: &mut FvmExecState<DB>,
-        changes: Vec<PowerChangeRequest>,
-    ) -> anyhow::Result<()> {
-        if changes.is_empty() {
-            return Ok(());
-        }
-
-        let mut change_requests = vec![];
-        for c in changes {
-            change_requests.push(top_down_finality_facet::PowerChangeRequest::try_from(c)?);
-        }
-
-        self.topdown
-            .call(state, |c| c.store_validator_changes(change_requests))
-    }
-
     /// Call this function to mint some FIL to the gateway contract
     pub fn mint_to_gateway(
         &self,
@@ -294,14 +276,17 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         Ok(r.into_return())
     }
 
-    pub fn get_latest_parent_finality(
+    pub fn get_latest_topdown_parent_state(
         &self,
         state: &mut FvmExecState<DB>,
-    ) -> anyhow::Result<IPCParentFinality> {
-        let r = self
-            .getter
-            .call(state, |c| c.get_latest_parent_finality())?;
-        Ok(IPCParentFinality::from(r))
+    ) -> anyhow::Result<ParentState> {
+        let (block_height, block_hash) = self
+            .topdown_voting
+            .call(state, |c| c.latest_committed())?;
+        Ok(ParentState{
+            height: block_height,
+            block_hash: block_hash.to_vec(),
+        })
     }
 
     /// Get the Ethereum adresses of validators who signed a checkpoint.

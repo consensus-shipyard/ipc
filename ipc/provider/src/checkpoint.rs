@@ -20,13 +20,6 @@ use tokio::sync::Semaphore;
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::PowerChangeRequest;
 
-pub struct TopdownCheckpoint {
-    pub parent_height: ChainEpoch,
-    pub parent_block_hash: Vec<u8>,
-    pub xnet_msgs: Vec<IpcEnvelope>,
-    pub power_changes: Vec<PowerChangeRequest>,
-}
-
 /// Tracks the config required for bottom up checkpoint submissions
 /// parent/child subnet and checkpoint period.
 pub struct CheckpointConfig {

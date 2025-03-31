@@ -369,12 +369,6 @@ impl Settings {
     pub fn topdown_enabled(&self) -> bool {
         !self.ipc.subnet_id.is_root() && self.ipc.topdown.is_some()
     }
-
-    /// Indicate whether we have configured the IPLD Resolver to run.
-    pub fn resolver_enabled(&self) -> bool {
-        !self.resolver.connection.listen_addr.is_empty()
-            && self.ipc.subnet_id != *ipc_api::subnet_id::UNDEF
-    }
 }
 
 // Run these tests serially because some of them modify the environment.

@@ -9,7 +9,6 @@ pub mod interpreter;
 pub mod observe;
 pub mod state;
 pub mod store;
-pub mod topdown;
 pub mod upgrades;
 pub use interpreter::FvmMessagesInterpreter;
 

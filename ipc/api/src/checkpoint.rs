@@ -18,6 +18,7 @@ use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize, Serializer};
 use serde_with::serde_as;
 use std::fmt::{Display, Formatter};
+use crate::staking::PowerChangeRequest;
 
 lazy_static! {
     // Default CID used for the genesis checkpoint. Using
@@ -52,6 +53,14 @@ impl Display for QuorumReachedEvent {
         )
     }
 }
+
+pub struct TopdownCheckpoint {
+    pub parent_height: ChainEpoch,
+    pub parent_block_hash: Vec<u8>,
+    pub xnet_msgs: Vec<IpcEnvelope>,
+    pub power_changes: Vec<PowerChangeRequest>,
+}
+
 
 /// The collection of items for the bottom up checkpoint submission
 #[serde_as]

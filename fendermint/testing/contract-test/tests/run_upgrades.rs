@@ -27,7 +27,6 @@ use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Account, Actor, ActorMeta, Genesis, PermissionMode, SignerAddr};
 use fendermint_vm_interpreter::fvm::bottomup::BottomUpManager;
 use fendermint_vm_interpreter::fvm::store::memory::MemoryBlockstore;
-use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeScheduler};
 use fendermint_vm_interpreter::fvm::FvmMessagesInterpreter;
 use fendermint_vm_topdown::voting::VoteTally;

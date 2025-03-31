@@ -5,7 +5,7 @@
 use crate::finality::ParentViewPayload;
 use crate::proxy::ParentQueryProxy;
 use crate::sync::syncer::LotusParentSyncer;
-use crate::{BlockHeight, IPCParentFinality};
+use crate::{BlockHeight, ParentState};
 use anyhow::Context;
 
 /// Tendermint aware syncer
@@ -26,11 +26,11 @@ where
         }
     }
 
-    pub async fn set_committed(&self, checkpoint: IPCParentFinality) {
+    pub async fn set_committed(&self, checkpoint: ParentState) {
         self.inner.set_committed(checkpoint).await
     }
 
-    pub async fn get_vote_below_height(&self, height: BlockHeight) -> Option<ParentViewPayload> {
+    pub async fn get_vote_below_height(&self, height: BlockHeight) -> Option<(BlockHeight, ParentViewPayload)> {
         self.inner.get_vote_below_height(height).await
     }
 

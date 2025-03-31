@@ -31,6 +31,7 @@ use std::time::Duration;
 use tendermint::block::Height;
 use tendermint_rpc::endpoint::commit;
 use tendermint_rpc::{endpoint::validators, Client, Paging};
+use fendermint_vm_message::chain::{ChainMessage, ValidatorMessage};
 
 /// Validator voting power snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -448,7 +449,12 @@ where
         .context("failed to produce checkpoint signature calldata")?;
 
     let tx_hash = broadcaster
-        .fevm_invoke(Address::from(gateway.addr()), calldata, chain_id)
+        .fevm_invoke(
+            Address::from(gateway.addr()),
+            calldata,
+            chain_id,
+            |s| ChainMessage::Validator(ValidatorMessage::SignBottomUpCheckpoint(s)),
+        )
         .await
         .context("failed to broadcast signature")?;
 

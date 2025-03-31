@@ -20,6 +20,25 @@ pub(crate) fn execute_bottom_up_signature<DB: Blockstore + Clone + 'static>(
     state: &mut FvmExecState<DB>,
     signed: SignedMessage,
 ) -> Result<ApplyMessageResponse, ApplyMessageError> {
+    let method_selector =
+        ipc_actors_abis::checkpointing_facet::AddCheckpointSignatureCall::selector();
+    execute_validator_message(state, signed, method_selector)
+}
+
+pub(crate) fn execute_topdown_propose<DB: Blockstore + Clone + 'static>(
+    state: &mut FvmExecState<DB>,
+    signed: SignedMessage,
+) -> Result<ApplyMessageResponse, ApplyMessageError> {
+    let method_selector =
+        ipc_actors_abis::top_down_voting_facet::ProposeCall::selector();
+    execute_validator_message(state, signed, method_selector)
+}
+
+fn execute_validator_message<DB: Blockstore + Clone + 'static>(
+    state: &mut FvmExecState<DB>,
+    signed: SignedMessage,
+    method_selector: [u8; 4],
+) -> Result<ApplyMessageResponse, ApplyMessageError> {
     let chain_id = state.chain_id();
     signed
         .verify(&chain_id)
@@ -30,9 +49,7 @@ pub(crate) fn execute_bottom_up_signature<DB: Blockstore + Clone + 'static>(
     let domain_hash = signed.domain_hash(&chain_id)?;
     let msg = signed.message;
 
-    // check the message signature matches, that means we are actually calling submit signature
-    let method_selector =
-        ipc_actors_abis::checkpointing_facet::AddCheckpointSignatureCall::selector();
+    // check the message signature matches, that means we are actually the correct method
     let calldata = msg
         .params
         .deserialize::<BytesDe>()
@@ -43,7 +60,7 @@ pub(crate) fn execute_bottom_up_signature<DB: Blockstore + Clone + 'static>(
         || method_selector != calldata[0..SOLIDITY_SELECTOR_BYTES]
     {
         return Err(ApplyMessageError::InvalidMessage(
-            "not calling submitting bottom up signature".to_string(),
+            "not executing validator message".to_string(),
         ));
     }
 

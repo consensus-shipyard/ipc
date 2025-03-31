@@ -4,7 +4,7 @@
 //! Type conversion for IPC Agent struct with solidity contract struct
 
 use crate::address::IPCAddress;
-use crate::checkpoint::BottomUpMsgBatch;
+use crate::checkpoint::{BottomUpMsgBatch, TopdownCheckpoint};
 use crate::checkpoint::{consensus, BottomUpCheckpoint, CompressedActivityRollup};
 use crate::cross::{IpcEnvelope, IpcMsgKind};
 use crate::staking::PowerChange;
@@ -21,7 +21,7 @@ use ipc_actors_abis::{
     checkpointing_facet, gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
     lib_gateway, register_subnet_facet, subnet_actor_activity_facet,
     subnet_actor_checkpointing_facet, subnet_actor_diamond, subnet_actor_getter_facet,
-    top_down_finality_facet, xnet_messaging_facet
+    top_down_finality_facet, xnet_messaging_facet, top_down_voting_facet,
 };
 
 /// The type conversion for IPC structs to evm solidity contracts. We need this convenient macro because
@@ -288,7 +288,7 @@ base_type_conversion!(gateway_messenger_facet);
 base_type_conversion!(lib_gateway);
 base_type_conversion!(subnet_actor_activity_facet);
 base_type_conversion!(checkpointing_facet);
-base_type_conversion!(top_down_finality_facet);
+base_type_conversion!(top_down_voting_facet);
 
 cross_msg_types!(gateway_getter_facet);
 cross_msg_types!(xnet_messaging_facet);
@@ -296,7 +296,7 @@ cross_msg_types!(gateway_messenger_facet);
 cross_msg_types!(lib_gateway);
 cross_msg_types!(subnet_actor_checkpointing_facet);
 cross_msg_types!(checkpointing_facet);
-cross_msg_types!(top_down_finality_facet);
+cross_msg_types!(top_down_voting_facet);
 
 bottom_up_checkpoint_conversion!(checkpointing_facet);
 bottom_up_checkpoint_conversion!(gateway_getter_facet);
@@ -348,11 +348,11 @@ pub fn fil_to_eth_amount(amount: &TokenAmount) -> anyhow::Result<U256> {
     Ok(U256::from_dec_str(&str)?)
 }
 
-impl TryFrom<PowerChange> for top_down_finality_facet::PowerChange {
+impl TryFrom<PowerChange> for top_down_voting_facet::PowerChange {
     type Error = anyhow::Error;
 
     fn try_from(value: PowerChange) -> Result<Self, Self::Error> {
-        Ok(top_down_finality_facet::PowerChange {
+        Ok(top_down_voting_facet::PowerChange {
             op: value.op as u8,
             payload: ethers::core::types::Bytes::from(value.payload),
             validator: payload_to_evm_address(value.validator.payload())?,
@@ -360,13 +360,33 @@ impl TryFrom<PowerChange> for top_down_finality_facet::PowerChange {
     }
 }
 
-impl TryFrom<PowerChangeRequest> for top_down_finality_facet::PowerChangeRequest {
+impl TryFrom<PowerChangeRequest> for top_down_voting_facet::PowerChangeRequest {
     type Error = anyhow::Error;
 
     fn try_from(value: PowerChangeRequest) -> Result<Self, Self::Error> {
-        Ok(top_down_finality_facet::PowerChangeRequest {
-            change: top_down_finality_facet::PowerChange::try_from(value.change)?,
+        Ok(top_down_voting_facet::PowerChangeRequest {
+            change: top_down_voting_facet::PowerChange::try_from(value.change)?,
             configuration_number: value.configuration_number,
+        })
+    }
+}
+
+impl TryFrom<TopdownCheckpoint> for top_down_voting_facet::TopdownCheckpoint {
+    type Error = anyhow::Error;
+
+    fn try_from(checkpoint: TopdownCheckpoint) -> Result<Self, Self::Error> {
+        if checkpoint.parent_block_hash.len() != 32 {
+            return Err(anyhow!("invalid block hash length, expecting 32, found {}", checkpoint.parent_block_hash.len()));
+        }
+
+        let mut block_hash = [0u8; 32];
+        block_hash.copy_from_slice(&checkpoint.parent_block_hash[0..32]);
+
+        Ok(Self {
+            height: checkpoint.parent_height as u64,
+            block_hash,
+            xnet_msgs: checkpoint.xnet_msgs.into_iter().map(|v| v.try_into()).collect::<anyhow::Result<Vec<_>>>()?,
+            power_changes: checkpoint.power_changes.into_iter().map(|v| v.try_into()).collect::<anyhow::Result<Vec<_>>>()?,
         })
     }
 }

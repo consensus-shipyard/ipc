@@ -23,6 +23,7 @@ import {GatewayManagerFacet} from "../contracts/gateway/GatewayManagerFacet.sol"
 import {CheckpointingFacet} from "../contracts/gateway/router/CheckpointingFacet.sol";
 import {XnetMessagingFacet} from "../contracts/gateway/router/XnetMessagingFacet.sol";
 import {TopDownFinalityFacet} from "../contracts/gateway/router/TopDownFinalityFacet.sol";
+import {TopDownVotingFacet} from "../contracts/gateway/router/TopDownVotingFacet.sol";
 
 import {SubnetActorMock} from "./mocks/SubnetActorMock.sol";
 import {SubnetActorManagerFacet} from "../contracts/subnet/SubnetActorManagerFacet.sol";
@@ -786,8 +787,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
 
         vm.prank(FilAddress.SYSTEM_ACTOR);
 
-        // TODO: update tests
-        // gatewayDiamond.topDownFinalizer().commitParentFinality(finality);
+        gatewayDiamond.topDownFinalizer().commitParentFinality(finality);
     }
 
     function setupWhiteListMethod(address caller, address src) public returns (bytes32) {
@@ -836,9 +836,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         // uint64 n = gatewayDiamond.getter().getLastConfigurationNumber() + 1;
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-
-        // TODO: update tests
-        // gatewayDiamond.topDownFinalizer().commitParentFinality(finality);
+        gatewayDiamond.topDownFinalizer().commitParentFinality(finality);
 
         vm.stopPrank();
     }

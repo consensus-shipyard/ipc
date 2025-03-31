@@ -17,7 +17,9 @@ use fendermint_rpc::message::GasParams;
 use fendermint_rpc::query::QueryClient;
 use fendermint_rpc::tx::{CallClient, TxClient, TxSync};
 use fendermint_rpc::{client::FendermintClient, message::SignedMessageFactory};
+use fendermint_vm_message::chain::{ChainMessage, ValidatorMessage};
 use fendermint_vm_message::query::FvmQueryHeight;
+use fendermint_vm_message::signed::SignedMessage;
 
 macro_rules! retry {
     ($max_retries:expr, $retry_delay:expr, $block:expr) => {{
@@ -108,11 +110,12 @@ where
     /// client seems to time out if the check fails, waiting for the inclusion which will never come, instead of
     /// returning the result with no `deliver_tx` and a failed `check_tx`. We can add our own mechanism to wait
     /// for commits if we have to.
-    pub async fn fevm_invoke(
+    pub async fn fevm_invoke<F: Sync + Fn(SignedMessage) -> ChainMessage>(
         &self,
         contract: Address,
         calldata: et::Bytes,
         chain_id: ChainID,
+        f: F,
     ) -> anyhow::Result<tendermint::hash::Hash> {
         let tx_hash = retry!(self.max_retries, self.retry_delay, {
             let sequence = self
@@ -170,6 +173,7 @@ where
                 calldata.0.clone(),
                 value,
                 gas_params,
+                &f
             )
             .await
             .context("failed to invoke contract")?;

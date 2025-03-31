@@ -97,12 +97,14 @@ impl IpcProvider {
 
     /// Initializes a new `IpcProvider` configured to interact with
     /// a single subnet.
-    pub fn new_with_subnet(
+    pub fn new_with_subnets(
         keystore_path: Option<String>,
-        subnet: config::Subnet,
+        subnets: Vec<config::Subnet>,
     ) -> anyhow::Result<Self> {
         let mut config = Config::new();
-        config.add_subnet(subnet);
+        for subnet in subnets {
+            config.add_subnet(subnet);
+        }
         let config = Arc::new(config);
 
         if let Some(repo_path) = keystore_path {
