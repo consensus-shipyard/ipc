@@ -108,14 +108,6 @@ fn start_resolve<V>(
                     .resolve_iroh(task.hash(), size, source.id.into())
                     .await
                 {
-                    Err(e) => {
-                        tracing::error!(
-                            error = e.to_string(),
-                            "failed to submit iroh resolution task"
-                        );
-                        // The service is no longer listening, we might as well stop taking new tasks from the queue.
-                        // By not quitting, we should see this error every time there is a new task, which is at least a constant reminder.
-                    }
                     Ok(Ok(())) => {
                         tracing::debug!(hash = %task.hash(), "iroh blob resolved");
                         atomically(|| task.set_resolved()).await;
@@ -135,9 +127,9 @@ fn start_resolve<V>(
                             });
                         }
                     }
-                    Ok(Err(e)) => {
+                    Err(e) | Ok(Err(e)) => {
                         tracing::error!(
-                            hash = ?task.hash(),
+                            hash = %task.hash(),
                             error = e.to_string(),
                             "iroh blob resolution failed, attempting retry"
                         );
@@ -168,17 +160,9 @@ fn start_resolve<V>(
                 len,
             } => {
                 match client.close_read_request(blob_hash, offset, len).await {
-                    Err(e) => {
-                        tracing::error!(
-                            error = e.to_string(),
-                            "failed to submit iroh resolution task"
-                        );
-                        // The service is no longer listening, we might as well stop taking new tasks from the queue.
-                        // By not quitting, we should see this error every time there is a new task, which is at least a constant reminder.
-                    }
                     Ok(Ok(response)) => {
                         let hash = task.hash();
-                        tracing::debug!(hash = ?hash, "iroh read request resolved");
+                        tracing::debug!(hash = %hash, "iroh read request resolved");
 
                         atomically(|| task.set_resolved()).await;
                         atomically(|| {
@@ -205,15 +189,15 @@ fn start_resolve<V>(
                             });
                         }
                     }
-                    Ok(Err(e)) => {
+                    Err(e) | Ok(Err(e)) => {
                         tracing::error!(
-                            hash = ?task.hash(),
+                            hash = %task.hash(),
                             error = e.to_string(),
                             "iroh read request failed"
                         );
                         if !reenqueue(task.clone(), queue, retry_delay).await {
                             tracing::error!(
-                                hash = ?task.hash(),
+                                hash = %task.hash(),
                                 "failed to re-enqueue read request"
                             );
                         }
@@ -277,14 +261,14 @@ async fn reenqueue(task: ResolveTask, queue: ResolveQueue, retry_delay: Duration
     if atomically(|| task.add_attempt()).await {
         tracing::error!(
             hash = %task.hash(),
-            "iroh blob resolution failed; retrying later"
+            "iroh task failed; retrying later"
         );
         schedule_retry(task, queue, retry_delay).await;
         true
     } else {
         tracing::error!(
-            hash = ?task.hash(),
-            "iroh blob resolution failed; no attempts remaining"
+            hash = %task.hash(),
+            "iroh task failed; no attempts remaining"
         );
         atomically(|| task.add_failure()).await;
         false
@@ -304,7 +288,7 @@ async fn reenqueue(task: ResolveTask, queue: ResolveQueue, retry_delay: Duration
 async fn schedule_retry(task: ResolveTask, queue: ResolveQueue, retry_delay: Duration) {
     tokio::spawn(async move {
         tokio::time::sleep(retry_delay).await;
-        tracing::debug!(hash = ?task.hash(), "retrying blob resolution after sleep");
+        tracing::debug!(hash = %task.hash(), "retrying iroh task after sleep");
         atomically(|| queue.write(task.clone())).await;
     });
 }

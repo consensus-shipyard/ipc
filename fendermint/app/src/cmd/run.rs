@@ -273,7 +273,7 @@ async fn run(settings: Settings, iroh_addr: String) -> anyhow::Result<()> {
             info!("starting the read request resolver...");
             tokio::spawn(async move { read_request_resolver.run().await });
         } else {
-            info!("iroh Resolver disabled.");
+            info!("iroh resolver disabled.");
             info!("read request resolver disabled.");
         }
 

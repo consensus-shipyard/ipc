@@ -56,11 +56,16 @@ pub struct ReadRequest {
 #[repr(u64)]
 pub enum Method {
     Constructor = METHOD_CONSTRUCTOR,
-    GetReadRequestStatus = frc42_dispatch::method_hash!("GetReadRequestStatus"),
-    CloseReadRequest = frc42_dispatch::method_hash!("CloseReadRequest"),
-    GetOpenReadRequests = frc42_dispatch::method_hash!("GetOpenReadRequests"),
+
+    // User methods
     OpenReadRequest = frc42_dispatch::method_hash!("OpenReadRequest"),
+
+    // System methods
+    GetReadRequestStatus = frc42_dispatch::method_hash!("GetReadRequestStatus"),
+    GetOpenReadRequests = frc42_dispatch::method_hash!("GetOpenReadRequests"),
+    GetPendingReadRequests = frc42_dispatch::method_hash!("GetPendingReadRequests"),
     SetReadRequestPending = frc42_dispatch::method_hash!("SetReadRequestPending"),
+    CloseReadRequest = frc42_dispatch::method_hash!("CloseReadRequest"),
 }
 
 /// Params for adding a read request.
@@ -78,24 +83,30 @@ pub struct OpenReadRequestParams {
     pub callback_method: MethodNum,
 }
 
-/// Params for closing a read request. The ID of the read request.
+/// Params for getting read request status.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct CloseReadRequestParams(pub Hash);
+pub struct GetReadRequestStatusParams(pub Hash);
+
+/// Params for getting open read requests.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct GetOpenReadRequestsParams(pub u32);
 
 /// Params for getting pending read requests.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct GetOpenReadRequestsParams(pub u32);
+pub struct GetPendingReadRequestsParams(pub u32);
 
 /// Params for setting a read request to pending.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct SetReadRequestPendingParams(pub Hash);
 
-/// Params for getting read request status.
+/// Params for closing a read request. The ID of the read request.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct GetReadRequestStatusParams(pub Hash);
+pub struct CloseReadRequestParams(pub Hash);
 
-pub type OpenReadRequestTuple = (Hash, Hash, u32, u32, Address, u64);
+/// Return type for request queues.
+pub type ReadRequestTuple = (Hash, Hash, u32, u32, Address, u64);

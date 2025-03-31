@@ -38,7 +38,7 @@ pub fn hash_rm(context: Context<'_, impl RecallOps>, hash_offset: u32) -> Result
         let iroh_client = match iroh.lock().await.client().await {
             Ok(client) => client,
             Err(e) => {
-                tracing::error!(hash = ?hash, error = e.to_string(), "failed to initialize Iroh client");
+                tracing::error!(hash = %hash, error = e.to_string(), "failed to initialize Iroh client");
                 return;
             }
         };
@@ -46,9 +46,9 @@ pub fn hash_rm(context: Context<'_, impl RecallOps>, hash_offset: u32) -> Result
         // TODO: this needs to be tagged with a "user id"
         let tag = iroh::blobs::Tag(format!("stored-seq-{hash}").into());
         match iroh_client.tags().delete(tag.clone()).await {
-            Ok(_) => tracing::debug!(tag = ?tag, hash = ?hash, "removed content from Iroh"),
+            Ok(_) => tracing::debug!(tag = ?tag, hash = %hash, "removed content from Iroh"),
             Err(e) => {
-                tracing::warn!(tag = ?tag, hash = ?hash, error = e.to_string(), "deleting tag from Iroh failed");
+                tracing::warn!(tag = ?tag, hash = %hash, error = e.to_string(), "deleting tag from Iroh failed");
             }
         }
     });

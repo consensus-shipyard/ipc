@@ -27,7 +27,7 @@ use iroh::{
     client::blobs::BlobStatus,
     net::NodeAddr,
 };
-use iroh_manager::{get_blob_hash_and_size, IrohManager};
+use iroh_manager::get_blob_hash_and_size;
 use lazy_static::lazy_static;
 use mime_guess::get_mime_extensions_str;
 use prometheus::{register_histogram, register_int_counter, Histogram, IntCounter};
@@ -72,23 +72,27 @@ cmd! {
                 }
 
                 let client = FendermintClient::new_http(tendermint_url, None)?;
-                let iroh_manager = IrohManager::from_addr(Some(iroh_addr));
+                let iroh_addr = iroh_addr
+                    .to_socket_addrs()?
+                    .next()
+                    .ok_or(anyhow!("failed to convert iroh_addr to a socket address"))?;
+                let iroh_client = iroh::client::Iroh::connect_addr(iroh_addr).await?;
 
                 // Admin routes
                 let health = warp::path!("health")
                     .and(warp::get()).and_then(handle_health);
                 let node_addr = warp::path!("v1" / "node" )
                 .and(warp::get())
-                .and(with_iroh(iroh_manager.clone()))
-                .and_then(handle_node_addr_with_manager);
+                .and(with_iroh(iroh_client.clone()))
+                .and_then(handle_node_addr);
 
                 // Objects routes
                 let objects_upload = warp::path!("v1" / "objects" )
                 .and(warp::post())
-                .and(with_iroh(iroh_manager.clone()))
+                .and(with_iroh(iroh_client.clone()))
                 .and(warp::multipart::form().max_length(settings.max_object_size + 1024 * 1024)) // max_object_size + 1MB for form overhead
                 .and(with_max_size(settings.max_object_size))
-                .and_then(handle_object_upload_with_manager);
+                .and_then(handle_object_upload);
 
                 let objects_download = warp::path!("v1" / "objects" / String / ..)
                 .and(warp::path::tail())
@@ -98,8 +102,8 @@ cmd! {
                 .and(warp::header::optional::<String>("Range"))
                 .and(warp::query::<HeightQuery>())
                 .and(with_client(client.clone()))
-                .and(with_iroh(iroh_manager.clone()))
-                .and_then(handle_object_download_with_manager);
+                .and(with_iroh(iroh_client.clone()))
+                .and_then(handle_object_download);
 
                 let router = health
                     .or(node_addr)
@@ -128,8 +132,8 @@ fn with_client(
 }
 
 fn with_iroh(
-    client: IrohManager,
-) -> impl Filter<Extract = (IrohManager,), Error = Infallible> + Clone {
+    client: iroh::client::Iroh,
+) -> impl Filter<Extract = (iroh::client::Iroh,), Error = Infallible> + Clone {
     warp::any().map(move || client.clone())
 }
 
@@ -274,15 +278,6 @@ async fn handle_health() -> Result<impl Reply, Rejection> {
     Ok(warp::reply::reply())
 }
 
-async fn handle_node_addr_with_manager(mut iroh: IrohManager) -> Result<impl Reply, Rejection> {
-    let iroh_client = iroh.client().await.map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("failed to load iroh client: {}", e),
-        })
-    })?;
-    handle_node_addr(iroh_client).await
-}
-
 async fn handle_node_addr(iroh: iroh::client::Iroh) -> Result<impl Reply, Rejection> {
     let node_addr = iroh.net().node_addr().await.map_err(|e| {
         Rejection::from(BadRequest {
@@ -296,19 +291,6 @@ async fn handle_node_addr(iroh: iroh::client::Iroh) -> Result<impl Reply, Reject
 struct UploadResponse {
     hash: String,
     metadata_hash: String,
-}
-
-async fn handle_object_upload_with_manager(
-    mut iroh: IrohManager,
-    form_data: warp::multipart::FormData,
-    max_size: u64,
-) -> Result<impl Reply, Rejection> {
-    let iroh_client = iroh.client().await.map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("failed to load iroh client: {}", e),
-        })
-    })?;
-    handle_object_upload(iroh_client, form_data, max_size).await
 }
 
 async fn handle_object_upload(
@@ -592,32 +574,6 @@ pub(crate) struct ObjectRange {
     len: u64,
     size: u64,
     body: Body,
-}
-
-async fn handle_object_download_with_manager<F: QueryClient + Send + Sync>(
-    address: String,
-    tail: Tail,
-    method: String,
-    range: Option<String>,
-    height_query: HeightQuery,
-    client: F,
-    mut iroh: IrohManager,
-) -> Result<impl Reply, Rejection> {
-    let iroh_client = iroh.client().await.map_err(|e| {
-        Rejection::from(BadRequest {
-            message: format!("failed to load iroh client: {}", e),
-        })
-    })?;
-    handle_object_download(
-        address,
-        tail,
-        method,
-        range,
-        height_query,
-        client,
-        iroh_client,
-    )
-    .await
 }
 
 async fn handle_object_download<F: QueryClient + Send + Sync>(

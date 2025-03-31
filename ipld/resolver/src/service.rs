@@ -292,18 +292,21 @@ where
                     // Connection events are handled by the behaviours, passed directly from the Swarm.
                     Some(_) => { },
                     // The connection is closed.
-                    None => { break; },
+                    None => {
+                        return Err(anyhow!("connection closed"));
+                    },
                 },
                 request = self.request_rx.recv() => match request {
                     // A Client sent us a request.
                     Some(req) => self.handle_request(req),
                     // This shouldn't happen because the service has a copy of the sender.
                     // All Client instances have been dropped.
-                    None => { break; }
+                    None => {
+                        return Err(anyhow!("all client instances have been dropped"));
+                    }
                 }
             }
         }
-        Ok(())
     }
 
     /// Handle events that the [`NetworkBehaviour`] macro generated for our [`Behaviour`], one for each field.

@@ -31,7 +31,7 @@ halt_height = 0
 # kind =
 
 # Number of pending blobs to process in parallel.
-blob_concurrency = 1024
+blob_concurrency = 500
 
 # Number of pending read requests to process in parallel.
 read_request_concurrency = 10
@@ -40,7 +40,7 @@ read_request_concurrency = 10
 blob_metrics_interval = 10
 
 # Gas limit used by the system actor to manage blob queues.
-blob_queue_gas_limit = 500000000
+blob_queue_gas_limit = 1000000000
 
 [abci]
 # Number of concurrent requests allowed to be _submitted_ to the application.

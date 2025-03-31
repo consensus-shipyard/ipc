@@ -13,9 +13,9 @@ use fvm_shared::MethodNum;
 use recall_actor_sdk::emit_evm_event;
 
 use crate::shared::{
-    CloseReadRequestParams, GetOpenReadRequestsParams, GetReadRequestStatusParams, Method,
-    OpenReadRequestParams, OpenReadRequestTuple, ReadRequestStatus, SetReadRequestPendingParams,
-    State, BLOB_READER_ACTOR_NAME,
+    CloseReadRequestParams, GetOpenReadRequestsParams, GetPendingReadRequestsParams,
+    GetReadRequestStatusParams, Method, OpenReadRequestParams, ReadRequestStatus, ReadRequestTuple,
+    SetReadRequestPendingParams, State, BLOB_READER_ACTOR_NAME,
 };
 use crate::sol_facade::{ReadRequestClosed, ReadRequestOpened, ReadRequestPending};
 
@@ -63,15 +63,6 @@ impl ReadReqActor {
         Ok(id)
     }
 
-    fn get_open_read_requests(
-        rt: &impl Runtime,
-        params: GetOpenReadRequestsParams,
-    ) -> Result<Vec<OpenReadRequestTuple>, ActorError> {
-        rt.validate_immediate_caller_accept_any()?;
-        rt.state::<State>()?
-            .get_open_read_requests(rt.store(), params.0)
-    }
-
     fn get_read_request_status(
         rt: &impl Runtime,
         params: GetReadRequestStatusParams,
@@ -83,13 +74,28 @@ impl ReadReqActor {
         Ok(status)
     }
 
-    fn close_read_request(
+    fn get_open_read_requests(
         rt: &impl Runtime,
-        params: CloseReadRequestParams,
-    ) -> Result<(), ActorError> {
-        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-        rt.transaction(|st: &mut State, _| st.close_read_request(rt.store(), params.0))?;
-        emit_evm_event(rt, ReadRequestClosed::new(&params.0))
+        params: GetOpenReadRequestsParams,
+    ) -> Result<Vec<ReadRequestTuple>, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+        rt.state::<State>()?.get_read_requests_by_status(
+            rt.store(),
+            ReadRequestStatus::Open,
+            params.0,
+        )
+    }
+
+    fn get_pending_read_requests(
+        rt: &impl Runtime,
+        params: GetPendingReadRequestsParams,
+    ) -> Result<Vec<ReadRequestTuple>, ActorError> {
+        rt.validate_immediate_caller_accept_any()?;
+        rt.state::<State>()?.get_read_requests_by_status(
+            rt.store(),
+            ReadRequestStatus::Pending,
+            params.0,
+        )
     }
 
     fn set_read_request_pending(
@@ -100,6 +106,15 @@ impl ReadReqActor {
 
         rt.transaction(|st: &mut State, _| st.set_read_request_pending(rt.store(), params.0))?;
         emit_evm_event(rt, ReadRequestPending::new(&params.0))
+    }
+
+    fn close_read_request(
+        rt: &impl Runtime,
+        params: CloseReadRequestParams,
+    ) -> Result<(), ActorError> {
+        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
+        rt.transaction(|st: &mut State, _| st.close_read_request(rt.store(), params.0))?;
+        emit_evm_event(rt, ReadRequestClosed::new(&params.0))
     }
 
     /// Fallback method for unimplemented method numbers.
@@ -126,11 +141,17 @@ impl ActorCode for ReadReqActor {
 
     actor_dispatch! {
         Constructor => constructor,
+
+        // User methods
         OpenReadRequest => open_read_request,
-        GetOpenReadRequests => get_open_read_requests,
+
+        // System methods
         GetReadRequestStatus => get_read_request_status,
-        CloseReadRequest => close_read_request,
+        GetOpenReadRequests => get_open_read_requests,
+        GetPendingReadRequests => get_pending_read_requests,
         SetReadRequestPending => set_read_request_pending,
+        CloseReadRequest => close_read_request,
+
         _ => fallback,
     }
 }

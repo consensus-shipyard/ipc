@@ -200,29 +200,48 @@ where
         }
     }
 
-    /// Return item count.
-    pub fn count(&self) -> Stm<usize> {
-        Ok(self.items.read()?.len())
-    }
-
     /// Return the status of an item. It can be queried for completion.
     pub fn get_status(&self, item: &T) -> Stm<Option<ResolveStatus<T>>> {
         let key = ResolveKey::from(item);
         Ok(self.items.read()?.get(&key).cloned())
     }
 
-    /// Collect resolved and failed items, ready for execution.
+    /// Collect total item count and resolved and failed items, ready for execution.
     ///
     /// The items collected are not removed, in case they need to be proposed again.
-    pub fn collect_done(&self) -> Stm<HashSet<T>> {
+    pub fn collect(&self) -> Stm<(usize, HashSet<T>)> {
+        let mut count = 0;
         let mut done = HashSet::new();
         let items = self.items.read()?;
         for item in items.values() {
+            let item_items = item.items.read()?;
+            count += item_items.len();
             if item.is_resolved()? || item.is_failed()? {
-                done.extend(item.items.read()?.iter().cloned());
+                done.extend(item_items.iter().cloned());
             }
         }
-        Ok(done)
+        Ok((count, done))
+    }
+
+    /// Count all items and resolved and failed items.
+    pub fn collect_counts(&self) -> Stm<(usize, usize)> {
+        let mut count = 0;
+        let mut done_count = 0;
+        let items = self.items.read()?;
+        for item in items.values() {
+            let item_items_count = item.items.read()?.len();
+            count += item_items_count;
+            if item.is_resolved()? || item.is_failed()? {
+                done_count += item_items_count;
+            }
+        }
+        Ok((count, done_count))
+    }
+
+    /// Return capacity from the limit, not including done items.
+    pub fn get_capacity(&self, limit: usize) -> Stm<usize> {
+        self.collect_counts()
+            .map(|(count, done_count)| limit.saturating_sub(count - done_count))
     }
 
     /// Remove an item from the resolution targets.
@@ -379,8 +398,10 @@ mod tests {
             let status = pool.add(item.clone())?;
             status.is_resolved.write(true)?;
 
-            let resolved1 = pool.collect_done()?;
-            let resolved2 = pool.collect_done()?;
+            let (count1, resolved1) = pool.collect()?;
+            let (count2, resolved2) = pool.collect()?;
+            assert_eq!(count1, 1);
+            assert_eq!(count2, 1);
             assert_eq!(resolved1, resolved2);
             assert!(resolved1.contains(&item));
             Ok(())
