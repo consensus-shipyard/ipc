@@ -28,7 +28,9 @@ use ipc_provider::IpcProvider;
 use libp2p::identity::secp256k1;
 use libp2p::identity::Keypair;
 use std::sync::Arc;
+use tokio::select;
 use tokio::sync::broadcast::error::RecvError;
+use tokio_util::sync::CancellationToken;
 use tower::ServiceBuilder;
 use tracing::info;
 
@@ -47,10 +49,9 @@ namespaces! {
     }
 }
 
-/// Run the Fendermint ABCI Application.
-///
-/// This method acts as our composition root.
-pub async fn run(settings: Settings) -> anyhow::Result<()> {
+/// Runs the ABCI server. If a CancellationToken is provided (i.e. Some(token)),
+/// the server future is wrapped with cancellation logic. Otherwise, it just awaits the server future.
+pub async fn run(settings: Settings, token: Option<CancellationToken>) -> anyhow::Result<()> {
     let tendermint_rpc_url = settings.tendermint_rpc_url()?;
     tracing::info!("Connecting to Tendermint at {tendermint_rpc_url}");
 
@@ -348,10 +349,22 @@ pub async fn run(settings: Settings) -> anyhow::Result<()> {
         .context("error creating ABCI server")?;
 
     // Run the ABCI server.
-    server
-        .listen(settings.abci.listen.to_string())
-        .await
-        .map_err(|e| anyhow!("error listening: {e}"))?;
+    if let Some(token) = token {
+        select! {
+            res = server.listen(settings.abci.listen.to_string()) => {
+                res.map_err(|e| anyhow!("error listening: {e}"))?
+            }
+            _ = token.cancelled() => {
+                info!("Cancellation requested. Shutting down ABCI server.");
+            }
+        }
+    } else {
+        // No cancellation token provided; run the server normally.
+        server
+            .listen(settings.abci.listen.to_string())
+            .await
+            .map_err(|e| anyhow!("error listening: {e}"))?
+    }
 
     Ok(())
 }

@@ -35,6 +35,7 @@ tendermint-config = { workspace = true }
 tendermint-rpc = { workspace = true }
 tendermint-proto = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { workspace = true }
 tower = { workspace = true }
 tower-abci = { workspace = true }
 tracing = { workspace = true }
@@ -68,8 +69,8 @@ fendermint_vm_snapshot = { path = "../vm/snapshot" }
 fendermint_vm_topdown = { path = "../vm/topdown" }
 
 # .car file wrapped in a crate
-actors-builtin-car =  { path = "../actors-builtin-car"}
-actors-custom-car = { path = "../actors-custom-car"}
+actors-builtin-car = { path = "../actors-builtin-car" }
+actors-custom-car = { path = "../actors-custom-car" }
 
 
 fvm = { workspace = true }
