@@ -6,6 +6,6 @@ use fendermint_app::service::node::run as run_node;
 
 cmd! {
   RunArgs(self, settings) {
-    run_node(settings).await
+    run_node(settings, None).await
   }
 }

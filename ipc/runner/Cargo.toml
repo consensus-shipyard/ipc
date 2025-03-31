@@ -38,6 +38,7 @@ serde_tuple = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { workspace = true }
 tokio-tungstenite = { workspace = true }
 toml = "0.7.2"
 url = { workspace = true }

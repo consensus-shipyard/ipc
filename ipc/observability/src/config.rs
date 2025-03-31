@@ -57,7 +57,7 @@ pub struct ConsoleLayerSettings {
     pub level: Option<String>,
 }
 
-fn default_log_level() -> Option<String> {
+pub fn default_log_level() -> Option<String> {
     Some("info".to_string())
 }
 
