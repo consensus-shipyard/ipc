@@ -52,6 +52,11 @@ where
         cache.get_payload_at_height(h).cloned()
     }
 
+    pub async fn latest_height(&self) -> BlockHeight {
+        let cache = self.data_cache.lock().await;
+        cache.latest_height()
+    }
+
     /// Insert the height into cache when we see a new non null block
     pub async fn sync(&self) -> anyhow::Result<()> {
         let chain_head = if let Some(h) = self.finalized_chain_head().await? {

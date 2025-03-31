@@ -11,7 +11,7 @@ use ipc_actors_abis::{
     checkpointing_facet, gateway_getter_facet, gateway_manager_facet, lib_gateway,
     lib_power_change_log, lib_quorum, register_subnet_facet, subnet_actor_activity_facet,
     subnet_actor_checkpointing_facet, subnet_actor_getter_facet, subnet_actor_manager_facet,
-    subnet_actor_reward_facet,
+    subnet_actor_reward_facet, top_down_finality_facet
 };
 use ipc_api::evm::{fil_to_eth_amount, payload_to_evm_address, subnet_id_to_evm_addresses};
 use ipc_api::validator::from_contract_validators;
@@ -25,10 +25,7 @@ use ipc_api::{eth_to_fil_amount, ethers_address_to_fil_address};
 use crate::config::subnet::SubnetConfig;
 use crate::config::Subnet;
 use crate::lotus::message::ipc::SubnetInfo;
-use crate::manager::subnet::{
-    BottomUpCheckpointRelayer, GetBlockHashResult, SubnetGenesisInfo, TopDownFinalityQuery,
-    TopDownQueryPayload, ValidatorRewarder,
-};
+use crate::manager::subnet::{BottomUpCheckpointRelayer, GetBlockHashResult, SubnetGenesisInfo, TopDownFinalityQuery, TopDownQueryPayload, TopDownVoting, ValidatorRewarder};
 
 use crate::manager::{EthManager, SubnetManager};
 use anyhow::{anyhow, Context, Result};
@@ -60,6 +57,7 @@ use ipc_observability::lazy_static;
 use ipc_wallet::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
 use num_traits::ToPrimitive;
 use std::result;
+use crate::checkpoint::TopdownCheckpoint;
 
 pub type SignerWithFeeEstimatorMiddleware =
     Eip1559GasEstimatorMiddleware<SignerMiddleware<Provider<ErrorParserHttp>, Wallet<SigningKey>>>;
@@ -102,6 +100,36 @@ abigen!(
         event Approval(address indexed owner, address indexed spender, uint256 value)
     ]"#,
 );
+
+#[async_trait]
+impl TopDownVoting for EthSubnetManager {
+    async fn latest_committed(&self) -> Result<(ChainEpoch, Vec<u8>)> {
+        let contract = top_down_finality_facet::TopDownFinalityFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        let (height, block_hash) = contract.latest_committed().call().await?;
+        Ok((height as ChainEpoch, block_hash.to_vec()))
+    }
+
+    async fn vote(&self, checkpoint: TopdownCheckpoint) -> Result<()> {
+        if checkpoint.parent_block_hash.len() != 32 {
+            return Err(anyhow!("invalid block hash length, expecting 32"));
+        }
+
+        let mut block_hash = [0u8; 32];
+        block_hash.copy_from_slice(&checkpoint.parent_block_hash[0..32]);
+
+        let cp = top_down_finality_facet::TopdownCheckpoint {
+            height: checkpoint.parent_height as u64,
+            block_hash,
+            xnet_msgs: checkpoint.xnet_msgs.into_iter().map(|m| m.try_into()).collect::<Result<Vec<_>>>()?,
+            power_changes: vec![],
+        };
+
+        todo!()
+    }
+}
 
 #[async_trait]
 impl TopDownFinalityQuery for EthSubnetManager {
@@ -252,6 +280,7 @@ impl TopDownFinalityQuery for EthSubnetManager {
         let finality = contract.get_latest_parent_finality().call().await?;
         Ok(finality.height.as_u64() as ChainEpoch)
     }
+
 }
 
 #[async_trait]

@@ -34,6 +34,10 @@ where
         self.inner.get_vote_below_height(height).await
     }
 
+    pub async fn latest_height(&self) -> BlockHeight {
+        self.inner.latest_height().await
+    }
+
     /// Sync with the parent, unless CometBFT is still catching up with the network,
     /// in which case we'll get the changes from the subnet peers in the blocks.
     pub async fn sync(&self) -> anyhow::Result<()> {

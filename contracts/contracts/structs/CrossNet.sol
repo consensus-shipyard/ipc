@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {SubnetID, IPCAddress} from "./Subnet.sol";
+import {SubnetID, IPCAddress, PowerChangeRequest} from "./Subnet.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {CompressedActivityRollup} from "../structs/Activity.sol";
+
+import {PowerChangeRequest} from "./Subnet.sol";
 
 uint64 constant MAX_MSGS_PER_BATCH = 10;
 uint256 constant BATCH_PERIOD = 100;
@@ -12,6 +14,33 @@ uint256 constant BATCH_PERIOD = 100;
 struct ParentFinality {
     uint256 height;
     bytes32 blockHash;
+}
+
+struct Vote {
+    TopdownCheckpoint payload;
+    uint256 totalPower;
+}
+
+struct TopdownVoting {
+    /// @notice The latest committed parent block height
+    uint64 committedParentHeight;
+    /// @notice The latest committed parent block hash
+    bytes32 committedBlockHash;
+    /// @notice The collection of currently ongoing votes' hashes
+    EnumerableSet.Bytes32Set ongoingVoteHashes;
+    /// @notice A mapping of bytes32 vote hash to the Vote
+    mapping(bytes32 => Vote) votes;
+    /// @notice Bitmap of voted validators
+    uint256 votedValidators;
+    /// @notice The total power of all voted validators
+    uint256 totalPowerVoted;
+}
+
+struct TopdownCheckpoint {
+    uint64 height;
+    bytes32 blockHash;
+    IpcEnvelope[] xnetMsgs;
+    PowerChangeRequest[] powerChanges;
 }
 
 /// @notice A bottom-up checkpoint type.

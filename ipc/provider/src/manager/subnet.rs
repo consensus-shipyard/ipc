@@ -16,6 +16,7 @@ use ipc_api::subnet::{Asset, ConstructParams, PermissionMode};
 use ipc_api::subnet_id::SubnetID;
 use ipc_api::validator::Validator;
 use std::collections::{BTreeMap, HashMap};
+use crate::checkpoint::TopdownCheckpoint;
 
 use crate::lotus::message::ipc::SubnetInfo;
 
@@ -244,6 +245,14 @@ pub trait TopDownFinalityQuery: Send + Sync {
     ) -> Result<TopDownQueryPayload<Vec<PowerChangeRequest>>>;
     /// Returns the latest parent finality committed in a child subnet
     async fn latest_parent_finality(&self) -> Result<ChainEpoch>;
+}
+
+#[async_trait]
+pub trait TopDownVoting: Send + Sync {
+    /// Returns the latest parent height and block hash voted in a child subnet
+    async fn latest_committed(&self) -> Result<(ChainEpoch, Vec<u8>)>;
+
+    async fn vote(&self, checkpoint: TopdownCheckpoint) -> Result<()>;
 }
 
 /// The bottom up checkpoint manager that handles the bottom up relaying from child subnet to the parent

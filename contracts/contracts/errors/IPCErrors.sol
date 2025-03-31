@@ -83,6 +83,10 @@ error MissingActivityCommitment();
 error ValidatorAlreadyClaimed();
 error InvalidActivityProof();
 error NotOwner();
+error HasAlreadyVoted(address validator);
+error ExpectingLivenessVote(uint64 expectedLivenessHeight, uint64 actualVoteHeight);
+error InvalidLivenssSubmissionHeight(uint64 expectedLivenessHeight, uint64 actualVoteHeight);
+error VoteNotProposed(bytes32 vote);
 
 enum InvalidXnetMessageReason {
     Sender,

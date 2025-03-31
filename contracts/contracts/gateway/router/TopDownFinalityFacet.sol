@@ -1,84 +1,139 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+
+import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
 import {GatewayActorModifiers} from "../../lib/LibGatewayActorStorage.sol";
-import {ParentFinality} from "../../structs/CrossNet.sol";
-import {PermissionMode, Validator, ValidatorInfo, PowerChangeRequest, Membership} from "../../structs/Subnet.sol";
+import {TopdownCheckpoint, TopdownVoting, SubnetID} from "../../structs/CrossNet.sol";
+import {PowerChangeRequest, Membership, ParentValidatorsTracker, ValidatorSet} from "../../structs/Subnet.sol";
+import {LibValidatorTracking, LibValidatorSet} from "../../lib/LibPower.sol";
+import {NotValidator, HasAlreadyVoted, ExpectingLivenessVote, InvalidLivenssSubmissionHeight, VoteNotProposed} from "../../errors/IPCErrors.sol";
 import {LibGateway} from "../../lib/LibGateway.sol";
 
-import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
-
-import {ParentValidatorsTracker, ValidatorSet} from "../../structs/Subnet.sol";
-import {LibValidatorTracking, LibValidatorSet} from "../../lib/LibPower.sol";
-
-contract TopDownFinalityFacet is GatewayActorModifiers {
-    using FilAddress for address;
+/// Performs topdown bridging voting on chain. This makes validator slashing possible and
+/// avoid potential collusion issues.
+contract TopDownFinalityFacet is GatewayActorModifiers {    
     using LibValidatorTracking for ParentValidatorsTracker;
     using LibValidatorSet for ValidatorSet;
+    using EnumerableSet for EnumerableSet.Bytes32Set;
+    using LibTopdownVoting for TopdownVoting;
+    using SubnetIDHelper for SubnetID;
 
-    /// @notice commit the ipc parent finality into storage and returns the previous committed finality
-    /// This is useful to understand if the finalities are consistent or if there have been reorgs.
-    /// If there are no previous committed fainality, it will be default to zero values, i.e. zero height and block hash.
-    /// @param finality - the parent finality
-    /// @return hasCommittedBefore A flag that indicates if a finality record has been committed before.
-    /// @return previousFinality The previous finality information.
-    function commitParentFinality(
-        ParentFinality calldata finality
-    ) external systemActorOnly returns (bool hasCommittedBefore, ParentFinality memory previousFinality) {
-        previousFinality = LibGateway.commitParentFinality(finality);
-        hasCommittedBefore = previousFinality.height != 0;
+    event TopdownQuorumFormed(bytes32 vote);
+    event VotingAborted(bytes32[] votedHashes);
+
+    function latestCommitted() external view returns (uint64 blockHeight, bytes32 blockHash) {
+        blockHeight = s.topdownVoting.committedParentHeight;
+        blockHash = s.topdownVoting.committedBlockHash;
     }
 
-    /// @notice Store the validator change requests from parent.
-    /// @param changeRequests - the validator changes
-    function storeValidatorChanges(PowerChangeRequest[] calldata changeRequests) external systemActorOnly {
-        s.validatorsTracker.batchStoreChange(changeRequests);
-    }
+    function propose(uint256 validatorIndex, TopdownCheckpoint calldata checkpoint) external {
+        bytes32 vote = keccak256(abi.encode(checkpoint));
 
-    /// @notice Returns the next and start configuration numbers in the tracker of changes
-    /// from the parent in the child gateway
-    function getTrackerConfigurationNumbers() external view returns (uint64, uint64) {
-        return (
-            s.validatorsTracker.changes.nextConfigurationNumber,
-            s.validatorsTracker.changes.startConfigurationNumber
-        );
-    }
-
-    /// @notice Apply all changes committed through the commitment of parent finality.
-    /// @return configurationNumber The configuration number of the changes set that has been confirmed.
-    function applyFinalityChanges() external systemActorOnly returns (uint64) {
-        // get the latest configuration number for the change set
-        uint64 configurationNumber = s.validatorsTracker.changes.nextConfigurationNumber - 1;
-        // return immediately if there are no changes to confirm by looking at next configNumber
-        if (
-            // nextConfiguration == startConfiguration (i.e. no changes)
-            (configurationNumber + 1) == s.validatorsTracker.changes.startConfigurationNumber
-        ) {
-            // 0 flags that there are no changes
-            return 0;
+        if (!s.topdownVoting.ongoingVoteHashes.contains(vote)) {
+            s.topdownVoting.storeCheckpoint(vote, checkpoint);
+            s.topdownVoting.ongoingVoteHashes.add(vote);
         }
-        // confirm the change
-        s.validatorsTracker.confirmChange(configurationNumber);
 
-        // Get active validators and populate the new power table.
-        address[] memory validators = s.validatorsTracker.validators.listActiveValidators();
-        uint256 vLength = validators.length;
-        Validator[] memory vs = new Validator[](vLength);
-        for (uint256 i; i < vLength; ) {
-            address addr = validators[i];
-            ValidatorInfo storage info = s.validatorsTracker.validators.validators[addr];
+        castVote(validatorIndex, vote);
+    }
 
-            // Extract the consensus weight for validator.
-            uint256 weight = info.currentPower;
+    function castVote(uint256 validatorIndex, bytes32 vote) internal {
+        if (!s.topdownVoting.ongoingVoteHashes.contains(vote)) {
+            revert VoteNotProposed(vote);
+        }
 
-            vs[i] = Validator({weight: weight, addr: addr, metadata: info.metadata});
+        address validatorAddr = s.currentMembership.validators[validatorIndex].addr;
+        if (validatorAddr == msg.sender) revert NotValidator(msg.sender);
+
+        if (s.topdownVoting.hasVoted(validatorIndex)) {
+            revert HasAlreadyVoted(msg.sender);
+        }
+        s.topdownVoting.markVoted(validatorIndex);
+
+        uint256 power = s.currentMembership.validators[validatorIndex].weight;
+        (uint256 totalPowerVoted, uint256 voteTotalPower) = s.topdownVoting.increaseVotePower(vote, power);
+
+        // TODO: getTotalActivePower is not optimized as it does looping every time it's called
+        uint256 quorumThreshold = (s.validatorsTracker.validators.getTotalActivePower() * 2) / 3;
+
+        if (voteTotalPower > quorumThreshold) {
+            emit TopdownQuorumFormed(vote);
+
+            execute(vote);
+
+            s.topdownVoting.clearVoting();
+            return;
+        }
+
+        if (totalPowerVoted > quorumThreshold) {
+            // this means more than quorum threshold of total weight has already
+            // voted and no consensus reached
+            emit VotingAborted(s.topdownVoting.ongoingVoteHashes.values());
+            s.topdownVoting.clearVoting();
+            return;
+        }
+    }
+
+    function execute(bytes32 vote) internal {
+        s.topdownVoting.voteCommitted(vote);
+        s.validatorsTracker.batchStoreChangeMemory(s.topdownVoting.votes[vote].payload.powerChanges);
+        LibGateway.applyTopDownMessages(s.networkName.getParentSubnet(), s.topdownVoting.votes[vote].payload.xnetMsgs);
+
+        // TODO: disabled postbox message propagation for now. 
+        // TODO: LibGateway has grown too big, need to delete some methods or reorg
+        // LibGateway.propagateAllPostboxMessages();
+    }
+}
+
+library LibTopdownVoting {
+    using EnumerableSet for EnumerableSet.Bytes32Set;
+
+    function voteCommitted(TopdownVoting storage self, bytes32 vote) internal {
+        self.committedBlockHash = self.votes[vote].payload.blockHash;
+        self.committedParentHeight = self.votes[vote].payload.height;
+    }
+
+    function hasVoted(TopdownVoting storage self, uint256 validatorIndex) internal view returns (bool) {
+        return self.votedValidators & (1 << validatorIndex) != 0;
+    }
+
+    function markVoted(TopdownVoting storage self, uint256 validatorIndex) internal {
+        self.votedValidators |= (1 << validatorIndex);
+    }
+
+    function storeCheckpoint(TopdownVoting storage self, bytes32 vote, TopdownCheckpoint calldata checkpoint) internal {
+        self.votes[vote].payload = checkpoint;
+        self.votes[vote].totalPower = 0;
+    }
+
+    function increaseVotePower(
+        TopdownVoting storage self,
+        bytes32 vote,
+        uint256 powerIncrease
+    ) internal returns (uint256 totalPowerVoted, uint256 voteTotalPower) {
+        voteTotalPower = self.votes[vote].totalPower + powerIncrease;
+        self.votes[vote].totalPower = voteTotalPower;
+
+        totalPowerVoted = self.totalPowerVoted;
+    }
+
+    function clearVoting(TopdownVoting storage self) internal {
+        uint256 totalNumVotes = self.ongoingVoteHashes.length();
+
+        for (uint256 i = 0; i < totalNumVotes; ) {
+            bytes32 voteHash = self.ongoingVoteHashes.at(i);
+
+            self.ongoingVoteHashes.remove(voteHash);
+            delete self.votes[voteHash];
+
             unchecked {
-                ++i;
+                i++;
             }
         }
 
-        // update membership with the resulting power table.
-        LibGateway.updateMembership(Membership({configurationNumber: configurationNumber, validators: vs}));
-        return configurationNumber;
+        self.totalPowerVoted = 0;
+        self.votedValidators = 0;
     }
 }

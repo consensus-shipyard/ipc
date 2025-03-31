@@ -135,34 +135,10 @@ where
     let finalized_checkpoint = voter.latest_finalized_checkpoint().await?;
     syncer.set_committed(finalized_checkpoint).await;
 
-    let voting_liveness_period = voter.livesness_period()?;
-
-    let Some(block) = syncer.get_vote_below_height(voting_liveness_period).await else {
+    let latest_height = syncer.latest_height().await;
+    let Some(block) = syncer.get_vote_below_height(latest_height).await else {
         tracing::debug!("topdown syncer not fetched new data");
-        return try_vote_for_liveness(syncer, voter).await;
+        return Ok(());
     };
-    vote_with_payload(syncer, voter, block).await
-}
-
-async fn try_vote_for_liveness<C, P>(
-    syncer: &Arc<TendermintAwareSyncer<C, P>>,
-    voter: &TopdownVoter,
-) -> anyhow::Result<()>
-where
-    C: tendermint_rpc::Client + Send + Sync + 'static,
-    P: ParentQueryProxy + Send + Sync + 'static,
-{
-    todo!()
-}
-
-async fn vote_with_payload<C, P>(
-    syncer: &Arc<TendermintAwareSyncer<C, P>>,
-    voter: &TopdownVoter,
-    payload: ParentViewPayload,
-) -> anyhow::Result<()>
-where
-    C: tendermint_rpc::Client + Send + Sync + 'static,
-    P: ParentQueryProxy + Send + Sync + 'static,
-{
-    todo!()
+    voter.vote(block).await
 }
