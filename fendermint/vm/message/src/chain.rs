@@ -39,12 +39,13 @@ mod arb {
 
     use super::ChainMessage;
     use crate::{ipc::IpcMessage, signed::SignedMessage};
+    use crate::chain::ValidatorMessage;
 
     impl quickcheck::Arbitrary for ChainMessage {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
             match u8::arbitrary(g) % 2 {
                 0 => ChainMessage::Signed(SignedMessage::arbitrary(g)),
-                _ => ChainMessage::Ipc(IpcMessage::arbitrary(g)),
+                _ => ChainMessage::Validator(ValidatorMessage::SignBottomUpCheckpoint(SignedMessage::arbitrary(g))),
             }
         }
     }
