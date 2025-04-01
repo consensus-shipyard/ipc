@@ -28,7 +28,7 @@ use ipc_actors_abis::top_down_voting_facet::{TopDownVotingFacet};
 use ipc_actors_abis::xnet_messaging_facet::XnetMessagingFacet;
 use ipc_actors_abis::{checkpointing_facet, top_down_finality_facet, top_down_voting_facet, xnet_messaging_facet};
 use ipc_api::cross::IpcEnvelope;
-use ipc_api::staking::{ConfigurationNumber, PowerChangeRequest};
+use ipc_api::staking::{ConfigurationNumber};
 
 use super::{
     fevm::{ContractCaller, MockProvider, NoRevert},

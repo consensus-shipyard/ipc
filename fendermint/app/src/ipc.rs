@@ -5,7 +5,6 @@
 use crate::app::{AppState, AppStoreKey};
 use crate::{App, BlockHeight};
 use fendermint_storage::{Codec, Encode, KVReadable, KVStore, KVWritable};
-use fendermint_vm_genesis::{Power, Validator};
 use fendermint_vm_interpreter::fvm::state::ipc::GatewayCaller;
 use fendermint_vm_interpreter::fvm::state::{FvmExecState, FvmStateParams};
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
@@ -23,9 +22,7 @@ use fendermint_vm_interpreter::fvm::Broadcaster;
 use fendermint_vm_interpreter::MessagesInterpreter;
 use fendermint_vm_message::chain::{ChainMessage, ValidatorMessage};
 use fendermint_vm_topdown::finality::ParentViewPayload;
-use ipc_api::subnet_id::SubnetID;
 use ipc_api::checkpoint::TopdownCheckpoint;
-use ipc_provider::IpcProvider;
 
 pub struct AppTopdownVoter<SS>
     where

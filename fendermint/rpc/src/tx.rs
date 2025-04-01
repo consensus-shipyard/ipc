@@ -16,7 +16,7 @@ use fvm_shared::econ::TokenAmount;
 use fvm_shared::MethodNum;
 
 use fendermint_vm_actor_interface::eam::CreateReturn;
-use fendermint_vm_message::chain::{ChainMessage, ValidatorMessage};
+use fendermint_vm_message::chain::{ChainMessage};
 
 use crate::message::{GasParams, SignedMessageFactory};
 use crate::query::{QueryClient, QueryResponse};

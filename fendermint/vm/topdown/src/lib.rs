@@ -95,27 +95,7 @@ impl Display for ParentState {
     }
 }
 
-/// If res is null round error, returns the default value from f()
-pub(crate) fn handle_null_round<T, F: FnOnce() -> T>(
-    res: anyhow::Result<T>,
-    f: F,
-) -> anyhow::Result<T> {
-    match res {
-        Ok(t) => Ok(t),
-        Err(e) => {
-            if is_null_round_error(&e) {
-                Ok(f())
-            } else {
-                Err(e)
-            }
-        }
-    }
-}
-
-pub(crate) fn is_null_round_error(err: &anyhow::Error) -> bool {
-    is_null_round_str(&err.to_string())
-}
-
+/// checks if the error is a filecoin null round error
 pub(crate) fn is_null_round_str(s: &str) -> bool {
     s.contains(NULL_ROUND_ERR_MSG)
 }

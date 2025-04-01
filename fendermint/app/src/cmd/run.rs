@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::{anyhow, bail, Context};
-use async_stm::atomically_or_err;
 use fendermint_abci::ApplicationService;
 use fendermint_app::ipc::{AppParentFinalityQuery, AppTopdownVoter};
-use fendermint_app::{App, AppConfig, AppStore, BitswapBlockstore};
+use fendermint_app::{App, AppConfig, AppStore};
 use fendermint_app_settings::AccountKind;
 use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
@@ -19,14 +18,10 @@ use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::observe::register_metrics as register_topdown_metrics;
 use fendermint_vm_topdown::proxy::{IPCProviderProxy, IPCProviderProxyWithLatency};
 use fvm_shared::address::{current_network, Address, Network};
-use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
 use ipc_observability::observe::register_metrics as register_default_metrics;
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
-use libp2p::identity::secp256k1;
-use libp2p::identity::Keypair;
 use std::sync::Arc;
-use tokio::sync::broadcast::error::RecvError;
 use tower::ServiceBuilder;
 use tracing::info;
 
@@ -200,7 +195,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
 
         let app_parent_finality_query = Arc::new(AppParentFinalityQuery::new(app.clone()));
         let topdown_voter = AppTopdownVoter::<NamespaceBlockstore>::new(ctx.broadcaster().clone());
-        let parent_proxy = Arc::new(make_ipc_provider_proxy(&settings)?);
+        let parent_proxy = Arc::new(IPCProviderProxyWithLatency::new(make_ipc_provider_proxy(&settings)?));
 
         let client = tendermint_client.clone();
         tokio::spawn(async move {

@@ -17,7 +17,7 @@ use fendermint_rpc::message::GasParams;
 use fendermint_rpc::query::QueryClient;
 use fendermint_rpc::tx::{CallClient, TxClient, TxSync};
 use fendermint_rpc::{client::FendermintClient, message::SignedMessageFactory};
-use fendermint_vm_message::chain::{ChainMessage, ValidatorMessage};
+use fendermint_vm_message::chain::{ChainMessage};
 use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_message::signed::SignedMessage;
 

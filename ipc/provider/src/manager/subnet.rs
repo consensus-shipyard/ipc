@@ -249,6 +249,7 @@ pub trait TopDownFinalityQuery: Send + Sync {
 #[async_trait]
 pub trait TopDownVoting: Send + Sync {
     /// Returns the latest parent height and block hash voted in a child subnet
+    #[allow(dead_code)]
     async fn latest_committed(&self) -> Result<(ChainEpoch, Vec<u8>)>;
 }
 

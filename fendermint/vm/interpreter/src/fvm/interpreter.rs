@@ -4,7 +4,6 @@
 use anyhow::{Context, Result};
 use cid::Cid;
 use fendermint_vm_message::chain::{ChainMessage, ValidatorMessage};
-use fendermint_vm_message::ipc::IpcMessage;
 use fendermint_vm_message::query::{FvmQuery, StateParams};
 use fendermint_vm_message::signed::SignedMessage;
 use fvm_ipld_blockstore::Blockstore;
