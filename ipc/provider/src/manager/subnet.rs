@@ -16,7 +16,6 @@ use ipc_api::subnet::{Asset, ConstructParams, PermissionMode};
 use ipc_api::subnet_id::SubnetID;
 use ipc_api::validator::Validator;
 use std::collections::{BTreeMap, HashMap};
-use ipc_api::checkpoint::TopdownCheckpoint;
 
 use crate::lotus::message::ipc::SubnetInfo;
 

@@ -12,7 +12,6 @@ use crate::{Config, ParentState};
 use ethers::utils::hex;
 use std::sync::Arc;
 use std::time::Duration;
-use anyhow::anyhow;
 use tokio::sync::Mutex;
 use async_trait::async_trait;
 use fvm_shared::chainid::ChainID;

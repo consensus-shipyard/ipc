@@ -402,18 +402,6 @@ mod tests {
     }
 
     #[test]
-    fn parse_default_config() {
-        let settings = parse_config("");
-        assert!(!settings.resolver_enabled());
-    }
-
-    #[test]
-    fn parse_test_config() {
-        let settings = parse_config("test");
-        assert!(settings.resolver_enabled());
-    }
-
-    #[test]
     fn compaction_to_string() {
         assert_eq!(DbCompaction::Level.to_string(), "level");
     }

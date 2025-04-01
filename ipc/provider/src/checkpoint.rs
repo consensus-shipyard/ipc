@@ -17,8 +17,6 @@ use std::fmt::{Display, Formatter};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::sync::Semaphore;
-use ipc_api::cross::IpcEnvelope;
-use ipc_api::staking::PowerChangeRequest;
 
 /// Tracks the config required for bottom up checkpoint submissions
 /// parent/child subnet and checkpoint period.
