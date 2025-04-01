@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use serde::{Deserialize, Serialize};
 
-use crate::{ipc::IpcMessage, signed::SignedMessage};
+use crate::signed::SignedMessage;
 
 /// The different kinds of messages that can appear in blocks, ie. the transactions
 /// we can receive from Tendermint through the ABCI.
@@ -38,7 +38,7 @@ impl From<SignedMessage> for ChainMessage {
 mod arb {
 
     use super::ChainMessage;
-    use crate::{ipc::IpcMessage, signed::SignedMessage};
+    use crate::signed::SignedMessage;
     use crate::chain::ValidatorMessage;
 
     impl quickcheck::Arbitrary for ChainMessage {
