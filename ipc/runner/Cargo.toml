@@ -53,6 +53,7 @@ ipc-api = { path = "../../ipc/api" }
 ipc-types = { path = "../../ipc/types" }
 fendermint_app = { path = "../../fendermint/app" }
 fendermint_app_settings = { path = "../../fendermint/app/settings" }
+fendermint_eth_api = { path = "../../fendermint/eth/api" }
 ipc-observability = { path = "../observability" }
 
 tracing-subscriber.workspace = true

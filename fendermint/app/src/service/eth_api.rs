@@ -3,13 +3,18 @@
 
 use anyhow::Context;
 use fendermint_eth_api::HybridClient;
+use tokio_util::sync::CancellationToken;
 use tracing::info;
 
 use crate::metrics::register_eth_metrics;
 use fendermint_app_settings::eth::EthSettings;
 
 /// Run the Ethereum API facade.
-pub async fn run(settings: EthSettings, client: HybridClient) -> anyhow::Result<()> {
+pub async fn run(
+    settings: EthSettings,
+    client: HybridClient,
+    cancel_token: Option<CancellationToken>,
+) -> anyhow::Result<()> {
     if settings.metrics.enabled {
         info!("metrics enabled");
 
@@ -46,6 +51,7 @@ pub async fn run(settings: EthSettings, client: HybridClient) -> anyhow::Result<
         settings.max_nonce_gap,
         gas,
         cors,
+        cancel_token,
     )
     .await
 }

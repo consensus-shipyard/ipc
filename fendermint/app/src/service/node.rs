@@ -52,7 +52,10 @@ namespaces! {
 
 /// Runs the ABCI server. If a CancellationToken is provided (i.e. Some(token)),
 /// the server future is wrapped with cancellation logic. Otherwise, it just awaits the server future.
-pub async fn run(settings: Settings, token: Option<CancellationToken>) -> anyhow::Result<()> {
+pub async fn run(
+    settings: Settings,
+    cancel_token: Option<CancellationToken>,
+) -> anyhow::Result<()> {
     let tendermint_rpc_url = settings.tendermint_rpc_url()?;
     tracing::info!("Connecting to Tendermint at {tendermint_rpc_url}");
 
@@ -350,7 +353,7 @@ pub async fn run(settings: Settings, token: Option<CancellationToken>) -> anyhow
         .context("error creating ABCI server")?;
 
     // Run the ABCI server.
-    if let Some(token) = token {
+    if let Some(token) = cancel_token {
         select! {
             res = server.listen(settings.abci.listen.to_string()) => {
                 res.map_err(|e| anyhow!("error listening: {e}"))?
@@ -360,7 +363,6 @@ pub async fn run(settings: Settings, token: Option<CancellationToken>) -> anyhow
             }
         }
     } else {
-        // No cancellation token provided; run the server normally.
         server
             .listen(settings.abci.listen.to_string())
             .await
