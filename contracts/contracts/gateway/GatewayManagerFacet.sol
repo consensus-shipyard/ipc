@@ -8,7 +8,7 @@ import {IpcEnvelope} from "../structs/CrossNet.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID, Subnet, Asset} from "../structs/Subnet.sol";
 import {Membership, AssetKind} from "../structs/Subnet.sol";
-import {AlreadyRegisteredSubnet, CannotReleaseZero, MethodNotAllowed, NotEnoughFunds, NotEnoughFundsToRelease, NotEnoughCollateral, NotEmptySubnetCircSupply, NotRegisteredSubnet, InvalidXnetMessage, InvalidXnetMessageReason} from "../errors/IPCErrors.sol";
+import {AlreadyRegisteredSubnet, CannotReleaseZero, MethodNotAllowed, NotEnoughFunds, NotEnoughFundsToRelease, NotEnoughCollateral, NotEmptySubnetCircSupply, NotRegisteredSubnet, InvalidXnetMessage, InvalidXnetMessageReason, TransferFailed} from "../errors/IPCErrors.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
@@ -103,7 +103,13 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         // Release fund flows from Gateway -> SubnetActor -> ReleaseQueue (Locking) -> Validator.
         // Because msg.sender is actually the subnet actor, this method sends the fund back to
         // the subnet actor caller.
-        SubnetActorGetterFacet(msg.sender).collateralSource().transferFunds(payable(msg.sender), amount);
+        (bool success, ) = SubnetActorGetterFacet(msg.sender).collateralSource().transferFunds(
+            payable(msg.sender),
+            amount
+        );
+        if (!success) {
+            revert TransferFailed();
+        }
     }
 
     /// @notice kill an existing subnet.
@@ -126,7 +132,13 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         delete s.subnets[id];
 
         s.subnetKeys.remove(id);
-        SubnetActorGetterFacet(msg.sender).collateralSource().transferFunds(payable(msg.sender), stake);
+        (bool success, ) = SubnetActorGetterFacet(msg.sender).collateralSource().transferFunds(
+            payable(msg.sender),
+            stake
+        );
+        if (!success) {
+            revert TransferFailed();
+        }
 
         emit SubnetDestroyed(subnet.id);
     }
