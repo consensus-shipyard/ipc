@@ -14,7 +14,6 @@ bytes = { workspace = true }
 cid = { workspace = true }
 hex = { workspace = true }
 fs-err = { workspace = true }
-futures-util = { workspace = true }
 k256 = { workspace = true }
 lazy_static = { workspace = true }
 libipld = { workspace = true }
