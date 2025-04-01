@@ -56,6 +56,10 @@ impl Config {
         }
     }
 
+    pub fn with_max_cache_blocks(&mut self, blocks: BlockHeight) {
+        self.max_cache_blocks = Some(blocks);
+    }
+
     pub fn max_cache_blocks(&self) -> BlockHeight {
         self.max_cache_blocks.unwrap_or(DEFAULT_MAX_CACHE_BLOCK)
     }

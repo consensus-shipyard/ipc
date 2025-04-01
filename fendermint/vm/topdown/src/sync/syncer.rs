@@ -317,6 +317,7 @@ mod tests {
     use ipc_api::staking::PowerChangeRequest;
     use ipc_provider::manager::{GetBlockHashResult, TopDownQueryPayload};
     use std::sync::Arc;
+    use fvm_shared::chainid::ChainID;
 
     /// How far behind the tip of the chain do we consider blocks final in the tests.
     const FINALITY_DELAY: u64 = 2;
@@ -328,6 +329,10 @@ mod tests {
     impl ParentFinalityStateQuery for TestParentFinalityStateQuery {
         fn get_latest_topdown_parent_state(&self) -> anyhow::Result<Option<ParentState>> {
             Ok(Some(self.latest_finality.clone()))
+        }
+
+        fn get_chain_id(&self) -> anyhow::Result<ChainID> {
+            Ok(ChainID::from(0))
         }
     }
 

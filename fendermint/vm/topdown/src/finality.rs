@@ -15,11 +15,11 @@ pub struct TopdownData {
 }
 
 impl TopdownData {
-    pub fn new(committed_checkpoint: ParentState) -> anyhow::Result<Self> {
-        Ok(Self {
+    pub fn new(committed_checkpoint: ParentState) -> Self {
+        Self {
             blocks: SequentialKeyCache::sequential(),
             committed_checkpoint,
-        })
+        }
     }
 
     /// Get the latest data stored in the cache to pull the next block

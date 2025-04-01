@@ -55,4 +55,8 @@ impl<C> ValidatorContext<C> {
             broadcaster,
         }
     }
+
+    pub fn broadcaster(&self) -> &Broadcaster<C> {
+        &self.broadcaster
+    }
 }

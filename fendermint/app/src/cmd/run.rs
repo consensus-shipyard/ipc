@@ -4,7 +4,7 @@
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically_or_err;
 use fendermint_abci::ApplicationService;
-use fendermint_app::ipc::{AppParentFinalityQuery};
+use fendermint_app::ipc::{AppParentFinalityQuery, AppTopdownVoter};
 use fendermint_app::{App, AppConfig, AppStore, BitswapBlockstore};
 use fendermint_app_settings::AccountKind;
 use fendermint_crypto::SecretKey;
@@ -33,6 +33,7 @@ use tracing::info;
 use crate::cmd::key::read_secret_key;
 use crate::{cmd, options::run::RunArgs, settings::Settings};
 use fendermint_app::observe::register_metrics as register_consensus_metrics;
+use fendermint_vm_topdown::sync::run_topdown_voting;
 
 cmd! {
   RunArgs(self, settings) {
@@ -98,14 +99,6 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         }
     };
 
-    let validator_keypair = validator.as_ref().map(|(sk, _)| {
-        let mut bz = sk.serialize();
-        let sk = libp2p::identity::secp256k1::SecretKey::try_from_bytes(&mut bz)
-            .expect("secp256k1 secret key");
-        let kp = libp2p::identity::secp256k1::Keypair::from(sk);
-        libp2p::identity::Keypair::from(kp)
-    });
-
     let validator_ctx = validator.map(|(sk, addr)| {
         // For now we are using the validator key for submitting transactions.
         // This allows us to identify transactions coming from empowered validators, to give priority to protocol related transactions.
@@ -137,25 +130,6 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
     let state_store =
         NamespaceBlockstore::new(db.clone(), ns.state_store).context("error creating state DB")?;
 
-    let topdown_enabled = settings.topdown_enabled();
-
-    if topdown_enabled {
-        info!("topdown finality enabled");
-        let topdown_config = settings.ipc.topdown_config()?;
-
-        todo!("setup topdown voting")
-        // let mut config = fendermint_vm_topdown::Config::new(
-        //     topdown_config.chain_head_delay,
-        //     topdown_config.polling_interval,
-        //     topdown_config.polling_interval,
-        // );
-        // if let Some(v) = topdown_config.max_cache_blocks {
-        //     info!(value = v, "setting max cache blocks");
-        //     config = config.with_max_cache_blocks(v);
-        // }
-
-    }
-
     // Start a snapshot manager in the background.
     let snapshots = if settings.snapshots.enabled {
         let (manager, client) = SnapshotManager::new(
@@ -182,7 +156,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         None
     };
 
-    let bottom_up_manager = BottomUpManager::new(tendermint_client.clone(), validator_ctx);
+    let bottom_up_manager = BottomUpManager::new(tendermint_client.clone(), validator_ctx.clone());
     let interpreter = FvmMessagesInterpreter::new(
         bottom_up_manager,
         UpgradeScheduler::new(),
@@ -204,6 +178,36 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         interpreter,
         snapshots,
     )?;
+
+    if settings.topdown_enabled() {
+        let Some(ctx) = validator_ctx.as_ref() else {
+            bail!("topdown enabled but validator secret key not configured");
+        };
+
+        info!("topdown finality enabled");
+
+        let topdown_config = settings.ipc.topdown_config()?;
+
+        let mut config = fendermint_vm_topdown::Config::new(
+            topdown_config.chain_head_delay,
+            topdown_config.polling_interval,
+            topdown_config.voting_interval,
+        );
+        if let Some(v) = topdown_config.max_cache_blocks {
+            info!(value = v, "setting max cache blocks");
+            config.with_max_cache_blocks(v);
+        }
+
+        let app_parent_finality_query = Arc::new(AppParentFinalityQuery::new(app.clone()));
+        let topdown_voter = AppTopdownVoter::<NamespaceBlockstore>::new(ctx.broadcaster().clone());
+        let parent_proxy = Arc::new(make_ipc_provider_proxy(&settings)?);
+
+        let client = tendermint_client.clone();
+        tokio::spawn(async move {
+            run_topdown_voting(config, app_parent_finality_query, parent_proxy,client, topdown_voter).await
+        });
+
+    }
 
     // Start the metrics on a background thread.
     if let Some(registry) = metrics_registry {

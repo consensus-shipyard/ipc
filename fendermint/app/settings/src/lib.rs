@@ -175,9 +175,9 @@ pub struct TopDownSettings {
     /// Parent syncing cron period, in seconds
     #[serde_as(as = "DurationSeconds<u64>")]
     pub polling_interval: Duration,
-    /// Top down exponential back off retry base
+    /// Validator voting cron period, in seconds
     #[serde_as(as = "DurationSeconds<u64>")]
-    pub exponential_back_off: Duration,
+    pub voting_interval: Duration,
     /// The max number of retries for exponential backoff before giving up
     pub exponential_retry_limit: usize,
     /// The parent rpc http endpoint

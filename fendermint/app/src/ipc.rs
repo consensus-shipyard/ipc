@@ -13,6 +13,7 @@ use fendermint_vm_topdown::sync::{ParentFinalityStateQuery, TopdownVoter};
 use fendermint_vm_topdown::ParentState;
 use fvm_ipld_blockstore::Blockstore;
 use std::sync::Arc;
+use anyhow::anyhow;
 use async_trait::async_trait;
 use fvm_shared::address::Address;
 use fvm_shared::chainid::ChainID;
@@ -32,7 +33,6 @@ pub struct AppTopdownVoter<SS>
 {
     gateway_caller: GatewayCaller<ReadOnlyBlockstore<Arc<SS>>>,
     broadcaster: Broadcaster<tendermint_rpc::HttpClient>,
-    chain_id: ChainID,
 }
 
 /// Queries the LATEST COMMITTED parent finality from the storage
@@ -45,6 +45,17 @@ where
     /// The app to get state
     app: App<DB, SS, S, I>,
     gateway_caller: GatewayCaller<ReadOnlyBlockstore<Arc<SS>>>,
+}
+
+impl <SS: Blockstore + Clone + 'static + Send + Sync> AppTopdownVoter<SS> {
+    pub fn new(
+        broadcaster: Broadcaster<tendermint_rpc::HttpClient>,
+    ) -> Self {
+        Self {
+            gateway_caller: Default::default(),
+            broadcaster,
+        }
+    }
 }
 
 impl<DB, SS, S, I> AppParentFinalityQuery<DB, SS, S, I>
@@ -93,11 +104,18 @@ where
                 .get_latest_topdown_parent_state(&mut exec_state)
         })
     }
+
+    fn get_chain_id(&self) -> anyhow::Result<ChainID> {
+        let r = self.with_exec_state(|s| {
+            Ok(s.chain_id())
+        })?;
+        r.ok_or_else(|| anyhow!("chain id not available as app is not up"))
+    }
 }
 
 #[async_trait]
 impl <SS> TopdownVoter for AppTopdownVoter<SS> where SS: Blockstore + Clone + 'static + Send + Sync {
-    async fn vote(&self, height: BlockHeight, parent_view_payload: ParentViewPayload) -> anyhow::Result<()> {
+    async fn vote(&self, chain_id: ChainID, height: BlockHeight, parent_view_payload: ParentViewPayload) -> anyhow::Result<()> {
         let cp = TopdownCheckpoint {
             parent_height: height as ChainEpoch,
             parent_block_hash: parent_view_payload.0,
@@ -108,7 +126,7 @@ impl <SS> TopdownVoter for AppTopdownVoter<SS> where SS: Blockstore + Clone + 's
         self.broadcaster.fevm_invoke(
             Address::from(self.gateway_caller.addr()),
             calldata,
-            self.chain_id,
+            chain_id,
             |s| ChainMessage::Validator(ValidatorMessage::TopdownPropose(s))
         ).await?;
         Ok(())
