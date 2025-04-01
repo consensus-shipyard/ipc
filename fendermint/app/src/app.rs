@@ -421,8 +421,13 @@ where
         // because it hasn't been committed to state store yet.
         let mut cache = self.validators_cache.lock().await;
         self.modify_exec_state(|s| {
+            // we need to leave this outside the closure
+            // otherwise `s`' lifetime would be captured by the
+            // closure causing unresolvable liftetime conflicts
+            // this is fine since we execute the future directly
+            // after calling the generator closure.
             let x = ValidatorCache::new_from_state(s);
-            async move {
+            async {
                *cache = Some(x?);
                 Ok(())
             }
