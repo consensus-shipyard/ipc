@@ -21,7 +21,7 @@ cmd! {
 
         let driver_handle = tokio::spawn(async move { driver.run().await });
 
-        let result = run_eth_api(settings, client).await;
+        let result = run_eth_api(settings, client, None).await;
 
         // Await the driver's termination to ensure proper connection closure.
         let _ = driver_handle.await;

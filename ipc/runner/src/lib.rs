@@ -1,8 +1,8 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-// mod binary;
-mod closure;
+mod process_manager;
+pub mod services;
 
 #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
 pub const BINARY_PATH: &str = concat!(

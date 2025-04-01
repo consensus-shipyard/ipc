@@ -13,7 +13,7 @@ use std::fmt::{Display, Formatter};
 use std::net::ToSocketAddrs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use tendermint_rpc::Url;
+use tendermint_rpc::{Url, WebSocketClientUrl};
 use testing::TestingSettings;
 use utils::EnvInterpol;
 
@@ -275,6 +275,9 @@ pub struct Settings {
     /// Where to reach CometBFT for queries or broadcasting transactions.
     tendermint_rpc_url: Url,
 
+    /// CometBFT websocket URL
+    tendermint_websocket_url: WebSocketClientUrl,
+
     /// Block height where we should gracefully stop the node
     pub halt_height: i64,
 
@@ -362,6 +365,17 @@ impl Settings {
         match std::env::var("TENDERMINT_RPC_URL").ok() {
             Some(url) => url.parse::<Url>().context("invalid Tendermint URL"),
             None => Ok(self.tendermint_rpc_url.clone()),
+        }
+    }
+
+    /// Tendermint websocket URL from the environment or the config file.
+    pub fn tendermint_websocket_url(&self) -> anyhow::Result<WebSocketClientUrl> {
+        // Prefer the "standard" env var used in the CLI.
+        match std::env::var("TENDERMINT_WS_URL").ok() {
+            Some(url) => url
+                .parse::<WebSocketClientUrl>()
+                .context("invalid Tendermint websocket URL"),
+            None => Ok(self.tendermint_websocket_url.clone()),
         }
     }
 
