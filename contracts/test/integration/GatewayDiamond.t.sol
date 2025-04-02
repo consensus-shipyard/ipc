@@ -12,7 +12,7 @@ import {IDiamond} from "../../contracts/interfaces/IDiamond.sol";
 import {IDiamondLoupe} from "../../contracts/interfaces/IDiamondLoupe.sol";
 import {IDiamondCut} from "../../contracts/interfaces/IDiamondCut.sol";
 import {QuorumInfo} from "../../contracts/structs/Quorum.sol";
-import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../../contracts/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, TopdownCheckpoint, ParentFinality} from "../../contracts/structs/CrossNet.sol";
 import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress, Validator, PowerChange, PowerChangeRequest, Asset, PowerOperation} from "../../contracts/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
@@ -104,7 +104,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
     }
 
     function testGatewayDiamond_LoupeFunction() public view {
-        require(gatewayDiamond.diamondLouper().facets().length == 9, "unexpected length");
+        require(gatewayDiamond.diamondLouper().facets().length == 10, "unexpected length");
         require(
             gatewayDiamond.diamondLouper().supportsInterface(type(IERC165).interfaceId) == true,
             "IERC165 not supported"
@@ -908,28 +908,22 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         );
     }
 
-    function testGatewayDiamond_CommitParentFinality_Fails_NotSystemActor() public {
-        address caller = vm.addr(100);
-
-        FvmAddress[] memory validators = new FvmAddress[](1);
-        validators[0] = FvmAddressHelper.from(caller);
-        uint256[] memory weights = new uint256[](1);
-        weights[0] = 100;
-
-        vm.prank(caller);
-        vm.expectRevert(NotSystemActor.selector);
-
-        ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
-
-        // TODO: fix commitParentFinality
-        // gatewayDiamond.topDownFinalizer().commitParentFinality(finality);
-    }
-
     function testGatewayDiamond_applyFinality_works() public {
+        Validator[] memory validators = new Validator[](1);
+        validators[0] = Validator({weight: 100, addr: TOPDOWN_VALIDATOR_1, metadata: new bytes(0)});
+
+        // create a random subnet id for it to work
+        address[] memory path = new address[](1);
+        path[0] = address(0);
+        SubnetID memory subnetId = SubnetID(ROOTNET_CHAINID, path);
+
+        GatewayDiamond.ConstructorParams memory gwConstructorParams2 = gatewayParams(subnetId, validators);
+        gatewayDiamond = createGatewayDiamond(gwConstructorParams2);
+
         // changes included for two validators joining
         address val1 = vm.addr(100);
         address val2 = vm.addr(101);
-        uint256 amount = 10000;
+        uint256 amount = 1;
         PowerChangeRequest[] memory changes = new PowerChangeRequest[](2);
 
         changes[0] = PowerChangeRequest({
@@ -941,81 +935,69 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             change: PowerChange({validator: val2, op: PowerOperation.SetPower, payload: abi.encode(amount)})
         });
 
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        vm.deal(TOPDOWN_VALIDATOR_1, 1 ether);
 
-        // TODO: storeValidatorChanges
-        // gatewayDiamond.topDownFinalizer().storeValidatorChanges(changes);
+        vm.startPrank(TOPDOWN_VALIDATOR_1);
+        TopdownCheckpoint memory checkpoint = TopdownCheckpoint({
+            height: 100,
+            blockHash: bytes32(0),
+            xnetMsgs: new IpcEnvelope[](0),
+            powerChanges: changes
+        });
+        gatewayDiamond.topDownVoting().propose(checkpoint);
+        vm.stopPrank();
+
+        vm.startPrank(FilAddress.SYSTEM_ACTOR);
         uint64 configNumber = gatewayDiamond.topDownFinalizer().applyFinalityChanges();
-        require(configNumber == 2, "wrong config number after applying finality");
+        require(configNumber == 2, "wrong config number after applying finality, should be 2");
         require(
-            gatewayDiamond.getter().getCurrentMembership().validators.length == 2,
-            "current membership should be 2"
+            gatewayDiamond.getter().getCurrentMembership().validators.length == 3,
+            "current membership should be 3"
         );
         require(gatewayDiamond.getter().getCurrentConfigurationNumber() == 2, "unexpected config number");
         require(gatewayDiamond.getter().getLastConfigurationNumber() == 0, "unexpected last config number");
-
         vm.stopPrank();
 
+        vm.startPrank(TOPDOWN_VALIDATOR_1);
         // new change with a validator leaving
         changes = new PowerChangeRequest[](1);
-
         changes[0] = PowerChangeRequest({
             configurationNumber: 3,
             change: PowerChange({validator: val1, op: PowerOperation.SetPower, payload: abi.encode(0)})
         });
+        checkpoint = TopdownCheckpoint({
+            height: 101,
+            blockHash: bytes32(0),
+            xnetMsgs: new IpcEnvelope[](0),
+            powerChanges: changes
+        });
+        gatewayDiamond.topDownVoting().propose(checkpoint);
+        vm.stopPrank();
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-
-        // TODO: storeValidatorChanges
-        // gatewayDiamond.topDownFinalizer().storeValidatorChanges(changes);
         configNumber = gatewayDiamond.topDownFinalizer().applyFinalityChanges();
-        require(configNumber == 3, "wrong config number after applying finality");
+        require(configNumber == 3, "wrong config number after applying finality, should be 3");
         require(
             gatewayDiamond.getter().getLastConfigurationNumber() == 2,
             "apply result: unexpected last config number"
         );
         require(gatewayDiamond.getter().getCurrentConfigurationNumber() == 3, "apply result: unexpected config number");
         require(
-            gatewayDiamond.getter().getCurrentMembership().validators.length == 1,
-            "current membership should be 1"
+            gatewayDiamond.getter().getCurrentMembership().validators.length == 2,
+            "current membership should be 2"
         );
-        require(gatewayDiamond.getter().getLastMembership().validators.length == 2, "last membership should be 2");
+        require(gatewayDiamond.getter().getLastMembership().validators.length == 3, "last membership should be 3");
 
         // no changes
         configNumber = gatewayDiamond.topDownFinalizer().applyFinalityChanges();
-        require(configNumber == 0, "wrong config number after applying finality");
+        require(configNumber == 0, "wrong config number after applying finality, should be 0");
         require(gatewayDiamond.getter().getLastConfigurationNumber() == 2, "no changes: unexpected last config number");
         require(gatewayDiamond.getter().getCurrentConfigurationNumber() == 3, "no changes: unexpected config number");
         require(
-            gatewayDiamond.getter().getCurrentMembership().validators.length == 1,
-            "current membership should be 1"
+            gatewayDiamond.getter().getCurrentMembership().validators.length == 2,
+            "current membership should be 2"
         );
-        require(gatewayDiamond.getter().getLastMembership().validators.length == 2, "last membership should be 2");
-
-        vm.stopPrank();
-    }
-
-    function testGatewayDiamond_CommitParentFinality_Works_WithQuery() public {
-        FvmAddress[] memory validators = new FvmAddress[](2);
-        validators[0] = FvmAddressHelper.from(vm.addr(100));
-        validators[1] = FvmAddressHelper.from(vm.addr(101));
-        uint256[] memory weights = new uint256[](2);
-        weights[0] = 100;
-        weights[1] = 150;
-
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        // increase the block number so that current block number is
-        // not the same as init committed parent finality height
-        vm.roll(10);
-
-        ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
-
-        // TODO: fix commitParentFinality
-        // gatewayDiamond.topDownFinalizer().commitParentFinality(finality);
-        // ParentFinality memory committedFinality = gatewayDiamond.getter().getParentFinality(block.number);
-        // require(committedFinality.height == finality.height, "heights are not equal");
-        // require(committedFinality.blockHash == finality.blockHash, "blockHash is not equal");
-        // require(gatewayDiamond.getter().getLatestParentFinality().height == block.number, "finality height not equal");
+        require(gatewayDiamond.getter().getLastMembership().validators.length == 3, "last membership should be 3");
 
         vm.stopPrank();
     }

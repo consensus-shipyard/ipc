@@ -525,7 +525,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = cloneIpcEnvelopeWithDifferentNonce(resultMessage, 0);
 
-        commitParentFinality(params.subnet.gatewayAddr);
+        vm.roll(10);
         executeTopDownMsgsAndExpectTopDownMessageEvent(
             msgs,
             params.subnet.gateway,
@@ -535,7 +535,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         );
 
         // apply the result and check it was propagated to the correct actor
-        commitParentFinality(params.subnetL3.gatewayAddr);
+        vm.roll(10);
         executeTopDownMsgs(msgs, params.subnetL3.gateway);
 
         assertTrue(params.caller.hasResult(), "missing result");
@@ -700,17 +700,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         executeTopDownMsgs(resultMsgs, subnetL3s[0].gateway);
         assertTrue(caller.hasResult(), "missing result");
         assertTrue(caller.result().outcome == OutcomeType.Ok, "wrong result outcome");
-    }
-
-    function commitParentFinality(address gateway) internal {
-        vm.roll(10);
-        ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
-
-        TopDownFinalityFacet gwTopDownFinalityFacet = TopDownFinalityFacet(address(gateway));
-
-        vm.prank(FilAddress.SYSTEM_ACTOR);
-        // TODO: fix commitParentFinality
-        // gwTopDownFinalityFacet.commitParentFinality(finality);
     }
 
     function executeTopDownMsgs(IpcEnvelope[] memory msgs, GatewayDiamond gw) internal {

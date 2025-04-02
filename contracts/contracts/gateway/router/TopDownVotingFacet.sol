@@ -13,14 +13,14 @@ import {LibGateway} from "../../lib/LibGateway.sol";
 
 /// Performs topdown bridging voting on chain. This makes validator slashing possible and
 /// avoid potential collusion issues.
-contract TopDownVotingFacet is GatewayActorModifiers {    
+contract TopDownVotingFacet is GatewayActorModifiers {
     using LibValidatorTracking for ParentValidatorsTracker;
     using LibValidatorSet for ValidatorSet;
     using EnumerableSet for EnumerableSet.Bytes32Set;
     using LibTopdownVoting for TopdownVoting;
     using SubnetIDHelper for SubnetID;
 
-    event TopdownQuorumFormed(bytes32 vote);
+    event TopdownQuorumFormed(bytes32 vote, uint256 quorumThreshold, uint256 totalWeight);
     event VotingAborted(bytes32[] votedHashes);
 
     function latestCommitted() external view returns (uint64 blockHeight, bytes32 blockHash) {
@@ -31,7 +31,7 @@ contract TopDownVotingFacet is GatewayActorModifiers {
     function propose(TopdownCheckpoint calldata checkpoint) external {
         bytes32 vote = keccak256(abi.encode(checkpoint));
 
-         if (!s.topdownVoting.ongoingVoteHashes.contains(vote)) {
+        if (!s.topdownVoting.ongoingVoteHashes.contains(vote)) {
             s.topdownVoting.storeCheckpoint(vote, checkpoint);
             s.topdownVoting.ongoingVoteHashes.add(vote);
         }
@@ -49,7 +49,7 @@ contract TopDownVotingFacet is GatewayActorModifiers {
 
         // can shift this query to off chain
         uint256 validatorIndex = type(uint256).max;
-        for (uint256 i = 0 ; i < totalValidators; ) {
+        for (uint256 i = 0; i < totalValidators; ) {
             if (s.currentMembership.validators[i].addr == msg.sender) {
                 validatorIndex = i;
             }
@@ -70,11 +70,10 @@ contract TopDownVotingFacet is GatewayActorModifiers {
         uint256 power = s.currentMembership.validators[validatorIndex].weight;
         (uint256 totalPowerVoted, uint256 voteTotalPower) = s.topdownVoting.increaseVotePower(vote, power);
 
-        // TODO: getTotalActivePower is not optimized as it does looping every time it's called
-        uint256 quorumThreshold = (s.validatorsTracker.validators.getTotalActivePower() * 2) / 3;
+        uint256 quorumThreshold = (totalWeight * 2) / 3;
 
         if (voteTotalPower > quorumThreshold) {
-            emit TopdownQuorumFormed(vote);
+            emit TopdownQuorumFormed(vote, quorumThreshold, totalWeight);
 
             execute(vote);
 
@@ -94,6 +93,7 @@ contract TopDownVotingFacet is GatewayActorModifiers {
     function execute(bytes32 vote) internal {
         s.topdownVoting.voteCommitted(vote);
         s.validatorsTracker.batchStoreChangeMemory(s.topdownVoting.votes[vote].payload.powerChanges);
+        require(s.networkName.route.length == 1, "route wrong");
         LibGateway.applyTopDownMessages(s.networkName.getParentSubnet(), s.topdownVoting.votes[vote].payload.xnetMsgs);
 
         // TODO: propagateAllPostboxMessages temporarily disabled due to contract size issue

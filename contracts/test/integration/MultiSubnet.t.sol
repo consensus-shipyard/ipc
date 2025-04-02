@@ -165,8 +165,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = expected;
 
-        // TODO: commitParentFinality doesn't not affect anything in this test.
-        commitParentFinality(nativeSubnet.gatewayAddr);
+        vm.roll(10);
 
         executeTopDownMsgs(msgs, nativeSubnet.id, nativeSubnet.gateway);
 
@@ -294,8 +293,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = expected;
 
-        // TODO: commitParentFinality doesn't not affect anything in this test.
-        commitParentFinality(nativeSubnet.gatewayAddr);
+        vm.roll(10);
 
         vm.expectRevert();
         executeTopDownMsgsRevert(msgs, nativeSubnet.id, nativeSubnet.gateway);
@@ -331,7 +329,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = expected;
 
-        commitParentFinality(tokenSubnet.gatewayAddr);
+        vm.roll(10);
 
         executeTopDownMsgs(msgs, tokenSubnet.id, tokenSubnet.gateway);
 
@@ -578,7 +576,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = expected;
 
-        commitParentFinality(tokenSubnet.gatewayAddr);
+        vm.roll(10);
 
         vm.expectRevert();
         executeTopDownMsgsRevert(msgs, tokenSubnet.id, tokenSubnet.gateway);
@@ -1140,7 +1138,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = xnetCallMsg;
 
-        commitParentFinality(nativeSubnet.gatewayAddr);
+        vm.roll(10);
         executeTopDownMsgs(msgs, nativeSubnet.id, nativeSubnet.gateway);
     }
 
@@ -1289,19 +1287,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = xnetCallMsg;
 
-        commitParentFinality(tokenSubnet.gatewayAddr);
-        executeTopDownMsgs(msgs, tokenSubnet.id, tokenSubnet.gateway);
-    }
-
-    function commitParentFinality(address gateway) internal {
         vm.roll(10);
-        ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
-
-        TopDownFinalityFacet gwTopDownFinalityFacet = TopDownFinalityFacet(address(gateway));
-
-        vm.prank(FilAddress.SYSTEM_ACTOR);
-        // TODO: fix commitParentFinality
-        // gwTopDownFinalityFacet.commitParentFinality(finality);
+        executeTopDownMsgs(msgs, tokenSubnet.id, tokenSubnet.gateway);
     }
 
     function executeTopDownMsgs(IpcEnvelope[] memory msgs, SubnetID memory subnet, GatewayDiamond gw) internal {

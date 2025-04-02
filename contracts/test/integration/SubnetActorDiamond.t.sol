@@ -10,7 +10,7 @@ import {NumberContractFacetSeven} from "../helpers/contracts/NumberContractFacet
 import {NumberContractFacetEight} from "../helpers/contracts/NumberContractFacetEight.sol";
 import {METHOD_SEND} from "../../contracts/constants/Constants.sol";
 import {ConsensusType} from "../../contracts/enums/ConsensusType.sol";
-import {BottomUpMsgBatch, IpcEnvelope, BottomUpCheckpoint, MAX_MSGS_PER_BATCH} from "../../contracts/structs/CrossNet.sol";
+import {BottomUpMsgBatch, IpcEnvelope, BottomUpCheckpoint, MAX_MSGS_PER_BATCH, TopdownCheckpoint} from "../../contracts/structs/CrossNet.sol";
 import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
 import {SubnetID, PermissionMode, IPCAddress, Subnet, Asset, ValidatorInfo, AssetKind, Membership, Validator, PowerOperation, PowerChangeRequest, PowerChange} from "../../contracts/structs/Subnet.sol";
 import {IERC165} from "../../contracts/interfaces/IERC165.sol";
@@ -106,22 +106,20 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         // run custom setup function
         address[] memory path = new address[](1);
         path[0] = ROOTNET_ADDRESS;
-
-        // create the root gateway actor.
-        GatewayDiamond.ConstructorParams memory gwConstructorParams = defaultGatewayParams();
+        SubnetID memory subnetId = SubnetID(ROOTNET_CHAINID, path);
 
         // create genesis validators
         uint256 numGenesisValidators = 3;
         uint256 startingPrivateKey = 100;
-        gwConstructorParams.genesisValidators = new Validator[](numGenesisValidators);
+        Validator[] memory genesisValidators = new Validator[](numGenesisValidators);
 
         for (uint256 i = 0; i < numGenesisValidators; i++) {
             (address validator, , bytes memory publicKey) = TestUtils.newValidator(startingPrivateKey + i);
-            gwConstructorParams.genesisValidators[i] = Validator({addr: validator, weight: 100, metadata: publicKey});
+            genesisValidators[i] = Validator({addr: validator, weight: 100, metadata: publicKey});
         }
 
         // now create the child subnet gateway
-        gatewayDiamond = createGatewayDiamond(gwConstructorParams);
+        gatewayDiamond = createGatewayDiamond(gatewayParams(subnetId, genesisValidators));
 
         Membership memory membership = gatewayDiamond.getter().getCurrentMembership();
         require(membership.validators.length == numGenesisValidators, "genesis validator num not correct");
@@ -137,9 +135,20 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             configurationNumber: 1
         });
 
+        TopdownCheckpoint memory checkpoint = TopdownCheckpoint({
+            height: 100,
+            blockHash: bytes32(0),
+            xnetMsgs: new IpcEnvelope[](0),
+            powerChanges: changes
+        });
+
+        for (uint256 i = 0; i < numGenesisValidators; i++) {
+            vm.startPrank(genesisValidators[i].addr);
+            gatewayDiamond.topDownVoting().propose(checkpoint);
+            vm.stopPrank();
+        }
+
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        // TODO: fix storeValidatorChanges
-        // gatewayDiamond.topDownFinalizer().storeValidatorChanges(changes);
         gatewayDiamond.topDownFinalizer().applyFinalityChanges();
 
         membership = gatewayDiamond.getter().getCurrentMembership();

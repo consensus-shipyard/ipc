@@ -258,7 +258,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         // incrementing the block number, test won't pass
         vm.roll(5);
 
-        addValidator(TOPDOWN_VALIDATOR_1, 100);
+        // addValidator(TOPDOWN_VALIDATOR_1, 100);
 
         (address validatorAddress, bytes memory publicKey) = TestUtils.deriveValidatorAddress(100);
         join(validatorAddress, publicKey);
