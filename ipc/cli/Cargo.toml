@@ -49,7 +49,10 @@ ipc-wallet = { path = "../../ipc/wallet", features = ["with-ethers"] }
 ipc-provider = { path = "../../ipc/provider" }
 ipc-api = { path = "../../ipc/api" }
 ipc-types = { path = "../../ipc/types" }
+ipc-observability = { path = "../../ipc/observability" }
+ipc-runner = { path = "../../ipc/runner" }
 tracing-subscriber.workspace = true
 
 fendermint_eth_hardhat = { path = "../../fendermint/eth/hardhat" }
 fendermint_eth_deployer = { path = "../../fendermint/eth/deployer" }
+fendermint_app_settings = { path = "../../fendermint/app/settings" }

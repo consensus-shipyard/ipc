@@ -1,5 +1,5 @@
 use super::Service;
-use crate::process_manager::{kill_process, spawn_process, ProcessConfig};
+use crate::process_manager::{kill_process, ProcessManager};
 use anyhow::Result;
 use async_trait::async_trait;
 use fendermint_app_settings::SocketAddress;
@@ -31,14 +31,10 @@ impl Service for CometBftService {
 
     async fn run(&self, shutdown: CancellationToken) -> Result<()> {
         let mut attempts = 0;
-        let process_config = ProcessConfig {
-            binary: "cometbft".to_string(),
-            args: vec![
-                "start".to_string(),
-                "--proxy_app".to_string(),
-                format!("tcp://{}", self.abci_proxy),
-            ],
-        };
+
+        let proxy_app = format!("tcp://{}", self.abci_proxy);
+        let process_manager =
+            ProcessManager::new("cometbft".into(), vec!["start", "--proxy_app", &proxy_app]);
 
         loop {
             if shutdown.is_cancelled() {
@@ -46,7 +42,7 @@ impl Service for CometBftService {
                 break;
             }
 
-            let spawn_result = spawn_process(&process_config).await;
+            let spawn_result = process_manager.spawn().await;
             let mut child = match spawn_result {
                 Ok(child) => child,
                 Err(e) => {
