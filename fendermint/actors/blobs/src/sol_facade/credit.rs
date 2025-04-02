@@ -7,7 +7,7 @@ use fendermint_actor_blobs_shared::params::{
     ApproveCreditParams, BuyCreditParams, GetAccountParams, GetCreditApprovalParams,
     RevokeCreditParams, SetAccountStatusParams, SetSponsorParams,
 };
-use fendermint_actor_blobs_shared::state::{Credit, CreditApproval, TtlStatus};
+use fendermint_actor_blobs_shared::state::{AccountInfo, Credit, CreditApproval, TtlStatus};
 use fil_actors_runtime::runtime::Runtime;
 use fil_actors_runtime::{actor_error, ActorError};
 use fvm_shared::address::Address;
@@ -22,7 +22,6 @@ use std::collections::{HashMap, HashSet};
 pub use recall_sol_facade::credit::Calls;
 
 use crate::sol_facade::{AbiCall, AbiCallRuntime, AbiEncodeError};
-use crate::state::AccountInfo;
 
 pub struct CreditPurchased {
     from: Address,

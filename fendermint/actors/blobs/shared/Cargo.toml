@@ -23,6 +23,7 @@ num-derive = { workspace = true }
 num-traits = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
+recall_actor_sdk = { path = "../../../../recall/actor_sdk" }
 recall_ipld = { path = "../../../../recall/ipld" }
 
 [features]

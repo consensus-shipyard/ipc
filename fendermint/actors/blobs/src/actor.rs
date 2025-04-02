@@ -12,7 +12,7 @@ use fendermint_actor_blobs_shared::params::{
 use fendermint_actor_blobs_shared::state::{
     BlobInfo, BlobRequest, BlobStatus, Credit, CreditApproval, GasAllowance, Hash, Subscription,
 };
-use fendermint_actor_blobs_shared::Method;
+use fendermint_actor_blobs_shared::{state::AccountInfo, Method};
 use fendermint_actor_recall_config_shared::{get_config, require_caller_is_admin};
 use fil_actors_runtime::{
     actor_dispatch, actor_error, extract_send_result,
@@ -30,7 +30,6 @@ use recall_actor_sdk::{
 use crate::sol_facade::credit::{CreditApproved, CreditDebited, CreditPurchased, CreditRevoked};
 use crate::sol_facade::gas::{GasSponsorSet, GasSponsorUnset};
 use crate::sol_facade::{blobs as sol_blobs, credit as sol_credit, AbiCall, AbiCallRuntime};
-use crate::state::AccountInfo;
 use crate::{State, BLOBS_ACTOR_NAME};
 
 #[cfg(feature = "fil-actor")]

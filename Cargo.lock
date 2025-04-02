@@ -3550,6 +3550,7 @@ dependencies = [
  "fvm_shared",
  "num-derive 0.3.3",
  "num-traits",
+ "recall_actor_sdk",
  "recall_ipld",
  "serde",
 ]
