@@ -7,7 +7,12 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use ethers_contract::{ContractError, EthLogDecode, LogMeta};
-use ipc_actors_abis::{checkpointing_facet, gateway_getter_facet, gateway_manager_facet, lib_gateway, lib_power_change_log, lib_quorum, register_subnet_facet, subnet_actor_activity_facet, subnet_actor_checkpointing_facet, subnet_actor_getter_facet, subnet_actor_manager_facet, subnet_actor_reward_facet, top_down_voting_facet};
+use ipc_actors_abis::{
+    checkpointing_facet, gateway_getter_facet, gateway_manager_facet, lib_gateway,
+    lib_power_change_log, lib_quorum, register_subnet_facet, subnet_actor_activity_facet,
+    subnet_actor_checkpointing_facet, subnet_actor_getter_facet, subnet_actor_manager_facet,
+    subnet_actor_reward_facet, top_down_voting_facet,
+};
 use ipc_api::evm::{fil_to_eth_amount, payload_to_evm_address, subnet_id_to_evm_addresses};
 use ipc_api::validator::from_contract_validators;
 use reqwest::header::HeaderValue;
@@ -20,7 +25,10 @@ use ipc_api::{eth_to_fil_amount, ethers_address_to_fil_address};
 use crate::config::subnet::SubnetConfig;
 use crate::config::Subnet;
 use crate::lotus::message::ipc::SubnetInfo;
-use crate::manager::subnet::{BottomUpCheckpointRelayer, GetBlockHashResult, SubnetGenesisInfo, TopDownFinalityQuery, TopDownQueryPayload, TopDownVoting, ValidatorRewarder};
+use crate::manager::subnet::{
+    BottomUpCheckpointRelayer, GetBlockHashResult, SubnetGenesisInfo, TopDownFinalityQuery,
+    TopDownQueryPayload, TopDownVoting, ValidatorRewarder,
+};
 
 use crate::manager::{EthManager, SubnetManager};
 use anyhow::{anyhow, Context, Result};
@@ -245,18 +253,6 @@ impl TopDownFinalityQuery for EthSubnetManager {
             block_hash,
         })
     }
-
-    async fn latest_parent_finality(&self) -> Result<ChainEpoch> {
-        tracing::info!("querying latest parent finality ");
-
-        let contract = gateway_getter_facet::GatewayGetterFacet::new(
-            self.ipc_contract_info.gateway_addr,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
-        let finality = contract.get_latest_parent_finality().call().await?;
-        Ok(finality.height.as_u64() as ChainEpoch)
-    }
-
 }
 
 #[async_trait]

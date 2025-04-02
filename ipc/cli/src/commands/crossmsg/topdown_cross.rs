@@ -60,11 +60,11 @@ pub(crate) struct ListTopdownMsgsArgs {
     pub to: ChainEpoch,
 }
 
-pub(crate) struct LatestParentFinality;
+pub(crate) struct LatestParentState;
 
 #[async_trait]
-impl CommandLineHandler for LatestParentFinality {
-    type Arguments = LatestParentFinalityArgs;
+impl CommandLineHandler for LatestParentState {
+    type Arguments = LatestParentStateArgs;
 
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
         log::debug!("latest parent finality: {:?}", arguments);
@@ -72,14 +72,14 @@ impl CommandLineHandler for LatestParentFinality {
         let provider = get_ipc_provider(global)?;
         let subnet = SubnetID::from_str(&arguments.subnet)?;
 
-        println!("{}", provider.latest_parent_finality(&subnet).await?);
+        println!("{}", provider.latest_parent_state(&subnet).await?);
         Ok(())
     }
 }
 
 #[derive(Debug, Args)]
 #[command(about = "Latest height of parent finality committed in child subnet")]
-pub(crate) struct LatestParentFinalityArgs {
+pub(crate) struct LatestParentStateArgs {
     #[arg(long, help = "The subnet id to check parent finality")]
     pub subnet: String,
 }

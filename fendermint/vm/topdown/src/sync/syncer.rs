@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! The inner type of parent syncer
 
-use crate::finality::{TopdownData, ParentViewPayload};
+use crate::finality::{ParentViewPayload, TopdownData};
 use crate::observe::ParentFinalityAcquired;
 use crate::proxy::ParentQueryProxy;
 use crate::{is_null_round_str, BlockHash, BlockHeight, Config, Error, ParentState};
@@ -46,7 +46,10 @@ where
         cache.finalized_checkpoint(checkpoint);
     }
 
-    pub async fn get_vote_below_height(&self, height: BlockHeight) -> Option<(BlockHeight, ParentViewPayload)> {
+    pub async fn get_vote_below_height(
+        &self,
+        height: BlockHeight,
+    ) -> Option<(BlockHeight, ParentViewPayload)> {
         let cache = self.data_cache.lock().await;
         let h = cache.first_non_null_block(height)?;
         cache.get_payload_at_height(h).cloned().map(|v| (h, v))
@@ -313,11 +316,11 @@ mod tests {
     use anyhow::anyhow;
     use async_trait::async_trait;
     use fendermint_vm_genesis::{Power, Validator};
+    use fvm_shared::chainid::ChainID;
     use ipc_api::cross::IpcEnvelope;
     use ipc_api::staking::PowerChangeRequest;
     use ipc_provider::manager::{GetBlockHashResult, TopDownQueryPayload};
     use std::sync::Arc;
-    use fvm_shared::chainid::ChainID;
 
     /// How far behind the tip of the chain do we consider blocks final in the tests.
     const FINALITY_DELAY: u64 = 2;

@@ -38,14 +38,16 @@ impl From<SignedMessage> for ChainMessage {
 mod arb {
 
     use super::ChainMessage;
-    use crate::signed::SignedMessage;
     use crate::chain::ValidatorMessage;
+    use crate::signed::SignedMessage;
 
     impl quickcheck::Arbitrary for ChainMessage {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
             match u8::arbitrary(g) % 2 {
                 0 => ChainMessage::Signed(SignedMessage::arbitrary(g)),
-                _ => ChainMessage::Validator(ValidatorMessage::SignBottomUpCheckpoint(SignedMessage::arbitrary(g))),
+                _ => ChainMessage::Validator(ValidatorMessage::SignBottomUpCheckpoint(
+                    SignedMessage::arbitrary(g),
+                )),
             }
         }
     }

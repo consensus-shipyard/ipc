@@ -724,11 +724,10 @@ impl IpcProvider {
         conn.manager().list_bootstrap_nodes(subnet).await
     }
 
-    /// Returns the latest finality from the parent committed in a child subnet.
-    pub async fn latest_parent_finality(&self, subnet: &SubnetID) -> anyhow::Result<ChainEpoch> {
+    /// Returns the latest parent state from the parent committed in a child subnet.
+    pub async fn latest_parent_state(&self, subnet: &SubnetID) -> anyhow::Result<ChainEpoch> {
         let conn = self.get_connection(subnet)?;
-
-        conn.manager().latest_parent_finality().await
+        Ok(conn.manager().latest_committed().await?.0)
     }
 
     pub async fn set_federated_power(

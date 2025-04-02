@@ -59,8 +59,6 @@ struct GatewayActorStorage {
     /// @notice List of subnets
     /// SubnetID => Subnet
     mapping(bytes32 => Subnet) subnets;
-    /// @notice The parent finalities. Key is the block number, value is the finality struct.
-    mapping(uint256 => ParentFinality) finalitiesMap;
     /// @notice Tracks the topdown voting process
     TopdownVoting topdownVoting;
     /// @notice Postbox keeps track of all the cross-net messages triggered by

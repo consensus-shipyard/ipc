@@ -24,11 +24,13 @@ use ipc_actors_abis::checkpointing_facet::CheckpointingFacet;
 use ipc_actors_abis::gateway_getter_facet::GatewayGetterFacet;
 use ipc_actors_abis::gateway_getter_facet::{self as getter, gateway_getter_facet};
 use ipc_actors_abis::top_down_finality_facet::TopDownFinalityFacet;
-use ipc_actors_abis::top_down_voting_facet::{TopDownVotingFacet};
+use ipc_actors_abis::top_down_voting_facet::TopDownVotingFacet;
 use ipc_actors_abis::xnet_messaging_facet::XnetMessagingFacet;
-use ipc_actors_abis::{checkpointing_facet, top_down_finality_facet, top_down_voting_facet, xnet_messaging_facet};
+use ipc_actors_abis::{
+    checkpointing_facet, top_down_finality_facet, top_down_voting_facet, xnet_messaging_facet,
+};
 use ipc_api::cross::IpcEnvelope;
-use ipc_api::staking::{ConfigurationNumber};
+use ipc_api::staking::ConfigurationNumber;
 
 use super::{
     fevm::{ContractCaller, MockProvider, NoRevert},
@@ -280,10 +282,9 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         &self,
         state: &mut FvmExecState<DB>,
     ) -> anyhow::Result<ParentState> {
-        let (block_height, block_hash) = self
-            .topdown_voting
-            .call(state, |c| c.latest_committed())?;
-        Ok(ParentState{
+        let (block_height, block_hash) =
+            self.topdown_voting.call(state, |c| c.latest_committed())?;
+        Ok(ParentState {
             height: block_height,
             block_hash: block_hash.to_vec(),
         })

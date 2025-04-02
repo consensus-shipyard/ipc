@@ -4,20 +4,20 @@
 
 use crate::app::{AppState, AppStoreKey};
 use crate::{App, BlockHeight};
+use anyhow::anyhow;
+use async_trait::async_trait;
 use fendermint_storage::{Codec, Encode, KVReadable, KVStore, KVWritable};
 use fendermint_vm_interpreter::fvm::state::ipc::GatewayCaller;
 use fendermint_vm_interpreter::fvm::state::{FvmExecState, FvmStateParams};
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
+use fendermint_vm_interpreter::fvm::Broadcaster;
 use fendermint_vm_topdown::sync::{ParentFinalityStateQuery, TopdownVoter};
 use fendermint_vm_topdown::ParentState;
 use fvm_ipld_blockstore::Blockstore;
-use std::sync::Arc;
-use anyhow::anyhow;
-use async_trait::async_trait;
 use fvm_shared::address::Address;
 use fvm_shared::chainid::ChainID;
 use fvm_shared::clock::ChainEpoch;
-use fendermint_vm_interpreter::fvm::Broadcaster;
+use std::sync::Arc;
 
 use fendermint_vm_interpreter::MessagesInterpreter;
 use fendermint_vm_message::chain::{ChainMessage, ValidatorMessage};
@@ -25,8 +25,8 @@ use fendermint_vm_topdown::finality::ParentViewPayload;
 use ipc_api::checkpoint::TopdownCheckpoint;
 
 pub struct AppTopdownVoter<SS>
-    where
-        SS: Blockstore + Clone + 'static + Send + Sync,
+where
+    SS: Blockstore + Clone + 'static + Send + Sync,
 {
     gateway_caller: GatewayCaller<ReadOnlyBlockstore<Arc<SS>>>,
     broadcaster: Broadcaster<tendermint_rpc::HttpClient>,
@@ -44,10 +44,8 @@ where
     gateway_caller: GatewayCaller<ReadOnlyBlockstore<Arc<SS>>>,
 }
 
-impl <SS: Blockstore + Clone + 'static + Send + Sync> AppTopdownVoter<SS> {
-    pub fn new(
-        broadcaster: Broadcaster<tendermint_rpc::HttpClient>,
-    ) -> Self {
+impl<SS: Blockstore + Clone + 'static + Send + Sync> AppTopdownVoter<SS> {
+    pub fn new(broadcaster: Broadcaster<tendermint_rpc::HttpClient>) -> Self {
         Self {
             gateway_caller: Default::default(),
             broadcaster,
@@ -103,29 +101,37 @@ where
     }
 
     fn get_chain_id(&self) -> anyhow::Result<ChainID> {
-        let r = self.with_exec_state(|s| {
-            Ok(s.chain_id())
-        })?;
+        let r = self.with_exec_state(|s| Ok(s.chain_id()))?;
         r.ok_or_else(|| anyhow!("chain id not available as app is not up"))
     }
 }
 
 #[async_trait]
-impl <SS> TopdownVoter for AppTopdownVoter<SS> where SS: Blockstore + Clone + 'static + Send + Sync {
-    async fn vote(&self, chain_id: ChainID, height: BlockHeight, parent_view_payload: ParentViewPayload) -> anyhow::Result<()> {
+impl<SS> TopdownVoter for AppTopdownVoter<SS>
+where
+    SS: Blockstore + Clone + 'static + Send + Sync,
+{
+    async fn vote(
+        &self,
+        chain_id: ChainID,
+        height: BlockHeight,
+        parent_view_payload: ParentViewPayload,
+    ) -> anyhow::Result<()> {
         let cp = TopdownCheckpoint {
             parent_height: height as ChainEpoch,
             parent_block_hash: parent_view_payload.0,
             xnet_msgs: parent_view_payload.2,
-            power_changes: parent_view_payload.1
+            power_changes: parent_view_payload.1,
         };
         let calldata = self.gateway_caller.propose_calldata(cp.try_into()?)?;
-        self.broadcaster.fevm_invoke(
-            Address::from(self.gateway_caller.addr()),
-            calldata,
-            chain_id,
-            |s| ChainMessage::Validator(ValidatorMessage::TopdownPropose(s))
-        ).await?;
+        self.broadcaster
+            .fevm_invoke(
+                Address::from(self.gateway_caller.addr()),
+                calldata,
+                chain_id,
+                |s| ChainMessage::Validator(ValidatorMessage::TopdownPropose(s)),
+            )
+            .await?;
         Ok(())
     }
 }

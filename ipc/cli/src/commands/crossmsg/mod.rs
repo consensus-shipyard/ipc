@@ -3,7 +3,7 @@
 use self::fund::{FundWithToken, FundWithTokenArgs, PreFund, PreFundArgs};
 use self::release::{PreRelease, PreReleaseArgs};
 use self::topdown_cross::{
-    LatestParentFinality, LatestParentFinalityArgs, ListTopdownMsgs, ListTopdownMsgsArgs,
+    LatestParentState, LatestParentStateArgs, ListTopdownMsgs, ListTopdownMsgsArgs,
 };
 use crate::commands::crossmsg::fund::Fund;
 use crate::commands::crossmsg::propagate::Propagate;
@@ -38,7 +38,7 @@ impl CrossMsgsCommandsArgs {
             Commands::PreRelease(args) => PreRelease::handle(global, args).await,
             Commands::Propagate(args) => Propagate::handle(global, args).await,
             Commands::ListTopdownMsgs(args) => ListTopdownMsgs::handle(global, args).await,
-            Commands::ParentFinality(args) => LatestParentFinality::handle(global, args).await,
+            Commands::ParentFinality(args) => LatestParentState::handle(global, args).await,
         }
     }
 }
@@ -52,5 +52,5 @@ pub(crate) enum Commands {
     PreRelease(PreReleaseArgs),
     Propagate(PropagateArgs),
     ListTopdownMsgs(ListTopdownMsgsArgs),
-    ParentFinality(LatestParentFinalityArgs),
+    ParentFinality(LatestParentStateArgs),
 }

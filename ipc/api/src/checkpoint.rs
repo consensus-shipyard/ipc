@@ -3,6 +3,7 @@
 //! Cross network messages related struct and utility functions.
 
 use crate::cross::IpcEnvelope;
+use crate::staking::PowerChangeRequest;
 use crate::subnet_id::SubnetID;
 use crate::HumanReadable;
 use cid::multihash::Code;
@@ -18,7 +19,6 @@ use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize, Serializer};
 use serde_with::serde_as;
 use std::fmt::{Display, Formatter};
-use crate::staking::PowerChangeRequest;
 
 lazy_static! {
     // Default CID used for the genesis checkpoint. Using
@@ -60,7 +60,6 @@ pub struct TopdownCheckpoint {
     pub xnet_msgs: Vec<IpcEnvelope>,
     pub power_changes: Vec<PowerChangeRequest>,
 }
-
 
 /// The collection of items for the bottom up checkpoint submission
 #[serde_as]

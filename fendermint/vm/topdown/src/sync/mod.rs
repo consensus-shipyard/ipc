@@ -9,16 +9,16 @@ use crate::proxy::ParentQueryProxy;
 use crate::sync::syncer::LotusParentSyncer;
 use crate::sync::tendermint::TendermintAwareSyncer;
 use crate::{Config, ParentState};
+use async_trait::async_trait;
 use ethers::utils::hex;
+use fvm_shared::chainid::ChainID;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
-use async_trait::async_trait;
-use fvm_shared::chainid::ChainID;
 
 use crate::finality::{ParentViewPayload, TopdownData};
-pub use syncer::fetch_topdown_events;
 use crate::observe::BlockHeight;
+pub use syncer::fetch_topdown_events;
 
 /// Query the parent finality from the child block chain state.
 ///
@@ -109,10 +109,11 @@ pub async fn run_topdown_voting<T, C, P, V>(
             }
         }
     };
-    let latest_committed = query.get_latest_topdown_parent_state()
+    let latest_committed = query
+        .get_latest_topdown_parent_state()
         .expect("app is up but state not available")
         .expect("latest committed parent state should be available, but non");
-    let topdown_data_container =  Arc::new(Mutex::new(TopdownData::new(latest_committed)));
+    let topdown_data_container = Arc::new(Mutex::new(TopdownData::new(latest_committed)));
 
     let lotus_syncer = LotusParentSyncer::new(config, parent_proxy.clone(), topdown_data_container)
         .expect("cannot create lotus parent syncer");
@@ -135,7 +136,15 @@ pub async fn run_topdown_voting<T, C, P, V>(
         loop {
             vote_interval.tick().await;
 
-            if let Err(e) = voting(&tendermint_syncer, &topdown_voter, &query, &parent_proxy, chain_id).await {
+            if let Err(e) = voting(
+                &tendermint_syncer,
+                &topdown_voter,
+                &query,
+                &parent_proxy,
+                chain_id,
+            )
+            .await
+            {
                 tracing::error!(error = e.to_string(), "sync with parent encountered error");
                 continue;
             }

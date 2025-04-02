@@ -16,7 +16,7 @@ use fvm_shared::econ::TokenAmount;
 use fvm_shared::MethodNum;
 
 use fendermint_vm_actor_interface::eam::CreateReturn;
-use fendermint_vm_message::chain::{ChainMessage};
+use fendermint_vm_message::chain::ChainMessage;
 
 use crate::message::{GasParams, SignedMessageFactory};
 use crate::query::{QueryClient, QueryResponse};
@@ -110,7 +110,7 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
         calldata: Bytes,
         value: TokenAmount,
         gas_params: GasParams,
-        f: &F
+        f: &F,
     ) -> anyhow::Result<M::Response<Vec<u8>>> {
         let mf = self.message_factory_mut();
 

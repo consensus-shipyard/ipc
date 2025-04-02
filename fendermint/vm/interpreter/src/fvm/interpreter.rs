@@ -412,9 +412,7 @@ where
                 ValidatorMessage::SignBottomUpCheckpoint(signed) => {
                     execute_bottom_up_signature(state, signed)
                 }
-                ValidatorMessage::TopdownPropose(signed) => {
-                    execute_topdown_propose(state, signed)
-                }
+                ValidatorMessage::TopdownPropose(signed) => execute_topdown_propose(state, signed),
             },
         }
     }

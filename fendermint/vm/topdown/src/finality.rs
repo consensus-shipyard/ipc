@@ -231,7 +231,7 @@ mod tests {
             (103, Some((vec![3; 32], vec![], vec![]))), // delayed height + final height
             (104, Some((vec![4; 32], vec![], vec![]))),
             (105, Some((vec![4; 32], vec![], vec![]))), // cache latest height, first non null block
-            // max proposal height is 106
+                                                        // max proposal height is 106
         ];
         let provider = new_provider(parent_blocks).await;
 
@@ -257,7 +257,7 @@ mod tests {
             (108, None),
             (109, None),
             (110, Some((vec![4; 32], vec![], vec![]))), // cache latest height
-            // max proposal height is 112
+                                                        // max proposal height is 112
         ];
         let mut provider = new_provider(parent_blocks).await;
         provider.config.max_proposal_range = Some(8);
@@ -278,7 +278,7 @@ mod tests {
             (108, None), // delayed block
             (109, Some((vec![8; 32], vec![], vec![]))),
             (110, Some((vec![10; 32], vec![], vec![]))), // cache latest height, first non null block
-            // max proposal height is 112
+                                                         // max proposal height is 112
         ];
         let mut provider = new_provider(parent_blocks).await;
         provider.config.max_proposal_range = Some(10);
@@ -299,7 +299,7 @@ mod tests {
             (108, None),                                // delayed block
             (109, None),
             (110, Some((vec![10; 32], vec![], vec![]))), // cache latest height, first non null block
-            // max proposal height is 112
+                                                         // max proposal height is 112
         ];
         let mut provider = new_provider(parent_blocks).await;
         provider.config.max_proposal_range = Some(10);

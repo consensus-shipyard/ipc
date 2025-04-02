@@ -195,13 +195,21 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
 
         let app_parent_finality_query = Arc::new(AppParentFinalityQuery::new(app.clone()));
         let topdown_voter = AppTopdownVoter::<NamespaceBlockstore>::new(ctx.broadcaster().clone());
-        let parent_proxy = Arc::new(IPCProviderProxyWithLatency::new(make_ipc_provider_proxy(&settings)?));
+        let parent_proxy = Arc::new(IPCProviderProxyWithLatency::new(make_ipc_provider_proxy(
+            &settings,
+        )?));
 
         let client = tendermint_client.clone();
         tokio::spawn(async move {
-            run_topdown_voting(config, app_parent_finality_query, parent_proxy,client, topdown_voter).await
+            run_topdown_voting(
+                config,
+                app_parent_finality_query,
+                parent_proxy,
+                client,
+                topdown_voter,
+            )
+            .await
         });
-
     }
 
     // Start the metrics on a background thread.

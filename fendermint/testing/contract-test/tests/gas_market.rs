@@ -64,14 +64,8 @@ async fn tester_with_upgrader(
 
     let bottom_up_manager = BottomUpManager::new(NeverCallClient, None);
 
-    let interpreter: FvmMessagesInterpreter<MemoryBlockstore, _> = FvmMessagesInterpreter::new(
-        bottom_up_manager,
-        upgrade_scheduler,
-        false,
-        200,
-        1.05,
-        1.05,
-    );
+    let interpreter: FvmMessagesInterpreter<MemoryBlockstore, _> =
+        FvmMessagesInterpreter::new(bottom_up_manager, upgrade_scheduler, false, 200, 1.05, 1.05);
 
     let genesis = Genesis {
         chain_name: CHAIN_NAME.to_string(),

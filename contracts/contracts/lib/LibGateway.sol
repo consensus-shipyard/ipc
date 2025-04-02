@@ -126,36 +126,6 @@ library LibGateway {
         }
     }
 
-    /// @notice obtain the ipc parent finality at certain block number
-    /// @param blockNumber - the block number to obtain the finality
-    function getParentFinality(uint256 blockNumber) internal view returns (ParentFinality memory) {
-        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
-        return s.finalitiesMap[blockNumber];
-    }
-
-    /// @notice obtain the latest committed ipc parent finality
-    function getLatestParentFinality() internal view returns (ParentFinality memory) {
-        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
-        return getParentFinality(s.latestParentHeight);
-    }
-
-    /// @notice commit the ipc parent finality into storage
-    /// @param finality - the finality to be committed
-    function commitParentFinality(
-        ParentFinality calldata finality
-    ) internal returns (ParentFinality memory lastFinality) {
-        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
-
-        uint256 lastHeight = s.latestParentHeight;
-        if (lastHeight >= finality.height) {
-            revert ParentFinalityAlreadyCommitted();
-        }
-        lastFinality = s.finalitiesMap[lastHeight];
-
-        s.finalitiesMap[finality.height] = finality;
-        s.latestParentHeight = finality.height;
-    }
-
     /// @notice set the next membership
     /// @param membership - new membership
     function updateMembership(Membership memory membership) internal {

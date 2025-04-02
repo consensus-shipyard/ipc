@@ -17,7 +17,7 @@ use fendermint_rpc::message::GasParams;
 use fendermint_rpc::query::QueryClient;
 use fendermint_rpc::tx::{CallClient, TxClient, TxSync};
 use fendermint_rpc::{client::FendermintClient, message::SignedMessageFactory};
-use fendermint_vm_message::chain::{ChainMessage};
+use fendermint_vm_message::chain::ChainMessage;
 use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_message::signed::SignedMessage;
 
@@ -173,7 +173,7 @@ where
                 calldata.0.clone(),
                 value,
                 gas_params,
-                &f
+                &f,
             )
             .await
             .context("failed to invoke contract")?;

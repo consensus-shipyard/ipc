@@ -22,7 +22,7 @@ use crate::lotus::message::ipc::SubnetInfo;
 /// Trait to interact with a subnet and handle its lifecycle.
 #[async_trait]
 pub trait SubnetManager:
-    Send + Sync + TopDownFinalityQuery + BottomUpCheckpointRelayer + ValidatorRewarder
+    Send + Sync + TopDownFinalityQuery + BottomUpCheckpointRelayer + ValidatorRewarder + TopDownVoting
 {
     /// Deploys a new subnet actor on the `parent` subnet and with the
     /// configuration passed in `ConstructParams`.
@@ -242,8 +242,6 @@ pub trait TopDownFinalityQuery: Send + Sync {
         subnet_id: &SubnetID,
         epoch: ChainEpoch,
     ) -> Result<TopDownQueryPayload<Vec<PowerChangeRequest>>>;
-    /// Returns the latest parent finality committed in a child subnet
-    async fn latest_parent_finality(&self) -> Result<ChainEpoch>;
 }
 
 #[async_trait]

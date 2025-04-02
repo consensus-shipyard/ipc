@@ -29,8 +29,7 @@ pub(crate) fn execute_topdown_propose<DB: Blockstore + Clone + 'static>(
     state: &mut FvmExecState<DB>,
     signed: SignedMessage,
 ) -> Result<ApplyMessageResponse, ApplyMessageError> {
-    let method_selector =
-        ipc_actors_abis::top_down_voting_facet::ProposeCall::selector();
+    let method_selector = ipc_actors_abis::top_down_voting_facet::ProposeCall::selector();
     execute_validator_message(state, signed, method_selector)
 }
 

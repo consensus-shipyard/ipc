@@ -69,17 +69,6 @@ contract GatewayGetterFacet {
         return s.bottomUpMsgBatches[e];
     }
 
-    /// @notice Returns the parent chain finality information for a given block number.
-    /// @param blockNumber The block number for which to retrieve parent-finality information.
-    function getParentFinality(uint256 blockNumber) external view returns (ParentFinality memory) {
-        return LibGateway.getParentFinality(blockNumber);
-    }
-
-    /// @notice Gets the most recent parent-finality information from the parent.
-    function getLatestParentFinality() external view returns (ParentFinality memory) {
-        return LibGateway.getLatestParentFinality();
-    }
-
     /// @notice Returns the subnet with the given id.
     /// @param subnetId the id of the subnet.
     /// @return found whether the subnet exists.

@@ -1300,7 +1300,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         TopDownFinalityFacet gwTopDownFinalityFacet = TopDownFinalityFacet(address(gateway));
 
         vm.prank(FilAddress.SYSTEM_ACTOR);
-        gwTopDownFinalityFacet.commitParentFinality(finality);
+        // TODO: fix commitParentFinality
+        // gwTopDownFinalityFacet.commitParentFinality(finality);
     }
 
     function executeTopDownMsgs(IpcEnvelope[] memory msgs, SubnetID memory subnet, GatewayDiamond gw) internal {

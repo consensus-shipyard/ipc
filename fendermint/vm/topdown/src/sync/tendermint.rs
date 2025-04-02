@@ -30,7 +30,10 @@ where
         self.inner.set_committed(checkpoint).await
     }
 
-    pub async fn get_vote_below_height(&self, height: BlockHeight) -> Option<(BlockHeight, ParentViewPayload)> {
+    pub async fn get_vote_below_height(
+        &self,
+        height: BlockHeight,
+    ) -> Option<(BlockHeight, ParentViewPayload)> {
         self.inner.get_vote_below_height(height).await
     }
 

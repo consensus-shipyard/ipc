@@ -4,8 +4,8 @@
 //! Type conversion for IPC Agent struct with solidity contract struct
 
 use crate::address::IPCAddress;
-use crate::checkpoint::{BottomUpMsgBatch, TopdownCheckpoint};
 use crate::checkpoint::{consensus, BottomUpCheckpoint, CompressedActivityRollup};
+use crate::checkpoint::{BottomUpMsgBatch, TopdownCheckpoint};
 use crate::cross::{IpcEnvelope, IpcMsgKind};
 use crate::staking::PowerChange;
 use crate::staking::PowerChangeRequest;
@@ -20,7 +20,8 @@ use fvm_shared::econ::TokenAmount;
 use ipc_actors_abis::{
     checkpointing_facet, gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
     lib_gateway, register_subnet_facet, subnet_actor_activity_facet,
-    subnet_actor_checkpointing_facet, subnet_actor_diamond, subnet_actor_getter_facet, xnet_messaging_facet, top_down_voting_facet,
+    subnet_actor_checkpointing_facet, subnet_actor_diamond, subnet_actor_getter_facet,
+    top_down_voting_facet, xnet_messaging_facet,
 };
 
 /// The type conversion for IPC structs to evm solidity contracts. We need this convenient macro because
@@ -375,7 +376,10 @@ impl TryFrom<TopdownCheckpoint> for top_down_voting_facet::TopdownCheckpoint {
 
     fn try_from(checkpoint: TopdownCheckpoint) -> Result<Self, Self::Error> {
         if checkpoint.parent_block_hash.len() != 32 {
-            return Err(anyhow!("invalid block hash length, expecting 32, found {}", checkpoint.parent_block_hash.len()));
+            return Err(anyhow!(
+                "invalid block hash length, expecting 32, found {}",
+                checkpoint.parent_block_hash.len()
+            ));
         }
 
         let mut block_hash = [0u8; 32];
@@ -384,8 +388,16 @@ impl TryFrom<TopdownCheckpoint> for top_down_voting_facet::TopdownCheckpoint {
         Ok(Self {
             height: checkpoint.parent_height as u64,
             block_hash,
-            xnet_msgs: checkpoint.xnet_msgs.into_iter().map(|v| v.try_into()).collect::<anyhow::Result<Vec<_>>>()?,
-            power_changes: checkpoint.power_changes.into_iter().map(|v| v.try_into()).collect::<anyhow::Result<Vec<_>>>()?,
+            xnet_msgs: checkpoint
+                .xnet_msgs
+                .into_iter()
+                .map(|v| v.try_into())
+                .collect::<anyhow::Result<Vec<_>>>()?,
+            power_changes: checkpoint
+                .power_changes
+                .into_iter()
+                .map(|v| v.try_into())
+                .collect::<anyhow::Result<Vec<_>>>()?,
         })
     }
 }
