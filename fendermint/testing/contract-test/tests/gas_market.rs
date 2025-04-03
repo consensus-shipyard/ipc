@@ -3,8 +3,6 @@
 
 mod staking;
 
-use std::sync::Arc;
-
 use async_trait::async_trait;
 use fendermint_actor_gas_market_eip1559::Constants;
 use fendermint_contract_test::Tester;
@@ -20,8 +18,6 @@ use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeScheduler};
 use fendermint_vm_interpreter::fvm::FvmMessagesInterpreter;
 use fendermint_vm_message::chain::ChainMessage;
 use fendermint_vm_message::signed::SignedMessage;
-use fendermint_vm_topdown::voting::VoteTally;
-use fendermint_vm_topdown::Toggle;
 use fvm_shared::chainid::ChainID;
 
 use fvm::executor::{ApplyKind, Executor};

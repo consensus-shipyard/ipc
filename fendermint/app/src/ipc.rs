@@ -11,8 +11,8 @@ use fendermint_vm_interpreter::fvm::state::ipc::GatewayCaller;
 use fendermint_vm_interpreter::fvm::state::{FvmExecState, FvmStateParams};
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
 use fendermint_vm_interpreter::fvm::Broadcaster;
-use fendermint_vm_topdown::sync::{ParentFinalityStateQuery, TopdownVoter};
-use fendermint_vm_topdown::ParentState;
+use fendermint_vm_topdown::sync::FendermintStateQuery;
+use fendermint_vm_topdown::{ParentState, TopdownVoter};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::address::Address;
 use fvm_shared::chainid::ChainID;
@@ -21,7 +21,7 @@ use std::sync::Arc;
 
 use fendermint_vm_interpreter::MessagesInterpreter;
 use fendermint_vm_message::chain::{ChainMessage, ValidatorMessage};
-use fendermint_vm_topdown::finality::ParentViewPayload;
+use fendermint_vm_topdown::cache::ParentViewPayload;
 use ipc_api::checkpoint::TopdownCheckpoint;
 
 pub struct AppTopdownVoter<SS>
@@ -82,7 +82,7 @@ where
     }
 }
 
-impl<DB, SS, S, I> ParentFinalityStateQuery for AppParentFinalityQuery<DB, SS, S, I>
+impl<DB, SS, S, I> FendermintStateQuery for AppParentFinalityQuery<DB, SS, S, I>
 where
     S: KVStore
         + Codec<AppState>

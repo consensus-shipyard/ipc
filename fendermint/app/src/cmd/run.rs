@@ -28,7 +28,7 @@ use tracing::info;
 use crate::cmd::key::read_secret_key;
 use crate::{cmd, options::run::RunArgs, settings::Settings};
 use fendermint_app::observe::register_metrics as register_consensus_metrics;
-use fendermint_vm_topdown::sync::run_topdown_voting;
+use fendermint_vm_topdown::run_topdown_voting;
 
 cmd! {
   RunArgs(self, settings) {

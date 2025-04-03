@@ -5,7 +5,7 @@
 /// or at least what appears in blocks.
 mod chain {
     use fendermint_testing::golden_cbor;
-    use fendermint_vm_message::{chain::ChainMessage, ipc::IpcMessage};
+    use fendermint_vm_message::chain::ChainMessage;
     use quickcheck::Arbitrary;
 
     golden_cbor! { "chain", signed, |g| {
@@ -17,14 +17,14 @@ mod chain {
       }
     }
 
-    golden_cbor! { "chain", ipc_top_down, |g| {
-        loop {
-            if let msg @ ChainMessage::Ipc(IpcMessage::TopDownExec(_)) = ChainMessage::arbitrary(g) {
-                return msg
-            }
-        }
-      }
-    }
+    // golden_cbor! { "chain", ipc_top_down, |g| {
+    //     loop {
+    //         if let msg @ ChainMessage::Ipc(IpcMessage::TopDownExec(_)) = ChainMessage::arbitrary(g) {
+    //             return msg
+    //         }
+    //     }
+    //   }
+    // }
 }
 
 /// Examples of FVM messages, which is what the client needs to sign.

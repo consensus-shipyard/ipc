@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! The tendermint aware syncer
 
-use crate::finality::ParentViewPayload;
+use crate::cache::ParentViewPayload;
 use crate::proxy::ParentQueryProxy;
 use crate::sync::syncer::LotusParentSyncer;
 use crate::{BlockHeight, ParentState};
@@ -30,15 +30,8 @@ where
         self.inner.set_committed(checkpoint).await
     }
 
-    pub async fn get_vote_below_height(
-        &self,
-        height: BlockHeight,
-    ) -> Option<(BlockHeight, ParentViewPayload)> {
-        self.inner.get_vote_below_height(height).await
-    }
-
-    pub async fn latest_height(&self) -> BlockHeight {
-        self.inner.latest_height().await
+    pub async fn fetched_first_non_null_block(&self) -> Option<(BlockHeight, ParentViewPayload)> {
+        self.inner.fetched_first_non_null_block().await
     }
 
     /// Sync with the parent, unless CometBFT is still catching up with the network,

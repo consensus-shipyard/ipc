@@ -397,10 +397,6 @@ mod tests {
         Settings::parse(c)
     }
 
-    fn parse_config(run_mode: &str) -> Settings {
-        try_parse_config(run_mode).expect("failed to parse Settings")
-    }
-
     #[test]
     fn compaction_to_string() {
         assert_eq!(DbCompaction::Level.to_string(), "level");
