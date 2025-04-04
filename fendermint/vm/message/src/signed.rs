@@ -148,7 +148,7 @@ impl SignedMessage {
         // We detect the case where the recipient is not an ethereum address. If that is the case then use regular signing rules,
         // which should allow messages from ethereum accounts to go to any other type of account, e.g. custom Wasm actors.
         match maybe_eth_address(&message.from) {
-            Some(addr) if is_eth_addr_compat_no_masked(&message.to) => {
+            Some(addr) if is_eth_addr_compat(&message.to) => {
                 let tx: TypedTransaction = from_fvm::to_eth_eip1559_request(message, chain_id)
                     .map_err(SignedMessageError::Ethereum)?
                     .into();
@@ -226,7 +226,7 @@ impl SignedMessage {
             )));
         };
 
-        if !is_eth_addr_compat_no_masked(&message.to) {
+        if !is_eth_addr_compat(&message.to) {
             let mut data = Self::cid(message)?.to_bytes();
             data.extend(chain_id_bytes(chain_id).iter());
 
@@ -364,11 +364,6 @@ fn maybe_eth_address(addr: &Address) -> Option<et::H160> {
 /// Check if the address can be converted to an Ethereum one.
 fn is_eth_addr_compat(addr: &Address) -> bool {
     from_fvm::to_eth_address(addr, true).is_ok()
-}
-
-/// Check if the address can be converted to a non-masked Ethereum one.
-fn is_eth_addr_compat_no_masked(addr: &Address) -> bool {
-    from_fvm::to_eth_address(addr, false).is_ok()
 }
 
 /// Check if the address is an Ethereum delegated one.
