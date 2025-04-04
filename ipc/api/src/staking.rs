@@ -13,7 +13,7 @@ use std::fmt::{Display, Formatter};
 
 pub type ConfigurationNumber = u64;
 
-#[derive(Clone, Debug, num_enum::TryFromPrimitive, Deserialize, Serialize)]
+#[derive(Clone, Debug, num_enum::TryFromPrimitive, Deserialize, Serialize, PartialEq, Eq)]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum PowerOperation {
@@ -21,14 +21,14 @@ pub enum PowerOperation {
     SetPower = 1,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PowerChangeRequest {
     pub configuration_number: ConfigurationNumber,
     pub change: PowerChange,
 }
 
 /// The change request to validator staking
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PowerChange {
     pub op: PowerOperation,
     pub payload: Vec<u8>,

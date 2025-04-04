@@ -1,32 +1,30 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-mod cache;
 mod error;
-mod finality;
 pub mod sync;
 
-pub mod convert;
 pub mod proxy;
-mod toggle;
-pub mod voting;
 
+pub mod cache;
 pub mod observe;
 
-use async_stm::Stm;
+use crate::cache::{ParentViewPayload, TopdownViewContainer};
 use async_trait::async_trait;
 use ethers::utils::hex;
+use fvm_shared::chainid::ChainID;
 use fvm_shared::clock::ChainEpoch;
-use ipc_api::cross::IpcEnvelope;
-use ipc_api::staking::PowerChangeRequest;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
+use std::sync::Arc;
 use std::time::Duration;
+use sync::syncer::LotusParentSyncer;
+use sync::tendermint::TendermintAwareSyncer;
+use tokio::sync::Mutex;
 
-pub use crate::cache::{SequentialAppendError, SequentialKeyCache, ValueIter};
 pub use crate::error::Error;
-pub use crate::finality::CachedFinalityProvider;
-pub use crate::toggle::Toggle;
+use crate::proxy::ParentQueryProxy;
+use crate::sync::FendermintStateQuery;
 
 pub type BlockHeight = u64;
 pub type Bytes = Vec<u8>;
@@ -34,10 +32,7 @@ pub type BlockHash = Bytes;
 
 /// The null round error message
 pub(crate) const NULL_ROUND_ERR_MSG: &str = "requested epoch was a null round";
-/// Default topdown proposal height range
-pub(crate) const DEFAULT_MAX_PROPOSAL_RANGE: BlockHeight = 100;
 pub(crate) const DEFAULT_MAX_CACHE_BLOCK: BlockHeight = 500;
-pub(crate) const DEFAULT_PROPOSAL_DELAY: BlockHeight = 2;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
@@ -48,57 +43,28 @@ pub struct Config {
     pub chain_head_delay: BlockHeight,
     /// Parent syncing cron period, in seconds
     pub polling_interval: Duration,
-    /// Top down exponential back off retry base
-    pub exponential_back_off: Duration,
-    /// The max number of retries for exponential backoff before giving up
-    pub exponential_retry_limit: usize,
-    /// The max number of blocks one should make the topdown proposal
-    pub max_proposal_range: Option<BlockHeight>,
+    /// Parent voting cron period, in seconds
+    pub vote_interval: Duration,
     /// Max number of blocks that should be stored in cache
     pub max_cache_blocks: Option<BlockHeight>,
-    pub proposal_delay: Option<BlockHeight>,
 }
 
 impl Config {
     pub fn new(
         chain_head_delay: BlockHeight,
         polling_interval: Duration,
-        exponential_back_off: Duration,
-        exponential_retry_limit: usize,
+        vote_interval: Duration,
     ) -> Self {
         Self {
             chain_head_delay,
             polling_interval,
-            exponential_back_off,
-            exponential_retry_limit,
-            max_proposal_range: None,
+            vote_interval,
             max_cache_blocks: None,
-            proposal_delay: None,
         }
     }
 
-    pub fn with_max_proposal_range(mut self, max_proposal_range: BlockHeight) -> Self {
-        self.max_proposal_range = Some(max_proposal_range);
-        self
-    }
-
-    pub fn with_proposal_delay(mut self, proposal_delay: BlockHeight) -> Self {
-        self.proposal_delay = Some(proposal_delay);
-        self
-    }
-
-    pub fn with_max_cache_blocks(mut self, max_cache_blocks: BlockHeight) -> Self {
-        self.max_cache_blocks = Some(max_cache_blocks);
-        self
-    }
-
-    pub fn max_proposal_range(&self) -> BlockHeight {
-        self.max_proposal_range
-            .unwrap_or(DEFAULT_MAX_PROPOSAL_RANGE)
-    }
-
-    pub fn proposal_delay(&self) -> BlockHeight {
-        self.proposal_delay.unwrap_or(DEFAULT_PROPOSAL_DELAY)
+    pub fn with_max_cache_blocks(&mut self, blocks: BlockHeight) {
+        self.max_cache_blocks = Some(blocks);
     }
 
     pub fn max_cache_blocks(&self) -> BlockHeight {
@@ -108,7 +74,7 @@ impl Config {
 
 /// The finality view for IPC parent at certain height.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct IPCParentFinality {
+pub struct ParentState {
     /// The latest chain height
     pub height: BlockHeight,
     /// The block hash. For FVM, it is a Cid. For Evm, it is bytes32 as one can now potentially
@@ -116,7 +82,7 @@ pub struct IPCParentFinality {
     pub block_hash: BlockHash,
 }
 
-impl IPCParentFinality {
+impl ParentState {
     pub fn new(height: ChainEpoch, hash: BlockHash) -> Self {
         Self {
             height: height as BlockHeight,
@@ -125,7 +91,7 @@ impl IPCParentFinality {
     }
 }
 
-impl Display for IPCParentFinality {
+impl Display for ParentState {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -136,54 +102,119 @@ impl Display for IPCParentFinality {
     }
 }
 
-#[async_trait]
-pub trait ParentViewProvider {
-    /// Obtain the genesis epoch of the current subnet in the parent
-    fn genesis_epoch(&self) -> anyhow::Result<BlockHeight>;
-    /// Get the validator changes from and to height.
-    async fn validator_changes_from(
-        &self,
-        from: BlockHeight,
-        to: BlockHeight,
-    ) -> anyhow::Result<Vec<PowerChangeRequest>>;
-    /// Get the top down messages from and to height.
-    async fn top_down_msgs_from(
-        &self,
-        from: BlockHeight,
-        to: BlockHeight,
-    ) -> anyhow::Result<Vec<IpcEnvelope>>;
-}
-
-pub trait ParentFinalityProvider: ParentViewProvider {
-    /// Latest proposal for parent finality
-    fn next_proposal(&self) -> Stm<Option<IPCParentFinality>>;
-    /// Check if the target proposal is valid
-    fn check_proposal(&self, proposal: &IPCParentFinality) -> Stm<bool>;
-    /// Called when finality is committed
-    fn set_new_finality(&self, finality: IPCParentFinality) -> Stm<()>;
-}
-
-/// If res is null round error, returns the default value from f()
-pub(crate) fn handle_null_round<T, F: FnOnce() -> T>(
-    res: anyhow::Result<T>,
-    f: F,
-) -> anyhow::Result<T> {
-    match res {
-        Ok(t) => Ok(t),
-        Err(e) => {
-            if is_null_round_error(&e) {
-                Ok(f())
-            } else {
-                Err(e)
-            }
-        }
-    }
-}
-
-pub(crate) fn is_null_round_error(err: &anyhow::Error) -> bool {
-    is_null_round_str(&err.to_string())
-}
-
+/// checks if the error is a filecoin null round error
 pub(crate) fn is_null_round_str(s: &str) -> bool {
     s.contains(NULL_ROUND_ERR_MSG)
+}
+
+/// Start the parent finality listener in the background
+pub async fn run_topdown_voting<T, C, P, V>(
+    config: Config,
+    query: Arc<T>,
+    parent_proxy: Arc<P>,
+    tendermint_client: C,
+    topdown_voter: V,
+) where
+    T: FendermintStateQuery + Send + Sync + 'static,
+    C: tendermint_rpc::Client + Send + Sync + 'static,
+    P: ParentQueryProxy + Send + Sync + 'static,
+    V: TopdownVoter + Send + Sync + 'static,
+{
+    let mut sync_interval = tokio::time::interval(config.polling_interval);
+    sync_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+    let mut vote_interval = tokio::time::interval(config.vote_interval);
+    vote_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+    let chain_id = loop {
+        match query.get_chain_id() {
+            Ok(chain_id) => break chain_id,
+            Err(e) => {
+                tracing::info!("app not up yet: {e}, sleep and retry");
+                vote_interval.tick().await;
+            }
+        }
+    };
+    let latest_committed = query
+        .get_latest_topdown_parent_state()
+        .expect("app is up but state not available")
+        .expect("latest committed parent state should be available, but non");
+    let topdown_data_container = Arc::new(Mutex::new(TopdownViewContainer::new(latest_committed)));
+
+    let lotus_syncer = LotusParentSyncer::new(config, parent_proxy.clone(), topdown_data_container)
+        .expect("cannot create lotus parent syncer");
+    let tendermint_syncer = Arc::new(TendermintAwareSyncer::new(lotus_syncer, tendermint_client));
+
+    let syncer = tendermint_syncer.clone();
+    tokio::spawn(async move {
+        loop {
+            sync_interval.tick().await;
+
+            if let Err(e) = syncer.sync().await {
+                tracing::error!(error = e.to_string(), "sync with parent encountered error");
+                continue;
+            }
+        }
+    });
+
+    // setup voting loop
+    tokio::spawn(async move {
+        loop {
+            vote_interval.tick().await;
+
+            if let Err(e) = voting(
+                &tendermint_syncer,
+                &topdown_voter,
+                &query,
+                &parent_proxy,
+                chain_id,
+            )
+            .await
+            {
+                tracing::error!(error = e.to_string(), "sync with parent encountered error");
+                continue;
+            }
+        }
+    });
+}
+
+async fn voting<T, C, P, V>(
+    syncer: &Arc<TendermintAwareSyncer<C, P>>,
+    voter: &V,
+    query: &Arc<T>,
+    parent_proxy: &Arc<P>,
+    chain_id: ChainID,
+) -> anyhow::Result<()>
+where
+    T: FendermintStateQuery + Send + Sync + 'static,
+    C: tendermint_rpc::Client + Send + Sync + 'static,
+    P: ParentQueryProxy + Send + Sync + 'static,
+    V: TopdownVoter + Send + Sync + 'static,
+{
+    let finalized_checkpoint = sync::query_starting_parent_state(query, parent_proxy).await?;
+    syncer.set_committed(finalized_checkpoint).await;
+
+    let Some((h, payload)) = syncer.fetched_first_non_null_block().await else {
+        tracing::debug!("topdown syncer not fetched new data");
+        return Ok(());
+    };
+    if payload.1.is_empty() && payload.0.is_empty() {
+        tracing::debug!(
+            height = h,
+            "no topdown messages nor validator changes, skip"
+        );
+        return Ok(());
+    }
+    voter.vote(chain_id, h, payload).await
+}
+
+/// A trait that will be called by validators to
+#[async_trait]
+pub trait TopdownVoter {
+    async fn vote(
+        &self,
+        chain_id: ChainID,
+        height: observe::BlockHeight,
+        parent_view_payload: ParentViewPayload,
+    ) -> anyhow::Result<()>;
 }

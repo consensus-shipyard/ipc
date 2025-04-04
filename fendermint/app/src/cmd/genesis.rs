@@ -337,9 +337,9 @@ async fn new_genesis_from_parent(
     args: &GenesisFromParentArgs,
 ) -> anyhow::Result<()> {
     // provider with the parent.
-    let parent_provider = IpcProvider::new_with_subnet(
+    let parent_provider = IpcProvider::new_with_subnets(
         None,
-        ipc_provider::config::Subnet {
+        vec![ipc_provider::config::Subnet {
             id: args
                 .subnet_id
                 .parent()
@@ -351,7 +351,7 @@ async fn new_genesis_from_parent(
                 registry_addr: args.parent_registry,
                 gateway_addr: args.parent_gateway,
             }),
-        },
+        }],
     )?;
 
     let genesis_info = parent_provider.get_genesis_info(&args.subnet_id).await?;

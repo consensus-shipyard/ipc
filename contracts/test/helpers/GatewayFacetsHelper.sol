@@ -6,6 +6,7 @@ import {GatewayGetterFacet} from "../../contracts/gateway/GatewayGetterFacet.sol
 import {GatewayManagerFacet} from "../../contracts/gateway/GatewayManagerFacet.sol";
 import {GatewayMessengerFacet} from "../../contracts/gateway/GatewayMessengerFacet.sol";
 import {TopDownFinalityFacet} from "../../contracts/gateway/router/TopDownFinalityFacet.sol";
+import {TopDownVotingFacet} from "../../contracts/gateway/router/TopDownVotingFacet.sol";
 import {CheckpointingFacet} from "../../contracts/gateway/router/CheckpointingFacet.sol";
 import {XnetMessagingFacet} from "../../contracts/gateway/router/XnetMessagingFacet.sol";
 import {GatewayDiamond} from "../../contracts/GatewayDiamond.sol";
@@ -38,6 +39,11 @@ library GatewayFacetsHelper {
         return facet;
     }
 
+    function topDownVoting(address gw) internal pure returns (TopDownVotingFacet) {
+        TopDownVotingFacet facet = TopDownVotingFacet(gw);
+        return facet;
+    }
+
     function checkpointer(address gw) internal pure returns (CheckpointingFacet) {
         CheckpointingFacet facet = CheckpointingFacet(gw);
         return facet;
@@ -46,6 +52,10 @@ library GatewayFacetsHelper {
     function xnetMessenger(address gw) internal pure returns (XnetMessagingFacet) {
         XnetMessagingFacet facet = XnetMessagingFacet(gw);
         return facet;
+    }
+
+    function topDownVoting(GatewayDiamond gw) internal pure returns (TopDownVotingFacet) {
+        return topDownVoting(address(gw));
     }
 
     function ownership(GatewayDiamond gw) internal pure returns (OwnershipFacet) {

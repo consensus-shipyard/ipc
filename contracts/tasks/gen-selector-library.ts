@@ -27,6 +27,7 @@ task('gen-selector-library', 'Generates a Solidity library with contract selecto
             'GatewayMessengerFacet',
             'CheckpointingFacet',
             'TopDownFinalityFacet',
+            'TopDownVotingFacet',
             'XnetMessagingFacet',
             'SubnetActorGetterFacet',
             'SubnetActorManagerFacet',

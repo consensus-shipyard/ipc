@@ -97,12 +97,14 @@ impl IpcProvider {
 
     /// Initializes a new `IpcProvider` configured to interact with
     /// a single subnet.
-    pub fn new_with_subnet(
+    pub fn new_with_subnets(
         keystore_path: Option<String>,
-        subnet: config::Subnet,
+        subnets: Vec<config::Subnet>,
     ) -> anyhow::Result<Self> {
         let mut config = Config::new();
-        config.add_subnet(subnet);
+        for subnet in subnets {
+            config.add_subnet(subnet);
+        }
         let config = Arc::new(config);
 
         if let Some(repo_path) = keystore_path {
@@ -722,11 +724,10 @@ impl IpcProvider {
         conn.manager().list_bootstrap_nodes(subnet).await
     }
 
-    /// Returns the latest finality from the parent committed in a child subnet.
-    pub async fn latest_parent_finality(&self, subnet: &SubnetID) -> anyhow::Result<ChainEpoch> {
+    /// Returns the latest parent state from the parent committed in a child subnet.
+    pub async fn latest_parent_state(&self, subnet: &SubnetID) -> anyhow::Result<ChainEpoch> {
         let conn = self.get_connection(subnet)?;
-
-        conn.manager().latest_parent_finality().await
+        Ok(conn.manager().latest_committed().await?.0)
     }
 
     pub async fn set_federated_power(

@@ -175,9 +175,9 @@ pub struct TopDownSettings {
     /// Parent syncing cron period, in seconds
     #[serde_as(as = "DurationSeconds<u64>")]
     pub polling_interval: Duration,
-    /// Top down exponential back off retry base
+    /// Validator voting cron period, in seconds
     #[serde_as(as = "DurationSeconds<u64>")]
-    pub exponential_back_off: Duration,
+    pub voting_interval: Duration,
     /// The max number of retries for exponential backoff before giving up
     pub exponential_retry_limit: usize,
     /// The parent rpc http endpoint
@@ -369,12 +369,6 @@ impl Settings {
     pub fn topdown_enabled(&self) -> bool {
         !self.ipc.subnet_id.is_root() && self.ipc.topdown.is_some()
     }
-
-    /// Indicate whether we have configured the IPLD Resolver to run.
-    pub fn resolver_enabled(&self) -> bool {
-        !self.resolver.connection.listen_addr.is_empty()
-            && self.ipc.subnet_id != *ipc_api::subnet_id::UNDEF
-    }
 }
 
 // Run these tests serially because some of them modify the environment.
@@ -401,22 +395,6 @@ mod tests {
         // which is why `#[serial]` was moved to the top.
         eprintln!("CONFIG = {:?}", c.cache);
         Settings::parse(c)
-    }
-
-    fn parse_config(run_mode: &str) -> Settings {
-        try_parse_config(run_mode).expect("failed to parse Settings")
-    }
-
-    #[test]
-    fn parse_default_config() {
-        let settings = parse_config("");
-        assert!(!settings.resolver_enabled());
-    }
-
-    #[test]
-    fn parse_test_config() {
-        let settings = parse_config("test");
-        assert!(settings.resolver_enabled());
     }
 
     #[test]

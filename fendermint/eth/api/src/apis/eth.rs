@@ -1008,12 +1008,6 @@ where
                                 continue;
                             }
                         }
-                        Ok(ChainMessage::Ipc(_)) => {
-                            // ipc messages are system messages, no need to check from and to
-                            if addrs_disjoint_from_emitters {
-                                continue;
-                            }
-                        }
                         _ => continue,
                     };
 
