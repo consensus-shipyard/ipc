@@ -3,10 +3,27 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::Error;
-use fendermint_actor_blobs_shared::state::Hash;
-use recall_actor_sdk::TryIntoEVMEvent;
+use fendermint_actor_blobs_shared::state::{Hash, PublicKey};
+use fil_actors_runtime::runtime::Runtime;
+use fil_actors_runtime::{actor_error, ActorError};
+use fvm_shared::clock::ChainEpoch;
+use num_traits::Zero;
+use recall_actor_sdk::{declare_abi_call, TryIntoEVMEvent};
 use recall_sol_facade::bucket as sol;
+use recall_sol_facade::types::{SolCall, SolInterface};
 use std::collections::HashMap;
+use std::string::ToString;
+
+pub use recall_sol_facade::bucket::Calls;
+
+use crate::{
+    AddParams, DeleteParams, GetParams, ListObjectsReturn, ListParams, Object,
+    UpdateObjectMetadataParams,
+};
+
+declare_abi_call!();
+
+// ----- Events ----- //
 
 pub struct ObjectAdded<'a> {
     pub key: &'a Vec<u8>,
@@ -77,5 +94,316 @@ impl TryIntoEVMEvent for ObjectDeleted<'_> {
             key: self.key.clone().into(),
             blobHash: self.blob_hash.0.into(),
         }))
+    }
+}
+
+// ----- Calls ----- //
+
+pub fn can_handle(input_data: &recall_actor_sdk::InputData) -> bool {
+    Calls::valid_selector(input_data.selector())
+}
+
+pub fn parse_input(input: &recall_actor_sdk::InputData) -> Result<Calls, ActorError> {
+    Calls::abi_decode_raw(input.selector(), input.calldata(), true)
+        .map_err(|e| actor_error!(illegal_argument, format!("invalid call: {}", e)))
+}
+
+impl AbiCallRuntime for sol::addObject_0Call {
+    type Params = AddParams;
+    type Returns = ();
+    type Output = Vec<u8>;
+
+    fn params(&self, rt: &impl Runtime) -> Self::Params {
+        let source = PublicKey(self.source.into());
+        let key: Vec<u8> = self.key.clone().into_bytes();
+        let hash = Hash(self.hash.into());
+        let recovery_hash = Hash(self.recoveryHash.into());
+        let size = self.size;
+        let from = rt.message().caller();
+        AddParams {
+            source,
+            key,
+            hash,
+            recovery_hash,
+            size,
+            ttl: None,
+            metadata: HashMap::default(),
+            overwrite: false,
+            from,
+        }
+    }
+
+    fn returns(&self, returns: Self::Returns) -> Self::Output {
+        Self::abi_encode_returns(&returns)
+    }
+}
+
+impl AbiCallRuntime for sol::addObject_1Call {
+    type Params = AddParams;
+    type Returns = ();
+    type Output = Vec<u8>;
+    fn params(&self, rt: &impl Runtime) -> Self::Params {
+        let source = PublicKey(self.source.into());
+        let key: Vec<u8> = self.key.clone().into_bytes();
+        let hash = Hash(self.hash.into());
+        let recovery_hash = Hash(self.recoveryHash.into());
+        let size = self.size;
+        let ttl = if self.ttl.clone().is_zero() {
+            None
+        } else {
+            Some(self.ttl as ChainEpoch)
+        };
+        let mut metadata: HashMap<String, String> = HashMap::with_capacity(self.metadata.len());
+        for kv in self.metadata.iter().cloned() {
+            metadata.insert(kv.key, kv.value);
+        }
+        let overwrite = self.overwrite;
+        let from = rt.message().caller();
+        AddParams {
+            source,
+            key,
+            hash,
+            recovery_hash,
+            size,
+            ttl,
+            metadata,
+            overwrite,
+            from,
+        }
+    }
+    fn returns(&self, returns: Self::Returns) -> Self::Output {
+        Self::abi_encode_returns(&returns)
+    }
+}
+
+impl AbiCallRuntime for sol::deleteObjectCall {
+    type Params = DeleteParams;
+    type Returns = ();
+    type Output = Vec<u8>;
+
+    fn params(&self, rt: &impl Runtime) -> Self::Params {
+        let key: Vec<u8> = self.key.clone().into_bytes();
+        let from = rt.message().caller();
+        DeleteParams { key, from }
+    }
+
+    fn returns(&self, returns: Self::Returns) -> Self::Output {
+        Self::abi_encode_returns(&returns)
+    }
+}
+
+impl AbiCall for sol::getObjectCall {
+    type Params = GetParams;
+    type Returns = Option<Object>;
+    type Output = Vec<u8>;
+
+    fn params(&self) -> Self::Params {
+        let key = self.key.clone().into_bytes();
+        GetParams(key)
+    }
+
+    fn returns(&self, returns: Self::Returns) -> Self::Output {
+        let object = returns
+            .map(|object| sol::ObjectValue {
+                blobHash: object.hash.0.into(),
+                recoveryHash: object.recovery_hash.0.into(),
+                size: object.size,
+                expiry: object.expiry as u64,
+                metadata: sol_metadata(object.metadata),
+            })
+            .unwrap_or(sol::ObjectValue {
+                blobHash: [0u8; 32].into(),
+                recoveryHash: [0u8; 32].into(),
+                size: 0,
+                expiry: 0,
+                metadata: vec![],
+            });
+        Self::abi_encode_returns(&(object,))
+    }
+}
+
+fn sol_metadata(metadata: HashMap<String, String>) -> Vec<sol::KeyValue> {
+    metadata
+        .iter()
+        .map(|(k, v)| sol::KeyValue {
+            key: k.clone(),
+            value: v.clone(),
+        })
+        .collect()
+}
+
+fn sol_query(list: ListObjectsReturn) -> sol::Query {
+    sol::Query {
+        objects: list
+            .objects
+            .iter()
+            .map(|(key, object_state)| sol::Object {
+                key: String::from_utf8_lossy(key.as_slice()).to_string(),
+                state: sol::ObjectState {
+                    blobHash: object_state.hash.0.into(),
+                    size: object_state.size,
+                    expiry: object_state.expiry as u64,
+                    metadata: sol_metadata(object_state.metadata.clone()),
+                },
+            })
+            .collect(),
+        commonPrefixes: list
+            .common_prefixes
+            .iter()
+            .map(|prefix| String::from_utf8_lossy(prefix.as_slice()).to_string())
+            .collect(),
+        nextKey: list
+            .next_key
+            .map(|k| String::from_utf8_lossy(k.as_slice()).to_string())
+            .unwrap_or_default(),
+    }
+}
+
+const DEFAULT_DELIMITER: &[u8] = b"/"; // "/" in ASCII and UTF-8
+const DEFAULT_START_KEY: Vec<u8> = vec![]; //= ""
+const DEFAULT_LIMIT: u64 = 0;
+
+impl AbiCall for sol::queryObjects_0Call {
+    type Params = ListParams;
+    type Returns = ListObjectsReturn;
+    type Output = Vec<u8>;
+
+    fn params(&self) -> Self::Params {
+        let prefix = self.prefix.clone().into_bytes();
+        let delimiter = self.delimiter.clone().into_bytes();
+        let start_key = self.startKey.clone().into_bytes();
+        let limit = self.limit;
+        ListParams {
+            prefix,
+            delimiter,
+            start_key: Some(start_key),
+            limit,
+        }
+    }
+
+    fn returns(&self, returns: Self::Returns) -> Self::Output {
+        let query = sol_query(returns);
+        Self::abi_encode_returns(&(query,))
+    }
+}
+
+impl AbiCall for sol::queryObjects_1Call {
+    type Params = ListParams;
+    type Returns = ListObjectsReturn;
+    type Output = Vec<u8>;
+
+    fn params(&self) -> Self::Params {
+        let prefix = self.prefix.clone().into_bytes();
+        let delimiter = self.delimiter.clone().into_bytes();
+        let start_key = self.startKey.clone().into_bytes();
+        let limit = DEFAULT_LIMIT;
+        ListParams {
+            prefix,
+            delimiter,
+            start_key: Some(start_key),
+            limit,
+        }
+    }
+
+    fn returns(&self, returns: Self::Returns) -> Self::Output {
+        let query = sol_query(returns);
+        Self::abi_encode_returns(&(query,))
+    }
+}
+
+impl AbiCall for sol::queryObjects_2Call {
+    type Params = ListParams;
+    type Returns = ListObjectsReturn;
+    type Output = Vec<u8>;
+
+    fn params(&self) -> Self::Params {
+        let prefix = self.prefix.clone().into_bytes();
+        let delimiter = DEFAULT_DELIMITER.to_vec();
+        let start_key = DEFAULT_START_KEY;
+        let limit = DEFAULT_LIMIT;
+        ListParams {
+            prefix,
+            delimiter,
+            start_key: Some(start_key),
+            limit,
+        }
+    }
+
+    fn returns(&self, returns: Self::Returns) -> Self::Output {
+        let query = sol_query(returns);
+        Self::abi_encode_returns(&(query,))
+    }
+}
+
+impl AbiCall for sol::queryObjects_3Call {
+    type Params = ListParams;
+    type Returns = ListObjectsReturn;
+    type Output = Vec<u8>;
+
+    fn params(&self) -> Self::Params {
+        let prefix = "".to_string().into_bytes();
+        let delimiter = "/".to_string().into_bytes();
+        let start_key = "".to_string().into_bytes();
+        let limit = 0;
+        ListParams {
+            prefix,
+            delimiter,
+            start_key: Some(start_key),
+            limit,
+        }
+    }
+
+    fn returns(&self, returns: Self::Returns) -> Self::Output {
+        let query = sol_query(returns);
+        Self::abi_encode_returns(&(query,))
+    }
+}
+
+impl AbiCall for sol::queryObjects_4Call {
+    type Params = ListParams;
+    type Returns = ListObjectsReturn;
+    type Output = Vec<u8>;
+
+    fn params(&self) -> Self::Params {
+        let prefix = self.prefix.clone().into_bytes();
+        let delimiter = self.delimiter.clone().into_bytes();
+        let start_key = DEFAULT_START_KEY;
+        let limit = DEFAULT_LIMIT;
+        ListParams {
+            prefix,
+            delimiter,
+            start_key: Some(start_key),
+            limit,
+        }
+    }
+
+    fn returns(&self, returns: Self::Returns) -> Self::Output {
+        let query = sol_query(returns);
+        Self::abi_encode_returns(&(query,))
+    }
+}
+
+impl AbiCallRuntime for sol::updateObjectMetadataCall {
+    type Params = UpdateObjectMetadataParams;
+    type Returns = ();
+    type Output = Vec<u8>;
+
+    fn params(&self, rt: &impl Runtime) -> Self::Params {
+        let mut metadata: HashMap<String, Option<String>> = HashMap::default();
+        for kv in self.metadata.iter().cloned() {
+            let key = kv.key;
+            let value = kv.value;
+            let value = if value.is_empty() { None } else { Some(value) };
+            metadata.insert(key, value);
+        }
+        UpdateObjectMetadataParams {
+            key: self.key.clone().into_bytes(),
+            metadata,
+            from: rt.message().caller(),
+        }
+    }
+
+    fn returns(&self, returns: Self::Returns) -> Self::Output {
+        Self::abi_encode_returns(&returns)
     }
 }

@@ -16,14 +16,18 @@ use fil_actors_runtime::{
 };
 
 use fvm_shared::address::Address;
-use recall_actor_sdk::{emit_evm_event, require_addr_is_origin_or_caller, to_id_address};
+use recall_actor_sdk::{
+    emit_evm_event, require_addr_is_origin_or_caller, to_id_address, InputData,
+    InvokeContractParams, InvokeContractReturn,
+};
 use recall_ipld::hamt::BytesKey;
 
 use crate::shared::{
     AddParams, DeleteParams, GetParams, ListObjectsReturn, ListParams, Method, Object,
     BUCKET_ACTOR_NAME,
 };
-use crate::sol_facade::{ObjectAdded, ObjectDeleted, ObjectMetadataUpdated};
+use crate::sol_facade as sol;
+use crate::sol_facade::{AbiCall, AbiCallRuntime};
 use crate::state::{ObjectState, State};
 use crate::{
     UpdateObjectMetadataParams, MAX_METADATA_ENTRIES, MAX_METADATA_KEY_SIZE,
@@ -107,7 +111,7 @@ impl Actor {
 
         emit_evm_event(
             rt,
-            ObjectAdded::new(&params.key, &params.hash, &params.metadata),
+            sol::ObjectAdded::new(&params.key, &params.hash, &params.metadata),
         )?;
 
         Ok(Object {
@@ -144,7 +148,7 @@ impl Actor {
 
         rt.transaction(|st: &mut State, rt| st.delete(rt.store(), &key))?;
 
-        emit_evm_event(rt, ObjectDeleted::new(&key, &object.hash))?;
+        emit_evm_event(rt, sol::ObjectDeleted::new(&key, &object.hash))?;
 
         Ok(())
     }
@@ -268,9 +272,83 @@ impl Actor {
             Ok(object.metadata)
         })?;
 
-        emit_evm_event(rt, ObjectMetadataUpdated::new(&params.key, &metadata))?;
+        emit_evm_event(rt, sol::ObjectMetadataUpdated::new(&params.key, &metadata))?;
 
         Ok(())
+    }
+
+    fn invoke_contract(
+        rt: &impl Runtime,
+        params: InvokeContractParams,
+    ) -> Result<InvokeContractReturn, ActorError> {
+        let input_data: InputData = params.try_into()?;
+        if sol::can_handle(&input_data) {
+            let output_data = match sol::parse_input(&input_data)? {
+                sol::Calls::addObject_0(call) => {
+                    // function addObject(bytes32 source, string memory key, bytes32 hash, bytes32 recoveryHash, uint64 size) external;
+                    let params = call.params(rt);
+                    Self::add_object(rt, params)?;
+                    call.returns(())
+                }
+                sol::Calls::addObject_1(call) => {
+                    // function addObject(AddObjectParams memory params) external;
+                    let params = call.params(rt);
+                    Self::add_object(rt, params)?;
+                    call.returns(())
+                }
+                sol::Calls::deleteObject(call) => {
+                    // function deleteObject(string memory key) external;
+                    let params = call.params(rt);
+                    Self::delete_object(rt, params)?;
+                    call.returns(())
+                }
+                sol::Calls::getObject(call) => {
+                    // function getObject(string memory key) external view returns (ObjectValue memory);
+                    let params = call.params();
+                    let object = Self::get_object(rt, params)?;
+                    call.returns(object)
+                }
+                sol::Calls::queryObjects_0(call) => {
+                    // function queryObjects(string memory prefix, string memory delimiter, string memory startKey, uint64 limit) external view returns (Query memory);
+                    let params = call.params();
+                    let list = Self::list_objects(rt, params)?;
+                    call.returns(list)
+                }
+                sol::Calls::queryObjects_1(call) => {
+                    // function queryObjects(string memory prefix, string memory delimiter, string memory startKey) external view returns (Query memory);
+                    let params = call.params();
+                    let list = Self::list_objects(rt, params)?;
+                    call.returns(list)
+                }
+                sol::Calls::queryObjects_2(call) => {
+                    // function queryObjects(string memory prefix) external view returns (Query memory);
+                    let params = call.params();
+                    let list = Self::list_objects(rt, params)?;
+                    call.returns(list)
+                }
+                sol::Calls::queryObjects_3(call) => {
+                    // function queryObjects() external view returns (Query memory);
+                    let params = call.params();
+                    let list = Self::list_objects(rt, params)?;
+                    call.returns(list)
+                }
+                sol::Calls::queryObjects_4(call) => {
+                    // function queryObjects(string memory prefix, string memory delimiter) external view returns (Query memory);
+                    let params = call.params();
+                    let list = Self::list_objects(rt, params)?;
+                    call.returns(list)
+                }
+                sol::Calls::updateObjectMetadata(call) => {
+                    // function updateObjectMetadata(string memory key, KeyValue[] memory metadata) external;
+                    let params = call.params(rt);
+                    Self::update_object_metadata(rt, params)?;
+                    call.returns(())
+                }
+            };
+            Ok(InvokeContractReturn { output_data })
+        } else {
+            Err(actor_error!(illegal_argument, "invalid call".to_string()))
+        }
     }
 }
 
@@ -381,6 +459,8 @@ impl ActorCode for Actor {
         GetObject => get_object,
         ListObjects => list_objects,
         UpdateObjectMetadata => update_object_metadata,
+        // EVM interop
+        InvokeContract => invoke_contract,
         _ => fallback,
     }
 }
@@ -474,7 +554,7 @@ mod tests {
     }
 
     fn expect_emitted_add_event(rt: &MockRuntime, params: &AddParams) {
-        let event = to_actor_event(ObjectAdded::new(
+        let event = to_actor_event(sol::ObjectAdded::new(
             &params.key,
             &params.hash,
             &params.metadata,
@@ -484,7 +564,7 @@ mod tests {
     }
 
     fn expect_emitted_delete_event(rt: &MockRuntime, params: &DeleteParams, hash: Hash) {
-        let event = to_actor_event(ObjectDeleted::new(&params.key, &hash)).unwrap();
+        let event = to_actor_event(sol::ObjectDeleted::new(&params.key, &hash)).unwrap();
         rt.expect_emitted_event(event);
     }
 
@@ -1014,7 +1094,7 @@ mod tests {
             ]),
         };
         rt.expect_validate_caller_any();
-        let event = to_actor_event(ObjectMetadataUpdated {
+        let event = to_actor_event(sol::ObjectMetadataUpdated {
             key: &add_params.key,
             metadata: &HashMap::from([("foo".into(), "zar".into()), ("foo3".into(), "bar".into())]),
         })
@@ -1097,7 +1177,7 @@ mod tests {
             ExitCode::OK,
             None,
         );
-        let event = to_actor_event(ObjectMetadataUpdated {
+        let event = to_actor_event(sol::ObjectMetadataUpdated {
             key: &alien_update.key,
             metadata: &HashMap::from([("foo".into(), "zar".into()), ("foo3".into(), "bar".into())]),
         })

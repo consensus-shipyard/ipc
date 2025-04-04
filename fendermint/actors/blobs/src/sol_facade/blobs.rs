@@ -124,18 +124,16 @@ impl AbiCallRuntime for sol::addBlobCall {
     type Returns = ();
     type Output = Vec<u8>;
     fn params(&self, rt: &impl Runtime) -> Self::Params {
-        let sponsor: Option<Address> = H160::from(self.params.sponsor)
-            .as_option()
-            .map(|a| a.into());
-        let source = PublicKey(self.params.source.into());
-        let hash = Hash(self.params.blobHash.into());
-        let metadata_hash = Hash(self.params.metadataHash.into());
-        let subscription_id: SubscriptionId = self.params.subscriptionId.clone().try_into()?;
-        let size = self.params.size;
-        let ttl = if self.params.ttl.is_zero() {
+        let sponsor: Option<Address> = H160::from(self.sponsor).as_option().map(|a| a.into());
+        let source = PublicKey(self.source.into());
+        let hash = Hash(self.blobHash.into());
+        let metadata_hash = Hash(self.metadataHash.into());
+        let subscription_id: SubscriptionId = self.subscriptionId.clone().try_into()?;
+        let size = self.size;
+        let ttl = if self.ttl.is_zero() {
             None
         } else {
-            Some(self.params.ttl as ChainEpoch)
+            Some(self.ttl as ChainEpoch)
         };
         let from: Address = rt.message().caller();
         Ok(AddBlobParams {
@@ -241,18 +239,16 @@ impl AbiCallRuntime for sol::overwriteBlobCall {
     type Output = Vec<u8>;
     fn params(&self, rt: &impl Runtime) -> Self::Params {
         let old_hash = Hash(self.oldHash.into());
-        let sponsor = H160::from(self.params.sponsor)
-            .as_option()
-            .map(|a| a.into());
-        let source: PublicKey = PublicKey(self.params.source.into());
-        let hash: Hash = Hash(self.params.blobHash.into());
-        let metadata_hash: Hash = Hash(self.params.metadataHash.into());
-        let subscription_id: SubscriptionId = self.params.subscriptionId.clone().try_into()?;
-        let size = self.params.size;
-        let ttl = if self.params.ttl.is_zero() {
+        let sponsor = H160::from(self.sponsor).as_option().map(|a| a.into());
+        let source: PublicKey = PublicKey(self.source.into());
+        let hash: Hash = Hash(self.blobHash.into());
+        let metadata_hash: Hash = Hash(self.metadataHash.into());
+        let subscription_id: SubscriptionId = self.subscriptionId.clone().try_into()?;
+        let size = self.size;
+        let ttl = if self.ttl.is_zero() {
             None
         } else {
-            Some(self.params.ttl as ChainEpoch)
+            Some(self.ttl as ChainEpoch)
         };
         let from: Address = rt.message().caller();
         Ok(OverwriteBlobParams {
@@ -280,16 +276,16 @@ impl AbiCall for sol::trimBlobExpiriesCall {
     type Output = Vec<u8>;
 
     fn params(&self) -> Self::Params {
-        let limit = self.params.limit;
+        let limit = self.limit;
         let limit = if limit.is_zero() { None } else { Some(limit) };
-        let hash: [u8; 32] = self.params.startingHash.into();
+        let hash: [u8; 32] = self.startingHash.into();
         let hash = if hash == [0; 32] {
             None
         } else {
             Some(Hash(hash))
         };
         TrimBlobExpiriesParams {
-            subscriber: H160::from(self.params.subscriber).into(),
+            subscriber: H160::from(self.subscriber).into(),
             limit,
             starting_hash: hash,
         }

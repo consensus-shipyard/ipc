@@ -33,6 +33,8 @@ pub enum Method {
     GetObject = frc42_dispatch::method_hash!("GetObject"),
     ListObjects = frc42_dispatch::method_hash!("ListObjects"),
     UpdateObjectMetadata = frc42_dispatch::method_hash!("UpdateObjectMetadata"),
+    // EVM Interop
+    InvokeContract = frc42_dispatch::method_hash!("InvokeEVM"),
 }
 
 /// Params for adding an object.
