@@ -8,7 +8,7 @@ import {GatewayActorModifiers} from "../../lib/LibGatewayActorStorage.sol";
 import {TopdownCheckpoint, TopdownVoting, SubnetID} from "../../structs/CrossNet.sol";
 import {PowerChangeRequest, Membership, ParentValidatorsTracker, Validator, ValidatorInfo, ValidatorSet} from "../../structs/Subnet.sol";
 import {LibValidatorTracking, LibValidatorSet} from "../../lib/LibPower.sol";
-import {NotValidator, HasAlreadyVoted, ExpectingLivenessVote, InvalidLivenssSubmissionHeight, VoteNotProposed} from "../../errors/IPCErrors.sol";
+import {NotValidator, HasAlreadyVoted, ExpectingLivenessVote, InvalidLivenssSubmissionHeight, InvalidTopdownCheckpointHeight, InvalidTopdownConfigNumber, VoteNotProposed, InvalidTopdownMessageNonce} from "../../errors/IPCErrors.sol";
 import {LibGateway} from "../../lib/LibGateway.sol";
 
 /// Performs topdown bridging voting on chain. This makes validator slashing possible and
@@ -32,11 +32,32 @@ contract TopDownVotingFacet is GatewayActorModifiers {
         bytes32 vote = keccak256(abi.encode(checkpoint));
 
         if (!s.topdownVoting.ongoingVoteHashes.contains(vote)) {
+            ensureValid(checkpoint);
             s.topdownVoting.storeCheckpoint(vote, checkpoint);
             s.topdownVoting.ongoingVoteHashes.add(vote);
         }
 
         castVote(vote);
+    }
+
+    function ensureValid(TopdownCheckpoint calldata checkpoint) internal view {
+        if (checkpoint.height <= s.topdownVoting.committedParentHeight) {
+            revert InvalidTopdownCheckpointHeight(checkpoint.height, s.topdownVoting.committedParentHeight);
+        }
+
+        if (checkpoint.xnetMsgs.length != 0) {
+            uint64 appliedNonce = s.appliedTopDownNonce + 1;
+            if (appliedNonce != checkpoint.xnetMsgs[0].originalNonce) {
+                revert InvalidTopdownMessageNonce(appliedNonce, checkpoint.xnetMsgs[0].originalNonce);
+            }
+        }
+
+        if (checkpoint.powerChanges.length != 0) {
+            uint64 expected = s.validatorsTracker.changes.nextConfigurationNumber;
+            if (expected != checkpoint.powerChanges[0].configurationNumber) {
+                revert InvalidTopdownConfigNumber(expected, checkpoint.powerChanges[0].configurationNumber);
+            }
+        }
     }
 
     function castVote(bytes32 vote) internal {
@@ -130,7 +151,8 @@ library LibTopdownVoting {
         voteTotalPower = self.votes[vote].totalPower + powerIncrease;
         self.votes[vote].totalPower = voteTotalPower;
 
-        totalPowerVoted = self.totalPowerVoted;
+        totalPowerVoted = self.totalPowerVoted + powerIncrease;
+        self.totalPowerVoted = totalPowerVoted;
     }
 
     function clearVoting(TopdownVoting storage self) internal {

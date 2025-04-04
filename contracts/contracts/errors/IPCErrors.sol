@@ -87,6 +87,10 @@ error HasAlreadyVoted(address validator);
 error ExpectingLivenessVote(uint64 expectedLivenessHeight, uint64 actualVoteHeight);
 error InvalidLivenssSubmissionHeight(uint64 expectedLivenessHeight, uint64 actualVoteHeight);
 error VoteNotProposed(bytes32 vote);
+// topdown checkpoint
+error InvalidTopdownCheckpointHeight(uint64 proposed, uint64 previous);
+error InvalidTopdownMessageNonce(uint64 expected, uint64 actual);
+error InvalidTopdownConfigNumber(uint64 expected, uint64 actual);
 
 enum InvalidXnetMessageReason {
     Sender,
