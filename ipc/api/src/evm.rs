@@ -5,7 +5,9 @@
 
 use crate::address::IPCAddress;
 use crate::checkpoint::BottomUpMsgBatch;
-use crate::checkpoint::{consensus, BottomUpCheckpoint, CompressedActivityRollup};
+use crate::checkpoint::{
+    consensus, BottomUpCheckpoint, BottomUpBatchCommitment, CompressedActivityRollup,
+};
 use crate::cross::{IpcEnvelope, IpcMsgKind};
 use crate::staking::PowerChange;
 use crate::staking::PowerChangeRequest;
@@ -188,11 +190,7 @@ macro_rules! bottom_up_checkpoint_conversion {
                     block_height: ethers::core::types::U256::from(checkpoint.block_height),
                     block_hash: vec_to_bytes32(checkpoint.block_hash)?,
                     next_configuration_number: checkpoint.next_configuration_number,
-                    msgs: checkpoint
-                        .msgs
-                        .into_iter()
-                        .map($module::IpcEnvelope::try_from)
-                        .collect::<Result<Vec<_>, _>>()?,
+                    msgs: checkpoint.msgs.try_into()?,
                     activity: checkpoint.activity_rollup.try_into()?,
                 })
             }
@@ -207,13 +205,32 @@ macro_rules! bottom_up_checkpoint_conversion {
                     block_height: value.block_height.as_u128() as ChainEpoch,
                     block_hash: value.block_hash.to_vec(),
                     next_configuration_number: value.next_configuration_number,
-                    msgs: value
-                        .msgs
-                        .into_iter()
-                        .map(IpcEnvelope::try_from)
-                        .collect::<Result<Vec<_>, _>>()?,
+                    msgs: value.msgs.into(),
                     activity_rollup: value.activity.into(),
                 })
+            }
+        }
+
+        impl TryFrom<BottomUpBatchCommitment> for $module::Commitment {
+            type Error = anyhow::Error;
+
+            fn try_from(value: BottomUpBatchCommitment) -> Result<Self, Self::Error> {
+                Ok($module::Commitment {
+                    total_num_msgs: value.total_num_msgs,
+                    msgs_root: value
+                        .msgs_root
+                        .try_into()
+                        .map_err(|_| anyhow!("cannot convert bytes32"))?,
+                })
+            }
+        }
+
+        impl From<$module::Commitment> for BottomUpBatchCommitment {
+            fn from(value: $module::Commitment) -> Self {
+                BottomUpBatchCommitment {
+                    total_num_msgs: value.total_num_msgs,
+                    msgs_root: value.msgs_root.to_vec(),
+                }
             }
         }
     };

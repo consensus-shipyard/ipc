@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import "../../contracts/errors/IPCErrors.sol";
-import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind, ResultMsg} from "../../contracts/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpCheckpoint, BottomUpMsgBatch, ParentFinality, IpcMsgKind, ResultMsg} from "../../contracts/structs/CrossNet.sol";
 import {SubnetID, Subnet, IPCAddress, Validator, FvmAddress} from "../../contracts/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
 import {AssetHelper} from "../../contracts/lib/AssetHelper.sol";
@@ -27,7 +27,7 @@ import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
 import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
-
+import {BottomUpBatchHelper} from "../helpers/BottomUpBatchHelper.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20PresetFixedSupply} from "../helpers/ERC20PresetFixedSupply.sol";
 
@@ -209,7 +209,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase, IIpcHandler {
             blockHeight: batch.blockHeight,
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
-            msgs: batch.msgs,
+            msgs: BottomUpBatchHelper.makeCommitment(batch.msgs),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
@@ -218,6 +218,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase, IIpcHandler {
             checkpoint,
             membershipRoot,
             weights[0] + weights[1] + weights[2],
+            BottomUpBatchHelper.makeEmptyBatch(),
             ActivityHelper.dummyActivityRollup()
         );
 

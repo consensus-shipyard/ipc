@@ -541,7 +541,7 @@ pub mod subnet {
                     178, 232, 216, 34, 217, 96, 27, 0, 185, 215, 8, 155, 25, 15, 1,
                 ],
                 next_configuration_number: 1,
-                msgs: vec![],
+                msgs: Default::default(),
                 activity: Default::default(),
             };
 

@@ -47,6 +47,7 @@ import "forge-std/console.sol";
 
 import {FullActivityRollup, Consensus} from "../../contracts/structs/Activity.sol";
 import {ActivityHelper} from "../helpers/ActivityHelper.sol";
+import {BottomUpBatchHelper} from "../helpers/BottomUpBatchHelper.sol";
 
 contract MultiSubnetTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
@@ -1354,7 +1355,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             blockHeight: batch.blockHeight,
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
-            msgs: batch.msgs,
+            msgs: BottomUpBatchHelper.makeCommitment(batch.msgs),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
@@ -1363,6 +1364,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             checkpoint,
             membershipRoot,
             weights[0] + weights[1] + weights[2],
+            BottomUpBatchHelper.makeEmptyBatch(),
             ActivityHelper.dummyActivityRollup()
         );
         vm.stopPrank();
@@ -1389,7 +1391,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             blockHeight: e,
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
-            msgs: msgs,
+            msgs: BottomUpBatchHelper.makeCommitment(msgs),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
@@ -1398,6 +1400,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             checkpoint,
             membershipRoot,
             weights[0] + weights[1] + weights[2],
+            BottomUpBatchHelper.makeEmptyBatch(),
             ActivityHelper.dummyActivityRollup()
         );
         vm.stopPrank();

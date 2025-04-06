@@ -4,7 +4,8 @@ pragma solidity ^0.8.23;
 import "forge-std/Test.sol";
 import "../../contracts/errors/IPCErrors.sol";
 import {EMPTY_BYTES} from "../../contracts/constants/Constants.sol";
-import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind, OutcomeType} from "../../contracts/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpCheckpoint, BottomUpMsgBatch, ParentFinality, IpcMsgKind, OutcomeType} from "../../contracts/structs/CrossNet.sol";
+import {BottomUpBatch} from "../../contracts/structs/BottomUpBatch.sol";
 import {SubnetID, Subnet, IPCAddress, Validator} from "../../contracts/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
 import {AssetHelper} from "../../contracts/lib/AssetHelper.sol";
@@ -33,6 +34,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20PresetFixedSupply} from "../helpers/ERC20PresetFixedSupply.sol";
 
 import {ActivityHelper} from "../helpers/ActivityHelper.sol";
+import {BottomUpBatchHelper} from "../helpers/BottomUpBatchHelper.sol";
 
 import "forge-std/console.sol";
 
@@ -498,8 +500,16 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         params.subnetL3.gateway.messenger().sendContractXnetMessage{value: params.amount}(crossMessage);
 
         // this would normally submitted by releayer. It call the subnet actor on the L2 network.
+        BottomUpCheckpoint memory _checkpoint = callCreateBottomUpCheckpointFromChildSubnet(params.subnetL3.id, params.subnetL3.gateway);
         submitBottomUpCheckpoint(
-            callCreateBottomUpCheckpointFromChildSubnet(params.subnetL3.id, params.subnetL3.gateway),
+            _checkpoint,
+            params.subnetL3.subnetActor
+        );
+        IpcEnvelope[] memory _msgs = new IpcEnvelope[](1);
+        _msgs[0] = crossMessage;
+        batchSubnetBottomUpExecution(
+            _checkpoint,
+            _msgs,
             params.subnetL3.subnetActor
         );
 
@@ -789,7 +799,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             blockHeight: batch.blockHeight,
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
-            msgs: batch.msgs,
+            msgs: BottomUpBatchHelper.makeCommitment(batch.msgs),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
@@ -798,6 +808,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             checkpoint,
             membershipRoot,
             weights[0] + weights[1] + weights[2],
+            batch.msgs,
             ActivityHelper.dummyActivityRollup()
         );
         vm.stopPrank();
@@ -823,7 +834,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             blockHeight: e,
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
-            msgs: msgs,
+            msgs: BottomUpBatchHelper.makeCommitment(msgs),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
@@ -832,6 +843,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             checkpoint,
             membershipRoot,
             weights[0] + weights[1] + weights[2],
+            BottomUpBatchHelper.makeEmptyBatch(),
             ActivityHelper.dummyActivityRollup()
         );
         vm.stopPrank();
@@ -865,6 +877,26 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
         return (parentValidators, parentSignatures);
     }
+
+    function batchSubnetBottomUpExecution(
+        BottomUpCheckpoint memory checkpoint, 
+        IpcEnvelope[] memory msgs, 
+        SubnetActorDiamond sa
+        ) internal {
+        BottomUpBatch.Inclusion[] memory inclusions = BottomUpBatchHelper.makeInclusions(msgs);
+
+        SubnetActorCheckpointingFacet checkpointer = sa.checkpointer();
+        vm.startPrank(address(sa));
+
+        checkpointer.execBottomUpBatch(
+            checkpoint.subnetID,
+            checkpoint.blockHeight,
+            inclusions
+        );
+
+        vm.stopPrank();
+    }
+
 
     function submitBottomUpCheckpoint(BottomUpCheckpoint memory checkpoint, SubnetActorDiamond sa) internal {
         (address[] memory parentValidators, bytes[] memory parentSignatures) = prepareValidatorsSignatures(

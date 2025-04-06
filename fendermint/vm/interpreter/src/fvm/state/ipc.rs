@@ -115,6 +115,7 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         state: &mut FvmExecState<DB>,
         checkpoint: checkpointing_facet::BottomUpCheckpoint,
         power_table: &[Validator<Power>],
+        msgs: Vec<checkpointing_facet::IpcEnvelope>,
         activity: checkpointing_facet::FullActivityRollup,
     ) -> anyhow::Result<AppliedMessage> {
         // Construct a Merkle tree from the power table, which we can use to validate validator set membership
@@ -129,7 +130,13 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         Ok(self
             .checkpointing
             .call_with_return(state, |c| {
-                c.create_bottom_up_checkpoint(checkpoint, tree.root_hash().0, total_power, activity)
+                c.create_bottom_up_checkpoint(
+                    checkpoint,
+                    tree.root_hash().0,
+                    total_power,
+                    msgs,
+                    activity,
+                )
             })?
             .into_return())
     }
@@ -332,7 +339,7 @@ pub fn tokens_to_mint(msgs: &[ipc_api::cross::IpcEnvelope]) -> TokenAmount {
 }
 
 /// Total amount of tokens to burn as a result of bottom-up messages leaving the subnet.
-pub fn tokens_to_burn(msgs: &[checkpointing_facet::IpcEnvelope]) -> TokenAmount {
+pub fn tokens_to_burn(msgs: &[gateway_getter_facet::IpcEnvelope]) -> TokenAmount {
     msgs.iter()
         .fold(TokenAmount::from_atto(0), |mut total, msg| {
             // Both fees and value were taken from the sender, and both are going up to the parent subnet:
