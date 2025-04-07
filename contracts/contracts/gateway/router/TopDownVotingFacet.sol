@@ -5,10 +5,10 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
 import {GatewayActorModifiers} from "../../lib/LibGatewayActorStorage.sol";
-import {TopdownCheckpoint, TopdownVoting, SubnetID} from "../../structs/CrossNet.sol";
+import {TopdownCheckpoint, TopdownVoting, SubnetID, Vote, IpcEnvelope} from "../../structs/CrossNet.sol";
 import {PowerChangeRequest, Membership, ParentValidatorsTracker, Validator, ValidatorInfo, ValidatorSet} from "../../structs/Subnet.sol";
 import {LibValidatorTracking, LibValidatorSet} from "../../lib/LibPower.sol";
-import {NotValidator, HasAlreadyVoted, ExpectingLivenessVote, InvalidLivenssSubmissionHeight, InvalidTopdownCheckpointHeight, InvalidTopdownConfigNumber, VoteNotProposed, InvalidTopdownMessageNonce} from "../../errors/IPCErrors.sol";
+import {NotValidator, HasAlreadyVoted, ExpectingLivenessVote, InvalidLivenssSubmissionHeight, InvalidTopdownCheckpointHeight, InvalidTopdownConfigNumber, NonSequential, VoteNotProposed, InvalidTopdownMessageNonce} from "../../errors/IPCErrors.sol";
 import {LibGateway} from "../../lib/LibGateway.sol";
 
 /// Performs topdown bridging voting on chain. This makes validator slashing possible and
@@ -21,11 +21,30 @@ contract TopDownVotingFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
 
     event TopdownQuorumFormed(bytes32 vote, uint256 quorumThreshold, uint256 totalWeight);
-    event VotingAborted(bytes32[] votedHashes);
+    event VotingAborted();
 
     function latestCommitted() external view returns (uint64 blockHeight, bytes32 blockHash) {
         blockHeight = s.topdownVoting.committedParentHeight;
         blockHash = s.topdownVoting.committedBlockHash;
+    }
+
+    function onGoingVoteInfo(bytes32 voteHash) external view returns (Vote memory vote) {
+        vote = s.topdownVoting.votes[voteHash];
+    }
+
+    function onGoingVotes() external view returns (bytes32[] memory votes, uint256 totalPowerVoted) {
+        uint256 totalNumVotes = s.topdownVoting.ongoingVoteHashes.length();
+        votes = new bytes32[](totalNumVotes);
+
+        for (uint256 i = 0; i < totalNumVotes; ) {
+            votes[i] = s.topdownVoting.ongoingVoteHashes.at(i);
+
+            unchecked {
+                i++;
+            }
+        }
+
+        totalPowerVoted = s.topdownVoting.totalPowerVoted;
     }
 
     /// @notice Returns the validator index in the current membership
@@ -41,7 +60,7 @@ contract TopDownVotingFacet is GatewayActorModifiers {
                 i++;
             }
         }
-        
+
         revert NotValidator(validator);
     }
 
@@ -108,13 +127,18 @@ contract TopDownVotingFacet is GatewayActorModifiers {
             return;
         }
 
-        if (totalPowerVoted > quorumThreshold) {
-            // this means more than quorum threshold of total weight has already
-            // voted and no consensus reached
-            emit VotingAborted(s.topdownVoting.ongoingVoteHashes.values());
-            s.topdownVoting.clearVoting();
+        if (totalPowerVoted <= quorumThreshold) {
             return;
         }
+
+        // this means more than quorum threshold of total weight has already
+        // voted and no consensus reached
+        emit VotingAborted();
+        s.topdownVoting.clearVoting();
+    }
+
+    function getNonce(IpcEnvelope calldata xmsg) internal pure returns (uint64) {
+        return xmsg.localNonce;
     }
 
     function ensureValid(TopdownCheckpoint calldata checkpoint) internal view {
@@ -123,10 +147,20 @@ contract TopDownVotingFacet is GatewayActorModifiers {
         }
 
         if (checkpoint.xnetMsgs.length != 0) {
-            uint64 appliedNonce = s.appliedTopDownNonce + 1;
-            if (appliedNonce != checkpoint.xnetMsgs[0].originalNonce) {
-                revert InvalidTopdownMessageNonce(appliedNonce, checkpoint.xnetMsgs[0].originalNonce);
+            uint64 appliedNonce = s.appliedTopDownNonce;
+            if (appliedNonce != getNonce(checkpoint.xnetMsgs[0])) {
+                revert InvalidTopdownMessageNonce(appliedNonce, getNonce(checkpoint.xnetMsgs[0]));
             }
+
+            // TODO: comment off due to size constraint
+            // for (uint256 i = 1; i < checkpoint.xnetMsgs.length; ) {
+            //     if (getNonce(checkpoint.xnetMsgs[i]) != getNonce(checkpoint.xnetMsgs[i-1]) + 1) {
+            //         revert NonSequential("XnetMsg", getNonce(checkpoint.xnetMsgs[i-1]), getNonce(checkpoint.xnetMsgs[i]));
+            //     }
+            //     unchecked {
+            //         i++;
+            //     }
+            // }
         }
 
         if (checkpoint.powerChanges.length != 0) {
@@ -134,6 +168,16 @@ contract TopDownVotingFacet is GatewayActorModifiers {
             if (expected != checkpoint.powerChanges[0].configurationNumber) {
                 revert InvalidTopdownConfigNumber(expected, checkpoint.powerChanges[0].configurationNumber);
             }
+
+            // TODO: comment off due to size constraint
+            // for (uint256 i = 1; i < checkpoint.powerChanges.length; ) {
+            //     if (checkpoint.powerChanges[i].configurationNumber != checkpoint.powerChanges[i-1].configurationNumber + 1) {
+            //         revert NonSequential("CFN", checkpoint.powerChanges[i-1].configurationNumber, checkpoint.powerChanges[i].configurationNumber);
+            //     }
+            //     unchecked {
+            //         i++;
+            //     }
+            // }
         }
     }
 
@@ -181,10 +225,10 @@ library LibTopdownVoting {
     }
 
     function clearVoting(TopdownVoting storage self) internal {
-        uint256 totalNumVotes = self.ongoingVoteHashes.length();
+        uint256 totalNumVotes = self.ongoingVoteHashes.length() - 1;
 
-        for (uint256 i = 0; i < totalNumVotes; ) {
-            bytes32 voteHash = self.ongoingVoteHashes.at(i);
+        for (uint256 i = 0; i <= totalNumVotes; ) {
+            bytes32 voteHash = self.ongoingVoteHashes.at(totalNumVotes - i);
 
             self.ongoingVoteHashes.remove(voteHash);
             delete self.votes[voteHash];

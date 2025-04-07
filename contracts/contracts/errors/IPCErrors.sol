@@ -91,6 +91,7 @@ error VoteNotProposed(bytes32 vote);
 error InvalidTopdownCheckpointHeight(uint64 proposed, uint64 previous);
 error InvalidTopdownMessageNonce(uint64 expected, uint64 actual);
 error InvalidTopdownConfigNumber(uint64 expected, uint64 actual);
+error NonSequential(string what, uint64 previous, uint64 current);
 
 enum InvalidXnetMessageReason {
     Sender,
