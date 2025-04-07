@@ -11,18 +11,18 @@ use fendermint_vm_interpreter::fvm::state::ipc::GatewayCaller;
 use fendermint_vm_interpreter::fvm::state::{FvmExecState, FvmStateParams};
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
 use fendermint_vm_interpreter::fvm::Broadcaster;
+use fendermint_vm_interpreter::MessagesInterpreter;
+use fendermint_vm_message::chain::{ChainMessage, ValidatorMessage};
+use fendermint_vm_topdown::cache::ParentViewPayload;
 use fendermint_vm_topdown::sync::FendermintStateQuery;
 use fendermint_vm_topdown::{ParentState, TopdownVoter};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::address::Address;
 use fvm_shared::chainid::ChainID;
 use fvm_shared::clock::ChainEpoch;
-use std::sync::Arc;
-
-use fendermint_vm_interpreter::MessagesInterpreter;
-use fendermint_vm_message::chain::{ChainMessage, ValidatorMessage};
-use fendermint_vm_topdown::cache::ParentViewPayload;
 use ipc_api::checkpoint::TopdownCheckpoint;
+use ipc_api::evm::payload_to_evm_address;
+use std::sync::Arc;
 
 pub struct AppTopdownVoter<SS>
 where
@@ -98,6 +98,12 @@ where
             self.gateway_caller
                 .get_latest_topdown_parent_state(&mut exec_state)
         })
+    }
+
+    fn has_voted(&self, validator: &Address) -> anyhow::Result<bool> {
+        let eth_address = payload_to_evm_address(validator.payload())?;
+        self.with_exec_state(|mut s| self.gateway_caller.has_voted(&mut s, eth_address))?
+            .ok_or_else(|| anyhow!("app is not up"))
     }
 
     fn get_chain_id(&self) -> anyhow::Result<ChainID> {

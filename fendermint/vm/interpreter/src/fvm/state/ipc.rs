@@ -3,7 +3,7 @@
 
 use anyhow::{anyhow, Context};
 use ethers::types as et;
-
+use ethers::types::Address;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::ActorID;
@@ -276,6 +276,14 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
             .xnet
             .call_with_return(state, |c| c.apply_cross_messages(messages))?;
         Ok(r.into_return())
+    }
+
+    pub fn has_voted(
+        &self,
+        state: &mut FvmExecState<DB>,
+        validator: Address,
+    ) -> anyhow::Result<bool> {
+        self.topdown_voting.call(state, |c| c.has_voted(validator))
     }
 
     pub fn get_latest_topdown_parent_state(

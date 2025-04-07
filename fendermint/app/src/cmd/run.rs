@@ -181,6 +181,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
 
         info!("topdown finality enabled");
 
+        let validator = ctx.addr;
         let topdown_config = settings.ipc.topdown_config()?;
 
         let mut config = fendermint_vm_topdown::Config::new(
@@ -202,6 +203,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         let client = tendermint_client.clone();
         tokio::spawn(async move {
             run_topdown_voting(
+                validator,
                 config,
                 app_parent_finality_query,
                 parent_proxy,

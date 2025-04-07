@@ -8,10 +8,10 @@ pub(crate) mod tendermint;
 use crate::proxy::ParentQueryProxy;
 use crate::ParentState;
 use ethers::utils::hex;
+use fvm_shared::address::Address;
 use fvm_shared::chainid::ChainID;
 use std::sync::Arc;
 use std::time::Duration;
-
 pub use syncer::fetch_topdown_events;
 
 /// Query the fendermint state from the child block chain state.
@@ -21,13 +21,16 @@ pub trait FendermintStateQuery {
     /// Get the latest committed parent state
     fn get_latest_topdown_parent_state(&self) -> anyhow::Result<Option<ParentState>>;
 
+    /// Checks if the validator has already voted
+    fn has_voted(&self, validator: &Address) -> anyhow::Result<bool>;
+
     /// Obtains the chain id from the fendermint state
     fn get_chain_id(&self) -> anyhow::Result<ChainID>;
 }
 
 /// Queries the starting parent state synced for polling. First checks the committed parent state, if none, that
 /// means the chain has just started, then query from the parent to get the genesis epoch.
-pub(crate) async fn query_starting_parent_state<T, P>(
+pub(crate) async fn query_parent_state<T, P>(
     query: &Arc<T>,
     parent_client: &Arc<P>,
 ) -> anyhow::Result<ParentState>

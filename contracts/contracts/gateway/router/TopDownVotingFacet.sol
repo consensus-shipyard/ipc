@@ -28,6 +28,29 @@ contract TopDownVotingFacet is GatewayActorModifiers {
         blockHash = s.topdownVoting.committedBlockHash;
     }
 
+    /// @notice Returns the validator index in the current membership
+    function getValidatorIndex(address validator) public view returns(uint256) {
+        uint256 totalValidators = s.currentMembership.validators.length;
+
+        for (uint256 i = 0; i < totalValidators; ) {
+            if (s.currentMembership.validators[i].addr == validator) {
+                return i;
+            }
+
+            unchecked {
+                i++;
+            }
+        }
+        
+        revert NotValidator(validator);
+    }
+
+    /// @notice Checks if the validator has voted
+    function hasVoted(address validator) external view returns(bool) {
+        uint256 validatorIndex = getValidatorIndex(validator);
+        return s.topdownVoting.hasVoted(validatorIndex);
+    }
+
     function propose(TopdownCheckpoint calldata checkpoint) external {
         bytes32 vote = keccak256(abi.encode(checkpoint));
 
@@ -37,34 +60,17 @@ contract TopDownVotingFacet is GatewayActorModifiers {
             s.topdownVoting.ongoingVoteHashes.add(vote);
         }
 
-        castVote(vote);
+        _castVote(vote);
     }
 
-    function ensureValid(TopdownCheckpoint calldata checkpoint) internal view {
-        if (checkpoint.height <= s.topdownVoting.committedParentHeight) {
-            revert InvalidTopdownCheckpointHeight(checkpoint.height, s.topdownVoting.committedParentHeight);
-        }
-
-        if (checkpoint.xnetMsgs.length != 0) {
-            uint64 appliedNonce = s.appliedTopDownNonce + 1;
-            if (appliedNonce != checkpoint.xnetMsgs[0].originalNonce) {
-                revert InvalidTopdownMessageNonce(appliedNonce, checkpoint.xnetMsgs[0].originalNonce);
-            }
-        }
-
-        if (checkpoint.powerChanges.length != 0) {
-            uint64 expected = s.validatorsTracker.changes.nextConfigurationNumber;
-            if (expected != checkpoint.powerChanges[0].configurationNumber) {
-                revert InvalidTopdownConfigNumber(expected, checkpoint.powerChanges[0].configurationNumber);
-            }
-        }
-    }
-
-    function castVote(bytes32 vote) internal {
+    function castVote(bytes32 vote) external {
         if (!s.topdownVoting.ongoingVoteHashes.contains(vote)) {
             revert VoteNotProposed(vote);
         }
+        _castVote(vote);
+    }
 
+    function _castVote(bytes32 vote) internal {
         uint256 totalValidators = s.currentMembership.validators.length;
         uint256 totalWeight = 0;
 
@@ -108,6 +114,26 @@ contract TopDownVotingFacet is GatewayActorModifiers {
             emit VotingAborted(s.topdownVoting.ongoingVoteHashes.values());
             s.topdownVoting.clearVoting();
             return;
+        }
+    }
+
+    function ensureValid(TopdownCheckpoint calldata checkpoint) internal view {
+        if (checkpoint.height <= s.topdownVoting.committedParentHeight) {
+            revert InvalidTopdownCheckpointHeight(checkpoint.height, s.topdownVoting.committedParentHeight);
+        }
+
+        if (checkpoint.xnetMsgs.length != 0) {
+            uint64 appliedNonce = s.appliedTopDownNonce + 1;
+            if (appliedNonce != checkpoint.xnetMsgs[0].originalNonce) {
+                revert InvalidTopdownMessageNonce(appliedNonce, checkpoint.xnetMsgs[0].originalNonce);
+            }
+        }
+
+        if (checkpoint.powerChanges.length != 0) {
+            uint64 expected = s.validatorsTracker.changes.nextConfigurationNumber;
+            if (expected != checkpoint.powerChanges[0].configurationNumber) {
+                revert InvalidTopdownConfigNumber(expected, checkpoint.powerChanges[0].configurationNumber);
+            }
         }
     }
 

@@ -12,6 +12,7 @@ pub mod observe;
 use crate::cache::{ParentViewPayload, TopdownViewContainer};
 use async_trait::async_trait;
 use ethers::utils::hex;
+use fvm_shared::address::Address;
 use fvm_shared::chainid::ChainID;
 use fvm_shared::clock::ChainEpoch;
 use serde::{Deserialize, Serialize};
@@ -109,6 +110,7 @@ pub(crate) fn is_null_round_str(s: &str) -> bool {
 
 /// Start the parent finality listener in the background
 pub async fn run_topdown_voting<T, C, P, V>(
+    validator: Address,
     config: Config,
     query: Arc<T>,
     parent_proxy: Arc<P>,
@@ -163,6 +165,7 @@ pub async fn run_topdown_voting<T, C, P, V>(
             vote_interval.tick().await;
 
             if let Err(e) = voting(
+                &validator,
                 &tendermint_syncer,
                 &topdown_voter,
                 &query,
@@ -179,6 +182,7 @@ pub async fn run_topdown_voting<T, C, P, V>(
 }
 
 async fn voting<T, C, P, V>(
+    validator: &Address,
     syncer: &Arc<TendermintAwareSyncer<C, P>>,
     voter: &V,
     query: &Arc<T>,
@@ -191,8 +195,16 @@ where
     P: ParentQueryProxy + Send + Sync + 'static,
     V: TopdownVoter + Send + Sync + 'static,
 {
-    let finalized_checkpoint = sync::query_starting_parent_state(query, parent_proxy).await?;
+    let finalized_checkpoint = sync::query_parent_state(query, parent_proxy).await?;
     syncer.set_committed(finalized_checkpoint).await;
+
+    if query.has_voted(validator)? {
+        tracing::debug!(
+            validator = validator.to_string(),
+            "validator has voted, skip this time"
+        );
+        return Ok(());
+    }
 
     let Some((h, payload)) = syncer.fetched_first_non_null_block().await else {
         tracing::debug!("topdown syncer not fetched new data");
