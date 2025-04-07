@@ -140,7 +140,6 @@ contract TopDownVotingFacet is GatewayActorModifiers {
     function execute(bytes32 vote) internal {
         s.topdownVoting.voteCommitted(vote);
         s.validatorsTracker.batchStoreChangeMemory(s.topdownVoting.votes[vote].payload.powerChanges);
-        require(s.networkName.route.length == 1, "route wrong");
         LibGateway.applyTopDownMessages(s.networkName.getParentSubnet(), s.topdownVoting.votes[vote].payload.xnetMsgs);
 
         // TODO: propagateAllPostboxMessages temporarily disabled due to contract size issue
