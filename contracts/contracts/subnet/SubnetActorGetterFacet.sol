@@ -10,6 +10,7 @@ import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {LibPower} from "../lib/LibPower.sol";
+import {LibBottomUpBatch} from "../lib/LibBottomUpBatch.sol";
 
 contract SubnetActorGetterFacet {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -225,5 +226,9 @@ contract SubnetActorGetterFacet {
     /// @notice Returns the collateral asset kind for the subnet.
     function collateralSource() external view returns (Asset memory supply) {
         return s.collateralSource;
+    }
+
+    function listPendingBottomUpBatchCommitments(SubnetID calldata subnet) external view returns (LibBottomUpBatch.ListPendingCommitmentsEntry[] memory) {
+        return LibBottomUpBatch.listPendingCommitments(subnet);
     }
 }

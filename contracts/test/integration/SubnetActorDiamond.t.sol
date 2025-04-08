@@ -2718,7 +2718,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     }
 
     // ============== Test bottom-up batch execution ===============
-    function testSubnetActor_BottomUpBatchExecution_Works() public {
+    function testSubnetActor_ExecBottomUpBatch() public {
         gatewayAddress = address(gatewayDiamond);
 
         Asset memory source = Asset({kind: AssetKind.Native, tokenAddress: address(0)});

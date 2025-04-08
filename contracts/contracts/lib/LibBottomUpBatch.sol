@@ -29,8 +29,9 @@ library LibBottomUpBatch {
         mapping(uint256 => BatchPending) pending;
     }
 
-    /// @notice Represents a pending bottom-up batch awaiting full execution at a specific checkpoint height.
+    /// @notice Represents a pending bottom-up batch commitment awaiting full execution at a specific checkpoint height.
     struct BatchPending {
+      /// @notice The pending batch commitment.
       BottomUpBatch.Commitment commitment;
       /// @notice Set of message leaf hashes that have already been executed for this batch.
       EnumerableSet.Bytes32Set executed;
@@ -114,6 +115,43 @@ library LibBottomUpBatch {
             tracker.pendingHeights.remove(bytes32(uint256(checkpointHeight)));
             delete tracker.pending[checkpointHeight];
         }
+    }
+
+    /// Return type for the list pending commitments view method.
+    struct ListPendingCommitmentsEntry {
+        uint64 height;
+        BottomUpBatch.Commitment commitment;
+        bytes32[] executed;
+    }
+
+    /// A view accessor to query the pending commitments for a given subnet.
+    function listPendingCommitments(
+        SubnetID calldata subnet
+    ) internal view returns (ListPendingCommitmentsEntry[] memory result) {
+        BottomUpBatchStorage storage s = bottomUpBatchStorage();
+
+        SubnetKey subnetKey = SubnetKey.wrap(subnet.toHash());
+
+        uint256 size = s.tracker[subnetKey].pendingHeights.length();
+        result = new ListPendingCommitmentsEntry[](size);
+
+        // Ok to not optimize with unchecked increments, since we expect this to be used off-chain only, for introspection.
+        for (uint256 i = 0; i < size; i++) {
+            Tracker storage tracker = s.tracker[subnetKey];
+            bytes32[] memory heights = tracker.pendingHeights.values();
+
+            for (uint256 j = 0; j < heights.length; j++) {
+                uint64 height = uint64(uint256(heights[j]) << 192 >> 192);
+                BatchPending storage pending = tracker.pending[height];
+                result[i] = ListPendingCommitmentsEntry({
+                    height: height,
+                    commitment: pending.commitment,
+                    executed: pending.executed.values()
+                });
+            }
+        }
+
+        return result;
     }
 
     function makeLeaf(IpcEnvelope memory _msg) internal pure returns (BottomUpBatch.MerkleHash) {

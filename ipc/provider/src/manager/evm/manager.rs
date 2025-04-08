@@ -34,6 +34,7 @@ use crate::manager::{EthManager, SubnetManager};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use ethers::abi::Tokenizable;
+use ethers::abi::AbiEncode;
 use ethers::contract::abigen;
 use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::{Signer, SignerMiddleware};
@@ -60,6 +61,8 @@ use ipc_observability::lazy_static;
 use ipc_wallet::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
 use num_traits::ToPrimitive;
 use std::result;
+use ipc_actors_abis::subnet_actor_checkpointing_facet::Inclusion;
+use ipc_actors_abis::subnet_actor_getter_facet::ListPendingCommitmentsEntry;
 
 pub type SignerWithFeeEstimatorMiddleware =
     Eip1559GasEstimatorMiddleware<SignerMiddleware<Provider<ErrorParserHttp>, Wallet<SigningKey>>>;
@@ -1226,6 +1229,16 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
         Ok(epoch.as_u64() as ChainEpoch)
     }
 
+    async fn list_pending_bottom_up_batch_commitments(&self, subnet_id: &SubnetID) -> Result<Vec<ListPendingCommitmentsEntry>> {
+        let address = contract_address_from_subnet(subnet_id)?;
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        let entries = contract.list_pending_bottom_up_batch_commitments(subnet_id.try_into()?).call().await?;
+        Ok(entries)
+    }
+
     async fn checkpoint_period(&self, subnet_id: &SubnetID) -> anyhow::Result<ChainEpoch> {
         let address = contract_address_from_subnet(subnet_id)?;
         let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
@@ -1303,6 +1316,101 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
             .await?
             .as_u64();
         Ok(epoch as ChainEpoch)
+    }
+
+    async fn make_next_bottom_up_batch_inclusions(
+        &self,
+        commitment: &ListPendingCommitmentsEntry
+    ) -> Result<Vec<Inclusion>> {
+        let contract = checkpointing_facet::CheckpointingFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+
+        let ev = contract
+            .event::<checkpointing_facet::BottomUpBatchRecordedFilter>()
+            .from_block(commitment.height)
+            .to_block(commitment.height)
+            .address(ValueOrArray::Value(contract.address()));
+
+        let result = query_with_meta(ev, contract.client()).await?;
+        let (event, meta) = match result.as_slice() {
+            [(event, meta)] => (event, meta),
+            [] => return Err(anyhow!("expected 1 BottomUpBatchRecorded event, got none")),
+            _ => return Err(anyhow!("expected 1 BottomUpBatchRecorded event, got multiple")),
+        };
+
+        if event.checkpoint_height != commitment.height as u64 {
+            return Err(anyhow!("checkpoint height not equal"));
+        }
+        tracing::debug!(
+            "found bottom up batch published at height: {}",
+            meta.block_number
+        );
+
+        let merkle = MerkleGen::new(
+            |msg| vec![msg.clone().encode_hex()],
+            event.msgs.as_slice(),
+            &["bytes32".to_owned()],
+        )?;
+
+        let mut inclusions = vec![];
+        for msg in &event.msgs {
+            let leaf_hash = merkle.leaf_hash(&[msg.clone().encode_hex()])?;
+            if commitment.executed.contains(&leaf_hash.0) {
+                tracing::debug!("skipping an already-executed bottom up msg: {:?}", msg);
+                continue;
+            }
+            let proof = merkle.get_proof(&msg)?;
+            let msg = convert_msg(msg.clone());
+            inclusions.push(Inclusion {
+                msg,
+                proof: proof.into_iter().map(|v| v.into()).collect(),
+            });
+        }
+        Ok(inclusions)
+    }
+
+    async fn execute_bottom_up_batch(
+        &self,
+        submitter: &Address,
+        subnet_id: &SubnetID,
+        height: ChainEpoch,
+        inclusions: Vec<Inclusion>
+    ) -> Result<ChainEpoch> {
+        let address = contract_address_from_subnet(&subnet_id)?;
+        tracing::debug!(
+            "execute bottom up batch: {inclusions:?} in evm subnet contract: {address:}"
+        );
+
+        let signer = Arc::new(self.get_signer_with_fee_estimator(submitter)?);
+        let contract = subnet_actor_checkpointing_facet::SubnetActorCheckpointingFacet::new(
+            address,
+            signer.clone(),
+        );
+        let call = contract.exec_bottom_up_batch(
+            subnet_id.try_into()?,
+            height.into(),
+            inclusions
+        );
+        let call = extend_call_with_pending_block(call).await?;
+
+        if let Some(calldata) = call.calldata() {
+            tracing::info!(
+                calldata = calldata.to_string(),
+                "execute bottom up batch raw call data"
+            );
+        }
+
+        let pending_tx = call.send().await?;
+        tracing::info!(
+            hash = hex::encode(pending_tx.tx_hash().as_bytes()),
+            "sent execute bottom up batch with txn"
+        );
+
+        let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
+
+        block_number_from_receipt(receipt)
     }
 }
 
@@ -1737,5 +1845,38 @@ mod tests {
         .unwrap()
         .root();
         assert_eq!(new_root, root);
+    }
+}
+
+
+fn convert_msg(
+    msg: checkpointing_facet::IpcEnvelope,
+) -> subnet_actor_checkpointing_facet::IpcEnvelope {
+    subnet_actor_checkpointing_facet::IpcEnvelope {
+        kind: msg.kind,
+        local_nonce: msg.local_nonce,
+        from: subnet_actor_checkpointing_facet::Ipcaddress {
+            subnet_id: subnet_actor_checkpointing_facet::SubnetID {
+                root: msg.from.subnet_id.root,
+                route: msg.from.subnet_id.route,
+            },
+            raw_address: subnet_actor_checkpointing_facet::FvmAddress {
+                addr_type: msg.from.raw_address.addr_type,
+                payload: msg.from.raw_address.payload,
+            },
+        },
+        to: subnet_actor_checkpointing_facet::Ipcaddress {
+            subnet_id: subnet_actor_checkpointing_facet::SubnetID {
+                root: msg.to.subnet_id.root,
+                route: msg.to.subnet_id.route,
+            },
+            raw_address: subnet_actor_checkpointing_facet::FvmAddress {
+                addr_type: msg.to.raw_address.addr_type,
+                payload: msg.to.raw_address.payload,
+            },
+        },
+        value: msg.value,
+        original_nonce: msg.original_nonce,
+        message: msg.message,
     }
 }

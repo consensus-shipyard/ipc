@@ -144,6 +144,7 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
                 i++;
             }
         }
+
         IGateway(s.ipcGatewayAddr).execBottomUpBatch(subnet, msgs);
 
         // Propagate cross messages from checkpoint to other subnets
