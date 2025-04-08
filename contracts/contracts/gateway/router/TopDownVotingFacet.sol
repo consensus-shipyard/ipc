@@ -82,13 +82,6 @@ contract TopDownVotingFacet is GatewayActorModifiers {
         _castVote(vote);
     }
 
-    function castVote(bytes32 vote) external {
-        if (!s.topdownVoting.ongoingVoteHashes.contains(vote)) {
-            revert VoteNotProposed(vote);
-        }
-        _castVote(vote);
-    }
-
     function _castVote(bytes32 vote) internal {
         uint256 totalValidators = s.currentMembership.validators.length;
         uint256 totalWeight = 0;
