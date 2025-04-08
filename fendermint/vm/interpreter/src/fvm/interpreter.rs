@@ -529,10 +529,10 @@ fn ipld_decode_signed_message(msg: &[u8]) -> Result<SignedMessage> {
         )
     })?;
 
-    match chain_msg {
-        ChainMessage::Signed(msg) => Ok(msg),
-        other => Err(CheckMessageError::IllegalMessage(format!("{:?}", other)).into()),
-    }
+    Ok(match chain_msg {
+        ChainMessage::Signed(msg) => msg,
+        ChainMessage::Validator(v) => v.into_inner(),
+    })
 }
 
 /// Decodes raw bytes and split into user msgs, i.e. normal signed messages and un-serialized validator messages.
