@@ -1,3 +1,4 @@
+use fvm_shared::address::Address;
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use serde::{Deserialize, Serialize};
@@ -26,6 +27,22 @@ pub enum ChainMessage {
 pub enum ValidatorMessage {
     SignBottomUpCheckpoint(SignedMessage),
     TopdownPropose(SignedMessage),
+}
+
+impl ValidatorMessage {
+    pub fn into_inner(self) -> SignedMessage {
+        match self {
+            ValidatorMessage::SignBottomUpCheckpoint(m) => m,
+            ValidatorMessage::TopdownPropose(m) => m,
+        }
+    }
+
+    pub fn sender(&self) -> &Address {
+        match self {
+            ValidatorMessage::SignBottomUpCheckpoint(m) => &m.message.from,
+            ValidatorMessage::TopdownPropose(m) => &m.message.from,
+        }
+    }
 }
 
 impl From<SignedMessage> for ChainMessage {

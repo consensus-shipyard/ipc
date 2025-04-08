@@ -30,6 +30,7 @@ use ipc_actors_abis::{
     checkpointing_facet, top_down_finality_facet, top_down_voting_facet, xnet_messaging_facet,
 };
 use ipc_api::cross::IpcEnvelope;
+use ipc_api::evm::payload_to_evm_address;
 use ipc_api::staking::ConfigurationNumber;
 
 use super::{
@@ -104,6 +105,30 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
             .getter
             .call(state, |c| c.bottom_up_check_period())?
             .as_u64())
+    }
+
+    pub fn is_validator(
+        &self,
+        state: &mut FvmExecState<DB>,
+        address: &fvm_shared::address::Address,
+    ) -> bool {
+        let Ok(addr) = payload_to_evm_address(address.payload()) else {
+            return false;
+        };
+        // as long as the validator index
+        self.get_validator_index(state, addr).is_ok()
+    }
+
+    /// Get the position of the validator in the
+    pub fn get_validator_index(
+        &self,
+        state: &mut FvmExecState<DB>,
+        address: ethers::types::Address,
+    ) -> anyhow::Result<usize> {
+        let r = self
+            .topdown_voting
+            .call(state, |c| c.get_validator_index(address))?;
+        Ok(r.as_usize())
     }
 
     /// Fetch the bottom-up message batch enqueued for a given checkpoint height.
