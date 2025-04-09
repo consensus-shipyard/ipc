@@ -81,6 +81,7 @@ fn main() -> color_eyre::Result<()> {
         "CheckpointingFacet",
         "TopDownFinalityFacet",
         "TopDownVotingFacet",
+        "TopDownVotingExecuteFacet",
         "XnetMessagingFacet",
         "GatewayMessengerFacet",
         "SubnetActorActivityFacet",
