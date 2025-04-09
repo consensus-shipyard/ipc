@@ -2,10 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! The tendermint aware syncer
 
-use crate::cache::ParentViewPayload;
 use crate::proxy::ParentQueryProxy;
 use crate::sync::syncer::LotusParentSyncer;
-use crate::{BlockHeight, ParentState};
 use anyhow::Context;
 
 /// Tendermint aware syncer
@@ -24,14 +22,6 @@ where
             inner,
             tendermint_client,
         }
-    }
-
-    pub async fn set_committed(&self, checkpoint: ParentState) {
-        self.inner.set_committed(checkpoint).await
-    }
-
-    pub async fn fetched_first_non_null_block(&self) -> Option<(BlockHeight, ParentViewPayload)> {
-        self.inner.fetched_first_non_null_block().await
     }
 
     /// Sync with the parent, unless CometBFT is still catching up with the network,

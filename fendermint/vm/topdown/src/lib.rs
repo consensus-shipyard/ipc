@@ -137,14 +137,14 @@ pub async fn run_topdown_voting<T, C, P, V>(
             }
         }
     };
-    let latest_committed = query
-        .get_latest_topdown_parent_state()
-        .expect("app is up but state not available")
+    let latest_committed = sync::query_parent_state(&query, &parent_proxy)
+        .await
         .expect("latest committed parent state should be available, but non");
     let topdown_data_container = Arc::new(Mutex::new(TopdownViewContainer::new(latest_committed)));
 
-    let lotus_syncer = LotusParentSyncer::new(config, parent_proxy.clone(), topdown_data_container)
-        .expect("cannot create lotus parent syncer");
+    let lotus_syncer =
+        LotusParentSyncer::new(config, parent_proxy.clone(), topdown_data_container.clone())
+            .expect("cannot create lotus parent syncer");
     let tendermint_syncer = Arc::new(TendermintAwareSyncer::new(lotus_syncer, tendermint_client));
 
     let syncer = tendermint_syncer.clone();
@@ -166,7 +166,7 @@ pub async fn run_topdown_voting<T, C, P, V>(
 
             if let Err(e) = voting(
                 &validator,
-                &tendermint_syncer,
+                topdown_data_container.clone(),
                 &topdown_voter,
                 &query,
                 &parent_proxy,
@@ -174,16 +174,19 @@ pub async fn run_topdown_voting<T, C, P, V>(
             )
             .await
             {
-                tracing::error!(error = e.to_string(), "sync with parent encountered error");
+                tracing::error!(
+                    error = e.to_string(),
+                    "voting for topdown encountered error"
+                );
                 continue;
-            }
+            };
         }
     });
 }
 
-async fn voting<T, C, P, V>(
+async fn voting<T, P, V>(
     validator: &Address,
-    syncer: &Arc<TendermintAwareSyncer<C, P>>,
+    topdown_data_container: Arc<Mutex<TopdownViewContainer>>,
     voter: &V,
     query: &Arc<T>,
     parent_proxy: &Arc<P>,
@@ -191,13 +194,9 @@ async fn voting<T, C, P, V>(
 ) -> anyhow::Result<()>
 where
     T: FendermintStateQuery + Send + Sync + 'static,
-    C: tendermint_rpc::Client + Send + Sync + 'static,
     P: ParentQueryProxy + Send + Sync + 'static,
     V: TopdownVoter + Send + Sync + 'static,
 {
-    let finalized_checkpoint = sync::query_parent_state(query, parent_proxy).await?;
-    syncer.set_committed(finalized_checkpoint).await;
-
     if query.has_voted(validator)? {
         tracing::debug!(
             validator = validator.to_string(),
@@ -206,18 +205,29 @@ where
         return Ok(());
     }
 
-    let Some((h, payload)) = syncer.fetched_first_non_null_block().await else {
-        tracing::debug!("topdown syncer not fetched new data");
+    let finalized_checkpoint = sync::query_parent_state(query, parent_proxy).await?;
+    let mut data_container = topdown_data_container.lock().await;
+    data_container.set_committed(finalized_checkpoint);
+
+    let Some((h, payload)) = data_container.next_vote() else {
+        tracing::info!("topdown syncer no new vote");
         return Ok(());
     };
-    if payload.1.is_empty() && payload.0.is_empty() {
-        tracing::debug!(
-            height = h,
-            "no topdown messages nor validator changes, skip"
-        );
-        return Ok(());
+
+    tracing::warn!(height = h, hash = hex::encode(&payload.0), "ready to vote");
+
+    match voter.vote(chain_id, h, payload).await {
+        Ok(()) => {
+            tracing::info!(height = h, "submitted new vote");
+        }
+        Err(e) => {
+            tracing::warn!(
+                height = h,
+                "failed to submit due to: {e}. Could be transient issue, retry next...",
+            )
+        }
     }
-    voter.vote(chain_id, h, payload).await
+    Ok(())
 }
 
 /// A trait that will be called by validators to

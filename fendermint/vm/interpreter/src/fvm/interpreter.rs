@@ -16,6 +16,7 @@ use tendermint_rpc::Client as TendermintClient;
 use crate::errors::*;
 use crate::fvm::bottomup::{BottomUpManager, PowerUpdates};
 use crate::fvm::gas_estimation::{estimate_gassed_msg, gas_search};
+use crate::fvm::topdown::TopdownManager;
 use crate::fvm::{
     activity::ValidatorActivityTracker,
     observe::{MsgExec, MsgExecPurpose},
@@ -50,6 +51,7 @@ where
     C: TendermintClient + Clone + Send + Sync + 'static,
 {
     gateway_caller: GatewayCaller<ReadOnlyBlockstore<Arc<DB>>>,
+    topdown_manager: TopdownManager<DB>,
     bottom_up_manager: BottomUpManager<DB, C>,
     upgrade_scheduler: UpgradeScheduler<DB>,
 
@@ -75,6 +77,7 @@ where
     ) -> Self {
         Self {
             gateway_caller: GatewayCaller::default(),
+            topdown_manager: TopdownManager::new(),
             bottom_up_manager,
             upgrade_scheduler,
             push_block_data_to_chainmeta_actor,
@@ -359,6 +362,8 @@ where
         &self,
         state: &mut FvmExecState<DB>,
     ) -> Result<EndBlockResponse, EndBlockError> {
+        self.topdown_manager.execute_topdown_voting_outcome(state)?;
+
         if let Some(pubkey) = state.block_producer() {
             state.activity_tracker().record_block_committed(pubkey)?;
         }

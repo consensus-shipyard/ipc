@@ -5,7 +5,7 @@
 use crate::cache::{ParentViewPayload, TopdownViewContainer};
 use crate::observe::ParentFinalityAcquired;
 use crate::proxy::ParentQueryProxy;
-use crate::{is_null_round_str, BlockHash, BlockHeight, Config, Error, ParentState};
+use crate::{is_null_round_str, BlockHash, BlockHeight, Config, Error};
 use anyhow::anyhow;
 use ethers::utils::hex;
 use ipc_observability::{emit, serde::HexEncodableBlockHash};
@@ -15,7 +15,7 @@ use tokio::sync::{Mutex, MutexGuard};
 use tracing::instrument;
 
 /// Sync every 10 parent block per sync call
-const SYNC_BATCH_SIZE: usize = 10;
+const SYNC_BATCH_SIZE: usize = 50;
 
 /// Parent syncer that constantly poll parent. This struct handles lotus null blocks and deferred
 /// execution. For ETH based parent, it should work out of the box as well.
@@ -39,16 +39,6 @@ where
             parent_proxy,
             data_cache,
         })
-    }
-
-    pub async fn set_committed(&self, checkpoint: ParentState) {
-        let mut cache = self.data_cache.lock().await;
-        cache.set_committed(checkpoint);
-    }
-
-    pub async fn fetched_first_non_null_block(&self) -> Option<(BlockHeight, ParentViewPayload)> {
-        let cache = self.data_cache.lock().await;
-        cache.fetched_first_non_null_block()
     }
 
     /// Insert the height into cache when we see a new non null block
@@ -138,8 +128,6 @@ where
                         "detected null round at height, inserted None to cache"
                     );
 
-                    data_cache.store_null_round(height)?;
-
                     emit(ParentFinalityAcquired {
                         source: "Parent syncer",
                         is_null: true,
@@ -186,7 +174,7 @@ where
         );
 
         data_cache.store_non_null_round(height, data.0.clone(), data.1.clone(), data.2.clone())?;
-        tracing::debug!(height, "non-null block pushed to cache");
+        tracing::warn!(height, "non-null block pushed to cache");
 
         emit(ParentFinalityAcquired {
             source: "Parent syncer",

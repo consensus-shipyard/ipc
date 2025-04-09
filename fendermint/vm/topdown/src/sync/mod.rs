@@ -69,7 +69,7 @@ where
                 height: genesis_epoch,
                 block_hash: r.block_hash,
             };
-            tracing::info!(
+            tracing::warn!(
                 genesis_finality = finality.to_string(),
                 "no previous finality committed, fetched from genesis epoch"
             );

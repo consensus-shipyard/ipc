@@ -21,7 +21,6 @@ use fendermint_vm_message::chain::ChainMessage;
 use crate::message::{GasParams, SignedMessageFactory};
 use crate::query::{QueryClient, QueryResponse};
 use crate::response::{decode_bytes, decode_fevm_create, decode_fevm_invoke};
-use ethers::contract::EthCall;
 use fendermint_vm_message::signed::SignedMessage;
 
 const SOLIDITY_SELECTOR_BYTES: usize = 4;
@@ -120,12 +119,6 @@ pub trait TxClient<M: BroadcastMode = TxCommit>: BoundClient + Send + Sync {
                 SOLIDITY_SELECTOR_BYTES,
                 calldata.len()
             ));
-        }
-
-        let sig_selector =
-            ipc_actors_abis::checkpointing_facet::AddCheckpointSignatureCall::selector();
-        if calldata[0..SOLIDITY_SELECTOR_BYTES] != sig_selector {
-            return Err(anyhow!("method not found"));
         }
 
         let msg = mf.create_chain_message(contract, calldata, value, gas_params, f)?;

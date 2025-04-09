@@ -20,14 +20,17 @@ use fendermint_vm_message::conv::{from_eth, from_fvm};
 use fendermint_vm_message::signed::sign_secp256k1;
 use fendermint_vm_topdown::ParentState;
 
+use fendermint_vm_message::conv::from_eth::to_fvm_tokens;
 use ipc_actors_abis::checkpointing_facet::CheckpointingFacet;
 use ipc_actors_abis::gateway_getter_facet::GatewayGetterFacet;
 use ipc_actors_abis::gateway_getter_facet::{self as getter, gateway_getter_facet};
 use ipc_actors_abis::top_down_finality_facet::TopDownFinalityFacet;
+use ipc_actors_abis::top_down_voting_execute_facet::TopDownVotingExecuteFacet;
 use ipc_actors_abis::top_down_voting_facet::TopDownVotingFacet;
 use ipc_actors_abis::xnet_messaging_facet::XnetMessagingFacet;
 use ipc_actors_abis::{
-    checkpointing_facet, top_down_finality_facet, top_down_voting_facet, xnet_messaging_facet,
+    checkpointing_facet, top_down_finality_facet, top_down_voting_execute_facet,
+    top_down_voting_facet, xnet_messaging_facet,
 };
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::evm::payload_to_evm_address;
@@ -58,6 +61,11 @@ pub struct GatewayCaller<DB> {
         TopDownVotingFacet<MockProvider>,
         top_down_voting_facet::TopDownVotingFacetErrors,
     >,
+    topdown_voting_execute: ContractCaller<
+        DB,
+        TopDownVotingExecuteFacet<MockProvider>,
+        top_down_voting_execute_facet::TopDownVotingExecuteFacetErrors,
+    >,
     xnet: ContractCaller<DB, XnetMessagingFacet<MockProvider>, NoRevert>,
 }
 
@@ -79,6 +87,7 @@ impl<DB> GatewayCaller<DB> {
             checkpointing: ContractCaller::new(addr, CheckpointingFacet::new),
             topdown: ContractCaller::new(addr, TopDownFinalityFacet::new),
             topdown_voting: ContractCaller::new(addr, TopDownVotingFacet::new),
+            topdown_voting_execute: ContractCaller::new(addr, TopDownVotingExecuteFacet::new),
             xnet: ContractCaller::new(addr, XnetMessagingFacet::new),
         }
     }
@@ -97,6 +106,26 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
     /// Return the current subnet ID.
     pub fn subnet_id(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<getter::SubnetID> {
         self.getter.call(state, |c| c.get_network_name())
+    }
+
+    pub fn get_voting_outcome(
+        &self,
+        state: &mut FvmExecState<DB>,
+    ) -> anyhow::Result<(u8, [u8; 32], TokenAmount)> {
+        let (outcome, vote, amount) = self
+            .topdown_voting_execute
+            .call(state, |c| c.get_vote_outcome())?;
+        let amount = to_fvm_tokens(&amount);
+        Ok((outcome, vote, amount))
+    }
+
+    pub fn clear_votes(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<()> {
+        self.topdown_voting_execute.call(state, |c| c.clear_votes())
+    }
+
+    /// Execute topdown voting winning vote
+    pub fn execute(&self, state: &mut FvmExecState<DB>, vote: [u8; 32]) -> anyhow::Result<()> {
+        self.topdown_voting_execute.call(state, |c| c.execute(vote))
     }
 
     /// Fetch the period with which the current subnet has to submit checkpoints to its parent.
@@ -337,17 +366,6 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
 
         Ok(addrs)
     }
-}
-
-/// Total amount of tokens to mint as a result of top-down messages arriving at the subnet.
-pub fn tokens_to_mint(msgs: &[ipc_api::cross::IpcEnvelope]) -> TokenAmount {
-    msgs.iter()
-        .fold(TokenAmount::from_atto(0), |mut total, msg| {
-            // Both fees and value are considered to enter the ciruculating supply of the subnet.
-            // Fees might be distributed among subnet validators.
-            total += &msg.value;
-            total
-        })
 }
 
 /// Total amount of tokens to burn as a result of bottom-up messages leaving the subnet.

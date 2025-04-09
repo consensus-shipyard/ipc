@@ -18,6 +18,7 @@ pub mod bundle;
 pub mod activity;
 pub(crate) mod gas;
 pub(crate) mod gas_estimation;
+pub(crate) mod topdown;
 mod validator;
 
 pub use bottomup::PowerUpdates;

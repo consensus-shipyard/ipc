@@ -15,31 +15,22 @@ pub type ParentViewPayload = (BlockHash, Vec<PowerChangeRequest>, Vec<IpcEnvelop
 ///   3. Deal with null blocks in filecoin
 #[derive(Clone)]
 pub struct TopdownViewContainer {
-    blocks: VecDeque<(BlockHeight, Option<ParentViewPayload>)>,
-    committed_parent_state: ParentState,
+    blocks: VecDeque<(BlockHeight, ParentViewPayload)>,
+    parent_state: ParentState,
 }
 
 impl TopdownViewContainer {
     pub fn new(committed_parent_state: ParentState) -> Self {
         Self {
             blocks: Default::default(),
-            committed_parent_state,
+            parent_state: committed_parent_state,
         }
     }
 
     /// Get the latest parent state stored in the cache to pull the next block
     pub fn get_latest_parent_state(&self) -> (BlockHeight, BlockHash) {
-        if let Some(v) = self.fetched_latest_parent_state() {
-            tracing::debug!(height = v.0, "first non null block in cache");
-            v
-        } else {
-            let p = self.committed_parent_state.clone();
-            tracing::debug!(
-                height = p.height,
-                "first non null block not in cache, use latest finality"
-            );
-            (p.height, p.block_hash)
-        }
+        let p = self.parent_state.clone();
+        (p.height, p.block_hash)
     }
 
     pub fn exceed_cache_size_limit(&self, limit: BlockHeight) -> bool {
@@ -53,28 +44,15 @@ impl TopdownViewContainer {
             }
             self.blocks.pop_front();
         }
-        self.committed_parent_state = checkpoint;
+
+        if self.parent_state.height < checkpoint.height {
+            self.parent_state = checkpoint;
+        }
     }
 
-    /// Get the first non-null block in the range of earliest cache block till the height specified, inclusive.
-    /// Return the block with lowest block height
-    pub(crate) fn fetched_first_non_null_block(&self) -> Option<(BlockHeight, ParentViewPayload)> {
-        for (h, v) in self.blocks.iter() {
-            if let Some(t) = v.as_ref() {
-                return Some((*h, t.clone()));
-            }
-        }
-        None
-    }
-
-    /// Get the highest block height and its block hash in the fetch blocks. Null blocks will not be returned.
-    pub(crate) fn fetched_latest_parent_state(&self) -> Option<(BlockHeight, BlockHash)> {
-        for (h, v) in self.blocks.iter().rev() {
-            if let Some(t) = v.as_ref() {
-                return Some((*h, t.0.clone()));
-            }
-        }
-        None
+    /// Return the block with lowest block height that is not null
+    pub(crate) fn next_vote(&self) -> Option<(BlockHeight, ParentViewPayload)> {
+        self.blocks.front().cloned()
     }
 
     pub fn store_non_null_round(
@@ -84,46 +62,30 @@ impl TopdownViewContainer {
         validator_changes: Vec<PowerChangeRequest>,
         top_down_msgs: Vec<IpcEnvelope>,
     ) -> Result<(), Error> {
+        let mut is_empty = true;
+
         if !top_down_msgs.is_empty() {
             // make sure incoming top down messages are ordered by nonce sequentially
             tracing::debug!(?top_down_msgs);
             ensure_sequential(&top_down_msgs, |msg| msg.local_nonce)?;
+            is_empty = false;
         };
         if !validator_changes.is_empty() {
             tracing::debug!(?validator_changes, "validator changes");
             ensure_sequential(&validator_changes, |change| change.configuration_number)?;
+            is_empty = false;
         }
 
-        self.append(height, Some((block_hash, validator_changes, top_down_msgs)))
-    }
-
-    /// When there is a new parent view, but it is actually a null round, call this function.
-    pub fn store_null_round(&mut self, height: BlockHeight) -> Result<(), Error> {
-        self.append(height, None)
-    }
-
-    pub fn append(
-        &mut self,
-        height: BlockHeight,
-        payload: Option<ParentViewPayload>,
-    ) -> Result<(), Error> {
-        let expected_next_height = if let Some((h, _)) = self.blocks.back() {
-            *h + 1
-        } else {
-            // no upper bound means no data yet, push back directly
-            self.blocks.push_back((height, payload));
-            return Ok(());
-        };
-
-        if expected_next_height == height {
-            self.blocks.push_back((height, payload));
-            Ok(())
-        } else {
-            Err(Error::NonSequentialParentViewInsert(
-                expected_next_height,
+        if !is_empty {
+            self.blocks.push_back((
                 height,
+                (block_hash.clone(), validator_changes, top_down_msgs),
             ))
         }
+
+        self.parent_state = ParentState { height, block_hash };
+
+        Ok(())
     }
 }
 
@@ -201,7 +163,7 @@ mod tests {
 
         // Test set new finality
         provider.set_committed(f.clone());
-        assert_eq!(provider.committed_parent_state, f);
+        assert_eq!(provider.parent_state, f);
         assert_eq!(provider.get_latest_parent_state(), (107u64, vec![7u8; 32]));
         assert_eq!(
             provider.fetched_latest_parent_state(),

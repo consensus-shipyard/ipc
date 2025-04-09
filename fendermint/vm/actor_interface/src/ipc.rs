@@ -57,6 +57,10 @@ lazy_static! {
                             abi: ia::top_down_voting_facet::TOPDOWNVOTINGFACET_ABI.to_owned(),
                         },
                         EthFacet {
+                            name: "TopDownVotingExecuteFacet",
+                            abi: ia::top_down_voting_execute_facet::TOPDOWNVOTINGEXECUTEFACET_ABI.to_owned(),
+                        },
+                        EthFacet {
                             name: "CheckpointingFacet",
                             abi: ia::checkpointing_facet::CHECKPOINTINGFACET_ABI.to_owned(),
                         },
