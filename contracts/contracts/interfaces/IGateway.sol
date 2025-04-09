@@ -65,9 +65,6 @@ interface IGateway {
     /// @notice Propagates all the stored messages to destination subnet
     function propagateAll() external payable;
 
-    /// @notice commit the ipc parent finality into storage
-    function commitParentFinality(ParentFinality calldata finality) external;
-
     /// @notice creates a new bottom-up checkpoint
     function createBottomUpCheckpoint(
         BottomUpCheckpoint calldata checkpoint,

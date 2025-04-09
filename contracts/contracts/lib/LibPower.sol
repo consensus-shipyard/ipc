@@ -578,21 +578,9 @@ library LibValidatorTracking {
     using LibValidatorSet for ValidatorSet;
     using LibPowerChangeLog for PowerChangeLog;
 
-    function storeChange(ParentValidatorsTracker storage self, PowerChangeRequest calldata changeRequest) internal {
-        uint64 configurationNumber = self.changes.recordChange({
-            validator: changeRequest.change.validator,
-            op: changeRequest.change.op,
-            payload: changeRequest.change.payload
-        });
-
-        if (configurationNumber != changeRequest.configurationNumber) {
-            revert InvalidConfigurationNumber();
-        }
-    }
-
-    function batchStoreChange(
+    function batchStoreChangeMemory(
         ParentValidatorsTracker storage self,
-        PowerChangeRequest[] calldata changeRequests
+        PowerChangeRequest[] memory changeRequests
     ) internal {
         uint256 length = changeRequests.length;
         if (length == 0) {
@@ -600,7 +588,16 @@ library LibValidatorTracking {
         }
 
         for (uint256 i; i < length; ) {
-            storeChange(self, changeRequests[i]);
+            uint64 configurationNumber = self.changes.recordChange({
+                validator: changeRequests[i].change.validator,
+                op: changeRequests[i].change.op,
+                payload: changeRequests[i].change.payload
+            });
+
+            if (configurationNumber != changeRequests[i].configurationNumber) {
+                revert InvalidConfigurationNumber();
+            }
+
             unchecked {
                 ++i;
             }

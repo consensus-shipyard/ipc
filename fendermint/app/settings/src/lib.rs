@@ -164,22 +164,14 @@ pub struct TopDownSettings {
     /// conservative and avoid other from rejecting the proposal because they don't see the
     /// height as final yet.
     pub chain_head_delay: BlockHeight,
-    /// The number of blocks on top of `chain_head_delay` to wait before proposing a height
-    /// as final on the parent chain, to avoid slight disagreements between validators whether
-    /// a block is final, or not just yet.
-    pub proposal_delay: BlockHeight,
-    /// The max number of blocks one should make the topdown proposal
-    pub max_proposal_range: BlockHeight,
     /// The max number of blocks to hold in memory for parent syncer
     pub max_cache_blocks: Option<BlockHeight>,
     /// Parent syncing cron period, in seconds
     #[serde_as(as = "DurationSeconds<u64>")]
     pub polling_interval: Duration,
-    /// Top down exponential back off retry base
+    /// Validator voting cron period, in seconds
     #[serde_as(as = "DurationSeconds<u64>")]
-    pub exponential_back_off: Duration,
-    /// The max number of retries for exponential backoff before giving up
-    pub exponential_retry_limit: usize,
+    pub voting_interval: Duration,
     /// The parent rpc http endpoint
     pub parent_http_endpoint: Url,
     /// Timeout for calls to the parent Ethereum API.
@@ -200,12 +192,6 @@ pub struct TopDownSettings {
 pub struct IpcSettings {
     #[serde_as(as = "IsHumanReadable")]
     pub subnet_id: SubnetID,
-    /// Interval with which votes can be gossiped.
-    #[serde_as(as = "DurationSeconds<u64>")]
-    pub vote_interval: Duration,
-    /// Timeout after which the last vote is re-published.
-    #[serde_as(as = "DurationSeconds<u64>")]
-    pub vote_timeout: Duration,
     /// The config for top down checkpoint. It's None if subnet id is root or not activating
     /// any top down checkpoint related operations
     pub topdown: Option<TopDownSettings>,
@@ -369,12 +355,6 @@ impl Settings {
     pub fn topdown_enabled(&self) -> bool {
         !self.ipc.subnet_id.is_root() && self.ipc.topdown.is_some()
     }
-
-    /// Indicate whether we have configured the IPLD Resolver to run.
-    pub fn resolver_enabled(&self) -> bool {
-        !self.resolver.connection.listen_addr.is_empty()
-            && self.ipc.subnet_id != *ipc_api::subnet_id::UNDEF
-    }
 }
 
 // Run these tests serially because some of them modify the environment.
@@ -401,22 +381,6 @@ mod tests {
         // which is why `#[serial]` was moved to the top.
         eprintln!("CONFIG = {:?}", c.cache);
         Settings::parse(c)
-    }
-
-    fn parse_config(run_mode: &str) -> Settings {
-        try_parse_config(run_mode).expect("failed to parse Settings")
-    }
-
-    #[test]
-    fn parse_default_config() {
-        let settings = parse_config("");
-        assert!(!settings.resolver_enabled());
-    }
-
-    #[test]
-    fn parse_test_config() {
-        let settings = parse_config("test");
-        assert!(settings.resolver_enabled());
     }
 
     #[test]

@@ -3,6 +3,7 @@
 //! Cross network messages related struct and utility functions.
 
 use crate::cross::IpcEnvelope;
+use crate::staking::PowerChangeRequest;
 use crate::subnet_id::SubnetID;
 use crate::HumanReadable;
 use cid::multihash::Code;
@@ -51,6 +52,13 @@ impl Display for QuorumReachedEvent {
             self.quorum_weight
         )
     }
+}
+
+pub struct TopdownCheckpoint {
+    pub parent_height: ChainEpoch,
+    pub parent_block_hash: Vec<u8>,
+    pub xnet_msgs: Vec<IpcEnvelope>,
+    pub power_changes: Vec<PowerChangeRequest>,
 }
 
 /// The collection of items for the bottom up checkpoint submission

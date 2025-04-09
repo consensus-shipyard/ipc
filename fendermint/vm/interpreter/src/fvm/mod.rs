@@ -9,7 +9,6 @@ pub mod interpreter;
 pub mod observe;
 pub mod state;
 pub mod store;
-pub mod topdown;
 pub mod upgrades;
 pub use interpreter::FvmMessagesInterpreter;
 
@@ -19,6 +18,7 @@ pub mod bundle;
 pub mod activity;
 pub(crate) mod gas;
 pub(crate) mod gas_estimation;
+pub(crate) mod topdown;
 mod validator;
 
 pub use bottomup::PowerUpdates;
@@ -55,5 +55,9 @@ impl<C> ValidatorContext<C> {
             addr,
             broadcaster,
         }
+    }
+
+    pub fn broadcaster(&self) -> &Broadcaster<C> {
+        &self.broadcaster
     }
 }

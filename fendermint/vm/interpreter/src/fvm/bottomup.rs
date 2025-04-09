@@ -20,6 +20,7 @@ use fendermint_crypto::SecretKey;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::BottomUpCheckpoint;
 use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
+use fendermint_vm_message::chain::{ChainMessage, ValidatorMessage};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{address::Address, chainid::ChainID};
 use ipc_actors_abis::checkpointing_facet as checkpoint;
@@ -448,7 +449,9 @@ where
         .context("failed to produce checkpoint signature calldata")?;
 
     let tx_hash = broadcaster
-        .fevm_invoke(Address::from(gateway.addr()), calldata, chain_id)
+        .fevm_invoke(Address::from(gateway.addr()), calldata, chain_id, |s| {
+            ChainMessage::Validator(ValidatorMessage::SignBottomUpCheckpoint(s))
+        })
         .await
         .context("failed to broadcast signature")?;
 

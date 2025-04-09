@@ -80,6 +80,8 @@ fn main() -> color_eyre::Result<()> {
         "GatewayGetterFacet",
         "CheckpointingFacet",
         "TopDownFinalityFacet",
+        "TopDownVotingFacet",
+        "TopDownVotingExecuteFacet",
         "XnetMessagingFacet",
         "GatewayMessengerFacet",
         "SubnetActorActivityFacet",
@@ -134,6 +136,7 @@ fn main() -> color_eyre::Result<()> {
         "SubnetActorGetterFacet",
         "LibGateway",
         "CheckpointingFacet",
+        "TopDownVotingFacet",
     ];
 
     let modules = fvm_address_conversion.into_iter().map(camel_to_snake);

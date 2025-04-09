@@ -16,25 +16,6 @@ contract TopDownFinalityFacet is GatewayActorModifiers {
     using LibValidatorTracking for ParentValidatorsTracker;
     using LibValidatorSet for ValidatorSet;
 
-    /// @notice commit the ipc parent finality into storage and returns the previous committed finality
-    /// This is useful to understand if the finalities are consistent or if there have been reorgs.
-    /// If there are no previous committed fainality, it will be default to zero values, i.e. zero height and block hash.
-    /// @param finality - the parent finality
-    /// @return hasCommittedBefore A flag that indicates if a finality record has been committed before.
-    /// @return previousFinality The previous finality information.
-    function commitParentFinality(
-        ParentFinality calldata finality
-    ) external systemActorOnly returns (bool hasCommittedBefore, ParentFinality memory previousFinality) {
-        previousFinality = LibGateway.commitParentFinality(finality);
-        hasCommittedBefore = previousFinality.height != 0;
-    }
-
-    /// @notice Store the validator change requests from parent.
-    /// @param changeRequests - the validator changes
-    function storeValidatorChanges(PowerChangeRequest[] calldata changeRequests) external systemActorOnly {
-        s.validatorsTracker.batchStoreChange(changeRequests);
-    }
-
     /// @notice Returns the next and start configuration numbers in the tracker of changes
     /// from the parent in the child gateway
     function getTrackerConfigurationNumbers() external view returns (uint64, uint64) {

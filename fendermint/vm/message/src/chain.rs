@@ -1,8 +1,9 @@
+use fvm_shared::address::Address;
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use serde::{Deserialize, Serialize};
 
-use crate::{ipc::IpcMessage, signed::SignedMessage};
+use crate::signed::SignedMessage;
 
 /// The different kinds of messages that can appear in blocks, ie. the transactions
 /// we can receive from Tendermint through the ABCI.
@@ -17,19 +18,6 @@ pub enum ChainMessage {
     /// A message that can be passed on to the FVM as-is.
     Signed(SignedMessage),
 
-    /// Messages involved in InterPlanetaryConsensus, which are basically top-down and bottom-up
-    /// checkpoints that piggy-back on the Tendermint voting mechanism for finality and CID resolution.
-    ///
-    /// Possible mechanisms include:
-    /// * Proposing "for resolution" - A message with a CID proposed for async resolution. These would be bottom-up
-    ///     messages that need to be relayed, so they also include some relayer identity and signature, for rewards.
-    /// * Proposing "for execution" - A message with a CID with proven availability and finality, ready to be executed.
-    ///     Such messages are proposed by the validators themselves, and their execution might trigger rewards for others.
-    ///
-    /// Because of the involvement of data availability voting and CID resolution, these messages require support
-    /// from the application, which is why they are handled in a special way.
-    Ipc(IpcMessage),
-
     /// The validator messages for IPC to function correctly.
     Validator(ValidatorMessage),
 }
@@ -38,6 +26,23 @@ pub enum ChainMessage {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ValidatorMessage {
     SignBottomUpCheckpoint(SignedMessage),
+    TopdownPropose(SignedMessage),
+}
+
+impl ValidatorMessage {
+    pub fn into_inner(self) -> SignedMessage {
+        match self {
+            ValidatorMessage::SignBottomUpCheckpoint(m) => m,
+            ValidatorMessage::TopdownPropose(m) => m,
+        }
+    }
+
+    pub fn sender(&self) -> &Address {
+        match self {
+            ValidatorMessage::SignBottomUpCheckpoint(m) => &m.message.from,
+            ValidatorMessage::TopdownPropose(m) => &m.message.from,
+        }
+    }
 }
 
 impl From<SignedMessage> for ChainMessage {
@@ -50,13 +55,16 @@ impl From<SignedMessage> for ChainMessage {
 mod arb {
 
     use super::ChainMessage;
-    use crate::{ipc::IpcMessage, signed::SignedMessage};
+    use crate::chain::ValidatorMessage;
+    use crate::signed::SignedMessage;
 
     impl quickcheck::Arbitrary for ChainMessage {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
             match u8::arbitrary(g) % 2 {
                 0 => ChainMessage::Signed(SignedMessage::arbitrary(g)),
-                _ => ChainMessage::Ipc(IpcMessage::arbitrary(g)),
+                _ => ChainMessage::Validator(ValidatorMessage::SignBottomUpCheckpoint(
+                    SignedMessage::arbitrary(g),
+                )),
             }
         }
     }

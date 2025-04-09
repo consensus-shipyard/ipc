@@ -4,7 +4,6 @@
 use anyhow::{Context, Result};
 use cid::Cid;
 use fendermint_vm_message::chain::{ChainMessage, ValidatorMessage};
-use fendermint_vm_message::ipc::IpcMessage;
 use fendermint_vm_message::query::{FvmQuery, StateParams};
 use fendermint_vm_message::signed::SignedMessage;
 use fvm_ipld_blockstore::Blockstore;
@@ -17,7 +16,7 @@ use tendermint_rpc::Client as TendermintClient;
 use crate::errors::*;
 use crate::fvm::bottomup::{BottomUpManager, PowerUpdates};
 use crate::fvm::gas_estimation::{estimate_gassed_msg, gas_search};
-use crate::fvm::topdown::TopDownManager;
+use crate::fvm::topdown::TopdownManager;
 use crate::fvm::{
     activity::ValidatorActivityTracker,
     observe::{MsgExec, MsgExecPurpose},
@@ -37,7 +36,8 @@ use std::convert::TryInto;
 use crate::fvm::executions::{
     execute_cron_message, execute_signed_message, push_block_to_chainmeta_actor_if_possible,
 };
-use crate::fvm::validator::execute_bottom_up_signature;
+use crate::fvm::state::ipc::GatewayCaller;
+use crate::fvm::validator::{execute_bottom_up_signature, execute_topdown_propose};
 
 struct Actor {
     id: ActorID,
@@ -50,8 +50,9 @@ where
     DB: Blockstore + Clone + Send + Sync + 'static,
     C: TendermintClient + Clone + Send + Sync + 'static,
 {
+    gateway_caller: GatewayCaller<ReadOnlyBlockstore<Arc<DB>>>,
+    topdown_manager: TopdownManager<DB>,
     bottom_up_manager: BottomUpManager<DB, C>,
-    top_down_manager: TopDownManager<DB>,
     upgrade_scheduler: UpgradeScheduler<DB>,
 
     push_block_data_to_chainmeta_actor: bool,
@@ -68,7 +69,6 @@ where
 {
     pub fn new(
         bottom_up_manager: BottomUpManager<DB, C>,
-        top_down_manager: TopDownManager<DB>,
         upgrade_scheduler: UpgradeScheduler<DB>,
         push_block_data_to_chainmeta_actor: bool,
         max_msgs_per_block: usize,
@@ -76,8 +76,9 @@ where
         gas_search_step: f64,
     ) -> Self {
         Self {
+            gateway_caller: GatewayCaller::default(),
+            topdown_manager: TopdownManager::new(),
             bottom_up_manager,
-            top_down_manager,
             upgrade_scheduler,
             push_block_data_to_chainmeta_actor,
             max_msgs_per_block,
@@ -244,34 +245,16 @@ where
 
     async fn prepare_messages_for_block(
         &self,
-        state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
+        mut state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
         msgs: Vec<Vec<u8>>,
         max_transaction_bytes: u64,
     ) -> Result<PrepareMessagesResponse, PrepareMessagesError> {
-        let signed_msgs = msgs
-            .iter()
-            .filter_map(|msg| match ipld_decode_signed_message(msg) {
-                Ok(vm) => Some(vm),
-                Err(e) => {
-                    tracing::warn!(error = %e, "failed to decode signable mempool message");
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
+        let (user_msgs, validator_msgs) =
+            decode_and_group_msgs(msgs, &mut state, &self.gateway_caller);
 
         let total_gas_limit = state.block_gas_tracker().available();
-        let signed_msgs_iter = select_messages_by_gas_limit(signed_msgs, total_gas_limit)
+        let mut all_msgs = select_messages_by_gas_limit(user_msgs, total_gas_limit)
             .into_iter()
-            .map(Into::into);
-
-        let top_down_iter = self
-            .top_down_manager
-            .chain_message_from_finality_or_quorum()
-            .await
-            .into_iter();
-
-        let mut all_msgs = top_down_iter
-            .chain(signed_msgs_iter)
             .map(|msg| fvm_ipld_encoding::to_vec(&msg).context("failed to encode message as IPLD"))
             .collect::<Result<Vec<Vec<u8>>>>()?;
 
@@ -285,7 +268,7 @@ where
         }
 
         let input_msg_count = all_msgs.len();
-        let (all_messages, total_bytes) =
+        let (mut all_messages, total_bytes) =
             select_messages_until_total_bytes(all_msgs, max_transaction_bytes as usize);
 
         if let Some(delta) = input_msg_count.checked_sub(all_messages.len()) {
@@ -298,6 +281,8 @@ where
             }
         }
 
+        all_messages.extend(validator_msgs);
+
         Ok(PrepareMessagesResponse {
             messages: all_messages,
             total_bytes,
@@ -306,30 +291,29 @@ where
 
     async fn attest_block_messages(
         &self,
-        state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
+        mut state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
         msgs: Vec<Vec<u8>>,
     ) -> Result<AttestMessagesResponse, AttestMessagesError> {
-        if msgs.len() > self.max_msgs_per_block {
-            tracing::warn!(
-                block_msgs = msgs.len(),
-                "rejecting block: too many messages"
-            );
-            return Ok(AttestMessagesResponse::Reject);
-        }
-
+        let mut total_user_msgs = 0;
         let mut block_gas_usage = 0;
+
         for msg in msgs {
             match fvm_ipld_encoding::from_slice::<ChainMessage>(&msg) {
                 Ok(chain_msg) => match chain_msg {
-                    ChainMessage::Ipc(IpcMessage::TopDownExec(finality)) => {
-                        if !self.top_down_manager.is_finality_valid(finality).await {
-                            return Ok(AttestMessagesResponse::Reject);
-                        }
-                    }
                     ChainMessage::Signed(signed) => {
                         block_gas_usage += signed.message.gas_limit;
+                        total_user_msgs += 1;
                     }
-                    ChainMessage::Validator(_) => {}
+                    ChainMessage::Validator(v) => {
+                        let sender = v.sender();
+                        if self.gateway_caller.is_validator(&mut state, sender) {
+                            continue;
+                        }
+                        tracing::warn!(
+                            "rejecting block: non validator {sender} sent validator message"
+                        );
+                        return Ok(AttestMessagesResponse::Reject);
+                    }
                 },
                 Err(e) => {
                     tracing::warn!(error = %e, "failed to decode message in proposal as ChainMessage");
@@ -338,6 +322,10 @@ where
             }
         }
 
+        if total_user_msgs > self.max_msgs_per_block {
+            tracing::warn!(total_user_msgs, "rejecting block: too many messages");
+            return Ok(AttestMessagesResponse::Reject);
+        }
         if block_gas_usage > state.block_gas_tracker().available() {
             return Ok(AttestMessagesResponse::Reject);
         }
@@ -374,6 +362,8 @@ where
         &self,
         state: &mut FvmExecState<DB>,
     ) -> Result<EndBlockResponse, EndBlockError> {
+        self.topdown_manager.execute_topdown_voting_outcome(state)?;
+
         if let Some(pubkey) = state.block_producer() {
             state.activity_tracker().record_block_committed(pubkey)?;
         }
@@ -390,12 +380,6 @@ where
         };
 
         let next_gas_market = state.finalize_gas_market()?;
-
-        if !power_updates.0.is_empty() {
-            self.top_down_manager
-                .update_voting_power_table(&power_updates)
-                .await;
-        }
 
         let response = EndBlockResponse {
             power_updates,
@@ -434,20 +418,11 @@ where
                     domain_hash,
                 })
             }
-            ChainMessage::Ipc(ipc_msg) => match ipc_msg {
-                IpcMessage::TopDownExec(p) => {
-                    let applied_message =
-                        self.top_down_manager.execute_topdown_msg(state, p).await?;
-                    Ok(ApplyMessageResponse {
-                        applied_message,
-                        domain_hash: None,
-                    })
-                }
-            },
             ChainMessage::Validator(v) => match v {
                 ValidatorMessage::SignBottomUpCheckpoint(signed) => {
                     execute_bottom_up_signature(state, signed)
                 }
+                ValidatorMessage::TopdownPropose(signed) => execute_topdown_propose(state, signed),
             },
         }
     }
@@ -559,8 +534,41 @@ fn ipld_decode_signed_message(msg: &[u8]) -> Result<SignedMessage> {
         )
     })?;
 
-    match chain_msg {
-        ChainMessage::Signed(msg) => Ok(msg),
-        other => Err(CheckMessageError::IllegalMessage(format!("{:?}", other)).into()),
+    Ok(match chain_msg {
+        ChainMessage::Signed(msg) => msg,
+        ChainMessage::Validator(v) => v.into_inner(),
+    })
+}
+
+/// Decodes raw bytes and split into user msgs, i.e. normal signed messages and un-serialized validator messages.
+fn decode_and_group_msgs<DB: Blockstore + Clone>(
+    msgs: Vec<Vec<u8>>,
+    state: &mut FvmExecState<DB>,
+    gateway_caller: &GatewayCaller<DB>,
+) -> (Vec<SignedMessage>, Vec<Vec<u8>>) {
+    let mut user_msgs = Vec::with_capacity(msgs.len());
+    let mut validator_msgs = vec![];
+
+    for msg in msgs {
+        let decoded = match fvm_ipld_encoding::from_slice::<ChainMessage>(&msg) {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::warn!(error = %e, "failed to decode mempool message");
+                continue;
+            }
+        };
+        match decoded {
+            ChainMessage::Signed(msg) => user_msgs.push(msg),
+            ChainMessage::Validator(validator_msg) => {
+                let sender = validator_msg.sender();
+                if !gateway_caller.is_validator(state, sender) {
+                    tracing::warn!("non validator {sender} sent validator msg, drop it");
+                    continue;
+                }
+                validator_msgs.push(msg);
+            }
+        }
     }
+
+    (user_msgs, validator_msgs)
 }

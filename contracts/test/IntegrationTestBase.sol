@@ -23,6 +23,8 @@ import {GatewayManagerFacet} from "../contracts/gateway/GatewayManagerFacet.sol"
 import {CheckpointingFacet} from "../contracts/gateway/router/CheckpointingFacet.sol";
 import {XnetMessagingFacet} from "../contracts/gateway/router/XnetMessagingFacet.sol";
 import {TopDownFinalityFacet} from "../contracts/gateway/router/TopDownFinalityFacet.sol";
+import {TopDownVotingFacet} from "../contracts/gateway/router/TopDownVotingFacet.sol";
+import {TopDownVotingExecuteFacet, VoteOutcome} from "../contracts/gateway/router/TopDownVotingExecuteFacet.sol";
 
 import {SubnetActorMock} from "./mocks/SubnetActorMock.sol";
 import {SubnetActorManagerFacet} from "../contracts/subnet/SubnetActorManagerFacet.sol";
@@ -130,6 +132,8 @@ contract TestGatewayActor is Test, TestParams {
     bytes4[] gwCheckpointingFacetSelectors;
     bytes4[] gwXnetMessagingFacetSelectors;
     bytes4[] gwTopDownFinalityFacetSelectors;
+    bytes4[] gwTopDownVotingFacetSelectors;
+    bytes4[] gwTopDownVotingExecuteFacetSelectors;
 
     bytes4[] gwManagerSelectors;
     bytes4[] gwGetterSelectors;
@@ -146,7 +150,8 @@ contract TestGatewayActor is Test, TestParams {
         gwCheckpointingFacetSelectors = SelectorLibrary.resolveSelectors("CheckpointingFacet");
         gwXnetMessagingFacetSelectors = SelectorLibrary.resolveSelectors("XnetMessagingFacet");
         gwTopDownFinalityFacetSelectors = SelectorLibrary.resolveSelectors("TopDownFinalityFacet");
-
+        gwTopDownVotingFacetSelectors = SelectorLibrary.resolveSelectors("TopDownVotingFacet");
+        gwTopDownVotingExecuteFacetSelectors = SelectorLibrary.resolveSelectors("TopDownVotingExecuteFacet");
         gwGetterSelectors = SelectorLibrary.resolveSelectors("GatewayGetterFacet");
         gwManagerSelectors = SelectorLibrary.resolveSelectors("GatewayManagerFacet");
         gwMessengerSelectors = SelectorLibrary.resolveSelectors("GatewayMessengerFacet");
@@ -296,9 +301,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     constructor() {}
 
     function setUp() public virtual {
-        address[] memory path = new address[](1);
-        path[0] = ROOTNET_ADDRESS;
-
         // create the root gateway actor.
         GatewayDiamond.ConstructorParams memory gwConstructorParams = defaultGatewayParams();
         gatewayDiamond = createGatewayDiamond(gwConstructorParams);
@@ -309,8 +311,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         );
 
         saDiamond = createSubnetActor(saConstructorParams);
-
-        addValidator(TOPDOWN_VALIDATOR_1, 100);
     }
 
     function defaultGatewayParams() internal view virtual returns (GatewayDiamond.ConstructorParams memory) {
@@ -337,10 +337,27 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         return params;
     }
 
+    function gatewayParams(
+        SubnetID memory id,
+        Validator[] memory validators
+    ) internal pure returns (GatewayDiamond.ConstructorParams memory) {
+        GatewayDiamond.ConstructorParams memory params = GatewayDiamond.ConstructorParams({
+            networkName: id,
+            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
+            genesisValidators: validators,
+            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
+            commitSha: DEFAULT_COMMIT_SHA
+        });
+        return params;
+    }
+
     function createGatewayDiamond(GatewayDiamond.ConstructorParams memory params) public returns (GatewayDiamond) {
         CheckpointingFacet checkpointingFacet = new CheckpointingFacet();
         XnetMessagingFacet xnetMessagingFacet = new XnetMessagingFacet();
         TopDownFinalityFacet topDownFinalityFacet = new TopDownFinalityFacet();
+        TopDownVotingFacet topDownVotingFacet = new TopDownVotingFacet();
+        TopDownVotingExecuteFacet topDownVotingExecuteFacet = new TopDownVotingExecuteFacet();
         GatewayManagerFacet manager = new GatewayManagerFacet();
         GatewayGetterFacet getter = new GatewayGetterFacet();
         GatewayMessengerFacet messenger = new GatewayMessengerFacet();
@@ -348,7 +365,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         DiamondLoupeFacet louper = new DiamondLoupeFacet();
         OwnershipFacet ownership = new OwnershipFacet();
 
-        IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](9);
+        IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](11);
 
         gwDiamondCut[0] = (
             IDiamond.FacetCut({
@@ -422,6 +439,21 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             })
         );
 
+        gwDiamondCut[9] = (
+            IDiamond.FacetCut({
+                facetAddress: address(topDownVotingFacet),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: gwTopDownVotingFacetSelectors
+            })
+        );
+
+        gwDiamondCut[10] = (
+            IDiamond.FacetCut({
+                facetAddress: address(topDownVotingExecuteFacet),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: gwTopDownVotingExecuteFacetSelectors
+            })
+        );
         gatewayDiamond = new GatewayDiamond(gwDiamondCut, params);
 
         return gatewayDiamond;
@@ -781,11 +813,6 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         weights[0] = 100;
         weights[1] = 100;
         weights[2] = 100;
-
-        ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
-
-        vm.prank(FilAddress.SYSTEM_ACTOR);
-        gatewayDiamond.topDownFinalizer().commitParentFinality(finality);
     }
 
     function setupWhiteListMethod(address caller, address src) public returns (bytes32) {
@@ -809,33 +836,10 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
         msgs[0] = crossMsg;
 
-        // we add a validator with 10 times as much weight as the default validator.
-        // This way we have 10/11 votes and we reach majority, setting the message in postbox
-        // addValidator(caller, 1000);
-
         vm.prank(FilAddress.SYSTEM_ACTOR);
         gatewayDiamond.xnetMessenger().applyCrossMessages(msgs);
 
         return crossMsg.toHash();
-    }
-
-    function addValidator(address validator) public {
-        addValidator(validator, 100);
-    }
-
-    function addValidator(address validator, uint256 weight) public {
-        FvmAddress[] memory validators = new FvmAddress[](1);
-        validators[0] = FvmAddressHelper.from(validator);
-        uint256[] memory weights = new uint256[](1);
-        weights[0] = weight;
-
-        vm.deal(validator, 1);
-        ParentFinality memory finality = ParentFinality({height: block.number, blockHash: bytes32(0)});
-        // uint64 n = gatewayDiamond.getter().getLastConfigurationNumber() + 1;
-
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        gatewayDiamond.topDownFinalizer().commitParentFinality(finality);
-        vm.stopPrank();
     }
 
     function reward(uint256 amount) public view {
@@ -1063,5 +1067,15 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         address subnetAddress
     ) public view returns (SubnetID memory, uint256, uint256, uint256, uint256) {
         return getSubnetGW(subnetAddress, gatewayDiamond);
+    }
+
+    function topDownVotingExecute(address gw) internal {
+        (VoteOutcome outcome, bytes32 vote,) = gw.topDownVotingExecute().getVoteOutcome();
+
+        if (outcome == VoteOutcome.QuorumAbandoned) {
+            gw.topDownVotingExecute().clearVotes();
+        } else if (outcome == VoteOutcome.QuorumFormed) {
+            gw.topDownVotingExecute().execute(vote);
+        }
     }
 }
