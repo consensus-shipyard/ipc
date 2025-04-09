@@ -948,6 +948,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         vm.stopPrank();
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        gatewayDiamond.topDownVoting().execute();
         uint64 configNumber = gatewayDiamond.topDownFinalizer().applyFinalityChanges();
         require(configNumber == 2, "wrong config number after applying finality, should be 2");
         require(
@@ -975,6 +976,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         vm.stopPrank();
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        gatewayDiamond.topDownVoting().execute();
         configNumber = gatewayDiamond.topDownFinalizer().applyFinalityChanges();
         require(configNumber == 3, "wrong config number after applying finality, should be 3");
         require(

@@ -53,8 +53,12 @@ contract GatewayTopdownVoting is Test, IntegrationTestBase, SubnetWithNativeToke
 
         vm.prank(validators[2].addr);
         gatewayDiamond.topDownVoting().propose(checkpoint);
-        
-        require(gatewayDiamond.topDownVoting().onGoingVoteInfo(voteHash).totalPower == 0, "weight 2 incorrect");
+        voteWeight += validators[2].weight;
+        require(gatewayDiamond.topDownVoting().onGoingVoteInfo(voteHash).totalPower == voteWeight, "weight 2 incorrect");
+
+        vm.prank(FilAddress.SYSTEM_ACTOR);
+        gatewayDiamond.topDownVoting().execute();
+
         (heightCommitted, ) = gatewayDiamond.topDownVoting().latestCommitted();
         require(heightCommitted == blockHeight, "height should be committed");
 
@@ -84,6 +88,9 @@ contract GatewayTopdownVoting is Test, IntegrationTestBase, SubnetWithNativeToke
             vm.prank(validators[i].addr);
             gatewayDiamond.topDownVoting().propose(checkpoint);
         }
+
+        vm.prank(FilAddress.SYSTEM_ACTOR);
+        gatewayDiamond.topDownVoting().execute();
 
         (heightCommitted, ) = gatewayDiamond.topDownVoting().latestCommitted();
         require(heightCommitted == 0, "height should still be 0");
@@ -117,6 +124,9 @@ contract GatewayTopdownVoting is Test, IntegrationTestBase, SubnetWithNativeToke
             gatewayDiamond.topDownVoting().propose(checkpoint);
         }
 
+        vm.prank(FilAddress.SYSTEM_ACTOR);
+        gatewayDiamond.topDownVoting().execute();
+
         (heightCommitted, ) = gatewayDiamond.topDownVoting().latestCommitted();
         require(heightCommitted == blockHeight, "height should be committed");
 
@@ -128,6 +138,9 @@ contract GatewayTopdownVoting is Test, IntegrationTestBase, SubnetWithNativeToke
             vm.prank(validators[i].addr);
             gatewayDiamond.topDownVoting().propose(checkpoint);
         }
+        
+        vm.prank(FilAddress.SYSTEM_ACTOR);
+        gatewayDiamond.topDownVoting().execute();
 
         (heightCommitted, ) = gatewayDiamond.topDownVoting().latestCommitted();
         require(heightCommitted == blockHeight, "height should be committed");
@@ -148,6 +161,9 @@ contract GatewayTopdownVoting is Test, IntegrationTestBase, SubnetWithNativeToke
             vm.prank(validators[i].addr);
             gatewayDiamond.topDownVoting().propose(checkpoint);
         }
+
+        vm.prank(FilAddress.SYSTEM_ACTOR);
+        gatewayDiamond.topDownVoting().execute();
 
         (heightCommitted, ) = gatewayDiamond.topDownVoting().latestCommitted();
         require(heightCommitted == blockHeight, "height should be committed");
@@ -201,8 +217,6 @@ contract GatewayTopdownVoting is Test, IntegrationTestBase, SubnetWithNativeToke
     }
 
     function dummyCheckpoint(uint64 blockHeight, bytes32 blockHash) internal pure returns (TopdownCheckpoint memory cp) {
-
-
         cp = TopdownCheckpoint({
             height: blockHeight,
             blockHash: blockHash,
