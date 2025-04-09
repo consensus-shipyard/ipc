@@ -107,27 +107,7 @@ contract TopDownVotingFacet is GatewayActorModifiers {
         s.topdownVoting.markVoted(validatorIndex);
 
         uint256 power = s.currentMembership.validators[validatorIndex].weight;
-        (uint256 totalPowerVoted, uint256 voteTotalPower) = s.topdownVoting.increaseVotePower(vote, power);
-
-        uint256 quorumThreshold = (totalWeight * 2) / 3;
-
-        if (voteTotalPower > quorumThreshold) {
-            emit TopdownQuorumFormed(vote, quorumThreshold, totalWeight);
-
-            execute(vote);
-
-            s.topdownVoting.clearVoting();
-            return;
-        }
-
-        if (totalPowerVoted <= quorumThreshold) {
-            return;
-        }
-
-        // this means more than quorum threshold of total weight has already
-        // voted and no consensus reached
-        emit VotingAborted();
-        s.topdownVoting.clearVoting();
+        s.topdownVoting.increaseVotePower(vote, power);
     }
 
     function getNonce(IpcEnvelope calldata xmsg) internal pure returns (uint64) {
@@ -174,9 +154,55 @@ contract TopDownVotingFacet is GatewayActorModifiers {
         }
     }
 
-    function execute(bytes32 vote) internal {
+    function execute() external systemActorOnly() returns(bool, uint256) {
+        uint256 totalWeight = 0;
+        uint256 totalValidators = s.currentMembership.validators.length;
+        for (uint256 i = 0; i < totalValidators; ) {
+            totalWeight += s.currentMembership.validators[i].weight;
+            unchecked {
+                i++;
+            }
+        }
+
+        uint256 quorumThreshold = (totalWeight * 2) / 3;
+
+        uint256 totalNumVotes = s.topdownVoting.ongoingVoteHashes.length();
+        for (uint256 i = 0; i < totalNumVotes; ) {
+            bytes32 vote = s.topdownVoting.ongoingVoteHashes.at(i);
+            if (s.topdownVoting.votes[vote].totalPower > quorumThreshold) {
+                emit TopdownQuorumFormed(vote, quorumThreshold, s.topdownVoting.votes[vote].totalPower);
+                uint256 tokensToMint = _execute(vote);
+                s.topdownVoting.clearVoting();
+                return (true, tokensToMint);
+            }
+
+            unchecked {
+                i++;
+            }
+        }
+
+        if (totalWeight > quorumThreshold) {
+            // this means more than quorum threshold of total weight has already
+            // voted and no consensus reached
+            emit VotingAborted();
+            s.topdownVoting.clearVoting();
+        }
+
+        return (false, 0);
+    }
+
+    function _execute(bytes32 vote) internal returns(uint256 tokensToMint) {
         s.topdownVoting.voteCommitted(vote);
         s.validatorsTracker.batchStoreChangeMemory(s.topdownVoting.votes[vote].payload.powerChanges);
+
+        uint256 numXnetMsgs = 0;
+        for (uint256 i = 0; i < numXnetMsgs; ) {
+            tokensToMint += s.topdownVoting.votes[vote].payload.xnetMsgs[i].value;
+            unchecked {
+                i++;
+            }
+        }
+
         LibGateway.applyTopDownMessages(s.networkName.getParentSubnet(), s.topdownVoting.votes[vote].payload.xnetMsgs);
 
         // TODO: propagateAllPostboxMessages temporarily disabled due to contract size issue
