@@ -50,8 +50,8 @@ contract TopDownVotingExecuteFacet is GatewayActorModifiers {
                 continue;
             }
 
-            uint256 numXnetMsgs = 0;
-            for (uint256 j = 0; i < numXnetMsgs; ) {
+            uint256 numXnetMsgs = s.topdownVoting.votes[vote].payload.xnetMsgs.length;
+            for (uint256 j = 0; j < numXnetMsgs; ) {
                 tokensToMint += s.topdownVoting.votes[vote].payload.xnetMsgs[j].value;
                 unchecked {
                     i++;
