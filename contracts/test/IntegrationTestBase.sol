@@ -24,6 +24,7 @@ import {CheckpointingFacet} from "../contracts/gateway/router/CheckpointingFacet
 import {XnetMessagingFacet} from "../contracts/gateway/router/XnetMessagingFacet.sol";
 import {TopDownFinalityFacet} from "../contracts/gateway/router/TopDownFinalityFacet.sol";
 import {TopDownVotingFacet} from "../contracts/gateway/router/TopDownVotingFacet.sol";
+import {TopDownVotingExecuteFacet, VoteOutcome} from "../contracts/gateway/router/TopDownVotingExecuteFacet.sol";
 
 import {SubnetActorMock} from "./mocks/SubnetActorMock.sol";
 import {SubnetActorManagerFacet} from "../contracts/subnet/SubnetActorManagerFacet.sol";
@@ -132,6 +133,7 @@ contract TestGatewayActor is Test, TestParams {
     bytes4[] gwXnetMessagingFacetSelectors;
     bytes4[] gwTopDownFinalityFacetSelectors;
     bytes4[] gwTopDownVotingFacetSelectors;
+    bytes4[] gwTopDownVotingExecuteFacetSelectors;
 
     bytes4[] gwManagerSelectors;
     bytes4[] gwGetterSelectors;
@@ -149,6 +151,7 @@ contract TestGatewayActor is Test, TestParams {
         gwXnetMessagingFacetSelectors = SelectorLibrary.resolveSelectors("XnetMessagingFacet");
         gwTopDownFinalityFacetSelectors = SelectorLibrary.resolveSelectors("TopDownFinalityFacet");
         gwTopDownVotingFacetSelectors = SelectorLibrary.resolveSelectors("TopDownVotingFacet");
+        gwTopDownVotingExecuteFacetSelectors = SelectorLibrary.resolveSelectors("TopDownVotingExecuteFacet");
         gwGetterSelectors = SelectorLibrary.resolveSelectors("GatewayGetterFacet");
         gwManagerSelectors = SelectorLibrary.resolveSelectors("GatewayManagerFacet");
         gwMessengerSelectors = SelectorLibrary.resolveSelectors("GatewayMessengerFacet");
@@ -354,6 +357,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         XnetMessagingFacet xnetMessagingFacet = new XnetMessagingFacet();
         TopDownFinalityFacet topDownFinalityFacet = new TopDownFinalityFacet();
         TopDownVotingFacet topDownVotingFacet = new TopDownVotingFacet();
+        TopDownVotingExecuteFacet topDownVotingExecuteFacet = new TopDownVotingExecuteFacet();
         GatewayManagerFacet manager = new GatewayManagerFacet();
         GatewayGetterFacet getter = new GatewayGetterFacet();
         GatewayMessengerFacet messenger = new GatewayMessengerFacet();
@@ -361,7 +365,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         DiamondLoupeFacet louper = new DiamondLoupeFacet();
         OwnershipFacet ownership = new OwnershipFacet();
 
-        IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](10);
+        IDiamond.FacetCut[] memory gwDiamondCut = new IDiamond.FacetCut[](11);
 
         gwDiamondCut[0] = (
             IDiamond.FacetCut({
@@ -443,6 +447,13 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             })
         );
 
+        gwDiamondCut[10] = (
+            IDiamond.FacetCut({
+                facetAddress: address(topDownVotingExecuteFacet),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: gwTopDownVotingExecuteFacetSelectors
+            })
+        );
         gatewayDiamond = new GatewayDiamond(gwDiamondCut, params);
 
         return gatewayDiamond;
@@ -1056,5 +1067,15 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         address subnetAddress
     ) public view returns (SubnetID memory, uint256, uint256, uint256, uint256) {
         return getSubnetGW(subnetAddress, gatewayDiamond);
+    }
+
+    function topDownVotingExecute(address gw) internal {
+        (VoteOutcome outcome, bytes32 vote,) = gw.topDownVotingExecute().getVoteOutcome();
+
+        if (outcome == VoteOutcome.QuorumAbandoned) {
+            gw.topDownVotingExecute().clearVotes();
+        } else if (outcome == VoteOutcome.QuorumFormed) {
+            gw.topDownVotingExecute().execute(vote);
+        }
     }
 }

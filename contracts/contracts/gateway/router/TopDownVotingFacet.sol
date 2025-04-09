@@ -125,15 +125,14 @@ contract TopDownVotingFacet is GatewayActorModifiers {
                 revert InvalidTopdownMessageNonce(appliedNonce, getNonce(checkpoint.xnetMsgs[0]));
             }
 
-            // TODO: comment off due to size constraint
-            // for (uint256 i = 1; i < checkpoint.xnetMsgs.length; ) {
-            //     if (getNonce(checkpoint.xnetMsgs[i]) != getNonce(checkpoint.xnetMsgs[i-1]) + 1) {
-            //         revert NonSequential("XnetMsg", getNonce(checkpoint.xnetMsgs[i-1]), getNonce(checkpoint.xnetMsgs[i]));
-            //     }
-            //     unchecked {
-            //         i++;
-            //     }
-            // }
+            for (uint256 i = 1; i < checkpoint.xnetMsgs.length; ) {
+                if (getNonce(checkpoint.xnetMsgs[i]) != getNonce(checkpoint.xnetMsgs[i-1]) + 1) {
+                    revert NonSequential("XnetMsg", getNonce(checkpoint.xnetMsgs[i-1]), getNonce(checkpoint.xnetMsgs[i]));
+                }
+                unchecked {
+                    i++;
+                }
+            }
         }
 
         if (checkpoint.powerChanges.length != 0) {
@@ -142,71 +141,15 @@ contract TopDownVotingFacet is GatewayActorModifiers {
                 revert InvalidTopdownConfigNumber(expected, checkpoint.powerChanges[0].configurationNumber);
             }
 
-            // TODO: comment off due to size constraint
-            // for (uint256 i = 1; i < checkpoint.powerChanges.length; ) {
-            //     if (checkpoint.powerChanges[i].configurationNumber != checkpoint.powerChanges[i-1].configurationNumber + 1) {
-            //         revert NonSequential("CFN", checkpoint.powerChanges[i-1].configurationNumber, checkpoint.powerChanges[i].configurationNumber);
-            //     }
-            //     unchecked {
-            //         i++;
-            //     }
-            // }
-        }
-    }
-
-    function execute() external systemActorOnly() returns(bool, uint256) {
-        uint256 totalWeight = 0;
-        uint256 totalValidators = s.currentMembership.validators.length;
-        for (uint256 i = 0; i < totalValidators; ) {
-            totalWeight += s.currentMembership.validators[i].weight;
-            unchecked {
-                i++;
+            for (uint256 i = 1; i < checkpoint.powerChanges.length; ) {
+                if (checkpoint.powerChanges[i].configurationNumber != checkpoint.powerChanges[i-1].configurationNumber + 1) {
+                    revert NonSequential("CFN", checkpoint.powerChanges[i-1].configurationNumber, checkpoint.powerChanges[i].configurationNumber);
+                }
+                unchecked {
+                    i++;
+                }
             }
         }
-
-        uint256 quorumThreshold = (totalWeight * 2) / 3;
-
-        uint256 totalNumVotes = s.topdownVoting.ongoingVoteHashes.length();
-        for (uint256 i = 0; i < totalNumVotes; ) {
-            bytes32 vote = s.topdownVoting.ongoingVoteHashes.at(i);
-            if (s.topdownVoting.votes[vote].totalPower > quorumThreshold) {
-                emit TopdownQuorumFormed(vote, quorumThreshold, s.topdownVoting.votes[vote].totalPower);
-                uint256 tokensToMint = _execute(vote);
-                s.topdownVoting.clearVoting();
-                return (true, tokensToMint);
-            }
-
-            unchecked {
-                i++;
-            }
-        }
-
-        if (totalWeight > quorumThreshold) {
-            // this means more than quorum threshold of total weight has already
-            // voted and no consensus reached
-            emit VotingAborted();
-            s.topdownVoting.clearVoting();
-        }
-
-        return (false, 0);
-    }
-
-    function _execute(bytes32 vote) internal returns(uint256 tokensToMint) {
-        s.topdownVoting.voteCommitted(vote);
-        s.validatorsTracker.batchStoreChangeMemory(s.topdownVoting.votes[vote].payload.powerChanges);
-
-        uint256 numXnetMsgs = 0;
-        for (uint256 i = 0; i < numXnetMsgs; ) {
-            tokensToMint += s.topdownVoting.votes[vote].payload.xnetMsgs[i].value;
-            unchecked {
-                i++;
-            }
-        }
-
-        LibGateway.applyTopDownMessages(s.networkName.getParentSubnet(), s.topdownVoting.votes[vote].payload.xnetMsgs);
-
-        // TODO: propagateAllPostboxMessages temporarily disabled due to contract size issue
-        // LibGateway.propagateAllPostboxMessages();
     }
 }
 

@@ -104,7 +104,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
     }
 
     function testGatewayDiamond_LoupeFunction() public view {
-        require(gatewayDiamond.diamondLouper().facets().length == 10, "unexpected length");
+        require(gatewayDiamond.diamondLouper().facets().length == 11, "unexpected length");
         require(
             gatewayDiamond.diamondLouper().supportsInterface(type(IERC165).interfaceId) == true,
             "IERC165 not supported"
@@ -948,7 +948,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         vm.stopPrank();
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        gatewayDiamond.topDownVoting().execute();
+        topDownVotingExecute(address(gatewayDiamond));
         uint64 configNumber = gatewayDiamond.topDownFinalizer().applyFinalityChanges();
         require(configNumber == 2, "wrong config number after applying finality, should be 2");
         require(
@@ -976,7 +976,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         vm.stopPrank();
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        gatewayDiamond.topDownVoting().execute();
+        topDownVotingExecute(address(gatewayDiamond));
         configNumber = gatewayDiamond.topDownFinalizer().applyFinalityChanges();
         require(configNumber == 3, "wrong config number after applying finality, should be 3");
         require(

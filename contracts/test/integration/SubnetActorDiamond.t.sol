@@ -149,6 +149,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         }
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
+        topDownVotingExecute(address(gatewayDiamond));
         gatewayDiamond.topDownFinalizer().applyFinalityChanges();
 
         membership = gatewayDiamond.getter().getCurrentMembership();
