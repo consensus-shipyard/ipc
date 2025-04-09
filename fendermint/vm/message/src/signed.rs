@@ -226,8 +226,8 @@ impl SignedMessage {
             )));
         };
 
-        if !is_eth_addr_compat(&message.to) {
-            let mut data = Self::cid(message)?.to_bytes();
+        let fvm_signature = Self::cid(message).map_err(SignedMessageError::Ipld).and_then(|cid| {
+            let mut data = cid.to_bytes();
             data.extend(chain_id_bytes(chain_id).iter());
 
             let rec = recover_secp256k1(signature, &data)
@@ -235,11 +235,18 @@ impl SignedMessage {
 
             let rec_addr = EthAddress::from(rec);
 
-            return if rec_addr.0 == from.0 {
+            if rec_addr.0 == from.0 {
                 Ok(())
             } else {
                 Err(SignedMessageError::InvalidSignature("the Ethereum delegated address did not match the one recovered from the signature".to_string()))
-            };
+            }
+        });
+
+        // If a destination IS NOT an ethereum-compatible address, we want to return the FVM signature check.
+        // If the destination IS an ethereum-compatible address, we shall check for FVM or EVM signatures.
+        // The calculation of FVM signature happens anyway.
+        if !is_eth_addr_compat(&message.to) || fvm_signature.is_ok() {
+            return fvm_signature;
         }
 
         let hash = to_eth_txn(message, chain_id)

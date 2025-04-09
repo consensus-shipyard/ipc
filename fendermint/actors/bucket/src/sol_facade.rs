@@ -261,6 +261,7 @@ fn sol_query(list: ListObjectsReturn) -> sol::Query {
 
 const DEFAULT_DELIMITER: &[u8] = b"/"; // "/" in ASCII and UTF-8
 const DEFAULT_START_KEY: Vec<u8> = vec![]; //= ""
+const DEFAULT_PREFIX: Vec<u8> = vec![]; //= ""
 const DEFAULT_LIMIT: u64 = 0;
 
 impl AbiCall for sol::queryObjects_0Call {
@@ -341,9 +342,9 @@ impl AbiCall for sol::queryObjects_3Call {
     type Output = Vec<u8>;
 
     fn params(&self) -> Self::Params {
-        let prefix = "".to_string().into_bytes();
-        let delimiter = "/".to_string().into_bytes();
-        let start_key = "".to_string().into_bytes();
+        let prefix = DEFAULT_PREFIX;
+        let delimiter = DEFAULT_DELIMITER.to_vec();
+        let start_key = DEFAULT_START_KEY.to_vec();
         let limit = 0;
         ListParams {
             prefix,
