@@ -62,7 +62,7 @@ async fn test_topdown_and_bottomup() {
 
                 // Subnet actor on the parent
                 let england_subnet = SubnetActorGetterFacet::new(
-                    to_eth_address(&england.subnet_id.subnet_actor(), true)
+                    to_eth_address(&england.subnet_id.subnet_actor())
                         .and_then(|a| a.ok_or_else(|| anyhow!("not an eth address")))?,
                     brussels_provider.clone(),
                 );

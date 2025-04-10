@@ -226,8 +226,8 @@ impl SignedMessage {
             )));
         };
 
-        let fvm_signature = Self::cid(message).map_err(SignedMessageError::Ipld).and_then(|cid| {
-            let mut data = cid.to_bytes();
+        if !is_eth_addr_compat(&message.to) {
+            let mut data = Self::cid(message)?.to_bytes();
             data.extend(chain_id_bytes(chain_id).iter());
 
             let rec = recover_secp256k1(signature, &data)
@@ -235,18 +235,11 @@ impl SignedMessage {
 
             let rec_addr = EthAddress::from(rec);
 
-            if rec_addr.0 == from.0 {
+            return if rec_addr.0 == from.0 {
                 Ok(())
             } else {
                 Err(SignedMessageError::InvalidSignature("the Ethereum delegated address did not match the one recovered from the signature".to_string()))
-            }
-        });
-
-        // If a destination IS NOT an ethereum-compatible address, we want to return the FVM signature check.
-        // If the destination IS an ethereum-compatible address, we shall check for FVM or EVM signatures.
-        // The calculation of FVM signature happens anyway.
-        if !is_eth_addr_compat(&message.to) || fvm_signature.is_ok() {
-            return fvm_signature;
+            };
         }
 
         let hash = to_eth_txn(message, chain_id)
@@ -370,7 +363,7 @@ fn maybe_eth_address(addr: &Address) -> Option<et::H160> {
 
 /// Check if the address can be converted to an Ethereum one.
 fn is_eth_addr_compat(addr: &Address) -> bool {
-    from_fvm::to_eth_address(addr, true).is_ok()
+    from_fvm::to_eth_address(addr).is_ok()
 }
 
 /// Check if the address is an Ethereum delegated one.
@@ -393,11 +386,13 @@ fn verify_eth_method(msg: &Message) -> Result<(), SignedMessageError> {
             )));
         }
     } else if msg.method_num != evm::Method::InvokeContract as u64 {
-        return Err(SignedMessageError::Ethereum(anyhow!(
-            "An EVM actor can only be called with InvokeContract; got {} - {}",
-            msg.to,
-            msg.method_num
-        )));
+        // TODO: Uncomment this block after the Recall Rust SDK no longer used the CometBFT API
+        //   to directly call WASM actors.
+        // return Err(SignedMessageError::Ethereum(anyhow!(
+        //     "An EVM actor can only be called with InvokeContract; got {} - {}",
+        //     msg.to,
+        //     msg.method_num
+        // )));
     }
     Ok(())
 }
