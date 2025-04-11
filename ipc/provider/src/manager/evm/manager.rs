@@ -1516,15 +1516,17 @@ fn block_number_from_positive_receipt(
     match receipt {
         Some(r) =>
         // success only
-        if r.status.as_ref().map(|x| x.as_u64()) != Some(1) {
-            let block_number = r
-                .block_number
-                .ok_or_else(|| anyhow!("cannot get block number"))?;
-            Ok(block_number.as_u64() as ChainEpoch)
-        } else {
-            Err(anyhow!(
-                "txn sent to network, but receipt was a revert receipt"
-            ))
+        {
+            if r.status.as_ref().map(|x| x.as_u64()) != Some(1) {
+                let block_number = r
+                    .block_number
+                    .ok_or_else(|| anyhow!("cannot get block number"))?;
+                Ok(block_number.as_u64() as ChainEpoch)
+            } else {
+                Err(anyhow!(
+                    "txn sent to network, but receipt was a revert receipt"
+                ))
+            }
         }
         None => Err(anyhow!(
             "txn sent to network, but receipt cannot be obtained, please check scanner"
