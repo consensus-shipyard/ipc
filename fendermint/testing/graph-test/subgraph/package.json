@@ -13,7 +13,7 @@
     "graph-local-clean": "docker compose down -v && docker-compose rm -v && rm -rf data/ipfs data/postgres"
   },
   "dependencies": {
-    "@graphprotocol/graph-cli": "0.45.2",
+    "@graphprotocol/graph-cli": "0.50.0",
     "@graphprotocol/graph-ts": "0.29.2",
     "@protofire/subgraph-toolkit": "^0.1.2"
   },
