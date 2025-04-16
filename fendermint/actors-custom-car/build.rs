@@ -219,7 +219,11 @@ fn build_all_wasm_blobs(
         .iter()
         .map(|actor| format!("-p={}", actor.package_name));
 
-    echo!("actors-custom-car", purple, "Target: channel={channel} target={target}");
+    echo!(
+        "actors-custom-car",
+        purple,
+        "Target: channel={channel} target={target}"
+    );
 
     let rustup = which::which("rustup")?;
 
@@ -294,7 +298,9 @@ fn print_cargo_rerun_if_dependency_instructions(
     let cargo_lock = find_cargo_lock(out_dir).ok_or_eyre("Couldn't find Cargo.lock")?;
     rerun_if_changed(&cargo_lock);
 
-    let workspace_dir = cargo_lock.parent().expect("A file always should have a parent");
+    let workspace_dir = cargo_lock
+        .parent()
+        .expect("A file always should have a parent");
 
     let metadata = create_metadata_command(workspace_dir.join("Cargo.toml")).exec()?;
 
