@@ -205,7 +205,7 @@ fn build_all_wasm_blobs(
     channel: &str,
     target: &str,
     actors: &[Actor],
-    cwd: &Path,
+    workspace_dir: &Path,
     manifest_path: &Path,
     out_dir: &Path,
 ) -> Result<Vec<Actor>> {
@@ -230,7 +230,7 @@ fn build_all_wasm_blobs(
         .arg(channel)
         .arg("cargo")
         .arg("build")
-        .current_dir(cwd)
+        .current_dir(workspace_dir)
         .args(package_args)
         .arg("--target")
         .arg(target)
