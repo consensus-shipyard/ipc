@@ -78,6 +78,13 @@ pub struct BottomUpMsgBatch {
     pub msgs: Vec<IpcEnvelope>,
 }
 
+#[serde_as]
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
+pub struct BottomUpBatchCommitment {
+    pub total_num_msgs: u64,
+    pub msgs_root: Vec<u8>,
+}
+
 /// Compressed representation of the activity summary that can be embedded in checkpoints to propagate up the hierarchy.
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 pub struct CompressedActivityRollup {
@@ -143,7 +150,7 @@ pub struct BottomUpCheckpoint {
     /// 0 could mean "no change".
     pub next_configuration_number: u64,
     /// The list of messages for execution
-    pub msgs: Vec<IpcEnvelope>,
+    pub msgs: BottomUpBatchCommitment,
     /// The activity commitment from child subnet to parent subnet
     pub activity_rollup: CompressedActivityRollup,
 }

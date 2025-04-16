@@ -386,7 +386,7 @@ contract MultiSubnetTest is IntegrationTestBase {
             blockHeight: batch.blockHeight,
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
-            msgs: batch.msgs,
+            msgs: BottomUpMsgBatchHelper.makeCommitment(batch.msgs),
             activity: CompressedActivityRollup({
                 consensus: Consensus.CompressedSummary({
                 stats: Consensus.AggregatedStats({

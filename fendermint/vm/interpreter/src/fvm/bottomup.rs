@@ -14,6 +14,7 @@ use super::{
 use crate::fvm::activity::ValidatorActivityTracker;
 use crate::types::BlockEndEvents;
 use anyhow::{anyhow, Context};
+use ethers::abi::AbiEncode;
 use ethers::abi::Tokenizable;
 use fendermint_crypto::PublicKey;
 use fendermint_crypto::SecretKey;
@@ -22,8 +23,11 @@ use fendermint_vm_actor_interface::ipc::BottomUpCheckpoint;
 use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{address::Address, chainid::ChainID};
-use ipc_actors_abis::checkpointing_facet as checkpoint;
+use ipc_actors_abis::checkpointing_facet::{Commitment, FvmAddress, Ipcaddress, SubnetID};
 use ipc_actors_abis::gateway_getter_facet as getter;
+use ipc_actors_abis::gateway_getter_facet::gateway_getter_facet;
+use ipc_actors_abis::{checkpointing_facet as checkpoint, checkpointing_facet};
+use ipc_api::merkle::MerkleGen;
 use ipc_api::staking::ConfigurationNumber;
 use ipc_observability::{emit, observe::TracingError, serde::HexEncodableBlockHash, Traceable};
 use std::collections::HashMap;
@@ -227,8 +231,12 @@ where
         *circ_supply -= burnt_tokens;
     });
 
-    let num_msgs = msgs.len();
-
+    let total_num_msgs = msgs.len();
+    let merkle = MerkleGen::new(
+        |msg| vec![msg.clone().encode_hex()],
+        msgs.as_slice(),
+        &["bytes32".to_owned()],
+    )?;
     let full_activity_rollup = state.activity_tracker().commit_activity()?;
 
     // Construct checkpoint.
@@ -237,17 +245,22 @@ where
         block_height: ethers::types::U256::from(height.value()),
         block_hash,
         next_configuration_number,
-        msgs,
+        msgs: Commitment {
+            total_num_msgs: total_num_msgs as u64,
+            msgs_root: merkle.root().to_fixed_bytes(),
+        },
         activity: full_activity_rollup.compressed()?,
     };
 
     // Save the checkpoint in the ledger.
     // Pass in the current power table, because these are the validators who can sign this checkpoint.
+    let msgs = convert_envelopes(msgs);
     let ret = gateway
         .create_bottom_up_checkpoint(
             state,
             checkpoint.clone(),
             &curr_power_table.0,
+            msgs,
             full_activity_rollup.into_inner(),
         )
         .context("failed to store checkpoint")?;
@@ -268,7 +281,7 @@ where
     emit(CheckpointCreated {
         height: height.value(),
         hash: HexEncodableBlockHash(block_hash.to_vec()),
-        msg_count: num_msgs,
+        msg_count: total_num_msgs,
         config_number: next_configuration_number,
     });
 
@@ -383,7 +396,10 @@ where
                 block_height: cp.block_height,
                 block_hash: cp.block_hash,
                 next_configuration_number: cp.next_configuration_number,
-                msgs: convert_tokenizables(cp.msgs)?,
+                msgs: Commitment {
+                    total_num_msgs: cp.msgs.total_num_msgs,
+                    msgs_root: cp.msgs.msgs_root,
+                },
                 activity: checkpoint::CompressedActivityRollup {
                     consensus: checkpoint::CompressedSummary {
                         stats: checkpoint::AggregatedStats {
@@ -499,11 +515,45 @@ fn convert_tokenizables<Source: Tokenizable, Target: Tokenizable>(
         .collect::<Result<Vec<_>, _>>()?)
 }
 
+fn convert_envelopes(
+    msgs: Vec<gateway_getter_facet::IpcEnvelope>,
+) -> Vec<checkpointing_facet::IpcEnvelope> {
+    msgs.into_iter()
+        .map(|m| checkpointing_facet::IpcEnvelope {
+            kind: m.kind,
+            local_nonce: m.local_nonce,
+            from: Ipcaddress {
+                subnet_id: SubnetID {
+                    root: m.from.subnet_id.root,
+                    route: m.from.subnet_id.route,
+                },
+                raw_address: FvmAddress {
+                    addr_type: m.from.raw_address.addr_type,
+                    payload: m.from.raw_address.payload,
+                },
+            },
+            to: Ipcaddress {
+                subnet_id: SubnetID {
+                    root: m.to.subnet_id.root,
+                    route: m.to.subnet_id.route,
+                },
+                raw_address: FvmAddress {
+                    addr_type: m.to.raw_address.addr_type,
+                    payload: m.to.raw_address.payload,
+                },
+            },
+            value: m.value,
+            original_nonce: m.original_nonce,
+            message: m.message,
+        })
+        .collect()
+}
+
 fn should_create_checkpoint<DB>(
     gateway: &GatewayCaller<DB>,
     state: &mut FvmExecState<DB>,
     height: Height,
-) -> anyhow::Result<Option<(Vec<checkpoint::IpcEnvelope>, checkpoint::SubnetID)>>
+) -> anyhow::Result<Option<(Vec<gateway_getter_facet::IpcEnvelope>, checkpoint::SubnetID)>>
 where
     DB: Blockstore + Clone,
 {
