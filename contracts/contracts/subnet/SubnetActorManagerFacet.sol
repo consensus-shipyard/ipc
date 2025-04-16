@@ -62,11 +62,11 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             revert SubnetAlreadyBootstrapped();
         }
 
-        s.supplySource.transferFunds(payable(msg.sender), amount);
-
         if (s.genesisBalance[msg.sender] < amount) {
             revert NotEnoughBalance();
         }
+
+        s.supplySource.transferFunds(payable(msg.sender), amount);
 
         s.genesisBalance[msg.sender] -= amount;
         s.genesisCircSupply -= amount;
