@@ -145,6 +145,21 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         require(membership.validators.length == numGenesisValidators + 1, "validator num not equal");
     }
 
+    function testSubnetActorDiamond_BeforeBootstrap() public {
+        (address validator1, , bytes memory publicKey1) = TestUtils.newValidator(100);
+
+        vm.deal(validator1, DEFAULT_MIN_VALIDATOR_STAKE);
+
+        vm.startPrank(validator1);
+        saDiamond.manager().preFund{value: 1000}(1000);
+        saDiamond.manager().join{value: 1}(publicKey1, 1);
+
+        require(address(validator1).balance == DEFAULT_MIN_VALIDATOR_STAKE - 1001, "post join balance not match");
+
+        saDiamond.manager().leave();
+        require(address(validator1).balance == DEFAULT_MIN_VALIDATOR_STAKE, "post leave balance not match");
+    }
+
     /// @notice Testing the basic join, stake, leave lifecycle of validators
     function testSubnetActorDiamond_BasicLifeCycle() public {
         (address validator1, uint256 privKey1, bytes memory publicKey1) = TestUtils.newValidator(100);

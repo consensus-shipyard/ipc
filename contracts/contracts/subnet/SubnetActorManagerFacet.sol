@@ -294,7 +294,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
                 delete s.genesisBalance[msg.sender];
                 s.genesisCircSupply -= genesisBalance;
                 LibSubnetActor.rmAddressFromBalanceKey(msg.sender);
-                s.collateralSource.transferFunds(payable(msg.sender), genesisBalance);
+                s.supplySource.transferFunds(payable(msg.sender), genesisBalance);
             }
 
             // interaction must be performed after checks and changes
