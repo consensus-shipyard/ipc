@@ -33,6 +33,9 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     /// @dev The subnet can optionally pass a genesis circulating supply that would be pre-allocated in the
     /// subnet from genesis (without having to wait for the subnet to be spawned to propagate the funds).
     function register(uint256 genesisCircSupply, uint256 collateral) external payable {
+        // The supplied amount must align with the arguments
+        require(msg.value == genesisCircSupply + collateral, "Deposit amount mismatch");
+
         // If L2+ support is not enabled, only allow the registration of new
         // subnets in the root
         if (s.networkName.route.length + 1 >= s.maxTreeDepth) {
