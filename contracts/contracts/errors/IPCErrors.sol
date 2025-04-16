@@ -83,6 +83,7 @@ error MissingActivityCommitment();
 error ValidatorAlreadyClaimed();
 error InvalidActivityProof();
 error NotOwner();
+error TransferFailed();
 
 enum InvalidXnetMessageReason {
     Sender,
