@@ -200,6 +200,7 @@ tracing-subscriber = { version = "0.3", features = [
 tracing-appender = "0.2.3"
 uuid = { version = "1.15.1", features = ["v4"] }
 url = { version = "2.4.1", features = ["serde"] }
+urlencoding = "2.1"
 warp = "0.3.7"
 zeroize = "1.6"
 
