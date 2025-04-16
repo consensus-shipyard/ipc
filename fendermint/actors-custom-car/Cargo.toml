@@ -29,3 +29,4 @@ ignore = "0.4"
 tracing = "0.1"
 build-rs-utils = { path = "../../build-rs-utils" }
 which = "7"
+indexmap = "2"
