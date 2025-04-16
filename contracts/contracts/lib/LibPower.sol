@@ -15,27 +15,26 @@ library LibAddressStakingReleases {
     /// @notice Add new release to the storage. Caller makes sure the release.releasedAt is ordered
     /// @notice in ascending order. This method does not do checks on this.
     function push(AddressStakingReleases storage self, StakingRelease memory release) internal {
-        uint16 length = self.length;
-        uint16 nextIdx = self.startIdx + length;
+        uint16 idx = self.totalReleases;
 
-        self.releases[nextIdx] = release;
-        self.length = length + 1;
+        self.releases[idx] = release;
+        self.totalReleases = idx + 1;
     }
 
     /// @notice Perform compaction on releases, i.e. aggregates the amount that can be released
     /// @notice and removes them from storage. Returns the total amount to release and the new
     /// @notice number of pending releases after compaction.
     function compact(AddressStakingReleases storage self) internal returns (uint256, uint16) {
-        uint16 length = self.length;
-        if (self.length == 0) {
+        uint16 toCollectIdx = self.toCollectIdx;
+        uint16 totalReleases = self.totalReleases;
+
+        if (toCollectIdx == totalReleases) {
             revert NoCollateralToWithdraw();
         }
 
-        uint16 i = self.startIdx;
-        uint16 newLength = length;
         uint256 amount;
-        while (i < length) {
-            StakingRelease memory release = self.releases[i];
+        for (; toCollectIdx < totalReleases;) {
+            StakingRelease memory release = self.releases[toCollectIdx];
 
             // releases are ordered ascending by releaseAt, no need to check
             // further as they will still be locked.
@@ -44,18 +43,16 @@ library LibAddressStakingReleases {
             }
 
             amount += release.amount;
-            delete self.releases[i];
+            delete self.releases[toCollectIdx];
 
             unchecked {
-                ++i;
-                --newLength;
+                ++toCollectIdx;
             }
         }
 
-        self.startIdx = i;
-        self.length = newLength;
+        self.toCollectIdx = toCollectIdx;
 
-        return (amount, newLength);
+        return (amount, totalReleases - toCollectIdx);
     }
 }
 
