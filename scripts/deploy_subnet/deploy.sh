@@ -569,7 +569,7 @@ subnet_struct="($subnet_root, [$subnet_eth_addr])"
 cast send --private-key "$pk" --rpc-url "$rpc_url" --timeout 120 "$VALIDATOR_GATER_ADDRESS" "setSubnet((uint64,address[]))" "$subnet_struct"
 echo "Set validator gater subnet ID"
 
-cast send --private-key "$pk" --rpc-url "$rpc_url" --timeout 120 "$VALIDATOR_REWARDER_ADDRESS" "setSubnet((uint64,address[]), uint256)" "$subnet_struct" "$bottomup_check_period"
+cast send --private-key "$pk" --rpc-url "$rpc_url" --timeout 120 "$VALIDATOR_REWARDER_ADDRESS" "setSubnet((uint64,address[]))" "$subnet_struct"
 echo "Set validator rewarder subnet ID"
 
 # Use the new subnet ID to update IPC config file
