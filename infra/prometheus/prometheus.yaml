@@ -18,9 +18,6 @@ scrape_configs:
         "validator-0-objects:9186",
         "validator-1-objects:9186",
         "validator-2-objects:9186",
-        "validator-0-iroh:9090",
-        "validator-1-iroh:9090",
-        "validator-2-iroh:9090",
         "prometheus:9090",
         "relayer:9184"
       ]

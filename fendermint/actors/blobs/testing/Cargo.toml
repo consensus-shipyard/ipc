@@ -14,7 +14,7 @@ crate-type = ["cdylib", "lib"]
 [dependencies]
 rand = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
-iroh-base = { workspace = true, features = ["key"] }
+iroh-blobs = { workspace = true }
 fvm_shared = { workspace = true }
 
 fendermint_actor_blobs_shared = { path = "../shared" }

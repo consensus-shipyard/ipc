@@ -3,8 +3,8 @@
 use anyhow::anyhow;
 use async_trait::async_trait;
 use ipc_api::subnet_id::SubnetID;
-use iroh::blobs::Hash;
-use iroh::net::NodeAddr;
+use iroh::NodeAddr;
+use iroh_blobs::Hash;
 use libipld::Cid;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot;

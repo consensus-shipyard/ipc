@@ -11,8 +11,9 @@ crate-type = ["cdylib", "lib"]
 [dependencies]
 fvm = { workspace = true }
 fvm_shared = { workspace = true }
+hex = { workspace = true }
 iroh = { workspace = true }
-once_cell = { workspace = true }
+iroh-blobs = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 

@@ -16,7 +16,6 @@ extend = [
     { path = "../../../infra/fendermint/scripts/ethapi.toml" },
     { path = "../../../infra/fendermint/scripts/fendermint.toml" },
     { path = "../../../infra/fendermint/scripts/promtail.toml" },
-    { path = "../../../infra/fendermint/scripts/iroh.toml" },
     { path = "./fendermint.toml" },
 ]
 
@@ -34,12 +33,19 @@ ETHAPI_HOST_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh $((CMT_RPC_HOST_
 FENDERMINT_METRICS_HOST_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh $((ETHAPI_HOST_PORT+1))"], condition = { env_not_set = [
     "FENDERMINT_METRICS_HOST_PORT",
 ] } }
-IROH_RPC_HOST_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh $((FENDERMINT_METRICS_HOST_PORT+1))"], condition = { env_not_set = [
-    "IROH_RPC_HOST_PORT",
+OBJECTS_IROH_V4_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh 11204"], condition = { env_not_set = [
+    "OBJECTS_IROH_V4_PORT",
 ] } }
-IROH_METRICS_HOST_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh $((IROH_RPC_HOST_PORT+1))"], condition = { env_not_set = [
-    "IROH_METRICS_HOST_PORT",
+OBJECTS_IROH_V6_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh 11205"], condition = { env_not_set = [
+    "OBJECTS_IROH_V6_PORT",
 ] } }
+FENDERMINT_IROH_V4_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh 11214"], condition = { env_not_set = [
+    "FENDERMINT_IROH_V4_PORT",
+] } }
+FENDERMINT_IROH_V6_PORT = { script = ["${ROOT_SCRIPTS_DIR}/get_port.sh 11215"], condition = { env_not_set = [
+    "FENDERMINT_IROH_V6_PORT",
+] } }
+
 TENDERMINT_RPC_URL = "http://127.0.0.1:${CMT_RPC_HOST_PORT}"
 FM_ETH__LISTEN__PORT = "${ETHAPI_HOST_PORT}"
 
@@ -69,8 +75,6 @@ dependencies = [
     "docker-network-create",
     "cometbft-init",
     "fendermint-init",
-    "iroh-start",
-    "iroh-wait",
     "fendermint-start",
     "cometbft-start",
     "cometbft-wait",
@@ -87,8 +91,7 @@ echo "CMT_P2P_HOST_PORT: $CMT_P2P_HOST_PORT"
 echo "CMT_RPC_HOST_PORT: $CMT_RPC_HOST_PORT"
 echo "ETHAPI_HOST_PORT: $ETHAPI_HOST_PORT"
 echo "FENDERMINT_METRICS_HOST_PORT: $FENDERMINT_METRICS_HOST_PORT"
-echo "IROH_RPC_HOST_PORT: $IROH_RPC_HOST_PORT"
-echo "IROH_METRICS_HOST_PORT: $IROH_METRICS_HOST_PORT"
+echo "FENDERMINT_IROH_RPC_HOST_PORT: $FENDERMINT_IROH_RPC_HOST_PORT"
 echo "TENDERMINT_RPC_URL: $TENDERMINT_RPC_URL"
 echo "FM_ETH__LISTEN__PORT: $FM_ETH__LISTEN__PORT"
 """
@@ -102,7 +105,6 @@ run_task = { name = [
     "cometbft-destroy",
     "fendermint-destroy",
     "ethapi-destroy",
-    "iroh-destroy",
     "promtail-destroy",
     "docker-network-rm",
     "test-data-dir-rm",

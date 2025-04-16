@@ -7,8 +7,8 @@ use fvm_shared::{
     address::Address, clock::ChainEpoch, crypto::signature::Signature, econ::TokenAmount, MethodNum,
 };
 use ipc_api::subnet_id::SubnetID;
-use iroh_base::hash::Hash;
-use iroh_base::key::NodeId;
+use iroh_base::NodeId;
+use iroh_blobs::Hash;
 use serde::{Deserialize, Serialize};
 
 /// Messages involved in InterPlanetary Consensus.

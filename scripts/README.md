@@ -97,12 +97,6 @@ used for `devnet` interactions (e.g., creating buckets, timehubs, writing data, 
 Finally, start all the services in separate terminal windows. The associated endpoints are shown
 below:
 
-- Iroh: `http://127.0.0.1:4919`
-
-  ```
-  make run-devnet-iroh
-  ```
-
 - Objects API: `http://127.0.0.8001`
 
   ```

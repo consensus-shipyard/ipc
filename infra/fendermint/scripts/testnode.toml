@@ -59,7 +59,6 @@ run_task = { name = [
     "ethapi-destroy",
     "objects-destroy",
     "promtail-destroy",
-    "iroh-destroy",
     "docker-network-rm",
     "destroy-log-volume",
 ] }

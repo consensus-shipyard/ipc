@@ -24,8 +24,8 @@ use fvm_ipld_hamt::Hamt;
 use fvm_shared::{address::Address, ActorID};
 use ipc_api::subnet_id::SubnetID;
 use ipc_ipld_resolver::{
-    Client, Config, ConnectionConfig, ContentConfig, DiscoveryConfig, Event, MembershipConfig,
-    NetworkConfig, Resolver, Service, VoteRecord,
+    Client, Config, ConnectionConfig, ContentConfig, DiscoveryConfig, Event, IrohConfig,
+    MembershipConfig, NetworkConfig, Resolver, Service, VoteRecord,
 };
 use libp2p::{
     core::{
@@ -318,6 +318,9 @@ async fn make_service(config: Config) -> (Service<TestStoreParams, TestVote>, Te
 }
 
 fn make_config(rng: &mut StdRng, cluster_size: u32, bootstrap_addr: Option<Multiaddr>) -> Config {
+    // currently leaks the directory
+    let iroh_path = tempfile::tempdir().unwrap().into_path();
+    let iroh_rpc_addr = "127.0.0.1:0".parse().unwrap();
     let config = Config {
         connection: ConnectionConfig {
             listen_addr: Multiaddr::from(Protocol::Memory(rng.gen::<u64>())),
@@ -347,7 +350,12 @@ fn make_config(rng: &mut StdRng, cluster_size: u32, bootstrap_addr: Option<Multi
             rate_limit_bytes: 1 << 20,
             rate_limit_period: Duration::from_secs(60),
         },
-        iroh_addr: None,
+        iroh: IrohConfig {
+            v4_addr: None,
+            v6_addr: None,
+            path: iroh_path,
+            rpc_addr: iroh_rpc_addr,
+        },
     };
 
     config

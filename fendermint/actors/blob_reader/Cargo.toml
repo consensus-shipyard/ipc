@@ -34,7 +34,7 @@ anyhow = { workspace = true }
 fil_actors_evm_shared = { workspace = true }
 fil_actors_runtime = { workspace = true, features = ["test_utils"] }
 hex-literal = { workspace = true }
-iroh-base = { workspace = true, features = ["key"] }
+iroh-blobs = { workspace = true }
 rand = { workspace = true }
 
 [features]

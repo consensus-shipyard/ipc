@@ -71,10 +71,13 @@ CMT_RPC_HOST_PORTS=(26657 26757 26857)
 ETHAPI_HOST_PORTS=(8645 8745 8845)
 RESOLVER_HOST_PORTS=(26655 26755 26855)
 OBJECTS_HOST_PORTS=(8001 8002 8003)
-IROH_RPC_HOST_PORTS=(4921 4922 4923)
+OBJECTS_IROH_V4_PORTS=(11204 11304 11404)
+OBJECTS_IROH_V6_PORTS=(11205 11305 11405)
 
+FENDERMINT_IROH_V4_PORTS=(11214 11314 11414)
+FENDERMINT_IROH_V6_PORTS=(11215 11315 11415)
 FENDERMINT_METRICS_HOST_PORTS=(9184 9185 9186)
-IROH_METRICS_HOST_PORTS=(9091 9092 9093)
+FENDERMINT_IROH_RPC_HOST_PORTS=(4919 4920 4921)
 PROMTAIL_AGENT_HOST_PORTS=(9080 9081 9082)
 
 PROMETHEUS_HOST_PORT=9090
@@ -204,7 +207,7 @@ if [[ -z ${SKIP_DEPENDENCIES+x} || "$SKIP_DEPENDENCIES" == "" || "$SKIP_DEPENDEN
     else
       echo "$DASHES Need to install docker"
       missing_dependencies+=("docker")
-    fi  
+    fi
     # Check jq
     echo "$DASHES Check jq..."
     if which jq &> /dev/null ; then
@@ -314,7 +317,6 @@ fi
 cp "$IPC_FOLDER"/infra/prometheus/prometheus.yaml "$IPC_CONFIG_FOLDER"
 cp "$IPC_FOLDER"/infra/loki/loki-config.yaml "$IPC_CONFIG_FOLDER"
 cp "$IPC_FOLDER"/infra/promtail/promtail-config.yaml "$IPC_CONFIG_FOLDER"
-cp "$IPC_FOLDER"/infra/iroh/iroh.config.toml "$IPC_CONFIG_FOLDER"
 
 # Explicitly set the chain ID if not provided
 if [[ -z ${CHAIN_ID+x} ]]; then
@@ -617,12 +619,14 @@ bootstrap_output=$(cargo make --makefile infra/fendermint/Makefile.toml \
     -e ETHAPI_HOST_PORT="${ETHAPI_HOST_PORTS[0]}" \
     -e RESOLVER_HOST_PORT="${RESOLVER_HOST_PORTS[0]}" \
     -e OBJECTS_HOST_PORT="${OBJECTS_HOST_PORTS[0]}" \
-    -e IROH_RPC_HOST_PORT="${IROH_RPC_HOST_PORTS[0]}" \
+    -e OBJECTS_IROH_V4_PORT="${OBJECTS_IROH_V4_PORTS[0]}" \
+    -e OBJECTS_IROH_V6_PORT="${OBJECTS_IROH_V6_PORTS[0]}" \
     -e FENDERMINT_METRICS_HOST_PORT="${FENDERMINT_METRICS_HOST_PORTS[0]}" \
-    -e IROH_METRICS_HOST_PORT="${IROH_METRICS_HOST_PORTS[0]}" \
+    -e FENDERMINT_IROH_RPC_HOST_PORT="${FENDERMINT_IROH_RPC_HOST_PORTS[0]}" \
+    -e FENDERMINT_IROH_V4_PORT="${FENDERMINT_IROH_V4_PORTS[0]}" \
+    -e FENDERMINT_IROH_V6_PORT="${FENDERMINT_IROH_V6_PORTS[0]}" \
     -e PROMTAIL_AGENT_HOST_PORT="${PROMTAIL_AGENT_HOST_PORTS[0]}" \
     -e PROMTAIL_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
-    -e IROH_CONFIG_FOLDER="${IPC_FOLDER}/infra/iroh/" \
     -e PARENT_HTTP_AUTH_TOKEN="${PARENT_HTTP_AUTH_TOKEN}" \
     -e PARENT_AUTH_FLAG="${PARENT_AUTH_FLAG}" \
     -e PARENT_REGISTRY="${PARENT_REGISTRY_ADDRESS}" \
@@ -657,12 +661,14 @@ do
       -e ETHAPI_HOST_PORT="${ETHAPI_HOST_PORTS[i]}" \
       -e RESOLVER_HOST_PORT="${RESOLVER_HOST_PORTS[i]}" \
       -e OBJECTS_HOST_PORT="${OBJECTS_HOST_PORTS[i]}" \
-      -e IROH_RPC_HOST_PORT="${IROH_RPC_HOST_PORTS[i]}" \
+      -e OBJECTS_IROH_V4_PORT="${OBJECTS_IROH_V4_PORTS[i]}" \
+      -e OBJECTS_IROH_V6_PORT="${OBJECTS_IROH_V6_PORTS[i]}" \
       -e FENDERMINT_METRICS_HOST_PORT="${FENDERMINT_METRICS_HOST_PORTS[i]}" \
-      -e IROH_METRICS_HOST_PORT="${IROH_METRICS_HOST_PORTS[i]}" \
+      -e FENDERMINT_IROH_RPC_HOST_PORT="${FENDERMINT_IROH_RPC_HOST_PORTS[i]}" \
+      -e FENDERMINT_IROH_V4_PORT="${FENDERMINT_IROH_V4_PORTS[i]}" \
+      -e FENDERMINT_IROH_V6_PORT="${FENDERMINT_IROH_V6_PORTS[i]}" \
       -e PROMTAIL_AGENT_HOST_PORT="${PROMTAIL_AGENT_HOST_PORTS[i]}" \
       -e PROMTAIL_CONFIG_FOLDER="${IPC_CONFIG_FOLDER}" \
-      -e IROH_CONFIG_FOLDER="${IPC_FOLDER}/infra/iroh/" \
       -e RESOLVER_BOOTSTRAPS="${bootstrap_resolver_endpoint}" \
       -e BOOTSTRAPS="${bootstrap_node_endpoint}" \
       -e PARENT_HTTP_AUTH_TOKEN="${PARENT_HTTP_AUTH_TOKEN}" \
@@ -762,7 +768,7 @@ if [[ $local_deploy = true ]]; then
   echo "$DASHES Move account funds into subnet"
   # move 10000 RECALL to subnet (i.e., leave 100 RECALL on rootnet for
   # testing purposes)
-  # note: see comment above about why we're using 10**18 due 
+  # note: see comment above about why we're using 10**18 due
   # to `ipc-cli` & `recall` CLI's atto assumption
   token_amount="10000000000000000000000"
   for i in {0..9}
@@ -771,7 +777,7 @@ if [[ $local_deploy = true ]]; then
     ipc-cli cross-msg fund-with-token --subnet "${subnet_id}" --from "${addr}" --approve "${token_amount}"
   done
   echo "Waiting for deposits to process..."
-  # TODO: this takes ~2 minutes for the topdown messages to propagate. need to reduce this for 
+  # TODO: this takes ~2 minutes for the topdown messages to propagate. need to reduce this for
   # localnet (i.e., ideally is seconds, not minutes)
   while true; do
     # validate accounts have subnet balance (the last account will be final deposit tx)
@@ -866,11 +872,6 @@ http://localhost:${OBJECTS_HOST_PORTS[0]}
 http://localhost:${OBJECTS_HOST_PORTS[1]}
 http://localhost:${OBJECTS_HOST_PORTS[2]}
 
-Iroh API:
-http://localhost:${IROH_RPC_HOST_PORTS[0]}
-http://localhost:${IROH_RPC_HOST_PORTS[1]}
-http://localhost:${IROH_RPC_HOST_PORTS[2]}
-
 ETH API:
 http://localhost:${ETHAPI_HOST_PORTS[0]}
 http://localhost:${ETHAPI_HOST_PORTS[1]}
@@ -889,6 +890,22 @@ http://localhost:${LOKI_HOST_PORT}
 
 Grafana API:
 http://localhost:${GRAFANA_HOST_PORT}
+
+Iroh Fendermint Node:
+127.0.0.1:${FENDERMINT_IROH_V4_PORTS[0]}
+127.0.0.1:${FENDERMINT_IROH_V6_PORTS[0]}
+127.0.0.1:${FENDERMINT_IROH_V4_PORTS[1]}
+127.0.0.1:${FENDERMINT_IROH_V6_PORTS[1]}
+127.0.0.1:${FENDERMINT_IROH_V4_PORTS[2]}
+127.0.0.1:${FENDERMINT_IROH_V6_PORTS[2]}
+
+Iroh Object Node:
+127.0.0.1:${OBJECTS_IROH_V4_PORTS[0]}
+127.0.0.1:${OBJECTS_IROH_V6_PORTS[0]}
+127.0.0.1:${OBJECTS_IROH_V4_PORTS[1]}
+127.0.0.1:${OBJECTS_IROH_V6_PORTS[1]}
+127.0.0.1:${OBJECTS_IROH_V4_PORTS[2]}
+127.0.0.1:${OBJECTS_IROH_V6_PORTS[2]}
 
 Contracts:
 Parent gateway:            ${PARENT_GATEWAY_ADDRESS}

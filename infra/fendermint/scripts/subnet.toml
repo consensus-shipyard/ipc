@@ -49,7 +49,6 @@ run_task = { name = [
     "ethapi-destroy",
     "objects-destroy",
     "promtail-destroy",
-    "iroh-destroy",
     "docker-network-rm",
 ] }
 
@@ -61,7 +60,6 @@ dependencies = [
     "ethapi-destroy",
     "objects-destroy",
     "promtail-destroy",
-    "iroh-destroy",
     "docker-network-rm",
     "fendermint-pull",
     "node-init",
@@ -69,8 +67,6 @@ dependencies = [
     "cometbft-config",
     "fendermint-deps",
     "validator-config",
-    "iroh-start",
-    "iroh-wait",
     "fendermint-start-validator",
     "cometbft-start",
     "cometbft-wait",
@@ -87,9 +83,6 @@ run_task = { name = [
     "ethapi-destroy",
     "objects-destroy",
     "promtail-destroy",
-    "iroh-destroy",
-    "iroh-start",
-    "iroh-wait",
     "fendermint-start-validator",
     "cometbft-start",
     "cometbft-wait",
@@ -115,8 +108,6 @@ dependencies = [
     "cometbft-config",
     "fendermint-deps",
     "subnet-config",
-    "iroh-start",
-    "iroh-wait",
     "fendermint-start-subnet",
     "cometbft-start",
     "cometbft-wait",
@@ -186,9 +177,6 @@ Subnet ID:
 
 Object API:
 \thttp://0.0.0.0:${OBJECTS_HOST_PORT}
-
-Iroh API:
-\thttp://0.0.0.0:${IROH_RPC_HOST_PORT}
 
 Eth API:
 \thttp://0.0.0.0:${ETHAPI_HOST_PORT}

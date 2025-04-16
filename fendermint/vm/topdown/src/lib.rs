@@ -19,7 +19,7 @@ use ethers::utils::hex;
 use fvm_shared::clock::ChainEpoch;
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::StakingChangeRequest;
-use iroh_base::hash::Hash;
+use iroh_blobs::Hash;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::time::Duration;

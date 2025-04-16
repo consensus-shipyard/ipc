@@ -13,7 +13,7 @@ use ipc_api::subnet_id::SubnetID;
 use ipc_ipld_resolver::{Client, ResolverIroh, ResolverIrohReadRequest, ValidatorKey, VoteRecord};
 use ipc_observability::emit;
 
-use iroh::blobs::Hash;
+use iroh_blobs::Hash;
 use libp2p::identity::Keypair;
 use serde::de::DeserializeOwned;
 use serde::Serialize;

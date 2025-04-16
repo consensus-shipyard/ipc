@@ -12,6 +12,7 @@ async-stm = { workspace = true }
 hex = { workspace = true }
 im = { workspace = true }
 iroh = { workspace = true }
+iroh-blobs = { workspace = true }
 libp2p = { workspace = true }
 prometheus = { workspace = true }
 serde = { workspace = true }

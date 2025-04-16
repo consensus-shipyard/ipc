@@ -23,10 +23,3 @@ scrape_configs:
       - labels:
           job: fendermint_log
           __path__: /var/log/fendermint/*.log
-  - job_name: iroh
-    static_configs:
-      - targets:
-          - localhost
-      - labels:
-          job: iroh_log
-          __path__: /var/log/iroh/*.log

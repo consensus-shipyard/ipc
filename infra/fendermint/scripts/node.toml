@@ -16,11 +16,10 @@ rm -rf ${BASE_DIR}
 
 [tasks.node-mkdir]
 script = """
-echo creating directories: $BASE_DIR $FM_DIR $CMT_DIR $IROH_DIR $KEYS_DIR
+echo creating directories: $BASE_DIR $FM_DIR $CMT_DIR $KEYS_DIR
 mkdir -p $BASE_DIR
 mkdir -p $FM_DIR
 mkdir -p $CMT_DIR
-mkdir -p $IROH_DIR
 mkdir -p $KEYS_DIR
 touch $ENV_FILE
 """

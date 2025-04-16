@@ -8,8 +8,8 @@ use async_stm::{
     queues::{tchan::TChan, TQueueLike},
     Stm, TVar,
 };
-use iroh::blobs::Hash;
-use iroh::net::NodeId;
+use iroh::NodeId;
+use iroh_blobs::Hash;
 
 /// The maximum number of times a task can be attempted.
 /// TODO: make configurable
@@ -275,9 +275,8 @@ mod tests {
     use super::{ResolveKey, ResolvePool, ResolveSource, TaskType};
 
     use async_stm::{atomically, queues::TQueueLike};
-    use iroh::base::key::SecretKey;
-    use iroh::blobs::Hash;
-    use iroh::net::NodeId;
+    use iroh::{NodeId, SecretKey};
+    use iroh_blobs::Hash;
     use rand::Rng;
 
     #[derive(Clone, Hash, Eq, PartialEq, Debug)]
@@ -293,7 +292,8 @@ mod tests {
             let mut data = [0u8; 256];
             rng.fill(&mut data);
             let hash = Hash::new(data);
-            let source = SecretKey::generate().public();
+
+            let source = SecretKey::generate(&mut rng).public();
             Self {
                 hash,
                 source,

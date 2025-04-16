@@ -8,10 +8,13 @@ docker run \
   --network ${NETWORK_NAME} \
   --volume ${BASE_DIR}:/data \
   --publish ${OBJECTS_HOST_PORT}:8001 \
+  --publish ${OBJECTS_IROH_V4_PORT}:11204/udp \
+  --publish ${OBJECTS_IROH_V6_PORT}:11205/udp \
   --env FM_CHAIN_NAME=${SUBNET_ID} \
   --env FM_OBJECTS__TRACING__CONSOLE__LEVEL=${OBJECTS_LOG_LEVEL} \
   --env TENDERMINT_RPC_URL=http://${CMT_CONTAINER_NAME}:26657 \
-  --env IROH_RPC_ADDR=${IROH_CONTAINER_NAME}:4919 \
+  --env IROH_PATH=/data/${NODE_NAME}/iroh-objects \
+  --env IROH_RESOLVER_RPC_ADDR=`docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${FM_CONTAINER_NAME}`:4919 \
   --env RUST_BACKTRACE=1 \
   ${FM_DOCKER_IMAGE} \
   --network=${FM_NETWORK} \

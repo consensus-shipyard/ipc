@@ -237,7 +237,6 @@ other validators:
 - `validator-0-promtail`
 - `validator-0-objects`
 - `validator-0-ethapi`
-- `validator-0-iroh`
 - `prometheus`
 - `grafana`
 - `anvil`

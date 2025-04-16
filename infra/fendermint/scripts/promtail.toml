@@ -15,7 +15,6 @@ docker run \
   --volume /var/run/docker.sock:/var/run/docker.sock \
   --volume ${PROMTAIL_CONFIG_FOLDER}/promtail-config.yaml:/etc/promtail/promtail-config.yaml \
   --volume ${FM_DIR}/data/logs:/var/log/fendermint/ \
-  --volume ${IROH_DIR}/logs:/var/log/iroh/ \
   ${PROMTAIL_DOCKER_IMAGE} \
   --client.external-labels=host=$(hostname),node=$NODE_NAME \
   --config.file=/etc/promtail/promtail-config.yaml \

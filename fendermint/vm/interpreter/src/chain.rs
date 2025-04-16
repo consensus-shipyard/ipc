@@ -56,7 +56,8 @@ use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{
     address::Address, clock::ChainEpoch, econ::TokenAmount, message::Message, MethodNum,
 };
-use iroh::{base::key::PublicKey, blobs::Hash, net::NodeId};
+use iroh::{NodeId, PublicKey};
+use iroh_blobs::Hash;
 use num_traits::Zero;
 use tokio_util::bytes;
 
