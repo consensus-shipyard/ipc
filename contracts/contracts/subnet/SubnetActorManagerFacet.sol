@@ -62,11 +62,11 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             revert SubnetAlreadyBootstrapped();
         }
 
-        s.supplySource.transferFunds(payable(msg.sender), amount);
-
         if (s.genesisBalance[msg.sender] < amount) {
             revert NotEnoughBalance();
         }
+
+        s.supplySource.transferFunds(payable(msg.sender), amount);
 
         s.genesisBalance[msg.sender] -= amount;
         s.genesisCircSupply -= amount;
@@ -294,7 +294,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
                 delete s.genesisBalance[msg.sender];
                 s.genesisCircSupply -= genesisBalance;
                 LibSubnetActor.rmAddressFromBalanceKey(msg.sender);
-                s.collateralSource.transferFunds(payable(msg.sender), genesisBalance);
+                s.supplySource.transferFunds(payable(msg.sender), genesisBalance);
             }
 
             // interaction must be performed after checks and changes
