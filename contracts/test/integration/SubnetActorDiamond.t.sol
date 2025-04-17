@@ -669,6 +669,35 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         saDiamond.checkpointer().validateActiveQuorumSignatures(validators, hash, signatures);
     }
 
+    function testSubnetActorDiamond_validateActiveQuorumSignatures_DuplicatedValidators() public {
+        (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
+        bytes[] memory pubKeys = new bytes[](3);
+        bytes[] memory signatures = new bytes[](3);
+
+        bytes32 hash = keccak256(abi.encodePacked("test"));
+        bytes32 hash0 = keccak256(abi.encodePacked("test1"));
+
+        for (uint256 i = 0; i < 3; i++) {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(keys[i], hash);
+
+            // create incorrect signature using `vv`
+            signatures[i] = abi.encodePacked(r, s, v);
+
+            pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
+            vm.deal(validators[i], 10 gwei);
+            vm.prank(validators[i]);
+            saDiamond.manager().join{value: 10}(pubKeys[i], 10);
+        }
+
+        signatures[0] = signatures[1];
+        validators[0] = validators[1];
+
+        vm.expectRevert(
+            abi.encodeWithSelector(SignatureAddressesNotSorted.selector)
+        );
+        saDiamond.checkpointer().validateActiveQuorumSignatures(validators, hash0, signatures);
+    }
+
     function testSubnetActorDiamond_validateActiveQuorumSignatures_InvalidSignatory() public {
         (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
         bytes[] memory pubKeys = new bytes[](3);
