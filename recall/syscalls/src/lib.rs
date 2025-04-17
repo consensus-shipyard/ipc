@@ -18,7 +18,8 @@ pub const HASHRM_SYSCALL_FUNCTION_NAME: &str = "hash_rm";
 const ENV_IROH_RPC_ADDR: &str = "IROH_SYSCALL_RPC_ADDR";
 
 async fn connect_rpc() -> Option<BlobsClient> {
-    let addr: SocketAddr = std::env::var(ENV_IROH_RPC_ADDR).ok()?.parse().ok()?;
+    let bind_addr: SocketAddr = std::env::var(ENV_IROH_RPC_ADDR).ok()?.parse().ok()?;
+    let addr: SocketAddr = format!("127.0.0.1:{}", bind_addr.port()).parse().ok()?;
     iroh_manager::connect_rpc(addr).await.ok()
 }
 static IROH_RPC_CLIENT: Mutex<Option<BlobsClient>> = Mutex::const_new(None);
@@ -32,6 +33,8 @@ fn hash_source(bytes: &[u8]) -> Result<[u8; 32]> {
 pub fn hash_rm(context: Context<'_, impl RecallOps>, hash_offset: u32) -> Result<()> {
     let hash_bytes = context.memory.try_slice(hash_offset, 32)?;
     let seq_hash = Hash::from_bytes(hash_source(hash_bytes)?);
+
+    tracing::debug!("queueing blob {} for deletion", seq_hash);
 
     // No blocking
     tokio::task::spawn(async move {
