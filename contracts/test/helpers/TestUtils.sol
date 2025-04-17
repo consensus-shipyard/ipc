@@ -36,10 +36,9 @@ library TestUtils {
         Vm vm
     ) internal returns (uint256[] memory validatorKeys, address[] memory addresses, uint256[] memory weights) {
         validatorKeys = new uint256[](4);
-        validatorKeys[0] = 100;
-        validatorKeys[1] = 200;
-        validatorKeys[2] = 300;
-        validatorKeys[3] = 400;
+        for (uint i = 0; i < 4; i++) {
+            validatorKeys[i] = getPrivateKey(i);
+        }
 
         addresses = new address[](4);
         addresses[0] = vm.addr(validatorKeys[0]);
@@ -64,9 +63,9 @@ library TestUtils {
         Vm vm
     ) internal returns (uint256[] memory validatorKeys, address[] memory addresses, uint256[] memory weights) {
         validatorKeys = new uint256[](3);
-        validatorKeys[0] = 100;
-        validatorKeys[1] = 200;
-        validatorKeys[2] = 300;
+        for (uint i = 0; i < 3; i++) {
+            validatorKeys[i] = getPrivateKey(i);
+        }
 
         addresses = new address[](3);
         addresses[0] = vm.addr(validatorKeys[0]);
@@ -97,15 +96,52 @@ library TestUtils {
         addr = address(uint160(uint256(keccak256(dataSubset))));
     }
 
+    /// The dummy private keys generated offchain so that the addresses of the private keys
+    /// are sorted in ascending order.
+    function getPrivateKey(uint256 idx) internal pure returns (uint256 privateKey) {
+        if (idx == 0) {
+            return 0xaf2be542934f2283d6cb21ee8c80495ab76d63b1071b75276a4a5e7673e4dae6;
+        }
+        if (idx == 1) {
+            return 0xb423cb058c1bd6b4494364de8bcbfd89d534ba709dd6de06dc7e7884dafca7b3;
+        }
+        if (idx == 2) {
+            return 0xc0df835826416ebdfe6372000466c8c5fe1013f8d40448281ab572d11f4aee50;
+        }
+        if (idx == 3) {
+            return 0xf731c1d1a68c1d060817b50dc3d56d2cdfb35a1636ad99ec9c3352e617bb907b;
+        }
+        if (idx == 4) {
+            return 0x3f339e466f1946264212212866a929837cd565423bf1d4b3818870021f2ec12e;
+        }
+        if (idx == 5) {
+            return 0x1ec4b12edb4056925ccc5687ca77bdd002de7af60de2a4be27f318b0a73df2fa;
+        }
+        if (idx == 6) {
+            return 0x072e51399be0cb21e3c50b076d8af6bb35f019a8d3d629b06e0d0c9e440921df;
+        }
+        if (idx == 7) {
+            return 0x8127a61993cac5dfa6f56d440f010e185fe7d308ddfd012a8966c7f353d123de;
+        }
+        if (idx == 8) {
+            return 0x19d47f8e12c86e270438ed1caa284e2f1ffdd0a99420b2b220ea70647799a60f;
+        }
+        if (idx == 9) {
+            return 0x98374b780974d9c11465be371871b6354fb537f2f24a6b985dbd4375b3f558a8;
+        }
+        revert("more than 10 validators not supported");
+    }
+
     function newValidator(
-        uint256 key
+        uint256 idx
     ) internal pure returns (address addr, uint256 privKey, bytes memory validatorKey) {
-        privKey = key;
-        bytes memory pubkey = derivePubKeyBytes(key);
-        validatorKey = deriveValidatorPubKeyBytes(key);
+        privKey = getPrivateKey(idx);
+        bytes memory pubkey = derivePubKeyBytes(privKey);
+        validatorKey = deriveValidatorPubKeyBytes(privKey);
         addr = address(uint160(uint256(keccak256(pubkey))));
     }
 
+    /// Generate a list of validators whose addresses are arranged in ascending order.
     function newValidators(
         uint256 n
     ) internal pure returns (address[] memory validators, uint256[] memory privKeys, bytes[] memory validatorKeys) {
@@ -114,7 +150,7 @@ library TestUtils {
         privKeys = new uint256[](n);
 
         for (uint i = 0; i < n; i++) {
-            (address addr, uint256 key, bytes memory validatorKey) = newValidator(100 + i);
+            (address addr, uint256 key, bytes memory validatorKey) = newValidator(i);
             validators[i] = addr;
             validatorKeys[i] = validatorKey;
             privKeys[i] = key;
@@ -123,18 +159,18 @@ library TestUtils {
         return (validators, privKeys, validatorKeys);
     }
 
-    function derivePubKey(uint8 seq) internal pure returns (address addr, bytes memory data) {
-        data = new bytes(65);
-        data[1] = bytes1(seq);
+    // function derivePubKey(uint8 seq) internal pure returns (address addr, bytes memory data) {
+    //     data = new bytes(65);
+    //     data[1] = bytes1(seq);
 
-        // use data[1:] for the hash
-        bytes memory dataSubset = new bytes(data.length - 1);
-        for (uint i = 1; i < data.length; i++) {
-            dataSubset[i - 1] = data[i];
-        }
+    //     // use data[1:] for the hash
+    //     bytes memory dataSubset = new bytes(data.length - 1);
+    //     for (uint i = 1; i < data.length; i++) {
+    //         dataSubset[i - 1] = data[i];
+    //     }
 
-        addr = address(uint160(uint256(keccak256(dataSubset))));
-    }
+    //     addr = address(uint160(uint256(keccak256(dataSubset))));
+    // }
 
     function ensureBytesEqual(bytes memory _a, bytes memory _b) internal pure {
         require(_a.length == _b.length, "bytes len not equal");

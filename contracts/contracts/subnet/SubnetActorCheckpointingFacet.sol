@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {InvalidBatchEpoch, MaxMsgsPerBatchExceeded, InvalidSignatureErr, BottomUpCheckpointAlreadySubmitted, CannotSubmitFutureCheckpoint, InvalidCheckpointEpoch} from "../errors/IPCErrors.sol";
+import {InvalidBatchEpoch, MaxMsgsPerBatchExceeded, InvalidSignatureErr, SignatureAddressesNotSorted, BottomUpCheckpointAlreadySubmitted, CannotSubmitFutureCheckpoint, InvalidCheckpointEpoch} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {BottomUpCheckpoint, BottomUpMsgBatch, BottomUpMsgBatchInfo} from "../structs/CrossNet.sol";
 import {Validator, ValidatorSet} from "../structs/Subnet.sol";
@@ -66,6 +66,16 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         bytes32 hash,
         bytes[] memory signatures
     ) public view {
+        for (uint256 i = 1; i < signatories.length; ) {
+            if (signatories[i] <= signatories[i - 1]) {
+                revert SignatureAddressesNotSorted();
+            }
+
+            unchecked {
+                i++;
+            }
+        }
+
         // This call reverts if at least one of the signatories (validator) is not in the active validator set.
         uint256[] memory collaterals = s.validatorSet.getTotalPowerOfValidators(signatories);
         uint256 activeCollateral = s.validatorSet.getTotalActivePower();

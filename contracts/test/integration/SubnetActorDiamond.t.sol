@@ -112,11 +112,10 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         // create genesis validators
         uint256 numGenesisValidators = 3;
-        uint256 startingPrivateKey = 100;
         gwConstructorParams.genesisValidators = new Validator[](numGenesisValidators);
 
         for (uint256 i = 0; i < numGenesisValidators; i++) {
-            (address validator, , bytes memory publicKey) = TestUtils.newValidator(startingPrivateKey + i);
+            (address validator, , bytes memory publicKey) = TestUtils.newValidator(i);
             gwConstructorParams.genesisValidators[i] = Validator({addr: validator, weight: 100, metadata: publicKey});
         }
 
@@ -147,8 +146,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
     /// @notice Testing the basic join, stake, leave lifecycle of validators
     function testSubnetActorDiamond_BasicLifeCycle() public {
-        (address validator1, uint256 privKey1, bytes memory publicKey1) = TestUtils.newValidator(100);
-        (address validator2, uint256 privKey2, bytes memory publicKey2) = TestUtils.newValidator(101);
+        (address validator1, uint256 privKey1, bytes memory publicKey1) = TestUtils.newValidator(0);
+        (address validator2, uint256 privKey2, bytes memory publicKey2) = TestUtils.newValidator(1);
 
         // total collateral in the gateway
         uint256 collateral = 0;
@@ -427,7 +426,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testSubnetActorDiamond_Bootstrap_Node() public {
-        (address validator, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(100);
+        (address validator, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(0);
 
         vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE);
         vm.prank(validator);
@@ -463,7 +462,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testSubnetActorDiamond_Leave_NotValidator() public {
-        (address validator, , ) = TestUtils.newValidator(100);
+        (address validator, , ) = TestUtils.newValidator(0);
 
         // non-empty subnet can't be killed
         vm.prank(validator);
@@ -472,9 +471,9 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testSubnetActorDiamond_Leave_Subnet() public {
-        (address validator1, uint256 privKey1, bytes memory publicKey1) = TestUtils.newValidator(100);
-        (address validator2, uint256 privKey2, bytes memory publicKey2) = TestUtils.newValidator(101);
-        (address validator3, uint256 privKey3, bytes memory publicKey3) = TestUtils.newValidator(102);
+        (address validator1, uint256 privKey1, bytes memory publicKey1) = TestUtils.newValidator(0);
+        (address validator2, uint256 privKey2, bytes memory publicKey2) = TestUtils.newValidator(1);
+        (address validator3, uint256 privKey3, bytes memory publicKey3) = TestUtils.newValidator(2);
 
         vm.deal(validator1, DEFAULT_MIN_VALIDATOR_STAKE);
         vm.deal(validator2, 3 * DEFAULT_MIN_VALIDATOR_STAKE);
@@ -513,7 +512,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testSubnetActorDiamond_Kill_NotBootstrappedSubnet() public {
-        (address validator1, , ) = TestUtils.newValidator(100);
+        (address validator1, , ) = TestUtils.newValidator(0);
 
         // not bootstrapped subnet can't be killed
         vm.expectRevert(SubnetNotBootstrapped.selector);
@@ -690,11 +689,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             saDiamond.manager().join{value: 10}(pubKeys[i], 10);
         }
 
-        // swap validators to trigger `InvalidSignatory` error;
-        address a;
-        a = validators[0];
-        validators[0] = validators[1];
-        validators[1] = a;
+        // use validator 1's signature for validator 0 to trigger `InvalidSignatory` error;
+        signatures[0] = signatures[1];
 
         vm.expectRevert(
             abi.encodeWithSelector(InvalidSignatureErr.selector, MultisignatureChecker.Error.InvalidSignatory)
@@ -1466,8 +1462,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function test_second_validator_can_join() public {
-        (address validatorAddress1, uint256 privKey1, bytes memory publicKey1) = TestUtils.newValidator(101);
-        (address validatorAddress2, , bytes memory publicKey2) = TestUtils.newValidator(102);
+        (address validatorAddress1, uint256 privKey1, bytes memory publicKey1) = TestUtils.newValidator(1);
+        (address validatorAddress2, , bytes memory publicKey2) = TestUtils.newValidator(2);
 
         join(validatorAddress1, publicKey1);
 
@@ -1728,7 +1724,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         saDiamond.manager().setFederatedPower(validators, publicKeys, powers);
 
-        confirmChange(validators[2], privKeys[2], validators[1], privKeys[1]);
+        confirmChange(validators[1], privKeys[1], validators[2], privKeys[2]);
 
         require(saDiamond.getter().isActiveValidator(validators[0]), "not active validator 0");
         require(saDiamond.getter().isActiveValidator(validators[1]), "not active validator 1");
@@ -1867,8 +1863,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     // Tests for collateral token
     // ----------------------------
     function testSubnetActorDiamond_CollateralERC20_SupplyERC20_RegisteredInGateway() public {
-        (address validator, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(100);
-        (address validator2, , ) = TestUtils.newValidator(101);
+        (address validator, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(0);
+        (address validator2, , ) = TestUtils.newValidator(1);
 
         // a bit of gas for execution, should not be needed
         vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE - 100);
@@ -2005,8 +2001,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testSubnetActorDiamond_CollateralERC20_SupplyERC20_SameToken_RegisteredInGateway() public {
-        (address validator, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(100);
-        (address validator2, , ) = TestUtils.newValidator(101);
+        (address validator, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(0);
+        (address validator2, , ) = TestUtils.newValidator(1);
 
         // a bit of gas for execution, should not be needed
         vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE - 100);
@@ -2128,8 +2124,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testSubnetActorDiamond_CollateralERC20_SupplyNative_RegisteredInGateway() public {
-        (address validator, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(100);
-        (address validator2, , ) = TestUtils.newValidator(101);
+        (address validator, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(0);
+        (address validator2, , ) = TestUtils.newValidator(1);
 
         // a bit of gas for execution, should not be needed
         vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE - 100);
@@ -2232,8 +2228,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testSubnetActorDiamond_CollateralNative_SupplyNative_RegisteredInGateway() public {
-        (address validator, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(100);
-        (address validator2, , ) = TestUtils.newValidator(101);
+        (address validator, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(0);
+        (address validator2, , ) = TestUtils.newValidator(1);
 
         // a bit of gas for execution, should not be needed
         vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE * 10);
@@ -2303,8 +2299,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testSubnetActorDiamond_CollateralNative_SupplyERC20_RegisteredInGateway() public {
-        (address validator, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(100);
-        (address validator2, , ) = TestUtils.newValidator(101);
+        (address validator, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(0);
+        (address validator2, , ) = TestUtils.newValidator(1);
 
         // a bit of gas for execution, should not be needed
         vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE * 10);
@@ -2745,7 +2741,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         saDiamond.manager().setValidatorGater(address(gater));
 
-        (address validator, , bytes memory publicKey) = TestUtils.newValidator(100);
+        (address validator, , bytes memory publicKey) = TestUtils.newValidator(0);
 
         vm.deal(validator, DEFAULT_MIN_VALIDATOR_STAKE * 3);
         vm.prank(validator);
