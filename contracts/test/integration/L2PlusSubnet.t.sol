@@ -888,7 +888,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         SubnetActorCheckpointingFacet checkpointer = sa.checkpointer();
         vm.startPrank(address(sa));
 
-        checkpointer.execBottomUpBatch(
+        checkpointer.execBottomUpMsgBatch(
             checkpoint.subnetID,
             checkpoint.blockHeight,
             inclusions

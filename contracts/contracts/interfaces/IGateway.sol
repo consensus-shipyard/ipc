@@ -27,7 +27,7 @@ interface IGateway {
     function commitCheckpoint(BottomUpCheckpoint calldata bottomUpCheckpoint) external;
 
     /// @notice submit a verified batch of committed cross-net messages for execution.
-    function execBottomUpBatch(
+    function execBottomUpMsgBatch(
         SubnetID calldata subnetID,
         IpcEnvelope[] calldata msgs
     ) external;

@@ -130,7 +130,7 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
     /// @param subnet The ID of the subnet from which the messages originated.
     /// @param checkpointHeight The height of the checkpoint containing the committed messages.
     /// @param inclusions An array of inclusion proofs and messages to be executed.
-    function execBottomUpBatch(
+    function execBottomUpMsgBatch(
         SubnetID calldata subnet,
         uint256 checkpointHeight,
         BottomUpBatch.Inclusion[] calldata inclusions
@@ -145,7 +145,7 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
             }
         }
 
-        IGateway(s.ipcGatewayAddr).execBottomUpBatch(subnet, msgs);
+        IGateway(s.ipcGatewayAddr).execBottomUpMsgBatch(subnet, msgs);
 
         // Propagate cross messages from checkpoint to other subnets
         IGateway(s.ipcGatewayAddr).propagateAll();

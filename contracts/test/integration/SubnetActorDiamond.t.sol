@@ -2793,7 +2793,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         // expect revert.
         uint256 invalidHeight = checkpoint.blockHeight + 1;
         vm.expectRevert(MissingBatchCommitment.selector);
-        checkpointer.execBottomUpBatch(
+        checkpointer.execBottomUpMsgBatch(
             checkpoint.subnetID,
             invalidHeight,
             inclusions
@@ -2804,7 +2804,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         inclusionsOne[0].msg = inclusions[0].msg;
         inclusionsOne[0].proof = inclusions[1].proof;
         vm.expectRevert(InvalidInclusionProof.selector);
-        checkpointer.execBottomUpBatch(
+        checkpointer.execBottomUpMsgBatch(
             checkpoint.subnetID,
             checkpoint.blockHeight,
             inclusionsOne
@@ -2812,7 +2812,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         // execute with a valid proof (1/2).
         inclusionsOne[0] = inclusions[0];
-        checkpointer.execBottomUpBatch(
+        checkpointer.execBottomUpMsgBatch(
             checkpoint.subnetID,
             checkpoint.blockHeight,
             inclusionsOne
@@ -2821,7 +2821,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         // attempt to re-execute the same msg.
         // expect revert.
         vm.expectRevert(BatchMsgAlreadyExecuted.selector);
-        checkpointer.execBottomUpBatch(
+        checkpointer.execBottomUpMsgBatch(
             checkpoint.subnetID,
             checkpoint.blockHeight,
             inclusionsOne
@@ -2829,7 +2829,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         // execute with a valid proof (2/2).
         inclusionsOne[0] = inclusions[1];
-        checkpointer.execBottomUpBatch(
+        checkpointer.execBottomUpMsgBatch(
             checkpoint.subnetID,
             checkpoint.blockHeight,
             inclusionsOne
@@ -2838,7 +2838,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         // attempt to re-execute the same msg.
         // expect revert.
         vm.expectRevert(MissingBatchCommitment.selector);
-        checkpointer.execBottomUpBatch(
+        checkpointer.execBottomUpMsgBatch(
             checkpoint.subnetID,
             checkpoint.blockHeight,
             inclusionsOne

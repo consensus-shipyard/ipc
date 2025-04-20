@@ -52,7 +52,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
     /// @notice submit a verified batch of committed cross-net messages for execution.
     /// @param subnetID The ID of the child subnet that originated the batch.
     /// @param msgs The batch of messages to be executed.
-    function execBottomUpBatch(
+    function execBottomUpMsgBatch(
         SubnetID calldata subnetID,
         IpcEnvelope[] calldata msgs
     ) external {
@@ -65,7 +65,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
             revert SubnetNotFound();
         }
 
-        _execBottomUpBatch(msgs, subnet);
+        _execBottomUpMsgBatch(msgs, subnet);
     }
 
     /// @notice creates a new bottom-up checkpoint
@@ -148,7 +148,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
         });
     }
 
- function _execBottomUpBatch(IpcEnvelope[] calldata msgs, Subnet storage subnet) internal {
+ function _execBottomUpMsgBatch(IpcEnvelope[] calldata msgs, Subnet storage subnet) internal {
         uint256 totalValue;
         uint256 crossMsgLength = msgs.length;
 
