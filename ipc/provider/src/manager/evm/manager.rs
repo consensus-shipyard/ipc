@@ -33,8 +33,8 @@ use crate::manager::subnet::{
 use crate::manager::{EthManager, SubnetManager};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
-use ethers::abi::Tokenizable;
 use ethers::abi::AbiEncode;
+use ethers::abi::Tokenizable;
 use ethers::contract::abigen;
 use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::{Signer, SignerMiddleware};
@@ -48,6 +48,8 @@ use ethers::middleware::Middleware;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_actors_abis::subnet_actor_activity_facet::ValidatorClaim;
+use ipc_actors_abis::subnet_actor_checkpointing_facet::Inclusion;
+use ipc_actors_abis::subnet_actor_getter_facet::ListPendingCommitmentsEntry;
 use ipc_api::checkpoint::{
     consensus::ValidatorData, BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent,
     Signature, VALIDATOR_REWARD_FIELDS,
@@ -61,8 +63,6 @@ use ipc_observability::lazy_static;
 use ipc_wallet::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
 use num_traits::ToPrimitive;
 use std::result;
-use ipc_actors_abis::subnet_actor_checkpointing_facet::Inclusion;
-use ipc_actors_abis::subnet_actor_getter_facet::ListPendingCommitmentsEntry;
 
 pub type SignerWithFeeEstimatorMiddleware =
     Eip1559GasEstimatorMiddleware<SignerMiddleware<Provider<ErrorParserHttp>, Wallet<SigningKey>>>;
@@ -1229,13 +1229,19 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
         Ok(epoch.as_u64() as ChainEpoch)
     }
 
-    async fn list_pending_bottom_up_batch_commitments(&self, subnet_id: &SubnetID) -> Result<Vec<ListPendingCommitmentsEntry>> {
+    async fn list_pending_bottom_up_batch_commitments(
+        &self,
+        subnet_id: &SubnetID,
+    ) -> Result<Vec<ListPendingCommitmentsEntry>> {
         let address = contract_address_from_subnet(subnet_id)?;
         let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
             address,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
-        let entries = contract.list_pending_bottom_up_batch_commitments(subnet_id.try_into()?).call().await?;
+        let entries = contract
+            .list_pending_bottom_up_batch_commitments(subnet_id.try_into()?)
+            .call()
+            .await?;
         Ok(entries)
     }
 
@@ -1320,7 +1326,7 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
 
     async fn make_next_bottom_up_batch_inclusions(
         &self,
-        commitment: &ListPendingCommitmentsEntry
+        commitment: &ListPendingCommitmentsEntry,
     ) -> Result<Vec<Inclusion>> {
         let contract = checkpointing_facet::CheckpointingFacet::new(
             self.ipc_contract_info.gateway_addr,
@@ -1337,7 +1343,11 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
         let (event, meta) = match result.as_slice() {
             [(event, meta)] => (event, meta),
             [] => return Err(anyhow!("expected 1 BottomUpBatchRecorded event, got none")),
-            _ => return Err(anyhow!("expected 1 BottomUpBatchRecorded event, got multiple")),
+            _ => {
+                return Err(anyhow!(
+                    "expected 1 BottomUpBatchRecorded event, got multiple"
+                ))
+            }
         };
 
         if event.checkpoint_height != commitment.height as u64 {
@@ -1376,7 +1386,7 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
         submitter: &Address,
         subnet_id: &SubnetID,
         height: ChainEpoch,
-        inclusions: Vec<Inclusion>
+        inclusions: Vec<Inclusion>,
     ) -> Result<ChainEpoch> {
         let address = contract_address_from_subnet(&subnet_id)?;
         tracing::debug!(
@@ -1388,11 +1398,7 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
             address,
             signer.clone(),
         );
-        let call = contract.exec_bottom_up_batch(
-            subnet_id.try_into()?,
-            height.into(),
-            inclusions
-        );
+        let call = contract.exec_bottom_up_batch(subnet_id.try_into()?, height.into(), inclusions);
         let call = extend_call_with_pending_block(call).await?;
 
         if let Some(calldata) = call.calldata() {
@@ -1847,7 +1853,6 @@ mod tests {
         assert_eq!(new_root, root);
     }
 }
-
 
 fn convert_msg(
     msg: checkpointing_facet::IpcEnvelope,

@@ -23,10 +23,10 @@ use fendermint_vm_actor_interface::ipc::BottomUpCheckpoint;
 use fendermint_vm_genesis::{Power, Validator, ValidatorKey};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::{address::Address, chainid::ChainID};
+use ipc_actors_abis::checkpointing_facet as checkpoint;
 use ipc_actors_abis::checkpointing_facet::{Commitment, FvmAddress, Ipcaddress, SubnetID};
 use ipc_actors_abis::gateway_getter_facet as getter;
 use ipc_actors_abis::gateway_getter_facet::gateway_getter_facet;
-use ipc_actors_abis::{checkpointing_facet as checkpoint, checkpointing_facet};
 use ipc_api::merkle::MerkleGen;
 use ipc_api::staking::ConfigurationNumber;
 use ipc_observability::{emit, observe::TracingError, serde::HexEncodableBlockHash, Traceable};
@@ -515,11 +515,9 @@ fn convert_tokenizables<Source: Tokenizable, Target: Tokenizable>(
         .collect::<Result<Vec<_>, _>>()?)
 }
 
-fn convert_envelopes(
-    msgs: Vec<gateway_getter_facet::IpcEnvelope>,
-) -> Vec<checkpointing_facet::IpcEnvelope> {
+fn convert_envelopes(msgs: Vec<gateway_getter_facet::IpcEnvelope>) -> Vec<checkpoint::IpcEnvelope> {
     msgs.into_iter()
-        .map(|m| checkpointing_facet::IpcEnvelope {
+        .map(|m| checkpoint::IpcEnvelope {
             kind: m.kind,
             local_nonce: m.local_nonce,
             from: Ipcaddress {

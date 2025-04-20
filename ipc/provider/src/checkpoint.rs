@@ -9,7 +9,9 @@ use anyhow::{anyhow, Result};
 use futures_util::future::try_join_all;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
+use ipc_actors_abis::subnet_actor_checkpointing_facet::Inclusion;
 use ipc_api::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
+use ipc_api::subnet_id::SubnetID;
 use ipc_observability::{emit, serde::HexEncodableBlockHash};
 use ipc_wallet::{EthKeyAddress, PersistentKeyStore};
 use std::cmp::max;
@@ -17,8 +19,6 @@ use std::fmt::{Display, Formatter};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::sync::Semaphore;
-use ipc_actors_abis::subnet_actor_checkpointing_facet::Inclusion;
-use ipc_api::subnet_id::SubnetID;
 
 /// Tracks the config required for bottom up checkpoint submissions
 /// parent/child subnet and checkpoint period.
@@ -247,14 +247,19 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
             .list_pending_bottom_up_batch_commitments(&self.metadata.child.id)
             .await
             .map_err(|e| {
-                anyhow!("cannot obtain the list of pending bottom up batch commitments due to: {e:}")
+                anyhow!(
+                    "cannot obtain the list of pending bottom up batch commitments due to: {e:}"
+                )
             })?;
         tracing::info!("total pending commitments: {}", pending_commitments.len());
 
         let mut count = 0;
         let mut tasks = vec![];
         for commitment in pending_commitments {
-            let inclusions = self.child_handler.make_next_bottom_up_batch_inclusions(&commitment).await?;
+            let inclusions = self
+                .child_handler
+                .make_next_bottom_up_batch_inclusions(&commitment)
+                .await?;
 
             // We support parallel batch execution using FIFO order with a limited parallelism (controlled by
             // the size of submission_semaphore).
@@ -275,14 +280,12 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                     &submitter,
                     &child_subnet_id,
                     height,
-                    inclusions
+                    inclusions,
                 )
-                    .await
-                    .inspect_err(|err| {
-                        tracing::error!(
-                                "Fail to execute bottom up batch at height {height}: {err}"
-                            );
-                    });
+                .await
+                .inspect_err(|err| {
+                    tracing::error!("Fail to execute bottom up batch at height {height}: {err}");
+                });
 
                 drop(permit);
                 result
@@ -333,15 +336,10 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         submitter: &Address,
         subnet_id: &SubnetID,
         height: ChainEpoch,
-        inclusions: Vec<Inclusion>
+        inclusions: Vec<Inclusion>,
     ) -> Result<(), anyhow::Error> {
         let epoch = parent_handler
-            .execute_bottom_up_batch(
-                &submitter,
-                subnet_id,
-                height,
-                inclusions,
-            )
+            .execute_bottom_up_batch(&submitter, subnet_id, height, inclusions)
             .await
             .map_err(|e| {
                 anyhow!(

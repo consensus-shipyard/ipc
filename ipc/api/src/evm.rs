@@ -6,7 +6,7 @@
 use crate::address::IPCAddress;
 use crate::checkpoint::BottomUpMsgBatch;
 use crate::checkpoint::{
-    consensus, BottomUpCheckpoint, BottomUpBatchCommitment, CompressedActivityRollup,
+    consensus, BottomUpBatchCommitment, BottomUpCheckpoint, CompressedActivityRollup,
 };
 use crate::cross::{IpcEnvelope, IpcMsgKind};
 use crate::staking::PowerChange;
