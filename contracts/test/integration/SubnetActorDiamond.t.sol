@@ -692,9 +692,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         signatures[0] = signatures[1];
         validators[0] = validators[1];
 
-        vm.expectRevert(
-            abi.encodeWithSelector(SignatureAddressesNotSorted.selector)
-        );
+        vm.expectRevert(abi.encodeWithSelector(DuplicateValidatorSignaturesFound.selector));
         saDiamond.checkpointer().validateActiveQuorumSignatures(validators, hash0, signatures);
     }
 

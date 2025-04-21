@@ -84,6 +84,7 @@ error ValidatorAlreadyClaimed();
 error InvalidActivityProof();
 error NotOwner();
 error SignatureAddressesNotSorted();
+error DuplicateValidatorSignaturesFound();
 
 enum InvalidXnetMessageReason {
     Sender,
