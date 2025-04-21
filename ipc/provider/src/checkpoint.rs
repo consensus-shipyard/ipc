@@ -241,13 +241,22 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         bundle: BottomUpCheckpointBundle,
         event: QuorumReachedEvent,
     ) -> Result<(), anyhow::Error> {
+        let BottomUpCheckpointBundle {
+            checkpoint,
+            signatures,
+            signatories,
+        } = bundle;
+
+        // sort by address in ascending order as the contract requires it.
+        let mut pairs = signatories
+            .into_iter()
+            .zip(signatures.into_iter())
+            .collect::<Vec<_>>();
+        pairs.sort_by(|a, b| a.0.cmp(&b.0));
+        let (signatories, signatures): (Vec<_>, Vec<_>) = pairs.into_iter().unzip();
+
         let epoch = parent_handler
-            .submit_checkpoint(
-                &submitter,
-                bundle.checkpoint,
-                bundle.signatures,
-                bundle.signatories,
-            )
+            .submit_checkpoint(&submitter, checkpoint, signatures, signatories)
             .await
             .map_err(|e| {
                 anyhow!(
