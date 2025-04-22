@@ -49,7 +49,11 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         // Commit in gateway to distribute rewards
         IGateway(s.ipcGatewayAddr).commitCheckpoint(checkpoint);
 
-        LibBottomUpBatch.recordBottomUpBatchCommitment(checkpoint.subnetID, uint64(checkpoint.blockHeight), checkpoint.msgs);
+        LibBottomUpBatch.recordBottomUpBatchCommitment(
+            checkpoint.subnetID,
+            uint64(checkpoint.blockHeight),
+            checkpoint.msgs
+        );
         LibActivity.recordActivityRollup(checkpoint.subnetID, uint64(checkpoint.blockHeight), checkpoint.activity);
 
         // confirming the changes in membership in the child
@@ -150,5 +154,4 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         // Propagate cross messages from checkpoint to other subnets
         IGateway(s.ipcGatewayAddr).propagateAll();
     }
-
 }

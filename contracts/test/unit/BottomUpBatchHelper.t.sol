@@ -62,13 +62,13 @@ contract BottomUpBatchHelperTest is Test {
     ) internal pure returns (IpcEnvelope memory) {
         return
             IpcEnvelope({
-            kind: IpcMsgKind.Transfer,
-            from: from,
-            to: to,
-            value: 0,
-            message: bytes(""),
-            localNonce: nonce,
-            originalNonce: 0
-        });
+                kind: IpcMsgKind.Transfer,
+                from: from,
+                to: to,
+                value: 0,
+                message: bytes(""),
+                localNonce: nonce,
+                originalNonce: 0
+            });
     }
 }

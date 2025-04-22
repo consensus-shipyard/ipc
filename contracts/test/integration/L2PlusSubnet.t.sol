@@ -500,18 +500,14 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         params.subnetL3.gateway.messenger().sendContractXnetMessage{value: params.amount}(crossMessage);
 
         // this would normally submitted by releayer. It call the subnet actor on the L2 network.
-        BottomUpCheckpoint memory _checkpoint = callCreateBottomUpCheckpointFromChildSubnet(params.subnetL3.id, params.subnetL3.gateway);
-        submitBottomUpCheckpoint(
-            _checkpoint,
-            params.subnetL3.subnetActor
+        BottomUpCheckpoint memory _checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+            params.subnetL3.id,
+            params.subnetL3.gateway
         );
+        submitBottomUpCheckpoint(_checkpoint, params.subnetL3.subnetActor);
         IpcEnvelope[] memory _msgs = new IpcEnvelope[](1);
         _msgs[0] = crossMessage;
-        batchSubnetBottomUpExecution(
-            _checkpoint,
-            _msgs,
-            params.subnetL3.subnetActor
-        );
+        batchSubnetBottomUpExecution(_checkpoint, _msgs, params.subnetL3.subnetActor);
 
         // create checkpoint in L2 and submit it to the root network (L2 subnet actor)
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
@@ -879,24 +875,19 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
     }
 
     function batchSubnetBottomUpExecution(
-        BottomUpCheckpoint memory checkpoint, 
-        IpcEnvelope[] memory msgs, 
+        BottomUpCheckpoint memory checkpoint,
+        IpcEnvelope[] memory msgs,
         SubnetActorDiamond sa
-        ) internal {
+    ) internal {
         BottomUpBatch.Inclusion[] memory inclusions = BottomUpBatchHelper.makeInclusions(msgs);
 
         SubnetActorCheckpointingFacet checkpointer = sa.checkpointer();
         vm.startPrank(address(sa));
 
-        checkpointer.execBottomUpMsgBatch(
-            checkpoint.subnetID,
-            checkpoint.blockHeight,
-            inclusions
-        );
+        checkpointer.execBottomUpMsgBatch(checkpoint.subnetID, checkpoint.blockHeight, inclusions);
 
         vm.stopPrank();
     }
-
 
     function submitBottomUpCheckpoint(BottomUpCheckpoint memory checkpoint, SubnetActorDiamond sa) internal {
         (address[] memory parentValidators, bytes[] memory parentSignatures) = prepareValidatorsSignatures(

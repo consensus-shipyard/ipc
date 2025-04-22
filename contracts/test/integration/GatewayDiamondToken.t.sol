@@ -184,7 +184,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
 
         // Now attempt to withdraw beyond the circulating supply.
         // This would be a malicious message.
-      //  batch.msgs[0] = CrossMsgHelper.createReleaseMsg(subnet.id, caller, FvmAddressHelper.from(recipient), 10);
+        //  batch.msgs[0] = CrossMsgHelper.createReleaseMsg(subnet.id, caller, FvmAddressHelper.from(recipient), 10);
         // TODO: moshababo
 
         // This reverts.

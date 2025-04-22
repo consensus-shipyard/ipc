@@ -27,10 +27,7 @@ interface IGateway {
     function commitCheckpoint(BottomUpCheckpoint calldata bottomUpCheckpoint) external;
 
     /// @notice submit a verified batch of committed cross-net messages for execution.
-    function execBottomUpMsgBatch(
-        SubnetID calldata subnetID,
-        IpcEnvelope[] calldata msgs
-    ) external;
+    function execBottomUpMsgBatch(SubnetID calldata subnetID, IpcEnvelope[] calldata msgs) external;
 
     /// @notice fund locks the received funds —denominated in the native coin— and moves the value down the hierarchy,
     /// crediting the funds to the specified address in the destination network.

@@ -52,10 +52,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
     /// @notice submit a verified batch of committed cross-net messages for execution.
     /// @param subnetID The ID of the child subnet that originated the batch.
     /// @param msgs The batch of messages to be executed.
-    function execBottomUpMsgBatch(
-        SubnetID calldata subnetID,
-        IpcEnvelope[] calldata msgs
-    ) external {
+    function execBottomUpMsgBatch(SubnetID calldata subnetID, IpcEnvelope[] calldata msgs) external {
         // subnet actor is used to implement access control
         if (subnetID.getActor() != msg.sender) {
             revert InvalidBatchSource();
@@ -148,7 +145,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
         });
     }
 
- function _execBottomUpMsgBatch(IpcEnvelope[] calldata msgs, Subnet storage subnet) internal {
+    function _execBottomUpMsgBatch(IpcEnvelope[] calldata msgs, Subnet storage subnet) internal {
         uint256 totalValue;
         uint256 crossMsgLength = msgs.length;
 

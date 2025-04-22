@@ -2416,7 +2416,12 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blocksMined
         );
 
-        confirmChange(addrs, privKeys, BottomUpBatchHelper.makeEmptyCommitment(), ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot));
+        confirmChange(
+            addrs,
+            privKeys,
+            BottomUpBatchHelper.makeEmptyCommitment(),
+            ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot)
+        );
 
         uint64 bottomUpCheckPeriod = uint64(gatewayDiamond.getter().bottomUpCheckPeriod());
 
@@ -2518,8 +2523,18 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blocksMined
         );
 
-        confirmChange(addrs, privKeys, BottomUpBatchHelper.makeEmptyCommitment(), ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot1));
-        confirmChange(addrs, privKeys, BottomUpBatchHelper.makeEmptyCommitment(), ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot2));
+        confirmChange(
+            addrs,
+            privKeys,
+            BottomUpBatchHelper.makeEmptyCommitment(),
+            ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot1)
+        );
+        confirmChange(
+            addrs,
+            privKeys,
+            BottomUpBatchHelper.makeEmptyCommitment(),
+            ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot2)
+        );
 
         vm.startPrank(addrs[0]);
         vm.deal(addrs[0], 1 ether);
@@ -2594,8 +2609,18 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blocksMined
         );
 
-        confirmChange(addrs, privKeys, BottomUpBatchHelper.makeEmptyCommitment(), ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot1));
-        confirmChange(addrs, privKeys, BottomUpBatchHelper.makeEmptyCommitment(), ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot2));
+        confirmChange(
+            addrs,
+            privKeys,
+            BottomUpBatchHelper.makeEmptyCommitment(),
+            ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot1)
+        );
+        confirmChange(
+            addrs,
+            privKeys,
+            BottomUpBatchHelper.makeEmptyCommitment(),
+            ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot2)
+        );
 
         vm.startPrank(addrs[0]);
         vm.deal(addrs[0], 1 ether);
@@ -2675,8 +2700,18 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         );
 
         // two checkpoints
-        confirmChange(addrs, privKeys, BottomUpBatchHelper.makeEmptyCommitment(), ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot1));
-        confirmChange(addrs, privKeys, BottomUpBatchHelper.makeEmptyCommitment(), ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot2));
+        confirmChange(
+            addrs,
+            privKeys,
+            BottomUpBatchHelper.makeEmptyCommitment(),
+            ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot1)
+        );
+        confirmChange(
+            addrs,
+            privKeys,
+            BottomUpBatchHelper.makeEmptyCommitment(),
+            ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot2)
+        );
 
         Consensus.ValidatorClaim[] memory claimProofs = new Consensus.ValidatorClaim[](2);
         uint64[] memory heights = new uint64[](2);
@@ -2785,7 +2820,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         confirmChange(addrs, privKeys, commitment, ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot));
         uint256 h = saDiamond.getter().lastBottomUpCheckpointHeight();
-        (, BottomUpCheckpoint memory checkpoint)  = saDiamond.getter().bottomUpCheckpointAtEpoch(h);
+        (, BottomUpCheckpoint memory checkpoint) = saDiamond.getter().bottomUpCheckpointAtEpoch(h);
         SubnetActorCheckpointingFacet checkpointer = saDiamond.checkpointer();
         BottomUpBatch.Inclusion[] memory inclusionsOne = new BottomUpBatch.Inclusion[](1);
 
@@ -2793,56 +2828,32 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         // expect revert.
         uint256 invalidHeight = checkpoint.blockHeight + 1;
         vm.expectRevert(MissingBatchCommitment.selector);
-        checkpointer.execBottomUpMsgBatch(
-            checkpoint.subnetID,
-            invalidHeight,
-            inclusions
-        );
+        checkpointer.execBottomUpMsgBatch(checkpoint.subnetID, invalidHeight, inclusions);
 
         // attempt to execute with invalid inclusion proof.
         // expect revert.
         inclusionsOne[0].msg = inclusions[0].msg;
         inclusionsOne[0].proof = inclusions[1].proof;
         vm.expectRevert(InvalidInclusionProof.selector);
-        checkpointer.execBottomUpMsgBatch(
-            checkpoint.subnetID,
-            checkpoint.blockHeight,
-            inclusionsOne
-        );
+        checkpointer.execBottomUpMsgBatch(checkpoint.subnetID, checkpoint.blockHeight, inclusionsOne);
 
         // execute with a valid proof (1/2).
         inclusionsOne[0] = inclusions[0];
-        checkpointer.execBottomUpMsgBatch(
-            checkpoint.subnetID,
-            checkpoint.blockHeight,
-            inclusionsOne
-        );
+        checkpointer.execBottomUpMsgBatch(checkpoint.subnetID, checkpoint.blockHeight, inclusionsOne);
 
         // attempt to re-execute the same msg.
         // expect revert.
         vm.expectRevert(BatchMsgAlreadyExecuted.selector);
-        checkpointer.execBottomUpMsgBatch(
-            checkpoint.subnetID,
-            checkpoint.blockHeight,
-            inclusionsOne
-        );
+        checkpointer.execBottomUpMsgBatch(checkpoint.subnetID, checkpoint.blockHeight, inclusionsOne);
 
         // execute with a valid proof (2/2).
         inclusionsOne[0] = inclusions[1];
-        checkpointer.execBottomUpMsgBatch(
-            checkpoint.subnetID,
-            checkpoint.blockHeight,
-            inclusionsOne
-        );
+        checkpointer.execBottomUpMsgBatch(checkpoint.subnetID, checkpoint.blockHeight, inclusionsOne);
 
         // attempt to re-execute the same msg.
         // expect revert.
         vm.expectRevert(MissingBatchCommitment.selector);
-        checkpointer.execBottomUpMsgBatch(
-            checkpoint.subnetID,
-            checkpoint.blockHeight,
-            inclusionsOne
-        );
+        checkpointer.execBottomUpMsgBatch(checkpoint.subnetID, checkpoint.blockHeight, inclusionsOne);
     }
 
     // -----------------------------------------------------------------------------------------------------------------
