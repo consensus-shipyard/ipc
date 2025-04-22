@@ -1350,7 +1350,7 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
             }
         };
 
-        if event.checkpoint_height != commitment.height as u64 {
+        if event.checkpoint_height != commitment.height {
             return Err(anyhow!("checkpoint height not equal"));
         }
         tracing::debug!(
@@ -1371,7 +1371,7 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
                 tracing::debug!("skipping an already-executed bottom up msg: {:?}", msg);
                 continue;
             }
-            let proof = merkle.get_proof(&msg)?;
+            let proof = merkle.get_proof(msg)?;
             let msg = convert_msg(msg.clone());
             inclusions.push(Inclusion {
                 msg,
@@ -1388,7 +1388,7 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
         height: ChainEpoch,
         inclusions: Vec<Inclusion>,
     ) -> Result<ChainEpoch> {
-        let address = contract_address_from_subnet(&subnet_id)?;
+        let address = contract_address_from_subnet(subnet_id)?;
         tracing::debug!(
             "execute bottom up batch: {inclusions:?} in evm subnet contract: {address:}"
         );
@@ -1727,6 +1727,38 @@ impl TryFrom<gateway_getter_facet::Subnet> for SubnetInfo {
     }
 }
 
+fn convert_msg(
+    msg: checkpointing_facet::IpcEnvelope,
+) -> subnet_actor_checkpointing_facet::IpcEnvelope {
+    subnet_actor_checkpointing_facet::IpcEnvelope {
+        kind: msg.kind,
+        local_nonce: msg.local_nonce,
+        from: subnet_actor_checkpointing_facet::Ipcaddress {
+            subnet_id: subnet_actor_checkpointing_facet::SubnetID {
+                root: msg.from.subnet_id.root,
+                route: msg.from.subnet_id.route,
+            },
+            raw_address: subnet_actor_checkpointing_facet::FvmAddress {
+                addr_type: msg.from.raw_address.addr_type,
+                payload: msg.from.raw_address.payload,
+            },
+        },
+        to: subnet_actor_checkpointing_facet::Ipcaddress {
+            subnet_id: subnet_actor_checkpointing_facet::SubnetID {
+                root: msg.to.subnet_id.root,
+                route: msg.to.subnet_id.route,
+            },
+            raw_address: subnet_actor_checkpointing_facet::FvmAddress {
+                addr_type: msg.to.raw_address.addr_type,
+                payload: msg.to.raw_address.payload,
+            },
+        },
+        value: msg.value,
+        original_nonce: msg.original_nonce,
+        message: msg.message,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::manager::evm::manager::contract_address_from_subnet;
@@ -1852,37 +1884,5 @@ mod tests {
         .unwrap()
         .root();
         assert_eq!(new_root, root);
-    }
-}
-
-fn convert_msg(
-    msg: checkpointing_facet::IpcEnvelope,
-) -> subnet_actor_checkpointing_facet::IpcEnvelope {
-    subnet_actor_checkpointing_facet::IpcEnvelope {
-        kind: msg.kind,
-        local_nonce: msg.local_nonce,
-        from: subnet_actor_checkpointing_facet::Ipcaddress {
-            subnet_id: subnet_actor_checkpointing_facet::SubnetID {
-                root: msg.from.subnet_id.root,
-                route: msg.from.subnet_id.route,
-            },
-            raw_address: subnet_actor_checkpointing_facet::FvmAddress {
-                addr_type: msg.from.raw_address.addr_type,
-                payload: msg.from.raw_address.payload,
-            },
-        },
-        to: subnet_actor_checkpointing_facet::Ipcaddress {
-            subnet_id: subnet_actor_checkpointing_facet::SubnetID {
-                root: msg.to.subnet_id.root,
-                route: msg.to.subnet_id.route,
-            },
-            raw_address: subnet_actor_checkpointing_facet::FvmAddress {
-                addr_type: msg.to.raw_address.addr_type,
-                payload: msg.to.raw_address.payload,
-            },
-        },
-        value: msg.value,
-        original_nonce: msg.original_nonce,
-        message: msg.message,
     }
 }

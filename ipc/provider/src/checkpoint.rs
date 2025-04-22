@@ -339,7 +339,7 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         inclusions: Vec<Inclusion>,
     ) -> Result<(), anyhow::Error> {
         let epoch = parent_handler
-            .execute_bottom_up_batch(&submitter, subnet_id, height, inclusions)
+            .execute_bottom_up_batch(submitter, subnet_id, height, inclusions)
             .await
             .map_err(|e| {
                 anyhow!(
