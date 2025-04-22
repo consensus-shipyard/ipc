@@ -296,13 +296,17 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
                 LibSubnetActor.rmAddressFromBalanceKey(msg.sender);
                 s.supplySource.transferFunds(payable(msg.sender), genesisBalance);
             }
+        }
+        // stake might be racing with `bootstrapSubnetIfNeeded` so we need to check again
 
-            // interaction must be performed after checks and changes
+        // interaction must be performed after checks and changes
+        // we do check bootstrapping again, deliberately to avoid a complex exploit scenario
+        if (!s.bootstrapped) {
             LibPower.withdrawWithConfirm(msg.sender, amount);
             s.collateralSource.transferFunds(payable(msg.sender), amount);
-            return;
+        } else {
+            LibPower.withdraw(msg.sender, amount);
         }
-        LibPower.withdraw(msg.sender, amount);
     }
 
     /// @notice method that allows to kill the subnet when all validators left.
