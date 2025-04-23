@@ -206,7 +206,8 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
 
     function _decreaseGenesisValidatorCollateral(address validator) internal {
         uint256 length = s.genesisValidators.length;
-        for (uint256 i; i < length; ) {
+        uint256 i;
+        for (; i < length; ) {
             if (s.genesisValidators[i].addr == validator) {
                 break;
             }
