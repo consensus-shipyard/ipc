@@ -9,7 +9,7 @@ use fendermint_actor_machine::{
     GET_ADDRESS_METHOD, GET_METADATA_METHOD, INIT_METHOD, METHOD_CONSTRUCTOR,
 };
 use fvm_ipld_encoding::{strict_bytes, tuple::*};
-use fvm_shared::{address::Address, clock::ChainEpoch};
+use fvm_shared::clock::ChainEpoch;
 use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
 
@@ -57,19 +57,12 @@ pub struct AddParams {
     pub metadata: HashMap<String, String>,
     /// Whether to overwrite a key if it already exists.
     pub overwrite: bool,
-    /// Account address that initiated the call
-    pub from: Address,
 }
 
-/// Params for deleting an object.
-#[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
-pub struct DeleteParams {
-    /// Key of the object to delete from a bucket.
-    #[serde(with = "strict_bytes")]
-    pub key: Vec<u8>,
-    /// Account address that initiated the call
-    pub from: Address,
-}
+/// Key of the object to delete from a bucket.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct DeleteParams(#[serde(with = "strict_bytes")] pub Vec<u8>);
 
 /// Params for getting an object.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -127,6 +120,4 @@ pub struct UpdateObjectMetadataParams {
     /// If a key-value is present, we'll update the entry (or insert if it does not exist)
     /// If only the key is present, we will delete the metadata entry
     pub metadata: HashMap<String, Option<String>>,
-    /// Account address that initiated the call
-    pub from: Address,
 }

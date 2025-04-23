@@ -32,6 +32,7 @@ fil_actors_evm_shared = { workspace = true }
 fil_actors_runtime = { workspace = true, features = ["test_utils"] }
 hex-literal = { workspace = true }
 rand = { workspace = true }
+cid = { workspace = true }
 
 fendermint_actor_blobs_testing = { path = "./testing" }
 

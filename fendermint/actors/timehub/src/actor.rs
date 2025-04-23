@@ -10,14 +10,13 @@ use fil_actors_runtime::{
     runtime::{ActorCode, Runtime},
     ActorError,
 };
-use recall_actor_sdk::{
-    evm::emit_evm_event,
-    util::{require_addr_is_origin_or_caller, to_id_address},
-};
+use recall_actor_sdk::evm::emit_evm_event;
+use recall_actor_sdk::evm::{InputData, InvokeContractParams, InvokeContractReturn};
+use recall_sol_facade::timehub::Calls;
 use tracing::debug;
 
-use crate::sol_facade::EventPushed;
-use crate::{Leaf, Method, PushParams, PushReturn, State, TIMEHUB_ACTOR_NAME};
+use crate::sol_facade::{AbiCall, EventPushed};
+use crate::{sol_facade, Leaf, Method, PushParams, PushReturn, State, TIMEHUB_ACTOR_NAME};
 
 #[cfg(feature = "fil-actor")]
 fil_actors_runtime::wasm_trampoline!(TimehubActor);
@@ -37,8 +36,7 @@ impl TimehubActor {
         // credit approval to the caller.
         let state = rt.state::<State>()?;
         let owner = state.owner;
-        let from = to_id_address(rt, params.from, false)?;
-        require_addr_is_origin_or_caller(rt, from)?;
+        let from = rt.message().caller();
 
         let actor_address = state.address.get()?;
         if !has_credit_approval(rt, owner, from)? {
@@ -50,12 +48,12 @@ impl TimehubActor {
         // Decode the raw bytes as a Cid and report any errors.
         // However, we pass opaque bytes to the store as it tries to validate and resolve any CID
         // it stores.
-        let cid = Cid::try_from(params.cid_bytes.as_slice()).map_err(|_err| {
+        let cid = Cid::try_from(params.0.as_slice()).map_err(|_err| {
             actor_error!(illegal_argument;
                     "data must be valid CID bytes")
         })?;
         let timestamp = rt.tipset_timestamp();
-        let data: RawLeaf = (timestamp, params.cid_bytes);
+        let data: RawLeaf = (timestamp, params.0);
 
         let ret = rt.transaction(|st: &mut State, rt| st.push(rt.store(), data))?;
 
@@ -98,6 +96,42 @@ impl TimehubActor {
         let st: State = rt.state()?;
         Ok(st.leaf_count)
     }
+
+    fn invoke_contract(
+        rt: &impl Runtime,
+        params: InvokeContractParams,
+    ) -> Result<InvokeContractReturn, ActorError> {
+        let input_data: InputData = params.try_into()?;
+        if sol_facade::can_handle(&input_data) {
+            let output_data: Vec<u8> = match sol_facade::parse_input(&input_data)? {
+                Calls::getCount(call) => {
+                    let count = Self::get_count(rt)?;
+                    call.returns(count)
+                }
+                Calls::getLeafAt(call) => {
+                    let params = call.params();
+                    let push_return = Self::get_leaf_at(rt, params)?;
+                    call.returns(push_return)
+                }
+                Calls::getPeaks(call) => {
+                    let peaks = Self::get_peaks(rt)?;
+                    call.returns(peaks)
+                }
+                Calls::getRoot(call) => {
+                    let root = Self::get_root(rt)?;
+                    call.returns(root)
+                }
+                Calls::push(call) => {
+                    let params = call.params();
+                    let push_return = Self::push(rt, params)?;
+                    call.returns(push_return)
+                }
+            };
+            Ok(InvokeContractReturn { output_data })
+        } else {
+            Err(actor_error!(illegal_argument, "invalid call".to_string()))
+        }
+    }
 }
 
 impl MachineActor for TimehubActor {
@@ -121,6 +155,8 @@ impl ActorCode for TimehubActor {
         Root => get_root,
         Peaks => get_peaks,
         Count => get_count,
+        // EVM interop
+        InvokeContract => invoke_contract,
         _ => fallback,
     }
 }
@@ -133,18 +169,14 @@ mod tests {
     use std::collections::HashMap;
     use std::str::FromStr;
 
-    use fendermint_actor_blobs_shared::{
-        credit::{CreditApproval, GetCreditApprovalParams},
-        method::Method as BlobMethod,
-        BLOBS_ACTOR_ADDR,
-    };
-    use fendermint_actor_machine::{
-        sol_facade::{MachineCreated, MachineInitialized},
-        ConstructorParams, InitParams, Kind,
-    };
+    use fendermint_actor_blobs_shared::credit::{CreditApproval, GetCreditApprovalParams};
+    use fendermint_actor_blobs_shared::method::Method as BlobMethod;
+    use fendermint_actor_blobs_shared::BLOBS_ACTOR_ADDR;
+
+    use fendermint_actor_machine::sol_facade::{MachineCreated, MachineInitialized};
+    use fendermint_actor_machine::{ConstructorParams, InitParams, Kind};
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::{
-        runtime::MessageInfo,
         test_utils::{
             expect_empty, MockRuntime, ADM_ACTOR_CODE_ID, ETHACCOUNT_ACTOR_CODE_ID,
             INIT_ACTOR_CODE_ID,
@@ -247,10 +279,7 @@ mod tests {
     fn push_cid(rt: &mut MockRuntime, cid: Cid, timestamp: u64, expected_index: u64) -> PushReturn {
         rt.expect_validate_caller_any();
         rt.tipset_timestamp = timestamp;
-        let push_params = PushParams {
-            cid_bytes: cid.to_bytes(),
-            from: rt.caller(),
-        };
+        let push_params = PushParams(cid.to_bytes());
         let event = to_actor_event(EventPushed::new(expected_index, timestamp, cid)).unwrap();
         rt.expect_emitted_event(event);
         rt.call::<TimehubActor>(
@@ -373,10 +402,7 @@ mod tests {
         // Attempt to push a CID, should fail with access control error.
         let cid = Cid::from_str("bafk2bzacecmnyfiwb52tkbwmm2dsd7ysi3nvuxl3lmspy7pl26wxj4zj7w4wi")
             .unwrap();
-        let push_params = PushParams {
-            cid_bytes: cid.to_bytes(),
-            from: origin,
-        };
+        let push_params = PushParams(cid.to_bytes());
         rt.expect_validate_caller_any();
 
         let err = rt
@@ -540,10 +566,7 @@ mod tests {
         // Attempt to push a CID, should fail with access control error.
         let cid = Cid::from_str("bafk2bzacecmnyfiwb52tkbwmm2dsd7ysi3nvuxl3lmspy7pl26wxj4zj7w4wi")
             .unwrap();
-        let push_params = PushParams {
-            cid_bytes: cid.to_bytes(),
-            from: rt.caller(),
-        };
+        let push_params = PushParams(cid.to_bytes());
         rt.expect_validate_caller_any();
 
         let err = rt

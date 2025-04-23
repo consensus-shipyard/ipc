@@ -151,16 +151,14 @@ impl AbiCall for sol::buyCredit_1Call {
 }
 
 /// function approveCredit(address to) external;
-impl AbiCallRuntime for sol::approveCredit_0Call {
+impl AbiCall for sol::approveCredit_0Call {
     type Params = ApproveCreditParams;
     type Returns = ();
     type Output = Vec<u8>;
 
-    fn params(&self, rt: &impl Runtime) -> Self::Params {
-        let from = rt.message().caller();
+    fn params(&self) -> Self::Params {
         let to: Address = H160::from(self.to).into();
         ApproveCreditParams {
-            from,
             to,
             caller_allowlist: None,
             credit_limit: None,
@@ -175,13 +173,12 @@ impl AbiCallRuntime for sol::approveCredit_0Call {
 }
 
 /// function approveCredit(address to, address[] memory caller, uint256 creditLimit, uint256 gasFeeLimit, uint64 ttl) external;
-impl AbiCallRuntime for sol::approveCredit_1Call {
+impl AbiCall for sol::approveCredit_1Call {
     type Params = ApproveCreditParams;
     type Returns = ();
     type Output = Vec<u8>;
 
-    fn params(&self, rt: &impl Runtime) -> Self::Params {
-        let from: Address = rt.message().caller();
+    fn params(&self) -> Self::Params {
         let to: Address = H160::from(self.to).into();
         let caller_allowlist: HashSet<Address> = HashSet::from_iter(
             self.caller
@@ -192,7 +189,6 @@ impl AbiCallRuntime for sol::approveCredit_1Call {
         let gas_fee_limit: TokenAmount = BigUintWrapper::from(self.gasFeeLimit).into();
         let ttl = self.ttl;
         ApproveCreditParams {
-            from,
             to,
             caller_allowlist: Some(caller_allowlist),
             credit_limit: Some(credit_limit),
@@ -207,13 +203,12 @@ impl AbiCallRuntime for sol::approveCredit_1Call {
 }
 
 /// function approveCredit(address to, address[] memory caller) external;
-impl AbiCallRuntime for sol::approveCredit_2Call {
+impl AbiCall for sol::approveCredit_2Call {
     type Params = ApproveCreditParams;
     type Returns = ();
     type Output = Vec<u8>;
 
-    fn params(&self, rt: &impl Runtime) -> Self::Params {
-        let from: Address = rt.message().caller();
+    fn params(&self) -> Self::Params {
         let to: Address = H160::from(self.to).into();
         let caller_allowlist: HashSet<Address> = HashSet::from_iter(
             self.caller
@@ -221,7 +216,6 @@ impl AbiCallRuntime for sol::approveCredit_2Call {
                 .map(|sol_address| H160::from(*sol_address).into()),
         );
         ApproveCreditParams {
-            from,
             to,
             caller_allowlist: Some(caller_allowlist),
             credit_limit: None,
@@ -236,17 +230,15 @@ impl AbiCallRuntime for sol::approveCredit_2Call {
 }
 
 /// function revokeCredit(address to, address caller) external;
-impl AbiCallRuntime for sol::revokeCredit_0Call {
+impl AbiCall for sol::revokeCredit_0Call {
     type Params = RevokeCreditParams;
     type Returns = ();
     type Output = Vec<u8>;
 
-    fn params(&self, rt: &impl Runtime) -> Self::Params {
-        let from: Address = rt.message().caller();
+    fn params(&self) -> Self::Params {
         let to: Address = H160::from(self.to).into();
         let caller: Address = H160::from(self.caller).into();
         RevokeCreditParams {
-            from,
             to,
             for_caller: Some(caller),
         }
@@ -258,16 +250,14 @@ impl AbiCallRuntime for sol::revokeCredit_0Call {
 }
 
 /// function revokeCredit(address to) external;
-impl AbiCallRuntime for sol::revokeCredit_1Call {
+impl AbiCall for sol::revokeCredit_1Call {
     type Params = RevokeCreditParams;
     type Returns = ();
     type Output = Vec<u8>;
 
-    fn params(&self, rt: &impl Runtime) -> Self::Params {
-        let from: Address = rt.message().caller();
+    fn params(&self) -> Self::Params {
         let to: Address = H160::from(self.to).into();
         RevokeCreditParams {
-            from,
             to,
             for_caller: None,
         }
@@ -279,20 +269,19 @@ impl AbiCallRuntime for sol::revokeCredit_1Call {
 }
 
 /// function setAccountSponsor(address from, address sponsor) external;
-impl AbiCallRuntime for sol::setAccountSponsorCall {
+impl AbiCall for sol::setAccountSponsorCall {
     type Params = SetSponsorParams; // FIXME SU Needs runtime for "from"
     type Returns = ();
     type Output = Vec<u8>;
 
-    fn params(&self, rt: &impl Runtime) -> Self::Params {
-        let from: Address = rt.message().caller();
+    fn params(&self) -> Self::Params {
         let sponsor = H160::from(self.sponsor);
         let sponsor: Option<Address> = if sponsor.is_null() {
             None
         } else {
             Some(sponsor.into())
         };
-        SetSponsorParams { from, sponsor }
+        SetSponsorParams(sponsor)
     }
 
     fn returns(&self, returns: Self::Returns) -> Self::Output {

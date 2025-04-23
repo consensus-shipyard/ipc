@@ -19,6 +19,7 @@ use num_traits::Zero;
 use recall_actor_sdk::{
     caller::{Caller, CallerOption},
     evm::emit_evm_event,
+    util::is_bucket_address,
     util::to_delegated_address,
 };
 
@@ -79,7 +80,8 @@ impl BlobsActor {
     ) -> Result<CreditApproval, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
-        let from_caller = Caller::new_delegated(rt, params.from, None, CallerOption::Auth)?;
+        let from_caller =
+            Caller::new_delegated(rt, rt.message().caller(), None, CallerOption::Auth)?;
         let to_caller = Caller::new_delegated(rt, params.to, None, CallerOption::Create)?;
         let config = get_config(rt)?;
 
@@ -132,7 +134,8 @@ impl BlobsActor {
     pub fn revoke_credit(rt: &impl Runtime, params: RevokeCreditParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
-        let from_caller = Caller::new_delegated(rt, params.from, None, CallerOption::Auth)?;
+        let from_caller =
+            Caller::new_delegated(rt, rt.message().caller(), None, CallerOption::Auth)?;
         let to_caller = Caller::new_delegated(rt, params.to, None, CallerOption::None)?;
 
         rt.transaction(|st: &mut State, rt| {
@@ -163,7 +166,8 @@ impl BlobsActor {
     ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
-        let caller = Caller::new_delegated(rt, params.from, params.sponsor, CallerOption::Auth)?;
+        let caller =
+            Caller::new_delegated(rt, rt.message().caller(), params.0, CallerOption::Auth)?;
         let config = get_config(rt)?;
 
         rt.transaction(|st: &mut State, rt| {
@@ -242,7 +246,12 @@ impl BlobsActor {
     pub fn add_blob(rt: &impl Runtime, params: AddBlobParams) -> Result<Subscription, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
-        let caller = Caller::new_delegated(rt, params.from, params.sponsor, CallerOption::Auth)?;
+        let from = if is_bucket_address(rt, rt.message().caller())? {
+            params.from
+        } else {
+            rt.message().caller()
+        };
+        let caller = Caller::new_delegated(rt, from, params.sponsor, CallerOption::Auth)?;
         let token_amount = rt.message().value_received();
         let config = get_config(rt)?;
 
@@ -307,7 +316,13 @@ impl BlobsActor {
     pub fn delete_blob(rt: &impl Runtime, params: DeleteBlobParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
-        let caller = Caller::new_delegated(rt, params.from, params.sponsor, CallerOption::Auth)?;
+        let from = if is_bucket_address(rt, rt.message().caller())? {
+            params.from
+        } else {
+            rt.message().caller()
+        };
+
+        let caller = Caller::new_delegated(rt, from, params.sponsor, CallerOption::Auth)?;
 
         let mut capacity_released = 0;
         let (delete, size) = rt.transaction(|st: &mut State, rt| {
@@ -355,8 +370,13 @@ impl BlobsActor {
     ) -> Result<Subscription, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
-        let caller =
-            Caller::new_delegated(rt, params.add.from, params.add.sponsor, CallerOption::Auth)?;
+        let from = if is_bucket_address(rt, rt.message().caller())? {
+            params.add.from
+        } else {
+            rt.message().caller()
+        };
+
+        let caller = Caller::new_delegated(rt, from, params.add.sponsor, CallerOption::Auth)?;
         let config = get_config(rt)?;
 
         // Determine if we need to delete an existing blob before adding the new one
@@ -442,15 +462,37 @@ mod tests {
         construct_and_verify, expect_emitted_add_event, expect_emitted_approve_event,
         expect_emitted_purchase_event, expect_emitted_revoke_event, expect_get_config,
     };
+    use cid::Cid;
     use fendermint_actor_blobs_shared::{
         blobs::{BlobStatus, SubscriptionId},
         method::Method,
     };
     use fendermint_actor_blobs_testing::{new_hash, new_pk, setup_logs};
     use fil_actors_evm_shared::address::EthAddress;
-    use fil_actors_runtime::test_utils::{ETHACCOUNT_ACTOR_CODE_ID, EVM_ACTOR_CODE_ID};
+    use fil_actors_runtime::test_utils::{
+        MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, EVM_ACTOR_CODE_ID,
+    };
+    use fil_actors_runtime::ADM_ACTOR_ADDR;
     use fvm_ipld_encoding::ipld_block::IpldBlock;
-    use fvm_shared::{address::Address, bigint::BigInt, clock::ChainEpoch, error::ExitCode};
+    use fvm_shared::sys::SendFlags;
+    use fvm_shared::{
+        address::Address, bigint::BigInt, clock::ChainEpoch, error::ExitCode, MethodNum,
+    };
+    use recall_actor_sdk::util::Kind;
+
+    fn expect_retrieve_bucket_code_cid(rt: &MockRuntime, code_cid: Cid) {
+        rt.expect_send(
+            ADM_ACTOR_ADDR,
+            2892692559 as MethodNum,
+            IpldBlock::serialize_cbor(&Kind::Bucket).unwrap(),
+            TokenAmount::zero(),
+            None,
+            SendFlags::READ_ONLY,
+            IpldBlock::serialize_cbor(&code_cid).unwrap(),
+            ExitCode::OK,
+            None,
+        );
+    }
 
     #[test]
     fn test_buy_credit() {
@@ -572,7 +614,6 @@ mod tests {
         rt.expect_validate_caller_any();
         expect_get_config(&rt);
         let approve_params = ApproveCreditParams {
-            from: owner_id_addr,
             to: to_id_addr,
             caller_allowlist: None,
             credit_limit: None,
@@ -594,13 +635,12 @@ mod tests {
         assert!(result.is_ok());
         rt.verify();
 
-        // Proxy caller (caller mismatch with from, but is correct origin)
+        // Proxy caller (caller mismatch with from, hence proxy is the one who approves)
         rt.set_caller(*EVM_ACTOR_CODE_ID, proxy_id_addr);
         rt.set_origin(owner_id_addr);
         rt.expect_validate_caller_any();
         expect_get_config(&rt);
         let approve_params = ApproveCreditParams {
-            from: owner_id_addr,
             to: to_id_addr,
             caller_allowlist: None,
             credit_limit: None,
@@ -609,7 +649,7 @@ mod tests {
         };
         expect_emitted_approve_event(
             &rt,
-            owner_f4_eth_addr,
+            proxy_f4_eth_addr,
             to_f4_eth_addr,
             approve_params.credit_limit.clone(),
             approve_params.gas_fee_limit.clone(),
@@ -620,29 +660,6 @@ mod tests {
             IpldBlock::serialize_cbor(&approve_params).unwrap(),
         );
         assert!(result.is_ok());
-        rt.verify();
-
-        // Caller/origin mismatch with from
-        rt.set_caller(*EVM_ACTOR_CODE_ID, proxy_id_addr);
-        rt.set_origin(owner_id_addr);
-        rt.expect_validate_caller_any();
-        let approve_params = ApproveCreditParams {
-            from: to_id_addr, // mismatch
-            to: to_id_addr,
-            caller_allowlist: None,
-            credit_limit: None,
-            gas_fee_limit: None,
-            ttl: None,
-        };
-        let result = rt.call::<BlobsActor>(
-            Method::ApproveCredit as u64,
-            IpldBlock::serialize_cbor(&approve_params).unwrap(),
-        );
-        let expected_return = Err(ActorError::illegal_argument(format!(
-            "address {} does not match origin or caller",
-            to_id_addr
-        )));
-        assert_eq!(result, expected_return);
         rt.verify();
     }
 
@@ -677,7 +694,6 @@ mod tests {
             ExitCode::OK,
         );
         let approve_params = ApproveCreditParams {
-            from: owner_f4_eth_addr,
             to: receiver_f4_eth_addr, // Use the external address to force the ID lookup to fail
             caller_allowlist: None,
             credit_limit: None,
@@ -736,7 +752,6 @@ mod tests {
         rt.expect_validate_caller_any();
         expect_get_config(&rt);
         let approve_params = ApproveCreditParams {
-            from: owner_id_addr,
             to: to_id_addr,
             caller_allowlist: None,
             credit_limit: None,
@@ -763,7 +778,6 @@ mod tests {
         rt.set_origin(owner_id_addr);
         rt.expect_validate_caller_any();
         let revoke_params = RevokeCreditParams {
-            from: owner_id_addr,
             to: to_id_addr,
             for_caller: None,
         };
@@ -780,7 +794,6 @@ mod tests {
         rt.set_origin(owner_id_addr);
         rt.expect_validate_caller_any();
         let revoke_params = RevokeCreditParams {
-            from: owner_id_addr,
             to: to_id_addr,
             for_caller: None,
         };
@@ -798,7 +811,6 @@ mod tests {
         rt.set_origin(owner_id_addr);
         rt.expect_validate_caller_any();
         let revoke_params = RevokeCreditParams {
-            from: to_id_addr, // mismatch
             to: to_id_addr,
             for_caller: None,
         };
@@ -806,9 +818,9 @@ mod tests {
             Method::RevokeCredit as u64,
             IpldBlock::serialize_cbor(&revoke_params).unwrap(),
         );
-        let expected_return = Err(ActorError::illegal_argument(format!(
-            "address {} does not match origin or caller",
-            to_id_addr
+        let expected_return = Err(ActorError::not_found(format!(
+            "{} not found in accounts",
+            proxy_id_addr
         )));
         assert_eq!(result, expected_return);
         rt.verify();
@@ -828,6 +840,7 @@ mod tests {
         let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
 
         rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
+        let code_cid = ETHACCOUNT_ACTOR_CODE_ID.clone();
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
         rt.set_epoch(ChainEpoch::from(0));
@@ -845,6 +858,7 @@ mod tests {
             size: hash.1,
             ttl: Some(3600),
         };
+        expect_retrieve_bucket_code_cid(&rt, code_cid);
         expect_get_config(&rt);
         let result = rt.call::<BlobsActor>(
             Method::AddBlob as u64,
@@ -874,6 +888,7 @@ mod tests {
         rt.set_received(TokenAmount::zero());
         rt.set_epoch(ChainEpoch::from(5));
         rt.expect_validate_caller_any();
+        expect_retrieve_bucket_code_cid(&rt, code_cid);
         expect_get_config(&rt);
         expect_emitted_add_event(&rt, 5, &add_params, f4_eth_addr, add_params.size);
         let subscription = rt
@@ -922,6 +937,7 @@ mod tests {
         let f4_eth_addr = Address::new_delegated(10, &eth_addr.0).unwrap();
 
         rt.set_delegated_address(id_addr.id().unwrap(), f4_eth_addr);
+        let code_cid = ETHACCOUNT_ACTOR_CODE_ID.clone();
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, id_addr);
         rt.set_origin(id_addr);
         rt.set_epoch(ChainEpoch::from(0));
@@ -944,6 +960,7 @@ mod tests {
         rt.set_balance(tokens_sent.clone());
         let tokens_required_atto = add_params.size * add_params.ttl.unwrap() as u64;
         let expected_tokens_unspent = tokens_sent.atto() - tokens_required_atto;
+        expect_retrieve_bucket_code_cid(&rt, code_cid);
         expect_get_config(&rt);
         expect_emitted_add_event(&rt, 0, &add_params, f4_eth_addr, add_params.size);
         rt.expect_send_simple(
@@ -975,6 +992,7 @@ mod tests {
             size: hash.1,
             ttl: Some(3600),
         };
+        expect_retrieve_bucket_code_cid(&rt, code_cid);
         expect_get_config(&rt);
         let response = rt.call::<BlobsActor>(
             Method::AddBlob as u64,
@@ -999,6 +1017,7 @@ mod tests {
             size: hash.1,
             ttl: Some(3600),
         };
+        expect_retrieve_bucket_code_cid(&rt, code_cid);
         expect_get_config(&rt);
         expect_emitted_add_event(&rt, 0, &add_params, f4_eth_addr, add_params.size);
         let result = rt.call::<BlobsActor>(
@@ -1013,6 +1032,7 @@ mod tests {
     fn test_add_blob_with_sponsor() {
         setup_logs();
         let rt = construct_and_verify();
+        let code_cid = ETHACCOUNT_ACTOR_CODE_ID.clone();
 
         let token_credit_rate = BigInt::from(1000000000000000000u64);
 
@@ -1057,7 +1077,6 @@ mod tests {
         rt.expect_validate_caller_any();
         expect_get_config(&rt);
         let approve_params = ApproveCreditParams {
-            from: sponsor_id_addr,
             to: spender_id_addr,
             caller_allowlist: None,
             credit_limit: None,
@@ -1095,6 +1114,7 @@ mod tests {
             size: hash.1,
             ttl: Some(3600),
         };
+        expect_retrieve_bucket_code_cid(&rt, code_cid);
         expect_get_config(&rt);
         expect_emitted_add_event(&rt, 0, &add_params, sponsor_f4_eth_addr, add_params.size);
         let response = rt.call::<BlobsActor>(
@@ -1122,6 +1142,7 @@ mod tests {
             size: hash.1,
             ttl: Some(3600),
         };
+        expect_retrieve_bucket_code_cid(&rt, code_cid);
         expect_get_config(&rt);
         expect_emitted_add_event(&rt, 0, &add_params, sponsor_f4_eth_addr, add_params.size);
         rt.expect_send_simple(

@@ -16,7 +16,7 @@ use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{strict_bytes, to_vec, tuple::*, CborStore, DAG_CBOR};
 use fvm_shared::address::Address;
 use num_derive::FromPrimitive;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 pub const TIMEHUB_ACTOR_NAME: &str = "timehub";
 const BIT_WIDTH: u32 = 3;
@@ -41,16 +41,14 @@ pub enum Method {
     Root = frc42_dispatch::method_hash!("Root"),
     Peaks = frc42_dispatch::method_hash!("Peaks"),
     Count = frc42_dispatch::method_hash!("Count"),
+    // EVM Interop
+    InvokeContract = frc42_dispatch::method_hash!("InvokeEVM"),
 }
 
-#[derive(Serialize_tuple, Deserialize_tuple)]
-pub struct PushParams {
-    /// Bytes of a CID to add.
-    #[serde(with = "strict_bytes")]
-    pub cid_bytes: Vec<u8>,
-    /// Account address that initiated the call.
-    pub from: Address,
-}
+/// Bytes of a CID to add.
+#[derive(Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct PushParams(#[serde(with = "strict_bytes")] pub Vec<u8>);
 
 #[derive(Serialize_tuple, Deserialize_tuple)]
 pub struct PushReturn {

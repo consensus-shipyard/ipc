@@ -100,32 +100,32 @@ impl BlobsActor {
                     call.returns(())
                 }
                 sol_credit::Calls::approveCredit_0(call) => {
-                    let params = call.params(rt);
+                    let params = call.params();
                     Self::approve_credit(rt, params)?;
                     call.returns(())
                 }
                 sol_credit::Calls::approveCredit_1(call) => {
-                    let params = call.params(rt);
+                    let params = call.params();
                     Self::approve_credit(rt, params)?;
                     call.returns(())
                 }
                 sol_credit::Calls::approveCredit_2(call) => {
-                    let params = call.params(rt);
+                    let params = call.params();
                     Self::approve_credit(rt, params)?;
                     call.returns(())
                 }
                 sol_credit::Calls::revokeCredit_0(call) => {
-                    let params = call.params(rt);
+                    let params = call.params();
                     Self::revoke_credit(rt, params)?;
                     call.returns(())
                 }
                 sol_credit::Calls::revokeCredit_1(call) => {
-                    let params = call.params(rt);
+                    let params = call.params();
                     Self::revoke_credit(rt, params)?;
                     call.returns(())
                 }
                 sol_credit::Calls::setAccountSponsor(call) => {
-                    let params = call.params(rt);
+                    let params = call.params();
                     Self::set_account_sponsor(rt, params)?;
                     call.returns(())
                 }

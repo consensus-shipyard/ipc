@@ -17,3 +17,4 @@ recall_sol_facade = { workspace = true, features = [] }
 anyhow = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 serde = { workspace = true }
+cid = { workspace = true }

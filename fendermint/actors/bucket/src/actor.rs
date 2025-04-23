@@ -18,9 +18,8 @@ use fil_actors_runtime::{
     ActorError,
 };
 use fvm_shared::address::Address;
-use recall_actor_sdk::{
-    evm::{emit_evm_event, InputData, InvokeContractParams, InvokeContractReturn},
-    util::{require_addr_is_origin_or_caller, to_id_address},
+use recall_actor_sdk::evm::{
+    emit_evm_event, InputData, InvokeContractParams, InvokeContractReturn,
 };
 use recall_ipld::hamt::BytesKey;
 
@@ -29,7 +28,7 @@ use crate::shared::{
     BUCKET_ACTOR_NAME,
 };
 use crate::sol_facade as sol;
-use crate::sol_facade::{AbiCall, AbiCallRuntime};
+use crate::sol_facade::AbiCall;
 use crate::state::{ObjectState, State};
 use crate::{
     UpdateObjectMetadataParams, MAX_METADATA_ENTRIES, MAX_METADATA_KEY_SIZE,
@@ -52,8 +51,7 @@ impl Actor {
     fn add_object(rt: &impl Runtime, params: AddParams) -> Result<Object, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
-        let from = to_id_address(rt, params.from, false)?;
-        require_addr_is_origin_or_caller(rt, from)?;
+        let from = rt.message().caller();
 
         let state = rt.state::<State>()?;
         let sub_id = get_blob_id(&state, &params.key)?;
@@ -141,12 +139,11 @@ impl Actor {
     fn delete_object(rt: &impl Runtime, params: DeleteParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
-        let from = to_id_address(rt, params.from, false)?;
-        require_addr_is_origin_or_caller(rt, from)?;
+        let from = rt.message().caller();
 
         let state = rt.state::<State>()?;
-        let sub_id = get_blob_id(&state, &params.key)?;
-        let key = BytesKey(params.key);
+        let sub_id = get_blob_id(&state, &params.0)?;
+        let key = BytesKey(params.0);
         let object = state
             .get(rt.store(), &key)?
             .ok_or(ActorError::illegal_state("object not found".into()))?;
@@ -234,8 +231,7 @@ impl Actor {
     ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
-        let from = to_id_address(rt, params.from, false)?;
-        require_addr_is_origin_or_caller(rt, from)?;
+        let from = rt.message().caller();
 
         let key = BytesKey(params.key.clone());
         let state = rt.state::<State>()?;
@@ -302,19 +298,19 @@ impl Actor {
             let output_data = match sol::parse_input(&input_data)? {
                 sol::Calls::addObject_0(call) => {
                     // function addObject(bytes32 source, string memory key, bytes32 hash, bytes32 recoveryHash, uint64 size) external;
-                    let params = call.params(rt);
+                    let params = call.params();
                     Self::add_object(rt, params)?;
                     call.returns(())
                 }
                 sol::Calls::addObject_1(call) => {
                     // function addObject(AddObjectParams memory params) external;
-                    let params = call.params(rt);
+                    let params = call.params();
                     Self::add_object(rt, params)?;
                     call.returns(())
                 }
                 sol::Calls::deleteObject(call) => {
                     // function deleteObject(string memory key) external;
-                    let params = call.params(rt);
+                    let params = call.params();
                     Self::delete_object(rt, params)?;
                     call.returns(())
                 }
@@ -356,7 +352,7 @@ impl Actor {
                 }
                 sol::Calls::updateObjectMetadata(call) => {
                     // function updateObjectMetadata(string memory key, KeyValue[] memory metadata) external;
-                    let params = call.params(rt);
+                    let params = call.params();
                     Self::update_object_metadata(rt, params)?;
                     call.returns(())
                 }
@@ -584,7 +580,7 @@ mod tests {
     }
 
     fn expect_emitted_delete_event(rt: &MockRuntime, params: &DeleteParams, hash: B256) {
-        let event = to_actor_event(sol::ObjectDeleted::new(&params.key, &hash)).unwrap();
+        let event = to_actor_event(sol::ObjectDeleted::new(&params.0, &hash)).unwrap();
         rt.expect_emitted_event(event);
     }
 
@@ -604,7 +600,6 @@ mod tests {
             size: hash.1,
             ttl: None,
             metadata: HashMap::new(),
-            from: origin,
             overwrite: false,
         };
         rt.expect_validate_caller_any();
@@ -660,7 +655,6 @@ mod tests {
             size: hash.1,
             ttl: None,
             metadata: HashMap::new(),
-            from: origin,
             overwrite: false,
         };
         rt.expect_validate_caller_any();
@@ -710,7 +704,6 @@ mod tests {
             size: hash.1,
             ttl: None,
             metadata: HashMap::new(),
-            from: origin,
             overwrite: true,
         };
         rt.expect_validate_caller_any();
@@ -767,7 +760,6 @@ mod tests {
             recovery_hash: new_hash(256).0,
             ttl: None,
             metadata: HashMap::new(),
-            from: origin,
             overwrite: false,
         };
         rt.expect_validate_caller_any();
@@ -825,7 +817,6 @@ mod tests {
             recovery_hash: new_hash(256).0,
             ttl: None,
             metadata: HashMap::new(),
-            from: origin,
             overwrite: false,
         };
         rt.expect_validate_caller_any();
@@ -854,7 +845,6 @@ mod tests {
             recovery_hash: new_hash(256).0,
             ttl: None,
             metadata: HashMap::new(),
-            from: origin,
             overwrite: false,
         };
         rt.expect_validate_caller_any();
@@ -895,7 +885,7 @@ mod tests {
         rt.verify();
 
         // Delete object
-        let delete_params = DeleteParams { key, from: origin };
+        let delete_params = DeleteParams(key);
         rt.expect_validate_caller_any();
         rt.expect_send_simple(
             BLOBS_ACTOR_ADDR,
@@ -955,7 +945,6 @@ mod tests {
             recovery_hash: new_hash(256).0,
             ttl: Some(ttl),
             metadata: HashMap::new(),
-            from: origin,
             overwrite: false,
         };
         rt.expect_validate_caller_any();
@@ -1056,7 +1045,6 @@ mod tests {
             recovery_hash: new_hash(256).0,
             ttl: Some(ttl),
             metadata: HashMap::from([("foo".into(), "bar".into()), ("foo2".into(), "bar".into())]),
-            from: origin,
             overwrite: false,
         };
         rt.expect_validate_caller_any();
@@ -1105,7 +1093,6 @@ mod tests {
 
         // Update metadata
         let update_object_params = UpdateObjectMetadataParams {
-            from: origin,
             key: add_params.key.clone(),
             metadata: HashMap::from([
                 ("foo".into(), Some("zar".into())),
@@ -1127,11 +1114,27 @@ mod tests {
         assert!(result.is_ok());
         rt.verify();
 
-        // Fail if "from" is neither origin nor caller
+        // Sent from an alien address with no credit approval hence no access rights
         let alien_id_addr = Address::new_id(112);
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, alien_id_addr);
         rt.set_origin(alien_id_addr);
         rt.expect_validate_caller_any();
+        rt.expect_send(
+            BLOBS_ACTOR_ADDR,
+            BlobMethod::GetCreditApproval as MethodNum,
+            IpldBlock::serialize_cbor(&GetCreditApprovalParams {
+                from: origin,
+                to: alien_id_addr,
+            })
+            .unwrap(),
+            TokenAmount::from_whole(0),
+            None,
+            SendFlags::READ_ONLY,
+            // We do not care what is inside credit approval. We only care if it is present.
+            IpldBlock::serialize_cbor::<Option<CreditApproval>>(&None).unwrap(),
+            ExitCode::OK,
+            None,
+        );
         let result = rt.call::<Actor>(
             Method::UpdateObjectMetadata as u64,
             IpldBlock::serialize_cbor(&update_object_params).unwrap(),
@@ -1144,7 +1147,6 @@ mod tests {
         rt.set_origin(alien_id_addr);
         rt.expect_validate_caller_any();
         let alien_update = UpdateObjectMetadataParams {
-            from: alien_id_addr,
             key: update_object_params.key,
             metadata: update_object_params.metadata,
         };

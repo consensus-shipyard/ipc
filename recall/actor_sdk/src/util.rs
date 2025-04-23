@@ -2,26 +2,17 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use cid::Cid;
 use fil_actors_runtime::{
+    deserialize_block, extract_send_result,
     runtime::{builtins::Type, Runtime},
-    ActorError,
+    ActorError, ADM_ACTOR_ADDR,
 };
-use fvm_shared::{address::Address, bigint::BigUint, econ::TokenAmount};
-
-/// Returns an error if the address does not match the message origin or caller.
-pub fn require_addr_is_origin_or_caller(
-    rt: &impl Runtime,
-    address: Address,
-) -> Result<(), ActorError> {
-    let address = to_id_address(rt, address, false)?;
-    if address == rt.message().origin() || address == rt.message().caller() {
-        return Ok(());
-    }
-    Err(ActorError::illegal_argument(format!(
-        "address {} does not match origin or caller",
-        address
-    )))
-}
+use fvm_ipld_encoding::ipld_block::IpldBlock;
+use fvm_shared::sys::SendFlags;
+use fvm_shared::{address::Address, bigint::BigUint, econ::TokenAmount, MethodNum};
+use num_traits::Zero;
+use serde::{Deserialize, Serialize};
 
 /// Resolves ID address of an actor.
 /// If `require_delegated` is `true`, the address must be of type
@@ -88,4 +79,32 @@ pub fn token_to_biguint(amount: Option<TokenAmount>) -> BigUint {
         .atto()
         .to_biguint()
         .unwrap_or_default()
+}
+
+/// The kinds of machines available.
+#[derive(Debug, Serialize, Deserialize)]
+pub enum Kind {
+    /// A bucket with S3-like key semantics.
+    Bucket,
+    /// An MMR accumulator, used for timestamping data.
+    Timehub,
+}
+
+pub fn is_bucket_address(rt: &impl Runtime, address: Address) -> Result<bool, ActorError> {
+    let caller_code_cid = rt
+        .resolve_address(&address)
+        .and_then(|actor_id| rt.get_actor_code_cid(&actor_id));
+    if let Some(caller_code_cid) = caller_code_cid {
+        let bucket_code_cid = deserialize_block::<Cid>(extract_send_result(rt.send(
+            &ADM_ACTOR_ADDR,
+            2892692559 as MethodNum,
+            IpldBlock::serialize_cbor(&Kind::Bucket)?,
+            TokenAmount::zero(),
+            None,
+            SendFlags::READ_ONLY,
+        ))?)?;
+        Ok(caller_code_cid.eq(&bucket_code_cid))
+    } else {
+        Ok(false)
+    }
 }

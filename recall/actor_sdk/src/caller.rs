@@ -5,7 +5,7 @@
 use fil_actors_runtime::{extract_send_result, runtime::Runtime, ActorError};
 use fvm_shared::{address::Address, bigint::Zero, econ::TokenAmount, error::ExitCode, METHOD_SEND};
 
-use crate::util::{require_addr_is_origin_or_caller, to_id_address, to_id_and_delegated_address};
+use crate::util::{to_id_address, to_id_and_delegated_address};
 
 /// Helper stuct for managing actor message caller and sponsor addresses.
 #[derive(Debug)]
@@ -56,10 +56,6 @@ impl Caller {
             Err(e) => Err(e),
         }?;
 
-        if matches!(option, CallerOption::Auth) {
-            require_addr_is_origin_or_caller(rt, id_addr)?;
-        }
-
         let caller = match sponsor {
             Some(sponsor) => {
                 let sponsor_id_addr = to_id_address(rt, sponsor, false)?;
@@ -104,10 +100,6 @@ impl Caller {
             }
             Err(e) => Err(e),
         }?;
-
-        if matches!(option, CallerOption::Auth) {
-            require_addr_is_origin_or_caller(rt, id_addr)?;
-        }
 
         let caller = match sponsor {
             Some(sponsor) => {
