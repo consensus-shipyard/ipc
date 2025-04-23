@@ -167,7 +167,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             LibPower.setMetadataWithConfirm(msg.sender, publicKey);
             LibPower.depositWithConfirm(msg.sender, amount);
 
-            _patchGenesisValidators(msg.sender);
+            _increaseGenesisValidatorCollateral(msg.sender);
 
             LibSubnetActor.bootstrapSubnetIfNeeded();
         } else {
@@ -177,21 +177,23 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
         }
     }
 
-    function _patchGenesisValidators(address validator) internal {
+    function _increaseGenesisValidatorCollateral(address validator) internal {
         // add to initial validators avoiding duplicates if it
         // is a genesis validator.
         bool alreadyValidator;
         uint256 length = s.genesisValidators.length;
         for (uint256 i; i < length; ) {
             if (s.genesisValidators[i].addr == validator) {
-                alreadyValidator = true;
                 break;
             }
             unchecked {
                 ++i;
             }
         }
-        if (!alreadyValidator) {
+        // already validator if we iterate through all of them but didn't get a match
+        if (i >= length) {
+            s.genesisValidators[i].collateral += collateral;
+        } else {
             uint256 collateral = s.validatorSet.validators[validator].currentPower;
             Validator memory val = Validator({
                 addr: validator,
@@ -199,6 +201,27 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
                 metadata: s.validatorSet.validators[validator].metadata
             });
             s.genesisValidators.push(val);
+        }
+    }
+
+    function _decreaseGenesisValidatorCollateral(address validator) internal {
+        uint256 length = s.genesisValidators.length;
+        for (uint256 i; i < length; ) {
+            if (s.genesisValidators[i].addr == validator) {
+                break;
+            }
+            unchecked {
+                ++i;
+            }
+        }
+        if (i < length) {
+            uint256 bound = s.genesisValidators[i].collateral;
+            if (bound < collateral) {
+                revert NotEnoughCollateral();
+            }
+            s.genesisValidators[i].collateral -= collateral;
+        } else {
+            revert NotValidator(address);
         }
     }
 
@@ -226,7 +249,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
 
         if (!s.bootstrapped) {
             LibPower.depositWithConfirm(msg.sender, amount);
-            _patchGenesisValidators(msg.sender);
+            _increaseGenesisValidatorCollateral(msg.sender);
             LibSubnetActor.bootstrapSubnetIfNeeded();
         } else {
             LibPower.deposit(msg.sender, amount);
@@ -258,6 +281,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
 
         if (!s.bootstrapped) {
             LibPower.withdrawWithConfirm(msg.sender, amount);
+            _decreaseGenesisValidatorCollateral(msg.sender);
             s.collateralSource.transferFunds(payable(msg.sender), amount);
         } else {
             LibPower.withdraw(msg.sender, amount);

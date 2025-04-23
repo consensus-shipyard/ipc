@@ -14,6 +14,7 @@ error CheckpointNotCreated();
 error BottomUpCheckpointAlreadySubmitted();
 error BatchNotCreated();
 error CollateralIsZero();
+error NotEnoughCollateral();
 error EmptyAddress();
 error FailedAddIncompleteQuorum();
 error FailedAddSignatory();
