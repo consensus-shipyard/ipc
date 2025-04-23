@@ -4,7 +4,7 @@
 
 use anyhow::Error;
 use cid::Cid;
-use recall_actor_sdk::TryIntoEVMEvent;
+use recall_actor_sdk::evm::TryIntoEVMEvent;
 use recall_sol_facade::primitives::U256;
 use recall_sol_facade::timehub as sol;
 

@@ -2,17 +2,14 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use fendermint_actor_blobs_shared::state::Hash;
-use fvm_shared::address::Address;
-use fvm_shared::MethodNum;
-use recall_actor_sdk::TryIntoEVMEvent;
-use recall_sol_facade::blob_reader as sol;
-use recall_sol_facade::primitives::U256;
-use recall_sol_facade::types::H160;
+use fendermint_actor_blobs_shared::bytes::B256;
+use fvm_shared::{address::Address, MethodNum};
+use recall_actor_sdk::evm::TryIntoEVMEvent;
+use recall_sol_facade::{blob_reader as sol, primitives::U256, types::H160};
 
 pub struct ReadRequestOpened<'a> {
-    pub id: &'a Hash,
-    pub blob_hash: &'a Hash,
+    pub id: &'a B256,
+    pub blob_hash: &'a B256,
     pub read_offset: u64,
     pub read_length: u64,
     pub callback: Address,
@@ -35,10 +32,10 @@ impl TryIntoEVMEvent for ReadRequestOpened<'_> {
 }
 
 pub struct ReadRequestPending<'a> {
-    pub id: &'a Hash,
+    pub id: &'a B256,
 }
 impl<'a> ReadRequestPending<'a> {
-    pub fn new(id: &'a Hash) -> Self {
+    pub fn new(id: &'a B256) -> Self {
         Self { id }
     }
 }
@@ -52,10 +49,10 @@ impl TryIntoEVMEvent for ReadRequestPending<'_> {
 }
 
 pub struct ReadRequestClosed<'a> {
-    pub id: &'a Hash,
+    pub id: &'a B256,
 }
 impl<'a> ReadRequestClosed<'a> {
-    pub fn new(id: &'a Hash) -> Self {
+    pub fn new(id: &'a B256) -> Self {
         Self { id }
     }
 }

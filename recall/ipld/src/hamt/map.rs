@@ -49,7 +49,11 @@ where
         }
     }
 
-    pub fn hamt<BS: Blockstore>(&self, store: BS, size: u64) -> Result<Hamt<BS, K, V>, ActorError> {
+    pub fn hamt<'a, BS: Blockstore>(
+        &self,
+        store: BS,
+        size: u64,
+    ) -> Result<Hamt<'a, BS, K, V>, ActorError> {
         Hamt::load(store, &self.cid, self.name.clone(), size)
     }
 
@@ -62,7 +66,7 @@ where
     }
 }
 
-pub struct Hamt<BS, K, V>
+pub struct Hamt<'a, BS, K, V>
 where
     BS: Blockstore,
     K: MapKey + Display,
@@ -70,6 +74,7 @@ where
 {
     map: Map<BS, K, V>,
     size: u64,
+    _marker: PhantomData<&'a BS>,
 }
 
 #[derive(Debug, Clone)]
@@ -82,7 +87,7 @@ where
     pub size: u64,
 }
 
-impl<BS, K, V> Hamt<BS, K, V>
+impl<'a, BS, K, V> Hamt<'a, BS, K, V>
 where
     BS: Blockstore,
     K: MapKey + Display,
@@ -90,7 +95,11 @@ where
 {
     fn load(store: BS, root: &Cid, name: String, size: u64) -> Result<Self, ActorError> {
         let map = Map::<BS, K, V>::load(store, root, DEFAULT_HAMT_CONFIG, name)?;
-        Ok(Self { map, size })
+        Ok(Self {
+            map,
+            size,
+            _marker: Default::default(),
+        })
     }
 
     pub fn get(&self, key: &K) -> Result<Option<V>, ActorError> {

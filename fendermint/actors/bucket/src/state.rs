@@ -7,16 +7,13 @@ use std::fmt::{Debug, Display, Formatter};
 use std::string::FromUtf8Error;
 
 use cid::Cid;
-use fendermint_actor_blobs_shared::state::Hash;
+use fendermint_actor_blobs_shared::bytes::B256;
 use fendermint_actor_machine::{Kind, MachineAddress, MachineState};
 use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::*;
-use fvm_shared::address::Address;
-use fvm_shared::clock::ChainEpoch;
-use recall_ipld::hamt;
-use recall_ipld::hamt::map::TrackedFlushResult;
-use recall_ipld::hamt::{BytesKey, MapKey};
+use fvm_shared::{address::Address, clock::ChainEpoch};
+use recall_ipld::hamt::{self, map::TrackedFlushResult, BytesKey, MapKey};
 use serde::{Deserialize, Serialize};
 
 const MAX_LIST_LIMIT: usize = 1000;
@@ -42,7 +39,7 @@ impl MachineState for State {
         store: &BS,
         owner: Address,
         metadata: HashMap<String, String>,
-    ) -> anyhow::Result<Self, ActorError> {
+    ) -> Result<Self, ActorError> {
         Ok(Self {
             address: Default::default(),
             objects: ObjectsState::new(store)?,
@@ -51,7 +48,7 @@ impl MachineState for State {
         })
     }
 
-    fn init(&mut self, address: Address) -> anyhow::Result<(), ActorError> {
+    fn init(&mut self, address: Address) -> Result<(), ActorError> {
         self.address.set(address)
     }
 
@@ -76,7 +73,7 @@ impl MachineState for State {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ObjectState {
     /// The object blake3 hash.
-    pub hash: Hash,
+    pub hash: B256,
     /// The object size.
     pub size: u64,
     /// Expiry block.
@@ -100,12 +97,12 @@ impl State {
         &mut self,
         store: &BS,
         key: BytesKey,
-        hash: Hash,
+        hash: B256,
         size: u64,
         expiry: ChainEpoch,
         metadata: HashMap<String, String>,
         overwrite: bool,
-    ) -> anyhow::Result<Cid, ActorError> {
+    ) -> Result<Cid, ActorError> {
         let object_key = ObjectKey(key.clone());
         let mut objects = self.objects.hamt(store)?;
         let object = ObjectState {
@@ -127,7 +124,7 @@ impl State {
         &mut self,
         store: &BS,
         key: &BytesKey,
-    ) -> anyhow::Result<(ObjectState, Cid), ActorError> {
+    ) -> Result<(ObjectState, Cid), ActorError> {
         let mut objects = self.objects.hamt(store)?;
         let object_key = ObjectKey(key.clone());
         let (tracked_result, object) = objects.delete_and_flush_tracked(&object_key)?;
@@ -143,7 +140,7 @@ impl State {
         &self,
         store: &BS,
         key: &BytesKey,
-    ) -> anyhow::Result<Option<ObjectState>, ActorError> {
+    ) -> Result<Option<ObjectState>, ActorError> {
         let object_key = ObjectKey(key.clone());
         let object = self.objects.hamt(store)?.get(&object_key)?;
         Ok(object)
@@ -157,9 +154,9 @@ impl State {
         start_key: Option<&BytesKey>,
         limit: u64,
         mut collector: F,
-    ) -> anyhow::Result<(Vec<Vec<u8>>, Option<BytesKey>), ActorError>
+    ) -> Result<(Vec<Vec<u8>>, Option<BytesKey>), ActorError>
     where
-        F: FnMut(Vec<u8>, ObjectState) -> anyhow::Result<(), ActorError>,
+        F: FnMut(Vec<u8>, ObjectState) -> Result<(), ActorError>,
     {
         let objects = self.objects.hamt(store)?;
         let mut common_prefixes = std::collections::BTreeSet::<Vec<u8>>::new();
@@ -316,8 +313,7 @@ mod tests {
         delimiter: Vec<u8>,
         start_key: Option<&BytesKey>,
         limit: u64,
-    ) -> anyhow::Result<(Vec<(Vec<u8>, ObjectState)>, Vec<Vec<u8>>, Option<BytesKey>), ActorError>
-    {
+    ) -> Result<(Vec<(Vec<u8>, ObjectState)>, Vec<Vec<u8>>, Option<BytesKey>), ActorError> {
         let mut objects = Vec::new();
         let (prefixes, next_key) = state.list(
             store,
@@ -325,7 +321,7 @@ mod tests {
             delimiter,
             start_key,
             limit,
-            |key: Vec<u8>, object: ObjectState| -> anyhow::Result<(), ActorError> {
+            |key: Vec<u8>, object: ObjectState| -> Result<(), ActorError> {
                 objects.push((key, object));
                 Ok(())
             },
@@ -784,7 +780,7 @@ mod tests {
             "test/hello".as_bytes().to_vec(),
         );
 
-        // List without prefix and limit 1
+        // List without a prefix and limit 1
         let result = list(&state, &store, vec![], "/".as_bytes().to_vec(), None, 1);
         assert!(result.is_ok());
         let result = result.unwrap();

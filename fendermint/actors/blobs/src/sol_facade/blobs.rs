@@ -2,22 +2,24 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use fendermint_actor_blobs_shared::params::{
-    AddBlobParams, DeleteBlobParams, GetBlobParams, GetStatsReturn, OverwriteBlobParams,
-    TrimBlobExpiriesParams,
+use fendermint_actor_blobs_shared::{
+    blobs::{
+        AddBlobParams, Blob, BlobStatus, DeleteBlobParams, GetBlobParams, OverwriteBlobParams,
+        TrimBlobExpiriesParams,
+    },
+    bytes::B256,
+    GetStatsReturn,
 };
-use fendermint_actor_blobs_shared::state::{BlobInfo, BlobStatus, Hash, PublicKey, SubscriptionId};
-use fil_actors_runtime::runtime::Runtime;
-use fil_actors_runtime::{actor_error, ActorError};
-use fvm_shared::address::Address;
-use fvm_shared::clock::ChainEpoch;
+use fil_actors_runtime::{actor_error, runtime::Runtime, ActorError};
+use fvm_shared::{address::Address, clock::ChainEpoch};
 use num_traits::Zero;
-use recall_actor_sdk::TryIntoEVMEvent;
-use recall_sol_facade::blobs as sol;
-use recall_sol_facade::primitives::U256;
-use recall_sol_facade::types::{BigUintWrapper, SolCall, SolInterface, H160};
-
+use recall_actor_sdk::evm::TryIntoEVMEvent;
 pub use recall_sol_facade::blobs::Calls;
+use recall_sol_facade::{
+    blobs as sol,
+    primitives::U256,
+    types::{BigUintWrapper, SolCall, SolInterface, H160},
+};
 
 use crate::sol_facade::{AbiCall, AbiCallRuntime, AbiEncodeError};
 
@@ -25,7 +27,7 @@ use crate::sol_facade::{AbiCall, AbiCallRuntime, AbiEncodeError};
 
 pub struct BlobAdded<'a> {
     pub subscriber: Address,
-    pub hash: &'a Hash,
+    pub hash: &'a B256,
     pub size: u64,
     pub expiry: ChainEpoch,
     pub bytes_used: u64,
@@ -48,8 +50,8 @@ impl TryIntoEVMEvent for BlobAdded<'_> {
 
 pub struct BlobPending<'a> {
     pub subscriber: Address,
-    pub hash: &'a Hash,
-    pub source: &'a PublicKey,
+    pub hash: &'a B256,
+    pub source: &'a B256,
 }
 impl TryIntoEVMEvent for BlobPending<'_> {
     type Target = sol::Events;
@@ -65,7 +67,7 @@ impl TryIntoEVMEvent for BlobPending<'_> {
 
 pub struct BlobFinalized<'a> {
     pub subscriber: Address,
-    pub hash: &'a Hash,
+    pub hash: &'a B256,
     pub resolved: bool,
 }
 impl TryIntoEVMEvent for BlobFinalized<'_> {
@@ -82,7 +84,7 @@ impl TryIntoEVMEvent for BlobFinalized<'_> {
 
 pub struct BlobDeleted<'a> {
     pub subscriber: Address,
-    pub hash: &'a Hash,
+    pub hash: &'a B256,
     pub size: u64,
     pub bytes_released: u64,
 }
@@ -101,11 +103,11 @@ impl TryIntoEVMEvent for BlobDeleted<'_> {
 
 // ----- Calls ----- //
 
-pub fn can_handle(input_data: &recall_actor_sdk::InputData) -> bool {
+pub fn can_handle(input_data: &recall_actor_sdk::evm::InputData) -> bool {
     Calls::valid_selector(input_data.selector())
 }
 
-pub fn parse_input(input: &recall_actor_sdk::InputData) -> Result<Calls, ActorError> {
+pub fn parse_input(input: &recall_actor_sdk::evm::InputData) -> Result<Calls, ActorError> {
     Calls::abi_decode_raw(input.selector(), input.calldata(), true)
         .map_err(|e| actor_error!(illegal_argument, format!("invalid call: {}", e)))
 }
@@ -125,17 +127,17 @@ impl AbiCallRuntime for sol::addBlobCall {
     type Output = Vec<u8>;
     fn params(&self, rt: &impl Runtime) -> Self::Params {
         let sponsor: Option<Address> = H160::from(self.sponsor).as_option().map(|a| a.into());
-        let source = PublicKey(self.source.into());
-        let hash = Hash(self.blobHash.into());
-        let metadata_hash = Hash(self.metadataHash.into());
-        let subscription_id: SubscriptionId = self.subscriptionId.clone().try_into()?;
+        let source = B256(self.source.into());
+        let hash = B256(self.blobHash.into());
+        let metadata_hash = B256(self.metadataHash.into());
+        let subscription_id = self.subscriptionId.clone().try_into()?;
         let size = self.size;
         let ttl = if self.ttl.is_zero() {
             None
         } else {
             Some(self.ttl as ChainEpoch)
         };
-        let from: Address = rt.message().caller();
+        let from = rt.message().caller();
         Ok(AddBlobParams {
             sponsor,
             source,
@@ -158,9 +160,9 @@ impl AbiCallRuntime for sol::deleteBlobCall {
     type Output = Vec<u8>;
     fn params(&self, rt: &impl Runtime) -> Self::Params {
         let subscriber = H160::from(self.subscriber).as_option().map(|a| a.into());
-        let hash = Hash(self.blobHash.into());
-        let subscription_id: SubscriptionId = self.subscriptionId.clone().try_into()?;
-        let from: Address = rt.message().caller();
+        let hash = B256(self.blobHash.into());
+        let subscription_id = self.subscriptionId.clone().try_into()?;
+        let from = rt.message().caller();
         Ok(DeleteBlobParams {
             sponsor: subscriber,
             hash,
@@ -175,10 +177,10 @@ impl AbiCallRuntime for sol::deleteBlobCall {
 
 impl AbiCall for sol::getBlobCall {
     type Params = Result<GetBlobParams, AbiEncodeError>;
-    type Returns = Option<BlobInfo>;
+    type Returns = Option<Blob>;
     type Output = Result<Vec<u8>, AbiEncodeError>;
     fn params(&self) -> Self::Params {
-        let blob_hash: Hash = Hash(self.blobHash.into());
+        let blob_hash = B256(self.blobHash.into());
         Ok(GetBlobParams(blob_hash))
     }
     fn returns(&self, blob: Self::Returns) -> Self::Output {
@@ -238,19 +240,19 @@ impl AbiCallRuntime for sol::overwriteBlobCall {
     type Returns = ();
     type Output = Vec<u8>;
     fn params(&self, rt: &impl Runtime) -> Self::Params {
-        let old_hash = Hash(self.oldHash.into());
+        let old_hash = B256(self.oldHash.into());
         let sponsor = H160::from(self.sponsor).as_option().map(|a| a.into());
-        let source: PublicKey = PublicKey(self.source.into());
-        let hash: Hash = Hash(self.blobHash.into());
-        let metadata_hash: Hash = Hash(self.metadataHash.into());
-        let subscription_id: SubscriptionId = self.subscriptionId.clone().try_into()?;
+        let source = B256(self.source.into());
+        let hash = B256(self.blobHash.into());
+        let metadata_hash = B256(self.metadataHash.into());
+        let subscription_id = self.subscriptionId.clone().try_into()?;
         let size = self.size;
         let ttl = if self.ttl.is_zero() {
             None
         } else {
             Some(self.ttl as ChainEpoch)
         };
-        let from: Address = rt.message().caller();
+        let from = rt.message().caller();
         Ok(OverwriteBlobParams {
             old_hash,
             add: AddBlobParams {
@@ -272,7 +274,7 @@ impl AbiCallRuntime for sol::overwriteBlobCall {
 
 impl AbiCall for sol::trimBlobExpiriesCall {
     type Params = TrimBlobExpiriesParams;
-    type Returns = (u32, Option<Hash>);
+    type Returns = (u32, Option<B256>);
     type Output = Vec<u8>;
 
     fn params(&self) -> Self::Params {
@@ -282,7 +284,7 @@ impl AbiCall for sol::trimBlobExpiriesCall {
         let hash = if hash == [0; 32] {
             None
         } else {
-            Some(Hash(hash))
+            Some(B256(hash))
         };
         TrimBlobExpiriesParams {
             subscriber: H160::from(self.subscriber).into(),

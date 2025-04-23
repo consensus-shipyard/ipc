@@ -2,16 +2,15 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use fendermint_actor_blobs_shared::state::Hash;
+use fendermint_actor_blobs_shared::bytes::B256;
 use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::address::Address;
 use log::info;
+use recall_ipld::hamt::{self, map::TrackedFlushResult};
 
 use crate::shared::{ReadRequest, ReadRequestStatus, ReadRequestTuple};
-use recall_ipld::hamt;
-use recall_ipld::hamt::map::TrackedFlushResult;
 
 const MAX_READ_REQUEST_LEN: u32 = 1024 * 1024; // 1MB
 
@@ -36,12 +35,12 @@ impl State {
     pub fn open_read_request<BS: Blockstore>(
         &mut self,
         store: &BS,
-        blob_hash: Hash,
+        blob_hash: B256,
         offset: u32,
         len: u32,
         callback_addr: Address,
         callback_method: u64,
-    ) -> Result<Hash, ActorError> {
+    ) -> Result<B256, ActorError> {
         // Validate length is not greater than the maximum allowed
         if len > MAX_READ_REQUEST_LEN {
             return Err(ActorError::illegal_argument(format!(
@@ -70,7 +69,7 @@ impl State {
     pub fn get_read_request_status<BS: Blockstore>(
         &self,
         store: BS,
-        id: Hash,
+        id: B256,
     ) -> Result<Option<ReadRequestStatus>, ActorError> {
         let read_requests = self.read_requests.hamt(store)?;
         Ok(read_requests.get(&id)?.map(|r| r.status.clone()))
@@ -106,7 +105,7 @@ impl State {
     pub fn set_read_request_pending<BS: Blockstore>(
         &mut self,
         store: BS,
-        id: Hash,
+        id: B256,
     ) -> Result<(), ActorError> {
         let mut read_requests = self.read_requests.hamt(store)?;
         let mut request = read_requests
@@ -130,7 +129,7 @@ impl State {
     pub fn close_read_request<BS: Blockstore>(
         &mut self,
         store: &BS,
-        request_id: Hash,
+        request_id: B256,
     ) -> Result<(), ActorError> {
         if self.get_read_request_status(store, request_id)?.is_none() {
             return Err(ActorError::not_found(
@@ -145,32 +144,32 @@ impl State {
         Ok(())
     }
 
-    fn next_request_id(&mut self) -> Hash {
+    fn next_request_id(&mut self) -> B256 {
         self.request_id_counter += 1;
-        Hash::from(self.request_id_counter)
+        B256::from(self.request_id_counter)
     }
 }
 
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct ReadRequests {
-    pub root: hamt::Root<Hash, ReadRequest>,
+    pub root: hamt::Root<B256, ReadRequest>,
     size: u64,
 }
 
 impl ReadRequests {
     pub fn new<BS: Blockstore>(store: &BS) -> Result<Self, ActorError> {
-        let root = hamt::Root::<Hash, ReadRequest>::new(store, "read_requests")?;
+        let root = hamt::Root::<B256, ReadRequest>::new(store, "read_requests")?;
         Ok(Self { root, size: 0 })
     }
 
     pub fn hamt<BS: Blockstore>(
         &self,
         store: BS,
-    ) -> Result<hamt::map::Hamt<BS, Hash, ReadRequest>, ActorError> {
+    ) -> Result<hamt::map::Hamt<BS, B256, ReadRequest>, ActorError> {
         self.root.hamt(store, self.size)
     }
 
-    pub fn save_tracked(&mut self, tracked_flush_result: TrackedFlushResult<Hash, ReadRequest>) {
+    pub fn save_tracked(&mut self, tracked_flush_result: TrackedFlushResult<B256, ReadRequest>) {
         self.root = tracked_flush_result.root;
         self.size = tracked_flush_result.size;
     }

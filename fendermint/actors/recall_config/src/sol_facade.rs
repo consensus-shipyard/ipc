@@ -2,13 +2,14 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use fendermint_actor_blobs_shared::state::TokenCreditRate;
-use fvm_shared::address::Address;
-use fvm_shared::clock::ChainEpoch;
-use recall_actor_sdk::TryIntoEVMEvent;
-use recall_sol_facade::config as sol;
-use recall_sol_facade::primitives::U256;
-use recall_sol_facade::types::{BigUintWrapper, H160};
+use fendermint_actor_blobs_shared::credit::TokenCreditRate;
+use fvm_shared::{address::Address, clock::ChainEpoch};
+use recall_actor_sdk::evm::TryIntoEVMEvent;
+use recall_sol_facade::{
+    config as sol,
+    primitives::U256,
+    types::{BigUintWrapper, H160},
+};
 
 pub struct ConfigAdminSet {
     pub admin: Address,

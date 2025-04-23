@@ -2,19 +2,20 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::Error;
-use fendermint_actor_blobs_shared::state::{Hash, PublicKey};
-use fil_actors_runtime::runtime::Runtime;
-use fil_actors_runtime::{actor_error, ActorError};
-use fvm_shared::clock::ChainEpoch;
-use num_traits::Zero;
-use recall_actor_sdk::{declare_abi_call, TryIntoEVMEvent};
-use recall_sol_facade::bucket as sol;
-use recall_sol_facade::types::{SolCall, SolInterface};
 use std::collections::HashMap;
 use std::string::ToString;
 
+use anyhow::Error;
+use fendermint_actor_blobs_shared::bytes::B256;
+use fil_actors_runtime::{actor_error, runtime::Runtime, ActorError};
+use fvm_shared::clock::ChainEpoch;
+use num_traits::Zero;
+use recall_actor_sdk::{declare_abi_call, evm::TryIntoEVMEvent};
 pub use recall_sol_facade::bucket::Calls;
+use recall_sol_facade::{
+    bucket as sol,
+    types::{SolCall, SolInterface},
+};
 
 use crate::{
     AddParams, DeleteParams, GetParams, ListObjectsReturn, ListParams, Object,
@@ -27,13 +28,13 @@ declare_abi_call!();
 
 pub struct ObjectAdded<'a> {
     pub key: &'a Vec<u8>,
-    pub blob_hash: &'a Hash,
+    pub blob_hash: &'a B256,
     pub metadata: &'a HashMap<String, String>,
 }
 impl<'a> ObjectAdded<'a> {
     pub fn new(
         key: &'a Vec<u8>,
-        blob_hash: &'a Hash,
+        blob_hash: &'a B256,
         metadata: &'a HashMap<String, String>,
     ) -> Self {
         Self {
@@ -80,10 +81,10 @@ impl<'a> TryIntoEVMEvent for ObjectMetadataUpdated<'a> {
 
 pub struct ObjectDeleted<'a> {
     pub key: &'a Vec<u8>,
-    pub blob_hash: &'a Hash,
+    pub blob_hash: &'a B256,
 }
 impl<'a> ObjectDeleted<'a> {
-    pub fn new(key: &'a Vec<u8>, blob_hash: &'a Hash) -> Self {
+    pub fn new(key: &'a Vec<u8>, blob_hash: &'a B256) -> Self {
         Self { key, blob_hash }
     }
 }
@@ -99,11 +100,11 @@ impl TryIntoEVMEvent for ObjectDeleted<'_> {
 
 // ----- Calls ----- //
 
-pub fn can_handle(input_data: &recall_actor_sdk::InputData) -> bool {
+pub fn can_handle(input_data: &recall_actor_sdk::evm::InputData) -> bool {
     Calls::valid_selector(input_data.selector())
 }
 
-pub fn parse_input(input: &recall_actor_sdk::InputData) -> Result<Calls, ActorError> {
+pub fn parse_input(input: &recall_actor_sdk::evm::InputData) -> Result<Calls, ActorError> {
     Calls::abi_decode_raw(input.selector(), input.calldata(), true)
         .map_err(|e| actor_error!(illegal_argument, format!("invalid call: {}", e)))
 }
@@ -114,10 +115,10 @@ impl AbiCallRuntime for sol::addObject_0Call {
     type Output = Vec<u8>;
 
     fn params(&self, rt: &impl Runtime) -> Self::Params {
-        let source = PublicKey(self.source.into());
+        let source = B256(self.source.into());
         let key: Vec<u8> = self.key.clone().into_bytes();
-        let hash = Hash(self.hash.into());
-        let recovery_hash = Hash(self.recoveryHash.into());
+        let hash = B256(self.hash.into());
+        let recovery_hash = B256(self.recoveryHash.into());
         let size = self.size;
         let from = rt.message().caller();
         AddParams {
@@ -143,10 +144,10 @@ impl AbiCallRuntime for sol::addObject_1Call {
     type Returns = ();
     type Output = Vec<u8>;
     fn params(&self, rt: &impl Runtime) -> Self::Params {
-        let source = PublicKey(self.source.into());
+        let source = B256(self.source.into());
         let key: Vec<u8> = self.key.clone().into_bytes();
-        let hash = Hash(self.hash.into());
-        let recovery_hash = Hash(self.recoveryHash.into());
+        let hash = B256(self.hash.into());
+        let recovery_hash = B256(self.recoveryHash.into());
         let size = self.size;
         let ttl = if self.ttl.clone().is_zero() {
             None

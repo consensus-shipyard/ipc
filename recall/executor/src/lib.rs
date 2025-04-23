@@ -7,8 +7,10 @@ use std::result::Result as StdResult;
 
 use anyhow::{anyhow, bail, Context, Result};
 use cid::Cid;
-use fendermint_actor_blobs_shared::params::{GetGasAllowanceParams, UpdateGasAllowanceParams};
-use fendermint_actor_blobs_shared::state::GasAllowance;
+use fendermint_actor_blobs_shared::{
+    credit::{GasAllowance, GetGasAllowanceParams, UpdateGasAllowanceParams},
+    method::Method::{GetGasAllowance, UpdateGasAllowance},
+};
 use fendermint_vm_actor_interface::{
     blobs::{BLOBS_ACTOR_ADDR, BLOBS_ACTOR_ID},
     eam::EAM_ACTOR_ID,
@@ -710,7 +712,7 @@ where
             to: BLOBS_ACTOR_ADDR,
             sequence: 0, // irrelevant for implicit executions
             gas_limit: i64::MAX as u64,
-            method_num: fendermint_actor_blobs_shared::Method::GetGasAllowance as u64,
+            method_num: GetGasAllowance as u64,
             params,
             value: Default::default(),
             version: Default::default(),
@@ -749,7 +751,7 @@ where
             to: BLOBS_ACTOR_ADDR,
             sequence: 0, // irrelevant for implicit executions
             gas_limit: i64::MAX as u64,
-            method_num: fendermint_actor_blobs_shared::Method::UpdateGasAllowance as u64,
+            method_num: UpdateGasAllowance as u64,
             params,
             value: Default::default(),
             version: Default::default(),

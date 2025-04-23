@@ -13,7 +13,7 @@ use recall_kernel_ops::RecallOps;
 use tokio::sync::Mutex;
 
 pub const MODULE_NAME: &str = "recall";
-pub const HASHRM_SYSCALL_FUNCTION_NAME: &str = "hash_rm";
+pub const DELETE_BLOB_SYSCALL_FUNCTION_NAME: &str = "delete_blob";
 
 const ENV_IROH_RPC_ADDR: &str = "IROH_SYSCALL_RPC_ADDR";
 
@@ -30,7 +30,8 @@ fn hash_source(bytes: &[u8]) -> Result<[u8; 32]> {
         .map_err(|e| ExecutionError::Syscall(SyscallError::new(ErrorNumber::IllegalArgument, e)))
 }
 
-pub fn hash_rm(context: Context<'_, impl RecallOps>, hash_offset: u32) -> Result<()> {
+/// Deletes a blob by hash from backing storage.
+pub fn delete_blob(context: Context<'_, impl RecallOps>, hash_offset: u32) -> Result<()> {
     let hash_bytes = context.memory.try_slice(hash_offset, 32)?;
     let seq_hash = Hash::from_bytes(hash_source(hash_bytes)?);
 

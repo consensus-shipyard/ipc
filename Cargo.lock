@@ -3432,7 +3432,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "fendermint_actor_blobs_shared",
- "fendermint_actor_machine",
+ "fendermint_actor_blobs_testing",
  "fil_actors_evm_shared",
  "fil_actors_runtime",
  "frc42_dispatch",
@@ -3440,11 +3440,9 @@ dependencies = [
  "fvm_ipld_encoding",
  "fvm_shared",
  "hex-literal 0.4.1",
- "iroh-blobs",
  "log",
  "num-derive 0.3.3",
  "num-traits",
- "rand 0.8.5",
  "recall_actor_sdk",
  "recall_ipld",
  "recall_sol_facade",
@@ -3458,7 +3456,6 @@ dependencies = [
  "anyhow",
  "fendermint_actor_blobs_shared",
  "fendermint_actor_blobs_testing",
- "fendermint_actor_machine",
  "fendermint_actor_recall_config_shared",
  "fil_actors_evm_shared",
  "fil_actors_runtime",
@@ -3480,15 +3477,14 @@ name = "fendermint_actor_blobs_shared"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "blake3",
  "data-encoding",
  "fil_actors_runtime",
  "frc42_dispatch",
- "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
  "fvm_shared",
  "num-derive 0.3.3",
  "num-traits",
- "recall_actor_sdk",
  "recall_ipld",
  "serde",
 ]
@@ -3613,7 +3609,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "fendermint_actor_blobs_shared",
- "fendermint_actor_machine",
  "fendermint_actor_recall_config_shared",
  "fil_actors_evm_shared",
  "fil_actors_runtime",
@@ -10242,7 +10237,6 @@ name = "recall_actor_sdk"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "fil_actors_evm_shared",
  "fil_actors_runtime",
  "fvm_ipld_encoding",
  "fvm_sdk",

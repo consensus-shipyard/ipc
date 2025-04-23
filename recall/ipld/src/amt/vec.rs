@@ -38,7 +38,7 @@ where
         }
     }
 
-    pub fn amt<BS: Blockstore>(&self, store: BS) -> Result<Amt<BS, V>, ActorError> {
+    pub fn amt<'a, BS: Blockstore>(&self, store: BS) -> Result<Amt<'a, BS, V>, ActorError> {
         Amt::load(store, &self.cid)
     }
 
@@ -47,12 +47,13 @@ where
     }
 }
 
-pub struct Amt<BS, V>
+pub struct Amt<'a, BS, V>
 where
     BS: Blockstore,
     V: DeserializeOwned + Serialize + PartialEq + Clone,
 {
     vec: Vec<BS, V>,
+    _marker: PhantomData<&'a BS>,
 }
 
 #[derive(Debug, Clone)]
@@ -63,14 +64,17 @@ where
     pub root: Root<V>,
 }
 
-impl<BS, V> Amt<BS, V>
+impl<'a, BS, V> Amt<'a, BS, V>
 where
     BS: Blockstore,
     V: DeserializeOwned + Serialize + PartialEq + Clone,
 {
     fn load(store: BS, root: &Cid) -> Result<Self, ActorError> {
         let vec = Vec::<BS, V>::load(store, root)?;
-        Ok(Self { vec })
+        Ok(Self {
+            vec,
+            _marker: Default::default(),
+        })
     }
 
     pub fn get(&self, index: u64) -> Result<Option<V>, ActorError> {

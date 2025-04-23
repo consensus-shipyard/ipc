@@ -22,10 +22,8 @@ num-traits = { workspace = true }
 recall_sol_facade = { workspace = true, features = ["blobs", "credit", "gas"] }
 serde = { workspace = true, features = ["derive"] }
 
-fendermint_actor_recall_config_shared = { path = "../recall_config/shared" }
 fendermint_actor_blobs_shared = { path = "./shared" }
-fendermint_actor_machine = { path = "../machine" }
-
+fendermint_actor_recall_config_shared = { path = "../recall_config/shared" }
 recall_actor_sdk = { path = "../../../recall/actor_sdk" }
 recall_ipld = { path = "../../../recall/ipld" }
 

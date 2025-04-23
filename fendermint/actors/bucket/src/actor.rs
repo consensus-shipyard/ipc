@@ -5,8 +5,11 @@
 use std::collections::HashMap;
 
 use fendermint_actor_blobs_shared::{
-    add_blob, delete_blob, get_blob, has_credit_approval, overwrite_blob,
-    state::{BlobInfo, BlobStatus, SubscriptionId},
+    blobs::{
+        AddBlobParams, Blob, BlobStatus, DeleteBlobParams, GetBlobParams, OverwriteBlobParams,
+        SubscriptionId,
+    },
+    sdk::{add_blob, delete_blob, get_blob, has_credit_approval, overwrite_blob},
 };
 use fendermint_actor_machine::MachineActor;
 use fil_actors_runtime::{
@@ -14,11 +17,10 @@ use fil_actors_runtime::{
     runtime::{ActorCode, Runtime},
     ActorError,
 };
-
 use fvm_shared::address::Address;
 use recall_actor_sdk::{
-    emit_evm_event, require_addr_is_origin_or_caller, to_id_address, InputData,
-    InvokeContractParams, InvokeContractReturn,
+    evm::{emit_evm_event, InputData, InvokeContractParams, InvokeContractReturn},
+    util::{require_addr_is_origin_or_caller, to_id_address},
 };
 use recall_ipld::hamt::BytesKey;
 
@@ -66,15 +68,19 @@ impl Actor {
                 // Overwrite if the flag is passed
                 overwrite_blob(
                     rt,
-                    from,
-                    object.hash,
-                    sub_id,
-                    params.hash,
-                    Some(state.owner),
-                    params.source,
-                    params.recovery_hash,
-                    params.size,
-                    params.ttl,
+                    OverwriteBlobParams {
+                        old_hash: object.hash,
+                        add: AddBlobParams {
+                            from,
+                            sponsor: Some(state.owner),
+                            source: params.source,
+                            hash: params.hash,
+                            metadata_hash: params.recovery_hash,
+                            id: sub_id,
+                            size: params.size,
+                            ttl: params.ttl,
+                        },
+                    },
                 )?
             } else {
                 // Return an error if no overwrite flag gets passed
@@ -86,14 +92,16 @@ impl Actor {
             // No object found, just a new blob
             add_blob(
                 rt,
-                params.from,
-                sub_id,
-                params.hash,
-                Some(state.owner),
-                params.source,
-                params.recovery_hash,
-                params.size,
-                params.ttl,
+                AddBlobParams {
+                    from,
+                    sponsor: Some(state.owner),
+                    source: params.source,
+                    hash: params.hash,
+                    metadata_hash: params.recovery_hash,
+                    id: sub_id,
+                    size: params.size,
+                    ttl: params.ttl,
+                },
             )?
         };
 
@@ -144,7 +152,15 @@ impl Actor {
             .ok_or(ActorError::illegal_state("object not found".into()))?;
 
         // Delete blob for object
-        delete_blob(rt, from, sub_id, object.hash, Some(state.owner))?;
+        delete_blob(
+            rt,
+            DeleteBlobParams {
+                from,
+                sponsor: Some(state.owner),
+                hash: object.hash,
+                id: sub_id,
+            },
+        )?;
 
         rt.transaction(|st: &mut State, rt| st.delete(rt.store(), &key))?;
 
@@ -162,7 +178,7 @@ impl Actor {
         let sub_id = get_blob_id(&state, &params.0)?;
         let key = BytesKey(params.0);
         if let Some(object_state) = state.get(rt.store(), &key)? {
-            if let Some(blob) = get_blob(rt, object_state.hash)? {
+            if let Some(blob) = get_blob(rt, GetBlobParams(object_state.hash))? {
                 let object = build_object(&blob, &object_state, sub_id, owner)?;
                 Ok(object)
             } else {
@@ -190,7 +206,7 @@ impl Actor {
             params.delimiter,
             start_key.as_ref(),
             params.limit,
-            |key: Vec<u8>, object_state: ObjectState| -> anyhow::Result<(), ActorError> {
+            |key: Vec<u8>, object_state: ObjectState| -> Result<(), ActorError> {
                 if object_state.expiry > current_epoch {
                     objects.push((key, object_state));
                 }
@@ -353,7 +369,7 @@ impl Actor {
 }
 
 /// Returns a blob subscription ID specific to this machine and object key.
-fn get_blob_id(state: &State, key: &[u8]) -> anyhow::Result<SubscriptionId, ActorError> {
+fn get_blob_id(state: &State, key: &[u8]) -> Result<SubscriptionId, ActorError> {
     let mut data = state.address.get()?.payload_bytes();
     data.extend(key);
     let id = blake3::hash(&data).to_hex().to_string();
@@ -362,11 +378,11 @@ fn get_blob_id(state: &State, key: &[u8]) -> anyhow::Result<SubscriptionId, Acto
 
 /// Build an object from its state and blob.
 fn build_object(
-    blob: &BlobInfo,
+    blob: &Blob,
     object_state: &ObjectState,
     sub_id: SubscriptionId,
     subscriber: Address,
-) -> anyhow::Result<Option<Object>, ActorError> {
+) -> Result<Option<Object>, ActorError> {
     match blob.status {
         BlobStatus::Resolved => {
             blob.subscribers.get(&sub_id).cloned().ok_or_else(|| {
@@ -387,7 +403,7 @@ fn build_object(
     }
 }
 
-fn validate_metadata(metadata: &HashMap<String, String>) -> anyhow::Result<(), ActorError> {
+fn validate_metadata(metadata: &HashMap<String, String>) -> Result<(), ActorError> {
     if metadata.len() as u32 > MAX_METADATA_ENTRIES {
         return Err(ActorError::illegal_state(format!(
             "the maximum metadata entries allowed is {}",
@@ -416,7 +432,7 @@ fn validate_metadata(metadata: &HashMap<String, String>) -> anyhow::Result<(), A
 
 fn validate_metadata_optional(
     metadata: &HashMap<String, Option<String>>,
-) -> anyhow::Result<(), ActorError> {
+) -> Result<(), ActorError> {
     for (key, value) in metadata {
         if key.len() as u32 > MAX_METADATA_KEY_SIZE {
             return Err(ActorError::illegal_state(format!(
@@ -470,27 +486,31 @@ mod tests {
     use super::*;
 
     use fendermint_actor_blobs_shared::{
-        params::{
-            AddBlobParams, DeleteBlobParams, GetBlobParams, GetCreditApprovalParams,
-            OverwriteBlobParams,
-        },
-        state::{CreditApproval, Hash, Subscription},
-        Method as BlobMethod, BLOBS_ACTOR_ADDR,
+        blobs::Subscription,
+        bytes::B256,
+        credit::{CreditApproval, GetCreditApprovalParams},
+        method::Method as BlobMethod,
+        BLOBS_ACTOR_ADDR,
     };
     use fendermint_actor_blobs_testing::{new_hash, new_pk, setup_logs};
-    use fendermint_actor_machine::sol_facade::{MachineCreated, MachineInitialized};
-    use fendermint_actor_machine::{ConstructorParams, InitParams, Kind};
+    use fendermint_actor_machine::{
+        sol_facade::{MachineCreated, MachineInitialized},
+        ConstructorParams, InitParams, Kind,
+    };
     use fil_actors_evm_shared::address::EthAddress;
-    use fil_actors_runtime::runtime::Runtime;
-    use fil_actors_runtime::test_utils::{
-        expect_empty, MockRuntime, ADM_ACTOR_CODE_ID, ETHACCOUNT_ACTOR_CODE_ID, INIT_ACTOR_CODE_ID,
+    use fil_actors_runtime::{
+        runtime::Runtime,
+        test_utils::{
+            expect_empty, MockRuntime, ADM_ACTOR_CODE_ID, ETHACCOUNT_ACTOR_CODE_ID,
+            INIT_ACTOR_CODE_ID,
+        },
     };
     use fil_actors_runtime::{ADM_ACTOR_ADDR, INIT_ACTOR_ADDR};
     use fvm_ipld_encoding::ipld_block::IpldBlock;
     use fvm_shared::{
         clock::ChainEpoch, econ::TokenAmount, error::ExitCode, sys::SendFlags, MethodNum,
     };
-    use recall_actor_sdk::to_actor_event;
+    use recall_actor_sdk::evm::to_actor_event;
 
     fn get_runtime() -> (MockRuntime, Address) {
         let origin_id_addr = Address::new_id(110);
@@ -563,7 +583,7 @@ mod tests {
         rt.expect_emitted_event(event);
     }
 
-    fn expect_emitted_delete_event(rt: &MockRuntime, params: &DeleteParams, hash: Hash) {
+    fn expect_emitted_delete_event(rt: &MockRuntime, params: &DeleteParams, hash: B256) {
         let event = to_actor_event(sol::ObjectDeleted::new(&params.key, &hash)).unwrap();
         rt.expect_emitted_event(event);
     }
@@ -881,10 +901,10 @@ mod tests {
             BLOBS_ACTOR_ADDR,
             BlobMethod::DeleteBlob as MethodNum,
             IpldBlock::serialize_cbor(&DeleteBlobParams {
+                from: origin,
                 sponsor: Some(origin),
                 hash: add_params.hash,
                 id: sub_id,
-                from: origin,
             })
             .unwrap(),
             TokenAmount::from_whole(0),
@@ -978,7 +998,7 @@ mod tests {
         rt.verify();
 
         // Get the object
-        let blob = BlobInfo {
+        let blob = Blob {
             size: add_params.size,
             subscribers: HashMap::from([(sub_id, ttl)]),
             status: BlobStatus::Resolved,
@@ -1168,10 +1188,10 @@ mod tests {
             // We do not care what is inside credit approval. We only care if it is present.
             IpldBlock::serialize_cbor::<Option<CreditApproval>>(&Some(CreditApproval {
                 credit_limit: None,
-                gas_fee_limit: None,
+                gas_allowance_limit: None,
                 expiry: None,
                 credit_used: TokenAmount::from_whole(0),
-                gas_fee_used: TokenAmount::from_whole(0),
+                gas_allowance_used: TokenAmount::from_whole(0),
             }))
             .unwrap(),
             ExitCode::OK,
@@ -1191,7 +1211,7 @@ mod tests {
         rt.verify();
 
         // Get the object and check metadata
-        let blob = BlobInfo {
+        let blob = Blob {
             size: add_params.size,
             subscribers: HashMap::from([(sub_id, ttl)]),
             status: BlobStatus::Resolved,

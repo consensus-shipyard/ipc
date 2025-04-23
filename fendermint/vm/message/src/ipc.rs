@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
-use fendermint_actor_blobs_shared::state::SubscriptionId;
+use fendermint_actor_blobs_shared::blobs::SubscriptionId;
 use fvm_shared::{
     address::Address, clock::ChainEpoch, crypto::signature::Signature, econ::TokenAmount, MethodNum,
 };

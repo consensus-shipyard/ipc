@@ -4,7 +4,7 @@
 
 use anyhow::Error;
 use fvm_shared::address::Address;
-use recall_actor_sdk::TryIntoEVMEvent;
+use recall_actor_sdk::evm::TryIntoEVMEvent;
 use recall_sol_facade::gas as sol;
 use recall_sol_facade::types::H160;
 

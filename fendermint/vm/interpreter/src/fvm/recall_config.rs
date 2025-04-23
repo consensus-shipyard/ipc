@@ -2,16 +2,15 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::fvm::FvmMessage;
 use anyhow::{bail, Context};
-use fendermint_actor_blobs_shared::state::TokenCreditRate;
-use fendermint_actor_recall_config_shared::Method::GetConfig;
-use fendermint_actor_recall_config_shared::RecallConfig;
-use fendermint_vm_actor_interface::recall_config::RECALL_CONFIG_ACTOR_ADDR;
-use fendermint_vm_actor_interface::system;
+use fendermint_actor_blobs_shared::credit::TokenCreditRate;
+use fendermint_actor_recall_config_shared::{Method::GetConfig, RecallConfig};
+use fendermint_vm_actor_interface::{recall_config::RECALL_CONFIG_ACTOR_ADDR, system};
 use fvm::executor::{ApplyKind, ApplyRet, Executor};
 use fvm_shared::clock::ChainEpoch;
 use num_traits::Zero;
+
+use crate::fvm::FvmMessage;
 
 /// Makes the current Recall network configuration available to execution state.
 #[derive(Debug, Clone)]

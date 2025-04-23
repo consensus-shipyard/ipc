@@ -3,14 +3,17 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use cid::Cid;
-use fendermint_actor_blobs_shared::has_credit_approval;
+use fendermint_actor_blobs_shared::sdk::has_credit_approval;
 use fendermint_actor_machine::MachineActor;
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
     runtime::{ActorCode, Runtime},
     ActorError,
 };
-use recall_actor_sdk::{emit_evm_event, require_addr_is_origin_or_caller, to_id_address};
+use recall_actor_sdk::{
+    evm::emit_evm_event,
+    util::{require_addr_is_origin_or_caller, to_id_address},
+};
 use tracing::debug;
 
 use crate::sol_facade::EventPushed;
@@ -131,11 +134,14 @@ mod tests {
     use std::str::FromStr;
 
     use fendermint_actor_blobs_shared::{
-        params::GetCreditApprovalParams, state::CreditApproval, Method as BlobMethod,
+        credit::{CreditApproval, GetCreditApprovalParams},
+        method::Method as BlobMethod,
         BLOBS_ACTOR_ADDR,
     };
-    use fendermint_actor_machine::sol_facade::{MachineCreated, MachineInitialized};
-    use fendermint_actor_machine::{ConstructorParams, InitParams, Kind};
+    use fendermint_actor_machine::{
+        sol_facade::{MachineCreated, MachineInitialized},
+        ConstructorParams, InitParams, Kind,
+    };
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::{
         runtime::MessageInfo,
@@ -150,7 +156,7 @@ mod tests {
         address::Address, clock::ChainEpoch, econ::TokenAmount, error::ExitCode, sys::SendFlags,
         MethodNum,
     };
-    use recall_actor_sdk::to_actor_event;
+    use recall_actor_sdk::evm::to_actor_event;
 
     pub fn construct_runtime(actor_address: Address, owner_id_addr: Address) -> MockRuntime {
         let owner_eth_addr = EthAddress(hex_literal::hex!(
@@ -399,10 +405,10 @@ mod tests {
         // Set up valid credit approval from the Timehub owner to the address that will perform the push
         let approval = CreditApproval {
             credit_limit: None,
-            gas_fee_limit: None,
+            gas_allowance_limit: None,
             expiry: None,
             credit_used: Default::default(),
-            gas_fee_used: Default::default(),
+            gas_allowance_used: Default::default(),
         };
         rt.expect_send(
             BLOBS_ACTOR_ADDR,
@@ -454,10 +460,10 @@ mod tests {
 
         let approval = CreditApproval {
             credit_limit: None,
-            gas_fee_limit: None,
+            gas_allowance_limit: None,
             expiry: Some(epoch1),
             credit_used: Default::default(),
-            gas_fee_used: Default::default(),
+            gas_allowance_used: Default::default(),
         };
         rt.expect_send(
             BLOBS_ACTOR_ADDR,
@@ -510,10 +516,10 @@ mod tests {
 
         let expired_approval = CreditApproval {
             credit_limit: None,
-            gas_fee_limit: None,
+            gas_allowance_limit: None,
             expiry: Some(epoch0),
             credit_used: Default::default(),
-            gas_fee_used: Default::default(),
+            gas_allowance_used: Default::default(),
         };
         rt.expect_send(
             BLOBS_ACTOR_ADDR,

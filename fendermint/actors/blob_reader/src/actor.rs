@@ -2,7 +2,7 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use fendermint_actor_blobs_shared::state::Hash;
+use fendermint_actor_blobs_shared::bytes::B256;
 use fil_actors_runtime::{
     actor_dispatch, actor_error,
     runtime::{ActorCode, Runtime},
@@ -10,7 +10,7 @@ use fil_actors_runtime::{
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::MethodNum;
-use recall_actor_sdk::emit_evm_event;
+use recall_actor_sdk::evm::emit_evm_event;
 
 use crate::shared::{
     CloseReadRequestParams, GetOpenReadRequestsParams, GetPendingReadRequestsParams,
@@ -34,7 +34,7 @@ impl ReadReqActor {
     fn open_read_request(
         rt: &impl Runtime,
         params: OpenReadRequestParams,
-    ) -> Result<Hash, ActorError> {
+    ) -> Result<B256, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
         let id = rt.transaction(|st: &mut State, _rt| {
@@ -103,7 +103,6 @@ impl ReadReqActor {
         params: SetReadRequestPendingParams,
     ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-
         rt.transaction(|st: &mut State, _| st.set_read_request_pending(rt.store(), params.0))?;
         emit_evm_event(rt, ReadRequestPending::new(&params.0))
     }
@@ -160,22 +159,14 @@ impl ActorCode for ReadReqActor {
 mod tests {
     use super::*;
     use crate::sol_facade::ReadRequestClosed;
-
+    use fendermint_actor_blobs_testing::new_hash;
     use fil_actors_evm_shared::address::EthAddress;
     use fil_actors_runtime::test_utils::{
         expect_empty, MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, SYSTEM_ACTOR_CODE_ID,
     };
     use fvm_ipld_encoding::ipld_block::IpldBlock;
     use fvm_shared::address::Address;
-    use rand::RngCore;
-    use recall_actor_sdk::to_actor_event;
-
-    pub fn new_hash(size: usize) -> (Hash, u64) {
-        let mut rng = rand::thread_rng();
-        let mut data = vec![0u8; size];
-        rng.fill_bytes(&mut data);
-        (Hash(*iroh_blobs::Hash::new(&data).as_bytes()), size as u64)
-    }
+    use recall_actor_sdk::evm::to_actor_event;
 
     pub fn construct_and_verify() -> MockRuntime {
         let rt = MockRuntime {
@@ -193,7 +184,7 @@ mod tests {
         rt
     }
 
-    fn expect_emitted_open_event(rt: &MockRuntime, params: &OpenReadRequestParams, id: &Hash) {
+    fn expect_emitted_open_event(rt: &MockRuntime, params: &OpenReadRequestParams, id: &B256) {
         let event = to_actor_event(ReadRequestOpened {
             id,
             blob_hash: &params.hash,
@@ -246,7 +237,7 @@ mod tests {
             callback_addr: f4_eth_addr,
             callback_method,
         };
-        let expected_id = Hash::from(1);
+        let expected_id = B256::from(1);
         expect_emitted_open_event(&rt, &open_params, &expected_id);
         let request_id = rt
             .call::<ReadReqActor>(
@@ -255,7 +246,7 @@ mod tests {
             )
             .unwrap()
             .unwrap()
-            .deserialize::<Hash>()
+            .deserialize::<B256>()
             .unwrap();
         rt.verify();
 
@@ -284,7 +275,7 @@ mod tests {
             )
             .unwrap()
             .unwrap()
-            .deserialize::<Vec<(Hash, Hash, u32, u32, Address, u64)>>()
+            .deserialize::<Vec<(B256, B256, u32, u32, Address, u64)>>()
             .unwrap();
 
         assert_eq!(result.len(), 1);
@@ -371,7 +362,7 @@ mod tests {
         // Test closing non-existent request
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-        let non_existent_request_id = Hash([0u8; 32]);
+        let non_existent_request_id = B256([0u8; 32]);
         let close_params = CloseReadRequestParams(non_existent_request_id);
         let result = rt.call::<ReadReqActor>(
             Method::CloseReadRequest as u64,

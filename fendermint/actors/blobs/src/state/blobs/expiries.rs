@@ -2,66 +2,101 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use fendermint_actor_blobs_shared::state::Hash;
-use fendermint_actor_blobs_shared::state::SubscriptionId;
+use std::fmt::Display;
+
+use fendermint_actor_blobs_shared::{blobs::SubscriptionId, bytes::B256};
 use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::tuple::*;
-use fvm_shared::address::Address;
-use fvm_shared::clock::ChainEpoch;
-use recall_ipld::amt::vec::TrackedFlushResult;
-use recall_ipld::{amt, hamt};
+use fvm_ipld_encoding::{tuple::*, RawBytes};
+use fvm_shared::{address::Address, clock::ChainEpoch};
+use recall_ipld::{
+    amt::{self, vec::TrackedFlushResult},
+    hamt::{self, MapKey},
+};
 
-use crate::state::ExpiryKey;
-
-type PerChainEpochRoot = hamt::Root<Address, hamt::Root<ExpiryKey, ()>>;
-
-#[derive(Debug, Clone, Serialize_tuple, Deserialize_tuple)]
-pub struct ExpiriesState {
-    pub root: amt::Root<PerChainEpochRoot>,
-    pub next_idx: Option<u64>,
+/// Key used to namespace subscriptions in the expiry index.
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize_tuple, Deserialize_tuple)]
+pub struct ExpiryKey {
+    /// Key hash.
+    pub hash: B256,
+    /// Key subscription ID.
+    pub id: SubscriptionId,
 }
 
-impl ExpiriesState {
-    fn store_name() -> String {
-        "expiries".to_string()
+impl Display for ExpiryKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ExpiryKey(hash: {}, id: {})", self.hash, self.id)
+    }
+}
+
+impl MapKey for ExpiryKey {
+    fn from_bytes(b: &[u8]) -> Result<Self, String> {
+        let raw_bytes = RawBytes::from(b.to_vec());
+        fil_actors_runtime::cbor::deserialize(&raw_bytes, "ExpiryKey")
+            .map_err(|e| format!("Failed to deserialize ExpiryKey {}", e))
     }
 
-    fn store_name_per_chain_epoch(chain_epoch: ChainEpoch) -> String {
-        format!("{}.{}", ExpiriesState::store_name(), chain_epoch)
+    fn to_bytes(&self) -> Result<Vec<u8>, String> {
+        let raw_bytes = fil_actors_runtime::cbor::serialize(self, "ExpiryKey")
+            .map_err(|e| format!("Failed to serialize ExpiryKey {}", e))?;
+        Ok(raw_bytes.to_vec())
     }
+}
 
-    fn store_name_per_address(chain_epoch: ChainEpoch, address: &Address) -> String {
-        format!(
-            "{}.{}",
-            ExpiriesState::store_name_per_chain_epoch(chain_epoch),
-            address
-        )
+impl ExpiryKey {
+    /// Create a new expiry key.
+    pub fn new(hash: B256, id: &SubscriptionId) -> Self {
+        Self {
+            hash,
+            id: id.clone(),
+        }
     }
+}
 
+/// Type used as the root of [`Expiries`].
+type ExpiriesRoot = hamt::Root<Address, hamt::Root<ExpiryKey, ()>>;
+
+/// AMT wrapper for expiry index state.
+#[derive(Debug, Clone, Serialize_tuple, Deserialize_tuple)]
+pub struct Expiries {
+    /// The AMT root.
+    pub root: amt::Root<ExpiriesRoot>,
+    /// Index marker for pagination.
+    /// When present, iteration starts from this index.
+    /// Otherwise, iteration begins from the first entry.
+    /// Used for efficient traversal during blob expiration.
+    next_index: Option<u64>,
+}
+
+impl Expiries {
+    /// Returns a new expiry collection.
     pub fn new<BS: Blockstore>(store: &BS) -> Result<Self, ActorError> {
-        let root = amt::Root::<PerChainEpochRoot>::new(store)?;
+        let root = amt::Root::<ExpiriesRoot>::new(store)?;
         Ok(Self {
             root,
-            next_idx: None,
+            next_index: None,
         })
     }
 
-    pub fn amt<BS: Blockstore>(
+    /// Returns the underlying [`amt::vec::Amt`].
+    pub fn amt<'a, BS: Blockstore>(
         &self,
         store: BS,
-    ) -> Result<amt::vec::Amt<BS, PerChainEpochRoot>, ActorError> {
+    ) -> Result<amt::vec::Amt<'a, BS, ExpiriesRoot>, ActorError> {
         self.root.amt(store)
     }
 
-    pub fn save_tracked(&mut self, tracked_flush_result: TrackedFlushResult<PerChainEpochRoot>) {
+    /// Saves the state from the [`TrackedFlushResult`].
+    pub fn save_tracked(&mut self, tracked_flush_result: TrackedFlushResult<ExpiriesRoot>) {
         self.root = tracked_flush_result.root;
     }
 
+    /// The size of the collection.
     pub fn len<BS: Blockstore>(&self, store: BS) -> Result<u64, ActorError> {
         Ok(self.root.amt(store)?.count())
     }
 
+    /// Iterates the collection up to the given epoch.
     pub fn foreach_up_to_epoch<BS: Blockstore, F>(
         &mut self,
         store: BS,
@@ -74,7 +109,7 @@ impl ExpiriesState {
     {
         let expiries = self.amt(&store)?;
         let (count, next_idx) = expiries.for_each_while_ranged(
-            self.next_idx,
+            self.next_index,
             batch_size,
             |index, per_chain_epoch_root| {
                 if index > epoch as u64 {
@@ -88,24 +123,31 @@ impl ExpiriesState {
                 Ok(true)
             },
         )?;
-        self.next_idx = batch_size.and(next_idx);
-        log::info!(
-            "finished deleting {} blobs, next_idx: {:?}, current_epoch: {}",
+        self.next_index = batch_size.and(next_idx);
+
+        log::debug!(
+            "walked {} blobs, next_index: {:?}, stop_epoch: {}",
             count,
-            self.next_idx,
+            self.next_index,
             epoch
         );
+
         Ok(())
     }
 
-    pub fn update_index<BS: Blockstore>(
+    /// Updates the collection by applying the list of [`ExpiryUpdate`]s.
+    pub fn update<BS: Blockstore>(
         &mut self,
         store: BS,
         subscriber: Address,
-        hash: Hash,
+        hash: B256,
         id: &SubscriptionId,
         updates: Vec<ExpiryUpdate>,
     ) -> Result<(), ActorError> {
+        if updates.is_empty() {
+            return Ok(());
+        }
+
         let mut expiries = self.amt(&store)?;
         for update in updates {
             match update {
@@ -117,7 +159,7 @@ impl ExpiriesState {
                         } else {
                             hamt::Root::<Address, hamt::Root<ExpiryKey, ()>>::new(
                                 &store,
-                                &ExpiriesState::store_name_per_chain_epoch(chain_epoch),
+                                &Expiries::store_name_per_root(chain_epoch),
                             )?
                         };
                     // The size does not matter
@@ -129,7 +171,7 @@ impl ExpiriesState {
                         } else {
                             hamt::Root::<ExpiryKey, ()>::new(
                                 &store,
-                                &ExpiriesState::store_name_per_address(chain_epoch, &subscriber),
+                                &Expiries::store_name_per_address(chain_epoch, &subscriber),
                             )?
                         };
                     let mut per_address_hamt = per_address_root.hamt(&store, 1)?; // The size does not matter here
@@ -175,10 +217,28 @@ impl ExpiriesState {
         }
         Ok(())
     }
+
+    /// Returns the store display name.
+    fn store_name() -> String {
+        "expiries".to_string()
+    }
+
+    /// Returns the store display name for a root.
+    fn store_name_per_root(chain_epoch: ChainEpoch) -> String {
+        format!("{}.{}", Expiries::store_name(), chain_epoch)
+    }
+
+    /// Returns the store display name for an address.
+    fn store_name_per_address(chain_epoch: ChainEpoch, address: &Address) -> String {
+        format!("{}.{}", Expiries::store_name_per_root(chain_epoch), address)
+    }
 }
 
+/// Helper enum for expiry updates.
 pub enum ExpiryUpdate {
+    /// Entry to add.
     Add(ChainEpoch),
+    /// Entry to remove.
     Remove(ChainEpoch),
 }
 
@@ -192,14 +252,14 @@ mod tests {
     #[test]
     fn test_expiries_foreach_up_to_epoch() {
         let store = MemoryBlockstore::default();
-        let mut state = ExpiriesState::new(&store).unwrap();
+        let mut state = Expiries::new(&store).unwrap();
 
         let addr = new_address();
         let mut hashes = vec![];
         for i in 1..=100 {
             let (hash, _) = new_hash(1024);
             state
-                .update_index(
+                .update(
                     &store,
                     addr,
                     hash,
@@ -224,7 +284,7 @@ mod tests {
         let remove_epoch = 5;
         let hash = hashes[remove_epoch - 1];
         state
-            .update_index(
+            .update(
                 &store,
                 addr,
                 hash,
@@ -247,14 +307,14 @@ mod tests {
     #[test]
     fn test_expiries_pagination() {
         let store = MemoryBlockstore::default();
-        let mut state = ExpiriesState::new(&store).unwrap();
+        let mut state = Expiries::new(&store).unwrap();
         let addr = new_address();
 
         // Create expiries at epochs 1,2,4,7,8,10
         for i in &[1, 2, 4, 7, 8, 10] {
             let (hash, _) = new_hash(1024);
             state
-                .update_index(
+                .update(
                     &store,
                     addr,
                     hash,
@@ -274,7 +334,7 @@ mod tests {
                     Ok(())
                 })
                 .unwrap();
-            done = state.next_idx.is_none();
+            done = state.next_index.is_none();
         }
 
         // Should get all epochs in order, despite gaps
@@ -284,7 +344,7 @@ mod tests {
     #[test]
     fn test_expiries_pagination_with_mutations() {
         let store = MemoryBlockstore::default();
-        let mut state = ExpiriesState::new(&store).unwrap();
+        let mut state = Expiries::new(&store).unwrap();
         let addr = new_address();
         let current_epoch = 100;
 
@@ -293,7 +353,7 @@ mod tests {
         for ttl in (10..=50).step_by(10) {
             let (hash, _) = new_hash(1024);
             state
-                .update_index(
+                .update(
                     &store,
                     addr,
                     hash,
@@ -318,7 +378,7 @@ mod tests {
         // Add new expiry at 135
         let (hash, _) = new_hash(1024);
         state
-            .update_index(
+            .update(
                 &store,
                 addr,
                 hash,
@@ -330,7 +390,7 @@ mod tests {
         // Remove expiry at 140
         let hash = hashes[3];
         state
-            .update_index(
+            .update(
                 &store,
                 addr,
                 hash,
@@ -340,7 +400,7 @@ mod tests {
             .unwrap();
 
         // Process remaining epochs
-        while state.next_idx.is_some() {
+        while state.next_index.is_some() {
             state
                 .foreach_up_to_epoch(&store, 150, Some(2), |epoch, _, _| {
                     processed.push(epoch);
@@ -356,7 +416,7 @@ mod tests {
     #[test]
     fn test_expiries_pagination_with_expiry_update() {
         let store = MemoryBlockstore::default();
-        let mut state = ExpiriesState::new(&store).unwrap();
+        let mut state = Expiries::new(&store).unwrap();
         let addr = new_address();
         let current_epoch = 100;
 
@@ -366,7 +426,7 @@ mod tests {
             let (hash, _) = new_hash(1024);
             let expiry = current_epoch + ttl;
             state
-                .update_index(
+                .update(
                     &store,
                     addr,
                     hash,
@@ -379,7 +439,7 @@ mod tests {
 
         let mut processed = vec![];
 
-        // Process first two expiries (110,120)
+        // Process the first two expiries (110,120)
         state
             .foreach_up_to_epoch(&store, 150, Some(2), |epoch, _, _| {
                 processed.push(epoch);
@@ -391,7 +451,7 @@ mod tests {
         // Extend expiry of the blob at 130 to 145 (can only extend, not reduce)
         let hash = hashes[2]; // blob with ttl 30
         state
-            .update_index(
+            .update(
                 &store,
                 addr,
                 hash,
@@ -404,7 +464,7 @@ mod tests {
             .unwrap();
 
         // Process remaining epochs - should see updated expiry
-        while state.next_idx.is_some() {
+        while state.next_index.is_some() {
             state
                 .foreach_up_to_epoch(&store, 150, Some(2), |epoch, _, _| {
                     processed.push(epoch);
@@ -420,7 +480,7 @@ mod tests {
     #[test]
     fn test_expiries_pagination_with_multiple_subscribers() {
         let store = MemoryBlockstore::default();
-        let mut state = ExpiriesState::new(&store).unwrap();
+        let mut state = Expiries::new(&store).unwrap();
         let addr1 = new_address();
         let addr2 = new_address();
 
@@ -433,7 +493,7 @@ mod tests {
         for _ in 0..2 {
             let (hash, _) = new_hash(1024);
             state
-                .update_index(
+                .update(
                     &store,
                     addr1,
                     hash,
@@ -445,7 +505,7 @@ mod tests {
         }
         let (hash, _) = new_hash(1024);
         state
-            .update_index(
+            .update(
                 &store,
                 addr1,
                 hash,
@@ -458,7 +518,7 @@ mod tests {
         // addr2's blobs
         let (hash, _) = new_hash(1024);
         state
-            .update_index(
+            .update(
                 &store,
                 addr2,
                 hash,
@@ -471,7 +531,7 @@ mod tests {
         for _ in 0..2 {
             let (hash, _) = new_hash(1024);
             state
-                .update_index(
+                .update(
                     &store,
                     addr2,
                     hash,
@@ -493,7 +553,7 @@ mod tests {
                     Ok(())
                 })
                 .unwrap();
-            done = state.next_idx.is_none();
+            done = state.next_index.is_none();
         }
 
         // Should get all entries, with multiple entries per epoch

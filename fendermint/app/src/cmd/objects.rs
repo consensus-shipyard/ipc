@@ -859,7 +859,7 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use bytes::Bytes;
-    use fendermint_actor_blobs_shared::state::Hash as BlobHash;
+    use fendermint_actor_blobs_shared::bytes::B256;
     use fendermint_vm_message::query::FvmQuery;
     use rand_chacha::rand_core::{RngCore, SeedableRng};
     use rand_chacha::ChaCha8Rng;
@@ -918,8 +918,8 @@ mod tests {
         metadata_iroh_hash: Hash,
     ) -> MockQueryClient {
         let object = Object {
-            hash: BlobHash(*hash_seq_hash.as_bytes()),
-            recovery_hash: BlobHash(*metadata_iroh_hash.as_bytes()),
+            hash: B256(*hash_seq_hash.as_bytes()),
+            recovery_hash: B256(*metadata_iroh_hash.as_bytes()),
             metadata: HashMap::from([
                 ("foo".to_string(), "bar".to_string()),
                 (

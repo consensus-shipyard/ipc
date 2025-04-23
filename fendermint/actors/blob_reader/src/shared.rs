@@ -4,7 +4,7 @@
 
 use std::fmt;
 
-use fendermint_actor_blobs_shared::state::Hash;
+use fendermint_actor_blobs_shared::bytes::B256;
 use fvm_ipld_encoding::tuple::*;
 use fvm_shared::{address::Address, ActorID, MethodNum, METHOD_CONSTRUCTOR};
 use num_derive::FromPrimitive;
@@ -39,7 +39,7 @@ impl fmt::Display for ReadRequestStatus {
 #[derive(Clone, Debug, PartialEq, Serialize_tuple, Deserialize_tuple)]
 pub struct ReadRequest {
     /// The hash of the blob to read data from.
-    pub blob_hash: Hash,
+    pub blob_hash: B256,
     /// The offset to start reading from.
     pub offset: u32,
     /// The length of data to read.
@@ -72,7 +72,7 @@ pub enum Method {
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct OpenReadRequestParams {
     /// The hash of the blob to read.
-    pub hash: Hash,
+    pub hash: B256,
     /// The offset to start reading from.
     pub offset: u32,
     /// The length of the read request.
@@ -86,7 +86,7 @@ pub struct OpenReadRequestParams {
 /// Params for getting read request status.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct GetReadRequestStatusParams(pub Hash);
+pub struct GetReadRequestStatusParams(pub B256);
 
 /// Params for getting open read requests.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -101,12 +101,12 @@ pub struct GetPendingReadRequestsParams(pub u32);
 /// Params for setting a read request to pending.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct SetReadRequestPendingParams(pub Hash);
+pub struct SetReadRequestPendingParams(pub B256);
 
 /// Params for closing a read request. The ID of the read request.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct CloseReadRequestParams(pub Hash);
+pub struct CloseReadRequestParams(pub B256);
 
 /// Return type for request queues.
-pub type ReadRequestTuple = (Hash, Hash, u32, u32, Address, u64);
+pub type ReadRequestTuple = (B256, B256, u32, u32, Address, u64);

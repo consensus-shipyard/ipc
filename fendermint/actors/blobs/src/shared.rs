@@ -4,4 +4,5 @@
 
 pub use crate::state::State;
 
+/// The name of the blob actor.
 pub const BLOBS_ACTOR_NAME: &str = "blobs";

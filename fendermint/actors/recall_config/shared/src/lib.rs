@@ -2,15 +2,13 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use fendermint_actor_blobs_shared::state::TokenCreditRate;
-use fil_actors_runtime::runtime::Runtime;
-use fil_actors_runtime::{deserialize_block, extract_send_result, ActorError};
+use fendermint_actor_blobs_shared::credit::TokenCreditRate;
+use fil_actors_runtime::{deserialize_block, extract_send_result, runtime::Runtime, ActorError};
 use fvm_ipld_encoding::tuple::*;
-use fvm_shared::address::Address;
-use fvm_shared::clock::ChainEpoch;
-use fvm_shared::econ::TokenAmount;
-use fvm_shared::sys::SendFlags;
-use fvm_shared::{ActorID, MethodNum, METHOD_CONSTRUCTOR};
+use fvm_shared::{
+    address::Address, clock::ChainEpoch, econ::TokenAmount, sys::SendFlags, ActorID, MethodNum,
+    METHOD_CONSTRUCTOR,
+};
 use num_derive::FromPrimitive;
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};

@@ -2,24 +2,25 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::Error;
-use fendermint_actor_blobs_shared::params::{
-    ApproveCreditParams, BuyCreditParams, GetAccountParams, GetCreditApprovalParams,
-    RevokeCreditParams, SetAccountStatusParams, SetSponsorParams,
-};
-use fendermint_actor_blobs_shared::state::{AccountInfo, Credit, CreditApproval, TtlStatus};
-use fil_actors_runtime::runtime::Runtime;
-use fil_actors_runtime::{actor_error, ActorError};
-use fvm_shared::address::Address;
-use fvm_shared::clock::ChainEpoch;
-use fvm_shared::econ::TokenAmount;
-use recall_actor_sdk::{token_to_biguint, TryIntoEVMEvent};
-use recall_sol_facade::credit as sol;
-use recall_sol_facade::primitives::U256;
-use recall_sol_facade::types::{BigUintWrapper, SolCall, SolInterface, H160};
 use std::collections::{HashMap, HashSet};
 
+use anyhow::Error;
+use fendermint_actor_blobs_shared::{
+    accounts::{Account, AccountStatus, GetAccountParams, SetAccountStatusParams},
+    credit::{
+        ApproveCreditParams, BuyCreditParams, Credit, CreditApproval, GetCreditApprovalParams,
+        RevokeCreditParams, SetSponsorParams,
+    },
+};
+use fil_actors_runtime::{actor_error, runtime::Runtime, ActorError};
+use fvm_shared::{address::Address, clock::ChainEpoch, econ::TokenAmount};
+use recall_actor_sdk::{evm::TryIntoEVMEvent, util::token_to_biguint};
 pub use recall_sol_facade::credit::Calls;
+use recall_sol_facade::{
+    credit as sol,
+    primitives::U256,
+    types::{BigUintWrapper, SolCall, SolInterface, H160},
+};
 
 use crate::sol_facade::{AbiCall, AbiCallRuntime, AbiEncodeError};
 
@@ -108,11 +109,11 @@ impl TryIntoEVMEvent for CreditDebited {
 
 // ----- Calls ----- //
 
-pub fn can_handle(input_data: &recall_actor_sdk::InputData) -> bool {
+pub fn can_handle(input_data: &recall_actor_sdk::evm::InputData) -> bool {
     Calls::valid_selector(input_data.selector())
 }
 
-pub fn parse_input(input: &recall_actor_sdk::InputData) -> Result<Calls, ActorError> {
+pub fn parse_input(input: &recall_actor_sdk::evm::InputData) -> Result<Calls, ActorError> {
     Calls::abi_decode_raw(input.selector(), input.calldata(), true)
         .map_err(|e| actor_error!(illegal_argument, format!("invalid call: {}", e)))
 }
@@ -301,7 +302,7 @@ impl AbiCallRuntime for sol::setAccountSponsorCall {
 
 fn convert_approvals(
     approvals: HashMap<Address, CreditApproval>,
-) -> Result<Vec<sol::Approval>, anyhow::Error> {
+) -> Result<Vec<sol::Approval>, Error> {
     approvals
         .iter()
         .map(|(address, credit_approval)| {
@@ -315,25 +316,26 @@ fn convert_approvals(
                         .unwrap_or_default()
                         .into(),
                     gasFeeLimit: credit_approval
-                        .gas_fee_limit
+                        .gas_allowance_limit
                         .clone()
                         .map(BigUintWrapper::from)
                         .unwrap_or_default()
                         .into(),
                     expiry: credit_approval.expiry.unwrap_or_default() as u64,
                     creditUsed: BigUintWrapper::from(credit_approval.credit_used.clone()).into(),
-                    gasFeeUsed: BigUintWrapper::from(credit_approval.gas_fee_used.clone()).into(),
+                    gasFeeUsed: BigUintWrapper::from(credit_approval.gas_allowance_used.clone())
+                        .into(),
                 },
             };
             Ok(approval)
         })
-        .collect::<Result<Vec<_>, anyhow::Error>>()
+        .collect::<Result<Vec<_>, Error>>()
 }
 
 /// function getAccount(address addr) external view returns (Account memory account);
 impl AbiCall for sol::getAccountCall {
     type Params = GetAccountParams;
-    type Returns = Option<AccountInfo>;
+    type Returns = Option<Account>;
     type Output = Result<Vec<u8>, AbiEncodeError>;
 
     fn params(&self) -> Self::Params {
@@ -403,14 +405,14 @@ impl AbiCall for sol::getCreditApprovalCall {
                     .unwrap_or_default()
                     .into(),
                 gasFeeLimit: credit_approval
-                    .gas_fee_limit
+                    .gas_allowance_limit
                     .clone()
                     .map(BigUintWrapper::from)
                     .unwrap_or_default()
                     .into(),
                 expiry: credit_approval.expiry.unwrap_or_default() as u64,
                 creditUsed: BigUintWrapper::from(credit_approval.credit_used.clone()).into(),
-                gasFeeUsed: BigUintWrapper::from(credit_approval.gas_fee_used.clone()).into(),
+                gasFeeUsed: BigUintWrapper::from(credit_approval.gas_allowance_used.clone()).into(),
             }
         } else {
             sol::CreditApproval {
@@ -434,10 +436,10 @@ impl AbiCall for sol::setAccountStatusCall {
     fn params(&self) -> Self::Params {
         let subscriber = H160::from(self.subscriber);
         let ttl_status = match self.ttlStatus {
-            0 => TtlStatus::Default,
-            1 => TtlStatus::Reduced,
-            2 => TtlStatus::Extended,
-            _ => return Err(actor_error!(illegal_argument, "invalid TtlStatus")),
+            0 => AccountStatus::Default,
+            1 => AccountStatus::Reduced,
+            2 => AccountStatus::Extended,
+            _ => return Err(actor_error!(illegal_argument, "invalid account status")),
         };
         Ok(SetAccountStatusParams {
             subscriber: subscriber.into(),
