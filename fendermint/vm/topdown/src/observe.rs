@@ -36,7 +36,7 @@ register_metrics! {
 }
 
 impl_traceables!(
-    TraceLevel::Info,
+    TraceLevel::Debug,
     "Topdown",
     ParentRpcCalled<'a>,
     ParentFinalityAcquired<'a>,

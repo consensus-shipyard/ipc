@@ -55,7 +55,7 @@ where
                        gas_used: Option<u64>,
                        return_data: Option<RawBytes>,
                        info: Option<String>| {
-            tracing::info!(
+            tracing::debug!(
                 exit_code = exit_code.value(),
                 from = msg.from.to_string(),
                 to = msg.to.to_string(),

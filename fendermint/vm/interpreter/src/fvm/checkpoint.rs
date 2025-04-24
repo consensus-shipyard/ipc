@@ -318,7 +318,7 @@ where
         .context("failed to broadcast signature")?;
 
     // The transaction should be in the mempool now.
-    tracing::info!(tx_hash = tx_hash.to_string(), "broadcasted signature");
+    tracing::debug!(tx_hash = tx_hash.to_string(), "broadcasted signature");
 
     Ok(())
 }

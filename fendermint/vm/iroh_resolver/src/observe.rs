@@ -44,7 +44,7 @@ register_metrics! {
 }
 
 impl_traceables!(
-    TraceLevel::Info,
+    TraceLevel::Debug,
     "IrohResolver",
     BlobsFinalityVotingFailure,
     BlobsFinalityVotingSuccess,

@@ -35,6 +35,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::fmt;
 use tendermint::consensus::params::Params as TendermintConsensusParams;
+use tracing::Level;
 
 pub type BlockHash = [u8; 32];
 
@@ -172,8 +173,9 @@ where
         params: FvmStateParams,
     ) -> anyhow::Result<Self> {
         let mut nc = NetworkConfig::new(params.network_version);
-        // TODO (findme): Make this configurable
-        nc.enable_actor_debugging();
+        if tracing::enabled!(Level::DEBUG) {
+            nc.enable_actor_debugging();
+        }
         nc.chain_id = ChainID::from(params.chain_id);
 
         // TODO: Configure:

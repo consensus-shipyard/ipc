@@ -55,7 +55,7 @@ where
         match qry {
             FvmQuery::Ipld(cid) => {
                 let data = state.store_get(&cid)?;
-                tracing::info!(
+                tracing::debug!(
                     height = state.block_height(),
                     pending = state.pending(),
                     cid = cid.to_string(),
@@ -67,7 +67,7 @@ where
             }
             FvmQuery::ActorState(address) => {
                 let (state, ret) = state.actor_state(&address).await?;
-                tracing::info!(
+                tracing::debug!(
                     height = state.block_height(),
                     pending = state.pending(),
                     addr = address.to_string(),
@@ -110,7 +110,7 @@ where
                 Ok((state, out))
             }
             FvmQuery::EstimateGas(mut msg) => {
-                tracing::info!(
+                tracing::debug!(
                     height = state.block_height(),
                     pending = state.pending(),
                     to = msg.to.to_string(),

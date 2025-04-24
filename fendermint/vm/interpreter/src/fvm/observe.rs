@@ -40,7 +40,7 @@ register_metrics! {
         = register_int_gauge!("bottomup_checkpoint_finalized_height", "Height of the checkpoint finalized");
 }
 
-impl_traceables!(TraceLevel::Info, "Execution", MsgExec);
+impl_traceables!(TraceLevel::Debug, "Execution", MsgExec);
 
 #[derive(Debug, strum::EnumString)]
 #[strum(serialize_all = "snake_case")]
@@ -75,7 +75,7 @@ impl Recordable for MsgExec {
 }
 
 impl_traceables!(
-    TraceLevel::Info,
+    TraceLevel::Debug,
     "Bottomup",
     CheckpointCreated,
     CheckpointSigned,

@@ -27,7 +27,7 @@ register_metrics! {
 }
 
 impl_traceables!(
-    TraceLevel::Info,
+    TraceLevel::Debug,
     "Consensus",
     BlockProposalReceived<'a>,
     BlockProposalSent<'a>,
@@ -35,7 +35,7 @@ impl_traceables!(
     BlockCommitted
 );
 
-impl_traceables!(TraceLevel::Info, "Mpool", MpoolReceived);
+impl_traceables!(TraceLevel::Debug, "Mpool", MpoolReceived);
 
 pub type BlockHeight = u64;
 
