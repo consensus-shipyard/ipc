@@ -52,11 +52,11 @@ impl Actor {
             if blockhashes.count() > st.lookback_len {
                 let mut first_idx = 0;
                 blockhashes
-                    .for_each_while(|i, _: &BlockHash| {
+                    .iter()
+                    .map_while(|res| res.ok())
+                    .for_each(|(i, _block_hash)| {
                         first_idx = i;
-                        Ok(false)
-                    })
-                    .unwrap();
+                    });
                 blockhashes.delete(first_idx).unwrap();
             }
 
