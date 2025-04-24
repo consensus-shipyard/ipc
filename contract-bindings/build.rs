@@ -223,15 +223,18 @@ async fn main() -> color_eyre::Result<()> {
     mod_f.flush()?;
     mod_f.sync_all()?;
 
-    echo!("contract-bindings", yellow, "Formatting...");
+	// XXX Currently `unparse` doesn't seem to be too happy
+    if false {
+        echo!("contract-bindings", yellow, "Formatting...");
 
-    // format file without host tooling
-    // TODO use tempfile to make the formatting atomic
-    let unformatted = fs_err::read_to_string(&mod_path)?;
-    let f = syn::parse_str(&unformatted)?;
-    let c = prettyplease::unparse(&f);
-    fs_err::write(&mod_path, c.as_bytes())?;
-
+        // format file without host tooling
+        // TODO use tempfile to make the formatting atomic
+        let unformatted = fs_err::read_to_string(&mod_path)?;
+        let f = syn::parse_str(&unformatted)?;
+        let c = prettyplease::unparse(&f);
+        fs_err::write(&mod_path, c.as_bytes())?;
+    }
+    
     Ok(())
 }
 
