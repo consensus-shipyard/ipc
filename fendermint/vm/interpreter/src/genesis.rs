@@ -16,7 +16,7 @@ use ethers::core::types as et;
 use fendermint_actor_eam::PermissionModeParams;
 use fendermint_eth_deployer::utils as deployer_utils;
 use fendermint_eth_hardhat::{
-    ContractSourceAndName, FullyQualifiedName, SolidityActorContractsLoader, SolidityActorContracts,
+    ContractSourceAndName, FullyQualifiedName, SolidityActorContracts, SolidityActorContractsLoader,
 };
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
@@ -768,7 +768,6 @@ pub async fn create_test_genesis_state(
     sol_actor_artifacts: SolidityActorContracts,
     genesis_params: Genesis,
 ) -> anyhow::Result<(FvmGenesisState<MemoryBlockstore>, GenesisOutput)> {
-
     let builder = GenesisBuilder::new(
         builtin_actors_bundle,
         custom_actors_bundle,
