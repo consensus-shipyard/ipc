@@ -113,7 +113,12 @@ async fn main() -> color_eyre::Result<()> {
     run_pnpm_install(&contracts_dir).await?;
     run_forge_build(&contracts_dir, contracts_dir.join(&out).as_path()).await?;
 
-    echo!("contract-bindings", yellow, "Writing generated code to {}", mod_path.display());
+    echo!(
+        "contract-bindings",
+        yellow,
+        "Writing generated code to {}",
+        mod_path.display()
+    );
 
     fs_err::create_dir_all(&gen_dir)?;
     let mut mod_f = fs_err::File::create(&mod_path)?;
@@ -223,7 +228,7 @@ async fn main() -> color_eyre::Result<()> {
     mod_f.flush()?;
     mod_f.sync_all()?;
 
-	// XXX Currently `unparse` doesn't seem to be too happy
+    // XXX Currently `unparse` doesn't seem to be too happy
     if false {
         echo!("contract-bindings", yellow, "Formatting...");
 
@@ -234,7 +239,7 @@ async fn main() -> color_eyre::Result<()> {
         let c = prettyplease::unparse(&f);
         fs_err::write(&mod_path, c.as_bytes())?;
     }
-    
+
     Ok(())
 }
 

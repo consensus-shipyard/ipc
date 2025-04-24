@@ -16,7 +16,8 @@ fn main() -> Result<()> {
     let contracts_forge_build_out_dir =
         std::env::var("CARGO_MANIFEST_DIR").context("Must have set CARGO_MANIFEST_DIR")?;
     let contracts_forge_build_out_dir =
-        std::path::Path::new(contracts_forge_build_out_dir.as_str()).join("../../../contracts/out/");
+        std::path::Path::new(contracts_forge_build_out_dir.as_str())
+            .join("../../../contracts/out/");
 
     rerun_if_changed("build.rs");
     rerun_if_changed(&contracts_forge_build_out_dir);
