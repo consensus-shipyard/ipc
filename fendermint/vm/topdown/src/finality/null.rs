@@ -124,10 +124,13 @@ impl FinalityWithNull {
         self.last_committed_finality.write(Some(finality))?;
 
         // emit event only after successful write
-        emit!(ParentFinalityCommitted {
-            block_height: height,
-            block_hash: &hash
-        });
+        emit!(
+            DEBUG,
+            ParentFinalityCommitted {
+                block_height: height,
+                block_hash: &hash
+            }
+        );
 
         Ok(())
     }

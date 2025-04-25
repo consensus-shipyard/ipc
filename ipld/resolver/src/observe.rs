@@ -87,12 +87,12 @@ register_metrics! {
 
 const DOMAIN: &str = "IPLD";
 
-impl_traceables!(TraceLevel::Info, DOMAIN, PingEvent);
+impl_traceables!(TraceLevel::Debug, DOMAIN, PingEvent);
 impl_traceables!(TraceLevel::Warn, DOMAIN, PingFailureEvent);
 impl_traceables!(TraceLevel::Info, DOMAIN, IdentifyEvent);
 impl_traceables!(TraceLevel::Warn, DOMAIN, IdentifyFailureEvent);
 impl_traceables!(TraceLevel::Info, DOMAIN, DiscoveryEvent);
-impl_traceables!(TraceLevel::Info, DOMAIN, MembershipEvent);
+impl_traceables!(TraceLevel::Debug, DOMAIN, MembershipEvent);
 impl_traceables!(TraceLevel::Warn, DOMAIN, MembershipFailureEvent);
 impl_traceables!(TraceLevel::Info, DOMAIN, ResolveEvent);
 impl_traceables!(TraceLevel::Warn, DOMAIN, ResolveFailureEvent);

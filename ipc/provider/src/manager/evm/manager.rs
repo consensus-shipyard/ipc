@@ -204,7 +204,7 @@ impl TopDownFinalityQuery for EthSubnetManager {
         epoch: ChainEpoch,
     ) -> Result<TopDownQueryPayload<Vec<StakingChangeRequest>>> {
         let address = contract_address_from_subnet(subnet_id)?;
-        tracing::info!("querying validator changes in evm subnet contract: {address:}");
+        tracing::debug!("querying validator changes in evm subnet contract: {address:}");
 
         let contract = subnet_actor_manager_facet::SubnetActorManagerFacet::new(
             address,
