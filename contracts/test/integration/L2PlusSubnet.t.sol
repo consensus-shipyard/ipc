@@ -612,15 +612,19 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         // apply the cross message in the L3 subnet
         executeTopDownMsgs(msgs, params.subnetL3.gateway);
         // submit checkoint so the result message can be propagated to L2
-        submitBottomUpCheckpoint(
-            callCreateBottomUpCheckpointFromChildSubnet(params.subnetL3.id, params.subnetL3.gateway),
-            params.subnetL3.subnetActor
-        );
+        vm.recordLogs();
+        BottomUpCheckpoint memory l3_checkpoint = callCreateBottomUpCheckpointFromChildSubnet(params.subnetL3.id, params.subnetL3.gateway);
+        IpcEnvelope[] memory l3_batch = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
+        submitBottomUpCheckpoint(l3_checkpoint, params.subnetL3.subnetActor);
+        execBottomUpMsgBatch(l3_checkpoint, l3_batch, params.subnetL3.subnetActor);
+
         // submit checkoint so the result message can be propagated to root network
-        submitBottomUpCheckpoint(
-            callCreateBottomUpCheckpointFromChildSubnet(params.subnet.id, params.subnet.gateway),
-            params.subnet.subnetActor
-        );
+        vm.recordLogs();
+        BottomUpCheckpoint memory l2_checkpoint = callCreateBottomUpCheckpointFromChildSubnet(params.subnet.id, params.subnet.gateway);
+        IpcEnvelope[] memory l2_batch = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
+        submitBottomUpCheckpoint(l2_checkpoint, params.subnet.subnetActor);
+        execBottomUpMsgBatch(l2_checkpoint, l2_batch, params.subnet.subnetActor);
+
         assertTrue(params.caller.hasResult(), "missing result");
         assertTrue(params.caller.result().outcome == params.expectedOutcome, "wrong result outcome");
         assertTrue(keccak256(params.caller.result().ret) == keccak256(params.expectedRet), "wrong result outcome");
