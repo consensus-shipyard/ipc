@@ -11,6 +11,7 @@ import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
 import {AssetHelper} from "../../contracts/lib/AssetHelper.sol";
 import {Asset, AssetKind} from "../../contracts/structs/Subnet.sol";
 import {FvmAddressHelper} from "../../contracts/lib/FvmAddressHelper.sol";
+import {BottomUpBatchRecorded} from "../../contracts/structs/BottomUpBatch.sol";
 import {CrossMsgHelper} from "../../contracts/lib/CrossMsgHelper.sol";
 import {GatewayDiamond} from "../../contracts/GatewayDiamond.sol";
 import {SubnetActorDiamond} from "../../contracts/SubnetActorDiamond.sol";
@@ -507,13 +508,15 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         submitBottomUpCheckpoint(_checkpoint, params.subnetL3.subnetActor);
         IpcEnvelope[] memory _msgs = new IpcEnvelope[](1);
         _msgs[0] = crossMessage;
-        batchSubnetBottomUpExecution(_checkpoint, _msgs, params.subnetL3.subnetActor);
+        execBottomUpMsgBatch(_checkpoint, _msgs, params.subnetL3.subnetActor);
 
         // create checkpoint in L2 and submit it to the root network (L2 subnet actor)
+        vm.recordLogs();
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
             params.subnet.id,
             params.subnet.gateway
         );
+        IpcEnvelope[] memory l2_batch = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
 
         // expected result top down message from root to L2. This is a response to the xnet call.
         IpcEnvelope memory resultMessage = crossMessage.createResultMsg(params.expectedOutcome, params.expectedRet);
@@ -521,6 +524,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
         submitBottomUpCheckpointAndExpectTopDownMessageEvent(
             checkpoint,
+            l2_batch,
             params.subnet.subnetActor,
             resultMessage,
             params.subnet.subnetActorAddr,
@@ -874,7 +878,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         return (parentValidators, parentSignatures);
     }
 
-    function batchSubnetBottomUpExecution(
+    function execBottomUpMsgBatch(
         BottomUpCheckpoint memory checkpoint,
         IpcEnvelope[] memory msgs,
         SubnetActorDiamond sa
@@ -899,6 +903,35 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
         vm.startPrank(address(sa));
         checkpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
+        vm.stopPrank();
+    }
+
+    function submitBottomUpCheckpointAndExpectTopDownMessageEvent(
+        BottomUpCheckpoint memory checkpoint,
+        IpcEnvelope[] memory msgBatch,
+        SubnetActorDiamond subnetActor,
+        IpcEnvelope memory expectedMessage,
+        address expectedSubnetAddr,
+        address expectedGatewayAddr
+    ) internal {
+        (address[] memory parentValidators, bytes[] memory parentSignatures) = prepareValidatorsSignatures(
+            checkpoint,
+            subnetActor
+        );
+
+        SubnetActorCheckpointingFacet checkpointer = subnetActor.checkpointer();
+
+        vm.startPrank(address(subnetActor));
+        checkpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
+        vm.expectEmit(true, true, true, true, expectedGatewayAddr);
+        emit LibGateway.NewTopDownMessage({
+            subnet: expectedSubnetAddr,
+            message: expectedMessage,
+            id: expectedMessage.toTracingId()
+        });
+        BottomUpBatch.Inclusion[] memory inclusions = BottomUpBatchHelper.makeInclusions(msgBatch);
+        checkpointer.execBottomUpMsgBatch(checkpoint.subnetID, checkpoint.blockHeight, inclusions);
+
         vm.stopPrank();
     }
 
@@ -950,6 +983,17 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
                 value: original.value,
                 message: original.message
             });
+    }
+
+    function getBottomUpBatchRecordedFromLogs(Vm.Log[] memory logs) internal pure returns (IpcEnvelope[] memory) {
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == BottomUpBatchRecorded.selector) {
+                (, IpcEnvelope[] memory msgs) = abi.decode(logs[i].data, (uint64, IpcEnvelope[]));
+                return msgs;
+            }
+        }
+
+        return new IpcEnvelope[](0);
     }
 
     function printActors() internal view {
