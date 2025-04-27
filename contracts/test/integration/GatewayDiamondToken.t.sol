@@ -172,9 +172,11 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         });
 
         vm.prank(address(saDiamond));
+        gatewayDiamond.checkpointer().commitCheckpoint(batch);
+        vm.prank(address(saDiamond));
         vm.expectEmit(true, true, true, true, address(token));
         emit Transfer(address(gatewayDiamond), recipient, value);
-        gatewayDiamond.checkpointer().commitCheckpoint(batch);
+        gatewayDiamond.checkpointer().execBottomUpMsgBatch(subnet.id, msgs);
 
         // Assert post-conditions.
         (, Subnet memory subnetAfter) = gatewayDiamond.getter().getSubnet(subnet.id);
@@ -184,13 +186,15 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
 
         // Now attempt to withdraw beyond the circulating supply.
         // This would be a malicious message.
-        //  batch.msgs[0] = CrossMsgHelper.createReleaseMsg(subnet.id, caller, FvmAddressHelper.from(recipient), 10);
-        // TODO: moshababo
+        msgs[0] = CrossMsgHelper.createReleaseMsg(subnet.id, caller, FvmAddressHelper.from(recipient), value);
+        batch.msgs = BottomUpBatchHelper.makeCommitment(msgs);
 
         // This reverts.
         vm.prank(address(saDiamond));
-        vm.expectRevert();
         gatewayDiamond.checkpointer().commitCheckpoint(batch);
+        vm.prank(address(saDiamond));
+        vm.expectRevert();
+        gatewayDiamond.checkpointer().execBottomUpMsgBatch(subnet.id, msgs);
     }
 
     // Call a smart contract in the parent through a smart contract.
