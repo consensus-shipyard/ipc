@@ -309,6 +309,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         );
 
         saDiamond = createSubnetActor(saConstructorParams);
+        gatewayDiamond.manager().approveSubnet(address(saDiamond), true);
 
         addValidator(TOPDOWN_VALIDATOR_1, 100);
     }
@@ -576,6 +577,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         );
         SubnetActorDiamond diamond = new SubnetActorDiamond(diamondCut, params, address(this));
 
+        approveSubnet(address(diamond), false);
+
         return diamond;
     }
 
@@ -696,6 +699,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(gw);
 
         SubnetActorDiamond d = new SubnetActorDiamond(diamondCut, params, address(this));
+        approveSubnet(address(d), false);
 
         return d;
     }
@@ -1014,10 +1018,41 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         require(stakedAfter == stakedBefore + stakeAmount, "unexpected stake");
     }
 
+    function approveSubnet(address subnet, bool shouldResumePrank) internal {
+        address previousPrank = msg.sender;
+        (bool isInPrank, ) = address(vm).call(abi.encodeWithSelector(vm.stopPrank.selector));
+        // console.logBytes(data);
+
+        vm.prank(gatewayDiamond.ownership().owner());
+        gatewayDiamond.manager().approveSubnet(subnet, true);
+        // console.log(subnet);
+
+        if (shouldResumePrank && isInPrank) {
+            vm.prank(previousPrank);
+        }
+    }
+
+    function approveSubnet(GatewayManagerFacet manager, address subnet, bool shouldResumePrank) internal {
+        address previousPrank = msg.sender;
+        (bool isInPrank, ) = address(vm).call(abi.encodeWithSelector(vm.stopPrank.selector));
+        // console.logBytes(data);
+
+        vm.prank(gatewayDiamond.ownership().owner());
+        manager.approveSubnet(subnet, true);
+        // console.log(subnet);
+
+        if (shouldResumePrank && isInPrank) {
+            vm.prank(previousPrank);
+        }
+    }
+
     function registerSubnetGW(uint256 collateral, address subnetAddress, GatewayDiamond gw) public {
         GatewayManagerFacet manager = gw.manager();
         GatewayGetterFacet getter = gw.getter();
 
+        approveSubnet(manager, subnetAddress, false);
+
+        vm.prank(subnetAddress);
         manager.register{value: collateral}(0, collateral);
 
         (SubnetID memory id, uint256 stake, uint256 topDownNonce, , uint256 circSupply) = getSubnetGW(
