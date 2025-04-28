@@ -7,13 +7,10 @@
 //! The JSON file encodes the `ABI` in field `abi` as well as input variables and their types.
 //! There are more fields, such as `bytecode`, `deployedBytecode` and `linkReferences` - the latter can be referenced from within the `bytecode`.
 
-use color_eyre::eyre::{self, bail, Context, ContextCompat, OptionExt, Result};
+use color_eyre::eyre::{self, bail, Context, ContextCompat, Result};
 use core::iter::Iterator;
 use ethers_core::types as et;
-use fendermint_vm_actor_interface::{
-    diamond::{EthContract, EthContractMap},
-    ipc::IPC_CONTRACTS,
-};
+use fendermint_vm_actor_interface::{diamond::EthContractMap, ipc::IPC_CONTRACTS};
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -189,12 +186,7 @@ impl SolidityActorContractsLoader {
 
         top_level_contracts.extend(IPC_CONTRACTS.clone());
 
-        all_contracts.extend(
-            top_level_contracts
-                .keys()
-                .into_iter()
-                .map(|&s| s.to_owned()),
-        );
+        all_contracts.extend(top_level_contracts.keys().map(|&s| s.to_owned()));
         all_contracts.extend(
             top_level_contracts
                 .values()
