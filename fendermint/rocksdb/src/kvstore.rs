@@ -117,7 +117,7 @@ where
     }
 }
 
-impl<'a, S> KVRead<S> for RocksDbReadTx<'a>
+impl<S> KVRead<S> for RocksDbReadTx<'_>
 where
     S: KVStore<Repr = Vec<u8>>,
     S::Namespace: AsRef<str>,
@@ -164,7 +164,7 @@ where
     }
 }
 
-impl<'a, S> KVRead<S> for RocksDbWriteTx<'a>
+impl<S> KVRead<S> for RocksDbWriteTx<'_>
 where
     S: KVStore<Repr = Vec<u8>>,
     S::Namespace: AsRef<str>,

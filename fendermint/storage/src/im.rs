@@ -143,7 +143,7 @@ impl<S: KVStore, M> Drop for Transaction<'_, S, M> {
     }
 }
 
-impl<'a, S: KVStore, M> KVRead<S> for Transaction<'a, S, M>
+impl<S: KVStore, M> KVRead<S> for Transaction<'_, S, M>
 where
     S::Repr: Hash + Eq,
 {

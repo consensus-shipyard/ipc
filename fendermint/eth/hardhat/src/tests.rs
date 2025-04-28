@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
-use crate::{fully_qualified_name, topo_sort, DependencyTree, SolidityActorContracts};
+use crate::{topo_sort, DependencyTree, SolidityActorContracts};
 
 use super::SolidityActorContractsLoader;
 

@@ -16,8 +16,7 @@ use ethers::core::types as et;
 use fendermint_actor_eam::PermissionModeParams;
 use fendermint_eth_deployer::utils as deployer_utils;
 use fendermint_eth_hardhat::{
-    fully_qualified_name, ContractName, ContractSourceAndName, FullyQualifiedName,
-    SolidityActorContracts, SolidityActorContractsLoader,
+    fully_qualified_name, ContractName, FullyQualifiedName, SolidityActorContracts,
 };
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
