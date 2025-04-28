@@ -7,7 +7,7 @@ authors.workspace = true
 version = "0.1.0"
 
 [lib]
-crate-type = ["cdylib", "lib"]
+crate-type = ["rlib"]
 
 [dependencies]
 cid = { workspace = true, default-features = false }

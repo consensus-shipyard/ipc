@@ -325,13 +325,12 @@ async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> anyhow:
     let builtin_actors =
         actors_car_blob(args.builtin_actors_path.as_ref(), actors_builtin_car::CAR)?;
     let sol_actor_contracts = if let Some(artifacts_path) = args.artifacts_path.as_ref() {
-        SolidityActorContractsLoader::load_directory(&args.artifacts_path)
+        SolidityActorContractsLoader::load_directory(&artifacts_path)
     } else {
-        let x = SolidityActorContracts::from_json(
+        SolidityActorContracts::from_json(
             fendermint_eth_hardhat_builtin::BUILTIN_SOL_ACTOR_ARTIFACTS,
-        )?;
-        Ok(x)
-    }?;
+        )
+    }.map_err(|e| anyhow!("{e:?}"))?;
 
     let builder = GenesisBuilder::new(
         builtin_actors.as_ref(),
