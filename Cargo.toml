@@ -251,7 +251,7 @@ fil_actor_adm = { path = "builtin-actors/actors/adm" }
 fil_actors_runtime = { path = "builtin-actors/runtime" }
 
 # Recall Solidity bindings
-recall_sol_facade = { git = "https://github.com/recallnet/contracts", package = "recall_sol_facade", rev = "fcd7530181900ab196e76b0bbe34c8ac764be434" }
+recall_sol_facade = { git = "https://github.com/recallnet/contracts", package = "recall_sol_facade", rev = "8dbfadfce7e306936a65fb955a83bc06b023007d" }
 
 # Using the same tendermint-rs dependency as tower-abci. From both we are interested in v037 modules.
 tower-abci = { version = "0.7" }
