@@ -16,7 +16,8 @@ use ethers::core::types as et;
 use fendermint_actor_eam::PermissionModeParams;
 use fendermint_eth_deployer::utils as deployer_utils;
 use fendermint_eth_hardhat::{
-    fully_qualified_name, ContractName, ContractSourceAndName, FullyQualifiedName, SolidityActorContracts, SolidityActorContractsLoader
+    fully_qualified_name, ContractName, ContractSourceAndName, FullyQualifiedName,
+    SolidityActorContracts, SolidityActorContractsLoader,
 };
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
@@ -493,7 +494,9 @@ impl<'a> GenesisBuilder<'a> {
     }
 
     fn collect_contracts(&self) -> anyhow::Result<(Vec<ContractName>, EthContractMap)> {
-        self.solidity_actor_contracts.collect_contracts().map_err(|e| anyhow!("{e:?}"))
+        self.solidity_actor_contracts
+            .collect_contracts()
+            .map_err(|e| anyhow!("{e:?}"))
     }
 }
 
@@ -635,7 +638,8 @@ where
         // all the libraries _deployed_ addresses any earlier
         let code = self
             .hardhat
-            .resolve_library_references(lib_name, &self.lib_addrs).map_err(|e| anyhow::anyhow!("{e:?}"))?;
+            .resolve_library_references(lib_name, &self.lib_addrs)
+            .map_err(|e| anyhow::anyhow!("{e:?}"))?;
 
         let eth_addr = state
             .create_evm_actor(*next_id, code)
@@ -682,7 +686,8 @@ where
 
         let code = self
             .hardhat
-            .resolve_library_references(contract_name, &self.lib_addrs).map_err(|e| anyhow::anyhow!("{e:?}"))?;
+            .resolve_library_references(contract_name, &self.lib_addrs)
+            .map_err(|e| anyhow::anyhow!("{e:?}"))?;
 
         let eth_addr = state
             .create_evm_actor_with_cons(contract_id, &contract.abi, code, constructor_params)

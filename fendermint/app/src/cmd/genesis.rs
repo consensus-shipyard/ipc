@@ -330,7 +330,8 @@ async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> anyhow:
         SolidityActorContracts::from_json(
             fendermint_eth_hardhat_builtin::BUILTIN_SOL_ACTOR_ARTIFACTS,
         )
-    }.map_err(|e| anyhow!("{e:?}"))?;
+    }
+    .map_err(|e| anyhow!("{e:?}"))?;
 
     let builder = GenesisBuilder::new(
         builtin_actors.as_ref(),

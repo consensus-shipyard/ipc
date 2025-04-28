@@ -213,16 +213,18 @@ fn build_all_wasm_blobs(
     );
 
     let rustup = which::which("rustup")?;
-    
-    let package_args = actors
-    .iter()
-    .map(|actor| actor.package_name.to_string());
+
+    let package_args = actors.iter().map(|actor| actor.package_name.to_string());
 
     let profile = "actor";
-    
+
     for package in package_args {
-        echo!("actors-custom-car", purple, "Target: {channel} {target} for actor {package}");
-        
+        echo!(
+            "actors-custom-car",
+            purple,
+            "Target: {channel} {target} for actor {package}"
+        );
+
         // Cargo build command for all test_actors at once.
         let mut cmd = Command::new(&rustup);
         cmd.arg("run")
@@ -230,7 +232,8 @@ fn build_all_wasm_blobs(
             .arg("cargo")
             .arg("rustc")
             .arg("--lib")
-            .arg("--crate-type").arg("cdylib")
+            .arg("--crate-type")
+            .arg("cdylib")
             .current_dir(workspace_dir)
             .arg(format!("--package={package}"))
             .arg(format!("--target={target}"))
@@ -385,7 +388,7 @@ fn main() -> Result<()> {
     // `rustc` upgrades in `rust-toolchain.toml`
     let out_dir = out_dir.join(&channel);
 
-    let profile = "actor"; 
+    let profile = "actor";
     // the joins represent the subdirectories under which `cargo` creates the actual WASM aritifacts
     let wasm_blob_dir = out_dir.join(target).join(profile);
 
