@@ -613,14 +613,20 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         executeTopDownMsgs(msgs, params.subnetL3.gateway);
         // submit checkoint so the result message can be propagated to L2
         vm.recordLogs();
-        BottomUpCheckpoint memory l3_checkpoint = callCreateBottomUpCheckpointFromChildSubnet(params.subnetL3.id, params.subnetL3.gateway);
+        BottomUpCheckpoint memory l3_checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+            params.subnetL3.id,
+            params.subnetL3.gateway
+        );
         IpcEnvelope[] memory l3_batch = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
         submitBottomUpCheckpoint(l3_checkpoint, params.subnetL3.subnetActor);
         execBottomUpMsgBatch(l3_checkpoint, l3_batch, params.subnetL3.subnetActor);
 
         // submit checkoint so the result message can be propagated to root network
         vm.recordLogs();
-        BottomUpCheckpoint memory l2_checkpoint = callCreateBottomUpCheckpointFromChildSubnet(params.subnet.id, params.subnet.gateway);
+        BottomUpCheckpoint memory l2_checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+            params.subnet.id,
+            params.subnet.gateway
+        );
         IpcEnvelope[] memory l2_batch = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
         submitBottomUpCheckpoint(l2_checkpoint, params.subnet.subnetActor);
         execBottomUpMsgBatch(l2_checkpoint, l2_batch, params.subnet.subnetActor);
@@ -667,6 +673,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         subnetL3s[0].gateway.messenger().sendContractXnetMessage{value: amount}(crossMessage);
 
         // submit the checkpoint from L3-0 to L2
+        vm.recordLogs();
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
             subnetL3s[0].id,
             subnetL3s[0].gateway
@@ -675,6 +682,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         // submit the checkpoint in L2 produces top down message to L3-1
         submitBottomUpCheckpointAndExpectTopDownMessageEvent(
             checkpoint,
+            getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs()),
             subnetL3s[0].subnetActor,
             crossMessage,
             subnetL3s[1].subnetActorAddr,
@@ -688,10 +696,8 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         executeTopDownMsgs(msgs, subnetL3s[1].gateway);
 
         // submit the checkpoint from L3-1 to L2 for result propagation
-        BottomUpCheckpoint memory resultCheckpoint = callCreateBottomUpCheckpointFromChildSubnet(
-            subnetL3s[1].id,
-            subnetL3s[1].gateway
-        );
+        vm.recordLogs();
+        checkpoint = callCreateBottomUpCheckpointFromChildSubnet(subnetL3s[1].id, subnetL3s[1].gateway);
 
         // expected result top down message from L2 to L3. This is a response to the xnet call.
         IpcEnvelope memory resultMessage = crossMessage.createResultMsg(OutcomeType.Ok, abi.encode(EMPTY_BYTES));
@@ -699,7 +705,8 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
         // submit the checkpoint in L2 produces top down message to L3-1
         submitBottomUpCheckpointAndExpectTopDownMessageEvent(
-            resultCheckpoint,
+            checkpoint,
+            getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs()),
             subnetL3s[1].subnetActor,
             resultMessage,
             subnetL3s[0].subnetActorAddr,
