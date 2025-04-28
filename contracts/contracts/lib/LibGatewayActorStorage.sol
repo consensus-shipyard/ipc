@@ -75,6 +75,8 @@ struct GatewayActorStorage {
     mapping(uint256 => BottomUpMsgBatch) bottomUpMsgBatches;
     /// @notice Keys of the registered subnets. Useful to iterate through them
     EnumerableSet.Bytes32Set subnetKeys;
+    /// @notice List of approved subnet that can join the network
+    EnumerableSet.AddressSet approvedSubnets;
 }
 
 library LibGatewayActorStorage {

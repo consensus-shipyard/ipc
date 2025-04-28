@@ -242,6 +242,11 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         // 3. Test that propagation is rejected when an intermediary subnet is ERC20.
     }
 
+    function approveSubnetNoResumePrank(address subnet) internal {
+        vm.prank(gatewayDiamond.ownership().owner());
+        gatewayDiamond.manager().approveSubnet(subnet, true);
+    }
+
     function createTokenSubnet(address tokenAddress) internal returns (Subnet memory) {
         // Create a subnet actor in the root network, with an ERC20 supply source with the specified token address.
         SubnetActorDiamond.ConstructorParams memory saConstructorParams = defaultSubnetActorParamsWith(
@@ -251,6 +256,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
 
         // Override the state variables with the new subnet.
         saDiamond = createSubnetActor(saConstructorParams);
+        approveSubnetNoResumePrank(address(saDiamond));
 
         // increment the block number by 5 (could be other number as well) so that commit
         // parent finality called down stream will work we need this because in setUp,
