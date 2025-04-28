@@ -240,7 +240,7 @@ fn build_all_wasm_blobs(
             .arg(format!("--profile={profile}"))
             .arg("--features=fil-actor")
             .arg("--manifest-path")
-            .arg(&manifest_path)
+            .arg(manifest_path)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             // We are supposed to only generate artifacts under OUT_DIR,

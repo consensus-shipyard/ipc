@@ -3,7 +3,7 @@
 
 use anyhow::{anyhow, Context, Result};
 use byteorder::{BigEndian, WriteBytesExt};
-use fendermint_eth_hardhat::{SolidityActorContracts, SolidityActorContractsLoader};
+use fendermint_eth_hardhat::SolidityActorContractsLoader;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_message::chain::ChainMessage;
 use fvm_shared::clock::ChainEpoch;

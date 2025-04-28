@@ -150,7 +150,7 @@ pub async fn run_command_with_stdio(
             .as_str()
             .rsplit("\x1b[2K\r")
             .next()
-            .unwrap_or_else(|| msg.as_str());
+            .unwrap_or(msg.as_str());
         if previous.as_ref().map(|x| x.as_str()) == Some(vis) {
             return None;
         }
