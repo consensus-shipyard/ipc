@@ -16,7 +16,7 @@ use ethers::core::types as et;
 use fendermint_actor_eam::PermissionModeParams;
 use fendermint_eth_deployer::utils as deployer_utils;
 use fendermint_eth_hardhat::{
-    ContractSourceAndName, FullyQualifiedName, SolidityActorContracts, SolidityActorContractsLoader,
+    fully_qualified_name, ContractName, ContractSourceAndName, FullyQualifiedName, SolidityActorContracts, SolidityActorContractsLoader
 };
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
@@ -492,8 +492,8 @@ impl<'a> GenesisBuilder<'a> {
         Ok(out)
     }
 
-    fn collect_contracts(&self) -> anyhow::Result<(Vec<ContractSourceAndName>, EthContractMap)> {
-        self.solidity_actor_contracts.collect_contracts()
+    fn collect_contracts(&self) -> anyhow::Result<(Vec<ContractName>, EthContractMap)> {
+        self.solidity_actor_contracts.collect_contracts().map_err(|e| anyhow!("{e:?}"))
     }
 }
 
@@ -502,11 +502,11 @@ impl<'a> GenesisBuilder<'a> {
 struct DeployConfig<'a> {
     ipc_params: Option<&'a IpcParams>,
     chain_id: ChainID,
-    hardhat: &'a SolidityActorContractsLoader,
+    hardhat: &'a SolidityActorContracts,
 }
 
 fn deploy_contracts(
-    ipc_contracts: Vec<ContractSourceAndName>,
+    ipc_contracts: Vec<ContractName>,
     top_level_contracts: &EthContractMap,
     validators: Vec<Validator<Collateral>>,
     mut next_id: u64,
@@ -517,8 +517,10 @@ fn deploy_contracts(
         ContractDeployer::<MemoryBlockstore>::new(config.hardhat, top_level_contracts);
 
     // Deploy Ethereum libraries.
-    for (lib_src, lib_name) in ipc_contracts {
-        deployer.deploy_library(state, &mut next_id, lib_src, &lib_name)?;
+    for lib_name in ipc_contracts {
+        // TODO
+        let lib_fqn = fully_qualified_name(Path::new("."), &lib_name);
+        deployer.deploy_library(state, &mut next_id, lib_fqn, &lib_name)?;
     }
 
     // IPC Gateway actor.
@@ -631,11 +633,9 @@ where
 
         // we can only link here, since we don't have
         // all the libraries _deployed_ addresses any earlier
-        let code = self.hardhat.resolve_library_references(
-            artifact_w_yet_to_resolve_lib_refs,
-            lib_name,
-            self.lib_addrs,
-        )?;
+        let code = self
+            .hardhat
+            .resolve_library_references(lib_name, &self.lib_addrs).map_err(|e| anyhow::anyhow!("{e:?}"))?;
 
         let eth_addr = state
             .create_evm_actor(*next_id, code)
@@ -677,14 +677,12 @@ where
 
         let artifact_w_yet_to_resolve_libs = self
             .hardhat
-            .get_top_level(contract_src, contract_name, &self.lib_addrs)
+            .get_top_level(contract_name)
             .with_context(|| format!("failed to load {contract_name} bytecode"))?;
 
-        let code = self.hardhat.resolve_library_references(
-            artifact_w_yet_to_resolve_libs,
-            contract_name,
-            &self.lib_addrs,
-        )?;
+        let code = self
+            .hardhat
+            .resolve_library_references(contract_name, &self.lib_addrs).map_err(|e| anyhow::anyhow!("{e:?}"))?;
 
         let eth_addr = state
             .create_evm_actor_with_cons(contract_id, &contract.abi, code, constructor_params)
@@ -719,9 +717,9 @@ where
         let mut facet_cuts = Vec::new();
 
         for facet in contract.facets.iter() {
-            let facet_name = facet.name;
+            let facet_name = &facet.name;
             let facet_src = contract_src(facet_name);
-            let facet_fqn = self.hardhat.fully_qualified_name(&facet_src, facet_name);
+            let facet_fqn = fully_qualified_name(&facet_src, facet_name);
 
             let facet_addr = self
                 .lib_addrs

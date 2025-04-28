@@ -316,6 +316,7 @@ mod tests {
     use std::time::Duration;
 
     use async_stm::{atomically, retry};
+    use fendermint_eth_hardhat::SolidityActorContractsLoader;
     use fendermint_vm_genesis::Genesis;
     use fendermint_vm_interpreter::fvm::{
         bundle::contracts_path,
@@ -445,10 +446,12 @@ mod tests {
         let mut g = quickcheck::Gen::new(5);
         let genesis = Genesis::arbitrary(&mut g);
 
+        let actors = SolidityActorContractsLoader::load_directory(&contracts_path()).unwrap();
+
         let (state, out) = create_test_genesis_state(
             actors_builtin_car::CAR,
             actors_custom_car::CAR,
-            contracts_path(),
+            actors,
             genesis,
         )
         .await
