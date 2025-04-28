@@ -212,70 +212,76 @@ fn build_all_wasm_blobs(
         actors.len()
     );
 
-    let package_args = actors
-        .iter()
-        .map(|actor| format!("-p={}", actor.package_name));
-
-    echo!("actors-custom-car", purple, "Target: {channel} {target}");
-
     let rustup = which::which("rustup")?;
+    
+    let package_args = actors
+    .iter()
+    .map(|actor| actor.package_name.to_string());
 
-    // Cargo build command for all test_actors at once.
-    let mut cmd = Command::new(rustup);
-    cmd.arg("run")
-        .arg(channel)
-        .arg("cargo")
-        .arg("build")
-        .current_dir(workspace_dir)
-        .args(package_args)
-        .arg("--target")
-        .arg(target)
-        .arg("--profile=wasm")
-        .arg("--features=fil-actor")
-        .arg("--manifest-path")
-        .arg(&manifest_path)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        // We are supposed to only generate artifacts under OUT_DIR,
-        // so set OUT_DIR as the target directory for this build.
-        .env("CARGO_TARGET_DIR", out_dir)
-        // As we are being called inside a build-script, this env variable is set. However, we set
-        // our own `RUSTFLAGS` and thus, we need to remove this. Otherwise cargo favors this
-        // env variable.
-        .env_remove("CARGO_ENCODED_RUSTFLAGS");
+    let profile = "actor";
+    
+    for package in package_args {
+        echo!("actors-custom-car", purple, "Target: {channel} {target} for actor {package}");
+        
+        // Cargo build command for all test_actors at once.
+        let mut cmd = Command::new(&rustup);
+        cmd.arg("run")
+            .arg(channel)
+            .arg("cargo")
+            .arg("rustc")
+            .arg("--lib")
+            .arg("--crate-type").arg("cdylib")
+            .current_dir(workspace_dir)
+            .arg(format!("--package={package}"))
+            .arg(format!("--target={target}"))
+            .arg(format!("--profile={profile}"))
+            .arg("--features=fil-actor")
+            .arg("--manifest-path")
+            .arg(&manifest_path)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            // We are supposed to only generate artifacts under OUT_DIR,
+            // so set OUT_DIR as the target directory for this build.
+            .env("CARGO_TARGET_DIR", out_dir)
+            // As we are being called inside a build-script, this env variable is set. However, we set
+            // our own `RUSTFLAGS` and thus, we need to remove this. Otherwise cargo favors this
+            // env variable.
+            .env_remove("CARGO_ENCODED_RUSTFLAGS");
 
-    echo!(
-        "actors-custom-car",
-        purple,
-        "Executing WASM compilation command: {:?}",
-        &cmd
-    );
+        echo!(
+            "actors-custom-car",
+            purple,
+            "Executing WASM compilation command: {:?}",
+            &cmd
+        );
 
-    // Launch the command.
-    let mut child = cmd.spawn()?;
+        // Launch the command.
+        let mut child = cmd.spawn()?;
 
-    // Pipe the output as cargo warnings. Unfortunately this is the only way to
-    // get cargo build to print the output.
-    let stdout = child.stdout.take().expect("no stdout");
-    let stderr = child.stderr.take().expect("no stderr");
-    let j1 = thread::spawn(move || {
-        for line in BufReader::new(stderr).lines() {
-            echo!("custom-actor-car", cyan, "{}", line.unwrap());
+        // Pipe the output as cargo warnings. Unfortunately this is the only way to
+        // get cargo build to print the output.
+        let stdout = child.stdout.take().expect("no stdout");
+        let stderr = child.stderr.take().expect("no stderr");
+        let j1 = thread::spawn(move || {
+            for line in BufReader::new(stderr).lines() {
+                echo!("custom-actor-car", cyan, "{}", line.unwrap());
+            }
+        });
+        let j2 = thread::spawn(move || {
+            for line in BufReader::new(stdout).lines() {
+                echo!("custom-actor-car", cyan, "{}", line.unwrap());
+            }
+        });
+
+        let _ = j1.join();
+        let _ = j2.join();
+
+        let exit_status = child.wait()?;
+        if !exit_status.success() {
+            bail!("actor build {package} failed");
         }
-    });
-    let j2 = thread::spawn(move || {
-        for line in BufReader::new(stdout).lines() {
-            echo!("custom-actor-car", cyan, "{}", line.unwrap());
-        }
-    });
-
-    let _ = j1.join();
-    let _ = j2.join();
-
-    let exit_status = child.wait()?;
-    if !exit_status.success() {
-        bail!("actor build faile");
     }
+
     Ok(actors.to_vec())
 }
 
@@ -379,8 +385,9 @@ fn main() -> Result<()> {
     // `rustc` upgrades in `rust-toolchain.toml`
     let out_dir = out_dir.join(&channel);
 
+    let profile = "actor"; 
     // the joins represent the subdirectories under which `cargo` creates the actual WASM aritifacts
-    let wasm_blob_dir = out_dir.join(target).join("wasm");
+    let wasm_blob_dir = out_dir.join(target).join(profile);
 
     echo!(
         "actors-custom-car",

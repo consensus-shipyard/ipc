@@ -3,6 +3,7 @@
 
 use anyhow::{anyhow, Context, Result};
 use byteorder::{BigEndian, WriteBytesExt};
+use fendermint_eth_hardhat::{SolidityActorContracts, SolidityActorContractsLoader};
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_message::chain::ChainMessage;
 use fvm_shared::clock::ChainEpoch;
@@ -30,10 +31,13 @@ pub async fn create_test_exec_state(
 )> {
     let artifacts_path = contracts_path();
 
+    let sol_actor_artifacts = SolidityActorContractsLoader::load_directory(&artifacts_path)
+        .map_err(|e| anyhow!("{e:?}"))?;
+
     let (state, out) = create_test_genesis_state(
         actors_builtin_car::CAR,
         actors_custom_car::CAR,
-        artifacts_path,
+        sol_actor_artifacts,
         genesis,
     )
     .await?;
