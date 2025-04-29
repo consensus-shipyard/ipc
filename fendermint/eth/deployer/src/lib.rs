@@ -14,7 +14,7 @@ use ethers::abi::Tokenize;
 use ethers::contract::ContractFactory;
 use ethers::core::types as eth_types;
 use ethers::prelude::*;
-use fendermint_eth_hardhat::{ContractSourceAndName, DeploymentArtifact, Hardhat, FQN};
+use fendermint_eth_hardhat::{ContractSourceAndName, DeploymentArtifact, SolidityActorContracts, FullyQualifiedName, fully_qualified_name};
 use fendermint_vm_actor_interface::diamond::EthContractMap;
 use fendermint_vm_actor_interface::ipc;
 use fendermint_vm_genesis::ipc::GatewayParams;
@@ -43,17 +43,17 @@ pub enum SubnetCreationPrivilege {
 }
 /// Responsible for deploying Ethereum contracts and libraries.
 pub struct EthContractDeployer {
-    hardhat: Hardhat,
+    hardhat: SolidityActorContracts,
     ipc_contracts: Vec<ContractSourceAndName>,
     top_contracts: EthContractMap,
-    lib_addrs: HashMap<FQN, eth_types::Address>,
+    lib_addrs: HashMap<FullyQualifiedName, eth_types::Address>,
     provider: SignerWithFeeEstimator,
     chain_id: u64,
 }
 
 impl EthContractDeployer {
     /// Creates a new `EthContractDeployer` instance.
-    pub fn new(hardhat: Hardhat, url: &str, private_key: &[u8], chain_id: u64) -> Result<Self> {
+    pub fn new(hardhat: SolidityActorContracts, url: &str, private_key: &[u8], chain_id: u64) -> Result<Self> {
         let provider = Provider::<Http>::try_from(url).context("failed to create HTTP provider")?;
         let wallet: LocalWallet =
             LocalWallet::from_bytes(private_key).context("invalid private key")?;
@@ -106,12 +106,12 @@ impl EthContractDeployer {
     /// Reads the library artifact, substitutes placeholders with correct addresses,
     /// deploys the library, and records its address.
     async fn deploy_library(&mut self, lib_src: &Path, lib_name: &str) -> Result<()> {
-        let fqn = self.hardhat.fqn(lib_src, lib_name);
+        let fqn = fully_qualified_name(lib_src, lib_name);
         tracing::info!("Deploying library: {}", lib_name);
 
         let artifact = self
             .hardhat
-            .prepare_deployment_artifact(lib_src, lib_name, &self.lib_addrs)
+            .resolve_library_references(lib_name, &self.lib_addrs)
             .with_context(|| format!("failed to load library bytecode for {fqn}"))?;
 
         let address = self.deploy_artifact(artifact, ()).await?;
@@ -135,7 +135,7 @@ impl EthContractDeployer {
 
         let artifact = self
             .hardhat
-            .prepare_deployment_artifact(&src, contract_name, &self.lib_addrs)
+            .resolve_library_references(contract_name, &self.lib_addrs)
             .with_context(|| format!("failed to load {contract_name} bytecode"))?;
 
         let address = self.deploy_artifact(artifact, constructor_params).await?;

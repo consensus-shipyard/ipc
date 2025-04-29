@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 use anyhow::{anyhow, Context, Result};
 use ethers::core::types as eth_types;
-use fendermint_eth_hardhat::{ContractSourceAndName, Hardhat, FQN};
+use fendermint_eth_hardhat::{ContractSourceAndName, SolidityActorContracts, FullyQualifiedName, fully_qualified_name};
 use fendermint_vm_actor_interface::diamond::EthContractMap;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use ipc_actors_abis::i_diamond::FacetCut;
@@ -22,7 +22,7 @@ pub fn contract_src(name: &str) -> PathBuf {
 /// Returns a tuple containing a vector of library contracts (with their source paths)
 /// and a map of top-level contracts.
 pub fn collect_contracts(
-    hardhat: &Hardhat,
+    hardhat: &SolidityActorContracts,
 ) -> Result<(Vec<ContractSourceAndName>, EthContractMap)> {
     let mut all_contract_names = Vec::new();
     let top_level_contracts = IPC_CONTRACTS.clone();
@@ -37,8 +37,8 @@ pub fn collect_contracts(
 
     let contracts_with_paths = all_contract_names
         .iter()
-        .map(|name| (contract_src(name), *name))
-        .collect::<Vec<_>>();
+        .map(|name| name.to_string())
+        .collect::<Vec<String>>();
 
     let mut eth_libs = hardhat
         .dependencies(&contracts_with_paths)
@@ -53,9 +53,9 @@ pub fn collect_contracts(
 /// Collects facet cuts for the diamond pattern for a specified top-level contract.
 pub fn collect_facets(
     contract_name: &str,
-    hardhat: &Hardhat,
+    hardhat: &SolidityActorContracts,
     top_contracts: &EthContractMap,
-    lib_addrs: &HashMap<FQN, eth_types::Address>,
+    lib_addrs: &HashMap<FullyQualifiedName, eth_types::Address>,
 ) -> Result<Vec<FacetCut>> {
     let contract = top_contracts
         .get(contract_name)
@@ -65,8 +65,8 @@ pub fn collect_facets(
         .facets
         .iter()
         .map(|facet| {
-            let src = contract_src(facet.name);
-            let facet_fqn = hardhat.fqn(&src, facet.name);
+            let src = contract_src(&facet.name);
+            let facet_fqn = fully_qualified_name(&src, &facet.name);
             let facet_addr = lib_addrs
                 .get(&facet_fqn)
                 .ok_or_else(|| anyhow!("facet {} has not been deployed", facet.name))?;
