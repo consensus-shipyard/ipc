@@ -14,7 +14,10 @@ use ethers::abi::Tokenize;
 use ethers::contract::ContractFactory;
 use ethers::core::types as eth_types;
 use ethers::prelude::*;
-use fendermint_eth_hardhat::{ContractSourceAndName, DeploymentArtifact, SolidityActorContracts, FullyQualifiedName, fully_qualified_name};
+use fendermint_eth_hardhat::{
+    fully_qualified_name, ContractSourceAndName, DeploymentArtifact, FullyQualifiedName,
+    SolidityActorContracts,
+};
 use fendermint_vm_actor_interface::diamond::EthContractMap;
 use fendermint_vm_actor_interface::ipc;
 use fendermint_vm_genesis::ipc::GatewayParams;
@@ -53,7 +56,12 @@ pub struct EthContractDeployer {
 
 impl EthContractDeployer {
     /// Creates a new `EthContractDeployer` instance.
-    pub fn new(hardhat: SolidityActorContracts, url: &str, private_key: &[u8], chain_id: u64) -> Result<Self> {
+    pub fn new(
+        hardhat: SolidityActorContracts,
+        url: &str,
+        private_key: &[u8],
+        chain_id: u64,
+    ) -> Result<Self> {
         let provider = Provider::<Http>::try_from(url).context("failed to create HTTP provider")?;
         let wallet: LocalWallet =
             LocalWallet::from_bytes(private_key).context("invalid private key")?;

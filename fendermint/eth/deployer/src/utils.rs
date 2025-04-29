@@ -8,7 +8,9 @@ use std::path::PathBuf;
 
 use anyhow::{anyhow, Context, Result};
 use ethers::core::types as eth_types;
-use fendermint_eth_hardhat::{ContractSourceAndName, SolidityActorContracts, FullyQualifiedName, fully_qualified_name};
+use fendermint_eth_hardhat::{
+    fully_qualified_name, ContractSourceAndName, FullyQualifiedName, SolidityActorContracts,
+};
 use fendermint_vm_actor_interface::diamond::EthContractMap;
 use fendermint_vm_actor_interface::ipc::IPC_CONTRACTS;
 use ipc_actors_abis::i_diamond::FacetCut;
