@@ -29,8 +29,10 @@ pub fn collect_contracts(
     let mut all_contract_names = Vec::new();
     let top_level_contracts = IPC_CONTRACTS.clone();
 
+    use color_eyre::eyre::WrapErr;
+
     // Add top-level contract names and their facet names.
-    all_contract_names.extend(top_level_contracts.keys().cloned());
+    all_contract_names.extend(top_level_contracts.keys().map(|x| x.to_string()));
     all_contract_names.extend(
         top_level_contracts
             .values()
