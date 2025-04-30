@@ -3447,6 +3447,7 @@ name = "fendermint_eth_deployer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "color-eyre 0.5.11",
  "ethers",
  "ethers-core",
  "fendermint_eth_hardhat",
