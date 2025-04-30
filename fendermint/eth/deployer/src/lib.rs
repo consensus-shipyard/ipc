@@ -92,7 +92,7 @@ impl EthContractDeployer {
         for (lib_src, lib_name) in self.ipc_contracts.clone() {
             self.deploy_library(&lib_src, &lib_name)
                 .await
-                .with_context(|| format!("failed to deploy library {lib_name}"))?;
+                .context(format!("failed to deploy library {lib_name}"))?;
         }
 
         // Deploy the IPC Gateway contract.
@@ -144,7 +144,7 @@ impl EthContractDeployer {
         let artifact = self
             .hardhat
             .resolve_library_references(contract_name, &self.lib_addrs)
-            .with_context(|| format!("failed to load {contract_name} bytecode"))?;
+            .context(format!("failed to load {contract_name} bytecode"))?;
 
         let address = self.deploy_artifact(artifact, constructor_params).await?;
         tracing::info!(?address, "Contract deployed successfully");
