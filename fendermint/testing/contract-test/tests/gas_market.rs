@@ -36,6 +36,7 @@ use lazy_static::lazy_static;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use tendermint_rpc::Client;
+use tracing::level_filters::LevelFilter;
 
 lazy_static! {
     static ref SECRET: SecretKey = rand_secret_key();
@@ -61,6 +62,12 @@ async fn default_tester() -> (Tester<I>, PublicKey) {
 async fn tester_with_upgrader(
     upgrade_scheduler: UpgradeScheduler<MemoryBlockstore>,
 ) -> (Tester<I>, PublicKey) {
+    let _sub = tracing_subscriber::fmt()
+        .with_level(true)
+        .with_line_number(true)
+        .with_max_level(LevelFilter::TRACE)
+        .try_init();
+
     let validator = rand_secret_key().public_key();
 
     let bottom_up_manager = BottomUpManager::new(NeverCallClient, None);

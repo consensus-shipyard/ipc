@@ -14,9 +14,10 @@ use cid::Cid;
 use ethers::abi::Tokenize;
 use ethers::core::types as et;
 use fendermint_actor_eam::PermissionModeParams;
-use fendermint_eth_deployer::utils as deployer_utils;
+use fendermint_eth_deployer::utils::{self as deployer_utils, contract_src};
 use fendermint_eth_hardhat::{
-    fully_qualified_name, ContractName, FullyQualifiedName, SolidityActorContracts,
+    as_contract_name, fully_qualified_name, ContractName, FullyQualifiedName,
+    SolidityActorContracts,
 };
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
@@ -278,8 +279,7 @@ impl<'a> GenesisBuilder<'a> {
         // STAGE 0: Declare the built-in EVM contracts we'll have to deploy.
         // ipc_entrypoints contains the external user facing contracts
         // all_ipc_contracts contains ipc_entrypoints + util contracts
-        let (all_ipc_contracts, ipc_entrypoints) =
-            deployer_utils::collect_contracts(&self.hardhat)?;
+        let (all_ipc_contracts, ipc_entrypoints) = self.collect_contracts()?;
 
         // STAGE 1: First we initialize native built-in actors.
         // System actor
@@ -520,7 +520,7 @@ fn deploy_contracts(
 
     // Deploy Ethereum libraries.
     for lib_name in ipc_contracts {
-        // TODO
+        // TODO XXX
         let lib_fqn = fully_qualified_name(Path::new("."), &lib_name);
         deployer.deploy_library(state, &mut next_id, lib_fqn, &lib_name)?;
     }
@@ -543,7 +543,11 @@ fn deploy_contracts(
             .facets(ipc::gateway::CONTRACT_NAME)
             .context("failed to collect gateway facets")?;
 
-        deployer.deploy_top_level_contract(state, ipc::gateway::CONTRACT_NAME, (facets, params))?
+        deployer.deploy_top_level_contract(
+            state,
+            &as_contract_name(ipc::gateway::CONTRACT_NAME),
+            (facets, params),
+        )?
     };
 
     // IPC SubnetRegistry actor.
@@ -591,7 +595,7 @@ fn deploy_contracts(
 
         deployer.deploy_top_level_contract(
             state,
-            ipc::registry::CONTRACT_NAME,
+            &as_contract_name(ipc::registry::CONTRACT_NAME),
             (facets, params),
         )?;
     }
@@ -603,7 +607,7 @@ struct ContractDeployer<'a, DB> {
     hardhat: &'a SolidityActorContracts,
     top_contracts: &'a EthContractMap,
     // Assign dynamic ID addresses to libraries, but use fixed addresses for the top level contracts.
-    lib_addrs: HashMap<FullyQualifiedName, et::Address>,
+    lib_addrs: HashMap<ContractName, et::Address>,
     phantom_db: PhantomData<DB>,
 }
 
@@ -626,22 +630,21 @@ where
         state: &mut FvmGenesisState<DB>,
         next_id: &mut u64,
         lib_fqn: FullyQualifiedName,
-        lib_name: &str,
+        lib_name: &ContractName,
     ) -> anyhow::Result<()> {
         let artifact_w_yet_to_resolve_lib_refs = self
             .hardhat
-            .get_lib(&lib_fqn)
-            .with_context(|| format!("failed to load library bytecode {lib_fqn}"))?;
+            .get_lib(&lib_name)
+            .with_context(|| format!("failed to load library bytecode {lib_name}"))?;
 
         // we can only link here, since we don't have
         // all the libraries _deployed_ addresses any earlier
-        let code = self
-            .hardhat
-            .resolve_library_references(lib_name, &self.lib_addrs)
+        let artifact = artifact_w_yet_to_resolve_lib_refs
+            .resolve_library_references(&self.lib_addrs)
             .map_err(|e| anyhow::anyhow!("{e:?}"))?;
 
         let eth_addr = state
-            .create_evm_actor(*next_id, code)
+            .create_evm_actor(*next_id, artifact)
             .with_context(|| format!("failed to create library actor {lib_fqn}"))?;
 
         let id_addr = et::Address::from(EthAddress::from_id(*next_id).0);
@@ -651,13 +654,13 @@ where
             actor_id = next_id,
             ?eth_addr,
             ?id_addr,
-            lib_fqn,
+            lib_name = lib_name.as_str(), // TODO tracing::Value can't be impled, find out why
             "deployed Ethereum library"
         );
 
         // We can use the masked ID here or the delegated address.
         // Maybe the masked ID is quicker because it doesn't need to be resolved.
-        self.lib_addrs.insert(lib_fqn, id_addr);
+        self.lib_addrs.insert(lib_name.clone(), id_addr);
 
         *next_id += 1;
 
@@ -668,7 +671,7 @@ where
     fn deploy_top_level_contract<T>(
         &self,
         state: &mut FvmGenesisState<DB>,
-        contract_name: &str,
+        contract_name: &ContractName,
         constructor_params: T,
     ) -> anyhow::Result<et::Address>
     where
@@ -676,20 +679,18 @@ where
     {
         let contract = self.top_contract(contract_name)?;
         let contract_id = contract.actor_id;
-        let contract_src = deployer_utils::contract_src(contract_name);
 
         let artifact_w_yet_to_resolve_libs = self
             .hardhat
-            .get_top_level(contract_name)
+            .get_contract(contract_name)
             .with_context(|| format!("failed to load {contract_name} bytecode"))?;
 
-        let code = self
-            .hardhat
-            .resolve_library_references(contract_name, &self.lib_addrs)
-            .map_err(|e| anyhow::anyhow!("{e:?}"))?;
+        let bytecode = artifact_w_yet_to_resolve_libs
+            .resolve_library_references(&self.lib_addrs)
+            .map_err(|e| anyhow::anyhow!("failed to resolve contract lib references {e:?}"))?;
 
         let eth_addr = state
-            .create_evm_actor_with_cons(contract_id, &contract.abi, code, constructor_params)
+            .create_evm_actor_with_cons(contract_id, &contract.abi, bytecode, constructor_params)
             .with_context(|| format!("failed to create {contract_name} actor"))?;
 
         let id_addr = et::Address::from(EthAddress::from_id(contract_id).0);
@@ -699,7 +700,7 @@ where
             actor_id = contract_id,
             ?eth_addr,
             ?id_addr,
-            contract_name,
+            contract_name = contract_name.as_str(),
             "deployed Ethereum contract"
         );
 
@@ -708,8 +709,8 @@ where
     }
 
     /// Collect Facet Cuts for the diamond pattern, where the facet address comes from already deployed library facets.
-    fn facets(&self, contract_name: &str) -> anyhow::Result<Vec<FacetCut>> {
-        /* TODO refactor to use
+    fn facets(&self, contract_name: impl Into<ContractName>) -> anyhow::Result<Vec<FacetCut>> {
+        /* XXX TODO refactor to use
         deployer_utils::collect_facets(
             contract_name,
             self.hardhat,
@@ -717,17 +718,18 @@ where
             &self.lib_addrs,
         )
         */
-        let contract = self.top_contract(contract_name)?;
+        let contract_name = contract_name.into();
+        let contract = self.top_contract(&contract_name)?;
         let mut facet_cuts = Vec::new();
 
         for facet in contract.facets.iter() {
-            let facet_name = &facet.name;
-            let facet_src = contract_src(facet_name);
-            let facet_fqn = fully_qualified_name(&facet_src, facet_name);
+            let facet_name = as_contract_name(&facet.name);
+            let facet_src = contract_src(&facet.name);
+            let facet_fqn = fully_qualified_name(&facet_src, &facet_name);
 
             let facet_addr = self
                 .lib_addrs
-                .get(&facet_fqn)
+                .get(&facet_name)
                 .ok_or_else(|| anyhow!("facet {facet_name} has not been deployed"))?;
 
             let method_sigs = facet
@@ -749,9 +751,9 @@ where
         Ok(facet_cuts)
     }
 
-    fn top_contract(&self, contract_name: &str) -> anyhow::Result<&EthContract> {
+    fn top_contract(&self, contract_name: &ContractName) -> anyhow::Result<&EthContract> {
         self.top_contracts
-            .get(contract_name)
+            .get(contract_name.as_str())
             .ok_or_else(|| anyhow!("unknown top contract name: {contract_name}"))
     }
 }

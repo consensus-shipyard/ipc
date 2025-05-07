@@ -26,6 +26,6 @@ num-traits = { workspace = true }
 toml = "0.8.19"
 cargo_metadata = "0.19"
 ignore = "0.4"
-tracing = "0.1"
+tracing = { workspace = true }
 build-rs-utils = { path = "../../build-rs-utils" }
 which = "7"

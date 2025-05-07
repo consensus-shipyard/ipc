@@ -2,8 +2,12 @@ use ethers_core::types as et;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use tracing::level_filters::LevelFilter;
 
-use crate::{topo_sort, DependencyTree, SolidityActorContracts};
+use crate::{
+    as_contract_name, topo_sort, ContractName, ContractSource, ContractSourceAndName,
+    DependencyTree, SolidityActorContracts,
+};
 
 use super::SolidityActorContractsLoader;
 
@@ -16,22 +20,27 @@ fn workspace_dir() -> PathBuf {
         .unwrap()
         .stdout;
     let cargo_path = Path::new(std::str::from_utf8(&output).unwrap().trim());
-    cargo_path.parent().unwrap().to_path_buf()
+    let ws_dir = cargo_path.parent().unwrap().to_path_buf();
+    tracing::debug!("Workspace dir found as {}", ws_dir.display());
+    ws_dir
 }
 
 /// Path to the Solidity contracts, indended to be used in tests.
 fn contracts_path() -> PathBuf {
-    let contracts_path = std::env::var("FM_CONTRACTS_DIR").unwrap_or_else(|_| {
-        workspace_dir()
-            .join("contracts/out")
-            .to_string_lossy()
-            .into_owned()
-    });
-
-    PathBuf::from_str(&contracts_path).expect("malformed contracts path")
+    let contracts_path = std::env::var("FM_CONTRACTS_DIR")
+        .map(|val| PathBuf::from_str(&val).expect("malformed contracts path"))
+        .unwrap_or_else(|_| workspace_dir().join("contracts").join("out"));
+    tracing::info!("Loading contracts from {}", contracts_path.display());
+    contracts_path
 }
 
 fn test_hardhat() -> SolidityActorContracts {
+    let _sub = tracing_subscriber::fmt()
+        .with_level(true)
+        .with_line_number(true)
+        .with_max_level(LevelFilter::TRACE)
+        .try_init();
+
     SolidityActorContractsLoader::load_directory(&contracts_path())
         .expect("Test contracts always works")
 }
@@ -52,12 +61,12 @@ fn bytecode_linking() {
     let mut libraries = HashMap::new();
 
     for lib in IPC_DEPS {
-        libraries.insert(lib.to_owned(), et::Address::default());
+        libraries.insert(dbg!(as_contract_name(lib)), et::Address::default());
     }
 
     // This one requires a subset of above libraries.
     let _bytecode = hardhat
-        .resolve_library_references("GatewayManagerFacet", &libraries)
+        .resolve_library_references(dbg!(&as_contract_name("GatewayManagerFacet")), &libraries)
         .unwrap();
 }
 
@@ -66,20 +75,21 @@ fn bytecode_missing_link() {
     let hardhat = test_hardhat();
 
     // Not giving any dependency should result in a failure.
-    let result = hardhat.resolve_library_references("SubnetActorDiamond", &Default::default());
+    let result = hardhat
+        .resolve_library_references(&as_contract_name("SubnetActorDiamond"), &Default::default());
 
     assert!(result.is_err());
     assert!(result
         .unwrap_err()
         .to_string()
-        .contains("failed to resolve library"));
+        .contains("No such contract: SubnetActorDiamond"));
 }
 
 #[test]
 fn library_dependencies() {
     let hardhat = test_hardhat();
 
-    let root_contracts = Vec::<String>::from_iter(
+    let root_contracts = Vec::<ContractName>::from_iter(
         [
             "GatewayDiamond",
             "GatewayManagerFacet",
@@ -95,7 +105,7 @@ fn library_dependencies() {
             "SubnetActorPauseFacet",
         ]
         .into_iter()
-        .map(|x| x.to_string()),
+        .map(|name| as_contract_name(name)),
     );
 
     // Name our top level contracts and gather all required libraries.

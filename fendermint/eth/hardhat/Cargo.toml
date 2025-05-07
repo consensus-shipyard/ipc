@@ -6,17 +6,6 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 
-
-[dependencies]
-color-eyre = { workspace = true }
-ethers-core = { workspace = true }
-hex = { workspace = true }
-fs-err = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-fendermint_vm_actor_interface = { path = "../../vm/actor_interface" }
-const-hex = { workspace = true }
-
 [build-dependencies]
 color-eyre = { workspace = true }
 fs-err = { workspace = true }
@@ -24,6 +13,21 @@ num-traits = { workspace = true }
 toml = "0.8.19"
 cargo_metadata = "0.19"
 ignore = "0.4"
-tracing = "0.1"
+tracing = { workspace = true }
 build-rs-utils = { path = "../../../build-rs-utils" }
 which = "7"
+
+[dependencies]
+color-eyre = { workspace = true }
+anyhow = { workspace = true }
+ethers-core = { workspace = true }
+hex = { workspace = true }
+fs-err = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+fendermint_vm_actor_interface = { path = "../../vm/actor_interface" }
+const-hex = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tracing-subscriber = { workspace = true }

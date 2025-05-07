@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use clap::{Args, ValueEnum};
 use ethers::types::Address;
 use fendermint_eth_deployer::{EthContractDeployer, SubnetCreationPrivilege};
-use fendermint_eth_hardhat::Hardhat;
+use fendermint_eth_hardhat::{SolidityActorContracts, SolidityActorContractsLoader};
 use ipc_provider::new_evm_keystore_from_config;
 use ipc_wallet::EvmKeyStore;
 use std::path::PathBuf;
@@ -58,7 +58,7 @@ impl CommandLineHandler for DeployCommand {
             )
         })?;
 
-        let hardhat = Hardhat::new(args.contracts_dir.clone());
+        let hardhat = SolidityActorContractsLoader::load_directory(&args.contracts_dir)?;
 
         let mut deployer =
             EthContractDeployer::new(hardhat, &args.url, key_info.private_key(), args.chain_id)?;

@@ -15,17 +15,17 @@ use ethers::contract::ContractFactory;
 use ethers::core::types as eth_types;
 use ethers::prelude::*;
 use fendermint_eth_hardhat::{
-    fully_qualified_name, ContractSourceAndName, DeploymentArtifact, FullyQualifiedName,
-    SolidityActorContracts,
+    as_contract_name, fully_qualified_name, ContractName, ContractSourceAndName,
+    DeploymentArtifact, FullyQualifiedName, SolidityActorContracts,
 };
 use fendermint_vm_actor_interface::diamond::EthContractMap;
 use fendermint_vm_actor_interface::ipc;
 use fendermint_vm_genesis::ipc::GatewayParams;
-use ipc_actors_abis::i_diamond::FacetCut;
+use ipc_actors_abis::{checkpointing_facet::FullSummary, i_diamond::FacetCut};
 use ipc_provider::manager::evm::gas_estimator_middleware::Eip1559GasEstimatorMiddleware;
 use k256::ecdsa::SigningKey;
 
-use crate::utils::{collect_contracts, collect_facets, contract_src};
+use crate::utils::{collect_facets, contract_src};
 
 // 200 is used because some networks like the Calibration network and mainnet can be slow,
 // and the transaction deployment can fail even though the transaction is mined.
@@ -47,9 +47,9 @@ pub enum SubnetCreationPrivilege {
 /// Responsible for deploying Ethereum contracts and libraries.
 pub struct EthContractDeployer {
     hardhat: SolidityActorContracts,
-    ipc_contracts: Vec<ContractSourceAndName>,
+    ipc_contracts: Vec<ContractName>,
     top_contracts: EthContractMap,
-    lib_addrs: HashMap<FullyQualifiedName, eth_types::Address>,
+    lib_addrs: HashMap<ContractName, eth_types::Address>,
     provider: SignerWithFeeEstimator,
     chain_id: u64,
 }
@@ -69,8 +69,9 @@ impl EthContractDeployer {
         let signer = SignerMiddleware::new(provider, wallet);
         let client = Eip1559GasEstimatorMiddleware::new(signer);
 
-        let (ipc_contracts, top_contracts) =
-            collect_contracts(&hardhat).context("failed to collect contracts")?;
+        let (ipc_contracts, top_contracts) = hardhat
+            .collect_contracts()
+            .context("failed to collect contracts YSUIF")?;
 
         Ok(Self {
             hardhat,
@@ -89,8 +90,10 @@ impl EthContractDeployer {
         subnet_creation_privilege: SubnetCreationPrivilege,
     ) -> Result<DeployedContracts> {
         // Deploy all required libraries.
-        for (lib_src, lib_name) in self.ipc_contracts.clone() {
-            self.deploy_library(&lib_src, &lib_name)
+        for lib_name in self.ipc_contracts.clone() {
+            // TODO
+            // let lib_fqn = fully_qualified_name(Path::new("."), &lib_name);
+            self.deploy_library(&lib_name)
                 .await
                 .context(format!("failed to deploy library {lib_name}"))?;
         }
@@ -113,38 +116,37 @@ impl EthContractDeployer {
     ///
     /// Reads the library artifact, substitutes placeholders with correct addresses,
     /// deploys the library, and records its address.
-    async fn deploy_library(&mut self, lib_src: &Path, lib_name: &str) -> Result<()> {
-        let fqn = fully_qualified_name(lib_src, lib_name);
+    async fn deploy_library(&mut self, lib_name: &ContractName) -> Result<()> {
         tracing::info!("Deploying library: {}", lib_name);
 
         let artifact = self
             .hardhat
             .resolve_library_references(lib_name, &self.lib_addrs)
-            .with_context(|| format!("failed to load library bytecode for {fqn}"))?;
+            .with_context(|| format!("failed to load library bytecode for {lib_name}"))?;
 
         let address = self.deploy_artifact(artifact, ()).await?;
 
         tracing::info!(?address, "Library deployed successfully");
-        self.lib_addrs.insert(fqn, address);
+        self.lib_addrs.insert(lib_name.clone(), address);
         Ok(())
     }
 
     /// Deploys a top-level contract with the given constructor parameters.
     async fn deploy_contract<T>(
         &self,
-        contract_name: &str,
+        contract_name: &ContractName,
         constructor_params: T,
     ) -> Result<eth_types::Address>
     where
         T: Tokenize,
     {
-        let src = contract_src(contract_name);
+        let src = contract_src(contract_name.as_str());
         tracing::info!("Deploying top-level contract: {}", contract_name);
 
         let artifact = self
             .hardhat
-            .resolve_library_references(contract_name, &self.lib_addrs)
-            .context(format!("failed to load {contract_name} bytecode"))?;
+            .resolve_library_references(&contract_name, &self.lib_addrs)
+            .with_context(|| format!("failed to load {contract_name} bytecode"))?;
 
         let address = self.deploy_artifact(artifact, constructor_params).await?;
         tracing::info!(?address, "Contract deployed successfully");
@@ -210,7 +212,7 @@ impl EthContractDeployer {
             .collect_facets(GATEWAY_NAME)
             .context("failed to collect gateway facets")?;
 
-        self.deploy_contract(GATEWAY_NAME, (facets, params))
+        self.deploy_contract(&as_contract_name(GATEWAY_NAME), (facets, params))
             .await
             .context("failed to deploy gateway contract")
     }
@@ -278,7 +280,7 @@ impl EthContractDeployer {
             creation_privileges: subnet_creation_privilege as u8,
         };
 
-        self.deploy_contract(REGISTRY_NAME, (facets, params))
+        self.deploy_contract(&as_contract_name(REGISTRY_NAME), (facets, params))
             .await
             .context("failed to deploy registry contract")
     }
