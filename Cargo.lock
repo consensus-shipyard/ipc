@@ -3385,6 +3385,8 @@ dependencies = [
  "rand 0.8.5",
  "tendermint-rpc",
  "tokio",
+ "tracing",
+ "tracing-subscriber 0.3.19",
 ]
 
 [[package]]
@@ -3469,6 +3471,7 @@ dependencies = [
 name = "fendermint_eth_hardhat"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "build-rs-utils",
  "cargo_metadata 0.19.2",
  "color-eyre 0.5.11",
@@ -3483,6 +3486,7 @@ dependencies = [
  "serde_json",
  "toml 0.8.20",
  "tracing",
+ "tracing-subscriber 0.3.19",
  "which 7.0.2",
 ]
 
@@ -3493,7 +3497,6 @@ dependencies = [
  "anyhow",
  "build-rs-utils",
  "cargo_metadata 0.19.2",
- "color-eyre 0.5.11",
  "ethers-core",
  "fendermint_eth_hardhat",
  "fs-err",
