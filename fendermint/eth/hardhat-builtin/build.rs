@@ -1,8 +1,8 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use anyhow::{Context, Result};
 use build_rs_utils::{echo, rerun_if_changed};
-use color_eyre::eyre::{Result, WrapErr};
 
 use fendermint_eth_hardhat as hardhat;
 
@@ -12,7 +12,7 @@ fn main() -> Result<()> {
     let compiled_handover_path =
         std::path::Path::new(compiled_handover_path.as_str()).join("super.json");
 
-    // FIXME TODO
+    // FIXME TODO tests currently rely on this
     let contracts_forge_build_out_dir =
         std::env::var("CARGO_MANIFEST_DIR").context("Must have set CARGO_MANIFEST_DIR")?;
     let contracts_forge_build_out_dir =

@@ -52,3 +52,5 @@ bytes = { workspace = true }
 multihash = { workspace = true }
 fvm = { workspace = true, features = ["testing"] }
 fendermint_actor_gas_market_eip1559 = { path = "../../actors/gas_market/eip1559" }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
