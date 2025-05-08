@@ -19,6 +19,7 @@ pub mod bundle;
 pub mod activity;
 pub(crate) mod gas;
 pub(crate) mod gas_estimation;
+mod validator;
 
 pub use bottomup::PowerUpdates;
 use fendermint_crypto::{PublicKey, SecretKey};
