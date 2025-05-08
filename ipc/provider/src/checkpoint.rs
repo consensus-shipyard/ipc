@@ -16,6 +16,7 @@ use std::fmt::{Display, Formatter};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::sync::Semaphore;
+use tokio::time::timeout;
 
 /// Tracks the config required for bottom up checkpoint submissions
 /// parent/child subnet and checkpoint period.
@@ -199,7 +200,7 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                     .await
                     .expect("Semaphore is not poisoned");
 
-                async move {
+                let fut = async move {
                     let height = event.height;
                     let hash = bundle.checkpoint.block_hash.clone();
                     let result: std::result::Result<(), anyhow::Error> =
@@ -219,8 +220,9 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
 
                     drop(submission_permit);
                     result
-                }
-                .await?;
+                };
+                // TODO reevaluate the 30 seconds in practice, tentatively significantly to generous
+                timeout(Duration::from_secs(30), fut).await.map_err(|_elapsed| { anyhow!("Timeout was reached at checkpoint with index {count}")})??;
 
                 count += 1;
                 tracing::debug!("This round has submitted {count} checkpoints",);
