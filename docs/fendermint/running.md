@@ -3,9 +3,9 @@
 The commands are all executed by the `fendermint` binary, which is produced from the `fendermint_app` crate,
 so we have many ways to run the program:
 
-* `fendermint <args>`, after running `cargo install --path fendermint/app`
-* `./target/release/fendermint <args>`, after running `cargo build --release`
-* `cargo run -p fendermint_app --release -- <args>`
+- `fendermint <args>`, after running `cargo install --path fendermint/app`
+- `./target/release/fendermint <args>`, after running `cargo build --release`
+- `cargo run -p fendermint_app --release -- <args>`
 
 The same is also available for step-by-step execution in the [Milestone-1 demo](./demos/milestone-1/README.md).
 
@@ -226,7 +226,7 @@ cargo run -p fendermint_app --release -- \
     seal-genesis \
       --builtin-actors-path fendermint/builtin-actors/output/bundle.car \
       --custom-actors-path fendermint/actors/output/custom_actors_bundle.car \
-      --output-path test-network/sealed.car \ 
+      --output-path test-network/sealed.car \
       --artifacts-path contracts/out
 ```
 
@@ -389,15 +389,6 @@ mkdir -p ~/.fendermint/data
 cp -r ./fendermint/app/config ~/.fendermint/config
 ```
 
-We will need the actor bundle to load. We can configure its location via environment variables, but the default
-configuration will look for it at `~/.fendermint/bundle.car`, so we might as well put it there.
-
-```shell
-make actor-bundle
-cp ./builtin-actors/output/bundle.car ~/.fendermint/bundle.car
-cp ./actors/output/custom_actors_bundle.car ~/.fendermint/custom_actors_bundle.car
-```
-
 Now, start the application.
 
 ```shell
@@ -535,6 +526,7 @@ cargo run -p fendermint_app --release -- eth run
 ```
 
 We will see:
+
 <details>
   <summary>ETH API log</summary>
 
@@ -761,7 +753,7 @@ cargo run -p fendermint_app -- \
 
 Here's a sample execution of the command for an already bootstrapped subnet in `/r314159`:
 
-```shell
+````shell
 cargo run -p fendermint_app -- \
     --network=test \
     genesis --genesis-file test-network/genesis.json \
@@ -796,4 +788,4 @@ Leading to the following genesis file:
       "active_validators_limit": 100
     }
 }
-```
+````

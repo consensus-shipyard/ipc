@@ -16,6 +16,7 @@ members = [
   "ipc/api",
   "ipc/types",
   "ipc/observability",
+  "ipc/runner",
 
   # ipld
   "ipld/resolver",
