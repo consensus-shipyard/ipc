@@ -5,7 +5,7 @@ use std::str::FromStr;
 use tracing::level_filters::LevelFilter;
 
 use crate::{
-    as_contract_name, topo_sort, ContractName, ContractSource, ContractSourceAndName,
+    as_contract_name, topo_sort, ContractName,
     DependencyTree, SolidityActorContracts,
 };
 
@@ -105,7 +105,7 @@ fn library_dependencies() {
             "SubnetActorPauseFacet",
         ]
         .into_iter()
-        .map(|name| as_contract_name(name)),
+        .map(as_contract_name),
     );
 
     // Name our top level contracts and gather all required libraries.

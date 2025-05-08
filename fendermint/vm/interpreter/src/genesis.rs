@@ -14,9 +14,9 @@ use cid::Cid;
 use ethers::abi::Tokenize;
 use ethers::core::types as et;
 use fendermint_actor_eam::PermissionModeParams;
-use fendermint_eth_deployer::utils::{self as deployer_utils, contract_src};
+use fendermint_eth_deployer::utils as deployer_utils;
 use fendermint_eth_hardhat::{
-    as_contract_name, fully_qualified_name, ContractName, FullyQualifiedName,
+    as_contract_name, ContractName, FullyQualifiedName,
     SolidityActorContracts,
 };
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
@@ -520,8 +520,7 @@ fn deploy_contracts(
 
     // Deploy Ethereum libraries.
     for lib_name in ipc_contracts {
-        // TODO XXX
-        let lib_fqn = fully_qualified_name(Path::new("."), &lib_name);
+        let lib_fqn = FullyQualifiedName::new(Path::new("."), &lib_name);
         deployer.deploy_library(state, &mut next_id, lib_fqn, &lib_name)?;
     }
 
@@ -634,7 +633,7 @@ where
     ) -> anyhow::Result<()> {
         let artifact_w_yet_to_resolve_lib_refs = self
             .hardhat
-            .get_lib(&lib_name)
+            .get_lib(lib_name)
             .with_context(|| format!("failed to load library bytecode {lib_name}"))?;
 
         // we can only link here, since we don't have
@@ -708,45 +707,11 @@ where
         Ok(eth_addr)
     }
 
-    /// Collect Facet Cuts for the diamond pattern, where the facet address comes from already deployed library facets.
+    /// Collect facet cuts for the diamond pattern, where the facet address comes from already deployed library facets.
     fn facets(&self, contract_name: impl Into<ContractName>) -> anyhow::Result<Vec<FacetCut>> {
-        /* XXX TODO refactor to use
-        deployer_utils::collect_facets(
-            contract_name,
-            self.hardhat,
-            self.top_contracts,
-            &self.lib_addrs,
-        )
-        */
         let contract_name = contract_name.into();
-        let contract = self.top_contract(&contract_name)?;
-        let mut facet_cuts = Vec::new();
-
-        for facet in contract.facets.iter() {
-            let facet_name = as_contract_name(&facet.name);
-            let facet_src = contract_src(&facet.name);
-            let facet_fqn = fully_qualified_name(&facet_src, &facet_name);
-
-            let facet_addr = self
-                .lib_addrs
-                .get(&facet_name)
-                .ok_or_else(|| anyhow!("facet {facet_name} has not been deployed"))?;
-
-            let method_sigs = facet
-                .abi
-                .functions()
-                .filter(|f| f.signature() != "init(bytes)")
-                .map(|f| f.short_signature())
-                .collect();
-
-            let facet_cut = FacetCut {
-                facet_address: *facet_addr,
-                action: 0, // Add
-                function_selectors: method_sigs,
-            };
-
-            facet_cuts.push(facet_cut);
-        }
+        let facet_cuts =
+            deployer_utils::collect_facets(contract_name.as_str(), self.top_contracts, &self.lib_addrs)?;
 
         Ok(facet_cuts)
     }

@@ -225,26 +225,11 @@ impl<A> Validator<A> {
 
 impl From<PermissionMode> for PermissionModeParams {
     fn from(value: PermissionMode) -> Self {
-        // fn hack(addr: fvm_shared::address::Address) -> fendermint_actor_eam::Address {
-        //     let json = serde_json::to_string(&addr).unwrap();
-        //     serde_json::from_str(&json).unwrap()
-        // }
-        fn nohack(addr: fvm_shared::address::Address) -> fvm_shared::address::Address {
-            addr
-        }
-
         match value {
             PermissionMode::Unrestricted => PermissionModeParams::Unrestricted,
-            PermissionMode::AllowList { addresses } => {
-                let addresses =
-                    Vec::<Address>::from_iter(addresses.into_iter().map(|v: SignerAddr| {
-                        // XXX a hack for type mismatches, which are none, due to patching (hypothesis)
-                        let address: Address = v.0;
-                        nohack(address)
-                    }));
-
-                PermissionModeParams::AllowList(addresses)
-            }
+            PermissionMode::AllowList { addresses } => PermissionModeParams::AllowList(
+                Vec::from_iter(addresses.into_iter().map(|addr| addr.0)),
+            ),
         }
     }
 }

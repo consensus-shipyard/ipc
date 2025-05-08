@@ -229,6 +229,7 @@ async fn main() -> color_eyre::Result<()> {
     mod_f.sync_all()?;
 
     // XXX Currently `unparse` doesn't seem to be too happy
+    // Hypothesis: It assumes a root file, rather than a module.
     if false {
         echo!("contract-bindings", yellow, "Formatting...");
 

@@ -6,7 +6,6 @@
 pub mod utils;
 
 use std::collections::HashMap;
-use std::path::Path;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Context, Result};
@@ -15,17 +14,17 @@ use ethers::contract::ContractFactory;
 use ethers::core::types as eth_types;
 use ethers::prelude::*;
 use fendermint_eth_hardhat::{
-    as_contract_name, fully_qualified_name, ContractName, ContractSourceAndName,
-    DeploymentArtifact, FullyQualifiedName, SolidityActorContracts,
+    as_contract_name, ContractName,
+    DeploymentArtifact, SolidityActorContracts,
 };
 use fendermint_vm_actor_interface::diamond::EthContractMap;
 use fendermint_vm_actor_interface::ipc;
 use fendermint_vm_genesis::ipc::GatewayParams;
-use ipc_actors_abis::{checkpointing_facet::FullSummary, i_diamond::FacetCut};
+use ipc_actors_abis::i_diamond::FacetCut;
 use ipc_provider::manager::evm::gas_estimator_middleware::Eip1559GasEstimatorMiddleware;
 use k256::ecdsa::SigningKey;
 
-use crate::utils::{collect_facets, contract_src};
+use crate::utils::collect_facets;
 
 // 200 is used because some networks like the Calibration network and mainnet can be slow,
 // and the transaction deployment can fail even though the transaction is mined.
@@ -71,7 +70,7 @@ impl EthContractDeployer {
 
         let (ipc_contracts, top_contracts) = hardhat
             .collect_contracts()
-            .context("failed to collect contracts YSUIF")?;
+            .context("failed to collect contracts")?;
 
         Ok(Self {
             hardhat,
@@ -91,8 +90,6 @@ impl EthContractDeployer {
     ) -> Result<DeployedContracts> {
         // Deploy all required libraries.
         for lib_name in self.ipc_contracts.clone() {
-            // TODO
-            // let lib_fqn = fully_qualified_name(Path::new("."), &lib_name);
             self.deploy_library(&lib_name)
                 .await
                 .context(format!("failed to deploy library {lib_name}"))?;
@@ -140,12 +137,11 @@ impl EthContractDeployer {
     where
         T: Tokenize,
     {
-        let src = contract_src(contract_name.as_str());
         tracing::info!("Deploying top-level contract: {}", contract_name);
 
         let artifact = self
             .hardhat
-            .resolve_library_references(&contract_name, &self.lib_addrs)
+            .resolve_library_references(contract_name, &self.lib_addrs)
             .with_context(|| format!("failed to load {contract_name} bytecode"))?;
 
         let address = self.deploy_artifact(artifact, constructor_params).await?;
@@ -209,7 +205,7 @@ impl EthContractDeployer {
             .context("failed to create gateway constructor parameters")?;
 
         let facets = self
-            .collect_facets(GATEWAY_NAME)
+            .contract_facets(GATEWAY_NAME)
             .context("failed to collect gateway facets")?;
 
         self.deploy_contract(&as_contract_name(GATEWAY_NAME), (facets, params))
@@ -228,7 +224,7 @@ impl EthContractDeployer {
         };
 
         let mut facets = self
-            .collect_facets(REGISTRY_NAME)
+            .contract_facets(REGISTRY_NAME)
             .context("failed to collect registry facets")?;
 
         // Ensure there are enough facets.
@@ -286,12 +282,7 @@ impl EthContractDeployer {
     }
 
     /// Collects facet cuts for the diamond pattern for a specified top-level contract.
-    fn collect_facets(&self, contract_name: &str) -> Result<Vec<FacetCut>> {
-        collect_facets(
-            contract_name,
-            &self.hardhat,
-            &self.top_contracts,
-            &self.lib_addrs,
-        )
+    fn contract_facets(&self, contract_name: &str) -> Result<Vec<FacetCut>> {
+        collect_facets(contract_name, &self.top_contracts, &self.lib_addrs)
     }
 }
