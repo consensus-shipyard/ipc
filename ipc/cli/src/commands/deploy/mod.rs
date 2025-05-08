@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use clap::{Args, ValueEnum};
 use ethers::types::Address;
 use fendermint_eth_deployer::{EthContractDeployer, SubnetCreationPrivilege};
-use fendermint_eth_hardhat::{SolidityActorContracts, SolidityActorContractsLoader};
+use fendermint_eth_hardhat::SolidityActorContractsLoader;
 use ipc_provider::new_evm_keystore_from_config;
 use ipc_wallet::EvmKeyStore;
 use std::path::PathBuf;
