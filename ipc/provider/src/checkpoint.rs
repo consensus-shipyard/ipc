@@ -6,7 +6,6 @@ use crate::config::Subnet;
 use crate::manager::{BottomUpCheckpointRelayer, EthSubnetManager};
 use crate::observe::CheckpointSubmitted;
 use anyhow::{anyhow, Result};
-use futures_util::future::try_join_all;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use ipc_api::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
@@ -129,7 +128,7 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         }
     }
 
-    /// Checks if the relayer has already submitted at the next submission epoch, if not it submits it.
+    /// Checks if the relayer has already submitted at the next submission epoch, if not it submitts the bottom up checkpoint.
     async fn submit_next_epoch(&self, submitter: Address) -> Result<()> {
         let last_checkpoint_epoch = self
             .parent_handler
@@ -155,7 +154,6 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         );
 
         let mut count = 0;
-        let mut all_submit_tasks = vec![];
 
         for h in start..=finalized_height {
             let events = self.child_handler.quorum_reached_events(h).await?;
@@ -199,12 +197,12 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                     .clone()
                     .acquire_owned()
                     .await
-                    .unwrap();
-                all_submit_tasks.push(tokio::task::spawn(async move {
+                    .expect("Semaphore is not poisoned");
+
+                async move {
                     let height = event.height;
                     let hash = bundle.checkpoint.block_hash.clone();
-
-                    let result =
+                    let result: std::result::Result<(), anyhow::Error> =
                         Self::submit_checkpoint(parent_handler_clone, submitter, bundle, event)
                             .await
                             .inspect(|_| {
@@ -221,16 +219,14 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
 
                     drop(submission_permit);
                     result
-                }));
+                }
+                .await?;
 
                 count += 1;
-                tracing::debug!("This round has asynchronously submitted {count} checkpoints",);
+                tracing::debug!("This round has submitted {count} checkpoints",);
             }
         }
-
-        tracing::debug!("Waiting for all submissions to finish");
-        // Return error if any of the submit task failed.
-        try_join_all(all_submit_tasks).await?;
+        tracing::debug!("Submissions complete");
 
         Ok(())
     }
