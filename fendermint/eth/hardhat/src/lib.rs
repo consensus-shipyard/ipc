@@ -8,7 +8,6 @@
 //! There are more fields, such as `bytecode`, `deployedBytecode` and `linkReferences` - the latter can be referenced from within the `bytecode`.
 
 use anyhow::{anyhow as eyre, bail, Context, Result};
-use tracing::Value;
 // use color_eyre::eyre::{self, bail, Context, ContextCompat, Result};
 use core::{fmt, iter::Iterator};
 use ethers_core::types as et;
@@ -16,7 +15,6 @@ use fendermint_vm_actor_interface::{diamond::EthContractMap, ipc::IPC_CONTRACTS}
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
 use std::{
-    borrow::Cow,
     cmp::Ord,
     collections::{BTreeMap, HashMap, HashSet, VecDeque},
     hash::Hash,
@@ -33,6 +31,12 @@ pub type ContractSource = PathBuf;
 /// Contract name as it appears in dependencies, e.g. `"SubnetIDHelper"`.
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct ContractName(pub(crate) String);
+
+impl From<&'_ ContractName> for ContractName {
+    fn from(value: &'_ ContractName) -> Self {
+        value.clone()
+    }
+}
 
 impl From<&'_ str> for ContractName {
     fn from(value: &'_ str) -> Self {
@@ -75,6 +79,19 @@ pub struct DeploymentArtifact {
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FullyQualifiedName(pub(crate) String);
 
+impl FullyQualifiedName {
+    pub fn new(path: impl Into<ContractSource>, name: impl Into<ContractName>) -> Self {
+        let path = path.into();
+        let name = name.into();
+        
+        Self(format!(
+            "{}:{}",
+            path.to_string_lossy(),
+            name.as_str()
+        ))
+    }
+}
+
 impl fmt::Display for FullyQualifiedName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
@@ -96,7 +113,10 @@ pub struct SolidityActorContracts {
 }
 
 impl SolidityActorContracts {
-    /// XXX
+    /// Collects library and top-level contracts
+    ///
+    /// Returns a tuple containing a vector of library contracts
+    /// and a map of top-level contracts.
     pub fn collect_contracts(&self) -> Result<(Vec<ContractName>, EthContractMap)> {
         let mut all_contract_names = Vec::new();
         let top_level_contracts = IPC_CONTRACTS.clone();
@@ -113,7 +133,7 @@ impl SolidityActorContracts {
             all_contract_names
                 .iter()
                 .cloned()
-                .map(|name| ContractName(name)),
+                .map(ContractName),
         );
 
         let mut eth_libs = self
@@ -162,8 +182,6 @@ impl SolidityActorContracts {
 
         // Construct dependency tree by recursive traversal.
         while let Some(name) = queue.pop_front() {
-            let contract_path = as_file_name(name.as_str());
-            // let fqn = fully_qualified_name(&contract_path, &name);
             if deps.contains_key(&name) {
                 // if dependency already contains the name, we don't need to do anything
                 tracing::debug!("Already processed dep: contract {name}");
@@ -185,7 +203,7 @@ impl SolidityActorContracts {
 
             let entry: &mut HashSet<_> = deps.entry(name.clone()).or_default();
 
-            for (lib_source, lib_name) in artifact.libraries_needed() {
+            for (_lib_source, lib_name) in artifact.libraries_needed() {
                 tracing::info!("Adding dependency edge: {name} -> {lib_name}");
                 entry.insert(lib_name.clone());
                 queue.push_back(lib_name);
@@ -233,18 +251,6 @@ impl SolidityActorContracts {
         let s = serde_json::to_string_pretty(self)?;
         Ok(s)
     }
-}
-
-/// Fully qualified name of a source and contract.
-pub fn fully_qualified_name(
-    contract_path: &Path,
-    contract_name: &ContractName,
-) -> FullyQualifiedName {
-    FullyQualifiedName(format!(
-        "{}:{}",
-        contract_path.to_string_lossy(),
-        contract_name.as_str()
-    ))
 }
 
 /// Utility to link bytecode from `forge build` process build artifacts.
@@ -298,12 +304,9 @@ impl SolidityActorContractsLoader {
 
         let top_level_artifacts =
             Result::<HashMap<ContractName, YetToLinkContractArtifact>>::from_iter(
-                top_level_contracts
-                    .into_iter()
-                    .map(|(name, eth): (&str, _)| {
+                top_level_contracts.into_keys().map(|name| {
                         let contract_name = as_contract_name(name);
-                        let contract_path = as_file_name(&name);
-                        // let fqn = fully_qualified_name(&contract_path, &contract_name);
+                        let contract_path = as_file_name(name);
                         let artifact: YetToLinkContractArtifact = self
                             .artifact(&contract_name, &contract_path)
                             .context(format!("Failed to load top level {name}"))?;
@@ -315,14 +318,13 @@ impl SolidityActorContractsLoader {
             Result::<HashMap<_, YetToLinkContractArtifact>>::from_iter(lib_deps.into_iter().map(
                 |(_source, contract_name): (_, ContractName)| {
                     let contract_path: PathBuf = as_file_name(contract_name.as_str());
-                    // let fqn = fully_qualified_name(&contract_path, &contract_name);
                     let artifact = self.artifact(&contract_name, &contract_path)?;
                     Ok((contract_name, artifact))
                 },
             ))?;
 
         Ok(SolidityActorContracts {
-            top_level: dbg!(top_level_artifacts),
+            top_level: top_level_artifacts,
             libs: lib_artifacts,
         })
     }
@@ -349,12 +351,12 @@ impl SolidityActorContractsLoader {
         artifact.resolve_library_references(libraries)
     }
 
-    #[deprecated(note = "Use `SolidityActorContracs::dependencies` instead, decouple IO")]
     /// Traverse the linked references and return the library contracts to be deployed in topological order.
     ///
     /// The result will include the top contracts as well, and it's up to the caller to filter them out if
     /// they have more complicated deployments including constructors. This is because there can be diamond
     /// facets among them which aren't ABI visible dependencies but should be deployed as libraries.
+    #[deprecated(note = "Use `SolidityActorContracs::dependencies` instead, decouple IO")]
     pub fn dependencies<I: IntoIterator<Item = (A, S)>, S: ToString, A: AsRef<Path>>(
         &self,
         root_contracts: I,
@@ -535,7 +537,7 @@ impl YetToLinkContractArtifact {
         for (lib_path, lib_name) in self.libraries_needed() {
             // References can be given with Fully Qualified Name, or just the contract name,
             // but they must be unique and unambiguous.
-            let fqn = fully_qualified_name(&lib_path, &lib_name);
+            let fqn = FullyQualifiedName::new(&lib_path, &lib_name);
             tracing::debug!("Requires library: {fqn}");
 
             let Some(lib_addr) = libraries.get(&lib_name) else {
@@ -561,7 +563,7 @@ impl YetToLinkContractArtifact {
 /// Match the `"bytecode"` entry in the Hardhat build artifact.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct Bytecode {
+pub struct Bytecode {
     /// Hexadecimal format with placeholders for links.
     pub object: String,
     pub link_references: HashMap<ContractSource, HashMap<ContractName, Vec<Position>>>,
