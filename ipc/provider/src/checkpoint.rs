@@ -222,7 +222,11 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                     result
                 };
                 // TODO reevaluate the 30 seconds in practice, tentatively significantly to generous
-                timeout(Duration::from_secs(30), fut).await.map_err(|_elapsed| { anyhow!("Timeout was reached at checkpoint with index {count}")})??;
+                timeout(Duration::from_secs(30), fut)
+                    .await
+                    .map_err(|_elapsed| {
+                        anyhow!("Timeout was reached at checkpoint with index {count}")
+                    })??;
 
                 count += 1;
                 tracing::debug!("This round has submitted {count} checkpoints",);
