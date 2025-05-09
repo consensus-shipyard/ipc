@@ -14,8 +14,7 @@ use ethers::contract::ContractFactory;
 use ethers::core::types as eth_types;
 use ethers::prelude::*;
 use fendermint_eth_hardhat::{
-    as_contract_name, ContractName,
-    DeploymentArtifact, SolidityActorContracts,
+    as_contract_name, ContractName, DeploymentArtifact, SolidityActorContracts,
 };
 use fendermint_vm_actor_interface::diamond::EthContractMap;
 use fendermint_vm_actor_interface::ipc;

@@ -16,8 +16,7 @@ use ethers::core::types as et;
 use fendermint_actor_eam::PermissionModeParams;
 use fendermint_eth_deployer::utils as deployer_utils;
 use fendermint_eth_hardhat::{
-    as_contract_name, ContractName, FullyQualifiedName,
-    SolidityActorContracts,
+    as_contract_name, ContractName, FullyQualifiedName, SolidityActorContracts,
 };
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
@@ -710,8 +709,11 @@ where
     /// Collect facet cuts for the diamond pattern, where the facet address comes from already deployed library facets.
     fn facets(&self, contract_name: impl Into<ContractName>) -> anyhow::Result<Vec<FacetCut>> {
         let contract_name = contract_name.into();
-        let facet_cuts =
-            deployer_utils::collect_facets(contract_name.as_str(), self.top_contracts, &self.lib_addrs)?;
+        let facet_cuts = deployer_utils::collect_facets(
+            contract_name.as_str(),
+            self.top_contracts,
+            &self.lib_addrs,
+        )?;
 
         Ok(facet_cuts)
     }

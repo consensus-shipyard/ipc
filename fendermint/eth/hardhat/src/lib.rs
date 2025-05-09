@@ -83,12 +83,8 @@ impl FullyQualifiedName {
     pub fn new(path: impl Into<ContractSource>, name: impl Into<ContractName>) -> Self {
         let path = path.into();
         let name = name.into();
-        
-        Self(format!(
-            "{}:{}",
-            path.to_string_lossy(),
-            name.as_str()
-        ))
+
+        Self(format!("{}:{}", path.to_string_lossy(), name.as_str()))
     }
 }
 
@@ -129,12 +125,7 @@ impl SolidityActorContracts {
                 .flat_map(|c| c.facets.iter().map(|f| f.name.to_owned())),
         );
 
-        let contract_names = Vec::from_iter(
-            all_contract_names
-                .iter()
-                .cloned()
-                .map(ContractName),
-        );
+        let contract_names = Vec::from_iter(all_contract_names.iter().cloned().map(ContractName));
 
         let mut eth_libs = self
             .dependencies(&contract_names)
@@ -305,13 +296,13 @@ impl SolidityActorContractsLoader {
         let top_level_artifacts =
             Result::<HashMap<ContractName, YetToLinkContractArtifact>>::from_iter(
                 top_level_contracts.into_keys().map(|name| {
-                        let contract_name = as_contract_name(name);
-                        let contract_path = as_file_name(name);
-                        let artifact: YetToLinkContractArtifact = self
-                            .artifact(&contract_name, &contract_path)
-                            .context(format!("Failed to load top level {name}"))?;
-                        Ok((contract_name, artifact))
-                    }),
+                    let contract_name = as_contract_name(name);
+                    let contract_path = as_file_name(name);
+                    let artifact: YetToLinkContractArtifact = self
+                        .artifact(&contract_name, &contract_path)
+                        .context(format!("Failed to load top level {name}"))?;
+                    Ok((contract_name, artifact))
+                }),
             )?;
 
         let lib_artifacts =
