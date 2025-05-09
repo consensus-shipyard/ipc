@@ -6,10 +6,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use tracing::level_filters::LevelFilter;
 
-use crate::{
-    as_contract_name, topo_sort, ContractName,
-    DependencyTree, SolidityActorContracts,
-};
+use crate::{as_contract_name, topo_sort, ContractName, DependencyTree, SolidityActorContracts};
 
 use super::SolidityActorContractsLoader;
 
