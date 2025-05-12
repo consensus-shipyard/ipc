@@ -256,7 +256,7 @@ fn sol_query(list: ListObjectsReturn) -> sol::Query {
 }
 
 const DEFAULT_DELIMITER: &[u8] = b"/"; // "/" in ASCII and UTF-8
-const DEFAULT_START_KEY: Vec<u8> = vec![]; //= ""
+const DEFAULT_START_KEY: Option<Vec<u8>> = None; //= ""
 const DEFAULT_PREFIX: Vec<u8> = vec![]; //= ""
 const DEFAULT_LIMIT: u64 = 0;
 
@@ -268,12 +268,16 @@ impl AbiCall for sol::queryObjects_0Call {
     fn params(&self) -> Self::Params {
         let prefix = self.prefix.clone().into_bytes();
         let delimiter = self.delimiter.clone().into_bytes();
-        let start_key = self.startKey.clone().into_bytes();
+        let start_key = if self.startKey.is_empty() {
+            None
+        } else {
+            Some(self.startKey.clone().into_bytes())
+        };
         let limit = self.limit;
         ListParams {
             prefix,
             delimiter,
-            start_key: Some(start_key),
+            start_key,
             limit,
         }
     }
@@ -292,12 +296,16 @@ impl AbiCall for sol::queryObjects_1Call {
     fn params(&self) -> Self::Params {
         let prefix = self.prefix.clone().into_bytes();
         let delimiter = self.delimiter.clone().into_bytes();
-        let start_key = self.startKey.clone().into_bytes();
+        let start_key = if self.startKey.is_empty() {
+            None
+        } else {
+            Some(self.startKey.clone().into_bytes())
+        };
         let limit = DEFAULT_LIMIT;
         ListParams {
             prefix,
             delimiter,
-            start_key: Some(start_key),
+            start_key,
             limit,
         }
     }
@@ -321,7 +329,7 @@ impl AbiCall for sol::queryObjects_2Call {
         ListParams {
             prefix,
             delimiter,
-            start_key: Some(start_key),
+            start_key,
             limit,
         }
     }
@@ -340,12 +348,12 @@ impl AbiCall for sol::queryObjects_3Call {
     fn params(&self) -> Self::Params {
         let prefix = DEFAULT_PREFIX;
         let delimiter = DEFAULT_DELIMITER.to_vec();
-        let start_key = DEFAULT_START_KEY.to_vec();
+        let start_key = DEFAULT_START_KEY;
         let limit = 0;
         ListParams {
             prefix,
             delimiter,
-            start_key: Some(start_key),
+            start_key,
             limit,
         }
     }
@@ -369,7 +377,7 @@ impl AbiCall for sol::queryObjects_4Call {
         ListParams {
             prefix,
             delimiter,
-            start_key: Some(start_key),
+            start_key,
             limit,
         }
     }
