@@ -420,7 +420,7 @@ fn make_ipc_provider_proxy(settings: &Settings) -> anyhow::Result<IPCProviderPro
     };
     info!("init ipc provider with subnet: {}", subnet.id);
 
-    let ipc_provider = IpcProvider::new_with_subnet(None, subnet)?;
+    let ipc_provider = IpcProvider::new_with_subnet(None, None, subnet)?;
     IPCProviderProxy::new(ipc_provider, settings.ipc.subnet_id.clone())
 }
 
