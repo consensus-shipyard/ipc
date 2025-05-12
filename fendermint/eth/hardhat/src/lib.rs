@@ -160,42 +160,41 @@ impl SolidityActorContracts {
         &self,
         root_contracts: I,
     ) -> Result<Vec<ContractName>> {
-        dbg!(self);
         let mut deps = DependencyTree::<ContractName>::default();
 
         let mut queue =
             VecDeque::<ContractName>::from_iter(root_contracts.into_iter().map(|name| {
                 let name = ContractName(name.to_string());
-                tracing::info!("Root contract: {name}");
+                tracing::debug!("Root contract: {name}");
                 name
             }));
-        tracing::info!("Root contracts # = {}", queue.len());
+        tracing::trace!("Root contracts # = {}", queue.len());
 
         // Construct dependency tree by recursive traversal.
         while let Some(name) = queue.pop_front() {
             if deps.contains_key(&name) {
                 // if dependency already contains the name, we don't need to do anything
-                tracing::debug!("Already processed dep: contract {name}");
+                tracing::trace!("Already processed dep: contract {name}");
                 continue;
             }
 
-            tracing::info!("Processing queue: contract {name}");
+            tracing::trace!("Processing queue: contract {name}");
 
             let artifact = self
                 .get_lib(&name)
                 .inspect(|&_x| {
-                    tracing::info!("Dependency lib: {name}",);
+                    tracing::trace!("Dependency lib: {name}",);
                 })
                 .or_else(|| self.get_top_level(&name))
                 .inspect(|_x| {
-                    tracing::info!("Dependency top: {name}");
+                    tracing::trace!("Dependency top: {name}");
                 })
                 .ok_or_else(|| eyre!("Failed to load dependency artifact: {name}"))?;
 
             let entry: &mut HashSet<_> = deps.entry(name.clone()).or_default();
 
             for (_lib_source, lib_name) in artifact.libraries_needed() {
-                tracing::info!("Adding dependency edge: {name} -> {lib_name}");
+                tracing::trace!("Adding dependency edge: {name} -> {lib_name}");
                 entry.insert(lib_name.clone());
                 queue.push_back(lib_name);
             }
@@ -347,7 +346,6 @@ impl SolidityActorContractsLoader {
     /// The result will include the top contracts as well, and it's up to the caller to filter them out if
     /// they have more complicated deployments including constructors. This is because there can be diamond
     /// facets among them which aren't ABI visible dependencies but should be deployed as libraries.
-    #[deprecated(note = "Use `SolidityActorContracs::dependencies` instead, decouple IO")]
     pub fn dependencies<I: IntoIterator<Item = (A, S)>, S: ToString, A: AsRef<Path>>(
         &self,
         root_contracts: I,
