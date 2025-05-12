@@ -12,23 +12,22 @@ const PASSPHRASE: &str = "foobarbaz";
 
 #[test]
 fn test_generate_key() {
-    let (salt, encryption_key) = EncryptionOverlay::derive_key(PASSPHRASE, None).unwrap();
-    let (second_salt, second_key) =
-        EncryptionOverlay::derive_key(PASSPHRASE, Some(salt)).unwrap();
+    let overlay1 = EncryptionOverlay::with_random_salt(PASSPHRASE).unwrap();
+    let overlay2 = EncryptionOverlay::from_salt(PASSPHRASE, overlay1.salt).unwrap();
 
     assert_eq!(
-        encryption_key, second_key,
+        overlay1.encryption_key, overlay2.encryption_key,
         "Derived key must be deterministic"
     );
-    assert_eq!(salt, second_salt, "Salts must match");
+    assert_eq!(overlay1.salt, overlay2.salt, "Salts must match");
 }
 
 #[test]
 fn test_encrypt_message() -> Result<()> {
-    let (_, private_key) = EncryptionOverlay::derive_key(PASSPHRASE, None)?;
+    let overlay = EncryptionOverlay::with_random_salt(PASSPHRASE)?;
     let message = "foo is coming";
-    let ciphertext = EncryptionOverlay::encrypt(&private_key, message.as_bytes())?;
-    let second_pass = EncryptionOverlay::encrypt(&private_key, message.as_bytes())?;
+    let ciphertext = overlay.encrypt(message.as_bytes())?;
+    let second_pass = overlay.encrypt(message.as_bytes())?;
     ensure!(
         ciphertext != second_pass,
         "Ciphertexts use secure initialization vectors"
@@ -38,10 +37,10 @@ fn test_encrypt_message() -> Result<()> {
 
 #[test]
 fn test_decrypt_message() -> Result<()> {
-    let (_, private_key) = EncryptionOverlay::derive_key(PASSPHRASE, None)?;
+    let overlay = EncryptionOverlay::with_random_salt(PASSPHRASE)?;
     let message = "foo is coming";
-    let ciphertext = EncryptionOverlay::encrypt(&private_key, message.as_bytes())?;
-    let plaintext = EncryptionOverlay::decrypt(&private_key, &ciphertext)?;
+    let ciphertext = overlay.encrypt(message.as_bytes())?;
+    let plaintext = overlay.decrypt(&ciphertext)?;
     ensure!(plaintext == message.as_bytes());
     Ok(())
 }
@@ -58,16 +57,10 @@ fn test_read_old_encrypted_keystore() -> Result<()> {
 #[test]
 fn test_read_write_encrypted_keystore() -> Result<()> {
     let keystore_location = tempfile::tempdir()?.into_path();
-    let ks = KeyStore::new(KeyStoreConfig::encrypted(
-        &keystore_location,
-        PASSPHRASE,
-    ))?;
+    let ks = KeyStore::new(KeyStoreConfig::encrypted(&keystore_location, PASSPHRASE))?;
     ks.flush()?;
 
-    let ks_read = KeyStore::new(KeyStoreConfig::encrypted(
-        &keystore_location,
-        PASSPHRASE,
-    ))?;
+    let ks_read = KeyStore::new(KeyStoreConfig::encrypted(&keystore_location, PASSPHRASE))?;
 
     ensure!(ks == ks_read);
 
@@ -88,10 +81,9 @@ fn test_read_write_keystore() -> Result<()> {
     let default = ks.get(&addr).unwrap();
 
     // Manually parse keystore.json
-    let keystore_file = keystore_location.join(PLAIN_JSON_KEYSTORE_NAME);
+    let keystore_file = keystore_location.join(PLAIN_KEYSTORE_NAME);
     let reader = BufReader::new(File::open(keystore_file)?);
-    let persisted_keystore: HashMap<String, PersistentKeyInfo> =
-        serde_json::from_reader(reader)?;
+    let persisted_keystore: HashMap<String, PersistentKeyInfo> = serde_json::from_reader(reader)?;
 
     let default_key_info = persisted_keystore.get(&addr).unwrap();
     let actual = BASE64_STANDARD.decode(default_key_info.private_key.clone())?;

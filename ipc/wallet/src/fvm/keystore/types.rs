@@ -2,7 +2,6 @@ use super::*;
 
 pub(crate) type SaltByteArray = [u8; RECOMMENDED_SALT_LEN];
 
-
 #[allow(missing_docs)]
 #[derive(Debug, Error)]
 pub enum EncryptedKeyStoreError {

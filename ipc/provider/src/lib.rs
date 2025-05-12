@@ -893,7 +893,9 @@ pub fn new_evm_keystore_from_path(
     repo_str: &str,
     password: Option<String>,
 ) -> anyhow::Result<PlainKeyStore<EthKeyAddress>> {
-    let name = password.map(|_| ipc_wallet::ENCRYPTED_KEYSTORE_NAME).unwrap_or_else(|| ipc_wallet::PLAIN_JSON_KEYSTORE_NAME);
+    let name = password
+        .map(|_| ipc_wallet::ENCRYPTED_KEYSTORE_NAME)
+        .unwrap_or_else(|| ipc_wallet::PLAIN_KEYSTORE_NAME);
     let repo = Path::new(&repo_str).join(name);
     let repo = expand_tilde(repo);
     let keystore_config = if let Some(pass) = password {
@@ -904,7 +906,10 @@ pub fn new_evm_keystore_from_path(
     KeyStore::new(keystore_config).map_err(|e| anyhow!("Failed to create evm keystore: {}", e))
 }
 
-pub fn new_fvm_keystore_from_path(repo_str: &str, password: Option<&str>) -> anyhow::Result<KeyStore> {
+pub fn new_fvm_keystore_from_path(
+    repo_str: &str,
+    password: Option<&str>,
+) -> anyhow::Result<KeyStore> {
     let repo = Path::new(&repo_str);
     let repo = expand_tilde(repo);
     let keystore_config = if let Some(password) = password {
