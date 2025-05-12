@@ -99,7 +99,7 @@ contract SubnetRegistryInvariants is StdInvariant, Test, TestRegistry, Integrati
             address owner = owners[i];
             uint64 nonce = registryHandler.getUserLastNonce(owner);
 
-            assertNotEq(nonce, 0);
+            require(nonce != 0, "nonce should not be 0");
             assertEq(
                 registryHandler.getSubnetDeployedBy(owner),
                 registryHandler.getSubnetDeployedWithNonce(owner, nonce)
