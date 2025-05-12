@@ -56,6 +56,10 @@ registry_addr = "0x0b4e239FF21b40120cDa817fba77bD1B366c1bcD"
 pub struct Config {
     /// Directory of the keystore that wants to be made available by the provider.
     pub keystore_path: Option<String>,
+
+    /// The password used to encrypt the keystore
+    pub password: Option<String>,
+
     #[serde(deserialize_with = "deserialize_subnets_from_vec", default)]
     #[serde(serialize_with = "serialize_subnets_to_str")]
     pub subnets: HashMap<SubnetID, Subnet>,
@@ -66,6 +70,7 @@ impl Config {
     pub fn new() -> Self {
         Config {
             keystore_path: None,
+            password: None,
             subnets: Default::default(),
         }
     }

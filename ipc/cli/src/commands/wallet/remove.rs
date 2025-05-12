@@ -4,7 +4,7 @@
 
 use async_trait::async_trait;
 use clap::Args;
-use ipc_wallet::{EvmKeyStore, WalletType};
+use ipc_wallet::{evm::adapter::EthKeyAddress, WalletType};
 use std::fmt::Debug;
 use std::str::FromStr;
 
@@ -23,15 +23,17 @@ impl CommandLineHandler for WalletRemove {
         let wallet_type = WalletType::from_str(&arguments.wallet_type)?;
 
         match wallet_type {
-            WalletType::Evm => {
+            WalletType::Etherium => {
                 let wallet = provider.evm_wallet()?;
-                let addr = ipc_wallet::EthKeyAddress::from_str(&arguments.address)?;
-                wallet.write().unwrap().remove(&addr)?;
+                let addr = EthKeyAddress::from_str(&arguments.address)?;
+                let mut guard = wallet.write().unwrap();
+                guard.remove(addr.to_string())?;
             }
-            WalletType::Fvm => {
+            WalletType::Filecoin => {
                 let wallet = provider.fvm_wallet()?;
                 let addr = fvm_shared::address::Address::from_str(&arguments.address)?;
-                wallet.write().unwrap().remove(&addr)?;
+                let mut guard = wallet.write().unwrap();
+                guard.remove(&addr)?;
             }
         }
         Ok(())

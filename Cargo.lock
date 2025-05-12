@@ -391,6 +391,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "155a5a185e42c6b77ac7b88a15143d930a9e9727a5b7b77eed417404ab15c247"
 
 [[package]]
+name = "assert_matches"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b34d609dfbaf33d6889b2b7106d3ca345eacad44200913df5ba02bfd31d2ba9"
+
+[[package]]
 name = "async-attributes"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5865,6 +5871,7 @@ dependencies = [
  "ahash 0.8.11",
  "anyhow",
  "argon2",
+ "assert_matches",
  "base64 0.21.7",
  "blake2b_simd",
  "bls-signatures 0.13.1",
@@ -5884,6 +5891,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 1.0.69",
+ "tiny-keccak",
  "tokio",
  "xsalsa20poly1305",
  "zeroize",

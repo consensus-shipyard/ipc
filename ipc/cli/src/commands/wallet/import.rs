@@ -25,7 +25,7 @@ impl CommandLineHandler for WalletImport {
         let wallet_type = WalletType::from_str(&arguments.wallet_type)?;
 
         if let Some(key) = &arguments.private_key {
-            if !matches!(wallet_type, WalletType::Evm) {
+            if !matches!(wallet_type, WalletType::Etherium) {
                 bail!("--private-key only supported by --wallet-type=evm");
             }
             println!(
@@ -43,8 +43,8 @@ impl CommandLineHandler for WalletImport {
             };
 
             match wallet_type {
-                WalletType::Fvm => println!("{:?}", provider.import_fvm_key(&keyinfo)?),
-                WalletType::Evm => {
+                WalletType::Filecoin => println!("{:?}", provider.import_fvm_key(&keyinfo)?),
+                WalletType::Etherium => {
                     let key = provider
                         .import_evm_key_from_privkey(&keyinfo)
                         .or_else(|_| provider.import_evm_key_from_json(&keyinfo))?;

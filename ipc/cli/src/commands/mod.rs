@@ -172,7 +172,7 @@ pub(crate) fn require_fil_addr_from_str(s: &str) -> anyhow::Result<fvm_shared::a
         Err(_) => {
             // see if it is an eth address
             let addr = ethers::types::Address::from_str(s)?;
-            ethers_address_to_fil_address(&addr)?
+            ethers_address_to_fil_address(addr)?
         }
         Ok(addr) => addr,
     };
