@@ -891,24 +891,34 @@ pub fn new_evm_keystore_from_config(
 
 pub fn new_evm_keystore_from_path(
     repo_str: &str,
-) -> anyhow::Result<PersistentKeyStore<EthKeyAddress>> {
-    let repo = Path::new(&repo_str).join(ipc_wallet::DEFAULT_KEYSTORE_NAME);
+    password: Option<String>,
+) -> anyhow::Result<PlainKeyStore<EthKeyAddress>> {
+    let name = password.map(|_| ipc_wallet::ENCRYPTED_KEYSTORE_NAME).unwrap_or_else(|| ipc_wallet::PLAIN_JSON_KEYSTORE_NAME);
+    let repo = Path::new(&repo_str).join(name);
     let repo = expand_tilde(repo);
-    PersistentKeyStore::new(repo).map_err(|e| anyhow!("Failed to create evm keystore: {}", e))
+    let keystore_config = if let Some(pass) = password {
+        KeyStoreConfig::encrypted(repo, password)
+    } else {
+        KeyStoreConfig::plain(repo)
+    };
+    KeyStore::new(keystore_config).map_err(|e| anyhow!("Failed to create evm keystore: {}", e))
 }
 
-pub fn new_fvm_keystore_from_path(repo_str: &str) -> anyhow::Result<KeyStore> {
+pub fn new_fvm_keystore_from_path(repo_str: &str, password: Option<&str>) -> anyhow::Result<KeyStore> {
     let repo = Path::new(&repo_str);
     let repo = expand_tilde(repo);
-    let keystore_config = KeyStoreConfig::Persistent(repo);
-    // TODO: we currently only support persistent keystore in the default repo directory.
+    let keystore_config = if let Some(password) = password {
+        KeyStoreConfig::encrypted(repo, password)
+    } else {
+        KeyStoreConfig::plain(repo)
+    };
     KeyStore::new(keystore_config).map_err(|e| anyhow!("Failed to create keystore: {}", e))
 }
 
 pub fn default_repo_path() -> String {
     let home = match std::env::var("HOME") {
         Ok(home) => home,
-        Err(_) => panic!("cannot get home"),
+        Err(e) => panic!("cannot get home from env var HOME: {e:?}"),
     };
     format!("{home:}/{:}", DEFAULT_REPO_PATH)
 }
