@@ -67,10 +67,10 @@ impl KeyStoreConfig {
             path: path.as_ref().to_path_buf(),
         }
     }
-    pub fn encrypted(path: impl AsRef<Path>, password: impl Into<String>) -> Self {
+    pub fn encrypted(path: impl AsRef<Path>, password: impl ToString) -> Self {
         Self::Encrypted {
             location: path.as_ref().to_path_buf(),
-            password: password.into(),
+            password: password.to_string(),
         }
     }
 }

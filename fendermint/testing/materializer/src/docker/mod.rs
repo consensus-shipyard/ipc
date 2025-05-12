@@ -318,6 +318,7 @@ impl DockerMaterializer {
         let mut config = if !file_name.exists() {
             IpcCliConfig {
                 keystore_path: Some("~/.ipc".to_string()),
+                password: None,
                 subnets: Default::default(),
             }
         } else {

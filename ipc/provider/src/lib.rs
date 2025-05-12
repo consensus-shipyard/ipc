@@ -99,17 +99,26 @@ impl IpcProvider {
     /// a single subnet.
     pub fn new_with_subnet(
         keystore_path: Option<String>,
+        // TODO FIXME XXX add
+        // password: Option<String>,
         subnet: config::Subnet,
     ) -> anyhow::Result<Self> {
         let mut config = Config::new();
+        config.keystore_path = keystore_path.clone();
+        config.password = None; // TODO FIXME XXX
         config.add_subnet(subnet);
         let config = Arc::new(config);
 
-        if let Some(repo_path) = keystore_path {
+        if let Some(repo_path) = keystore_path.as_ref() {
+            let maybe_password = config.password.as_ref().map(|x| x.as_str());
             let fvm_wallet = Arc::new(RwLock::new(Wallet::new(new_fvm_keystore_from_path(
                 &repo_path,
+                maybe_password.clone(),
             )?)));
-            let evm_keystore = Arc::new(RwLock::new(new_evm_keystore_from_path(&repo_path)?));
+            let evm_keystore = Arc::new(RwLock::new(new_evm_keystore_from_path(
+                &repo_path,
+                maybe_password,
+            )?));
             Ok(Self::new(config, fvm_wallet, evm_keystore))
         } else {
             Ok(Self {
@@ -870,7 +879,8 @@ impl IpcProvider {
 fn new_fvm_wallet_from_config(config: Arc<Config>) -> anyhow::Result<KeyStore> {
     let repo_str = &config.keystore_path;
     if let Some(repo_str) = repo_str {
-        new_fvm_keystore_from_path(repo_str)
+        let password = config.password.as_ref().map(|x| x.as_str());
+        new_fvm_keystore_from_path(repo_str, password)
     } else {
         Err(anyhow!(
             "No keystore repo found in config. Try using absolute path"
@@ -883,7 +893,8 @@ pub fn new_evm_keystore_from_config(
 ) -> anyhow::Result<PersistentKeyStore<EthKeyAddress>> {
     let repo_str = &config.keystore_path;
     if let Some(repo_str) = repo_str {
-        new_evm_keystore_from_path(repo_str)
+        let password = config.password.as_ref().map(|x| x.as_str());
+        new_evm_keystore_from_path(repo_str, password)
     } else {
         Err(anyhow!("No keystore repo found in config"))
     }
@@ -891,19 +902,14 @@ pub fn new_evm_keystore_from_config(
 
 pub fn new_evm_keystore_from_path(
     repo_str: &str,
-    password: Option<String>,
-) -> anyhow::Result<PlainKeyStore<EthKeyAddress>> {
-    let name = password
-        .map(|_| ipc_wallet::ENCRYPTED_KEYSTORE_NAME)
-        .unwrap_or_else(|| ipc_wallet::PLAIN_KEYSTORE_NAME);
-    let repo = Path::new(&repo_str).join(name);
+    // TODO make `password` useful
+    _password: Option<&str>,
+) -> anyhow::Result<PersistentKeyStore<EthKeyAddress>> {
+    let repo = Path::new(&repo_str).join(ipc_wallet::DEFAULT_KEYSTORE_NAME);
     let repo = expand_tilde(repo);
-    let keystore_config = if let Some(pass) = password {
-        KeyStoreConfig::encrypted(repo, password)
-    } else {
-        KeyStoreConfig::plain(repo)
-    };
-    KeyStore::new(keystore_config).map_err(|e| anyhow!("Failed to create evm keystore: {}", e))
+
+    // TODO handle passphrase/password/encryption
+    PersistentKeyStore::new(repo).map_err(|e| anyhow!("Failed to create evm keystore").context(e))
 }
 
 pub fn new_fvm_keystore_from_path(

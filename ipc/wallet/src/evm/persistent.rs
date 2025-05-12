@@ -88,6 +88,7 @@ impl<T: Clone + Eq + Hash + TryFrom<KeyInfo> + Default + ToString> KeyStore
 }
 
 impl<T: Clone + Eq + Hash + TryFrom<KeyInfo> + Default + ToString> PersistentKeyStore<T> {
+    // TODO handle encryption
     pub fn new(path: PathBuf) -> Result<Self> {
         if let Some(p) = path.parent() {
             if !p.exists() {
