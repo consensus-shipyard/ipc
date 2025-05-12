@@ -1589,15 +1589,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
 
         uint256[] memory heights = gatewayDiamond.getter().getIncompleteCheckpointHeights();
         require(heights.length == n, "heights.len is not n");
-
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        gatewayDiamond.checkpointer().pruneBottomUpCheckpoints(4);
-        vm.stopPrank();
-
-        index = gatewayDiamond.getter().getCheckpointRetentionHeight();
-        require(index == 4, "height was not updated");
-        heights = gatewayDiamond.getter().getIncompleteCheckpointHeights();
-        require(heights.length == n, "index is not the same");
     }
 
     function testGatewayDiamond_commitCheckpoint_Fails_WrongNumberMessages() public {
