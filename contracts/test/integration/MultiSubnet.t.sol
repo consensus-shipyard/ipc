@@ -639,12 +639,15 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.prank(caller);
         manager.release{value: amount}(FvmAddressHelper.from(address(recipient)));
 
+        vm.recordLogs();
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnet.id,
             nativeSubnet.gateway
         );
-
+        IpcEnvelope[] memory msgs = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
         submitBottomUpCheckpoint(checkpoint, nativeSubnet.subnetActor);
+        execBottomUpMsgBatch(checkpoint, msgs, nativeSubnet.subnetActor);
+
         assertEq(recipient.balance, amount);
     }
 
