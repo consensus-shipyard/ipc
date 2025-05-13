@@ -4,6 +4,7 @@ pragma solidity ^0.8.23;
 import "forge-std/Test.sol";
 import "../../contracts/errors/IPCErrors.sol";
 import {IpcEnvelope, BottomUpCheckpoint, BottomUpMsgBatch, ParentFinality, IpcMsgKind, ResultMsg} from "../../contracts/structs/CrossNet.sol";
+import {BottomUpBatchRecorded, BottomUpBatch} from "../../contracts/structs/BottomUpBatch.sol";
 import {SubnetID, Subnet, IPCAddress, Validator, FvmAddress} from "../../contracts/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
 import {AssetHelper} from "../../contracts/lib/AssetHelper.sol";
@@ -218,7 +219,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase, IIpcHandler {
             checkpoint,
             membershipRoot,
             weights[0] + weights[1] + weights[2],
-            BottomUpBatchHelper.makeEmptyBatch(),
+            batch.msgs,
             ActivityHelper.dummyActivityRollup()
         );
 
@@ -394,14 +395,15 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase, IIpcHandler {
 
         bool finished = false;
         while (!finished) {
+            SubnetActorDiamond sa = SubnetActorDiamond(payable(from.getActor()));
             SubnetID memory parent = from.getParentSubnet();
 
             address gateway = subnets.getSubnetGateway(from);
             // this would normally submitted by releayer. It call the subnet actor on the L2 network.
-            submitBottomUpCheckpoint(
-                createBottomUpCheckpoint(from, GatewayDiamond(payable(gateway))),
-                SubnetActorDiamond(payable(from.getActor()))
-            );
+            BottomUpCheckpoint memory checkpoint = createBottomUpCheckpoint(from, GatewayDiamond(payable(gateway)));
+            IpcEnvelope[] memory msgs = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
+            submitBottomUpCheckpoint(checkpoint, sa);
+            execBottomUpMsgBatch(checkpoint, msgs, sa);
 
             from = parent;
             finished = parent.equals(to);
@@ -600,5 +602,31 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase, IIpcHandler {
             address(subnets.getSubnetGateway(l3SubnetIDs[0])).balance == 0,
             "L3 gateway final balance should be 0 ether"
         );
+    }
+
+    function getBottomUpBatchRecordedFromLogs(Vm.Log[] memory logs) internal pure returns (IpcEnvelope[] memory) {
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == BottomUpBatchRecorded.selector) {
+                (, IpcEnvelope[] memory msgs) = abi.decode(logs[i].data, (uint64, IpcEnvelope[]));
+                return msgs;
+            }
+        }
+
+        return new IpcEnvelope[](0);
+    }
+
+    function execBottomUpMsgBatch(
+        BottomUpCheckpoint memory checkpoint,
+        IpcEnvelope[] memory msgs,
+        SubnetActorDiamond sa
+    ) internal {
+        BottomUpBatch.Inclusion[] memory inclusions = BottomUpBatchHelper.makeInclusions(msgs);
+
+        SubnetActorCheckpointingFacet checkpointer = sa.checkpointer();
+        vm.startPrank(address(sa));
+
+        checkpointer.execBottomUpMsgBatch(checkpoint.subnetID, checkpoint.blockHeight, inclusions);
+
+        vm.stopPrank();
     }
 }
