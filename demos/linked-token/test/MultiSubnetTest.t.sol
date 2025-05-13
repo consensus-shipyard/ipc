@@ -9,6 +9,7 @@ import {TestUtils} from "@ipc/test/helpers/TestUtils.sol";
 import {MerkleTreeHelper} from "@ipc/test/helpers/MerkleTreeHelper.sol";
 import {GatewayFacetsHelper} from "@ipc/test/helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "@ipc/test/helpers/SubnetActorFacetsHelper.sol";
+import {BottomUpBatchHelper} from "@ipc/test/helpers/BottomUpBatchHelper.sol";
 import {ActivityHelper} from "@ipc/test/helpers/ActivityHelper.sol";
 import {LinkedTokenController} from "../contracts/LinkedTokenController.sol";
 import {LinkedTokenReplica} from "../contracts/LinkedTokenReplica.sol";
