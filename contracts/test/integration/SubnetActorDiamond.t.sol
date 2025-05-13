@@ -1030,10 +1030,10 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHeight: saDiamond.getter().bottomUpCheckPeriod() + 3,
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 0,
-            msgs: BottomUpBatchHelper.makeCommitment(msgs),
+            msgs: BottomUpBatchHelper.makeEmptyCommitment(),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
-        vm.expectRevert(InvalidCheckpointEpoch.selector); // FAILS
+        vm.expectRevert(InvalidCheckpointEpoch.selector);
         submitCheckpointInternal(checkpoint, validators, signatures, keys);
 
         checkpoint = BottomUpCheckpoint({
