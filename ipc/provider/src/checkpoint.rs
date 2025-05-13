@@ -296,6 +296,7 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         }
 
         tracing::debug!("Waiting for all execution tasks to finish");
+
         // Return error if any of the submit task failed.
         try_join_all(tasks).await?;
 
