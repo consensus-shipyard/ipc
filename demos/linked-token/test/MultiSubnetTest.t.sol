@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
+import "forge-std/Test.sol";
+import "forge-std/console.sol";
+import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IntegrationTestBase, RootSubnetDefinition, TestSubnetDefinition} from "@ipc/test/IntegrationTestBase.sol";
@@ -37,9 +41,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {CrossMsgHelper} from "@ipc/contracts/lib/CrossMsgHelper.sol";
 import {IIpcHandler} from "@ipc/sdk/interfaces/IIpcHandler.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
-import "forge-std/console.sol";
-
-import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {BottomUpBatchRecorded, BottomUpBatch} from "@ipc/contracts/structs/BottomUpBatch.sol";
 
 string constant REPLICA_TOKEN_NAME = "USDCTestReplica";
 string constant REPLICA_TOKEN_SYMBOL = "USDCtR";
@@ -301,10 +303,7 @@ contract MultiSubnetTest is IntegrationTestBase {
         executeTopDownMsgs(msgs, nativeSubnetName, nativeSubnetGateway);
 
         //ensure that tokens are delivered on subnet
-        require(
-            IERC20(ipcTokenReplica).balanceOf(recipient) == transferAmount,
-            "incorrect proxy token balance"
-        );
+        require(IERC20(ipcTokenReplica).balanceOf(recipient) == transferAmount, "incorrect proxy token balance");
     }
 
     function _testTransferBottomUp() public {
@@ -326,11 +325,14 @@ contract MultiSubnetTest is IntegrationTestBase {
 
         console.log("Begin bottom up checkpoint");
 
+        vm.recordLogs();
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnetName,
             nativeSubnetGateway
         );
+        IpcEnvelope[] memory msgs = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
         submitBottomUpCheckpoint(checkpoint, rootNativeSubnetActor);
+        execBottomUpMsgBatch(checkpoint, msgs, rootNativeSubnetActor);
 
         //ensure that usdc tokens are returned on root net
         require(holderTotalAmount == testUSDC.balanceOf(holder), "unexpected holder balance after withdrawal");
@@ -387,20 +389,23 @@ contract MultiSubnetTest is IntegrationTestBase {
             blockHeight: batch.blockHeight,
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
-            msgs: BottomUpMsgBatchHelper.makeCommitment(batch.msgs),
+            msgs: BottomUpBatchHelper.makeCommitment(batch.msgs),
             activity: CompressedActivityRollup({
                 consensus: Consensus.CompressedSummary({
-                stats: Consensus.AggregatedStats({
-                    totalActiveValidators: 1,
-                    totalNumBlocksCommitted: 1
-                }),
-                dataRootCommitment: Consensus.MerkleHash.wrap(bytes32(0))
-            })
+                    stats: Consensus.AggregatedStats({totalActiveValidators: 1, totalNumBlocksCommitted: 1}),
+                    dataRootCommitment: Consensus.MerkleHash.wrap(bytes32(0))
+                })
             })
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        checkpointer.createBottomUpCheckpoint(checkpoint, membershipRoot, weights[0] + weights[1] + weights[2], ActivityHelper.dummyActivityRollup());
+        checkpointer.createBottomUpCheckpoint(
+            checkpoint,
+            membershipRoot,
+            weights[0] + weights[1] + weights[2],
+            batch.msgs,
+            ActivityHelper.dummyActivityRollup()
+        );
         vm.stopPrank();
 
         return checkpoint;
@@ -436,5 +441,31 @@ contract MultiSubnetTest is IntegrationTestBase {
 
     function getNextEpoch(uint256 blockNumber, uint256 checkPeriod) internal pure returns (uint256) {
         return ((uint64(blockNumber) / checkPeriod) + 1) * checkPeriod;
+    }
+
+    function getBottomUpBatchRecordedFromLogs(Vm.Log[] memory logs) internal pure returns (IpcEnvelope[] memory) {
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == BottomUpBatchRecorded.selector) {
+                (, IpcEnvelope[] memory msgs) = abi.decode(logs[i].data, (uint64, IpcEnvelope[]));
+                return msgs;
+            }
+        }
+
+        return new IpcEnvelope[](0);
+    }
+
+    function execBottomUpMsgBatch(
+        BottomUpCheckpoint memory checkpoint,
+        IpcEnvelope[] memory msgs,
+        SubnetActorDiamond sa
+    ) internal {
+        BottomUpBatch.Inclusion[] memory inclusions = BottomUpBatchHelper.makeInclusions(msgs);
+
+        SubnetActorCheckpointingFacet checkpointer = sa.checkpointer();
+        vm.startPrank(address(sa));
+
+        checkpointer.execBottomUpMsgBatch(checkpoint.subnetID, checkpoint.blockHeight, inclusions);
+
+        vm.stopPrank();
     }
 }
