@@ -37,7 +37,7 @@ fn test_hardhat() -> SolidityActorContracts {
     let _sub = tracing_subscriber::fmt()
         .with_level(true)
         .with_line_number(true)
-        .with_max_level(LevelFilter::TRACE)
+        .with_max_level(LevelFilter::INFO)
         .try_init();
 
     SolidityActorContractsLoader::load_directory(&contracts_path())
