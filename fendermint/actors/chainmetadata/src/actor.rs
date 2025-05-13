@@ -20,7 +20,10 @@ fil_actors_runtime::wasm_trampoline!(Actor);
 pub struct Actor;
 
 impl Actor {
-    fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
+    pub(crate) fn constructor(
+        rt: &impl Runtime,
+        params: ConstructorParams,
+    ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         let state = State::new(rt.store(), params.lookback_len).map_err(|e| {
@@ -32,7 +35,10 @@ impl Actor {
         Ok(())
     }
 
-    fn push_block_hash(rt: &impl Runtime, params: PushBlockParams) -> Result<(), ActorError> {
+    pub(crate) fn push_block_hash(
+        rt: &impl Runtime,
+        params: PushBlockParams,
+    ) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         rt.transaction(|st: &mut State, rt| {
@@ -49,11 +55,11 @@ impl Actor {
 
             // remove the oldest block if the AMT is full (note that this assume the
             // for_each_while iterates in order, which it seems to do)
-            if blockhashes.count() > st.lookback_len {
+            if dbg!(blockhashes.count() > st.lookback_len) {
                 let mut first_idx = 0;
                 blockhashes
                     .iter()
-                    .map_while(|res| res.ok())
+                    .map_while(|res: Result<(u64, &BlockHash), fvm_ipld_amt::Error>| res.ok())
                     .for_each(|(i, _block_hash)| {
                         first_idx = i;
                     });
@@ -71,12 +77,12 @@ impl Actor {
         Ok(())
     }
 
-    fn lookback_len(rt: &impl Runtime) -> Result<u64, ActorError> {
+    pub(crate) fn lookback_len(rt: &impl Runtime) -> Result<u64, ActorError> {
         let state: State = rt.state()?;
         Ok(state.lookback_len)
     }
 
-    fn get_block_hash(
+    pub(crate) fn get_block_hash(
         rt: &impl Runtime,
         epoch: ChainEpoch,
     ) -> Result<Option<BlockHash>, ActorError> {
