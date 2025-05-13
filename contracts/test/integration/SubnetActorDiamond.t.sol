@@ -854,7 +854,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             blockHeight: 1,
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
-            msgs: BottomUpBatchHelper.makeCommitment(msgs),
+            msgs: BottomUpBatchHelper.makeEmptyCommitment(),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
