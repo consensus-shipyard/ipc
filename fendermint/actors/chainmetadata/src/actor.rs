@@ -58,11 +58,11 @@ impl Actor {
             if dbg!(blockhashes.count() > st.lookback_len) {
                 let mut first_idx = 0;
                 blockhashes
-                    .iter()
-                    .map_while(|res: Result<(u64, &BlockHash), fvm_ipld_amt::Error>| res.ok())
-                    .for_each(|(i, _block_hash)| {
+                    .for_each_while(|i, _: &BlockHash| {
                         first_idx = i;
-                    });
+                        Ok(false)
+                    })
+                    .unwrap();
                 blockhashes.delete(first_idx).unwrap();
             }
 
