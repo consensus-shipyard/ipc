@@ -298,6 +298,8 @@ impl StateMachine for StakingMachine {
                     signatures.push((*addr, signature.into()));
                 }
 
+                signatures.sort_by_key(|(addr, _)| addr.clone());
+
                 system
                     .subnet
                     .try_submit_checkpoint(
