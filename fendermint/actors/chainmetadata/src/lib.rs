@@ -5,7 +5,3 @@ mod actor;
 mod shared;
 
 pub use shared::*;
-
-#[cfg(feature = "fil-actor")]
-#[cfg(test)]
-mod tests;

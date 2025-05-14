@@ -21,10 +21,7 @@ fil_actors_runtime::wasm_trampoline!(Actor);
 pub struct Actor;
 
 impl Actor {
-    pub(crate) fn constructor(
-        rt: &impl Runtime,
-        params: ConstructorParams,
-    ) -> Result<(), ActorError> {
+    fn constructor(rt: &impl Runtime, params: ConstructorParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         let state = State::new(rt.store(), params.lookback_len).map_err(|e| {
@@ -36,10 +33,7 @@ impl Actor {
         Ok(())
     }
 
-    pub(crate) fn push_block_hash(
-        rt: &impl Runtime,
-        params: PushBlockParams,
-    ) -> Result<(), ActorError> {
+    fn push_block_hash(rt: &impl Runtime, params: PushBlockParams) -> Result<(), ActorError> {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         rt.transaction(|st: &mut State, rt| {
@@ -81,12 +75,12 @@ impl Actor {
         Ok(())
     }
 
-    pub(crate) fn lookback_len(rt: &impl Runtime) -> Result<u64, ActorError> {
+    fn lookback_len(rt: &impl Runtime) -> Result<u64, ActorError> {
         let state: State = rt.state()?;
         Ok(state.lookback_len)
     }
 
-    pub(crate) fn get_block_hash(
+    fn get_block_hash(
         rt: &impl Runtime,
         epoch: ChainEpoch,
     ) -> Result<Option<BlockHash>, ActorError> {
