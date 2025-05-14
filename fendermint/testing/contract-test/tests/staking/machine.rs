@@ -298,7 +298,7 @@ impl StateMachine for StakingMachine {
                     signatures.push((*addr, signature.into()));
                 }
 
-                signatures.sort_by_key(|(addr, _)| addr.clone());
+                signatures.sort_by_key(|(addr, _)| *addr);
 
                 system
                     .subnet
