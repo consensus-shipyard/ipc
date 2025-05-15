@@ -15,7 +15,7 @@ pub const TRACING_TARGET: &str = "tracing_event";
 // Creates a temporary subscriber that logs all traces to stderr. Useful when global tracing is not set yet.
 pub fn create_temporary_subscriber() -> Subscriber {
     tracing_subscriber::FmtSubscriber::builder()
-        .with_max_level(Level::TRACE)
+        .with_max_level(Level::DEBUG)
         .with_target(false)
         .with_file(true)
         .with_line_number(true)

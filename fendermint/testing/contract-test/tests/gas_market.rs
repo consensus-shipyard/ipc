@@ -65,7 +65,7 @@ async fn tester_with_upgrader(
     let _sub = tracing_subscriber::fmt()
         .with_level(true)
         .with_line_number(true)
-        .with_max_level(LevelFilter::TRACE)
+        .with_max_level(LevelFilter::INFO)
         .try_init();
 
     let validator = rand_secret_key().public_key();
