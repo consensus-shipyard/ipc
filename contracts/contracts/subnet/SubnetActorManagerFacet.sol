@@ -167,7 +167,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             LibPower.setMetadataWithConfirm(msg.sender, publicKey);
             LibPower.depositWithConfirm(msg.sender, amount);
 
-            _patchGenesisValidators(msg.sender);
+            _increaseGenesisValidatorCollateral(msg.sender, amount);
 
             LibSubnetActor.bootstrapSubnetIfNeeded();
         } else {
@@ -177,28 +177,53 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
         }
     }
 
-    function _patchGenesisValidators(address validator) internal {
+    function _increaseGenesisValidatorCollateral(address validator, uint256 amount) internal {
         // add to initial validators avoiding duplicates if it
         // is a genesis validator.
         bool alreadyValidator;
         uint256 length = s.genesisValidators.length;
-        for (uint256 i; i < length; ) {
+        uint256 i;
+        for (; i < length; ) {
             if (s.genesisValidators[i].addr == validator) {
-                alreadyValidator = true;
                 break;
             }
             unchecked {
                 ++i;
             }
         }
-        if (!alreadyValidator) {
+        // already validator if we iterate through all of them but didn't get a match
+        if (i >= length) {
+            s.genesisValidators[i].weight += amount;
+        } else {
             uint256 collateral = s.validatorSet.validators[validator].currentPower;
             Validator memory val = Validator({
                 addr: validator,
-                weight: collateral,
+                weight: amount,
                 metadata: s.validatorSet.validators[validator].metadata
             });
             s.genesisValidators.push(val);
+        }
+    }
+
+    function _decreaseGenesisValidatorCollateral(address validator, uint256 amount) internal {
+        uint256 length = s.genesisValidators.length;
+        uint256 i;
+        for (; i < length; ) {
+            if (s.genesisValidators[i].addr == validator) {
+                break;
+            }
+            unchecked {
+                ++i;
+            }
+        }
+        if (i < length) {
+            uint256 bound = s.genesisValidators[i].weight;
+            if (bound < amount) {
+                revert NotEnoughCollateral();
+            }
+            s.genesisValidators[i].weight -= amount;
+        } else {
+            revert NotValidator(validator);
         }
     }
 
@@ -226,7 +251,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
 
         if (!s.bootstrapped) {
             LibPower.depositWithConfirm(msg.sender, amount);
-            _patchGenesisValidators(msg.sender);
+            _increaseGenesisValidatorCollateral(msg.sender, amount);
             LibSubnetActor.bootstrapSubnetIfNeeded();
         } else {
             LibPower.deposit(msg.sender, amount);
@@ -258,6 +283,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
 
         if (!s.bootstrapped) {
             LibPower.withdrawWithConfirm(msg.sender, amount);
+            _decreaseGenesisValidatorCollateral(msg.sender, amount);
             s.collateralSource.transferFunds(payable(msg.sender), amount);
         } else {
             LibPower.withdraw(msg.sender, amount);
@@ -296,13 +322,18 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
                 LibSubnetActor.rmAddressFromBalanceKey(msg.sender);
                 s.supplySource.transferFunds(payable(msg.sender), genesisBalance);
             }
+        }
+        // stake might be racing with `bootstrapSubnetIfNeeded` so we need to check again
 
-            // interaction must be performed after checks and changes
+        // interaction must be performed after checks and changes
+        // we do check bootstrapping again, deliberately to avoid a complex exploit scenario
+        if (!s.bootstrapped) {
+            _decreaseGenesisValidatorCollateral(msg.sender, amount);
             LibPower.withdrawWithConfirm(msg.sender, amount);
             s.collateralSource.transferFunds(payable(msg.sender), amount);
-            return;
+        } else {
+            LibPower.withdraw(msg.sender, amount);
         }
-        LibPower.withdraw(msg.sender, amount);
     }
 
     /// @notice method that allows to kill the subnet when all validators left.
