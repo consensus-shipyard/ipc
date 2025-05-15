@@ -121,6 +121,7 @@ mod tests {
     fn test_serialization() {
         let mut config = Config {
             keystore_path: Some(String::from("~/.ipc")),
+            password: None,
             subnets: Default::default(),
         };
 

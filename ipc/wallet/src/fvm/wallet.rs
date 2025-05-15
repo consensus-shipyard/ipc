@@ -271,7 +271,7 @@ mod tests {
 
     fn generate_wallet() -> Wallet {
         let key_vec = construct_priv_keys();
-        Wallet::new_from_keys(KeyStore::new(KeyStoreConfig::Memory).unwrap(), key_vec)
+        Wallet::new_from_keys(KeyStore::new(KeyStoreConfig::InMemory).unwrap(), key_vec)
     }
 
     #[test]
@@ -281,7 +281,7 @@ mod tests {
         let addr = key_vec[0].address;
 
         let mut wallet =
-            Wallet::new_from_keys(KeyStore::new(KeyStoreConfig::Memory).unwrap(), key_vec);
+            Wallet::new_from_keys(KeyStore::new(KeyStoreConfig::InMemory).unwrap(), key_vec);
 
         // make sure that this address resolves to the right key
         assert_eq!(wallet.find_key(&addr).unwrap(), found_key);
@@ -308,7 +308,7 @@ mod tests {
         let priv_key_bytes = key_vec[2].key_info.private_key().clone();
         let addr = key_vec[2].address;
 
-        let keystore = KeyStore::new(KeyStoreConfig::Memory).unwrap();
+        let keystore = KeyStore::new(KeyStoreConfig::InMemory).unwrap();
         let mut wallet = Wallet::new_from_keys(keystore, key_vec);
         let msg = [0u8; 64];
 
@@ -329,7 +329,7 @@ mod tests {
     fn import_export() -> anyhow::Result<()> {
         let key_vec = construct_priv_keys();
         let key = key_vec[0].clone();
-        let keystore = KeyStore::new(KeyStoreConfig::Memory).unwrap();
+        let keystore = KeyStore::new(KeyStoreConfig::InMemory).unwrap();
         let mut wallet = Wallet::new_from_keys(keystore, key_vec);
 
         let key_info = wallet.export(&key.address).unwrap();
@@ -360,7 +360,7 @@ mod tests {
         let key_vec = construct_priv_keys();
         let mut addr_string_vec = Vec::new();
 
-        let mut key_store = KeyStore::new(KeyStoreConfig::Memory).unwrap();
+        let mut key_store = KeyStore::new(KeyStoreConfig::InMemory).unwrap();
 
         for i in &key_vec {
             addr_string_vec.push(i.address.to_string());
@@ -408,7 +408,7 @@ mod tests {
 
     #[test]
     fn get_set_default() {
-        let key_store = KeyStore::new(KeyStoreConfig::Memory).unwrap();
+        let key_store = KeyStore::new(KeyStoreConfig::InMemory).unwrap();
         let mut wallet = Wallet::new(key_store);
         // check to make sure that there is no default
         assert_eq!(wallet.get_default().unwrap_err(), Error::KeyInfo);
@@ -437,7 +437,7 @@ mod tests {
         let secp_key_info = KeyInfo::new(SignatureType::Secp256k1, secp_priv_key);
         let secp_key = Key::try_from(secp_key_info).unwrap();
         let addr = secp_key.address;
-        let key_store = KeyStore::new(KeyStoreConfig::Memory).unwrap();
+        let key_store = KeyStore::new(KeyStoreConfig::InMemory).unwrap();
         let mut wallet = Wallet::new_from_keys(key_store, vec![secp_key]);
 
         let msg = [0u8; 64];
@@ -456,7 +456,7 @@ mod tests {
         let bls_key_info = KeyInfo::new(SignatureType::BLS, bls_priv_key);
         let bls_key = Key::try_from(bls_key_info).unwrap();
         let addr = bls_key.address;
-        let key_store = KeyStore::new(KeyStoreConfig::Memory).unwrap();
+        let key_store = KeyStore::new(KeyStoreConfig::InMemory).unwrap();
         let mut wallet = Wallet::new_from_keys(key_store, vec![bls_key]);
 
         let msg = [0u8; 64];
