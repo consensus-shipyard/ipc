@@ -48,4 +48,7 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
 
       - name: Run unit tests
-        run: make test-rust
+        run: |
+          # FIXME should fetch this automatically for materializer
+          docker pull cometbft/cometbft:v0.37.x
+          make test-rust
