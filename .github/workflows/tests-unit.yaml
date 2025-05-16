@@ -47,6 +47,17 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
 
+      - name: Download Docker image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp
+
+      - name: Load Docker image
+        run: |
+          docker load --input /tmp/docker-image.tar
+          docker image ls -a
+
       - name: Run unit tests
         run: |
           # FIXME should fetch this automatically for materializer
