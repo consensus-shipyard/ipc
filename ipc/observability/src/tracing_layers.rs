@@ -42,7 +42,7 @@ where
         event.record(&mut visitor);
 
         if self.domains.is_some()
-            && !visitor.domain.map_or(false, |d| {
+            && !visitor.domain.is_some_and(|d| {
                 self.domains
                     .as_ref()
                     .unwrap()
@@ -54,7 +54,7 @@ where
         }
 
         if self.events.is_some()
-            && !visitor.event.map_or(false, |e| {
+            && !visitor.event.is_some_and(|e| {
                 self.events
                     .as_ref()
                     .unwrap()

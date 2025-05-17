@@ -274,7 +274,7 @@ async fn run(settings: Settings) -> anyhow::Result<()> {
         bottom_up_manager,
         top_down_manager,
         UpgradeScheduler::new(),
-        testing_settings.map_or(true, |t| t.push_chain_meta),
+        testing_settings.is_none_or(|t| t.push_chain_meta),
         settings.abci.block_max_msgs,
         settings.fvm.gas_overestimation_rate,
         settings.fvm.gas_search_step,
