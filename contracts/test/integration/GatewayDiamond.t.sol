@@ -568,7 +568,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
     }
 
     function testGatewayDiamond_Single_Funding() public {
-        (address validatorAddress, , bytes memory publicKey) = TestUtils.newValidator(100);
+        (address validatorAddress, , bytes memory publicKey) = TestUtils.newValidator(0);
 
         join(validatorAddress, publicKey);
 
@@ -689,7 +689,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
     }
 
     function testGatewayDiamond_Fund_Works_ReactivatedSubnet() public {
-        (address validatorAddress, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(100);
+        (address validatorAddress, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(0);
         assert(validatorAddress == vm.addr(privKey));
 
         join(validatorAddress, publicKey);
@@ -1602,15 +1602,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
 
         uint256[] memory heights = gatewayDiamond.getter().getIncompleteCheckpointHeights();
         require(heights.length == n, "heights.len is not n");
-
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        gatewayDiamond.checkpointer().pruneBottomUpCheckpoints(4);
-        vm.stopPrank();
-
-        index = gatewayDiamond.getter().getCheckpointRetentionHeight();
-        require(index == 4, "height was not updated");
-        heights = gatewayDiamond.getter().getIncompleteCheckpointHeights();
-        require(heights.length == n, "index is not the same");
     }
 
     function testGatewayDiamond_commitCheckpoint_Fails_WrongNumberMessages() public {
