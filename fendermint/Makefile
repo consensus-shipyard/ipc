@@ -54,11 +54,9 @@ e2e-only:
 	cd testing/snapshot-test && cargo make --profile $(PROFILE)
 	cd testing/graph-test    && cargo make --profile $(PROFILE)
 ifeq ($(PROFILE), release)
-	echo "@@1"
-	cargo test --release --locked --package fendermint_materializer test_topdown_and_bottomup -- --nocapture
+	cargo test --release --locked --package fendermint_materializer
 else
-	echo "@@2"
-	cargo test --locked --package fendermint_materializer test_topdown_and_bottomup -- --nocapture
+	cargo test --locked --package fendermint_materializer
 endif
 
 clean:
