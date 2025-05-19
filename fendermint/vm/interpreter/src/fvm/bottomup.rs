@@ -239,8 +239,8 @@ where
                 msgs.as_slice(),
                 &["bytes32".to_owned()],
             )?
-                .root()
-                .to_fixed_bytes()
+            .root()
+            .to_fixed_bytes()
         } else {
             [0u8; 32]
         }
