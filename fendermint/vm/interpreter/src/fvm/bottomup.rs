@@ -232,11 +232,20 @@ where
     });
 
     let total_num_msgs = msgs.len();
-    let merkle = MerkleGen::new(
-        |msg| vec![msg.clone().encode_hex()],
-        msgs.as_slice(),
-        &["bytes32".to_owned()],
-    )?;
+    let msgs_root = {
+        if total_num_msgs > 0 {
+            MerkleGen::new(
+                |msg| vec![msg.clone().encode_hex()],
+                msgs.as_slice(),
+                &["bytes32".to_owned()],
+            )?
+                .root()
+                .to_fixed_bytes()
+        } else {
+            [0u8; 32]
+        }
+    };
+
     let full_activity_rollup = state.activity_tracker().commit_activity()?;
 
     // Construct checkpoint.
@@ -247,7 +256,7 @@ where
         next_configuration_number,
         msgs: Commitment {
             total_num_msgs: total_num_msgs as u64,
-            msgs_root: merkle.root().to_fixed_bytes(),
+            msgs_root,
         },
         activity: full_activity_rollup.compressed()?,
     };
