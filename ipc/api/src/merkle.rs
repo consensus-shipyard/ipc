@@ -18,10 +18,6 @@ pub struct MerkleGen<F, E> {
 }
 
 impl<F: Fn(&E) -> Vec<String>, E> MerkleGen<F, E> {
-    pub fn root(&self) -> Hash {
-        self.tree.root()
-    }
-
     pub fn new<S: ToString>(f: F, values: &[E], fields: &[S]) -> anyhow::Result<Self> {
         let values = values.iter().map(&f).collect::<Vec<_>>();
 
@@ -34,8 +30,16 @@ impl<F: Fn(&E) -> Vec<String>, E> MerkleGen<F, E> {
         })
     }
 
+    pub fn root(&self) -> Hash {
+        self.tree.root()
+    }
+
     pub fn get_proof(&self, data: &E) -> anyhow::Result<Vec<Hash>> {
         let leaf = (self.f_gen)(data);
         self.tree.get_proof(LeafType::LeafBytes(leaf))
+    }
+
+    pub fn leaf_hash<V: ToString>(&self, leaf: &[V]) -> anyhow::Result<Hash> {
+        self.tree.leaf_hash(leaf)
     }
 }

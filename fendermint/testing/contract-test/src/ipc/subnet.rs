@@ -12,6 +12,7 @@ use fendermint_vm_message::conv::{from_eth, from_fvm};
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::crypto::signature::SECP_SIG_LEN;
 use fvm_shared::econ::TokenAmount;
+use ipc_actors_abis::gateway_getter_facet::IpcEnvelope;
 use ipc_actors_abis::subnet_actor_checkpointing_facet::{
     self as checkpointer, SubnetActorCheckpointingFacet,
 };
@@ -119,7 +120,7 @@ impl<DB: Blockstore + Clone> SubnetCaller<DB> {
         &self,
         state: &mut FvmExecState<DB>,
         checkpoint: checkpointer::BottomUpCheckpoint,
-        _messages: Vec<checkpointer::IpcEnvelope>,
+        _messages: Vec<IpcEnvelope>,
         signatures: Vec<(EthAddress, [u8; SECP_SIG_LEN])>,
     ) -> TryCallResult<()> {
         let mut addrs = Vec::new();
