@@ -7,4 +7,5 @@ remappings = [
     "@ipc/=node_modules/@consensus-shipyard/ipc-contracts/",
     ## this murky remapping is only needed transitively for testing; we should try to get rid of this.
     "murky/=node_modules/@consensus-shipyard/ipc-contracts/lib/murky/src/",
+    "ExcessivelySafeCall/=node_modules/@consensus-shipyard/ipc-contracts/lib/ExcessivelySafeCall/src/",
 ]

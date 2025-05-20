@@ -35,7 +35,7 @@ impl DockerRelayer {
     /// This assumes that the submitter and the involved parent and child
     /// subnets have been added to the `ipc-cli` config.
     #[allow(clippy::too_many_arguments)]
-    pub async fn get_or_create<'a>(
+    pub async fn get_or_create(
         root: impl AsRef<Path>,
         docker: Docker,
         dropper: DropChute,

@@ -4,6 +4,7 @@ out = "out"
 libs = ["node_modules", "lib"]
 fs_permissions = [{ access = "read-write", path = "./out"}]
 remappings = [
-    "@consensus-shipyard/=node_modules/@consensus-shipyard/"
+    "@consensus-shipyard/=node_modules/@consensus-shipyard/",
+    "ExcessivelySafeCall/=node_modules/@consensus-shipyard/ipc-contracts/lib/ExcessivelySafeCall/src/",
 ]
 allow_paths = ["../../contracts"]
