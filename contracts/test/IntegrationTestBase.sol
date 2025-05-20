@@ -309,7 +309,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         );
 
         saDiamond = createSubnetActor(saConstructorParams);
-        gatewayDiamond.manager().approveSubnet(address(saDiamond), true);
+        gatewayDiamond.manager().approveSubnet(address(saDiamond));
 
         addValidator(TOPDOWN_VALIDATOR_1, 100);
     }
@@ -1021,11 +1021,9 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     function approveSubnet(address subnet, bool shouldResumePrank) internal {
         address previousPrank = msg.sender;
         (bool isInPrank, ) = address(vm).call(abi.encodeWithSelector(vm.stopPrank.selector));
-        // console.logBytes(data);
 
         vm.prank(gatewayDiamond.ownership().owner());
-        gatewayDiamond.manager().approveSubnet(subnet, true);
-        // console.log(subnet);
+        gatewayDiamond.manager().approveSubnet(subnet);
 
         if (shouldResumePrank && isInPrank) {
             vm.prank(previousPrank);
@@ -1035,11 +1033,9 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     function approveSubnet(GatewayManagerFacet manager, address subnet, bool shouldResumePrank) internal {
         address previousPrank = msg.sender;
         (bool isInPrank, ) = address(vm).call(abi.encodeWithSelector(vm.stopPrank.selector));
-        // console.logBytes(data);
 
         vm.prank(gatewayDiamond.ownership().owner());
-        manager.approveSubnet(subnet, true);
-        // console.log(subnet);
+        manager.approveSubnet(subnet);
 
         if (shouldResumePrank && isInPrank) {
             vm.prank(previousPrank);

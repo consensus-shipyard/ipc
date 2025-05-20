@@ -31,14 +31,16 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
 
     event SubnetDestroyed(SubnetID id);
 
-    function approveSubnet(address subnet, bool isApprove) external {
+    /// @notice Owner reject a subnet from joining the gateway
+    function rejectApprovedSubnet(address subnet) external {
         LibDiamond.enforceIsContractOwner();
+        s.approvedSubnets.remove(subnet);
+    }
 
-        if (isApprove) {
-            s.approvedSubnets.add(subnet);
-        } else {
-            s.approvedSubnets.remove(subnet);
-        }
+    /// @notice Owner accepts a subnet from joining the gateway
+    function approveSubnet(address subnet) external {
+        LibDiamond.enforceIsContractOwner();
+        s.approvedSubnets.add(subnet);
     }
 
     /// @notice register a subnet in the gateway. It is called by a subnet when it reaches the threshold stake
