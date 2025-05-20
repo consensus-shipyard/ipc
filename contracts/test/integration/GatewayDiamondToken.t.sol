@@ -244,7 +244,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
 
     function approveSubnetNoResumePrank(address subnet) internal {
         vm.prank(gatewayDiamond.ownership().owner());
-        gatewayDiamond.manager().approveSubnet(subnet, true);
+        gatewayDiamond.manager().approveSubnet(subnet);
     }
 
     function createTokenSubnet(address tokenAddress) internal returns (Subnet memory) {
