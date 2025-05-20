@@ -8,7 +8,7 @@
 # The goal of this step is to copy the `Cargo.toml` and `Cargo.lock` files _without_ the source code,
 # so that we can run a step in `builder` that compiles the dependencies only. To do so we first
 # copy the whole codebase then get rid of everything except the dependencies and do a build.
-FROM --platform=$BUILDPLATFORM ubuntu:jammy as stripper
+FROM --platform=$BUILDPLATFORM ubuntu:jammy AS stripper
 
 WORKDIR /app
 
@@ -31,11 +31,28 @@ RUN echo "fn main() { println!(\"I'm the dummy.\"); }" > fendermint/app/src/main
 # with the `ubuntu` base and Rust installed.
 # Using the `jammy` version because `latest` gave a GLIBC_2.38 not found with the `debian:bookworm` runner.
 # See version at https://packages.debian.org/search?searchon=sourcenames&keywords=glibc and https://launchpad.net/ubuntu/+source/glibc
-FROM --platform=$BUILDPLATFORM ubuntu:jammy as builder
+FROM --platform=$BUILDPLATFORM ubuntu:jammy AS builder
 
 RUN apt-get update && \
   apt-get install -y build-essential clang cmake protobuf-compiler curl \
   openssl libssl-dev pkg-config
+
+RUN chsh -s $(which bash) $(whoami)
+RUN echo "x$SHELL"
+
+# install foundry
+RUN curl -L https://foundry.paradigm.xyz | bash -
+ENV PATH=${PATH}:~/.cargo/bin:~/.foundry/bin
+RUN ls -al ~/.foundry/bin && ~/.foundry/bin/foundryup
+
+# install nvm
+RUN curl -sSL -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash -
+
+# install pnpm
+ENV ENV="~/.bashrc"
+RUN echo $SHELL; curl -sSL https://get.pnpm.io/install.sh | ENV="$ENV" SHELL="$(which sh)" sh -
+ENV PATH=${PATH}:~/.local/share/pnpm
+
 
 # Get Rust
 RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y
@@ -48,7 +65,7 @@ ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
 WORKDIR /app
 
 # Update the version here if our `rust-toolchain.toml` would cause something new to be fetched every time.
-ARG RUST_VERSION=1.78
+ARG RUST_VERSION=1.85
 RUN rustup install ${RUST_VERSION} && rustup target add wasm32-unknown-unknown
 
 # Defined here so anything above it can be cached as a common dependency.
