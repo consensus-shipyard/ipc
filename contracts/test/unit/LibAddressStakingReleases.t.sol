@@ -16,8 +16,8 @@ contract AssetHelperTest is Test {
         releaseQueue.push(StakingRelease({releaseAt: 120, amount: 10}));
         releaseQueue.push(StakingRelease({releaseAt: 130, amount: 10}));
         releaseQueue.push(StakingRelease({releaseAt: 140, amount: 10}));
-        
-        uint256 amount; 
+
+        uint256 amount;
         uint16 releasesToCollect;
 
         vm.roll(99);
@@ -29,7 +29,7 @@ contract AssetHelperTest is Test {
         (amount, releasesToCollect) = releaseQueue.compact();
         require(amount == 10, "should have 10 to collect");
         require(releasesToCollect == 4, "should have 4 future releases");
-        
+
         vm.roll(121);
         (amount, releasesToCollect) = releaseQueue.compact();
         require(amount == 20, "should have 20 to collect");
@@ -39,7 +39,7 @@ contract AssetHelperTest is Test {
         (amount, releasesToCollect) = releaseQueue.compact();
         require(amount == 20, "should  have 20 to collect after block 160");
         require(releasesToCollect == 0, "should have 0 future releases");
-        
+
         vm.roll(180);
         vm.expectRevert(abi.encodeWithSelector(NoCollateralToWithdraw.selector));
         (amount, releasesToCollect) = releaseQueue.compact();
