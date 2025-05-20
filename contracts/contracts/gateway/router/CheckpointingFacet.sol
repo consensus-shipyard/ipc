@@ -79,24 +79,6 @@ contract CheckpointingFacet is GatewayActorModifiers {
         emit ActivityRollupRecorded(uint64(checkpoint.blockHeight), activity);
     }
 
-    /// @notice Set a new checkpoint retention height and garbage collect all checkpoints in range [`retentionHeight`, `newRetentionHeight`)
-    /// @dev `retentionHeight` is the height of the first incomplete checkpointswe must keep to implement checkpointing.
-    /// All checkpoints with a height less than `retentionHeight` are removed from the history, assuming they are committed to the parent.
-    /// @param newRetentionHeight - the height of the oldest checkpoint to keep
-    function pruneBottomUpCheckpoints(uint256 newRetentionHeight) external systemActorOnly {
-        // we need to clean manually the checkpoints because Solidity does not support passing
-        // a storage variable as an interface (so we can iterate and remove directly inside pruneQuorums)
-        for (uint256 h = s.checkpointQuorumMap.retentionHeight; h < newRetentionHeight; ) {
-            delete s.bottomUpCheckpoints[h];
-            delete s.bottomUpMsgBatches[h];
-            unchecked {
-                ++h;
-            }
-        }
-
-        LibQuorum.pruneQuorums(s.checkpointQuorumMap, newRetentionHeight);
-    }
-
     /// @notice checks whether the provided checkpoint signature for the block at height `height` is valid and accumulates that it
     /// @dev If adding the signature leads to reaching the threshold, then the checkpoint is removed from `incompleteCheckpoints`
     /// @param height - the height of the block in the checkpoint
