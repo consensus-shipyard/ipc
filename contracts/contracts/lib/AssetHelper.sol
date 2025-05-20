@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.23;
 
+import {ExcessivelySafeCall} from "ExcessivelySafeCall/ExcessivelySafeCall.sol";
 import {NotEnoughBalance, InvalidSubnetActor} from "../errors/IPCErrors.sol";
 import {Asset, AssetKind} from "../structs/Subnet.sol";
 import {EMPTY_BYTES} from "../constants/Constants.sol";
@@ -10,7 +11,10 @@ import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 
 /// @notice Helpers to deal with a supply source.
 library AssetHelper {
+    using ExcessivelySafeCall for address;
     using SafeERC20 for IERC20;
+
+    uint16 constant private MAX_MEMORY_SIZE = 128;
 
     /// @notice Assumes that the address provided belongs to a subnet rooted on this network,
     ///         and checks if its supply kind matches the provided one.
@@ -88,12 +92,16 @@ library AssetHelper {
         uint256 value
     ) internal returns (bool success, bytes memory ret) {
         return
-            asset.tokenAddress.call(
-        // using IERC20 transfer instead of safe transfer so we can
-        // bubble-up the failure instead of reverting on failure so we
-        // can send the receipt.
-            abi.encodePacked(IERC20.transfer.selector, abi.encode(recipient, value))
-        );
+            asset.tokenAddress.excessivelySafeCall(
+                // do not limit gas at the moment
+                gasleft(),
+                0,
+                MAX_MEMORY_SIZE,
+                // using IERC20 transfer instead of safe transfer so we can
+                // bubble-up the failure instead of reverting on failure so we
+                // can send the receipt.
+                abi.encodePacked(IERC20.transfer.selector, abi.encode(recipient, value))
+            );
     }
 
     /// @notice Calls the target with the specified data, ensuring it receives the specified value.
@@ -173,7 +181,13 @@ library AssetHelper {
             revert InvalidSubnetActor();
         }
 
-        return target.call{value: value}(data);
+        return target.excessivelySafeCall(
+                // do not limit gas at the moment
+                gasleft(),
+                value,
+                MAX_MEMORY_SIZE,
+                data
+            );
     }
 
     /**
