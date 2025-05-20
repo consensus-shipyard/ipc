@@ -31,7 +31,7 @@ macro_rules! build_print {
 /// Echo some text with a prefix
 ///
 /// ```no_run
-/// # use crate::echo;
+/// # use build_rs_utils::echo;
 /// let red = "some redish color tone";
 /// echo!("foo", cyan, "I like {red}");
 /// ```
