@@ -23,6 +23,7 @@ use fendermint_vm_topdown::IPCParentFinality;
 use ipc_actors_abis::checkpointing_facet::CheckpointingFacet;
 use ipc_actors_abis::gateway_getter_facet::GatewayGetterFacet;
 use ipc_actors_abis::gateway_getter_facet::{self as getter, gateway_getter_facet};
+use ipc_actors_abis::gateway_manager_facet::GatewayManagerFacet;
 use ipc_actors_abis::top_down_finality_facet::TopDownFinalityFacet;
 use ipc_actors_abis::xnet_messaging_facet::XnetMessagingFacet;
 use ipc_actors_abis::{checkpointing_facet, top_down_finality_facet, xnet_messaging_facet};
@@ -50,6 +51,7 @@ pub struct GatewayCaller<DB> {
         top_down_finality_facet::TopDownFinalityFacetErrors,
     >,
     xnet: ContractCaller<DB, XnetMessagingFacet<MockProvider>, NoRevert>,
+    manager: ContractCaller<DB, GatewayManagerFacet<MockProvider>, NoRevert>,
 }
 
 impl<DB> Default for GatewayCaller<DB> {
@@ -70,6 +72,7 @@ impl<DB> GatewayCaller<DB> {
             checkpointing: ContractCaller::new(addr, CheckpointingFacet::new),
             topdown: ContractCaller::new(addr, TopDownFinalityFacet::new),
             xnet: ContractCaller::new(addr, XnetMessagingFacet::new),
+            manager: ContractCaller::new(addr, GatewayManagerFacet::new),
         }
     }
 
@@ -317,6 +320,16 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         let addrs = addrs.into_iter().map(|a| a.into()).collect();
 
         Ok(addrs)
+    }
+
+    pub fn approve_subnet_joining_gateway(
+        &self,
+        state: &mut FvmExecState<DB>,
+        subnet: EthAddress,
+    ) -> anyhow::Result<()> {
+        let evm_subnet = ethers::types::Address::from(subnet);
+        self.manager.call(state, |c| c.approve_subnet(evm_subnet))?;
+        Ok(())
     }
 }
 
