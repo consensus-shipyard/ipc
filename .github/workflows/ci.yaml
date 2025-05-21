@@ -99,3 +99,14 @@ jobs:
       - build
       - unit-tests
       - e2e-tests
+
+  build-localnet-image:
+    uses: ./.github/workflows/docker-build-localnet-image.yaml
+    secrets: inherit
+    # Dependencies are not strictly necessary, but if fendermint tests pass they publish docker too, so they better work.
+    # It is because of these needs that all the filters are allowed to run on `main` too, otherwise this would be disabled.
+    # It could be done in a more granular approach inside the workflows to allow the job to pass but opt-out of testing,
+    # but I guess it doesn't hurt to run a final round of unconditional tests, even though it takes longer to publish.
+    if: github.ref == 'refs/heads/main'
+    needs:
+      - docker-publish

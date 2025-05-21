@@ -1,0 +1,39 @@
+name: Build Localnet Image
+on:
+  # Runs on non-main branches where the fendermint image must be built locally
+  pull_request:
+
+  # runs on main branch after the fendermint image has been published
+  workflow_call:
+
+jobs:
+  build-localnet-image:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+
+      - name: Install Nushell
+        run: ./deployment/set-up-nu.sh
+
+      - name: Build Localnet Image
+        working-directory: ./deployment
+        run: |
+          set -eux
+
+          source ./.nu/activate.sh
+
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            hash=$(git rev-parse --short=7 HEAD)
+            flags="--fendermint-image textile/fendermint:sha-$hash --push-multi-arch-tags textile/recall-localnet:sha-$hash,textile/recall-localnet:latest"
+          else
+            flags="--rebuild-fendermint-image --local-image-tag recall-localnet"
+          fi
+
+          ./localnet.nu build-docker-image $flags --node-count 2
