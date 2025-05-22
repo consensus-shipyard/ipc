@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::path::PathBuf;
 use strum;
@@ -9,7 +9,7 @@ use tracing_appender;
 use tracing_appender::rolling::Rotation;
 
 #[serde_as]
-#[derive(Debug, Deserialize, Clone, strum::EnumString, strum::Display)]
+#[derive(Debug, Deserialize, Serialize, Clone, strum::EnumString, strum::Display)]
 #[strum(serialize_all = "snake_case")]
 #[serde(rename_all = "lowercase")]
 pub enum RotationKind {
@@ -40,22 +40,53 @@ impl RotationKind {
         }
     }
 }
-
 #[serde_as]
-#[derive(Debug, Deserialize, Clone, Default)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TracingSettings {
+    #[serde(default = "default_console_settings")]
     pub console: Option<ConsoleLayerSettings>,
+
+    #[serde(default)] // still optional
     pub file: Option<FileLayerSettings>,
 }
 
 #[serde_as]
-#[derive(Debug, Deserialize, Clone, Default)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ConsoleLayerSettings {
+    #[serde(default = "default_log_level")]
     pub level: Option<String>,
 }
 
+pub fn default_log_level() -> Option<String> {
+    Some("info".to_string())
+}
+
+fn default_console_settings() -> Option<ConsoleLayerSettings> {
+    Some(ConsoleLayerSettings {
+        level: default_log_level(),
+    })
+}
+
+// If you still want to `#[derive(Default)]`:
+impl Default for ConsoleLayerSettings {
+    fn default() -> Self {
+        Self {
+            level: default_log_level(),
+        }
+    }
+}
+
+impl Default for TracingSettings {
+    fn default() -> Self {
+        Self {
+            console: default_console_settings(),
+            file: None,
+        }
+    }
+}
+
 #[serde_as]
-#[derive(Debug, Deserialize, Clone, Default)]
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
 pub struct FileLayerSettings {
     pub enabled: bool,
     pub level: Option<String>,

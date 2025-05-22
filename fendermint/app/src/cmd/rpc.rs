@@ -35,8 +35,8 @@ use fendermint_rpc::message::{GasParams, SignedMessageFactory};
 use fendermint_rpc::{client::FendermintClient, query::QueryClient};
 use fendermint_vm_actor_interface::eam::{self, CreateReturn, EthAddress};
 
-use super::key::read_secret_key;
 use crate::fs;
+use crate::keys::read_secret_key;
 
 cmd! {
   RpcArgs(self) {
