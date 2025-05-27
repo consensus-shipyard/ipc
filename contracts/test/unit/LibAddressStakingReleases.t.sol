@@ -18,7 +18,7 @@ contract AssetHelperTest is Test {
         releaseQueue.push(StakingRelease({releaseAt: 140, amount: 10}));
 
         uint256 amount;
-        uint16 releasesToCollect;
+        uint32 releasesToCollect;
 
         vm.roll(99);
         (amount, releasesToCollect) = releaseQueue.compact();
