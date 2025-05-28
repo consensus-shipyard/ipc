@@ -36,5 +36,30 @@ jobs:
         with:
           shared-key: build
 
+      - uses: pnpm/action-setup@v2
+
+      - name: Set up node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '21'
+          cache: 'pnpm'
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Download Docker image
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp
+
+      - name: Load Docker image
+        run: |
+          docker load --input /tmp/docker-image.tar
+          docker image ls -a
+
       - name: Run unit tests
-        run: make test-rust
+        run: |
+          # FIXME should fetch this automatically for materializer
+          docker pull cometbft/cometbft:v0.37.x
+          make test-rust

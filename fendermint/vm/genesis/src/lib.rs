@@ -227,10 +227,9 @@ impl From<PermissionMode> for PermissionModeParams {
     fn from(value: PermissionMode) -> Self {
         match value {
             PermissionMode::Unrestricted => PermissionModeParams::Unrestricted,
-            PermissionMode::AllowList { addresses } => {
-                let addresses = addresses.into_iter().map(|v| v.0).collect::<Vec<_>>();
-                PermissionModeParams::AllowList(addresses)
-            }
+            PermissionMode::AllowList { addresses } => PermissionModeParams::AllowList(
+                Vec::from_iter(addresses.into_iter().map(|addr| addr.0)),
+            ),
         }
     }
 }

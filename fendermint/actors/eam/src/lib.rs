@@ -9,7 +9,7 @@ use fil_actors_runtime::EAM_ACTOR_ID;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_ipld_encoding::tuple::*;
-use fvm_shared::address::Address;
+pub use fvm_shared::address::Address;
 use fvm_shared::{ActorID, MethodNum};
 use num_derive::FromPrimitive;
 
