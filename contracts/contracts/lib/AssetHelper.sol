@@ -14,6 +14,8 @@ library AssetHelper {
     using ExcessivelySafeCall for address;
     using SafeERC20 for IERC20;
 
+    error TransferFailed(address, address, uint256);
+
     uint16 constant private MAX_MEMORY_SIZE = 128;
 
     /// @notice Assumes that the address provided belongs to a subnet rooted on this network,
@@ -80,6 +82,19 @@ library AssetHelper {
         } else if (asset.kind == AssetKind.ERC20) {
             return ierc20Transfer(asset, recipient, value);
         }
+    }
+
+    /// @notice Transfers the specified amount out of our treasury to the recipient address. Reverts on failure.
+    function safeTransferFunds(Asset memory asset,
+        address payable recipient,
+        uint256 value
+    ) internal returns (bytes memory) {
+        (bool success, bytes memory ret) = transferFunds(asset, recipient, value);
+        if (!success) {
+            revert TransferFailed(address(this), recipient, value);
+        }
+
+        return ret;
     }
 
     /// @notice Wrapper for an IERC20 transfer that bubbles up the success or failure
