@@ -15,47 +15,42 @@ library LibAddressStakingReleases {
     /// @notice Add new release to the storage. Caller makes sure the release.releasedAt is ordered
     /// @notice in ascending order. This method does not do checks on this.
     function push(AddressStakingReleases storage self, StakingRelease memory release) internal {
-        uint16 length = self.length;
-        uint16 nextIdx = self.startIdx + length;
+        uint32 idx = self.tail;
 
-        self.releases[nextIdx] = release;
-        self.length = length + 1;
+        self.releases[idx] = release;
+        self.tail = idx + 1;
     }
 
     /// @notice Perform compaction on releases, i.e. aggregates the amount that can be released
     /// @notice and removes them from storage. Returns the total amount to release and the new
     /// @notice number of pending releases after compaction.
-    function compact(AddressStakingReleases storage self) internal returns (uint256, uint16) {
-        uint16 length = self.length;
-        if (self.length == 0) {
+    function compact(AddressStakingReleases storage self) internal returns (uint256, uint32) {
+        uint32 head = self.head;
+        uint32 tail = self.tail;
+
+        if (head == tail) {
             revert NoCollateralToWithdraw();
         }
 
-        uint16 i = self.startIdx;
-        uint16 newLength = length;
         uint256 amount;
-        while (i < length) {
-            StakingRelease memory release = self.releases[i];
-
+        for (; head < tail;) {
             // releases are ordered ascending by releaseAt, no need to check
             // further as they will still be locked.
-            if (release.releaseAt > block.number) {
+            if (self.releases[head].releaseAt > block.number) {
                 break;
             }
 
-            amount += release.amount;
-            delete self.releases[i];
+            amount += self.releases[head].amount;
+            delete self.releases[head];
 
             unchecked {
-                ++i;
-                --newLength;
+                ++head;
             }
         }
 
-        self.startIdx = i;
-        self.length = newLength;
+        self.head = head;
 
-        return (amount, newLength);
+        return (amount, tail - head);
     }
 }
 
@@ -82,7 +77,7 @@ library LibStakingReleaseQueue {
 
     /// @notice Validator claim the available collateral that are released
     function claim(StakingReleaseQueue storage self, address validator) internal returns (uint256) {
-        (uint256 amount, uint16 newLength) = self.releases[validator].compact();
+        (uint256 amount, uint32 newLength) = self.releases[validator].compact();
 
         if (newLength == 0) {
             delete self.releases[validator];
