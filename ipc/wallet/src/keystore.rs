@@ -5,7 +5,6 @@
 
 use fs::{create_dir, File};
 use fs_err as fs;
-use fvm_shared::address::Address;
 use std::{
     collections::HashMap,
     io::{BufReader, BufWriter, ErrorKind, Read, Write},

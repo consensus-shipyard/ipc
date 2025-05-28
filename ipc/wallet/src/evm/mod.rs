@@ -5,9 +5,6 @@
 
 pub(crate) mod key;
 
-use anyhow::Result;
-use key::EvmKeyInfo;
-use std::hash::Hash;
 
 pub const DEFAULT_KEYSTORE_NAME: &str = "evm_keystore.json";
 

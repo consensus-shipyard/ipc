@@ -5,7 +5,6 @@ use assert_matches::assert_matches;
 use libsecp256k1::{Message as SecpMessage, SecretKey as SecpPrivate};
 
 use super::*;
-use crate::fvm::FvmCrownJewels;
 use crate::CrownJewels;
 use crate::{generate, KeyStoreConfig};
 
@@ -63,7 +62,7 @@ fn contains_key() {
 #[test]
 fn sign() {
     let key_vec = construct_priv_keys();
-    let priv_key_bytes = key_vec[2].key_info.private_key().clone();
+    let priv_key_bytes = key_vec[2].key_info.private_key();
     let addr = key_vec[2].address;
 
     let keystore = CrownJewels::new(KeyStoreConfig::InMemory).unwrap();
@@ -74,7 +73,7 @@ fn sign() {
 
     let msg_complete = blake2b_256(&msg);
     let message = SecpMessage::parse(&msg_complete);
-    let priv_key = SecpPrivate::parse_slice(&priv_key_bytes).unwrap();
+    let priv_key = SecpPrivate::parse_slice(priv_key_bytes).unwrap();
     let (sig, recovery_id) = libsecp256k1::sign(&message, &priv_key);
     let mut new_bytes = [0; 65];
     new_bytes[..64].copy_from_slice(&sig.serialize());

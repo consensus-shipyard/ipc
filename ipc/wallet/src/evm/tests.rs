@@ -1,9 +1,8 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-use crate::evm::EvmKeyInfo;
+use crate::evm::key::EvmKeyInfo;
 use crate::{AddressDerivator, CrownJewels, DefaultKey, KeyStoreConfig};
 use std::convert::Infallible;
-use std::default;
 use std::fmt::{Display, Formatter};
 
 use super::key::EvmPersistentKeyInfo;
@@ -119,7 +118,7 @@ fn test_default() {
 
     // Create the key store again
 
-    let mut ks = EvmCrownJewelsTest::new(KeyStoreConfig::plain(&keystore_location)).unwrap();
+    let ks = EvmCrownJewelsTest::new(KeyStoreConfig::plain(&keystore_location)).unwrap();
     let key_from_store = ks.get(&addr).unwrap();
     assert_eq!(key_from_store, key_info);
     let key_from_store = ks.get(&Key::default()).unwrap();
