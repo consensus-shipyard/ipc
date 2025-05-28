@@ -9,6 +9,7 @@ use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{tuple::*, RawBytes};
 use fvm_shared::{address::Address, clock::ChainEpoch};
+use log::debug;
 use recall_ipld::{
     amt::{self, vec::TrackedFlushResult},
     hamt::{self, MapKey},
@@ -108,7 +109,13 @@ impl Expiries {
         F: FnMut(ChainEpoch, Address, ExpiryKey) -> Result<(), ActorError>,
     {
         let expiries = self.amt(&store)?;
-        let (count, next_idx) = expiries.for_each_while_ranged(
+
+        debug!(
+            "walking blobs up to epoch {} (next_index: {:?})",
+            epoch, self.next_index
+        );
+
+        let (_, next_idx) = expiries.for_each_while_ranged(
             self.next_index,
             batch_size,
             |index, per_chain_epoch_root| {
@@ -123,14 +130,9 @@ impl Expiries {
                 Ok(true)
             },
         )?;
-        self.next_index = batch_size.and(next_idx);
+        self.next_index = next_idx.filter(|&idx| idx <= epoch as u64);
 
-        log::debug!(
-            "walked {} blobs, next_index: {:?}, stop_epoch: {}",
-            count,
-            self.next_index,
-            epoch
-        );
+        debug!("walked blobs (next_index: {:?})", self.next_index,);
 
         Ok(())
     }
@@ -448,7 +450,7 @@ mod tests {
             .unwrap();
         assert_eq!(processed, vec![110, 120]);
 
-        // Extend expiry of the blob at 130 to 145 (can only extend, not reduce)
+        // Extend the expiry of the blob at 130 to 145 (can only extend, not reduce)
         let hash = hashes[2]; // blob with ttl 30
         state
             .update(

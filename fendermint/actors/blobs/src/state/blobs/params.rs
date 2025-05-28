@@ -58,6 +58,10 @@ pub struct DeleteBlobStateParams {
     pub id: SubscriptionId,
     /// Chain epoch.
     pub epoch: ChainEpoch,
+    /// Whether to skip returning credit for an over-debit.
+    /// This is needed to handle cases where multiple subscriptions are being expired in the same
+    /// epoch for the same subscriber.
+    pub skip_credit_return: bool,
 }
 
 impl DeleteBlobStateParams {
@@ -69,6 +73,33 @@ impl DeleteBlobStateParams {
             hash: params.hash,
             id: params.id,
             epoch,
+            skip_credit_return: false,
+        }
+    }
+}
+
+/// Params for setting a blob to pending state.
+#[derive(Clone, Debug)]
+pub struct SetPendingBlobStateParams {
+    /// Source Iroh node ID used for ingestion.
+    pub source: B256,
+    /// Blob blake3 hash.
+    pub hash: B256,
+    /// Blob size.
+    pub size: u64,
+    /// Identifier used to differentiate blob additions for the same subscriber.
+    pub id: SubscriptionId,
+}
+
+impl SetPendingBlobStateParams {
+    pub fn from_actor_params(
+        params: fendermint_actor_blobs_shared::blobs::SetBlobPendingParams,
+    ) -> Self {
+        Self {
+            source: params.source,
+            hash: params.hash,
+            size: params.size,
+            id: params.id,
         }
     }
 }
@@ -76,8 +107,12 @@ impl DeleteBlobStateParams {
 /// Params for finalizing a blob.
 #[derive(Clone, Debug)]
 pub struct FinalizeBlobStateParams {
+    /// Source Iroh node ID used for ingestion.
+    pub source: B256,
     /// Blob blake3 hash.
     pub hash: B256,
+    /// Blob size.
+    pub size: u64,
     /// Identifier used to differentiate blob additions for the same subscriber.
     pub id: SubscriptionId,
     /// Finalized status.
@@ -92,7 +127,9 @@ impl FinalizeBlobStateParams {
         epoch: ChainEpoch,
     ) -> Self {
         Self {
+            source: params.source,
             hash: params.hash,
+            size: params.size,
             id: params.id,
             status: params.status,
             epoch,

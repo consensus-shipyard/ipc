@@ -325,7 +325,7 @@ impl BlobsActor {
         let caller = Caller::new_delegated(rt, from, params.sponsor, CallerOption::Auth)?;
 
         let mut capacity_released = 0;
-        let (delete, size) = rt.transaction(|st: &mut State, rt| {
+        let (delete, size, _) = rt.transaction(|st: &mut State, rt| {
             let initial_capacity_used = st.blobs.bytes_size();
             let res = st.delete_blob(
                 rt.store(),
@@ -354,10 +354,10 @@ impl BlobsActor {
         Ok(())
     }
 
-    /// Deletes a blob subscription and adds another in a sinlge call.
+    /// Deletes a blob subscription and adds another in a single call.
     ///
     /// This method is more efficient than two separate calls to `delete_blob` and `add_blob`,
-    /// and is useful for some blob workflows like a replacing a key in a bucket actor.
+    /// and is useful for some blob workflows like replacing a key in a bucket actor.
     ///
     /// The `sponsor` will be the subscriber (the account responsible for payment), if it exists
     /// and there is an approval from `sponsor` to `from`.    
@@ -392,7 +392,7 @@ impl BlobsActor {
             let add_params = params.add;
 
             let initial_capacity_used = st.blobs.bytes_size();
-            let (delete, delete_size) = if overwrite {
+            let (delete, delete_size, _) = if overwrite {
                 st.delete_blob(
                     rt.store(),
                     caller.state_address(),
@@ -401,10 +401,11 @@ impl BlobsActor {
                         hash: params.old_hash,
                         id: add_params.id.clone(),
                         epoch: rt.curr_epoch(),
+                        skip_credit_return: false,
                     },
                 )?
             } else {
-                (false, 0)
+                (false, 0, false)
             };
             capacity_released = initial_capacity_used - st.blobs.bytes_size();
 
@@ -704,7 +705,7 @@ mod tests {
             Method::ApproveCredit as u64,
             IpldBlock::serialize_cbor(&approve_params).unwrap(),
         );
-        // This test should pass, but in the mock runtime, sending token to an address does not
+        // This test should pass, but in the mock runtime, sending a token to an address does not
         // create the actor, like it does in the real FVM runtime.
         // The result is that the second call to to_id_address in the approve_credit method still
         // fails after the call to send with a "not found" error.
@@ -1001,7 +1002,7 @@ mod tests {
         assert!(response.is_err());
         rt.verify();
 
-        // Try sending exact amount
+        // Try sending the exact amount
         let tokens_required_atto = add_params.size * add_params.ttl.unwrap() as u64;
         let tokens_sent = TokenAmount::from_atto(tokens_required_atto);
         rt.set_received(tokens_sent.clone());
@@ -1071,7 +1072,7 @@ mod tests {
         assert!(response.is_ok());
         rt.verify();
 
-        // Sponsors approves credit
+        // Sponsors approve credit
         rt.set_caller(*ETHACCOUNT_ACTOR_CODE_ID, sponsor_id_addr);
         rt.set_origin(sponsor_id_addr);
         rt.expect_validate_caller_any();

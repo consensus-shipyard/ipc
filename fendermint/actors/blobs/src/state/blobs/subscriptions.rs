@@ -162,6 +162,7 @@ impl Subscriptions {
         store: &BS,
         caller: &Caller<BS>,
         params: &AddBlobStateParams,
+        overlap: ChainEpoch,
         expiry: ChainEpoch,
     ) -> Result<UpsertSubscriptionResult, ActorError> {
         let mut subscriptions = self.hamt(store)?;
@@ -190,6 +191,7 @@ impl Subscriptions {
         } else {
             let subscription = Subscription {
                 added: params.epoch,
+                overlap,
                 expiry,
                 source: params.source,
                 delegate: caller.delegate_address(),
@@ -250,4 +252,446 @@ fn deserialize_iter_sub<'a>(
         ActorError::illegal_state(format!("failed to decode subscription ID from iter: {}", e))
     })?;
     Ok((subscription_id, sub))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use fendermint_actor_blobs_shared::blobs::{Subscription, SubscriptionId};
+    use fendermint_actor_blobs_testing::new_pk;
+    use fvm_ipld_blockstore::MemoryBlockstore;
+    use fvm_shared::clock::ChainEpoch;
+
+    fn create_test_subscription(
+        id: &str,
+        added: ChainEpoch,
+        expiry: ChainEpoch,
+        failed: bool,
+    ) -> (SubscriptionId, Subscription) {
+        let subscription_id = SubscriptionId::new(id).unwrap();
+        let subscription = Subscription {
+            added,
+            overlap: 0,
+            expiry,
+            source: new_pk(),
+            delegate: None,
+            failed,
+        };
+        (subscription_id, subscription)
+    }
+
+    #[test]
+    fn test_max_expiries_empty_group() {
+        let store = MemoryBlockstore::default();
+        let subscriptions = Subscriptions::new(&store).unwrap();
+
+        let target_id = SubscriptionId::new("not-exists").unwrap();
+        let (max, new_max) = subscriptions
+            .max_expiries(&store, &target_id, Some(100))
+            .unwrap();
+
+        assert_eq!(max, None, "Max expiry should be None for empty group");
+        assert_eq!(
+            new_max,
+            Some(100),
+            "New max should be the new value when group is empty"
+        );
+    }
+
+    #[test]
+    fn test_max_expiries_single_subscription() {
+        let store = MemoryBlockstore::default();
+        let mut subscriptions = Subscriptions::new(&store).unwrap();
+
+        // Add a single subscription
+        let (id, subscription) = create_test_subscription("test1", 0, 50, false);
+        subscriptions
+            .save_subscription(&store, &id, subscription)
+            .unwrap();
+
+        // Test with existing ID
+        let (max, new_max) = subscriptions.max_expiries(&store, &id, Some(100)).unwrap();
+        assert_eq!(
+            max,
+            Some(50),
+            "Max should be the existing subscription's expiry"
+        );
+        assert_eq!(new_max, Some(100), "New max should be the new value");
+
+        // Test with non-existing ID
+        let non_existing_id = SubscriptionId::new("not-exists").unwrap();
+        let (max, new_max) = subscriptions
+            .max_expiries(&store, &non_existing_id, Some(80))
+            .unwrap();
+        assert_eq!(
+            max,
+            Some(50),
+            "Max should be the existing subscription's expiry"
+        );
+        assert_eq!(
+            new_max,
+            Some(80),
+            "New max should be the new value for non-existing ID"
+        );
+    }
+
+    #[test]
+    fn test_max_expiries_multiple_subscriptions() {
+        let store = MemoryBlockstore::default();
+        let mut subscriptions = Subscriptions::new(&store).unwrap();
+
+        // Add multiple subscriptions with different expiries
+        let (id1, sub1) = create_test_subscription("test1", 0, 50, false);
+        let (id2, sub2) = create_test_subscription("test2", 0, 70, false);
+        let (id3, sub3) = create_test_subscription("test3", 0, 30, false);
+        subscriptions.save_subscription(&store, &id1, sub1).unwrap();
+        subscriptions.save_subscription(&store, &id2, sub2).unwrap();
+        subscriptions.save_subscription(&store, &id3, sub3).unwrap();
+
+        // Test updating the middle expiry
+        let (max, new_max) = subscriptions.max_expiries(&store, &id1, Some(60)).unwrap();
+        assert_eq!(max, Some(70), "Max should be the highest expiry (70)");
+        assert_eq!(
+            new_max,
+            Some(70),
+            "New max should still be 70 after update to 60"
+        );
+
+        // Test updating to the new highest expiry
+        let (max, new_max) = subscriptions.max_expiries(&store, &id1, Some(100)).unwrap();
+        assert_eq!(max, Some(70), "Max should be the highest expiry (70)");
+        assert_eq!(new_max, Some(100), "New max should be 100 after update");
+
+        // Test with non-existing ID
+        let non_existing_id = SubscriptionId::new("not-exists").unwrap();
+        let (max, new_max) = subscriptions
+            .max_expiries(&store, &non_existing_id, Some(120))
+            .unwrap();
+        assert_eq!(max, Some(70), "Max should be the highest expiry (70)");
+        assert_eq!(
+            new_max,
+            Some(120),
+            "New max should be 120 for non-existing ID"
+        );
+    }
+
+    #[test]
+    fn test_max_expiries_with_failed_subscriptions() {
+        let store = MemoryBlockstore::default();
+        let mut subscriptions = Subscriptions::new(&store).unwrap();
+
+        // Add a mix of failed and non-failed subscriptions
+        let (id1, sub1) = create_test_subscription("test1", 0, 50, true); // Failed
+        let (id2, sub2) = create_test_subscription("test2", 0, 70, false); // Not failed
+        let (id3, sub3) = create_test_subscription("test3", 0, 90, true); // Failed (highest)
+        subscriptions.save_subscription(&store, &id1, sub1).unwrap();
+        subscriptions.save_subscription(&store, &id2, sub2).unwrap();
+        subscriptions.save_subscription(&store, &id3, sub3).unwrap();
+
+        // Failed subscriptions should be ignored in max calculation
+        let (max, new_max) = subscriptions.max_expiries(&store, &id2, Some(60)).unwrap();
+        assert_eq!(
+            max,
+            Some(70),
+            "Max should only consider non-failed subscriptions (70)"
+        );
+        assert_eq!(new_max, Some(60), "New max should be 60 after update");
+
+        // Test updating a failed subscription
+        let (max, new_max) = subscriptions.max_expiries(&store, &id1, Some(100)).unwrap();
+        assert_eq!(
+            max,
+            Some(70),
+            "Max should only consider non-failed subscriptions (70)"
+        );
+        assert_eq!(
+            new_max,
+            Some(100),
+            "New max should be 100 after updating a failed subscription"
+        );
+    }
+
+    #[test]
+    fn test_max_expiries_with_none_new_value() {
+        let store = MemoryBlockstore::default();
+        let mut subscriptions = Subscriptions::new(&store).unwrap();
+
+        // Add subscriptions
+        let (id1, sub1) = create_test_subscription("test1", 0, 50, false);
+        let (id2, sub2) = create_test_subscription("test2", 0, 70, false);
+        subscriptions.save_subscription(&store, &id1, sub1).unwrap();
+        subscriptions.save_subscription(&store, &id2, sub2).unwrap();
+
+        // Test with None as new_value - should calculate without modifying
+        let (max, new_max) = subscriptions.max_expiries(&store, &id1, None).unwrap();
+        assert_eq!(max, Some(70), "Max should be the highest expiry (70)");
+        assert_eq!(
+            new_max,
+            Some(70),
+            "New max should remain 70 when target expiry is None"
+        );
+
+        // Test with target_id that doesn't exist and None as new_value
+        let non_existing_id = SubscriptionId::new("not-exists").unwrap();
+        let (max, new_max) = subscriptions
+            .max_expiries(&store, &non_existing_id, None)
+            .unwrap();
+        assert_eq!(max, Some(70), "Max should be the highest expiry (70)");
+        assert_eq!(
+            new_max,
+            Some(70),
+            "New max should remain 70 for non-existing ID with None value"
+        );
+    }
+
+    #[test]
+    fn test_max_expiries_with_zero_new_value() {
+        let store = MemoryBlockstore::default();
+        let mut subscriptions = Subscriptions::new(&store).unwrap();
+
+        // Add subscriptions
+        let (id1, sub1) = create_test_subscription("test1", 0, 50, false);
+        let (id2, sub2) = create_test_subscription("test2", 0, 70, false);
+        subscriptions.save_subscription(&store, &id1, sub1).unwrap();
+        subscriptions.save_subscription(&store, &id2, sub2).unwrap();
+
+        // Test with zero as new_value for the highest expiry
+        let (max, new_max) = subscriptions.max_expiries(&store, &id2, Some(0)).unwrap();
+        assert_eq!(max, Some(70), "Max should be the highest expiry (70)");
+        assert_eq!(
+            new_max,
+            Some(50),
+            "New max should be 50 after setting highest to 0"
+        );
+
+        // Test with zero as new_value for the lowest expiry
+        let (max, new_max) = subscriptions.max_expiries(&store, &id1, Some(0)).unwrap();
+        assert_eq!(max, Some(70), "Max should be the highest expiry (70)");
+        assert_eq!(
+            new_max,
+            Some(70),
+            "New max should be the highest expiry (70)"
+        );
+    }
+
+    #[test]
+    fn test_max_expiries_with_one_zero_new_value() {
+        let store = MemoryBlockstore::default();
+        let mut subscriptions = Subscriptions::new(&store).unwrap();
+
+        // Add subscriptions
+        let (id1, sub1) = create_test_subscription("test1", 0, 50, true);
+        let (id2, sub2) = create_test_subscription("test2", 0, 70, false);
+        subscriptions.save_subscription(&store, &id1, sub1).unwrap();
+        subscriptions.save_subscription(&store, &id2, sub2).unwrap();
+
+        // Test with zero as new_value for the highest expiry
+        let (max, new_max) = subscriptions.max_expiries(&store, &id2, Some(0)).unwrap();
+        assert_eq!(max, Some(70), "Max should be the highest expiry (70)");
+        assert_eq!(
+            new_max, None,
+            "New max should be None after setting highest to 0"
+        );
+
+        // Test with zero as new_value for the lowest expiry
+        let (max, new_max) = subscriptions.max_expiries(&store, &id1, Some(0)).unwrap();
+        assert_eq!(max, Some(70), "Max should be the highest expiry (70)");
+        assert_eq!(
+            new_max,
+            Some(70),
+            "New max should be the highest expiry (70)"
+        );
+    }
+
+    #[test]
+    fn test_is_min_added_empty_group() {
+        let store = MemoryBlockstore::default();
+        let subscriptions = Subscriptions::new(&store).unwrap();
+
+        let target_id = SubscriptionId::new("nonexistent").unwrap();
+        let result = subscriptions.is_min_added(&store, &target_id);
+
+        // This should return not found error since no subscription exists
+        assert!(result.is_err());
+
+        // Verify it's the expected error type
+        match result {
+            Err(e) => {
+                assert!(e.to_string().contains("not found"));
+                assert!(e.to_string().contains("nonexistent"));
+            }
+            _ => panic!("Expected not found error"),
+        }
+    }
+
+    #[test]
+    fn test_is_min_added_single_subscription() {
+        let store = MemoryBlockstore::default();
+        let mut subscriptions = Subscriptions::new(&store).unwrap();
+
+        // Add a single subscription
+        let (id, subscription) = create_test_subscription("test1", 100, 200, false);
+        subscriptions
+            .save_subscription(&store, &id, subscription)
+            .unwrap();
+
+        // Check if it's the minimum (it should be since it's the only one)
+        let (is_min, next_min) = subscriptions.is_min_added(&store, &id).unwrap();
+        assert!(is_min, "Single subscription should be minimum");
+        assert_eq!(next_min, None, "No next minimum should exist");
+    }
+
+    #[test]
+    fn test_is_min_added_multiple_subscriptions_is_min() {
+        let store = MemoryBlockstore::default();
+        let mut subscriptions = Subscriptions::new(&store).unwrap();
+
+        // Add multiple subscriptions with the first having the earliest added timestamp
+        let (id1, sub1) = create_test_subscription("test1", 100, 200, false);
+        let (id2, sub2) = create_test_subscription("test2", 150, 250, false);
+        let (id3, sub3) = create_test_subscription("test3", 200, 300, false);
+        subscriptions.save_subscription(&store, &id1, sub1).unwrap();
+        subscriptions.save_subscription(&store, &id2, sub2).unwrap();
+        subscriptions.save_subscription(&store, &id3, sub3).unwrap();
+
+        // Check if id1 is the minimum (it should be)
+        let (is_min, next_min) = subscriptions.is_min_added(&store, &id1).unwrap();
+        assert!(
+            is_min,
+            "Subscription with earliest added timestamp should be minimum"
+        );
+        assert_eq!(next_min, Some(150), "Next minimum should be 150 (from id2)");
+    }
+
+    #[test]
+    fn test_is_min_added_multiple_subscriptions_not_min() {
+        let store = MemoryBlockstore::default();
+        let mut subscriptions = Subscriptions::new(&store).unwrap();
+
+        // Add multiple subscriptions with the second one not being the earliest
+        let (id1, sub1) = create_test_subscription("test1", 100, 200, false);
+        let (id2, sub2) = create_test_subscription("test2", 150, 250, false);
+        let (id3, sub3) = create_test_subscription("test3", 200, 300, false);
+        subscriptions.save_subscription(&store, &id1, sub1).unwrap();
+        subscriptions.save_subscription(&store, &id2, sub2).unwrap();
+        subscriptions.save_subscription(&store, &id3, sub3).unwrap();
+
+        // Check if id2 is the minimum (it shouldn't be)
+        let (is_min, next_min) = subscriptions.is_min_added(&store, &id2).unwrap();
+        assert!(
+            !is_min,
+            "Subscription with later added timestamp should not be minimum"
+        );
+        assert_eq!(
+            next_min, None,
+            "Next minimum should be None when not the minimum"
+        );
+    }
+
+    #[test]
+    fn test_is_min_added_equal_timestamps() {
+        let store = MemoryBlockstore::default();
+        let mut subscriptions = Subscriptions::new(&store).unwrap();
+
+        // Add multiple subscriptions with equal earliest timestamps
+        let (id1, sub1) = create_test_subscription("test1", 100, 200, false);
+        let (id2, sub2) = create_test_subscription("test2", 100, 250, false);
+        let (id3, sub3) = create_test_subscription("test3", 200, 300, false);
+        subscriptions.save_subscription(&store, &id1, sub1).unwrap();
+        subscriptions.save_subscription(&store, &id2, sub2).unwrap();
+        subscriptions.save_subscription(&store, &id3, sub3).unwrap();
+
+        // Check id1 - both id1 and id2 have the same timestamp
+        let (is_min, next_min) = subscriptions.is_min_added(&store, &id1).unwrap();
+        assert!(
+            is_min,
+            "Subscription with equal earliest timestamp should be minimum"
+        );
+        assert_eq!(next_min, Some(100), "Next minimum should be 100 (from id2)");
+
+        // Check id2 - both id1 and id2 have the same timestamp
+        let (is_min, next_min) = subscriptions.is_min_added(&store, &id2).unwrap();
+        assert!(
+            is_min,
+            "Subscription with equal earliest timestamp should be minimum"
+        );
+        assert_eq!(next_min, Some(100), "Next minimum should be 100 (from id1)");
+    }
+
+    #[test]
+    fn test_is_min_added_with_failed_subscriptions() {
+        let store = MemoryBlockstore::default();
+        let mut subscriptions = Subscriptions::new(&store).unwrap();
+
+        // Add multiple subscriptions with failed ones having earlier timestamps
+        let (id1, sub1) = create_test_subscription("test1", 50, 150, true); // Failed (earliest)
+        let (id2, sub2) = create_test_subscription("test2", 100, 200, false); // Not failed (should be min)
+        let (id3, sub3) = create_test_subscription("test3", 75, 175, true); // Failed (between id1 and id2)
+        let (id4, sub4) = create_test_subscription("test4", 150, 250, false); // Not failed (later)
+        subscriptions.save_subscription(&store, &id1, sub1).unwrap();
+        subscriptions.save_subscription(&store, &id2, sub2).unwrap();
+        subscriptions.save_subscription(&store, &id3, sub3).unwrap();
+        subscriptions.save_subscription(&store, &id4, sub4).unwrap();
+
+        // Check if id2 is the minimum (it should be since failed ones are ignored)
+        let (is_min, next_min) = subscriptions.is_min_added(&store, &id2).unwrap();
+        assert!(
+            is_min,
+            "Non-failed subscription with earliest timestamp should be minimum"
+        );
+        assert_eq!(next_min, Some(150), "Next minimum should be 150 (from id4)");
+
+        // Check a failed subscription
+        let (is_min, next_min) = subscriptions.is_min_added(&store, &id1).unwrap();
+        assert!(is_min, "Failed subscription is checked against itself"); // This is somewhat counterintuitive
+        assert_eq!(next_min, Some(100), "Next minimum should be 100 (from id2)");
+    }
+
+    #[test]
+    fn test_is_min_added_all_other_subscriptions_are_failed() {
+        let store = MemoryBlockstore::default();
+        let mut subscriptions = Subscriptions::new(&store).unwrap();
+
+        // Add multiple subscriptions where all others are failed
+        let (id1, sub1) = create_test_subscription("test1", 100, 200, true); // Failed
+        let (id2, sub2) = create_test_subscription("test2", 150, 250, false); // Only non-failed subscription
+        let (id3, sub3) = create_test_subscription("test3", 50, 150, true); // Failed, earliest
+        subscriptions.save_subscription(&store, &id1, sub1).unwrap();
+        subscriptions.save_subscription(&store, &id2, sub2).unwrap();
+        subscriptions.save_subscription(&store, &id3, sub3).unwrap();
+
+        // Check if id2 is the minimum (it should be since all others are failed)
+        let (is_min, next_min) = subscriptions.is_min_added(&store, &id2).unwrap();
+        assert!(is_min, "Only non-failed subscription should be minimum");
+        assert_eq!(
+            next_min, None,
+            "No next minimum should exist when all others are failed"
+        );
+    }
+
+    #[test]
+    fn test_is_min_added_with_nonexistent_id() {
+        let store = MemoryBlockstore::default();
+        let mut subscriptions = Subscriptions::new(&store).unwrap();
+
+        // Add some subscriptions
+        let (id1, sub1) = create_test_subscription("test1", 100, 200, false);
+        let (id2, sub2) = create_test_subscription("test2", 150, 250, false);
+        subscriptions.save_subscription(&store, &id1, sub1).unwrap();
+        subscriptions.save_subscription(&store, &id2, sub2).unwrap();
+
+        // Check with nonexistent ID
+        let nonexistent_id = SubscriptionId::new("nonexistent").unwrap();
+        let result = subscriptions.is_min_added(&store, &nonexistent_id);
+
+        // Should return a "not found" error
+        assert!(result.is_err());
+        match result {
+            Err(e) => {
+                assert!(e.to_string().contains("not found"));
+                assert!(e.to_string().contains("nonexistent"));
+            }
+            _ => panic!("Expected not found error"),
+        }
+    }
 }

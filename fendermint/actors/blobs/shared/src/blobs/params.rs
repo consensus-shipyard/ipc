@@ -15,7 +15,7 @@ pub struct AddBlobParams {
     /// Address of the entity adding the blob.
     pub from: Address,
     /// Optional sponsor address.
-    /// Origin or caller must still have a delegation from sponsor.
+    /// Origin or caller must still have a delegation from a sponsor.
     pub sponsor: Option<Address>,
     /// Source Iroh node ID used for ingestion.
     pub source: B256,
@@ -77,11 +77,15 @@ pub struct SetBlobPendingParams {
 /// Params for finalizing a blob.
 #[derive(Clone, Debug, Serialize_tuple, Deserialize_tuple)]
 pub struct FinalizeBlobParams {
+    /// Source Iroh node ID used for ingestion.
+    pub source: B256,
     /// The address that requested the blob.
     /// This could be a wallet or machine.
     pub subscriber: Address,
     /// Blob blake3 hash.
     pub hash: B256,
+    /// Blob size.
+    pub size: u64,
     /// Identifier used to differentiate blob additions for the same subscriber.
     pub id: SubscriptionId,
     /// The status to set as final.
@@ -94,7 +98,7 @@ pub struct DeleteBlobParams {
     /// Account address that initiated the deletion.
     pub from: Address,
     /// Optional sponsor address.
-    /// Origin or caller must still have a delegation from sponsor.
+    /// Origin or caller must still have a delegation from a sponsor.
     /// Must be used if the caller is the delegate who added the blob.
     pub sponsor: Option<Address>,
     /// Blob blake3 hash.

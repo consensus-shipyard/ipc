@@ -167,7 +167,7 @@ impl Blobs {
 
     /// Releases subnet bytes capacity.
     pub fn release_capacity(&mut self, size: u64) {
-        self.bytes_size -= size;
+        self.bytes_size = self.bytes_size.saturating_sub(size);
 
         debug!("released {} bytes to subnet", size);
     }
@@ -189,7 +189,7 @@ impl Blobs {
     ) -> Result<Option<GetBlobResult>, ActorError> {
         let blobs_hamt = self.hamt(store)?;
 
-        // Early return if blob doesn't exist
+        // Early return if the blob doesn't exist
         let blob = match blobs_hamt.get(&hash)? {
             Some(blob) => blob,
             None => return Ok(None),
@@ -257,8 +257,10 @@ impl Blobs {
 
         // Update blob status and added index if the blob is not already resolved
         if !matches!(blob.status, BlobStatus::Resolved) {
-            // It's pending or failed, reset to added status
-            blob.status = BlobStatus::Added;
+            // If failed, reset to added state
+            if matches!(blob.status, BlobStatus::Failed) {
+                blob.status = BlobStatus::Added;
+            }
 
             // Add to or update the source in the added queue
             self.added.upsert(
@@ -293,15 +295,14 @@ impl Blobs {
 
         self.save_tracked(blobs.set_and_flush_tracked(&params.hash, blob)?);
 
-        if blob_added {
-            debug!("created new blob {}", params.hash);
-        }
-
         // Update global state
         if blob_added {
-            self.bytes_size += params.size;
+            self.bytes_size = self.bytes_size.saturating_add(params.size);
 
             debug!("used {} bytes from subnet", params.size);
+            debug!("created new blob {}", params.hash);
+        } else {
+            debug!("used 0 bytes from subnet");
         }
 
         Ok(UpsertBlobResult {
@@ -320,7 +321,7 @@ impl Blobs {
     ///
     /// This function updates multiple related data structures after a blob has been retrieved:
     /// 1. Update the subscription state in subscriptions collection
-    /// 2. Update the subscription list for the subscriber
+    /// 2. Update the subscription list for subscriber
     /// 3. Update the blob entry in the blobs HAMT
     ///
     /// This function ensures that all state changes from a blob retrieval operation are
@@ -355,7 +356,7 @@ impl Blobs {
     /// 2. Remove the blob source from the "added" queue
     /// 3. Remove the blob source from the "pending" queue
     /// 4. Delete the subscription from the subscriber's subscriptions
-    /// 5. If the subscriber has no remaining subscriptions to the blob, remove the subscriber
+    /// 5. If the subscriber has no remaining subscriptions to the blob, remove subscriber
     /// 6. If no subscribers remain for the blob, delete the blob entirely
     pub fn delete_subscription<BS: Blockstore>(
         &mut self,
@@ -377,7 +378,7 @@ impl Blobs {
         // Remove the source from the added queue
         self.added.remove_source(
             store,
-            hash,
+            &hash,
             blob_result.blob.size,
             BlobSource::new(
                 caller.subscriber_address(),
@@ -389,7 +390,7 @@ impl Blobs {
         // Remove the source from the pending queue
         self.pending.remove_source(
             store,
-            hash,
+            &hash,
             blob_result.blob.size,
             BlobSource::new(
                 caller.subscriber_address(),
@@ -430,6 +431,10 @@ impl Blobs {
             if blob_deleted {
                 self.save_tracked(blobs_hamt.delete_and_flush_tracked(&hash)?.0);
                 debug!("deleted blob {}", hash);
+            } else {
+                self.save_tracked(
+                    blobs_hamt.set_and_flush_tracked(&hash, blob_result.blob.clone())?,
+                );
             }
             blob_deleted
         } else {
@@ -445,69 +450,5 @@ impl Blobs {
         };
 
         Ok(blob_deleted)
-    }
-
-    /// Marks a blob as pending resolution.
-    ///
-    /// This method transitions a blob from 'added' to 'pending' state, indicating that its
-    /// resolution process has started. It updates the blob's status and moves it from the
-    /// 'added' queue to the 'pending' queue.
-    pub fn set_pending<BS: Blockstore>(
-        &mut self,
-        store: &BS,
-        subscriber: Address,
-        hash: B256,
-        size: u64,
-        id: SubscriptionId,
-        source: B256,
-    ) -> Result<(), ActorError> {
-        let mut blobs = self.hamt(store)?;
-        let mut blob = if let Some(blob) = blobs.get(&hash)? {
-            blob
-        } else {
-            // The blob may have been deleted before it was set to pending
-            return Ok(());
-        };
-
-        // Check if the blob's size matches the size provided when it was added
-        if blob.size != size {
-            return Err(ActorError::assertion_failed(format!(
-                "blob {} size mismatch (expected: {}; actual: {})",
-                hash, size, blob.size
-            )));
-        }
-
-        // Update status
-        blob.status = BlobStatus::Pending;
-
-        // Add the source to the pending queue
-        self.pending.upsert(
-            store,
-            hash,
-            BlobSource::new(subscriber, id, source),
-            blob.size,
-        )?;
-
-        // Remove entire blob entry from the added queue
-        self.added.remove_entry(store, &hash, blob.size)?;
-
-        // Save blob
-        self.save_tracked(blobs.set_and_flush_tracked(&hash, blob)?);
-
-        Ok(())
-    }
-
-    /// Removes a blob source from the pending queue.
-    ///
-    /// This method is typically called when a blob has been successfully processed
-    /// and should no longer be considered pending.
-    pub fn remove_pending_source<BS: Blockstore>(
-        &mut self,
-        store: &BS,
-        hash: B256,
-        size: u64,
-        source: BlobSource,
-    ) -> Result<(), ActorError> {
-        self.pending.remove_source(store, hash, size, source)
     }
 }

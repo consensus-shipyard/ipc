@@ -17,6 +17,8 @@ use crate::bytes::B256;
 pub struct Subscription {
     /// Added block.
     pub added: ChainEpoch,
+    /// Overlap with initial group expiry.
+    pub overlap: ChainEpoch,
     /// Expiry block.
     pub expiry: ChainEpoch,
     /// Source Iroh node ID used for ingestion.

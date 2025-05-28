@@ -15,6 +15,7 @@ use fvm_ipld_blockstore::{Blockstore, MemoryBlockstore};
 use fvm_shared::{address::Address, clock::ChainEpoch, econ::TokenAmount};
 use num_traits::Zero;
 
+use crate::state::blobs::SetPendingBlobStateParams;
 use crate::{
     caller::DelegationOptions,
     state::blobs::{AddBlobStateParams, FinalizeBlobStateParams},
@@ -30,7 +31,7 @@ fn test_set_account_status() {
 
     struct TestCase {
         name: &'static str,
-        initial_ttl_status: Option<AccountStatus>, // None means don't set initial status
+        initial_ttl_status: Option<AccountStatus>, // None means don't set the initial status
         new_ttl_status: AccountStatus,
         expected_ttl: ChainEpoch,
     }
@@ -221,7 +222,16 @@ fn debit_accounts_delete_from_disc<BS: Blockstore>(
     assert_eq!(stats.bytes_added, size);
 
     // Set to status pending
-    let res = state.set_blob_pending(&store, subscriber, hash, size, id1.clone(), source);
+    let res = state.set_blob_pending(
+        &store,
+        subscriber,
+        SetPendingBlobStateParams {
+            hash,
+            size,
+            id: id1.clone(),
+            source,
+        },
+    );
     assert!(res.is_ok());
     let stats = state.get_stats(config, TokenAmount::zero());
     assert_eq!(stats.num_blobs, 1);
@@ -236,7 +246,9 @@ fn debit_accounts_delete_from_disc<BS: Blockstore>(
         &store,
         subscriber,
         FinalizeBlobStateParams {
+            source,
             hash,
+            size,
             id: id1.clone(),
             status: BlobStatus::Resolved,
             epoch: finalize_epoch,
@@ -308,7 +320,7 @@ fn debit_accounts_delete_from_disc<BS: Blockstore>(
     let group = subscribers.get(&subscriber).unwrap().unwrap();
     assert_eq!(group.len(), 2);
 
-    // Debit all accounts at an epoch between the two expiries (3601-3621)
+    // Debit all the accounts at an epoch between the two expiries (3601-3621)
     let debit_epoch = ChainEpoch::from(config.blob_min_ttl + 11);
     let (deletes_from_disc, _) = state.debit_accounts(&store, config, debit_epoch).unwrap();
     assert!(deletes_from_disc.is_empty());
@@ -329,7 +341,7 @@ fn debit_accounts_delete_from_disc<BS: Blockstore>(
     let group = subscribers.get(&subscriber).unwrap().unwrap();
     assert_eq!(group.len(), 1); // the first subscription was deleted
 
-    // Debit all accounts at an epoch greater than group expiry (3621)
+    // Debit all the accounts at an epoch greater than group expiry (3621)
     let debit_epoch = ChainEpoch::from(config.blob_min_ttl + 31);
     let (deletes_from_disc, _) = state.debit_accounts(&store, config, debit_epoch).unwrap();
     assert!(!deletes_from_disc.is_empty()); // blob is marked for deletion

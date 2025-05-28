@@ -212,7 +212,7 @@ impl<'a, BS: Blockstore> Caller<'a, BS> {
         cost: &Credit,
         current_epoch: ChainEpoch,
     ) -> Result<(), ActorError> {
-        // Check subscriber's free credit
+        // Check the subscriber's free credit
         if &self.subscriber().credit_free < cost {
             return Err(ActorError::insufficient_funds(format!(
                 "account {} has insufficient credit (available: {}; required: {})",
@@ -223,13 +223,14 @@ impl<'a, BS: Blockstore> Caller<'a, BS> {
         }
         match self {
             Self::Default((_, account)) => {
-                account.capacity_used += size;
+                account.capacity_used = account.capacity_used.saturating_add(size);
                 account.credit_free -= cost;
                 account.credit_committed += cost;
             }
             Self::Sponsored(delegation) => {
                 delegation.use_credit_allowance(cost, current_epoch)?;
-                delegation.from_account.capacity_used += size;
+                delegation.from_account.capacity_used =
+                    delegation.from_account.capacity_used.saturating_add(size);
                 delegation.from_account.credit_free -= cost;
                 delegation.from_account.credit_committed += cost;
             }
@@ -249,13 +250,14 @@ impl<'a, BS: Blockstore> Caller<'a, BS> {
     pub fn release_capacity(&mut self, size: u64, cost: &Credit) {
         match self {
             Self::Default((_, account)) => {
-                account.capacity_used -= size;
+                account.capacity_used = account.capacity_used.saturating_sub(size);
                 account.credit_free += cost;
                 account.credit_committed -= cost;
             }
             Self::Sponsored(delegation) => {
                 delegation.return_credit_allowance(cost);
-                delegation.from_account.capacity_used -= size;
+                delegation.from_account.capacity_used =
+                    delegation.from_account.capacity_used.saturating_sub(size);
                 delegation.from_account.credit_free += cost;
                 delegation.from_account.credit_committed -= cost;
             }
@@ -415,7 +417,7 @@ impl<'a, BS: Blockstore> Caller<'a, BS> {
             Self::Default(_) => Ok(()),
             Self::Sponsored(delegation) => {
                 delegation.cancel(accounts)?;
-                // Delegation is now invalid, convert to default caller type
+                // Delegation is now invalid, convert to the default caller type
                 *self = Self::Default((delegation.to, delegation.to_account.clone()));
                 Ok(())
             }
@@ -723,7 +725,7 @@ impl<'a, BS: Blockstore> Delegation<'a, &'a BS> {
         allowance
     }
 
-    /// Validates whether the delegation has valid expiry for the epoch.
+    /// Verifies that the delegation's expiry is valid for the current epoch.
     pub fn validate_expiration(&self, current_epoch: ChainEpoch) -> Result<(), ActorError> {
         self.approval_from.validate_expiration(current_epoch)?;
         self.approval_to.validate_expiration(current_epoch)?;

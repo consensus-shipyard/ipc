@@ -13,12 +13,17 @@ use fendermint_actor_blobs_shared::{
 use fendermint_actor_recall_config_shared::RecallConfig;
 use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::Blockstore;
-use fvm_shared::{address::Address, bigint::BigInt, clock::ChainEpoch, econ::TokenAmount};
+use fvm_shared::{
+    address::Address, bigint::BigInt, clock::ChainEpoch, econ::TokenAmount, error::ExitCode,
+};
 use log::debug;
 use num_traits::Zero;
 use recall_ipld::hamt::BytesKey;
 
-use super::{AddBlobStateParams, Blob, BlobSource, DeleteBlobStateParams, FinalizeBlobStateParams};
+use super::{
+    AddBlobStateParams, Blob, BlobSource, DeleteBlobStateParams, FinalizeBlobStateParams,
+    SetPendingBlobStateParams,
+};
 use crate::{caller::Caller, state::credit::CommitCapacityParams, State};
 
 /// Return type for blob queues.
@@ -59,14 +64,16 @@ impl State {
 
         // Validate the TTL
         let ttl = caller.validate_ttl_usage(config, params.ttl)?;
-        let expiry = i64::saturating_add(params.epoch, ttl);
+        let expiry = params.epoch.saturating_add(ttl);
 
         // Get or create a new blob
         let result = self.blobs.upsert(store, &caller, &params, expiry)?;
 
         // Determine credit commitments
         let credit_return = self.get_storage_cost(result.return_duration, &params.size);
-        self.return_committed_credit_for_caller(&mut caller, &credit_return);
+        if credit_return.is_positive() {
+            self.return_committed_credit_for_caller(&mut caller, &credit_return);
+        }
         let credit_required = self.get_storage_cost(result.commit_duration, &params.size);
 
         // Account capacity is changing, debit for existing usage
@@ -84,8 +91,10 @@ impl State {
                     epoch: params.epoch,
                 },
             )?
-        } else {
+        } else if credit_required.is_negative() {
             self.release_capacity_for_caller(&mut caller, 0, &-credit_required);
+            params.token_amount
+        } else {
             params.token_amount
         };
 
@@ -190,7 +199,7 @@ impl State {
             .collect()
     }
 
-    /// Marks a blob as pending resolution.
+    /// Marks a blob as being in the pending resolution state.
     ///
     /// This method transitions a blob from 'added' to 'pending' state, indicating that its
     /// resolution process has started. It updates the blob's status and moves it from the
@@ -201,13 +210,92 @@ impl State {
         &mut self,
         store: &BS,
         subscriber: Address,
-        hash: B256,
-        size: u64,
-        id: SubscriptionId,
-        source: B256,
+        params: SetPendingBlobStateParams,
     ) -> Result<(), ActorError> {
+        // Get the blob
+        let mut blob = match self
+            .blobs
+            .get_and_hydrate(store, subscriber, params.hash, &params.id)
+        {
+            Ok(Some(result)) => result,
+            Ok(None) => {
+                // Blob might have been deleted already
+                // Remove the entire blob entry from the added queue
+                self.blobs
+                    .added
+                    .remove_entry(store, &params.hash, params.size)?;
+                return Ok(());
+            }
+            Err(err)
+                if err.exit_code() == ExitCode::USR_FORBIDDEN
+                    || err.exit_code() == ExitCode::USR_NOT_FOUND =>
+            {
+                // Blob might not be accessible (forbidden or not found)
+                // Remove the source from the added queue
+                self.blobs.added.remove_source(
+                    store,
+                    &params.hash,
+                    params.size,
+                    BlobSource::new(subscriber, params.id.clone(), params.source),
+                )?;
+                return Ok(());
+            }
+            Err(err) => return Err(err),
+        };
+
+        // Check the current status
+        match blob.blob.status {
+            BlobStatus::Resolved => {
+                // Blob is already finalized as resolved.
+                // Remove the entire blob entry from the added queue
+                self.blobs
+                    .added
+                    .remove_entry(store, &params.hash, params.size)?;
+                return Ok(());
+            }
+            BlobStatus::Failed => {
+                return Err(ActorError::illegal_state(format!(
+                    "blob {} cannot be set to pending from status failed",
+                    params.hash
+                )));
+            }
+            _ => {}
+        }
+
+        // Check if the blob's size matches the size provided when it was added
+        if blob.blob.size != params.size {
+            return Err(ActorError::assertion_failed(format!(
+                "blob {} size mismatch (expected: {}; actual: {})",
+                params.hash, params.size, blob.blob.size
+            )));
+        }
+
+        // Update status
+        blob.blob.status = BlobStatus::Pending;
+
+        // Add the source to the pending queue
+        self.blobs.pending.upsert(
+            store,
+            params.hash,
+            BlobSource::new(subscriber, params.id.clone(), params.source),
+            params.size,
+        )?;
+
+        // Remove the source from the added queue
+        self.blobs.added.remove_source(
+            store,
+            &params.hash,
+            params.size,
+            BlobSource::new(subscriber, params.id.clone(), params.source),
+        )?;
+
+        // Save blob
         self.blobs
-            .set_pending(store, subscriber, hash, size, id, source)
+            .save_result(store, subscriber, params.hash, &params.id, &mut blob)?;
+
+        debug!("set blob {} to pending", params.hash);
+
+        Ok(())
     }
 
     /// Finalizes a blob's resolution process with a success or failure status.
@@ -222,7 +310,7 @@ impl State {
         store: &BS,
         subscriber: Address,
         params: FinalizeBlobStateParams,
-    ) -> Result<(), ActorError> {
+    ) -> Result<bool, ActorError> {
         // Validate incoming status
         if matches!(params.status, BlobStatus::Added | BlobStatus::Pending) {
             return Err(ActorError::illegal_state(format!(
@@ -232,28 +320,65 @@ impl State {
         }
 
         // Get the blob
-        let mut blob =
-            match self
-                .blobs
-                .get_and_hydrate(store, subscriber, params.hash, &params.id)?
+        let mut blob = match self
+            .blobs
+            .get_and_hydrate(store, subscriber, params.hash, &params.id)
+        {
+            Ok(Some(result)) => result,
+            Ok(None) => {
+                debug!("blob not found {} (id: {})", params.hash, params.id);
+                // Blob might have been deleted already
+                // Remove the entire blob entry from the pending queue
+                self.blobs
+                    .pending
+                    .remove_entry(store, &params.hash, params.size)?;
+                return Ok(false);
+            }
+            Err(err)
+                if err.exit_code() == ExitCode::USR_FORBIDDEN
+                    || err.exit_code() == ExitCode::USR_NOT_FOUND =>
             {
-                Some(result) => result,
-                None => {
-                    // The blob may have been deleted before it was finalized
-                    return Ok(());
-                }
-            };
+                debug!("blob error {} {} (id: {})", params.hash, err, params.id);
+                // Blob might not be accessible (forbidden or not found)
+                // Remove the entire blob entry from the pending queue
+                self.blobs.pending.remove_source(
+                    store,
+                    &params.hash,
+                    params.size,
+                    BlobSource::new(subscriber, params.id.clone(), params.source),
+                )?;
+                return Ok(false);
+            }
+            Err(err) => return Err(err),
+        };
 
         // Check the current status
-        if matches!(blob.blob.status, BlobStatus::Added) {
-            return Err(ActorError::illegal_state(format!(
-                "blob {} cannot be finalized from status added",
-                params.hash
+        match blob.blob.status {
+            BlobStatus::Added => {
+                return Err(ActorError::illegal_state(format!(
+                    "blob {} cannot be finalized from status added",
+                    params.hash
+                )));
+            }
+            BlobStatus::Resolved => {
+                debug!("blob already resolved {} (id: {})", params.hash, params.id);
+                // Blob is already finalized as resolved.
+                // We can ignore later finalizations, even if they are failed.
+                // Remove the entire blob entry from the pending queue
+                self.blobs
+                    .pending
+                    .remove_entry(store, &params.hash, blob.blob.size)?;
+                return Ok(false);
+            }
+            _ => {}
+        }
+
+        // Check if the blob's size matches the size provided when it was added
+        if blob.blob.size != params.size {
+            return Err(ActorError::assertion_failed(format!(
+                "blob {} size mismatch (expected: {}; actual: {})",
+                params.hash, params.size, blob.blob.size
             )));
-        } else if matches!(blob.blob.status, BlobStatus::Resolved) {
-            // Blob is already finalized as resolved.
-            // We can ignore later finalizations, even if they are failed.
-            return Ok(());
         }
 
         // Load the caller account and delegation.
@@ -267,7 +392,7 @@ impl State {
 
         // Update blob status
         blob.blob.status = params.status.clone();
-        if matches!(blob.blob.status, BlobStatus::Failed) {
+        if matches!(blob.blob.status, BlobStatus::Failed) && !blob.subscription.failed {
             // Mark the subscription as failed
             blob.subscription.failed = true;
 
@@ -279,47 +404,42 @@ impl State {
                     .max_expiries(store, &params.id, Some(0))?;
             let (sub_is_min_added, next_min_added) =
                 blob.subscriptions.is_min_added(store, &params.id)?;
-            let group_expiry = group_expiry.unwrap(); // safe here
-            let size = blob.blob.size;
             let last_debit_epoch = caller.subscriber().last_debit_epoch;
             if last_debit_epoch > blob.subscription.added && sub_is_min_added {
                 // The refund extends up to either the next minimum added epoch that is less
                 // than the last debit epoch, or the last debit epoch.
-                let cutoff = next_min_added
-                    .unwrap_or(last_debit_epoch)
-                    .min(last_debit_epoch);
-                let refund_credits = self.get_storage_cost(cutoff - blob.subscription.added, &size);
-                let correction_credits = if cutoff > group_expiry {
-                    self.get_storage_cost(cutoff - group_expiry, &size)
+                let refund_end = if let Some(next_min_added) = next_min_added {
+                    next_min_added.min(blob.subscription.expiry)
+                } else {
+                    last_debit_epoch
+                };
+                let refund_credits = self.get_storage_cost(
+                    refund_end - (blob.subscription.added - blob.subscription.overlap),
+                    &blob.blob.size,
+                );
+                let group_expiry = group_expiry.unwrap(); // safe here
+                let correction_credits = if refund_end > group_expiry {
+                    self.get_storage_cost(refund_end - group_expiry, &blob.blob.size)
                 } else {
                     Credit::zero()
                 };
                 self.refund_caller(&mut caller, &refund_credits, &correction_credits);
             }
 
-            // If there's no new group expiry, all subscriptions have failed,
-            // and we can reclaim capacity.
-            let reclaim_capacity = if new_group_expiry.is_none() { size } else { 0 };
-            self.blobs.release_capacity(reclaim_capacity);
-
-            // Release credits considering other subscriptions may still be pending.
-            let reclaim_credits = if last_debit_epoch < group_expiry {
-                self.get_storage_cost(
-                    group_expiry
-                        - new_group_expiry.map_or(last_debit_epoch, |e| e.max(last_debit_epoch)),
-                    &size,
-                )
-            } else {
-                Credit::zero()
-            };
-
-            self.release_capacity_for_caller(&mut caller, reclaim_capacity, &reclaim_credits);
+            // Account for reclaimed size and move committed credit to free credit
+            self.release_capacity_for_subnet_and_caller(
+                &mut caller,
+                group_expiry,
+                new_group_expiry,
+                blob.blob.size,
+                blob.blob.subscribers.len(),
+            );
         }
 
         // Remove the source from the pending queue
-        self.blobs.remove_pending_source(
+        self.blobs.pending.remove_source(
             store,
-            params.hash,
+            &params.hash,
             blob.blob.size,
             BlobSource::new(subscriber, params.id.clone(), blob.subscription.source),
         )?;
@@ -338,7 +458,7 @@ impl State {
 
         debug!("finalized blob {} to status {}", params.hash, params.status);
 
-        Ok(())
+        Ok(true)
     }
 
     /// Deletes a blob subscription or the entire blob if it has no remaining subscriptions.
@@ -358,7 +478,7 @@ impl State {
         caller: Address,
         sponsor: Option<Address>,
         params: DeleteBlobStateParams,
-    ) -> Result<(bool, u64), ActorError> {
+    ) -> Result<(bool, u64, bool), ActorError> {
         // Load the caller account and delegation.
         let mut accounts = self.accounts.hamt(store)?;
         let mut caller = Caller::load(store, &accounts, caller, sponsor)?;
@@ -380,11 +500,11 @@ impl State {
                 // However, the system may have already deleted the blob due to expiration or
                 // insufficient funds.
                 // We could use a custom error code, but this is easier.
-                return Ok((false, 0));
+                return Ok((false, 0, false));
             }
         };
 
-        // Do not allow deletion if status is added or pending.
+        // Do not allow deletion if the status is added or pending.
         // This would cause issues with deletion from disc.
         if matches!(blob.blob.status, BlobStatus::Added)
             || matches!(blob.blob.status, BlobStatus::Pending)
@@ -399,64 +519,35 @@ impl State {
         // account for capacity up to this blob's expiry if it is less than
         // the current epoch.
         // If the subscription is failed, there may be no group expiry.
-        let (group_expiry, new_group_expiry) =
-            blob.subscriptions
-                .max_expiries(store, &params.id, Some(0))?;
-        if let Some(group_expiry) = group_expiry {
-            let debit_epoch = group_expiry.min(params.epoch);
-            // Account capacity is changing, debit for existing usage.
-            // It could be possible that debit epoch is less than the last debit,
-            // in which case we need to refund for that duration.
-            let last_debit_epoch = caller.subscriber().last_debit_epoch;
-            if last_debit_epoch < debit_epoch {
-                self.debit_caller(&mut caller, debit_epoch);
-            } else if last_debit_epoch != debit_epoch {
-                // The account was debited after this blob's expiry
-                // Return over-debited credit
-                let return_credits =
-                    self.get_storage_cost(last_debit_epoch - group_expiry, &blob.blob.size);
-                self.return_committed_credit_for_caller(&mut caller, &return_credits);
-            }
-        }
-
-        // Account for reclaimed size and move committed credit to free credit
-        // If blob failed, capacity and committed credits have already been returned
-        let size = blob.blob.size;
-        if !matches!(blob.blob.status, BlobStatus::Failed) && !blob.subscription.failed {
-            // If there's no new group expiry, we can reclaim capacity.
-            let reclaim_caller_capacity = if new_group_expiry.is_none() {
-                // Reduce subnet capacity by blob size
-                self.blobs.release_capacity(size);
-
-                // Only reclaim caller capacity if this was the last subscriber
-                if blob.blob.subscribers.len() == 1 {
-                    size
-                } else {
-                    0
+        let mut return_duration = 0;
+        if !blob.subscription.failed {
+            let (group_expiry, new_group_expiry) =
+                blob.subscriptions
+                    .max_expiries(store, &params.id, Some(0))?;
+            if let Some(group_expiry) = group_expiry {
+                let debit_epoch = group_expiry.min(params.epoch);
+                // Account capacity is changing, debit for existing usage.
+                // It could be possible that the debit epoch is less than the last debit,
+                // in which case we need to refund for that duration.
+                let last_debit_epoch = caller.subscriber().last_debit_epoch;
+                if last_debit_epoch < debit_epoch {
+                    self.debit_caller(&mut caller, debit_epoch);
+                } else if last_debit_epoch != debit_epoch && !params.skip_credit_return {
+                    // The account was debited after this blob's expiry
+                    // Return over-debited credit
+                    return_duration = last_debit_epoch - group_expiry;
+                    let return_credits = self.get_storage_cost(return_duration, &blob.blob.size);
+                    self.return_committed_credit_for_caller(&mut caller, &return_credits);
                 }
-            } else {
-                0
-            };
+            }
 
-            // We can release credits if the new group expiry is in the future,
-            // considering other subscriptions may still be active.
-            let reclaim_credits = group_expiry
-                .map(|group_expiry| {
-                    let last_debit_epoch = caller.subscriber().last_debit_epoch;
-                    if last_debit_epoch < group_expiry {
-                        let reclaim_duration_start =
-                            new_group_expiry.map_or(last_debit_epoch, |e| e.max(last_debit_epoch));
-                        self.get_storage_cost(group_expiry - reclaim_duration_start, &size)
-                    } else {
-                        Credit::zero()
-                    }
-                })
-                .unwrap_or_default();
-
-            self.release_capacity_for_caller(
+            // Account for reclaimed size and move committed credit to free credit
+            self.release_capacity_for_subnet_and_caller(
                 &mut caller,
-                reclaim_caller_capacity,
-                &reclaim_credits,
+                group_expiry,
+                new_group_expiry,
+                blob.blob.size,
+                blob.blob.subscribers.len(),
             );
         }
 
@@ -468,10 +559,14 @@ impl State {
             &mut blob,
         )?;
 
+        if blob.subscription.failed && blob_deleted {
+            self.blobs.release_capacity(blob.blob.size);
+        }
+
         // Save accounts
         self.save_caller(&mut caller, &mut accounts)?;
 
-        Ok((blob_deleted, size))
+        Ok((blob_deleted, blob.blob.size, return_duration > 0))
     }
 
     /// Adjusts all subscriptions for `account` according to its max TTL.
@@ -519,10 +614,12 @@ impl State {
                         let (id_bytes, subscription) = val.map_err(err_map)?;
                         let id = from_utf8(id_bytes).map_err(err_map)?;
 
-                        if subscription.expiry - subscription.added > new_ttl {
+                        // Skip expired subscriptions, they will be handled by cron tick
+                        let expired = subscription.expiry <= current_epoch;
+                        if !expired && subscription.expiry - subscription.added > new_ttl {
                             if new_ttl == 0 {
                                 // Delete subscription
-                                let (from_disc, _) = self.delete_blob(
+                                let (from_disc, _, _) = self.delete_blob(
                                     store,
                                     subscriber,
                                     None,
@@ -530,12 +627,14 @@ impl State {
                                         epoch: current_epoch,
                                         hash,
                                         id: SubscriptionId::new(id)?,
+                                        skip_credit_return: false,
                                     },
                                 )?;
                                 if from_disc {
                                     deleted_blobs.push(hash);
                                 };
                             } else {
+                                // Reduce subscription TTL
                                 self.add_blob(
                                     store,
                                     config,
@@ -607,5 +706,42 @@ impl State {
         Ok(accounts
             .get(&address)?
             .map_or(config.blob_default_ttl, |account| account.max_ttl))
+    }
+
+    /// Releases capacity for the subnet and caller.
+    /// Does NOT flush the state to the blockstore.
+    fn release_capacity_for_subnet_and_caller<BS: Blockstore>(
+        &mut self,
+        caller: &mut Caller<BS>,
+        group_expiry: Option<ChainEpoch>,
+        new_group_expiry: Option<ChainEpoch>,
+        size: u64,
+        num_subscribers: u64,
+    ) {
+        // If there's no new group expiry, we can reclaim capacity.
+        let reclaim_capacity = if new_group_expiry.is_none() { size } else { 0 };
+
+        // Only reclaim subnet capacity if this was the last subscriber
+        if num_subscribers == 1 {
+            self.blobs.release_capacity(reclaim_capacity);
+        }
+
+        // We can release credits if the new group expiry is in the future,
+        // considering other subscriptions may still be active.
+        let reclaim_credits = group_expiry
+            .map(|group_expiry| {
+                let last_debit_epoch = caller.subscriber().last_debit_epoch;
+                if last_debit_epoch < group_expiry {
+                    // let reclaim_start = new_group_expiry.unwrap_or(last_debit_epoch);
+                    let reclaim_start =
+                        new_group_expiry.map_or(last_debit_epoch, |e| e.max(last_debit_epoch));
+                    self.get_storage_cost(group_expiry - reclaim_start, &size)
+                } else {
+                    Credit::zero()
+                }
+            })
+            .unwrap_or_default();
+
+        self.release_capacity_for_caller(caller, reclaim_capacity, &reclaim_credits);
     }
 }

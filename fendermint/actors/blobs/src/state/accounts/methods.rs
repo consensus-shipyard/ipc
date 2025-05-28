@@ -83,11 +83,13 @@ impl State {
         let mut delete_from_disc = HashSet::new();
         let mut num_deleted = 0;
         let mut expiries = self.blobs.expiries.clone();
+        let mut credit_return_groups = HashSet::new();
         expiries.foreach_up_to_epoch(
             store,
             current_epoch,
             Some(config.blob_delete_batch_size),
             |_, subscriber, key| {
+                let key_tuple = (subscriber, key.hash);
                 match self.delete_blob(
                     store,
                     subscriber,
@@ -96,12 +98,16 @@ impl State {
                         hash: key.hash,
                         id: key.id.clone(),
                         epoch: current_epoch,
+                        skip_credit_return: credit_return_groups.contains(&key_tuple),
                     },
                 ) {
-                    Ok((from_disc, _)) => {
+                    Ok((from_disc, _, credit_returned)) => {
                         num_deleted += 1;
                         if from_disc {
                             delete_from_disc.insert(key.hash);
+                        }
+                        if credit_returned {
+                            credit_return_groups.insert(key_tuple);
                         }
                     }
                     Err(e) => {

@@ -84,11 +84,11 @@ impl Subscribers {
         expiry: ChainEpoch,
     ) -> Result<UpsertSubscriberResult, ActorError> {
         let mut subscribers = self.hamt(store)?;
-        let (mut subscriptions, subscriber_added) =
+        let mut subscriptions =
             if let Some(subscriptions) = subscribers.get(&caller.subscriber_address())? {
-                (subscriptions, false)
+                subscriptions
             } else {
-                (Subscriptions::new(store)?, true)
+                Subscriptions::new(store)?
             };
 
         // If the subscriber has been debited after the group's max expiry, we need to
@@ -97,18 +97,19 @@ impl Subscribers {
         let (group_expiry, new_group_expiry) =
             subscriptions.max_expiries(store, &params.id, Some(expiry))?;
         let return_duration = group_expiry
-            .filter(|&expiry| caller.subscriber().last_debit_epoch > expiry)
+            .filter(|&expiry| params.epoch > expiry)
             .map_or(0, |expiry| params.epoch - expiry);
 
-        // Determine the duration for which credits will be commited, considering the subscription
+        // Determine the duration for which credits will be committed, considering the subscription
         // group may have expiries that cover a portion of the added duration.
-        // Duration can be negative if subscriber is reducing expiry.
+        // Duration can be negative if the subscriber is reducing expiry.
         let new_group_expiry = new_group_expiry.unwrap(); // safe here
-        let group_expiry = group_expiry.map_or(params.epoch, |e| e.max(params.epoch));
-        let commit_duration = new_group_expiry - group_expiry;
+        let commit_start = group_expiry.map_or(params.epoch, |e| e.max(params.epoch));
+        let commit_duration = new_group_expiry - commit_start;
+        let overlap = commit_start - group_expiry.unwrap_or(params.epoch);
 
         // Add/update subscription
-        let result = subscriptions.upsert(store, caller, params, expiry)?;
+        let result = subscriptions.upsert(store, caller, params, overlap, expiry)?;
 
         self.save_tracked(
             subscribers.set_and_flush_tracked(&caller.subscriber_address(), subscriptions)?,
@@ -116,7 +117,7 @@ impl Subscribers {
 
         Ok(UpsertSubscriberResult {
             subscription: result.subscription,
-            subscriber_added,
+            subscriber_added: group_expiry.is_none(),
             previous_subscription_expiry: result.previous_expiry,
             commit_duration,
             return_duration,

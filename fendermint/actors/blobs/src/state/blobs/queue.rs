@@ -132,7 +132,7 @@ impl Queue {
     ) -> Result<(), ActorError> {
         let mut collection = self.hamt(&store)?;
         let sources_root = if let Some(sources_root) = collection.get(&hash)? {
-            // Modify existing entry
+            // Modify the existing entry
             let mut sources = sources_root.hamt(&store, 0)?;
             sources.set_and_flush(&source, ())?
         } else {
@@ -140,7 +140,7 @@ impl Queue {
             let sources_root =
                 hamt::Root::<BlobSource, ()>::new(&store, &self.store_name_per_hash(hash))?;
             let mut sources = sources_root.hamt(&store, 0)?;
-            self.bytes_size += blob_size;
+            self.bytes_size = self.bytes_size.saturating_add(blob_size);
             sources.set_and_flush(&source, ())?
         };
         self.save_tracked(collection.set_and_flush_tracked(&hash, sources_root)?);
@@ -174,19 +174,19 @@ impl Queue {
     pub fn remove_source<BS: Blockstore>(
         &mut self,
         store: BS,
-        hash: B256,
+        hash: &B256,
         size: u64,
         source: BlobSource,
     ) -> Result<(), ActorError> {
         let mut collection = self.hamt(&store)?;
-        if let Some(mut source_root) = collection.get(&hash)? {
+        if let Some(mut source_root) = collection.get(hash)? {
             let mut sources = source_root.hamt(&store, 1)?;
             (source_root, _) = sources.delete_and_flush(&source)?;
             if sources.is_empty() {
-                self.save_tracked(collection.delete_and_flush_tracked(&hash)?.0);
-                self.bytes_size -= size;
+                self.save_tracked(collection.delete_and_flush_tracked(hash)?.0);
+                self.bytes_size = self.bytes_size.saturating_sub(size);
             } else {
-                self.save_tracked(collection.set_and_flush_tracked(&hash, source_root)?);
+                self.save_tracked(collection.set_and_flush_tracked(hash, source_root)?);
             }
         }
         Ok(())
@@ -203,7 +203,7 @@ impl Queue {
         let (res, deleted) = collection.delete_and_flush_tracked(hash)?;
         self.save_tracked(res);
         if deleted.is_some() {
-            self.bytes_size -= size;
+            self.bytes_size = self.bytes_size.saturating_sub(size);
         }
         Ok(())
     }

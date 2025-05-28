@@ -16,7 +16,9 @@ use fvm_ipld_blockstore::{Blockstore, MemoryBlockstore};
 use fvm_shared::{address::Address, bigint::BigInt, clock::ChainEpoch, econ::TokenAmount};
 use num_traits::Zero;
 
-use super::{AddBlobStateParams, DeleteBlobStateParams, FinalizeBlobStateParams};
+use super::{
+    AddBlobStateParams, DeleteBlobStateParams, FinalizeBlobStateParams, SetPendingBlobStateParams,
+};
 use crate::{caller::DelegationOptions, testing::check_approval_used, State};
 
 #[test]
@@ -363,7 +365,7 @@ fn add_blob_same_hash_same_account<BS: Blockstore>(
         )
         .is_ok());
 
-    // Add blob with a default subscription ID
+    // Add a blob with a default subscription ID
     let (hash, size) = new_hash(1024);
     let add1_epoch = current_epoch;
     let id1 = SubscriptionId::default();
@@ -436,7 +438,16 @@ fn add_blob_same_hash_same_account<BS: Blockstore>(
     assert_eq!(account.capacity_used, size);
 
     // Set to status pending
-    let res = state.set_blob_pending(&store, subscriber, hash, size, id1.clone(), source);
+    let res = state.set_blob_pending(
+        &store,
+        subscriber,
+        SetPendingBlobStateParams {
+            hash,
+            size,
+            id: id1.clone(),
+            source,
+        },
+    );
     assert!(res.is_ok());
 
     // Check stats
@@ -453,7 +464,9 @@ fn add_blob_same_hash_same_account<BS: Blockstore>(
         &store,
         subscriber,
         FinalizeBlobStateParams {
+            source,
             hash,
+            size,
             id: id1.clone(),
             status: BlobStatus::Resolved,
             epoch: finalize_epoch,
@@ -644,11 +657,12 @@ fn add_blob_same_hash_same_account<BS: Blockstore>(
             hash,
             id: id1.clone(),
             epoch: delete_epoch,
+            skip_credit_return: false,
         },
     );
 
     assert!(res.is_ok());
-    let (delete_from_disk, deleted_size) = res.unwrap();
+    let (delete_from_disk, deleted_size, _) = res.unwrap();
     assert!(!delete_from_disk);
     assert_eq!(deleted_size, size);
 
@@ -927,6 +941,7 @@ fn test_finalize_blob_from_bad_state() {
 
     // Add a blob
     let (hash, size) = new_hash(1024);
+    let source = new_pk();
     let res = state.add_blob(
         &store,
         &config,
@@ -938,7 +953,7 @@ fn test_finalize_blob_from_bad_state() {
             id: SubscriptionId::default(),
             size,
             ttl: None,
-            source: new_pk(),
+            source,
             epoch: current_epoch,
             token_amount: TokenAmount::zero(),
         },
@@ -951,7 +966,9 @@ fn test_finalize_blob_from_bad_state() {
         &store,
         caller,
         FinalizeBlobStateParams {
+            source,
             hash,
+            size,
             id: SubscriptionId::default(),
             status: BlobStatus::Pending,
             epoch: finalize_epoch,
@@ -1002,10 +1019,12 @@ fn test_finalize_blob_resolved() {
     let res = state.set_blob_pending(
         &store,
         caller,
-        hash,
-        size,
-        SubscriptionId::default(),
-        source,
+        SetPendingBlobStateParams {
+            hash,
+            size,
+            id: SubscriptionId::default(),
+            source,
+        },
     );
     assert!(res.is_ok());
 
@@ -1015,7 +1034,9 @@ fn test_finalize_blob_resolved() {
         &store,
         caller,
         FinalizeBlobStateParams {
+            source,
             hash,
+            size,
             id: SubscriptionId::default(),
             status: BlobStatus::Resolved,
             epoch: finalize_epoch,
@@ -1076,10 +1097,12 @@ fn test_finalize_blob_failed() {
     let res = state.set_blob_pending(
         &store,
         caller,
-        hash,
-        size,
-        SubscriptionId::default(),
-        source,
+        SetPendingBlobStateParams {
+            hash,
+            size,
+            id: SubscriptionId::default(),
+            source,
+        },
     );
     assert!(res.is_ok());
 
@@ -1089,7 +1112,9 @@ fn test_finalize_blob_failed() {
         &store,
         caller,
         FinalizeBlobStateParams {
+            source,
             hash,
+            size,
             id: SubscriptionId::default(),
             status: BlobStatus::Failed,
             epoch: finalize_epoch,
@@ -1211,10 +1236,12 @@ fn test_finalize_blob_failed_refund() {
     let res = state.set_blob_pending(
         &store,
         caller,
-        hash,
-        size,
-        SubscriptionId::default(),
-        source,
+        SetPendingBlobStateParams {
+            hash,
+            size,
+            id: SubscriptionId::default(),
+            source,
+        },
     );
     assert!(res.is_ok());
 
@@ -1224,7 +1251,9 @@ fn test_finalize_blob_failed_refund() {
         &store,
         caller,
         FinalizeBlobStateParams {
+            source,
             hash,
+            size,
             id: SubscriptionId::default(),
             status: BlobStatus::Failed,
             epoch: finalize_epoch,
@@ -1365,10 +1394,12 @@ fn delete_blob_refund<BS: Blockstore>(
     let res = state.set_blob_pending(
         &store,
         subscriber,
-        hash1,
-        size1,
-        SubscriptionId::default(),
-        source1,
+        SetPendingBlobStateParams {
+            hash: hash1,
+            size: size1,
+            id: SubscriptionId::default(),
+            source: source1,
+        },
     );
     assert!(res.is_ok());
     let finalize_epoch = ChainEpoch::from(current_epoch + 1);
@@ -1376,7 +1407,9 @@ fn delete_blob_refund<BS: Blockstore>(
         &store,
         subscriber,
         FinalizeBlobStateParams {
+            source: source1,
             hash: hash1,
+            size: size1,
             id: SubscriptionId::default(),
             status: BlobStatus::Resolved,
             epoch: finalize_epoch,
@@ -1448,7 +1481,7 @@ fn delete_blob_refund<BS: Blockstore>(
 
     // Delete the first blob
     let delete_epoch = ChainEpoch::from(config.blob_min_ttl + 20);
-    let (delete_from_disc, deleted_size) = state
+    let (delete_from_disc, deleted_size, _) = state
         .delete_blob(
             &store,
             caller,
@@ -1457,6 +1490,7 @@ fn delete_blob_refund<BS: Blockstore>(
                 hash: hash1,
                 id: SubscriptionId::default(),
                 epoch: delete_epoch,
+                skip_credit_return: false,
             },
         )
         .unwrap();
@@ -1595,14 +1629,25 @@ fn test_trim_blob_expiries() {
                 )
                 .unwrap();
             state
-                .set_blob_pending(&store, caller, hash, size, id.clone(), source)
+                .set_blob_pending(
+                    &store,
+                    caller,
+                    SetPendingBlobStateParams {
+                        hash,
+                        size,
+                        id: id.clone(),
+                        source,
+                    },
+                )
                 .unwrap();
             state
                 .finalize_blob(
                     &store,
                     caller,
                     FinalizeBlobStateParams {
+                        source,
                         hash,
+                        size,
                         id,
                         status: BlobStatus::Resolved,
                         epoch: current_epoch,
@@ -1782,14 +1827,25 @@ fn test_trim_blob_expiries_pagination() {
                 )
                 .unwrap();
             state
-                .set_blob_pending(&store, caller, hash, size, id.clone(), source)
+                .set_blob_pending(
+                    &store,
+                    caller,
+                    SetPendingBlobStateParams {
+                        hash,
+                        size,
+                        id: id.clone(),
+                        source,
+                    },
+                )
                 .unwrap();
             state
                 .finalize_blob(
                     &store,
                     caller,
                     FinalizeBlobStateParams {
+                        source,
                         hash,
+                        size,
                         id,
                         status: BlobStatus::Resolved,
                         epoch: current_epoch,
@@ -1948,14 +2004,25 @@ fn test_trim_blob_expiries_for_multiple_accounts() {
             )
             .unwrap();
         state
-            .set_blob_pending(&store, address1, hash, size, id.clone(), source)
+            .set_blob_pending(
+                &store,
+                address1,
+                SetPendingBlobStateParams {
+                    hash,
+                    size,
+                    id: id.clone(),
+                    source,
+                },
+            )
             .unwrap();
         state
             .finalize_blob(
                 &store,
                 address1,
                 FinalizeBlobStateParams {
+                    source,
                     hash,
+                    size,
                     id,
                     status: BlobStatus::Resolved,
                     epoch: current_epoch,
@@ -1987,14 +2054,25 @@ fn test_trim_blob_expiries_for_multiple_accounts() {
             )
             .unwrap();
         state
-            .set_blob_pending(&store, address2, hash, size, id.clone(), source)
+            .set_blob_pending(
+                &store,
+                address2,
+                SetPendingBlobStateParams {
+                    hash,
+                    size,
+                    id: id.clone(),
+                    source,
+                },
+            )
             .unwrap();
         state
             .finalize_blob(
                 &store,
                 address2,
                 FinalizeBlobStateParams {
+                    source,
                     hash,
+                    size,
                     id,
                     status: BlobStatus::Resolved,
                     epoch: current_epoch,

@@ -61,7 +61,9 @@ impl State {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::blobs::{AddBlobStateParams, FinalizeBlobStateParams};
+    use crate::state::blobs::{
+        AddBlobStateParams, FinalizeBlobStateParams, SetPendingBlobStateParams,
+    };
     use fendermint_actor_blobs_shared::{
         blobs::{BlobStatus, SubscriptionId},
         bytes::B256,
@@ -76,25 +78,64 @@ mod tests {
     use num_traits::Zero;
     use rand::{seq::SliceRandom, Rng};
     use std::collections::{BTreeMap, HashMap};
-    use std::ops::{AddAssign, SubAssign};
+
+    #[allow(dead_code)]
+    fn test_simulate_one_day_multiple_runs() {
+        const NUM_RUNS: usize = 1000;
+        let mut successful_runs = 0;
+
+        for _ in 0..NUM_RUNS {
+            // Run the test in a way that we can catch panics
+            let result = std::panic::catch_unwind(|| {
+                // Call the existing test method
+                test_simulate_one_day();
+            });
+
+            match result {
+                Ok(_) => {
+                    successful_runs += 1;
+                }
+                Err(_) => {
+                    break;
+                }
+            }
+        }
+
+        println!("------- Test Summary -------");
+        println!("Total runs: {}", NUM_RUNS);
+        println!("Successful runs: {}", successful_runs);
+        println!("Failed runs: {}", NUM_RUNS - successful_runs);
+        println!(
+            "Success rate: {:.2}%",
+            (successful_runs as f64 / NUM_RUNS as f64) * 100.0
+        );
+
+        // Fail the overall test if any run failed
+        assert_eq!(
+            successful_runs,
+            NUM_RUNS,
+            "{} out of {} test runs failed or didn't run",
+            NUM_RUNS - successful_runs,
+            NUM_RUNS
+        );
+    }
 
     #[test]
     fn test_simulate_one_day() {
         setup_logs();
 
         let config = RecallConfig {
-            blob_credit_debit_interval: ChainEpoch::from(60),
+            blob_credit_debit_interval: ChainEpoch::from(10),
             blob_min_ttl: ChainEpoch::from(10),
             ..Default::default()
         };
 
-        #[derive(Clone, Debug, Hash, PartialEq, Eq)]
+        #[derive(Clone, Debug)]
         struct TestBlob {
             hash: B256,
             metadata_hash: B256,
             size: u64,
-            added: Option<ChainEpoch>,
-            resolve: Option<ChainEpoch>,
+            added: HashMap<Address, Vec<(String, ChainEpoch, ChainEpoch)>>, // added, expiry
         }
 
         fn generate_test_blobs(count: i64, min_size: usize, max_size: usize) -> Vec<TestBlob> {
@@ -108,8 +149,7 @@ mod tests {
                     hash,
                     metadata_hash: new_metadata_hash(),
                     size,
-                    added: None,
-                    resolve: None,
+                    added: HashMap::new(),
                 });
             }
             blobs
@@ -136,15 +176,15 @@ mod tests {
         // Test params
         let epochs: i64 = 360; // num. epochs to run test for
         let user_pool_size: i64 = 10; // some may not be used, some will be used more than once
-        let blob_pool_size: i64 = epochs; // some may not be used, some will be used more than once
+        let blob_pool_size: i64 = user_pool_size; // some may not be used, some will be used more than once
         let min_ttl = config.blob_min_ttl;
         let max_ttl = epochs;
-        let min_size = 8;
-        let max_size = 1024;
+        let min_size = 10;
+        let max_size = 1000;
         let add_intervals = [1, 2, 4, 8, 10, 12, 15, 20]; // used to add at random intervals
         let max_resolve_epochs = 30; // max num. epochs in future to resolve
         let debit_interval: i64 = config.blob_credit_debit_interval; // interval at which to debit all accounts
-        let percent_fail_resolve = 0.1; // controls % of subscriptions that fail resolve
+        let percent_fail_resolve = 0.1; // controls % of subscriptions that fail to resolve
 
         // Set up store and state
         let store = MemoryBlockstore::default();
@@ -159,12 +199,17 @@ mod tests {
         // Get some blobs.
         let mut blobs = generate_test_blobs(blob_pool_size, min_size, max_size);
 
-        // Map of resolve epochs to set of blob indexes
+        // Map of resolve epochs to a set of blob indexes
         #[allow(clippy::type_complexity)]
         let mut resolves: BTreeMap<
             ChainEpoch,
-            HashMap<Address, HashMap<usize, (SubscriptionId, B256, Credit)>>,
+            Vec<(Address, SubscriptionId, B256, u64, B256)>,
         > = BTreeMap::new();
+        #[allow(clippy::type_complexity)]
+        let mut statuses: HashMap<
+            (Address, SubscriptionId, B256),
+            (BlobStatus, ChainEpoch),
+        > = HashMap::new();
 
         // Walk epochs.
         // We go for twice the paramaterized epochs to ensure all subscriptions can expire.
@@ -172,7 +217,6 @@ mod tests {
         let mut num_readded = 0;
         let mut num_resolved = 0;
         let mut num_failed = 0;
-        let mut credit_used: HashMap<Address, Credit> = HashMap::new();
         for epoch in 1..=epochs * 2 {
             if epoch <= epochs {
                 let add_interval = add_intervals.choose(&mut rng).unwrap().to_owned();
@@ -180,119 +224,57 @@ mod tests {
                     // Add a random blob with a random user
                     let blob_index = rng.gen_range(0..blobs.len());
                     let blob = unsafe { blobs.get_unchecked_mut(blob_index) };
-                    if blob.added.is_none() {
-                        let user_index = rng.gen_range(0..users.len());
-                        let user = users[user_index];
-                        let sub_id = new_subscription_id(7);
-                        let ttl = rng.gen_range(min_ttl..=max_ttl);
-                        let source = new_pk();
-                        let res = state.add_blob(
-                            &store,
-                            &config,
-                            user,
-                            None,
-                            AddBlobStateParams {
-                                hash: blob.hash,
-                                metadata_hash: blob.metadata_hash,
-                                id: sub_id.clone(),
-                                size: blob.size,
-                                ttl: Some(ttl),
-                                source,
-                                epoch,
-                                token_amount: TokenAmount::zero(),
-                            },
+                    let user_index = rng.gen_range(0..users.len());
+                    let user = users[user_index];
+                    let sub_id = new_subscription_id(7);
+                    let ttl = rng.gen_range(min_ttl..=max_ttl);
+                    let source = new_pk();
+
+                    let res = state.add_blob(
+                        &store,
+                        &config,
+                        user,
+                        None,
+                        AddBlobStateParams {
+                            hash: blob.hash,
+                            metadata_hash: blob.metadata_hash,
+                            id: sub_id.clone(),
+                            size: blob.size,
+                            ttl: Some(ttl),
+                            source,
+                            epoch,
+                            token_amount: TokenAmount::zero(),
+                        },
+                    );
+                    assert!(res.is_ok());
+
+                    if blob.added.is_empty() {
+                        num_added += 1;
+                        warn!(
+                            "added new blob {} at epoch {} with ttl {}",
+                            blob.hash, epoch, ttl
                         );
-                        assert!(res.is_ok());
-                        if blob.added.is_none() {
-                            num_added += 1;
-                            warn!(
-                                "added new blob {} at epoch {} with ttl {}",
-                                blob.hash, epoch, ttl
-                            );
-                        } else {
-                            warn!(
-                                "added new sub to blob {} at epoch {} with ttl {}",
-                                blob.hash, epoch, ttl
-                            );
-                            num_readded += 1;
-                        }
-                        blob.added = Some(epoch);
-
-                        // Determine how much credit should get committed for this blob
-                        let credit = state.get_storage_cost(ttl, &blob.size);
-                        // Track credit amount for user, assuming the whole committed amount gets debited
-                        credit_used
-                            .entry(user)
-                            .and_modify(|c| c.add_assign(&credit))
-                            .or_insert(credit.clone());
-
-                        // Schedule a resolve to happen in the future
-                        let resolve = rng.gen_range(1..=max_resolve_epochs) + epoch;
-                        resolves
-                            .entry(resolve)
-                            .and_modify(|entry| {
-                                entry
-                                    .entry(user)
-                                    .and_modify(|subs| {
-                                        subs.insert(
-                                            blob_index,
-                                            (sub_id.clone(), source, credit.clone()),
-                                        );
-                                    })
-                                    .or_insert(HashMap::from([(
-                                        blob_index,
-                                        (sub_id.clone(), source, credit.clone()),
-                                    )]));
-                            })
-                            .or_insert(HashMap::from([(
-                                user,
-                                HashMap::from([(blob_index, (sub_id, source, credit))]),
-                            )]));
+                    } else {
+                        num_readded += 1;
+                        warn!(
+                            "added new sub to blob {} at epoch {} with ttl {}",
+                            blob.hash, epoch, ttl
+                        );
                     }
-                }
-            }
 
-            // Resolve blob(s)
-            if let Some(users) = resolves.get(&epoch) {
-                for (user, index) in users {
-                    for (i, (sub_id, source, credit)) in index {
-                        let blob = unsafe { blobs.get_unchecked(*i) };
-                        let fail = rng.gen_bool(percent_fail_resolve);
-                        let status = if fail {
-                            num_failed += 1;
-                            credit_used
-                                .entry(*user)
-                                .and_modify(|c| c.sub_assign(credit));
-                            BlobStatus::Failed
-                        } else {
-                            num_resolved += 1;
-                            BlobStatus::Resolved
-                        };
-                        // Simulate the chain putting this blob into pending state, which is
-                        // required before finalization.
-                        state
-                            .set_blob_pending(
-                                &store,
-                                *user,
-                                blob.hash,
-                                blob.size,
-                                sub_id.clone(),
-                                *source,
-                            )
-                            .unwrap();
-                        state
-                            .finalize_blob(
-                                &store,
-                                *user,
-                                FinalizeBlobStateParams {
-                                    hash: blob.hash,
-                                    id: sub_id.clone(),
-                                    status,
-                                    epoch,
-                                },
-                            )
-                            .unwrap();
-                    }
+                    // Determine if this will fail or not
+                    let fail = rng.gen_bool(percent_fail_resolve);
+                    let status = if fail {
+                        BlobStatus::Failed
+                    } else {
+                        BlobStatus::Resolved
+                    };
+                    statuses.insert((user, sub_id.clone(), blob.hash), (status.clone(), 0));
+
+                    // Track blob interval per user
+                    let expiry = epoch + ttl;
+                    let added = blob.added.entry(user).or_insert(Vec::new());
+                    added.push((sub_id.into(), epoch, expiry));
                 }
             }
 
@@ -305,40 +287,200 @@ mod tests {
                     epoch
                 );
             }
+
+            // Move added blobs to pending state
+            let added_blobs = state.get_added_blobs(&store, 1000).unwrap();
+            for (hash, size, sources) in added_blobs {
+                for (user, id, source) in sources {
+                    warn!(
+                        "processing added blob {} for {} at epoch {} (id: {})",
+                        hash, user, epoch, id
+                    );
+                    state
+                        .set_blob_pending(
+                            &store,
+                            user,
+                            SetPendingBlobStateParams {
+                                source,
+                                hash,
+                                size,
+                                id,
+                            },
+                        )
+                        .unwrap();
+                }
+            }
+
+            // Schedule pending blobs for finalization
+            let pending_blobs = state.get_pending_blobs(&store, 1000).unwrap();
+            for (hash, size, sources) in pending_blobs {
+                for (user, id, source) in sources {
+                    if let Some(status) = statuses.get_mut(&(user, id.clone(), hash)) {
+                        if status.1 == 0 {
+                            let resolve_epoch = rng.gen_range(1..=max_resolve_epochs) + epoch;
+
+                            warn!(
+                                "processing pending blob {} for {} at epoch {} (id: {})",
+                                hash, user, epoch, id
+                            );
+
+                            status.1 = resolve_epoch;
+                            resolves
+                                .entry(resolve_epoch)
+                                .and_modify(|entry| {
+                                    entry.push((user, id.clone(), hash, size, source));
+                                })
+                                .or_insert(vec![(user, id.clone(), hash, size, source)]);
+                        }
+                    }
+                }
+            }
+
+            // Resolve blobs
+            if let Some(entries) = resolves.get(&epoch) {
+                for (user, id, hash, size, source) in entries {
+                    let status = statuses.get_mut(&(*user, id.clone(), *hash)).unwrap();
+                    match status.0 {
+                        BlobStatus::Failed => {
+                            num_failed += 1;
+                        }
+                        BlobStatus::Resolved => {
+                            num_resolved += 1;
+                        }
+                        _ => unreachable!(),
+                    }
+                    warn!(
+                        "finalizing blob {} for {} to status {} at epoch {} (id: {})",
+                        hash, user, status.0, epoch, id
+                    );
+                    let finalized = state
+                        .finalize_blob(
+                            &store,
+                            *user,
+                            FinalizeBlobStateParams {
+                                source: *source,
+                                hash: *hash,
+                                size: *size,
+                                id: id.clone(),
+                                status: status.0.clone(),
+                                epoch,
+                            },
+                        )
+                        .unwrap();
+                    if !finalized {
+                        status.1 = 0;
+                    }
+                }
+            }
         }
 
-        let mut total_credit_used = Credit::zero();
-        for (_, credit) in credit_used.clone() {
-            total_credit_used.add_assign(&credit);
-        }
-
-        debug!("credit used: {}", total_credit_used);
         debug!("num. blobs added: {}", num_added);
         debug!("num. blobs re-added: {}", num_readded);
         debug!("num. blobs resolved: {}", num_resolved);
         debug!("num. blobs failed: {}", num_failed);
 
-        // Check the account balances
-        for (i, user) in users.iter().enumerate() {
-            let account = state.get_account(&store, *user).unwrap().unwrap();
-            debug!("account {}: {:#?}", i, account);
-            assert_eq!(account.capacity_used, 0);
-            assert_eq!(account.credit_committed, Credit::zero());
-            let credit_used = credit_used.get(user).unwrap();
-            assert_eq!(account.credit_free, &user_credit - credit_used);
-        }
-
-        // Check state.
-        // Everything should be empty except for credit_debited.
+        // Check global state.
         let stats = state.get_stats(&config, TokenAmount::zero());
         debug!("stats: {:#?}", stats);
-        assert_eq!(stats.capacity_used, 0);
-        assert_eq!(stats.credit_committed, Credit::zero());
-        assert_eq!(stats.credit_debited, total_credit_used);
         assert_eq!(stats.num_blobs, 0);
         assert_eq!(stats.num_added, 0);
         assert_eq!(stats.bytes_added, 0);
         assert_eq!(stats.num_resolving, 0);
         assert_eq!(stats.bytes_resolving, 0);
+
+        // Check the account balances
+        let mut total_credit = Credit::zero();
+        for (i, user) in users.iter().enumerate() {
+            let account = state.get_account(&store, *user).unwrap().unwrap();
+            debug!("account {} {}: {:#?}", i, user, account);
+
+            let mut total_user_credit = Credit::zero();
+            for blob in blobs.iter() {
+                if let Some(added) = blob.added.get(user) {
+                    debug!("{} subscriptions to {}", user, blob.hash);
+                    let mut intervals = Vec::new();
+                    for (id, start, end) in added {
+                        if let Some((status, resolve_epoch)) =
+                            statuses.get(&(*user, SubscriptionId::new(id).unwrap(), blob.hash))
+                        {
+                            debug!(
+                                "id: {}, size: {}, start: {}, expiry: {}, status: {}, resolved: {}",
+                                id, blob.size, start, end, status, resolve_epoch
+                            );
+                            if status == &BlobStatus::Resolved
+                                || (status == &BlobStatus::Failed && *resolve_epoch == 0)
+                            {
+                                intervals.push((*start as u64, *end as u64));
+                            }
+                        }
+                    }
+                    let duration = get_total_duration(intervals) as ChainEpoch;
+                    debug!("total duration: {}", duration);
+                    let credit = state.get_storage_cost(duration, &blob.size);
+                    total_user_credit += &credit;
+                }
+            }
+            debug!("total user credit: {}", total_user_credit);
+
+            assert_eq!(account.capacity_used, 0);
+            assert_eq!(account.credit_free, &user_credit - &total_user_credit);
+            assert_eq!(account.credit_committed, Credit::zero());
+
+            total_credit += &total_user_credit;
+        }
+
+        // Check more global state.
+        assert_eq!(stats.capacity_used, 0);
+        assert_eq!(stats.credit_committed, Credit::zero());
+        assert_eq!(stats.credit_debited, total_credit);
+    }
+
+    fn get_total_duration(mut intervals: Vec<(u64, u64)>) -> u64 {
+        if intervals.is_empty() {
+            return 0;
+        }
+
+        // Sort intervals by start time
+        intervals.sort_by_key(|&(start, _)| start);
+
+        let mut merged = Vec::new();
+        let mut current = intervals[0];
+
+        // Merge overlapping intervals
+        for &(start, end) in &intervals[1..] {
+            if start <= current.1 {
+                // Overlapping interval, extend if needed
+                current.1 = current.1.max(end);
+            } else {
+                // Non-overlapping interval
+                merged.push(current);
+                current = (start, end);
+            }
+        }
+        merged.push(current);
+
+        merged.iter().map(|&(start, end)| end - start).sum()
+    }
+
+    #[test]
+    fn test_total_non_overlapping_duration() {
+        assert_eq!(get_total_duration(vec![]), 0);
+        assert_eq!(get_total_duration(vec![(1, 5)]), 4);
+        assert_eq!(get_total_duration(vec![(1, 5), (10, 15)]), 9);
+        assert_eq!(get_total_duration(vec![(1, 5), (3, 8)]), 7);
+        assert_eq!(get_total_duration(vec![(1, 10), (3, 5)]), 9);
+        assert_eq!(
+            get_total_duration(vec![(1, 5), (2, 7), (6, 9), (11, 13)]),
+            10
+        );
+        assert_eq!(get_total_duration(vec![(1, 5), (5, 10)]), 9);
+        assert_eq!(
+            get_total_duration(vec![(11, 13), (1, 5), (6, 9), (2, 7)]),
+            10
+        );
+        assert_eq!(
+            get_total_duration(vec![(1, 3), (2, 6), (8, 10), (15, 18), (4, 7), (16, 17)]),
+            11
+        );
     }
 }

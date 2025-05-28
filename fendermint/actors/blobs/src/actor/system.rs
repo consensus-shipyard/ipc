@@ -22,7 +22,7 @@ use recall_actor_sdk::{
 use crate::{
     actor::{delete_from_disc, BlobsActor},
     sol_facade::{blobs as sol_blobs, credit::CreditDebited},
-    state::blobs::FinalizeBlobStateParams,
+    state::blobs::{FinalizeBlobStateParams, SetPendingBlobStateParams},
     State,
 };
 
@@ -99,7 +99,7 @@ impl BlobsActor {
         )
     }
 
-    /// Returns a list of [`BlobRequest`]s that are currenlty in the [`BlobStatus::Added`] state.
+    /// Returns a list of [`BlobRequest`]s that are currently in the [`BlobStatus::Added`] state.
     ///
     /// All blobs that have been added but have not yet been picked up by validators for download
     /// are in the [`BlobStatus::Added`] state.
@@ -111,7 +111,7 @@ impl BlobsActor {
         rt.state::<State>()?.get_added_blobs(rt.store(), params.0)
     }
 
-    /// Returns a list of [`BlobRequest`]s that are currenlty in the [`BlobStatus::Pending`] state.
+    /// Returns a list of [`BlobRequest`]s that are currently in the [`BlobStatus::Pending`] state.
     ///
     /// All blobs that have been added and picked up by validators for download are in the
     /// [`BlobStatus::Pending`] state.
@@ -141,10 +141,7 @@ impl BlobsActor {
             st.set_blob_pending(
                 rt.store(),
                 caller.state_address(),
-                params.hash,
-                params.size,
-                params.id,
-                params.source,
+                SetPendingBlobStateParams::from_actor_params(params.clone()),
             )
         })?;
 

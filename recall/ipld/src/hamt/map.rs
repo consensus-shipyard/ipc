@@ -109,7 +109,7 @@ where
     pub fn set(&mut self, key: &K, value: V) -> Result<Option<V>, ActorError> {
         let previous = self.map.set(key, value)?;
         if previous.is_none() {
-            self.size += 1;
+            self.size = self.size.saturating_add(1);
         }
         Ok(previous)
     }
@@ -117,7 +117,7 @@ where
     pub fn set_if_absent(&mut self, key: &K, value: V) -> Result<bool, ActorError> {
         let was_absent = self.map.set_if_absent(key, value.clone())?;
         if was_absent {
-            self.size += 1;
+            self.size = self.size.saturating_add(1);
         }
         Ok(was_absent)
     }
@@ -164,7 +164,7 @@ where
     pub fn delete(&mut self, key: &K) -> Result<Option<V>, ActorError> {
         let deleted = self.map.delete(key)?;
         if deleted.is_some() {
-            self.size -= 1;
+            self.size = self.size.saturating_sub(1);
         }
         Ok(deleted)
     }

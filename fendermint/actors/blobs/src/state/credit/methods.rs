@@ -284,9 +284,6 @@ impl State {
         caller: &mut Caller<BS>,
         amount: &Credit,
     ) {
-        if amount.is_zero() {
-            return;
-        }
         caller.return_committed_credit(amount);
 
         // Update global state

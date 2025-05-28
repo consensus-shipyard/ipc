@@ -1046,6 +1046,7 @@ where
                     let to = blobs::BLOBS_ACTOR_ADDR;
                     let method_num = FinalizeBlob as u64;
                     let gas_limit = env.blob_queue_gas_limit;
+                    let source = B256(*blob.source.as_bytes());
                     let hash = B256(*blob.hash.as_bytes());
                     let status = if blob.succeeded {
                         BlobStatus::Resolved
@@ -1053,8 +1054,10 @@ where
                         BlobStatus::Failed
                     };
                     let params = FinalizeBlobParams {
+                        source,
                         subscriber: blob.subscriber,
                         hash,
+                        size: blob.size,
                         id: blob.id,
                         status,
                     };
