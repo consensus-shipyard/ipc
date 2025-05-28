@@ -28,7 +28,6 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
     event SubnetDestroyed(SubnetID id);
-    error TransferFailed(address src, address dst, uint256 amount);
 
     /// @notice register a subnet in the gateway. It is called by a subnet when it reaches the threshold stake
     /// @dev The subnet can optionally pass a genesis circulating supply that would be pre-allocated in the
@@ -104,13 +103,10 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         // Release fund flows from Gateway -> SubnetActor -> ReleaseQueue (Locking) -> Validator.
         // Because msg.sender is actually the subnet actor, this method sends the fund back to
         // the subnet actor caller.
-        (bool success, ) = SubnetActorGetterFacet(msg.sender).collateralSource().transferFunds(
+        SubnetActorGetterFacet(msg.sender).collateralSource().safeTransferFunds(
             payable(msg.sender),
             amount
         );
-        if (!success) {
-            revert TransferFailed(msg.sender, address(this), amount);
-        }
     }
 
     /// @notice kill an existing subnet.
@@ -133,13 +129,10 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         delete s.subnets[id];
 
         s.subnetKeys.remove(id);
-        (bool success, ) = SubnetActorGetterFacet(msg.sender).collateralSource().transferFunds(
+        SubnetActorGetterFacet(msg.sender).collateralSource().safeTransferFunds(
             payable(msg.sender),
             stake
         );
-        if (!success) {
-            revert TransferFailed(msg.sender, address(this), stake);
-        }
 
         emit SubnetDestroyed(subnet.id);
     }
