@@ -1,3 +1,5 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
 use crate::blake2b_256;
 use libsecp256k1::{Message as SecpMessage, SecretKey as SecpPrivate};
 use assert_matches::assert_matches;

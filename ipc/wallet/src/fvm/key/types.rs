@@ -1,3 +1,5 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
 use base64::{prelude::BASE64_STANDARD, Engine};
 use fvm_shared::crypto::signature::SignatureType;
 
