@@ -53,12 +53,13 @@ pub fn to_public(sig_type: SignatureType, private_key: &[u8]) -> Result<Vec<u8>,
 pub fn new_address(sig_type: SignatureType, public_key: &[u8]) -> Result<Address, WalletErr> {
     match sig_type {
         SignatureType::BLS => {
-            let addr = Address::new_bls(public_key).map_err(|err| WalletErr::Other(err.to_string()))?;
+            let addr =
+                Address::new_bls(public_key).map_err(|err| WalletErr::Other(err.to_string()))?;
             Ok(addr)
         }
         SignatureType::Secp256k1 => {
-            let addr =
-                Address::new_secp256k1(public_key).map_err(|err| WalletErr::Other(err.to_string()))?;
+            let addr = Address::new_secp256k1(public_key)
+                .map_err(|err| WalletErr::Other(err.to_string()))?;
             Ok(addr)
         }
     }
@@ -66,11 +67,15 @@ pub fn new_address(sig_type: SignatureType, public_key: &[u8]) -> Result<Address
 
 /// Sign takes in `SignatureType`, private key and message. Returns a Signature
 /// for that message
-pub fn sign(sig_type: SignatureType, private_key: &[u8], msg: &[u8]) -> Result<Signature, WalletErr> {
+pub fn sign(
+    sig_type: SignatureType,
+    private_key: &[u8],
+    msg: &[u8],
+) -> Result<Signature, WalletErr> {
     match sig_type {
         SignatureType::BLS => {
-            let priv_key =
-                BlsPrivate::from_bytes(private_key).map_err(|err| WalletErr::Other(err.to_string()))?;
+            let priv_key = BlsPrivate::from_bytes(private_key)
+                .map_err(|err| WalletErr::Other(err.to_string()))?;
             // this returns a signature from bls-signatures, so we need to convert this to a
             // crypto signature
             let sig = priv_key.sign(msg);

@@ -19,9 +19,7 @@ use ipc_api::{
     subnet::{ConsensusType, ConstructParams},
     subnet_id::SubnetID,
 };
-use ipc_wallet::{
-    EthKeyAddress, EvmKeyStore, CrownJewels, KeyStoreConfig, PlainKeyStore, Wallet,
-};
+use ipc_wallet::{CrownJewels, EthKeyAddress, EvmKeyStore, KeyStoreConfig, PlainKeyStore, Wallet};
 use lotus::message::wallet::WalletKeyType;
 use manager::{EthSubnetManager, SubnetGenesisInfo, SubnetInfo, SubnetManager};
 use serde::{Deserialize, Serialize};
@@ -114,7 +112,10 @@ impl IpcProvider {
                 &repo_path,
                 config.password.as_ref(),
             )?)));
-            let evm_keystore = Arc::new(RwLock::new(new_evm_keystore_from_path(&keystore_path, &keystore_password)?));
+            let evm_keystore = Arc::new(RwLock::new(new_evm_keystore_from_path(
+                &keystore_path,
+                &keystore_password,
+            )?));
             Ok(Self::new(config, fvm_wallet, evm_keystore))
         } else {
             Ok(Self {
@@ -898,7 +899,9 @@ pub fn new_evm_keystore_from_path(
     repo_str: &str,
     password: Option<String>,
 ) -> anyhow::Result<PlainKeyStore<EthKeyAddress>> {
-    let name = password.map(|_| ipc_wallet::ENCRYPTED_KEYSTORE_NAME).unwrap_or_else(|| ipc_wallet::PLAIN_JSON_KEYSTORE_NAME);
+    let name = password
+        .map(|_| ipc_wallet::ENCRYPTED_KEYSTORE_NAME)
+        .unwrap_or_else(|| ipc_wallet::PLAIN_JSON_KEYSTORE_NAME);
     let repo = Path::new(&repo_str).join(name);
     let repo = expand_tilde(repo);
     let keystore_config = if let Some(pass) = password {
@@ -909,7 +912,10 @@ pub fn new_evm_keystore_from_path(
     CrownJewels::new(keystore_config).map_err(|e| anyhow!("Failed to create evm keystore: {}", e))
 }
 
-pub fn new_fvm_keystore_from_path(repo_str: &str, password: Option<String>) -> anyhow::Result<CrownJewels> {
+pub fn new_fvm_keystore_from_path(
+    repo_str: &str,
+    password: Option<String>,
+) -> anyhow::Result<CrownJewels> {
     let repo = Path::new(&repo_str);
     let repo = expand_tilde(repo);
     let keystore_config = if let Some(ref password) = password {

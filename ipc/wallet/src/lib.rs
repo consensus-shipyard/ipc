@@ -22,9 +22,7 @@ mod evm;
 mod fvm;
 
 #[cfg(feature = "with-ethers")]
-pub use crate::evm::{
-    DEFAULT_KEYSTORE_NAME,
-};
+pub use crate::evm::DEFAULT_KEYSTORE_NAME;
 
 pub use crate::fvm::*;
 
@@ -42,8 +40,8 @@ impl FromStr for WalletType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
-            "etherium"|"evm" => Self::Etherium,
-            "filecoin"|"fvm" => Self::Filecoin,
+            "etherium" | "evm" => Self::Etherium,
+            "filecoin" | "fvm" => Self::Filecoin,
             _ => return Err(anyhow!("invalid wallet type")),
         })
     }

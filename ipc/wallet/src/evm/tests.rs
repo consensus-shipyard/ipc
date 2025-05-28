@@ -21,7 +21,7 @@ impl AddressDerivator for EvmKeyInfo {
     type Key = Key;
     fn as_address(&self) -> Self::Key {
         Key::try_from(self).unwrap()
-    } 
+    }
 }
 impl TryFrom<&EvmKeyInfo> for Key {
     type Error = Infallible;
@@ -33,7 +33,6 @@ impl TryFrom<&EvmKeyInfo> for Key {
     }
 }
 
-
 impl From<(&Key, &EvmKeyInfo)> for EvmPersistentKeyInfo {
     fn from(value: (&Key, &EvmKeyInfo)) -> Self {
         let sk = hex::encode(&value.1.private_key);
@@ -41,16 +40,15 @@ impl From<(&Key, &EvmKeyInfo)> for EvmPersistentKeyInfo {
         EvmPersistentKeyInfo {
             private_key: sk,
             address: address.to_string(),
-        }   
+        }
     }
 }
 impl From<(&Key, &EvmPersistentKeyInfo)> for EvmKeyInfo {
     fn from(value: (&Key, &EvmPersistentKeyInfo)) -> Self {
         let sk = hex::decode(&value.1.private_key).expect("TODO");
-        EvmKeyInfo { private_key: sk  }
+        EvmKeyInfo { private_key: sk }
     }
 }
-
 
 impl Default for Key {
     fn default() -> Self {
@@ -98,7 +96,7 @@ fn test_default() {
     let keystore_location = keystore_folder.join("eth_keystore");
 
     let mut ks = EvmCrownJewelsTest::new(KeyStoreConfig::plain(&keystore_location)).unwrap();
-    
+
     let key_info = EvmKeyInfo {
         private_key: vec![0, 1, 2],
     };

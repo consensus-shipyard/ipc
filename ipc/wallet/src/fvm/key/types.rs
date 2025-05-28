@@ -34,20 +34,20 @@ impl FvmKeyInfo {
     }
 }
 
-
 #[derive(Clone, PartialEq, Debug, Eq, serde::Serialize, serde::Deserialize)]
 pub struct PersistentKeyInfo {
     pub(crate) key_type: SignatureType,
     pub(crate) private_key: String,
 }
 
-
 // TODO make this a `TryFrom`, we cannot sanity for on-disk stuff
 impl From<(&String, &PersistentKeyInfo)> for FvmKeyInfo {
     fn from(value: (&String, &PersistentKeyInfo)) -> Self {
         Self {
             key_type: value.1.key_type,
-            private_key: BASE64_STANDARD.decode(value.1.private_key.clone()).expect("Sane key, insane assumption, but hey")
+            private_key: BASE64_STANDARD
+                .decode(value.1.private_key.clone())
+                .expect("Sane key, insane assumption, but hey"),
         }
     }
 }

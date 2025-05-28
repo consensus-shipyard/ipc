@@ -67,12 +67,18 @@ impl Wallet {
     }
 
     /// Return a wallet from a given amount of keys.
-    pub fn new_from_keys(keystore: FvmCrownJewels, key_vec: impl IntoIterator<Item = FullKey>) -> Self {
+    pub fn new_from_keys(
+        keystore: FvmCrownJewels,
+        key_vec: impl IntoIterator<Item = FullKey>,
+    ) -> Self {
         let mut keys: HashMap<Address, FullKey> = HashMap::new();
         for item in key_vec.into_iter() {
             keys.insert(item.address, item);
         }
-        Wallet { in_memory_cache: keys, keystore }
+        Wallet {
+            in_memory_cache: keys,
+            keystore,
+        }
     }
 
     // If this key does not exist in the keys hashmap, check if this key is in
@@ -135,7 +141,7 @@ impl Wallet {
         let key_info = self.keystore.get(&String::from("default"))?;
         Ok(key_info)
     }
-    
+
     /// Return the address of the default `KeyInfo` in the wallet
     pub fn get_default(&self) -> Result<Address, WalletErr> {
         let key_info = self.get_default_info()?;
@@ -160,7 +166,7 @@ impl Wallet {
 
     /// Generate a new address that fits the requirement of the given
     /// `SignatureType`
-    /// 
+    ///
     /// If no default key is present, makes the generated key the default one!
     pub fn generate_addr(&mut self, typ: SignatureType) -> Result<Address, WalletErr> {
         let key = generate_key(typ)?;

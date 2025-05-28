@@ -7,7 +7,7 @@ use fs_err as fs;
 use std::io::Result;
 
 /// Restricts permissions on a file to user-only: 0600
-/// 
+///
 /// Note: No operation on non unix platforms
 pub fn set_user_perm(_file: &fs::File) -> Result<()> {
     #[cfg(unix)]

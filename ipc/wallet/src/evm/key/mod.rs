@@ -2,10 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use zeroize::Zeroize;
 
-
 pub mod adapter;
-
-
 
 /// The struct that contains evm private key info
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -43,14 +40,14 @@ impl From<(&String, &EvmKeyInfo)> for EvmPersistentKeyInfo {
         let address = value.0.clone();
         EvmPersistentKeyInfo {
             private_key: sk,
-            address
-        }   
+            address,
+        }
     }
 }
 impl From<(&String, &EvmPersistentKeyInfo)> for EvmKeyInfo {
     fn from(value: (&String, &EvmPersistentKeyInfo)) -> Self {
         let sk = hex::decode(&value.1.private_key).expect("TODO");
-        EvmKeyInfo { private_key: sk  }
+        EvmKeyInfo { private_key: sk }
     }
 }
 
@@ -65,8 +62,6 @@ impl std::str::FromStr for EvmKeyInfo {
     type Err = hex::FromHexError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let sk = hex::decode(s)?;
-        Ok(Self {
-            private_key: sk,
-        })
+        Ok(Self { private_key: sk })
     }
 }

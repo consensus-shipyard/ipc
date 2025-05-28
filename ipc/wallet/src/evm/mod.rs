@@ -22,7 +22,7 @@ mod tests;
 
 //     type InMem: Clone + PartialEq + Eq + for<'a,'b> From<(&'a Key, &'b Persist)> where &InMem: Into<Self::Key>;
 //     type Persist: serde::Deserialize + serde::Serialize + for<'a,'b> From<(&'a Key, &'b InMem)>;
-    
+
 //     /// Get the key info by address string
 //     fn get(&self, addr: &Self::Key) -> Result<Option<Self::InMem>>;
 //     /// List all addresses in the key store

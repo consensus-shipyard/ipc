@@ -56,7 +56,7 @@ registry_addr = "0x0b4e239FF21b40120cDa817fba77bD1B366c1bcD"
 pub struct Config {
     /// Directory of the keystore that wants to be made available by the provider.
     pub keystore_path: Option<String>,
-    
+
     /// The password used to encrypt the keystore
     pub password: Option<String>,
 

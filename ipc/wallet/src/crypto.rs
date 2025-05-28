@@ -4,37 +4,36 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 // use super::*;
 
-
 pub const ENCRYPTED_KEYSTORE_NAME: &str = "keystore";
 
+use ahash::HashMapExt;
 use argon2::password_hash::SaltString;
+use argon2::PasswordHasher;
 pub use argon2::RECOMMENDED_SALT_LEN;
 use rand::rngs::OsRng;
 use rand::RngCore;
-use xsalsa20poly1305::{aead::generic_array::GenericArray, KeyInit, XSalsa20Poly1305, NONCE_SIZE};
-use ahash::HashMapExt;
-use argon2::PasswordHasher;
 use xsalsa20poly1305::aead::Aead;
+use xsalsa20poly1305::{aead::generic_array::GenericArray, KeyInit, XSalsa20Poly1305, NONCE_SIZE};
 
 #[allow(missing_docs)]
 #[derive(Debug, thiserror::Error)]
 pub enum CryptoError {
     #[error("Error decrypting data, is the password correct?")]
     DecryptionError,
-    
+
     #[error("Error encrypting data")]
     EncryptionError,
-    
+
     #[error("Error with forest configuration, ensure it's enabled in your `config.toml` with `encrypted_keystore` being set")]
     ConfigurationError,
-    
+
     #[error(transparent)]
     Argon2(#[from] argon2::Error),
 
     // XXX TODO make variants per use, not goto catch-all-wrappers
     #[error(transparent)]
     PasswdHashing(#[from] argon2::password_hash::Error),
-    
+
     #[error(transparent)]
     Base64Decode(#[from] base64::DecodeError),
 
@@ -48,7 +47,7 @@ pub enum CryptoError {
 pub(crate) type SaltByteArray = [u8; RECOMMENDED_SALT_LEN];
 
 /// Encrypted overlay for the `KeyStore` in [`ENCRYPTED_KEYSTORE_LOCATION`]
-/// 
+///
 /// Uses `Argon2id` as hash key derivation
 /// and algorithm `XSalsa20Poly1305` authenticated encryption
 /// and CBOR as data format encoding.
@@ -59,27 +58,29 @@ pub(crate) struct EncryptionOverlay {
     encryption_key: Vec<u8>,
 }
 
-
 impl EncryptionOverlay {
     pub(crate) fn new(passphrase: &str) -> Result<Self, CryptoError> {
         let (salt, encryption_key) = Self::derive_key(passphrase, None)?;
         Ok(Self {
             salt,
             encryption_key,
-        })        
+        })
     }
-    
-    pub(crate) fn new_with_salt(passphrase: &str, salt: SaltByteArray) -> Result<Self, CryptoError> {
+
+    pub(crate) fn new_with_salt(
+        passphrase: &str,
+        salt: SaltByteArray,
+    ) -> Result<Self, CryptoError> {
         let (salt, encryption_key) = Self::derive_key(passphrase, Some(salt))?;
         Ok(Self {
             salt,
             encryption_key,
         })
     }
-    
+
     /// Use given salt and passphrase to derive the salt bytes array (cc) and actual encryption key
-    /// 
-    /// If the `prev_salt` is `None`, a new one will be generated using the OS provided RNG. 
+    ///
+    /// If the `prev_salt` is `None`, a new one will be generated using the OS provided RNG.
     pub(crate) fn derive_key(
         passphrase: &str,
         prev_salt: Option<SaltByteArray>,
@@ -112,8 +113,7 @@ impl EncryptionOverlay {
             param_builder.build()?,
         );
         let salt_string = SaltString::encode_b64(&salt)?;
-        let pw_hash = hasher
-            .hash_password(passphrase.as_bytes(), &salt_string)?;
+        let pw_hash = hasher.hash_password(passphrase.as_bytes(), &salt_string)?;
         if let Some(hash) = pw_hash.hash {
             Ok((salt, hash.as_bytes().to_vec()))
         } else {
@@ -138,8 +138,7 @@ impl EncryptionOverlay {
         let nonce = GenericArray::from_slice(&msg[cyphertext_len..]);
         let key = GenericArray::from_slice(&self.encryption_key);
         let cipher = XSalsa20Poly1305::new(key);
-        let plaintext = cipher
-            .decrypt(nonce, ciphertext)?;
+        let plaintext = cipher.decrypt(nonce, ciphertext)?;
         Ok(plaintext)
     }
 }

@@ -1,13 +1,13 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use crate::blake2b_256;
-use libsecp256k1::{Message as SecpMessage, SecretKey as SecpPrivate};
 use assert_matches::assert_matches;
+use libsecp256k1::{Message as SecpMessage, SecretKey as SecpPrivate};
 
 use super::*;
-use crate::{generate, KeyStoreConfig};
-use crate::CrownJewels;
 use crate::fvm::FvmCrownJewels;
+use crate::CrownJewels;
+use crate::{generate, KeyStoreConfig};
 
 fn construct_priv_keys() -> Vec<FullKey> {
     let mut secp_keys = Vec::new();
@@ -48,8 +48,7 @@ fn contains_key() {
     assert!(wallet.has_key(&addr));
 
     let new_priv_key = generate(SignatureType::BLS).unwrap();
-    let pub_key =
-        helpers::to_public(SignatureType::BLS, new_priv_key.as_slice()).unwrap();
+    let pub_key = helpers::to_public(SignatureType::BLS, new_priv_key.as_slice()).unwrap();
     let address = Address::new_bls(pub_key.as_slice()).unwrap();
 
     // test to see if the new key has been created and added to the wallet
@@ -68,7 +67,7 @@ fn sign() {
     let addr = key_vec[2].address;
 
     let keystore = CrownJewels::new(KeyStoreConfig::InMemory).unwrap();
-    let mut wallet  = Wallet::new_from_keys(keystore, key_vec.clone());
+    let mut wallet = Wallet::new_from_keys(keystore, key_vec.clone());
     let msg = [0u8; 64];
 
     let msg_sig = wallet.sign(&addr, &msg).unwrap();
@@ -89,15 +88,14 @@ fn import_export() -> anyhow::Result<()> {
     let key_vec = construct_priv_keys();
     let key = key_vec[0].clone();
     let keystore = CrownJewels::new(KeyStoreConfig::InMemory).unwrap();
-    let mut wallet  = Wallet::new_from_keys(keystore, key_vec);
+    let mut wallet = Wallet::new_from_keys(keystore, key_vec);
 
     let key_info = wallet.export(&key.address).unwrap();
     // test to see if export returns the correct key_info
     assert_eq!(key_info, key.key_info);
 
     let new_priv_key = generate(SignatureType::Secp256k1).unwrap();
-    let pub_key =
-        helpers::to_public(SignatureType::Secp256k1, new_priv_key.as_slice()).unwrap();
+    let pub_key = helpers::to_public(SignatureType::Secp256k1, new_priv_key.as_slice()).unwrap();
     let test_addr = Address::new_secp256k1(pub_key.as_slice()).unwrap();
     let key_info_err = wallet.export(&test_addr).unwrap_err();
     // test to make sure that an error is raised when an incorrect address is added
@@ -111,7 +109,7 @@ fn import_export() -> anyhow::Result<()> {
     // make sure that error is thrown when attempted to re-import a duplicate
     // key_info
     if let WalletErr::KeyExists = duplicate_error {
-        Err(duplicate_error)?;   
+        Err(duplicate_error)?;
     }
     Ok(())
 }
@@ -170,13 +168,12 @@ fn generate_new_key() {
 #[test]
 fn get_set_default() {
     let key_store = CrownJewels::new(KeyStoreConfig::InMemory).unwrap();
-    let mut wallet  = Wallet::new(key_store);
+    let mut wallet = Wallet::new(key_store);
     // check to make sure that there is no default
     assert_matches!(wallet.get_default().unwrap_err(), WalletErr::KeyInfo);
 
     let new_priv_key = generate(SignatureType::Secp256k1).unwrap();
-    let pub_key =
-        helpers::to_public(SignatureType::Secp256k1, new_priv_key.as_slice()).unwrap();
+    let pub_key = helpers::to_public(SignatureType::Secp256k1, new_priv_key.as_slice()).unwrap();
     let test_addr = Address::new_secp256k1(pub_key.as_slice()).unwrap();
 
     let key_info = FvmKeyInfo::new(SignatureType::Secp256k1, new_priv_key);
@@ -199,7 +196,7 @@ fn secp_verify() {
     let secp_key = FullKey::try_from(secp_key_info).unwrap();
     let addr = secp_key.address;
     let key_store = CrownJewels::new(KeyStoreConfig::InMemory).unwrap();
-    let mut wallet  = Wallet::new_from_keys(key_store, vec![secp_key]);
+    let mut wallet = Wallet::new_from_keys(key_store, vec![secp_key]);
 
     let msg = [0u8; 64];
 
@@ -218,7 +215,7 @@ fn bls_verify_test() {
     let bls_key = FullKey::try_from(bls_key_info).unwrap();
     let addr = bls_key.address;
     let key_store = CrownJewels::new(KeyStoreConfig::InMemory).unwrap();
-    let mut wallet  = Wallet::new_from_keys(key_store, vec![bls_key]);
+    let mut wallet = Wallet::new_from_keys(key_store, vec![bls_key]);
 
     let msg = [0u8; 64];
 
