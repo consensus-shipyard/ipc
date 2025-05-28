@@ -3,6 +3,11 @@
 // Copyright 2019-2023 ChainSafe Systems
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+// TODO few of these make sense
+// TODO signing should produce a signature type
+// TODO signature verification should be done on the signature type
+// TODO signatures should be parsed from bytes and assert constraints / failable parsing
+
 use blake2b_simd::Params;
 use bls_signatures::{PrivateKey as BlsPrivate, Serialize};
 use fvm_shared::{
@@ -12,7 +17,7 @@ use fvm_shared::{
 use libsecp256k1::{Message as SecpMessage, PublicKey as SecpPublic, SecretKey as SecpPrivate};
 use rand::rngs::OsRng;
 
-use super::errors::Error;
+use crate::errors::*;
 
 /// Generates BLAKE2b hash of fixed 32 bytes size.
 pub fn blake2b_256(ingest: &[u8]) -> [u8; 32] {
@@ -28,15 +33,15 @@ pub fn blake2b_256(ingest: &[u8]) -> [u8; 32] {
 }
 
 /// Return the public key for a given private key and `SignatureType`
-pub fn to_public(sig_type: SignatureType, private_key: &[u8]) -> Result<Vec<u8>, Error> {
+pub fn to_public(sig_type: SignatureType, private_key: &[u8]) -> Result<Vec<u8>, WalletErr> {
     match sig_type {
         SignatureType::BLS => Ok(BlsPrivate::from_bytes(private_key)
-            .map_err(|err| Error::Other(err.to_string()))?
+            .map_err(|err| WalletErr::Other(err.to_string()))?
             .public_key()
             .as_bytes()),
         SignatureType::Secp256k1 => {
             let private_key = SecpPrivate::parse_slice(private_key)
-                .map_err(|err| Error::Other(err.to_string()))?;
+                .map_err(|err| WalletErr::Other(err.to_string()))?;
             let public_key = SecpPublic::from_secret_key(&private_key);
             Ok(public_key.serialize().to_vec())
         }
@@ -45,15 +50,15 @@ pub fn to_public(sig_type: SignatureType, private_key: &[u8]) -> Result<Vec<u8>,
 
 /// Return a new Address that is of a given `SignatureType` and uses the
 /// supplied public key
-pub fn new_address(sig_type: SignatureType, public_key: &[u8]) -> Result<Address, Error> {
+pub fn new_address(sig_type: SignatureType, public_key: &[u8]) -> Result<Address, WalletErr> {
     match sig_type {
         SignatureType::BLS => {
-            let addr = Address::new_bls(public_key).map_err(|err| Error::Other(err.to_string()))?;
+            let addr = Address::new_bls(public_key).map_err(|err| WalletErr::Other(err.to_string()))?;
             Ok(addr)
         }
         SignatureType::Secp256k1 => {
             let addr =
-                Address::new_secp256k1(public_key).map_err(|err| Error::Other(err.to_string()))?;
+                Address::new_secp256k1(public_key).map_err(|err| WalletErr::Other(err.to_string()))?;
             Ok(addr)
         }
     }
@@ -61,11 +66,11 @@ pub fn new_address(sig_type: SignatureType, public_key: &[u8]) -> Result<Address
 
 /// Sign takes in `SignatureType`, private key and message. Returns a Signature
 /// for that message
-pub fn sign(sig_type: SignatureType, private_key: &[u8], msg: &[u8]) -> Result<Signature, Error> {
+pub fn sign(sig_type: SignatureType, private_key: &[u8], msg: &[u8]) -> Result<Signature, WalletErr> {
     match sig_type {
         SignatureType::BLS => {
             let priv_key =
-                BlsPrivate::from_bytes(private_key).map_err(|err| Error::Other(err.to_string()))?;
+                BlsPrivate::from_bytes(private_key).map_err(|err| WalletErr::Other(err.to_string()))?;
             // this returns a signature from bls-signatures, so we need to convert this to a
             // crypto signature
             let sig = priv_key.sign(msg);
@@ -74,7 +79,7 @@ pub fn sign(sig_type: SignatureType, private_key: &[u8], msg: &[u8]) -> Result<S
         }
         SignatureType::Secp256k1 => {
             let priv_key = SecpPrivate::parse_slice(private_key)
-                .map_err(|err| Error::Other(err.to_string()))?;
+                .map_err(|err| WalletErr::Other(err.to_string()))?;
             let msg_hash = blake2b_256(msg);
             let message = SecpMessage::parse(&msg_hash);
             let (sig, recovery_id) = libsecp256k1::sign(&message, &priv_key);
@@ -88,7 +93,7 @@ pub fn sign(sig_type: SignatureType, private_key: &[u8], msg: &[u8]) -> Result<S
 }
 
 /// Generate a new private key
-pub fn generate(sig_type: SignatureType) -> Result<Vec<u8>, Error> {
+pub fn generate(sig_type: SignatureType) -> Result<Vec<u8>, WalletErr> {
     let rng = &mut OsRng;
     match sig_type {
         SignatureType::BLS => {

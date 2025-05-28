@@ -1,20 +1,22 @@
 use crate::fvm::serialization::json::signature_type::SignatureTypeJson;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use base64::prelude::*;
+
 
 use super::*;
 
 /// Wrapper for serializing and de-serializing a `KeyInfo` from JSON.
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Eq)]
 #[serde(transparent)]
-pub struct KeyInfoJson(#[serde(with = "self")] pub KeyInfo);
+pub struct KeyInfoJson(#[serde(with = "self")] pub FvmKeyInfo);
 
 /// Wrapper for serializing a `KeyInfo` reference to JSON.
 #[derive(Serialize)]
 #[serde(transparent)]
-pub struct KeyInfoJsonRef<'a>(#[serde(with = "self")] pub &'a KeyInfo);
+pub struct KeyInfoJsonRef<'a>(#[serde(with = "self")] pub &'a FvmKeyInfo);
 
-impl From<KeyInfoJson> for KeyInfo {
-    fn from(key: KeyInfoJson) -> KeyInfo {
+impl From<KeyInfoJson> for FvmKeyInfo {
+    fn from(key: KeyInfoJson) -> FvmKeyInfo {
         key.0
     }
 }
@@ -26,7 +28,7 @@ struct JsonHelper {
     private_key: String,
 }
 
-pub fn serialize<S>(k: &KeyInfo, serializer: S) -> Result<S::Ok, S::Error>
+pub fn serialize<S>(k: &FvmKeyInfo, serializer: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
@@ -37,7 +39,7 @@ where
     .serialize(serializer)
 }
 
-pub fn deserialize<'de, D>(deserializer: D) -> Result<KeyInfo, D::Error>
+pub fn deserialize<'de, D>(deserializer: D) -> Result<FvmKeyInfo, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -45,7 +47,7 @@ where
         sig_type,
         private_key,
     } = Deserialize::deserialize(deserializer)?;
-    Ok(KeyInfo {
+    Ok(FvmKeyInfo {
         key_type: sig_type.0,
         private_key: BASE64_STANDARD
             .decode(private_key)

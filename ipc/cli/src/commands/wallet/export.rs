@@ -77,8 +77,8 @@ impl CommandLineHandler for WalletExport {
 
         let wallet_type = WalletType::from_str(&arguments.wallet_type)?;
         let v = match wallet_type {
-            WalletType::Evm => WalletExport::export_evm(&provider, arguments),
-            WalletType::Fvm => WalletExport::export_fvm(&provider, arguments),
+            WalletType::Etherium => WalletExport::export_evm(&provider, arguments),
+            WalletType::Filecoin => WalletExport::export_fvm(&provider, arguments),
         }?;
 
         match &arguments.output {
@@ -166,8 +166,8 @@ impl CommandLineHandler for WalletPublicKey {
 
         let wallet_type = WalletType::from_str(&arguments.wallet_type)?;
         let v = match wallet_type {
-            WalletType::Evm => WalletPublicKey::pubkey_evm(&provider, arguments),
-            WalletType::Fvm => WalletPublicKey::pubkey_fvm(&provider, arguments),
+            WalletType::Etherium => WalletPublicKey::pubkey_evm(&provider, arguments),
+            WalletType::Filecoin => WalletPublicKey::pubkey_fvm(&provider, arguments),
         }?;
         println!("{v}");
         Ok(())

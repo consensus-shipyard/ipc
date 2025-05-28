@@ -20,7 +20,7 @@ use ipc_api::{
     subnet_id::SubnetID,
 };
 use ipc_wallet::{
-    EthKeyAddress, EvmKeyStore, KeyStore, KeyStoreConfig, PersistentKeyStore, Wallet,
+    EthKeyAddress, EvmKeyStore, CrownJewels, KeyStoreConfig, PlainKeyStore, Wallet,
 };
 use lotus::message::wallet::WalletKeyType;
 use manager::{EthSubnetManager, SubnetGenesisInfo, SubnetInfo, SubnetManager};
@@ -67,14 +67,14 @@ pub struct IpcProvider {
     sender: Option<Address>,
     config: Arc<Config>,
     fvm_wallet: Option<Arc<RwLock<Wallet>>>,
-    evm_keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
+    evm_keystore: Option<Arc<RwLock<PlainKeyStore<EthKeyAddress>>>>,
 }
 
 impl IpcProvider {
     fn new(
         config: Arc<Config>,
         fvm_wallet: Arc<RwLock<Wallet>>,
-        evm_keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
+        evm_keystore: Arc<RwLock<PlainKeyStore<EthKeyAddress>>>,
     ) -> Self {
         Self {
             sender: None,
@@ -99,17 +99,22 @@ impl IpcProvider {
     /// a single subnet.
     pub fn new_with_subnet(
         keystore_path: Option<String>,
+        keystore_password: Option<String>,
         subnet: config::Subnet,
     ) -> anyhow::Result<Self> {
         let mut config = Config::new();
+        // XXX why is `config.keystore_path` not set? Why are we not creating it based on the populated config?
+        // config.keystore_path = keystore_password.clone();
+        config.password = keystore_password.clone();
         config.add_subnet(subnet);
         let config = Arc::new(config);
 
         if let Some(repo_path) = keystore_path {
             let fvm_wallet = Arc::new(RwLock::new(Wallet::new(new_fvm_keystore_from_path(
                 &repo_path,
+                config.password.as_ref(),
             )?)));
-            let evm_keystore = Arc::new(RwLock::new(new_evm_keystore_from_path(&repo_path)?));
+            let evm_keystore = Arc::new(RwLock::new(new_evm_keystore_from_path(&keystore_path, &keystore_password)?));
             Ok(Self::new(config, fvm_wallet, evm_keystore))
         } else {
             Ok(Self {
@@ -176,7 +181,7 @@ impl IpcProvider {
     ///
     /// This method should be used when we want the wallet retrieval to throw an error
     /// if it is not configured (i.e. when the provider needs to sign transactions).
-    pub fn evm_wallet(&self) -> anyhow::Result<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>> {
+    pub fn evm_wallet(&self) -> anyhow::Result<Arc<RwLock<PlainKeyStore<EthKeyAddress>>>> {
         if let Some(wallet) = &self.evm_keystore {
             Ok(wallet.clone())
         } else {
@@ -840,11 +845,11 @@ impl IpcProvider {
             SignatureType::Secp256k1
         };
 
-        let key_info = ipc_wallet::json::KeyInfoJson(ipc_wallet::KeyInfo::new(
+        let key_info = ipc_wallet::json::KeyInfoJson(ipc_wallet::FvmKeyInfo::new(
             key_type,
             base64::engine::general_purpose::STANDARD.decode(&keyinfo.private_key)?,
         ));
-        let key_info = ipc_wallet::KeyInfo::from(key_info);
+        let key_info = ipc_wallet::FvmKeyInfo::from(key_info);
         Ok(wallet.import(key_info)?)
     }
 
@@ -867,10 +872,10 @@ impl IpcProvider {
     }
 }
 
-fn new_fvm_wallet_from_config(config: Arc<Config>) -> anyhow::Result<KeyStore> {
+fn new_fvm_wallet_from_config(config: Arc<Config>) -> anyhow::Result<CrownJewels> {
     let repo_str = &config.keystore_path;
     if let Some(repo_str) = repo_str {
-        new_fvm_keystore_from_path(repo_str)
+        new_fvm_keystore_from_path(repo_str, config.password.clone())
     } else {
         Err(anyhow!(
             "No keystore repo found in config. Try using absolute path"
@@ -880,10 +885,10 @@ fn new_fvm_wallet_from_config(config: Arc<Config>) -> anyhow::Result<KeyStore> {
 
 pub fn new_evm_keystore_from_config(
     config: Arc<Config>,
-) -> anyhow::Result<PersistentKeyStore<EthKeyAddress>> {
+) -> anyhow::Result<PlainKeyStore<EthKeyAddress>> {
     let repo_str = &config.keystore_path;
     if let Some(repo_str) = repo_str {
-        new_evm_keystore_from_path(repo_str)
+        new_evm_keystore_from_path(repo_str, config.password.clone())
     } else {
         Err(anyhow!("No keystore repo found in config"))
     }
@@ -901,18 +906,18 @@ pub fn new_evm_keystore_from_path(
     } else {
         KeyStoreConfig::plain(repo)
     };
-    KeyStore::new(keystore_config).map_err(|e| anyhow!("Failed to create evm keystore: {}", e))
+    CrownJewels::new(keystore_config).map_err(|e| anyhow!("Failed to create evm keystore: {}", e))
 }
 
-pub fn new_fvm_keystore_from_path(repo_str: &str, password: Option<&str>) -> anyhow::Result<KeyStore> {
+pub fn new_fvm_keystore_from_path(repo_str: &str, password: Option<String>) -> anyhow::Result<CrownJewels> {
     let repo = Path::new(&repo_str);
     let repo = expand_tilde(repo);
-    let keystore_config = if let Some(password) = password {
-        KeyStoreConfig::encrypted(repo, password)
+    let keystore_config = if let Some(ref password) = password {
+        KeyStoreConfig::encrypted(repo, password.as_ref())
     } else {
         KeyStoreConfig::plain(repo)
     };
-    KeyStore::new(keystore_config).map_err(|e| anyhow!("Failed to create keystore: {}", e))
+    CrownJewels::new(keystore_config).map_err(|e| anyhow!("Failed to create keystore: {}", e))
 }
 
 pub fn default_repo_path() -> String {

@@ -57,7 +57,7 @@ use ipc_api::staking::{PowerChangeRequest, ValidatorInfo, ValidatorStakingInfo};
 use ipc_api::subnet::ConstructParams;
 use ipc_api::subnet_id::SubnetID;
 use ipc_observability::lazy_static;
-use ipc_wallet::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
+use ipc_wallet::{EthKeyAddress, EvmKeyStore, PlainKeyStore};
 use num_traits::ToPrimitive;
 use std::result;
 
@@ -81,7 +81,7 @@ const TRANSACTION_RECEIPT_RETRIES: usize = 200;
 const SUBNET_MAJORITY_PERCENTAGE: u8 = 67;
 
 pub struct EthSubnetManager {
-    keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
+    keystore: Option<Arc<RwLock<PlainKeyStore<EthKeyAddress>>>>,
     ipc_contract_info: IPCContractInfo,
 }
 
@@ -1037,7 +1037,7 @@ impl EthSubnetManager {
         registry_addr: ethers::types::Address,
         chain_id: u64,
         provider: Provider<ErrorParserHttp>,
-        keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
+        keystore: Option<Arc<RwLock<PlainKeyStore<EthKeyAddress>>>>,
     ) -> Self {
         Self {
             keystore,
@@ -1084,7 +1084,7 @@ impl EthSubnetManager {
         }
     }
 
-    pub fn keystore(&self) -> Result<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>> {
+    pub fn keystore(&self) -> Result<Arc<RwLock<PlainKeyStore<EthKeyAddress>>>> {
         self.keystore
             .clone()
             .ok_or(anyhow!("no evm keystore available"))
@@ -1115,7 +1115,7 @@ impl EthSubnetManager {
 
     pub fn from_subnet_with_wallet_store(
         subnet: &Subnet,
-        keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
+        keystore: Option<Arc<RwLock<PlainKeyStore<EthKeyAddress>>>>,
     ) -> Result<Self> {
         let url = subnet.rpc_http().clone();
         let auth_token = subnet.auth_token();

@@ -8,6 +8,8 @@ use crate::{
     wallet,
 };
 
+mod encryption {
+    use super::*;
 const PASSPHRASE: &str = "foobarbaz";
 
 #[test]
@@ -50,7 +52,7 @@ fn test_decrypt_message() -> Result<()> {
 fn test_read_old_encrypted_keystore() -> Result<()> {
     let dir: PathBuf = "tests/keystore_encrypted_old".into();
     ensure!(dir.exists());
-    let ks = KeyStore::new(KeyStoreConfig::encrypted(dir, PASSPHRASE))?;
+    let ks = CrownJewels::new(KeyStoreConfig::encrypted(dir, PASSPHRASE))?;
     ensure!(ks.plain.is_some());
     Ok(())
 }
@@ -58,13 +60,13 @@ fn test_read_old_encrypted_keystore() -> Result<()> {
 #[test]
 fn test_read_write_encrypted_keystore() -> Result<()> {
     let keystore_location = tempfile::tempdir()?.into_path();
-    let ks = KeyStore::new(KeyStoreConfig::encrypted(
+    let ks = CrownJewels::new(KeyStoreConfig::encrypted(
         &keystore_location,
         PASSPHRASE,
     ))?;
     ks.flush()?;
 
-    let ks_read = KeyStore::new(KeyStoreConfig::encrypted(
+    let ks_read = CrownJewels::new(KeyStoreConfig::encrypted(
         &keystore_location,
         PASSPHRASE,
     ))?;
@@ -77,7 +79,7 @@ fn test_read_write_encrypted_keystore() -> Result<()> {
 #[test]
 fn test_read_write_keystore() -> Result<()> {
     let keystore_location = tempfile::tempdir()?.into_path();
-    let mut ks = KeyStore::new(KeyStoreConfig::plain(&keystore_location))?;
+    let mut ks = CrownJewels::new(KeyStoreConfig::plain(&keystore_location))?;
 
     let key = wallet::generate_key(SignatureType::BLS)?;
 
@@ -102,13 +104,13 @@ fn test_read_write_keystore() -> Result<()> {
     );
 
     // Read existing keystore.json
-    let ks_read = KeyStore::new(KeyStoreConfig::plain(keystore_location))?;
+    let ks_read = CrownJewels::new(KeyStoreConfig::plain(keystore_location))?;
     ensure!(ks == ks_read);
 
     Ok(())
 }
 
-impl quickcheck::Arbitrary for KeyInfo {
+impl quickcheck::Arbitrary for FvmKeyInfo {
     fn arbitrary(g: &mut quickcheck::Gen) -> Self {
         let sigtype = g
             .choose(&[
@@ -116,7 +118,7 @@ impl quickcheck::Arbitrary for KeyInfo {
                 fvm_shared::crypto::signature::SignatureType::Secp256k1,
             ])
             .unwrap();
-        KeyInfo {
+        FvmKeyInfo {
             key_type: *sigtype,
             private_key: Vec::arbitrary(g),
         }
@@ -124,8 +126,9 @@ impl quickcheck::Arbitrary for KeyInfo {
 }
 
 #[quickcheck]
-fn keyinfo_roundtrip(keyinfo: KeyInfo) {
+fn keyinfo_roundtrip(keyinfo: FvmKeyInfo) {
     let serialized: String = serde_json::to_string(&KeyInfoJsonRef(&keyinfo)).unwrap();
     let parsed: KeyInfoJson = serde_json::from_str(&serialized).unwrap();
     assert_eq!(keyinfo, parsed.0);
+}
 }

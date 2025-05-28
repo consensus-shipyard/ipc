@@ -29,7 +29,7 @@ impl CommandLineHandler for WalletBalances {
         let mut errors = Vec::new();
 
         match wallet_type {
-            WalletType::Evm => {
+            WalletType::Etherium => {
                 let wallet = provider.evm_wallet()?;
                 let addresses = wallet.read().unwrap().list()?;
                 let r = addresses
@@ -53,8 +53,7 @@ impl CommandLineHandler for WalletBalances {
 
                 for r in v.into_iter() {
                     match r {
-                        Ok(i) => {
-                            let (balance, addr) = i;
+                        Ok((balance, addr)) => {
                             if addr.to_string() != "default-key" {
                                 println!("{} - Balance: {}", addr, balance);
                             }
@@ -74,7 +73,7 @@ impl CommandLineHandler for WalletBalances {
                     return Err(error);
                 }
             }
-            WalletType::Fvm => {
+            WalletType::Filecoin => {
                 let wallet = provider.fvm_wallet()?;
                 let addresses = wallet.read().unwrap().list_addrs()?;
                 let r = addresses
