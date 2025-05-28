@@ -3,7 +3,7 @@
 
 use std::{path::PathBuf, time::Duration};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 
 use ipc_api::subnet_id::SubnetID;
@@ -12,7 +12,7 @@ use multiaddr::Multiaddr;
 use crate::{home_relative, IsHumanReadable};
 
 #[serde_as]
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ResolverSettings {
     /// Time to wait between attempts to resolve a CID, in seconds.
     #[serde_as(as = "DurationSeconds<u64>")]
@@ -24,10 +24,23 @@ pub struct ResolverSettings {
     pub content: ContentSettings,
 }
 
+impl Default for ResolverSettings {
+    fn default() -> Self {
+        Self {
+            retry_delay: Duration::from_secs(10),
+            network: Default::default(),
+            discovery: Default::default(),
+            membership: Default::default(),
+            connection: Default::default(),
+            content: Default::default(),
+        }
+    }
+}
+
 /// Settings describing the subnet hierarchy, not the physical network.
 ///
 /// For physical network settings see [ConnectionSettings].
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NetworkSettings {
     /// Cryptographic key used to sign messages.
     ///
@@ -40,8 +53,17 @@ pub struct NetworkSettings {
 
 home_relative!(NetworkSettings { local_key });
 
+impl Default for NetworkSettings {
+    fn default() -> Self {
+        Self {
+            local_key: PathBuf::from("keys/network.sk"),
+            network_name: "default".into(),
+        }
+    }
+}
+
 /// Configuration for [`discovery::Behaviour`].
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct DiscoverySettings {
     /// Custom nodes which never expire, e.g. bootstrap or reserved nodes.
     ///
@@ -53,9 +75,19 @@ pub struct DiscoverySettings {
     pub enable_kademlia: bool,
 }
 
+impl Default for DiscoverySettings {
+    fn default() -> Self {
+        Self {
+            static_addresses: Vec::new(),
+            target_connections: 10,
+            enable_kademlia: true,
+        }
+    }
+}
+
 /// Configuration for [`membership::Behaviour`].
 #[serde_as]
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MembershipSettings {
     /// User defined list of subnets which will never be pruned from the cache.
     #[serde_as(as = "Vec<IsHumanReadable>")]
@@ -77,7 +109,19 @@ pub struct MembershipSettings {
     pub max_provider_age: Duration,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+impl Default for MembershipSettings {
+    fn default() -> Self {
+        Self {
+            static_subnets: Vec::new(),
+            max_subnets: 100,
+            publish_interval: Duration::from_secs(60),
+            min_time_between_publish: Duration::from_secs(5),
+            max_provider_age: Duration::from_secs(300),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ConnectionSettings {
     /// The address where we will listen to incoming connections.
     pub listen_addr: Multiaddr,
@@ -94,9 +138,22 @@ pub struct ConnectionSettings {
     pub event_buffer_capacity: u32,
 }
 
+impl Default for ConnectionSettings {
+    fn default() -> Self {
+        Self {
+            listen_addr: Multiaddr::empty(),
+            external_addresses: Vec::new(),
+            max_incoming: 30,
+            expected_peer_count: 10000,
+            max_peers_per_query: 5,
+            event_buffer_capacity: 100,
+        }
+    }
+}
+
 /// Configuration for [`content::Behaviour`].
 #[serde_as]
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ContentSettings {
     /// Number of bytes that can be consumed by remote peers in a time period.
     ///
@@ -107,4 +164,13 @@ pub struct ContentSettings {
     /// 0 means no limit.
     #[serde_as(as = "DurationSeconds<u64>")]
     pub rate_limit_period: Duration,
+}
+
+impl Default for ContentSettings {
+    fn default() -> Self {
+        Self {
+            rate_limit_bytes: 0,
+            rate_limit_period: Duration::from_secs(0),
+        }
+    }
 }

@@ -5,11 +5,13 @@
 use crate::config::Subnet;
 use anyhow::anyhow;
 use fvm_shared::address::{Address, Payload};
+use http::{HeaderName, HeaderValue};
 use ipc_api::subnet_id::SubnetID;
 use ipc_types::EthAddress;
 use serde::ser::{Error, SerializeSeq};
 use serde::Serializer;
 use std::collections::HashMap;
+use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin};
 
 /// A serde serialization method to serialize a hashmap of subnets with subnet id as key and
 /// Subnet struct as value to a vec of subnets
@@ -60,6 +62,54 @@ fn address_to_eth_address(addr: &Address) -> anyhow::Result<EthAddress> {
         }
         Payload::ID(id) => Ok(EthAddress::from_id(*id)),
         _ => Err(anyhow!("not eth address")),
+    }
+}
+
+/// Convert a Vec<String> into an AllowOrigin.
+pub fn vec_to_allow_origin(origins: Vec<String>) -> anyhow::Result<AllowOrigin> {
+    if origins.len() == 1 && origins[0] == "*" {
+        Ok(AllowOrigin::any())
+    } else {
+        let list = origins
+            .into_iter()
+            .map(|s| {
+                HeaderValue::from_str(&s)
+                    .map_err(|e| anyhow::anyhow!("Failed to parse origin '{}': {}", s, e))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(AllowOrigin::list(list))
+    }
+}
+
+/// Convert a Vec<String> into an AllowMethods.
+pub fn vec_to_allow_methods(methods: Vec<String>) -> anyhow::Result<AllowMethods> {
+    if methods.len() == 1 && methods[0] == "*" {
+        Ok(AllowMethods::any())
+    } else {
+        let list = methods
+            .into_iter()
+            .map(|s| {
+                s.parse()
+                    .map_err(|e| anyhow::anyhow!("Failed to parse method '{}': {}", s, e))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(AllowMethods::list(list))
+    }
+}
+
+/// Convert a Vec<String> into an AllowHeaders.
+pub fn vec_to_allow_headers(headers: Vec<String>) -> anyhow::Result<AllowHeaders> {
+    if headers.len() == 1 && headers[0] == "*" {
+        Ok(AllowHeaders::any())
+    } else {
+        let list = headers
+            .into_iter()
+            .map(|s| {
+                s.parse::<HeaderName>()
+                    .map_err(|e| anyhow::anyhow!("Failed to parse header name '{}': {}", s, e))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(AllowHeaders::list(list))
     }
 }
 

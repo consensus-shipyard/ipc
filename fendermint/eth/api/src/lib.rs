@@ -6,6 +6,8 @@ use axum::routing::{get, post};
 use fvm_shared::econ::TokenAmount;
 use jsonrpc_v2::Data;
 use std::{net::ToSocketAddrs, sync::Arc, time::Duration};
+use tokio::select;
+use tokio_util::sync::CancellationToken;
 use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer};
 
 pub mod apis;
@@ -59,6 +61,7 @@ pub async fn listen<A: ToSocketAddrs>(
     max_nonce_gap: Nonce,
     gas_opt: GasOpt,
     cors_opt: CorsOpt,
+    cancel_token: Option<CancellationToken>,
 ) -> anyhow::Result<()> {
     if let Some(listen_addr) = listen_addr.to_socket_addrs()?.next() {
         let rpc_state = Arc::new(JsonRpcState::new(
@@ -82,9 +85,26 @@ pub async fn listen<A: ToSocketAddrs>(
             rpc_state,
         };
         let router = make_router(app_state, cors_opt);
-        let server = axum::Server::try_bind(&listen_addr)?.serve(router.into_make_service());
+        let server = axum::Server::try_bind(&listen_addr)?;
         tracing::info!(?listen_addr, "bound Ethereum API");
-        server.await?;
+
+        // Run the server.
+        if let Some(token) = cancel_token {
+            select! {
+                res = server.serve(router.into_make_service()) => {
+                    res.map_err(|e| anyhow!("error listening: {e}"))?
+                }
+                _ = token.cancelled() => {
+                    tracing::info!("Cancellation requested. Shutting down ETH API server.");
+                }
+            }
+        } else {
+            server
+                .serve(router.into_make_service())
+                .await
+                .map_err(|e| anyhow!("error listening: {e}"))?;
+        }
+
         Ok(())
     } else {
         Err(anyhow!("failed to convert to any socket address"))
