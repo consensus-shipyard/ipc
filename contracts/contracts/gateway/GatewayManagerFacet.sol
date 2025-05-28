@@ -104,7 +104,10 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         // Release fund flows from Gateway -> SubnetActor -> ReleaseQueue (Locking) -> Validator.
         // Because msg.sender is actually the subnet actor, this method sends the fund back to
         // the subnet actor caller.
-        (bool success, ) = SubnetActorGetterFacet(msg.sender).collateralSource().transferFunds(payable(msg.sender), amount);
+        (bool success, ) = SubnetActorGetterFacet(msg.sender).collateralSource().transferFunds(
+            payable(msg.sender),
+            amount
+        );
         if (!success) {
             revert TransferFailed(msg.sender, address(this), amount);
         }
@@ -130,7 +133,10 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         delete s.subnets[id];
 
         s.subnetKeys.remove(id);
-        (bool success, ) = SubnetActorGetterFacet(msg.sender).collateralSource().transferFunds(payable(msg.sender), stake);
+        (bool success, ) = SubnetActorGetterFacet(msg.sender).collateralSource().transferFunds(
+            payable(msg.sender),
+            stake
+        );
         if (!success) {
             revert TransferFailed(msg.sender, address(this), stake);
         }
