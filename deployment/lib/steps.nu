@@ -50,9 +50,6 @@ export def get-deploy-subnet-contracts-steps [set_up_contract_owner_steps: list]
     { name: "faucet_set_drip_amount" fn: { subnet faucet-set-drip-amount 5e18} }
 
     ...$set_up_contract_owner_steps
-    { name: "deploy_blob_manager_contract" fn: { subnet deploy-subnet-contract ($env.state | get $env.state.subnet_contract_owner_ref) "BlobManager"} }
-    { name: "deploy_credit_contract" fn: { subnet deploy-subnet-contract ($env.state | get $env.state.subnet_contract_owner_ref) "CreditManager"} }
-    { name: "deploy_bucket_manager_contract" fn: { subnet deploy-subnet-contract ($env.state | get $env.state.subnet_contract_owner_ref) "BucketManager"} }
     { name: "validator_check_funds_on_subnet" fn: { util wait-for-funds-on-subnet $env.state.validator0.address} }
   ]
 }

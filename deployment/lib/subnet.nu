@@ -59,22 +59,6 @@ export def faucet-set-drip-amount [drip_amount: float] {
   ]
 }
 
-export def deploy-subnet-contract [owner: record, contract_name] {
-  forge-retry $contract_name [
-    script $"script/($contract_name).s.sol"
-    --private-key $owner.private_key
-    --tc DeployScript
-    --sig "'run()'"
-    --rpc-url $env.state.config.subnet.rpc_url
-    --broadcast -vv
-    --timeout 30
-    -g 100000
-  ]
-
-  let addr = (open $"($env.state.config.ipc_src_dir)/recall-contracts/broadcast/($contract_name).s.sol/($env.state.config.subnet.chain_id)/run-latest.json" | get returns | values | where internal_type == $"contract ($contract_name)" | get 0.value)
-  do $env.state.update ({} | insert $"($contract_name | str downcase)_contract_address" $addr)
-}
-
 export def send-funds [src: record, dest:record, amount: float] {
   cast-retry "send-funds" [
     send --private-key $src.private_key

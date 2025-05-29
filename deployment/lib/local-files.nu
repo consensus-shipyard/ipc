@@ -43,10 +43,7 @@ export def write-subnet-config [dest: string, --bootstrap] {
     $cfg = ($cfg | merge deep {
       subnet: {
         addresses: {
-          credit_manager: $env.state.creditManager_contract_address
-          bucket_manager: $env.state.bucketManager_contract_address
           faucet_contract: $env.state.faucet_contract_address
-          blob_manager: $env.state.blobManager_contract_address
         }
       }
       endpoints: {
