@@ -3,6 +3,7 @@
 #![cfg(feature = "with-ethers")]
 use super::*;
 
+use core::fmt;
 use std::str::FromStr;
 
 impl TryFrom<&EvmKeyInfo> for ethers::types::Address {
@@ -56,8 +57,8 @@ impl From<EthKeyAddress> for ethers::types::Address {
     }
 }
 
-impl Display for EthKeyAddress {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+impl fmt::Display for EthKeyAddress {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self == &Self::default() {
             write!(f, "default-key")
         } else {
@@ -71,7 +72,7 @@ impl TryFrom<EvmKeyInfo> for EthKeyAddress {
 
     fn try_from(value: EvmKeyInfo) -> std::result::Result<Self, Self::Error> {
         Ok(Self {
-            inner: ethers::types::Address::try_from(value)?,
+            inner: ethers::types::Address::try_from(&value)?,
         })
     }
 }

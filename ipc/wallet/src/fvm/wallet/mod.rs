@@ -51,13 +51,13 @@ impl TryFrom<FvmKeyInfo> for FullKey {
 /// A wallet is a collection of private keys with optional persistence and
 /// optional encryption.
 #[derive(Clone, PartialEq, Debug, Eq)]
-pub struct Wallet {
+pub struct Wallet /*<S=FvmCrownJewels>*/ {
     in_memory_cache: HashMap<Address, FullKey>,
     // double check, the key is string due to some hackory with test vs life key names
     keystore: FvmCrownJewels,
 }
 
-impl Wallet {
+impl Wallet /*<S>*/ {
     /// Return a new wallet with a given `KeyStore`
     pub fn new(keystore: FvmCrownJewels) -> Self {
         Wallet {

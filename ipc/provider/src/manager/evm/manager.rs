@@ -15,6 +15,7 @@ use ipc_actors_abis::{
 };
 use ipc_api::evm::{fil_to_eth_amount, payload_to_evm_address, subnet_id_to_evm_addresses};
 use ipc_api::validator::from_contract_validators;
+use ipc_wallet::evm::EvmCrownJewels;
 use reqwest::header::HeaderValue;
 use reqwest::Client;
 use std::net::{IpAddr, SocketAddr};
@@ -57,7 +58,7 @@ use ipc_api::staking::{PowerChangeRequest, ValidatorInfo, ValidatorStakingInfo};
 use ipc_api::subnet::ConstructParams;
 use ipc_api::subnet_id::SubnetID;
 use ipc_observability::lazy_static;
-use ipc_wallet::{EthKeyAddress, EvmKeyStore, PlainKeyStore};
+use ipc_wallet::*;
 use num_traits::ToPrimitive;
 use std::result;
 
@@ -81,7 +82,7 @@ const TRANSACTION_RECEIPT_RETRIES: usize = 200;
 const SUBNET_MAJORITY_PERCENTAGE: u8 = 67;
 
 pub struct EthSubnetManager {
-    keystore: Option<Arc<RwLock<PlainKeyStore<EthKeyAddress>>>>,
+    keystore: Option<Arc<RwLock<EvmCrownJewels>>>,
     ipc_contract_info: IPCContractInfo,
 }
 
@@ -1037,7 +1038,7 @@ impl EthSubnetManager {
         registry_addr: ethers::types::Address,
         chain_id: u64,
         provider: Provider<ErrorParserHttp>,
-        keystore: Option<Arc<RwLock<PlainKeyStore<EthKeyAddress>>>>,
+        keystore: Option<Arc<RwLock<EvmCrownJewels>>>,
     ) -> Self {
         Self {
             keystore,
@@ -1084,7 +1085,7 @@ impl EthSubnetManager {
         }
     }
 
-    pub fn keystore(&self) -> Result<Arc<RwLock<PlainKeyStore<EthKeyAddress>>>> {
+    pub fn keystore(&self) -> Result<Arc<RwLock<EvmCrownJewels>>> {
         self.keystore
             .clone()
             .ok_or(anyhow!("no evm keystore available"))
@@ -1101,9 +1102,7 @@ impl EthSubnetManager {
         let addr = payload_to_evm_address(addr.payload())?;
         let keystore = self.keystore()?;
         let keystore = keystore.read().unwrap();
-        let private_key = keystore
-            .get(&addr.into())?
-            .ok_or_else(|| anyhow!("address {addr:} does not have private key in key store"))?;
+        let private_key = keystore.get(&addr.into())?;
         let wallet = LocalWallet::from_bytes(private_key.private_key())?
             .with_chain_id(self.ipc_contract_info.chain_id);
 
@@ -1115,7 +1114,7 @@ impl EthSubnetManager {
 
     pub fn from_subnet_with_wallet_store(
         subnet: &Subnet,
-        keystore: Option<Arc<RwLock<PlainKeyStore<EthKeyAddress>>>>,
+        keystore: Option<Arc<RwLock<EvmCrownJewels>>>,
     ) -> Result<Self> {
         let url = subnet.rpc_http().clone();
         let auth_token = subnet.auth_token();

@@ -3,9 +3,13 @@
 
 //! Ethereum wallet key store.
 
-pub(crate) mod key;
+mod key;
 
 pub const DEFAULT_KEYSTORE_NAME: &str = "evm_keystore.json";
+
+pub use key::*;
+
+pub type EvmCrownJewels = crate::CrownJewels<String, EvmKeyInfo, EvmPersistentKeyInfo>;
 
 #[cfg(test)]
 mod tests;

@@ -4,12 +4,20 @@ use std::fmt::Write;
 // SPDX-License-Identifier: Apache-2.0, MIT
 use zeroize::Zeroize;
 
+use crate::AddressDerivator;
+
 pub mod adapter;
 
 /// The struct that contains evm private key info
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct EvmKeyInfo {
     pub(crate) private_key: Vec<u8>,
+}
+
+impl AddressDerivator<String> for EvmKeyInfo {
+    fn as_address(&self) -> String {
+        todo!("")
+    }
 }
 
 impl EvmKeyInfo {
@@ -42,6 +50,12 @@ impl Drop for EvmKeyInfo {
 pub struct EvmPersistentKeyInfo {
     pub(crate) address: String,
     pub(crate) private_key: String,
+}
+
+impl EvmPersistentKeyInfo {
+    pub fn private_key(&self) -> &str {
+        &self.private_key
+    }
 }
 
 impl From<(&String, &EvmKeyInfo)> for EvmPersistentKeyInfo {

@@ -11,7 +11,8 @@ use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use ipc_api::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
 use ipc_observability::{emit, serde::HexEncodableBlockHash};
-use ipc_wallet::{EthKeyAddress, PlainKeyStore};
+use ipc_wallet::evm::EvmCrownJewels;
+use ipc_wallet::*; // XXX TODO FIXME
 use std::cmp::max;
 use std::fmt::{Display, Formatter};
 use std::sync::{Arc, RwLock};
@@ -73,7 +74,7 @@ impl BottomUpCheckpointManager<EthSubnetManager> {
     pub async fn new_evm_manager(
         parent: Subnet,
         child: Subnet,
-        keystore: Arc<RwLock<PlainKeyStore<EthKeyAddress>>>,
+        keystore: Arc<RwLock<EvmCrownJewels>>,
         max_parallelism: usize,
     ) -> Result<Self> {
         let parent_handler =

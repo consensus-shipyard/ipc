@@ -18,8 +18,8 @@ pub use errors::*;
 pub(crate) mod crypto;
 pub use crypto::*;
 
-mod evm;
-mod fvm;
+pub mod evm;
+pub mod fvm;
 
 #[cfg(feature = "with-ethers")]
 pub use crate::evm::DEFAULT_KEYSTORE_NAME;

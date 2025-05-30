@@ -70,13 +70,11 @@ use core::fmt::Debug;
 use core::hash::Hash;
 
 /// Derive an address from the key info
-pub trait AddressDerivator {
-    type Key;
-    fn as_address(&self) -> Self::Key;
+pub trait AddressDerivator<Key> {
+    fn as_address(&self) -> Key;
 }
-impl AddressDerivator for FvmKeyInfo {
-    type Key = String;
-    fn as_address(&self) -> Self::Key {
+impl AddressDerivator<String> for FvmKeyInfo {
+    fn as_address(&self) -> String {
         todo!("as address will be impl'd soon™")
     }
 }
@@ -107,12 +105,7 @@ pub struct CrownJewels<K: Hash + PartialEq + Eq + Debug, I, P> {
 impl<K, I, P> CrownJewels<K, I, P>
 where
     K: Hash + PartialEq + Eq + Debug + Serialize + Clone + for<'de> Deserialize<'de>,
-    I: AddressDerivator<Key = K>
-        + Debug
-        + Clone
-        + PartialEq
-        + Eq
-        + for<'k, 'p> From<(&'k K, &'p P)>,
+    I: AddressDerivator<K> + Debug + Clone + PartialEq + Eq + for<'k, 'p> From<(&'k K, &'p P)>,
     P: Debug + Clone + Serialize + for<'de> Deserialize<'de> + for<'k, 'i> From<(&'k K, &'i I)>,
     // XXX consider `&I: Into<K>` to allow for conversion of the in mem key to the address,
     // XXX which _should_ be deterministic based on the public key
@@ -358,7 +351,7 @@ where
     {
         let default_key = <K as DefaultKey>::default_key();
         let info = self.get(key)?;
-        self.remove(default_key.clone());
+        let _ = self.remove(default_key.clone());
         self.put(default_key, info)?;
         Ok(())
     }

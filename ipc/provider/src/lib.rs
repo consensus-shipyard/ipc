@@ -19,7 +19,9 @@ use ipc_api::{
     subnet::{ConsensusType, ConstructParams},
     subnet_id::SubnetID,
 };
-use ipc_wallet::{CrownJewels, EthKeyAddress, EvmKeyStore, KeyStoreConfig, PlainKeyStore, Wallet};
+use ipc_wallet::evm::adapter::{random_eth_key_info, EthKeyAddress};
+use ipc_wallet::evm::EvmCrownJewels;
+use ipc_wallet::{CrownJewels, FvmCrownJewels, KeyStoreConfig, Wallet};
 use lotus::message::wallet::WalletKeyType;
 use manager::{EthSubnetManager, SubnetGenesisInfo, SubnetInfo, SubnetManager};
 use serde::{Deserialize, Serialize};
@@ -65,14 +67,14 @@ pub struct IpcProvider {
     sender: Option<Address>,
     config: Arc<Config>,
     fvm_wallet: Option<Arc<RwLock<Wallet>>>,
-    evm_keystore: Option<Arc<RwLock<PlainKeyStore<EthKeyAddress>>>>,
+    evm_keystore: Option<Arc<RwLock<EvmCrownJewels>>>, // XXX key should be `EthKeyAddress`
 }
 
 impl IpcProvider {
     fn new(
         config: Arc<Config>,
         fvm_wallet: Arc<RwLock<Wallet>>,
-        evm_keystore: Arc<RwLock<PlainKeyStore<EthKeyAddress>>>,
+        evm_keystore: Arc<RwLock<EvmCrownJewels>>,
     ) -> Self {
         Self {
             sender: None,
@@ -110,7 +112,7 @@ impl IpcProvider {
         if let Some(repo_path) = keystore_path {
             let fvm_wallet = Arc::new(RwLock::new(Wallet::new(new_fvm_keystore_from_path(
                 &repo_path,
-                config.password.as_ref(),
+                config.password.clone(),
             )?)));
             let evm_keystore = Arc::new(RwLock::new(new_evm_keystore_from_path(
                 &keystore_path,
@@ -182,7 +184,7 @@ impl IpcProvider {
     ///
     /// This method should be used when we want the wallet retrieval to throw an error
     /// if it is not configured (i.e. when the provider needs to sign transactions).
-    pub fn evm_wallet(&self) -> anyhow::Result<Arc<RwLock<PlainKeyStore<EthKeyAddress>>>> {
+    pub fn evm_wallet(&self) -> anyhow::Result<Arc<RwLock<EvmCrownJewels>>> {
         if let Some(wallet) = &self.evm_keystore {
             Ok(wallet.clone())
         } else {
@@ -304,11 +306,9 @@ impl IpcProvider {
         let sender = self.check_sender(subnet_config, from)?;
         let addr = payload_to_evm_address(sender.payload())?;
         let keystore = self.evm_wallet()?;
-        let key_info = keystore
-            .read()
-            .unwrap()
-            .get(&addr.into())?
-            .ok_or_else(|| anyhow!("key does not exists"))?;
+        let guard = keystore.read().unwrap();
+        let key_info = guard.get(&addr.into())?;
+        // TODO carve this out into helper types
         let sk = libsecp256k1::SecretKey::parse_slice(key_info.private_key())?;
         let public_key = libsecp256k1::PublicKey::from_secret_key(&sk).serialize();
         let hex_public_key = hex::encode(public_key);
@@ -792,6 +792,7 @@ impl IpcProvider {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct LotusJsonKeyType {
+    // XXX should not be present outside generated code
     pub r#type: String,
     pub private_key: String,
 }
@@ -811,6 +812,7 @@ impl Drop for LotusJsonKeyType {
     }
 }
 
+// XXX TODO FIXME
 // Here I put in some other category the wallet-related
 // function so we can reconcile them easily when we decide to tackle
 // https://github.com/consensus-shipyard/ipc-agent/issues/308
@@ -828,10 +830,11 @@ impl IpcProvider {
     }
 
     pub fn new_evm_key(&self) -> anyhow::Result<EthKeyAddress> {
-        let key_info = ipc_wallet::random_eth_key_info();
+        let key_info = random_eth_key_info();
         let wallet = self.evm_wallet()?;
 
-        let out = wallet.write().unwrap().put(key_info);
+        let mut guard = wallet.write().unwrap();
+        let out = guard.put(key_info);
         out
     }
 
@@ -846,34 +849,31 @@ impl IpcProvider {
             SignatureType::Secp256k1
         };
 
-        let key_info = ipc_wallet::json::KeyInfoJson(ipc_wallet::FvmKeyInfo::new(
-            key_type,
-            base64::engine::general_purpose::STANDARD.decode(&keyinfo.private_key)?,
-        ));
-        let key_info = ipc_wallet::FvmKeyInfo::from(key_info);
+        // XXX use some better abstraction here and define key format through types and fn naming
+        let sk = base64::engine::general_purpose::STANDARD.decode(&keyinfo.private_key)?;
+        let key_info = ipc_wallet::FvmKeyInfo::new(key_type, sk);
         Ok(wallet.import(key_info)?)
     }
 
     pub fn import_evm_key_from_privkey(&self, private_key: &str) -> anyhow::Result<EthKeyAddress> {
         let keystore = self.evm_wallet()?;
-        let mut keystore = keystore.write().unwrap();
-
         let private_key = if !private_key.starts_with("0x") {
             hex::decode(private_key)?
         } else {
             hex::decode(&private_key[2..])?
         };
-        keystore.put(ipc_wallet::EvmKeyInfo::new(private_key))
+        let mut guard = keystore.write().unwrap();
+        guard.put(ipc_wallet::evm::EvmKeyInfo::new(private_key))
     }
 
     pub fn import_evm_key_from_json(&self, keyinfo: &str) -> anyhow::Result<EthKeyAddress> {
-        let persisted: ipc_wallet::PersistentKeyInfo = serde_json::from_str(keyinfo)?;
+        let persisted: ipc_wallet::evm::EvmPersistentKeyInfo = serde_json::from_str(keyinfo)?;
         let persisted: String = persisted.private_key().parse()?;
         self.import_evm_key_from_privkey(&persisted)
     }
 }
 
-fn new_fvm_wallet_from_config(config: Arc<Config>) -> anyhow::Result<CrownJewels> {
+fn new_fvm_wallet_from_config(config: Arc<Config>) -> anyhow::Result<FvmCrownJewels> {
     let repo_str = &config.keystore_path;
     if let Some(repo_str) = repo_str {
         new_fvm_keystore_from_path(repo_str, config.password.clone())
@@ -884,9 +884,7 @@ fn new_fvm_wallet_from_config(config: Arc<Config>) -> anyhow::Result<CrownJewels
     }
 }
 
-pub fn new_evm_keystore_from_config(
-    config: Arc<Config>,
-) -> anyhow::Result<PlainKeyStore<EthKeyAddress>> {
+pub fn new_evm_keystore_from_config(config: Arc<Config>) -> anyhow::Result<EvmCrownJewels> {
     let repo_str = &config.keystore_path;
     if let Some(repo_str) = repo_str {
         new_evm_keystore_from_path(repo_str, config.password.clone())
@@ -898,7 +896,7 @@ pub fn new_evm_keystore_from_config(
 pub fn new_evm_keystore_from_path(
     repo_str: &str,
     password: Option<String>,
-) -> anyhow::Result<PlainKeyStore<EthKeyAddress>> {
+) -> anyhow::Result<EvmCrownJewels> {
     let name = password
         .map(|_| ipc_wallet::ENCRYPTED_KEYSTORE_NAME)
         .unwrap_or_else(|| ipc_wallet::PLAIN_JSON_KEYSTORE_NAME);
@@ -909,13 +907,14 @@ pub fn new_evm_keystore_from_path(
     } else {
         KeyStoreConfig::plain(repo)
     };
-    CrownJewels::new(keystore_config).map_err(|e| anyhow!("Failed to create evm keystore: {}", e))
+    EvmCrownJewels::new(keystore_config)
+        .map_err(|e| anyhow!("Failed to create evm keystore: {}", e))
 }
 
 pub fn new_fvm_keystore_from_path(
     repo_str: &str,
     password: Option<String>,
-) -> anyhow::Result<CrownJewels> {
+) -> anyhow::Result<FvmCrownJewels> {
     let repo = Path::new(&repo_str);
     let repo = expand_tilde(repo);
     let keystore_config = if let Some(ref password) = password {
@@ -923,7 +922,7 @@ pub fn new_fvm_keystore_from_path(
     } else {
         KeyStoreConfig::plain(repo)
     };
-    CrownJewels::new(keystore_config).map_err(|e| anyhow!("Failed to create keystore: {}", e))
+    FvmCrownJewels::new(keystore_config).map_err(|e| anyhow!("Failed to create keystore: {}", e))
 }
 
 pub fn default_repo_path() -> String {

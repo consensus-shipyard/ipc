@@ -33,9 +33,8 @@ impl DefaultKey for Key {
         }
     }
 }
-impl AddressDerivator for EvmKeyInfo {
-    type Key = Key;
-    fn as_address(&self) -> Self::Key {
+impl AddressDerivator<Key> for EvmKeyInfo {
+    fn as_address(&self) -> Key {
         Key::try_from(self).unwrap()
     }
 }
@@ -72,7 +71,6 @@ impl Display for Key {
     }
 }
 
-type EvmCrownJewels = CrownJewels<String, EvmKeyInfo, EvmPersistentKeyInfo>;
 type EvmCrownJewelsTest = CrownJewels<Key, EvmKeyInfo, EvmPersistentKeyInfo>;
 
 #[test]
@@ -112,7 +110,7 @@ fn test_default() {
 
     // can't set default if the key hasn't been put yet.
     assert!(ks.set_default(&addr).is_err());
-    ks.put(addr.clone(), key_info.clone());
+    let _ = ks.put(addr.clone(), key_info.clone());
     ks.set_default(&addr).unwrap();
     assert_eq!(ks.get_default().unwrap(), Some(addr.clone()));
 
@@ -120,7 +118,7 @@ fn test_default() {
     let new_key = EvmKeyInfo {
         private_key: vec![0, 1, 3],
     };
-    let new_addr = new_key.as_address();
+    let new_addr: Key = new_key.as_address();
     ks.put(new_addr.clone(), new_key.clone()).unwrap();
     ks.set_default(&new_addr).unwrap();
     assert_eq!(ks.get_default().unwrap(), Some(new_addr.clone()));
@@ -130,7 +128,7 @@ fn test_default() {
     let ks = EvmCrownJewelsTest::new(KeyStoreConfig::plain(&keystore_location)).unwrap();
     let key_from_store = ks.get(&addr).unwrap();
     assert_eq!(key_from_store, key_info);
-    let key_from_store = ks.get(&Key::default_key()).unwrap();
+    let _key_from_store = ks.get(&Key::default_key()).unwrap();
     // the default is also recovered from persistent storage
     assert_eq!(ks.get_default().unwrap().unwrap(), new_addr);
 }
