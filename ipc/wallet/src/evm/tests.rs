@@ -8,12 +8,31 @@ use std::fmt::{Display, Formatter};
 use super::key::EvmPersistentKeyInfo;
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(from = "String")]
+#[serde(into = "String")]
 pub struct Key {
     data: String,
 }
+
+impl From<String> for Key {
+    fn from(data: String) -> Self {
+        Self {
+            data
+        }
+    }
+} 
+
+impl Into<String> for Key {
+    fn into(self) -> String {
+        self.data
+    }
+}
+
 impl DefaultKey for Key {
     fn default_key() -> Self {
-        <Self as Default>::default()
+        Self {
+            data: "default-key".to_owned(),
+        }
     }
 }
 impl AddressDerivator for EvmKeyInfo {
@@ -46,14 +65,6 @@ impl From<(&Key, &EvmPersistentKeyInfo)> for EvmKeyInfo {
     fn from(value: (&Key, &EvmPersistentKeyInfo)) -> Self {
         let sk = hex::decode(&value.1.private_key).expect("TODO");
         EvmKeyInfo { private_key: sk }
-    }
-}
-
-impl Default for Key {
-    fn default() -> Self {
-        Self {
-            data: String::from("default-key"),
-        }
     }
 }
 
@@ -99,11 +110,11 @@ fn test_default() {
     let key_info = EvmKeyInfo {
         private_key: vec![0, 1, 2],
     };
-    let addr = Key::try_from(&key_info).unwrap();
+    let addr = key_info.as_address();
 
     // can't set default if the key hasn't been put yet.
     assert!(ks.set_default(&addr).is_err());
-    ks.put(addr.clone(), key_info.clone()).unwrap();
+    ks.put(addr.clone(), key_info.clone());
     ks.set_default(&addr).unwrap();
     assert_eq!(ks.get_default().unwrap(), Some(addr.clone()));
 
@@ -111,7 +122,7 @@ fn test_default() {
     let new_key = EvmKeyInfo {
         private_key: vec![0, 1, 3],
     };
-    let new_addr = Key::try_from(&new_key).unwrap();
+    let new_addr = new_key.as_address();
     ks.put(new_addr.clone(), new_key.clone()).unwrap();
     ks.set_default(&new_addr).unwrap();
     assert_eq!(ks.get_default().unwrap(), Some(new_addr.clone()));
@@ -121,7 +132,7 @@ fn test_default() {
     let ks = EvmCrownJewelsTest::new(KeyStoreConfig::plain(&keystore_location)).unwrap();
     let key_from_store = ks.get(&addr).unwrap();
     assert_eq!(key_from_store, key_info);
-    let key_from_store = ks.get(&Key::default()).unwrap();
+    let key_from_store = ks.get(&Key::default_key()).unwrap();
     // the default is also recovered from persistent storage
     assert_eq!(ks.get_default().unwrap().unwrap(), new_addr);
 }

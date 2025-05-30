@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use zeroize::Zeroize;
@@ -13,6 +15,14 @@ pub struct EvmKeyInfo {
 impl EvmKeyInfo {
     pub fn new(private_key: Vec<u8>) -> Self {
         Self { private_key }
+    }
+}
+
+impl core::fmt::Display for EvmKeyInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let key = hex::encode(self.private_key());
+        f.write_str(&key)?;
+        Ok(())
     }
 }
 
@@ -51,14 +61,7 @@ impl From<(&String, &EvmPersistentKeyInfo)> for EvmKeyInfo {
     }
 }
 
-impl std::fmt::Display for EvmKeyInfo {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = hex::encode(&self.private_key);
-        f.write_str(&s)
-    }
-}
-
-impl std::str::FromStr for EvmKeyInfo {
+impl core::str::FromStr for EvmKeyInfo {
     type Err = hex::FromHexError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let sk = hex::decode(s)?;

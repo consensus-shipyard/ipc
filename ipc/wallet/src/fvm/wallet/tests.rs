@@ -107,9 +107,9 @@ fn import_export() -> anyhow::Result<()> {
     let duplicate_error = wallet.import(test_key_info).unwrap_err();
     // make sure that error is thrown when attempted to re-import a duplicate
     // key_info
-    if let WalletErr::KeyExists = duplicate_error {
-        Err(duplicate_error)?;
-    }
+    let WalletErr::KeyExists = duplicate_error else {
+        return Err(duplicate_error.into());
+    };
     Ok(())
 }
 

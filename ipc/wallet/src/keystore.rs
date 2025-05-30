@@ -77,7 +77,7 @@ pub trait AddressDerivator {
 impl AddressDerivator for FvmKeyInfo {
     type Key = String;
     fn as_address(&self) -> Self::Key {
-        todo!()
+        todo!("as address will be impl'd soon™")
     }
 }
 
@@ -345,8 +345,7 @@ where
         self.key_info.insert(key, key_info);
 
         if self.plain.is_some() {
-            self.flush()
-                .map_err(|err| WalletErr::Other(err.to_string()))?;
+            self.flush()?;
         }
 
         Ok(())
@@ -359,6 +358,7 @@ where
     {
         let default_key = <K as DefaultKey>::default_key();
         let info = self.get(key)?;
+        self.remove(default_key.clone());
         self.put(default_key, info)?;
         Ok(())
     }
@@ -368,10 +368,10 @@ where
         K: DefaultKey,
     {
         let default_key = <K as DefaultKey>::default_key();
-        let info = self.get(&default_key)?;
-        // let k = info.into();
-        // Ok(k)
-        todo!()
+        let Ok(info) = self.get(&default_key) else {
+            return Ok(None) // FIXME TODO retain the error type
+        };
+        Ok(Some(info.as_address()))        
     }
 
     /// Remove the key and corresponding `KeyInfo` from the `KeyStore`
