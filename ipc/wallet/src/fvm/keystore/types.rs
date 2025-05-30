@@ -5,7 +5,7 @@ use super::*;
 pub(crate) type SaltByteArray = [u8; RECOMMENDED_SALT_LEN];
 
 #[allow(missing_docs)]
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum EncryptedKeyStoreError {
     /// Possibly indicates incorrect passphrase
     #[error("Error decrypting data, is the password correct?")]
