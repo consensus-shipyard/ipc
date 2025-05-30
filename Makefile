@@ -61,9 +61,3 @@ run-devnet-objects:
 
 run-devnet-evm:
 	FM_ETH__TRACING__CONSOLE__LEVEL=debug ./target/release/fendermint eth run
-
-run-localnet:
-	./scripts/deploy_subnet/deploy.sh localnet
-
-stop-localnet:
-	./scripts/deploy_subnet/stop_local.sh
