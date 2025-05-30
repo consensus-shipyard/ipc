@@ -47,8 +47,6 @@ use crate::options::objects::{ObjectsArgs, ObjectsCommands};
 const ENTANGLER_ALPHA: u8 = 3;
 /// The s parameter for alpha entanglement determines the number of horizontal strands in the grid.
 const ENTANGLER_S: u8 = 5;
-/// The p parameter for alpha entanglement determines the number of helical strands in the grid.
-const ENTANGLER_P: u8 = 5;
 /// Chunk size used by the entangler.
 const CHUNK_SIZE: u64 = 1024;
 
@@ -531,7 +529,7 @@ async fn tag_entangled_data(
 fn new_entangler(iroh: &BlobsClient) -> Result<Entangler<EntanglerIrohStorage>, entangler::Error> {
     Entangler::new(
         EntanglerIrohStorage::from_client(iroh.clone()),
-        Config::new(ENTANGLER_ALPHA, ENTANGLER_S, ENTANGLER_P),
+        Config::new(ENTANGLER_ALPHA, ENTANGLER_S),
     )
 }
 

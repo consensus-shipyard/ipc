@@ -90,8 +90,8 @@ data-encoding = { version = "2.3.3" }
 dirs = "5.0"
 dircpy = "0.3.19"
 either = "1.10"
-entangler = { package = "recall_entangler", git = "https://github.com/recallnet/entanglement.git", rev = "6a61ea31dd2486ca6d1e96367d1f83d6d82602d4" }
-entangler_storage = { package = "recall_entangler_storage", git = "https://github.com/recallnet/entanglement.git", rev = "6a61ea31dd2486ca6d1e96367d1f83d6d82602d4" }
+entangler = { package = "recall_entangler", git = "https://github.com/recallnet/entanglement.git", rev = "aee1c675ff05e5cde4771a2e2eb3ac4dab8476bc" }
+entangler_storage = { package = "recall_entangler_storage", git = "https://github.com/recallnet/entanglement.git", rev = "aee1c675ff05e5cde4771a2e2eb3ac4dab8476bc" }
 env_logger = "0.10"
 erased-serde = "0.3"
 ethers = { version = "2.0.13", features = ["abigen", "ws"] }
@@ -108,9 +108,10 @@ hex-literal = "0.4.1"
 http = "0.2.12"
 im = "15.1.0"
 integer-encoding = { version = "3.0.3", default-features = false }
-iroh = "0.34"
-iroh-base = "0.34"
-iroh-blobs = { version = "0.34", features = ["rpc"] }
+iroh = "0.35"
+iroh-base = "0.35"
+iroh-blobs = { version = "0.35", features = ["rpc"] }
+iroh-relay = "0.35"
 jsonrpc-v2 = { version = "0.11", default-features = false, features = [
     "bytes-v10",
 ] }
@@ -162,7 +163,7 @@ prost = { version = "0.11" }
 quickcheck = "1"
 quickcheck_async = "0.1"
 quickcheck_macros = "1"
-quic-rpc = { version = "0.19", features = ["quinn-transport"] }
+quic-rpc = { version = "0.20", features = ["quinn-transport"] }
 iroh-quinn = { version = "0.13" }
 rand = "0.8"
 rand_chacha = "0.3"
@@ -189,7 +190,7 @@ tokio = { version = "1", features = [
     "io-std",
     "sync",
 ] }
-tokio-stream = "0.1.14"
+tokio-stream = "0.1.17"
 tokio-util = { version = "0.7.8", features = ["compat"] }
 tokio-tungstenite = { version = "0.18.0", features = ["native-tls"] }
 toml = "0.8"
@@ -251,7 +252,7 @@ fil_actor_adm = { path = "builtin-actors/actors/adm" }
 fil_actors_runtime = { path = "builtin-actors/runtime" }
 
 # Recall Solidity bindings
-recall_sol_facade = { git = "https://github.com/recallnet/contracts", package = "recall_sol_facade", rev = "8dbfadfce7e306936a65fb955a83bc06b023007d" }
+recall_sol_facade = { git = "https://github.com/recallnet/contracts", rev = "8dbfadfce7e306936a65fb955a83bc06b023007d" }
 
 # Using the same tendermint-rs dependency as tower-abci. From both we are interested in v037 modules.
 tower-abci = { version = "0.7" }

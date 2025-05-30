@@ -7,14 +7,16 @@ use std::path::Path;
 use std::time::Duration;
 
 use anyhow::Result;
-use iroh::protocol::Router;
-use iroh::Endpoint;
-use iroh_blobs::net_protocol::Blobs;
-use iroh_blobs::rpc::proto::RpcService;
-use iroh_blobs::store::GcConfig;
-use iroh_blobs::util::fs::load_secret_key;
+use iroh::{
+    defaults::DEFAULT_STUN_PORT, protocol::Router, Endpoint, RelayMap, RelayMode, RelayNode,
+};
+use iroh_blobs::{
+    net_protocol::Blobs, rpc::proto::RpcService, store::GcConfig, util::fs::load_secret_key,
+};
+use iroh_relay::RelayQuicConfig;
 use quic_rpc::server::{ChannelTypes, RpcChannel, RpcServerError};
 use tracing::info;
+use url::Url;
 
 use crate::BlobsClient;
 
@@ -67,6 +69,62 @@ const GC_DURATION: Duration = Duration::from_secs(300);
 const DEFAULT_PORT_V4: u16 = 11204;
 const DEFAULT_PORT_V6: u16 = 11205;
 
+/// Hostname of the default USE relay.
+pub const USE_RELAY_HOSTNAME: &str = "use1-1.relay.recallnet.recall.iroh.link.";
+/// Hostname of the default USW relay.
+pub const USW_RELAY_HOSTNAME: &str = "usw1-1.relay.recallnet.recall.iroh.link.";
+/// Hostname of the default EUC relay.
+pub const EUC_RELAY_HOSTNAME: &str = "euc1-1.relay.recallnet.recall.iroh.link.";
+
+/// Get the default [`RelayMap`].
+pub fn default_relay_map() -> RelayMap {
+    RelayMap::from_iter([
+        default_use_relay_node(),
+        default_usw_relay_node(),
+        default_euc_relay_node(),
+    ])
+}
+
+/// Get the default [`RelayNode`] for USE.
+pub fn default_use_relay_node() -> RelayNode {
+    let url: Url = format!("https://{USE_RELAY_HOSTNAME}")
+        .parse()
+        .expect("default url");
+    RelayNode {
+        url: url.into(),
+        stun_only: false,
+        stun_port: DEFAULT_STUN_PORT,
+        quic: Some(RelayQuicConfig::default()),
+    }
+}
+
+/// Get the default [`RelayNode`] for USW.
+pub fn default_usw_relay_node() -> RelayNode {
+    let url: Url = format!("https://{USW_RELAY_HOSTNAME}")
+        .parse()
+        .expect("default_url");
+    RelayNode {
+        url: url.into(),
+        stun_only: false,
+        stun_port: DEFAULT_STUN_PORT,
+        quic: Some(RelayQuicConfig::default()),
+    }
+}
+
+/// Get the default [`RelayNode`] for EUC
+pub fn default_euc_relay_node() -> RelayNode {
+    // The default Asia-Pacific relay server run by number0.
+    let url: Url = format!("https://{EUC_RELAY_HOSTNAME}")
+        .parse()
+        .expect("default_url");
+    RelayNode {
+        url: url.into(),
+        stun_only: false,
+        stun_port: DEFAULT_STUN_PORT,
+        quic: Some(RelayQuicConfig::default()),
+    }
+}
+
 impl IrohNode {
     /// Creates a new persistent iroh node in the specified location.
     ///
@@ -95,6 +153,7 @@ impl IrohNode {
 
         let endpoint = Endpoint::builder()
             .discovery_n0()
+            .relay_mode(RelayMode::Custom(default_relay_map()))
             .secret_key(secret_key)
             .bind_addr_v4(v4)
             .bind_addr_v6(v6)
@@ -108,8 +167,7 @@ impl IrohNode {
 
         let router = Router::builder(endpoint)
             .accept(iroh_blobs::ALPN, blobs.clone())
-            .spawn()
-            .await?;
+            .spawn();
 
         let client = blobs.client().boxed();
         Ok(Self {
@@ -130,8 +188,7 @@ impl IrohNode {
 
         let router = Router::builder(endpoint)
             .accept(iroh_blobs::ALPN, blobs.clone())
-            .spawn()
-            .await?;
+            .spawn();
         let client = blobs.client().boxed();
         Ok(Self {
             router,
