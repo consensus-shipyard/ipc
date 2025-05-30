@@ -23,12 +23,12 @@ impl CommandLineHandler for WalletRemove {
         let wallet_type = WalletType::from_str(&arguments.wallet_type)?;
 
         match wallet_type {
-            WalletType::Evm => {
+            WalletType::Etherium => {
                 let wallet = provider.evm_wallet()?;
                 let addr = ipc_wallet::EthKeyAddress::from_str(&arguments.address)?;
                 wallet.write().unwrap().remove(&addr)?;
             }
-            WalletType::Fvm => {
+            WalletType::Filecoin => {
                 let wallet = provider.fvm_wallet()?;
                 let addr = fvm_shared::address::Address::from_str(&arguments.address)?;
                 wallet.write().unwrap().remove(&addr)?;

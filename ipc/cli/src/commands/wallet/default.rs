@@ -23,12 +23,12 @@ impl CommandLineHandler for WalletSetDefault {
         let wallet_type = WalletType::from_str(&arguments.wallet_type)?;
 
         match wallet_type {
-            WalletType::Evm => {
+            WalletType::Etherium => {
                 let wallet = provider.evm_wallet()?;
                 let addr = ipc_wallet::EthKeyAddress::from_str(&arguments.address)?;
                 wallet.write().unwrap().set_default(&addr)?;
             }
-            WalletType::Fvm => {
+            WalletType::Filecoin => {
                 let wallet = provider.fvm_wallet()?;
                 let addr = fvm_shared::address::Address::from_str(&arguments.address)?;
                 wallet.write().unwrap().set_default(addr)?;
@@ -43,6 +43,7 @@ impl CommandLineHandler for WalletSetDefault {
 pub(crate) struct WalletSetDefaultArgs {
     #[arg(long, help = "Address of the key to default")]
     pub address: String,
+    // TODO use a custom parser with `WalletType::from_str`
     #[arg(long, help = "The type of the wallet, i.e. fvm, evm")]
     pub wallet_type: String,
 }
@@ -60,7 +61,7 @@ impl CommandLineHandler for WalletGetDefault {
         let wallet_type = WalletType::from_str(&arguments.wallet_type)?;
 
         match wallet_type {
-            WalletType::Evm => {
+            WalletType::Etherium => {
                 let wallet = provider.evm_wallet()?;
                 let mut wallet = wallet.write().unwrap();
                 match wallet.get_default()? {
@@ -68,7 +69,7 @@ impl CommandLineHandler for WalletGetDefault {
                     Some(addr) => println!("{:?}", addr.to_string()),
                 }
             }
-            WalletType::Fvm => {
+            WalletType::Filecoin => {
                 let wallet = provider.fvm_wallet()?;
                 println!("{:?}", wallet.write().unwrap().get_default()?);
             }

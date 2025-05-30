@@ -20,7 +20,7 @@ impl CommandLineHandler for WalletList {
         let provider = get_ipc_provider(global)?;
         let wallet_type = WalletType::from_str(&arguments.wallet_type)?;
         match wallet_type {
-            WalletType::Evm => {
+            WalletType::Etherium => {
                 let wallet = provider.evm_wallet()?;
                 let addresses = wallet.read().unwrap().list()?;
                 for address in addresses.iter() {
@@ -38,7 +38,7 @@ impl CommandLineHandler for WalletList {
                 }
                 Ok(())
             }
-            WalletType::Fvm => {
+            WalletType::Filecoin => {
                 let wallet = provider.fvm_wallet()?;
                 let addresses = wallet.read().unwrap().list_addrs()?;
                 for address in addresses.iter() {
