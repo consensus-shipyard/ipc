@@ -180,7 +180,6 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
     function _increaseGenesisValidatorCollateral(address validator, uint256 amount) internal {
         // add to initial validators avoiding duplicates if it
         // is a genesis validator.
-        bool alreadyValidator;
         uint256 length = s.genesisValidators.length;
         uint256 i;
         for (; i < length; ) {
@@ -191,10 +190,14 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
                 ++i;
             }
         }
-        // already validator if we iterate through all of them but didn't get a match
-        if (i >= length) {
+        // if we iterate through all of them, and found one
+        // condition must hold
+        if (i < length) {
+            // nth-call to `_increaseGenesisValidatorCollateral`
             s.genesisValidators[i].weight += amount;
         } else {
+            // otherwise we need to lookup the power from the current power table
+            // and initialize the amount from that
             uint256 collateral = s.validatorSet.validators[validator].currentPower;
             Validator memory val = Validator({
                 addr: validator,
