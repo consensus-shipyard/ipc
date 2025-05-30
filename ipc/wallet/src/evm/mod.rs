@@ -5,7 +5,6 @@
 
 pub(crate) mod key;
 
-
 pub const DEFAULT_KEYSTORE_NAME: &str = "evm_keystore.json";
 
 #[cfg(test)]

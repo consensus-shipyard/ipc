@@ -16,11 +16,9 @@ pub struct Key {
 
 impl From<String> for Key {
     fn from(data: String) -> Self {
-        Self {
-            data
-        }
+        Self { data }
     }
-} 
+}
 
 impl Into<String> for Key {
     fn into(self) -> String {

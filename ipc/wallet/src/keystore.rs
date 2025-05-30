@@ -369,9 +369,9 @@ where
     {
         let default_key = <K as DefaultKey>::default_key();
         let Ok(info) = self.get(&default_key) else {
-            return Ok(None) // FIXME TODO retain the error type
+            return Ok(None); // FIXME TODO retain the error type
         };
-        Ok(Some(info.as_address()))        
+        Ok(Some(info.as_address()))
     }
 
     /// Remove the key and corresponding `KeyInfo` from the `KeyStore`
