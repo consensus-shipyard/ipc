@@ -33,7 +33,7 @@ lint: license $(patsubst %, lint/%, $(SUBTREES_ALL))
 
 config-devnet:
 	PATH="./target/release:$(PATH)" \
-	./scripts/setup.sh
+	./scripts/devnet_setup.sh
 
 run-devnet-fendermint:
 	rm -rf ~/.fendermint/data/rocksdb
