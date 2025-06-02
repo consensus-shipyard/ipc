@@ -31,8 +31,7 @@ impl CommandLineHandler for WalletList {
                     }
                     print!("Address: {}", address);
 
-                    let key_info =
-guard                    .get(&address.to_string())?;
+                    let key_info = guard.get(&address.to_string())?;
                     let sk = libsecp256k1::SecretKey::parse_slice(key_info.private_key())?;
                     let pub_key =
                         hex::encode(libsecp256k1::PublicKey::from_secret_key(&sk).serialize())

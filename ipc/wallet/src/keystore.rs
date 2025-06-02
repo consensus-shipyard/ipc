@@ -318,8 +318,7 @@ where
     }
 
     /// Return all of the keys that are stored in the `KeyStore`
-    pub fn list(&self) -> Vec<K>
-    {
+    pub fn list(&self) -> Vec<K> {
         Vec::from_iter(self.key_info.keys().cloned())
     }
 

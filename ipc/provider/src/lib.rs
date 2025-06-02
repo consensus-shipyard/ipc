@@ -115,12 +115,10 @@ impl IpcProvider {
                 &keystore_path,
                 config.password.clone(),
             )?)));
-            let evm_keystore = Arc::new(RwLock::new(
-                new_evm_keystore_from_path(
-                    &keystore_path,
-                    keystore_password.clone(),
-                )?)
-            );
+            let evm_keystore = Arc::new(RwLock::new(new_evm_keystore_from_path(
+                &keystore_path,
+                keystore_password.clone(),
+            )?));
             Ok(Self::new(config, fvm_wallet, evm_keystore))
         } else {
             Ok(Self {
@@ -227,8 +225,8 @@ impl IpcProvider {
                 if self.sender.is_none() {
                     let wallet = self.evm_wallet()?;
                     let guard = wallet.write().unwrap();
-                    let Some(addr_str) = guard.get_default()? else  {
-        anyhow::bail!("no default evm account configured")
+                    let Some(addr_str) = guard.get_default()? else {
+                        anyhow::bail!("no default evm account configured")
                     };
                     let addr_eth = EthAddress::from_str(&addr_str)?;
                     let addr = Address::try_from(&addr_eth)?;
@@ -827,8 +825,7 @@ impl IpcProvider {
         let tp = match tp {
             WalletKeyType::BLS => SignatureType::BLS,
             WalletKeyType::Secp256k1 => SignatureType::Secp256k1,
-            WalletKeyType::Secp256k1Ledger =>
-                anyhow::bail!("ledger key type not supported"),
+            WalletKeyType::Secp256k1Ledger => anyhow::bail!("ledger key type not supported"),
         };
 
         let wallet = self.fvm_wallet()?;
@@ -874,8 +871,8 @@ impl IpcProvider {
         };
         let mut guard = keystore.write().unwrap();
         let key_info = ipc_wallet::evm::EvmKeyInfo::new(private_key);
-           
-        let addr = key_info.as_address(); 
+
+        let addr = key_info.as_address();
         let addr_eth = EthKeyAddress::from_str(&addr)?;
         guard.put(addr.to_string(), key_info)?;
         Ok(addr_eth)
@@ -912,7 +909,8 @@ pub fn new_evm_keystore_from_path(
     repo_str: &str,
     password: Option<String>,
 ) -> anyhow::Result<EvmCrownJewels> {
-    let name = password.as_ref()
+    let name = password
+        .as_ref()
         .map(|_| ipc_wallet::ENCRYPTED_KEYSTORE_NAME)
         .unwrap_or_else(|| ipc_wallet::PLAIN_JSON_KEYSTORE_NAME);
     let repo = Path::new(&repo_str).join(name);

@@ -24,11 +24,8 @@ impl WalletExport {
         let keystore = provider.evm_wallet()?;
         let address = ethers::types::Address::from_str(&arguments.address)?;
 
-        let guard= keystore
-        .read()
-        .unwrap();
-        let key_info = guard 
-            .get(&address.to_string())?;
+        let guard = keystore.read().unwrap();
+        let key_info = guard.get(&address.to_string())?;
 
         if arguments.hex {
             return Ok(hex::encode(key_info.private_key()));
@@ -38,10 +35,7 @@ impl WalletExport {
             return Ok(BASE64_STANDARD.encode(key_info.private_key()));
         }
 
-        let info = EvmPersistentKeyInfo::new(
-            format!("{:?}", address),
-            &key_info,
-        );
+        let info = EvmPersistentKeyInfo::new(format!("{:?}", address), &key_info);
         Ok(serde_json::to_string(&info)?)
     }
 
@@ -132,11 +126,8 @@ impl WalletPublicKey {
         // validation!
         let address = ethers::types::Address::from_str(&arguments.address)?;
 
-        let guard = keystore
-            .read()
-            .unwrap();
-        let key_info = guard
-            .get(&address.to_string())?;
+        let guard = keystore.read().unwrap();
+        let key_info = guard.get(&address.to_string())?;
 
         let sk = libsecp256k1::SecretKey::parse_slice(key_info.private_key())?;
         Ok(hex::encode(libsecp256k1::PublicKey::from_secret_key(&sk).serialize()).to_string())
