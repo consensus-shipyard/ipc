@@ -4,7 +4,7 @@
 
 use async_trait::async_trait;
 use clap::Args;
-use ipc_wallet::{EvmKeyStore, WalletType};
+use ipc_wallet::{evm::adapter::EthKeyAddress, WalletType};
 use std::fmt::Debug;
 use std::str::FromStr;
 
@@ -25,13 +25,14 @@ impl CommandLineHandler for WalletSetDefault {
         match wallet_type {
             WalletType::Etherium => {
                 let wallet = provider.evm_wallet()?;
-                let addr = ipc_wallet::EthKeyAddress::from_str(&arguments.address)?;
-                wallet.write().unwrap().set_default(&addr)?;
+                let addr = EthKeyAddress::from_str(&arguments.address)?;
+                wallet.write().unwrap().set_default(&addr.to_string())?;
             }
             WalletType::Filecoin => {
                 let wallet = provider.fvm_wallet()?;
                 let addr = fvm_shared::address::Address::from_str(&arguments.address)?;
-                wallet.write().unwrap().set_default(addr)?;
+                let mut guard = wallet.write().unwrap();
+                guard.set_default(addr)?;
             }
         }
         Ok(())

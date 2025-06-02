@@ -1102,7 +1102,7 @@ impl EthSubnetManager {
         let addr = payload_to_evm_address(addr.payload())?;
         let keystore = self.keystore()?;
         let keystore = keystore.read().unwrap();
-        let private_key = keystore.get(&addr.into())?;
+        let private_key = keystore.get(&addr.to_string())?;
         let wallet = LocalWallet::from_bytes(private_key.private_key())?
             .with_chain_id(self.ipc_contract_info.chain_id);
 

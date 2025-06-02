@@ -318,11 +318,9 @@ where
     }
 
     /// Return all of the keys that are stored in the `KeyStore`
-    pub fn list<'a, 'b>(&'a self) -> impl Iterator<Item = K> + 'b
-    where
-        'a: 'b,
+    pub fn list(&self) -> Vec<K>
     {
-        self.key_info.keys().cloned()
+        Vec::from_iter(self.key_info.keys().cloned())
     }
 
     /// Return `KeyInfo` that corresponds to a given key

@@ -53,6 +53,14 @@ pub struct EvmPersistentKeyInfo {
 }
 
 impl EvmPersistentKeyInfo {
+    pub fn new(addr: impl Into<String>, key_info: &EvmKeyInfo) -> Self {
+        let sk = hex::encode(key_info.private_key());
+        let address = addr.into();
+        Self {
+            private_key: sk,
+            address,
+        }
+    }
     pub fn private_key(&self) -> &str {
         &self.private_key
     }

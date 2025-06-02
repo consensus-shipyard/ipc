@@ -8,9 +8,8 @@ use futures_util::future::join_all;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_api::ethers_address_to_fil_address;
 use ipc_api::subnet_id::SubnetID;
-use ipc_wallet::{EthKeyAddress, EvmKeyStore, WalletType};
+use ipc_wallet::{evm::adapter::EthKeyAddress, WalletType};
 use std::{fmt::Debug, str::FromStr};
-
 use crate::{get_ipc_provider, CommandLineHandler, GlobalArguments};
 
 pub(crate) struct WalletBalances;
@@ -31,25 +30,24 @@ impl CommandLineHandler for WalletBalances {
         match wallet_type {
             WalletType::Etherium => {
                 let wallet = provider.evm_wallet()?;
-                let addresses = wallet.read().unwrap().list()?;
-                let r = addresses
-                    .iter()
+                let addresses = wallet.read().unwrap().list();
+                let r = Vec::from_iter(addresses.iter()
                     .map(|addr| {
                         let provider = provider.clone();
                         let subnet = subnet.clone();
                         async move {
+                            let addr_eth = EthKeyAddress::from_str(&addr)?;
                             provider
                                 .wallet_balance(
                                     &subnet,
-                                    &ethers_address_to_fil_address(&(addr.clone()).into())?,
+                                    &ethers_address_to_fil_address(addr_eth.clone())?,
                                 )
                                 .await
-                                .map(|balance| (balance, addr))
+                                .map(|balance| (balance, addr_eth))
                         }
-                    })
-                    .collect::<Vec<_>>();
+                    }));
 
-                let v: Vec<anyhow::Result<(TokenAmount, &EthKeyAddress)>> = join_all(r).await;
+                let v: Vec<anyhow::Result<(TokenAmount, EthKeyAddress)>> = join_all(r).await;
 
                 for r in v.into_iter() {
                     match r {
@@ -76,7 +74,7 @@ impl CommandLineHandler for WalletBalances {
             WalletType::Filecoin => {
                 let wallet = provider.fvm_wallet()?;
                 let addresses = wallet.read().unwrap().list_addrs()?;
-                let r = addresses
+                let r = Vec::from_iter(addresses
                     .iter()
                     .map(|addr| {
                         let provider = provider.clone();
@@ -87,13 +85,11 @@ impl CommandLineHandler for WalletBalances {
                                 .await
                                 .map(|balance| (balance, addr))
                         }
-                    })
-                    .collect::<Vec<_>>();
+                    }));
 
-                let r = join_all(r)
+                let r = anyhow::Result::<Vec<(TokenAmount, &Address)>>::from_iter(join_all(r)
                     .await
-                    .into_iter()
-                    .collect::<anyhow::Result<Vec<(TokenAmount, &Address)>>>()?;
+                    .into_iter())?;
                 for (balance, addr) in r {
                     println!("{:?} - Balance: {}", addr, balance);
                 }

@@ -28,8 +28,8 @@ pub fn eth_to_fil_amount(amount: &ethers::types::U256) -> anyhow::Result<TokenAm
     Ok(TokenAmount::from_atto(v))
 }
 
-pub fn ethers_address_to_fil_address(addr: &ethers::types::Address) -> anyhow::Result<Address> {
-    let raw_addr = format!("{addr:?}");
+pub fn ethers_address_to_fil_address(addr: impl ToString) -> anyhow::Result<Address> {
+    let raw_addr = addr.to_string();
     log::debug!("raw evm subnet addr: {raw_addr:}");
 
     let eth_addr = EthAddress::from_str(&raw_addr)?;

@@ -3,7 +3,7 @@
 //! Ipc agent sdk, contains the json rpc client to interact with the IPC agent rpc server.
 
 use crate::manager::{GetBlockHashResult, TopDownQueryPayload};
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use base64::Engine;
 use config::Config;
 use fvm_shared::{
@@ -19,9 +19,10 @@ use ipc_api::{
     subnet::{ConsensusType, ConstructParams},
     subnet_id::SubnetID,
 };
+use ipc_types::EthAddress;
 use ipc_wallet::evm::adapter::{random_eth_key_info, EthKeyAddress};
 use ipc_wallet::evm::EvmCrownJewels;
-use ipc_wallet::{CrownJewels, FvmCrownJewels, KeyStoreConfig, Wallet};
+use ipc_wallet::{AddressDerivator, CrownJewels, FvmCrownJewels, KeyStoreConfig, Wallet};
 use lotus::message::wallet::WalletKeyType;
 use manager::{EthSubnetManager, SubnetGenesisInfo, SubnetInfo, SubnetManager};
 use serde::{Deserialize, Serialize};
@@ -109,15 +110,17 @@ impl IpcProvider {
         config.add_subnet(subnet);
         let config = Arc::new(config);
 
-        if let Some(repo_path) = keystore_path {
+        if let Some(keystore_path) = keystore_path {
             let fvm_wallet = Arc::new(RwLock::new(Wallet::new(new_fvm_keystore_from_path(
-                &repo_path,
+                &keystore_path,
                 config.password.clone(),
             )?)));
-            let evm_keystore = Arc::new(RwLock::new(new_evm_keystore_from_path(
-                &keystore_path,
-                &keystore_password,
-            )?));
+            let evm_keystore = Arc::new(RwLock::new(
+                new_evm_keystore_from_path(
+                    &keystore_path,
+                    keystore_password.clone(),
+                )?)
+            );
             Ok(Self::new(config, fvm_wallet, evm_keystore))
         } else {
             Ok(Self {
@@ -223,17 +226,19 @@ impl IpcProvider {
             config::subnet::SubnetConfig::Fevm(_) => {
                 if self.sender.is_none() {
                     let wallet = self.evm_wallet()?;
-                    let addr = match wallet.write().unwrap().get_default()? {
-                        None => return Err(anyhow!("no default evm account configured")),
-                        Some(addr) => Address::try_from(addr)?,
+                    let guard = wallet.write().unwrap();
+                    let Some(addr_str) = guard.get_default()? else  {
+        anyhow::bail!("no default evm account configured")
                     };
-                    self.sender = Some(addr);
+                    let addr_eth = EthAddress::from_str(&addr_str)?;
+                    let addr = Address::try_from(&addr_eth)?;
+                    self.sender = Some(addr.clone());
                     return Ok(addr);
                 }
             }
         };
 
-        Err(anyhow!("error fetching a valid sender"))
+        anyhow::bail!("error fetching a valid sender")
     }
 
     /// Lists available subnet connections
@@ -306,8 +311,7 @@ impl IpcProvider {
         let sender = self.check_sender(subnet_config, from)?;
         let addr = payload_to_evm_address(sender.payload())?;
         let keystore = self.evm_wallet()?;
-        let guard = keystore.read().unwrap();
-        let key_info = guard.get(&addr.into())?;
+        let key_info = keystore.read().unwrap().get(&addr.to_string())?;
         // TODO carve this out into helper types
         let sk = libsecp256k1::SecretKey::parse_slice(key_info.private_key())?;
         let public_key = libsecp256k1::PublicKey::from_secret_key(&sk).serialize();
@@ -495,7 +499,7 @@ impl IpcProvider {
     ) -> anyhow::Result<ChainEpoch> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
         let conn = match self.connection(&parent) {
-            None => return Err(anyhow!("target parent subnet not found")),
+            None => bail!("target parent subnet not found"),
             Some(conn) => conn,
         };
 
@@ -516,7 +520,7 @@ impl IpcProvider {
         amount: TokenAmount,
     ) -> anyhow::Result<ChainEpoch> {
         let conn = match self.connection(&subnet) {
-            None => return Err(anyhow!("target subnet not found: {subnet}")),
+            None => bail!("target subnet not found: {subnet}"),
             Some(conn) => conn,
         };
 
@@ -673,7 +677,7 @@ impl IpcProvider {
         height: ChainEpoch,
     ) -> anyhow::Result<Option<BottomUpCheckpointBundle>> {
         let conn = match self.connection(subnet) {
-            None => return Err(anyhow!("target subnet not found")),
+            None => bail!("target subnet not found"),
             Some(conn) => conn,
         };
 
@@ -823,19 +827,25 @@ impl IpcProvider {
         let tp = match tp {
             WalletKeyType::BLS => SignatureType::BLS,
             WalletKeyType::Secp256k1 => SignatureType::Secp256k1,
-            WalletKeyType::Secp256k1Ledger => return Err(anyhow!("ledger key type not supported")),
+            WalletKeyType::Secp256k1Ledger =>
+                anyhow::bail!("ledger key type not supported"),
         };
 
-        self.fvm_wallet()?.write().unwrap().generate_addr(tp)
+        let wallet = self.fvm_wallet()?;
+        let mut guard = wallet.write().unwrap();
+        let addr = guard.generate_addr(tp)?;
+        Ok(addr)
     }
 
     pub fn new_evm_key(&self) -> anyhow::Result<EthKeyAddress> {
         let key_info = random_eth_key_info();
         let wallet = self.evm_wallet()?;
 
+        let addr = key_info.as_address();
+        let addr_eth = EthKeyAddress::from_str(&addr)?;
         let mut guard = wallet.write().unwrap();
-        let out = guard.put(key_info);
-        out
+        guard.put(addr.clone(), key_info)?;
+        Ok(addr_eth)
     }
 
     pub fn import_fvm_key(&self, keyinfo: &str) -> anyhow::Result<Address> {
@@ -863,7 +873,12 @@ impl IpcProvider {
             hex::decode(&private_key[2..])?
         };
         let mut guard = keystore.write().unwrap();
-        guard.put(ipc_wallet::evm::EvmKeyInfo::new(private_key))
+        let key_info = ipc_wallet::evm::EvmKeyInfo::new(private_key);
+           
+        let addr = key_info.as_address(); 
+        let addr_eth = EthKeyAddress::from_str(&addr)?;
+        guard.put(addr.to_string(), key_info)?;
+        Ok(addr_eth)
     }
 
     pub fn import_evm_key_from_json(&self, keyinfo: &str) -> anyhow::Result<EthKeyAddress> {
@@ -897,13 +912,13 @@ pub fn new_evm_keystore_from_path(
     repo_str: &str,
     password: Option<String>,
 ) -> anyhow::Result<EvmCrownJewels> {
-    let name = password
+    let name = password.as_ref()
         .map(|_| ipc_wallet::ENCRYPTED_KEYSTORE_NAME)
         .unwrap_or_else(|| ipc_wallet::PLAIN_JSON_KEYSTORE_NAME);
     let repo = Path::new(&repo_str).join(name);
     let repo = expand_tilde(repo);
-    let keystore_config = if let Some(pass) = password {
-        KeyStoreConfig::encrypted(repo, password)
+    let keystore_config = if let Some(ref password) = password {
+        KeyStoreConfig::encrypted(repo, password.clone())
     } else {
         KeyStoreConfig::plain(repo)
     };
@@ -918,7 +933,7 @@ pub fn new_fvm_keystore_from_path(
     let repo = Path::new(&repo_str);
     let repo = expand_tilde(repo);
     let keystore_config = if let Some(ref password) = password {
-        KeyStoreConfig::encrypted(repo, password.as_ref())
+        KeyStoreConfig::encrypted(repo, password.clone())
     } else {
         KeyStoreConfig::plain(repo)
     };
