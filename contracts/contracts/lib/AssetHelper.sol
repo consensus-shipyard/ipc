@@ -1,22 +1,28 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.23;
 
-import {NotEnoughBalance} from "../errors/IPCErrors.sol";
+import {ExcessivelySafeCall} from "ExcessivelySafeCall/ExcessivelySafeCall.sol";
+import {NotEnoughBalance, InvalidSubnetActor} from "../errors/IPCErrors.sol";
 import {Asset, AssetKind} from "../structs/Subnet.sol";
 import {EMPTY_BYTES} from "../constants/Constants.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
+import {ISubnetActor} from "../interfaces/ISubnetActor.sol";
 
 /// @notice Helpers to deal with a supply source.
 library AssetHelper {
+    using ExcessivelySafeCall for address;
     using SafeERC20 for IERC20;
+
+    error TransferFailed(address, address, uint256);
+
+    uint16 constant private MAX_MEMORY_SIZE = 128;
 
     /// @notice Assumes that the address provided belongs to a subnet rooted on this network,
     ///         and checks if its supply kind matches the provided one.
     ///         It reverts if the address does not correspond to a subnet actor.
     function hasSupplyOfKind(address subnetActor, AssetKind compare) internal view returns (bool) {
-        return SubnetActorGetterFacet(subnetActor).supplySource().kind == compare;
+        return ISubnetActor(subnetActor).supplySource().kind == compare;
     }
 
     /// @notice Checks that a given supply strategy is correctly formed and its preconditions are met.
@@ -35,6 +41,10 @@ library AssetHelper {
     /// @notice Asserts that the supply strategy is of the given kind. If not, it reverts.
     function expect(Asset memory asset, AssetKind kind) internal pure {
         require(asset.kind == kind, "Unexpected asset");
+    }
+
+    function equals(Asset memory asset, Asset memory asset2) internal pure returns (bool) {
+        return asset.tokenAddress == asset2.tokenAddress && asset.kind == asset2.kind;
     }
 
     /// @notice Locks the specified amount from msg.sender into custody.
@@ -74,6 +84,19 @@ library AssetHelper {
         }
     }
 
+    /// @notice Transfers the specified amount out of our treasury to the recipient address. Reverts on failure.
+    function safeTransferFunds(Asset memory asset,
+        address payable recipient,
+        uint256 value
+    ) internal returns (bytes memory) {
+        (bool success, bytes memory ret) = transferFunds(asset, recipient, value);
+        if (!success) {
+            revert TransferFailed(address(this), recipient, value);
+        }
+
+        return ret;
+    }
+
     /// @notice Wrapper for an IERC20 transfer that bubbles up the success or failure
     /// and the return value instead of reverting so a cross-message receipt can be
     /// triggered from the execution.
@@ -84,12 +107,16 @@ library AssetHelper {
         uint256 value
     ) internal returns (bool success, bytes memory ret) {
         return
-            asset.tokenAddress.call(
-        // using IERC20 transfer instead of safe transfer so we can
-        // bubble-up the failure instead of reverting on failure so we
-        // can send the receipt.
-            abi.encodePacked(IERC20.transfer.selector, abi.encode(recipient, value))
-        );
+            asset.tokenAddress.excessivelySafeCall(
+                // do not limit gas at the moment
+                gasleft(),
+                0,
+                MAX_MEMORY_SIZE,
+                // using IERC20 transfer instead of safe transfer so we can
+                // bubble-up the failure instead of reverting on failure so we
+                // can send the receipt.
+                abi.encodePacked(IERC20.transfer.selector, abi.encode(recipient, value))
+            );
     }
 
     /// @notice Calls the target with the specified data, ensuring it receives the specified value.
@@ -145,6 +172,15 @@ library AssetHelper {
         return (success, ret);
     }
 
+    /// @notice Checks if the given address is a contract.
+    function isContract(address account) internal view returns (bool) {
+        uint256 size;
+        assembly {
+            size := extcodesize(account)
+        }
+        return size > 0;
+    }
+
     /// @dev Adaptation from implementation `openzeppelin-contracts/utils/Address.sol`
     /// that doesn't revert immediately in case of failure and merely notifies of the outcome.
     function functionCallWithValue(
@@ -156,7 +192,17 @@ library AssetHelper {
             revert NotEnoughBalance();
         }
 
-        return target.call{value: value}(data);
+        if (!isContract(target)) {
+            revert InvalidSubnetActor();
+        }
+
+        return target.excessivelySafeCall(
+                // do not limit gas at the moment
+                gasleft(),
+                value,
+                MAX_MEMORY_SIZE,
+                data
+            );
     }
 
     /**
@@ -196,6 +242,15 @@ library AssetHelper {
         }
     }
 
+    // @notice Gets the balance of the account.
+    function balanceOf(Asset memory asset, address holder) internal view returns (uint256 ret) {
+        if (asset.kind == AssetKind.Native) {
+            ret = holder.balance;
+        } else if (asset.kind == AssetKind.ERC20) {
+            ret = IERC20(asset.tokenAddress).balanceOf(holder);
+        }
+    }
+
     // @notice Makes the asset available for spending by the given spender, without actually sending it.
     // @return msgValue The amount of msg.value that needs to be sent along with the subsequent call that will _actually_ spend that asset.
     //                  Will be 0 if the asset is a token, since no native coins are to be sent.
@@ -214,4 +269,7 @@ library AssetHelper {
         return Asset({kind: AssetKind.Native, tokenAddress: address(0)});
     }
 
+    function erc20(address token) internal pure returns (Asset memory) {
+        return Asset({kind: AssetKind.ERC20, tokenAddress: token});
+    }
 }

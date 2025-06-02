@@ -12,9 +12,11 @@ import {BATCH_PERIOD, MAX_MSGS_PER_BATCH} from "./structs/CrossNet.sol";
 import {LibDiamond} from "./lib/LibDiamond.sol";
 import {PermissionMode, SubnetID, AssetKind, Asset} from "./structs/Subnet.sol";
 import {SubnetIDHelper} from "./lib/SubnetIDHelper.sol";
-import {LibStaking} from "./lib/LibStaking.sol";
+import {LibPower} from "./lib/LibPower.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AssetHelper} from "./lib/AssetHelper.sol";
+import {LibActivity} from "./lib/LibActivity.sol";
+
 error FunctionNotFound(bytes4 _functionSelector);
 
 contract SubnetActorDiamond {
@@ -37,6 +39,7 @@ contract SubnetActorDiamond {
         Asset collateralSource;
         SubnetID parentId;
         address validatorGater;
+        address validatorRewarder;
     }
 
     constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params, address owner) {
@@ -91,16 +94,20 @@ contract SubnetActorDiamond {
 
         s.validatorSet.activeLimit = params.activeValidatorsLimit;
         // Start the next configuration number from 1, 0 is reserved for no change and the genesis membership
-        s.changeSet.nextConfigurationNumber = LibStaking.INITIAL_CONFIGURATION_NUMBER;
+        s.changeSet.nextConfigurationNumber = LibPower.INITIAL_CONFIGURATION_NUMBER;
         // The startConfiguration number is also 1 to match with nextConfigurationNumber, indicating we have
         // empty validator change logs
-        s.changeSet.startConfigurationNumber = LibStaking.INITIAL_CONFIGURATION_NUMBER;
+        s.changeSet.startConfigurationNumber = LibPower.INITIAL_CONFIGURATION_NUMBER;
         // Set the supply strategy.
         s.supplySource = params.supplySource;
         s.collateralSource = params.collateralSource;
 
         if (params.validatorGater != address(0)) {
             s.validatorGater = params.validatorGater;
+        }
+
+        if (params.validatorRewarder != address(0)) {
+            LibActivity.setRewarder(params.validatorRewarder);
         }
     }
 

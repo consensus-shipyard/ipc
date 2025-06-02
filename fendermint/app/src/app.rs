@@ -3,31 +3,38 @@
 use std::future::Future;
 use std::sync::Arc;
 
+use crate::observe::{
+    BlockCommitted, BlockProposalEvaluated, BlockProposalReceived, BlockProposalSent, Message,
+    MpoolReceived,
+};
+use crate::validators::ValidatorCache;
+use crate::AppExitCode;
+use crate::BlockHeight;
+use crate::{tmconv::*, VERSION};
+use actors_custom_api::gas_market::Reading;
 use anyhow::{anyhow, Context, Result};
 use async_stm::{atomically, atomically_or_err};
 use async_trait::async_trait;
 use cid::Cid;
-use fendermint_abci::util::take_until_max_size;
 use fendermint_abci::{AbciResult, Application};
+use fendermint_crypto::PublicKey;
 use fendermint_storage::{
     Codec, Encode, KVCollection, KVRead, KVReadable, KVStore, KVWritable, KVWrite,
 };
 use fendermint_vm_core::Timestamp;
-use fendermint_vm_interpreter::bytes::{
-    BytesMessageApplyRes, BytesMessageCheckRes, BytesMessageQuery, BytesMessageQueryRes,
-};
-use fendermint_vm_interpreter::chain::{ChainEnv, ChainMessageApplyRet, IllegalMessage};
 use fendermint_vm_interpreter::fvm::state::{
     empty_state_tree, CheckStateRef, FvmExecState, FvmQueryState, FvmStateParams,
     FvmUpdatableParams,
 };
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
-use fendermint_vm_interpreter::fvm::{FvmApplyRet, PowerUpdates};
 use fendermint_vm_interpreter::genesis::{read_genesis_car, GenesisAppState};
-use fendermint_vm_interpreter::signed::InvalidSignature;
-use fendermint_vm_interpreter::{
-    CheckInterpreter, ExecInterpreter, ProposalInterpreter, QueryInterpreter,
+
+use fendermint_vm_interpreter::errors::{ApplyMessageError, CheckMessageError, QueryError};
+use fendermint_vm_interpreter::types::{
+    ApplyMessageResponse, AttestMessagesResponse, EndBlockResponse, Query,
 };
+use fendermint_vm_interpreter::MessagesInterpreter;
+
 use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_snapshot::{SnapshotClient, SnapshotError};
 use fvm::engine::MultiEngine;
@@ -41,15 +48,8 @@ use num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
+use tendermint::consensus::params::Params as TendermintConsensusParams;
 use tracing::instrument;
-
-use crate::observe::{
-    BlockCommitted, BlockProposalEvaluated, BlockProposalReceived, BlockProposalSent, Message,
-    MpoolReceived,
-};
-use crate::AppExitCode;
-use crate::BlockHeight;
-use crate::{tmconv::*, VERSION};
 
 #[derive(Serialize)]
 #[repr(u8)]
@@ -102,11 +102,11 @@ impl AppState {
     }
 }
 
-pub struct AppConfig<S: KVStore> {
+pub struct AppConfig<KV: KVStore> {
     /// Namespace to store the current app state.
-    pub app_namespace: S::Namespace,
+    pub app_namespace: KV::Namespace,
     /// Namespace to store the app state history.
-    pub state_hist_namespace: S::Namespace,
+    pub state_hist_namespace: KV::Namespace,
     /// Size of state history to keep; 0 means unlimited.
     pub state_hist_size: u64,
     /// Block height where we should gracefully stop the node
@@ -115,10 +115,11 @@ pub struct AppConfig<S: KVStore> {
 
 /// Handle ABCI requests.
 #[derive(Clone)]
-pub struct App<DB, SS, S, I>
+pub struct App<DB, BS, KV, MI>
 where
-    SS: Blockstore + Clone + 'static,
-    S: KVStore,
+    BS: Blockstore + Clone + 'static + Send + Sync,
+    KV: KVStore,
+    MI: MessagesInterpreter<BS> + Send + Sync,
 {
     /// Database backing all key-value operations.
     db: Arc<DB>,
@@ -127,13 +128,13 @@ where
     /// Must be kept separate from storage that can be influenced by network operations such as Bitswap;
     /// nodes must be able to run transactions deterministically. By contrast the Bitswap store should
     /// be able to read its own storage area as well as state storage, to serve content from both.
-    state_store: Arc<SS>,
+    state_store: Arc<BS>,
     /// Wasm engine cache.
     multi_engine: Arc<MultiEngine>,
     /// Block height where we should gracefully stop the node
     halt_height: i64,
     /// Namespace to store app state.
-    namespace: S::Namespace,
+    namespace: KV::Namespace,
     /// Collection of past state parameters.
     ///
     /// We store the state hash for the height of the block where it was committed,
@@ -144,39 +145,40 @@ where
     /// The state also contains things like timestamp and the network version,
     /// so that we can retrospectively execute FVM messages at past block heights
     /// in read-only mode.
-    state_hist: KVCollection<S, BlockHeight, FvmStateParams>,
-    /// Interpreter for block lifecycle events.
-    interpreter: Arc<I>,
-    /// Environment-like dependencies for the interpreter.
-    chain_env: ChainEnv,
+    state_hist: KVCollection<KV, BlockHeight, FvmStateParams>,
+    /// Interpreter for messages and the block lifecycle events.
+    messages_interpreter: Arc<MI>,
+
     /// Interface to the snapshotter, if enabled.
     snapshots: Option<SnapshotClient>,
     /// State accumulating changes during block execution.
-    exec_state: Arc<tokio::sync::Mutex<Option<FvmExecState<SS>>>>,
+    exec_state: Arc<tokio::sync::Mutex<Option<FvmExecState<BS>>>>,
     /// Projected (partial) state accumulating during transaction checks.
-    check_state: CheckStateRef<SS>,
+    check_state: CheckStateRef<BS>,
     /// How much history to keep.
     ///
     /// Zero means unlimited.
     state_hist_size: u64,
+    /// Caches the validators.
+    validators_cache: Arc<tokio::sync::Mutex<Option<ValidatorCache>>>,
 }
 
-impl<DB, SS, S, I> App<DB, SS, S, I>
+impl<DB, BS, KV, MI> App<DB, BS, KV, MI>
 where
-    S: KVStore
+    KV: KVStore
         + Codec<AppState>
         + Encode<AppStoreKey>
         + Encode<BlockHeight>
         + Codec<FvmStateParams>,
-    DB: KVWritable<S> + KVReadable<S> + Clone + 'static,
-    SS: Blockstore + Clone + 'static,
+    DB: KVWritable<KV> + KVReadable<KV> + Clone + 'static,
+    BS: Blockstore + Clone + 'static + Send + Sync,
+    MI: MessagesInterpreter<BS> + Send + Sync,
 {
     pub fn new(
-        config: AppConfig<S>,
+        config: AppConfig<KV>,
         db: DB,
-        state_store: SS,
-        interpreter: I,
-        chain_env: ChainEnv,
+        state_store: BS,
+        interpreter: MI,
         snapshots: Option<SnapshotClient>,
     ) -> Result<Self> {
         let app = Self {
@@ -187,29 +189,30 @@ where
             namespace: config.app_namespace,
             state_hist: KVCollection::new(config.state_hist_namespace),
             state_hist_size: config.state_hist_size,
-            interpreter: Arc::new(interpreter),
-            chain_env,
+            messages_interpreter: Arc::new(interpreter),
             snapshots,
             exec_state: Arc::new(tokio::sync::Mutex::new(None)),
             check_state: Arc::new(tokio::sync::Mutex::new(None)),
+            validators_cache: Arc::new(tokio::sync::Mutex::new(None)),
         };
         app.init_committed_state()?;
         Ok(app)
     }
 }
 
-impl<DB, SS, S, I> App<DB, SS, S, I>
+impl<DB, BS, KV, MI> App<DB, BS, KV, MI>
 where
-    S: KVStore
+    KV: KVStore
         + Codec<AppState>
         + Encode<AppStoreKey>
         + Encode<BlockHeight>
         + Codec<FvmStateParams>,
-    DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
-    SS: Blockstore + 'static + Clone,
+    DB: KVWritable<KV> + KVReadable<KV> + 'static + Clone,
+    BS: Blockstore + 'static + Clone + Send + Sync,
+    MI: MessagesInterpreter<BS> + Send + Sync,
 {
     /// Get an owned clone of the state store.
-    fn state_store_clone(&self) -> SS {
+    fn state_store_clone(&self) -> BS {
         self.state_store.as_ref().clone()
     }
 
@@ -232,6 +235,7 @@ where
                     chain_id: 0,
                     power_scale: 0,
                     app_version: 0,
+                    consensus_params: None,
                 },
             };
             self.set_committed_state(state)?;
@@ -282,15 +286,40 @@ where
             .context("commit failed")
     }
 
+    /// Diff our current consensus params with new values, and return Some with the final params
+    /// if they differ (and therefore a consensus layer update is necessary).
+    fn maybe_update_app_state(
+        &self,
+        gas_market: &Reading,
+    ) -> Result<Option<TendermintConsensusParams>> {
+        let mut state = self.committed_state()?;
+        let current = state
+            .state_params
+            .consensus_params
+            .ok_or_else(|| anyhow!("no current consensus params in state"))?;
+
+        if current.block.max_gas == gas_market.block_gas_limit as i64 {
+            return Ok(None); // No update necessary.
+        }
+
+        // Proceeding with update.
+        let mut updated = current;
+        updated.block.max_gas = gas_market.block_gas_limit as i64;
+        state.state_params.consensus_params = Some(updated.clone());
+        self.set_committed_state(state)?;
+
+        Ok(Some(updated))
+    }
+
     /// Put the execution state during block execution. Has to be empty.
-    async fn put_exec_state(&self, state: FvmExecState<SS>) {
+    async fn put_exec_state(&self, state: FvmExecState<BS>) {
         let mut guard = self.exec_state.lock().await;
         assert!(guard.is_none(), "exec state not empty");
         *guard = Some(state);
     }
 
     /// Take the execution state during block execution. Has to be non-empty.
-    async fn take_exec_state(&self) -> FvmExecState<SS> {
+    async fn take_exec_state(&self) -> FvmExecState<BS> {
         let mut guard = self.exec_state.lock().await;
         guard.take().expect("exec state empty")
     }
@@ -298,48 +327,48 @@ where
     /// Take the execution state, update it, put it back, return the output.
     async fn modify_exec_state<T, F, R>(&self, f: F) -> Result<T>
     where
-        F: FnOnce((ChainEnv, FvmExecState<SS>)) -> R,
-        R: Future<Output = Result<((ChainEnv, FvmExecState<SS>), T)>>,
+        F: FnOnce(FvmExecState<BS>) -> R,
+        R: Future<Output = Result<(FvmExecState<BS>, T)>>,
     {
         let mut guard = self.exec_state.lock().await;
         let state = guard.take().expect("exec state empty");
 
-        // NOTE: There is no need to save the `ChainEnv`; it's shared with other, meant for cloning.
-        let ((_env, state), ret) = f((self.chain_env.clone(), state)).await?;
+        let (state, ret) = f(state).await?;
 
         *guard = Some(state);
 
         Ok(ret)
     }
 
-    /// Get a read only fvm execution state. This is useful to perform query commands targeting
-    /// the latest state.
-    pub fn new_read_only_exec_state(
+    /// Get a read-only view from the current FVM execution state, optionally passing a new BlockContext.
+    /// This is useful to perform query commands targeting the latest state. Mutations from transactions
+    /// will not be persisted.
+    pub fn read_only_view(
         &self,
-    ) -> Result<Option<FvmExecState<ReadOnlyBlockstore<Arc<SS>>>>> {
-        let maybe_app_state = self.get_committed_state()?;
+        height: Option<BlockHeight>,
+    ) -> Result<Option<FvmExecState<ReadOnlyBlockstore<Arc<BS>>>>> {
+        let app_state = match self.get_committed_state()? {
+            Some(app_state) => app_state,
+            None => return Ok(None),
+        };
 
-        Ok(if let Some(app_state) = maybe_app_state {
-            let block_height = app_state.block_height;
-            let state_params = app_state.state_params;
+        let block_height = height.unwrap_or(app_state.block_height);
+        let state_params = app_state.state_params;
 
-            // wait for block production
-            if !Self::can_query_state(block_height, &state_params) {
-                return Ok(None);
-            }
+        // wait for block production
+        if !Self::can_query_state(block_height, &state_params) {
+            return Ok(None);
+        }
 
-            let exec_state = FvmExecState::new(
-                ReadOnlyBlockstore::new(self.state_store.clone()),
-                self.multi_engine.as_ref(),
-                block_height as ChainEpoch,
-                state_params,
-            )
-            .context("error creating execution state")?;
+        let exec_state = FvmExecState::new(
+            ReadOnlyBlockstore::new(self.state_store.clone()),
+            self.multi_engine.as_ref(),
+            block_height as ChainEpoch,
+            state_params,
+        )
+        .context("error creating execution state")?;
 
-            Some(exec_state)
-        } else {
-            None
-        })
+        Ok(Some(exec_state))
     }
 
     /// Look up a past state at a particular height Tendermint Core is looking for.
@@ -384,6 +413,40 @@ where
             _ => Err(anyhow!("invalid app state json")),
         }
     }
+
+    /// Replaces the current validators cache with a new one.
+    async fn refresh_validators_cache(&self) -> Result<()> {
+        // TODO: This should be read only state, but we can't use the read-only view here
+        // because it hasn't been committed to state store yet.
+        self.modify_exec_state(|mut s| async {
+            let mut cache = self.validators_cache.lock().await;
+            *cache = Some(ValidatorCache::new_from_state(&mut s)?);
+            Ok((s, ()))
+        })
+        .await?;
+
+        Ok(())
+    }
+
+    /// Retrieves a validator from the cache, initializing it if necessary.
+    async fn get_validator_from_cache(&self, id: &tendermint::account::Id) -> Result<PublicKey> {
+        let mut cache = self.validators_cache.lock().await;
+
+        // If cache is not initialized, update it from the state
+        if cache.is_none() {
+            let mut state = self
+                .read_only_view(None)?
+                .ok_or_else(|| anyhow!("exec state should be present"))?;
+
+            *cache = Some(ValidatorCache::new_from_state(&mut state)?);
+        }
+
+        // Retrieve the validator from the cache
+        cache
+            .as_ref()
+            .context("Validator cache is not available")?
+            .get_validator(id)
+    }
 }
 
 // NOTE: The `Application` interface doesn't allow failures at the moment. The protobuf
@@ -392,34 +455,17 @@ where
 // the `tower-abci` library would throw an exception when it tried to convert a
 // `Response::Exception` into a `ConsensusResponse` for example.
 #[async_trait]
-impl<DB, SS, S, I> Application for App<DB, SS, S, I>
+impl<DB, BS, KV, MI> Application for App<DB, BS, KV, MI>
 where
-    S: KVStore
+    KV: KVStore
         + Codec<AppState>
         + Encode<AppStoreKey>
         + Encode<BlockHeight>
         + Codec<FvmStateParams>,
-    S::Namespace: Sync + Send,
-    DB: KVWritable<S> + KVReadable<S> + Clone + Send + Sync + 'static,
-    SS: Blockstore + Clone + Send + Sync + 'static,
-    I: ProposalInterpreter<State = ChainEnv, Message = Vec<u8>>,
-    I: ExecInterpreter<
-        State = (ChainEnv, FvmExecState<SS>),
-        Message = Vec<u8>,
-        BeginOutput = FvmApplyRet,
-        DeliverOutput = BytesMessageApplyRes,
-        EndOutput = PowerUpdates,
-    >,
-    I: CheckInterpreter<
-        State = FvmExecState<ReadOnlyBlockstore<SS>>,
-        Message = Vec<u8>,
-        Output = BytesMessageCheckRes,
-    >,
-    I: QueryInterpreter<
-        State = FvmQueryState<SS>,
-        Query = BytesMessageQuery,
-        Output = BytesMessageQueryRes,
-    >,
+    KV::Namespace: Sync + Send,
+    DB: KVWritable<KV> + KVReadable<KV> + Clone + Send + Sync + 'static,
+    BS: Blockstore + Clone + Send + Sync + 'static,
+    MI: MessagesInterpreter<BS> + Send + Sync,
 {
     /// Provide information about the ABCI application.
     async fn info(&self, _request: request::Info) -> AbciResult<response::Info> {
@@ -446,7 +492,11 @@ where
         // Make it easy to spot any discrepancies between nodes.
         tracing::info!(genesis_hash = genesis_hash.to_string(), "genesis");
 
-        let (validators, state_params) = read_genesis_car(genesis_bytes, &self.state_store).await?;
+        let (validators, mut state_params) =
+            read_genesis_car(genesis_bytes, &self.state_store).await?;
+
+        state_params.consensus_params = Some(request.consensus_params);
+
         let validators =
             to_validator_updates(validators).context("failed to convert validators")?;
 
@@ -471,7 +521,7 @@ where
         };
 
         let response = response::InitChain {
-            consensus_params: None,
+            consensus_params: None, // not updating the proposed consensus params
             validators,
             app_hash: app_state.app_hash(),
         };
@@ -522,17 +572,18 @@ where
         )
         .context("error creating query state")?;
 
-        let qry = (request.path, request.data.to_vec());
+        let query = Query {
+            path: request.path,
+            params: request.data.to_vec(),
+        };
 
-        let (_, result) = self
-            .interpreter
-            .query(state, qry)
-            .await
-            .context("error running query")?;
-
+        let result = self.messages_interpreter.query(state, query).await;
         let response = match result {
-            Err(e) => invalid_query(AppError::InvalidEncoding, e.description),
             Ok(result) => to_query(result, block_height)?,
+            Err(QueryError::InvalidQuery(e)) => {
+                invalid_query(AppError::InvalidEncoding, e.to_string())
+            }
+            Err(QueryError::Other(e)) => Err(e).context("failed to query message")?,
         };
         Ok(response)
     }
@@ -542,15 +593,11 @@ where
         // Keep the guard through the check, so there can be only one at a time.
         let mut guard = self.check_state.lock().await;
 
-        let state = match guard.take() {
+        let mut state = match guard.take() {
             Some(state) => state,
             None => {
                 let db = self.state_store_clone();
                 let state = self.committed_state()?;
-
-                // This would create a partial state, but some client scenarios need the full one.
-                // FvmCheckState::new(db, state.state_root(), state.chain_id())
-                //     .context("error creating check state")?
 
                 FvmExecState::new(
                     ReadOnlyBlockstore::new(db),
@@ -562,32 +609,36 @@ where
             }
         };
 
-        let (state, result) = self
-            .interpreter
-            .check(
-                state,
+        let result = self
+            .messages_interpreter
+            .check_message(
+                &mut state,
                 request.tx.to_vec(),
                 request.kind == CheckTxKind::Recheck,
             )
-            .await
-            .context("error running check")?;
-
-        // Update the check state.
-        *guard = Some(state);
+            .await;
 
         let mut mpool_received_trace = MpoolReceived::default();
 
         let response = match result {
-            Err(e) => invalid_check_tx(AppError::InvalidEncoding, e.description),
-            Ok(result) => match result {
-                Err(IllegalMessage) => invalid_check_tx(AppError::IllegalMessage, "".to_owned()),
-                Ok(Err(InvalidSignature(d))) => invalid_check_tx(AppError::InvalidSignature, d),
-                Ok(Ok(ret)) => {
-                    mpool_received_trace.message = Some(Message::from(&ret.message));
-                    to_check_tx(ret)
-                }
-            },
+            Ok(response) => {
+                mpool_received_trace.message = Some(Message::from(&response.message));
+                to_check_tx(response)
+            }
+            Err(CheckMessageError::IllegalMessage(s)) => {
+                invalid_check_tx(AppError::IllegalMessage, s)
+            }
+            Err(CheckMessageError::InvalidSignature(e)) => {
+                invalid_check_tx(AppError::InvalidSignature, e.to_string())
+            }
+            Err(CheckMessageError::InvalidMessage(s)) => {
+                invalid_check_tx(AppError::InvalidEncoding, s)
+            }
+            Err(CheckMessageError::Other(e)) => Err(e).context("failed to check message")?,
         };
+
+        // Update the check state.
+        *guard = Some(state);
 
         mpool_received_trace.accept = response.code.is_ok();
         if !mpool_received_trace.accept {
@@ -595,6 +646,7 @@ where
         }
 
         emit(mpool_received_trace);
+
         Ok(response)
     }
 
@@ -610,20 +662,23 @@ where
         );
         let txs = request.txs.into_iter().map(|tx| tx.to_vec()).collect();
 
-        let txs = self
-            .interpreter
-            .prepare(self.chain_env.clone(), txs)
+        let state = self
+            .read_only_view(Some(request.height.value()))?
+            .ok_or_else(|| anyhow!("exec state should be present"))?;
+
+        let response = self
+            .messages_interpreter
+            .prepare_messages_for_block(state, txs, request.max_tx_bytes.try_into().unwrap())
             .await
             .context("failed to prepare proposal")?;
 
-        let txs = txs.into_iter().map(bytes::Bytes::from).collect();
-        let (txs, size) = take_until_max_size(txs, request.max_tx_bytes.try_into().unwrap());
+        let txs = Vec::from_iter(response.messages.into_iter().map(bytes::Bytes::from));
 
         emit(BlockProposalSent {
             validator: &request.proposer_address,
             height: request.height.value(),
             tx_count: txs.len(),
-            size,
+            size: response.total_bytes,
         });
 
         Ok(response::PrepareProposal { txs })
@@ -643,11 +698,17 @@ where
         let size_txs = txs.iter().map(|tx| tx.len()).sum::<usize>();
         let num_txs = txs.len();
 
-        let accept = self
-            .interpreter
-            .process(self.chain_env.clone(), txs)
+        let state = self
+            .read_only_view(Some(request.height.value()))?
+            .ok_or_else(|| anyhow!("exec state should be present"))?;
+
+        let process_decision = self
+            .messages_interpreter
+            .attest_block_messages(state, txs)
             .await
             .context("failed to process proposal")?;
+
+        let accept = process_decision == AttestMessagesResponse::Accept;
 
         emit(BlockProposalReceived {
             height: request.height.value(),
@@ -704,46 +765,59 @@ where
 
         state_params.timestamp = to_timestamp(request.header.time);
 
-        let state = FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
-            .context("error creating new state")?
-            .with_block_hash(block_hash)
-            .with_validator_id(request.header.proposer_address);
+        let validator = self
+            .get_validator_from_cache(&request.header.proposer_address)
+            .await?;
 
-        tracing::debug!("initialized exec state");
+        let mut state =
+            FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
+                .context("error creating new state")?
+                .with_block_hash(block_hash)
+                .with_block_producer(validator);
+
+        tracing::debug!("initialized new exec state");
+
+        let response = self
+            .messages_interpreter
+            .begin_block(&mut state)
+            .await
+            .context("failed to begin block")?;
 
         self.put_exec_state(state).await;
 
-        let ret = self
-            .modify_exec_state(|s| self.interpreter.begin(s))
-            .await
-            .context("begin failed")?;
-
-        Ok(to_begin_block(ret))
+        Ok(to_begin_block(response.applied_cron_message))
     }
 
     /// Apply a transaction to the application's state.
     async fn deliver_tx(&self, request: request::DeliverTx) -> AbciResult<response::DeliverTx> {
         let msg = request.tx.to_vec();
-        let (result, block_hash) = self
-            .modify_exec_state(|s| async {
-                let ((env, state), res) = self.interpreter.deliver(s, msg).await?;
-                let block_hash = state.block_hash();
-                Ok(((env, state), (res, block_hash)))
-            })
-            .await
-            .context("deliver failed")?;
+
+        let (result, block_hash) = {
+            let mut guard = self.exec_state.lock().await;
+            let mut state = guard.take().expect("exec state empty");
+
+            let result = self
+                .messages_interpreter
+                .apply_message(&mut state, msg)
+                .await;
+            let block_hash = state.block_hash();
+
+            *guard = Some(state);
+            (result, block_hash)
+        };
 
         let response = match result {
-            Err(e) => invalid_deliver_tx(AppError::InvalidEncoding, e.description),
-            Ok(ret) => match ret {
-                ChainMessageApplyRet::Signed(Err(InvalidSignature(d))) => {
-                    invalid_deliver_tx(AppError::InvalidSignature, d)
-                }
-                ChainMessageApplyRet::Signed(Ok(ret)) => {
-                    to_deliver_tx(ret.fvm, ret.domain_hash, block_hash)
-                }
-                ChainMessageApplyRet::Ipc(ret) => to_deliver_tx(ret, None, block_hash),
-            },
+            Ok(ApplyMessageResponse {
+                applied_message,
+                domain_hash,
+            }) => to_deliver_tx(applied_message, domain_hash, block_hash),
+            Err(ApplyMessageError::InvalidSignature(err)) => {
+                invalid_deliver_tx(AppError::InvalidSignature, err.to_string())
+            }
+            Err(ApplyMessageError::InvalidMessage(s)) => {
+                invalid_deliver_tx(AppError::InvalidEncoding, s)
+            }
+            Err(ApplyMessageError::Other(e)) => Err(e).context("failed to apply message")?,
         };
 
         if response.code != 0.into() {
@@ -761,15 +835,46 @@ where
     async fn end_block(&self, request: request::EndBlock) -> AbciResult<response::EndBlock> {
         tracing::debug!(height = request.height, "end block");
 
-        // TODO: Return events from epoch transitions.
-        let ret = self
-            .modify_exec_state(|s| self.interpreter.end(s))
-            .await
-            .context("end failed")?;
+        let response = {
+            let mut guard = self.exec_state.lock().await;
+            let mut state = guard.take().expect("exec state empty");
 
-        let r = to_end_block(ret)?;
+            let result = self.messages_interpreter.end_block(&mut state).await;
+            *guard = Some(state);
 
-        Ok(r)
+            result?
+        };
+
+        let EndBlockResponse {
+            power_updates,
+            gas_market,
+            events,
+        } = response;
+
+        // Convert the incoming power updates to Tendermint validator updates.
+        let validator_updates =
+            to_validator_updates(power_updates.0).context("failed to convert validator updates")?;
+
+        // Replace the validator cache if the validator set has changed.
+        if !validator_updates.is_empty() {
+            self.refresh_validators_cache().await?;
+        }
+
+        // Maybe update the app state with the new block gas limit.
+        let consensus_param_updates = self
+            .maybe_update_app_state(&gas_market)
+            .context("failed to update block gas limit")?;
+
+        let ret = response::EndBlock {
+            validator_updates,
+            consensus_param_updates,
+            events: events
+                .into_iter()
+                .flat_map(|(stamped, emitters)| to_events("event", stamped, emitters))
+                .collect::<Vec<_>>(),
+        };
+
+        Ok(ret)
     }
 
     /// Commit the current state at the current height.

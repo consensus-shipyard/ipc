@@ -118,10 +118,11 @@ contract IpcExchangeTest is Test {
             to: ipcAddressB,
             value: 1000,
             message: abi.encode(callMsg),
-            nonce: 0
+            originalNonce: 0,
+            localNonce: 0
         });
 
-        resultMsg = ResultMsg({outcome: OutcomeType.Ok, id: callEnvelope.toHash(), ret: bytes("")});
+        resultMsg = ResultMsg({outcome: OutcomeType.Ok, id: callEnvelope.toTracingId(), ret: bytes("")});
 
         resultEnvelope = IpcEnvelope({
             kind: IpcMsgKind.Result,
@@ -129,7 +130,8 @@ contract IpcExchangeTest is Test {
             to: ipcAddressA,
             value: 1000,
             message: abi.encode(resultMsg),
-            nonce: 0
+            originalNonce: 0,
+            localNonce: 0
         });
 
         exch = new RecorderIpcExchange(gateway);
@@ -194,8 +196,8 @@ contract IpcExchangeTest is Test {
         vm.deal(address(this), 1000);
         exch.performIpcCall_(ipcAddressA, callMsg, 1);
         // assert that we stored the correct callEnvelope in the correlation map.
-        IpcEnvelope memory correlated = exch.getInflight(callEnvelope.toHash());
-        require(correlated.toHash() == callEnvelope.toHash());
+        IpcEnvelope memory correlated = exch.getInflight(callEnvelope.toTracingId());
+        require(correlated.toTracingId() == callEnvelope.toTracingId());
 
         vm.startPrank(gateway);
 
@@ -210,7 +212,8 @@ contract IpcExchangeTest is Test {
         // Send three messages from within the contract.
         bytes32[] memory ids = new bytes32[](3);
         for (uint64 i = 0; i < 3; i++) {
-            callEnvelope.nonce = i;
+            callEnvelope.localNonce = i;
+            callEnvelope.originalNonce = i;
             vm.mockCall(
                 gateway,
                 abi.encodeWithSelector(IGateway.sendContractXnetMessage.selector),
@@ -218,7 +221,7 @@ contract IpcExchangeTest is Test {
             );
             exch.performIpcCall_(ipcAddressA, callMsg, 1);
 
-            bytes32 id = callEnvelope.toHash();
+            bytes32 id = callEnvelope.toTracingId();
             require(exch.getInflight(id).value != 0, "envelope not found in correlation map");
 
             ids[i] = id;
@@ -252,8 +255,8 @@ contract IpcExchangeTest is Test {
         resultEnvelope.message = abi.encode(resultMsg);
 
         // assert that we stored the correct callEnvelope in the correlation map.
-        IpcEnvelope memory correlated = exch.getInflight(callEnvelope.toHash());
-        require(correlated.toHash() == callEnvelope.toHash());
+        IpcEnvelope memory correlated = exch.getInflight(callEnvelope.toTracingId());
+        require(correlated.toTracingId() == callEnvelope.toTracingId());
 
         // Simulate an OK incoming result.
         exch.handleIpcMessage(resultEnvelope);

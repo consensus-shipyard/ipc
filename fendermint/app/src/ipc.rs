@@ -14,6 +14,8 @@ use fendermint_vm_topdown::IPCParentFinality;
 use fvm_ipld_blockstore::Blockstore;
 use std::sync::Arc;
 
+use fendermint_vm_interpreter::MessagesInterpreter;
+
 use serde::{Deserialize, Serialize};
 
 /// All the things that can be voted on in a subnet.
@@ -26,8 +28,9 @@ pub enum AppVote {
 /// Queries the LATEST COMMITTED parent finality from the storage
 pub struct AppParentFinalityQuery<DB, SS, S, I>
 where
-    SS: Blockstore + Clone + 'static,
+    SS: Blockstore + Clone + 'static + Send + Sync,
     S: KVStore,
+    I: MessagesInterpreter<SS> + Send + Sync,
 {
     /// The app to get state
     app: App<DB, SS, S, I>,
@@ -42,7 +45,8 @@ where
         + Encode<BlockHeight>
         + Codec<FvmStateParams>,
     DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
-    SS: Blockstore + 'static + Clone,
+    SS: Blockstore + Clone + 'static + Send + Sync,
+    I: MessagesInterpreter<SS> + Send + Sync,
 {
     pub fn new(app: App<DB, SS, S, I>) -> Self {
         Self {
@@ -55,7 +59,7 @@ where
     where
         F: FnOnce(FvmExecState<ReadOnlyBlockstore<Arc<SS>>>) -> anyhow::Result<T>,
     {
-        match self.app.new_read_only_exec_state()? {
+        match self.app.read_only_view(None)? {
             Some(s) => f(s).map(Some),
             None => Ok(None),
         }
@@ -70,7 +74,8 @@ where
         + Encode<BlockHeight>
         + Codec<FvmStateParams>,
     DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
-    SS: Blockstore + 'static + Clone,
+    SS: Blockstore + Clone + 'static + Send + Sync,
+    I: MessagesInterpreter<SS> + Send + Sync,
 {
     fn get_latest_committed_finality(&self) -> anyhow::Result<Option<IPCParentFinality>> {
         self.with_exec_state(|mut exec_state| {

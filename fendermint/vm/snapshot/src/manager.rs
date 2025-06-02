@@ -14,6 +14,8 @@ use fendermint_vm_interpreter::fvm::state::FvmStateParams;
 use fvm_ipld_blockstore::Blockstore;
 use tendermint_rpc::Client;
 
+use fs_err as fs;
+
 pub struct SnapshotParams {
     /// Location to store completed snapshots.
     pub snapshots_dir: PathBuf,
@@ -54,7 +56,7 @@ where
     /// Create a new manager.
     pub fn new(store: BS, params: SnapshotParams) -> anyhow::Result<(Self, SnapshotClient)> {
         // Make sure the target directory exists.
-        std::fs::create_dir_all(&params.snapshots_dir)
+        fs::create_dir_all(&params.snapshots_dir)
             .context("failed to create snapshots directory")?;
 
         let snapshot_items =
@@ -180,7 +182,7 @@ where
 
         for r in removables {
             let snapshot_dir = r.snapshot_dir.to_string_lossy().to_string();
-            if let Err(e) = std::fs::remove_dir_all(&r.snapshot_dir) {
+            if let Err(e) = fs::remove_dir_all(&r.snapshot_dir) {
                 tracing::error!(error =? e, snapshot_dir, "failed to remove snapshot");
             } else {
                 tracing::info!(snapshot_dir, "removed snapshot");
@@ -222,24 +224,25 @@ where
             .await
             .context("failed to write CAR file")?;
 
-        let snapshot_size = std::fs::metadata(&snapshot_path)
+        let snapshot_size = fs::metadata(&snapshot_path)
             .context("failed to get snapshot metadata")?
             .len() as usize;
 
         // Create a checksum over the CAR file.
         let checksum_bytes = file_checksum(&snapshot_path).context("failed to compute checksum")?;
 
-        std::fs::write(&checksum_path, checksum_bytes.to_string())
+        fs::write(&checksum_path, checksum_bytes.to_string())
             .context("failed to write checksum file")?;
 
         // Create a directory for the parts.
-        std::fs::create_dir(&parts_path).context("failed to create parts dir")?;
+        fs::create_dir(&parts_path).context("failed to create parts dir")?;
 
         // Split the CAR file into chunks.
         // They can be listed in the right order with e.g. `ls | sort -n`
         // Alternatively we could pad them with zeroes based on the original file size and the chunk size,
         // but this way it will be easier to return them based on a numeric index.
-        let chunks_count = car::split(&snapshot_path, &parts_path, self.chunk_size, |idx| {
+        let snapshot_bytes = fs::read(snapshot_path)?;
+        let chunks_count = car::split(snapshot_bytes, &parts_path, self.chunk_size, |idx| {
             format!("{idx}.part")
         })
         .await
@@ -296,9 +299,9 @@ where
 /// Docker container's temporary directory to the host mounted volume,
 /// then fall back to copying.
 fn move_or_copy(from: &Path, to: &Path) -> anyhow::Result<()> {
-    if std::fs::rename(from, to).is_ok() {
+    if fs::rename(from, to).is_ok() {
         // Delete the big CAR file - keep the only the parts.
-        std::fs::remove_file(to.join(SNAPSHOT_FILE_NAME)).context("failed to remove CAR file")?;
+        fs::remove_file(to.join(SNAPSHOT_FILE_NAME)).context("failed to remove CAR file")?;
     } else {
         dircpy::CopyBuilder::new(from, to)
             .with_exclude_filter(SNAPSHOT_FILE_NAME)
@@ -309,12 +312,13 @@ fn move_or_copy(from: &Path, to: &Path) -> anyhow::Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use super::fs;
     use std::time::Duration;
 
     use async_stm::{atomically, retry};
     use fendermint_vm_genesis::Genesis;
     use fendermint_vm_interpreter::fvm::{
-        bundle::{bundle_path, contracts_path, custom_actors_bundle_path},
+        bundle::contracts_path,
         state::{snapshot::Snapshot, FvmStateParams},
         store::memory::MemoryBlockstore,
     };
@@ -401,7 +405,7 @@ mod tests {
             snapshots_dir.path().join("snapshot-0")
         );
 
-        let _ = std::fs::File::open(snapshot.snapshot_dir.join("manifest.json"))
+        let _ = fs::File::open(snapshot.snapshot_dir.join("manifest.json"))
             .expect("manifests file exists");
 
         let snapshots = manifest::list_manifests(snapshots_dir.path()).unwrap();
@@ -441,12 +445,11 @@ mod tests {
         let mut g = quickcheck::Gen::new(5);
         let genesis = Genesis::arbitrary(&mut g);
 
-        let maybe_contract_path = genesis.ipc.as_ref().map(|_| contracts_path());
         let (state, out) = create_test_genesis_state(
-            bundle_path(),
-            custom_actors_bundle_path(),
+            actors_builtin_car::CAR,
+            actors_custom_car::CAR,
+            contracts_path(),
             genesis,
-            maybe_contract_path,
         )
         .await
         .expect("cannot create genesis state");
@@ -467,6 +470,7 @@ mod tests {
             chain_id: out.chain_id.into(),
             power_scale: out.power_scale,
             app_version: 0,
+            consensus_params: None,
         };
 
         (state_params, store)

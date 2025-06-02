@@ -36,7 +36,7 @@ make e2e
 
 ## IPC Solidity Actors
 
-We generate Rust bindings for the Solidity actors we need to invoke from the [contracts](../contracts/) folder, some of which are deployed during the genesis process. The bindings live in [contracts/binding/](../contracts/binding), and are generated automatically during the build, or with the following command:
+We generate Rust bindings for the Solidity actors we need to invoke from the [contracts](../contracts/) folder, some of which are deployed during the genesis process. The bindings live in [contract-bindings/](../contract-bindings), and are generated automatically during the build, or with the following command:
 
 ```bash
 make gen
@@ -44,7 +44,7 @@ make gen
 
 To run it, you will have to install [forge](https://book.getfoundry.sh/getting-started/installation).
 
-The list of contracts for which we generate Rust bindings are in [build.rs](../contracts/binding/build.rs) and needs to be maintained by hand, for example if a new "diamond facet" is added to a contract, it has to be added here. Diamond facets also have to be added manually in [ipc.rs](./vm/actor_interface/src/ipc.rs) where the contracts which need to be deployed during genesis are described. These facets cannot be divined from the ABI description, so they have to be maintained explicitly.
+The list of contracts for which we generate Rust bindings are in [build.rs](../contract-bindings/build.rs) and needs to be maintained by hand, for example if a new "diamond facet" is added to a contract, it has to be added here. Diamond facets also have to be added manually in [ipc.rs](./vm/actor_interface/src/ipc.rs) where the contracts which need to be deployed during genesis are described. These facets cannot be divined from the ABI description, so they have to be maintained explicitly.
 
 To test whether the genesis process works, we can run the following unit test:
 

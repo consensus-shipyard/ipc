@@ -20,6 +20,7 @@ use fendermint_vm_genesis::{
     ipc::{GatewayParams, IpcParams},
     Account, Actor, ActorMeta, Collateral, Genesis, SignerAddr, Validator, ValidatorKey,
 };
+use fs_err as fs;
 use fvm_shared::{bigint::Zero, chainid::ChainID, econ::TokenAmount, version::NetworkVersion};
 use ipc_api::subnet_id::SubnetID;
 use ipc_provider::config::subnet::{
@@ -90,6 +91,7 @@ macro_rules! env_vars {
     };
 }
 
+#[derive(Debug)]
 pub struct DockerMaterials;
 
 impl Materials for DockerMaterials {
@@ -160,6 +162,7 @@ pub struct DockerMaterializerState {
     port_ranges: BTreeMap<NodeName, DockerPortRange>,
 }
 
+#[derive(Debug)]
 pub struct DockerMaterializer {
     dir: PathBuf,
     rng: StdRng,
@@ -260,7 +263,7 @@ impl DockerMaterializer {
         }
 
         let dir = self.dir.join(testnet_name.path());
-        if let Err(e) = std::fs::remove_dir_all(&dir) {
+        if let Err(e) = fs::remove_dir_all(&dir) {
             if !e.to_string().contains("No such file") {
                 bail!(
                     "failed to remove testnet directory {}: {e:?}",
@@ -438,7 +441,7 @@ impl DockerMaterializer {
         let ipc_dir = self.ipc_dir(testnet_name);
         let accounts_dir = self.accounts_dir(testnet_name);
         // Create a `~/.ipc` directory, as expected by default by the `ipc-cli`.
-        std::fs::create_dir_all(&ipc_dir).context("failed to create .ipc dir")?;
+        fs::create_dir_all(&ipc_dir).context("failed to create .ipc dir")?;
         // Use the owner of the directory for the container, so we don't get permission issues.
         let user = user_id(&ipc_dir)?;
         // Mount the `~/.ipc` directory and all the keys to be imported.
@@ -528,9 +531,9 @@ impl DockerMaterializer {
 
     /// Run some kind of command with the `ipc-cli` that needs to be executed as
     /// transaction by an account on a given subnet.
-    async fn ipc_cli_run_cmd<'a>(
+    async fn ipc_cli_run_cmd(
         &mut self,
-        submit_config: &SubmitConfig<'a, DockerMaterials>,
+        submit_config: &SubmitConfig<'_, DockerMaterials>,
         account: &DefaultAccount,
         cmd: String,
     ) -> anyhow::Result<Vec<String>> {
@@ -666,6 +669,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             // TODO: Some of these hardcoded values can go into the manifest.
             let genesis = Genesis {
                 chain_name,
+                chain_id: None,
                 timestamp: Timestamp::current(),
                 network_version: NetworkVersion::V21,
                 base_fee: TokenAmount::zero(),
@@ -765,8 +769,8 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         's: 'a,
     {
         // Overwrite the env file which has seed addresses, then start the node (unless it's already running).
-        node.start(seed_nodes).await?;
-        node.wait_for_started(*STARTUP_TIMEOUT).await?;
+        node.start_all_containers(seed_nodes).await?;
+        node.wait_for_apis_to_start(*STARTUP_TIMEOUT).await?;
         // Trying to avoid `Tendermint RPC error: server returned malformatted JSON (no 'result' or 'error')` on first subnet creation attempt.
         tokio::time::sleep(Duration::from_secs(5)).await;
         Ok(())
@@ -786,7 +790,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
 
         // Check if we have already created the subnet.
         if subnet_id_file.exists() {
-            let subnet_id = std::fs::read_to_string(&subnet_id_file)
+            let subnet_id = fs::read_to_string(&subnet_id_file)
                 .context("failed to read subnet ID from file")?;
 
             let subnet_id = SubnetID::from_str(&subnet_id).with_context(|| {

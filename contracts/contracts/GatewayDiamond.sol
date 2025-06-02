@@ -11,14 +11,14 @@ import {InvalidCollateral, InvalidSubmissionPeriod, InvalidMajorityPercentage} f
 import {LibDiamond} from "./lib/LibDiamond.sol";
 import {LibGateway} from "./lib/LibGateway.sol";
 import {SubnetID} from "./structs/Subnet.sol";
-import {LibStaking} from "./lib/LibStaking.sol";
+import {LibPower, LibValidatorSet} from "./lib/LibPower.sol";
 import {BATCH_PERIOD, MAX_MSGS_PER_BATCH} from "./structs/CrossNet.sol";
 
 error FunctionNotFound(bytes4 _functionSelector);
 
-bool constant FEATURE_MULTILEVEL_CROSSMSG = false;
+bool constant FEATURE_MULTILEVEL_CROSSMSG = true;
 bool constant FEATURE_GENERAL_PUPRPOSE_CROSSMSG = true;
-uint8 constant FEATURE_SUBNET_DEPTH = 2;
+uint8 constant FEATURE_SUBNET_DEPTH = 10;
 
 contract GatewayDiamond {
     GatewayActorStorage internal s;
@@ -69,13 +69,31 @@ contract GatewayDiamond {
 
         s.validatorsTracker.validators.activeLimit = params.activeValidatorsLimit;
         // Start the next configuration number from 1, 0 is reserved for no change and the genesis membership
-        s.validatorsTracker.changes.nextConfigurationNumber = LibStaking.INITIAL_CONFIGURATION_NUMBER;
+        s.validatorsTracker.changes.nextConfigurationNumber = LibPower.INITIAL_CONFIGURATION_NUMBER;
         // The startConfiguration number is also 1 to match with nextConfigurationNumber, indicating we have
         // empty validator change logs
-        s.validatorsTracker.changes.startConfigurationNumber = LibStaking.INITIAL_CONFIGURATION_NUMBER;
+        s.validatorsTracker.changes.startConfigurationNumber = LibPower.INITIAL_CONFIGURATION_NUMBER;
+
         // set initial validators and update membership
         Membership memory initial = Membership({configurationNumber: 0, validators: params.genesisValidators});
         LibGateway.updateMembership(initial);
+
+        // Add genesis validators to the parent validators tracker.
+        uint256 vLength = params.genesisValidators.length;
+        for (uint256 i; i < vLength; ) {
+            address addr = params.genesisValidators[i].addr;
+
+            // LibValidatorSet setMetadata take a calldata as parameter, but metadata is "memory"
+            // directly setting the metadata instead
+            s.validatorsTracker.validators.validators[addr].metadata = params.genesisValidators[i].metadata;
+
+            uint256 amount = params.genesisValidators[i].weight;
+            LibValidatorSet.setPowerWithConfirm(s.validatorsTracker.validators, addr, amount);
+
+            unchecked {
+                ++i;
+            }
+        }
     }
 
     function _fallback() internal {

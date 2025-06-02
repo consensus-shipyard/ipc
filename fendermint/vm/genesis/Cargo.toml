@@ -21,8 +21,8 @@ tendermint = { workspace = true }
 cid = { workspace = true, optional = true }
 multihash = { workspace = true, optional = true }
 fvm_shared = { workspace = true }
-ipc-api = { workspace = true }
-fendermint_actor_eam = { workspace = true }
+ipc-api = { path = "../../../ipc/api" }
+fendermint_actor_eam = { path = "../../actors/eam" }
 
 fendermint_crypto = { path = "../../crypto" }
 fendermint_testing = { path = "../../testing", optional = true }
@@ -34,6 +34,7 @@ quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }
 hex = { workspace = true }
 serde_json = { workspace = true }
+ipc-types = { path = "../../../ipc/types"}
 
 # Enable arb on self for tests.
 fendermint_vm_genesis = { path = ".", features = ["arb"] }

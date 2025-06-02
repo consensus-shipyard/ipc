@@ -289,6 +289,7 @@ fn gen_subnets(
                 } else {
                     Some(choose_one(g, parent_nodes))
                 },
+                fendermint_additional_config: None,
             };
             let id = NodeId::arbitrary(g);
             node_ids.push(id.clone());

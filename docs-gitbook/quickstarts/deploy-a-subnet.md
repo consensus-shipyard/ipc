@@ -10,7 +10,7 @@ Several steps in this guide involve running long-lived processes. In each of the
 
 ### Step 1: Prepare your system
 
-#### Install the basic requirements for IPC:
+#### Install the basic requirements for IPC
 
 {% tabs %}
 {% tab title="Linux" %}
@@ -19,6 +19,7 @@ Several steps in this guide involve running long-lived processes. In each of the
 - Install Rust. See [instructions](https://www.rust-lang.org/tools/install).
 - Install cargo-make: `cargo install --force cargo-make`.
 - Install Docker. See [instructions](https://docs.docker.com/engine/install/ubuntu/).
+- Install Node.js. See [instructions](https://nodejs.org/en/download).
 - Install Foundry. See [instructions](https://book.getfoundry.sh/getting-started/installation).
 
 Also install the following dependencies ([details](https://lotus.filecoin.io/lotus/install/prerequisites/#supported-platforms))
@@ -37,11 +38,12 @@ sudo apt update && sudo apt install build-essential libssl-dev mesa-opencl-icd o
 - Install Rust. See [instructions](https://www.rust-lang.org/tools/install). (if you have homebrew installed rust, you may need to uninstall that if you get errors in the build)
 - Install Cargo make: `cargo install --force cargo-make`
 - Install docker. See [instructions](https://docs.docker.com/desktop/install/mac-install/).
+- Install Node.js. See [instructions](https://nodejs.org/en/download).
 - Install foundry. See [instructions](https://book.getfoundry.sh/getting-started/installation).
   {% endtab %}
   {% endtabs %}
 
-#### Building:
+#### Building
 
 {% hint style="info" %}
 NOTE: this step may take a while to compile, depending on OS version and hardware build
@@ -129,7 +131,6 @@ registry_addr = "<REGISTRY_ADDR>"
 - **Replace** the `gateway_addr` and `registry_addr` with the following values. Click on the badges below to take you to the source to copy and paste them or go to [this link](https://github.com/consensus-shipyard/ipc/blob/cd/contracts/deployments/r314159.json).
 
   [![Gateway Address](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fconsensus-shipyard%2Fipc%2Fcd%2Fcontracts%2Fdeployments%2Fr314159.json&query=%24.gateway_addr&label=Gateway%20Address)](https://github.com/consensus-shipyard/ipc/blob/cd/contracts/deployments/r314159.json)
-
   [![Registry Address](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fconsensus-shipyard%2Fipc%2Fcd%2Fcontracts%2Fdeployments%2Fr314159.json&query=%24.registry_addr&label=Registry%20Address)](https://github.com/consensus-shipyard/ipc/blob/cd/contracts/deployments/r314159.json)
 
 If you want to deploy your own custom ipc stack of contracts:
@@ -287,28 +288,28 @@ TIP: Highly recommend documenting that information which will be useful to boots
 #################################
 
 Subnet ID:
-	/r314159/t410f6b2qto756ox3qfoonq4ii6pdrylxwyretgpixuy
+ /r314159/t410f6b2qto756ox3qfoonq4ii6pdrylxwyretgpixuy
 
 Eth API:
-	http://0.0.0.0:8545
+ http://0.0.0.0:8545
 
 Chain ID:
-	3684170297508395
+ 3684170297508395
 
 Fendermint API:
-	http://localhost:26658
+ http://localhost:26658
 
 CometBFT API:
-	http://0.0.0.0:26657
+ http://0.0.0.0:26657
 
 CometBFT node ID:
-	ca644ac3194d39a2834f5d98e141d682772c149b
+ ca644ac3194d39a2834f5d98e141d682772c149b
 
 CometBFT P2P:
-	http://0.0.0.0:26656
+ http://0.0.0.0:26656
 
 IPLD Resolver Multiaddress:
-	/ip4/0.0.0.0/tcp/26655/p2p/16Uiu2HAkwhrWn9hYFQMR2QmW5Ky7HJKSGVkT8xKnQr1oUGCkqWms
+ /ip4/0.0.0.0/tcp/26655/p2p/16Uiu2HAkwhrWn9hYFQMR2QmW5Ky7HJKSGVkT8xKnQr1oUGCkqWms
 ```
 
 You'll need the final component of the `IPLD Resolver Multiaddress` (the `peer ID`) and the `CometBFT node ID` for the next nodes to start.

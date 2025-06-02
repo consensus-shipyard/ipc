@@ -33,6 +33,9 @@ import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.so
 
 import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 
+import {FullActivityRollup, Consensus} from "../../contracts/structs/Activity.sol";
+import {ActivityHelper} from "../helpers/ActivityHelper.sol";
+
 contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
@@ -110,7 +113,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
             10
         );
         vm.expectEmit(true, true, true, true, address(gatewayDiamond));
-        emit LibGateway.NewTopDownMessage(address(saDiamond), expected);
+        emit LibGateway.NewTopDownMessage(address(saDiamond), expected, expected.toTracingId());
         gatewayDiamond.manager().fundWithToken(subnet.id, FvmAddressHelper.from(caller), 10);
 
         // Assert post-conditions.
@@ -163,7 +166,8 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
             blockHash: blockhash(block.number),
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             nextConfigurationNumber: 0,
-            msgs: msgs
+            msgs: msgs,
+            activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
         vm.prank(address(saDiamond));
@@ -187,8 +191,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         gatewayDiamond.checkpointer().commitCheckpoint(batch);
     }
 
-    // Call a smart contract in the parent through a smart contract and with
-    // an ERC20 token supply.
+    // Call a smart contract in the parent through a smart contract.
     function test_childToParentCall() public {
         Subnet memory subnet = createTokenSubnet(address(token));
 
@@ -221,7 +224,8 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
             blockHash: blockhash(block.number),
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             nextConfigurationNumber: 0,
-            msgs: msgs
+            msgs: msgs,
+            activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
         // Verify that we received the call and that the recipient has the tokens.

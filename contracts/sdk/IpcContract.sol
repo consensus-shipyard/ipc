@@ -79,13 +79,14 @@ abstract contract IpcExchange is IIpcHandler, Ownable, ReentrancyGuard {
                 kind: IpcMsgKind.Call,
                 from: to, // TODO: will anyway be replaced by sendContractXnetMessage.
                 to: to,
-                nonce: 0, // TODO: will be replaced.
+                localNonce: 0, // TODO: will be replaced.
+                originalNonce: 0, // TODO: will be replaced
                 value: value,
                 message: abi.encode(callMsg)
             })
         );
         // Add the message to the list of inflights
-        bytes32 id = envelope.toHash();
+        bytes32 id = envelope.toTracingId();
         inflightMsgs[id] = envelope;
     }
 

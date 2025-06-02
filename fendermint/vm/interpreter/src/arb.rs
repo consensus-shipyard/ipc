@@ -21,6 +21,7 @@ impl Arbitrary for FvmStateParams {
                 .into(),
             power_scale: *g.choose(&[-1, 0, 3]).unwrap(),
             app_version: *g.choose(&[0, 1, 2]).unwrap(),
+            consensus_params: None,
         }
     }
 }

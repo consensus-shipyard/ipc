@@ -14,6 +14,7 @@ cid = { workspace = true }
 ethers-core = { workspace = true }
 ethers-contract = { workspace = true }
 erased-serde = { workspace = true }
+fs-err = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 jsonrpc-v2 = { workspace = true }
@@ -32,7 +33,7 @@ tokio = { workspace = true }
 tower-http = { workspace = true }
 
 fil_actors_evm_shared = { workspace = true }
-fvm_shared = { workspace = true }
+fvm_shared = { workspace = true, features  = ["crypto"] }
 fvm_ipld_encoding = { workspace = true }
 
 fendermint_crypto = { path = "../../crypto" }

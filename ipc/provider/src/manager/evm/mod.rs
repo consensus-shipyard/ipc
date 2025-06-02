@@ -1,6 +1,8 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 
+mod error_parsing;
+pub mod gas_estimator_middleware;
 mod manager;
 
 use async_trait::async_trait;

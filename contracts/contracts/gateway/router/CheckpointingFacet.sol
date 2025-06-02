@@ -14,12 +14,17 @@ import {NotRegisteredSubnet, SubnetNotActive, SubnetNotFound, InvalidSubnet, Che
 import {BatchNotCreated, InvalidBatchEpoch, BatchAlreadyExists, NotEnoughSubnetCircSupply, InvalidCheckpointEpoch} from "../../errors/IPCErrors.sol";
 
 import {CrossMsgHelper} from "../../lib/CrossMsgHelper.sol";
-import {IpcEnvelope, SubnetID} from "../../structs/CrossNet.sol";
+import {IpcEnvelope, SubnetID, IpcMsgKind} from "../../structs/CrossNet.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
+
+import {ActivityRollupRecorded, FullActivityRollup} from "../../structs/Activity.sol";
 
 contract CheckpointingFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
+
+    /// @dev Emitted when a checkpoint is committed to gateway.
+    event CheckpointCommitted(address indexed subnet, uint256 subnetHeight);
 
     /// @notice submit a verified checkpoint in the gateway to trigger side-effects.
     /// @dev this method is called by the corresponding subnet actor.
@@ -41,16 +46,20 @@ contract CheckpointingFacet is GatewayActorModifiers {
         LibGateway.checkMsgLength(checkpoint.msgs);
 
         execBottomUpMsgs(checkpoint.msgs, subnet);
+
+        emit CheckpointCommitted({subnet: checkpoint.subnetID.getAddress(), subnetHeight: checkpoint.blockHeight});
     }
 
     /// @notice creates a new bottom-up checkpoint
     /// @param checkpoint - a bottom-up checkpoint
     /// @param membershipRootHash - a root hash of the Merkle tree built from the validator public keys and their weight
     /// @param membershipWeight - the total weight of the membership
+    /// @param activity - the full activity rollup
     function createBottomUpCheckpoint(
         BottomUpCheckpoint calldata checkpoint,
         bytes32 membershipRootHash,
-        uint256 membershipWeight
+        uint256 membershipWeight,
+        FullActivityRollup calldata activity
     ) external systemActorOnly {
         if (LibGateway.bottomUpCheckpointExists(checkpoint.blockHeight)) {
             revert CheckpointAlreadyExists();
@@ -64,25 +73,10 @@ contract CheckpointingFacet is GatewayActorModifiers {
             membershipWeight: membershipWeight,
             majorityPercentage: s.majorityPercentage
         });
+
         LibGateway.storeBottomUpCheckpoint(checkpoint);
-    }
 
-    /// @notice Set a new checkpoint retention height and garbage collect all checkpoints in range [`retentionHeight`, `newRetentionHeight`)
-    /// @dev `retentionHeight` is the height of the first incomplete checkpointswe must keep to implement checkpointing.
-    /// All checkpoints with a height less than `retentionHeight` are removed from the history, assuming they are committed to the parent.
-    /// @param newRetentionHeight - the height of the oldest checkpoint to keep
-    function pruneBottomUpCheckpoints(uint256 newRetentionHeight) external systemActorOnly {
-        // we need to clean manually the checkpoints because Solidity does not support passing
-        // a storage variable as an interface (so we can iterate and remove directly inside pruneQuorums)
-        for (uint256 h = s.checkpointQuorumMap.retentionHeight; h < newRetentionHeight; ) {
-            delete s.bottomUpCheckpoints[h];
-            delete s.bottomUpMsgBatches[h];
-            unchecked {
-                ++h;
-            }
-        }
-
-        LibQuorum.pruneQuorums(s.checkpointQuorumMap, newRetentionHeight);
+        emit ActivityRollupRecorded(uint64(checkpoint.blockHeight), activity);
     }
 
     /// @notice checks whether the provided checkpoint signature for the block at height `height` is valid and accumulates that it
@@ -122,7 +116,9 @@ contract CheckpointingFacet is GatewayActorModifiers {
         uint256 crossMsgLength = msgs.length;
 
         for (uint256 i; i < crossMsgLength; ) {
-            totalValue += msgs[i].value;
+            if (msgs[i].kind != IpcMsgKind.Call) {
+                totalValue += msgs[i].value;
+            }
             unchecked {
                 ++i;
             }

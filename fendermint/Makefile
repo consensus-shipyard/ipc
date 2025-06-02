@@ -1,6 +1,6 @@
 .PHONY: all build test lint license check-fmt check-clippy actor-bundle
 
-BUILTIN_ACTORS_TAG    ?= v12.0.0
+BUILTIN_ACTORS_TAG    ?= v15.0.0
 BUILTIN_ACTORS_BUNDLE := $(PWD)/builtin-actors/output/bundle.car
 CUSTOM_ACTORS_BUNDLE  := $(PWD)/actors/output/custom_actors_bundle.car
 
@@ -53,7 +53,11 @@ e2e-only:
 	cd testing/smoke-test    && cargo make --profile $(PROFILE)
 	cd testing/snapshot-test && cargo make --profile $(PROFILE)
 	cd testing/graph-test    && cargo make --profile $(PROFILE)
-	PROFILE=$(PROFILE) cargo test --locked --package fendermint_materializer
+ifeq ($(PROFILE), release)
+	cargo test --release --locked --package fendermint_materializer
+else
+	cargo test --locked --package fendermint_materializer
+endif
 
 clean:
 	cargo clean

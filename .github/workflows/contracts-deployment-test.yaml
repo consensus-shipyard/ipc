@@ -1,4 +1,4 @@
-name: 'Contracts: Smoke test deployment'
+name: "Contracts: Smoke test deployment"
 
 # This workflow is triggered from the main CI workflow.
 on:
@@ -17,8 +17,8 @@ jobs:
     - name: Setup Node
       uses: actions/setup-node@v4
       with:
-        node-version: '18.x'
-        cache: 'pnpm'
+        node-version: "18.x"
+        cache: "pnpm"
 
     - name: Install dependencies
       run: cd contracts && make deps
@@ -27,6 +27,7 @@ jobs:
       uses: foundry-rs/foundry-toolchain@v1
       with:
         cache: false
+        version: v0.3.0
 
     - name: Generate Ethereum Private Key and Create .env File and run make
       run: |

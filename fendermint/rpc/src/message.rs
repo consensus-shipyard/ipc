@@ -14,6 +14,8 @@ use fvm_shared::{
     address::Address, chainid::ChainID, econ::TokenAmount, message::Message, MethodNum, METHOD_SEND,
 };
 
+use fs_err as fs;
+
 use crate::B64_ENGINE;
 
 /// Factory methods for transaction payload construction.
@@ -144,7 +146,7 @@ impl SignedMessageFactory {
 
     /// Convenience method to read the secret key from a file, expected to be in Base64 format.
     pub fn read_secret_key(sk: &Path) -> anyhow::Result<SecretKey> {
-        let b64 = std::fs::read_to_string(sk).context("failed to read secret key")?;
+        let b64 = fs::read_to_string(sk).context("failed to read secret key")?;
         let bz: Vec<u8> = B64_ENGINE
             .decode(b64)
             .context("failed to parse base64 string")?;

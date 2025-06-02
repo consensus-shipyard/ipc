@@ -8,6 +8,7 @@ use fendermint_vm_interpreter::fvm::state::{
     snapshot::{BlockHeight, SnapshotVersion},
     FvmStateParams,
 };
+use fs_err as fs;
 
 use crate::{
     manifest,
@@ -102,11 +103,11 @@ impl SnapshotClient {
                     };
 
                     // Create a `parts` sub-directory for the chunks.
-                    if let Err(e) = std::fs::create_dir(download.parts_dir()) {
+                    if let Err(e) = fs::create_dir(download.parts_dir()) {
                         return abort(SnapshotError::from(e));
                     };
 
-                    if let Err(e) = std::fs::write(download_path.join(MANIFEST_FILE_NAME), json) {
+                    if let Err(e) = fs::write(download_path.join(MANIFEST_FILE_NAME), json) {
                         return abort(SnapshotError::from(e));
                     }
 
@@ -138,7 +139,7 @@ impl SnapshotClient {
                 let part_path = cd.parts_dir().join(format!("{}.part", index));
 
                 // We are doing IO inside the STM transaction, but that's okay because there is no contention on the download.
-                match std::fs::write(part_path, contents) {
+                match fs::write(part_path, contents) {
                     Ok(()) => {
                         let next_index = index + 1;
                         cd.next_index.write(next_index)?;

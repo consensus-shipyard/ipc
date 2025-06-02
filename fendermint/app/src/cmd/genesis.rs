@@ -9,12 +9,14 @@ use ipc_provider::IpcProvider;
 use std::path::PathBuf;
 
 use fendermint_vm_actor_interface::eam::EthAddress;
-use fendermint_vm_core::{chainid, Timestamp};
+use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{
     ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, PermissionMode, SignerAddr,
     Validator, ValidatorKey,
 };
 use fendermint_vm_interpreter::genesis::{GenesisAppState, GenesisBuilder};
+
+use crate::fs;
 
 use crate::cmd;
 use crate::options::genesis::*;
@@ -30,6 +32,7 @@ cmd! {
         GenesisCommands::AddAccount(args) => args.exec(genesis_file).await,
         GenesisCommands::AddMultisig(args) => args.exec(genesis_file).await,
         GenesisCommands::AddValidator(args) => args.exec(genesis_file).await,
+        GenesisCommands::SetChainId(args) => args.exec(genesis_file).await,
         GenesisCommands::IntoTendermint(args) => args.exec(genesis_file).await,
         GenesisCommands::SetEamPermissions(args) => args.exec(genesis_file).await,
         GenesisCommands::Ipc { command } => command.exec(genesis_file).await,
@@ -42,6 +45,7 @@ cmd! {
     let genesis = Genesis {
       timestamp: Timestamp(self.timestamp),
       chain_name: self.chain_name.clone(),
+      chain_id: None,
       network_version: self.network_version,
       base_fee: self.base_fee.clone(),
       power_scale: self.power_scale,
@@ -52,7 +56,7 @@ cmd! {
     };
 
     let json = serde_json::to_string_pretty(&genesis)?;
-    std::fs::write(genesis_file, json)?;
+    fs::write(genesis_file, json)?;
 
     Ok(())
   }
@@ -73,6 +77,11 @@ cmd! {
 cmd! {
   GenesisAddValidatorArgs(self, genesis_file: PathBuf) {
     add_validator(&genesis_file, self)
+  }
+}
+cmd! {
+  GenesisSetChainIdArgs(self, genesis_file: PathBuf) {
+    set_chain_id(&genesis_file, self)
   }
 }
 
@@ -99,6 +108,13 @@ cmd! {
             seal_genesis(&genesis_file, args).await,
     }
   }
+}
+
+fn set_chain_id(genesis_file: &PathBuf, args: &GenesisSetChainIdArgs) -> anyhow::Result<()> {
+    update_genesis(genesis_file, |mut genesis| {
+        genesis.chain_id = Some(args.chain_id);
+        Ok(genesis)
+    })
 }
 
 fn add_account(genesis_file: &PathBuf, args: &GenesisAddAccountArgs) -> anyhow::Result<()> {
@@ -181,7 +197,7 @@ fn add_validator(genesis_file: &PathBuf, args: &GenesisAddValidatorArgs) -> anyh
 }
 
 fn read_genesis(genesis_file: &PathBuf) -> anyhow::Result<Genesis> {
-    let json = std::fs::read_to_string(genesis_file).context("failed to read genesis")?;
+    let json = fs::read_to_string(genesis_file).context("failed to read genesis")?;
     let genesis = serde_json::from_str::<Genesis>(&json).context("failed to parse genesis")?;
     Ok(genesis)
 }
@@ -193,7 +209,7 @@ where
     let genesis = read_genesis(genesis_file)?;
     let genesis = f(genesis)?;
     let json = serde_json::to_string_pretty(&genesis)?;
-    std::fs::write(genesis_file, json)?;
+    fs::write(genesis_file, json)?;
     Ok(())
 }
 
@@ -218,13 +234,12 @@ fn into_tendermint(genesis_file: &PathBuf, args: &GenesisIntoTendermintArgs) -> 
     let genesis = read_genesis(genesis_file)?;
     let app_state: Option<String> = match args.app_state {
         Some(ref path) if path.exists() => {
-            Some(GenesisAppState::v1(std::fs::read(path)?).compress_and_encode()?)
+            Some(GenesisAppState::v1(fs::read(path)?).compress_and_encode()?)
         }
         _ => None,
     };
 
-    let chain_id: u64 = chainid::from_str_hashed(&genesis.chain_name)?.into();
-    let chain_id = chain_id.to_string();
+    let chain_id = u64::from(genesis.chain_id()?).to_string();
 
     let tmg = tendermint::Genesis {
         genesis_time: tendermint::time::Time::from_unix_timestamp(genesis.timestamp.as_secs(), 0)?,
@@ -260,7 +275,7 @@ fn into_tendermint(genesis_file: &PathBuf, args: &GenesisIntoTendermintArgs) -> 
         app_state,
     };
     let tmg_json = serde_json::to_string_pretty(&tmg)?;
-    std::fs::write(&args.out, tmg_json)?;
+    fs::write(&args.out, tmg_json)?;
     Ok(())
 }
 
@@ -292,15 +307,27 @@ fn set_ipc_gateway(genesis_file: &PathBuf, args: &GenesisIpcGatewayArgs) -> anyh
 async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> anyhow::Result<()> {
     let genesis_params = read_genesis(genesis_file)?;
 
-    let mut builder = GenesisBuilder::new(
-        args.builtin_actors_path.clone(),
-        args.custom_actors_path.clone(),
+    fn actors_car_blob(
+        path: Option<&PathBuf>,
+        fallback: &'static [u8],
+    ) -> anyhow::Result<std::borrow::Cow<'static, [u8]>> {
+        let actors = path
+            .map(fs_err::read)
+            .transpose()?
+            .map(std::borrow::Cow::Owned)
+            .unwrap_or_else(|| std::borrow::Cow::Borrowed(fallback));
+        Ok(actors)
+    }
+    let custom_actors = actors_car_blob(args.custom_actors_path.as_ref(), actors_custom_car::CAR)?;
+    let builtin_actors =
+        actors_car_blob(args.builtin_actors_path.as_ref(), actors_builtin_car::CAR)?;
+
+    let builder = GenesisBuilder::new(
+        builtin_actors.as_ref(),
+        custom_actors.as_ref(),
+        args.artifacts_path.clone(),
         genesis_params,
     );
-
-    if let Some(ref ipc_system_artifacts) = args.artifacts_path {
-        builder = builder.with_ipc_system_contracts(ipc_system_artifacts.clone());
-    }
 
     builder.write_to(args.output_path.clone()).await
 }
@@ -352,6 +379,7 @@ async fn new_genesis_from_parent(
         accounts: Vec::new(),
         eam_permission_mode: PermissionMode::Unrestricted,
         ipc: Some(ipc_params),
+        chain_id: None,
     };
 
     for v in genesis_info.validators {
@@ -374,7 +402,7 @@ async fn new_genesis_from_parent(
     }
 
     let json = serde_json::to_string_pretty(&genesis)?;
-    std::fs::write(genesis_file, json)?;
+    fs::write(genesis_file, json)?;
 
     Ok(())
 }

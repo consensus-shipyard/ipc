@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {InvalidBatchEpoch, MaxMsgsPerBatchExceeded, InvalidSignatureErr, BottomUpCheckpointAlreadySubmitted, CannotSubmitFutureCheckpoint, InvalidCheckpointEpoch} from "../errors/IPCErrors.sol";
+import {InvalidBatchEpoch, MaxMsgsPerBatchExceeded, InvalidSignatureErr, DuplicateValidatorSignaturesFound, SignatureAddressesNotSorted, BottomUpCheckpointAlreadySubmitted, CannotSubmitFutureCheckpoint, InvalidCheckpointEpoch} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {BottomUpCheckpoint, BottomUpMsgBatch, BottomUpMsgBatchInfo} from "../structs/CrossNet.sol";
 import {Validator, ValidatorSet} from "../structs/Subnet.sol";
 import {MultisignatureChecker} from "../lib/LibMultisignatureChecker.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
-import {LibValidatorSet, LibStaking} from "../lib/LibStaking.sol";
+import {LibValidatorSet, LibPower} from "../lib/LibPower.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {LibSubnetActor} from "../lib/LibSubnetActor.sol";
 import {Pausable} from "../lib/LibPausable.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
+import {LibActivity} from "../lib/LibActivity.sol";
 
 contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard, Pausable {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -45,8 +46,12 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         // Commit in gateway to distribute rewards
         IGateway(s.ipcGatewayAddr).commitCheckpoint(checkpoint);
 
+        LibActivity.recordActivityRollup(checkpoint.subnetID, uint64(checkpoint.blockHeight), checkpoint.activity);
         // confirming the changes in membership in the child
-        LibStaking.confirmChange(checkpoint.nextConfigurationNumber);
+        LibPower.confirmChange(checkpoint.nextConfigurationNumber);
+
+        // Propagate cross messages from checkpoint to other subnets
+        IGateway(s.ipcGatewayAddr).propagateAll();
     }
 
     /// @notice Checks whether the signatures are valid for the provided signatories and hash within the current validator set.
@@ -61,6 +66,19 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         bytes32 hash,
         bytes[] memory signatures
     ) public view {
+        for (uint256 i = 1; i < signatories.length; ) {
+            if (signatories[i] < signatories[i - 1]) {
+                revert SignatureAddressesNotSorted();
+            }
+            if (signatories[i] == signatories[i - 1]) {
+                revert DuplicateValidatorSignaturesFound();
+            }
+
+            unchecked {
+                i++;
+            }
+        }
+
         // This call reverts if at least one of the signatories (validator) is not in the active validator set.
         uint256[] memory collaterals = s.validatorSet.getTotalPowerOfValidators(signatories);
         uint256 activeCollateral = s.validatorSet.getTotalActivePower();
