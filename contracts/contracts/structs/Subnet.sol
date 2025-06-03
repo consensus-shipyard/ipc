@@ -66,9 +66,11 @@ struct StakingRelease {
 /// @dev    Mimics the implementation of array in solidity,
 ///         this way is more aligned with our use case.
 struct AddressStakingReleases {
-    uint16 length;
-    uint16 startIdx;
-    mapping(uint16 => StakingRelease) releases;
+    /// @dev The total number of releases, the tail of the release queue
+    uint32 tail;
+    /// @dev The next release that one can collect
+    uint32 head;
+    mapping(uint32 => StakingRelease) releases;
 }
 
 /// @notice Manages the staking release queue.
