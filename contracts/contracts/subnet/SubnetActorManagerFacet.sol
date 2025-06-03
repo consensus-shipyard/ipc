@@ -196,9 +196,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             // nth-call to `_increaseGenesisValidatorCollateral`
             s.genesisValidators[i].weight += amount;
         } else {
-            // otherwise we need to lookup the power from the current power table
-            // and initialize the amount from that
-            uint256 collateral = s.validatorSet.validators[validator].currentPower;
+            // otherwise we need to add new validator with given amount
             Validator memory val = Validator({
                 addr: validator,
                 weight: amount,
