@@ -62,11 +62,11 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             revert SubnetAlreadyBootstrapped();
         }
 
-        s.supplySource.transferFunds(payable(msg.sender), amount);
-
         if (s.genesisBalance[msg.sender] < amount) {
             revert NotEnoughBalance();
         }
+
+        s.supplySource.transferFunds(payable(msg.sender), amount);
 
         s.genesisBalance[msg.sender] -= amount;
         s.genesisCircSupply -= amount;
@@ -294,15 +294,19 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
                 delete s.genesisBalance[msg.sender];
                 s.genesisCircSupply -= genesisBalance;
                 LibSubnetActor.rmAddressFromBalanceKey(msg.sender);
-                s.collateralSource.transferFunds(payable(msg.sender), genesisBalance);
+                s.supplySource.transferFunds(payable(msg.sender), genesisBalance);
             }
+        }
+        // stake might be racing with `bootstrapSubnetIfNeeded` so we need to check again
 
-            // interaction must be performed after checks and changes
+        // interaction must be performed after checks and changes
+        // we do check bootstrapping again, deliberately to avoid a complex exploit scenario
+        if (!s.bootstrapped) {
             LibPower.withdrawWithConfirm(msg.sender, amount);
             s.collateralSource.transferFunds(payable(msg.sender), amount);
-            return;
+        } else {
+            LibPower.withdraw(msg.sender, amount);
         }
-        LibPower.withdraw(msg.sender, amount);
     }
 
     /// @notice method that allows to kill the subnet when all validators left.

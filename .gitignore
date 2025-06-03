@@ -3,8 +3,12 @@ target/
 node_modules/
 .DS_Store
 
+
 # we migrated from npm to pnpm.
 package-lock.json
 .vscode
 
 .pnpm-store
+
+# no idea which forge package creates this
+.wake
