@@ -8,15 +8,16 @@ use std::collections::HashMap;
 
 use ethers::abi::Abi;
 use fvm_shared::ActorID;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EthFacet {
-    pub name: &'static str,
+    pub name: String,
     pub abi: Abi,
 }
 
 /// Top level Ethereum contract with a pre-determined ID.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EthContract {
     /// Pre-determined ID for the contract.
     ///

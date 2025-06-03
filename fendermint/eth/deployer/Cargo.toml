@@ -25,3 +25,4 @@ ipc-api = { path = "../../../ipc/api" }
 ipc-provider = { path = "../../../ipc/provider" }
 tokio = { workspace = true }
 tracing-subscriber = { workspace = true }
+color-eyre = { workspace = true }
