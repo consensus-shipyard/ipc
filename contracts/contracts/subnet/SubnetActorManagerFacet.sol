@@ -167,7 +167,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
             LibPower.setMetadataWithConfirm(msg.sender, publicKey);
             LibPower.depositWithConfirm(msg.sender, amount);
 
-            _patchGenesisValidators(msg.sender);
+            _increaseGenesisValidatorCollateral(msg.sender, amount);
 
             LibSubnetActor.bootstrapSubnetIfNeeded();
         } else {
@@ -177,28 +177,54 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
         }
     }
 
-    function _patchGenesisValidators(address validator) internal {
+    function _increaseGenesisValidatorCollateral(address validator, uint256 amount) internal {
         // add to initial validators avoiding duplicates if it
         // is a genesis validator.
-        bool alreadyValidator;
         uint256 length = s.genesisValidators.length;
-        for (uint256 i; i < length; ) {
+        uint256 i;
+        for (; i < length; ) {
             if (s.genesisValidators[i].addr == validator) {
-                alreadyValidator = true;
                 break;
             }
             unchecked {
                 ++i;
             }
         }
-        if (!alreadyValidator) {
-            uint256 collateral = s.validatorSet.validators[validator].currentPower;
+        // if we iterate through all of them, and found one
+        // condition must hold
+        if (i < length) {
+            // nth-call to `_increaseGenesisValidatorCollateral`
+            s.genesisValidators[i].weight += amount;
+        } else {
+            // otherwise we need to add new validator with given amount
             Validator memory val = Validator({
                 addr: validator,
-                weight: collateral,
+                weight: amount,
                 metadata: s.validatorSet.validators[validator].metadata
             });
             s.genesisValidators.push(val);
+        }
+    }
+
+    function _decreaseGenesisValidatorCollateral(address validator, uint256 amount) internal {
+        uint256 length = s.genesisValidators.length;
+        uint256 i;
+        for (; i < length; ) {
+            if (s.genesisValidators[i].addr == validator) {
+                break;
+            }
+            unchecked {
+                ++i;
+            }
+        }
+        if (i < length) {
+            uint256 bound = s.genesisValidators[i].weight;
+            if (bound < amount) {
+                revert NotEnoughCollateral();
+            }
+            s.genesisValidators[i].weight -= amount;
+        } else {
+            revert NotValidator(validator);
         }
     }
 
@@ -226,7 +252,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
 
         if (!s.bootstrapped) {
             LibPower.depositWithConfirm(msg.sender, amount);
-            _patchGenesisValidators(msg.sender);
+            _increaseGenesisValidatorCollateral(msg.sender, amount);
             LibSubnetActor.bootstrapSubnetIfNeeded();
         } else {
             LibPower.deposit(msg.sender, amount);
@@ -258,6 +284,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
 
         if (!s.bootstrapped) {
             LibPower.withdrawWithConfirm(msg.sender, amount);
+            _decreaseGenesisValidatorCollateral(msg.sender, amount);
             s.collateralSource.transferFunds(payable(msg.sender), amount);
         } else {
             LibPower.withdraw(msg.sender, amount);
@@ -302,6 +329,7 @@ contract SubnetActorManagerFacet is SubnetActorModifiers, ReentrancyGuard, Pausa
         // interaction must be performed after checks and changes
         // we do check bootstrapping again, deliberately to avoid a complex exploit scenario
         if (!s.bootstrapped) {
+            _decreaseGenesisValidatorCollateral(msg.sender, amount);
             LibPower.withdrawWithConfirm(msg.sender, amount);
             s.collateralSource.transferFunds(payable(msg.sender), amount);
         } else {
