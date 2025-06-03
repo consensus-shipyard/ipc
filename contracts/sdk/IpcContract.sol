@@ -86,7 +86,7 @@ abstract contract IpcExchange is IIpcHandler, Ownable, ReentrancyGuard {
             })
         );
         // Add the message to the list of inflights
-        bytes32 id = envelope.toHash();
+        bytes32 id = envelope.toTracingId();
         inflightMsgs[id] = envelope;
     }
 
