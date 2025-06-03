@@ -6,7 +6,6 @@
 
 pub const ENCRYPTED_KEYSTORE_NAME: &str = "keystore";
 
-use ahash::HashMapExt;
 use argon2::password_hash::SaltString;
 use argon2::PasswordHasher;
 pub use argon2::RECOMMENDED_SALT_LEN;

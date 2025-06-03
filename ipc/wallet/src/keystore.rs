@@ -152,7 +152,7 @@ where
 
                         Ok(Self {
                             key_info,
-                            plain: Some(PlainPersistentKeyStore { path: file_path }),
+                            plain: Some(PlainPersistentKeyStore::new(file_path)),
                             encryption: None,
                             _phantom: Default::default(),
                         })
@@ -165,7 +165,7 @@ where
                             );
                             Ok(Self {
                                 key_info: HashMap::new(),
-                                plain: Some(PlainPersistentKeyStore { path: file_path }),
+                                plain: Some(PlainPersistentKeyStore::new(file_path)),
                                 encryption: None,
                                 _phantom: Default::default(),
                             })
@@ -201,7 +201,7 @@ where
 
                             Ok(Self {
                                 key_info: HashMap::new(),
-                                plain: Some(PlainPersistentKeyStore { path: file_path }),
+                                plain: Some(PlainPersistentKeyStore::new(file_path)),
                                 encryption: Some(EncryptionOverlay::new(&password)?),
                                 _phantom: Default::default(),
                             })
@@ -237,7 +237,7 @@ where
                             );
                             Ok(Self {
                                 key_info,
-                                plain: Some(PlainPersistentKeyStore { path: file_path }),
+                                plain: Some(PlainPersistentKeyStore::new(file_path)),
                                 encryption: Some(overlay),
                                 _phantom: Default::default(),
                             })
@@ -248,7 +248,7 @@ where
 
                         Ok(Self {
                             key_info: HashMap::new(),
-                            plain: Some(PlainPersistentKeyStore { path: file_path }),
+                            plain: Some(PlainPersistentKeyStore::new(file_path)),
                             encryption: Some(EncryptionOverlay::new(&password)?),
                             _phantom: Default::default(),
                         })
@@ -341,7 +341,8 @@ where
         Ok(())
     }
 
-    ///
+    /// Set the default key as a delegate/copy to what is referenced
+    /// by the existing `key` passed as argument
     pub fn set_default(&mut self, key: &K) -> Result<(), WalletErr>
     where
         K: DefaultKey,
@@ -353,6 +354,7 @@ where
         Ok(())
     }
 
+    /// Obtain the default key, if any. No default key is not an error
     pub fn get_default(&self) -> Result<Option<K>, WalletErr>
     where
         K: DefaultKey,

@@ -229,7 +229,7 @@ impl IpcProvider {
                         anyhow::bail!("no default evm account configured")
                     };
                     let addr_eth = EthAddress::from_str(&addr_str)?;
-                    let addr = Address::try_from(&addr_eth)?;
+                    let addr = Address::from(&addr_eth);
                     self.sender = Some(addr);
                     return Ok(addr);
                 }
