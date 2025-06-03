@@ -5,7 +5,7 @@
 // as per Cargo.toml: https://github.com/literallymarvellous/merkle-tree-rs/blob/d4abd1ca716e65d05e577e2f22b69947bef5b843/Cargo.toml#L5
 //
 // License headers added post-fork.
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use ethers::{
     abi::{
         self,

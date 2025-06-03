@@ -14,7 +14,6 @@ use super::{
 use crate::fvm::activity::ValidatorActivityTracker;
 use crate::types::BlockEndEvents;
 use anyhow::{anyhow, Context};
-use ethers::abi::AbiEncode;
 use ethers::abi::Tokenizable;
 use fendermint_crypto::PublicKey;
 use fendermint_crypto::SecretKey;
@@ -27,6 +26,7 @@ use ipc_actors_abis::checkpointing_facet as checkpoint;
 use ipc_actors_abis::checkpointing_facet::{Commitment, FvmAddress, Ipcaddress, SubnetID};
 use ipc_actors_abis::gateway_getter_facet as getter;
 use ipc_actors_abis::gateway_getter_facet::gateway_getter_facet;
+use ipc_api::checkpoint::{abi_encode_envelope, abi_encode_envelope_fields};
 use ipc_api::merkle::MerkleGen;
 use ipc_api::staking::ConfigurationNumber;
 use ipc_observability::{emit, observe::TracingError, serde::HexEncodableBlockHash, Traceable};
@@ -231,20 +231,19 @@ where
         *circ_supply -= burnt_tokens;
     });
 
-    let total_num_msgs = msgs.len();
-    let msgs_root = {
-        if total_num_msgs > 0 {
-            MerkleGen::new(
-                |msg| vec![msg.clone().encode_hex()],
-                msgs.as_slice(),
-                &["bytes32".to_owned()],
-            )?
-            .root()
-            .to_fixed_bytes()
-        } else {
-            [0u8; 32]
-        }
-    };
+    let msgs = convert_envelopes(msgs);
+    let msgs_count = msgs.len();
+
+    let mut msgs_root = [0u8; 32];
+    if msgs_count > 0 {
+        msgs_root = MerkleGen::new(
+            abi_encode_envelope,
+            msgs.as_slice(),
+            &abi_encode_envelope_fields(),
+        )?
+        .root()
+        .to_fixed_bytes()
+    }
 
     let full_activity_rollup = state.activity_tracker().commit_activity()?;
 
@@ -255,7 +254,7 @@ where
         block_hash,
         next_configuration_number,
         msgs: Commitment {
-            total_num_msgs: total_num_msgs as u64,
+            total_num_msgs: msgs_count as u64,
             msgs_root,
         },
         activity: full_activity_rollup.compressed()?,
@@ -263,7 +262,6 @@ where
 
     // Save the checkpoint in the ledger.
     // Pass in the current power table, because these are the validators who can sign this checkpoint.
-    let msgs = convert_envelopes(msgs);
     let ret = gateway
         .create_bottom_up_checkpoint(
             state,
@@ -290,7 +288,7 @@ where
     emit(CheckpointCreated {
         height: height.value(),
         hash: HexEncodableBlockHash(block_hash.to_vec()),
-        msg_count: total_num_msgs,
+        msg_count: msgs_count,
         config_number: next_configuration_number,
     });
 

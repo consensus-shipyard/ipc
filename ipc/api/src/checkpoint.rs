@@ -8,11 +8,13 @@ use crate::HumanReadable;
 use cid::multihash::Code;
 use cid::multihash::MultihashDigest;
 use cid::Cid;
+use ethers::abi::AbiEncode;
 use ethers::utils::hex;
 use fvm_ipld_encoding::DAG_CBOR;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
+use ipc_actors_abis::checkpointing_facet;
 use lazy_static::lazy_static;
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize, Serializer};
@@ -83,6 +85,64 @@ pub struct BottomUpMsgBatch {
 pub struct BottomUpBatchCommitment {
     pub total_num_msgs: u64,
     pub msgs_root: Vec<u8>,
+}
+
+// Encode to human-readable format, expected by `ipc_api::merkle::MerkleGen`.
+// TODO: since this is done only to later be encoded via `abi::encode`, while
+// that can be done on `checkpointing_facet::IpcEnvelope` directly,
+// this workflow doesn't make sense, and should be refactored.
+pub fn abi_encode_envelope(msg: &checkpointing_facet::IpcEnvelope) -> Vec<String> {
+    vec![
+        hex::encode(msg.kind.encode()),
+        hex::encode(msg.local_nonce.encode()),
+        hex::encode(msg.original_nonce.encode()),
+        hex::encode(msg.value.encode()),
+        hex::encode(msg.to.clone().subnet_id.root.encode()),
+        format!(
+            "[{}]",
+            msg.to
+                .subnet_id
+                .route
+                .iter()
+                .map(|addr| format!("{:#x}", addr))
+                .collect::<Vec<_>>()
+                .join(",")
+        ),
+        hex::encode(msg.to.clone().raw_address.addr_type.encode()),
+        format!("{:#x}", msg.to.clone().raw_address.payload),
+        hex::encode(msg.from.clone().subnet_id.root.encode()),
+        format!(
+            "[{}]",
+            msg.from
+                .subnet_id
+                .route
+                .iter()
+                .map(|addr| format!("{:#x}", addr))
+                .collect::<Vec<_>>()
+                .join(",")
+        ),
+        hex::encode(msg.from.clone().raw_address.addr_type.encode()),
+        format!("{:#x}", msg.from.clone().raw_address.payload),
+        format!("{:#x}", msg.message),
+    ]
+}
+
+pub fn abi_encode_envelope_fields() -> Vec<impl ToString> {
+    vec![
+        "uint8".to_owned(),
+        "uint64".to_owned(),
+        "uint64".to_owned(),
+        "uint256".to_owned(),
+        "uint64".to_owned(),
+        "address[]".to_owned(),
+        "uint8".to_owned(),
+        "bytes".to_owned(),
+        "uint64".to_owned(),
+        "address[]".to_owned(),
+        "uint8".to_owned(),
+        "bytes".to_owned(),
+        "bytes".to_owned(),
+    ]
 }
 
 /// Compressed representation of the activity summary that can be embedded in checkpoints to propagate up the hierarchy.

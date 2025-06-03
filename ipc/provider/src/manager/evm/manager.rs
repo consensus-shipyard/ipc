@@ -33,7 +33,6 @@ use crate::manager::subnet::{
 use crate::manager::{EthManager, SubnetManager};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
-use ethers::abi::AbiEncode;
 use ethers::abi::Tokenizable;
 use ethers::contract::abigen;
 use ethers::prelude::k256::ecdsa::SigningKey;
@@ -51,8 +50,8 @@ use ipc_actors_abis::subnet_actor_activity_facet::ValidatorClaim;
 use ipc_actors_abis::subnet_actor_checkpointing_facet::Inclusion;
 use ipc_actors_abis::subnet_actor_getter_facet::ListPendingCommitmentsEntry;
 use ipc_api::checkpoint::{
-    consensus::ValidatorData, BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent,
-    Signature, VALIDATOR_REWARD_FIELDS,
+    abi_encode_envelope, abi_encode_envelope_fields, consensus::ValidatorData, BottomUpCheckpoint,
+    BottomUpCheckpointBundle, QuorumReachedEvent, Signature, VALIDATOR_REWARD_FIELDS,
 };
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::merkle::MerkleGen;
@@ -1359,14 +1358,14 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
         );
 
         let merkle = MerkleGen::new(
-            |msg| vec![msg.clone().encode_hex()],
+            abi_encode_envelope,
             event.msgs.as_slice(),
-            &["bytes32".to_owned()],
+            &abi_encode_envelope_fields(),
         )?;
 
         let mut inclusions = vec![];
         for msg in &event.msgs {
-            let leaf_hash = merkle.leaf_hash(&[msg.clone().encode_hex()])?;
+            let leaf_hash = merkle.leaf_hash(&abi_encode_envelope(msg))?;
             if commitment.executed.contains(&leaf_hash.0) {
                 tracing::debug!("skipping an already-executed bottom up msg: {:?}", msg);
                 continue;
