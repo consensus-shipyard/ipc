@@ -111,13 +111,14 @@ where
         let Some(Actor {
             id: _,
             state: actor,
-        }) = self.lookup_actor(state, &msg.from)? else  {
+        }) = self.lookup_actor(state, &msg.from)?
+        else {
             return Ok(CheckResponse::new(
                 msg,
                 ExitCode::SYS_SENDER_INVALID,
                 None,
                 None,
-            ))
+            ));
         };
 
         let balance_needed = msg.gas_fee_cap.clone() * msg.gas_limit;

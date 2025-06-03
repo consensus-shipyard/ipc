@@ -428,7 +428,7 @@ where
             // after calling the generator closure.
             let x = ValidatorCache::new_from_state(s);
             async {
-               *cache = Some(x?);
+                *cache = Some(x?);
                 Ok(())
             }
         })
