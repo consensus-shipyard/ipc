@@ -64,7 +64,7 @@ impl CommandLineHandler for WalletGetDefault {
         match wallet_type {
             WalletType::Etherium => {
                 let wallet = provider.evm_wallet()?;
-                let mut wallet = wallet.write().unwrap();
+                let wallet = wallet.write().unwrap();
                 match wallet.get_default()? {
                     None => println!("No default account set"),
                     Some(addr) => println!("{:?}", addr.to_string()),

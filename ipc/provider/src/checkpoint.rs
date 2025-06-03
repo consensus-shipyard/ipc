@@ -12,7 +12,7 @@ use fvm_shared::clock::ChainEpoch;
 use ipc_api::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
 use ipc_observability::{emit, serde::HexEncodableBlockHash};
 use ipc_wallet::evm::EvmCrownJewels;
-use ipc_wallet::*; // XXX TODO FIXME
+// XXX TODO FIXME
 use std::cmp::max;
 use std::fmt::{Display, Formatter};
 use std::sync::{Arc, RwLock};

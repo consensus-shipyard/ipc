@@ -56,7 +56,7 @@ impl CommandLineHandler for BottomUpRelayer {
 
         let config_path = global.config_path();
         let config = Arc::new(Config::from_file(&config_path)?);
-        let mut keystore = new_evm_keystore_from_config(config)?;
+        let keystore = new_evm_keystore_from_config(config)?;
         let submitter = match (arguments.submitter.as_ref(), keystore.get_default()?) {
             (Some(submitter), _) => require_fil_addr_from_str(submitter)?,
             (None, Some(addr)) => {

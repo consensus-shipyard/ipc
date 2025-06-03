@@ -58,7 +58,6 @@ use ipc_api::staking::{PowerChangeRequest, ValidatorInfo, ValidatorStakingInfo};
 use ipc_api::subnet::ConstructParams;
 use ipc_api::subnet_id::SubnetID;
 use ipc_observability::lazy_static;
-use ipc_wallet::*;
 use num_traits::ToPrimitive;
 use std::result;
 
@@ -321,7 +320,7 @@ impl SubnetManager for EthSubnetManager {
                                 subnet_deploy;
 
                             tracing::debug!("subnet deployed at {subnet_addr:?}");
-                            return ethers_address_to_fil_address(&subnet_addr);
+                            return ethers_address_to_fil_address(subnet_addr);
                         }
                         Err(_) => {
                             tracing::debug!("no event for subnet actor published yet, continue");
@@ -1256,7 +1255,7 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
         let checkpoint = BottomUpCheckpoint::try_from(checkpoint)?;
         let signatories = signatories
             .into_iter()
-            .map(|s| ethers_address_to_fil_address(&s))
+            .map(ethers_address_to_fil_address)
             .collect::<Result<Vec<_>, _>>()?;
         let signatures = signatures
             .into_iter()
@@ -1470,7 +1469,7 @@ fn order_validator_data(
 ) -> anyhow::Result<Vec<checkpointing_facet::ValidatorData>> {
     let mut mapped = validator_data
         .iter()
-        .map(|a| ethers_address_to_fil_address(&a.validator).map(|v| (v, a.blocks_committed)))
+        .map(|a| ethers_address_to_fil_address(a.validator).map(|v| (v, a.blocks_committed)))
         .collect::<Result<Vec<_>, _>>()?;
 
     mapped.sort_by(|a, b| {
@@ -1577,7 +1576,7 @@ fn into_genesis_balance_map(
 ) -> Result<BTreeMap<Address, TokenAmount>> {
     let mut map = BTreeMap::new();
     for (a, b) in addrs.into_iter().zip(balances) {
-        map.insert(ethers_address_to_fil_address(&a)?, eth_to_fil_amount(&b)?);
+        map.insert(ethers_address_to_fil_address(a)?, eth_to_fil_amount(&b)?);
     }
     Ok(map)
 }

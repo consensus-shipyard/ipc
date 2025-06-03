@@ -4,7 +4,6 @@
 
 use async_trait::async_trait;
 use clap::Args;
-use fvm_shared::address::Address;
 use ipc_wallet::{evm::adapter::EthKeyAddress, WalletType};
 use std::fmt::Debug;
 use std::str::FromStr;

@@ -20,9 +20,9 @@ impl From<String> for Key {
     }
 }
 
-impl Into<String> for Key {
-    fn into(self) -> String {
-        self.data
+impl From<Key> for String {
+    fn from(val: Key) -> Self {
+        val.data
     }
 }
 

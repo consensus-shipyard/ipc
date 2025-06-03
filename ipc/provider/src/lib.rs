@@ -22,7 +22,7 @@ use ipc_api::{
 use ipc_types::EthAddress;
 use ipc_wallet::evm::adapter::{random_eth_key_info, EthKeyAddress};
 use ipc_wallet::evm::EvmCrownJewels;
-use ipc_wallet::{AddressDerivator, CrownJewels, FvmCrownJewels, KeyStoreConfig, Wallet};
+use ipc_wallet::{AddressDerivator, FvmCrownJewels, KeyStoreConfig, Wallet};
 use lotus::message::wallet::WalletKeyType;
 use manager::{EthSubnetManager, SubnetGenesisInfo, SubnetInfo, SubnetManager};
 use serde::{Deserialize, Serialize};
@@ -230,7 +230,7 @@ impl IpcProvider {
                     };
                     let addr_eth = EthAddress::from_str(&addr_str)?;
                     let addr = Address::try_from(&addr_eth)?;
-                    self.sender = Some(addr.clone());
+                    self.sender = Some(addr);
                     return Ok(addr);
                 }
             }

@@ -35,7 +35,7 @@ impl CommandLineHandler for WalletBalances {
                     let provider = provider.clone();
                     let subnet = subnet.clone();
                     async move {
-                        let addr_eth = EthKeyAddress::from_str(&addr)?;
+                        let addr_eth = EthKeyAddress::from_str(addr)?;
                         provider
                             .wallet_balance(
                                 &subnet,

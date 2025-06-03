@@ -1,7 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 
-use anyhow::anyhow;
 use async_trait::async_trait;
 use clap::{Args, ValueEnum};
 use ethers::types::Address;
