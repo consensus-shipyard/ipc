@@ -131,6 +131,10 @@ impl StateMachine for StakingMachine {
             .new_subnet(&mut exec_state, params)
             .expect("failed to create subnet");
 
+        gateway
+            .approve_subnet_joining_gateway(&mut exec_state, subnet_addr)
+            .unwrap();
+
         let subnet_id =
             SubnetID::new_from_parent(&parent_ipc.gateway.subnet_id, subnet_addr.into());
 
