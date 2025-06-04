@@ -116,9 +116,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
         uint256 crossMsgLength = msgs.length;
 
         for (uint256 i; i < crossMsgLength; ) {
-            if (msgs[i].kind != IpcMsgKind.Call) {
-                totalValue += msgs[i].value;
-            }
+            totalValue += msgs[i].value;
             unchecked {
                 ++i;
             }
