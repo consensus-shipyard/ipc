@@ -21,7 +21,6 @@ error FailedRemoveIncompleteQuorum();
 error GatewayCannotBeZero();
 error InvalidActorAddress();
 error InvalidCheckpointEpoch();
-error CannotSubmitFutureCheckpoint();
 error BatchMsgAlreadyExecuted();
 error MissingBatchCommitment();
 error InvalidInclusionProof();
