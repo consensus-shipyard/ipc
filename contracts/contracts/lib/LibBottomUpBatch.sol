@@ -155,6 +155,7 @@ library LibBottomUpBatch {
     }
 
     function makeLeaf(IpcEnvelope memory _msg) public pure returns (BottomUpBatch.MerkleHash) {
+        // solhint-disable-next-line func-named-parameters
         bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(
             _msg.kind,
             _msg.localNonce,
