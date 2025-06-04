@@ -5,6 +5,7 @@ import {BottomUpCheckpoint, BottomUpMsgBatch, IpcEnvelope, ParentFinality} from 
 import {FullActivityRollup} from "../structs/Activity.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
+import {Membership} from "../structs/Subnet.sol";
 
 /// @title Gateway interface
 /// @author LimeChain team
@@ -75,4 +76,10 @@ interface IGateway {
         uint256 membershipWeight,
         FullActivityRollup calldata activity
     ) external;
+
+    /// @notice Returns the current membership.
+    function getCurrentMembership() external view returns (Membership memory);
+
+    /// @notice Returns the target validator's voting power
+    function getValidatorPower(address _validator) external view returns (uint256);
 }
