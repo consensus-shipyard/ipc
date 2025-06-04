@@ -176,7 +176,6 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         vm.prank(address(saDiamond));
         vm.expectEmit(true, true, true, true, address(token));
         emit Transfer(address(gatewayDiamond), recipient, value);
-        vm.prank(address(saDiamond));
         gatewayDiamond.checkpointer().execBottomUpMsgBatch(msgs);
 
         // Assert post-conditions.
