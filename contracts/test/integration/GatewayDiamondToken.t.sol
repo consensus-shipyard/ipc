@@ -176,7 +176,8 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         vm.prank(address(saDiamond));
         vm.expectEmit(true, true, true, true, address(token));
         emit Transfer(address(gatewayDiamond), recipient, value);
-        gatewayDiamond.checkpointer().execBottomUpMsgBatch(subnet.id, msgs);
+        vm.prank(address(saDiamond));
+        gatewayDiamond.checkpointer().execBottomUpMsgBatch(msgs);
 
         // Assert post-conditions.
         (, Subnet memory subnetAfter) = gatewayDiamond.getter().getSubnet(subnet.id);
@@ -194,7 +195,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         gatewayDiamond.checkpointer().commitCheckpoint(batch);
         vm.prank(address(saDiamond));
         vm.expectRevert();
-        gatewayDiamond.checkpointer().execBottomUpMsgBatch(subnet.id, msgs);
+        gatewayDiamond.checkpointer().execBottomUpMsgBatch(msgs);
     }
 
     // Call a smart contract in the parent through a smart contract.
@@ -239,7 +240,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         gatewayDiamond.checkpointer().commitCheckpoint(batch);
         vm.prank(address(saDiamond));
         vm.expectCall(recipient, abi.encodeCall(IIpcHandler.handleIpcMessage, (msgs[0])), 1);
-        gatewayDiamond.checkpointer().execBottomUpMsgBatch(subnet.id, msgs);
+        gatewayDiamond.checkpointer().execBottomUpMsgBatch(msgs);
         assertEq(token.balanceOf(recipient), value);
     }
 

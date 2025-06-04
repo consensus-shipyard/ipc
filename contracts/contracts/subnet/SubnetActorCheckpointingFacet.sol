@@ -51,7 +51,6 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
 
         if (checkpoint.msgs.totalNumMsgs > 0) {
             LibBottomUpBatch.recordBottomUpBatchCommitment(
-                checkpoint.subnetID,
                 uint64(checkpoint.blockHeight),
                 checkpoint.msgs
             );
@@ -146,25 +145,23 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
     /// @dev Each message in the batch must include a valid Merkle proof of inclusion.
     ///      This function verifies each proof, processes the message, and submits it to the gateway for execution.
     ///      It also triggers propagation of cross-subnet messages after successful execution.
-    /// @param subnet The ID of the subnet from which the messages originated.
     /// @param checkpointHeight The height of the checkpoint containing the committed messages.
     /// @param inclusions An array of inclusion proofs and messages to be executed.
     function execBottomUpMsgBatch(
-        SubnetID calldata subnet,
         uint256 checkpointHeight,
         BottomUpBatch.Inclusion[] calldata inclusions
     ) external whenNotPaused {
         uint256 len = inclusions.length;
         IpcEnvelope[] memory msgs = new IpcEnvelope[](len);
         for (uint256 i = 0; i < len; ) {
-            LibBottomUpBatch.processBottomUpBatchMsg(subnet, checkpointHeight, inclusions[i].msg, inclusions[i].proof);
+            LibBottomUpBatch.processBottomUpBatchMsg(checkpointHeight, inclusions[i].msg, inclusions[i].proof);
             msgs[i] = inclusions[i].msg;
             unchecked {
                 i++;
             }
         }
 
-        IGateway(s.ipcGatewayAddr).execBottomUpMsgBatch(subnet, msgs);
+        IGateway(s.ipcGatewayAddr).execBottomUpMsgBatch(msgs);
 
         // Propagate cross messages from checkpoint to other subnets
         IGateway(s.ipcGatewayAddr).propagateAll();

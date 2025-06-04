@@ -899,7 +899,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         SubnetActorCheckpointingFacet checkpointer = sa.checkpointer();
         vm.startPrank(address(sa));
 
-        checkpointer.execBottomUpMsgBatch(checkpoint.subnetID, checkpoint.blockHeight, inclusions);
+        checkpointer.execBottomUpMsgBatch(checkpoint.blockHeight, inclusions);
 
         vm.stopPrank();
     }
@@ -941,7 +941,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             id: expectedMessage.toTracingId()
         });
         BottomUpBatch.Inclusion[] memory inclusions = BottomUpBatchHelper.makeInclusions(msgBatch);
-        checkpointer.execBottomUpMsgBatch(checkpoint.subnetID, checkpoint.blockHeight, inclusions);
+        checkpointer.execBottomUpMsgBatch(checkpoint.blockHeight, inclusions);
 
         vm.stopPrank();
     }

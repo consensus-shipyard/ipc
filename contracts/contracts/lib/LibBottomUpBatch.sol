@@ -16,18 +16,7 @@ import {BottomUpBatch} from "../structs/BottomUpBatch.sol";
 library LibBottomUpBatch {
     bytes32 private constant NAMESPACE = keccak256("bottomupbatch");
 
-    using SubnetIDHelper for SubnetID;
     using EnumerableSet for EnumerableSet.Bytes32Set;
-
-    type SubnetKey is bytes32;
-
-    /// @notice Tracks the execution status of committed bottom-up message batches for a specific subnet.
-    struct Tracker {
-        /// @notice Set of checkpoint heights with batches that are still pending execution.
-        EnumerableSet.Bytes32Set pendingHeights;
-        /// @notice Mapping of checkpoint height to its pending batch data.
-        mapping(uint256 => BatchPending) pending;
-    }
 
     /// @notice Represents a pending bottom-up batch commitment awaiting full execution at a specific checkpoint height.
     struct BatchPending {
@@ -39,8 +28,10 @@ library LibBottomUpBatch {
 
     /// @notice Storage structure used by the SubnetActor to manage bottom-up message batches and their execution status.
     struct BottomUpBatchStorage {
-        /// @notice Tracks pending batches and their execution progress per subnet key.
-        mapping(SubnetKey => Tracker) tracker;
+        /// @notice Set of checkpoint heights with batches that are still pending execution.
+        EnumerableSet.Bytes32Set pendingHeights;
+        /// @notice Mapping of checkpoint height to its pending batch data.
+        mapping(uint256 => BatchPending) pending;
     }
 
     function ensureValidProof(
@@ -63,34 +54,27 @@ library LibBottomUpBatch {
     }
 
     function recordBottomUpBatchCommitment(
-        SubnetID calldata subnet,
         uint64 checkpointHeight,
         BottomUpBatch.Commitment calldata commitment
     ) internal {
         BottomUpBatchStorage storage s = bottomUpBatchStorage();
 
-        SubnetKey subnetKey = SubnetKey.wrap(subnet.toHash());
-
-        Tracker storage tracker = s.tracker[subnetKey];
-        bool added = tracker.pendingHeights.add(bytes32(uint256(checkpointHeight)));
+        bool added = s.pendingHeights.add(bytes32(uint256(checkpointHeight)));
         require(added, "duplicate checkpoint height");
 
-        BatchPending storage pending = tracker.pending[checkpointHeight];
+        BatchPending storage pending = s.pending[checkpointHeight];
         pending.commitment = commitment;
     }
 
     function processBottomUpBatchMsg(
-        SubnetID calldata subnet,
         uint256 checkpointHeight,
         IpcEnvelope calldata ipcMsg,
         BottomUpBatch.MerkleHash[] calldata proof
     ) internal {
         BottomUpBatchStorage storage s = bottomUpBatchStorage();
 
-        SubnetKey subnetKey = SubnetKey.wrap(subnet.toHash());
-
         // Find the pending batch.
-        BatchPending storage pending = s.tracker[subnetKey].pending[checkpointHeight];
+        BatchPending storage pending = s.pending[checkpointHeight];
         BottomUpBatch.MerkleHash root = pending.commitment.msgsRoot;
         if (BottomUpBatch.MerkleHash.unwrap(root) == bytes32(0)) {
             revert MissingBatchCommitment();
@@ -111,9 +95,8 @@ library LibBottomUpBatch {
 
         // Prune state for this height if all msgs were executed.
         if (pending.executed.length() == pending.commitment.totalNumMsgs) {
-            Tracker storage tracker = s.tracker[subnetKey];
-            tracker.pendingHeights.remove(bytes32(uint256(checkpointHeight)));
-            delete tracker.pending[checkpointHeight];
+            s.pendingHeights.remove(bytes32(uint256(checkpointHeight)));
+            delete s.pending[checkpointHeight];
         }
     }
 
@@ -125,24 +108,19 @@ library LibBottomUpBatch {
     }
 
     /// A view accessor to query the pending commitments for a given subnet.
-    function listPendingCommitments(
-        SubnetID calldata subnet
-    ) internal view returns (ListPendingCommitmentsEntry[] memory result) {
+    function listPendingCommitments() internal view returns (ListPendingCommitmentsEntry[] memory result) {
         BottomUpBatchStorage storage s = bottomUpBatchStorage();
 
-        SubnetKey subnetKey = SubnetKey.wrap(subnet.toHash());
-
-        uint256 size = s.tracker[subnetKey].pendingHeights.length();
+        uint256 size = s.pendingHeights.length();
         result = new ListPendingCommitmentsEntry[](size);
 
         // Ok to not optimize with unchecked increments, since we expect this to be used off-chain only, for introspection.
         for (uint256 i = 0; i < size; i++) {
-            Tracker storage tracker = s.tracker[subnetKey];
-            bytes32[] memory heights = tracker.pendingHeights.values();
+            bytes32[] memory heights = s.pendingHeights.values();
 
             for (uint256 j = 0; j < heights.length; j++) {
                 uint64 height = uint64(uint256(heights[j]) << 192 >> 192);
-                BatchPending storage pending = tracker.pending[height];
+                BatchPending storage pending = s.pending[height];
                 result[i] = ListPendingCommitmentsEntry({
                     height: height,
                     commitment: pending.commitment,

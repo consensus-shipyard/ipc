@@ -2851,32 +2851,32 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         // expect revert.
         uint256 invalidHeight = checkpoint.blockHeight + 1;
         vm.expectRevert(MissingBatchCommitment.selector);
-        checkpointer.execBottomUpMsgBatch(checkpoint.subnetID, invalidHeight, inclusions);
+        checkpointer.execBottomUpMsgBatch(invalidHeight, inclusions);
 
         // attempt to execute with invalid inclusion proof.
         // expect revert.
         inclusionsOne[0].msg = inclusions[0].msg;
         inclusionsOne[0].proof = inclusions[1].proof;
         vm.expectRevert(InvalidInclusionProof.selector);
-        checkpointer.execBottomUpMsgBatch(checkpoint.subnetID, checkpoint.blockHeight, inclusionsOne);
+        checkpointer.execBottomUpMsgBatch(checkpoint.blockHeight, inclusionsOne);
 
         // execute with a valid proof (1/2).
         inclusionsOne[0] = inclusions[0];
-        checkpointer.execBottomUpMsgBatch(checkpoint.subnetID, checkpoint.blockHeight, inclusionsOne);
+        checkpointer.execBottomUpMsgBatch(checkpoint.blockHeight, inclusionsOne);
 
         // attempt to re-execute the same msg.
         // expect revert.
         vm.expectRevert(BatchMsgAlreadyExecuted.selector);
-        checkpointer.execBottomUpMsgBatch(checkpoint.subnetID, checkpoint.blockHeight, inclusionsOne);
+        checkpointer.execBottomUpMsgBatch(checkpoint.blockHeight, inclusionsOne);
 
         // execute with a valid proof (2/2).
         inclusionsOne[0] = inclusions[1];
-        checkpointer.execBottomUpMsgBatch(checkpoint.subnetID, checkpoint.blockHeight, inclusionsOne);
+        checkpointer.execBottomUpMsgBatch(checkpoint.blockHeight, inclusionsOne);
 
         // attempt to re-execute the same msg.
         // expect revert.
         vm.expectRevert(MissingBatchCommitment.selector);
-        checkpointer.execBottomUpMsgBatch(checkpoint.subnetID, checkpoint.blockHeight, inclusionsOne);
+        checkpointer.execBottomUpMsgBatch(checkpoint.blockHeight, inclusionsOne);
     }
 
     // -----------------------------------------------------------------------------------------------------------------

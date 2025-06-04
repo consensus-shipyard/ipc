@@ -14,7 +14,7 @@ use fendermint_vm_actor_interface::ipc;
 use fendermint_vm_message::conv::from_fvm::to_eth_address;
 use ipc_actors_abis::gateway_getter_facet::{GatewayGetterFacet, ParentFinality};
 use ipc_actors_abis::gateway_manager_facet::{FvmAddress, GatewayManagerFacet};
-use ipc_actors_abis::subnet_actor_getter_facet::{SubnetActorGetterFacet, SubnetID};
+use ipc_actors_abis::subnet_actor_getter_facet::SubnetActorGetterFacet;
 
 const MANIFEST: &str = "layer2.yaml";
 const CHECKPOINT_PERIOD: u64 = 10;
@@ -268,15 +268,7 @@ async fn test_bottomup_batch_execution() -> Result<(), anyhow::Error> {
             let mut retry = 0;
             loop {
                 let pending = england_subnet
-                    .list_pending_bottom_up_batch_commitments(SubnetID {
-                        root: england.subnet_id.root_id(),
-                        route: england
-                            .subnet_id
-                            .children()
-                            .iter()
-                            .map(|x| to_eth_address(x).unwrap().unwrap())
-                            .collect(),
-                    })
+                    .list_pending_bottom_up_batch_commitments()
                     .call()
                     .await
                     .context("failed to query last checkpoint height")?;

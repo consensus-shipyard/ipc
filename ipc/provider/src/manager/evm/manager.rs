@@ -1238,7 +1238,7 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
         let entries = contract
-            .list_pending_bottom_up_batch_commitments(subnet_id.try_into()?)
+            .list_pending_bottom_up_batch_commitments()
             .call()
             .await?;
         Ok(entries)
@@ -1397,8 +1397,7 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
             address,
             signer.clone(),
         );
-        let call =
-            contract.exec_bottom_up_msg_batch(subnet_id.try_into()?, height.into(), inclusions);
+        let call = contract.exec_bottom_up_msg_batch(height.into(), inclusions);
         let call = extend_call_with_pending_block(call).await?;
 
         if let Some(calldata) = call.calldata() {

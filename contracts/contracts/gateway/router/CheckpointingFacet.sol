@@ -50,13 +50,8 @@ contract CheckpointingFacet is GatewayActorModifiers {
     }
 
     /// @notice submit a verified batch of committed cross-net messages for execution.
-    /// @param subnetID The ID of the child subnet that originated the batch.
     /// @param msgs The batch of messages to be executed.
-    function execBottomUpMsgBatch(SubnetID calldata subnetID, IpcEnvelope[] calldata msgs) external {
-        // subnet actor is used to implement access control
-        if (subnetID.getActor() != msg.sender) {
-            revert InvalidBatchSource();
-        }
+    function execBottomUpMsgBatch(IpcEnvelope[] calldata msgs) external {
         (bool subnetExists, Subnet storage subnet) = LibGateway.getSubnet(msg.sender);
         if (!subnetExists) {
             revert SubnetNotFound();

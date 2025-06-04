@@ -1196,7 +1196,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         vm.prank(caller);
         gatewayDiamond.checkpointer().commitCheckpoint(checkpoint);
         vm.prank(caller);
-        gatewayDiamond.checkpointer().execBottomUpMsgBatch(subnetId, msgs);
+        gatewayDiamond.checkpointer().execBottomUpMsgBatch(msgs);
 
         (, subnetInfo) = gatewayDiamond.getter().getSubnet(subnetId);
         require(subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT - totalAmount, "unexpected circulating supply");
