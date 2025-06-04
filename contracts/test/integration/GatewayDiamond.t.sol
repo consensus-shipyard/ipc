@@ -1168,6 +1168,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         (, subnetInfo) = gatewayDiamond.getter().getSubnet(subnetId);
         require(subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT, "unexpected circulation supply after funding");
 
+        uint256 totalAmount = 0;
         IpcEnvelope[] memory msgs = new IpcEnvelope[](10);
         for (uint64 i = 0; i < 10; i++) {
             msgs[i] = TestUtils.newXnetCallMsg(
@@ -1179,6 +1180,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
                 amount,
                 i
             );
+
+            totalAmount += amount;
         }
 
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
@@ -1192,10 +1195,11 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
 
         vm.prank(caller);
         gatewayDiamond.checkpointer().commitCheckpoint(checkpoint);
+        vm.prank(caller);
+        gatewayDiamond.checkpointer().execBottomUpMsgBatch(msgs);
 
         (, subnetInfo) = gatewayDiamond.getter().getSubnet(subnetId);
-        // cross net messages with Call kind does not affect the circulating supply
-        require(subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT, "unexpected circulating supply");
+        require(subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT - totalAmount, "unexpected circulating supply");
     }
 
     function testGatewayDiamond_listIncompleteCheckpoints() public {

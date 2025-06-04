@@ -110,8 +110,8 @@ node_modules: package.json pnpm-lock.yaml
 	touch node_modules
 
 build: node_modules | forge
-	forge build
-	FOUNDRY_SRC=sdk forge build
+	forge build --names
+	forge build sdk --names
 
 test: node_modules test/helpers/SelectorLibrary.sol | forge
 	forge test -vvv --ffi

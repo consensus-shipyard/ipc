@@ -625,7 +625,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase, IIpcHandler {
         SubnetActorCheckpointingFacet checkpointer = sa.checkpointer();
         vm.startPrank(address(sa));
 
-        checkpointer.execBottomUpMsgBatch(checkpoint.subnetID, checkpoint.blockHeight, inclusions);
+        checkpointer.execBottomUpMsgBatch(checkpoint.blockHeight, inclusions);
 
         vm.stopPrank();
     }

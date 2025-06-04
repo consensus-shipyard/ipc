@@ -324,18 +324,19 @@ where
         guard.take().expect("exec state empty")
     }
 
-    /// Take the execution state, update it, put it back, return the output.
-    async fn modify_exec_state<T, F, R>(&self, f: F) -> Result<T>
+    /// Update the execution state using the provided closure.
+    ///
+    /// Note: Deals with panics in the user provided closure as well.
+    async fn modify_exec_state<T, G, F>(&self, generator: G) -> Result<T>
     where
-        F: FnOnce(FvmExecState<BS>) -> R,
-        R: Future<Output = Result<(FvmExecState<BS>, T)>>,
+        G: for<'s> FnOnce(&'s mut FvmExecState<BS>) -> F,
+        F: Future<Output = Result<T>>,
+        T: 'static,
     {
         let mut guard = self.exec_state.lock().await;
-        let state = guard.take().expect("exec state empty");
-
-        let (state, ret) = f(state).await?;
-
-        *guard = Some(state);
+        let maybe_state = guard.as_mut();
+        let state = maybe_state.expect("exec state empty");
+        let ret = generator(state).await?;
 
         Ok(ret)
     }
@@ -418,10 +419,18 @@ where
     async fn refresh_validators_cache(&self) -> Result<()> {
         // TODO: This should be read only state, but we can't use the read-only view here
         // because it hasn't been committed to state store yet.
-        self.modify_exec_state(|mut s| async {
-            let mut cache = self.validators_cache.lock().await;
-            *cache = Some(ValidatorCache::new_from_state(&mut s)?);
-            Ok((s, ()))
+        let mut cache = self.validators_cache.lock().await;
+        self.modify_exec_state(|s| {
+            // we need to leave this outside the closure
+            // otherwise `s`' lifetime would be captured by the
+            // closure causing unresolvable liftetime conflicts
+            // this is fine since we execute the future directly
+            // after calling the generator closure.
+            let x = ValidatorCache::new_from_state(s);
+            async {
+                *cache = Some(x?);
+                Ok(())
+            }
         })
         .await?;
 
