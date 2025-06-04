@@ -1,6 +1,8 @@
 
-export def log [str: string, --color: string = "yellow"] {
-  print $"(ansi cyan)== [create-subnet] (ansi $color)($str)(ansi reset)"
+export def log [str: string,
+  --prefix: string = "create-subnet",
+  --color: string = "yellow"] {
+  print $"(ansi cyan)== [($prefix)] (ansi $color)($str)(ansi reset)"
 }
 
 # Run command in setup docker image
@@ -129,7 +131,8 @@ export def get-base-config [
     let fendermint_commit = $fendermint_image | str replace -r ".*sha-" ""
     if $local_commit != $fendermint_commit {
       if ($env.SKIP_COMMIT_MATCH_CHECK? | is-empty) {
-        print $"ERROR: local commit ($local_commit) does not match fendermint image ($fendermint_image)"
+        print $"ERROR: local ipc commit ($local_commit) does not match fendermint image ($fendermint_image)"
+        print "You can disable this check by setting SKIP_COMMIT_MATCH_CHECK=true"
         exit 1
       }
     }

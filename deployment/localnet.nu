@@ -61,7 +61,6 @@ def "main run" [
 
   let steps = [
     { name: "localnet_init" fn: { localnet init-state $workdir $fendermint_image}}
-    { name: "update_submodules" fn: { git submodule update --init --recursive }}
     ...$build_fendermint_image
     { name: "localnet_start_anvil" fn: {localnet run-anvil $workdir}}
     ...(steps get-create-subnet-steps $get_funds_step)
@@ -95,6 +94,11 @@ def "main run-dind" [
   --workdir: string = "./localnet-data", # where to store networks.toml and state.yml
   ] {
 
+  let image = $"textile/recall-localnet:($tag)"
+  if $tag == "latest" {
+    docker pull $image
+  }
+
   docker run ...[
     --rm -d --name localnet
     -p 127.0.0.1:8545:8545
@@ -102,7 +106,7 @@ def "main run-dind" [
     -p 127.0.0.1:8001:8001
     -p 127.0.0.1:26657:26657
     --privileged
-    $"textile/recall-localnet:($tag)"
+    $image
   ]
   print "Container localnet is running."
 

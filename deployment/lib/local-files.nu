@@ -55,8 +55,9 @@ export def write-subnet-config [dest: string, --bootstrap] {
   $cfg | save -f $dest
 }
 
+const docker_dir = path self ../docker
 export def build-setup-docker-image [] {
-  cd docker
+  cd $docker_dir
   docker build ...[
     --build-arg $"fendermint_image=($env.state.config.fendermint_image)"
     -t $env.state.config.setup_image
@@ -122,4 +123,10 @@ export def write-recall-cli-config [] {
   let cfg = {} | insert $env.state.config.network ($endpoints | merge deep $contracts)
 
   $cfg | save -f ($env.state.config.workdir | path join "networks.toml")
+}
+
+export def update-git-submodules [] {
+  const ipc_dir = path self ../..
+  cd $ipc_dir
+  git submodule update --init --recursive
 }

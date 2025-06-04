@@ -6,6 +6,8 @@ use ./subnet.nu
 
 export def get-create-subnet-steps [get_funds_fn: closure] {
   [
+    { name: "update_submodules" fn: { local-files update-git-submodules }}
+
     { name: "build_setup_image" fn: { local-files build-setup-docker-image} }
     { name: "create_ipc_config" fn: { parent-chain write-ipc-cli-config }}
 

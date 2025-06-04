@@ -68,16 +68,23 @@ export def send-funds [src: record, dest:record, amount: float] {
   ]
 }
 
+def --env set-up-recall-cli [private_key: string] {
+  let cfg = ($env.state.config.workdir | path join "networks.toml")
+  $env.RECALL_NETWORK_CONFIG_FILE = $cfg
+  $env.RECALL_NETWORK = $env.state.config.network
+  $env.RECALL_PRIVATE_KEY = $private_key
+}
+
 # WARNING: this command invokes `recall` CLI on your PATH!!!
 export def set-network-admin [] {
-  let cfg = ($env.state.config.workdir | path join "networks.toml")
-  recall -c $cfg -n $env.state.config.network subnet config set-admin --private-key $env.state.validator0.private_key $env.state.network_admin.address
+  set-up-recall-cli $env.state.validator0.private_key
+  recall subnet config set-admin $env.state.network_admin.address
 }
 
 # WARNING: this command invokes `recall` CLI on your PATH!!!
 export def set-network-config [] {
-  let cfg = ($env.state.config.workdir | path join "networks.toml")
-  recall -c $cfg -n $env.state.config.network subnet config set --private-key $env.state.network_admin.private_key ...[
+  set-up-recall-cli $env.state.validator0.private_key
+  recall subnet config set ...[
     --blob-capacity (10 * 2 ** 40)
     --token-credit-rate (1e36)
     --blob-credit-debit-interval 600
@@ -86,4 +93,15 @@ export def set-network-config [] {
     --blob-delete-batch-size 100
     --account-debit-batch-size 1000
   ]
+}
+
+export def run-recall-cli-test [] {
+  set-up-recall-cli $env.state.faucet_owner.private_key
+  recall account info
+  recall account credit stats
+  recall account credit buy 2
+  recall account credit stats
+  let addr = recall bucket create --alias test1 | tee {print} | from json | get address | inspect
+  recall bucket add -a $addr --key a1 ./set-up-nu.sh
+  recall bucket get -a $addr a1
 }
