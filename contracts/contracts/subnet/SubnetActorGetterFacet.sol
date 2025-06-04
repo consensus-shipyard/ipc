@@ -228,7 +228,11 @@ contract SubnetActorGetterFacet {
         return s.collateralSource;
     }
 
-    function listPendingBottomUpBatchCommitments() external view returns (LibBottomUpBatch.ListPendingCommitmentsEntry[] memory) {
+    function listPendingBottomUpBatchCommitments()
+        external
+        view
+        returns (LibBottomUpBatch.ListPendingCommitmentsEntry[] memory)
+    {
         return LibBottomUpBatch.listPendingCommitments();
     }
 }

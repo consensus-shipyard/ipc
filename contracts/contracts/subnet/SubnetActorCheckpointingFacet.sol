@@ -50,10 +50,7 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         IGateway(s.ipcGatewayAddr).commitCheckpoint(checkpoint);
 
         if (checkpoint.msgs.totalNumMsgs > 0) {
-            LibBottomUpBatch.recordBottomUpBatchCommitment(
-                uint64(checkpoint.blockHeight),
-                checkpoint.msgs
-            );
+            LibBottomUpBatch.recordBottomUpBatchCommitment(uint64(checkpoint.blockHeight), checkpoint.msgs);
         }
         LibActivity.recordActivityRollup(checkpoint.subnetID, uint64(checkpoint.blockHeight), checkpoint.activity);
 
