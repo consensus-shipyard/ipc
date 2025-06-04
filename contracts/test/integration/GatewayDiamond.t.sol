@@ -12,7 +12,7 @@ import {IDiamond} from "../../contracts/interfaces/IDiamond.sol";
 import {IDiamondLoupe} from "../../contracts/interfaces/IDiamondLoupe.sol";
 import {IDiamondCut} from "../../contracts/interfaces/IDiamondCut.sol";
 import {QuorumInfo} from "../../contracts/structs/Quorum.sol";
-import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../../contracts/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpCheckpoint, ParentFinality} from "../../contracts/structs/CrossNet.sol";
 import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress, Validator, PowerChange, PowerChangeRequest, Asset, PowerOperation} from "../../contracts/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
@@ -41,6 +41,7 @@ import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
 
 import {FullActivityRollup, Consensus} from "../../contracts/structs/Activity.sol";
 import {ActivityHelper} from "../helpers/ActivityHelper.sol";
+import {BottomUpBatchHelper} from "../helpers/BottomUpBatchHelper.sol";
 
 contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeTokenMock {
     using SubnetIDHelper for SubnetID;
@@ -1027,7 +1028,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHeight: 0,
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
-            msgs: new IpcEnvelope[](0),
+            msgs: BottomUpBatchHelper.makeCommitment(BottomUpBatchHelper.makeEmptyBatch()),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
@@ -1036,7 +1037,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
-            msgs: new IpcEnvelope[](0),
+            msgs: BottomUpBatchHelper.makeCommitment(BottomUpBatchHelper.makeEmptyBatch()),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
@@ -1047,6 +1048,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             checkpoint,
             membershipRoot,
             0,
+            BottomUpBatchHelper.makeEmptyBatch(),
             ActivityHelper.dummyActivityRollup()
         );
         vm.stopPrank();
@@ -1058,6 +1060,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             old,
             membershipRoot,
             weights[0] + weights[1] + weights[2],
+            BottomUpBatchHelper.makeEmptyBatch(),
             ActivityHelper.dummyActivityRollup()
         );
         vm.stopPrank();
@@ -1068,6 +1071,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             checkpoint,
             membershipRoot,
             weights[0] + weights[1] + weights[2],
+            BottomUpBatchHelper.makeEmptyBatch(),
             ActivityHelper.dummyActivityRollup()
         );
         vm.stopPrank();
@@ -1085,7 +1089,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHeight: d,
             blockHash: keccak256("block"),
             nextConfigurationNumber: 2,
-            msgs: new IpcEnvelope[](0),
+            msgs: BottomUpBatchHelper.makeCommitment(BottomUpBatchHelper.makeEmptyBatch()),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
@@ -1095,6 +1099,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             checkpoint,
             membershipRoot,
             weights[0] + weights[1] + weights[2],
+            BottomUpBatchHelper.makeEmptyBatch(),
             ActivityHelper.dummyActivityRollup()
         );
         vm.stopPrank();
@@ -1110,7 +1115,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
-            msgs: new IpcEnvelope[](0),
+            msgs: BottomUpBatchHelper.makeCommitment(BottomUpBatchHelper.makeEmptyBatch()),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
@@ -1132,7 +1137,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
-            msgs: new IpcEnvelope[](0),
+            msgs: BottomUpBatchHelper.makeCommitment(BottomUpBatchHelper.makeEmptyBatch()),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
@@ -1184,12 +1189,14 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
-            msgs: msgs,
+            msgs: BottomUpBatchHelper.makeCommitment(msgs),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
         vm.prank(caller);
         gatewayDiamond.checkpointer().commitCheckpoint(checkpoint);
+        vm.prank(caller);
+        gatewayDiamond.checkpointer().execBottomUpMsgBatch(msgs);
 
         (, subnetInfo) = gatewayDiamond.getter().getSubnet(subnetId);
         require(subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT - totalAmount, "unexpected circulating supply");
@@ -1205,7 +1212,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
-            msgs: new IpcEnvelope[](0),
+            msgs: BottomUpBatchHelper.makeCommitment(BottomUpBatchHelper.makeEmptyBatch()),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
@@ -1214,7 +1221,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHeight: 2 * gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block2"),
             nextConfigurationNumber: 1,
-            msgs: new IpcEnvelope[](0),
+            msgs: BottomUpBatchHelper.makeCommitment(BottomUpBatchHelper.makeEmptyBatch()),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
@@ -1224,12 +1231,14 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             checkpoint1,
             membershipRoot,
             weights[0] + weights[1] + weights[2],
+            BottomUpBatchHelper.makeEmptyBatch(),
             ActivityHelper.dummyActivityRollup()
         );
         gatewayDiamond.checkpointer().createBottomUpCheckpoint(
             checkpoint2,
             membershipRoot,
             weights[0] + weights[1] + weights[2],
+            BottomUpBatchHelper.makeEmptyBatch(),
             ActivityHelper.dummyActivityRollup()
         );
         vm.stopPrank();
@@ -1281,7 +1290,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block"),
             nextConfigurationNumber: 1,
-            msgs: new IpcEnvelope[](0),
+            msgs: BottomUpBatchHelper.makeCommitment(BottomUpBatchHelper.makeEmptyBatch()),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
@@ -1291,6 +1300,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             checkpoint,
             membershipRoot,
             weights[0] + weights[1] + weights[2],
+            BottomUpBatchHelper.makeEmptyBatch(),
             ActivityHelper.dummyActivityRollup()
         );
         vm.stopPrank();
@@ -1344,7 +1354,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block"),
             nextConfigurationNumber: 1,
-            msgs: new IpcEnvelope[](0),
+            msgs: BottomUpBatchHelper.makeCommitment(BottomUpBatchHelper.makeEmptyBatch()),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
@@ -1354,6 +1364,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             checkpoint,
             membershipRoot,
             weights[0] + weights[1] + weights[2],
+            BottomUpBatchHelper.makeEmptyBatch(),
             ActivityHelper.dummyActivityRollup()
         );
         vm.stopPrank();
@@ -1429,7 +1440,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block"),
             nextConfigurationNumber: 1,
-            msgs: new IpcEnvelope[](0),
+            msgs: BottomUpBatchHelper.makeCommitment(BottomUpBatchHelper.makeEmptyBatch()),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
@@ -1439,6 +1450,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             checkpoint,
             membershipRoot,
             10,
+            BottomUpBatchHelper.makeEmptyBatch(),
             ActivityHelper.dummyActivityRollup()
         );
         vm.stopPrank();
@@ -1469,7 +1481,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block"),
             nextConfigurationNumber: 1,
-            msgs: new IpcEnvelope[](0),
+            msgs: BottomUpBatchHelper.makeCommitment(BottomUpBatchHelper.makeEmptyBatch()),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
@@ -1479,6 +1491,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             checkpoint,
             membershipRoot,
             10,
+            BottomUpBatchHelper.makeEmptyBatch(),
             ActivityHelper.dummyActivityRollup()
         );
         vm.stopPrank();
@@ -1519,7 +1532,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block"),
             nextConfigurationNumber: 1,
-            msgs: new IpcEnvelope[](0),
+            msgs: BottomUpBatchHelper.makeCommitment(BottomUpBatchHelper.makeEmptyBatch()),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
@@ -1529,6 +1542,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             checkpoint,
             membershipRoot,
             10,
+            BottomUpBatchHelper.makeEmptyBatch(),
             ActivityHelper.dummyActivityRollup()
         );
         vm.stopPrank();
@@ -1573,7 +1587,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
                 blockHeight: i * gatewayDiamond.getter().bottomUpCheckPeriod(),
                 blockHash: keccak256("block"),
                 nextConfigurationNumber: 1,
-                msgs: new IpcEnvelope[](0),
+                msgs: BottomUpBatchHelper.makeCommitment(BottomUpBatchHelper.makeEmptyBatch()),
                 activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
             });
 
@@ -1581,6 +1595,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
                 checkpoint,
                 membershipRoot,
                 10,
+                BottomUpBatchHelper.makeEmptyBatch(),
                 ActivityHelper.dummyActivityRollup()
             );
         }
@@ -1633,7 +1648,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 1,
-            msgs: msgs,
+            msgs: BottomUpBatchHelper.makeCommitment(msgs),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
