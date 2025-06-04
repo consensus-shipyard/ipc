@@ -2826,7 +2826,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
                 subnetId: saDiamond.getter().getParent(),
                 rawAddress: FvmAddressHelper.from(address(saDiamond))
             }),
-            DEFAULT_CROSS_MSG_FEE + 1,
+            0,
             0
         );
         msgs[1] = TestUtils.newXnetCallMsg(
@@ -2835,7 +2835,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
                 subnetId: saDiamond.getter().getParent(),
                 rawAddress: FvmAddressHelper.from(address(saDiamond))
             }),
-            DEFAULT_CROSS_MSG_FEE + 1,
+            0,
             1
         );
         BottomUpBatch.Commitment memory commitment = BottomUpBatchHelper.makeCommitment(msgs);

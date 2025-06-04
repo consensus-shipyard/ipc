@@ -154,7 +154,7 @@ library LibBottomUpBatch {
         return result;
     }
 
-    function makeLeaf(IpcEnvelope memory _msg) internal pure returns (BottomUpBatch.MerkleHash) {
+    function makeLeaf(IpcEnvelope memory _msg) public pure returns (BottomUpBatch.MerkleHash) {
         bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(
             _msg.kind,
             _msg.localNonce,
