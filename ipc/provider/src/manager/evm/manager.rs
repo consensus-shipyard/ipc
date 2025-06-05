@@ -20,7 +20,9 @@ use reqwest::Client;
 use std::net::{IpAddr, SocketAddr};
 
 use ipc_api::subnet::{Asset, AssetKind, PermissionMode};
-use ipc_api::{eth_to_fil_amount, ethers_address_to_fil_address};
+use ipc_api::{
+    eth_to_fil_amount, ethers_address_to_fil_address, ethers_address_to_ipc_eth_address,
+};
 
 use crate::config::subnet::SubnetConfig;
 use crate::config::Subnet;
@@ -288,6 +290,7 @@ impl SubnetManager for EthSubnetManager {
             collateral_source: register_subnet_facet::Asset::try_from(params.collateral_source)?,
             validator_gater: payload_to_evm_address(params.validator_gater.payload())?,
             validator_rewarder: payload_to_evm_address(params.validator_rewarder.payload())?,
+            genesis_subnet_ipc_contracts_owner: params.genesis_subnet_ipc_contracts_owner,
         };
 
         tracing::info!("creating subnet on evm with params: {params:?}");
@@ -762,6 +765,8 @@ impl SubnetManager for EthSubnetManager {
 
         let genesis_balances = contract.genesis_balances().await?;
         let bottom_up_checkpoint_period = contract.bottom_up_check_period().call().await?.as_u64();
+        let genesis_subnet_ipc_contracts_owner =
+            contract.genesis_subnet_ipc_contracts_owner().call().await?;
 
         Ok(SubnetGenesisInfo {
             // Active validators limit set for the child subnet.
@@ -783,6 +788,9 @@ impl SubnetManager for EthSubnetManager {
                 kind: AssetKind::Native,
                 token_address: None,
             },
+            genesis_subnet_ipc_contracts_owner: ethers_address_to_ipc_eth_address(
+                &genesis_subnet_ipc_contracts_owner,
+            )?,
         })
     }
 

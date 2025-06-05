@@ -15,6 +15,7 @@ use ipc_api::staking::{PowerChangeRequest, ValidatorInfo};
 use ipc_api::subnet::{Asset, ConstructParams, PermissionMode};
 use ipc_api::subnet_id::SubnetID;
 use ipc_api::validator::Validator;
+use ipc_types::EthAddress;
 use std::collections::{BTreeMap, HashMap};
 
 use crate::lotus::message::ipc::SubnetInfo;
@@ -205,6 +206,7 @@ pub struct SubnetGenesisInfo {
     pub genesis_balances: BTreeMap<Address, TokenAmount>,
     pub permission_mode: PermissionMode,
     pub supply_source: Asset,
+    pub genesis_subnet_ipc_contracts_owner: EthAddress,
 }
 
 /// The generic payload that returns the block hash of the data returning block with the actual
