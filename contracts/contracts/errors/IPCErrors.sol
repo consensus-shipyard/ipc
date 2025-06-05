@@ -85,6 +85,7 @@ error InvalidActivityProof();
 error NotOwner();
 error SignatureAddressesNotSorted();
 error DuplicateValidatorSignaturesFound();
+error MissingGenesisSubnetIpcContractsOwner();
 
 enum InvalidXnetMessageReason {
     Sender,

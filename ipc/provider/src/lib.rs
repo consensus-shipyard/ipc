@@ -258,6 +258,7 @@ impl IpcProvider {
         collateral_source: Asset,
         validator_gater: Address,
         validator_rewarder: Address,
+        subnet_ipc_diamond_contracts_owner: ethers::types::Address,
     ) -> anyhow::Result<Address> {
         let conn = self.get_connection(&parent)?;
 
@@ -278,6 +279,7 @@ impl IpcProvider {
             collateral_source,
             validator_gater,
             validator_rewarder,
+            genesis_subnet_ipc_contracts_owner: subnet_ipc_diamond_contracts_owner,
         };
 
         conn.manager()

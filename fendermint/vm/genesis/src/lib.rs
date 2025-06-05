@@ -49,6 +49,8 @@ pub struct Genesis {
     /// IPC related configuration, if enabled.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ipc: Option<ipc::IpcParams>,
+    /// The owner of the IPC Solidity contracts within the subnet
+    pub ipc_contracts_owner: ethers::types::Address,
 }
 
 impl Genesis {

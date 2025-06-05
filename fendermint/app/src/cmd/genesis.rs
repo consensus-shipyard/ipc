@@ -53,6 +53,7 @@ cmd! {
       accounts: Vec::new(),
       eam_permission_mode: PermissionMode::Unrestricted,
       ipc: None,
+      ipc_contracts_owner: None,
     };
 
     let json = serde_json::to_string_pretty(&genesis)?;
@@ -380,6 +381,7 @@ async fn new_genesis_from_parent(
         eam_permission_mode: PermissionMode::Unrestricted,
         ipc: Some(ipc_params),
         chain_id: None,
+        ipc_contracts_owner: args.ipc_contracts_owner.clone(),
     };
 
     for v in genesis_info.validators {
