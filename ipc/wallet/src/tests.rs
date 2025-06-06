@@ -14,6 +14,25 @@ mod encryption {
     use super::*;
 const PASSPHRASE: &str = "foobarbaz";
 
+
+#[cfg(test)]
+mod compat {
+    #[test]
+    fn pre_20250606_evm_keystore_works() {
+        // there is no encrypted version!
+        static SAMPLE_PLAIN :&[u8] = include_bytes!("tests/evm.plain.keystore");
+        todo!();
+    }
+
+    #[test]
+    fn pre_20250606_fvm_keystore_works() {
+        static SAMPLE_PLAIN :&[u8] = include_bytes!("tests/fvm.plain.keystore");
+        static SAMPLE_PLAIN :&[u8] = include_bytes!("tests/fvm.encrypted.keystore");
+        let password = "abc123";
+        todo!();
+    }
+}
+
 #[test]
 fn test_generate_key() {
     let (salt, encryption_key) = EncryptionOverlay::derive_key(PASSPHRASE, None).unwrap();
