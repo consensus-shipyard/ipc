@@ -19,7 +19,6 @@ use cargo_metadata::{DependencyKind, MetadataCommand};
 use color_eyre::eyre::{bail, eyre, OptionExt, Result};
 use fil_actor_bundler::Bundler;
 use fs_err as fs;
-use std::collections::HashSet;
 use std::io::{BufRead, BufReader};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -220,10 +219,15 @@ fn build_all_wasm_blobs(
         .iter()
         .map(|actor| format!("-p={}", actor.package_name));
 
-    echo!("actors-custom-car", purple, "Target: {channel} {target}");
+    echo!(
+        "actors-custom-car",
+        purple,
+        "Target: channel={channel} target={target}"
+    );
 
     let rustup = which::which("rustup")?;
 
+    let profile = "wasm-actor";
     // Cargo build command for all test_actors at once.
     let mut cmd = Command::new(rustup);
     cmd.arg("run")
@@ -234,7 +238,8 @@ fn build_all_wasm_blobs(
         .args(package_args)
         .arg("--target")
         .arg(target)
-        .arg("--profile=wasm")
+        .arg("--profile")
+        .arg(profile)
         .arg("--features=fil-actor")
         .arg(format!("--manifest-path={}", manifest_path.display()))
         .stdout(Stdio::piped())
@@ -293,9 +298,11 @@ fn print_cargo_rerun_if_dependency_instructions(
     let cargo_lock = find_cargo_lock(out_dir).ok_or_eyre("Couldn't find Cargo.lock")?;
     rerun_if_changed(&cargo_lock);
 
-    let workspace = cargo_lock.parent().unwrap();
+    let workspace_dir = cargo_lock
+        .parent()
+        .expect("A file always should have a parent");
 
-    let metadata = create_metadata_command(workspace.join("Cargo.toml")).exec()?;
+    let metadata = create_metadata_command(workspace_dir.join("Cargo.toml")).exec()?;
 
     let package = metadata
         .packages
@@ -307,7 +314,7 @@ fn print_cargo_rerun_if_dependency_instructions(
     let mut dependencies = Vec::from_iter(package.dependencies.iter());
 
     // Collect all packages by follow the dependencies of all packages we find.
-    let mut packages = HashSet::new();
+    let mut packages = indexmap::IndexSet::new();
     packages.insert(DeduplicatePackage::from(package));
 
     while let Some(dependency) = dependencies.pop() {
@@ -325,7 +332,7 @@ fn print_cargo_rerun_if_dependency_instructions(
         let maybe_package = metadata
             .packages
             .iter()
-            .filter(|p| !p.manifest_path.starts_with(workspace))
+            .filter(|p| !p.manifest_path.starts_with(workspace_dir))
             .find(|p| {
                 // Check that the name matches and that the version matches or this is
                 // a git or path dep. A git or path dependency can only occur once, so we don't
@@ -382,8 +389,10 @@ fn main() -> Result<()> {
     // `rustc` upgrades in `rust-toolchain.toml`
     let out_dir = out_dir.join(&channel);
 
+    let profile = "wasm-actor";
+
     // the joins represent the subdirectories under which `cargo` creates the actual WASM aritifacts
-    let wasm_blob_dir = out_dir.join(target).join("wasm");
+    let wasm_blob_dir = out_dir.join(target).join(profile);
 
     echo!(
         "actors-custom-car",
