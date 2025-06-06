@@ -6,6 +6,9 @@ use crate::AddressDerivator;
 
 pub mod adapter;
 
+#[cfg(test)]
+mod tests;
+
 /// The struct that contains evm private key info
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct EvmKeyInfo {
