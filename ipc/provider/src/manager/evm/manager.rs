@@ -15,6 +15,7 @@ use ipc_actors_abis::{
 };
 use ipc_api::evm::{fil_to_eth_amount, payload_to_evm_address, subnet_id_to_evm_addresses};
 use ipc_api::validator::from_contract_validators;
+use ipc_wallet::evm::EvmCrownJewels;
 use reqwest::header::HeaderValue;
 use reqwest::Client;
 use std::net::{IpAddr, SocketAddr};
@@ -57,7 +58,6 @@ use ipc_api::staking::{PowerChangeRequest, ValidatorInfo, ValidatorStakingInfo};
 use ipc_api::subnet::ConstructParams;
 use ipc_api::subnet_id::SubnetID;
 use ipc_observability::lazy_static;
-use ipc_wallet::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
 use num_traits::ToPrimitive;
 use std::result;
 
@@ -81,7 +81,7 @@ const TRANSACTION_RECEIPT_RETRIES: usize = 200;
 const SUBNET_MAJORITY_PERCENTAGE: u8 = 67;
 
 pub struct EthSubnetManager {
-    keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
+    keystore: Option<Arc<RwLock<EvmCrownJewels>>>,
     ipc_contract_info: IPCContractInfo,
 }
 
@@ -320,7 +320,7 @@ impl SubnetManager for EthSubnetManager {
                                 subnet_deploy;
 
                             tracing::debug!("subnet deployed at {subnet_addr:?}");
-                            return ethers_address_to_fil_address(&subnet_addr);
+                            return ethers_address_to_fil_address(subnet_addr);
                         }
                         Err(_) => {
                             tracing::debug!("no event for subnet actor published yet, continue");
@@ -1037,7 +1037,7 @@ impl EthSubnetManager {
         registry_addr: ethers::types::Address,
         chain_id: u64,
         provider: Provider<ErrorParserHttp>,
-        keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
+        keystore: Option<Arc<RwLock<EvmCrownJewels>>>,
     ) -> Self {
         Self {
             keystore,
@@ -1084,7 +1084,7 @@ impl EthSubnetManager {
         }
     }
 
-    pub fn keystore(&self) -> Result<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>> {
+    pub fn keystore(&self) -> Result<Arc<RwLock<EvmCrownJewels>>> {
         self.keystore
             .clone()
             .ok_or(anyhow!("no evm keystore available"))
@@ -1101,9 +1101,7 @@ impl EthSubnetManager {
         let addr = payload_to_evm_address(addr.payload())?;
         let keystore = self.keystore()?;
         let keystore = keystore.read().unwrap();
-        let private_key = keystore
-            .get(&addr.into())?
-            .ok_or_else(|| anyhow!("address {addr:} does not have private key in key store"))?;
+        let private_key = keystore.get(&addr.to_string())?;
         let wallet = LocalWallet::from_bytes(private_key.private_key())?
             .with_chain_id(self.ipc_contract_info.chain_id);
 
@@ -1115,7 +1113,7 @@ impl EthSubnetManager {
 
     pub fn from_subnet_with_wallet_store(
         subnet: &Subnet,
-        keystore: Option<Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>>,
+        keystore: Option<Arc<RwLock<EvmCrownJewels>>>,
     ) -> Result<Self> {
         let url = subnet.rpc_http().clone();
         let auth_token = subnet.auth_token();
@@ -1257,7 +1255,7 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
         let checkpoint = BottomUpCheckpoint::try_from(checkpoint)?;
         let signatories = signatories
             .into_iter()
-            .map(|s| ethers_address_to_fil_address(&s))
+            .map(ethers_address_to_fil_address)
             .collect::<Result<Vec<_>, _>>()?;
         let signatures = signatures
             .into_iter()
@@ -1471,7 +1469,7 @@ fn order_validator_data(
 ) -> anyhow::Result<Vec<checkpointing_facet::ValidatorData>> {
     let mut mapped = validator_data
         .iter()
-        .map(|a| ethers_address_to_fil_address(&a.validator).map(|v| (v, a.blocks_committed)))
+        .map(|a| ethers_address_to_fil_address(a.validator).map(|v| (v, a.blocks_committed)))
         .collect::<Result<Vec<_>, _>>()?;
 
     mapped.sort_by(|a, b| {
@@ -1578,7 +1576,7 @@ fn into_genesis_balance_map(
 ) -> Result<BTreeMap<Address, TokenAmount>> {
     let mut map = BTreeMap::new();
     for (a, b) in addrs.into_iter().zip(balances) {
-        map.insert(ethers_address_to_fil_address(&a)?, eth_to_fil_amount(&b)?);
+        map.insert(ethers_address_to_fil_address(a)?, eth_to_fil_amount(&b)?);
     }
     Ok(map)
 }

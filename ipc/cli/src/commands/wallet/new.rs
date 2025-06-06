@@ -24,10 +24,10 @@ impl CommandLineHandler for WalletNew {
 
         let wallet_type = WalletType::from_str(&arguments.wallet_type)?;
         match wallet_type {
-            WalletType::Evm => {
+            WalletType::Etherium => {
                 println!("{:?}", provider.new_evm_key()?.to_string());
             }
-            WalletType::Fvm => {
+            WalletType::Filecoin => {
                 let tp = WalletKeyType::from_str(
                     &arguments
                         .key_type

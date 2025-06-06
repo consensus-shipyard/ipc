@@ -11,15 +11,15 @@ pub mod json {
     // Wrapper for serializing and deserializing a Signature from JSON.
     #[derive(Deserialize, Serialize)]
     #[serde(transparent)]
-    pub struct SignatureJson(#[serde(with = "self")] pub Signature);
+    pub struct SignatureAdapter(#[serde(with = "self")] pub Signature);
 
     /// Wrapper for serializing a Signature reference to JSON.
     #[derive(Serialize)]
     #[serde(transparent)]
-    pub struct SignatureJsonRef<'a>(#[serde(with = "self")] pub &'a Signature);
+    pub struct SignatureAdapterRef<'a>(#[serde(with = "self")] pub &'a Signature);
 
     #[derive(Serialize, Deserialize)]
-    struct JsonHelper {
+    struct SignatureParsingHelper {
         #[serde(rename = "Type")]
         sig_type: SignatureType,
         #[serde(rename = "Data")]
@@ -30,7 +30,7 @@ pub mod json {
     where
         S: Serializer,
     {
-        JsonHelper {
+        SignatureParsingHelper {
             sig_type: m.signature_type(),
             bytes: BASE64_STANDARD.encode(&m.bytes),
         }
@@ -41,7 +41,7 @@ pub mod json {
     where
         D: Deserializer<'de>,
     {
-        let JsonHelper { sig_type, bytes } = Deserialize::deserialize(deserializer)?;
+        let SignatureParsingHelper { sig_type, bytes } = Deserialize::deserialize(deserializer)?;
         Ok(Signature {
             sig_type,
             bytes: BASE64_STANDARD.decode(bytes).map_err(de::Error::custom)?,
@@ -52,20 +52,20 @@ pub mod json {
     pub mod opt {
         use serde::{self, Deserialize, Deserializer, Serialize, Serializer};
 
-        use super::{Signature, SignatureJson, SignatureJsonRef};
+        use super::{Signature, SignatureAdapter, SignatureAdapterRef};
 
         pub fn serialize<S>(v: &Option<Signature>, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer,
         {
-            v.as_ref().map(SignatureJsonRef).serialize(serializer)
+            v.as_ref().map(SignatureAdapterRef).serialize(serializer)
         }
 
         pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Signature>, D::Error>
         where
             D: Deserializer<'de>,
         {
-            let s: Option<SignatureJson> = Deserialize::deserialize(deserializer)?;
+            let s: Option<SignatureAdapter> = Deserialize::deserialize(deserializer)?;
             Ok(s.map(|v| v.0))
         }
     }
@@ -117,7 +117,7 @@ mod tests {
     use fvm_shared::crypto::signature::{Signature, SignatureType};
     use quickcheck_macros::quickcheck;
 
-    use super::json::{signature_type::SignatureTypeJson, SignatureJson, SignatureJsonRef};
+    use super::json::{signature_type::SignatureTypeJson, SignatureAdapter, SignatureAdapterRef};
 
     // Auxiliary impl to support quickcheck
     #[derive(Clone, Debug, PartialEq, Eq, Copy)]
@@ -149,8 +149,8 @@ mod tests {
     #[quickcheck]
     fn signature_roundtrip(signature: SignatureWrapper) {
         let signature = signature.0;
-        let serialized = serde_json::to_string(&SignatureJsonRef(&signature)).unwrap();
-        let parsed: SignatureJson = serde_json::from_str(&serialized).unwrap();
+        let serialized = serde_json::to_string(&SignatureAdapterRef(&signature)).unwrap();
+        let parsed: SignatureAdapter = serde_json::from_str(&serialized).unwrap();
         assert_eq!(signature, parsed.0);
     }
 
