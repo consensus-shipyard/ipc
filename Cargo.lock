@@ -5888,6 +5888,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 1.0.69",
+ "tiny-keccak",
  "tokio",
  "xsalsa20poly1305",
  "zeroize",

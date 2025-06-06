@@ -21,17 +21,19 @@ zeroize = "1.6.0"
 # cryptography
 ahash = "0.8"
 argon2 = { version = "0.5", features = ["std"] } # std::error::Error
-bls-signatures = { version = "0.13.0", default-features = false, features = ["blst"] }
+bls-signatures = { version = "0.13.0", default-features = false, features = [
+  "blst",
+] }
 blake2b_simd = { workspace = true }
 libsecp256k1 = { workspace = true }
-xsalsa20poly1305 = { version = "0.9", features = ["std"]}
+xsalsa20poly1305 = { version = "0.9", features = ["std"] }
+tiny-keccak = { version = "2.0.2", features = ["keccak"] }
 
 # encoding
 serde = { workspace = true }
 serde_json = { workspace = true }
 base64 = { workspace = true }
 serde_ipld_dagcbor = "0.4.2"
-
 ipc-types = { path = "../../ipc/types" }
 
 [dev-dependencies]

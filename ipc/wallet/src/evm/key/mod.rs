@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use zeroize::Zeroize;
 
-use crate::{AddressDerivator, CryptoError};
+use crate::AddressDerivator;
 
 pub mod adapter;
 
@@ -12,35 +12,53 @@ pub struct EvmKeyInfo {
     pub(crate) private_key: Vec<u8>,
 }
 
-fn sk_to_pub_secp256k1(sk: &[u8]) -> Result<Vec<u8>> {
+fn sk_to_pub_secp256k1(sk: &[u8]) -> anyhow::Result<Vec<u8>> {
     let sk = libsecp256k1::SecretKey::parse_slice(sk)?;
     let pk = libsecp256k1::PublicKey::from_secret_key(&sk);
     Ok(pk.serialize().to_vec())
 }
-fn sk_to_pub_bls(sk: &[u8]) -> Result<Vec<u8>> {
+#[allow(dead_code)]
+fn sk_to_pub_bls(sk: &[u8]) -> anyhow::Result<Vec<u8>> {
     use bls_signatures::Serialize;
     let sk = bls_signatures::PrivateKey::from_bytes(sk)?;
     let pk = sk.public_key();
     Ok(pk.as_bytes())
 }
 
-pub fn pk_to_address(pubkey: &[u8]) -> Result<[u8; 20], ()> {
+pub fn pk_to_address(pubkey: &[u8]) -> anyhow::Result<[u8; 20]> {
     use fvm_shared::address::SECP_PUB_LEN;
+    use tiny_keccak::{Hasher, Keccak};
 
     if pubkey.len() != SECP_PUB_LEN {
-        return Err(());
+        anyhow::bail!(
+            "Unexpected length: {} should be {}",
+            pubkey.len(),
+            SECP_PUB_LEN
+        );
     }
+
+    fn keccak256(bytes: &[u8]) -> [u8; 32] {
+        let mut output = [0u8; 32];
+
+        let mut hasher = Keccak::v256();
+        hasher.update(bytes.as_ref());
+        hasher.finalize(&mut output);
+        output
+    }
+
     let mut hash20 = [0u8; 20];
     // Based on [ethers_core::utils::secret_key_to_address]
-    let hash32 = cid::multihash::Code::Keccak256.digest(&pubkey[1..]);
-    hash20.copy_from_slice(&hash32.digest()[12..]);
+    let hash32 = keccak256(&pubkey[1..]);
+    hash20.copy_from_slice(&hash32[12..]);
     Ok(hash20)
 }
 
 impl AddressDerivator<String> for EvmKeyInfo {
     fn as_address(&self) -> String {
         // TODO deal with BLS signatures
-        sk_to_pub_secp256k1(self.private_key()).expect("Input is pre-checked at construction")
+        let addr =
+            sk_to_pub_secp256k1(self.private_key()).expect("Input is pre-checked at construction");
+        hex::encode(addr)
     }
 }
 
