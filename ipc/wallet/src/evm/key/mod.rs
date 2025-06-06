@@ -7,6 +7,7 @@ use crate::AddressDerivator;
 pub mod adapter;
 
 #[cfg(test)]
+#[cfg(feature = "ethers")]
 mod tests;
 
 /// The struct that contains evm private key info
@@ -59,9 +60,10 @@ pub fn pk_to_address(pubkey: &[u8]) -> anyhow::Result<[u8; 20]> {
 impl AddressDerivator<String> for EvmKeyInfo {
     fn as_address(&self) -> String {
         // TODO deal with BLS signatures
-        let addr =
+        let pubkey =
             sk_to_pub_secp256k1(self.private_key()).expect("Input is pre-checked at construction");
-        hex::encode(addr)
+        let addr = pk_to_address(&pubkey).expect("Public key to address never fails with valid key");
+        hex::encode(addr.as_slice())
     }
 }
 
