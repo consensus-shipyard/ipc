@@ -3289,6 +3289,7 @@ dependencies = [
  "bytes",
  "cid 0.10.1",
  "clap 4.5.32",
+ "ethers",
  "fendermint_materializer",
  "fendermint_vm_actor_interface",
  "fendermint_vm_genesis",

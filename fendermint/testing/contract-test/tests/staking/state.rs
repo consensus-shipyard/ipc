@@ -13,6 +13,7 @@ use fendermint_vm_genesis::{
     Account, Actor, ActorMeta, Collateral, Genesis, PermissionMode, SignerAddr, Validator,
     ValidatorKey,
 };
+use fendermint_vm_message::conv::from_fvm;
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::bigint::Integer;
@@ -576,6 +577,8 @@ impl arbitrary::Arbitrary<'_> for StakingState {
             ArbSubnetAddress::arbitrary(u)?.0,
         );
 
+        let ipc_contracts_owner = accounts.first().unwrap().addr;
+
         let parent_genesis = Genesis {
             chain_name: String::arbitrary(u)?,
             chain_id: None,
@@ -587,6 +590,7 @@ impl arbitrary::Arbitrary<'_> for StakingState {
             accounts: parent_actors,
             eam_permission_mode: PermissionMode::Unrestricted,
             ipc: Some(parent_ipc),
+            ipc_contracts_owner: ipc_contracts_owner.into(),
         };
 
         let child_ipc = IpcParams {
@@ -609,6 +613,7 @@ impl arbitrary::Arbitrary<'_> for StakingState {
             accounts: Vec::new(),
             eam_permission_mode: PermissionMode::Unrestricted,
             ipc: Some(child_ipc),
+            ipc_contracts_owner: ipc_contracts_owner.into(),
         };
 
         Ok(StakingState::new(accounts, parent_genesis, child_genesis))

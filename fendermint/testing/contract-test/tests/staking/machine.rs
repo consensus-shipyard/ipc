@@ -121,6 +121,7 @@ impl StateMachine for StakingMachine {
             },
             validator_gater: EthAddress::from(ethers::types::Address::zero()).into(),
             validator_rewarder: Default::default(),
+            genesis_subnet_ipc_contracts_owner: Default::default(),
         };
 
         eprintln!("\n> PARENT IPC: {parent_ipc:?}");

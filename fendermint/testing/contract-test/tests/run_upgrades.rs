@@ -30,6 +30,7 @@ use fendermint_vm_interpreter::fvm::store::memory::MemoryBlockstore;
 use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeScheduler};
 use fendermint_vm_interpreter::fvm::FvmMessagesInterpreter;
+use fendermint_vm_message::conv::from_fvm;
 use fendermint_vm_topdown::voting::VoteTally;
 use fendermint_vm_topdown::Toggle;
 
@@ -214,6 +215,8 @@ async fn test_applying_upgrades() {
         1.05,
     );
 
+    let ipc_contracts_owner = from_fvm::to_eth_address(&ADDR).unwrap().unwrap();
+
     let genesis = Genesis {
         chain_name: CHAIN_NAME.to_string(),
         chain_id: None,
@@ -230,6 +233,7 @@ async fn test_applying_upgrades() {
         }],
         eam_permission_mode: PermissionMode::Unrestricted,
         ipc: None,
+        ipc_contracts_owner,
     };
 
     let mut tester = Tester::new(interpreter, genesis).await.unwrap();

@@ -20,9 +20,7 @@ use reqwest::Client;
 use std::net::{IpAddr, SocketAddr};
 
 use ipc_api::subnet::{Asset, AssetKind, PermissionMode};
-use ipc_api::{
-    eth_to_fil_amount, ethers_address_to_fil_address, ethers_address_to_ipc_eth_address,
-};
+use ipc_api::{eth_to_fil_amount, ethers_address_to_fil_address};
 
 use crate::config::subnet::SubnetConfig;
 use crate::config::Subnet;
@@ -788,9 +786,7 @@ impl SubnetManager for EthSubnetManager {
                 kind: AssetKind::Native,
                 token_address: None,
             },
-            genesis_subnet_ipc_contracts_owner: ethers_address_to_ipc_eth_address(
-                &genesis_subnet_ipc_contracts_owner,
-            )?,
+            genesis_subnet_ipc_contracts_owner,
         })
     }
 

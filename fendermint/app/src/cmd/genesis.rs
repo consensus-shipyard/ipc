@@ -53,7 +53,7 @@ cmd! {
       accounts: Vec::new(),
       eam_permission_mode: PermissionMode::Unrestricted,
       ipc: None,
-      ipc_contracts_owner: None,
+      ipc_contracts_owner: self.ipc_contracts_owner,
     };
 
     let json = serde_json::to_string_pretty(&genesis)?;
@@ -366,6 +366,7 @@ async fn new_genesis_from_parent(
             active_validators_limit: genesis_info.active_validators_limit,
         },
     };
+
     let mut genesis = Genesis {
         // We set the genesis epoch as the genesis timestamp so it can be
         // generated deterministically by all participants
@@ -381,7 +382,7 @@ async fn new_genesis_from_parent(
         eam_permission_mode: PermissionMode::Unrestricted,
         ipc: Some(ipc_params),
         chain_id: None,
-        ipc_contracts_owner: args.ipc_contracts_owner.clone(),
+        ipc_contracts_owner: genesis_info.genesis_subnet_ipc_contracts_owner,
     };
 
     for v in genesis_info.validators {
