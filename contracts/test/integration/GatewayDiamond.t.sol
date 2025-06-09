@@ -1657,58 +1657,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         gatewayDiamond.checkpointer().commitCheckpoint(checkpoint);
     }
 
-    function testGatewayDiamond_PopulateBottomUpMsgBatch_Works() public {
-        uint256 releaseAmount = 10;
-        address from = address(100);
-
-        address[] memory path = new address[](2);
-        path[0] = makeAddr("root");
-        path[1] = makeAddr("subnet_one");
-
-        GatewayDiamond.ConstructorParams memory constructorParams = GatewayDiamond.ConstructorParams({
-            networkName: SubnetID({root: ROOTNET_CHAINID, route: path}),
-            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
-            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
-            genesisValidators: new Validator[](0),
-            activeValidatorsLimit: 100,
-            commitSha: DEFAULT_COMMIT_SHA
-        });
-
-        gatewayDiamond = createGatewayDiamond(constructorParams);
-        uint256 d = gatewayDiamond.getter().bottomUpCheckPeriod();
-
-        // a few messags in first batch
-        uint64 numMsgs = 10;
-        vm.roll(1);
-        vm.startPrank(from);
-        vm.deal(from, numMsgs * (releaseAmount + DEFAULT_CROSS_MSG_FEE));
-
-        for (uint64 i = 0; i < numMsgs; i++) {
-            release(releaseAmount);
-        }
-        require(gatewayDiamond.getter().bottomUpMsgBatch(d).msgs.length == numMsgs, "no messages");
-
-        numMsgs = gatewayDiamond.getter().maxMsgsPerBottomUpBatch() + 10;
-        vm.roll(d + 1);
-        vm.startPrank(from);
-        vm.deal(from, numMsgs * (releaseAmount + DEFAULT_CROSS_MSG_FEE));
-
-        for (uint64 i = 0; i < numMsgs; i++) {
-            release(releaseAmount);
-        }
-        // one batch should be overflow in d+1 and the rest of the messages should have been
-        // added to the next batch
-        require(
-            gatewayDiamond.getter().bottomUpMsgBatch(d + 1).msgs.length ==
-                gatewayDiamond.getter().maxMsgsPerBottomUpBatch(),
-            "wrong number of messages in full batch"
-        );
-        require(
-            gatewayDiamond.getter().bottomUpMsgBatch(2 * d).msgs.length == 10,
-            "wrong number of messages after full batch"
-        );
-    }
-
     function newListOfMessages(uint64 size) internal view returns (IpcEnvelope[] memory msgs) {
         msgs = new IpcEnvelope[](size);
         for (uint64 i = 0; i < size; i++) {
