@@ -83,7 +83,7 @@ export def set-network-admin [] {
 
 # WARNING: this command invokes `recall` CLI on your PATH!!!
 export def set-network-config [] {
-  set-up-recall-cli $env.state.validator0.private_key
+  set-up-recall-cli $env.state.network_admin.private_key
   recall subnet config set ...[
     --blob-capacity (10 * 2 ** 40)
     --token-credit-rate (1e36)
