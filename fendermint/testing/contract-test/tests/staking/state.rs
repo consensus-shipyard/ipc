@@ -13,7 +13,6 @@ use fendermint_vm_genesis::{
     Account, Actor, ActorMeta, Collateral, Genesis, PermissionMode, SignerAddr, Validator,
     ValidatorKey,
 };
-use fendermint_vm_message::conv::from_fvm;
 use fvm_shared::address::Address;
 use fvm_shared::bigint::BigInt;
 use fvm_shared::bigint::Integer;
