@@ -40,7 +40,7 @@ jobs:
           version: v0.3.0
 
       - name: Install aderyn
-        run: cargo install aderyn
+        run: cargo install aderyn@0.0.15
 
       - name: Make deps
         run: cd contracts && make deps
