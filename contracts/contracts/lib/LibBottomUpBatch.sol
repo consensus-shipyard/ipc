@@ -111,26 +111,22 @@ library LibBottomUpBatch {
     function listPendingCommitments() internal view returns (ListPendingCommitmentsEntry[] memory result) {
         BottomUpBatchStorage storage s = bottomUpBatchStorage();
 
-        uint256 size = s.pendingHeights.length();
+        bytes32[] memory heights = s.pendingHeights.values();
+        uint256 size = heights.length;
+
         result = new ListPendingCommitmentsEntry[](size);
 
-        // Ok to not optimize with unchecked increments, since we expect this to be used off-chain only, for introspection.
         for (uint256 i = 0; i < size; i++) {
-            bytes32[] memory heights = s.pendingHeights.values();
-
-            for (uint256 j = 0; j < heights.length; j++) {
-                uint64 height = uint64(uint256(heights[j]) << 192 >> 192);
-                BatchPending storage pending = s.pending[height];
-                result[i] = ListPendingCommitmentsEntry({
-                    height: height,
-                    commitment: pending.commitment,
-                    executed: pending.executed.values()
-                });
-            }
+            uint64 height = uint64(uint256(heights[i]));
+            BatchPending storage pending = s.pending[height];
+            result[i] = ListPendingCommitmentsEntry({
+                height: height,
+                commitment: pending.commitment,
+                executed: pending.executed.values()
+            });
         }
-
-        return result;
     }
+
 
     function makeLeaf(IpcEnvelope memory _msg) public pure returns (BottomUpBatch.MerkleHash) {
         // solhint-disable-next-line func-named-parameters
