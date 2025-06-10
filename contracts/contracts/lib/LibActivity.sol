@@ -99,23 +99,20 @@ library LibActivity {
 
         SubnetKey subnetKey = SubnetKey.wrap(subnet.toHash());
 
-        uint256 size = s.tracker[subnetKey].pendingHeights.length();
+        ConsensusTracker storage tracker = s.tracker[subnetKey];
+        bytes32[] memory heights = tracker.pendingHeights.values();
+        uint256 size = heights.length;
+
         result = new ListPendingReturnEntry[](size);
 
-        // Ok to not optimize with unchecked increments, since we expect this to be used off-chain only, for introspection.
         for (uint256 i = 0; i < size; i++) {
-            ConsensusTracker storage tracker = s.tracker[subnetKey];
-            bytes32[] memory heights = tracker.pendingHeights.values();
-
-            for (uint256 j = 0; j < heights.length; j++) {
-                uint64 height = uint64(uint256(heights[j]) << 192 >> 192);
-                ConsensusPendingAtHeight storage pending = tracker.pending[height];
-                result[i] = ListPendingReturnEntry({
-                    height: height,
-                    summary: pending.summary,
-                    claimed: pending.claimed.values()
-                });
-            }
+            uint64 height = uint64(uint256(heights[i]));
+            ConsensusPendingAtHeight storage pending = tracker.pending[height];
+            result[i] = ListPendingReturnEntry({
+                height: height,
+                summary: pending.summary,
+                claimed: pending.claimed.values()
+            });
         }
 
         return result;
