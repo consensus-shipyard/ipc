@@ -97,8 +97,14 @@ library SubnetIDHelper {
 
     /// @notice Computes the common parent of the current subnet and the one given as argument
     function commonParent(SubnetID calldata subnet1, SubnetID calldata subnet2) public pure returns (SubnetID memory) {
+        // If the roots are not identical, exit early
         if (subnet1.root != subnet2.root) {
             return SubnetID({root: 0, route: new address[](0)});
+        }
+
+        // If both subnet addresses references the same subnet, return early
+        if (equals(subnet1, subnet2)) {
+            return subnet1;
         }
 
         uint256 i;
@@ -113,6 +119,8 @@ library SubnetIDHelper {
             return SubnetID({root: subnet1.root, route: new address[](0)});
         }
 
+        // note: only works for subnets that differ at least in the leaf element,
+        // since `i + 1 === min(subnet1routeLength, subnet2routeLength)`
         address[] memory route = new address[](i);
         for (uint256 j; j < i; ) {
             route[j] = subnet1.route[j];

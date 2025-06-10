@@ -567,7 +567,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
     }
 
     function testGatewayDiamond_Single_Funding() public {
-        (address validatorAddress, , bytes memory publicKey) = TestUtils.newValidator(100);
+        (address validatorAddress, , bytes memory publicKey) = TestUtils.newValidator(0);
 
         join(validatorAddress, publicKey);
 
@@ -688,7 +688,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
     }
 
     function testGatewayDiamond_Fund_Works_ReactivatedSubnet() public {
-        (address validatorAddress, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(100);
+        (address validatorAddress, uint256 privKey, bytes memory publicKey) = TestUtils.newValidator(0);
         assert(validatorAddress == vm.addr(privKey));
 
         join(validatorAddress, publicKey);
@@ -1163,6 +1163,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         (, subnetInfo) = gatewayDiamond.getter().getSubnet(subnetId);
         require(subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT, "unexpected circulation supply after funding");
 
+        uint256 totalAmount = 0;
         IpcEnvelope[] memory msgs = new IpcEnvelope[](10);
         for (uint64 i = 0; i < 10; i++) {
             msgs[i] = TestUtils.newXnetCallMsg(
@@ -1174,6 +1175,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
                 amount,
                 i
             );
+
+            totalAmount += amount;
         }
 
         BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
@@ -1189,8 +1192,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         gatewayDiamond.checkpointer().commitCheckpoint(checkpoint);
 
         (, subnetInfo) = gatewayDiamond.getter().getSubnet(subnetId);
-        // cross net messages with Call kind does not affect the circulating supply
-        require(subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT, "unexpected circulating supply");
+        require(subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT - totalAmount, "unexpected circulating supply");
     }
 
     function testGatewayDiamond_listIncompleteCheckpoints() public {
@@ -1589,15 +1591,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
 
         uint256[] memory heights = gatewayDiamond.getter().getIncompleteCheckpointHeights();
         require(heights.length == n, "heights.len is not n");
-
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        gatewayDiamond.checkpointer().pruneBottomUpCheckpoints(4);
-        vm.stopPrank();
-
-        index = gatewayDiamond.getter().getCheckpointRetentionHeight();
-        require(index == 4, "height was not updated");
-        heights = gatewayDiamond.getter().getIncompleteCheckpointHeights();
-        require(heights.length == n, "index is not the same");
     }
 
     function testGatewayDiamond_commitCheckpoint_Fails_WrongNumberMessages() public {

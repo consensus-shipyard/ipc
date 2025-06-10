@@ -1,6 +1,7 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use anyhow::Error;
 use fil_actors_runtime::actor_dispatch;
 use fil_actors_runtime::actor_error;
 use fil_actors_runtime::builtin::singletons::SYSTEM_ACTOR_ADDR;
@@ -50,13 +51,16 @@ impl Actor {
             // remove the oldest block if the AMT is full (note that this assume the
             // for_each_while iterates in order, which it seems to do)
             if blockhashes.count() > st.lookback_len {
-                let mut first_idx = 0;
-                blockhashes
-                    .for_each_while(|i, _: &BlockHash| {
-                        first_idx = i;
-                        Ok(false)
+                let first_idx = blockhashes
+                    .iter()
+                    .map(|res| {
+                        let (i, _blockhash) = res?;
+                        Ok::<u64, Error>(i)
                     })
-                    .unwrap();
+                    .next()
+                    .expect("Blockhashes is not empty")
+                    .expect("Blockhashes does not contain an error variant result");
+
                 blockhashes.delete(first_idx).unwrap();
             }
 

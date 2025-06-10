@@ -20,6 +20,7 @@ fendermint_vm_resolver = { path = "../resolver" }
 fendermint_vm_topdown = { path = "../topdown" }
 fendermint_crypto = { path = "../../crypto" }
 fendermint_eth_hardhat = { path = "../../eth/hardhat" }
+fendermint_eth_deployer = { path = "../../eth/deployer" }
 fendermint_rpc = { path = "../../rpc" }
 fendermint_tracing = { path = "../../tracing" }
 actors-custom-car = { path = "../../actors-custom-car" }
