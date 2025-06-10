@@ -216,6 +216,17 @@ where
             .check()
             .map_err(|e| CheckMessageError::InvalidMessage(e.to_string()))?;
 
+        // regardless it is recheck or not, ensure gas fee cap is more than current base fee
+        let base_fee = state.block_gas_tracker().base_fee();
+        if fvm_msg.gas_fee_cap < *base_fee {
+            return Ok(CheckResponse::new(
+                fvm_msg,
+                ExitCode::USR_ASSERTION_FAILED,
+                Some(format!("below base fee: {}", base_fee)),
+                None,
+            ));
+        }
+
         if is_recheck {
             let priority = state.txn_priority_calculator().priority(fvm_msg);
             return Ok(CheckResponse::new_ok(fvm_msg, priority));
