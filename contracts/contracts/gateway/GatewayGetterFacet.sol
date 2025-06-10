@@ -183,6 +183,20 @@ contract GatewayGetterFacet {
         return s.currentMembership;
     }
 
+    /// @notice Returns the target validator's voting power
+    function getValidatorPower(address _validator) external view returns (uint256) {
+        uint256 numValidators = s.currentMembership.validators.length;
+        for (uint256 i = 0; i < numValidators; ) {
+            if (s.currentMembership.validators[i].addr == _validator) {
+                return s.currentMembership.validators[i].weight;
+            }
+            unchecked {
+                i++;
+            }
+        }
+        return 0;
+    }
+
     /// @notice Returns the current configuration number.
     function getCurrentConfigurationNumber() external view returns (uint64) {
         return s.currentMembership.configurationNumber;
