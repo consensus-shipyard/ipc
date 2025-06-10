@@ -215,7 +215,14 @@ async fn test_applying_upgrades() {
         1.05,
     );
 
-    let ipc_contracts_owner = from_fvm::to_eth_address(&ADDR).unwrap().unwrap();
+    // We use a random actor ID for ipc_contracts_owner as it's not used for
+    // anything in this test. This is important because we want to make sure
+    // that the actor ID isn't accidentally used as a valid actor ID in the
+    // test.
+    let ipc_contracts_owner = Address::new_id(10000);
+    let ipc_contracts_owner = from_fvm::to_eth_address(&ipc_contracts_owner)
+        .unwrap()
+        .unwrap();
 
     let genesis = Genesis {
         chain_name: CHAIN_NAME.to_string(),
