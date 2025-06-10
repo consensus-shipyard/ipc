@@ -319,6 +319,7 @@ impl DockerMaterializer {
             IpcCliConfig {
                 keystore_path: Some("~/.ipc".to_string()),
                 subnets: Default::default(),
+                password: None,
             }
         } else {
             IpcCliConfig::from_file(&file_name).context("failed to read ipc-cli config")?
@@ -1072,6 +1073,7 @@ mod tests {
         let mut config0 = IpcCliConfig {
             keystore_path: Some("~/.ipc".to_string()),
             subnets: Default::default(),
+            password: None,
         };
 
         config0.add_subnet(IpcCliSubnet {

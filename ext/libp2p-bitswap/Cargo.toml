@@ -19,7 +19,7 @@ fnv = { workspace = true }
 futures = { workspace = true }
 lazy_static = { workspace = true }
 libipld = { workspace = true, default-features = false }
-libp2p = { workspace = true , features = ["request-response"] }
+libp2p = { workspace = true, features = ["request-response"] }
 prometheus = { workspace = true }
 prost = { workspace = true, optional = true }
 thiserror = { workspace = true }

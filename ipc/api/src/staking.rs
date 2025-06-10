@@ -46,7 +46,7 @@ impl TryFrom<lib_power_change_log::NewPowerChangeRequestFilter> for PowerChangeR
             change: PowerChange {
                 op: PowerOperation::try_from(value.op)?,
                 payload: value.payload.to_vec(),
-                validator: ethers_address_to_fil_address(&value.validator)?,
+                validator: ethers_address_to_fil_address(value.validator)?,
             },
         })
     }
