@@ -5,6 +5,7 @@ use self::bootstrap::{AddBootstrap, AddBootstrapArgs, ListBootstraps, ListBootst
 use self::join::{StakeSubnet, StakeSubnetArgs, UnstakeSubnet, UnstakeSubnetArgs};
 use self::leave::{Claim, ClaimArgs};
 use self::rpc::{ChainIdSubnet, ChainIdSubnetArgs};
+use crate::commands::subnet::approve::{ApproveSubnet, ApproveSubnetArgs};
 pub use crate::commands::subnet::create::{CreateSubnet, CreateSubnetArgs};
 use crate::commands::subnet::genesis_epoch::{GenesisEpoch, GenesisEpochArgs};
 pub use crate::commands::subnet::join::{JoinSubnet, JoinSubnetArgs};
@@ -12,6 +13,7 @@ pub use crate::commands::subnet::kill::{KillSubnet, KillSubnetArgs};
 pub use crate::commands::subnet::leave::{LeaveSubnet, LeaveSubnetArgs};
 use crate::commands::subnet::list_subnets::{ListSubnets, ListSubnetsArgs};
 use crate::commands::subnet::list_validators::{ListValidators, ListValidatorsArgs};
+use crate::commands::subnet::reject_approved::{RejectApprovedSubnet, RejectApprovedSubnetArgs};
 use crate::commands::subnet::rpc::{RPCSubnet, RPCSubnetArgs};
 use crate::commands::subnet::send_value::{SendValue, SendValueArgs};
 use crate::commands::subnet::set_federated_power::{SetFederatedPower, SetFederatedPowerArgs};
@@ -22,6 +24,7 @@ use crate::commands::subnet::validator::{ValidatorInfo, ValidatorInfoArgs};
 use crate::{CommandLineHandler, GlobalArguments};
 use clap::{Args, Subcommand};
 
+pub mod approve;
 pub mod bootstrap;
 pub mod create;
 mod genesis_epoch;
@@ -30,6 +33,7 @@ pub mod kill;
 pub mod leave;
 pub mod list_subnets;
 pub mod list_validators;
+pub mod reject_approved;
 pub mod rpc;
 pub mod send_value;
 mod set_federated_power;
@@ -53,6 +57,8 @@ impl SubnetCommandsArgs {
     pub async fn handle(&self, global: &GlobalArguments) -> anyhow::Result<()> {
         match &self.command {
             Commands::Create(args) => CreateSubnet::handle(global, args).await,
+            Commands::Approve(args) => ApproveSubnet::handle(global, args).await,
+            Commands::RejectApproved(args) => RejectApprovedSubnet::handle(global, args).await,
             Commands::List(args) => ListSubnets::handle(global, args).await,
             Commands::ListValidators(args) => ListValidators::handle(global, args).await,
             Commands::Join(args) => JoinSubnet::handle(global, args).await,
@@ -79,6 +85,8 @@ impl SubnetCommandsArgs {
 #[derive(Debug, Subcommand)]
 pub(crate) enum Commands {
     Create(CreateSubnetArgs),
+    Approve(ApproveSubnetArgs),
+    RejectApproved(RejectApprovedSubnetArgs),
     List(ListSubnetsArgs),
     ListValidators(ListValidatorsArgs),
     Join(JoinSubnetArgs),

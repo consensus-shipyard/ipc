@@ -335,6 +335,38 @@ impl SubnetManager for EthSubnetManager {
         }
     }
 
+    async fn approve_subnet(&self, subnet: SubnetID, from: Address) -> Result<()> {
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
+        let contract = gateway_manager_facet::GatewayManagerFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            signer.clone(),
+        );
+
+        let subnet_address = contract_address_from_subnet(&subnet)?;
+
+        let txn = contract.approve_subnet(subnet_address);
+        let txn = extend_call_with_pending_block(txn).await?;
+
+        txn.send().await?.await?;
+        Ok(())
+    }
+
+    async fn reject_approved_subnet(&self, subnet: SubnetID, from: Address) -> Result<()> {
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
+        let contract = gateway_manager_facet::GatewayManagerFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            signer.clone(),
+        );
+
+        let subnet_address = contract_address_from_subnet(&subnet)?;
+
+        let txn = contract.reject_approved_subnet(subnet_address);
+        let txn = extend_call_with_pending_block(txn).await?;
+
+        txn.send().await?.await?;
+        Ok(())
+    }
+
     async fn join_subnet(
         &self,
         subnet: SubnetID,
