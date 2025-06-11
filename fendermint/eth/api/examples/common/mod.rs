@@ -38,6 +38,7 @@ pub type TestContractCall<C, T> = ContractCall<TestMiddleware<C>, T>;
 
 /// Gas limit to set for transactions.
 pub const ENOUGH_GAS: u64 = 10_000_000_000u64;
+pub const ENOUGH_GAS_PRICE: u64 = 1000u64;
 
 pub struct TestAccount {
     pub secret_key: SecretKey,

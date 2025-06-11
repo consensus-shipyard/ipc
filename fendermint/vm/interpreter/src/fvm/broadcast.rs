@@ -130,9 +130,12 @@ where
             // I don't want to call the Ethereum API directly (it would be one more dependency).
             // Another option is for Fendermint to recognise transactions coming from validators
             // and always put them into the block to facilitate checkpointing.
+
+            let state = self.client.state_params(FvmQueryHeight::Committed).await?;
+            let gas_fee_cap = self.gas_fee_cap.clone().max(state.value.base_fee);
             let mut gas_params = GasParams {
                 gas_limit: BLOCK_GAS_LIMIT,
-                gas_fee_cap: self.gas_fee_cap.clone(),
+                gas_fee_cap,
                 gas_premium: self.gas_premium.clone(),
             };
 

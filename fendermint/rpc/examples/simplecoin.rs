@@ -51,8 +51,8 @@ lazy_static! {
     /// Default gas params based on the testkit.
     static ref GAS_PARAMS: GasParams = GasParams {
         gas_limit: 10_000_000_000,
-        gas_fee_cap: TokenAmount::default(),
-        gas_premium: TokenAmount::default(),
+        gas_fee_cap: TokenAmount::from_atto(100),
+        gas_premium: TokenAmount::from_atto(100),
     };
 }
 
