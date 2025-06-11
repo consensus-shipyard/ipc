@@ -49,7 +49,7 @@ use tracing::Level;
 
 use crate::common::{
     adjust_provider, make_middleware, prepare_call, request, send_transaction, TestAccount,
-    TestContractCall,
+    TestContractCall, ENOUGH_GAS_PRICE,
 };
 
 mod common;
@@ -710,11 +710,16 @@ where
         })?;
     }
 
+    tracing::info!("ready to check legacy txn");
+
     // Check legacy transactions
     // Set up the transaction details for a legacy transaction
-    let tx = TransactionRequest::new()
+    let mut tx = TransactionRequest::new()
         .to(to.eth_addr) // Replace with recipient address
         .value(U256::from(1u64)); // Gas limit for standard ETH transfer
+
+    tx = tx.gas(ENOUGH_GAS);
+    tx = tx.gas_price(ENOUGH_GAS_PRICE);
 
     // Send the transaction
     let pending_tx = mw.send_transaction(tx, None).await?;
