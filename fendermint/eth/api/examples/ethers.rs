@@ -788,8 +788,6 @@ where
     // Set the gas based on the testkit so it doesn't trigger estimation.
     let mut tx = tx
         .gas(ENOUGH_GAS)
-        .max_fee_per_gas(0)
-        .max_priority_fee_per_gas(0)
         .into();
 
     // Fill in the missing fields like `from` and `nonce` (which involves querying the API).
