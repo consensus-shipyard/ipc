@@ -786,9 +786,7 @@ where
     let tx = Eip1559TransactionRequest::new().to(to.eth_addr).value(1000);
 
     // Set the gas based on the testkit so it doesn't trigger estimation.
-    let mut tx = tx
-        .gas(ENOUGH_GAS)
-        .into();
+    let mut tx = tx.gas(ENOUGH_GAS).into();
 
     // Fill in the missing fields like `from` and `nonce` (which involves querying the API).
     mw.fill_transaction(&mut tx, None).await?;
