@@ -3,7 +3,7 @@
 
 use anyhow::{Context, Result};
 use cid::Cid;
-use fendermint_vm_message::chain::ChainMessage;
+use fendermint_vm_message::chain::{ChainMessage, ValidatorMessage};
 use fendermint_vm_message::ipc::IpcMessage;
 use fendermint_vm_message::query::{FvmQuery, StateParams};
 use fendermint_vm_message::signed::SignedMessage;
@@ -37,6 +37,7 @@ use std::convert::TryInto;
 use crate::fvm::executions::{
     execute_cron_message, execute_signed_message, push_block_to_chainmeta_actor_if_possible,
 };
+use crate::fvm::validator::execute_bottom_up_signature;
 
 struct Actor {
     id: ActorID,
@@ -327,6 +328,7 @@ where
                     ChainMessage::Signed(signed) => {
                         block_gas_usage += signed.message.gas_limit;
                     }
+                    ChainMessage::Validator(_) => {}
                 },
                 Err(e) => {
                     tracing::warn!(error = %e, "failed to decode message in proposal as ChainMessage");
@@ -439,6 +441,11 @@ where
                         applied_message,
                         domain_hash: None,
                     })
+                }
+            },
+            ChainMessage::Validator(v) => match v {
+                ValidatorMessage::SignBottomUpCheckpoint(signed) => {
+                    execute_bottom_up_signature(state, signed)
                 }
             },
         }
