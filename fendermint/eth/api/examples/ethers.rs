@@ -603,7 +603,9 @@ where
     // Send a SimpleCoin transaction to get an event emitted.
     // Not using `prepare_call` here because `send_transaction` will fill the missing fields.
     let coin_send_value = U256::from(100);
-    let coin_send: TestContractCall<_, bool> = contract.send_coin(to.eth_addr, coin_send_value);
+    let mut coin_send: TestContractCall<_, bool> = contract.send_coin(to.eth_addr, coin_send_value);
+
+    coin_send = coin_send.gas(ENOUGH_GAS);
 
     // Take note of the inputs to ascertain it's the same we get back.
     let tx_input = match coin_send.tx {
@@ -629,6 +631,7 @@ where
             _ => false,
         },
     )?;
+    tracing::info!(tx_hash = ?receipt.transaction_hash, "obtained coin sent txn by hash");
 
     request(
         "eth_getLogs",
@@ -636,6 +639,7 @@ where
             .await,
         |logs| *logs == receipt.logs,
     )?;
+    tracing::info!(tx_hash = ?receipt.transaction_hash, "obtained coin sent txn logs");
 
     // Check that requesting logs with higher-than-highest height does not fail.
     request(
