@@ -325,6 +325,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         vm.deal(subnetAddress, totalAmount);
 
         registerSubnet(registerAmount, subnetAddress);
+
+        vm.startPrank(subnetAddress);
         addStake(stakeAmount, subnetAddress);
 
         (, uint256 totalStaked, , , ) = getSubnet(subnetAddress);
@@ -341,6 +343,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         vm.deal(subnetAddress, registerAmount);
 
         registerSubnet(registerAmount, subnetAddress);
+
+        vm.startPrank(subnetAddress);
         gatewayDiamond.manager().releaseStake(registerAmount);
 
         vm.deal(subnetAddress, stakeAmount);
@@ -360,6 +364,8 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         vm.deal(subnetAddress, registerAmount);
 
         registerSubnet(registerAmount, subnetAddress);
+
+        vm.startPrank(subnetAddress);
         gatewayDiamond.manager().releaseStake(registerAmount);
 
         vm.deal(subnetAddress, stakeAmount);
@@ -383,6 +389,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
 
         registerSubnet(registerAmount, subnetAddress);
 
+        vm.startPrank(subnetAddress);
         for (uint256 i = 0; i < numberOfStakes; i++) {
             addStake(singleStakeAmount, subnetAddress);
 
@@ -420,8 +427,10 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         vm.deal(subnetAddress, fullAmount);
 
         registerSubnet(registerAmount, subnetAddress);
-        addStake(stakeAmount, subnetAddress);
 
+        vm.startPrank(subnetAddress);
+
+        addStake(stakeAmount, subnetAddress);
         gatewayDiamond.manager().releaseStake(fullAmount);
 
         (, uint256 stake, , , ) = getSubnet(subnetAddress);
@@ -436,6 +445,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         vm.deal(subnetAddress, DEFAULT_COLLATERAL_AMOUNT);
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, subnetAddress);
 
+        vm.startPrank(subnetAddress);
         gatewayDiamond.manager().releaseStake(DEFAULT_COLLATERAL_AMOUNT / 2);
 
         (, uint256 stake, , , ) = getSubnet(subnetAddress);
@@ -454,8 +464,10 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         vm.deal(subnetAddress, totalAmount);
 
         registerSubnet(registerAmount, subnetAddress);
-        addStake(partialAmount, subnetAddress);
 
+        vm.startPrank(subnetAddress);
+
+        addStake(partialAmount, subnetAddress);
         gatewayDiamond.manager().releaseStake(partialAmount);
 
         (, uint256 stake, , , ) = getSubnet(subnetAddress);
@@ -487,6 +499,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
 
         vm.expectRevert(NotEnoughFundsToRelease.selector);
 
+        vm.startPrank(subnetAddress);
         gatewayDiamond.manager().releaseStake(releaseAmount);
     }
 
@@ -504,6 +517,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
 
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, subnetAddress);
 
+        vm.startPrank(subnetAddress);
         gatewayDiamond.manager().releaseStake(10);
 
         (, uint256 stake, , , ) = getSubnet(subnetAddress);
@@ -521,6 +535,7 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
 
         require(subnetAddress.balance == 0, "unexpected balance");
 
+        vm.startPrank(subnetAddress);
         gatewayDiamond.manager().kill();
 
         (SubnetID memory id, uint256 stake, uint256 nonce, , uint256 circSupply) = getSubnet(subnetAddress);
