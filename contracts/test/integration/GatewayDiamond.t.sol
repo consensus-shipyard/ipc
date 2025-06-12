@@ -1615,8 +1615,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         registerSubnet(DEFAULT_COLLATERAL_AMOUNT, caller);
         vm.stopPrank();
 
-        uint256 amount = 1;
-
         (SubnetID memory subnetId, , , , ) = getSubnet(address(caller));
         (bool exist, Subnet memory subnetInfo) = gatewayDiamond.getter().getSubnet(subnetId);
         require(exist, "subnet does not exist");
@@ -1628,33 +1626,6 @@ contract GatewayActorDiamondTest is Test, IntegrationTestBase, SubnetWithNativeT
         );
         (, subnetInfo) = gatewayDiamond.getter().getSubnet(subnetId);
         require(subnetInfo.circSupply == DEFAULT_COLLATERAL_AMOUNT, "unexpected circulation supply after funding");
-
-        uint64 size = gatewayDiamond.getter().maxMsgsPerBottomUpBatch() + 1;
-        IpcEnvelope[] memory msgs = new IpcEnvelope[](size);
-        for (uint64 i = 0; i < size; i++) {
-            msgs[i] = TestUtils.newXnetCallMsg(
-                IPCAddress({subnetId: subnetId, rawAddress: FvmAddressHelper.from(caller)}),
-                IPCAddress({
-                    subnetId: gatewayDiamond.getter().getNetworkName(),
-                    rawAddress: FvmAddressHelper.from(caller)
-                }),
-                amount,
-                i
-            );
-        }
-
-        BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-            subnetID: subnetId,
-            blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
-            blockHash: keccak256("block1"),
-            nextConfigurationNumber: 1,
-            msgs: BottomUpBatchHelper.makeCommitment(msgs),
-            activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
-        });
-
-        vm.prank(caller);
-        vm.expectRevert(MaxMsgsPerBatchExceeded.selector);
-        gatewayDiamond.checkpointer().commitCheckpoint(checkpoint);
     }
 
     function newListOfMessages(uint64 size) internal view returns (IpcEnvelope[] memory msgs) {

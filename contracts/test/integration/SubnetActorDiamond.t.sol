@@ -10,7 +10,7 @@ import {NumberContractFacetSeven} from "../helpers/contracts/NumberContractFacet
 import {NumberContractFacetEight} from "../helpers/contracts/NumberContractFacetEight.sol";
 import {METHOD_SEND} from "../../contracts/constants/Constants.sol";
 import {ConsensusType} from "../../contracts/enums/ConsensusType.sol";
-import {IpcEnvelope, BottomUpCheckpoint, MAX_MSGS_PER_BATCH} from "../../contracts/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpCheckpoint} from "../../contracts/structs/CrossNet.sol";
 import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
 import {SubnetID, PermissionMode, IPCAddress, Subnet, Asset, ValidatorInfo, AssetKind, Membership, Validator, PowerOperation, PowerChangeRequest, PowerChange} from "../../contracts/structs/Subnet.sol";
 import {IERC165} from "../../contracts/interfaces/IERC165.sol";

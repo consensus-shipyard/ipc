@@ -8,7 +8,6 @@ error CannotConfirmFutureChanges();
 error CannotReleaseZero();
 error CheckpointAlreadyExists();
 error BatchAlreadyExists();
-error MaxMsgsPerBatchExceeded();
 error QuorumAlreadyProcessed();
 error CheckpointNotCreated();
 error BottomUpCheckpointAlreadySubmitted();

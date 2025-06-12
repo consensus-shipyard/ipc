@@ -514,16 +514,6 @@ library LibGateway {
         }
     }
 
-    /// @notice Checks the length of a message batch commitment, ensuring it is in (0, maxMsgsPerBottomUpBatch).
-    /// @param commitment The batch commitment to check.
-    function checkMsgLength(BottomUpBatch.Commitment calldata commitment) internal view {
-        GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
-
-        if (commitment.totalNumMsgs > s.maxMsgsPerBottomUpBatch) {
-            revert MaxMsgsPerBatchExceeded();
-        }
-    }
-
     /// Checks if the incoming and outgoing subnet supply sources can be mapped.
     /// Caller should make sure the incoming/outgoing subnets and current subnet are immediate parent/child subnets.
     function checkSubnetsSupplyCompatible(

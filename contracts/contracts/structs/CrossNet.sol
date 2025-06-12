@@ -6,9 +6,6 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {CompressedActivityRollup} from "../structs/Activity.sol";
 import {BottomUpBatch} from "../structs/BottomUpBatch.sol";
 
-uint64 constant MAX_MSGS_PER_BATCH = 10;
-uint256 constant BATCH_PERIOD = 100;
-
 /// @notice The parent finality for IPC parent at certain height.
 struct ParentFinality {
     uint256 height;
