@@ -412,6 +412,7 @@ where
         abi: &Abi,
         bytecode: Vec<u8>,
         constructor_params: T,
+        deployer: ethers::types::Address,
     ) -> anyhow::Result<EthAddress> {
         let constructor = abi
             .constructor()
@@ -420,7 +421,7 @@ where
             .encode_input(bytecode, &constructor_params.into_tokens())
             .context("failed to encode constructor input")?;
 
-        self.create_evm_actor(id, initcode)
+        self.create_evm_actor(id, initcode, deployer)
     }
 
     /// Deploy an EVM contract.
@@ -430,14 +431,14 @@ where
         &mut self,
         id: ActorID,
         initcode: Vec<u8>,
+        deployer: ethers::types::Address,
     ) -> anyhow::Result<EthAddress> {
         // Here we are circumventing the normal way of creating an actor through the EAM and jump ahead to what the `Init` actor would do:
         // https://github.com/filecoin-project/builtin-actors/blob/421855a7b968114ac59422c1faeca968482eccf4/actors/init/src/lib.rs#L97-L107
 
         // Based on how the EAM constructs it.
         let params = evm::ConstructorParams {
-            // We have to pick someone as creator for these quasi built-in types.
-            creator: EthAddress::from_id(system::SYSTEM_ACTOR_ID),
+            creator: EthAddress::from(deployer),
             initcode: RawBytes::from(initcode),
         };
         let params = RawBytes::serialize(params)?;

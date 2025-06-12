@@ -384,7 +384,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
                 supplySource: native,
                 collateralSource: AssetHelper.native(),
                 validatorGater: address(0),
-                validatorRewarder: address(0)
+                validatorRewarder: address(0),
+                genesisSubnetIpcContractsOwner: address(1)
             }),
             address(saDupGetterFaucet),
             address(saDupMangerFaucet),

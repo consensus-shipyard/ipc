@@ -666,6 +666,9 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         self.get_or_create_genesis(subnet_name, || {
             let chain_name = subnet_name.path_string();
             let chain_id = chainid::from_str_hashed(&chain_name)?;
+            // For root subnet, the owner is the first validator
+            let ipc_contracts_owner = validators.first_key_value().unwrap().0.eth_addr().into();
+
             // TODO: Some of these hardcoded values can go into the manifest.
             let genesis = Genesis {
                 chain_name,
@@ -700,6 +703,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                         active_validators_limit: 100,
                     },
                 }),
+                ipc_contracts_owner,
             };
             Ok(genesis)
         })

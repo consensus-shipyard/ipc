@@ -326,9 +326,11 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         &self,
         state: &mut FvmExecState<DB>,
         subnet: EthAddress,
+        owner: EthAddress,
     ) -> anyhow::Result<()> {
         let evm_subnet = ethers::types::Address::from(subnet);
-        self.manager.call(state, |c| c.approve_subnet(evm_subnet))?;
+        self.manager
+            .call(state, |c| c.approve_subnet(evm_subnet).from(owner))?;
         Ok(())
     }
 }

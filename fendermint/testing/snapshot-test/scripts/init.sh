@@ -9,6 +9,9 @@ CMT_DIR=/data/${NODE_NAME}/cometbft
 GENESIS_FILE=/data/genesis.json
 SEALED_GENESIS_FILE=/data/sealed.car
 
+fendermint key gen --out-dir $KEYS_DIR --name owner
+fendermint key into-eth --secret-key $KEYS_DIR/owner.sk --name $KEYS_DIR/contracts-owner
+
 # Create a genesis file
 fendermint \
   genesis --genesis-file $GENESIS_FILE \
@@ -16,7 +19,8 @@ fendermint \
     --chain-name $FM_CHAIN_NAME \
     --base-fee 1000 \
     --timestamp 1680101412 \
-    --power-scale 0
+    --power-scale 0 \
+    --ipc-contracts-owner $(cat $KEYS_DIR/contracts-owner.addr)
 
 # Create some validators
 mkdir -p $KEYS_DIR
