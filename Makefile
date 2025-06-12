@@ -2,6 +2,7 @@
 # instead of making an even more compilicated common one, let's delegate to them.
 
 default:
+	# to be removed, only needed for unit-tests and end2end tests which don't have pnpm installed right now
 	cd contracts && make gen
 	cargo build --release
 	./target/release/ipc-cli --version
@@ -13,7 +14,8 @@ SUBTREES_ALL := $(SUBTREES_RUST) $(SUBTREES_CONTRACTS)
 
 test: test-rust test-contracts
 
-test-rust: $(patsubst %, test/%, $(SUBTREES_RUST))
+test-rust:
+	cargo test --release --workspace
 
 test-contracts: $(patsubst %, test/%, $(SUBTREES_CONTRACTS))
 
@@ -31,3 +33,18 @@ lint: license $(patsubst %, lint/%, $(SUBTREES_ALL))
 
 markdownlint:
 	$(MARKDOWNLINT_CLI) --fix $$(find . -iwholename './crates/**/README.md' -or -iwholename './contracts/**/*.md' -or -iwholename './specs/**/*.md' -or -iwholename './docs*/**/*.md')
+
+fmt:
+	cargo +nightly fmt
+
+check-fmt:
+	cargo +nightly fmt --check
+
+clippy:
+	cargo clippy --workspace --tests --no-deps --fix --allow-dirty --allow-staged -- -D clippy::all
+
+check-clippy:
+	cargo clippy --workspace --tests --no-deps -- -D clippy::all
+
+
+.PHONY: clippy check-clippy fmt check-fmt markdownlint license test test-rust test-contracts
