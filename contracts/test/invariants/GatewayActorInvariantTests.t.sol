@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {StdInvariant} from "forge-std/StdInvariant.sol";
-import {GatewayDiamond} from "../../src/GatewayDiamond.sol";
+import {GatewayDiamond} from "../../contracts/GatewayDiamond.sol";
 import {L1GatewayActorDiamond, L2GatewayActorDiamond, L3GatewayActorDiamond} from "../IntegrationTestPresets.sol";
 import {GatewayActorHandler} from "./handlers/GatewayActorHandler.sol";
 import {GatewayActorBasicProperties} from "./GatewayActorProperties.sol";

@@ -39,7 +39,7 @@ This is just a high level view of what happens during message resolution. In the
 
 The IPLD Resolver uses libp2p to form a Peer-to-Peer network, using the following protocols:
 * [Ping](https://github.com/libp2p/rust-libp2p/tree/v0.50.1/protocols/ping)
-* [Identify](https://github.com/libp2p/rust-libp2p/tree/v0.50.1/protocols/ping) is used to learn the listening address of the remote peers
+* [Identify](https://github.com/libp2p/rust-libp2p/tree/v0.50.1/protocols/identify) is used to learn the listening address of the remote peers
 * [Kademlia](https://github.com/libp2p/rust-libp2p/tree/v0.50.1/protocols/kad) is used for peer discovery
 * [Gossipsub](https://github.com/libp2p/rust-libp2p/tree/v0.50.1/protocols/gossipsub) is used to announce information about subnets the peers provide data for
 * [Bitswap](https://github.com/ipfs-rust/libp2p-bitswap) is used to resolve CIDs to content

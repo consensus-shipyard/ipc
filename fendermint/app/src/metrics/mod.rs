@@ -2,7 +2,5 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 mod prometheus;
-mod tracing;
 
-pub use prometheus::app::register_metrics as register_app_metrics;
-pub use tracing::layer;
+pub use prometheus::eth::register_metrics as register_eth_metrics;

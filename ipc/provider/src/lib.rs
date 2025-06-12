@@ -9,10 +9,11 @@ use config::Config;
 use fvm_shared::{
     address::Address, clock::ChainEpoch, crypto::signature::SignatureType, econ::TokenAmount,
 };
+use ipc_api::checkpoint::consensus::ValidatorData;
 use ipc_api::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
 use ipc_api::evm::payload_to_evm_address;
-use ipc_api::staking::{StakingChangeRequest, ValidatorInfo};
-use ipc_api::subnet::{PermissionMode, SupplySource};
+use ipc_api::staking::{PowerChangeRequest, ValidatorInfo};
+use ipc_api::subnet::{Asset, PermissionMode};
 use ipc_api::{
     cross::IpcEnvelope,
     subnet::{ConsensusType, ConstructParams},
@@ -38,6 +39,7 @@ pub mod config;
 pub mod jsonrpc;
 pub mod lotus;
 pub mod manager;
+pub mod observe;
 
 const DEFAULT_REPO_PATH: &str = ".ipc";
 const DEFAULT_CONFIG_NAME: &str = "config.toml";
@@ -252,7 +254,10 @@ impl IpcProvider {
         active_validators_limit: u16,
         min_cross_msg_fee: TokenAmount,
         permission_mode: PermissionMode,
-        supply_source: SupplySource,
+        supply_source: Asset,
+        collateral_source: Asset,
+        validator_gater: Address,
+        validator_rewarder: Address,
     ) -> anyhow::Result<Address> {
         let conn = self.get_connection(&parent)?;
 
@@ -270,6 +275,9 @@ impl IpcProvider {
             min_cross_msg_fee,
             permission_mode,
             supply_source,
+            collateral_source,
+            validator_gater,
+            validator_rewarder,
         };
 
         conn.manager()
@@ -519,19 +527,6 @@ impl IpcProvider {
             .await
     }
 
-    /// Propagate a cross-net message forward. For `postbox_msg_key`, we are using bytes because different
-    /// runtime have different representations. For FVM, it should be `CID` as bytes. For EVM, it is
-    /// `bytes32`.
-    pub async fn propagate(
-        &self,
-        _subnet: SubnetID,
-        _gateway_addr: Address,
-        _from: Address,
-        _postbox_msg_key: Vec<u8>,
-    ) -> anyhow::Result<()> {
-        todo!()
-    }
-
     /// Send value between two addresses in a subnet
     pub async fn send_value(
         &mut self,
@@ -597,12 +592,22 @@ impl IpcProvider {
         conn.manager().get_validator_info(subnet, validator).await
     }
 
+    pub async fn list_validators(
+        &self,
+        subnet: &SubnetID,
+    ) -> anyhow::Result<Vec<(Address, ValidatorInfo)>> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = self.get_connection(&parent)?;
+
+        conn.manager().list_validators(subnet).await
+    }
+
     /// Get the changes in subnet validators. This is fetched from parent.
     pub async fn get_validator_changeset(
         &self,
         subnet: &SubnetID,
         epoch: ChainEpoch,
-    ) -> anyhow::Result<TopDownQueryPayload<Vec<StakingChangeRequest>>> {
+    ) -> anyhow::Result<TopDownQueryPayload<Vec<PowerChangeRequest>>> {
         let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
         let conn = self.get_connection(&parent)?;
 
@@ -736,6 +741,43 @@ impl IpcProvider {
         let conn = self.get_connection(&parent)?;
         conn.manager()
             .set_federated_power(from, subnet, validators, public_keys, federated_power)
+            .await
+    }
+
+    pub async fn list_validator_activities(
+        &self,
+        subnet: &SubnetID,
+        validator: &Address,
+        from: ChainEpoch,
+        to: ChainEpoch,
+    ) -> anyhow::Result<Vec<(u64, ValidatorData)>> {
+        let conn = self.get_connection(subnet)?;
+        conn.manager()
+            .query_validator_rewards(validator, from, to)
+            .await
+    }
+
+    pub async fn batch_subnet_claim(
+        &self,
+        reward_claim_subnet: &SubnetID,
+        reward_source_subnet: &SubnetID, // TODO(review): eventually support multiple source subnets
+        from: ChainEpoch,
+        to: ChainEpoch,
+        validator: &Address,
+    ) -> anyhow::Result<()> {
+        let conn = self.get_connection(reward_source_subnet)?;
+
+        let claims = conn
+            .manager()
+            .query_reward_claims(validator, from, to)
+            .await?;
+
+        let parent = reward_claim_subnet
+            .parent()
+            .ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = self.get_connection(&parent)?;
+        conn.manager()
+            .batch_subnet_claim(validator, reward_claim_subnet, reward_source_subnet, claims)
             .await
     }
 }

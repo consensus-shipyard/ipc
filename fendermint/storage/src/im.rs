@@ -2,13 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use std::{
     hash::Hash,
+    marker::PhantomData,
     mem,
     sync::{Arc, Mutex, MutexGuard},
     thread,
 };
 
 use crate::{
-    Decode, Encode, KVRead, KVReadable, KVResult, KVStore, KVTransaction, KVWritable, KVWrite,
+    Decode, Encode, KVError, KVRead, KVReadable, KVResult, KVStore, KVTransaction, KVWritable,
+    KVWrite,
 };
 
 /// Read-only mode.
@@ -16,6 +18,7 @@ pub struct Read;
 /// Read-write mode.
 pub struct Write;
 
+/// Immutable data multimap.
 type IDataMap<S> = im::HashMap<
     <S as KVStore>::Namespace,
     im::HashMap<<S as KVStore>::Repr, Arc<<S as KVStore>::Repr>>,
@@ -64,7 +67,10 @@ impl<S: KVStore> KVReadable<S> for InMemoryBackend<S>
 where
     S::Repr: Hash + Eq,
 {
-    type Tx<'a> = Transaction<'a, S, Read> where Self: 'a;
+    type Tx<'a>
+        = Transaction<'a, S, Read>
+    where
+        Self: 'a;
 
     /// Take a fresh snapshot, to isolate the effects of any further writes
     /// to the datastore from this read transaction.
@@ -83,7 +89,7 @@ where
     S::Repr: Hash + Eq,
 {
     type Tx<'a>
-    = Transaction<'a, S, Write>
+        = Transaction<'a, S, Write>
     where
         Self: 'a;
 
@@ -114,7 +120,7 @@ pub struct Transaction<'a, S: KVStore, M> {
     _mode: M,
 }
 
-impl<'a, S: KVStore> KVTransaction for Transaction<'a, S, Write> {
+impl<S: KVStore> KVTransaction for Transaction<'_, S, Write> {
     // An exclusive lock has already been taken.
     fn commit(mut self) -> KVResult<()> {
         let mut guard = self.backend.data.lock().unwrap();
@@ -129,7 +135,7 @@ impl<'a, S: KVStore> KVTransaction for Transaction<'a, S, Write> {
     }
 }
 
-impl<'a, S: KVStore, M> Drop for Transaction<'a, S, M> {
+impl<S: KVStore, M> Drop for Transaction<'_, S, M> {
     fn drop(&mut self) {
         if self.token.is_some() && !thread::panicking() {
             panic!("Transaction prematurely dropped. Must call `.commit()` or `.rollback()`.");
@@ -137,7 +143,7 @@ impl<'a, S: KVStore, M> Drop for Transaction<'a, S, M> {
     }
 }
 
-impl<'a, S: KVStore, M> KVRead<S> for Transaction<'a, S, M>
+impl<S: KVStore, M> KVRead<S> for Transaction<'_, S, M>
 where
     S::Repr: Hash + Eq,
 {
@@ -152,9 +158,26 @@ where
         }
         Ok(None)
     }
+
+    fn iterate<K, V>(&self, ns: &S::Namespace) -> impl Iterator<Item = KVResult<(K, V)>>
+    where
+        S: Decode<K> + Decode<V>,
+        <S as KVStore>::Repr: Ord + 'static,
+        K: 'static,
+        V: 'static,
+    {
+        if let Some(m) = self.data.get(ns) {
+            let mut items = m.iter().map(|(k, v)| (k, v.as_ref())).collect::<Vec<_>>();
+            items.sort_by(|a, b| a.0.cmp(b.0));
+
+            KVIter::<S, K, V>::new(items)
+        } else {
+            KVIter::empty()
+        }
+    }
 }
 
-impl<'a, S: KVStore> KVWrite<S> for Transaction<'a, S, Write>
+impl<S: KVStore> KVWrite<S> for Transaction<'_, S, Write>
 where
     S::Repr: Hash + Eq,
 {
@@ -180,6 +203,48 @@ where
             self.data.insert(ns.clone(), m);
         }
         Ok(())
+    }
+}
+
+struct KVIter<'a, S: KVStore, K, V> {
+    items: Vec<(&'a S::Repr, &'a S::Repr)>,
+    next: usize,
+    phantom_v: PhantomData<V>,
+    phantom_k: PhantomData<K>,
+}
+
+impl<'a, S, K, V> KVIter<'a, S, K, V>
+where
+    S: KVStore,
+{
+    pub fn new(items: Vec<(&'a S::Repr, &'a S::Repr)>) -> Self {
+        KVIter {
+            items,
+            next: 0,
+            phantom_v: PhantomData,
+            phantom_k: PhantomData,
+        }
+    }
+
+    pub fn empty() -> Self {
+        Self::new(vec![])
+    }
+}
+
+impl<S, K, V> Iterator for KVIter<'_, S, K, V>
+where
+    S: KVStore + Decode<K> + Decode<V>,
+{
+    type Item = Result<(K, V), KVError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some((k, v)) = self.items.get(self.next) {
+            self.next += 1;
+            let kv = S::from_repr(k).and_then(|k| S::from_repr(v).map(|v| (k, v)));
+            Some(kv)
+        } else {
+            None
+        }
     }
 }
 

@@ -123,7 +123,7 @@ async fn main() {
 /// Get the next sequence number (nonce) of an account.
 async fn sequence(client: &impl QueryClient, addr: &Address) -> anyhow::Result<u64> {
     let state = client
-        .actor_state(&addr, FvmQueryHeight::default())
+        .actor_state(addr, FvmQueryHeight::default())
         .await
         .context("failed to get actor state")?;
 

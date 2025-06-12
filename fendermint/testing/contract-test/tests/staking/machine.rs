@@ -1,6 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-use std::{cell::RefCell, collections::HashSet, sync::Arc};
+use std::{cell::RefCell, collections::HashSet};
 
 use arbitrary::{Arbitrary, Unstructured};
 use fendermint_contract_test::ipc::{registry::RegistryCaller, subnet::SubnetCaller};
@@ -19,7 +19,6 @@ use fendermint_vm_message::{
     conv::from_fvm::{self, to_eth_tokens},
     signed::sign_secp256k1,
 };
-use fvm::engine::MultiEngine;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::bigint::Integer;
 use fvm_shared::econ::TokenAmount;
@@ -65,9 +64,7 @@ pub enum StakingCommand {
 }
 
 #[derive(Default)]
-pub struct StakingMachine {
-    multi_engine: Arc<MultiEngine>,
-}
+pub struct StakingMachine {}
 
 impl StateMachine for StakingMachine {
     type System = StakingSystem;
@@ -86,9 +83,8 @@ impl StateMachine for StakingMachine {
     fn new_system(&self, state: &Self::State) -> Self::System {
         let rt = tokio::runtime::Runtime::new().expect("create tokio runtime for init");
 
-        let (mut exec_state, _) = rt
-            .block_on(fendermint_contract_test::init_exec_state(
-                self.multi_engine.clone(),
+        let (mut exec_state, _, _) = rt
+            .block_on(fendermint_contract_test::create_test_exec_state(
                 state.parent_genesis.clone(),
             ))
             .expect("failed to init parent");
@@ -115,10 +111,16 @@ impl StateMachine for StakingMachine {
             min_activation_collateral: to_eth_tokens(&state.min_collateral()).unwrap(),
             min_validators: state.min_validators() as u64,
             permission_mode: 0, // collateral based
-            supply_source: ipc_actors_abis::register_subnet_facet::SupplySource {
+            supply_source: ipc_actors_abis::register_subnet_facet::Asset {
                 kind: 0, // native token
                 token_address: ethers::types::Address::zero(),
             },
+            collateral_source: ipc_actors_abis::register_subnet_facet::Asset {
+                kind: 0, // native token
+                token_address: ethers::types::Address::zero(),
+            },
+            validator_gater: EthAddress::from(ethers::types::Address::zero()).into(),
+            validator_rewarder: Default::default(),
         };
 
         eprintln!("\n> PARENT IPC: {parent_ipc:?}");
@@ -284,6 +286,7 @@ impl StateMachine for StakingMachine {
                     block_hash: *block_hash,
                     next_configuration_number: *next_configuration_number,
                     msgs: Vec::new(),
+                    activity: Default::default(),
                 };
                 let checkpoint_hash = checkpoint.clone().abi_hash();
 
@@ -294,6 +297,8 @@ impl StateMachine for StakingMachine {
                     let signature = from_fvm::to_eth_signature(&signature, false).unwrap();
                     signatures.push((*addr, signature.into()));
                 }
+
+                signatures.sort_by_key(|(addr, _)| *addr);
 
                 system
                     .subnet

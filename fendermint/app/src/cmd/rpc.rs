@@ -28,15 +28,15 @@ use tendermint::abci::response::DeliverTx;
 use tendermint::block::Height;
 use tendermint_rpc::HttpClient;
 
+use crate::cmd;
+use crate::options::rpc::{BroadcastMode, FevmArgs, RpcFevmCommands, TransArgs};
+use crate::options::rpc::{RpcArgs, RpcCommands, RpcQueryCommands};
 use fendermint_rpc::message::{GasParams, SignedMessageFactory};
 use fendermint_rpc::{client::FendermintClient, query::QueryClient};
 use fendermint_vm_actor_interface::eam::{self, CreateReturn, EthAddress};
 
-use crate::cmd;
-use crate::options::rpc::{BroadcastMode, FevmArgs, RpcFevmCommands, TransArgs};
-use crate::options::rpc::{RpcArgs, RpcCommands, RpcQueryCommands};
-
 use super::key::read_secret_key;
+use crate::fs;
 
 cmd! {
   RpcArgs(self) {
@@ -185,7 +185,7 @@ async fn fevm_create(
     contract: PathBuf,
     constructor_args: Bytes,
 ) -> anyhow::Result<()> {
-    let contract_hex = std::fs::read_to_string(contract).context("failed to read contract")?;
+    let contract_hex = fs::read_to_string(contract).context("failed to read contract")?;
     let contract_bytes = hex::decode(contract_hex).context("failed to parse contract from hex")?;
     let contract_bytes = Bytes::from(contract_bytes);
 

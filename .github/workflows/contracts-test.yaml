@@ -1,4 +1,4 @@
-name: Tests
+name: 'Contracts: Tests'
 
 # This workflow is triggered from the main CI workflow.
 on:
@@ -12,39 +12,29 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v3
         with:
-          ref: ${{ github.event.pull_request.head.ref }}
+          ref: ${{ github.ref }}
           submodules: recursive
-
-      - name: Install python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Install abi
-        run: pip install eth_abi
-
-      - name: Install lcov and genhtml
-        run:  sudo apt-get update && sudo apt-get -y install lcov
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
           cache: false
+          version: v0.3.0
 
       - name: Cache Solidity ABI artifacts
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
-          path: ./contracts/out
-          key: contracts-abi-${{ hashFiles('./contracts/src/**/*.sol') }}
-
-      - name: Run coverage check - flaky so we run twice to catch false negatives
-        run: cd contracts; make coverage || make coverage
+          path: |
+            ./contracts/out
+            ./contract-bindings
+            ./contracts/cache
+          key: v2-contracts-abi-${{ hashFiles('./contracts/**/*.sol') }}
 
       - name: Run tests
-        run: cd contracts; forge test -vvv --ffi
+        run: cd contracts; make test
 
       - name: Run axelar-token tests
-        run: cd extras/axelar-token; forge test -vvv --ffi
+        run: cd demos/axelar-token; forge test -vvv --ffi
 
       - name: Run linked-token tests
-        run: cd extras/linked-token; forge test -vvv --ffi
+        run: cd demos/linked-token; forge test -vvv --ffi

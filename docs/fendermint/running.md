@@ -2,6 +2,7 @@
 
 The commands are all executed by the `fendermint` binary, which is produced from the `fendermint_app` crate,
 so we have many ways to run the program:
+
 * `fendermint <args>`, after running `cargo install --path fendermint/app`
 * `./target/release/fendermint <args>`, after running `cargo build --release`
 * `cargo run -p fendermint_app --release -- <args>`
@@ -27,6 +28,7 @@ mkdir test-network
 ```
 
 If you are running in test network, define the network using env variable.
+
 ```shell
 export FM_NETWORK=test
 ```
@@ -83,7 +85,7 @@ $ cat test-network/keys/alice.pk
 Ak5Juk793ZAg/7Ojj4bzOmIFGpwLhET1vg2ROihUJFkq
 ```
 
-If you want to use existing ethereum private key, perform the follwoing:
+If you want to use existing ethereum private key, perform the following:
 
 ```shell
 cargo run -p fendermint_app --release -- key eth-to-fendermint --secret-key <path to private key> --name eth --out-dir test-network/keys
@@ -197,7 +199,9 @@ cargo run -p fendermint_app --release -- \
       --bottom-up-check-period 10 \
       --msg-fee 1 --majority-percentage 65
 ```
+
 Check the result:
+
 ```console
 $ cat test-network/genesis.json | jq .ipc
 {
@@ -209,6 +213,21 @@ $ cat test-network/genesis.json | jq .ipc
     "majority_percentage": 65
   }
 }
+```
+
+### Seal Genesis State
+
+After the genesis file has been created, seal the genesis state and dump to a car file.
+
+```shell
+cargo run -p fendermint_app --release -- \
+  genesis --genesis-file test-network/genesis.json \
+  ipc \
+    seal-genesis \
+      --builtin-actors-path fendermint/builtin-actors/output/bundle.car \
+      --custom-actors-path fendermint/actors/output/custom_actors_bundle.car \
+      --output-path test-network/sealed.car \ 
+      --artifacts-path contracts/out
 ```
 
 ### Configure CometBFT
@@ -238,7 +257,8 @@ file we created earlier to the format CometBFT accepts. Start with the genesis f
 mv ~/.cometbft/config/genesis.json ~/.cometbft/config/genesis.json.orig
 cargo run -p fendermint_app --release -- \
   genesis --genesis-file test-network/genesis.json \
-  into-tendermint --out ~/.cometbft/config/genesis.json
+  into-tendermint --out ~/.cometbft/config/genesis.json \
+  --app-state test-network/sealed.car
 ```
 
 Check the contents of the created Comet BFT Genesis file:
@@ -316,7 +336,6 @@ $ cat ~/.cometbft/config/genesis.json
 We can see that our original `genesis.json` has been made part of CometBFT's version under `app_state`,
 and that the top level `validators` are empty, to be filled out by the application during the `init_chain` ABCI call.
 
-
 #### Convert the private key
 
 By default CometBFT uses Ed25519 validator keys, but in theory it can use anything that looks like a key.
@@ -351,6 +370,7 @@ $ cat ~/.cometbft/config/priv_validator_key.json
 $ cat test-network/keys/bob.pk
 AiImfwVC/LeFJN9bB612aCtjbCYWuilf2SorSUXez/QE
 ```
+
 </details>
 
 ## Run processes
@@ -440,8 +460,8 @@ $ rm -rf ~/.fendermint/data/rocksdb && cargo run -p fendermint_app --release -- 
 ...
 2023-05-19T09:13:54.110007Z DEBUG fendermint_app::app: commit state state_root="bafy2bzacebh4fbl6rv7tlxxf2zsxqifjr424tkykwmgffqaho6mvr6hy7dq42" timestamp=1684487633
 ```
-</details>
 
+</details>
 
 <details>
   <summary>CometBFT log</summary>
@@ -462,15 +482,18 @@ I[2023-05-19|10:13:54.110] committed state                              module=s
 I[2023-05-19|10:13:54.116] indexed block exents                         module=txindex height=3
 ...
 ```
+
 </details>
 
 Note that the first block execution is very slow because we have to load the Wasm engine, as indicated by the first proposal having a timeout,
 but after that the blocks come in fast, one per second.
 
 ### Run ETH API
+
 If we want to use `evm` related API, such as running `fendermint/eth/api/examples/ethers.rs`, we need to start ETH API process.
 
 The ETH RPC api runs on top of cometbft. Make sure you have cometbft running properly. The architecture is as follows:
+
 ```
 +---------------------------+
 | Node                      |
@@ -504,10 +527,13 @@ The ETH RPC api runs on top of cometbft. Make sure you have cometbft running pro
 | :8545                     |
 -----------------------------
 ```
+
 To start the ethereum RPC api with:
+
 ```
 cargo run -p fendermint_app --release -- eth run
 ```
+
 We will see:
 <details>
   <summary>ETH API log</summary>
@@ -520,13 +546,14 @@ We will see:
 </details>
 
 We can try query the chain id by:
+
 ```shell
 curl -X POST -i   -H 'Content-Type: application/json'   -d '{"jsonrpc":"2.0","id":0,"method":"eth_chainId","params":[]}'   http://localhost:8545
 ```
 
 ### Access Metrics
 
-By default `fendermint` has Prometheus metrics enabled (with more to be added) and available at http://localhost:9184/metrics.
+By default `fendermint` has Prometheus metrics enabled (with more to be added) and available at <http://localhost:9184/metrics>.
 
 ## Query the state
 
@@ -649,7 +676,6 @@ $ cargo run -p fendermint_app --release -- rpc query actor-state --address $ALIC
 
 Great, Alice's nonce was correctly increased as well.
 
-
 ## Create FEVM Contract
 
 When we want to deploy a smart contract to the FVM, the currently supported way is by deploying EVM contracts to FEVM.
@@ -721,7 +747,9 @@ Note that the script figures out the Alice's nonce on its own, so we don't have 
 ## Deploy IPC child subnet
 
 ### Crate genesis from parent
+
 Fendermint includes a command to automatically create the genesis file for an IPC child subnet according to the information for the subnet available in its parent. Here's an example of the generation of a genesis file for a subnet that has already been bootstrapped in the parent.
+
 ```shell
 cargo run -p fendermint_app -- \
     --network=test \
@@ -732,6 +760,7 @@ cargo run -p fendermint_app -- \
 ```
 
 Here's a sample execution of the command for an already bootstrapped subnet in `/r314159`:
+
 ```shell
 cargo run -p fendermint_app -- \
     --network=test \

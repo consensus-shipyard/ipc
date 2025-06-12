@@ -23,53 +23,18 @@ on:
 
 
 jobs:
-  # JOB to run change detection
-  changes:
-    runs-on: ubuntu-latest
-    # Required permissions
-    permissions:
-      pull-requests: read
-    # Set job outputs to values from filter step
-    outputs:
-      workspace:     ${{ steps.filter.outputs.workspace }}
-      contracts:     ${{ steps.filter.outputs.contracts }}
-      ipc:           ${{ steps.filter.outputs.ipc }}
-      ipld-resolver: ${{ steps.filter.outputs.ipld-resolver }}
-      fendermint:    ${{ steps.filter.outputs.fendermint }}
-    steps:
-      # For pull requests it's not necessary to checkout the code,
-      # but the workflow is also triggered on pushes to `main`.
-      - uses: actions/checkout@v3
-
-      - uses: dorny/paths-filter@v2
-        id: filter
-        with:
-          filters: |
-            workspace:
-              - 'Cargo.toml'
-            contracts:
-              - 'contracts/**'
-            ipc:
-              - 'ipc/**'
-            ipld-resolver:
-              - 'ipld/resolver/**'
-            fendermint:
-              - 'fendermint/**'
+  commonmark:
+    uses: ./.github/workflows/commonmark-lint.yaml
 
   license:
     uses: ./.github/workflows/license.yaml
 
   contracts-prettier:
     uses: ./.github/workflows/contracts-prettier.yaml
-    needs: [changes]
-    if: >-
-      needs.changes.outputs.contracts == 'true' ||
-      github.ref == 'refs/heads/main' ||
-      github.ref_type == 'tag'
 
   contracts-deployment-test:
     uses: ./.github/workflows/contracts-deployment-test.yaml
-    needs: [ contracts-prettier ]
+    needs: [contracts-prettier]
 
   contracts-test:
     uses: ./.github/workflows/contracts-test.yaml
@@ -79,65 +44,48 @@ jobs:
     uses: ./.github/workflows/contracts-storage.yaml
     needs: [contracts-prettier]
 
-  contracts-npm-audit:
-    uses: ./.github/workflows/contracts-npm-audit.yaml
-    needs: [contracts-prettier]
+## This causes too much unpredictable noise, turning our builds red whenever a new vulnerability is found.
+## It's better to have a separate workflow for auditing, and have it run on a schedule.
+## However, given this code is purely used for tooling and not for production, it's not a big deal.
+#  contracts-pnpm-audit:
+#    uses: ./.github/workflows/contracts-pnpm-audit.yaml
+#    needs: [contracts-prettier]
 
   contracts-sast:
     uses: ./.github/workflows/contracts-sast.yaml
     needs: [contracts-prettier]
 
-  extras:
-    uses: ./.github/workflows/extras.yaml
+  demos:
+    uses: ./.github/workflows/demos.yaml
     needs: [contracts-prettier]
 
-  ipc:
-    uses: ./.github/workflows/ipc.yaml
-    needs: [changes, license]
-    if: >-
-      needs.changes.outputs.workspace == 'true' ||
-      needs.changes.outputs.contracts == 'true' ||
-      needs.changes.outputs.ipc == 'true' ||
-      github.ref == 'refs/heads/main' ||
-      github.ref_type == 'tag'
+  build:
+    uses: ./.github/workflows/build.yaml
+    needs: [license]
 
-  ipld-resolver:
-    uses: ./.github/workflows/ipld-resolver.yaml
-    needs: [changes, license]
-    if: >-
-      needs.changes.outputs.workspace == 'true' ||
-      needs.changes.outputs.ipld-resolver == 'true' ||
-      github.ref == 'refs/heads/main' ||
-      github.ref_type == 'tag'
-
-  fendermint-test:
-    uses: ./.github/workflows/fendermint-test.yaml
+  unit-tests:
+    uses: ./.github/workflows/tests-unit.yaml
     secrets: inherit
-    needs: [changes, license]
-    if: >-
-      needs.changes.outputs.workspace == 'true' ||
-      needs.changes.outputs.contracts == 'true' ||
-      needs.changes.outputs.ipc == 'true' ||
-      needs.changes.outputs.ipld-resolver == 'true' ||
-      needs.changes.outputs.fendermint == 'true' ||
-      github.ref == 'refs/heads/main' ||
-      github.ref_type == 'tag'
+    needs:
+      - build
+
+  e2e-tests:
+    uses: ./.github/workflows/tests-e2e.yaml
+    secrets: inherit
+    needs:
+      - build
 
   fevm-contract-tests:
     uses: ./.github/workflows/fevm-contract-tests.yaml
     secrets: inherit
-    needs: [changes, license]
+    needs:
+      - build
     if: >-
-      needs.changes.outputs.workspace == 'true' ||
-      needs.changes.outputs.contracts == 'true' ||
-      needs.changes.outputs.ipc == 'true' ||
-      needs.changes.outputs.ipld-resolver == 'true' ||
-      needs.changes.outputs.fendermint == 'true' ||
       github.ref == 'refs/heads/main' ||
       github.ref_type == 'tag'
 
-  fendermint-publish:
-    uses: ./.github/workflows/fendermint-publish.yaml
+  docker-publish:
+    uses: ./.github/workflows/docker-publish.yaml
     secrets: inherit
     # Dependencies are not strictly necessary, but if fendermint tests pass they publish docker too, so they better work.
     # It is because of these needs that all the filters are allowed to run on `main` too, otherwise this would be disabled.
@@ -148,6 +96,6 @@ jobs:
       github.ref_type == 'tag'
     needs:
       - contracts-test # generates the ABI artifacts (although fendermint can do on its own too)
-      - ipc
-      - ipld-resolver
-      - fendermint-test
+      - build
+      - unit-tests
+      - e2e-tests

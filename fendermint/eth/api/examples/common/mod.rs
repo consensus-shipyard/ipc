@@ -101,7 +101,7 @@ where
     // transaction in a different way, but we can't for example use the actor ID in the hash, because
     // we have no way of sending it along with the message.
     let wallet: Wallet<SigningKey> =
-        Wallet::from_bytes(&sender.secret_key.serialize().as_ref())?.with_chain_id(chain_id);
+        Wallet::from_bytes(sender.secret_key.serialize().as_ref())?.with_chain_id(chain_id);
 
     Ok(SignerMiddleware::new(provider, wallet))
 }

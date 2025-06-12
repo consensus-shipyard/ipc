@@ -20,9 +20,9 @@ use fvm_ipld_encoding::CborStore;
 use fvm_shared::{address::Address, chainid::ChainID, clock::ChainEpoch, ActorID};
 use num_traits::Zero;
 
-use crate::fvm::{store::ReadOnlyBlockstore, FvmMessage};
+use crate::fvm::{state::CheckStateRef, store::ReadOnlyBlockstore, FvmMessage};
 
-use super::{CheckStateRef, FvmExecState, FvmStateParams};
+use super::{FvmExecState, FvmStateParams};
 
 /// The state over which we run queries. These can interrogate the IPLD block store or the state tree.
 pub struct FvmQueryState<DB>
@@ -43,7 +43,6 @@ where
     exec_state: RefCell<Option<FvmExecState<ReadOnlyBlockstore<DB>>>>,
     /// Lazy locked check state.
     check_state: CheckStateRef<DB>,
-    /// Whether to try ot use the check state or not.
     pending: bool,
 }
 
@@ -179,9 +178,8 @@ where
             if msg.sequence.is_zero() {
                 let state_tree = s.state_tree_mut();
                 if let Some(id) = state_tree.lookup_id(&msg.from)? {
-                    state_tree.get_actor(id)?.map(|st| {
+                    state_tree.get_actor(id)?.inspect(|st| {
                         msg.sequence = st.sequence;
-                        st
                     });
                 }
             }
@@ -228,10 +226,6 @@ where
 
     pub fn block_height(&self) -> ChainEpoch {
         self.block_height
-    }
-
-    pub fn pending(&self) -> bool {
-        self.pending
     }
 }
 

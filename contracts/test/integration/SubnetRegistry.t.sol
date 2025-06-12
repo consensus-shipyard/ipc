@@ -1,34 +1,36 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import "../../src/errors/IPCErrors.sol";
+import "../../contracts/errors/IPCErrors.sol";
 import "forge-std/Test.sol";
 
-import {ConsensusType} from "../../src/enums/ConsensusType.sol";
+import {ConsensusType} from "../../contracts/enums/ConsensusType.sol";
 import {TestUtils} from "../helpers/TestUtils.sol";
-import {IERC165} from "../../src/interfaces/IERC165.sol";
-import {IDiamond} from "../../src/interfaces/IDiamond.sol";
-import {IDiamondCut} from "../../src/interfaces/IDiamondCut.sol";
-import {IDiamondLoupe} from "../../src/interfaces/IDiamondLoupe.sol";
-import {LibDiamond} from "../../src/lib/LibDiamond.sol";
+import {IERC165} from "../../contracts/interfaces/IERC165.sol";
+import {IDiamond} from "../../contracts/interfaces/IDiamond.sol";
+import {IDiamondCut} from "../../contracts/interfaces/IDiamondCut.sol";
+import {IDiamondLoupe} from "../../contracts/interfaces/IDiamondLoupe.sol";
+import {LibDiamond} from "../../contracts/lib/LibDiamond.sol";
 
-import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
-import {SubnetActorManagerFacet} from "../../src/subnet/SubnetActorManagerFacet.sol";
-import {SubnetActorPauseFacet} from "../../src/subnet/SubnetActorPauseFacet.sol";
-import {SubnetActorCheckpointingFacet} from "../../src/subnet/SubnetActorCheckpointingFacet.sol";
-import {SubnetActorRewardFacet} from "../../src/subnet/SubnetActorRewardFacet.sol";
-import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
-import {SubnetID, PermissionMode, SubnetCreationPrivileges} from "../../src/structs/Subnet.sol";
-import {SubnetRegistryDiamond} from "../../src/SubnetRegistryDiamond.sol";
+import {SubnetActorGetterFacet} from "../../contracts/subnet/SubnetActorGetterFacet.sol";
+import {SubnetActorManagerFacet} from "../../contracts/subnet/SubnetActorManagerFacet.sol";
+import {SubnetActorPauseFacet} from "../../contracts/subnet/SubnetActorPauseFacet.sol";
+import {SubnetActorCheckpointingFacet} from "../../contracts/subnet/SubnetActorCheckpointingFacet.sol";
+import {SubnetActorRewardFacet} from "../../contracts/subnet/SubnetActorRewardFacet.sol";
+import {SubnetActorDiamond} from "../../contracts/SubnetActorDiamond.sol";
+import {SubnetActorActivityFacet} from "../../contracts/subnet/SubnetActorActivityFacet.sol";
+import {SubnetID, PermissionMode, SubnetCreationPrivileges} from "../../contracts/structs/Subnet.sol";
+import {SubnetRegistryDiamond} from "../../contracts/SubnetRegistryDiamond.sol";
 
-import {RegisterSubnetFacet} from "../../src/subnetregistry/RegisterSubnetFacet.sol";
-import {SubnetGetterFacet} from "../../src/subnetregistry/SubnetGetterFacet.sol";
-import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
-import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
-import {OwnershipFacet} from "../../src/OwnershipFacet.sol";
-import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";
+import {RegisterSubnetFacet} from "../../contracts/subnetregistry/RegisterSubnetFacet.sol";
+import {SubnetGetterFacet} from "../../contracts/subnetregistry/SubnetGetterFacet.sol";
+import {DiamondLoupeFacet} from "../../contracts/diamond/DiamondLoupeFacet.sol";
+import {DiamondCutFacet} from "../../contracts/diamond/DiamondCutFacet.sol";
+import {OwnershipFacet} from "../../contracts/OwnershipFacet.sol";
+import {AssetHelper} from "../../contracts/lib/AssetHelper.sol";
 import {RegistryFacetsHelper} from "../helpers/RegistryFacetsHelper.sol";
 import {DiamondFacetsHelper} from "../helpers/DiamondFacetsHelper.sol";
+import {ValidatorRewarderMap} from "../../contracts/examples/ValidatorRewarderMap.sol";
 
 import {SelectorLibrary} from "../helpers/SelectorLibrary.sol";
 
@@ -66,6 +68,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         params.diamondCutFacet = address(new DiamondCutFacet());
         params.diamondLoupeFacet = address(new DiamondLoupeFacet());
         params.ownershipFacet = address(new OwnershipFacet());
+        params.activityFacet = address(new SubnetActorActivityFacet());
 
         params.subnetActorGetterSelectors = mockedSelectors;
         params.subnetActorManagerSelectors = mockedSelectors2;
@@ -75,6 +78,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         params.subnetActorDiamondCutSelectors = SelectorLibrary.resolveSelectors("DiamondCutFacet");
         params.subnetActorDiamondLoupeSelectors = SelectorLibrary.resolveSelectors("DiamondLoupeFacet");
         params.subnetActorOwnershipSelectors = SelectorLibrary.resolveSelectors("OwnershipFacet");
+        params.subnetActorActivitySelectors = SelectorLibrary.resolveSelectors("SubnetActorActivityFacet");
 
         params.creationPrivileges = SubnetCreationPrivileges.Unrestricted;
 
@@ -101,7 +105,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         params.permissionMode = PermissionMode.Collateral;
 
         vm.prank(address(1));
-        vm.expectRevert(LibDiamond.NotOwner.selector);
+        vm.expectRevert(NotOwner.selector);
         s.register().newSubnetActor(params);
     }
 
@@ -170,6 +174,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         new SubnetRegistryDiamond(diamondCut, params);
 
         params.ownershipFacet = address(8);
+        params.activityFacet = address(9);
         new SubnetRegistryDiamond(diamondCut, params);
     }
 
@@ -255,7 +260,10 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
             activeValidatorsLimit: _activeValidatorsLimit,
             powerScale: _powerScale,
             permissionMode: PermissionMode.Collateral,
-            supplySource: SupplySourceHelper.native()
+            supplySource: AssetHelper.native(),
+            collateralSource: AssetHelper.native(),
+            validatorGater: address(0),
+            validatorRewarder: address(new ValidatorRewarderMap())
         });
 
         registrySubnetFacet.newSubnetActor(params);
@@ -306,7 +314,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
 
         // Test only owner can update
         vm.prank(address(1)); // Set a different address as the sender
-        vm.expectRevert(abi.encodeWithSelector(LibDiamond.NotOwner.selector)); // Expected revert message
+        vm.expectRevert(abi.encodeWithSelector(NotOwner.selector)); // Expected revert message
         registrySubnetGetterFacet.updateReferenceSubnetContract(
             newGetterFacet,
             newManagerFacet,

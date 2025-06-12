@@ -3,12 +3,14 @@ pragma solidity ^0.8.23;
 
 import {Test} from "forge-std/Test.sol";
 import {console} from "forge-std/console.sol";
-import {MaxPQ, LibMaxPQ} from "../../src/lib/priority/LibMaxPQ.sol";
-import {LibValidatorSet} from "../../src/lib/LibStaking.sol";
-import {ValidatorSet} from "../../src/structs/Subnet.sol";
+import {MaxPQ, LibMaxPQ} from "../../contracts/lib/priority/LibMaxPQ.sol";
+import {LibValidatorSet} from "../../contracts/lib/LibPower.sol";
+import {ValidatorSet} from "../../contracts/structs/Subnet.sol";
+import {LibValidatorSetTestUtil} from "./LibValidatorSetTest.t.sol";
 
 contract LibMaxPQTest is Test {
     using LibValidatorSet for ValidatorSet;
+    using LibValidatorSetTestUtil for ValidatorSet;
     using LibMaxPQ for MaxPQ;
 
     MaxPQ private maxPQ;
@@ -22,7 +24,7 @@ contract LibMaxPQTest is Test {
         uint16 size = maxPQ.getSize();
         for (uint16 i = 1; i <= size; i++) {
             address addr = maxPQ.inner.posToAddress[i];
-            uint256 collateral = validators.getConfirmedCollateral(addr);
+            uint256 collateral = validators.getCurrentPower(addr);
             console.log("idx", i, addr, collateral);
         }
     }

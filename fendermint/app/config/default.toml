@@ -63,6 +63,14 @@ host = "127.0.0.1"
 # The default port where the Prometheus exporter makes the metrics available.
 port = 9184
 
+[tracing]
+
+[tracing.console]
+enabled = true
+
+[tracing.file]
+enabled = false
+
 [snapshots]
 # Enable the export and import of snapshots.
 enabled = false
@@ -138,6 +146,35 @@ host = "127.0.0.1"
 # JSON-RPC (POST) and WebSockets (GET) requests.
 port = 8545
 
+[eth.metrics]
+# Enable the export of metrics over HTTP.
+enabled = true
+
+[eth.metrics.listen]
+# Only accept connections from a Prometheus scraper, assumed to be running locally.
+host = "127.0.0.1"
+# The default port where the Prometheus exporter makes the metrics available.
+port = 9185
+
+[eth.cors]
+# A list of origins a cross-domain request can be executed from
+# Default value '[]' disables cors support
+# Use '["*"]' to allow any origin
+allowed_origins = []
+# A list of methods the client is allowed to use with cross-domain requests
+# Suggested methods if allowing origins: "GET", "OPTIONS", "HEAD", "POST"
+allowed_methods = []
+# A list of non-simple headers the client is allowed to use with cross-domain requests
+# Suggested headers if allowing origins: "Accept", "Authorization", "Content-Type", "Origin"
+allowed_headers = []
+
+[eth.tracing]
+
+[eth.tracing.console]
+enabled = true
+
+[eth.tracing.file]
+enabled = false
 
 # IPLD Resolver Configuration
 [resolver]
@@ -154,7 +191,6 @@ local_key = "keys/network.sk"
 # so we can derive a name using the rootnet ID and use this as an override.
 network_name = ""
 
-
 # Peer Discovery
 [resolver.discovery]
 # Bootstrap node addresses for peer discovery, or the entire list for a static network
@@ -168,7 +204,6 @@ target_connections = 50
 
 # Option to disable Kademlia, for example in a fixed static network.
 enable_kademlia = true
-
 
 # IPC Subnet Membership
 [resolver.membership]
@@ -214,7 +249,6 @@ max_peers_per_query = 5
 # consumer gets an error because it's falling behind.
 event_buffer_capacity = 100
 
-
 # Serving Content
 [resolver.content]
 # Number of bytes that can be consumed by remote peers in a time period. 0 means no limit.
@@ -236,7 +270,6 @@ vote_interval = 1
 # potential stalling because peers missed an important vote and the cache is full,
 # pausing the syncer, preventing new events to trigger votes.
 vote_timeout = 60
-
 
 # # Setting which are only allowed if the `--network` CLI parameter is `testnet`.
 # [testing]

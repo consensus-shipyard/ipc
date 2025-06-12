@@ -4,14 +4,16 @@ pragma solidity ^0.8.23;
 import "forge-std/StdUtils.sol";
 import "forge-std/StdCheats.sol";
 import {CommonBase} from "forge-std/Base.sol";
-import {RegisterSubnetFacet} from "../../../src/subnetregistry/RegisterSubnetFacet.sol";
-import {SubnetGetterFacet} from "../../../src/subnetregistry/SubnetGetterFacet.sol";
-import {SubnetActorDiamond} from "../../../src/SubnetActorDiamond.sol";
-import {SubnetRegistryDiamond} from "../../../src/SubnetRegistryDiamond.sol";
-import {ConsensusType} from "../../../src/enums/ConsensusType.sol";
-import {SubnetID, PermissionMode} from "../../../src/structs/Subnet.sol";
-import {SupplySourceHelper} from "../../../src/lib/SupplySourceHelper.sol";
-import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
+import {RegisterSubnetFacet} from "../../../contracts/subnetregistry/RegisterSubnetFacet.sol";
+import {SubnetGetterFacet} from "../../../contracts/subnetregistry/SubnetGetterFacet.sol";
+import {SubnetActorDiamond} from "../../../contracts/SubnetActorDiamond.sol";
+import {SubnetRegistryDiamond} from "../../../contracts/SubnetRegistryDiamond.sol";
+import {ConsensusType} from "../../../contracts/enums/ConsensusType.sol";
+import {SubnetID, PermissionMode} from "../../../contracts/structs/Subnet.sol";
+import {AssetHelper} from "../../../contracts/lib/AssetHelper.sol";
+import {ValidatorRewarderMap} from "../../../contracts/examples/ValidatorRewarderMap.sol";
+
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {RegistryFacetsHelper} from "../../helpers/RegistryFacetsHelper.sol";
 
 contract SubnetRegistryHandler is CommonBase, StdCheats, StdUtils {
@@ -122,7 +124,10 @@ contract SubnetRegistryHandler is CommonBase, StdCheats, StdUtils {
             activeValidatorsLimit: _activeValidatorsLimit,
             powerScale: _powerScale,
             permissionMode: PermissionMode.Collateral,
-            supplySource: SupplySourceHelper.native()
+            supplySource: AssetHelper.native(),
+            collateralSource: AssetHelper.native(),
+            validatorGater: address(0),
+            validatorRewarder: address(new ValidatorRewarderMap())
         });
 
         address owner = getRandomOldAddressOrNewOne(seed);

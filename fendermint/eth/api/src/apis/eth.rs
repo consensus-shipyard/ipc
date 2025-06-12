@@ -20,6 +20,7 @@ use fendermint_vm_actor_interface::evm;
 use fendermint_vm_message::chain::ChainMessage;
 use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_message::signed::SignedMessage;
+use fil_actors_evm_shared::uints;
 use futures::FutureExt;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
@@ -36,9 +37,7 @@ use tendermint_rpc::{
     Client,
 };
 
-use fil_actors_evm_shared::uints;
-
-use crate::conv::from_eth::{self, to_fvm_message};
+use crate::conv::from_eth::{self, derive_origin_kind, to_fvm_message};
 use crate::conv::from_tm::{self, msg_hash, to_chain_message, to_cumulative, to_eth_block_zero};
 use crate::error::{error_with_revert, OutOfSequence};
 use crate::filters::{matches_topics, FilterId, FilterKind, FilterRecords};
@@ -46,7 +45,7 @@ use crate::{
     conv::{
         from_eth::to_fvm_address,
         from_fvm::to_eth_tokens,
-        from_tm::{to_eth_receipt, to_eth_transaction},
+        from_tm::{to_eth_receipt, to_eth_transaction_response},
     },
     error, JsonRpcData, JsonRpcResult,
 };
@@ -427,7 +426,8 @@ where
     C: Client + Sync + Send,
 {
     // Check in the pending cache first.
-    if let Some(tx) = data.tx_cache.get(&tx_hash) {
+    if let Some((tx, sig)) = data.tx_cache.get(&tx_hash) {
+        let tx = from_eth::to_eth_transaction_response(&tx, sig)?;
         Ok(Some(tx))
     } else if let Some(res) = data.tx_by_hash(tx_hash).await? {
         let msg = to_chain_message(&res.tx)?;
@@ -439,8 +439,11 @@ where
                 .state_params(FvmQueryHeight::Height(header.header.height.value()))
                 .await?;
             let chain_id = ChainID::from(sp.value.chain_id);
+
             let hash = msg_hash(&res.tx_result.events, &res.tx);
-            let mut tx = to_eth_transaction(msg, chain_id, hash)?;
+            let mut tx = to_eth_transaction_response(msg, chain_id)?;
+            debug_assert_eq!(hash, tx.hash);
+
             tx.transaction_index = Some(et::U64::from(res.index));
             tx.block_hash = Some(et::H256::from_slice(header.header.hash().as_bytes()));
             tx.block_number = Some(et::U64::from(res.height.value()));
@@ -484,32 +487,40 @@ pub async fn get_transaction_receipt<C>(
 where
     C: Client + Sync + Send,
 {
-    if let Some(res) = data.tx_by_hash(tx_hash).await? {
-        let header: header::Response = data.tm().header(res.height).await?;
-        let block_results: block_results::Response = data.tm().block_results(res.height).await?;
-        let cumulative = to_cumulative(&block_results);
-        let state_params = data
-            .client
-            .state_params(FvmQueryHeight::Height(header.header.height.value()))
-            .await?;
-        let msg = to_chain_message(&res.tx)?;
-        if let ChainMessage::Signed(msg) = msg {
-            let receipt = to_eth_receipt(
-                &msg,
-                &res,
-                &cumulative,
-                &header.header,
-                &state_params.value.base_fee,
-            )
-            .await
-            .context("failed to convert to receipt")?;
+    let Some(tx_res) = data.tx_by_hash(tx_hash).await? else {
+        return Ok(None);
+    };
 
-            Ok(Some(receipt))
-        } else {
-            error(ExitCode::USR_ILLEGAL_ARGUMENT, "incompatible transaction")
-        }
+    let Ok(header) = data.tm().header(tx_res.height).await else {
+        // this means the txn hash is found, but block header is not found, this could happen
+        // when the txn is at the chain head and the block not finalized yet. We give the
+        // benefit of the doubt and return None for the txn
+        return Ok(None);
+    };
+
+    // Header is found, block results are expected to be present, raise error is not found
+    let block_results: block_results::Response = data.tm().block_results(tx_res.height).await?;
+    let cumulative = to_cumulative(&block_results);
+    let state_params = data
+        .client
+        .state_params(FvmQueryHeight::Height(header.header.height.value()))
+        .await?;
+    let msg = to_chain_message(&tx_res.tx)?;
+
+    if let ChainMessage::Signed(msg) = msg {
+        let receipt = to_eth_receipt(
+            &msg,
+            &tx_res,
+            &cumulative,
+            &header.header,
+            &state_params.value.base_fee,
+        )
+        .await
+        .context("failed to convert to receipt")?;
+
+        Ok(Some(receipt))
     } else {
-        Ok(None)
+        error(ExitCode::USR_ILLEGAL_ARGUMENT, "incompatible transaction")
     }
 }
 
@@ -605,6 +616,14 @@ pub async fn get_uncle_by_block_number_and_index<C>(
     Ok(None)
 }
 
+fn normalize_signature(sig: &mut et::Signature) -> JsonRpcResult<()> {
+    sig.v = sig
+        .recovery_id()
+        .context("cannot normalize eth signature")?
+        .to_byte() as u64;
+    Ok(())
+}
+
 /// Creates new message call transaction or a contract creation for signed transactions.
 pub async fn send_raw_transaction<C>(
     data: JsonRpcData<C>,
@@ -614,23 +633,23 @@ where
     C: Client + Sync + Send,
 {
     let rlp = rlp::Rlp::new(tx.as_ref());
-    let (tx, sig): (TypedTransaction, et::Signature) = TypedTransaction::decode_signed(&rlp)
+    let (tx, mut sig): (TypedTransaction, et::Signature) = TypedTransaction::decode_signed(&rlp)
         .context("failed to decode RLP as signed TypedTransaction")?;
 
+    // for legacy eip155 transactions, the chain id is encoded in it. The `v` most likely will not
+    // be normalized, normalize to ensure consistent txn hash calculation.
+    normalize_signature(&mut sig)?;
+
     let sighash = tx.sighash();
-    let msghash = et::TxHash::from(ethers_core::utils::keccak256(rlp.as_raw()));
+    let msghash = tx.hash(&sig);
     tracing::debug!(?sighash, eth_hash = ?msghash, ?tx, "received raw transaction");
 
-    if let Some(tx) = tx.as_eip1559_ref() {
-        let tx = from_eth::to_eth_transaction(tx.clone(), sig, msghash);
-        data.tx_cache.insert(msghash, tx);
-    }
-
-    let msg = to_fvm_message(tx, false)?;
+    let msg = to_fvm_message(tx.clone())?;
     let sender = msg.from;
     let nonce = msg.sequence;
 
     let msg = SignedMessage {
+        origin_kind: derive_origin_kind(&tx)?,
         message: msg,
         signature: Signature::new_secp256k1(sig.to_vec()),
     };
@@ -641,6 +660,8 @@ where
     // but not the execution results - those will have to be polled with get_transaction_receipt.
     let res: tx_sync::Response = data.tm().broadcast_tx_sync(bz).await?;
     if res.code.is_ok() {
+        data.tx_cache.insert(msghash, (tx, sig));
+
         // The following hash would be okay for ethers-rs,and we could use it to look up the TX with Tendermint,
         // but ethers.js would reject it because it doesn't match what Ethereum would use.
         // Ok(et::TxHash::from_slice(res.hash.as_bytes()))
@@ -664,6 +685,8 @@ where
             tracing::debug!(eth_hash = ?msghash, expected = oos.expected, got = oos.got, is_admissible, "out-of-sequence transaction received");
 
             if is_admissible {
+                data.tx_cache.insert(msghash, (tx, sig));
+
                 data.tx_buffer.insert(sender, nonce, msg);
                 return Ok(msghash);
             }
@@ -681,7 +704,7 @@ pub async fn call<C>(
 where
     C: Client + Sync + Send,
 {
-    let msg = to_fvm_message(tx.into(), true)?;
+    let msg = to_fvm_message(tx.into())?;
     let is_create = msg.to == EAM_ACTOR_ADDR;
     let height = data.query_height(block_id).await?;
     let response = data.client.call(msg, height).await?;
@@ -730,7 +753,7 @@ where
         EstimateGasParams::Two((tx, block_id)) => (tx, block_id),
     };
 
-    let msg = to_fvm_message(tx.into(), true).context("failed to convert to FVM message")?;
+    let msg = to_fvm_message(tx.into()).context("failed to convert to FVM message")?;
 
     let height = data
         .query_height(block_id)
@@ -956,9 +979,9 @@ where
 
     while height <= to_height {
         if let Ok(block_results) = data.tm().block_results(height).await {
-            if let Some(tx_results) = block_results.txs_results {
-                let block_number = et::U64::from(height.value());
+            let block_number = et::U64::from(height.value());
 
+            if let Some(tx_results) = block_results.txs_results {
                 let block = data
                     .block_by_height(et::BlockNumber::Number(block_number))
                     .await?;
@@ -967,21 +990,29 @@ where
 
                 let mut log_index_start = 0usize;
                 for ((tx_idx, tx_result), tx) in tx_results.iter().enumerate().zip(block.data()) {
-                    let msg = match to_chain_message(tx) {
-                        Ok(ChainMessage::Signed(msg)) => msg,
-                        _ => continue,
-                    };
-
                     let emitters = from_tm::collect_emitters(&tx_result.events);
 
-                    // Filter by address.
-                    if !addrs.is_empty()
-                        && !addrs.contains(&msg.message().from)
-                        && !addrs.contains(&msg.message().to)
-                        && addrs.intersection(&emitters).next().is_none()
-                    {
-                        continue;
-                    }
+                    let addrs_disjoint_from_emitters =
+                        !addrs.is_empty() && addrs.intersection(&emitters).next().is_none();
+
+                    match to_chain_message(tx) {
+                        Ok(ChainMessage::Signed(msg)) => {
+                            // Filter by sender and recipient addresses.
+                            if addrs_disjoint_from_emitters
+                                && !addrs.contains(&msg.message().from)
+                                && !addrs.contains(&msg.message().to)
+                            {
+                                continue;
+                            }
+                        }
+                        Ok(ChainMessage::Ipc(_)) => {
+                            // ipc messages are system messages, no need to check from and to
+                            if addrs_disjoint_from_emitters {
+                                continue;
+                            }
+                        }
+                        _ => continue,
+                    };
 
                     let tx_hash = msg_hash(&tx_result.events, tx);
                     let tx_idx = et::U64::from(tx_idx);
@@ -1002,6 +1033,29 @@ where
 
                     log_index_start += tx_result.events.len();
                 }
+            }
+
+            if let Some(events) = block_results.end_block_events {
+                let emitters = from_tm::collect_emitters(&events);
+
+                // Filter by address.
+                if !addrs.is_empty() && addrs.intersection(&emitters).next().is_none() {
+                    height = height.increment();
+                    continue;
+                }
+
+                // all zero indicating it's system contract call
+                let tx_hash = et::TxHash::zero();
+                let tx_idx = et::U64::zero();
+                let block_hash = et::H256::zero();
+
+                let mut tx_logs =
+                    from_tm::to_logs(&events, block_hash, block_number, tx_hash, tx_idx, 0)?;
+
+                // Filter by topic.
+                tx_logs.retain(|log| matches_topics(&filter, log));
+
+                logs.append(&mut tx_logs);
             }
         } else {
             break;

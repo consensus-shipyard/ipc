@@ -10,27 +10,30 @@ license.workspace = true
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 axum = { workspace = true }
+cid = { workspace = true }
 ethers-core = { workspace = true }
 ethers-contract = { workspace = true }
 erased-serde = { workspace = true }
+fs-err = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
 jsonrpc-v2 = { workspace = true }
 lazy_static = { workspace = true }
 lru_time_cache = { workspace = true }
 paste = { workspace = true }
-serde = { workspace = true }
+prometheus = { workspace = true }
 rand = { workspace = true }
 regex = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
 tendermint = { workspace = true }
 tendermint-rpc = { workspace = true }
 tokio = { workspace = true }
+tower-http = { workspace = true }
 
-cid = { workspace = true }
 fil_actors_evm_shared = { workspace = true }
-fvm_shared = { workspace = true }
+fvm_shared = { workspace = true, features  = ["crypto"] }
 fvm_ipld_encoding = { workspace = true }
 
 fendermint_crypto = { path = "../../crypto" }
@@ -45,11 +48,11 @@ ethers = { workspace = true, features = ["abigen"] }
 hex = { workspace = true }
 lazy_static = { workspace = true }
 rand = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
 quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 
 fendermint_testing = { path = "../../testing", features = ["arb"] }
 fendermint_vm_message = { path = "../../vm/message", features = ["arb"] }

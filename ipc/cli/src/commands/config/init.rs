@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 use crate::{CommandLineHandler, GlobalArguments};
 use async_trait::async_trait;
+use fs_err as fs;
 use ipc_provider::config::DEFAULT_CONFIG_TEMPLATE;
 use std::io::Write;
 
@@ -20,16 +21,14 @@ impl CommandLineHandler for InitConfig {
 
         let file_path = std::path::Path::new(&path);
         if let Some(parent) = file_path.parent() {
-            std::fs::create_dir_all(parent)?;
+            fs::create_dir_all(parent)?;
         }
-        let mut file = std::fs::File::create(&path).map_err(|e| {
-            log::error!("couldn't create config file");
-            e
+        let mut file = fs::File::create(&path).inspect_err(|e| {
+            log::error!("couldn't create config file: {e}");
         })?;
         file.write_all(DEFAULT_CONFIG_TEMPLATE.as_bytes())
-            .map_err(|e| {
-                log::error!("error populating empty config template");
-                e
+            .inspect_err(|e| {
+                log::error!("error populating empty config template: {e}");
             })?;
 
         log::info!("Empty config populated successful in {}", &path);

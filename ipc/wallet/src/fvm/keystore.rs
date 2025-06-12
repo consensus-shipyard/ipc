@@ -3,9 +3,10 @@
 // Copyright 2019-2023 ChainSafe Systems
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use fs::{create_dir, File};
+use fs_err as fs;
 use std::{
     fmt::Display,
-    fs::{self, create_dir, File},
     io::{BufReader, BufWriter, ErrorKind, Read, Write},
     path::{Path, PathBuf},
 };
@@ -191,12 +192,11 @@ impl KeyStore {
                         // Existing cleartext JSON keystore
                         let persisted_key_info: HashMap<String, PersistentKeyInfo> =
                             serde_json::from_reader(reader)
-                                .map_err(|e| {
+                                .inspect_err(|_| {
                                     error!(
-                                "failed to deserialize keyfile, initializing new keystore at: {:?}",
-                                file_path
-                            );
-                                    e
+                                        "failed to deserialize keyfile, initializing new keystore at: {:?}",
+                                        file_path
+                                    );
                                 })
                                 .unwrap_or_default();
 
@@ -292,9 +292,8 @@ impl KeyStore {
                                 .map_err(|error| Error::Other(error.to_string()))?;
 
                             let key_info = serde_ipld_dagcbor::from_slice(&decrypted_data)
-                                .map_err(|e| {
+                                .inspect_err(|_| {
                                     error!("Failed to deserialize keyfile, initializing new");
-                                    e
                                 })
                                 .unwrap_or_default();
 

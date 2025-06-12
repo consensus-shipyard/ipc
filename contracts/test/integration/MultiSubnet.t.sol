@@ -2,48 +2,51 @@
 pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
-import "../../src/errors/IPCErrors.sol";
-import {EMPTY_BYTES, METHOD_SEND} from "../../src/constants/Constants.sol";
-import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind, OutcomeType} from "../../src/structs/CrossNet.sol";
-import {FvmAddress} from "../../src/structs/FvmAddress.sol";
-import {SubnetID, Subnet, IPCAddress, Validator} from "../../src/structs/Subnet.sol";
-import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
-import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";
-import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
-import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
-import {GatewayDiamond, FEATURE_MULTILEVEL_CROSSMSG} from "../../src/GatewayDiamond.sol";
-import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
-import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
-import {SubnetActorManagerFacet} from "../../src/subnet/SubnetActorManagerFacet.sol";
-import {SubnetActorCheckpointingFacet} from "../../src/subnet/SubnetActorCheckpointingFacet.sol";
-import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
-import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
-import {LibGateway} from "../../src/lib/LibGateway.sol";
-import {TopDownFinalityFacet} from "../../src/gateway/router/TopDownFinalityFacet.sol";
-import {CheckpointingFacet} from "../../src/gateway/router/CheckpointingFacet.sol";
-import {XnetMessagingFacet} from "../../src/gateway/router/XnetMessagingFacet.sol";
-import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
-import {GatewayMessengerFacet} from "../../src/gateway/GatewayMessengerFacet.sol";
-import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
-import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
+import "../../contracts/errors/IPCErrors.sol";
+import {EMPTY_BYTES, METHOD_SEND} from "../../contracts/constants/Constants.sol";
+import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind, OutcomeType} from "../../contracts/structs/CrossNet.sol";
+import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
+import {SubnetID, Subnet, IPCAddress, Validator} from "../../contracts/structs/Subnet.sol";
+import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
+import {AssetHelper} from "../../contracts/lib/AssetHelper.sol";
+import {FvmAddressHelper} from "../../contracts/lib/FvmAddressHelper.sol";
+import {CrossMsgHelper} from "../../contracts/lib/CrossMsgHelper.sol";
+import {GatewayDiamond, FEATURE_MULTILEVEL_CROSSMSG} from "../../contracts/GatewayDiamond.sol";
+import {SubnetActorDiamond} from "../../contracts/SubnetActorDiamond.sol";
+import {SubnetActorGetterFacet} from "../../contracts/subnet/SubnetActorGetterFacet.sol";
+import {SubnetActorManagerFacet} from "../../contracts/subnet/SubnetActorManagerFacet.sol";
+import {SubnetActorCheckpointingFacet} from "../../contracts/subnet/SubnetActorCheckpointingFacet.sol";
+import {GatewayGetterFacet} from "../../contracts/gateway/GatewayGetterFacet.sol";
+import {GatewayManagerFacet} from "../../contracts/gateway/GatewayManagerFacet.sol";
+import {LibGateway} from "../../contracts/lib/LibGateway.sol";
+import {TopDownFinalityFacet} from "../../contracts/gateway/router/TopDownFinalityFacet.sol";
+import {CheckpointingFacet} from "../../contracts/gateway/router/CheckpointingFacet.sol";
+import {XnetMessagingFacet} from "../../contracts/gateway/router/XnetMessagingFacet.sol";
+import {DiamondCutFacet} from "../../contracts/diamond/DiamondCutFacet.sol";
+import {GatewayMessengerFacet} from "../../contracts/gateway/GatewayMessengerFacet.sol";
+import {DiamondLoupeFacet} from "../../contracts/diamond/DiamondLoupeFacet.sol";
+import {DiamondCutFacet} from "../../contracts/diamond/DiamondCutFacet.sol";
 import {IntegrationTestBase, RootSubnetDefinition, TestSubnetDefinition} from "../IntegrationTestBase.sol";
 import {L2GatewayActorDiamond, L1GatewayActorDiamond} from "../IntegrationTestPresets.sol";
 import {TestUtils, MockIpcContract, MockIpcContractPayable, MockIpcContractRevert, MockIpcContractFallback} from "../helpers/TestUtils.sol";
-import {FilAddress} from "fevmate/utils/FilAddress.sol";
+import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
 
-import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20PresetFixedSupply} from "../helpers/ERC20PresetFixedSupply.sol";
 import {ERC20Deflationary} from "../helpers/ERC20Deflationary.sol";
 import {ERC20Inflationary} from "../helpers/ERC20Inflationary.sol";
 import {ERC20Nil} from "../helpers/ERC20Nil.sol";
 
-import {IERC20Errors} from "openzeppelin-contracts/interfaces/draft-IERC6093.sol";
+import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 
 import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "../helpers/SubnetActorFacetsHelper.sol";
 
 import "forge-std/console.sol";
+
+import {FullActivityRollup, Consensus} from "../../contracts/structs/Activity.sol";
+import {ActivityHelper} from "../helpers/ActivityHelper.sol";
 
 contract MultiSubnetTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
@@ -112,7 +115,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         address tokenAddress,
         address rootGatewayAddress,
         SubnetID memory rootSubnetName
-    ) internal returns (TestSubnetDefinition memory tokenSubnet) {
+    ) internal returns (TestSubnetDefinition memory) {
         SubnetActorDiamond rootTokenSubnetActor = createSubnetActor(
             defaultSubnetActorParamsWith(rootGatewayAddress, rootSubnetName, tokenAddress)
         );
@@ -121,14 +124,15 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         SubnetID memory tokenSubnetName = SubnetID({root: ROOTNET_CHAINID, route: tokenSubnetPath});
         GatewayDiamond tokenSubnetGateway = createGatewayDiamond(gatewayParams(tokenSubnetName));
 
-        tokenSubnet = TestSubnetDefinition({
-            gateway: tokenSubnetGateway,
-            gatewayAddr: address(tokenSubnetGateway),
-            id: tokenSubnetName,
-            subnetActor: rootTokenSubnetActor,
-            subnetActorAddr: address(rootTokenSubnetActor),
-            path: tokenSubnetPath
-        });
+        return
+            TestSubnetDefinition({
+                gateway: tokenSubnetGateway,
+                gatewayAddr: address(tokenSubnetGateway),
+                id: tokenSubnetName,
+                subnetActor: rootTokenSubnetActor,
+                subnetActorAddr: address(rootTokenSubnetActor),
+                path: tokenSubnetPath
+            });
     }
 
     //--------------------
@@ -155,7 +159,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         vm.prank(caller);
         vm.expectEmit(true, true, true, true, rootSubnet.gatewayAddr);
-        emit LibGateway.NewTopDownMessage(nativeSubnet.subnetActorAddr, expected);
+        emit LibGateway.NewTopDownMessage(nativeSubnet.subnetActorAddr, expected, expected.toTracingId());
         rootSubnet.gateway.manager().fund{value: amount}(nativeSubnet.id, FvmAddressHelper.from(address(recipient)));
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
@@ -284,7 +288,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         vm.prank(caller);
         vm.expectEmit(true, true, true, true, rootSubnet.gatewayAddr);
-        emit LibGateway.NewTopDownMessage(nativeSubnet.subnetActorAddr, expected);
+        emit LibGateway.NewTopDownMessage(nativeSubnet.subnetActorAddr, expected, expected.toTracingId());
         rootSubnet.gateway.manager().fund{value: amount}(nativeSubnet.id, FvmAddressHelper.from(address(recipient)));
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
@@ -321,7 +325,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         vm.prank(caller);
         vm.expectEmit(true, true, true, true, rootSubnet.gatewayAddr);
-        emit LibGateway.NewTopDownMessage(tokenSubnet.subnetActorAddr, expected);
+        emit LibGateway.NewTopDownMessage(tokenSubnet.subnetActorAddr, expected, expected.toTracingId());
         rootSubnet.gateway.manager().fundWithToken(tokenSubnet.id, FvmAddressHelper.from(address(recipient)), amount);
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
@@ -448,7 +452,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         registerSubnetGW(DEFAULT_COLLATERAL_AMOUNT, nilTokenSubnet.subnetActorAddr, rootSubnet.gateway);
 
         vm.prank(caller);
-        vm.expectRevert(SupplySourceHelper.NoBalanceIncrease.selector);
+        vm.expectRevert("No balance increase");
         rootSubnet.gateway.manager().fundWithToken(nilTokenSubnet.id, FvmAddressHelper.from(address(caller)), amount);
         assertEq(getSubnetCircSupplyGW(nilTokenSubnet.id, rootSubnet.gateway), 0);
     }
@@ -568,7 +572,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         vm.prank(caller);
         vm.expectEmit(true, true, true, true, rootSubnet.gatewayAddr);
-        emit LibGateway.NewTopDownMessage(tokenSubnet.subnetActorAddr, expected);
+        emit LibGateway.NewTopDownMessage(tokenSubnet.subnetActorAddr, expected, expected.toTracingId());
         rootSubnet.gateway.manager().fundWithToken(tokenSubnet.id, FvmAddressHelper.from(address(recipient)), amount);
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
@@ -1091,8 +1095,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         );
 
         submitBottomUpCheckpoint(checkpoint, nativeSubnet.subnetActor);
-
-        assertEq(recipient.balance, amount);
     }
 
     function testMultiSubnet_Native_SendCrossMessageFromParentToChild() public {
@@ -1122,12 +1124,17 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             to: xnetCallMsg.to,
             value: xnetCallMsg.value,
             message: xnetCallMsg.message,
-            nonce: 1
+            originalNonce: 0,
+            localNonce: 1
         });
 
         vm.prank(address(caller));
         vm.expectEmit(true, true, true, true, rootSubnet.gatewayAddr);
-        emit LibGateway.NewTopDownMessage({subnet: nativeSubnet.subnetActorAddr, message: committedEvent});
+        emit LibGateway.NewTopDownMessage({
+            subnet: nativeSubnet.subnetActorAddr,
+            message: committedEvent,
+            id: committedEvent.toTracingId()
+        });
         rootSubnet.gateway.messenger().sendContractXnetMessage{value: amount}(xnetCallMsg);
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
@@ -1135,8 +1142,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         commitParentFinality(nativeSubnet.gatewayAddr);
         executeTopDownMsgs(msgs, nativeSubnet.id, nativeSubnet.gateway);
-
-        assertEq(address(recipient).balance, amount);
     }
 
     function testMultiSubnet_Token_CallResultRevertsFromChildToParent() public {
@@ -1235,8 +1240,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         );
 
         submitBottomUpCheckpoint(checkpoint, tokenSubnet.subnetActor);
-
-        assertEq(token.balanceOf(recipient), amount);
     }
 
     function testMultiSubnet_Erc20_SendCrossMessageFromParentToChild() public {
@@ -1270,12 +1273,17 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             to: xnetCallMsg.to,
             value: xnetCallMsg.value,
             message: xnetCallMsg.message,
-            nonce: 1
+            originalNonce: 0,
+            localNonce: 1
         });
 
         vm.prank(address(caller));
         vm.expectEmit(true, true, true, true, rootSubnet.gatewayAddr);
-        emit LibGateway.NewTopDownMessage({subnet: tokenSubnet.subnetActorAddr, message: committedEvent});
+        emit LibGateway.NewTopDownMessage({
+            subnet: tokenSubnet.subnetActorAddr,
+            message: committedEvent,
+            id: committedEvent.toTracingId()
+        });
         rootSubnet.gateway.messenger().sendContractXnetMessage{value: amount}(xnetCallMsg);
 
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
@@ -1283,8 +1291,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         commitParentFinality(tokenSubnet.gatewayAddr);
         executeTopDownMsgs(msgs, tokenSubnet.id, tokenSubnet.gateway);
-
-        assertEq(address(recipient).balance, amount);
     }
 
     function commitParentFinality(address gateway) internal {
@@ -1311,7 +1317,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         console.log("minted tokens in executed top-downs: %d", minted_tokens);
 
         // The implementation of the function in fendermint is in
-        // https://github.com/consensus-shipyard/ipc/blob/main/fendermint/vm/interpreter/src/fvm/topdown.rs#L43
+        // https://github.com/consensus-shipyard/ipc/blob/main/fendermint/vm/interpreter/contracts/fvm/topdown.rs#L43
 
         // This emulates minting tokens.
         vm.deal(address(gw), minted_tokens);
@@ -1348,11 +1354,17 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             blockHeight: batch.blockHeight,
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
-            msgs: batch.msgs
+            msgs: batch.msgs,
+            activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        checkpointer.createBottomUpCheckpoint(checkpoint, membershipRoot, weights[0] + weights[1] + weights[2]);
+        checkpointer.createBottomUpCheckpoint(
+            checkpoint,
+            membershipRoot,
+            weights[0] + weights[1] + weights[2],
+            ActivityHelper.dummyActivityRollup()
+        );
         vm.stopPrank();
 
         return checkpoint;
@@ -1377,11 +1389,17 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             blockHeight: e,
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
-            msgs: msgs
+            msgs: msgs,
+            activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
         vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        checkpointer.createBottomUpCheckpoint(checkpoint, membershipRoot, weights[0] + weights[1] + weights[2]);
+        checkpointer.createBottomUpCheckpoint(
+            checkpoint,
+            membershipRoot,
+            weights[0] + weights[1] + weights[2],
+            ActivityHelper.dummyActivityRollup()
+        );
         vm.stopPrank();
 
         return checkpoint;
@@ -1398,7 +1416,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             vm.deal(parentValidators[i], 10 gwei);
             parentPubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(parentKeys[i]);
             vm.prank(parentValidators[i]);
-            manager.join{value: 10}(parentPubKeys[i]);
+            manager.join{value: 10}(parentPubKeys[i], 10);
         }
 
         bytes32 hash = keccak256(abi.encode(checkpoint));

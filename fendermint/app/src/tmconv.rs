@@ -4,10 +4,8 @@
 use anyhow::{anyhow, bail, Context};
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Power, Validator};
-use fendermint_vm_interpreter::fvm::{
-    state::{BlockHash, FvmStateParams},
-    FvmApplyRet, FvmCheckRet, FvmQueryRet, PowerUpdates,
-};
+use fendermint_vm_interpreter::fvm::state::{BlockHash, FvmStateParams};
+use fendermint_vm_interpreter::types::{AppliedMessage, CheckResponse, QueryResponse};
 use fendermint_vm_message::signed::DomainHash;
 use fendermint_vm_snapshot::{SnapshotItem, SnapshotManifest};
 use fvm_shared::{address::Address, error::ExitCode, event::StampedEvent, ActorID};
@@ -65,7 +63,7 @@ pub fn invalid_query(err: AppError, description: String) -> response::Query {
 }
 
 pub fn to_deliver_tx(
-    ret: FvmApplyRet,
+    ret: AppliedMessage,
     domain_hash: Option<DomainHash>,
     block_hash: Option<BlockHash>,
 ) -> response::DeliverTx {
@@ -125,43 +123,27 @@ pub fn to_deliver_tx(
     }
 }
 
-pub fn to_check_tx(ret: FvmCheckRet) -> response::CheckTx {
+pub fn to_check_tx(ret: CheckResponse) -> response::CheckTx {
     // Putting the message `log` because only `log` appears in the `tx_sync` JSON-RPC response.
     let message = ret
         .info
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| to_error_msg(ret.exit_code).to_owned());
 
-    // Potential error messages that arise in checking if contract execution is enabled are returned in the data.
-    // See https://github.com/gakonst/ethers-rs/commit/860100535812cbfe5e3cc417872392a6d76a159c for examples.
-    // Do this the same way as `to_deliver_tx`, serializing to IPLD.
-    let data: bytes::Bytes = ret.return_data.unwrap_or_default().to_vec().into();
-
     response::CheckTx {
         code: to_code(ret.exit_code),
         log: message.clone(),
         info: Default::default(),
-        data,
+        data: Default::default(),
         gas_wanted: ret.gas_limit.try_into().unwrap_or(i64::MAX),
         sender: ret.sender.to_string(),
+        priority: ret.priority,
         ..Default::default()
     }
 }
 
-/// Map the return values from epoch boundary operations to validator updates.
-pub fn to_end_block(power_table: PowerUpdates) -> anyhow::Result<response::EndBlock> {
-    let validator_updates =
-        to_validator_updates(power_table.0).context("failed to convert validator updates")?;
-
-    Ok(response::EndBlock {
-        validator_updates,
-        consensus_param_updates: None,
-        events: Vec::new(), // TODO: Events from epoch transitions?
-    })
-}
-
 /// Map the return values from cron operations.
-pub fn to_begin_block(ret: FvmApplyRet) -> response::BeginBlock {
+pub fn to_begin_block(ret: AppliedMessage) -> response::BeginBlock {
     let events = to_events("event", ret.apply_ret.events, ret.emitters);
 
     response::BeginBlock { events }
@@ -253,15 +235,15 @@ pub fn to_message_event(from: Address, to: Address) -> Event {
 }
 
 /// Map to query results.
-pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> anyhow::Result<response::Query> {
+pub fn to_query(ret: QueryResponse, block_height: BlockHeight) -> anyhow::Result<response::Query> {
     let exit_code = match ret {
-        FvmQueryRet::Ipld(None) | FvmQueryRet::ActorState(None) => ExitCode::USR_NOT_FOUND,
-        FvmQueryRet::Ipld(_) | FvmQueryRet::ActorState(_) => ExitCode::OK,
+        QueryResponse::Ipld(None) | QueryResponse::ActorState(None) => ExitCode::USR_NOT_FOUND,
+        QueryResponse::Ipld(_) | QueryResponse::ActorState(_) => ExitCode::OK,
         // For calls and estimates, the caller needs to look into the `value` field to see the real exit code;
         // the query itself is successful, even if the value represents a failure.
-        FvmQueryRet::Call(_) | FvmQueryRet::EstimateGas(_) => ExitCode::OK,
-        FvmQueryRet::StateParams(_) => ExitCode::OK,
-        FvmQueryRet::BuiltinActors(_) => ExitCode::OK,
+        QueryResponse::Call(_) | QueryResponse::EstimateGas(_) => ExitCode::OK,
+        QueryResponse::StateParams(_) => ExitCode::OK,
+        QueryResponse::BuiltinActors(_) => ExitCode::OK,
     };
 
     // The return value has a `key` field which is supposed to be set to the data matched.
@@ -269,19 +251,19 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> anyhow::Result<r
     // but I assume the query sender has. Rather than repeat everything, I'll add the key
     // where it gives some extra information, like the actor ID, just to keep this option visible.
     let (key, value) = match ret {
-        FvmQueryRet::Ipld(None) | FvmQueryRet::ActorState(None) => (Vec::new(), Vec::new()),
-        FvmQueryRet::Ipld(Some(bz)) => (Vec::new(), bz),
-        FvmQueryRet::ActorState(Some(x)) => {
+        QueryResponse::Ipld(None) | QueryResponse::ActorState(None) => (Vec::new(), Vec::new()),
+        QueryResponse::Ipld(Some(bz)) => (Vec::new(), bz),
+        QueryResponse::ActorState(Some(x)) => {
             let (id, st) = *x;
             let k = ipld_encode!(id);
             let v = ipld_encode!(st);
             (k, v)
         }
-        FvmQueryRet::Call(ret) => {
+        QueryResponse::Call(ret) => {
             // Send back an entire Tendermint deliver_tx response, encoded as IPLD.
             // This is so there is a single representation of a call result, instead
-            // of a normal delivery being one way and a query exposing `FvmApplyRet`.
-            let dtx = to_deliver_tx(ret, None, None);
+            // of a normal delivery being one way and a query exposing `ApplyResponse`.
+            let dtx = to_deliver_tx(*ret, None, None);
             let dtx = tendermint_proto::abci::ResponseDeliverTx::from(dtx);
             let mut buf = bytes::BytesMut::new();
             dtx.encode(&mut buf)?;
@@ -290,15 +272,15 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> anyhow::Result<r
             let v = ipld_encode!(bz);
             (Vec::new(), v)
         }
-        FvmQueryRet::EstimateGas(est) => {
+        QueryResponse::EstimateGas(est) => {
             let v = ipld_encode!(est);
             (Vec::new(), v)
         }
-        FvmQueryRet::StateParams(sp) => {
+        QueryResponse::StateParams(sp) => {
             let v = ipld_encode!(sp);
             (Vec::new(), v)
         }
-        FvmQueryRet::BuiltinActors(ba) => {
+        QueryResponse::BuiltinActors(ba) => {
             let v = ipld_encode!(ba);
             (Vec::new(), v)
         }
@@ -320,6 +302,8 @@ pub fn to_query(ret: FvmQueryRet, block_height: BlockHeight) -> anyhow::Result<r
 }
 
 /// Project Genesis validators to Tendermint.
+/// TODO: the import is quite strange, `Validator` and `Power` are imported from `genesis` crate,
+/// TODO: which should be from a `type` or `validator` crate.
 pub fn to_validator_updates(
     validators: Vec<Validator<Power>>,
 ) -> anyhow::Result<Vec<tendermint::validator::Update>> {

@@ -1,4 +1,4 @@
-name: Storage check
+name: 'Contracts: Storage check'
 
 # This workflow is triggered from the main CI workflow.
 on:
@@ -18,20 +18,22 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Setup Node 16
-        uses: actions/setup-node@v3
+      - uses: pnpm/action-setup@v2
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: '18.x'
-          cache: 'npm'
-          cache-dependency-path: 'contracts/package-lock.json'
+          cache: 'pnpm'
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
           cache: false
+          version: v0.3.0
 
       - name: Install Node dependencies
-        run: cd contracts && npm i --unsafe-perm
+        run: cd contracts && pnpm i --unsafe-perm
 
       - name: Storage check
-        run: cd contracts && npx hardhat storage-layout --check
+        run: cd contracts && pnpm exec hardhat storage-layout --check

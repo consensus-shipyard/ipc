@@ -23,7 +23,6 @@ use ethers_core::{
     abi::Abi,
     types::{BlockId, BlockNumber, Bytes, TransactionReceipt, H256, U256, U64},
 };
-use hex;
 use std::{fmt::Debug, path::PathBuf, sync::Arc};
 use tracing::Level;
 
@@ -35,8 +34,7 @@ mod common;
 // Generate a statically typed interface for the contract.
 abigen!(QueryBlockhash, "../../testing/contracts/QueryBlockhash.abi");
 
-const QUERYBLOCKHASH_HEX: &'static str =
-    include_str!("../../../testing/contracts/QueryBlockhash.bin");
+const QUERYBLOCKHASH_HEX: &str = include_str!("../../../testing/contracts/QueryBlockhash.bin");
 
 #[derive(Parser, Debug)]
 pub struct Options {
@@ -159,7 +157,7 @@ where
             provider
                 .get_block(BlockId::Number(BlockNumber::Number(U64::from(epoch))))
                 .await,
-            |b| b.is_some() && b.as_ref().map(|b| b.number).flatten() == Some(U64::from(epoch)),
+            |b| b.is_some() && b.as_ref().and_then(|b| b.number) == Some(U64::from(epoch)),
         )?;
         let bh = b.unwrap().hash.expect("hash should be set");
         tracing::info!("blockhash from API:      {:?}", bh);

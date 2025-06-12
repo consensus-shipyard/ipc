@@ -1,3 +1,63 @@
+# Targets that are commands.
+COMMANDS :=  deploy-stack gen compile-abi rust-binding slither lint fmt deps build \
+             test install-dev install-npm-package install-eth-abi storage clean coverage \
+             prepare forge
+
+# Targets that are prerequisite commands.
+PREREQ_COMMANDS := pnpm
+
+# Targets that are not commands.
+NON_COMMANDS := node_modules test/helpers/SelectorLibrary.sol
+
+# Declare commands and prerequisite commands as phony targets.
+.PHONY: $(COMMANDS) $(PREREQ_COMMANDS)
+
+# Make all commands and non-command targets dependent on the prerequisites.
+$(COMMANDS): $(PREREQ_COMMANDS)
+$(NON_COMMANDS): $(PREREQ_COMMANDS)
+
+# Override PROFILE env var to choose between `local | ci`
+PROFILE ?= local
+
+# Set to `--push` to push the multiarch image during the build.
+# Leave on `--load` for local build, but it only works for a single platform.
+BUILDX_STORE ?= --load
+# Set according to what kind of `--platform` and `--cache` to use.
+# Leave empty for local builds, then the platform matches the local one.
+BUILDX_FLAGS ?=
+# Set to the `<repo>/<image>:<tag>` label the image.
+BUILDX_TAG   ?= contracts:latest
+
+COMMIT_SHA := $(shell git rev-parse --short HEAD)
+
+
+# To use `buildx` locally to produce multiplatform images, one needs to run `docker buildx create --use`.
+# After that it looks like even the regular docker build needs the `--load` parameter, which hopefully
+# it can handle for anyone with `DOCKER_BUILDKIT=1`.
+docker-build:
+	if [ "$(PROFILE)" = "ci" ]; then \
+		docker buildx build \
+			$(BUILDX_STORE) \
+			$(BUILDX_FLAGS) \
+			--build-arg COMMIT_SHA="$(COMMIT_SHA)" \
+			-f docker/Dockerfile \
+			-t $(BUILDX_TAG) $(PWD)/.; \
+	else \
+		DOCKER_BUILDKIT=1 \
+		docker build \
+			$(BUILDX_STORE) \
+			--build-arg COMMIT_SHA="$(COMMIT_SHA)" \
+			-f docker/Dockerfile \
+			-t contracts:latest $(PWD)/.; \
+	fi
+
+pnpm:
+	@command -v pnpm > /dev/null || { \
+		echo "pnpm is not installed. Installing pnpm..."; \
+		npm install -g pnpm; \
+	}
+
+
 # ==============================================================================
 # Deployment
 
@@ -7,23 +67,8 @@ NETWORK ?= auto
 # It is required by docker builds, but shouldn't be checked into git.
 OUTPUT ?= out
 
-deploy-ipc:
-	./ops/deploy.sh $(NETWORK)
-
-deploy-subnet-registry:
-	./ops/deploy-subnet-registry.sh $(NETWORK)
-
-deploy-subnet:
-	./ops/deploy-subnet.sh $(NETWORK)
-
-upgrade-gw-diamond:
-	./ops/upgrade-gw-diamond.sh $(NETWORK)
-
-upgrade-sa-diamond:
-	./ops/upgrade-sa-diamond.sh $(NETWORK) $(SUBNET_ACTOR_ADDRESS)
-
-upgrade-sr-diamond:
-	./ops/upgrade-sr-diamond.sh $(NETWORK)
+deploy-stack:
+	pnpm exec hardhat deploy-stack --network $(NETWORK)
 
 # ==============================================================================
 # Code generation
@@ -35,23 +80,12 @@ upgrade-sr-diamond:
 
 gen: compile-abi rust-binding
 
-compile-abi: | forge
+compile-abi: node_modules | forge
 	mkdir -p $(OUTPUT)
 	./ops/compile-abi.sh $(OUTPUT)
 
 rust-binding:
-	OUTPUT=$(OUTPUT) cargo build --locked --release --manifest-path ./binding/Cargo.toml -p ipc_actors_abis
-
-# commit-abi:
-# 	./ops/commit-abi.sh $(OUTPUT)
-
-# commit-rust-binding:
-# 	./ops/commit-rust-binding.sh
-
-# check-rust-binding:
-# 	cargo fmt --manifest-path ./binding/Cargo.toml && \
-# 	cargo clippy --manifest-path ./binding/Cargo.toml && \
-# 	./ops/check-rust-binding.sh
+	OUTPUT=$(OUTPUT) cargo build --release --manifest-path ../contract-bindings/Cargo.toml -p ipc_actors_abis
 
 # ==============================================================================
 # Running security checks within the local computer
@@ -63,30 +97,29 @@ slither:
 # Development support
 
 lint: fmt
-	npx solhint 'src/**/*.sol'
+	pnpm exec solhint 'contracts/**/*.sol' 'sdk/**/**/*.sol'
 
 fmt:
-	npm install --silent --no-save
-	npx prettier --check -w 'src/**/**/*.sol' 'sdk/**/**/*.sol' 'test/**/**/*.sol' 'test/**/**/*.t.sol' '**/*.{js,jsx,ts,tsx,json,css,md}'
+	pnpm install --silent --no-save
+	pnpm exec prettier --check -w 'contracts/**/**/*.sol' 'sdk/**/**/*.sol' 'test/**/**/*.sol' 'test/**/**/*.t.sol' '**/*.{js,jsx,ts,tsx,json,css}'
 
-build: | forge
-	forge build
+deps: node_modules
 
-test: | forge
+node_modules: package.json pnpm-lock.yaml
+	pnpm install
+	touch node_modules
+
+build: node_modules | forge
+	forge build --names
+	forge build sdk --names
+
+test: node_modules test/helpers/SelectorLibrary.sol | forge
 	forge test -vvv --ffi
-
-install-dev: install-npm-package install-eth-abi
-
-install-npm-package:
-	npm install --save-dev
-
-install-eth-abi:
-	curl -sSL https://bootstrap.pypa.io/get-pip.py -o get-pip.py && python3 get-pip.py && rm get-pip.py && python3 -m pip install eth_abi
 
 storage:
 	rm -rf ./cache
 	rm -rf ./cache_hardhat
-	npx hardhat storage-layout --update
+	pnpm exec hardhat storage-layout --update
 
 clean:
 	rm -rf ./artifacts
@@ -94,24 +127,23 @@ clean:
 	rm -rf ./cache_hardhat
 	rm -rf ./typechain
 
-coverage: | forge
+coverage: node_modules | forge
 	forge coverage --ffi --report lcov -C ./src
-	genhtml -o coverage_report lcov.info --branch-coverage
+	@if [ "$(shell uname)" = "Darwin" ]; then \
+		genhtml -o coverage_report lcov.info --branch-coverage --ignore-errors category; \
+	else \
+		genhtml -o coverage_report lcov.info --branch-coverage; \
+	fi
 	./tools/check_coverage.sh
 
-coverage-for-mac: | forge
-	forge coverage --ffi --report lcov -C ./src
-	genhtml -o coverage_report lcov.info --branch-coverage --ignore-errors category
-	./tools/check_coverage.sh
+prepare: test/helpers/SelectorLibrary.sol fmt lint test slither
 
-prepare: build-selector-library fmt lint test slither
-
-build-selector-library: | forge
-	python3 scripts/python/build_selector_library.py
-	npx prettier -w test/helpers/SelectorLibrary.sol
+test/helpers/SelectorLibrary.sol: | forge
+    # viaIR is causing stack too deep in optimization for tests, but not in prod for `confirmChange`, disable for tests
+	VIAIR_DISABLED=true pnpm exec hardhat gen-selector-library
+	pnpm exec prettier -w test/helpers/SelectorLibrary.sol
 
 # Forge is used by the ipc-solidity-actors compilation steps.
-.PHONY: forge
 forge:
 	@if [ -z "$(shell which forge)" ]; then \
 		echo "Please install Foundry. See https://book.getfoundry.sh/getting-started/installation"; \
@@ -119,4 +151,3 @@ forge:
 	fi
 
 # ==============================================================================
-.PHONY: deploy-ipc lint fmt check-subnet slither check-gateway test prepare storage build clean

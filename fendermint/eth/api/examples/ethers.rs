@@ -41,8 +41,8 @@ use ethers_core::{
     abi::Abi,
     types::{
         transaction::eip2718::TypedTransaction, Address, BlockId, BlockNumber, Bytes,
-        Eip1559TransactionRequest, Filter, Log, SyncingStatus, TransactionReceipt, TxHash, H256,
-        U256, U64,
+        Eip1559TransactionRequest, Filter, Log, SyncingStatus, TransactionReceipt,
+        TransactionRequest, TxHash, H256, U256, U64,
     },
 };
 use tracing::Level;
@@ -61,8 +61,8 @@ const FILTERS_ENABLED: bool = true;
 // An example of what it looks like is at https://github.com/filecoin-project/ref-fvm/blob/evm-integration-tests/testing/integration/tests/evm/src/simple_coin/simple_coin.rs
 abigen!(SimpleCoin, "../../testing/contracts/SimpleCoin.abi");
 
-const SIMPLECOIN_HEX: &'static str = include_str!("../../../testing/contracts/SimpleCoin.bin");
-const SIMPLECOIN_RUNTIME_HEX: &'static str =
+const SIMPLECOIN_HEX: &str = include_str!("../../../testing/contracts/SimpleCoin.bin");
+const SIMPLECOIN_RUNTIME_HEX: &str =
     include_str!("../../../testing/contracts/SimpleCoin.bin-runtime");
 
 #[derive(Parser, Debug)]
@@ -303,7 +303,7 @@ where
         provider
             .get_block(BlockId::Number(BlockNumber::Number(bn)))
             .await,
-        |b| b.is_some() && b.as_ref().map(|b| b.number).flatten() == Some(bn),
+        |b| b.is_some() && b.as_ref().and_then(|b| b.number) == Some(bn),
     )?;
 
     let bh = b.unwrap().hash.expect("hash should be set");
@@ -312,7 +312,7 @@ where
     request(
         "eth_getBlockByHash w/o txns",
         provider.get_block(BlockId::Hash(bh)).await,
-        |b| b.is_some() && b.as_ref().map(|b| b.number).flatten() == Some(bn),
+        |b| b.is_some() && b.as_ref().and_then(|b| b.number) == Some(bn),
     )?;
 
     // Get the synthetic zero block.
@@ -330,7 +330,7 @@ where
     request(
         "eth_getBlockByHash @ zero",
         provider.get_block(BlockId::Hash(bh)).await,
-        |b| b.is_some() && b.as_ref().map(|b| b.number).flatten() == Some(U64::from(0)),
+        |b| b.is_some() && b.as_ref().and_then(|b| b.number) == Some(U64::from(0)),
     )?;
 
     // Check that block 1 points at the synthetic block 0 as parent.
@@ -400,7 +400,7 @@ where
         provider
             .get_block_with_txs(BlockId::Number(BlockNumber::Number(bn)))
             .await,
-        |b| b.is_some() && b.as_ref().map(|b| b.number).flatten() == Some(bn),
+        |b| b.is_some() && b.as_ref().and_then(|b| b.number) == Some(bn),
     )?;
 
     assert_eq!(
@@ -413,7 +413,7 @@ where
     request(
         "eth_getBlockByHash w/ txns",
         provider.get_block_with_txs(BlockId::Hash(bh)).await,
-        |b| b.is_some() && b.as_ref().map(|b| b.number).flatten() == Some(bn),
+        |b| b.is_some() && b.as_ref().and_then(|b| b.number) == Some(bn),
     )?;
 
     // By now there should be a transaction in a block.
@@ -427,7 +427,7 @@ where
             )
             .await,
         |hist| {
-            hist.base_fee_per_gas.len() > 0
+            !hist.base_fee_per_gas.is_empty()
                 && *hist.base_fee_per_gas.last().unwrap() == base_fee
                 && hist.gas_used_ratio.iter().any(|r| *r > 0.0)
         },
@@ -705,6 +705,17 @@ where
             *ok
         })?;
     }
+
+    // Check legacy transactions
+    // Set up the transaction details for a legacy transaction
+    let tx = TransactionRequest::new()
+        .to(to.eth_addr) // Replace with recipient address
+        .value(U256::from(1u64)); // Gas limit for standard ETH transfer
+
+    // Send the transaction
+    let pending_tx = mw.send_transaction(tx, None).await?;
+    let receipt = pending_tx.await?.unwrap();
+    tracing::info!("legacy transaction sent: {:?}", receipt.transaction_hash);
 
     Ok(())
 }

@@ -4,14 +4,18 @@
 use std::{
     collections::BTreeMap,
     fmt::Display,
+    io,
     path::{Path, PathBuf},
     str::FromStr,
     time::{Duration, Instant},
 };
 
+use tokio::try_join;
+
 use anyhow::{anyhow, bail, Context};
 use bollard::Docker;
 use ethers::{providers::Middleware, types::H160};
+use fs_err as fs;
 use fvm_shared::bigint::Zero;
 use lazy_static::lazy_static;
 use tendermint_rpc::Client;
@@ -81,13 +85,13 @@ impl Display for DockerNode {
 }
 
 impl DockerNode {
-    pub async fn get_or_create<'a>(
+    pub async fn get_or_create(
         root: impl AsRef<Path>,
         docker: Docker,
         dropper: DropChute,
         drop_policy: &DropPolicy,
         node_name: &NodeName,
-        node_config: &NodeConfig<'a, DockerMaterials>,
+        node_config: &NodeConfig<'_, DockerMaterials>,
         port_range: DockerPortRange,
     ) -> anyhow::Result<Self> {
         let fendermint_name = container_name(node_name, "fendermint");
@@ -120,7 +124,7 @@ impl DockerNode {
 
         // Directory for the node's data volumes
         let node_dir = root.as_ref().join(node_name);
-        std::fs::create_dir_all(&node_dir).context("failed to create node dir")?;
+        fs::create_dir_all(&node_dir).context("failed to create node dir")?;
 
         // Get the current user ID to use with docker containers.
         let user = user_id(&node_dir)?;
@@ -141,28 +145,28 @@ impl DockerNode {
         // Create a directory for keys
         let keys_dir = node_dir.join("keys");
         if !keys_dir.exists() {
-            std::fs::create_dir(&keys_dir)?;
+            fs::create_dir(&keys_dir)?;
         }
 
         // Create a directory for cometbft
         let cometbft_dir = node_dir.join("cometbft");
         if !cometbft_dir.exists() {
-            std::fs::create_dir(&cometbft_dir)?;
+            fs::create_dir(&cometbft_dir)?;
         }
 
         // Create a directory for fendermint
         let fendermint_dir = node_dir.join("fendermint");
         if !fendermint_dir.exists() {
-            std::fs::create_dir(&fendermint_dir)?;
-            std::fs::create_dir(fendermint_dir.join("data"))?;
-            std::fs::create_dir(fendermint_dir.join("logs"))?;
-            std::fs::create_dir(fendermint_dir.join("snapshots"))?;
+            fs::create_dir(&fendermint_dir)?;
+            fs::create_dir(fendermint_dir.join("data"))?;
+            fs::create_dir(fendermint_dir.join("logs"))?;
+            fs::create_dir(fendermint_dir.join("snapshots"))?;
         }
 
         // Create a directory for ethapi logs
         let ethapi_dir = node_dir.join("ethapi");
         if !ethapi_dir.exists() {
-            std::fs::create_dir_all(ethapi_dir.join("logs"))?;
+            fs::create_dir_all(ethapi_dir.join("logs"))?;
         }
 
         // We'll need to run some cometbft and fendermint commands.
@@ -205,6 +209,21 @@ impl DockerNode {
 
         export_file(keys_dir.join(COMETBFT_NODE_ID), cometbft_node_id)?;
 
+        fendermint_runner
+            .run_cmd(
+                "genesis \
+                    --genesis-file /fendermint/genesis.json \
+                    ipc \
+                        seal-genesis \
+                        --builtin-actors-path /fendermint/bundle.car \
+                        --custom-actors-path /fendermint/custom_actors_bundle.car \
+                        --artifacts-path /fendermint/contracts \
+                        --output-path /cometbft/config/sealed.json \
+                    ",
+            )
+            .await
+            .context("failed to seal genesis state")?;
+
         // Convert fendermint genesis to cometbft.
         fendermint_runner
             .run_cmd(
@@ -212,6 +231,7 @@ impl DockerNode {
                     --genesis-file /fendermint/genesis.json \
                     into-tendermint \
                     --out /cometbft/config/genesis.json \
+                    --app-state /cometbft/config/sealed.json \
                     ",
             )
             .await
@@ -220,7 +240,7 @@ impl DockerNode {
         // Convert validator private key to cometbft.
         if let Some(v) = node_config.validator {
             let validator_key_path = v.secret_key_path();
-            std::fs::copy(validator_key_path, keys_dir.join("validator_key.sk"))
+            fs::copy(validator_key_path, keys_dir.join("validator_key.sk"))
                 .context("failed to copy validator key")?;
 
             fendermint_runner
@@ -383,15 +403,20 @@ impl DockerNode {
         let fendermint = match fendermint {
             Some(c) => c,
             None => {
-                let creator = make_runner(
-                    FENDERMINT_IMAGE,
-                    volumes(vec![
-                        (keys_dir.clone(), "/fendermint/keys"),
-                        (fendermint_dir.join("data"), "/fendermint/data"),
-                        (fendermint_dir.join("logs"), "/fendermint/logs"),
-                        (fendermint_dir.join("snapshots"), "/fendermint/snapshots"),
-                    ]),
-                );
+                let mut volume_mappings = vec![
+                    (keys_dir.clone(), "/fendermint/keys"),
+                    (fendermint_dir.join("data"), "/fendermint/data"),
+                    (fendermint_dir.join("logs"), "/fendermint/logs"),
+                    (fendermint_dir.join("snapshots"), "/fendermint/snapshots"),
+                ];
+
+                if let Some(additional_config) = node_config.fendermint_additional_config {
+                    let host_config_path =
+                        write_config_to_disk(additional_config, &fendermint_dir, "dev.toml")?;
+                    volume_mappings.push((host_config_path, "/fendermint/config/dev.toml"));
+                }
+
+                let creator = make_runner(FENDERMINT_IMAGE, volumes(volume_mappings));
 
                 creator
                     .create(
@@ -464,7 +489,7 @@ impl DockerNode {
         })
     }
 
-    pub async fn start(&self, seed_nodes: &[&Self]) -> anyhow::Result<()> {
+    pub async fn start_all_containers(&self, seed_nodes: &[&Self]) -> anyhow::Result<()> {
         let cometbft_seeds = collect_seeds(seed_nodes, |n| {
             let host = &n.cometbft.hostname();
             let id = n.cometbft_node_id()?;
@@ -484,18 +509,20 @@ impl DockerNode {
 
         export_env(self.path.join(DYNAMIC_ENV), &env)?;
 
-        // Start all three containers.
-        self.fendermint.start().await?;
-        self.cometbft.start().await?;
-        if let Some(ref ethapi) = self.ethapi {
-            ethapi.start().await?;
-        }
+        // Start all three containers at the same time.
+        try_join!(self.fendermint.start(), self.cometbft.start(), async {
+            if let Some(ref ethapi) = self.ethapi {
+                ethapi.start().await
+            } else {
+                Ok(())
+            }
+        })?;
 
         Ok(())
     }
 
     /// Allow time for things to consolidate and APIs to start.
-    pub async fn wait_for_started(&self, timeout: Duration) -> anyhow::Result<bool> {
+    pub async fn wait_for_apis_to_start(&self, timeout: Duration) -> anyhow::Result<bool> {
         let start = Instant::now();
 
         loop {
@@ -511,7 +538,7 @@ impl DockerNode {
             }
 
             if let Some(client) = self.ethapi_http_provider()? {
-                if let Err(e) = client.get_chainid().await {
+                if let Err(e) = client.get_block(1).await {
                     continue;
                 }
             }
@@ -623,7 +650,7 @@ fn export_env(file_path: impl AsRef<Path>, env: &EnvMap) -> anyhow::Result<()> {
 }
 
 fn read_file(file_path: impl AsRef<Path>) -> anyhow::Result<String> {
-    std::fs::read_to_string(&file_path)
+    fs::read_to_string(&file_path)
         .with_context(|| format!("failed to read {}", file_path.as_ref().to_string_lossy()))
 }
 
@@ -645,6 +672,22 @@ fn parse_fendermint_peer_id(value: impl AsRef<str>) -> anyhow::Result<String> {
     Ok(value)
 }
 
+// Writes the given TOML configuration to a file under the provided directory.
+// The file will be named as specified by `file_name`.
+// Returns the full path to the written file.
+pub fn write_config_to_disk<P: AsRef<Path>>(
+    config: &toml::Value,
+    directory: P,
+    file_name: &str,
+) -> io::Result<PathBuf> {
+    let target_dir = directory.as_ref();
+    fs::create_dir_all(target_dir)?; // Ensure the directory exists.
+    let file_path = target_dir.join(file_name);
+    let toml_string =
+        toml::to_string_pretty(config).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    fs::write(&file_path, toml_string)?;
+    Ok(file_path)
+}
 #[cfg(test)]
 mod tests {
     use super::{DockerRunner, COMETBFT_IMAGE};

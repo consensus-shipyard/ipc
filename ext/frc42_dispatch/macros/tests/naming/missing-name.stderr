@@ -1,0 +1,7 @@
+error: unexpected end of input, expected string literal
+ --> tests/naming/missing-name.rs:5:23
+  |
+5 |     let _ident_hash = method_hash!();
+  |                       ^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the macro `method_hash` (in Nightly builds, run with -Z macro-backtrace for more info)

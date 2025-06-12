@@ -4,17 +4,19 @@
 
 use crate::config::Subnet;
 use crate::manager::{BottomUpCheckpointRelayer, EthSubnetManager};
+use crate::observe::CheckpointSubmitted;
 use anyhow::{anyhow, Result};
-use futures_util::future::try_join_all;
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use ipc_api::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
+use ipc_observability::{emit, serde::HexEncodableBlockHash};
 use ipc_wallet::{EthKeyAddress, PersistentKeyStore};
 use std::cmp::max;
 use std::fmt::{Display, Formatter};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::sync::Semaphore;
+use tokio::time::timeout;
 
 /// Tracks the config required for bottom up checkpoint submissions
 /// parent/child subnet and checkpoint period.
@@ -127,7 +129,7 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         }
     }
 
-    /// Checks if the relayer has already submitted at the next submission epoch, if not it submits it.
+    /// Checks if the relayer has already submitted at the next submission epoch, if not it submitts the bottom up checkpoint.
     async fn submit_next_epoch(&self, submitter: Address) -> Result<()> {
         let last_checkpoint_epoch = self
             .parent_handler
@@ -153,7 +155,6 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         );
 
         let mut count = 0;
-        let mut all_submit_tasks = vec![];
 
         for h in start..=finalized_height {
             let events = self.child_handler.quorum_reached_events(h).await?;
@@ -162,7 +163,7 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                 continue;
             }
 
-            tracing::debug!("found reached events at height : {h}");
+            tracing::info!("found reached events at height : {h}");
 
             for event in events {
                 // Note that the event will be emitted later than the checkpoint height.
@@ -170,7 +171,7 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                 // in fendermint at height 403. This means the event.height == 400 which is
                 // already committed.
                 if event.height <= last_checkpoint_epoch {
-                    tracing::debug!("event height already committed: {}", event.height);
+                    tracing::info!("event height already committed: {}", event.height);
                     continue;
                 }
 
@@ -197,29 +198,41 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
                     .clone()
                     .acquire_owned()
                     .await
-                    .unwrap();
-                all_submit_tasks.push(tokio::task::spawn(async move {
+                    .expect("Semaphore is not poisoned");
+
+                let fut = async move {
                     let height = event.height;
-                    let result =
+                    let hash = bundle.checkpoint.block_hash.clone();
+                    let result: std::result::Result<(), anyhow::Error> =
                         Self::submit_checkpoint(parent_handler_clone, submitter, bundle, event)
                             .await
+                            .inspect(|_| {
+                                emit(CheckpointSubmitted {
+                                    height,
+                                    hash: HexEncodableBlockHash(hash),
+                                });
+                            })
                             .inspect_err(|err| {
                                 tracing::error!(
                                     "Fail to submit checkpoint at height {height}: {err}"
                                 );
                             });
+
                     drop(submission_permit);
                     result
-                }));
+                };
+                // TODO reevaluate the 30 seconds in practice, tentatively significantly to generous
+                timeout(Duration::from_secs(30), fut)
+                    .await
+                    .map_err(|_elapsed| {
+                        anyhow!("Timeout was reached at checkpoint with index {count}")
+                    })??;
 
                 count += 1;
-                tracing::debug!("This round has asynchronously submitted {count} checkpoints",);
+                tracing::debug!("This round has submitted {count} checkpoints",);
             }
         }
-
-        tracing::debug!("Waiting for all submissions to finish");
-        // Return error if any of the submit task failed.
-        try_join_all(all_submit_tasks).await?;
+        tracing::debug!("Submissions complete");
 
         Ok(())
     }
@@ -230,13 +243,22 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         bundle: BottomUpCheckpointBundle,
         event: QuorumReachedEvent,
     ) -> Result<(), anyhow::Error> {
+        let BottomUpCheckpointBundle {
+            checkpoint,
+            signatures,
+            signatories,
+        } = bundle;
+
+        // sort by address in ascending order as the contract requires it.
+        let mut pairs = signatories
+            .into_iter()
+            .zip(signatures.into_iter())
+            .collect::<Vec<_>>();
+        pairs.sort_by(|a, b| a.0.cmp(&b.0));
+        let (signatories, signatures): (Vec<_>, Vec<_>) = pairs.into_iter().unzip();
+
         let epoch = parent_handler
-            .submit_checkpoint(
-                &submitter,
-                bundle.checkpoint,
-                bundle.signatures,
-                bundle.signatories,
-            )
+            .submit_checkpoint(&submitter, checkpoint, signatures, signatories)
             .await
             .map_err(|e| {
                 anyhow!(

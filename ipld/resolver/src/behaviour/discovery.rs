@@ -8,6 +8,9 @@ use std::{
     time::Duration,
 };
 
+use super::NetworkConfig;
+use crate::observe;
+use ipc_observability::emit;
 use libp2p::{
     core::Endpoint,
     identify::Info,
@@ -23,11 +26,6 @@ use libp2p::{
 };
 use log::{debug, warn};
 use tokio::time::Interval;
-
-use crate::stats;
-
-use super::NetworkConfig;
-
 // NOTE: The Discovery behaviour is largely based on what exists in Forest. If it ain't broken...
 // NOTE: Not sure if emitting events is going to be useful yet, but for now it's an example of having one.
 
@@ -36,7 +34,7 @@ use super::NetworkConfig;
 pub enum Event {
     /// Event emitted when a peer is added or updated in the routing table,
     /// which means if we later ask for its addresses, they should be known.
-    Added(PeerId, Vec<Multiaddr>),
+    Added(PeerId),
 
     /// Event emitted when a peer is removed from the routing table.
     Removed(PeerId),
@@ -155,8 +153,8 @@ impl Behaviour {
         } else {
             // It would be nice to use `.group_by` here but it's unstable.
             // Make sure static peers are reported as routable.
-            for (peer_id, addr) in static_addresses.iter() {
-                outbox.push_back(Event::Added(*peer_id, vec![addr.clone()]))
+            for (peer_id, _) in static_addresses.iter() {
+                outbox.push_back(Event::Added(*peer_id))
             }
             None
         };
@@ -178,7 +176,7 @@ impl Behaviour {
     pub fn background_lookup(&mut self, peer_id: PeerId) {
         if self.addresses_of_peer(peer_id).is_empty() {
             if let Some(kademlia) = self.inner.as_mut() {
-                stats::DISCOVERY_BACKGROUND_LOOKUP.inc();
+                emit(observe::DiscoveryEvent::BackgroundLookup(peer_id));
                 kademlia.get_closest_peers(peer_id);
             }
         }
@@ -241,13 +239,13 @@ impl NetworkBehaviour for Behaviour {
         match &event {
             FromSwarm::ConnectionEstablished(e) => {
                 if e.other_established == 0 {
-                    stats::DISCOVERY_CONNECTED_PEERS.inc();
+                    emit(observe::DiscoveryEvent::ConnectionEstablished(e.peer_id));
                     self.num_connections += 1;
                 }
             }
             FromSwarm::ConnectionClosed(e) => {
                 if e.remaining_established == 0 {
-                    stats::DISCOVERY_CONNECTED_PEERS.dec();
+                    emit(observe::DiscoveryEvent::ConnectionClosed(e.peer_id));
                     self.num_connections -= 1;
                 }
             }
@@ -394,17 +392,12 @@ impl NetworkBehaviour for Behaviour {
                         }
                         // Unfortunately, looking at the Kademlia behaviour, it looks like when it goes from pending to active,
                         // it won't emit another event, so we might as well tentatively emit an event here.
-                        kad::Event::PendingRoutablePeer { peer, address } => {
+                        kad::Event::PendingRoutablePeer { peer, .. } => {
                             debug!("{peer} pending to the routing table of {}", self.peer_id);
-                            self.outbox.push_back(Event::Added(peer, vec![address]))
+                            self.outbox.push_back(Event::Added(peer))
                         }
                         // This event should ensure that we will be able to answer address lookups later.
-                        kad::Event::RoutingUpdated {
-                            peer,
-                            addresses,
-                            old_peer,
-                            ..
-                        } => {
+                        kad::Event::RoutingUpdated { peer, old_peer, .. } => {
                             debug!("{peer} added to the routing table of {}", self.peer_id);
                             // There are two events here; we can only return one, so let's defer them to the outbox.
                             if let Some(peer_id) = old_peer {
@@ -412,8 +405,7 @@ impl NetworkBehaviour for Behaviour {
                                     self.outbox.push_back(Event::Removed(peer_id))
                                 }
                             }
-                            self.outbox
-                                .push_back(Event::Added(peer, addresses.into_vec()))
+                            self.outbox.push_back(Event::Added(peer))
                         }
                     }
                 }

@@ -2,49 +2,53 @@
 pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
-import "../src/errors/IPCErrors.sol";
+import "../contracts/errors/IPCErrors.sol";
 
-import {EMPTY_BYTES, METHOD_SEND} from "../src/constants/Constants.sol";
-import {ConsensusType} from "../src/enums/ConsensusType.sol";
-import {IDiamond} from "../src/interfaces/IDiamond.sol";
-import {IpcEnvelope, BottomUpCheckpoint, IpcMsgKind, ParentFinality, CallMsg} from "../src/structs/CrossNet.sol";
-import {FvmAddress} from "../src/structs/FvmAddress.sol";
-import {SubnetID, SupplyKind, PermissionMode, PermissionMode, Subnet, SupplySource, IPCAddress, Validator} from "../src/structs/Subnet.sol";
-import {SubnetIDHelper} from "../src/lib/SubnetIDHelper.sol";
-import {FvmAddressHelper} from "../src/lib/FvmAddressHelper.sol";
-import {CrossMsgHelper} from "../src/lib/CrossMsgHelper.sol";
-import {FilAddress} from "fevmate/utils/FilAddress.sol";
-import {GatewayDiamond} from "../src/GatewayDiamond.sol";
-import {SubnetActorDiamond} from "../src/SubnetActorDiamond.sol";
-import {GatewayGetterFacet} from "../src/gateway/GatewayGetterFacet.sol";
-import {GatewayMessengerFacet} from "../src/gateway/GatewayMessengerFacet.sol";
-import {GatewayManagerFacet} from "../src/gateway/GatewayManagerFacet.sol";
+import {EMPTY_BYTES, METHOD_SEND} from "../contracts/constants/Constants.sol";
+import {ConsensusType} from "../contracts/enums/ConsensusType.sol";
+import {IDiamond} from "../contracts/interfaces/IDiamond.sol";
+import {IpcEnvelope, BottomUpCheckpoint, IpcMsgKind, ParentFinality, CallMsg} from "../contracts/structs/CrossNet.sol";
+import {FvmAddress} from "../contracts/structs/FvmAddress.sol";
+import {SubnetID, AssetKind, PermissionMode, PermissionMode, Subnet, Asset, IPCAddress, Validator} from "../contracts/structs/Subnet.sol";
+import {SubnetIDHelper} from "../contracts/lib/SubnetIDHelper.sol";
+import {FvmAddressHelper} from "../contracts/lib/FvmAddressHelper.sol";
+import {CrossMsgHelper} from "../contracts/lib/CrossMsgHelper.sol";
+import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
+import {GatewayDiamond} from "../contracts/GatewayDiamond.sol";
+import {SubnetActorDiamond} from "../contracts/SubnetActorDiamond.sol";
+import {GatewayGetterFacet} from "../contracts/gateway/GatewayGetterFacet.sol";
+import {GatewayMessengerFacet} from "../contracts/gateway/GatewayMessengerFacet.sol";
+import {GatewayManagerFacet} from "../contracts/gateway/GatewayManagerFacet.sol";
 
-import {CheckpointingFacet} from "../src/gateway/router/CheckpointingFacet.sol";
-import {XnetMessagingFacet} from "../src/gateway/router/XnetMessagingFacet.sol";
-import {TopDownFinalityFacet} from "../src/gateway/router/TopDownFinalityFacet.sol";
+import {CheckpointingFacet} from "../contracts/gateway/router/CheckpointingFacet.sol";
+import {XnetMessagingFacet} from "../contracts/gateway/router/XnetMessagingFacet.sol";
+import {TopDownFinalityFacet} from "../contracts/gateway/router/TopDownFinalityFacet.sol";
 
 import {SubnetActorMock} from "./mocks/SubnetActorMock.sol";
-import {SubnetActorManagerFacet} from "../src/subnet/SubnetActorManagerFacet.sol";
-import {SubnetActorPauseFacet} from "../src/subnet/SubnetActorPauseFacet.sol";
-import {SubnetActorCheckpointingFacet} from "../src/subnet/SubnetActorCheckpointingFacet.sol";
-import {SubnetActorRewardFacet} from "../src/subnet/SubnetActorRewardFacet.sol";
-import {SubnetActorGetterFacet} from "../src/subnet/SubnetActorGetterFacet.sol";
+import {SubnetActorManagerFacet} from "../contracts/subnet/SubnetActorManagerFacet.sol";
+import {SubnetActorPauseFacet} from "../contracts/subnet/SubnetActorPauseFacet.sol";
+import {SubnetActorCheckpointingFacet} from "../contracts/subnet/SubnetActorCheckpointingFacet.sol";
+import {SubnetActorRewardFacet} from "../contracts/subnet/SubnetActorRewardFacet.sol";
+import {SubnetActorGetterFacet} from "../contracts/subnet/SubnetActorGetterFacet.sol";
 
-import {SubnetRegistryDiamond} from "../src/SubnetRegistryDiamond.sol";
-import {RegisterSubnetFacet} from "../src/subnetregistry/RegisterSubnetFacet.sol";
-import {SubnetGetterFacet} from "../src/subnetregistry/SubnetGetterFacet.sol";
+import {SubnetRegistryDiamond} from "../contracts/SubnetRegistryDiamond.sol";
+import {RegisterSubnetFacet} from "../contracts/subnetregistry/RegisterSubnetFacet.sol";
+import {SubnetGetterFacet} from "../contracts/subnetregistry/SubnetGetterFacet.sol";
 
-import {OwnershipFacet} from "../src/OwnershipFacet.sol";
+import {OwnershipFacet} from "../contracts/OwnershipFacet.sol";
 
-import {DiamondLoupeFacet} from "../src/diamond/DiamondLoupeFacet.sol";
-import {DiamondCutFacet} from "../src/diamond/DiamondCutFacet.sol";
-import {SupplySourceHelper} from "../src/lib/SupplySourceHelper.sol";
+import {DiamondLoupeFacet} from "../contracts/diamond/DiamondLoupeFacet.sol";
+import {DiamondCutFacet} from "../contracts/diamond/DiamondCutFacet.sol";
+import {AssetHelper} from "../contracts/lib/AssetHelper.sol";
 import {TestUtils} from "./helpers/TestUtils.sol";
 import {SelectorLibrary} from "./helpers/SelectorLibrary.sol";
 import {GatewayFacetsHelper} from "./helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "./helpers/SubnetActorFacetsHelper.sol";
 import {DiamondFacetsHelper} from "./helpers/DiamondFacetsHelper.sol";
+
+import {FullActivityRollup, CompressedActivityRollup, Consensus} from "../contracts/structs/Activity.sol";
+import {ValidatorRewarderMap} from "../contracts/examples/ValidatorRewarderMap.sol";
+import {SubnetActorActivityFacet} from "../contracts/subnet/SubnetActorActivityFacet.sol";
 
 struct TestSubnetDefinition {
     GatewayDiamond gateway;
@@ -61,6 +65,18 @@ struct RootSubnetDefinition {
     SubnetID id;
 }
 
+contract SubnetWithNativeTokenMock {
+    function supplySource() public pure returns (Asset memory t) {
+        return t;
+    }
+
+    function collateralSource() public pure returns (Asset memory t) {
+        return t;
+    }
+
+    receive() external payable {}
+}
+
 contract TestParams {
     uint64 constant MAX_NONCE = type(uint64).max;
     address constant BLS_ACCOUNT_ADDREESS = address(0xfF000000000000000000000000000000bEefbEEf);
@@ -73,8 +89,6 @@ contract TestParams {
     bytes constant GENESIS = EMPTY_BYTES;
     uint256 constant DEFAULT_CROSS_MSG_FEE = 10 gwei;
     uint256 constant DEFAULT_RELAYER_REWARD = 10 gwei;
-    address constant CHILD_NETWORK_ADDRESS = address(10);
-    address constant CHILD_NETWORK_ADDRESS_2 = address(11);
     uint64 constant EPOCH_ONE = 1 * DEFAULT_CHECKPOINT_PERIOD;
     uint256 constant INITIAL_VALIDATOR_FUNDS = 1 ether;
     uint16 constant DEFAULT_ACTIVE_VALIDATORS_LIMIT = 100;
@@ -84,6 +98,9 @@ contract TestParams {
     address constant DEFAULT_IPC_GATEWAY_ADDR = address(1024);
     address constant TOPDOWN_VALIDATOR_1 = address(12);
     bytes32 constant DEFAULT_COMMIT_SHA = "c7d8f53f";
+
+    address CHILD_NETWORK_ADDRESS = address(new SubnetWithNativeTokenMock());
+    address CHILD_NETWORK_ADDRESS_2 = address(new SubnetWithNativeTokenMock());
 }
 
 contract TestRegistry is Test, TestParams {
@@ -150,6 +167,7 @@ contract TestSubnetActor is Test, TestParams {
     bytes4[] saCutterSelectors;
     bytes4[] saLouperSelectors;
     bytes4[] saOwnershipSelectors;
+    bytes4[] saActivitySelectors;
 
     SubnetActorDiamond saDiamond;
     SubnetActorMock saMock;
@@ -164,20 +182,21 @@ contract TestSubnetActor is Test, TestParams {
         saCutterSelectors = SelectorLibrary.resolveSelectors("DiamondCutFacet");
         saLouperSelectors = SelectorLibrary.resolveSelectors("DiamondLoupeFacet");
         saOwnershipSelectors = SelectorLibrary.resolveSelectors("OwnershipFacet");
+        saActivitySelectors = SelectorLibrary.resolveSelectors("SubnetActorActivityFacet");
     }
 
     function defaultSubnetActorParamsWith(
         address gw,
         SubnetID memory parentID
     ) internal pure returns (SubnetActorDiamond.ConstructorParams memory) {
-        SupplySource memory native = SupplySourceHelper.native();
+        Asset memory native = AssetHelper.native();
         return defaultSubnetActorParamsWith(gw, parentID, native);
     }
 
     function defaultSubnetActorParamsWith(
         address gw,
         SubnetID memory parentID,
-        SupplySource memory source
+        Asset memory source
     ) internal pure returns (SubnetActorDiamond.ConstructorParams memory) {
         SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
             parentId: parentID,
@@ -190,7 +209,35 @@ contract TestSubnetActor is Test, TestParams {
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
             powerScale: DEFAULT_POWER_SCALE,
             permissionMode: PermissionMode.Collateral,
-            supplySource: source
+            supplySource: source,
+            collateralSource: AssetHelper.native(),
+            validatorGater: address(0),
+            validatorRewarder: address(0)
+        });
+        return params;
+    }
+
+    function defaultSubnetActorParamsWith(
+        address gw,
+        SubnetID memory parentID,
+        Asset memory source,
+        Asset memory collateral
+    ) internal pure returns (SubnetActorDiamond.ConstructorParams memory) {
+        SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
+            parentId: parentID,
+            ipcGatewayAddr: gw,
+            consensus: ConsensusType.Fendermint,
+            minActivationCollateral: DEFAULT_COLLATERAL_AMOUNT,
+            minValidators: DEFAULT_MIN_VALIDATORS,
+            bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
+            majorityPercentage: DEFAULT_MAJORITY_PERCENTAGE,
+            activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
+            powerScale: DEFAULT_POWER_SCALE,
+            permissionMode: PermissionMode.Collateral,
+            supplySource: source,
+            collateralSource: collateral,
+            validatorGater: address(0),
+            validatorRewarder: address(0)
         });
         return params;
     }
@@ -202,7 +249,7 @@ contract TestSubnetActor is Test, TestParams {
             defaultSubnetActorParamsWith(
                 gw,
                 SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
-                SupplySourceHelper.native()
+                AssetHelper.native()
             );
     }
 
@@ -222,7 +269,10 @@ contract TestSubnetActor is Test, TestParams {
             activeValidatorsLimit: DEFAULT_ACTIVE_VALIDATORS_LIMIT,
             powerScale: DEFAULT_POWER_SCALE,
             permissionMode: PermissionMode.Collateral,
-            supplySource: SupplySource({kind: SupplyKind.ERC20, tokenAddress: tokenAddress})
+            supplySource: Asset({kind: AssetKind.ERC20, tokenAddress: tokenAddress}),
+            collateralSource: AssetHelper.native(),
+            validatorGater: address(0),
+            validatorRewarder: address(0)
         });
         return params;
     }
@@ -230,7 +280,7 @@ contract TestSubnetActor is Test, TestParams {
 
 contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor, TestGatewayActor {
     using SubnetIDHelper for SubnetID;
-    using SupplySourceHelper for SupplySource;
+    using AssetHelper for Asset;
     using CrossMsgHelper for IpcEnvelope;
     using FvmAddressHelper for FvmAddress;
     using GatewayFacetsHelper for address;
@@ -263,7 +313,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         addValidator(TOPDOWN_VALIDATOR_1, 100);
     }
 
-    function defaultGatewayParams() internal pure virtual returns (GatewayDiamond.ConstructorParams memory) {
+    function defaultGatewayParams() internal view virtual returns (GatewayDiamond.ConstructorParams memory) {
         GatewayDiamond.ConstructorParams memory params = GatewayDiamond.ConstructorParams({
             networkName: SubnetID({root: ROOTNET_CHAINID, route: new address[](0)}),
             bottomUpCheckPeriod: DEFAULT_CHECKPOINT_PERIOD,
@@ -371,6 +421,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
                 functionSelectors: gwOwnershipSelectors
             })
         );
+
         gatewayDiamond = new GatewayDiamond(gwDiamondCut, params);
 
         return gatewayDiamond;
@@ -448,8 +499,9 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         DiamondLoupeFacet louper = new DiamondLoupeFacet();
         DiamondCutFacet cutter = new DiamondCutFacet();
         OwnershipFacet ownership = new OwnershipFacet();
+        SubnetActorActivityFacet activity = new SubnetActorActivityFacet();
 
-        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](8);
+        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](9);
 
         diamondCut[0] = (
             IDiamond.FacetCut({
@@ -515,6 +567,13 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             })
         );
 
+        diamondCut[8] = (
+            IDiamond.FacetCut({
+                facetAddress: address(activity),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: saActivitySelectors
+            })
+        );
         SubnetActorDiamond diamond = new SubnetActorDiamond(diamondCut, params, address(this));
 
         return diamond;
@@ -563,7 +622,42 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             activeValidatorsLimit: _activeValidatorsLimit,
             powerScale: 12,
             permissionMode: _permissionMode,
-            supplySource: SupplySourceHelper.native()
+            supplySource: AssetHelper.native(),
+            collateralSource: AssetHelper.native(),
+            validatorGater: address(0),
+            validatorRewarder: address(new ValidatorRewarderMap())
+        });
+        saDiamond = createSubnetActor(params);
+    }
+
+    function createSubnetActor(
+        address _ipcGatewayAddr,
+        ConsensusType _consensus,
+        uint256 _minActivationCollateral,
+        uint64 _minValidators,
+        uint64 _checkPeriod,
+        uint8 _majorityPercentage,
+        PermissionMode _permissionMode,
+        uint16 _activeValidatorsLimit,
+        address _validatorGater
+    ) public {
+        SubnetID memory _parentId = SubnetID(ROOTNET_CHAINID, new address[](0));
+
+        SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
+            parentId: _parentId,
+            ipcGatewayAddr: _ipcGatewayAddr,
+            consensus: _consensus,
+            minActivationCollateral: _minActivationCollateral,
+            minValidators: _minValidators,
+            bottomUpCheckPeriod: _checkPeriod,
+            majorityPercentage: _majorityPercentage,
+            activeValidatorsLimit: _activeValidatorsLimit,
+            powerScale: 12,
+            permissionMode: _permissionMode,
+            supplySource: AssetHelper.native(),
+            collateralSource: AssetHelper.native(),
+            validatorGater: _validatorGater,
+            validatorRewarder: address(new ValidatorRewarderMap())
         });
         saDiamond = createSubnetActor(params);
     }
@@ -708,7 +802,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
                 rawAddress: FvmAddressHelper.from(src)
             }),
             value: DEFAULT_CROSS_MSG_FEE + 1,
-            nonce: 0,
+            localNonce: 0,
+            originalNonce: 0,
             message: EMPTY_BYTES
         });
         IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
@@ -748,10 +843,10 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     }
 
     function fund(address funderAddress, uint256 fundAmount) public {
-        fund(funderAddress, fundAmount, SupplyKind.Native);
+        fund(funderAddress, fundAmount, AssetKind.Native);
     }
 
-    function fund(address funderAddress, uint256 fundAmount, SupplyKind mode) public {
+    function fund(address funderAddress, uint256 fundAmount, AssetKind mode) public {
         // funding subnets is free, we do not need cross msg fee
         (SubnetID memory subnetId, , uint256 nonceBefore, , uint256 circSupplyBefore) = getSubnet(address(saDiamond));
 
@@ -759,9 +854,9 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         uint256 expectedNonce = nonceBefore + 1;
         uint256 expectedCircSupply = circSupplyBefore + fundAmount;
 
-        if (mode == SupplyKind.Native) {
+        if (mode == AssetKind.Native) {
             gatewayDiamond.manager().fund{value: fundAmount}(subnetId, FvmAddressHelper.from(funderAddress));
-        } else if (mode == SupplyKind.ERC20) {
+        } else if (mode == AssetKind.ERC20) {
             gatewayDiamond.manager().fundWithToken(subnetId, FvmAddressHelper.from(funderAddress), fundAmount);
         }
 
@@ -779,7 +874,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     function join(address validatorAddress, bytes memory pubkey) public {
         vm.prank(validatorAddress);
         vm.deal(validatorAddress, DEFAULT_COLLATERAL_AMOUNT + 1);
-        saDiamond.manager().join{value: DEFAULT_COLLATERAL_AMOUNT}(pubkey);
+        saDiamond.manager().join{value: DEFAULT_COLLATERAL_AMOUNT}(pubkey, DEFAULT_COLLATERAL_AMOUNT);
     }
 
     function confirmChange(address validator, uint256 privKey) internal {
@@ -839,7 +934,51 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             blockHeight: h,
             blockHash: keccak256(abi.encode(h)),
             nextConfigurationNumber: nextConfigNum - 1,
-            msgs: new IpcEnvelope[](0)
+            msgs: new IpcEnvelope[](0),
+            activity: CompressedActivityRollup({
+                consensus: Consensus.CompressedSummary({
+                    stats: Consensus.AggregatedStats({
+                        totalActiveValidators: uint64(validators.length),
+                        totalNumBlocksCommitted: 3
+                    }),
+                    dataRootCommitment: Consensus.MerkleHash.wrap(bytes32(uint256(nextConfigNum)))
+                })
+            })
+        });
+
+        vm.deal(address(saDiamond), 100 ether);
+
+        bytes32 hash = keccak256(abi.encode(checkpoint));
+
+        for (uint256 i = 0; i < n; i++) {
+            (uint8 v, bytes32 r, bytes32 s) = vm.sign(privKeys[i], hash);
+            signatures[i] = abi.encodePacked(r, s, v);
+        }
+
+        vm.prank(validators[0]);
+        saDiamond.checkpointer().submitCheckpoint(checkpoint, validators, signatures);
+    }
+
+    function confirmChange(
+        address[] memory validators,
+        uint256[] memory privKeys,
+        CompressedActivityRollup memory activities
+    ) internal {
+        uint256 n = validators.length;
+
+        bytes[] memory signatures = new bytes[](n);
+
+        (uint64 nextConfigNum, ) = saDiamond.getter().getConfigurationNumbers();
+
+        uint256 h = saDiamond.getter().lastBottomUpCheckpointHeight() + saDiamond.getter().bottomUpCheckPeriod();
+
+        BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
+            subnetID: saDiamond.getter().getParent().createSubnetId(address(saDiamond)),
+            blockHeight: h,
+            blockHash: keccak256(abi.encode(h)),
+            nextConfigurationNumber: nextConfigNum - 1,
+            msgs: new IpcEnvelope[](0),
+            activity: activities
         });
 
         vm.deal(address(saDiamond), 100 ether);
@@ -866,7 +1005,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
 
         (, uint256 stakedBefore, , , ) = getSubnet(subnetAddress);
 
-        gatewayDiamond.manager().addStake{value: stakeAmount}();
+        gatewayDiamond.manager().addStake{value: stakeAmount}(stakeAmount);
 
         uint256 balanceAfter = subnetAddress.balance;
         (, uint256 stakedAfter, , , ) = getSubnet(subnetAddress);
@@ -879,7 +1018,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         GatewayManagerFacet manager = gw.manager();
         GatewayGetterFacet getter = gw.getter();
 
-        manager.register{value: collateral}(0);
+        manager.register{value: collateral}(0, collateral);
 
         (SubnetID memory id, uint256 stake, uint256 topDownNonce, , uint256 circSupply) = getSubnetGW(
             subnetAddress,

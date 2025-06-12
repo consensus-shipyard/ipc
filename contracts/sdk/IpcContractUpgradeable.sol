@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind} from "../src/structs/CrossNet.sol";
-import {IPCAddress} from "../src/structs/Subnet.sol";
-import {EMPTY_BYTES} from "../src/constants/Constants.sol";
-import {IGateway} from "../src/interfaces/IGateway.sol";
-import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import {IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind} from "../contracts/structs/CrossNet.sol";
+import {IPCAddress} from "../contracts/structs/Subnet.sol";
+import {EMPTY_BYTES} from "../contracts/constants/Constants.sol";
+import {IGateway} from "../contracts/interfaces/IGateway.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-import {CrossMsgHelper} from "../src/lib/CrossMsgHelper.sol";
+import {CrossMsgHelper} from "../contracts/lib/CrossMsgHelper.sol";
 
 import {IIpcHandler} from "./interfaces/IIpcHandler.sol";
 
@@ -27,9 +27,10 @@ abstract contract IpcExchangeUpgradeable is Initializable, IIpcHandler, OwnableU
         _disableInitializers();
     }
 
+    // solhint-disable-next-line func-name-mixedcase
     function __IpcExchangeUpgradeable_init(address gatewayAddr_) public onlyInitializing {
         gatewayAddr = gatewayAddr_;
-        __Ownable_init();
+        __Ownable_init(msg.sender);
         __ReentrancyGuard_init();
     }
 
@@ -89,7 +90,8 @@ abstract contract IpcExchangeUpgradeable is Initializable, IIpcHandler, OwnableU
                 kind: IpcMsgKind.Call,
                 from: to, // TODO: will anyway be replaced by sendContractXnetMessage.
                 to: to,
-                nonce: 0, // TODO: will be replaced.
+                localNonce: 0, // TODO: will be replaced.
+                originalNonce: 0, // TODO: will be replaced.
                 value: value,
                 message: abi.encode(callMsg)
             })

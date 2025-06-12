@@ -10,7 +10,7 @@ use url::Url;
 use fendermint_vm_genesis::Collateral;
 
 use crate::{
-    manifest::{Balance, CheckpointConfig, EnvMap},
+    manifest::{Balance, CheckpointConfig, EnvMap, FendermintConfig},
     materials::Materials,
     AccountName, NodeName, RelayerName, ResourceHash, SubnetName, TestnetName,
 };
@@ -222,6 +222,8 @@ pub struct NodeConfig<'a, M: Materials> {
     pub env: &'a EnvMap,
     /// Number of nodes to be expected in the subnet, including this node, or 0 if unknown.
     pub peer_count: usize,
+    /// Additional configuration for Fendermint
+    pub fendermint_additional_config: Option<&'a FendermintConfig>,
 }
 
 /// Options regarding relayer configuration
@@ -269,7 +271,7 @@ pub enum TargetConfig<'a, M: Materials> {
     Internal(&'a M::Node),
 }
 
-impl<'a, M: Materials> SubmitConfig<'a, M> {
+impl<M: Materials> SubmitConfig<'_, M> {
     /// Map over the internal and external target configurations to find a first non-empty result.
     pub fn find_node<F, G, T>(&self, f: F, g: G) -> Option<T>
     where

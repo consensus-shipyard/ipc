@@ -1,12 +1,17 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 
+use self::bootstrap::{AddBootstrap, AddBootstrapArgs, ListBootstraps, ListBootstrapsArgs};
+use self::join::{StakeSubnet, StakeSubnetArgs, UnstakeSubnet, UnstakeSubnetArgs};
+use self::leave::{Claim, ClaimArgs};
+use self::rpc::{ChainIdSubnet, ChainIdSubnetArgs};
 pub use crate::commands::subnet::create::{CreateSubnet, CreateSubnetArgs};
 use crate::commands::subnet::genesis_epoch::{GenesisEpoch, GenesisEpochArgs};
 pub use crate::commands::subnet::join::{JoinSubnet, JoinSubnetArgs};
 pub use crate::commands::subnet::kill::{KillSubnet, KillSubnetArgs};
 pub use crate::commands::subnet::leave::{LeaveSubnet, LeaveSubnetArgs};
 use crate::commands::subnet::list_subnets::{ListSubnets, ListSubnetsArgs};
+use crate::commands::subnet::list_validators::{ListValidators, ListValidatorsArgs};
 use crate::commands::subnet::rpc::{RPCSubnet, RPCSubnetArgs};
 use crate::commands::subnet::send_value::{SendValue, SendValueArgs};
 use crate::commands::subnet::set_federated_power::{SetFederatedPower, SetFederatedPowerArgs};
@@ -17,11 +22,6 @@ use crate::commands::subnet::validator::{ValidatorInfo, ValidatorInfoArgs};
 use crate::{CommandLineHandler, GlobalArguments};
 use clap::{Args, Subcommand};
 
-use self::bootstrap::{AddBootstrap, AddBootstrapArgs, ListBootstraps, ListBootstrapsArgs};
-use self::join::{StakeSubnet, StakeSubnetArgs, UnstakeSubnet, UnstakeSubnetArgs};
-use self::leave::{Claim, ClaimArgs};
-use self::rpc::{ChainIdSubnet, ChainIdSubnetArgs};
-
 pub mod bootstrap;
 pub mod create;
 mod genesis_epoch;
@@ -29,11 +29,14 @@ pub mod join;
 pub mod kill;
 pub mod leave;
 pub mod list_subnets;
+pub mod list_validators;
 pub mod rpc;
 pub mod send_value;
 mod set_federated_power;
 pub mod show_gateway_contract_commit_sha;
 mod validator;
+
+pub(crate) const ZERO_ADDRESS: &str = "0000000000000000000000000000000000000000";
 
 #[derive(Debug, Args)]
 #[command(
@@ -51,6 +54,7 @@ impl SubnetCommandsArgs {
         match &self.command {
             Commands::Create(args) => CreateSubnet::handle(global, args).await,
             Commands::List(args) => ListSubnets::handle(global, args).await,
+            Commands::ListValidators(args) => ListValidators::handle(global, args).await,
             Commands::Join(args) => JoinSubnet::handle(global, args).await,
             Commands::Rpc(args) => RPCSubnet::handle(global, args).await,
             Commands::ChainId(args) => ChainIdSubnet::handle(global, args).await,
@@ -76,6 +80,7 @@ impl SubnetCommandsArgs {
 pub(crate) enum Commands {
     Create(CreateSubnetArgs),
     List(ListSubnetsArgs),
+    ListValidators(ListValidatorsArgs),
     Join(JoinSubnetArgs),
     Rpc(RPCSubnetArgs),
     ChainId(ChainIdSubnetArgs),

@@ -19,6 +19,7 @@ env_logger = "0.10.0"
 ethers = { workspace = true }
 ethers-contract = { workspace = true }
 fil_actors_runtime = { workspace = true }
+fs-err = { workspace = true }
 futures-util = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true }
@@ -41,8 +42,14 @@ tokio-tungstenite = { workspace = true }
 toml = "0.7.2"
 url = { workspace = true }
 zeroize = "1.6.0"
+prometheus = { workspace = true }
+prometheus_exporter = { workspace = true }
 
-ipc-wallet = { workspace = true }
-ipc-provider = { workspace = true }
-ipc-api = { workspace = true }
-ipc-types = { workspace = true }
+ipc-wallet = { path = "../../ipc/wallet", features = ["with-ethers"] }
+ipc-provider = { path = "../../ipc/provider" }
+ipc-api = { path = "../../ipc/api" }
+ipc-types = { path = "../../ipc/types" }
+tracing-subscriber.workspace = true
+
+fendermint_eth_hardhat = { path = "../../fendermint/eth/hardhat" }
+fendermint_eth_deployer = { path = "../../fendermint/eth/deployer" }

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {LibGateway} from "../../src/lib/LibGateway.sol";
-import {IpcEnvelope, BottomUpMsgBatch} from "../../src/structs/CrossNet.sol";
-import {SubnetID} from "../../src/structs/Subnet.sol";
-import {GatewayActorStorage, LibGatewayActorStorage} from "../../src/lib/LibGatewayActorStorage.sol";
-import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
+import {LibGateway} from "../../contracts/lib/LibGateway.sol";
+import {IpcEnvelope, BottomUpMsgBatch} from "../../contracts/structs/CrossNet.sol";
+import {SubnetID} from "../../contracts/structs/Subnet.sol";
+import {GatewayActorStorage, LibGatewayActorStorage} from "../../contracts/lib/LibGatewayActorStorage.sol";
+import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
 
 contract LibGatewayMock {
     using SubnetIDHelper for SubnetID;

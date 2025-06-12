@@ -11,12 +11,14 @@ pub mod proxy;
 mod toggle;
 pub mod voting;
 
+pub mod observe;
+
 use async_stm::Stm;
 use async_trait::async_trait;
 use ethers::utils::hex;
 use fvm_shared::clock::ChainEpoch;
 use ipc_api::cross::IpcEnvelope;
-use ipc_api::staking::StakingChangeRequest;
+use ipc_api::staking::PowerChangeRequest;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
@@ -143,7 +145,7 @@ pub trait ParentViewProvider {
         &self,
         from: BlockHeight,
         to: BlockHeight,
-    ) -> anyhow::Result<Vec<StakingChangeRequest>>;
+    ) -> anyhow::Result<Vec<PowerChangeRequest>>;
     /// Get the top down messages from and to height.
     async fn top_down_msgs_from(
         &self,
@@ -158,11 +160,7 @@ pub trait ParentFinalityProvider: ParentViewProvider {
     /// Check if the target proposal is valid
     fn check_proposal(&self, proposal: &IPCParentFinality) -> Stm<bool>;
     /// Called when finality is committed
-    fn set_new_finality(
-        &self,
-        finality: IPCParentFinality,
-        previous_finality: Option<IPCParentFinality>,
-    ) -> Stm<()>;
+    fn set_new_finality(&self, finality: IPCParentFinality) -> Stm<()>;
 }
 
 /// If res is null round error, returns the default value from f()

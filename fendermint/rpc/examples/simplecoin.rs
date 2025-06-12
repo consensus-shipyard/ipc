@@ -45,7 +45,7 @@ type MockContractCall<T> = ethers::prelude::ContractCall<MockProvider, T>;
 // This path starts from the root of this project, not this file.
 abigen!(SimpleCoin, "../testing/contracts/SimpleCoin.abi");
 
-const CONTRACT_HEX: &'static str = include_str!("../../testing/contracts/SimpleCoin.bin");
+const CONTRACT_HEX: &str = include_str!("../../testing/contracts/SimpleCoin.bin");
 
 lazy_static! {
     /// Default gas params based on the testkit.
@@ -132,9 +132,7 @@ async fn main() {
     run(&mut client).await.expect("failed to run example");
 }
 
-async fn run(
-    client: &mut (impl TxClient<TxCommit> + QueryClient + CallClient),
-) -> anyhow::Result<()> {
+async fn run(client: &mut (impl TxClient<TxCommit> + CallClient)) -> anyhow::Result<()> {
     let create_return = deploy_contract(client)
         .await
         .context("failed to deploy contract")?;
@@ -167,7 +165,7 @@ async fn run(
 
     tracing::info!(
         balance = format!("{}", balance_call),
-        owner_eth_addr = hex::encode(&owner_eth_addr.0),
+        owner_eth_addr = hex::encode(owner_eth_addr.0),
         "owner balance"
     );
 
@@ -207,7 +205,7 @@ async fn actor_id(client: &impl QueryClient, addr: &Address) -> anyhow::Result<u
 
 /// Deploy SimpleCoin.
 async fn deploy_contract(client: &mut impl TxClient<TxCommit>) -> anyhow::Result<CreateReturn> {
-    let contract = hex::decode(&CONTRACT_HEX).context("error parsing contract")?;
+    let contract = hex::decode(CONTRACT_HEX).context("error parsing contract")?;
 
     let res = client
         .fevm_create(
@@ -322,8 +320,8 @@ fn coin_contract(contract_eth_addr: &EthAddress) -> SimpleCoin<MockProvider> {
     // A dummy client that we don't intend to use to call the contract or send transactions.
     let (client, _mock) = ethers::providers::Provider::mocked();
     let contract_h160_addr = eth_addr_to_h160(contract_eth_addr);
-    let contract = SimpleCoin::new(contract_h160_addr, std::sync::Arc::new(client));
-    contract
+
+    SimpleCoin::new(contract_h160_addr, std::sync::Arc::new(client))
 }
 
 fn eth_addr_to_h160(eth_addr: &EthAddress) -> H160 {

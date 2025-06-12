@@ -13,7 +13,6 @@ anyhow = { workspace = true }
 ethers = { workspace = true }
 hex = { workspace = true }
 lazy_static = { workspace = true }
-merkle-tree-rs = { workspace = true }
 paste = { workspace = true }
 serde = { workspace = true }
 serde_tuple = { workspace = true }
@@ -27,13 +26,15 @@ fvm_ipld_hamt = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
 
 fil_actors_evm_shared = { workspace = true }
-ipc_actors_abis = { workspace = true }
-ipc-api = { workspace = true }
+ipc_actors_abis = { path = "../../../contract-bindings" }
+ipc-api = { path = "../../../ipc/api" }
 
 # The following is disabled so its dependency on an earlier version of fvm_shared doesn't
 # stop us from using the latest version of the FVM. It can be re-enabled if there are more
 # hardcoded method hashes than what we care to maintain, but currently there is only one.
 # frc42_dispatch = { workspace = true }
+
+merkle-tree-rs = { path = "../../../ext/merkle-tree-rs" }
 
 fendermint_vm_genesis = { path = "../genesis" }
 fendermint_crypto = { path = "../../crypto" }
@@ -45,3 +46,6 @@ quickcheck_macros = { workspace = true }
 rand = { workspace = true }
 
 fendermint_vm_genesis = { path = "../genesis", features = ["arb"] }
+
+[features]
+m2-native = []

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {SubnetRegistryDiamond} from "../../src/SubnetRegistryDiamond.sol";
-import {RegisterSubnetFacet} from "../../src/subnetregistry/RegisterSubnetFacet.sol";
-import {SubnetGetterFacet} from "../../src/subnetregistry/SubnetGetterFacet.sol";
+import {SubnetRegistryDiamond} from "../../contracts/SubnetRegistryDiamond.sol";
+import {RegisterSubnetFacet} from "../../contracts/subnetregistry/RegisterSubnetFacet.sol";
+import {SubnetGetterFacet} from "../../contracts/subnetregistry/SubnetGetterFacet.sol";
 
 library RegistryFacetsHelper {
     function register(address a) internal pure returns (RegisterSubnetFacet) {

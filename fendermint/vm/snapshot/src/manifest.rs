@@ -8,6 +8,7 @@ use fendermint_vm_interpreter::fvm::state::{
     snapshot::{BlockHeight, SnapshotVersion},
     FvmStateParams,
 };
+use fs_err as fs;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -43,7 +44,7 @@ pub fn write_manifest(
 
     let manifest_path = snapshot_dir.as_ref().join(MANIFEST_FILE_NAME);
 
-    std::fs::write(&manifest_path, json).context("failed to write manifest file")?;
+    fs::write(&manifest_path, json).context("failed to write manifest file")?;
 
     Ok(manifest_path)
 }
@@ -51,7 +52,8 @@ pub fn write_manifest(
 /// Collect all the manifests from a directory containing snapshot-directories, e.g.
 /// `snapshots/snapshot-1/manifest.json` etc.
 pub fn list_manifests(snapshot_dir: impl AsRef<Path>) -> anyhow::Result<Vec<SnapshotItem>> {
-    let contents = std::fs::read_dir(snapshot_dir).context("failed to read snapshot directory")?;
+    let snapshot_dir = snapshot_dir.as_ref();
+    let contents = fs::read_dir(snapshot_dir).context("failed to read snapshot directory")?;
 
     // Collect all manifest file paths.
     let mut manifests = Vec::new();
@@ -80,7 +82,7 @@ pub fn list_manifests(snapshot_dir: impl AsRef<Path>) -> anyhow::Result<Vec<Snap
     let mut items = Vec::new();
 
     for (snapshot_dir, manifest) in manifests {
-        let json = std::fs::read_to_string(&manifest).context("failed to open manifest")?;
+        let json = fs::read_to_string(&manifest).context("failed to open manifest")?;
         match serde_json::from_str(&json) {
             Ok(manifest) => items.push(SnapshotItem::new(snapshot_dir, manifest)),
             Err(e) => {
@@ -101,7 +103,7 @@ pub fn list_manifests(snapshot_dir: impl AsRef<Path>) -> anyhow::Result<Vec<Snap
 
 /// Calculate the Sha256 checksum of a file.
 pub fn file_checksum(path: impl AsRef<Path>) -> anyhow::Result<tendermint::Hash> {
-    let mut file = std::fs::File::open(&path)?;
+    let mut file = fs::File::open(path.as_ref())?;
     let mut hasher = Sha256::new();
     let _ = std::io::copy(&mut file, &mut hasher)?;
     let hash = hasher.finalize().into();
@@ -115,7 +117,7 @@ pub fn parts_checksum(path: impl AsRef<Path>) -> anyhow::Result<tendermint::Hash
     let chunks = list_parts(path)?;
 
     for path in chunks {
-        let mut file = std::fs::File::open(path).context("failed to open part")?;
+        let mut file = fs::File::open(path).context("failed to open part")?;
         let _ = std::io::copy(&mut file, &mut hasher)?;
     }
 
@@ -125,7 +127,7 @@ pub fn parts_checksum(path: impl AsRef<Path>) -> anyhow::Result<tendermint::Hash
 
 /// List all the `{idx}.part` files in a directory.
 pub fn list_parts(path: impl AsRef<Path>) -> anyhow::Result<Vec<PathBuf>> {
-    let mut chunks = std::fs::read_dir(path.as_ref())
+    let mut chunks = fs::read_dir(path.as_ref())
         .unwrap()
         .collect::<Result<Vec<_>, _>>()
         .with_context(|| {
@@ -190,6 +192,7 @@ mod arb {
                         .into(),
                     power_scale: *g.choose(&[-1, 0, 3]).unwrap(),
                     app_version: 0,
+                    consensus_params: None,
                 },
                 version: Arbitrary::arbitrary(g),
             }

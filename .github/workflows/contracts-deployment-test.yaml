@@ -1,4 +1,4 @@
-name: Deployment Test
+name: "Contracts: Smoke test deployment"
 
 # This workflow is triggered from the main CI workflow.
 on:
@@ -12,21 +12,22 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v2
+    - uses: pnpm/action-setup@v2
+
+    - name: Setup Node
+      uses: actions/setup-node@v4
       with:
-        node-version: '18' # Adjust this as needed for your project
+        node-version: "18.x"
+        cache: "pnpm"
 
     - name: Install dependencies
-      run: cd contracts && npm install
+      run: cd contracts && make deps
 
     - name: Install Foundry
-      run: |
-        cd contracts
-        curl -L https://foundry.paradigm.xyz | bash
-        export PATH="$PATH:/home/runner/.config/.foundry/bin"
-        foundryup
-        forge install
+      uses: foundry-rs/foundry-toolchain@v1
+      with:
+        cache: false
+        version: v0.3.0
 
     - name: Generate Ethereum Private Key and Create .env File and run make
       run: |
@@ -36,6 +37,6 @@ jobs:
         echo "export RPC_URL=http://127.0.0.1:1337" >> .env
         echo "export CHAIN_ID=1337" >> .env
         export PATH="$PATH:/home/runner/.config/.foundry/bin"
-        npx ganache-cli -g0 -p1337 --account 0x$PRIVATE_KEY,1001901919191919191  &
+        pnpm exec ganache-cli -g0 -p1337 --account 0x$PRIVATE_KEY,1001901919191919191  &
         sleep 5
-        make deploy-ipc
+        make deploy-stack

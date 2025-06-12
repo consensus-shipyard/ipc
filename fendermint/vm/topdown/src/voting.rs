@@ -3,10 +3,16 @@
 
 use async_stm::{abort, atomically_or_err, retry, Stm, StmResult, TVar};
 use serde::{de::DeserializeOwned, Serialize};
+use std::fmt::Display;
 use std::hash::Hash;
 use std::{fmt::Debug, time::Duration};
 
+use crate::observe::{
+    ParentFinalityCommitted, ParentFinalityPeerQuorumReached, ParentFinalityPeerVoteReceived,
+    ParentFinalityPeerVoteSent,
+};
 use crate::{BlockHash, BlockHeight};
+use ipc_observability::{emit, serde::HexEncodableBlockHash};
 
 // Usign this type because it's `Hash`, unlike the normal `libsecp256k1::PublicKey`.
 pub use ipc_ipld_resolver::ValidatorKey;
@@ -67,7 +73,7 @@ pub struct VoteTally<K = ValidatorKey, V = BlockHash> {
 
 impl<K, V> VoteTally<K, V>
 where
-    K: Clone + Hash + Eq + Sync + Send + 'static + Debug,
+    K: Clone + Hash + Eq + Sync + Send + 'static + Debug + Display,
     V: AsRef<[u8]> + Clone + Hash + Eq + Sync + Send + 'static,
 {
     /// Create an uninitialized instance. Before blocks can be added to it
@@ -210,13 +216,23 @@ where
             }
         }
 
-        let votes_for_block = votes_at_height.entry(block_hash).or_default();
+        let validator_pub_key = validator_key.to_string();
+
+        let votes_for_block = votes_at_height.entry(block_hash.clone()).or_default();
 
         if votes_for_block.insert(validator_key).is_some() {
             return Ok(false);
         }
 
         self.votes.write(votes)?;
+
+        emit(ParentFinalityPeerVoteReceived {
+            block_height,
+            validator: &validator_pub_key,
+            block_hash: HexEncodableBlockHash(block_hash.as_ref().to_vec()),
+            // TODO- this needs to be the commitment hash once implemented
+            commitment_hash: None,
+        });
 
         Ok(true)
     }
@@ -278,6 +294,14 @@ where
             tracing::debug!(weight, quorum_threshold, "showdown");
 
             if weight >= quorum_threshold {
+                emit(ParentFinalityPeerQuorumReached {
+                    block_height: *block_height,
+                    block_hash: HexEncodableBlockHash(block_hash.as_ref().to_vec()),
+                    // TODO - just placeholder - need to use real commitment once implemented
+                    commitment_hash: None,
+                    weight,
+                });
+
                 return Ok(Some((*block_height, block_hash.clone())));
             }
         }
@@ -288,14 +312,28 @@ where
     /// Call when a new finalized block is added to the ledger, to clear out all preceding blocks.
     ///
     /// After this operation the minimum item in the chain will the new finalized block.
-    pub fn set_finalized(&self, block_height: BlockHeight, block_hash: V) -> Stm<()> {
+    pub fn set_finalized(
+        &self,
+        parent_block_height: BlockHeight,
+        parent_block_hash: V,
+        proposer: Option<&str>,
+        local_block_height: Option<BlockHeight>,
+    ) -> Stm<()> {
         self.chain.update(|chain| {
-            let (_, mut chain) = chain.split(&block_height);
-            chain.insert(block_height, Some(block_hash));
+            let (_, mut chain) = chain.split(&parent_block_height);
+            chain.insert(parent_block_height, Some(parent_block_hash.clone()));
             chain
         })?;
 
-        self.votes.update(|votes| votes.split(&block_height).1)?;
+        self.votes
+            .update(|votes| votes.split(&parent_block_height).1)?;
+
+        emit(ParentFinalityCommitted {
+            local_height: local_block_height,
+            parent_height: parent_block_height,
+            block_hash: HexEncodableBlockHash(parent_block_hash.as_ref().to_vec()),
+            proposer,
+        });
 
         Ok(())
     }
@@ -418,6 +456,12 @@ pub async fn publish_vote_loop<V, F>(
                     if let Err(e) = client.publish_vote(vote) {
                         tracing::error!(error = e.to_string(), "failed to publish vote");
                     }
+
+                    emit(ParentFinalityPeerVoteSent {
+                        block_height: next_height,
+                        block_hash: HexEncodableBlockHash(next_hash.clone()),
+                        commitment_hash: None,
+                    });
                 }
                 Err(e) => {
                     tracing::error!(error = e.to_string(), "failed to sign vote");

@@ -16,8 +16,8 @@ tracing = { workspace = true }
 tokio = { workspace = true }
 
 cid = { workspace = true }
-ipc-api = { workspace = true }
-ipc_ipld_resolver = { workspace = true }
+ipc-api = { path = "../../../ipc/api" }
+ipc_ipld_resolver = { path = "../../../ipld/resolver" }
 
 [dev-dependencies]
 tokio = { workspace = true }

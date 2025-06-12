@@ -1,0 +1,96 @@
+name: Fendermint CI - Publish
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+env:
+  CARGO_INCREMENTAL: "0"
+  SCCACHE_CACHE_SIZE: 10G
+  CC: "sccache clang"
+  CXX: "sccache clang++"
+  PROFILE: "ci"
+  BUILDX_FLAGS: "--cache-from=type=gha --cache-to=type=gha,mode=max"
+
+jobs:
+  publish:
+    name: Publish artifacts
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image:
+          - name: fendermint
+            path: fendermint
+            needs_deps: true
+          - name: ipc-contracts
+            path: contracts
+            needs_deps: false
+
+    permissions:
+      packages: write
+      contents: read
+
+    steps:
+      - name: Check out the project
+        uses: actions/checkout@v3
+
+      - name: Install Tools
+        uses: ./.github/actions/install-tools
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          rust: stable
+
+      - name: Setup Cache
+        uses: ./.github/actions/setup-cache
+        timeout-minutes: 5
+        continue-on-error: true
+        with:
+          cache-prefix: publish-${{ hashFiles('rust-toolchain', 'rust-toolchain.toml') }}
+          cache-suffix: ${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Docker Login
+        shell: bash
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+
+      - name: Prepare Docker Image Tag
+        id: prep
+        run: |
+          IMAGE_ID=ghcr.io/${{ github.repository_owner }}/${{ matrix.image.name }}
+          # Convert the image name to lowercase.
+          IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
+          # Extract the version from the git ref.
+          VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
+          [ "$VERSION" == "main" ] && VERSION=latest
+          echo "IMAGE_TAG=$IMAGE_ID:$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Docker Deps (if needed)
+        if: ${{ matrix.image.needs_deps }}
+        run: |
+          cd ${{ matrix.image.path }} && make docker-deps
+
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - name: Build and Push Multiarch Docker Image
+        run: |
+          export BUILDX_TAG=${{ steps.prep.outputs.IMAGE_TAG }}
+          export BUILDX_STORE="--push"
+          export BUILDX_FLAGS="--platform linux/amd64,linux/arm64 ${BUILDX_FLAGS}"
+          cd ${{ matrix.image.path }} && make docker-build
+
+      - name: Delete all containers from package without tags
+        uses: Chizkiyahu/delete-untagged-ghcr-action@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          owner_type: org
+          package_name: ${{ matrix.image.name }}
+          untagged_only: true
+          except_untagged_multiplatform: true

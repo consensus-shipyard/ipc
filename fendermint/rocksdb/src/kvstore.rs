@@ -85,7 +85,8 @@ where
     S: KVStore<Repr = Vec<u8>>,
     S::Namespace: AsRef<str>,
 {
-    type Tx<'a> = RocksDbReadTx<'a>
+    type Tx<'a>
+        = RocksDbReadTx<'a>
     where
         Self: 'a;
 
@@ -103,7 +104,8 @@ where
     S: KVStore<Repr = Vec<u8>>,
     S::Namespace: AsRef<str>,
 {
-    type Tx<'a> = RocksDbWriteTx<'a>
+    type Tx<'a>
+        = RocksDbWriteTx<'a>
     where
         Self: 'a;
 
@@ -115,7 +117,7 @@ where
     }
 }
 
-impl<'a, S> KVRead<S> for RocksDbReadTx<'a>
+impl<S> KVRead<S> for RocksDbReadTx<'_>
 where
     S: KVStore<Repr = Vec<u8>>,
     S::Namespace: AsRef<str>,
@@ -138,9 +140,31 @@ where
             }
         })
     }
+
+    fn iterate<K, V>(&self, ns: &S::Namespace) -> impl Iterator<Item = KVResult<(K, V)>>
+    where
+        S: Decode<K> + Decode<V>,
+        <S as KVStore>::Repr: Ord + 'static,
+    {
+        self.cache
+            .with_cf_handle(ns.as_ref(), |cf| {
+                let it = self.snapshot.iterator_cf(cf, rocksdb::IteratorMode::Start);
+
+                let it = it.map(|res| res.map_err(to_kv_error)).map(|res| {
+                    res.and_then(|(k, v)| {
+                        let k: K = S::from_repr(&k.to_vec())?;
+                        let v: V = S::from_repr(&v.to_vec())?;
+                        Ok((k, v))
+                    })
+                });
+
+                Ok(it)
+            })
+            .expect("just wrapped into ok")
+    }
 }
 
-impl<'a, S> KVRead<S> for RocksDbWriteTx<'a>
+impl<S> KVRead<S> for RocksDbWriteTx<'_>
 where
     S: KVStore<Repr = Vec<u8>>,
     S::Namespace: AsRef<str>,
@@ -160,9 +184,31 @@ where
             }
         })
     }
+
+    fn iterate<K, V>(&self, ns: &S::Namespace) -> impl Iterator<Item = KVResult<(K, V)>>
+    where
+        S: Decode<K> + Decode<V>,
+        <S as KVStore>::Repr: Ord + 'static,
+    {
+        self.cache
+            .with_cf_handle(ns.as_ref(), |cf| {
+                let it = self.tx.iterator_cf(cf, rocksdb::IteratorMode::Start);
+
+                let it = it.map(|res| res.map_err(to_kv_error)).map(|res| {
+                    res.and_then(|(k, v)| {
+                        let k: K = S::from_repr(&k.to_vec())?;
+                        let v: V = S::from_repr(&v.to_vec())?;
+                        Ok((k, v))
+                    })
+                });
+
+                Ok(it)
+            })
+            .expect("just wrapped into ok")
+    }
 }
 
-impl<'a, S> KVWrite<S> for RocksDbWriteTx<'a>
+impl<S> KVWrite<S> for RocksDbWriteTx<'_>
 where
     S: KVStore<Repr = Vec<u8>>,
     S::Namespace: AsRef<str>,
@@ -197,7 +243,7 @@ where
     }
 }
 
-impl<'a> KVTransaction for RocksDbWriteTx<'a> {
+impl KVTransaction for RocksDbWriteTx<'_> {
     fn commit(self) -> KVResult<()> {
         let tx = self.take_tx();
         tx.commit().map_err(to_kv_error)
@@ -209,7 +255,7 @@ impl<'a> KVTransaction for RocksDbWriteTx<'a> {
     }
 }
 
-impl<'a> Drop for RocksDbWriteTx<'a> {
+impl Drop for RocksDbWriteTx<'_> {
     fn drop(&mut self) {
         if !thread::panicking() {
             panic!("Transaction prematurely dropped. Must call `.commit()` or `.rollback()`.");

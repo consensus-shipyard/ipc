@@ -37,16 +37,25 @@ pub enum PermissionMode {
     Static,
 }
 
-/// Defines the supply source of a subnet on its parent subnet.
+/// Defines a generic token of a subnet on its parent subnet.
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct SupplySource {
+pub struct Asset {
     /// The kind of supply.
-    pub kind: SupplyKind,
+    pub kind: AssetKind,
     /// The address of the ERC20 token if that supply kind is selected.
     pub token_address: Option<Address>,
 }
 
-/// Determines the type of supply used by the subnet.
+impl Default for Asset {
+    fn default() -> Self {
+        Self {
+            kind: AssetKind::Native,
+            token_address: None,
+        }
+    }
+}
+
+/// Determines the type of a token used by the subnet.
 #[repr(u8)]
 #[derive(
     Copy,
@@ -60,7 +69,7 @@ pub struct SupplySource {
     strum::VariantNames,
 )]
 #[strum(serialize_all = "snake_case")]
-pub enum SupplyKind {
+pub enum AssetKind {
     Native,
     ERC20,
 }
@@ -76,7 +85,10 @@ pub struct ConstructParams {
     pub active_validators_limit: u16,
     pub min_cross_msg_fee: TokenAmount,
     pub permission_mode: PermissionMode,
-    pub supply_source: SupplySource,
+    pub supply_source: Asset,
+    pub collateral_source: Asset,
+    pub validator_gater: Address,
+    pub validator_rewarder: Address,
 }
 
 /// Consensus types supported by hierarchical consensus

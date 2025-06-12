@@ -44,25 +44,20 @@ pub fn expand_path(home_dir: &Path, path: &Path) -> PathBuf {
 }
 
 /// Expand paths that begin with "~" to `$HOME`.
+///
+/// Does not support `~user/sub/dir` patterns.
 pub fn expand_tilde<P: AsRef<Path>>(path: P) -> PathBuf {
-    let p = path.as_ref().to_path_buf();
-    if !p.starts_with("~") {
-        return p;
+    let p = path.as_ref();
+    let home = dirs::home_dir().expect("A global home directory is set for the current user");
+    if p == std::path::Path::new("~") {
+        // shortcut for bare home
+        return home;
     }
-    if p == Path::new("~") {
-        return dirs::home_dir().unwrap_or(p);
-    }
-    dirs::home_dir()
-        .map(|mut h| {
-            if h == Path::new("/") {
-                // `~/foo` becomes just `/foo` instead of `//foo` if `/` is home.
-                p.strip_prefix("~").unwrap().to_path_buf()
-            } else {
-                h.push(p.strip_prefix("~/").unwrap());
-                h
-            }
-        })
-        .unwrap_or(p)
+    let Ok(sub) = p.strip_prefix("~/") else {
+        return p.to_path_buf();
+    };
+    // sub does NOT have a leading slash, so this works for bot `home=/` and `home!=/`.
+    home.join(sub)
 }
 
 #[derive(Clone, Debug)]

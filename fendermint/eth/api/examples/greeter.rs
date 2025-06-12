@@ -13,6 +13,7 @@
 //! cargo run -p fendermint_eth_api --release --example GREETER --
 //! ```
 
+use fs_err as fs;
 use std::{fmt::Debug, path::PathBuf, sync::Arc};
 
 use anyhow::Context;
@@ -37,7 +38,7 @@ mod common;
 // Generate a statically typed interface for the contract.
 abigen!(Greeter, "../../testing/contracts/Greeter.abi");
 
-const GREETER_HEX: &'static str = include_str!("../../../testing/contracts/Greeter.bin");
+const GREETER_HEX: &str = include_str!("../../../testing/contracts/Greeter.bin");
 
 #[derive(Parser, Debug)]
 pub struct Options {
@@ -180,7 +181,7 @@ where
 
         let json = serde_json::to_string_pretty(&output).unwrap();
 
-        std::fs::write(out, json).expect("failed to write metadata");
+        fs::write(out, json).expect("failed to write metadata");
     }
 
     Ok(())

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind} from "../src/structs/CrossNet.sol";
-import {IPCAddress} from "../src/structs/Subnet.sol";
-import {EMPTY_BYTES} from "../src/constants/Constants.sol";
-import {IGateway} from "../src/interfaces/IGateway.sol";
-import {ReentrancyGuard} from "openzeppelin-contracts/utils/ReentrancyGuard.sol";
-import {Ownable} from "openzeppelin-contracts/access/Ownable.sol";
-import {CrossMsgHelper} from "../src/lib/CrossMsgHelper.sol";
+import {IpcEnvelope, ResultMsg, CallMsg, IpcMsgKind} from "../contracts/structs/CrossNet.sol";
+import {IPCAddress} from "../contracts/structs/Subnet.sol";
+import {EMPTY_BYTES} from "../contracts/constants/Constants.sol";
+import {IGateway} from "../contracts/interfaces/IGateway.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {CrossMsgHelper} from "../contracts/lib/CrossMsgHelper.sol";
 import {IIpcHandler} from "./interfaces/IIpcHandler.sol";
 
 abstract contract IpcExchange is IIpcHandler, Ownable, ReentrancyGuard {
@@ -79,13 +79,14 @@ abstract contract IpcExchange is IIpcHandler, Ownable, ReentrancyGuard {
                 kind: IpcMsgKind.Call,
                 from: to, // TODO: will anyway be replaced by sendContractXnetMessage.
                 to: to,
-                nonce: 0, // TODO: will be replaced.
+                localNonce: 0, // TODO: will be replaced.
+                originalNonce: 0, // TODO: will be replaced
                 value: value,
                 message: abi.encode(callMsg)
             })
         );
         // Add the message to the list of inflights
-        bytes32 id = envelope.toHash();
+        bytes32 id = envelope.toTracingId();
         inflightMsgs[id] = envelope;
     }
 

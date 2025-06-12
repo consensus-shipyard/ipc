@@ -62,7 +62,7 @@ impl<DB: Blockstore + Clone> SubnetCaller<DB> {
 
         // We need to send in the name of the address as a sender, not the system account.
         self.manager.call(state, |c| {
-            c.join(public_key.into()).from(addr).value(deposit)
+            c.join(public_key.into(), deposit).from(addr).value(deposit)
         })
     }
 
@@ -76,7 +76,7 @@ impl<DB: Blockstore + Clone> SubnetCaller<DB> {
         let addr = EthAddress::new_secp256k1(&public_key)?;
         let deposit = from_fvm::to_eth_tokens(&validator.power.0)?;
         self.manager.try_call(state, |c| {
-            c.join(public_key.into()).from(addr).value(deposit)
+            c.join(public_key.into(), deposit).from(addr).value(deposit)
         })
     }
 
@@ -89,7 +89,7 @@ impl<DB: Blockstore + Clone> SubnetCaller<DB> {
     ) -> TryCallResult<()> {
         let deposit = from_fvm::to_eth_tokens(value)?;
         self.manager
-            .try_call(state, |c| c.stake().from(addr).value(deposit))
+            .try_call(state, |c| c.stake(deposit).from(addr).value(deposit))
     }
 
     /// Try to decrease the stake of a validator.
@@ -148,7 +148,7 @@ impl<DB: Blockstore + Clone> SubnetCaller<DB> {
         addr: &EthAddress,
     ) -> anyhow::Result<TokenAmount> {
         self.get_validator(state, addr)
-            .map(|i| from_eth::to_fvm_tokens(&i.confirmed_collateral))
+            .map(|i| from_eth::to_fvm_tokens(&i.current_power))
     }
 
     /// Get the total (unconfirmed) collateral of a validator.
@@ -158,7 +158,7 @@ impl<DB: Blockstore + Clone> SubnetCaller<DB> {
         addr: &EthAddress,
     ) -> anyhow::Result<TokenAmount> {
         self.get_validator(state, addr)
-            .map(|i| from_eth::to_fvm_tokens(&i.total_collateral))
+            .map(|i| from_eth::to_fvm_tokens(&i.next_power))
     }
 
     /// Get the `(next, start)` configuration number pair.

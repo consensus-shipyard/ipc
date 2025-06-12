@@ -65,10 +65,16 @@ RUN if [ "${TARGETARCH}" = "arm64" ]; then \
 COPY --from=stripper /app /app
 
 # Build the dependencies.
-RUN set -eux; \
+RUN \
+  --mount=type=cache,target=/root/.cargo/registry,sharing=locked \
+  --mount=type=cache,target=/root/.cargo/git,sharing=locked \
+  --mount=type=cache,target=/app/target,sharing=locked \
+  set -eux; \
   case "${TARGETARCH}" in \
   amd64) ARCH='x86_64'  ;; \
-  arm64) ARCH='aarch64' ;; \
+  arm64) ARCH='aarch64'; \
+      rustup target add aarch64-unknown-linux-gnu; \
+      rustup toolchain install stable-aarch64-unknown-linux-gnu ;; \
   *) echo >&2 "unsupported architecture: ${TARGETARCH}"; exit 1 ;; \
   esac; \
   rustup show ; \
@@ -83,10 +89,16 @@ COPY . .
 RUN find . -type f \( -wholename "**/src/lib.rs" -o -wholename "**/src/main.rs" \) | xargs touch
 
 # Do the final build.
-RUN set -eux; \
+RUN \
+  --mount=type=cache,target=/root/.cargo/registry,sharing=locked \
+  --mount=type=cache,target=/root/.cargo/git,sharing=locked \
+  --mount=type=cache,target=/app/target,sharing=locked \
+  set -eux; \
   case "${TARGETARCH}" in \
   amd64) ARCH='x86_64'  ;; \
-  arm64) ARCH='aarch64' ;; \
+  arm64) ARCH='aarch64'; \
+    rustup target add aarch64-unknown-linux-gnu; \
+    rustup toolchain install stable-aarch64-unknown-linux-gnu ;; \
   esac; \
   cargo install --locked --root output --path fendermint/app --target ${ARCH}-unknown-linux-gnu ; \
   cargo install --locked --root output --path ipc/cli --target ${ARCH}-unknown-linux-gnu

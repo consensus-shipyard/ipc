@@ -4,10 +4,10 @@ pragma solidity ^0.8.23;
 import "forge-std/StdUtils.sol";
 import "forge-std/StdCheats.sol";
 import {CommonBase} from "forge-std/Base.sol";
-import {GatewayDiamond} from "../../../src/GatewayDiamond.sol";
-import {GatewayManagerFacet} from "../../../src/gateway/GatewayManagerFacet.sol";
+import {GatewayDiamond} from "../../../contracts/GatewayDiamond.sol";
+import {GatewayManagerFacet} from "../../../contracts/gateway/GatewayManagerFacet.sol";
 import {GatewayFacetsHelper} from "../../helpers/GatewayFacetsHelper.sol";
-import {EnumerableSet} from "openzeppelin-contracts/utils/structs/EnumerableSet.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 uint256 constant ETH_SUPPLY = 129_590_000 ether;
 
@@ -24,12 +24,12 @@ contract GatewayActorHandler is CommonBase, StdCheats, StdUtils {
 
     function register(uint256 amount) public {
         amount = bound(amount, 0, 3 * DEFAULT_MIN_VALIDATOR_STAKE);
-        managerFacet.register(amount);
+        managerFacet.register(amount, 0);
     }
 
     function stake(uint256 amount) public {
         amount = bound(amount, 0, 3 * DEFAULT_MIN_VALIDATOR_STAKE);
-        managerFacet.addStake{value: amount}();
+        managerFacet.addStake{value: amount}(amount);
     }
 
     function _pay(address to, uint256 amount) internal {

@@ -1,15 +1,16 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, bail, Context};
 use config::{Config, ConfigError, Environment, File};
 use fvm_shared::address::Address;
+use fvm_shared::bigint::Zero;
 use fvm_shared::econ::TokenAmount;
 use ipc_api::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
 use std::fmt::{Display, Formatter};
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::net::ToSocketAddrs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tendermint_rpc::Url;
@@ -22,6 +23,7 @@ use fendermint_vm_topdown::BlockHeight;
 use self::eth::EthSettings;
 use self::fvm::FvmSettings;
 use self::resolver::ResolverSettings;
+use ipc_observability::config::TracingSettings;
 use ipc_provider::config::deserialize::deserialize_eth_address_from_str;
 
 pub mod eth;
@@ -63,7 +65,7 @@ impl std::net::ToSocketAddrs for SocketAddress {
 impl TryInto<std::net::SocketAddr> for SocketAddress {
     type Error = std::io::Error;
 
-    fn try_into(self) -> Result<SocketAddr, Self::Error> {
+    fn try_into(self) -> Result<std::net::SocketAddr, Self::Error> {
         self.to_socket_addrs()?
             .next()
             .ok_or_else(|| std::io::Error::from(std::io::ErrorKind::AddrNotAvailable))
@@ -211,9 +213,16 @@ pub struct IpcSettings {
 
 impl IpcSettings {
     pub fn topdown_config(&self) -> anyhow::Result<&TopDownSettings> {
-        self.topdown
+        let ret = self
+            .topdown
             .as_ref()
-            .ok_or_else(|| anyhow!("top down config missing"))
+            .ok_or_else(|| anyhow!("top down config missing"))?;
+
+        if ret.chain_head_delay.is_zero() {
+            bail!("unsafe top-down chain head delay: zero value not accepted")
+        };
+
+        Ok(ret)
     }
 }
 
@@ -262,10 +271,6 @@ pub struct Settings {
     snapshots_dir: PathBuf,
     /// Solidity contracts.
     contracts_dir: PathBuf,
-    /// Builtin-actors CAR file.
-    builtin_actors_bundle: PathBuf,
-    /// Custom actors CAR file.
-    custom_actors_bundle: PathBuf,
 
     /// Where to reach CometBFT for queries or broadcasting transactions.
     tendermint_rpc_url: Url,
@@ -286,16 +291,11 @@ pub struct Settings {
     pub broadcast: BroadcastSettings,
     pub ipc: IpcSettings,
     pub testing: Option<TestingSettings>,
+    pub tracing: TracingSettings,
 }
 
 impl Settings {
-    home_relative!(
-        data_dir,
-        snapshots_dir,
-        contracts_dir,
-        builtin_actors_bundle,
-        custom_actors_bundle
-    );
+    home_relative!(data_dir, snapshots_dir, contracts_dir);
 
     /// Load the default configuration from a directory,
     /// then potential overrides specific to the run mode,
@@ -326,9 +326,16 @@ impl Settings {
                     .ignore_empty(true) // otherwise "" will be parsed as a list item
                     .try_parsing(true) // required for list separator
                     .list_separator(",") // need to list keys explicitly below otherwise it can't pase simple `String` type
+                    .with_list_parse_key("tracing.file.domain_filter")
+                    .with_list_parse_key("tracing.file.events_filter")
                     .with_list_parse_key("resolver.connection.external_addresses")
                     .with_list_parse_key("resolver.discovery.static_addresses")
-                    .with_list_parse_key("resolver.membership.static_subnets"),
+                    .with_list_parse_key("resolver.membership.static_subnets")
+                    .with_list_parse_key("eth.cors.allowed_origins")
+                    .with_list_parse_key("eth.cors.allowed_methods")
+                    .with_list_parse_key("eth.cors.allowed_headers")
+                    .with_list_parse_key("eth.tracing.file.domain_filter")
+                    .with_list_parse_key("eth.tracing.file.events_filter"),
             ))
             // Set the home directory based on what was passed to the CLI,
             // so everything in the config can be relative to it.
@@ -381,7 +388,7 @@ mod tests {
 
     use crate::DbCompaction;
 
-    use super::Settings;
+    use super::{ConfigError, Settings};
 
     fn try_parse_config(run_mode: &str) -> Result<Settings, config::ConfigError> {
         let current_dir = PathBuf::from(".");
@@ -422,21 +429,41 @@ mod tests {
         let settings = with_env_vars(vec![
                 ("FM_RESOLVER__CONNECTION__EXTERNAL_ADDRESSES", "/ip4/198.51.100.0/tcp/4242/p2p/QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N,/ip6/2604:1380:2000:7a00::1/udp/4001/quic/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb"),
                 ("FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES", "/ip4/198.51.100.1/tcp/4242/p2p/QmYyQSo1c1Ym7orWxLYvCrM2EmxFTANf8wXmmE7DWjhx5N,/ip6/2604:1380:2000:7a00::2/udp/4001/quic/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb"),
+                ("FM_RESOLVER__MEMBERSHIP__STATIC_SUBNETS", "/r314/f410fijl3evsntewwhqxy6cx5ijdq5qp5cjlocbgzgey,/r314/f410fwplxlims2wnigaha2gofgktue7hiusmttwridkq"),
+                ("FM_ETH__CORS__ALLOWED_ORIGINS", "https://example.com,https://www.example.org"),
+                ("FM_ETH__CORS__ALLOWED_METHODS", "GET,POST"),
+                ("FM_ETH__CORS__ALLOWED_HEADERS", "Accept,Content-Type"),
                 // Set a normal string key as well to make sure we have configured the library correctly and it doesn't try to parse everything as a list.
                 ("FM_RESOLVER__NETWORK__NETWORK_NAME", "test"),
             ], || try_parse_config("")).unwrap();
 
-        assert_eq!(settings.resolver.discovery.static_addresses.len(), 2);
         assert_eq!(settings.resolver.connection.external_addresses.len(), 2);
+        assert_eq!(settings.resolver.discovery.static_addresses.len(), 2);
+        assert_eq!(settings.resolver.membership.static_subnets.len(), 2);
+        assert_eq!(
+            format!("{:?}", settings.eth.cors.allowed_origins),
+            "List([\"https://example.com\", \"https://www.example.org\"])"
+        );
+        assert_eq!(
+            format!("{:?}", settings.eth.cors.allowed_methods),
+            "Const(Some(\"GET,POST\"))"
+        );
+        assert_eq!(
+            format!("{:?}", settings.eth.cors.allowed_headers),
+            "Const(Some(\"accept,content-type\"))"
+        );
     }
 
     #[test]
     fn parse_empty_comma_separated() {
         let settings = with_env_vars(
             vec![
-                ("FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES", ""),
                 ("FM_RESOLVER__CONNECTION__EXTERNAL_ADDRESSES", ""),
+                ("FM_RESOLVER__DISCOVERY__STATIC_ADDRESSES", ""),
                 ("FM_RESOLVER__MEMBERSHIP__STATIC_SUBNETS", ""),
+                ("FM_ETH__CORS__ALLOWED_ORIGINS", ""),
+                ("FM_ETH__CORS__ALLOWED_METHODS", ""),
+                ("FM_ETH__CORS__ALLOWED_HEADERS", ""),
             ],
             || try_parse_config(""),
         )
@@ -445,6 +472,18 @@ mod tests {
         assert_eq!(settings.resolver.connection.external_addresses.len(), 0);
         assert_eq!(settings.resolver.discovery.static_addresses.len(), 0);
         assert_eq!(settings.resolver.membership.static_subnets.len(), 0);
+        assert_eq!(
+            format!("{:?}", settings.eth.cors.allowed_origins),
+            "List([])"
+        );
+        assert_eq!(
+            format!("{:?}", settings.eth.cors.allowed_methods),
+            "Const(None)"
+        );
+        assert_eq!(
+            format!("{:?}", settings.eth.cors.allowed_headers),
+            "Const(None)"
+        );
     }
 
     #[test]
@@ -470,5 +509,52 @@ mod tests {
             settings.resolver.discovery.static_addresses[1],
             multiaddr!(Dns4("bar.ai"), Tcp(5678u16))
         );
+    }
+
+    #[test]
+    fn parse_cors_origins_variants() {
+        // relative URL without a base
+        let settings = with_env_vars(
+            vec![("FM_ETH__CORS__ALLOWED_ORIGINS", "example.com")],
+            || try_parse_config(""),
+        );
+        assert!(
+            matches!(settings, Err(ConfigError::Message(ref msg)) if msg == "relative URL without a base")
+        );
+
+        // opaque origin
+        let settings = with_env_vars(
+            vec![(
+                "FM_ETH__CORS__ALLOWED_ORIGINS",
+                "javascript:console.log(\"invalid origin\")",
+            )],
+            || try_parse_config(""),
+        );
+        assert!(
+            matches!(settings, Err(ConfigError::Message(ref msg)) if msg == "opaque origins are not allowed")
+        );
+
+        // Allow all with "*"
+        let settings = with_env_vars(vec![("FM_ETH__CORS__ALLOWED_ORIGINS", "*")], || {
+            try_parse_config("")
+        });
+        assert!(settings.is_ok());
+
+        // IPv4
+        let settings = with_env_vars(
+            vec![("FM_ETH__CORS__ALLOWED_ORIGINS", "http://192.0.2.1:1234")],
+            || try_parse_config(""),
+        );
+        assert!(settings.is_ok());
+
+        // IPv6
+        let settings = with_env_vars(
+            vec![(
+                "FM_ETH__CORS__ALLOWED_ORIGINS",
+                "http://[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:1234",
+            )],
+            || try_parse_config(""),
+        );
+        assert!(settings.is_ok());
     }
 }

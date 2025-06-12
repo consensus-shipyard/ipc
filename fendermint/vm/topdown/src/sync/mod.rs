@@ -137,8 +137,9 @@ where
         .collect::<Vec<_>>();
 
     atomically(|| {
-        view_provider.set_new_finality(finality.clone(), None)?;
-        vote_tally.set_finalized(finality.height, finality.block_hash.clone())?;
+        view_provider.set_new_finality(finality.clone())?;
+
+        vote_tally.set_finalized(finality.height, finality.block_hash.clone(), None, None)?;
         vote_tally.set_power_table(power_table.clone())?;
         Ok(())
     })

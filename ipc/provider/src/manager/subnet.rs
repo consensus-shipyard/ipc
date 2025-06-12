@@ -1,30 +1,33 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 
-use std::collections::{BTreeMap, HashMap};
-
 use anyhow::Result;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
+use ipc_actors_abis::subnet_actor_activity_facet::ValidatorClaim;
 use ipc_api::checkpoint::{
-    BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent, Signature,
+    consensus::ValidatorData, BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent,
+    Signature,
 };
 use ipc_api::cross::IpcEnvelope;
-use ipc_api::staking::{StakingChangeRequest, ValidatorInfo};
-use ipc_api::subnet::{ConstructParams, PermissionMode, SupplySource};
+use ipc_api::staking::{PowerChangeRequest, ValidatorInfo};
+use ipc_api::subnet::{Asset, ConstructParams, PermissionMode};
 use ipc_api::subnet_id::SubnetID;
 use ipc_api::validator::Validator;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::lotus::message::ipc::SubnetInfo;
 
 /// Trait to interact with a subnet and handle its lifecycle.
 #[async_trait]
-pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpointRelayer {
+pub trait SubnetManager:
+    Send + Sync + TopDownFinalityQuery + BottomUpCheckpointRelayer + ValidatorRewarder
+{
     /// Deploys a new subnet actor on the `parent` subnet and with the
     /// configuration passed in `ConstructParams`.
     /// The result of the function is the ID address for the subnet actor from which the final
-    /// subet ID can be inferred.
+    /// subnet ID can be inferred.
     async fn create_subnet(&self, from: Address, params: ConstructParams) -> Result<Address>;
 
     /// Performs the call to join a subnet from a wallet address and staking an amount
@@ -137,17 +140,6 @@ pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpoint
         amount: TokenAmount,
     ) -> Result<ChainEpoch>;
 
-    /// Propagate a cross-net message forward. For `postbox_msg_key`, we are using bytes because different
-    /// runtime have different representations. For FVM, it should be `CID` as bytes. For EVM, it is
-    /// `bytes32`.
-    async fn propagate(
-        &self,
-        subnet: SubnetID,
-        gateway_addr: Address,
-        from: Address,
-        postbox_msg_key: Vec<u8>,
-    ) -> Result<()>;
-
     /// Send value between two addresses in a subnet
     async fn send_value(&self, from: Address, to: Address, amount: TokenAmount) -> Result<()>;
 
@@ -163,10 +155,10 @@ pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpoint
     async fn get_commit_sha(&self) -> Result<[u8; 32]>;
 
     /// Gets the subnet supply source
-    async fn get_subnet_supply_source(
-        &self,
-        subnet: &SubnetID,
-    ) -> Result<ipc_actors_abis::subnet_actor_getter_facet::SupplySource>;
+    async fn get_subnet_supply_source(&self, subnet: &SubnetID) -> Result<Asset>;
+
+    /// Gets the subnet collateral source
+    async fn get_subnet_collateral_source(&self, subnet: &SubnetID) -> Result<Asset>;
 
     /// Gets the genesis information required to bootstrap a child subnet
     async fn get_genesis_info(&self, subnet: &SubnetID) -> Result<SubnetGenesisInfo>;
@@ -189,6 +181,9 @@ pub trait SubnetManager: Send + Sync + TopDownFinalityQuery + BottomUpCheckpoint
         validator: &Address,
     ) -> Result<ValidatorInfo>;
 
+    /// Lists all the validators
+    async fn list_validators(&self, subnet: &SubnetID) -> Result<Vec<(Address, ValidatorInfo)>>;
+
     async fn set_federated_power(
         &self,
         from: &Address,
@@ -209,7 +204,7 @@ pub struct SubnetGenesisInfo {
     pub validators: Vec<Validator>,
     pub genesis_balances: BTreeMap<Address, TokenAmount>,
     pub permission_mode: PermissionMode,
-    pub supply_source: SupplySource,
+    pub supply_source: Asset,
 }
 
 /// The generic payload that returns the block hash of the data returning block with the actual
@@ -246,7 +241,7 @@ pub trait TopDownFinalityQuery: Send + Sync {
         &self,
         subnet_id: &SubnetID,
         epoch: ChainEpoch,
-    ) -> Result<TopDownQueryPayload<Vec<StakingChangeRequest>>>;
+    ) -> Result<TopDownQueryPayload<Vec<PowerChangeRequest>>>;
     /// Returns the latest parent finality committed in a child subnet
     async fn latest_parent_finality(&self) -> Result<ChainEpoch>;
 }
@@ -278,4 +273,34 @@ pub trait BottomUpCheckpointRelayer: Send + Sync {
     async fn quorum_reached_events(&self, height: ChainEpoch) -> Result<Vec<QuorumReachedEvent>>;
     /// Get the current epoch in the current subnet
     async fn current_epoch(&self) -> Result<ChainEpoch>;
+}
+
+/// The validator reward related functions, such as check reward and claim reward for mining blocks
+/// in the child subnet
+#[async_trait]
+pub trait ValidatorRewarder: Send + Sync {
+    /// Query validator claims, indexed by checkpoint height, to batch claim rewards.
+    async fn query_reward_claims(
+        &self,
+        validator_addr: &Address,
+        from_checkpoint: ChainEpoch,
+        to_checkpoint: ChainEpoch,
+    ) -> Result<Vec<(u64, ValidatorClaim)>>;
+
+    /// Query validator rewards in the current subnet, without obtaining proofs.
+    async fn query_validator_rewards(
+        &self,
+        validator: &Address,
+        from_checkpoint: ChainEpoch,
+        to_checkpoint: ChainEpoch,
+    ) -> Result<Vec<(u64, ValidatorData)>>;
+
+    /// Claim validator rewards in a batch for the specified subnet.
+    async fn batch_subnet_claim(
+        &self,
+        submitter: &Address,
+        reward_claim_subnet: &SubnetID,
+        reward_origin_subnet: &SubnetID,
+        claims: Vec<(u64, ValidatorClaim)>,
+    ) -> Result<()>;
 }

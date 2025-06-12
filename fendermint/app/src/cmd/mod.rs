@@ -10,6 +10,11 @@ use crate::{
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 
+use ipc_observability::config::TracingSettings;
+use ipc_observability::traces::create_temporary_subscriber;
+use ipc_observability::traces::set_global_tracing_subscriber;
+use tracing::subscriber;
+
 pub mod config;
 pub mod debug;
 pub mod eth;
@@ -63,13 +68,36 @@ macro_rules! cmd {
 pub async fn exec(opts: &Options) -> anyhow::Result<()> {
     match &opts.command {
         Commands::Config(args) => args.exec(settings(opts)?).await,
-        Commands::Debug(args) => args.exec(()).await,
-        Commands::Run(args) => args.exec(settings(opts)?).await,
-        Commands::Key(args) => args.exec(()).await,
-        Commands::Genesis(args) => args.exec(()).await,
-        Commands::Rpc(args) => args.exec(()).await,
-        Commands::Eth(args) => args.exec(settings(opts)?.eth).await,
-        Commands::Materializer(args) => args.exec(()).await,
+        Commands::Debug(args) => {
+            let _trace_file_guard = set_global_tracing_subscriber(&TracingSettings::default());
+            args.exec(()).await
+        }
+        Commands::Run(args) => {
+            let settings = settings(opts)?;
+            let _trace_file_guard = set_global_tracing_subscriber(&settings.tracing);
+            args.exec(settings).await
+        }
+        Commands::Key(args) => {
+            let _trace_file_guard = set_global_tracing_subscriber(&TracingSettings::default());
+            args.exec(()).await
+        }
+        Commands::Genesis(args) => {
+            let _trace_file_guard = set_global_tracing_subscriber(&TracingSettings::default());
+            args.exec(()).await
+        }
+        Commands::Rpc(args) => {
+            let _trace_file_guard = set_global_tracing_subscriber(&TracingSettings::default());
+            args.exec(()).await
+        }
+        Commands::Eth(args) => {
+            let settings = settings(opts)?.eth;
+            let _trace_file_guard = set_global_tracing_subscriber(&settings.tracing);
+            args.exec(settings).await
+        }
+        Commands::Materializer(args) => {
+            let _trace_file_guard = set_global_tracing_subscriber(&TracingSettings::default());
+            args.exec(()).await
+        }
     }
 }
 
@@ -81,10 +109,13 @@ fn settings(opts: &Options) -> anyhow::Result<Settings> {
         d => d,
     };
 
-    tracing::info!(
-        path = config_dir.to_string_lossy().into_owned(),
-        "reading configuration"
-    );
+    subscriber::with_default(create_temporary_subscriber(), || {
+        tracing::info!(
+            path = config_dir.to_string_lossy().into_owned(),
+            "reading configuration"
+        )
+    });
+
     let settings =
         Settings::new(&config_dir, &opts.home_dir, &opts.mode).context("error parsing settings")?;
 

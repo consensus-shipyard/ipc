@@ -6,10 +6,13 @@ PACKAGE := $(patsubst %, --package %, $(CRATE))
 all: test build
 
 build:
-	cargo build --release
+	cargo build --locked --release
+
+install:
+	cargo install --locked --path cli
 
 test:
-	cargo test --release $(PACKAGE)
+	cargo test --locked --release $(PACKAGE)
 
 # itest:
 # 	cargo test -p itest --test checkpoint -- --nocapture

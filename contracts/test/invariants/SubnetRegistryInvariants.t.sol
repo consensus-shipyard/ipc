@@ -3,21 +3,22 @@ pragma solidity ^0.8.23;
 
 import {StdInvariant, Test} from "forge-std/Test.sol";
 import {TestUtils} from "../helpers/TestUtils.sol";
-import {IDiamond} from "../../src/interfaces/IDiamond.sol";
+import {IDiamond} from "../../contracts/interfaces/IDiamond.sol";
 import {SubnetRegistryHandler} from "./handlers/SubnetRegistryHandler.sol";
-import {SubnetRegistryDiamond} from "../../src/SubnetRegistryDiamond.sol";
-import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
-import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
-import {SubnetActorManagerFacet} from "../../src/subnet/SubnetActorManagerFacet.sol";
-import {SubnetActorPauseFacet} from "../../src/subnet/SubnetActorPauseFacet.sol";
-import {SubnetActorCheckpointingFacet} from "../../src/subnet/SubnetActorCheckpointingFacet.sol";
-import {SubnetActorRewardFacet} from "../../src/subnet/SubnetActorRewardFacet.sol";
-import {SubnetID} from "../../src/structs/Subnet.sol";
-import {RegisterSubnetFacet} from "../../src/subnetregistry/RegisterSubnetFacet.sol";
-import {SubnetGetterFacet} from "../../src/subnetregistry/SubnetGetterFacet.sol";
-import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
-import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
-import {OwnershipFacet} from "../../src/OwnershipFacet.sol";
+import {SubnetRegistryDiamond} from "../../contracts/SubnetRegistryDiamond.sol";
+import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
+import {SubnetActorGetterFacet} from "../../contracts/subnet/SubnetActorGetterFacet.sol";
+import {SubnetActorManagerFacet} from "../../contracts/subnet/SubnetActorManagerFacet.sol";
+import {SubnetActorPauseFacet} from "../../contracts/subnet/SubnetActorPauseFacet.sol";
+import {SubnetActorCheckpointingFacet} from "../../contracts/subnet/SubnetActorCheckpointingFacet.sol";
+import {SubnetActorRewardFacet} from "../../contracts/subnet/SubnetActorRewardFacet.sol";
+import {SubnetID} from "../../contracts/structs/Subnet.sol";
+import {RegisterSubnetFacet} from "../../contracts/subnetregistry/RegisterSubnetFacet.sol";
+import {SubnetGetterFacet} from "../../contracts/subnetregistry/SubnetGetterFacet.sol";
+import {DiamondLoupeFacet} from "../../contracts/diamond/DiamondLoupeFacet.sol";
+import {DiamondCutFacet} from "../../contracts/diamond/DiamondCutFacet.sol";
+import {OwnershipFacet} from "../../contracts/OwnershipFacet.sol";
+import {SubnetActorActivityFacet} from "../../contracts/subnet/SubnetActorActivityFacet.sol";
 import {IntegrationTestBase, TestRegistry} from "../IntegrationTestBase.sol";
 import {SelectorLibrary} from "../helpers/SelectorLibrary.sol";
 
@@ -51,6 +52,7 @@ contract SubnetRegistryInvariants is StdInvariant, Test, TestRegistry, Integrati
         params.diamondCutFacet = address(new DiamondCutFacet());
         params.diamondLoupeFacet = address(new DiamondLoupeFacet());
         params.ownershipFacet = address(new OwnershipFacet());
+        params.activityFacet = address(new SubnetActorActivityFacet());
 
         params.subnetActorGetterSelectors = mockedSelectors;
         params.subnetActorManagerSelectors = mockedSelectors2;
@@ -60,6 +62,7 @@ contract SubnetRegistryInvariants is StdInvariant, Test, TestRegistry, Integrati
         params.subnetActorDiamondCutSelectors = SelectorLibrary.resolveSelectors("DiamondCutFacet");
         params.subnetActorDiamondLoupeSelectors = SelectorLibrary.resolveSelectors("DiamondLoupeFacet");
         params.subnetActorOwnershipSelectors = SelectorLibrary.resolveSelectors("OwnershipFacet");
+        params.subnetActorActivitySelectors = SelectorLibrary.resolveSelectors("SubnetActorActivityFacet");
 
         registryDiamond = createSubnetRegistry(params);
         registryHandler = new SubnetRegistryHandler(registryDiamond);
@@ -96,7 +99,7 @@ contract SubnetRegistryInvariants is StdInvariant, Test, TestRegistry, Integrati
             address owner = owners[i];
             uint64 nonce = registryHandler.getUserLastNonce(owner);
 
-            assertNotEq(nonce, 0);
+            require(nonce != 0, "nonce should not be 0");
             assertEq(
                 registryHandler.getSubnetDeployedBy(owner),
                 registryHandler.getSubnetDeployedWithNonce(owner, nonce)

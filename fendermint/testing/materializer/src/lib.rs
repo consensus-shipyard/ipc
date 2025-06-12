@@ -20,6 +20,8 @@ pub mod validation;
 
 #[cfg(feature = "arb")]
 mod arb;
+pub mod bencher;
+pub mod concurrency;
 
 /// An ID identifying a resource within its parent.
 #[derive(Clone, Serialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -213,7 +215,7 @@ resource_name!(CliName: Testnet);
 
 impl TestnetName {
     pub fn new<T: Into<TestnetId>>(id: T) -> Self {
-        // Not including a leadign slash (ie. "/testnets") so that we can join with directory paths.
+        // Not including a leading slash (ie. "/testnets") so that we can join with directory paths.
         Self(ResourceName::from("testnets").join_id(&id.into()))
     }
 

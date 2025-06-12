@@ -13,6 +13,7 @@
 //! cargo test --release -p fendermint_vm_topdown --test smt_voting
 //! ```
 
+use core::fmt;
 use std::{
     cmp::{max, min},
     collections::BTreeMap,
@@ -40,6 +41,12 @@ state_machine_test!(voting, 10000 ms, 65512 bytes, 200 steps, VotingMachine::new
 /// Test key to make debugging more readable.
 #[derive(Debug, Clone, Hash, Eq, PartialEq, PartialOrd, Ord)]
 pub struct VotingKey(u64);
+
+impl fmt::Display for VotingKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "VotingKey({})", self.0)
+    }
+}
 
 pub type VotingError = voting::Error<VotingKey>;
 
@@ -369,7 +376,7 @@ impl smt::StateMachine for VotingMachine {
 
             VotingCommand::BlockFinalized(block_height, block_hash) => self.atomically_ok(|| {
                 system
-                    .set_finalized(*block_height, block_hash.clone())
+                    .set_finalized(*block_height, block_hash.clone(), None, None)
                     .map(|_| None)
             }),
 

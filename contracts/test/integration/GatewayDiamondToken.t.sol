@@ -3,35 +3,38 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 
-import "../../src/errors/IPCErrors.sol";
-import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../../src/constants/Constants.sol";
-import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint} from "../../src/structs/CrossNet.sol";
-import {FvmAddress} from "../../src/structs/FvmAddress.sol";
-import {IPCAddress, SubnetID, Subnet, SupplySource, SupplyKind, Validator} from "../../src/structs/Subnet.sol";
-import {SubnetIDHelper} from "../../src/lib/SubnetIDHelper.sol";
-import {FvmAddressHelper} from "../../src/lib/FvmAddressHelper.sol";
-import {CrossMsgHelper} from "../../src/lib/CrossMsgHelper.sol";
+import "../../contracts/errors/IPCErrors.sol";
+import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../../contracts/constants/Constants.sol";
+import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint} from "../../contracts/structs/CrossNet.sol";
+import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
+import {IPCAddress, SubnetID, Subnet, Asset, AssetKind, Validator} from "../../contracts/structs/Subnet.sol";
+import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
+import {FvmAddressHelper} from "../../contracts/lib/FvmAddressHelper.sol";
+import {CrossMsgHelper} from "../../contracts/lib/CrossMsgHelper.sol";
 import {IIpcHandler} from "../../sdk/interfaces/IIpcHandler.sol";
-import {SupplySourceHelper} from "../../src/lib/SupplySourceHelper.sol";
-import {FilAddress} from "fevmate/utils/FilAddress.sol";
-import {GatewayDiamond} from "../../src/GatewayDiamond.sol";
-import {LibGateway} from "../../src/lib/LibGateway.sol";
+import {AssetHelper} from "../../contracts/lib/AssetHelper.sol";
+import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
+import {GatewayDiamond} from "../../contracts/GatewayDiamond.sol";
+import {LibGateway} from "../../contracts/lib/LibGateway.sol";
 import {MockIpcContract, TestUtils} from "../helpers/TestUtils.sol";
 import {IntegrationTestBase} from "../IntegrationTestBase.sol";
-import {SubnetActorDiamond} from "../../src/SubnetActorDiamond.sol";
-import {GatewayGetterFacet} from "../../src/gateway/GatewayGetterFacet.sol";
-import {GatewayMessengerFacet} from "../../src/gateway/GatewayMessengerFacet.sol";
-import {GatewayManagerFacet} from "../../src/gateway/GatewayManagerFacet.sol";
-import {SubnetActorManagerFacet} from "../../src/subnet/SubnetActorManagerFacet.sol";
-import {SubnetActorGetterFacet} from "../../src/subnet/SubnetActorGetterFacet.sol";
-import {DiamondLoupeFacet} from "../../src/diamond/DiamondLoupeFacet.sol";
-import {DiamondCutFacet} from "../../src/diamond/DiamondCutFacet.sol";
+import {SubnetActorDiamond} from "../../contracts/SubnetActorDiamond.sol";
+import {GatewayGetterFacet} from "../../contracts/gateway/GatewayGetterFacet.sol";
+import {GatewayMessengerFacet} from "../../contracts/gateway/GatewayMessengerFacet.sol";
+import {GatewayManagerFacet} from "../../contracts/gateway/GatewayManagerFacet.sol";
+import {SubnetActorManagerFacet} from "../../contracts/subnet/SubnetActorManagerFacet.sol";
+import {SubnetActorGetterFacet} from "../../contracts/subnet/SubnetActorGetterFacet.sol";
+import {DiamondLoupeFacet} from "../../contracts/diamond/DiamondLoupeFacet.sol";
+import {DiamondCutFacet} from "../../contracts/diamond/DiamondCutFacet.sol";
 
-import {IERC20} from "openzeppelin-contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20PresetFixedSupply} from "../helpers/ERC20PresetFixedSupply.sol";
-import {IERC20Errors} from "openzeppelin-contracts/interfaces/draft-IERC6093.sol";
+import {IERC20Errors} from "@openzeppelin/contracts/interfaces/draft-IERC6093.sol";
 
 import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
+
+import {FullActivityRollup, Consensus} from "../../contracts/structs/Activity.sol";
+import {ActivityHelper} from "../helpers/ActivityHelper.sol";
 
 contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
@@ -57,7 +60,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         (SubnetID memory subnetId, , , , ) = getSubnet(address(saDiamond));
 
         vm.prank(caller);
-        vm.expectRevert(SupplySourceHelper.UnexpectedSupplySource.selector);
+        vm.expectRevert("Unexpected asset");
         gatewayDiamond.manager().fundWithToken(subnetId, FvmAddressHelper.from(caller), 100);
     }
 
@@ -68,7 +71,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         Subnet memory subnet = createTokenSubnet(address(token));
 
         vm.prank(caller);
-        vm.expectRevert(SupplySourceHelper.UnexpectedSupplySource.selector);
+        vm.expectRevert("Unexpected asset");
         gatewayDiamond.manager().fund{value: 100}(subnet.id, FvmAddressHelper.from(caller));
     }
 
@@ -110,7 +113,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
             10
         );
         vm.expectEmit(true, true, true, true, address(gatewayDiamond));
-        emit LibGateway.NewTopDownMessage(address(saDiamond), expected);
+        emit LibGateway.NewTopDownMessage(address(saDiamond), expected, expected.toTracingId());
         gatewayDiamond.manager().fundWithToken(subnet.id, FvmAddressHelper.from(caller), 10);
 
         // Assert post-conditions.
@@ -163,7 +166,8 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
             blockHash: blockhash(block.number),
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             nextConfigurationNumber: 0,
-            msgs: msgs
+            msgs: msgs,
+            activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
         vm.prank(address(saDiamond));
@@ -187,8 +191,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         gatewayDiamond.checkpointer().commitCheckpoint(batch);
     }
 
-    // Call a smart contract in the parent through a smart contract and with
-    // an ERC20 token supply.
+    // Call a smart contract in the parent through a smart contract.
     function test_childToParentCall() public {
         Subnet memory subnet = createTokenSubnet(address(token));
 
@@ -221,7 +224,8 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
             blockHash: blockhash(block.number),
             blockHeight: gatewayDiamond.getter().bottomUpCheckPeriod(),
             nextConfigurationNumber: 0,
-            msgs: msgs
+            msgs: msgs,
+            activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
         // Verify that we received the call and that the recipient has the tokens.
@@ -243,7 +247,7 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         SubnetActorDiamond.ConstructorParams memory saConstructorParams = defaultSubnetActorParamsWith(
             address(gatewayDiamond)
         );
-        saConstructorParams.supplySource = SupplySource({kind: SupplyKind.ERC20, tokenAddress: tokenAddress});
+        saConstructorParams.supplySource = Asset({kind: AssetKind.ERC20, tokenAddress: tokenAddress});
 
         // Override the state variables with the new subnet.
         saDiamond = createSubnetActor(saConstructorParams);

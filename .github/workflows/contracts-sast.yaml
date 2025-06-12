@@ -1,4 +1,4 @@
-name: Static analysis
+name: 'Contracts: Static analysis'
 
 # This workflow is triggered from the main CI workflow.
 on:
@@ -37,12 +37,27 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
         with:
           cache: false
+          version: v0.3.0
 
       - name: Install aderyn
         run: cargo install aderyn
 
+      - name: Make deps
+        run: cd contracts && make deps
+
+      # We need a normal npm install because pnpm hoists node_modules and creates symlinks.
+      # Aderyn performs local compilation calling solc directly. Solc requires the target of symlinks to be whitelisted
+      # in allowed-paths. Unfortunately, Aderyn doesn't support passing in allowed-paths, nor does it pick them up from
+      # Foundry config. I also wasn't able to mimic a standard node_modules layout with pnpm, after trying various
+      # hoisting and linking settings. So we bite the bullet and perform an ordinary npm install to make Aderyn happy.
+      - name: Force an ordinary npm install
+        run: cd contracts && rm -rf node_modules && npm install
+
+      - name: Print Aderyn version
+        run: aderyn --version
+
       - name: Run aderyn
-        run: cd contracts && aderyn ./ -o report.json
+        run: cd contracts && aderyn --skip-update-check ./ -o report.json
 
       - name: Check results
         run: cd contracts && ./tools/check_aderyn.sh
@@ -53,31 +68,17 @@ jobs:
     if: ${{ !github.event.pull_request.draft }}
     steps:
       - uses: actions/checkout@v3
-      - name: Setup Node 16
-        uses: actions/setup-node@v3
+      - uses: pnpm/action-setup@v2
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: '18.x'
-          cache: 'npm'
-          cache-dependency-path: 'contracts/package-lock.json'
+          cache: 'pnpm'
       - name: Install Node dependencies
-        run: cd contracts && npm i --unsafe-perm
+        run: cd contracts && pnpm i --unsafe-perm
       - name: Install solidity plugin
-        run: cd contracts && npm i --unsafe-perm prettier prettier-plugin-solidity
+        run: cd contracts && pnpm i --unsafe-perm prettier prettier-plugin-solidity
       - name: Prettier check
-        run: cd contracts && npx prettier --check 'src/**/*.sol' 'test/*.sol'
+        run: cd contracts && pnpm exec prettier --check 'contracts/**/*.sol' 'test/*.sol'
       - name: Solhint check
-        run: cd contracts && npx solhint 'src/**/*.sol'
-
-  codespell:
-    name: Codespell check
-    runs-on: ubuntu-latest
-    if: ${{ !github.event.pull_request.draft }}
-    steps:
-      - uses: actions/checkout@v3
-      - name: CodeSpell check
-        uses: codespell-project/actions-codespell@v2.0
-        with:
-          check_hidden: true
-          check_filenames: true
-          path: contracts/src/*,contracts/script/*,contracts/scripts/*,contracts/test/*
-          ignore_words_file: contracts/.codespellignore
+        run: cd contracts && pnpm exec solhint 'contracts/**/*.sol'
