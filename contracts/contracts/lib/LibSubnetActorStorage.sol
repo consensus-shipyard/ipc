@@ -21,8 +21,6 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
         bytes32 currentSubnetHash;
         /// @notice Address of the IPC gateway for the subnet
         address ipcGatewayAddr;
-        /// @notice Maximum number of messages per batch
-        uint64 maxMsgsPerBottomUpBatch;
         /// @notice majority percentage value (must be greater than or equal to 51)
         uint8 majorityPercentage;
         /// @notice Power scale determining the accuracy of the power scale (in number of decimals from whole FIL)

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {InvalidBatchEpoch, MaxMsgsPerBatchExceeded, InvalidSignatureErr, DuplicateValidatorSignaturesFound, SignatureAddressesNotSorted, BottomUpCheckpointAlreadySubmitted, CannotSubmitFutureCheckpoint, InvalidCheckpointEpoch} from "../errors/IPCErrors.sol";
+import {InvalidBatchEpoch, InvalidSignatureErr, DuplicateValidatorSignaturesFound, SignatureAddressesNotSorted, BottomUpCheckpointAlreadySubmitted, InvalidCheckpointEpoch} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {BottomUpCheckpoint, BottomUpMsgBatch, BottomUpMsgBatchInfo} from "../structs/CrossNet.sol";
 import {Validator, ValidatorSet, SubnetID} from "../structs/Subnet.sol";
@@ -106,11 +106,6 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
     /// @dev The checkpoint block height must be equal to the last bottom-up checkpoint height or
     /// @dev the next one or the number of bottom up messages exceeds the max batch size.
     function ensureValidCheckpoint(BottomUpCheckpoint calldata checkpoint) internal view {
-        uint64 maxMsgsPerBottomUpBatch = s.maxMsgsPerBottomUpBatch;
-        if (checkpoint.msgs.totalNumMsgs > maxMsgsPerBottomUpBatch) {
-            revert MaxMsgsPerBatchExceeded();
-        }
-
         uint256 lastBottomUpCheckpointHeight = s.lastBottomUpCheckpointHeight;
         uint256 bottomUpCheckPeriod = s.bottomUpCheckPeriod;
 
@@ -120,22 +115,9 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         }
 
         uint256 nextCheckpointHeight = LibGateway.getNextEpoch(lastBottomUpCheckpointHeight, bottomUpCheckPeriod);
-
-        if (checkpoint.blockHeight > nextCheckpointHeight) {
-            revert CannotSubmitFutureCheckpoint();
+        if (checkpoint.blockHeight != nextCheckpointHeight) {
+            revert InvalidCheckpointEpoch();
         }
-
-        // the expected bottom up checkpoint height, valid height
-        if (checkpoint.blockHeight == nextCheckpointHeight) {
-            return;
-        }
-
-        // if the bottom up messages' length is max, we consider that epoch valid, allow early submission
-        if (checkpoint.msgs.totalNumMsgs == s.maxMsgsPerBottomUpBatch) {
-            return;
-        }
-
-        revert InvalidCheckpointEpoch();
     }
 
     /// @notice Executes bottom-up messages that have been committed to in a checkpoint.
