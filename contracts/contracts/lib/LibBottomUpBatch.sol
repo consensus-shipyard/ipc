@@ -19,7 +19,7 @@ library LibBottomUpBatch {
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
     /// @notice Represents a pending bottom-up batch commitment awaiting full execution at a specific checkpoint height.
-    struct BatchPending {
+    struct PendingBatch {
       /// @notice The pending batch commitment.
       BottomUpBatch.Commitment commitment;
       /// @notice Set of message leaf hashes that have already been executed for this batch.
@@ -31,7 +31,7 @@ library LibBottomUpBatch {
         /// @notice Set of checkpoint heights with batches that are still pending execution.
         EnumerableSet.Bytes32Set pendingHeights;
         /// @notice Mapping of checkpoint height to its pending batch data.
-        mapping(uint256 => BatchPending) pending;
+        mapping(uint256 => PendingBatch) pending;
     }
 
     function ensureValidProof(
@@ -62,7 +62,7 @@ library LibBottomUpBatch {
         bool added = s.pendingHeights.add(bytes32(uint256(checkpointHeight)));
         require(added, "duplicate checkpoint height");
 
-        BatchPending storage pending = s.pending[checkpointHeight];
+        PendingBatch storage pending = s.pending[checkpointHeight];
         pending.commitment = commitment;
     }
 
@@ -74,7 +74,7 @@ library LibBottomUpBatch {
         BottomUpBatchStorage storage s = bottomUpBatchStorage();
 
         // Find the pending batch.
-        BatchPending storage pending = s.pending[checkpointHeight];
+        PendingBatch storage pending = s.pending[checkpointHeight];
         BottomUpBatch.MerkleHash root = pending.commitment.msgsRoot;
         if (BottomUpBatch.MerkleHash.unwrap(root) == bytes32(0)) {
             revert MissingBatchCommitment();
@@ -96,6 +96,14 @@ library LibBottomUpBatch {
         // Prune state for this height if all msgs were executed.
         if (pending.executed.length() == pending.commitment.totalNumMsgs) {
             s.pendingHeights.remove(bytes32(uint256(checkpointHeight)));
+
+            // Clear nested set before deleting the struct.
+            PendingBatch storage pending = s.pending[checkpointHeight];
+            uint256 len = pending.executed.length();
+            for (uint256 i = 0; i < len; i++) {
+                bytes32 leaf = pending.executed.at(0);
+                pending.executed.remove(leaf);
+            }
             delete s.pending[checkpointHeight];
         }
     }
@@ -118,7 +126,7 @@ library LibBottomUpBatch {
 
         for (uint256 i = 0; i < size; i++) {
             uint64 height = uint64(uint256(heights[i]));
-            BatchPending storage pending = s.pending[height];
+            PendingBatch storage pending = s.pending[height];
             result[i] = ListPendingCommitmentsEntry({
                 height: height,
                 commitment: pending.commitment,

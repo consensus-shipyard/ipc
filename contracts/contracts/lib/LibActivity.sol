@@ -148,7 +148,16 @@ library LibActivity {
         // Prune state for this height if all validators have claimed.
         if (pending.claimed.length() == pending.summary.stats.totalActiveValidators) {
             ConsensusTracker storage tracker = s.tracker[subnetKey];
+
             tracker.pendingHeights.remove(bytes32(uint256(checkpointHeight)));
+
+            // Clear nested set before deleting the struct.
+            ConsensusPendingAtHeight storage pending = tracker.pending[checkpointHeight];
+            uint256 len = pending.claimed.length();
+            for (uint256 i = 0; i < len; i++) {
+                address addr = pending.claimed.at(0);
+                pending.claimed.remove(addr);
+            }
             delete tracker.pending[checkpointHeight];
         }
     }
