@@ -1,0 +1,1 @@
+{"name":"diagram-builder","version":"1.0.0","description":"Mermaid diagram builder","private":true,"dependencies":{"@mermaid-js/mermaid-cli":"^10.6.1"}}

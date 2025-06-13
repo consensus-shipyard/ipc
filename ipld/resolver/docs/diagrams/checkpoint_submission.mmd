@@ -1,0 +1,82 @@
+sequenceDiagram
+    participant ParentLotus as Parent Lotus (Validator/Miner)
+    participant ParentAgent as IPC Agent (Parent)
+    participant ChildAgent as IPC Agent (Child)
+    participant FullLotus as Parent Lotus (Full)
+    participant ChildLotus as Child Lotus (Validator)
+    participant Validator as Validator
+
+    Note over ParentLotus, ParentAgent: Parent Subnet Validator
+    Note over ChildAgent, Validator: Child Subnet Validator
+
+    rect rgb(238, 251, 245)
+        Note over ParentLotus, ParentAgent: Parent Subnet Validator
+    end
+    rect rgb(254, 239, 236)
+        Note over ChildAgent, Validator: Child Subnet Validator
+    end
+
+    %% Initialize
+    Note over ParentLotus, Validator: Initialize
+
+    ParentAgent->>ParentLotus: subscribe
+
+    Validator->>ChildLotus: start
+    Validator->>FullLotus: start
+    Validator->>ChildAgent: start
+
+    ChildAgent->>FullLotus: subscribe
+    ChildAgent->>ChildLotus: subscribe
+
+    Validator->>+ChildAgent: join subnet
+    ChildAgent->>-ParentLotus: join subnet
+    ParentLotus->>ParentLotus: create block and<br/>execute transaction
+
+    %% During Epoch
+    Note over ParentLotus, Validator: During Epoch
+
+    loop Every Block
+        ParentLotus-->>FullLotus: broadcast block
+        alt if contains top-down messages
+            FullLotus-->>ChildAgent: observe finalized top-down message
+            ChildAgent->>ChildLotus: submit finalized top-down message
+            ChildLotus->>ChildAgent: is finalized on parent?
+            Note right of ChildAgent: Check messages proposed by others.
+        end
+
+        alt if has power to create block
+            ChildLotus->>ChildLotus: create block
+        end
+
+        ChildLotus->>ChildLotus: receive block
+    end
+
+    %% End of Epoch
+    Note over ParentLotus, Validator: End of Epoch
+
+    ChildLotus->>ChildLotus: next block producer<br/>creates checkpoint
+    Note left of ChildLotus: Ledger rules dictate<br/>checkpoint contents.
+    ChildLotus-->>ChildAgent: observe checkpoint
+
+    alt if validator in epoch
+        ChildAgent->>ChildLotus: submit signature over checkpoint
+    end
+
+    loop Accumulate Signatures
+        ChildLotus->>ChildLotus: create block
+        Note left of ChildLotus: Accumulate signatures<br/>in the ledger.
+        Note over ChildLotus: ... wait for quorum of signatures ...
+    end
+
+    ChildLotus-->>ChildAgent: observe quorum
+    ChildAgent->>ParentLotus: submit checkpoint with quorum certificate
+
+    ParentLotus->>+ParentAgent: resolve checkpoint CID
+    ParentAgent->>+ChildAgent: resolve checkpoint CID
+    Note right of ChildAgent: This is where the IPLD Resolver<br/>comes into play.
+    ChildAgent->>ChildLotus: fetch checkpoint contents
+    ChildAgent->>-ParentAgent: checkpoint contents
+    ParentAgent->>-ParentLotus: checkpoint contents
+
+    ParentLotus->>ParentLotus: create block and<br/>execute checkpoint
+    ParentLotus-->>FullLotus: broadcast block
