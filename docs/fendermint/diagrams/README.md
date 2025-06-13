@@ -1,12 +1,16 @@
 # Diagrams
 
-This directory contains [PlantUML](https://plantuml.com/) diagrams which are turned into images ready to be embedded into docs.
+This directory contains [Mermaid](https://mermaid.js.org/) diagrams which are turned into images ready to be embedded into docs.
 
 To render the images, run the following command:
 
 ```shell
 make diagrams
 ```
+
+## Prerequisites
+
+The build process uses the Mermaid CLI tool which requires Node.js. The Makefile will automatically install the required dependencies locally.
 
 ## Automation
 
@@ -21,9 +25,17 @@ set -eo pipefail
 # Redirect output to stderr.
 exec 1>&2
 
-if git diff --cached --name-only  --diff-filter=d | grep .puml
+if git diff --cached --name-only  --diff-filter=d | grep .mmd
 then
   make diagrams
-  git add docs/diagrams/*.png
+  git add docs/fendermint/diagrams/*.png
 fi
+```
+
+## Cleaning Up
+
+To clean up generated files and dependencies:
+
+```shell
+make clean
 ```
