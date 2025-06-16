@@ -561,6 +561,7 @@ fn ipld_decode_signed_message(msg: &[u8]) -> Result<SignedMessage> {
 
     match chain_msg {
         ChainMessage::Signed(msg) => Ok(msg),
+        ChainMessage::Validator(ValidatorMessage::SignBottomUpCheckpoint(msg)) => Ok(msg),
         other => Err(CheckMessageError::IllegalMessage(format!("{:?}", other)).into()),
     }
 }
