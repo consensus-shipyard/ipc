@@ -13,6 +13,8 @@ use zeroize::Zeroize;
 #[cfg(feature = "with-ethers")]
 use std::str::FromStr;
 
+use std::fmt::{Display, Formatter};
+
 pub use crate::evm::persistent::{PersistentKeyInfo, PersistentKeyStore};
 
 pub const DEFAULT_KEYSTORE_NAME: &str = "evm_keystore.json";
