@@ -7,7 +7,6 @@ mod memory;
 mod persistent;
 
 use anyhow::Result;
-use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 use zeroize::Zeroize;
 
