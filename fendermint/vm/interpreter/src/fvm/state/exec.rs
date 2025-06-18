@@ -173,9 +173,7 @@ where
         params: FvmStateParams,
     ) -> anyhow::Result<Self> {
         let mut nc = NetworkConfig::new(params.network_version);
-        if tracing::enabled!(Level::DEBUG) {
-            nc.enable_actor_debugging();
-        }
+        nc.enable_actor_debugging(); // Warning! Changing this on a live network will lead to non-determinism and consensus failures.
         nc.chain_id = ChainID::from(params.chain_id);
 
         // TODO: Configure:
