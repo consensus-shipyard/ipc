@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use anyhow::{anyhow, bail, Context};
 use async_recursion::async_recursion;
-use either::Either;
-use fvm_shared::chainid::ChainID;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt::Display,
@@ -13,15 +11,15 @@ use url::Url;
 
 use crate::{
     manifest::{
-        BalanceMap, CollateralMap, EnvMap, IpcDeployment, Manifest, Node, NodeMode, ParentNode,
-        Rootnet, Subnet,
+        BalanceMap, CollateralMap, EnvMap, Manifest, Node, NodeMode, ParentNode, Rootnet, Subnet,
     },
     materializer::{
         Materializer, NodeConfig, ParentConfig, RelayerConfig, SubmitConfig, SubnetConfig,
         TargetConfig,
     },
-    materials::Materials,
-    AccountId, NodeId, NodeName, RelayerName, ResourceHash, SubnetId, SubnetName, TestnetName,
+    materials::{IpcContractsOwner, Materials},
+    AccountId, NodeId, NodeName, RelayerName, ResourceHash, ResourceId, SubnetId, SubnetName,
+    TestnetName,
 };
 
 /// The `Testnet` parses a [Manifest] and is able to derive the steps
@@ -234,6 +232,7 @@ where
         subnet_name: &SubnetName,
         validators: CollateralMap,
         balances: BalanceMap,
+        ipc_contracts_owner: &ResourceId,
     ) -> anyhow::Result<()> {
         let validators = self
             .account_map(validators)
@@ -243,8 +242,13 @@ where
             .account_map(balances)
             .context("invalid root balances")?;
 
+        let ipc_contracts_owner = self
+            .account(ipc_contracts_owner)
+            .context("invalid ipc contract owner")?;
+
         // Remember the genesis so we can potentially create more nodes later.
-        let genesis = m.create_root_genesis(subnet_name, validators, balances)?;
+        let genesis =
+            m.create_root_genesis(subnet_name, validators, balances, ipc_contracts_owner)?;
 
         self.genesis.insert(subnet_name.clone(), genesis);
 
@@ -390,52 +394,25 @@ where
         rootnet: &Rootnet,
     ) -> anyhow::Result<()> {
         match rootnet {
-            Rootnet::External {
-                chain_id,
-                deployment,
-                urls,
-            } => {
-                // Establish balances.
-                for (id, a) in self.accounts.iter() {
-                    let reference = ResourceHash::digest(format!("funding {id} from faucet"));
-                    m.fund_from_faucet(a, Some(reference))
-                        .await
-                        .context("faucet failed")?;
-                }
-
-                // Establish root contract locations.
-                let deployment = match deployment {
-                    IpcDeployment::New { deployer } => {
-                        let deployer = self.account(deployer).context("invalid deployer")?;
-                        m.new_deployment(root_name, deployer, urls.clone())
-                            .await
-                            .context("failed to deploy IPC contracts")?
-                    }
-                    IpcDeployment::Existing { gateway, registry } => {
-                        m.existing_deployment(root_name, *gateway, *registry)?
-                    }
-                };
-
-                let subnet = m
-                    .create_root_subnet(root_name, Either::Left(ChainID::from(*chain_id)))
-                    .context("failed to create root subnet")?;
-
-                self.subnets.insert(root_name.clone(), subnet);
-                self.deployments.insert(root_name.clone(), deployment);
-                self.externals.clone_from(urls);
-            }
             Rootnet::New {
                 validators,
                 balances,
                 nodes,
                 env,
+                ipc_contracts_owner,
             } => {
-                self.create_root_genesis(m, root_name, validators.clone(), balances.clone())
-                    .context("failed to create root genesis")?;
+                self.create_root_genesis(
+                    m,
+                    root_name,
+                    validators.clone(),
+                    balances.clone(),
+                    ipc_contracts_owner,
+                )
+                .context("failed to create root genesis")?;
 
                 let genesis = self.genesis(root_name)?;
                 let subnet = m
-                    .create_root_subnet(root_name, Either::Right(genesis))
+                    .create_root_subnet(root_name, ipc_contracts_owner, &genesis)
                     .context("failed to create root subnet")?;
                 let deployment = m.default_deployment(root_name)?;
 
@@ -483,6 +460,20 @@ where
                 )
                 .await
                 .with_context(|| format!("failed to create {subnet_name}"))?;
+
+            let parent_subnet = self.subnet(parent_subnet_name)?;
+
+            let parent_contracts_owner = self
+                .account(parent_subnet.ipc_contracts_owner())
+                .context("invalid parent contracts owner")?;
+
+            m.approve_subnet(
+                &parent_submit_config,
+                &created_subnet,
+                &parent_contracts_owner,
+            )
+            .await
+            .with_context(|| format!("failed to approve subnet {subnet_name}"))?;
 
             self.subnets.insert(subnet_name.clone(), created_subnet);
         };

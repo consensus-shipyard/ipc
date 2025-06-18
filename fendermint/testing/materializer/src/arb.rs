@@ -1,18 +1,12 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use ethers::{
-    core::rand::{rngs::StdRng, SeedableRng},
-    types::H160,
-};
-use fendermint_vm_core::chainid;
 use lazy_static::lazy_static;
 use std::{
     cmp::min,
     collections::BTreeMap,
     ops::{Mul, SubAssign},
 };
-use url::Url;
 
 use fendermint_vm_genesis::Collateral;
 use fvm_shared::{
@@ -23,8 +17,8 @@ use quickcheck::{Arbitrary, Gen};
 
 use crate::{
     manifest::{
-        Account, Balance, BalanceMap, CheckpointConfig, CollateralMap, EnvMap, IpcDeployment,
-        Manifest, Node, NodeMap, NodeMode, ParentNode, Relayer, Rootnet, Subnet, SubnetMap,
+        Account, Balance, BalanceMap, CheckpointConfig, CollateralMap, EnvMap, Manifest, Node,
+        NodeMap, NodeMode, ParentNode, Relayer, Rootnet, Subnet, SubnetMap,
     },
     AccountId, NodeId, RelayerId, ResourceId, SubnetId,
 };
@@ -135,22 +129,9 @@ fn gen_manifest(
         .map(|id| (id.clone(), default_balance.clone()))
         .collect();
 
-    let rootnet = if bool::arbitrary(g) {
-        Rootnet::External {
-            chain_id: chainid::from_str_hashed(&String::arbitrary(g))
-                .unwrap_or(12345u64.into())
-                .into(),
-            deployment: if bool::arbitrary(g) {
-                let [gateway, registry] = gen_addresses::<2>(g);
-                IpcDeployment::Existing { gateway, registry }
-            } else {
-                IpcDeployment::New {
-                    deployer: choose_one(g, &account_ids),
-                }
-            },
-            urls: gen_urls(g),
-        }
-    } else {
+    let ipc_contracts_owner = choose_one(g, &account_ids);
+
+    let rootnet = {
         let initial_balances = balances.clone();
         let subnet = gen_root_subnet(g, &account_ids, &mut balances);
 
@@ -159,12 +140,12 @@ fn gen_manifest(
             balances: initial_balances,
             nodes: subnet.nodes,
             env: gen_env(g),
+            ipc_contracts_owner,
         }
     };
 
     // Collect the parent nodes on the rootnet that subnets can target.
     let parent_nodes: Vec<ParentNode> = match &rootnet {
-        Rootnet::External { urls, .. } => urls.iter().cloned().map(ParentNode::External).collect(),
         Rootnet::New { ref nodes, .. } => nodes.keys().cloned().map(ParentNode::Internal).collect(),
     };
 
@@ -185,28 +166,6 @@ fn gen_manifest(
         rootnet,
         subnets,
     }
-}
-
-/// Generate random ethereum address.
-fn gen_addresses<const N: usize>(g: &mut Gen) -> [H160; N] {
-    let mut rng = StdRng::seed_from_u64(u64::arbitrary(g));
-    std::array::from_fn(|_| H160::random_using(&mut rng))
-}
-
-/// Generate something that looks like it could be a JSON-RPC endpoint of an L1.
-///
-/// Return more, as if we had a list of nodes to choose from.
-fn gen_urls(g: &mut Gen) -> Vec<Url> {
-    let mut urls = Vec::new();
-    for _ in 0..1 + usize::arbitrary(g) % 3 {
-        let id = ResourceId::arbitrary(g);
-        // The glif.io addresses are load balanced, but let's pretend we can target a specific node.
-        // Alternatively we could vary the ports or whatever.
-        let url = format!("https://{}.api.calibration.node.glif.io/rpc/v1", id.0);
-        let url = Url::parse(&url).expect("URL should parse");
-        urls.push(url);
-    }
-    urls
 }
 
 /// Recursively generate some subnets.

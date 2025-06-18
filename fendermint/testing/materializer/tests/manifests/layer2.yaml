@@ -16,6 +16,7 @@ rootnet:
   env:
     CMT_CONSENSUS_TIMEOUT_COMMIT: 2s
     FM_LOG_LEVEL: info,fendermint=debug
+  ipc_contracts_owner: alice
 
   nodes:
     brussels:
