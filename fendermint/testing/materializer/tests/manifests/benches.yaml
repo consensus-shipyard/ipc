@@ -109,7 +109,7 @@ rootnet:
   env:
     CMT_CONSENSUS_TIMEOUT_COMMIT: 1s
     FM_LOG_LEVEL: info,fendermint=debug
-  ipc_contracts_owner: 1
+  ipc_contracts_owner: "1"
 
   nodes:
     # A singleton node.
