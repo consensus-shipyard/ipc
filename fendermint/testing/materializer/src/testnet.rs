@@ -412,7 +412,7 @@ where
 
                 let genesis = self.genesis(root_name)?;
                 let subnet = m
-                    .create_root_subnet(root_name, ipc_contracts_owner, &genesis)
+                    .create_root_subnet(root_name, ipc_contracts_owner, genesis)
                     .context("failed to create root subnet")?;
                 let deployment = m.default_deployment(root_name)?;
 
@@ -470,7 +470,7 @@ where
             m.approve_subnet(
                 &parent_submit_config,
                 &created_subnet,
-                &parent_contracts_owner,
+                parent_contracts_owner,
             )
             .await
             .with_context(|| format!("failed to approve subnet {subnet_name}"))?;

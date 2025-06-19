@@ -154,8 +154,8 @@ pub enum IpcDeployment {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "type")]
 pub enum Rootnet {
-    /// TODO Karel - make this code functional again. We currently don't use it and the new deployment does not work.
-    /// We will want to support Anvil as a rootnet instead of this.
+    // TODO Karel - make this code functional again. We currently don't use it and the new deployment does not work.
+    // We will want to support Anvil as a rootnet instead of this.
     // External {
     //     /// We need to know the ID of the chain to be able to create a `SubnetID` for it.
     //     chain_id: u64,
@@ -164,7 +164,6 @@ pub enum Rootnet {
     //     /// Addresses of JSON-RPC endpoints on the external L1.
     //     urls: Vec<Url>,
     // },
-
     /// Provision a new chain to run the L1.
     ///
     /// It is assumed that a newly provisioned chain will have built-in support for IPC,
