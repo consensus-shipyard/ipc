@@ -89,6 +89,12 @@ pub struct GenesisNewArgs {
     /// Number of decimals to use during converting FIL to Power.
     #[arg(long, short)]
     pub power_scale: i8,
+    #[arg(
+        long,
+        short,
+        help = "Initial genesis owner address for all IPC diamond contracts on this subnet (controls admin functions; transferrable)"
+    )]
+    pub ipc_contracts_owner: ethers::types::Address,
 }
 
 #[derive(Args, Debug)]

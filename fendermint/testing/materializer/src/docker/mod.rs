@@ -9,7 +9,6 @@ use bollard::{
     secret::{ContainerSummary, Network},
     Docker,
 };
-use either::Either;
 use ethers::{
     core::rand::{rngs::StdRng, SeedableRng},
     types::H160,
@@ -21,7 +20,7 @@ use fendermint_vm_genesis::{
     Account, Actor, ActorMeta, Collateral, Genesis, SignerAddr, Validator, ValidatorKey,
 };
 use fs_err as fs;
-use fvm_shared::{bigint::Zero, chainid::ChainID, econ::TokenAmount, version::NetworkVersion};
+use fvm_shared::{bigint::Zero, econ::TokenAmount, version::NetworkVersion};
 use ipc_api::subnet_id::SubnetID;
 use ipc_provider::config::subnet::{
     EVMSubnet, Subnet as IpcCliSubnet, SubnetConfig as IpcCliSubnetConfig,
@@ -48,8 +47,8 @@ use crate::{
         export_file, export_json, export_script, import_json, DefaultAccount, DefaultDeployment,
         DefaultGenesis, DefaultSubnet, Materials,
     },
-    CliName, NodeName, RelayerName, ResourceHash, ResourceName, SubnetName, TestnetName,
-    TestnetResource,
+    CliName, NodeName, RelayerName, ResourceHash, ResourceId, ResourceName, SubnetName,
+    TestnetName, TestnetResource,
 };
 
 mod container;
@@ -662,10 +661,14 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         subnet_name: &SubnetName,
         validators: BTreeMap<&'a DefaultAccount, Collateral>,
         balances: BTreeMap<&'a DefaultAccount, Balance>,
+        ipc_contracts_owner: &'a DefaultAccount,
     ) -> anyhow::Result<DefaultGenesis> {
         self.get_or_create_genesis(subnet_name, || {
             let chain_name = subnet_name.path_string();
             let chain_id = chainid::from_str_hashed(&chain_name)?;
+            // For root subnet, the owner is the first validator
+            let ipc_contracts_owner = ipc_contracts_owner.eth_addr().into();
+
             // TODO: Some of these hardcoded values can go into the manifest.
             let genesis = Genesis {
                 chain_name,
@@ -700,6 +703,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                         active_validators_limit: 100,
                     },
                 }),
+                ipc_contracts_owner,
             };
             Ok(genesis)
         })
@@ -708,24 +712,19 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
     fn create_root_subnet(
         &mut self,
         subnet_name: &SubnetName,
-        params: Either<ChainID, &DefaultGenesis>,
+        contracts_owner: &ResourceId,
+        params: &DefaultGenesis,
     ) -> anyhow::Result<DefaultSubnet> {
-        let subnet_id = match params {
-            Either::Left(id) => SubnetID::new_root(id.into()),
-            Either::Right(g) => {
-                let ipc = g
-                    .genesis
-                    .ipc
-                    .as_ref()
-                    .ok_or_else(|| anyhow!("IPC configuration missing from genesis"))?;
-
-                ipc.gateway.subnet_id.clone()
-            }
-        };
+        let ipc = params
+            .genesis
+            .ipc
+            .as_ref()
+            .ok_or_else(|| anyhow!("IPC configuration missing from genesis"))?;
 
         Ok(DefaultSubnet {
             name: subnet_name.clone(),
-            subnet_id,
+            contracts_owner: contracts_owner.clone(),
+            subnet_id: ipc.gateway.subnet_id.clone(),
         })
     }
 
@@ -803,6 +802,8 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
 
             let subnet = DefaultSubnet {
                 subnet_id,
+                // TODO Karel - save the contracts_owner to file.
+                contracts_owner: subnet_config.creator.account_id(),
                 name: subnet_name.clone(),
             };
 
@@ -820,12 +821,14 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                 --bottomup-check-period {} \
                 --permission-mode collateral \
                 --supply-source-kind native \
+                --genesis-subnet-ipc-contracts-owner {:?}
                 ",
             parent_submit_config.subnet.subnet_id,
             subnet_config.creator.eth_addr(),
             subnet_config.min_validators,
             TokenAmount::from_nano(1), // The minimum for native mode that the CLI parses
-            subnet_config.bottom_up_checkpoint.period
+            subnet_config.bottom_up_checkpoint.period,
+            subnet_config.creator.eth_addr(),
         );
 
         // Now run the command and capture the output.
@@ -845,8 +848,35 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
 
         Ok(DefaultSubnet {
             name: subnet_name.clone(),
+            contracts_owner: subnet_config.creator.account_id(),
             subnet_id,
         })
+    }
+
+    async fn approve_subnet<'s, 'a>(
+        &'s mut self,
+        parent_submit_config: &SubmitConfig<'a, DockerMaterials>,
+        subnet: &'a DefaultSubnet,
+        contracts_owner: &'a DefaultAccount,
+    ) -> anyhow::Result<()>
+    where
+        's: 'a,
+    {
+        let cmd = format!(
+            "ipc-cli subnet approve \
+                --subnet {} \
+                --from {:?}
+            ",
+            subnet.subnet_id,
+            contracts_owner.eth_addr(),
+        );
+
+        let logs = self
+            .ipc_cli_run_cmd(parent_submit_config, contracts_owner, cmd)
+            .await
+            .context("failed to approve subnet")?;
+
+        Ok(())
     }
 
     async fn fund_subnet<'s, 'a>(

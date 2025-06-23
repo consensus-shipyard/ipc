@@ -212,7 +212,8 @@ contract TestSubnetActor is Test, TestParams {
             supplySource: source,
             collateralSource: AssetHelper.native(),
             validatorGater: address(0),
-            validatorRewarder: address(0)
+            validatorRewarder: address(0),
+            genesisSubnetIpcContractsOwner: address(1)
         });
         return params;
     }
@@ -237,7 +238,8 @@ contract TestSubnetActor is Test, TestParams {
             supplySource: source,
             collateralSource: collateral,
             validatorGater: address(0),
-            validatorRewarder: address(0)
+            validatorRewarder: address(0),
+            genesisSubnetIpcContractsOwner: address(1)
         });
         return params;
     }
@@ -272,7 +274,8 @@ contract TestSubnetActor is Test, TestParams {
             supplySource: Asset({kind: AssetKind.ERC20, tokenAddress: tokenAddress}),
             collateralSource: AssetHelper.native(),
             validatorGater: address(0),
-            validatorRewarder: address(0)
+            validatorRewarder: address(0),
+            genesisSubnetIpcContractsOwner: address(1)
         });
         return params;
     }
@@ -628,7 +631,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             supplySource: AssetHelper.native(),
             collateralSource: AssetHelper.native(),
             validatorGater: address(0),
-            validatorRewarder: address(new ValidatorRewarderMap())
+            validatorRewarder: address(new ValidatorRewarderMap()),
+            genesisSubnetIpcContractsOwner: address(1)
         });
         saDiamond = createSubnetActor(params);
     }
@@ -660,7 +664,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             supplySource: AssetHelper.native(),
             collateralSource: AssetHelper.native(),
             validatorGater: _validatorGater,
-            validatorRewarder: address(new ValidatorRewarderMap())
+            validatorRewarder: address(new ValidatorRewarderMap()),
+            genesisSubnetIpcContractsOwner: address(1)
         });
         saDiamond = createSubnetActor(params);
     }

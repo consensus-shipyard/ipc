@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use anyhow::{anyhow, bail, Ok};
 use async_trait::async_trait;
-use either::Either;
 use ethers::types::H160;
 use fendermint_vm_genesis::Collateral;
-use fvm_shared::{chainid::ChainID, econ::TokenAmount};
+use fvm_shared::econ::TokenAmount;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
@@ -19,7 +18,8 @@ use crate::{
     materializer::{Materializer, NodeConfig, RelayerConfig, SubmitConfig, SubnetConfig},
     materials::Materials,
     testnet::Testnet,
-    AccountName, NodeName, RelayerName, ResourceHash, ResourceName, SubnetName, TestnetName,
+    AccountName, NodeName, RelayerName, ResourceHash, ResourceId, ResourceName, SubnetName,
+    TestnetName, ValidatedSubnet,
 };
 
 const DEFAULT_FAUCET_FIL: u64 = 100;
@@ -44,7 +44,7 @@ impl Materials for ValidationMaterials {
     type Deployment = SubnetName;
     type Account = AccountName;
     type Genesis = SubnetName;
-    type Subnet = SubnetName;
+    type Subnet = ValidatedSubnet;
     type Node = NodeName;
     type Relayer = RelayerName;
 }
@@ -231,6 +231,7 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
         subnet_name: &SubnetName,
         validators: BTreeMap<&'a VAccount, Collateral>,
         balances: BTreeMap<&'a VAccount, Balance>,
+        _ipc_contracts_owner: &'a VAccount,
     ) -> anyhow::Result<VGenesis> {
         self.ensure_contains(subnet_name)?;
         let tn = self.network()?;
@@ -252,9 +253,13 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
     fn create_root_subnet(
         &mut self,
         subnet_name: &SubnetName,
-        _params: Either<ChainID, &VGenesis>,
+        contracts_owner: &ResourceId,
+        _params: &VGenesis,
     ) -> anyhow::Result<VSubnet> {
-        Ok(subnet_name.clone())
+        Ok(ValidatedSubnet {
+            name: subnet_name.clone(),
+            owner: contracts_owner.clone(),
+        })
     }
 
     async fn create_node<'s, 'a>(
@@ -289,11 +294,28 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
         self.ensure_contains(subnet_name)?;
         // Check that the submitter has balance on the parent subnet to create the child.
         let parent = parent_submit_config.subnet;
-        self.ensure_balance(parent, subnet_config.creator)?;
+        self.ensure_balance(&parent.name, subnet_config.creator)?;
         // Insert child subnet balances entry.
         self.balances
             .insert(subnet_name.clone(), Default::default());
-        Ok(subnet_name.clone())
+
+        Ok(ValidatedSubnet {
+            name: subnet_name.clone(),
+            owner: subnet_config.creator.0.id(),
+        })
+    }
+
+    async fn approve_subnet<'s, 'a>(
+        &'s mut self,
+        _parent_submit_config: &SubmitConfig<'a, ValidationMaterials>,
+        _subnet: &'a VSubnet,
+        _contracts_owner: &'a VAccount,
+    ) -> anyhow::Result<()>
+    where
+        's: 'a,
+    {
+        // Maybe there should be some check?
+        Ok(())
     }
 
     async fn fund_subnet<'s, 'a>(
@@ -308,8 +330,8 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
         's: 'a,
     {
         // Debit parent balance; Credit child balance
-        self.fund_from_parent(subnet, account, amount, true)?;
-        self.ensure_unique(&subnet.parent().unwrap(), reference)?;
+        self.fund_from_parent(&subnet.name, account, amount, true)?;
+        self.ensure_unique(&subnet.name.parent().unwrap(), reference)?;
         Ok(())
     }
 
@@ -326,10 +348,10 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
         's: 'a,
     {
         // Debit parent balance, but do not make the funds available in the child
-        self.fund_from_parent(subnet, account, collateral.0, false)?;
+        self.fund_from_parent(&subnet.name, account, collateral.0, false)?;
         // Debit parent balance; Credit child balance
-        self.fund_from_parent(subnet, account, balance.0, true)?;
-        self.ensure_unique(&subnet.parent().unwrap(), reference)?;
+        self.fund_from_parent(&subnet.name, account, balance.0, true)?;
+        self.ensure_unique(&subnet.name.parent().unwrap(), reference)?;
         Ok(())
     }
 
@@ -342,7 +364,7 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
         's: 'a,
     {
         // We're supposed to fetch the data from the parent, there's nothing to check.
-        Ok(subnet.clone())
+        Ok(subnet.name.clone())
     }
 
     async fn create_relayer<'s, 'a>(
@@ -357,7 +379,7 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
         self.ensure_contains(relayer_name)?;
         // Check that submitter has balance on the parent.
         let parent = parent_submit_config.subnet;
-        self.ensure_balance(parent, relayer_config.submitter)?;
+        self.ensure_balance(&parent.name, relayer_config.submitter)?;
         Ok(relayer_name.clone())
     }
 }

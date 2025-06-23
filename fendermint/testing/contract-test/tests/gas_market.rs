@@ -20,6 +20,7 @@ use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeScheduler};
 use fendermint_vm_interpreter::fvm::FvmMessagesInterpreter;
 use fendermint_vm_message::chain::ChainMessage;
+use fendermint_vm_message::conv::from_fvm;
 use fendermint_vm_message::signed::SignedMessage;
 use fendermint_vm_topdown::voting::VoteTally;
 use fendermint_vm_topdown::Toggle;
@@ -78,6 +79,15 @@ async fn tester_with_upgrader(
         1.05,
     );
 
+    // We use a random actor ID for ipc_contracts_owner as it's not used for
+    // anything in this test. This is important because we want to make sure
+    // that the actor ID isn't accidentally used as a valid actor ID in the
+    // test.
+    let ipc_contracts_owner = Address::new_id(10000);
+    let ipc_contracts_owner = from_fvm::to_eth_address(&ipc_contracts_owner)
+        .unwrap()
+        .unwrap();
+
     let genesis = Genesis {
         chain_name: CHAIN_NAME.to_string(),
         chain_id: None,
@@ -102,6 +112,7 @@ async fn tester_with_upgrader(
         ],
         eam_permission_mode: PermissionMode::Unrestricted,
         ipc: None,
+        ipc_contracts_owner,
     };
     (Tester::new(interpreter, genesis).await.unwrap(), validator)
 }

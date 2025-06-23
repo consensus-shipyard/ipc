@@ -16,8 +16,8 @@ use ipc_api::subnet_id::SubnetID;
 
 use fs_err as fs;
 
-use super::export;
-use crate::{AccountId, AccountName, SubnetName};
+use super::{export, IpcContractsOwner};
+use crate::{AccountId, AccountName, ResourceId, SubnetName};
 
 pub struct DefaultDeployment {
     pub name: SubnetName,
@@ -60,6 +60,14 @@ pub struct DefaultSubnet {
     pub name: SubnetName,
     /// ID allocated to the subnet during creation.
     pub subnet_id: SubnetID,
+    /// Name of the account that owns the IPC contracts on the subnet.
+    pub contracts_owner: ResourceId,
+}
+
+impl IpcContractsOwner for DefaultSubnet {
+    fn ipc_contracts_owner(&self) -> ResourceId {
+        self.contracts_owner.clone()
+    }
 }
 
 impl Display for DefaultSubnet {
