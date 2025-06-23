@@ -42,6 +42,12 @@ pub trait SubnetManager:
         metadata: Vec<u8>,
     ) -> Result<ChainEpoch>;
 
+    /// Approves a subnet to be bootstrapped on the gateway. Only the gateway contract owner can perform this operation.
+    async fn approve_subnet(&self, subnet: SubnetID, from: Address) -> Result<()>;
+
+    /// Revokes the approval for a subnet to be bootstrapped on the gateway. Only the gateway contract owner can perform this operation.
+    async fn reject_approved_subnet(&self, subnet: SubnetID, from: Address) -> Result<()>;
+
     /// Adds some initial balance to an address before a child subnet bootstraps to make
     /// it available in the subnet at genesis.
     async fn pre_fund(&self, subnet: SubnetID, from: Address, balance: TokenAmount) -> Result<()>;
@@ -205,6 +211,7 @@ pub struct SubnetGenesisInfo {
     pub genesis_balances: BTreeMap<Address, TokenAmount>,
     pub permission_mode: PermissionMode,
     pub supply_source: Asset,
+    pub genesis_subnet_ipc_contracts_owner: ethers::types::Address,
 }
 
 /// The generic payload that returns the block hash of the data returning block with the actual

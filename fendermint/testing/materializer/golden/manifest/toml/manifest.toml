@@ -1,350 +1,210 @@
-[accounts.-ehA]
+[accounts.AQ-]
 
-[accounts.eqqqti]
+[accounts.YAT]
 
-[accounts.fHA_ON]
-
-[accounts.f_ZX]
-
-[accounts.iPd]
+[accounts.__AIik_j]
 
 [rootnet]
 type = "New"
+ipc_contracts_owner = "__AIik_j"
 
 [rootnet.validators]
-fHA_ON = "1"
-f_ZX = "6046835366980227743"
-iPd = "9209383518813002826"
+AQ- = "3199669152641157384"
+YAT = "4725570830599158438"
 
 [rootnet.balances]
--ehA = "100000000000000000000"
-eqqqti = "100000000000000000000"
-fHA_ON = "100000000000000000000"
-f_ZX = "100000000000000000000"
-iPd = "100000000000000000000"
+AQ- = "100000000000000000000"
+YAT = "100000000000000000000"
+__AIik_j = "100000000000000000000"
 
-[rootnet.nodes.2Xzri8W]
-ethapi = true
+[rootnet.nodes.H-OQy]
+ethapi = false
+seed_nodes = ["v_i8Zob2"]
+
+[rootnet.nodes.H-OQy.mode]
+type = "Validator"
+validator = "YAT"
+
+[rootnet.nodes.v_i8Zob2]
+ethapi = false
 seed_nodes = []
 
-[rootnet.nodes.2Xzri8W.mode]
+[rootnet.nodes.v_i8Zob2.mode]
 type = "Validator"
-validator = "fHA_ON"
-
-[rootnet.nodes.9fcF]
-ethapi = false
-seed_nodes = ["2Xzri8W"]
-
-[rootnet.nodes.9fcF.mode]
-type = "Validator"
-validator = "f_ZX"
-
-[rootnet.nodes.ytPNQ]
-ethapi = false
-seed_nodes = ["2Xzri8W"]
-
-[rootnet.nodes.ytPNQ.mode]
-type = "Validator"
-validator = "iPd"
+validator = "AQ-"
 
 [rootnet.env]
-CMT___rDM = "⁕᧗TmW"
-FM__jNsMLX = ""
+CMT_BbFqXr = "莭~"
+CMT_CVVs = ""
+FM_94_UH__V = "”"
+FM_9Uc_6 = "$񺔤 T:\t"
 
-[subnets.OIAAB]
-creator = "iPd"
+[subnets.LiP3Aa]
+creator = "AQ-"
 
-[subnets.OIAAB.validators]
-fHA_ON = "1"
-iPd = "4676106809805163365"
+[subnets.LiP3Aa.validators]
+AQ- = "3208789968795461243"
+YAT = "4067256200506058538"
 
-[subnets.OIAAB.balances]
-eqqqti = "6278883500910718379"
+[subnets.LiP3Aa.balances]
+YAT = "163461705830362489"
 
-[subnets.OIAAB.nodes.Wjm]
-ethapi = true
-seed_nodes = ["_Tz3"]
-parent_node = "ytPNQ"
-
-[subnets.OIAAB.nodes.Wjm.mode]
-type = "Validator"
-validator = "iPd"
-
-[subnets.OIAAB.nodes._Tz3]
+[subnets.LiP3Aa.nodes.KzA_y]
 ethapi = true
 seed_nodes = []
-parent_node = "2Xzri8W"
+parent_node = "H-OQy"
 
-[subnets.OIAAB.nodes._Tz3.mode]
+[subnets.LiP3Aa.nodes.KzA_y.mode]
 type = "Validator"
-validator = "fHA_ON"
+validator = "AQ-"
 
-[subnets.OIAAB.relayers.AQ5VNelq]
-submitter = "f_ZX"
-follow_node = "Wjm"
-submit_node = "2Xzri8W"
-
-[subnets.OIAAB.relayers.JH_Lv89k]
-submitter = "eqqqti"
-follow_node = "Wjm"
-submit_node = "9fcF"
-
-[subnets.OIAAB.relayers.mVEGKQww]
-submitter = "eqqqti"
-follow_node = "Wjm"
-submit_node = "9fcF"
-
-[subnets.OIAAB.bottom_up_checkpoint]
-period = 20416
-
-[subnets.OIAAB.env]
-CMT__FAwV = " ( V㯄\u007F5P~"
-CMT__yckLqO_ = "]"
-FM__-PBDnk = "d⁇;"
-
-[subnets.OIAAB.subnets.a_B2ET]
-creator = "eqqqti"
-
-[subnets.OIAAB.subnets.a_B2ET.validators]
-eqqqti = "4783142365052360646"
-fHA_ON = "1867169665136070113"
-f_ZX = "6927759254411342548"
-iPd = "6700029521346481243"
-
-[subnets.OIAAB.subnets.a_B2ET.balances]
-fHA_ON = "3665971483067389340"
-iPd = "3908771491087171112"
-
-[subnets.OIAAB.subnets.a_B2ET.nodes.KNhPCouO]
+[subnets.LiP3Aa.nodes.bxD_]
 ethapi = false
-seed_nodes = []
-parent_node = "_Tz3"
+seed_nodes = ["KzA_y"]
+parent_node = "H-OQy"
 
-[subnets.OIAAB.subnets.a_B2ET.nodes.KNhPCouO.mode]
+[subnets.LiP3Aa.nodes.bxD_.mode]
 type = "Validator"
-validator = "eqqqti"
+validator = "YAT"
 
-[subnets.OIAAB.subnets.a_B2ET.nodes.MlW]
+[subnets.LiP3Aa.relayers.GBJee6I]
+submitter = "__AIik_j"
+follow_node = "bxD_"
+submit_node = "H-OQy"
+
+[subnets.LiP3Aa.relayers.V-YH5_]
+submitter = "AQ-"
+follow_node = "bxD_"
+submit_node = "H-OQy"
+
+[subnets.LiP3Aa.relayers._eRAVi]
+submitter = "__AIik_j"
+follow_node = "bxD_"
+submit_node = "v_i8Zob2"
+
+[subnets.LiP3Aa.bottom_up_checkpoint]
+period = 14470
+
+[subnets.LiP3Aa.env]
+CMT_BGn = "$‑P"
+FM_4KaVz = "~ᘰ잲ಕ/⁢"
+
+[subnets.LiP3Aa.subnets.8YI__]
+creator = "YAT"
+
+[subnets.LiP3Aa.subnets.8YI__.validators]
+AQ- = "7474117444708975073"
+YAT = "704272210253566680"
+
+[subnets.LiP3Aa.subnets.8YI__.balances]
+__AIik_j = "4931498906063716101"
+
+[subnets.LiP3Aa.subnets.8YI__.nodes.Pu0-1]
 ethapi = true
-seed_nodes = ["KNhPCouO"]
-parent_node = "Wjm"
+seed_nodes = ["_VBAH"]
+parent_node = "bxD_"
 
-[subnets.OIAAB.subnets.a_B2ET.nodes.MlW.mode]
-type = "Validator"
-validator = "f_ZX"
-
-[subnets.OIAAB.subnets.a_B2ET.nodes.Nkm]
-ethapi = true
-seed_nodes = ["KNhPCouO", "MlW"]
-parent_node = "Wjm"
-
-[subnets.OIAAB.subnets.a_B2ET.nodes.Nkm.mode]
+[subnets.LiP3Aa.subnets.8YI__.nodes.Pu0-1.mode]
 type = "Full"
 
-[subnets.OIAAB.subnets.a_B2ET.nodes.faJwRIB]
+[subnets.LiP3Aa.subnets.8YI__.nodes._VBAH]
 ethapi = true
-seed_nodes = ["KNhPCouO"]
-parent_node = "Wjm"
+seed_nodes = []
+parent_node = "bxD_"
 
-[subnets.OIAAB.subnets.a_B2ET.nodes.faJwRIB.mode]
+[subnets.LiP3Aa.subnets.8YI__.nodes._VBAH.mode]
 type = "Validator"
-validator = "fHA_ON"
+validator = "AQ-"
 
-[subnets.OIAAB.subnets.a_B2ET.relayers.EEhBJk]
-submitter = "eqqqti"
-follow_node = "KNhPCouO"
-submit_node = "_Tz3"
+[subnets.LiP3Aa.subnets.8YI__.relayers.Fn5]
+submitter = "YAT"
+follow_node = "Pu0-1"
+submit_node = "bxD_"
 
-[subnets.OIAAB.subnets.a_B2ET.relayers.JXoBTnAJ]
-submitter = "eqqqti"
-follow_node = "MlW"
-submit_node = "_Tz3"
+[subnets.LiP3Aa.subnets.8YI__.bottom_up_checkpoint]
+period = 2
 
-[subnets.OIAAB.subnets.a_B2ET.bottom_up_checkpoint]
-period = 69588
+[subnets.LiP3Aa.subnets.8YI__.env]
+CMT_xKeJD8 = "¨\t[轻h~"
 
-[subnets.OIAAB.subnets.a_B2ET.env]
-FM__U4Ln = "?5-b6X"
+[subnets.LiP3Aa.subnets.BMcX]
+creator = "YAT"
 
-[subnets.OIAAB.subnets.hsS8]
-creator = "eqqqti"
+[subnets.LiP3Aa.subnets.BMcX.validators]
+AQ- = "1"
+__AIik_j = "4253330905707509191"
 
-[subnets.OIAAB.subnets.hsS8.validators]
--ehA = "4177615969204677409"
-iPd = "3023520693388139466"
+[subnets.LiP3Aa.subnets.BMcX.balances]
+YAT = "7095226404222467058"
+__AIik_j = "285822876018329041"
 
-[subnets.OIAAB.subnets.hsS8.balances]
-fHA_ON = "3999049419089336580"
-f_ZX = "16787427968912834"
+[subnets.LiP3Aa.subnets.BMcX.nodes.qKgTswA]
+ethapi = true
+seed_nodes = ["szuvBc"]
+parent_node = "KzA_y"
 
-[subnets.OIAAB.subnets.hsS8.nodes.BP9kN-7H]
+[subnets.LiP3Aa.subnets.BMcX.nodes.qKgTswA.mode]
+type = "Validator"
+validator = "__AIik_j"
+
+[subnets.LiP3Aa.subnets.BMcX.nodes.szuvBc]
 ethapi = false
 seed_nodes = []
-parent_node = "_Tz3"
+parent_node = "bxD_"
 
-[subnets.OIAAB.subnets.hsS8.nodes.BP9kN-7H.mode]
+[subnets.LiP3Aa.subnets.BMcX.nodes.szuvBc.mode]
 type = "Validator"
-validator = "-ehA"
+validator = "AQ-"
 
-[subnets.OIAAB.subnets.hsS8.nodes.RgO4P]
-ethapi = true
-seed_nodes = ["BP9kN-7H"]
-parent_node = "_Tz3"
+[subnets.LiP3Aa.subnets.BMcX.relayers.EfBDlNr]
+submitter = "YAT"
+follow_node = "szuvBc"
+submit_node = "KzA_y"
 
-[subnets.OIAAB.subnets.hsS8.nodes.RgO4P.mode]
-type = "Validator"
-validator = "iPd"
+[subnets.LiP3Aa.subnets.BMcX.relayers.YXgj8]
+submitter = "YAT"
+follow_node = "szuvBc"
+submit_node = "KzA_y"
 
-[subnets.OIAAB.subnets.hsS8.relayers.6H8]
-submitter = "eqqqti"
-follow_node = "RgO4P"
-submit_node = "_Tz3"
+[subnets.LiP3Aa.subnets.BMcX.relayers.qQN_l]
+submitter = "YAT"
+follow_node = "szuvBc"
+submit_node = "bxD_"
 
-[subnets.OIAAB.subnets.hsS8.relayers.iM3nURY7]
-submitter = "eqqqti"
-follow_node = "BP9kN-7H"
-submit_node = "Wjm"
+[subnets.LiP3Aa.subnets.BMcX.bottom_up_checkpoint]
+period = 78277
 
-[subnets.OIAAB.subnets.hsS8.relayers.pAzBpx0A]
-submitter = "eqqqti"
-follow_node = "RgO4P"
-submit_node = "Wjm"
+[subnets.U2R]
+creator = "AQ-"
 
-[subnets.OIAAB.subnets.hsS8.bottom_up_checkpoint]
-period = 52876
+[subnets.U2R.validators]
+YAT = "458065369041837599"
+__AIik_j = "1"
 
-[subnets.OIAAB.subnets.hsS8.env]
-FM__ALjA = "\u001D⁒F\t"
-FM__OQlQrBC_ = "񘒆\""
-FM___gj9W = "　둘"
-FM__l1xT = "纗\u0000"
+[subnets.U2R.balances]
+AQ- = "7929997960992083551"
 
-[subnets.Xix27]
-creator = "-ehA"
-
-[subnets.Xix27.validators]
-eqqqti = "2273965564539515671"
-
-[subnets.Xix27.balances]
--ehA = "4462424318869078388"
-eqqqti = "1"
-
-[subnets.Xix27.nodes.EMVA1wX8]
+[subnets.U2R.nodes.VwKz-]
 ethapi = false
-seed_nodes = []
-parent_node = "ytPNQ"
+seed_nodes = ["vSqDgoA"]
+parent_node = "H-OQy"
 
-[subnets.Xix27.nodes.EMVA1wX8.mode]
-type = "Validator"
-validator = "eqqqti"
+[subnets.U2R.nodes.VwKz-.mode]
+type = "Full"
 
-[subnets.Xix27.relayers.AaY]
-submitter = "f_ZX"
-follow_node = "EMVA1wX8"
-submit_node = "ytPNQ"
-
-[subnets.Xix27.bottom_up_checkpoint]
-period = 86
-
-[subnets.Xix27.env]
-FM__-vAVSaCB = ""
-FM__GANBlUA = "> \u00068"
-FM__J9S70J = "W<;[>N7"
-
-[subnets.Xix27.subnets.BSuqr]
-creator = "eqqqti"
-
-[subnets.Xix27.subnets.BSuqr.validators]
-eqqqti = "3966640668041645659"
-iPd = "7955897069057031398"
-
-[subnets.Xix27.subnets.BSuqr.balances]
--ehA = "3580135969056598395"
-eqqqti = "2848608469072110344"
-fHA_ON = "3197931706738709560"
-iPd = "3455357208511056337"
-
-[subnets.Xix27.subnets.BSuqr.nodes.2RrAM_M]
-ethapi = true
-seed_nodes = ["dIEn0B"]
-parent_node = "EMVA1wX8"
-
-[subnets.Xix27.subnets.BSuqr.nodes.2RrAM_M.mode]
-type = "Validator"
-validator = "iPd"
-
-[subnets.Xix27.subnets.BSuqr.nodes.dIEn0B]
+[subnets.U2R.nodes.vSqDgoA]
 ethapi = true
 seed_nodes = []
-parent_node = "EMVA1wX8"
+parent_node = "H-OQy"
 
-[subnets.Xix27.subnets.BSuqr.nodes.dIEn0B.mode]
+[subnets.U2R.nodes.vSqDgoA.mode]
 type = "Validator"
-validator = "eqqqti"
+validator = "YAT"
 
-[subnets.Xix27.subnets.BSuqr.relayers.E4RnO]
-submitter = "-ehA"
-follow_node = "dIEn0B"
-submit_node = "EMVA1wX8"
+[subnets.U2R.relayers.qzm69hNE]
+submitter = "YAT"
+follow_node = "VwKz-"
+submit_node = "v_i8Zob2"
 
-[subnets.Xix27.subnets.BSuqr.relayers.HOj]
-submitter = "eqqqti"
-follow_node = "2RrAM_M"
-submit_node = "EMVA1wX8"
-
-[subnets.Xix27.subnets.BSuqr.bottom_up_checkpoint]
-period = 10175
-
-[subnets.Xix27.subnets.BSuqr.env]
-FM__-d0B = ""
-FM__BMijgql = "@+_毼<"
-FM__B_h = "y\u0019¥§"
-FM__gDpB = "񆡐"
-
-[subnets.Xix27.subnets.V09gr]
-creator = "-ehA"
-
-[subnets.Xix27.subnets.V09gr.validators]
--ehA = "1201438629685537523"
-f_ZX = "5847338233826462781"
-
-[subnets.Xix27.subnets.V09gr.balances]
-eqqqti = "8364947985555720798"
-fHA_ON = "1"
-f_ZX = "5278587617192961211"
-iPd = "6976379959117607671"
-
-[subnets.Xix27.subnets.V09gr.nodes.AJQ-j]
-ethapi = true
-seed_nodes = []
-parent_node = "EMVA1wX8"
-
-[subnets.Xix27.subnets.V09gr.nodes.AJQ-j.mode]
-type = "Validator"
-validator = "-ehA"
-
-[subnets.Xix27.subnets.V09gr.nodes.k0n]
-ethapi = true
-seed_nodes = ["AJQ-j"]
-parent_node = "EMVA1wX8"
-
-[subnets.Xix27.subnets.V09gr.nodes.k0n.mode]
-type = "Validator"
-validator = "f_ZX"
-
-[subnets.Xix27.subnets.V09gr.relayers.m6Pelb3]
-submitter = "-ehA"
-follow_node = "AJQ-j"
-submit_node = "EMVA1wX8"
-
-[subnets.Xix27.subnets.V09gr.relayers.qpPslo]
-submitter = "-ehA"
-follow_node = "AJQ-j"
-submit_node = "EMVA1wX8"
-
-[subnets.Xix27.subnets.V09gr.bottom_up_checkpoint]
-period = 7187
-
-[subnets.Xix27.subnets.V09gr.env]
-CMT__sU_9fp = "\f )\" 񴤘+"
-FM__vpsIh_t = "`"
+[subnets.U2R.bottom_up_checkpoint]
+period = 25216

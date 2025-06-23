@@ -18,6 +18,8 @@ quickcheck = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 tendermint = { workspace = true }
 
+ethers = { workspace = true }
+
 cid = { workspace = true, optional = true }
 multihash = { workspace = true, optional = true }
 fvm_shared = { workspace = true }
@@ -34,7 +36,7 @@ quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }
 hex = { workspace = true }
 serde_json = { workspace = true }
-ipc-types = { path = "../../../ipc/types"}
+ipc-types = { path = "../../../ipc/types" }
 
 # Enable arb on self for tests.
 fendermint_vm_genesis = { path = ".", features = ["arb"] }

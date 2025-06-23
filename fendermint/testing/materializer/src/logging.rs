@@ -1,10 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use async_trait::async_trait;
-use either::Either;
 use ethers::types::H160;
 use fendermint_vm_genesis::Collateral;
-use fvm_shared::{chainid::ChainID, econ::TokenAmount};
+use fvm_shared::econ::TokenAmount;
 use std::{collections::BTreeMap, fmt::Display};
 use url::Url;
 
@@ -12,7 +11,7 @@ use crate::{
     manifest::Balance,
     materializer::{Materializer, NodeConfig, RelayerConfig, SubmitConfig, SubnetConfig},
     materials::Materials,
-    AccountName, NodeName, RelayerName, ResourceHash, SubnetName, TestnetName,
+    AccountName, NodeName, RelayerName, ResourceHash, ResourceId, SubnetName, TestnetName,
 };
 
 /// Simple in-memory logging to help debug manifests.
@@ -96,19 +95,22 @@ where
         subnet_name: &SubnetName,
         validators: BTreeMap<&'a M::Account, Collateral>,
         balances: BTreeMap<&'a M::Account, Balance>,
+        ipc_contracts_owner: &'a M::Account,
     ) -> anyhow::Result<M::Genesis> {
         tracing::info!(%subnet_name, ctx=self.ctx, "create_root_genesis");
         self.inner
-            .create_root_genesis(subnet_name, validators, balances)
+            .create_root_genesis(subnet_name, validators, balances, ipc_contracts_owner)
     }
 
     fn create_root_subnet(
         &mut self,
         subnet_name: &SubnetName,
-        params: Either<ChainID, &M::Genesis>,
+        contracts_owner: &ResourceId,
+        params: &M::Genesis,
     ) -> anyhow::Result<M::Subnet> {
         tracing::info!(%subnet_name, ctx=self.ctx, "create_root_subnet");
-        self.inner.create_root_subnet(subnet_name, params)
+        self.inner
+            .create_root_subnet(subnet_name, contracts_owner, params)
     }
 
     async fn create_node<'s, 'a>(
@@ -147,6 +149,20 @@ where
         tracing::info!(%subnet_name, ctx=self.ctx, "create_subnet");
         self.inner
             .create_subnet(parent_submit_config, subnet_name, subnet_config)
+            .await
+    }
+
+    async fn approve_subnet<'s, 'a>(
+        &'s mut self,
+        parent_submit_config: &SubmitConfig<'a, M>,
+        subnet: &'a M::Subnet,
+        contracts_owner: &'a M::Account,
+    ) -> anyhow::Result<()>
+    where
+        's: 'a,
+    {
+        self.inner
+            .approve_subnet(parent_submit_config, subnet, contracts_owner)
             .await
     }
 

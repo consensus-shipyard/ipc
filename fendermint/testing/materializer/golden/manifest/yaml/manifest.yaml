@@ -1,153 +1,114 @@
 accounts:
-  3VK: {}
-  A49ag: {}
-  KnRAxXtK: {}
-  NU7: {}
-  eWn: {}
+  9n7sv4: {}
+  _BxA: {}
+  nRQvU: {}
+  xVW76QJ: {}
 rootnet:
   type: New
   validators:
-    A49ag: '1400098391792422484'
+    _BxA: '7911974672191958257'
   balances:
-    3VK: '100000000000000000000'
-    A49ag: '100000000000000000000'
-    KnRAxXtK: '100000000000000000000'
-    NU7: '100000000000000000000'
-    eWn: '100000000000000000000'
+    9n7sv4: '100000000000000000000'
+    _BxA: '100000000000000000000'
+    nRQvU: '100000000000000000000'
+    xVW76QJ: '100000000000000000000'
   nodes:
-    yCG:
+    r1VC:
       mode:
         type: Validator
-        validator: A49ag
-      ethapi: false
+        validator: _BxA
+      ethapi: true
       seed_nodes: []
+  env:
+    CMT_8rQ: 䐬]%,s
+    CMT_95CuZ: "\x8B"
+    CMT_UAUexN: kP
+    FM_Aliygr: )
+  ipc_contracts_owner: xVW76QJ
 subnets:
-  BzD5vI2O:
-    creator: A49ag
+  BbJoOiG:
+    creator: _BxA
     validators:
-      3VK: '7529731445287884387'
-      A49ag: '9167930837587646193'
-      KnRAxXtK: '7827548757745403291'
-      NU7: '6425733186569988379'
+      9n7sv4: '1'
+      _BxA: '3482849399712350012'
+      nRQvU: '8973314966683994900'
     balances:
-      NU7: '1'
+      9n7sv4: '5826600168390017718'
     nodes:
-      10ZnopA:
+      2BG:
         mode:
           type: Validator
-          validator: 3VK
-        ethapi: false
-        seed_nodes: []
-        parent_node: yCG
-      e8q2cGc:
-        mode:
-          type: Validator
-          validator: KnRAxXtK
+          validator: nRQvU
         ethapi: true
         seed_nodes:
-        - zRtBr_Bs
-        parent_node: yCG
-      zRtBr_Bs:
+        - _K_WLe83
+        parent_node: r1VC
+      _K_WLe83:
         mode:
           type: Validator
-          validator: A49ag
+          validator: 9n7sv4
         ethapi: false
-        seed_nodes:
-        - 10ZnopA
-        parent_node: yCG
-      zhH18:
+        seed_nodes: []
+        parent_node: r1VC
+      _Pmzziv:
         mode:
           type: Validator
-          validator: NU7
-        ethapi: false
+          validator: _BxA
+        ethapi: true
         seed_nodes:
-        - 10ZnopA
-        - e8q2cGc
-        parent_node: yCG
+        - _K_WLe83
+        parent_node: r1VC
     relayers:
-      9nQ:
-        submitter: eWn
-        follow_node: e8q2cGc
-        submit_node: yCG
-      VbOB:
-        submitter: A49ag
-        follow_node: zRtBr_Bs
-        submit_node: yCG
+      _MZBH6WI:
+        submitter: 9n7sv4
+        follow_node: _Pmzziv
+        submit_node: r1VC
+      t-eTE:
+        submitter: nRQvU
+        follow_node: _K_WLe83
+        submit_node: r1VC
     bottom_up_checkpoint:
-      period: 2
+      period: 33311
     env:
-      FM__tS0: ":\b￼ᩀ/_y"
-    subnets:
-      hnhRk:
-        creator: NU7
-        validators:
-          KnRAxXtK: '8643995327005714255'
-          eWn: '1'
-        balances:
-          3VK: '8541113104596080524'
-          A49ag: '4271512068964340951'
-          KnRAxXtK: '4260071654886967116'
-          NU7: '5270641239536351101'
-        nodes:
-          jmeholol:
-            mode:
-              type: Full
-            ethapi: false
-            seed_nodes:
-            - xAAuRFO
-            parent_node: zhH18
-          xAAuRFO:
-            mode:
-              type: Validator
-              validator: KnRAxXtK
-            ethapi: false
-            seed_nodes: []
-            parent_node: e8q2cGc
-        relayers:
-          Q9kaeW:
-            submitter: NU7
-            follow_node: xAAuRFO
-            submit_node: e8q2cGc
-          gS23B:
-            submitter: NU7
-            follow_node: xAAuRFO
-            submit_node: e8q2cGc
-          hBBPy:
-            submitter: NU7
-            follow_node: xAAuRFO
-            submit_node: e8q2cGc
-        bottom_up_checkpoint:
-          period: 79709
-        env:
-          CMT__3DhVhDAP: "\x92　𝽮"
-          CMT__PUwq5p_i: "?7\x81"
-          FM__w5FBBJmm: 〤H
-  xmCp:
-    creator: A49ag
+      CMT_I2WvrK3H: "ｱ\x94{{ o"
+  R0SD:
+    creator: nRQvU
     validators:
-      NU7: '8966640422312622504'
+      9n7sv4: '2691171915680454088'
+      xVW76QJ: '6108752515019803037'
     balances:
-      NU7: '1'
+      9n7sv4: '1'
     nodes:
-      C1nz:
+      BzH4q_:
         mode:
           type: Validator
-          validator: NU7
+          validator: xVW76QJ
+        ethapi: true
+        seed_nodes:
+        - hI5nJ
+        parent_node: r1VC
+      hI5nJ:
+        mode:
+          type: Validator
+          validator: 9n7sv4
         ethapi: true
         seed_nodes: []
-        parent_node: yCG
+        parent_node: r1VC
     relayers:
-      LJZCa1ci:
-        submitter: A49ag
-        follow_node: C1nz
-        submit_node: yCG
-      urpBK_h:
-        submitter: eWn
-        follow_node: C1nz
-        submit_node: yCG
+      6rBQV:
+        submitter: _BxA
+        follow_node: hI5nJ
+        submit_node: r1VC
+      EAEuz7:
+        submitter: nRQvU
+        follow_node: BzH4q_
+        submit_node: r1VC
+      XGdb_xM:
+        submitter: nRQvU
+        follow_node: BzH4q_
+        submit_node: r1VC
     bottom_up_checkpoint:
-      period: 64612
+      period: 71466
     env:
-      CMT__6UItA: ⁮⁃T󿿿
-      CMT__GRhPQ: ﷆ
-      FM__imh_l6if: ''
+      CMT_C4Sf: "束⁈\x93\x84,;h"
+      FM_Blm: "« 4\x81H؄?⁚'"

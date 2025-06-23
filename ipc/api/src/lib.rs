@@ -28,11 +28,17 @@ pub fn eth_to_fil_amount(amount: &ethers::types::U256) -> anyhow::Result<TokenAm
     Ok(TokenAmount::from_atto(v))
 }
 
-pub fn ethers_address_to_fil_address(addr: &ethers::types::Address) -> anyhow::Result<Address> {
+pub fn ethers_address_to_ipc_eth_address(
+    addr: &ethers::types::Address,
+) -> anyhow::Result<EthAddress> {
     let raw_addr = format!("{addr:?}");
     log::debug!("raw evm subnet addr: {raw_addr:}");
 
-    let eth_addr = EthAddress::from_str(&raw_addr)?;
+    Ok(EthAddress::from_str(&raw_addr)?)
+}
+
+pub fn ethers_address_to_fil_address(addr: &ethers::types::Address) -> anyhow::Result<Address> {
+    let eth_addr = ethers_address_to_ipc_eth_address(addr)?;
     Ok(Address::from(eth_addr))
 }
 
