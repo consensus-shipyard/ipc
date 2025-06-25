@@ -3274,6 +3274,7 @@ dependencies = [
  "tendermint-proto 0.31.1",
  "tendermint-rpc",
  "tokio",
+ "toml 0.8.20",
  "tower 0.4.13",
  "tower-abci",
  "tracing",
