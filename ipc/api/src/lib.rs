@@ -37,8 +37,8 @@ pub fn ethers_address_to_ipc_eth_address(
     Ok(EthAddress::from_str(&raw_addr)?)
 }
 
-pub fn ethers_address_to_fil_address(addr: &ethers::types::Address) -> anyhow::Result<Address> {
-    let eth_addr = ethers_address_to_ipc_eth_address(addr)?;
+pub fn ethers_address_to_fil_address(addr: ethers::types::Address) -> anyhow::Result<Address> {
+    let eth_addr = ethers_address_to_ipc_eth_address(&addr)?;
     Ok(Address::from(eth_addr))
 }
 
