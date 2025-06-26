@@ -4116,6 +4116,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "filetime"
+version = "0.2.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "35c0522e981e68cbfa8c3f978441a5f34b30b96e146b33cd3359176b50fe8586"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "libredox",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
 name = "fixed-hash"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5816,15 +5828,18 @@ dependencies = [
  "env_logger 0.10.2",
  "ethers",
  "ethers-contract",
+ "fendermint_app_settings",
  "fendermint_eth_deployer",
  "fendermint_eth_hardhat",
  "fil_actors_runtime",
+ "flate2",
  "fs-err",
  "futures-util",
  "fvm_ipld_encoding",
  "fvm_shared",
  "hex",
  "ipc-api",
+ "ipc-observability",
  "ipc-provider",
  "ipc-types",
  "ipc-wallet",
@@ -5841,7 +5856,9 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "serde_tuple",
+ "sha2 0.10.8",
  "strum",
+ "tar",
  "thiserror 1.0.69",
  "tokio",
  "tokio-tungstenite 0.18.0",
@@ -6884,6 +6901,7 @@ checksum = "c0ff37bd590ca25063e35af745c343cb7a0271906fb7b37e4813e8f79f00268d"
 dependencies = [
  "bitflags 2.9.0",
  "libc",
+ "redox_syscall",
 ]
 
 [[package]]
@@ -10404,6 +10422,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
+name = "tar"
+version = "0.4.44"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d863878d212c87a19c1a610eb53bb01fe12951c0501cf5a0d65f724914a667a"
+dependencies = [
+ "filetime",
+ "libc",
+ "xattr",
+]
+
+[[package]]
 name = "target-lexicon"
 version = "0.12.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12397,6 +12426,16 @@ dependencies = [
  "rusticata-macros",
  "thiserror 1.0.69",
  "time",
+]
+
+[[package]]
+name = "xattr"
+version = "1.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af3a19837351dc82ba89f8a125e22a3c475f05aba604acc023d62b2739ae2909"
+dependencies = [
+ "libc",
+ "rustix 1.0.2",
 ]
 
 [[package]]

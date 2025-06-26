@@ -1,0 +1,18 @@
+{
+  "block_height": 670944554,
+  "size": 5279996817261953086,
+  "chunks": 66302186,
+  "checksum": "011880E7FEFF7B89F7F900CA8A8A31EE01005B714996EB6E56A9C94629C68E05",
+  "state_params": {
+    "state_root": "QmRAmJvPSFPjeHkVJyPktbmM2SRHURjbM7xs7JRD1zCjWJ",
+    "timestamp": 4213217894191243202,
+    "network_version": 4294967295,
+    "base_fee": "8250707776968713539450246576050714477",
+    "circ_supply": "91104274315546431878752615555686100806",
+    "chain_id": 2521733350176005,
+    "power_scale": 3,
+    "app_version": 0,
+    "consensus_params": null
+  },
+  "version": 1130599963
+}
