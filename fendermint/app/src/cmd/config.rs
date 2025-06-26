@@ -1,7 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use fendermint_app_options::config::{ConfigArgs, ConfigCommands, InitConfigArgs, PrintConfigArgs};
+use fendermint_app_options::config::{
+    ConfigArgs, ConfigCommands, DisplayConfigArgs, InitConfigArgs,
+};
 
 use crate::{
     cmd, cmd::load_settings, options::Options, settings::utils::expand_tilde, settings::Settings,
@@ -14,13 +16,13 @@ cmd! {
   ConfigArgs(self, options: Arc<Options>) {
     match &self.command {
         ConfigCommands::Init(args) => args.exec(options).await,
-        ConfigCommands::Print(args) => args.exec(load_settings(options)?).await
+        ConfigCommands::Display(args) => args.exec(load_settings(options)?).await
     }
   }
 }
 
 cmd! {
-  PrintConfigArgs(self, settings) {
+  DisplayConfigArgs(self, settings) {
     print_settings(settings)
   }
 }

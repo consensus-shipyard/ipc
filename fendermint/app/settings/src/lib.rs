@@ -639,6 +639,8 @@ mod tests {
             vec![("FM_ETH__CORS__ALLOWED_ORIGINS", "example.com")],
             || try_parse_config(""),
         );
+
+        println!("settings = {:#?}", settings);
         assert!(
             matches!(settings, Err(ConfigError::Message(ref msg)) if msg == "relative URL without a base")
         );

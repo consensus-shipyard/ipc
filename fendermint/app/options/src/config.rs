@@ -4,7 +4,7 @@
 use clap::{Args, Subcommand};
 
 #[derive(Args, Debug)]
-pub struct PrintConfigArgs;
+pub struct DisplayConfigArgs;
 
 #[derive(Args, Debug)]
 pub struct InitConfigArgs;
@@ -13,8 +13,8 @@ pub struct InitConfigArgs;
 pub enum ConfigCommands {
     /// Create a new default config file
     Init(InitConfigArgs),
-    /// Print the current config
-    Print(PrintConfigArgs),
+    /// Display the current config
+    Display(DisplayConfigArgs),
 }
 
 #[derive(Args, Debug)]

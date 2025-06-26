@@ -12,6 +12,7 @@ use serde::ser::{Error, SerializeSeq};
 use serde::Serializer;
 use std::collections::HashMap;
 use tower_http::cors::{AllowHeaders, AllowMethods, AllowOrigin};
+use url::Url;
 
 /// A serde serialization method to serialize a hashmap of subnets with subnet id as key and
 /// Subnet struct as value to a vec of subnets
@@ -68,17 +69,24 @@ fn address_to_eth_address(addr: &Address) -> anyhow::Result<EthAddress> {
 /// Convert a Vec<String> into an AllowOrigin.
 pub fn vec_to_allow_origin(origins: Vec<String>) -> anyhow::Result<AllowOrigin> {
     if origins.len() == 1 && origins[0] == "*" {
-        Ok(AllowOrigin::any())
-    } else {
-        let list = origins
-            .into_iter()
-            .map(|s| {
-                HeaderValue::from_str(&s)
-                    .map_err(|e| anyhow::anyhow!("Failed to parse origin '{}': {}", s, e))
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(AllowOrigin::list(list))
+        return Ok(AllowOrigin::any());
     }
+
+    let list = origins
+        .into_iter()
+        .map(|s| parse_origin(&s).map_err(|e| anyhow::anyhow!("{}", e)))
+        .collect::<anyhow::Result<Vec<_>>>()?;
+
+    Ok(AllowOrigin::list(list))
+}
+
+fn parse_origin(s: &str) -> anyhow::Result<HeaderValue> {
+    // First parse as url to extract the validated origin
+    let origin = s.parse::<Url>()?.origin();
+    if !origin.is_tuple() {
+        return Err(anyhow!("opaque origins are not allowed"));
+    }
+    Ok(HeaderValue::from_str(&origin.ascii_serialization())?)
 }
 
 /// Convert a Vec<String> into an AllowMethods.
