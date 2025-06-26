@@ -1,227 +1,345 @@
 {
   "accounts": {
-    "6zyA7": {},
-    "9hbSsB": {},
-    "EHQ-": {},
-    "IRr7T": {}
+    "GACLiGU": {},
+    "J_P": {},
+    "QWfBkHf": {},
+    "amJl": {}
   },
   "rootnet": {
-    "type": "External",
-    "chain_id": 1020675456393680,
-    "deployment": {
-      "type": "Existing",
-      "gateway": "0x11e993b2bd02766156a9e10d2781a943879abb53",
-      "registry": "0xda6f5719152b186a828acb0a4493e25a37ac43b7"
+    "type": "New",
+    "validators": {
+      "GACLiGU": "4478590220487655865",
+      "J_P": "1",
+      "amJl": "1"
     },
-    "urls": [
-      "https://ya64_.api.calibration.node.glif.io/rpc/v1",
-      "https://_oaxfc4c.api.calibration.node.glif.io/rpc/v1",
-      "https://m80.api.calibration.node.glif.io/rpc/v1"
-    ]
-  },
-  "subnets": {
-    "-BBkTATP": {
-      "creator": "6zyA7",
-      "validators": {
-        "6zyA7": "8325828212729098344",
-        "EHQ-": "1942350963860584797",
-        "IRr7T": "4680138372343081663"
-      },
-      "balances": {
-        "6zyA7": "4259378155931225643"
-      },
-      "nodes": {
-        "-u8": {
-          "mode": {
-            "type": "Validator",
-            "validator": "6zyA7"
-          },
-          "ethapi": true,
-          "seed_nodes": [],
-          "parent_node": "https://m80.api.calibration.node.glif.io/rpc/v1"
+    "balances": {
+      "GACLiGU": "100000000000000000000",
+      "J_P": "100000000000000000000",
+      "QWfBkHf": "100000000000000000000",
+      "amJl": "100000000000000000000"
+    },
+    "nodes": {
+      "B0OEJA": {
+        "mode": {
+          "type": "Validator",
+          "validator": "GACLiGU"
         },
-        "_fWg6": {
-          "mode": {
-            "type": "Full"
-          },
-          "ethapi": true,
-          "seed_nodes": [
-            "jS4"
-          ],
-          "parent_node": "https://ya64_.api.calibration.node.glif.io/rpc/v1"
+        "ethapi": true,
+        "seed_nodes": []
+      },
+      "UfAp": {
+        "mode": {
+          "type": "Validator",
+          "validator": "amJl"
         },
-        "jS4": {
-          "mode": {
-            "type": "Validator",
-            "validator": "EHQ-"
-          },
-          "ethapi": false,
-          "seed_nodes": [
-            "-u8"
-          ],
-          "parent_node": "https://m80.api.calibration.node.glif.io/rpc/v1"
-        }
+        "ethapi": false,
+        "seed_nodes": [
+          "B0OEJA"
+        ]
       },
-      "relayers": {
-        "bv9B": {
-          "submitter": "IRr7T",
-          "follow_node": "jS4",
-          "submit_node": "https://m80.api.calibration.node.glif.io/rpc/v1"
-        }
-      },
-      "bottom_up_checkpoint": {
-        "period": 67277
-      },
-      "env": {
-        "CMT__K-RY": "匊6\n",
-        "FM__6Tg_iRT": ">"
+      "dRgMC_": {
+        "mode": {
+          "type": "Full"
+        },
+        "ethapi": true,
+        "seed_nodes": [
+          "B0OEJA"
+        ]
       }
     },
-    "uex": {
-      "creator": "6zyA7",
+    "env": {
+      "CMT_gAv": "2*8󰀀"
+    },
+    "ipc_contracts_owner": "QWfBkHf"
+  },
+  "subnets": {
+    "NA6_WNT": {
+      "creator": "QWfBkHf",
       "validators": {
-        "9hbSsB": "5894953243723114349",
-        "EHQ-": "7201584667281066602"
+        "J_P": "2443698283648477126"
       },
       "balances": {
-        "9hbSsB": "8056020496037717271",
-        "IRr7T": "3898224579998834442"
+        "J_P": "857322575801910089",
+        "amJl": "7687929685226908205"
       },
       "nodes": {
-        "0Lj6": {
+        "tyXy": {
           "mode": {
             "type": "Validator",
-            "validator": "EHQ-"
+            "validator": "J_P"
           },
-          "ethapi": true,
-          "seed_nodes": [
-            "gH8Uf"
-          ],
-          "parent_node": "https://m80.api.calibration.node.glif.io/rpc/v1"
-        },
-        "gH8Uf": {
-          "mode": {
-            "type": "Validator",
-            "validator": "9hbSsB"
-          },
-          "ethapi": true,
+          "ethapi": false,
           "seed_nodes": [],
-          "parent_node": "https://ya64_.api.calibration.node.glif.io/rpc/v1"
+          "parent_node": "B0OEJA"
         }
       },
       "relayers": {
-        "9MBF0C5K": {
-          "submitter": "9hbSsB",
-          "follow_node": "0Lj6",
-          "submit_node": "https://_oaxfc4c.api.calibration.node.glif.io/rpc/v1"
+        "KEk": {
+          "submitter": "QWfBkHf",
+          "follow_node": "tyXy",
+          "submit_node": "UfAp"
         },
-        "DVIYFoev": {
-          "submitter": "EHQ-",
-          "follow_node": "gH8Uf",
-          "submit_node": "https://ya64_.api.calibration.node.glif.io/rpc/v1"
-        },
-        "Jg9WZ": {
-          "submitter": "IRr7T",
-          "follow_node": "gH8Uf",
-          "submit_node": "https://ya64_.api.calibration.node.glif.io/rpc/v1"
+        "Kq93": {
+          "submitter": "J_P",
+          "follow_node": "tyXy",
+          "submit_node": "dRgMC_"
         }
       },
       "bottom_up_checkpoint": {
-        "period": 22226
-      },
-      "env": {
-        "CMT__HyLavhZ": "⁪S#򺊘",
-        "CMT___m9-": "F?-¥>¯",
-        "FM__8s8myW9d": "銩x\"؄&",
-        "FM__jrlww4": "["
+        "period": 17985
       },
       "subnets": {
-        "DBBwcnPZ": {
-          "creator": "9hbSsB",
+        "2rG": {
+          "creator": "amJl",
           "validators": {
-            "9hbSsB": "218786779909603395"
+            "GACLiGU": "5975235457886043130",
+            "J_P": "3431385567482720644",
+            "amJl": "2199676097588236073"
           },
           "balances": {
-            "6zyA7": "3751747136988174159",
-            "9hbSsB": "6184548030841584560"
+            "GACLiGU": "5576035963707423888",
+            "QWfBkHf": "6816595804932599899"
           },
           "nodes": {
-            "q1q7": {
+            "IpeD": {
               "mode": {
                 "type": "Validator",
-                "validator": "9hbSsB"
+                "validator": "GACLiGU"
               },
               "ethapi": true,
               "seed_nodes": [],
-              "parent_node": "0Lj6"
-            }
-          },
-          "relayers": {
-            "3Tpx": {
-              "submitter": "IRr7T",
-              "follow_node": "q1q7",
-              "submit_node": "gH8Uf"
+              "parent_node": "tyXy"
             },
-            "KEHk3k": {
-              "submitter": "IRr7T",
-              "follow_node": "q1q7",
-              "submit_node": "gH8Uf"
+            "R3T": {
+              "mode": {
+                "type": "Full"
+              },
+              "ethapi": true,
+              "seed_nodes": [
+                "j_5hB"
+              ],
+              "parent_node": "tyXy"
             },
-            "cnMB3": {
-              "submitter": "IRr7T",
-              "follow_node": "q1q7",
-              "submit_node": "gH8Uf"
-            }
-          },
-          "bottom_up_checkpoint": {
-            "period": 75543
-          }
-        },
-        "uZEO3": {
-          "creator": "IRr7T",
-          "validators": {
-            "EHQ-": "4627470862527818298",
-            "IRr7T": "1392419311846296547"
-          },
-          "balances": {
-            "6zyA7": "1",
-            "EHQ-": "2497512308460913818",
-            "IRr7T": "2815621020594761215"
-          },
-          "nodes": {
-            "UOVVil-": {
+            "j_5hB": {
               "mode": {
                 "type": "Validator",
-                "validator": "IRr7T"
+                "validator": "J_P"
               },
               "ethapi": false,
               "seed_nodes": [
-                "xrX7C_k_"
+                "IpeD"
               ],
-              "parent_node": "gH8Uf"
-            },
-            "xrX7C_k_": {
-              "mode": {
-                "type": "Validator",
-                "validator": "EHQ-"
-              },
-              "ethapi": true,
-              "seed_nodes": [],
-              "parent_node": "0Lj6"
+              "parent_node": "tyXy"
             }
           },
           "relayers": {
-            "ZfdBJ": {
-              "submitter": "9hbSsB",
-              "follow_node": "xrX7C_k_",
-              "submit_node": "0Lj6"
+            "3j30oA": {
+              "submitter": "amJl",
+              "follow_node": "j_5hB",
+              "submit_node": "tyXy"
             }
           },
           "bottom_up_checkpoint": {
-            "period": 2600
+            "period": 79369
+          }
+        },
+        "Bcr": {
+          "creator": "J_P",
+          "validators": {
+            "amJl": "1"
+          },
+          "balances": {
+            "GACLiGU": "3511421302070673585",
+            "J_P": "4446405039425248225",
+            "QWfBkHf": "265994458232786131"
+          },
+          "nodes": {
+            "nMoTHt8": {
+              "mode": {
+                "type": "Validator",
+                "validator": "amJl"
+              },
+              "ethapi": false,
+              "seed_nodes": [],
+              "parent_node": "tyXy"
+            }
+          },
+          "relayers": {
+            "AzsFit": {
+              "submitter": "J_P",
+              "follow_node": "nMoTHt8",
+              "submit_node": "tyXy"
+            },
+            "B1h2moF": {
+              "submitter": "J_P",
+              "follow_node": "nMoTHt8",
+              "submit_node": "tyXy"
+            },
+            "JXB": {
+              "submitter": "amJl",
+              "follow_node": "nMoTHt8",
+              "submit_node": "tyXy"
+            }
+          },
+          "bottom_up_checkpoint": {
+            "period": 37662
           },
           "env": {
-            "CMT____DUE0": "H7/‑!"
+            "CMT_AjpA_89": "",
+            "CMT_IP9AySTC": "+Y",
+            "CMT_IT2AT": ""
+          }
+        }
+      }
+    },
+    "uufIjUA": {
+      "creator": "amJl",
+      "validators": {
+        "J_P": "9020122933710502355",
+        "amJl": "5987871760640901119"
+      },
+      "balances": {
+        "J_P": "1294260920204155015"
+      },
+      "nodes": {
+        "F1sRu": {
+          "mode": {
+            "type": "Validator",
+            "validator": "amJl"
+          },
+          "ethapi": true,
+          "seed_nodes": [
+            "n3HARq1k"
+          ],
+          "parent_node": "dRgMC_"
+        },
+        "n3HARq1k": {
+          "mode": {
+            "type": "Validator",
+            "validator": "J_P"
+          },
+          "ethapi": true,
+          "seed_nodes": [],
+          "parent_node": "dRgMC_"
+        }
+      },
+      "relayers": {
+        "RMssH83": {
+          "submitter": "QWfBkHf",
+          "follow_node": "n3HARq1k",
+          "submit_node": "B0OEJA"
+        }
+      },
+      "bottom_up_checkpoint": {
+        "period": 44293
+      },
+      "env": {
+        "CMT_7oh7": "2~4f\u0000",
+        "CMT_ZFippov": "眇",
+        "CMT_ZgYAh9": "/II]",
+        "CMT_pk2pB1": "V("
+      },
+      "subnets": {
+        "4ZAl-": {
+          "creator": "J_P",
+          "validators": {
+            "GACLiGU": "7847736138830376208",
+            "J_P": "6161813680563865392"
+          },
+          "balances": {
+            "amJl": "710151163820650608"
+          },
+          "nodes": {
+            "B-TBTzWR": {
+              "mode": {
+                "type": "Validator",
+                "validator": "GACLiGU"
+              },
+              "ethapi": true,
+              "seed_nodes": [],
+              "parent_node": "F1sRu"
+            },
+            "IkA": {
+              "mode": {
+                "type": "Validator",
+                "validator": "J_P"
+              },
+              "ethapi": true,
+              "seed_nodes": [
+                "B-TBTzWR"
+              ],
+              "parent_node": "F1sRu"
+            }
+          },
+          "relayers": {
+            "Mrc4": {
+              "submitter": "J_P",
+              "follow_node": "IkA",
+              "submit_node": "F1sRu"
+            }
+          },
+          "bottom_up_checkpoint": {
+            "period": 83591
+          },
+          "env": {
+            "CMT_7J0_tl0d": "%_qªO ¯\""
+          }
+        },
+        "KhJZyp": {
+          "creator": "J_P",
+          "validators": {
+            "GACLiGU": "5198011253287881750",
+            "J_P": "6173364979798873819",
+            "QWfBkHf": "8950212965970481215"
+          },
+          "balances": {
+            "QWfBkHf": "841221373046786962"
+          },
+          "nodes": {
+            "-afbZ": {
+              "mode": {
+                "type": "Validator",
+                "validator": "GACLiGU"
+              },
+              "ethapi": true,
+              "seed_nodes": [],
+              "parent_node": "F1sRu"
+            },
+            "C8rWJB": {
+              "mode": {
+                "type": "Validator",
+                "validator": "J_P"
+              },
+              "ethapi": true,
+              "seed_nodes": [
+                "-afbZ"
+              ],
+              "parent_node": "F1sRu"
+            },
+            "nNU": {
+              "mode": {
+                "type": "Validator",
+                "validator": "QWfBkHf"
+              },
+              "ethapi": false,
+              "seed_nodes": [
+                "C8rWJB"
+              ],
+              "parent_node": "F1sRu"
+            }
+          },
+          "relayers": {
+            "aqh": {
+              "submitter": "J_P",
+              "follow_node": "nNU",
+              "submit_node": "F1sRu"
+            }
+          },
+          "bottom_up_checkpoint": {
+            "period": 16443
+          },
+          "env": {
+            "CMT_Req": "⶚"
           }
         }
       }

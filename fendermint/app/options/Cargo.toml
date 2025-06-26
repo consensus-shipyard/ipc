@@ -28,6 +28,8 @@ ipc-types = { path = "../../../ipc/types" }
 url = { workspace = true }
 ipc-observability = { path = "../../../ipc/observability" }
 
+ethers = { workspace = true }
+
 fendermint_vm_genesis = { path = "../../vm/genesis" }
 fendermint_vm_actor_interface = { path = "../../vm/actor_interface" }
 fendermint_materializer = { path = "../../testing/materializer" }

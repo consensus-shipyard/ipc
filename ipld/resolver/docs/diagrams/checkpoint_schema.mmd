@@ -1,0 +1,78 @@
+erDiagram
+    %% Subnet Actor in parent subnet
+    VALIDATOR {
+        string public_key PK
+        integer power "delegated stake"
+    }
+
+    CONFIGURATION {
+        integer config_number PK
+    }
+
+    VALIDATOR_SNAPSHOT {
+        integer config_number FK
+        string public_key FK
+        integer power "delegated stake in the config"
+    }
+
+    SUBMITTED_CHECKPOINT {
+        string checkpoint FK
+    }
+
+    %% Checkpointing
+    CHECKPOINT {
+        integer epoch_number FK
+        integer next_config_number FK
+        string state_hash "CID"
+    }
+
+    SIGNATURE {
+        string public_key FK "validator public key"
+        string checkpoint FK
+        string signature
+    }
+
+    %% Child subnet
+    EPOCH {
+        integer epoch_number PK
+        integer config_number FK
+        integer start_block_height FK
+        integer epoch_length
+    }
+
+    CROSS_MESSAGES {
+        integer epoch_number FK
+        string messages FK "CID - An AMT containing CIDs"
+    }
+
+    MESSAGE {
+        string id PK "CID"
+        string from FK "address"
+        string to FK "address"
+        integer nonce
+        string payload
+    }
+
+    BLOCK {
+        string hash PK "CID"
+        integer height
+        string messages FK "CID"
+    }
+
+    %% Relationships
+    CONFIGURATION ||--o{ VALIDATOR_SNAPSHOT : "has"
+    VALIDATOR ||--o{ VALIDATOR_SNAPSHOT : "creates"
+
+    CONFIGURATION ||--o{ EPOCH : "defines"
+    BLOCK ||--|| EPOCH : "starts"
+    EPOCH ||--|| CROSS_MESSAGES : "contains"
+    EPOCH ||--o| CHECKPOINT : "produces"
+
+    CHECKPOINT ||--o{ SIGNATURE : "signed_by"
+    VALIDATOR ||--o{ SIGNATURE : "signs"
+
+    CONFIGURATION ||--o{ CHECKPOINT : "next_config"
+    CHECKPOINT ||--o| SUBMITTED_CHECKPOINT : "submitted_as"
+
+    CROSS_MESSAGES ||--o{ MESSAGE : "includes"
+    BLOCK ||--o{ MESSAGE : "contains"
