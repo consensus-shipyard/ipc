@@ -45,10 +45,11 @@ import {SelectorLibrary} from "./helpers/SelectorLibrary.sol";
 import {GatewayFacetsHelper} from "./helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "./helpers/SubnetActorFacetsHelper.sol";
 import {DiamondFacetsHelper} from "./helpers/DiamondFacetsHelper.sol";
-
 import {FullActivityRollup, CompressedActivityRollup, Consensus} from "../contracts/structs/Activity.sol";
+import {BottomUpBatch} from "../contracts/structs/BottomUpBatch.sol";
 import {ValidatorRewarderMap} from "../contracts/examples/ValidatorRewarderMap.sol";
 import {SubnetActorActivityFacet} from "../contracts/subnet/SubnetActorActivityFacet.sol";
+import {BottomUpBatchHelper} from "./helpers/BottomUpBatchHelper.sol";
 
 struct TestSubnetDefinition {
     GatewayDiamond gateway;
@@ -943,7 +944,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             blockHeight: h,
             blockHash: keccak256(abi.encode(h)),
             nextConfigurationNumber: nextConfigNum - 1,
-            msgs: new IpcEnvelope[](0),
+            msgs: BottomUpBatchHelper.makeCommitment(BottomUpBatchHelper.makeEmptyBatch()),
             activity: CompressedActivityRollup({
                 consensus: Consensus.CompressedSummary({
                     stats: Consensus.AggregatedStats({
@@ -971,6 +972,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     function confirmChange(
         address[] memory validators,
         uint256[] memory privKeys,
+        BottomUpBatch.Commitment memory commitment,
         CompressedActivityRollup memory activities
     ) internal {
         uint256 n = validators.length;
@@ -986,7 +988,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             blockHeight: h,
             blockHash: keccak256(abi.encode(h)),
             nextConfigurationNumber: nextConfigNum - 1,
-            msgs: new IpcEnvelope[](0),
+            msgs: commitment,
             activity: activities
         });
 

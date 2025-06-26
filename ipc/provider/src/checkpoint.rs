@@ -8,7 +8,9 @@ use crate::observe::CheckpointSubmitted;
 use anyhow::{anyhow, Result};
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
+use ipc_actors_abis::subnet_actor_checkpointing_facet::Inclusion;
 use ipc_api::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
+use ipc_api::subnet_id::SubnetID;
 use ipc_observability::{emit, serde::HexEncodableBlockHash};
 use ipc_wallet::{EthKeyAddress, PersistentKeyStore};
 use std::cmp::max;
@@ -125,6 +127,9 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
             if let Err(e) = self.submit_next_epoch(submitter).await {
                 tracing::error!("cannot submit checkpoint for submitter: {submitter} due to {e}");
             }
+            if let Err(e) = self.execute_pending_batch_commitments(submitter).await {
+                tracing::error!("cannot execute pending batch commitments for submitter: {submitter} due to {e}");
+            }
             tokio::time::sleep(submission_interval).await;
         }
     }
@@ -237,6 +242,69 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         Ok(())
     }
 
+    /// Checks if there are any pending bottom up batch commitments, if so execute them.
+    async fn execute_pending_batch_commitments(&self, submitter: Address) -> Result<()> {
+        let pending_commitments = self
+            .parent_handler
+            .list_pending_bottom_up_batch_commitments(&self.metadata.child.id)
+            .await
+            .map_err(|e| {
+                anyhow!(
+                    "cannot obtain the list of pending bottom up batch commitments due to: {e:}"
+                )
+            })?;
+        tracing::info!("total pending commitments: {}", pending_commitments.len());
+
+        let mut count = 0;
+        let mut tasks = vec![];
+        for commitment in pending_commitments {
+            let inclusions = self
+                .child_handler
+                .make_next_bottom_up_batch_inclusions(&commitment)
+                .await?;
+
+            // We support parallel batch execution using FIFO order with a limited parallelism (controlled by
+            // the size of submission_semaphore).
+            // We need to acquire a permit (from a limited permit pool) before submitting a checkpoint.
+            // We may wait here until a permit is available.
+            let parent_handler_clone = Arc::clone(&self.parent_handler);
+            let child_subnet_id = self.metadata.child.id.clone();
+            let permit = self
+                .submission_semaphore
+                .clone()
+                .acquire_owned()
+                .await
+                .unwrap();
+            tasks.push(tokio::task::spawn(async move {
+                let height = commitment.height as i64;
+                let result = Self::exec_bottom_up_batch(
+                    parent_handler_clone,
+                    &submitter,
+                    &child_subnet_id,
+                    height,
+                    inclusions,
+                )
+                .await
+                .inspect_err(|err| {
+                    tracing::error!("Fail to execute bottom up batch at height {height}: {err}");
+                });
+
+                drop(permit);
+                result
+            }));
+
+            count += 1;
+            tracing::debug!("This round has asynchronously executed {count} batch commitments",);
+        }
+
+        tracing::debug!("Waiting for all execution tasks to finish");
+
+        // Return error if any of the submit task failed.
+        futures_util::future::try_join_all(tasks).await?;
+
+        Ok(())
+    }
+
     async fn submit_checkpoint(
         parent_handler: Arc<T>,
         submitter: Address,
@@ -270,6 +338,31 @@ impl<T: BottomUpCheckpointRelayer + Send + Sync + 'static> BottomUpCheckpointMan
         tracing::info!(
             "submitted bottom up checkpoint({}) in parent at height {}",
             event.height,
+            epoch
+        );
+        Ok(())
+    }
+
+    async fn exec_bottom_up_batch(
+        parent_handler: Arc<T>,
+        submitter: &Address,
+        subnet_id: &SubnetID,
+        height: ChainEpoch,
+        inclusions: Vec<Inclusion>,
+    ) -> Result<(), anyhow::Error> {
+        let epoch = parent_handler
+            .execute_bottom_up_batch(submitter, subnet_id, height, inclusions)
+            .await
+            .map_err(|e| {
+                anyhow!(
+                    "cannot execute bottom up batch at height {} due to: {e}",
+                    height
+                )
+            })?;
+
+        tracing::info!(
+            "submitted bottom up batch({}) in parent at height {}",
+            height,
             epoch
         );
         Ok(())

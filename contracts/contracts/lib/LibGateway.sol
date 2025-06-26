@@ -6,7 +6,8 @@ import {GatewayActorStorage, LibGatewayActorStorage} from "../lib/LibGatewayActo
 import {BURNT_FUNDS_ACTOR} from "../constants/Constants.sol";
 import {SubnetID, Subnet, AssetKind, Asset} from "../structs/Subnet.sol";
 import {SubnetActorGetterFacet} from "../subnet/SubnetActorGetterFacet.sol";
-import {CallMsg, IpcMsgKind, IpcEnvelope, OutcomeType, BottomUpMsgBatch, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
+import {CallMsg, IpcMsgKind, IpcEnvelope, OutcomeType, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality} from "../structs/CrossNet.sol";
+import {BottomUpBatch} from "../structs/BottomUpBatch.sol";
 import {Membership} from "../structs/Subnet.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
@@ -94,17 +95,7 @@ library LibGateway {
         b.nextConfigurationNumber = checkpoint.nextConfigurationNumber;
         b.blockHeight = checkpoint.blockHeight;
         b.activity = checkpoint.activity;
-
-        uint256 msgLength = checkpoint.msgs.length;
-        for (uint256 i; i < msgLength; ) {
-            // We need to push because initializing an array with a static
-            // length will cause a copy from memory to storage, making
-            // the compiler unhappy.
-            b.msgs.push(checkpoint.msgs[i]);
-            unchecked {
-                ++i;
-            }
-        }
+        b.msgs = checkpoint.msgs;
     }
 
     /// @notice stores bottom-up batch
@@ -557,12 +548,12 @@ library LibGateway {
         }
     }
 
-    /// @notice Checks the length of a message batch, ensuring it is in (0, maxMsgsPerBottomUpBatch).
-    /// @param msgs The batch of messages to check.
-    function checkMsgLength(IpcEnvelope[] calldata msgs) internal view {
+    /// @notice Checks the length of a message batch commitment, ensuring it is in (0, maxMsgsPerBottomUpBatch).
+    /// @param commitment The batch commitment to check.
+    function checkMsgLength(BottomUpBatch.Commitment calldata commitment) internal view {
         GatewayActorStorage storage s = LibGatewayActorStorage.appStorage();
 
-        if (msgs.length > s.maxMsgsPerBottomUpBatch) {
+        if (commitment.totalNumMsgs > s.maxMsgsPerBottomUpBatch) {
             revert MaxMsgsPerBatchExceeded();
         }
     }

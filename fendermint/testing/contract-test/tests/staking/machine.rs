@@ -300,7 +300,7 @@ impl StateMachine for StakingMachine {
                     block_height: ethers::types::U256::from(*block_height),
                     block_hash: *block_hash,
                     next_configuration_number: *next_configuration_number,
-                    msgs: Vec::new(),
+                    msgs: Default::default(),
                     activity: Default::default(),
                 };
                 let checkpoint_hash = checkpoint.clone().abi_hash();

@@ -1,11 +1,14 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 
+use crate::lotus::message::ipc::SubnetInfo;
 use anyhow::Result;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_actors_abis::subnet_actor_activity_facet::ValidatorClaim;
+use ipc_actors_abis::subnet_actor_checkpointing_facet::Inclusion;
+use ipc_actors_abis::subnet_actor_getter_facet::ListPendingCommitmentsEntry;
 use ipc_api::checkpoint::{
     consensus::ValidatorData, BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent,
     Signature,
@@ -16,8 +19,6 @@ use ipc_api::subnet::{Asset, ConstructParams, PermissionMode};
 use ipc_api::subnet_id::SubnetID;
 use ipc_api::validator::Validator;
 use std::collections::{BTreeMap, HashMap};
-
-use crate::lotus::message::ipc::SubnetInfo;
 
 /// Trait to interact with a subnet and handle its lifecycle.
 #[async_trait]
@@ -280,6 +281,25 @@ pub trait BottomUpCheckpointRelayer: Send + Sync {
     async fn quorum_reached_events(&self, height: ChainEpoch) -> Result<Vec<QuorumReachedEvent>>;
     /// Get the current epoch in the current subnet
     async fn current_epoch(&self) -> Result<ChainEpoch>;
+    /// Lists the pending bottom-up batch commitments for the given subnet.
+    async fn list_pending_bottom_up_batch_commitments(
+        &self,
+        subnet_id: &SubnetID,
+    ) -> Result<Vec<ListPendingCommitmentsEntry>>;
+    /// Prepares the next messages and their inclusion proof
+    /// that should be executed based on the current pending commitment.
+    async fn make_next_bottom_up_batch_inclusions(
+        &self,
+        current: &ListPendingCommitmentsEntry,
+    ) -> Result<Vec<Inclusion>>;
+    /// Executes a batch of committed bottom-up messages.
+    async fn execute_bottom_up_batch(
+        &self,
+        submitter: &Address,
+        subnet_id: &SubnetID,
+        height: ChainEpoch,
+        inclusions: Vec<Inclusion>,
+    ) -> Result<ChainEpoch>;
 }
 
 /// The validator reward related functions, such as check reward and claim reward for mining blocks
