@@ -234,9 +234,9 @@ contract SubnetActorGetterFacet {
     }
 
     function listPendingBottomUpBatchCommitments()
-    external
-    view
-    returns (LibBottomUpBatch.ListPendingCommitmentsEntry[] memory)
+        external
+        view
+        returns (LibBottomUpBatch.ListPendingCommitmentsEntry[] memory)
     {
         return LibBottomUpBatch.listPendingCommitments();
     }
