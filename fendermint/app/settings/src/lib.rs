@@ -12,8 +12,9 @@ use serde_with::{serde_as, DurationSeconds};
 use std::fmt::{Display, Formatter};
 use std::net::ToSocketAddrs;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::time::Duration;
-use tendermint_rpc::Url;
+use tendermint_rpc::{Url, WebSocketClientUrl};
 use testing::TestingSettings;
 use utils::EnvInterpol;
 
@@ -42,7 +43,7 @@ struct IsHumanReadable;
 human_readable_str!(SubnetID);
 human_readable_delegate!(TokenAmount);
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct SocketAddress {
     pub host: String,
     pub port: u32,
@@ -72,7 +73,7 @@ impl TryInto<std::net::SocketAddr> for SocketAddress {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "lowercase")]
 /// Indicate the FVM account kind for generating addresses from a key.
 pub enum AccountKind {
@@ -84,7 +85,7 @@ pub enum AccountKind {
 
 /// A Secp256k1 key used to sign transactions,
 /// with the account kind showing if it's a regular or an ethereum key.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct SigningKey {
     path: PathBuf,
     pub kind: AccountKind,
@@ -92,13 +93,26 @@ pub struct SigningKey {
 
 home_relative!(SigningKey { path });
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct AbciSettings {
     pub listen: SocketAddress,
     /// Queue size for each ABCI component.
     pub bound: usize,
     /// Maximum number of messages allowed in a block.
     pub block_max_msgs: usize,
+}
+
+impl Default for AbciSettings {
+    fn default() -> Self {
+        Self {
+            listen: SocketAddress {
+                host: "127.0.0.1".into(),
+                port: 26658,
+            },
+            bound: 1,
+            block_max_msgs: 1000,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -131,7 +145,7 @@ impl Display for DbCompaction {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DbSettings {
     /// Length of the app state history to keep in the database before pruning; 0 means unlimited.
     ///
@@ -141,11 +155,20 @@ pub struct DbSettings {
     pub compaction_style: DbCompaction,
 }
 
+impl Default for DbSettings {
+    fn default() -> Self {
+        Self {
+            state_hist_size: 0,
+            compaction_style: DbCompaction::Level,
+        }
+    }
+}
+
 /// Settings affecting how we deal with failures in trying to send transactions to the local CometBFT node.
 /// It is not expected to be unavailable, however we might get into race conditions about the nonce which
 /// would need us to try creating a completely new transaction and try again.
 #[serde_as]
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct BroadcastSettings {
     /// Number of times to retry broadcasting a transaction.
     pub max_retries: u8,
@@ -156,8 +179,18 @@ pub struct BroadcastSettings {
     pub gas_overestimation_rate: f64,
 }
 
+impl Default for BroadcastSettings {
+    fn default() -> Self {
+        Self {
+            max_retries: 5,
+            retry_delay: Duration::from_secs(2),
+            gas_overestimation_rate: 2.0,
+        }
+    }
+}
+
 #[serde_as]
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TopDownSettings {
     /// The number of blocks to delay before reporting a height as final on the parent chain.
     /// To propose a certain number of epochs delayed from the latest height, we see to be
@@ -196,7 +229,7 @@ pub struct TopDownSettings {
 }
 
 #[serde_as]
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct IpcSettings {
     #[serde_as(as = "IsHumanReadable")]
     pub subnet_id: SubnetID,
@@ -209,6 +242,17 @@ pub struct IpcSettings {
     /// The config for top down checkpoint. It's None if subnet id is root or not activating
     /// any top down checkpoint related operations
     pub topdown: Option<TopDownSettings>,
+}
+
+impl Default for IpcSettings {
+    fn default() -> Self {
+        Self {
+            subnet_id: SubnetID::default(),
+            vote_interval: Duration::from_secs(1),
+            vote_timeout: Duration::from_secs(60),
+            topdown: None,
+        }
+    }
 }
 
 impl IpcSettings {
@@ -227,7 +271,7 @@ impl IpcSettings {
 }
 
 #[serde_as]
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct SnapshotSettings {
     /// Enable the export and import of snapshots.
     pub enabled: bool,
@@ -247,13 +291,27 @@ pub struct SnapshotSettings {
     download_dir: Option<PathBuf>,
 }
 
+impl Default for SnapshotSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            block_interval: 30000,
+            hist_size: 3,
+            chunk_size_bytes: 10485760,
+            last_access_hold: Duration::from_secs(300),
+            sync_poll_interval: Duration::from_secs(60),
+            download_dir: None,
+        }
+    }
+}
+
 impl SnapshotSettings {
     pub fn download_dir(&self) -> PathBuf {
         self.download_dir.clone().unwrap_or(std::env::temp_dir())
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct MetricsSettings {
     /// Enable the export of metrics over HTTP.
     pub enabled: bool,
@@ -261,9 +319,22 @@ pub struct MetricsSettings {
     pub listen: SocketAddress,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+impl Default for MetricsSettings {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            listen: SocketAddress {
+                host: "127.0.0.1".into(),
+                port: 9184,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Settings {
     /// Home directory configured on the CLI, to which all paths in settings can be set relative.
+    #[serde(skip)]
     home_dir: PathBuf,
     /// Database files.
     data_dir: PathBuf,
@@ -274,6 +345,9 @@ pub struct Settings {
 
     /// Where to reach CometBFT for queries or broadcasting transactions.
     tendermint_rpc_url: Url,
+
+    /// CometBFT websocket URL
+    tendermint_websocket_url: WebSocketClientUrl,
 
     /// Block height where we should gracefully stop the node
     pub halt_height: i64,
@@ -292,6 +366,42 @@ pub struct Settings {
     pub ipc: IpcSettings,
     pub testing: Option<TestingSettings>,
     pub tracing: TracingSettings,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        let tendermint_rpc_url = Url::from_str("http://127.0.0.1:26657").unwrap();
+        let tendermint_websocket_url =
+            WebSocketClientUrl::from_str("ws://127.0.0.1:26657/websocket").unwrap();
+
+        let data_dir = PathBuf::from_str("data").unwrap();
+        let snapshots_dir = PathBuf::from_str("snapshots").unwrap();
+        let contracts_dir = PathBuf::from_str("contracts").unwrap();
+        let home_dir = PathBuf::from_str("~/.fendermint").unwrap();
+
+        Self {
+            data_dir,
+            snapshots_dir,
+            contracts_dir,
+            home_dir,
+            tendermint_rpc_url,
+            tendermint_websocket_url,
+            halt_height: 0,
+            validator_key: None,
+
+            abci: Default::default(),
+            db: Default::default(),
+            metrics: Default::default(),
+            snapshots: Default::default(),
+            eth: Default::default(),
+            fvm: Default::default(),
+            resolver: Default::default(),
+            broadcast: Default::default(),
+            ipc: Default::default(),
+            testing: None,
+            tracing: Default::default(),
+        }
+    }
 }
 
 impl Settings {
@@ -362,6 +472,17 @@ impl Settings {
         match std::env::var("TENDERMINT_RPC_URL").ok() {
             Some(url) => url.parse::<Url>().context("invalid Tendermint URL"),
             None => Ok(self.tendermint_rpc_url.clone()),
+        }
+    }
+
+    /// Tendermint websocket URL from the environment or the config file.
+    pub fn tendermint_websocket_url(&self) -> anyhow::Result<WebSocketClientUrl> {
+        // Prefer the "standard" env var used in the CLI.
+        match std::env::var("TENDERMINT_WS_URL").ok() {
+            Some(url) => url
+                .parse::<WebSocketClientUrl>()
+                .context("invalid Tendermint websocket URL"),
+            None => Ok(self.tendermint_websocket_url.clone()),
         }
     }
 
@@ -518,6 +639,8 @@ mod tests {
             vec![("FM_ETH__CORS__ALLOWED_ORIGINS", "example.com")],
             || try_parse_config(""),
         );
+
+        println!("settings = {:#?}", settings);
         assert!(
             matches!(settings, Err(ConfigError::Message(ref msg)) if msg == "relative URL without a base")
         );
