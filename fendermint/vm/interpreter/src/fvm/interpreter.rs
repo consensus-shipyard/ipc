@@ -215,8 +215,9 @@ where
             .check()
             .map_err(|e| CheckMessageError::InvalidMessage(e.to_string()))?;
 
-        // regardless it is recheck or not, ensure gas fee cap is more than current base fee
         let base_fee = state.block_gas_tracker().base_fee();
+        // Regardless it is recheck or not, ensure gas fee cap is more than current
+        // base fee.
         if fvm_msg.gas_fee_cap < *base_fee {
             return Ok(CheckResponse::new(
                 fvm_msg,

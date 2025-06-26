@@ -23,6 +23,8 @@ where
     (out, total)
 }
 
+/// Select the messages with gas fee cap above the base fee. Messages will gas fee cap lower than
+/// the base fee will be dropped.
 pub fn select_messages_above_base_fee(
     msgs: Vec<SignedMessage>,
     base_fee: &TokenAmount,

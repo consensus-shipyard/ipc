@@ -37,8 +37,8 @@ pub type TestMiddleware<C> = SignerMiddleware<Provider<C>, Wallet<SigningKey>>;
 pub type TestContractCall<C, T> = ContractCall<TestMiddleware<C>, T>;
 
 /// Gas limit to set for transactions.
-pub const ENOUGH_GAS: u64 = 10_000_000_000u64;
-pub const ENOUGH_GAS_PRICE: u64 = 1000u64;
+pub const MIN_GAS: u64 = 10_000_000_000u64;
+pub const MIN_GAS_PRICE: u64 = 1000u64;
 
 pub struct TestAccount {
     pub secret_key: SecretKey,
@@ -121,7 +121,7 @@ where
         let tx = call.tx.as_eip1559_mut();
         let tx = tx.expect("eip1559");
 
-        tx.gas = Some(ENOUGH_GAS.into());
+        tx.gas = Some(MIN_GAS.into());
         tx.max_fee_per_gas = Some(0.into());
         tx.max_priority_fee_per_gas = Some(0.into());
     }
