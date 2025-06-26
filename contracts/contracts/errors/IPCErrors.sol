@@ -24,6 +24,7 @@ error InvalidCheckpointEpoch();
 error CannotSubmitFutureCheckpoint();
 error BatchMsgAlreadyExecuted();
 error MissingBatchCommitment();
+error DuplicatedCheckpointHeight(uint64 height);
 error InvalidInclusionProof();
 error InvalidBatchEpoch();
 error InvalidCheckpointSource();
