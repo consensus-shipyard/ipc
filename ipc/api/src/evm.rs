@@ -49,6 +49,7 @@ macro_rules! base_type_conversion {
                 let children = value
                     .route
                     .iter()
+                    .cloned()
                     .map(ethers_address_to_fil_address)
                     .collect::<anyhow::Result<Vec<_>>>()?;
                 Ok(SubnetID::new(value.root, children))
@@ -284,7 +285,7 @@ macro_rules! asset_conversion {
                 let token_address = if value.token_address == ethers::types::Address::zero() {
                     None
                 } else {
-                    Some(ethers_address_to_fil_address(&value.token_address)?)
+                    Some(ethers_address_to_fil_address(value.token_address)?)
                 };
 
                 Ok(Self {

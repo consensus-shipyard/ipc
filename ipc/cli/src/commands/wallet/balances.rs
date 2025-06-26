@@ -39,7 +39,7 @@ impl CommandLineHandler for WalletBalances {
                         provider
                             .wallet_balance(
                                 &subnet,
-                                &ethers_address_to_fil_address(addr_eth.clone())?,
+                                &ethers_address_to_fil_address(addr_eth.clone().into())?,
                             )
                             .await
                             .map(|balance| (balance, addr_eth))

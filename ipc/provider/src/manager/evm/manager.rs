@@ -895,6 +895,7 @@ impl SubnetManager for EthSubnetManager {
         addresses.extend(
             active
                 .iter()
+                .cloned()
                 .map(ethers_address_to_fil_address)
                 .collect::<Result<Vec<_>, _>>()?,
         );
@@ -910,6 +911,7 @@ impl SubnetManager for EthSubnetManager {
         addresses.extend(
             waiting
                 .iter()
+                .cloned()
                 .map(ethers_address_to_fil_address)
                 .collect::<Result<Vec<_>, _>>()?,
         );
