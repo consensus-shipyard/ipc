@@ -8,9 +8,6 @@ use async_trait::async_trait;
 use clap::Args;
 use fendermint_app_settings::Settings;
 use fs_err as fs;
-use ipc_provider::config::DEFAULT_CONFIG_TEMPLATE;
-use std::io::Write;
-use std::os::unix::process;
 use std::path::Path;
 
 use crate::comet_runner::run_comet;

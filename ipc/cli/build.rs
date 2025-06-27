@@ -3,12 +3,12 @@
 use flate2::read::GzDecoder;
 use hex::decode as hex_decode;
 use reqwest::blocking::Client;
-use reqwest::header::{HeaderMap, ACCEPT, AUTHORIZATION, USER_AGENT};
+use reqwest::header::{HeaderMap, ACCEPT, USER_AGENT};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::{
     env, fs,
-    io::{self, Read},
+    io::{self},
     path::PathBuf,
     process::exit,
 };
