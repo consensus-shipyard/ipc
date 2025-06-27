@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import-wallets:
   - wallet-type: evm
     private-key: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
@@ -7,11 +8,20 @@ deploy:
   url: http://localhost:8545
   from: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
   chain-id: 31337
+=======
+# deploy:
+#   enabled: false
+#   url: http://localhost:8545
+#   from: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+#   chain-id: 31337
+#   contracts-dir: /Users/karlem/work/ipc/contracts/out
+>>>>>>> 02efffd3 (feat: add files)
 
 create:
   parent: /r31337
   from: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
   min-validator-stake: 1.0
+<<<<<<< HEAD
   min-validators: 1
   bottomup-check-period: 50
   permission-mode: federated
@@ -29,3 +39,11 @@ activate:
 genesis:
   base-fee: 1000
   power-scale: 0
+=======
+  min-validators: 4
+  bottomup-check-period: 50
+  permission-mode: 1
+  supply-source-kind: 0
+  min-cross-msg-fee: 0.1
+  genesis-subnet-ipc-contracts-owner: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+>>>>>>> 02efffd3 (feat: add files)
