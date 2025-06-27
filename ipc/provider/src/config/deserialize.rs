@@ -102,7 +102,7 @@ where
     deserializer.deserialize_str(SubnetIDVisitor)
 }
 
-fn eth_addr_str_to_address(s: &str) -> anyhow::Result<Address> {
+pub fn eth_addr_str_to_address(s: &str) -> anyhow::Result<Address> {
     let addr = EthAddress::from_str(s)?;
     Ok(Address::from(addr))
 }

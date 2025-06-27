@@ -5856,6 +5856,7 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "serde_tuple",
+ "serde_yaml",
  "sha2 0.10.8",
  "strum",
  "tar",
@@ -5940,6 +5941,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid 0.10.1",
+ "ethers",
  "fvm_ipld_amt",
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",

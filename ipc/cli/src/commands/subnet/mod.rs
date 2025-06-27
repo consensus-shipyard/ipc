@@ -1,13 +1,16 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 
-use self::bootstrap::{AddBootstrap, AddBootstrapArgs, ListBootstraps, ListBootstrapsArgs};
+use self::add_bootstrap_node::{
+    AddBootstrapArgs, AddNodeBootstrap, ListBootstrapNodes, ListBootstrapsArgs,
+};
 use self::join::{StakeSubnet, StakeSubnetArgs, UnstakeSubnet, UnstakeSubnetArgs};
 use self::leave::{Claim, ClaimArgs};
 use self::rpc::{ChainIdSubnet, ChainIdSubnetArgs};
 use crate::commands::subnet::approve::{ApproveSubnet, ApproveSubnetArgs};
 pub use crate::commands::subnet::create::{CreateSubnet, CreateSubnetArgs};
 use crate::commands::subnet::genesis_epoch::{GenesisEpoch, GenesisEpochArgs};
+use crate::commands::subnet::init::{InitSubnet, InitSubnetArgs};
 pub use crate::commands::subnet::join::{JoinSubnet, JoinSubnetArgs};
 pub use crate::commands::subnet::kill::{KillSubnet, KillSubnetArgs};
 pub use crate::commands::subnet::leave::{LeaveSubnet, LeaveSubnetArgs};
@@ -24,10 +27,11 @@ use crate::commands::subnet::validator::{ValidatorInfo, ValidatorInfoArgs};
 use crate::{CommandLineHandler, GlobalArguments};
 use clap::{Args, Subcommand};
 
+pub mod add_bootstrap_node;
 pub mod approve;
-pub mod bootstrap;
 pub mod create;
 mod genesis_epoch;
+pub mod init;
 pub mod join;
 pub mod kill;
 pub mod leave;
@@ -56,6 +60,7 @@ pub(crate) struct SubnetCommandsArgs {
 impl SubnetCommandsArgs {
     pub async fn handle(&self, global: &GlobalArguments) -> anyhow::Result<()> {
         match &self.command {
+            Commands::Init(args) => InitSubnet::handle(global, args).await,
             Commands::Create(args) => CreateSubnet::handle(global, args).await,
             Commands::Approve(args) => ApproveSubnet::handle(global, args).await,
             Commands::RejectApproved(args) => RejectApprovedSubnet::handle(global, args).await,
@@ -70,8 +75,8 @@ impl SubnetCommandsArgs {
             Commands::Stake(args) => StakeSubnet::handle(global, args).await,
             Commands::Unstake(args) => UnstakeSubnet::handle(global, args).await,
             Commands::Claim(args) => Claim::handle(global, args).await,
-            Commands::AddBootstrap(args) => AddBootstrap::handle(global, args).await,
-            Commands::ListBootstraps(args) => ListBootstraps::handle(global, args).await,
+            Commands::AddBootstrap(args) => AddNodeBootstrap::handle(global, args).await,
+            Commands::ListBootstraps(args) => ListBootstrapNodes::handle(global, args).await,
             Commands::GenesisEpoch(args) => GenesisEpoch::handle(global, args).await,
             Commands::GetValidator(args) => ValidatorInfo::handle(global, args).await,
             Commands::ShowGatewayContractCommitSha(args) => {
@@ -84,6 +89,7 @@ impl SubnetCommandsArgs {
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum Commands {
+    Init(InitSubnetArgs),
     Create(CreateSubnetArgs),
     Approve(ApproveSubnetArgs),
     RejectApproved(RejectApprovedSubnetArgs),

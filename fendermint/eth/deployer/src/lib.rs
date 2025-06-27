@@ -31,6 +31,7 @@ const TRANSACTION_RECEIPT_RETRIES: usize = 200;
 type SignerWithFeeEstimator =
     Arc<Eip1559GasEstimatorMiddleware<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>>;
 
+#[derive(Debug)]
 pub struct DeployedContracts {
     pub registry: eth_types::Address,
     pub gateway: eth_types::Address,
