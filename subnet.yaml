@@ -1,0 +1,17 @@
+# deploy:
+#   enabled: false
+#   url: http://localhost:8545
+#   from: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+#   chain-id: 31337
+#   contracts-dir: /Users/karlem/work/ipc/contracts/out
+
+create:
+  parent: /r31337
+  from: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+  min-validator-stake: 1.0
+  min-validators: 4
+  bottomup-check-period: 50
+  permission-mode: 1
+  supply-source-kind: 0
+  min-cross-msg-fee: 0.1
+  genesis-subnet-ipc-contracts-owner: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266

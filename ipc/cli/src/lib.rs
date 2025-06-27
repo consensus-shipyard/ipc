@@ -9,6 +9,7 @@ use num_traits::cast::FromPrimitive;
 mod commands;
 
 pub use commands::*;
+pub mod comet_runner;
 use ipc_provider::config::Config;
 
 /// The trait that represents the abstraction of a command line handler. To implement a new command
