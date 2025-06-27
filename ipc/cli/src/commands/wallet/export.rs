@@ -1,14 +1,13 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 //! Wallet export cli handler
-use anyhow::anyhow;
 use async_trait::async_trait;
 use base64::{prelude::BASE64_STANDARD, Engine};
 use clap::Args;
 use fs_err as fs;
 use fvm_shared::address::Address;
 use ipc_provider::{lotus::message::wallet::WalletKeyType, IpcProvider, LotusJsonKeyType};
-use ipc_wallet::{EvmKeyStore, PersistentKeyInfo, WalletType};
+use ipc_wallet::{evm::EvmPersistentKeyInfo, WalletType};
 use std::fmt::Debug;
 use std::fs::Permissions;
 use std::io::Write;
@@ -24,11 +23,8 @@ impl WalletExport {
         let keystore = provider.evm_wallet()?;
         let address = ethers::types::Address::from_str(&arguments.address)?;
 
-        let key_info = keystore
-            .read()
-            .unwrap()
-            .get(&address.into())?
-            .ok_or_else(|| anyhow!("key does not exists"))?;
+        let guard = keystore.read().unwrap();
+        let key_info = guard.get(&address.to_string())?;
 
         if arguments.hex {
             return Ok(hex::encode(key_info.private_key()));
@@ -38,10 +34,7 @@ impl WalletExport {
             return Ok(BASE64_STANDARD.encode(key_info.private_key()));
         }
 
-        let info = PersistentKeyInfo::new(
-            format!("{:?}", address),
-            hex::encode(key_info.private_key()),
-        );
+        let info = EvmPersistentKeyInfo::new(format!("{:?}", address), &key_info);
         Ok(serde_json::to_string(&info)?)
     }
 
@@ -77,8 +70,8 @@ impl CommandLineHandler for WalletExport {
 
         let wallet_type = WalletType::from_str(&arguments.wallet_type)?;
         let v = match wallet_type {
-            WalletType::Evm => WalletExport::export_evm(&provider, arguments),
-            WalletType::Fvm => WalletExport::export_fvm(&provider, arguments),
+            WalletType::Etherium => WalletExport::export_evm(&provider, arguments),
+            WalletType::Filecoin => WalletExport::export_fvm(&provider, arguments),
         }?;
 
         match &arguments.output {
@@ -129,13 +122,11 @@ impl WalletPublicKey {
         arguments: &WalletPublicKeyArgs,
     ) -> anyhow::Result<String> {
         let keystore = provider.evm_wallet()?;
+        // validation!
         let address = ethers::types::Address::from_str(&arguments.address)?;
 
-        let key_info = keystore
-            .read()
-            .unwrap()
-            .get(&address.into())?
-            .ok_or_else(|| anyhow!("key does not exists"))?;
+        let guard = keystore.read().unwrap();
+        let key_info = guard.get(&address.to_string())?;
 
         let sk = libsecp256k1::SecretKey::parse_slice(key_info.private_key())?;
         Ok(hex::encode(libsecp256k1::PublicKey::from_secret_key(&sk).serialize()).to_string())
@@ -166,8 +157,8 @@ impl CommandLineHandler for WalletPublicKey {
 
         let wallet_type = WalletType::from_str(&arguments.wallet_type)?;
         let v = match wallet_type {
-            WalletType::Evm => WalletPublicKey::pubkey_evm(&provider, arguments),
-            WalletType::Fvm => WalletPublicKey::pubkey_fvm(&provider, arguments),
+            WalletType::Etherium => WalletPublicKey::pubkey_evm(&provider, arguments),
+            WalletType::Filecoin => WalletPublicKey::pubkey_fvm(&provider, arguments),
         }?;
         println!("{v}");
         Ok(())

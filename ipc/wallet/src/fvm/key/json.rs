@@ -1,0 +1,57 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
+use crate::fvm::serialization::json::signature_type::SignatureTypeJson;
+use base64::prelude::*;
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+
+use super::*;
+
+/// Wrapper for serializing and de-serializing a `KeyInfo` from JSON.
+#[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Eq)]
+#[serde(transparent)]
+pub struct KeyInfoJson(#[serde(with = "self")] pub FvmKeyInfo);
+
+/// Wrapper for serializing a `KeyInfo` reference to JSON.
+#[derive(Serialize)]
+#[serde(transparent)]
+pub struct KeyInfoJsonRef<'a>(#[serde(with = "self")] pub &'a FvmKeyInfo);
+
+impl From<KeyInfoJson> for FvmKeyInfo {
+    fn from(key: KeyInfoJson) -> FvmKeyInfo {
+        key.0
+    }
+}
+#[derive(Serialize, Deserialize)]
+struct JsonHelper {
+    #[serde(rename = "Type")]
+    sig_type: SignatureTypeJson,
+    #[serde(rename = "PrivateKey")]
+    private_key: String,
+}
+
+pub fn serialize<S>(k: &FvmKeyInfo, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    JsonHelper {
+        sig_type: SignatureTypeJson(k.key_type),
+        private_key: BASE64_STANDARD.encode(&k.private_key),
+    }
+    .serialize(serializer)
+}
+
+pub fn deserialize<'de, D>(deserializer: D) -> Result<FvmKeyInfo, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let JsonHelper {
+        sig_type,
+        private_key,
+    } = Deserialize::deserialize(deserializer)?;
+    Ok(FvmKeyInfo {
+        key_type: sig_type.0,
+        private_key: BASE64_STANDARD
+            .decode(private_key)
+            .map_err(de::Error::custom)?,
+    })
+}

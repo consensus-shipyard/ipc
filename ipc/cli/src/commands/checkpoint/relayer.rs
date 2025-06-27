@@ -14,7 +14,7 @@ use ipc_provider::checkpoint::BottomUpCheckpointManager;
 use ipc_provider::config::Config;
 use ipc_provider::new_evm_keystore_from_config;
 use ipc_provider::observe::register_metrics as register_checkpoint_metrics;
-use ipc_wallet::EvmKeyStore;
+use ipc_wallet::evm::adapter::EthKeyAddress;
 use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
@@ -56,11 +56,12 @@ impl CommandLineHandler for BottomUpRelayer {
 
         let config_path = global.config_path();
         let config = Arc::new(Config::from_file(&config_path)?);
-        let mut keystore = new_evm_keystore_from_config(config)?;
+        let keystore = new_evm_keystore_from_config(config)?;
         let submitter = match (arguments.submitter.as_ref(), keystore.get_default()?) {
             (Some(submitter), _) => require_fil_addr_from_str(submitter)?,
             (None, Some(addr)) => {
                 log::info!("using default address: {addr:?}");
+                let addr = EthKeyAddress::from_str(&addr)?;
                 Address::try_from(addr)?
             }
             _ => {

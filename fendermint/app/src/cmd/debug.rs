@@ -38,6 +38,7 @@ async fn export_topdown_events(args: &DebugExportTopDownEventsArgs) -> anyhow::R
     // based on how it's done in `run.rs` and the `genesis ipc from-parent` command.
     let parent_provider = IpcProvider::new_with_subnet(
         None,
+        None,
         ipc_provider::config::Subnet {
             id: args
                 .subnet_id
