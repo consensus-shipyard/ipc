@@ -165,7 +165,17 @@ impl<T: Clone + Eq + Hash + TryFrom<KeyInfo> + Default + ToString> PersistentKey
 
         let file = File::create(&self.file_path)?;
 
-        // TODO: do we need to set path permission?
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+
+            const USER_ONLY_MODE: u32 = 0o600;
+            let meta = file.metadata()?;
+            let mut permissions = meta.permissions();
+            if permissions.mode() != USER_ONLY_MODE {
+                permissions.set_mode(USER_ONLY_MODE);
+            }
+        }
 
         let writer = BufWriter::new(file);
 

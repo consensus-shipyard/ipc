@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::path::PathBuf;
 use strum;
@@ -9,7 +9,7 @@ use tracing_appender;
 use tracing_appender::rolling::Rotation;
 
 #[serde_as]
-#[derive(Debug, Deserialize, Clone, strum::EnumString, strum::Display)]
+#[derive(Debug, Deserialize, Serialize, Clone, strum::EnumString, strum::Display)]
 #[strum(serialize_all = "snake_case")]
 #[serde(rename_all = "lowercase")]
 pub enum RotationKind {
@@ -42,20 +42,20 @@ impl RotationKind {
 }
 
 #[serde_as]
-#[derive(Debug, Deserialize, Clone, Default)]
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
 pub struct TracingSettings {
     pub console: Option<ConsoleLayerSettings>,
     pub file: Option<FileLayerSettings>,
 }
 
 #[serde_as]
-#[derive(Debug, Deserialize, Clone, Default)]
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
 pub struct ConsoleLayerSettings {
     pub level: Option<String>,
 }
 
 #[serde_as]
-#[derive(Debug, Deserialize, Clone, Default)]
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
 pub struct FileLayerSettings {
     pub enabled: bool,
     pub level: Option<String>,

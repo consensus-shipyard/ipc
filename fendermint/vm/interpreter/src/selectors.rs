@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use fendermint_vm_message::signed::SignedMessage;
+use fvm_shared::econ::TokenAmount;
 
 /// Generic helper: select items until the accumulated weight exceeds `max`.
 /// Returns a tuple of (selected items, accumulated weight).
@@ -20,6 +21,17 @@ where
         out.push(item);
     }
     (out, total)
+}
+
+/// Select the messages with gas fee cap above the base fee. Messages will gas fee cap lower than
+/// the base fee will be dropped.
+pub fn select_messages_above_base_fee(
+    msgs: Vec<SignedMessage>,
+    base_fee: &TokenAmount,
+) -> Vec<SignedMessage> {
+    msgs.into_iter()
+        .filter(|f| f.message.gas_fee_cap > *base_fee)
+        .collect()
 }
 
 /// Select messages by gas limit.

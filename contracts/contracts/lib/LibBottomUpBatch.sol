@@ -9,7 +9,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import {SubnetID} from "../structs/Subnet.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
-import {InvalidInclusionProof, BatchMsgAlreadyExecuted, MissingBatchCommitment} from "../errors/IPCErrors.sol";
+import {InvalidInclusionProof, BatchMsgAlreadyExecuted, MissingBatchCommitment, DuplicatedCheckpointHeight} from "../errors/IPCErrors.sol";
 import {BottomUpBatch} from "../structs/BottomUpBatch.sol";
 
 /// Library to handle bottom up batch 2-phase execution.
@@ -60,7 +60,9 @@ library LibBottomUpBatch {
         BottomUpBatchStorage storage s = bottomUpBatchStorage();
 
         bool added = s.pendingHeights.add(bytes32(uint256(checkpointHeight)));
-        require(added, "duplicate checkpoint height");
+        if (!added) {
+            revert DuplicatedCheckpointHeight(checkpointHeight);
+        }
 
         PendingBatch storage pending = s.pending[checkpointHeight];
         pending.commitment = commitment;

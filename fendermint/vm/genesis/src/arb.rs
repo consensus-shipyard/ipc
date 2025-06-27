@@ -100,6 +100,10 @@ impl Arbitrary for Genesis {
     fn arbitrary(g: &mut Gen) -> Self {
         let nv = usize::arbitrary(g) % 10 + 1;
         let na = usize::arbitrary(g) % 10;
+
+        let bytes = [u8::arbitrary(g); 20];
+        let ipc_contracts_owner = ethers::types::Address::from_slice(&bytes);
+
         Self {
             timestamp: Timestamp(u64::arbitrary(g)),
             chain_name: String::arbitrary(g),
@@ -115,6 +119,7 @@ impl Arbitrary for Genesis {
             } else {
                 None
             },
+            ipc_contracts_owner,
         }
     }
 }

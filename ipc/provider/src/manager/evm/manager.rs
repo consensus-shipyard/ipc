@@ -290,6 +290,7 @@ impl SubnetManager for EthSubnetManager {
             collateral_source: register_subnet_facet::Asset::try_from(params.collateral_source)?,
             validator_gater: payload_to_evm_address(params.validator_gater.payload())?,
             validator_rewarder: payload_to_evm_address(params.validator_rewarder.payload())?,
+            genesis_subnet_ipc_contracts_owner: params.genesis_subnet_ipc_contracts_owner,
         };
 
         tracing::info!("creating subnet on evm with params: {params:?}");
@@ -334,6 +335,38 @@ impl SubnetManager for EthSubnetManager {
             }
             None => Err(anyhow!("no receipt for event, txn not successful")),
         }
+    }
+
+    async fn approve_subnet(&self, subnet: SubnetID, from: Address) -> Result<()> {
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
+        let contract = gateway_manager_facet::GatewayManagerFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            signer.clone(),
+        );
+
+        let subnet_address = contract_address_from_subnet(&subnet)?;
+
+        let txn = contract.approve_subnet(subnet_address);
+        let txn = extend_call_with_pending_block(txn).await?;
+
+        txn.send().await?.await?;
+        Ok(())
+    }
+
+    async fn reject_approved_subnet(&self, subnet: SubnetID, from: Address) -> Result<()> {
+        let signer = Arc::new(self.get_signer_with_fee_estimator(&from)?);
+        let contract = gateway_manager_facet::GatewayManagerFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            signer.clone(),
+        );
+
+        let subnet_address = contract_address_from_subnet(&subnet)?;
+
+        let txn = contract.reject_approved_subnet(subnet_address);
+        let txn = extend_call_with_pending_block(txn).await?;
+
+        txn.send().await?.await?;
+        Ok(())
     }
 
     async fn join_subnet(
@@ -764,6 +797,8 @@ impl SubnetManager for EthSubnetManager {
 
         let genesis_balances = contract.genesis_balances().await?;
         let bottom_up_checkpoint_period = contract.bottom_up_check_period().call().await?.as_u64();
+        let genesis_subnet_ipc_contracts_owner =
+            contract.genesis_subnet_ipc_contracts_owner().call().await?;
 
         Ok(SubnetGenesisInfo {
             // Active validators limit set for the child subnet.
@@ -785,6 +820,7 @@ impl SubnetManager for EthSubnetManager {
                 kind: AssetKind::Native,
                 token_address: None,
             },
+            genesis_subnet_ipc_contracts_owner,
         })
     }
 

@@ -5,10 +5,17 @@ use std::{os::unix::fs::PermissionsExt, path::Path};
 
 mod defaults;
 
+use crate::ResourceId;
 use anyhow::Context;
 pub use defaults::*;
 use fs_err as fs;
 use serde::{de::DeserializeOwned, Serialize};
+
+/// Represents the owner of the gateway/registry contract on an IPC subnet
+pub trait IpcContractsOwner {
+    /// return the address of the gateway/registry contract on this subnet
+    fn ipc_contracts_owner(&self) -> ResourceId;
+}
 
 /// Type family of all the things a [Materializer] can create.
 ///
@@ -28,7 +35,7 @@ pub trait Materials {
     /// Represents the genesis.json file (can be a file location, or a model).
     type Genesis: Sync + Send;
     /// The address of a dynamically created subnet.
-    type Subnet: Sync + Send;
+    type Subnet: Sync + Send + IpcContractsOwner;
     /// The handle to a node; could be a (set of) docker container(s) or remote addresses.
     type Node: Sync + Send;
     /// The handle to a relayer process.

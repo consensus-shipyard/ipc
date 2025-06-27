@@ -8,8 +8,9 @@ import {IpcEnvelope} from "../structs/CrossNet.sol";
 import {FvmAddress} from "../structs/FvmAddress.sol";
 import {SubnetID, Subnet, Asset} from "../structs/Subnet.sol";
 import {Membership, AssetKind} from "../structs/Subnet.sol";
-import {AlreadyRegisteredSubnet, CannotReleaseZero, MethodNotAllowed, NotEnoughFunds, NotEnoughFundsToRelease, NotEnoughCollateral, NotEmptySubnetCircSupply, NotRegisteredSubnet, InvalidXnetMessage, InvalidXnetMessageReason} from "../errors/IPCErrors.sol";
+import {NotAuthorized, AlreadyRegisteredSubnet, CannotReleaseZero, MethodNotAllowed, NotEnoughFunds, NotEnoughFundsToRelease, NotEnoughCollateral, NotEmptySubnetCircSupply, NotRegisteredSubnet, InvalidXnetMessage, InvalidXnetMessageReason} from "../errors/IPCErrors.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
+import {LibDiamond} from "../lib/LibDiamond.sol";
 import {SubnetIDHelper} from "../lib/SubnetIDHelper.sol";
 import {CrossMsgHelper} from "../lib/CrossMsgHelper.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
@@ -26,8 +27,21 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
     using SubnetIDHelper for SubnetID;
     using AssetHelper for Asset;
     using EnumerableSet for EnumerableSet.Bytes32Set;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     event SubnetDestroyed(SubnetID id);
+
+    /// @notice Owner reject a subnet from joining the gateway
+    function rejectApprovedSubnet(address subnet) external {
+        LibDiamond.enforceIsContractOwner();
+        s.approvedSubnets.remove(subnet);
+    }
+
+    /// @notice Owner accepts a subnet from joining the gateway
+    function approveSubnet(address subnet) external {
+        LibDiamond.enforceIsContractOwner();
+        s.approvedSubnets.add(subnet);
+    }
 
     /// @notice register a subnet in the gateway. It is called by a subnet when it reaches the threshold stake
     /// @dev The subnet can optionally pass a genesis circulating supply that would be pre-allocated in the
@@ -37,6 +51,10 @@ contract GatewayManagerFacet is GatewayActorModifiers, ReentrancyGuard {
         // subnets in the root
         if (s.networkName.route.length + 1 >= s.maxTreeDepth) {
             revert MethodNotAllowed(ERR_CHILD_SUBNET_NOT_ALLOWED);
+        }
+
+        if (!s.approvedSubnets.contains(msg.sender)) {
+            revert NotAuthorized(msg.sender);
         }
 
         SubnetID memory subnetId = s.networkName.createSubnetId(msg.sender);

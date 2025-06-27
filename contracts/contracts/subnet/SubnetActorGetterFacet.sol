@@ -228,6 +228,11 @@ contract SubnetActorGetterFacet {
         return s.collateralSource;
     }
 
+    /// @notice Returns the genesis owner of the subnet IPC contracts
+    function genesisSubnetIpcContractsOwner() external view returns (address) {
+        return s.genesisSubnetIpcContractsOwner;
+    }
+
     function listPendingBottomUpBatchCommitments()
         external
         view

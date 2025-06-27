@@ -23,6 +23,7 @@ error InvalidCheckpointEpoch();
 error BatchMsgAlreadyExecuted();
 error MissingBatchCommitment();
 error InvalidInclusionProof();
+error DuplicatedCheckpointHeight(uint64 height);
 error InvalidBatchEpoch();
 error InvalidCheckpointSource();
 error InvalidBatchSource();
@@ -86,6 +87,7 @@ error InvalidActivityProof();
 error NotOwner();
 error SignatureAddressesNotSorted();
 error DuplicateValidatorSignaturesFound();
+error MissingGenesisSubnetIpcContractsOwner();
 
 enum InvalidXnetMessageReason {
     Sender,

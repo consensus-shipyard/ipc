@@ -7,12 +7,13 @@ mod memory;
 mod persistent;
 
 use anyhow::Result;
-use std::fmt::{Display, Formatter};
 use std::hash::Hash;
 use zeroize::Zeroize;
 
 #[cfg(feature = "with-ethers")]
 use std::str::FromStr;
+
+use std::fmt::{Display, Formatter};
 
 pub use crate::evm::persistent::{PersistentKeyInfo, PersistentKeyStore};
 

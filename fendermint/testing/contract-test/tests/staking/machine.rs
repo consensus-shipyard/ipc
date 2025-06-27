@@ -99,6 +99,10 @@ impl StateMachine for StakingMachine {
         let (root, route) =
             subnet_id_to_eth(&parent_ipc.gateway.subnet_id).expect("subnet ID is valid");
 
+        let genesis_subnet_ipc_contracts_owner = state.child_genesis.validators.first().unwrap();
+        let genesis_subnet_ipc_contracts_owner =
+            EthAddress::from(genesis_subnet_ipc_contracts_owner.public_key.0);
+
         // TODO: Need to add field to specify release queue lock time.
         let params = SubnetConstructorParams {
             parent_id: ipc_actors_abis::register_subnet_facet::SubnetID { root, route },
@@ -121,6 +125,7 @@ impl StateMachine for StakingMachine {
             },
             validator_gater: EthAddress::from(ethers::types::Address::zero()).into(),
             validator_rewarder: Default::default(),
+            genesis_subnet_ipc_contracts_owner: genesis_subnet_ipc_contracts_owner.into(),
         };
 
         eprintln!("\n> PARENT IPC: {parent_ipc:?}");
@@ -130,6 +135,16 @@ impl StateMachine for StakingMachine {
         let subnet_addr = registry
             .new_subnet(&mut exec_state, params)
             .expect("failed to create subnet");
+
+        // let
+
+        gateway
+            .approve_subnet_joining_gateway(
+                &mut exec_state,
+                subnet_addr,
+                genesis_subnet_ipc_contracts_owner,
+            )
+            .unwrap();
 
         let subnet_id =
             SubnetID::new_from_parent(&parent_ipc.gateway.subnet_id, subnet_addr.into());

@@ -1,6 +1,7 @@
 use ethers::providers::{Http, Provider};
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
+use crate::materials::IpcContractsOwner;
 use multihash::MultihashDigest;
 use serde::{Deserialize, Serialize};
 use std::fmt::Formatter;
@@ -22,6 +23,24 @@ pub mod validation;
 mod arb;
 pub mod bencher;
 pub mod concurrency;
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ValidatedSubnet {
+    pub name: SubnetName,
+    pub owner: ResourceId,
+}
+
+impl Display for ValidatedSubnet {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "name: {}, owner: {}", self.name, self.owner)
+    }
+}
+
+impl IpcContractsOwner for ValidatedSubnet {
+    fn ipc_contracts_owner(&self) -> ResourceId {
+        self.owner.clone()
+    }
+}
 
 /// An ID identifying a resource within its parent.
 #[derive(Clone, Serialize, PartialEq, Eq, PartialOrd, Ord)]
