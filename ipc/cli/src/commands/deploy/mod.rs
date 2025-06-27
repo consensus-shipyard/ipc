@@ -25,6 +25,12 @@ pub enum CliSubnetCreationPrivilege {
     Owner,
 }
 
+impl Default for CliSubnetCreationPrivilege {
+    fn default() -> Self {
+        CliSubnetCreationPrivilege::Unrestricted
+    }
+}
+
 impl fmt::Display for CliSubnetCreationPrivilege {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
