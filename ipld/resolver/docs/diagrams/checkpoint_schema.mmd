@@ -1,5 +1,8 @@
 erDiagram
-    %% Subnet Actor in parent subnet
+    %% =====================================================
+    %% Subnet Actor in parent subnet (Blue section #79ADDC)
+    %% =====================================================
+
     VALIDATOR {
         string public_key PK
         integer power "delegated stake"
@@ -19,7 +22,10 @@ erDiagram
         string checkpoint FK
     }
 
-    %% Checkpointing
+    %% =====================================================
+    %% Checkpointing (Yellow section #FFEE93)
+    %% =====================================================
+
     CHECKPOINT {
         integer epoch_number FK
         integer next_config_number FK
@@ -32,7 +38,10 @@ erDiagram
         string signature
     }
 
-    %% Child subnet
+    %% =====================================================
+    %% Child subnet (Orange section #FFC09F)
+    %% =====================================================
+
     EPOCH {
         integer epoch_number PK
         integer config_number FK
@@ -59,20 +68,26 @@ erDiagram
         string messages FK "CID"
     }
 
+    %% =====================================================
     %% Relationships
+    %% =====================================================
+
+    %% Parent subnet relationships (Blue section)
     CONFIGURATION ||--o{ VALIDATOR_SNAPSHOT : "has"
     VALIDATOR ||--o{ VALIDATOR_SNAPSHOT : "creates"
 
+    %% Cross-section relationships
     CONFIGURATION ||--o{ EPOCH : "defines"
+    CONFIGURATION ||--o{ CHECKPOINT : "next_config"
+
+    %% Child subnet relationships (Orange section)
     BLOCK ||--|| EPOCH : "starts"
     EPOCH ||--|| CROSS_MESSAGES : "contains"
-    EPOCH ||--o| CHECKPOINT : "produces"
-
-    CHECKPOINT ||--o{ SIGNATURE : "signed_by"
-    VALIDATOR ||--o{ SIGNATURE : "signs"
-
-    CONFIGURATION ||--o{ CHECKPOINT : "next_config"
-    CHECKPOINT ||--o| SUBMITTED_CHECKPOINT : "submitted_as"
-
     CROSS_MESSAGES ||--o{ MESSAGE : "includes"
     BLOCK ||--o{ MESSAGE : "contains"
+
+    %% Checkpointing relationships (Yellow section)
+    EPOCH ||--o| CHECKPOINT : "produces"
+    CHECKPOINT ||--o{ SIGNATURE : "signed_by"
+    VALIDATOR ||--o{ SIGNATURE : "signs"
+    CHECKPOINT ||--o| SUBMITTED_CHECKPOINT : "submitted_as"

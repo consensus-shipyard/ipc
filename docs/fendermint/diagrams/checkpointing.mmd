@@ -10,176 +10,210 @@ sequenceDiagram
     participant ChildGateway as Child Gateway
     participant ChildActors as Child Actors
 
-    Note over ParentNode, ParentGateway: Parent Subnet
-    Note over ChildCometBFT, ChildActors: Child Subnet
+    rect rgb(238, 251, 245)
+        Note over ParentNode, ParentGateway: Parent Subnet
+    end
+    rect rgb(254, 239, 236)
+        Note over ChildCometBFT, ChildActors: Child Subnet
+    end
 
     %% Initialize
     Note over ParentNode, ChildActors: Initialize
 
-    Validator->>ChildCometBFT: start
-    Validator->>ChildFendermint: start
-    ChildFendermint->>ChildSyncer: start
-    Validator->>IPCAgent: start
-    IPCAgent->>ParentNode: subscribe
-    Relayer->>ChildCometBFT: subscribe
+    rect rgb(238, 251, 245)
+        Validator->>ChildCometBFT: start
+        Validator->>ChildFendermint: start
+        ChildFendermint->>ChildSyncer: start
+        Validator->>IPCAgent: start
+        IPCAgent->>ParentNode: subscribe
+    end
+    rect rgb(254, 239, 236)
+        Relayer->>ChildCometBFT: subscribe
+    end
 
     %% Joining a Subnet
     Note over ParentNode, ChildActors: Joining a Subnet
 
-    Validator->>+IPCAgent: join subnet
-    IPCAgent->>-ParentNode: TX: join subnet
-    ParentNode->>+ParentNode: create block and<br/>execute transaction
-    ParentNode->>+ParentGateway: join(subnet, validator)
-    ParentGateway->>ParentGateway: new validator<br/>configuration
-    ParentGateway-->>IPCAgent: emit new configuration event
-    deactivate ParentGateway
-    deactivate ParentNode
+    rect rgb(238, 251, 245)
+        Validator->>+IPCAgent: join subnet
+        IPCAgent->>-ParentNode: TX: join subnet
+        ParentNode->>+ParentNode: create block and<br/>execute transaction
+        ParentNode->>+ParentGateway: join(subnet, validator)
+        ParentGateway->>ParentGateway: new validator<br/>configuration
+        ParentGateway-->>IPCAgent: emit new configuration event
+        deactivate ParentGateway
+        deactivate ParentNode
+    end
 
     %% Syncing with Parent
     Note over ParentNode, ChildActors: Syncing with Parent
     Note over ChildSyncer, IPCAgent: ... syncing with the parent at regular intervals ...
 
-    ChildSyncer->>+IPCAgent: get latest finalized block
-    IPCAgent->>-ChildSyncer: finalized block height
+    rect rgb(254, 239, 236)
+        ChildSyncer->>+IPCAgent: get latest finalized block
+    end
+    rect rgb(238, 251, 245)
+        IPCAgent->>-ChildSyncer: finalized block height
+    end
 
-    ChildSyncer->>+IPCAgent: get new configurations up to finalized block
-    IPCAgent->>-ChildSyncer: configuration changes
+    rect rgb(254, 239, 236)
+        ChildSyncer->>+IPCAgent: get new configurations up to finalized block
+    end
+    rect rgb(238, 251, 245)
+        IPCAgent->>-ChildSyncer: configuration changes
+    end
 
     Note over ChildCometBFT, ChildFendermint: ... when this validator creates a block ...
 
-    ChildCometBFT->>+ChildFendermint: prepare_proposal
-    ChildFendermint->>+ChildSyncer: get finalized parent block height
-    ChildSyncer->>-ChildFendermint: finalized block height
-    ChildFendermint->>-ChildCometBFT: proposal(TopDownCheckpoint)
-    ChildCometBFT-->>ChildCometBFT: broadcast proposal
+    rect rgb(254, 239, 236)
+        ChildCometBFT->>+ChildFendermint: prepare_proposal
+        ChildFendermint->>+ChildSyncer: get finalized parent block height
+        ChildSyncer->>-ChildFendermint: finalized block height
+        ChildFendermint->>-ChildCometBFT: proposal(TopDownCheckpoint)
+        ChildCometBFT-->>ChildCometBFT: broadcast proposal
+    end
 
     Note over ChildCometBFT, ChildFendermint: ... for every block created in the subnet ...
 
-    ChildCometBFT-->>ChildCometBFT: receive proposal
-    ChildCometBFT->>+ChildFendermint: process_proposal(TopDownCheckpoint)
-    ChildFendermint->>+ChildSyncer: check finality of parent block height
-    ChildSyncer->>-ChildFendermint: is known and final or not
-    ChildFendermint->>-ChildCometBFT: accept or reject
+    rect rgb(254, 239, 236)
+        ChildCometBFT-->>ChildCometBFT: receive proposal
+        ChildCometBFT->>+ChildFendermint: process_proposal(TopDownCheckpoint)
+        ChildFendermint->>+ChildSyncer: check finality of parent block height
+        ChildSyncer->>-ChildFendermint: is known and final or not
+        ChildFendermint->>-ChildCometBFT: accept or reject
 
-    ChildCometBFT-->>ChildCometBFT: receive block
+        ChildCometBFT-->>ChildCometBFT: receive block
 
-    ChildCometBFT->>+ChildFendermint: deliver_tx(TopDownCheckpoint)
-    ChildFendermint->>+ChildSyncer: get configuration changes up to the finalized height
-    ChildSyncer->>+IPCAgent: fetch missing configurations
-    IPCAgent->>+ParentNode: query state
-    ParentNode->>ParentGateway: query state
-    ParentNode->>-IPCAgent: gateway state
-    IPCAgent->>-ChildSyncer: new configurations
-    ChildSyncer->>-ChildFendermint: new configurations
-    ChildFendermint->>+ChildGateway: call GatewayRouterFacet::setMembership
-    ChildGateway->>ChildGateway: accumulate validator changes
-    ChildGateway->>-ChildFendermint: result
-    ChildFendermint->>-ChildCometBFT: receipts
+        ChildCometBFT->>+ChildFendermint: deliver_tx(TopDownCheckpoint)
+        ChildFendermint->>+ChildSyncer: get configuration changes up to the finalized height
+    end
+    rect rgb(238, 251, 245)
+        ChildSyncer->>+IPCAgent: fetch missing configurations
+        IPCAgent->>+ParentNode: query state
+        ParentNode->>ParentGateway: query state
+        ParentNode->>-IPCAgent: gateway state
+        IPCAgent->>-ChildSyncer: new configurations
+    end
+    rect rgb(254, 239, 236)
+        ChildSyncer->>-ChildFendermint: new configurations
+        ChildFendermint->>+ChildGateway: call GatewayRouterFacet::setMembership
+        ChildGateway->>ChildGateway: accumulate validator changes
+        ChildGateway->>-ChildFendermint: result
+        ChildFendermint->>-ChildCometBFT: receipts
 
-    ChildCometBFT->>+ChildFendermint: deliver_tx(SignedMessage invoking the Gateway)
-    Note left of ChildFendermint: Example of a transaction execution<br/>enqueueing a bottom-up message.
-    ChildFendermint->>+ChildActors: invoke with Message
-    ChildActors->>+ChildGateway: send bottom-up CrossMsg
-    ChildGateway->>ChildGateway: accumulate CrossMsgs
-    ChildGateway->>-ChildActors: result
-    ChildActors->>-ChildFendermint: result
-    ChildFendermint->>-ChildCometBFT: receipts
+        ChildCometBFT->>+ChildFendermint: deliver_tx(SignedMessage invoking the Gateway)
+        Note left of ChildFendermint: Example of a transaction execution<br/>enqueueing a bottom-up message.
+        ChildFendermint->>+ChildActors: invoke with Message
+        ChildActors->>+ChildGateway: send bottom-up CrossMsg
+        ChildGateway->>ChildGateway: accumulate CrossMsgs
+        ChildGateway->>-ChildActors: result
+        ChildActors->>-ChildFendermint: result
+        ChildFendermint->>-ChildCometBFT: receipts
+    end
 
     %% End of Checkpoint Period
     Note over ParentNode, ChildActors: End of Checkpoint Period
 
-    ChildCometBFT->>+ChildFendermint: end_block
-    alt block height % bottom-up checkpoint period == 0
-        ChildFendermint->>+ChildCometBFT: get current validator set
-        ChildCometBFT->>-ChildFendermint: power table
-        ChildFendermint->>ChildFendermint: create Merkle tree of power table
-        ChildFendermint->>ChildFendermint: set validator set root hash in checkpoint
+    rect rgb(254, 239, 236)
+        ChildCometBFT->>+ChildFendermint: end_block
+        alt block height % bottom-up checkpoint period == 0
+            ChildFendermint->>+ChildCometBFT: get current validator set
+            ChildCometBFT->>-ChildFendermint: power table
+            ChildFendermint->>ChildFendermint: create Merkle tree of power table
+            ChildFendermint->>ChildFendermint: set validator set root hash in checkpoint
 
-        ChildFendermint->>+ChildGateway: call GatewayRouterFacet::update_membership
-        ChildGateway->>ChildGateway: clear configuration accumulator
-        ChildGateway->>-ChildFendermint: new configurations
-        ChildFendermint->>ChildFendermint: set next configuration number in checkpoint
+            ChildFendermint->>+ChildGateway: call GatewayRouterFacet::update_membership
+            ChildGateway->>ChildGateway: clear configuration accumulator
+            ChildGateway->>-ChildFendermint: new configurations
+            ChildFendermint->>ChildFendermint: set next configuration number in checkpoint
 
-        ChildFendermint->>+ChildGateway: call GatewayGetterFacet::bottom_up_messages
-        ChildGateway->>-ChildFendermint: bottom-up CrossMsgs
-        ChildFendermint->>ChildFendermint: set CrossMsgs hash in checkpoint
+            ChildFendermint->>+ChildGateway: call GatewayGetterFacet::bottom_up_messages
+            ChildGateway->>-ChildFendermint: bottom-up CrossMsgs
+            ChildFendermint->>ChildFendermint: set CrossMsgs hash in checkpoint
 
-        ChildFendermint->>+ChildGateway: call GatewayRouterFacet::create_bottom_up_checkpoint
-        ChildGateway->>ChildGateway: store checkpoint
-        ChildGateway->>-ChildFendermint: result
+            ChildFendermint->>+ChildGateway: call GatewayRouterFacet::create_bottom_up_checkpoint
+            ChildGateway->>ChildGateway: store checkpoint
+            ChildGateway->>-ChildFendermint: result
 
-        alt current node is a validator in the power table
-            ChildFendermint->>+ChildFendermint: broadcast_signature
-            ChildFendermint->>ChildFendermint: create Merkle proof of (validator, power)
-            ChildFendermint->>ChildFendermint: hash the checkpoint
-            ChildFendermint->>ChildFendermint: sign the checkpoint hash with validator key
-            ChildFendermint->>ChildFendermint: create a Message to invoke GatewayRouterFacet::add_checkpoint_signature
-            ChildFendermint->>+ChildCometBFT: query validator nonce
-            ChildCometBFT->>-ChildFendermint: validator actor sequence
-            ChildFendermint->>+ChildCometBFT: estimate message gas
-            ChildCometBFT->>-ChildFendermint: simulated transaction gas limit
-            ChildFendermint->>ChildFendermint: sign the Message with the validator key
-            ChildFendermint->>-ChildCometBFT: broadast SignedMessage
+            alt current node is a validator in the power table
+                ChildFendermint->>+ChildFendermint: broadcast_signature
+                ChildFendermint->>ChildFendermint: create Merkle proof of (validator, power)
+                ChildFendermint->>ChildFendermint: hash the checkpoint
+                ChildFendermint->>ChildFendermint: sign the checkpoint hash with validator key
+                ChildFendermint->>ChildFendermint: create a Message to invoke GatewayRouterFacet::add_checkpoint_signature
+                ChildFendermint->>+ChildCometBFT: query validator nonce
+                ChildCometBFT->>-ChildFendermint: validator actor sequence
+                ChildFendermint->>+ChildCometBFT: estimate message gas
+                ChildCometBFT->>-ChildFendermint: simulated transaction gas limit
+                ChildFendermint->>ChildFendermint: sign the Message with the validator key
+                ChildFendermint->>-ChildCometBFT: broadast SignedMessage
+            end
         end
+        ChildFendermint->>-ChildCometBFT: new configurations (a.k.a. validator updates)
     end
-    ChildFendermint->>-ChildCometBFT: new configurations (a.k.a. validator updates)
 
     %% Signature Accumulation
     Note over ParentNode, ChildActors: Signature Accumulation
 
-    ChildCometBFT-->>ChildCometBFT: receive transaction with checkpoint signature
-    ChildCometBFT-->>ChildCometBFT: broadcast block with signature transactions
-    ChildCometBFT-->>ChildCometBFT: receive block with signature transactions
+    rect rgb(254, 239, 236)
+        ChildCometBFT-->>ChildCometBFT: receive transaction with checkpoint signature
+        ChildCometBFT-->>ChildCometBFT: broadcast block with signature transactions
+        ChildCometBFT-->>ChildCometBFT: receive block with signature transactions
 
-    ChildCometBFT->>+ChildFendermint: deliver_tx(SignedMessage with checkpoint signature)
-    ChildFendermint->>+ChildGateway: invoke with Message calling GatewayRouterFacet::add_checkpoint_signature
-    ChildGateway->>ChildGateway: look up BottomUpCheckpoint at indicated height
-    ChildGateway->>ChildGateway: validate that the signed hash matches the checkpoint
-    ChildGateway->>ChildGateway: validate the Merkle proof with the recovered signatory
-    ChildGateway->>ChildGateway: update the accumulated weight of total signatures
-    alt weight over quorum threshold
-        ChildGateway->>ChildGateway: mark checkpoint as completed
-        ChildGateway-->>Relayer: emit checkpoint quorum event
+        ChildCometBFT->>+ChildFendermint: deliver_tx(SignedMessage with checkpoint signature)
+        ChildFendermint->>+ChildGateway: invoke with Message calling GatewayRouterFacet::add_checkpoint_signature
+        ChildGateway->>ChildGateway: look up BottomUpCheckpoint at indicated height
+        ChildGateway->>ChildGateway: validate that the signed hash matches the checkpoint
+        ChildGateway->>ChildGateway: validate the Merkle proof with the recovered signatory
+        ChildGateway->>ChildGateway: update the accumulated weight of total signatures
+        alt weight over quorum threshold
+            ChildGateway->>ChildGateway: mark checkpoint as completed
+            ChildGateway-->>Relayer: emit checkpoint quorum event
+        end
+        ChildGateway->>-ChildFendermint: result
+        ChildFendermint->>-ChildCometBFT: receipts
+
+        Relayer->>+Relayer: observe quorum event
+        Relayer->>+ChildCometBFT: query checkpoint at height in quorum event
+        ChildCometBFT->>+ChildFendermint: ABCI Call query
+        ChildFendermint->>+ChildGateway: read-only call to GatewayGetterFacet::bottom_up_checkpoint
+        ChildGateway->>-ChildFendermint: BottomUpCheckpoint
+        ChildFendermint->>-ChildCometBFT: BottomUpCheckpoint
+        ChildCometBFT->>-Relayer: BottomUpCheckpoint
+
+        Relayer->>+ChildCometBFT: query signatures at height in quorum event
+        ChildCometBFT->>+ChildFendermint: ABCI Call query
+        ChildFendermint->>+ChildGateway: read-only call to GatewayGetterFacet::get_checkpoint_signatures (TBD)
+        ChildGateway->>-ChildFendermint: MultiSig
+        ChildFendermint->>-ChildCometBFT: MultiSig
+        ChildCometBFT->>-Relayer: MultiSig
+
+        Relayer->>+ChildCometBFT: query CrossMsgs at height in quorum event
+        ChildCometBFT->>+ChildFendermint: ABCI Call query
+        ChildFendermint->>+ChildGateway: read-only call to GatewayGetterFacet::bottom_up_messages (TBD)
+        ChildGateway->>-ChildFendermint: CrossMsgs
+        ChildFendermint->>-ChildCometBFT: CrossMsgs
+        ChildCometBFT->>-Relayer: CrossMsgs
+
+        Relayer->>Relayer: create Message to invoke GatewayRouterFacet::submit_bottom_up_checkpoint (TBD)
+        Relayer->>Relayer: sign the Message with the relayer reward key
     end
-    ChildGateway->>-ChildFendermint: result
-    ChildFendermint->>-ChildCometBFT: receipts
-
-    Relayer->>+Relayer: observe quorum event
-    Relayer->>+ChildCometBFT: query checkpoint at height in quorum event
-    ChildCometBFT->>+ChildFendermint: ABCI Call query
-    ChildFendermint->>+ChildGateway: read-only call to GatewayGetterFacet::bottom_up_checkpoint
-    ChildGateway->>-ChildFendermint: BottomUpCheckpoint
-    ChildFendermint->>-ChildCometBFT: BottomUpCheckpoint
-    ChildCometBFT->>-Relayer: BottomUpCheckpoint
-
-    Relayer->>+ChildCometBFT: query signatures at height in quorum event
-    ChildCometBFT->>+ChildFendermint: ABCI Call query
-    ChildFendermint->>+ChildGateway: read-only call to GatewayGetterFacet::get_checkpoint_signatures (TBD)
-    ChildGateway->>-ChildFendermint: MultiSig
-    ChildFendermint->>-ChildCometBFT: MultiSig
-    ChildCometBFT->>-Relayer: MultiSig
-
-    Relayer->>+ChildCometBFT: query CrossMsgs at height in quorum event
-    ChildCometBFT->>+ChildFendermint: ABCI Call query
-    ChildFendermint->>+ChildGateway: read-only call to GatewayGetterFacet::bottom_up_messages (TBD)
-    ChildGateway->>-ChildFendermint: CrossMsgs
-    ChildFendermint->>-ChildCometBFT: CrossMsgs
-    ChildCometBFT->>-Relayer: CrossMsgs
-
-    Relayer->>Relayer: create Message to invoke GatewayRouterFacet::submit_bottom_up_checkpoint (TBD)
-    Relayer->>Relayer: sign the Message with the relayer reward key
-    Relayer->>-ParentNode: broadcast SignedMessage
+    rect rgb(238, 251, 245)
+        Relayer->>-ParentNode: broadcast SignedMessage
+    end
 
     %% Handle Checkpoint in Parent
     Note over ParentNode, ChildActors: Handle Checkpoint in Parent
 
-    ParentNode-->>ParentNode: receive block
+    rect rgb(238, 251, 245)
+        ParentNode-->>ParentNode: receive block
 
-    ParentNode->>+ParentGateway: call GatewayRouterFacet::submit_bottom_up_checkpoint
-    ParentGateway->>ParentGateway: load validator set at current configuration number
-    ParentGateway->>ParentGateway: validate signatures in the checkpoint
-    ParentGateway->>ParentGateway: validate quroum threshold was reached
-    ParentGateway->>ParentGateway: validate cross message hash matches the checkpoint
-    ParentGateway->>ParentGateway: update next configuration number
-    ParentGateway->>ParentGateway: execute cross messages
-    ParentGateway->>-ParentNode: receipt
+        ParentNode->>+ParentGateway: call GatewayRouterFacet::submit_bottom_up_checkpoint
+        ParentGateway->>ParentGateway: load validator set at current configuration number
+        ParentGateway->>ParentGateway: validate signatures in the checkpoint
+        ParentGateway->>ParentGateway: validate quroum threshold was reached
+        ParentGateway->>ParentGateway: validate cross message hash matches the checkpoint
+        ParentGateway->>ParentGateway: update next configuration number
+        ParentGateway->>ParentGateway: execute cross messages
+        ParentGateway->>-ParentNode: receipt
+    end
