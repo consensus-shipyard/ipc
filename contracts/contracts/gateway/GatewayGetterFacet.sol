@@ -42,11 +42,6 @@ contract GatewayGetterFacet {
         return s.totalSubnets;
     }
 
-    /// @notice Returns the maximum number of messages per bottom-up batch.
-    function maxMsgsPerBottomUpBatch() external view returns (uint64) {
-        return s.maxMsgsPerBottomUpBatch;
-    }
-
     /// @notice Returns the period for bottom-up checkpointing.
     function bottomUpCheckPeriod() external view returns (uint256) {
         return s.bottomUpCheckPeriod;
