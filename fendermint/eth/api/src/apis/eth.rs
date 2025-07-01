@@ -722,14 +722,7 @@ where
         };
         error_with_revert(ExitCode::new(deliver_tx.code.value()), msg, data)
     } else if is_create {
-        // It's not clear why some tools like Remix call this with deployment transaction, but they do.
-        // We could parse the deployed contract address, but it would be of very limited use;
-        // the call effect isn't persisted, so one would have to send an actual transaction
-        // and then run a call on `pending` state with this address to have a chance to hit
-        // that contract before the transaction is included in a block, assuming address
-        // creation is deterministic.
-        // Lotus returns empty: https://github.com/filecoin-project/lotus/blob/v1.23.1-rc2/node/impl/full/eth.go#L1091-L1094
-        Ok(Default::default())
+        Ok(deliver_tx.data.into())
     } else {
         let return_data = decode_fevm_invoke(&deliver_tx)
             .context("error decoding data from deliver_tx in query")?;
