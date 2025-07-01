@@ -30,7 +30,7 @@ fendermint_actor_gas_market_eip1559 = { path = "../../actors/gas_market/eip1559"
 fendermint_actor_eam = { path = "../../actors/eam" }
 fendermint_testing = { path = "../../testing", optional = true }
 ipc_actors_abis = { path = "../../../contract-bindings" }
-
+fil_actor_eam = { workspace = true }
 ipc-api = { path = "../../../ipc/api" }
 ipc-observability = { path = "../../../ipc/observability" }
 

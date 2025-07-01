@@ -3742,6 +3742,7 @@ dependencies = [
  "fendermint_vm_message",
  "fendermint_vm_resolver",
  "fendermint_vm_topdown",
+ "fil_actor_eam",
  "futures-core",
  "futures-util",
  "fvm",
