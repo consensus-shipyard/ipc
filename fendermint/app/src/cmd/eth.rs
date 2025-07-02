@@ -38,8 +38,7 @@ async fn run(settings: EthSettings, client: HybridClient) -> anyhow::Result<()> 
 
         let registry = prometheus::Registry::new();
 
-        fendermint_app::metrics::register_eth_metrics(&registry)
-            .context("failed to register metrics")?;
+        crate::metrics::register_eth_metrics(&registry).context("failed to register metrics")?;
 
         info!(
             listen_addr = settings.metrics.listen.to_string(),

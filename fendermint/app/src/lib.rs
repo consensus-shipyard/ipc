@@ -1,14 +1,20 @@
-extern crate core;
-
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-mod app;
+pub mod app;
+pub mod cmd;
 pub mod ipc;
 pub mod metrics;
 pub mod observe;
 mod store;
 mod tmconv;
 mod validators;
+
+extern crate core;
+
+pub use fendermint_app_options as options;
+pub use fendermint_app_settings as settings;
+
+use fs_err as fs;
 
 pub use app::{App, AppConfig};
 pub use store::{AppStore, BitswapBlockstore};

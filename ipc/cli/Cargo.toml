@@ -65,3 +65,5 @@ tracing-subscriber.workspace = true
 fendermint_eth_hardhat = { path = "../../fendermint/eth/hardhat" }
 fendermint_eth_deployer = { path = "../../fendermint/eth/deployer" }
 fendermint_app_settings = { path = "../../fendermint/app/settings" }
+fendermint_vm_actor_interface = { path = "../../fendermint/vm/actor_interface" }
+fendermint_app = { path = "../../fendermint/app" }

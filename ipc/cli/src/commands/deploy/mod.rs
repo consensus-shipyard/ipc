@@ -74,12 +74,13 @@ pub(crate) async fn deploy_contracts(
     config: &DeployConfig,
 ) -> anyhow::Result<DeployedContracts> {
     // Retrieve the key info for the provided "from" address.
-    let key_info = key_store.get(&config.from.into())?.ok_or_else(|| {
-        anyhow!(
-            "address {} does not have a private key in key store",
-            config.from
-        )
-    })?;
+    let key_info: ipc_wallet::EvmKeyInfo =
+        key_store.get(&config.from.into())?.ok_or_else(|| {
+            anyhow!(
+                "address {} does not have a private key in key store",
+                config.from
+            )
+        })?;
 
     let hardhat = Hardhat::new(config.contracts_dir.clone());
 

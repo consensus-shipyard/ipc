@@ -1,15 +1,11 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-pub use fendermint_app_options as options;
-pub use fendermint_app_settings as settings;
+use fendermint_app::*;
 
-use fs_err as fs;
 use ipc_observability::traces::create_temporary_subscriber;
 use std::sync::Arc;
 use tracing::subscriber;
-
-mod cmd;
 
 /// Install a panic handler that prints stuff to the logs, otherwise it only shows up in the console.
 fn init_panic_handler() {

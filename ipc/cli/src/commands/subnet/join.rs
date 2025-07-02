@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use clap::Args;
 use ipc_api::subnet_id::SubnetID;
 use num_traits::Zero;
+use serde::Deserialize;
 use std::{fmt::Debug, str::FromStr};
 
 use crate::{
@@ -24,27 +25,37 @@ impl CommandLineHandler for JoinSubnet {
         log::debug!("join subnet with args: {:?}", arguments);
 
         let mut provider = get_ipc_provider(global)?;
-        let subnet = SubnetID::from_str(&arguments.subnet)?;
-        let from = match &arguments.from {
-            Some(address) => Some(require_fil_addr_from_str(address)?),
-            None => None,
-        };
-        if let Some(initial_balance) = arguments.initial_balance.filter(|x| !x.is_zero()) {
-            log::info!("pre-funding address with {initial_balance}");
-            provider
-                .pre_fund(subnet.clone(), from, f64_to_token_amount(initial_balance)?)
-                .await?;
-        }
-        let epoch = provider
-            .join_subnet(subnet, from, f64_to_token_amount(arguments.collateral)?)
-            .await?;
+        let epoch = join_subnet(&mut provider, &arguments).await?;
+
         println!("joined at epoch: {epoch}");
 
         Ok(())
     }
 }
 
-#[derive(Debug, Args)]
+pub(crate) async fn join_subnet(
+    provider: &mut ipc_provider::IpcProvider,
+    args: &JoinSubnetArgs,
+) -> anyhow::Result<i64> {
+    let subnet = SubnetID::from_str(&args.subnet)?;
+    let from = match &args.from {
+        Some(address) => Some(require_fil_addr_from_str(address)?),
+        None => None,
+    };
+    if let Some(initial_balance) = args.initial_balance.filter(|x| !x.is_zero()) {
+        log::info!("pre-funding address with {initial_balance}");
+        provider
+            .pre_fund(subnet.clone(), from, f64_to_token_amount(initial_balance)?)
+            .await?;
+    }
+    let epoch = provider
+        .join_subnet(subnet, from, f64_to_token_amount(args.collateral)?)
+        .await?;
+
+    Ok(epoch)
+}
+
+#[derive(Debug, Clone, Args)]
 #[command(name = "join", about = "Join a subnet")]
 pub struct JoinSubnetArgs {
     #[arg(long, help = "The address that joins the subnet")]

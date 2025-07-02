@@ -67,6 +67,12 @@ impl Subnet {
             SubnetConfig::Fevm(s) => s.gateway_addr,
         }
     }
+
+    pub fn registry_addr(&self) -> Address {
+        match &self.config {
+            SubnetConfig::Fevm(s) => s.registry_addr,
+        }
+    }
 }
 
 /// The FVM subnet config parameters
