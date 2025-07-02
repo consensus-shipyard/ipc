@@ -9,24 +9,16 @@
 use crate::subnet_id::SubnetID;
 use fvm_ipld_encoding::repr::*;
 use fvm_shared::{address::Address, clock::ChainEpoch, econ::TokenAmount};
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize};
+use std::str::FromStr;
+use strum::{EnumString, VariantNames};
 
 /// ID used in the builtin-actors bundle manifest
 pub const MANIFEST_ID: &str = "ipc_subnet_actor";
 
 /// Determines the permission mode for validators.
 #[repr(u8)]
-#[derive(
-    Copy,
-    Debug,
-    Clone,
-    Serialize_repr,
-    Deserialize_repr,
-    PartialEq,
-    Eq,
-    strum::EnumString,
-    strum::VariantNames,
-)]
+#[derive(Copy, Debug, Clone, Serialize_repr, PartialEq, Eq, EnumString, VariantNames)]
 #[strum(serialize_all = "snake_case")]
 pub enum PermissionMode {
     /// Validator power is determined by the collateral staked
@@ -35,6 +27,44 @@ pub enum PermissionMode {
     Federated,
     /// Validator power is determined by the initial collateral staked and does not change anymore
     Static,
+}
+
+impl<'de> Deserialize<'de> for PermissionMode {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct Visitor;
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = PermissionMode;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(f, "a u8 (0–2) or one of {:?}", PermissionMode::VARIANTS)
+            }
+
+            fn visit_u64<E>(self, v: u64) -> Result<PermissionMode, E>
+            where
+                E: de::Error,
+            {
+                match v {
+                    0 => Ok(PermissionMode::Collateral),
+                    1 => Ok(PermissionMode::Federated),
+                    2 => Ok(PermissionMode::Static),
+                    other => Err(E::invalid_value(de::Unexpected::Unsigned(other), &self)),
+                }
+            }
+
+            fn visit_str<E>(self, s: &str) -> Result<PermissionMode, E>
+            where
+                E: de::Error,
+            {
+                PermissionMode::from_str(s)
+                    .map_err(|_| E::invalid_value(de::Unexpected::Str(s), &self))
+            }
+        }
+
+        deserializer.deserialize_any(Visitor)
+    }
 }
 
 /// Defines a generic token of a subnet on its parent subnet.
@@ -58,20 +88,48 @@ impl Default for Asset {
 /// Determines the type of a token used by the subnet.
 #[repr(u8)]
 #[derive(
-    Copy,
-    Debug,
-    Clone,
-    Serialize_repr,
-    Deserialize_repr,
-    PartialEq,
-    Eq,
-    strum::EnumString,
-    strum::VariantNames,
+    Copy, Debug, Clone, Serialize_repr, PartialEq, Eq, strum::EnumString, strum::VariantNames,
 )]
 #[strum(serialize_all = "snake_case")]
 pub enum AssetKind {
     Native,
     ERC20,
+}
+
+impl<'de> Deserialize<'de> for AssetKind {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct Visitor;
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = AssetKind;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(f, "a u8 (0–2) or one of {:?}", AssetKind::VARIANTS)
+            }
+
+            fn visit_u64<E>(self, v: u64) -> Result<AssetKind, E>
+            where
+                E: de::Error,
+            {
+                match v {
+                    0 => Ok(AssetKind::Native),
+                    1 => Ok(AssetKind::ERC20),
+                    other => Err(E::invalid_value(de::Unexpected::Unsigned(other), &self)),
+                }
+            }
+
+            fn visit_str<E>(self, s: &str) -> Result<AssetKind, E>
+            where
+                E: de::Error,
+            {
+                AssetKind::from_str(s).map_err(|_| E::invalid_value(de::Unexpected::Str(s), &self))
+            }
+        }
+
+        deserializer.deserialize_any(Visitor)
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

@@ -3,6 +3,7 @@
 use std::str::FromStr;
 
 use crate::uints::U256;
+use ethers::types::H160;
 use fvm_ipld_encoding::{serde, strict_bytes};
 use fvm_shared::address::Address;
 use fvm_shared::ActorID;
@@ -21,6 +22,14 @@ impl From<U256> for EthAddress {
         let mut bytes = [0u8; 32];
         v.to_big_endian(&mut bytes);
         Self(bytes[12..].try_into().unwrap())
+    }
+}
+
+/// Converts an H160 to an EthAddress
+impl From<H160> for EthAddress {
+    fn from(h: H160) -> Self {
+        // H160 is just a [u8;20] under the hood
+        EthAddress(h.0)
     }
 }
 
