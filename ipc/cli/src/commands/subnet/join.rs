@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use clap::Args;
 use ipc_api::subnet_id::SubnetID;
 use num_traits::Zero;
+use serde::Deserialize;
 use std::{fmt::Debug, str::FromStr};
 
 use crate::{
@@ -24,7 +25,7 @@ impl CommandLineHandler for JoinSubnet {
         log::debug!("join subnet with args: {:?}", arguments);
 
         let mut provider = get_ipc_provider(global)?;
-        let epoch = join_subnet(&mut provider, arguments).await?;
+        let epoch = join_subnet(&mut provider, &arguments).await?;
 
         println!("joined at epoch: {epoch}");
 
