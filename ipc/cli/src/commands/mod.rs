@@ -17,7 +17,6 @@ use crate::commands::crossmsg::CrossMsgsCommandsArgs;
 use crate::commands::util::UtilCommandsArgs;
 use crate::GlobalArguments;
 use anyhow::{anyhow, Context, Result};
-
 use clap::{Command, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Generator, Shell};
 use fvm_shared::econ::TokenAmount;
@@ -172,7 +171,7 @@ pub(crate) fn require_fil_addr_from_str(s: &str) -> anyhow::Result<fvm_shared::a
         Err(_) => {
             // see if it is an eth address
             let addr = ethers::types::Address::from_str(s)?;
-            ethers_address_to_fil_address(&addr)?
+            ethers_address_to_fil_address(addr)?
         }
         Ok(addr) => addr,
     };

@@ -46,7 +46,7 @@ pub fn from_contract_validators(
         .into_iter()
         .map(|validator| {
             Ok(Validator {
-                addr: ethers_address_to_fil_address(&validator.addr)?,
+                addr: ethers_address_to_fil_address(validator.addr)?,
                 weight: eth_to_fil_amount(&validator.weight)?,
                 metadata: validator.metadata.to_vec(),
             })

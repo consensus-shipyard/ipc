@@ -112,10 +112,12 @@ impl<T: Clone + Eq + Hash + TryFrom<KeyInfo> + Default + ToString> PersistentKey
                 };
             }
         };
-        let reader = BufReader::new(p);
+        let reader = BufReader::new(&p);
 
         let persisted_key_info: Vec<PersistentKeyInfo> =
             serde_json::from_reader(reader).map_err(|e| {
+                let x = fs_err::read_to_string(&p);
+                log::debug!("\n====\n{x:?}\n====\n");
                 anyhow!(
                     "failed to deserialize keyfile, initializing new keystore at: {:?} due to: {e:}",
                     path
