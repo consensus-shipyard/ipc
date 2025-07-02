@@ -20,14 +20,20 @@ impl CommandLineHandler for ApproveSubnet {
         log::debug!("approve subnet with args: {:?}", arguments);
 
         let mut provider = get_ipc_provider(global)?;
-        let subnet = SubnetID::from_str(&arguments.subnet)?;
-        let from = match &arguments.from {
-            Some(address) => Some(require_fil_addr_from_str(address)?),
-            None => None,
-        };
-
-        provider.approve_subnet(subnet, from).await
+        approve_subnet(&mut provider, arguments).await
     }
+}
+
+pub(crate) async fn approve_subnet(
+    provider: &mut ipc_provider::IpcProvider,
+    args: &ApproveSubnetArgs,
+) -> anyhow::Result<()> {
+    let subnet = SubnetID::from_str(&args.subnet)?;
+    let from = match &args.from {
+        Some(address) => Some(require_fil_addr_from_str(address)?),
+        None => None,
+    };
+    provider.approve_subnet(subnet, from).await
 }
 
 #[derive(Debug, Args)]

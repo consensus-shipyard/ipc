@@ -305,7 +305,7 @@ fn set_ipc_gateway(genesis_file: &PathBuf, args: &GenesisIpcGatewayArgs) -> anyh
     })
 }
 
-async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> anyhow::Result<()> {
+pub async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> anyhow::Result<()> {
     let genesis_params = read_genesis(genesis_file)?;
 
     fn actors_car_blob(
@@ -333,7 +333,7 @@ async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> anyhow:
     builder.write_to(args.output_path.clone()).await
 }
 
-async fn new_genesis_from_parent(
+pub async fn new_genesis_from_parent(
     genesis_file: &PathBuf,
     args: &GenesisFromParentArgs,
 ) -> anyhow::Result<()> {
