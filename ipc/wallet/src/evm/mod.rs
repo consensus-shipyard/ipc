@@ -5,7 +5,8 @@
 
 mod key;
 
-pub const DEFAULT_KEYSTORE_NAME: &str = "evm_keystore.json";
+pub const ENCRYPTED_KEYSTORE_NAME: &str = "evm_keystore";
+pub const KEYSTORE_NAME: &str = "evm_keystore.json";
 
 pub use key::*;
 

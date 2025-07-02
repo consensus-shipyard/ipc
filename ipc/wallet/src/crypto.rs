@@ -4,8 +4,6 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 // use super::*;
 
-pub const ENCRYPTED_KEYSTORE_NAME: &str = "keystore";
-
 use argon2::password_hash::SaltString;
 use argon2::PasswordHasher;
 pub use argon2::RECOMMENDED_SALT_LEN;

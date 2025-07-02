@@ -941,8 +941,8 @@ pub fn new_evm_keystore_from_path(
 ) -> anyhow::Result<EvmCrownJewels> {
     let name = password
         .as_ref()
-        .map(|_| ipc_wallet::ENCRYPTED_KEYSTORE_NAME)
-        .unwrap_or_else(|| ipc_wallet::PLAIN_JSON_KEYSTORE_NAME);
+        .map(|_| ipc_wallet::evm::ENCRYPTED_KEYSTORE_NAME)
+        .unwrap_or_else(|| ipc_wallet::evm::KEYSTORE_NAME);
     let repo = Path::new(&repo_str).join(name);
     let repo = expand_tilde(repo);
     let keystore_config = if let Some(ref password) = password {
@@ -958,7 +958,11 @@ pub fn new_fvm_keystore_from_path(
     repo_str: &str,
     password: Option<String>,
 ) -> anyhow::Result<FvmCrownJewels> {
-    let repo = Path::new(&repo_str);
+    let name = password
+        .as_ref()
+        .map(|_| ipc_wallet::fvm::ENCRYPTED_KEYSTORE_NAME)
+        .unwrap_or_else(|| ipc_wallet::fvm::KEYSTORE_NAME);
+    let repo = Path::new(&repo_str).join(name);
     let repo = expand_tilde(repo);
     let keystore_config = if let Some(ref password) = password {
         KeyStoreConfig::encrypted(repo, password.clone())

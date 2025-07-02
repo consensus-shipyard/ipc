@@ -21,9 +21,6 @@ pub use crypto::*;
 pub mod evm;
 pub mod fvm;
 
-#[cfg(feature = "with-ethers")]
-pub use crate::evm::DEFAULT_KEYSTORE_NAME;
-
 pub use crate::fvm::*;
 
 #[cfg(test)]

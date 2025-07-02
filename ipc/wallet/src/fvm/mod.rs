@@ -12,3 +12,6 @@ pub use wallet::helpers::*;
 pub use wallet::*;
 
 pub type FvmCrownJewels = CrownJewels<String, FvmKeyInfo, PersistentKeyInfo>;
+
+pub const ENCRYPTED_KEYSTORE_NAME: &str = "keystore";
+pub const KEYSTORE_NAME: &str = "keystore.json";
