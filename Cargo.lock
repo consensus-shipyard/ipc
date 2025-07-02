@@ -5737,6 +5737,7 @@ dependencies = [
  "cid 0.10.1",
  "clap 4.5.32",
  "clap_complete",
+ "color-eyre 0.5.11",
  "env_logger 0.10.2",
  "ethers",
  "ethers-contract",
