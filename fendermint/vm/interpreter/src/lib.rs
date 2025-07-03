@@ -9,6 +9,7 @@ pub mod types;
 
 #[cfg(feature = "arb")]
 mod arb;
+mod bridge;
 
 use crate::errors::*;
 use crate::fvm::state::{FvmExecState, FvmQueryState};
