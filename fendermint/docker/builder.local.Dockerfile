@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # Builder
-FROM rust:bookworm as builder
+FROM rust:1.83.0-bookworm as builder
 
 RUN apt-get update && \
   apt-get install -y build-essential clang cmake protobuf-compiler && \
