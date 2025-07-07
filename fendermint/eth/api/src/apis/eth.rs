@@ -722,7 +722,8 @@ where
         };
         error_with_revert(ExitCode::new(deliver_tx.code.value()), msg, data)
     } else if is_create {
-        Ok(deliver_tx.data.into())
+        let decoded = Vec::<u8>::from(decode_data(&deliver_tx.data)?);
+        Ok(decoded.into())
     } else {
         let return_data = decode_fevm_invoke(&deliver_tx)
             .context("error decoding data from deliver_tx in query")?;

@@ -220,6 +220,7 @@ fvm_ipld_amt = "0.6.2"
 # Keep the version here in sync with the Makefile!
 fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
 fil_actor_eam = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
+fil_actor_evm = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
 fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
 
 cid = { version = "0.10.1", default-features = false, features = [
