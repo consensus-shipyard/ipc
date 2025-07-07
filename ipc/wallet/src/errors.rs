@@ -13,8 +13,10 @@ pub enum WalletErr {
         key: String,
         available_keys: Vec<String>,
     },
+
     #[error("Key already exists in keystore")]
     KeyExists { key: String },
+
     #[error("Key does not exist in keystore")]
     KeyNotExists { key: String },
 

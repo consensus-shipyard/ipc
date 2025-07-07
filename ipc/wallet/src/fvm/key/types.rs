@@ -3,6 +3,8 @@
 use base64::{prelude::BASE64_STANDARD, Engine};
 use fvm_shared::crypto::signature::SignatureType;
 
+use crate::{new_address, to_public, AddressDerivator};
+
 // TODO need to update keyinfo to not use SignatureType, use string instead to
 // save keys like jwt secret
 /// `KeyInfo` structure, this contains the type of key (stored as a string) and
@@ -12,6 +14,17 @@ pub struct FvmKeyInfo {
     pub(crate) key_type: SignatureType,
     // Vec<u8> is used because The private keys for BLS and SECP256K1 are not of the same type
     pub(crate) private_key: Vec<u8>,
+}
+
+impl AddressDerivator<String> for FvmKeyInfo {
+    /// Address as used in the wallet
+    // XXX the `wallet-` is absurd, remove
+    fn as_address(&self) -> String {
+        let key_type = *self.key_type();
+        let pub_key = to_public(key_type, &self.private_key).unwrap();
+        let address = new_address(key_type, pub_key.as_slice()).unwrap();
+        format!("wallet-{address}")
+    }
 }
 
 impl FvmKeyInfo {

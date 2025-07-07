@@ -250,7 +250,7 @@ pub fn export_key_info(addr: &Address, keystore: &FvmCrownJewels) -> Result<FvmK
     Ok(key.key_info)
 }
 
-/// Generate new key of given `SignatureType`
+/// Generate new secret key of given `SignatureType`
 pub fn generate_key(typ: SignatureType) -> Result<FullKey, WalletErr> {
     let private_key = self::helpers::generate(typ)?;
     let key_info = FvmKeyInfo::new(typ, private_key);

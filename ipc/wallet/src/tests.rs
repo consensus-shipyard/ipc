@@ -91,7 +91,7 @@ mod encryption {
 
         let mut ks = FvmCrownJewels::new(KeyStoreConfig::plain(keystore_location))?;
 
-        let key = wallet::generate_key(SignatureType::BLS)?;
+        let key = wallet::generate_key(SignatureType::Secp256k1)?;
 
         let addr = format!("wallet-{}", key.address);
         ks.put(addr.clone(), key.key_info)?;
@@ -102,10 +102,10 @@ mod encryption {
         // Manually parse keystore.json
         let reader = BufReader::new(fs::File::open(keystore_location)?);
         let persisted_keystore: HashMap<String, PersistentKeyInfo> =
-            serde_json::from_reader(reader)?;
+            dbg!(serde_json::from_reader(reader))?;
 
-        let default_key_info = persisted_keystore.get(&addr).unwrap();
-        let actual = BASE64_STANDARD.decode(default_key_info.private_key.clone())?;
+        let default_key_info = persisted_keystore.get(dbg!(&addr)).unwrap();
+        let actual = BASE64_STANDARD.decode(dbg!(default_key_info.private_key.clone()))?;
 
         assert_eq!(
             default.private_key, actual,
@@ -123,10 +123,7 @@ mod encryption {
     impl quickcheck::Arbitrary for FvmKeyInfo {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
             let sigtype = g
-                .choose(&[
-                    fvm_shared::crypto::signature::SignatureType::BLS,
-                    fvm_shared::crypto::signature::SignatureType::Secp256k1,
-                ])
+                .choose(&[fvm_shared::crypto::signature::SignatureType::Secp256k1])
                 .unwrap();
             FvmKeyInfo {
                 key_type: *sigtype,

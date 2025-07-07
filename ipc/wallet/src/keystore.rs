@@ -5,7 +5,6 @@
 
 use fs::{create_dir, File};
 use fs_err as fs;
-use fvm_shared::crypto::signature::SignatureType;
 use std::{
     collections::HashMap,
     io::{BufReader, BufWriter, ErrorKind, Read, Write},
@@ -23,7 +22,7 @@ pub const PLAIN_JSON_KEYSTORE_NAME: &str = "keystore.json";
 /// Environmental variable which holds the `KeyStore` encryption phrase.
 pub const FOREST_KEYSTORE_PHRASE_ENV: &str = "FOREST_KEYSTORE_PHRASE";
 
-use crate::{crypto::*, new_address, to_public, FvmKeyInfo};
+use crate::crypto::*;
 
 /// Configuration type for constructing a `KeyStore`
 pub enum KeyStoreConfig {
@@ -74,15 +73,6 @@ use core::hash::Hash;
 pub trait AddressDerivator<Key> {
     fn as_address(&self) -> Key;
 }
-impl AddressDerivator<String> for FvmKeyInfo {
-    fn as_address(&self) -> String {
-        let ty = SignatureType::Secp256k1;
-        let pub_key = to_public(ty, &self.private_key).unwrap();
-        let address = new_address(ty, pub_key.as_slice()).unwrap();
-        hex::encode(address.to_bytes())
-    }
-}
-
 /// Provides the default key identifier required to lookup the key information
 pub trait DefaultKey {
     fn default_key() -> Self;
@@ -106,11 +96,20 @@ pub struct CrownJewels<K: Hash + PartialEq + Eq + Debug, I, P> {
     _phantom: PhantomData<P>,
 }
 
-impl<K, I, P> CrownJewels<K, I, P>
+impl<AddrT, InfoT, PersistReprT> CrownJewels<AddrT, InfoT, PersistReprT>
 where
-    K: Hash + PartialEq + Eq + Debug + Serialize + Clone + for<'de> Deserialize<'de>,
-    I: AddressDerivator<K> + Debug + Clone + PartialEq + Eq + for<'k, 'p> From<(&'k K, &'p P)>,
-    P: Debug + Clone + Serialize + for<'de> Deserialize<'de> + for<'k, 'i> From<(&'k K, &'i I)>,
+    AddrT: Hash + PartialEq + Eq + Debug + Serialize + Clone + for<'de> Deserialize<'de>,
+    InfoT: AddressDerivator<AddrT>
+        + Debug
+        + Clone
+        + PartialEq
+        + Eq
+        + for<'k, 'p> From<(&'k AddrT, &'p PersistReprT)>,
+    PersistReprT: Debug
+        + Clone
+        + Serialize
+        + for<'de> Deserialize<'de>
+        + for<'k, 'i> From<(&'k AddrT, &'i InfoT)>,
     // XXX consider `&I: Into<K>` to allow for conversion of the in mem key to the address,
     // XXX which _should_ be deterministic based on the public key
 {
@@ -129,7 +128,7 @@ where
                         let reader = BufReader::new(file);
 
                         // Existing cleartext JSON keystore
-                        let persisted_key_info: HashMap<K, P> =
+                        let persisted_key_info: HashMap<AddrT, PersistReprT> =
                             serde_json::from_reader(reader)
                                 .inspect_err(|_| {
                                     error!(
@@ -139,16 +138,19 @@ where
                                 })
                                 .unwrap_or_default();
 
-                        let mut key_info = HashMap::<K, I>::with_capacity(128);
-                        for (key, value) in persisted_key_info.iter() {
+                        let mut key_info = HashMap::<AddrT, InfoT>::with_capacity(128);
+                        for (addr, persist) in persisted_key_info.iter() {
+                            let info = <InfoT as From<_>>::from((addr, persist));
+                            // the addr here does not match the one returned from `Addressable::as_address` due to some prefix fun in `fvm`
+
                             key_info.insert(
-                                key.clone(),
-                                <I as From<_>>::from((key, value)), // KeyInfo {
-                                                                    //     private_key: BASE64_STANDARD
-                                                                    //         .decode(value.private_key.clone())
-                                                                    //         .map_err(|error| Error::Other(error.to_string()))?,
-                                                                    //     key_type: value.key_type,
-                                                                    // },
+                                addr.clone(),
+                                info, // KeyInfo {
+                                      //     private_key: BASE64_STANDARD
+                                      //         .decode(value.private_key.clone())
+                                      //         .map_err(|error| Error::Other(error.to_string()))?,
+                                      //     key_type: value.key_type,
+                                      // },
                             );
                         }
 
@@ -222,7 +224,7 @@ where
                                 .decrypt(&data)
                                 .map_err(|error| WalletErr::Other(error.to_string()))?;
 
-                            let key_info: HashMap<K, P> =
+                            let key_info: HashMap<AddrT, PersistReprT> =
                                 serde_ipld_dagcbor::from_slice(&decrypted_data)
                                     .inspect_err(|_| {
                                         // TODO XXX this is bonkers
@@ -230,10 +232,10 @@ where
                                     })
                                     .unwrap_or_default();
 
-                            let key_info: HashMap<K, I> = HashMap::from_iter(
+                            let key_info: HashMap<AddrT, InfoT> = HashMap::from_iter(
                                 key_info
                                     .iter()
-                                    .map(|(k, p)| (k.clone(), <I as From<_>>::from((k, p)))),
+                                    .map(|(k, p)| (k.clone(), <InfoT as From<_>>::from((k, p)))),
                             );
                             Ok(Self {
                                 key_info,
@@ -277,11 +279,10 @@ where
                 match &self.encryption {
                     Some(encrypted_keystore) => {
                         // Flush For EncryptedKeyStore
-                        let key_info = HashMap::<K, P>::from_iter(
-                            self.key_info
-                                .iter()
-                                .map(|(k, i)| (k.clone(), <P as From<_>>::from((k, i)))),
-                        );
+                        let key_info =
+                            HashMap::<AddrT, PersistReprT>::from_iter(self.key_info.iter().map(
+                                |(k, i)| (k.clone(), <PersistReprT as From<_>>::from((k, i))),
+                            ));
                         let data = serde_ipld_dagcbor::to_vec(&key_info).map_err(|e| {
                             WalletErr::Other(format!("failed to serialize and write key info: {e}"))
                         })?;
@@ -295,10 +296,10 @@ where
                         Ok(())
                     }
                     None => {
-                        let key_info = HashMap::<K, P>::from_iter(
-                            self.key_info
-                                .iter()
-                                .map(|(k, i)| (k.clone(), <P as From<_>>::from((k, i)))),
+                        let key_info = HashMap::<AddrT, PersistReprT>::from_iter(
+                            self.key_info.iter().map(|(addr, info)| {
+                                (addr.clone(), <PersistReprT as From<_>>::from((addr, info)))
+                            }),
                         );
 
                         // Flush for PersistentKeyStore
@@ -318,37 +319,43 @@ where
     }
 
     fn available_keys(&self) -> Vec<String> {
-        Vec::from_iter(self.key_info.keys().map(|k| self.key_to_string(k)))
+        Vec::from_iter(self.key_info.keys().map(|addr| self.addr_to_string(addr)))
     }
 
-    fn key_to_string(&self, key: &K) -> String {
-        format!("{key:?}")
+    fn addr_to_string(&self, addr: &AddrT) -> String {
+        format!("{addr:?}")
     }
 
     /// Return all of the keys that are stored in the `KeyStore`
-    pub fn list(&self) -> Vec<K> {
+    pub fn list(&self) -> Vec<AddrT> {
         Vec::from_iter(self.key_info.keys().cloned())
     }
 
     /// Return `KeyInfo` that corresponds to a given key
-    pub fn get(&self, key: &K) -> Result<I, WalletErr> {
+    pub fn get(&self, addr: &AddrT) -> Result<InfoT, WalletErr> {
         self.key_info
-            .get(key)
+            .get(addr)
             .cloned()
             .ok_or_else(|| WalletErr::KeyInfo {
-                key: format!("{key:?}"),
+                key: self.addr_to_string(addr),
                 available_keys: self.available_keys(),
             })
     }
 
     /// Save a key/`KeyInfo` pair to the `KeyStore`
-    pub fn put(&mut self, key: K, key_info: I) -> Result<(), WalletErr> {
-        if self.key_info.contains_key(&key) {
+    pub fn put(&mut self, addr: AddrT, info: InfoT) -> Result<(), WalletErr>
+    where
+        AddrT: DefaultKey,
+    {
+        if <AddrT as DefaultKey>::default_key() != addr {
+            debug_assert_eq!(&info.as_address(), &addr);
+        }
+        if self.key_info.contains_key(&addr) {
             return Err(WalletErr::KeyExists {
-                key: self.key_to_string(&key),
+                key: self.addr_to_string(&addr),
             });
         }
-        self.key_info.insert(key, key_info);
+        self.key_info.insert(addr, info);
 
         if self.plain.is_some() {
             self.flush()?;
@@ -359,11 +366,11 @@ where
 
     /// Set the default key as a delegate/copy to what is referenced
     /// by the existing `key` passed as argument
-    pub fn set_default(&mut self, key: &K) -> Result<(), WalletErr>
+    pub fn set_default(&mut self, key: &AddrT) -> Result<(), WalletErr>
     where
-        K: DefaultKey,
+        AddrT: DefaultKey,
     {
-        let default_key = <K as DefaultKey>::default_key();
+        let default_key = <AddrT as DefaultKey>::default_key();
         let info = self.get(key)?;
         let _ = self.remove(default_key.clone());
         self.put(default_key, info)?;
@@ -371,11 +378,11 @@ where
     }
 
     /// Obtain the default key, if any. No default key is not an error
-    pub fn get_default(&self) -> Result<Option<K>, WalletErr>
+    pub fn get_default(&self) -> Result<Option<AddrT>, WalletErr>
     where
-        K: DefaultKey,
+        AddrT: DefaultKey,
     {
-        let default_key = <K as DefaultKey>::default_key();
+        let default_key = <AddrT as DefaultKey>::default_key();
         let Ok(info) = self.get(&default_key) else {
             return Ok(None); // FIXME TODO retain the error type
         };
@@ -383,9 +390,9 @@ where
     }
 
     /// Remove the key and corresponding `KeyInfo` from the `KeyStore`
-    pub fn remove(&mut self, key: K) -> Result<I, WalletErr> {
+    pub fn remove(&mut self, key: AddrT) -> Result<InfoT, WalletErr> {
         let key_out = self.key_info.remove(&key).ok_or(WalletErr::KeyInfo {
-            key: self.key_to_string(&key),
+            key: self.addr_to_string(&key),
             available_keys: self.available_keys(),
         })?;
 
