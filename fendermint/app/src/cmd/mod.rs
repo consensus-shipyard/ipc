@@ -3,6 +3,8 @@
 
 //! CLI command implementations.
 
+use std::sync::Arc;
+
 use crate::{
     options::{Commands, Options},
     settings::{utils::expand_tilde, Settings},
@@ -65,15 +67,15 @@ macro_rules! cmd {
 }
 
 /// Execute the command specified in the options.
-pub async fn exec(opts: &Options) -> anyhow::Result<()> {
+pub async fn exec(opts: Arc<Options>) -> anyhow::Result<()> {
     match &opts.command {
-        Commands::Config(args) => args.exec(settings(opts)?).await,
+        Commands::Config(args) => args.exec(opts.clone()).await,
         Commands::Debug(args) => {
             let _trace_file_guard = set_global_tracing_subscriber(&TracingSettings::default());
             args.exec(()).await
         }
         Commands::Run(args) => {
-            let settings = settings(opts)?;
+            let settings = load_settings(opts.clone())?;
             let _trace_file_guard = set_global_tracing_subscriber(&settings.tracing);
             args.exec(settings).await
         }
@@ -90,7 +92,7 @@ pub async fn exec(opts: &Options) -> anyhow::Result<()> {
             args.exec(()).await
         }
         Commands::Eth(args) => {
-            let settings = settings(opts)?.eth;
+            let settings = load_settings(opts.clone())?.eth;
             let _trace_file_guard = set_global_tracing_subscriber(&settings.tracing);
             args.exec(settings).await
         }
@@ -102,7 +104,7 @@ pub async fn exec(opts: &Options) -> anyhow::Result<()> {
 }
 
 /// Try to parse the settings in the configuration directory.
-fn settings(opts: &Options) -> anyhow::Result<Settings> {
+pub fn load_settings(opts: Arc<Options>) -> anyhow::Result<Settings> {
     let config_dir = match expand_tilde(opts.config_dir()) {
         d if !d.exists() => return Err(anyhow!("'{d:?}' does not exist")),
         d if !d.is_dir() => return Err(anyhow!("'{d:?}' is a not a directory")),

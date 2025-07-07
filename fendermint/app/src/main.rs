@@ -6,6 +6,7 @@ pub use fendermint_app_settings as settings;
 
 use fs_err as fs;
 use ipc_observability::traces::create_temporary_subscriber;
+use std::sync::Arc;
 use tracing::subscriber;
 
 mod cmd;
@@ -38,10 +39,11 @@ fn init_panic_handler() {
 #[tokio::main]
 async fn main() {
     let opts = options::parse();
+    let opts = Arc::new(opts);
 
     init_panic_handler();
 
-    if let Err(e) = cmd::exec(&opts).await {
+    if let Err(e) = cmd::exec(opts.clone()).await {
         subscriber::with_default(create_temporary_subscriber(), || {
             tracing::error!("failed to execute {:?}: {e:?}", opts)
         });

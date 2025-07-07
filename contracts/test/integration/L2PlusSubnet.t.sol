@@ -4,12 +4,14 @@ pragma solidity ^0.8.23;
 import "forge-std/Test.sol";
 import "../../contracts/errors/IPCErrors.sol";
 import {EMPTY_BYTES} from "../../contracts/constants/Constants.sol";
-import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind, OutcomeType} from "../../contracts/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpCheckpoint, BottomUpMsgBatch, ParentFinality, IpcMsgKind, OutcomeType} from "../../contracts/structs/CrossNet.sol";
+import {BottomUpBatch} from "../../contracts/structs/BottomUpBatch.sol";
 import {SubnetID, Subnet, IPCAddress, Validator} from "../../contracts/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
 import {AssetHelper} from "../../contracts/lib/AssetHelper.sol";
 import {Asset, AssetKind} from "../../contracts/structs/Subnet.sol";
 import {FvmAddressHelper} from "../../contracts/lib/FvmAddressHelper.sol";
+import {BottomUpBatchRecorded} from "../../contracts/structs/BottomUpBatch.sol";
 import {CrossMsgHelper} from "../../contracts/lib/CrossMsgHelper.sol";
 import {GatewayDiamond} from "../../contracts/GatewayDiamond.sol";
 import {SubnetActorDiamond} from "../../contracts/SubnetActorDiamond.sol";
@@ -33,6 +35,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20PresetFixedSupply} from "../helpers/ERC20PresetFixedSupply.sol";
 
 import {ActivityHelper} from "../helpers/ActivityHelper.sol";
+import {BottomUpBatchHelper} from "../helpers/BottomUpBatchHelper.sol";
 
 import "forge-std/console.sol";
 
@@ -498,16 +501,22 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         params.subnetL3.gateway.messenger().sendContractXnetMessage{value: params.amount}(crossMessage);
 
         // this would normally submitted by releayer. It call the subnet actor on the L2 network.
-        submitBottomUpCheckpoint(
-            callCreateBottomUpCheckpointFromChildSubnet(params.subnetL3.id, params.subnetL3.gateway),
-            params.subnetL3.subnetActor
+        BottomUpCheckpoint memory _checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+            params.subnetL3.id,
+            params.subnetL3.gateway
         );
+        submitBottomUpCheckpoint(_checkpoint, params.subnetL3.subnetActor);
+        IpcEnvelope[] memory _msgs = new IpcEnvelope[](1);
+        _msgs[0] = crossMessage;
+        execBottomUpMsgBatch(_checkpoint, _msgs, params.subnetL3.subnetActor);
 
         // create checkpoint in L2 and submit it to the root network (L2 subnet actor)
+        vm.recordLogs();
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
             params.subnet.id,
             params.subnet.gateway
         );
+        IpcEnvelope[] memory l2_batch = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
 
         // expected result top down message from root to L2. This is a response to the xnet call.
         IpcEnvelope memory resultMessage = crossMessage.createResultMsg(params.expectedOutcome, params.expectedRet);
@@ -515,6 +524,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
         submitBottomUpCheckpointAndExpectTopDownMessageEvent(
             checkpoint,
+            l2_batch,
             params.subnet.subnetActor,
             resultMessage,
             params.subnet.subnetActorAddr,
@@ -602,15 +612,25 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         // apply the cross message in the L3 subnet
         executeTopDownMsgs(msgs, params.subnetL3.gateway);
         // submit checkoint so the result message can be propagated to L2
-        submitBottomUpCheckpoint(
-            callCreateBottomUpCheckpointFromChildSubnet(params.subnetL3.id, params.subnetL3.gateway),
-            params.subnetL3.subnetActor
+        vm.recordLogs();
+        BottomUpCheckpoint memory l3_checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+            params.subnetL3.id,
+            params.subnetL3.gateway
         );
+        IpcEnvelope[] memory l3_batch = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
+        submitBottomUpCheckpoint(l3_checkpoint, params.subnetL3.subnetActor);
+        execBottomUpMsgBatch(l3_checkpoint, l3_batch, params.subnetL3.subnetActor);
+
         // submit checkoint so the result message can be propagated to root network
-        submitBottomUpCheckpoint(
-            callCreateBottomUpCheckpointFromChildSubnet(params.subnet.id, params.subnet.gateway),
-            params.subnet.subnetActor
+        vm.recordLogs();
+        BottomUpCheckpoint memory l2_checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+            params.subnet.id,
+            params.subnet.gateway
         );
+        IpcEnvelope[] memory l2_batch = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
+        submitBottomUpCheckpoint(l2_checkpoint, params.subnet.subnetActor);
+        execBottomUpMsgBatch(l2_checkpoint, l2_batch, params.subnet.subnetActor);
+
         assertTrue(params.caller.hasResult(), "missing result");
         assertTrue(params.caller.result().outcome == params.expectedOutcome, "wrong result outcome");
         assertTrue(keccak256(params.caller.result().ret) == keccak256(params.expectedRet), "wrong result outcome");
@@ -653,6 +673,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         subnetL3s[0].gateway.messenger().sendContractXnetMessage{value: amount}(crossMessage);
 
         // submit the checkpoint from L3-0 to L2
+        vm.recordLogs();
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
             subnetL3s[0].id,
             subnetL3s[0].gateway
@@ -661,6 +682,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         // submit the checkpoint in L2 produces top down message to L3-1
         submitBottomUpCheckpointAndExpectTopDownMessageEvent(
             checkpoint,
+            getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs()),
             subnetL3s[0].subnetActor,
             crossMessage,
             subnetL3s[1].subnetActorAddr,
@@ -674,10 +696,8 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         executeTopDownMsgs(msgs, subnetL3s[1].gateway);
 
         // submit the checkpoint from L3-1 to L2 for result propagation
-        BottomUpCheckpoint memory resultCheckpoint = callCreateBottomUpCheckpointFromChildSubnet(
-            subnetL3s[1].id,
-            subnetL3s[1].gateway
-        );
+        vm.recordLogs();
+        checkpoint = callCreateBottomUpCheckpointFromChildSubnet(subnetL3s[1].id, subnetL3s[1].gateway);
 
         // expected result top down message from L2 to L3. This is a response to the xnet call.
         IpcEnvelope memory resultMessage = crossMessage.createResultMsg(OutcomeType.Ok, abi.encode(EMPTY_BYTES));
@@ -685,7 +705,8 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
         // submit the checkpoint in L2 produces top down message to L3-1
         submitBottomUpCheckpointAndExpectTopDownMessageEvent(
-            resultCheckpoint,
+            checkpoint,
+            getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs()),
             subnetL3s[1].subnetActor,
             resultMessage,
             subnetL3s[0].subnetActorAddr,
@@ -789,7 +810,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             blockHeight: batch.blockHeight,
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
-            msgs: batch.msgs,
+            msgs: BottomUpBatchHelper.makeCommitment(batch.msgs),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
@@ -798,6 +819,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             checkpoint,
             membershipRoot,
             weights[0] + weights[1] + weights[2],
+            batch.msgs,
             ActivityHelper.dummyActivityRollup()
         );
         vm.stopPrank();
@@ -823,7 +845,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             blockHeight: e,
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
-            msgs: msgs,
+            msgs: BottomUpBatchHelper.makeCommitment(msgs),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
@@ -832,6 +854,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             checkpoint,
             membershipRoot,
             weights[0] + weights[1] + weights[2],
+            BottomUpBatchHelper.makeEmptyBatch(),
             ActivityHelper.dummyActivityRollup()
         );
         vm.stopPrank();
@@ -866,6 +889,21 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         return (parentValidators, parentSignatures);
     }
 
+    function execBottomUpMsgBatch(
+        BottomUpCheckpoint memory checkpoint,
+        IpcEnvelope[] memory msgs,
+        SubnetActorDiamond sa
+    ) internal {
+        BottomUpBatch.Inclusion[] memory inclusions = BottomUpBatchHelper.makeInclusions(msgs);
+
+        SubnetActorCheckpointingFacet checkpointer = sa.checkpointer();
+        vm.startPrank(address(sa));
+
+        checkpointer.execBottomUpMsgBatch(checkpoint.blockHeight, inclusions);
+
+        vm.stopPrank();
+    }
+
     function submitBottomUpCheckpoint(BottomUpCheckpoint memory checkpoint, SubnetActorDiamond sa) internal {
         (address[] memory parentValidators, bytes[] memory parentSignatures) = prepareValidatorsSignatures(
             checkpoint,
@@ -876,6 +914,35 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
         vm.startPrank(address(sa));
         checkpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
+        vm.stopPrank();
+    }
+
+    function submitBottomUpCheckpointAndExpectTopDownMessageEvent(
+        BottomUpCheckpoint memory checkpoint,
+        IpcEnvelope[] memory msgBatch,
+        SubnetActorDiamond subnetActor,
+        IpcEnvelope memory expectedMessage,
+        address expectedSubnetAddr,
+        address expectedGatewayAddr
+    ) internal {
+        (address[] memory parentValidators, bytes[] memory parentSignatures) = prepareValidatorsSignatures(
+            checkpoint,
+            subnetActor
+        );
+
+        SubnetActorCheckpointingFacet checkpointer = subnetActor.checkpointer();
+
+        vm.startPrank(address(subnetActor));
+        checkpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
+        vm.expectEmit(true, true, true, true, expectedGatewayAddr);
+        emit LibGateway.NewTopDownMessage({
+            subnet: expectedSubnetAddr,
+            message: expectedMessage,
+            id: expectedMessage.toTracingId()
+        });
+        BottomUpBatch.Inclusion[] memory inclusions = BottomUpBatchHelper.makeInclusions(msgBatch);
+        checkpointer.execBottomUpMsgBatch(checkpoint.blockHeight, inclusions);
+
         vm.stopPrank();
     }
 
@@ -927,6 +994,17 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
                 value: original.value,
                 message: original.message
             });
+    }
+
+    function getBottomUpBatchRecordedFromLogs(Vm.Log[] memory logs) internal pure returns (IpcEnvelope[] memory) {
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == BottomUpBatchRecorded.selector) {
+                (, IpcEnvelope[] memory msgs) = abi.decode(logs[i].data, (uint64, IpcEnvelope[]));
+                return msgs;
+            }
+        }
+
+        return new IpcEnvelope[](0);
     }
 
     function printActors() internal view {

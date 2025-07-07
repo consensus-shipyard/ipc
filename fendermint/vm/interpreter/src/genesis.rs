@@ -474,6 +474,7 @@ impl<'a> GenesisBuilder<'a> {
             ipc_params: genesis.ipc.as_ref(),
             chain_id: out.chain_id,
             hardhat: &self.hardhat,
+            deployer_addr: genesis.ipc_contracts_owner,
         };
 
         deploy_contracts(
@@ -495,6 +496,7 @@ struct DeployConfig<'a> {
     ipc_params: Option<&'a IpcParams>,
     chain_id: ChainID,
     hardhat: &'a Hardhat,
+    deployer_addr: ethers::types::Address,
 }
 
 fn deploy_contracts(
@@ -505,8 +507,11 @@ fn deploy_contracts(
     state: &mut FvmGenesisState<MemoryBlockstore>,
     config: DeployConfig,
 ) -> anyhow::Result<()> {
-    let mut deployer =
-        ContractDeployer::<MemoryBlockstore>::new(config.hardhat, top_level_contracts);
+    let mut deployer = ContractDeployer::<MemoryBlockstore>::new(
+        config.hardhat,
+        top_level_contracts,
+        config.deployer_addr,
+    );
 
     // Deploy Ethereum libraries.
     for (lib_src, lib_name) in ipc_contracts {
@@ -588,6 +593,7 @@ struct ContractDeployer<'a, DB> {
     top_contracts: &'a EthContractMap,
     // Assign dynamic ID addresses to libraries, but use fixed addresses for the top level contracts.
     lib_addrs: HashMap<FQN, et::Address>,
+    deployer_addr: ethers::types::Address,
     phantom_db: PhantomData<DB>,
 }
 
@@ -595,10 +601,15 @@ impl<'a, DB> ContractDeployer<'a, DB>
 where
     DB: Blockstore + 'static + Clone,
 {
-    pub fn new(hardhat: &'a Hardhat, top_contracts: &'a EthContractMap) -> Self {
+    pub fn new(
+        hardhat: &'a Hardhat,
+        top_contracts: &'a EthContractMap,
+        deployer_addr: ethers::types::Address,
+    ) -> Self {
         Self {
             hardhat,
             top_contracts,
+            deployer_addr,
             lib_addrs: Default::default(),
             phantom_db: PhantomData,
         }
@@ -620,7 +631,7 @@ where
             .with_context(|| format!("failed to load library bytecode {fqn}"))?;
 
         let eth_addr = state
-            .create_evm_actor(*next_id, artifact.bytecode)
+            .create_evm_actor(*next_id, artifact.bytecode, self.deployer_addr)
             .with_context(|| format!("failed to create library actor {fqn}"))?;
 
         let id_addr = et::Address::from(EthAddress::from_id(*next_id).0);
@@ -668,6 +679,7 @@ where
                 &contract.abi,
                 artifact.bytecode,
                 constructor_params,
+                self.deployer_addr,
             )
             .with_context(|| format!("failed to create {contract_name} actor"))?;
 

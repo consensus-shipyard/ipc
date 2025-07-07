@@ -21,9 +21,8 @@ const MANIFEST: &str = "standalone.yaml";
 async fn test_sent_tx_found_in_mempool() -> Result<(), anyhow::Error> {
     let (testnet, cleanup) = make_testnet(MANIFEST, |manifest| {
         // Slow down consensus to where we can see the effect of the transaction not being found by Ethereum hash.
-        if let Rootnet::New { ref mut env, .. } = manifest.rootnet {
-            env.insert("CMT_CONSENSUS_TIMEOUT_COMMIT".into(), "10s".into());
-        };
+        let Rootnet::New { ref mut env, .. } = &mut manifest.rootnet;
+        env.insert("CMT_CONSENSUS_TIMEOUT_COMMIT".into(), "10s".into());
     })
     .await?;
 

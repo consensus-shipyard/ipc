@@ -21,8 +21,11 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
         bytes32 currentSubnetHash;
         /// @notice Address of the IPC gateway for the subnet
         address ipcGatewayAddr;
-        /// @notice Maximum number of messages per batch
-        uint64 maxMsgsPerBottomUpBatch;
+        /// @notice Genesis address assigned as owner of all IPC diamond contracts deployed on this subnet (child) chain.
+        /// @dev    This is only the initial (genesis) owner; ownership can be transferred or updated later via on-chain transaction.
+        ///         The address lives on the subnet network and controls contract‐level administrative functions
+        ///         (e.g. pausing, upgrading, facet management) for every IPC diamond contract within the subnet.
+        address genesisSubnetIpcContractsOwner;
         /// @notice majority percentage value (must be greater than or equal to 51)
         uint8 majorityPercentage;
         /// @notice Power scale determining the accuracy of the power scale (in number of decimals from whole FIL)

@@ -2,14 +2,15 @@
 pragma solidity ^0.8.23;
 
 import {GatewayActorModifiers} from "../../lib/LibGatewayActorStorage.sol";
-import {BottomUpCheckpoint} from "../../structs/CrossNet.sol";
+import {BottomUpCheckpoint, IpcEnvelope} from "../../structs/CrossNet.sol";
+import {BottomUpBatchRecorded} from "../../structs/BottomUpBatch.sol";
 import {LibGateway} from "../../lib/LibGateway.sol";
 import {LibQuorum} from "../../lib/LibQuorum.sol";
 import {Subnet} from "../../structs/Subnet.sol";
 import {QuorumObjKind} from "../../structs/Quorum.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
-import {InvalidBatchSource, NotEnoughBalance, MaxMsgsPerBatchExceeded, InvalidCheckpointSource, CheckpointAlreadyExists} from "../../errors/IPCErrors.sol";
+import {InvalidBatchSource, NotEnoughBalance, InvalidCheckpointSource, CheckpointAlreadyExists} from "../../errors/IPCErrors.sol";
 import {NotRegisteredSubnet, SubnetNotActive, SubnetNotFound, InvalidSubnet, CheckpointNotCreated} from "../../errors/IPCErrors.sol";
 import {BatchNotCreated, InvalidBatchEpoch, BatchAlreadyExists, NotEnoughSubnetCircSupply, InvalidCheckpointEpoch} from "../../errors/IPCErrors.sol";
 
@@ -43,22 +44,31 @@ contract CheckpointingFacet is GatewayActorModifiers {
             revert InvalidSubnet();
         }
 
-        LibGateway.checkMsgLength(checkpoint.msgs);
-
-        execBottomUpMsgs(checkpoint.msgs, subnet);
-
         emit CheckpointCommitted({subnet: checkpoint.subnetID.getAddress(), subnetHeight: checkpoint.blockHeight});
+    }
+
+    /// @notice submit a verified batch of committed cross-net messages for execution.
+    /// @param msgs The batch of messages to be executed.
+    function execBottomUpMsgBatch(IpcEnvelope[] calldata msgs) external {
+        (bool subnetExists, Subnet storage subnet) = LibGateway.getSubnet(msg.sender);
+        if (!subnetExists) {
+            revert SubnetNotFound();
+        }
+
+        _execBottomUpMsgBatch(msgs, subnet);
     }
 
     /// @notice creates a new bottom-up checkpoint
     /// @param checkpoint - a bottom-up checkpoint
     /// @param membershipRootHash - a root hash of the Merkle tree built from the validator public keys and their weight
     /// @param membershipWeight - the total weight of the membership
+    /// @param msgs - the full messages batch
     /// @param activity - the full activity rollup
     function createBottomUpCheckpoint(
         BottomUpCheckpoint calldata checkpoint,
         bytes32 membershipRootHash,
         uint256 membershipWeight,
+        IpcEnvelope[] calldata msgs,
         FullActivityRollup calldata activity
     ) external systemActorOnly {
         if (LibGateway.bottomUpCheckpointExists(checkpoint.blockHeight)) {
@@ -76,6 +86,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
 
         LibGateway.storeBottomUpCheckpoint(checkpoint);
 
+        emit BottomUpBatchRecorded(uint64(checkpoint.blockHeight), msgs);
         emit ActivityRollupRecorded(uint64(checkpoint.blockHeight), activity);
     }
 
@@ -109,9 +120,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
         });
     }
 
-    /// @notice submit a batch of cross-net messages for execution.
-    /// @param msgs The batch of bottom-up cross-network messages to be executed.
-    function execBottomUpMsgs(IpcEnvelope[] calldata msgs, Subnet storage subnet) internal {
+    function _execBottomUpMsgBatch(IpcEnvelope[] calldata msgs, Subnet storage subnet) internal {
         uint256 totalValue;
         uint256 crossMsgLength = msgs.length;
 

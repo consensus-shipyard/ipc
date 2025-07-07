@@ -8,7 +8,6 @@ error CannotConfirmFutureChanges();
 error CannotReleaseZero();
 error CheckpointAlreadyExists();
 error BatchAlreadyExists();
-error MaxMsgsPerBatchExceeded();
 error QuorumAlreadyProcessed();
 error CheckpointNotCreated();
 error BottomUpCheckpointAlreadySubmitted();
@@ -21,7 +20,10 @@ error FailedRemoveIncompleteQuorum();
 error GatewayCannotBeZero();
 error InvalidActorAddress();
 error InvalidCheckpointEpoch();
-error CannotSubmitFutureCheckpoint();
+error BatchMsgAlreadyExecuted();
+error MissingBatchCommitment();
+error InvalidInclusionProof();
+error DuplicatedCheckpointHeight(uint64 height);
 error InvalidBatchEpoch();
 error InvalidCheckpointSource();
 error InvalidBatchSource();
@@ -85,6 +87,7 @@ error InvalidActivityProof();
 error NotOwner();
 error SignatureAddressesNotSorted();
 error DuplicateValidatorSignaturesFound();
+error MissingGenesisSubnetIpcContractsOwner();
 
 enum InvalidXnetMessageReason {
     Sender,

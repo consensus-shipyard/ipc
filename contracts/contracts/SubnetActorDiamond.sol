@@ -7,8 +7,7 @@ import {IDiamond} from "./interfaces/IDiamond.sol";
 import {IDiamondCut} from "./interfaces/IDiamondCut.sol";
 import {IDiamondLoupe} from "./interfaces/IDiamondLoupe.sol";
 import {IERC165} from "./interfaces/IERC165.sol";
-import {GatewayCannotBeZero, NotGateway, InvalidSubmissionPeriod, InvalidCollateral, InvalidMajorityPercentage, InvalidPowerScale} from "./errors/IPCErrors.sol";
-import {BATCH_PERIOD, MAX_MSGS_PER_BATCH} from "./structs/CrossNet.sol";
+import {GatewayCannotBeZero, NotGateway, InvalidSubmissionPeriod, InvalidCollateral, InvalidMajorityPercentage, InvalidPowerScale, MissingGenesisSubnetIpcContractsOwner} from "./errors/IPCErrors.sol";
 import {LibDiamond} from "./lib/LibDiamond.sol";
 import {PermissionMode, SubnetID, AssetKind, Asset} from "./structs/Subnet.sol";
 import {SubnetIDHelper} from "./lib/SubnetIDHelper.sol";
@@ -40,6 +39,11 @@ contract SubnetActorDiamond {
         SubnetID parentId;
         address validatorGater;
         address validatorRewarder;
+        /// @notice Genesis address assigned as owner of all IPC diamond contracts deployed on this subnet (child) chain.
+        /// @dev    This is only the initial (genesis) owner; ownership can be transferred or updated later via on-chain transaction.
+        ///         The address lives on the subnet network and controls contract‐level administrative functions
+        ///         (e.g. pausing, upgrading, facet management) for every IPC diamond contract within the subnet.
+        address genesisSubnetIpcContractsOwner;
     }
 
     constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params, address owner) {
@@ -58,6 +62,9 @@ contract SubnetActorDiamond {
         }
         if (params.powerScale > 18) {
             revert InvalidPowerScale();
+        }
+        if (params.genesisSubnetIpcContractsOwner == address(0)) {
+            revert MissingGenesisSubnetIpcContractsOwner();
         }
 
         params.supplySource.validate();
@@ -86,11 +93,7 @@ contract SubnetActorDiamond {
         s.powerScale = params.powerScale;
         s.currentSubnetHash = s.parentId.createSubnetId(address(this)).toHash();
         s.validatorSet.permissionMode = params.permissionMode;
-
-        // BottomUpMsgBatch config parameters.
-        // NOTE: Let's fix them for now, but we could make them configurable
-        // through the gateway constructor in the future.
-        s.maxMsgsPerBottomUpBatch = MAX_MSGS_PER_BATCH;
+        s.genesisSubnetIpcContractsOwner = params.genesisSubnetIpcContractsOwner;
 
         s.validatorSet.activeLimit = params.activeValidatorsLimit;
         // Start the next configuration number from 1, 0 is reserved for no change and the genesis membership

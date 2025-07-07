@@ -64,6 +64,7 @@ impl CreateSubnet {
                 collateral_source,
                 validator_gater,
                 validator_rewarder,
+                arguments.genesis_subnet_ipc_contracts_owner,
             )
             .await?;
 
@@ -185,4 +186,12 @@ pub struct CreateSubnetArgs {
         help = "The address of collateral source of a subnet on its parent subnet. None if kind is native"
     )]
     pub collateral_source_address: Option<String>,
+
+    #[arg(
+        long,
+        help = "Genesis address assigned as the initial owner of all IPC diamond contracts on this subnet chain. \
+This address lives on the subnet network and controls contract-level administrative functions (e.g. pausing, upgrading, facet management) \
+for every IPC diamond contract within the subnet. Ownership can be transferred later via an on-chain transaction."
+    )]
+    pub genesis_subnet_ipc_contracts_owner: ethers::types::Address,
 }

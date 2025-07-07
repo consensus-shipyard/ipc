@@ -28,6 +28,7 @@ prometheus_exporter = { workspace = true }
 prost = { workspace = true }
 rand_chacha = { workspace = true }
 serde = { workspace = true }
+toml = { workspace = true }
 serde_json = { workspace = true }
 serde_with = { workspace = true }
 tendermint = { workspace = true }
@@ -68,8 +69,8 @@ fendermint_vm_snapshot = { path = "../vm/snapshot" }
 fendermint_vm_topdown = { path = "../vm/topdown" }
 
 # .car file wrapped in a crate
-actors-builtin-car =  { path = "../actors-builtin-car"}
-actors-custom-car = { path = "../actors-custom-car"}
+actors-builtin-car = { path = "../actors-builtin-car" }
+actors-custom-car = { path = "../actors-custom-car" }
 
 
 fvm = { workspace = true }

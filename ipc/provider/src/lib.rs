@@ -258,6 +258,7 @@ impl IpcProvider {
         collateral_source: Asset,
         validator_gater: Address,
         validator_rewarder: Address,
+        subnet_ipc_contracts_owner: ethers::types::Address,
     ) -> anyhow::Result<Address> {
         let conn = self.get_connection(&parent)?;
 
@@ -278,6 +279,7 @@ impl IpcProvider {
             collateral_source,
             validator_gater,
             validator_rewarder,
+            genesis_subnet_ipc_contracts_owner: subnet_ipc_contracts_owner,
         };
 
         conn.manager()
@@ -398,6 +400,34 @@ impl IpcProvider {
         let sender = self.check_sender(subnet_config, from)?;
 
         conn.manager().claim_collateral(subnet, sender).await
+    }
+
+    pub async fn approve_subnet(
+        &mut self,
+        subnet: SubnetID,
+        from: Option<Address>,
+    ) -> anyhow::Result<()> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = self.get_connection(&parent)?;
+
+        let subnet_config = conn.subnet();
+        let sender = self.check_sender(subnet_config, from)?;
+
+        conn.manager().approve_subnet(subnet, sender).await
+    }
+
+    pub async fn reject_approved_subnet(
+        &mut self,
+        subnet: SubnetID,
+        from: Option<Address>,
+    ) -> anyhow::Result<()> {
+        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
+        let conn = self.get_connection(&parent)?;
+
+        let subnet_config = conn.subnet();
+        let sender = self.check_sender(subnet_config, from)?;
+
+        conn.manager().reject_approved_subnet(subnet, sender).await
     }
 
     pub async fn kill_subnet(

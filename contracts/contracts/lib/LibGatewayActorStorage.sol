@@ -24,8 +24,6 @@ struct GatewayActorStorage {
     uint64 appliedTopDownNonce;
     /// @notice Number of active subnets spawned from this one
     uint64 totalSubnets;
-    /// @notice Maximum number of messages per batch
-    uint64 maxMsgsPerBottomUpBatch;
     /// @notice majority percentage value (must be greater than or equal to 51)
     uint8 majorityPercentage;
     /// @notice Code commit SHA where this contract is from
@@ -75,6 +73,8 @@ struct GatewayActorStorage {
     mapping(uint256 => BottomUpMsgBatch) bottomUpMsgBatches;
     /// @notice Keys of the registered subnets. Useful to iterate through them
     EnumerableSet.Bytes32Set subnetKeys;
+    /// @notice List of approved subnet that can join the network
+    EnumerableSet.AddressSet approvedSubnets;
 }
 
 library LibGatewayActorStorage {

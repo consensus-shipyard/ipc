@@ -30,7 +30,7 @@ use std::{fmt::Debug, path::PathBuf, sync::Arc};
 
 use anyhow::{bail, Context};
 use clap::Parser;
-use common::{TestMiddleware, ENOUGH_GAS};
+use common::{TestMiddleware, MIN_GAS};
 use ethers::providers::StreamExt;
 use ethers::{
     prelude::{abigen, ContractFactory},
@@ -49,7 +49,7 @@ use tracing::Level;
 
 use crate::common::{
     adjust_provider, make_middleware, prepare_call, request, send_transaction, TestAccount,
-    TestContractCall,
+    TestContractCall, MIN_GAS_PRICE,
 };
 
 mod common;
@@ -603,7 +603,9 @@ where
     // Send a SimpleCoin transaction to get an event emitted.
     // Not using `prepare_call` here because `send_transaction` will fill the missing fields.
     let coin_send_value = U256::from(100);
-    let coin_send: TestContractCall<_, bool> = contract.send_coin(to.eth_addr, coin_send_value);
+    let mut coin_send: TestContractCall<_, bool> = contract.send_coin(to.eth_addr, coin_send_value);
+
+    coin_send = coin_send.gas(MIN_GAS);
 
     // Take note of the inputs to ascertain it's the same we get back.
     let tx_input = match coin_send.tx {
@@ -629,6 +631,7 @@ where
             _ => false,
         },
     )?;
+    tracing::info!(tx_hash = ?receipt.transaction_hash, "obtained coin sent txn by hash");
 
     request(
         "eth_getLogs",
@@ -636,6 +639,7 @@ where
             .await,
         |logs| *logs == receipt.logs,
     )?;
+    tracing::info!(tx_hash = ?receipt.transaction_hash, "obtained coin sent txn logs");
 
     // Check that requesting logs with higher-than-highest height does not fail.
     request(
@@ -706,11 +710,16 @@ where
         })?;
     }
 
+    tracing::info!("ready to check legacy txn");
+
     // Check legacy transactions
     // Set up the transaction details for a legacy transaction
-    let tx = TransactionRequest::new()
+    let mut tx = TransactionRequest::new()
         .to(to.eth_addr) // Replace with recipient address
         .value(U256::from(1u64)); // Gas limit for standard ETH transfer
+
+    tx = tx.gas(MIN_GAS);
+    tx = tx.gas_price(MIN_GAS_PRICE);
 
     // Send the transaction
     let pending_tx = mw.send_transaction(tx, None).await?;
@@ -786,11 +795,7 @@ where
     let tx = Eip1559TransactionRequest::new().to(to.eth_addr).value(1000);
 
     // Set the gas based on the testkit so it doesn't trigger estimation.
-    let mut tx = tx
-        .gas(ENOUGH_GAS)
-        .max_fee_per_gas(0)
-        .max_priority_fee_per_gas(0)
-        .into();
+    let mut tx = tx.gas(MIN_GAS).into();
 
     // Fill in the missing fields like `from` and `nonce` (which involves querying the API).
     mw.fill_transaction(&mut tx, None).await?;

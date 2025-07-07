@@ -31,6 +31,7 @@ import {L2GatewayActorDiamond, L1GatewayActorDiamond} from "../IntegrationTestPr
 import {TestUtils, MockIpcContract, MockIpcContractPayable, MockIpcContractRevert, MockIpcContractFallback} from "../helpers/TestUtils.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
 import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
+import {BottomUpBatchRecorded, BottomUpBatch} from "../../contracts/structs/BottomUpBatch.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ERC20PresetFixedSupply} from "../helpers/ERC20PresetFixedSupply.sol";
@@ -47,6 +48,7 @@ import "forge-std/console.sol";
 
 import {FullActivityRollup, Consensus} from "../../contracts/structs/Activity.sol";
 import {ActivityHelper} from "../helpers/ActivityHelper.sol";
+import {BottomUpBatchHelper} from "../helpers/BottomUpBatchHelper.sol";
 
 contract MultiSubnetTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
@@ -380,12 +382,14 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.prank(caller);
         manager.release{value: releaseAmount}(FvmAddressHelper.from(address(recipient)));
 
+        vm.recordLogs();
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
             deflationaryTokenSubnet.id,
             deflationaryTokenSubnet.gateway
         );
-
+        IpcEnvelope[] memory msgs = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
         submitBottomUpCheckpoint(checkpoint, deflationaryTokenSubnet.subnetActor);
+        execBottomUpMsgBatch(checkpoint, msgs, deflationaryTokenSubnet.subnetActor);
 
         assertEq(deflationaryToken.balanceOf(recipient), releaseAmount / 2);
         assertEq(deflationaryToken.balanceOf(rootSubnet.gatewayAddr), 0);
@@ -424,16 +428,44 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.prank(caller);
         manager.release{value: releaseAmount}(FvmAddressHelper.from(address(recipient)));
 
+        vm.recordLogs();
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
             inflationaryTokenSubnet.id,
             inflationaryTokenSubnet.gateway
         );
-
+        IpcEnvelope[] memory msgs = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
         submitBottomUpCheckpoint(checkpoint, inflationaryTokenSubnet.subnetActor);
+        execBottomUpMsgBatch(checkpoint, msgs, inflationaryTokenSubnet.subnetActor);
 
         assertEq(inflationaryToken.balanceOf(recipient), releaseAmount * 2);
         assertEq(inflationaryToken.balanceOf(rootSubnet.gatewayAddr), 0);
         assertEq(getSubnetCircSupplyGW(inflationaryTokenSubnet.id, rootSubnet.gateway), 0);
+    }
+
+    function getBottomUpBatchRecordedFromLogs(Vm.Log[] memory logs) internal pure returns (IpcEnvelope[] memory) {
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == BottomUpBatchRecorded.selector) {
+                (, IpcEnvelope[] memory msgs) = abi.decode(logs[i].data, (uint64, IpcEnvelope[]));
+                return msgs;
+            }
+        }
+
+        return new IpcEnvelope[](0);
+    }
+
+    function execBottomUpMsgBatch(
+        BottomUpCheckpoint memory checkpoint,
+        IpcEnvelope[] memory msgs,
+        SubnetActorDiamond sa
+    ) internal {
+        BottomUpBatch.Inclusion[] memory inclusions = BottomUpBatchHelper.makeInclusions(msgs);
+
+        SubnetActorCheckpointingFacet checkpointer = sa.checkpointer();
+        vm.startPrank(address(sa));
+
+        checkpointer.execBottomUpMsgBatch(checkpoint.blockHeight, inclusions);
+
+        vm.stopPrank();
     }
 
     function testMultiSubnet_NilErc20_ReleaseFromChildToParent() public {
@@ -607,12 +639,15 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.prank(caller);
         manager.release{value: amount}(FvmAddressHelper.from(address(recipient)));
 
+        vm.recordLogs();
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnet.id,
             nativeSubnet.gateway
         );
-
+        IpcEnvelope[] memory msgs = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
         submitBottomUpCheckpoint(checkpoint, nativeSubnet.subnetActor);
+        execBottomUpMsgBatch(checkpoint, msgs, nativeSubnet.subnetActor);
+
         assertEq(recipient.balance, amount);
     }
 
@@ -692,6 +727,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         );
 
         submitBottomUpCheckpoint(checkpoint, nativeSubnet.subnetActor);
+        execBottomUpMsgBatch(checkpoint, crossMsgs, nativeSubnet.subnetActor);
 
         // caller's balance should receive the refund
         assertEq(caller.balance, 1 ether);
@@ -737,8 +773,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             nativeSubnet.gateway,
             crossMsgs
         );
-
         submitBottomUpCheckpoint(checkpoint, nativeSubnet.subnetActor);
+        execBottomUpMsgBatch(checkpoint, crossMsgs, nativeSubnet.subnetActor);
 
         // caller's balance should receive the refund
         assertEq(caller.balance, 1 ether);
@@ -789,12 +825,14 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.prank(caller);
         manager.release{value: amount}(FvmAddressHelper.from(address(recipient)));
 
+        vm.recordLogs();
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnet.id,
             nativeSubnet.gateway
         );
-
+        IpcEnvelope[] memory msgs = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
         submitBottomUpCheckpoint(checkpoint, nativeSubnet.subnetActor);
+        execBottomUpMsgBatch(checkpoint, msgs, nativeSubnet.subnetActor);
 
         assertEq(recipient.balance, amount);
     }
@@ -886,6 +924,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         );
 
         submitBottomUpCheckpoint(checkpoint, tokenSubnet.subnetActor);
+        execBottomUpMsgBatch(checkpoint, crossMsgs, tokenSubnet.subnetActor);
 
         // fund rejected, so fund should be unlocked
         assertEq(token.balanceOf(caller), amount);
@@ -932,6 +971,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         );
 
         submitBottomUpCheckpoint(checkpoint, tokenSubnet.subnetActor);
+        execBottomUpMsgBatch(checkpoint, crossMsgs, tokenSubnet.subnetActor);
 
         // fund rejected, so fund should be unlocked
         assertEq(token.balanceOf(caller), amount);
@@ -959,12 +999,14 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.prank(caller);
         manager.release{value: amount}(FvmAddressHelper.from(address(recipient)));
 
+        vm.recordLogs();
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
             tokenSubnet.id,
             tokenSubnet.gateway
         );
-
+        IpcEnvelope[] memory msgs = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
         submitBottomUpCheckpoint(checkpoint, tokenSubnet.subnetActor);
+        execBottomUpMsgBatch(checkpoint, msgs, tokenSubnet.subnetActor);
 
         assertEq(token.balanceOf(recipient), amount);
     }
@@ -991,12 +1033,15 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.prank(caller);
         manager.release{value: amount}(FvmAddressHelper.from(address(recipient)));
 
+        vm.recordLogs();
         BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
             tokenSubnet.id,
             tokenSubnet.gateway
         );
-
+        IpcEnvelope[] memory msgs = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
         submitBottomUpCheckpoint(checkpoint, tokenSubnet.subnetActor);
+        execBottomUpMsgBatch(checkpoint, msgs, tokenSubnet.subnetActor);
+
         assertEq(token.balanceOf(recipient), amount);
         assertEq(recipient.balance, 0);
     }
@@ -1354,7 +1399,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             blockHeight: batch.blockHeight,
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
-            msgs: batch.msgs,
+            msgs: BottomUpBatchHelper.makeCommitment(batch.msgs),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
@@ -1363,6 +1408,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             checkpoint,
             membershipRoot,
             weights[0] + weights[1] + weights[2],
+            batch.msgs,
             ActivityHelper.dummyActivityRollup()
         );
         vm.stopPrank();
@@ -1389,7 +1435,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             blockHeight: e,
             blockHash: keccak256("block1"),
             nextConfigurationNumber: 0,
-            msgs: msgs,
+            msgs: BottomUpBatchHelper.makeCommitment(msgs),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
 
@@ -1398,6 +1444,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             checkpoint,
             membershipRoot,
             weights[0] + weights[1] + weights[2],
+            BottomUpBatchHelper.makeEmptyBatch(),
             ActivityHelper.dummyActivityRollup()
         );
         vm.stopPrank();

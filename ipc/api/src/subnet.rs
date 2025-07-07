@@ -89,6 +89,7 @@ pub struct ConstructParams {
     pub collateral_source: Asset,
     pub validator_gater: Address,
     pub validator_rewarder: Address,
+    pub genesis_subnet_ipc_contracts_owner: ethers::types::Address,
 }
 
 /// Consensus types supported by hierarchical consensus

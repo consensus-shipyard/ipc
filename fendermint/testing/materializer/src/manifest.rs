@@ -101,11 +101,10 @@ impl Manifest {
     }
 
     fn load_all_fendermint_configs(&mut self, base_dir: &Path) -> Result<(), std::io::Error> {
-        // rootnet
-        if let Rootnet::New { nodes, .. } = &mut self.rootnet {
-            for node in nodes.values_mut() {
-                node.load_fendermint_config(base_dir)?;
-            }
+        let Rootnet::New { nodes, .. } = &mut self.rootnet;
+
+        for node in nodes.values_mut() {
+            node.load_fendermint_config(base_dir)?;
         }
 
         // subnets
@@ -145,6 +144,7 @@ pub enum IpcDeployment {
     Existing {
         gateway: ethers::core::types::Address,
         registry: ethers::core::types::Address,
+        deployer: AccountId,
     },
 }
 
@@ -154,18 +154,16 @@ pub enum IpcDeployment {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "type")]
 pub enum Rootnet {
-    /// Existing L1 running outside our control.
-    ///
-    /// This implies using some sort of Faucet to get balances for the accounts.
-    External {
-        /// We need to know the ID of the chain to be able to create a `SubnetID` for it.
-        chain_id: u64,
-        /// Indicate whether we have to (re)deploy the IPC contract or we can use an existing one.
-        deployment: IpcDeployment,
-        /// Addresses of JSON-RPC endpoints on the external L1.
-        urls: Vec<Url>,
-    },
-
+    // TODO Karel - make this code functional again. We currently don't use it and the new deployment does not work.
+    // We will want to support Anvil as a rootnet instead of this.
+    // External {
+    //     /// We need to know the ID of the chain to be able to create a `SubnetID` for it.
+    //     chain_id: u64,
+    //     /// Indicate whether we have to (re)deploy the IPC contract or we can use an existing one.
+    //     deployment: IpcDeployment,
+    //     /// Addresses of JSON-RPC endpoints on the external L1.
+    //     urls: Vec<Url>,
+    // },
     /// Provision a new chain to run the L1.
     ///
     /// It is assumed that a newly provisioned chain will have built-in support for IPC,
@@ -182,6 +180,8 @@ pub enum Rootnet {
         /// Custom env vars to pass on to the nodes.
         #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
         env: EnvMap,
+        /// IPC contracts owner
+        ipc_contracts_owner: AccountId,
     },
 }
 

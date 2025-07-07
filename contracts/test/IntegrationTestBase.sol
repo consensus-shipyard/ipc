@@ -45,10 +45,11 @@ import {SelectorLibrary} from "./helpers/SelectorLibrary.sol";
 import {GatewayFacetsHelper} from "./helpers/GatewayFacetsHelper.sol";
 import {SubnetActorFacetsHelper} from "./helpers/SubnetActorFacetsHelper.sol";
 import {DiamondFacetsHelper} from "./helpers/DiamondFacetsHelper.sol";
-
 import {FullActivityRollup, CompressedActivityRollup, Consensus} from "../contracts/structs/Activity.sol";
+import {BottomUpBatch} from "../contracts/structs/BottomUpBatch.sol";
 import {ValidatorRewarderMap} from "../contracts/examples/ValidatorRewarderMap.sol";
 import {SubnetActorActivityFacet} from "../contracts/subnet/SubnetActorActivityFacet.sol";
+import {BottomUpBatchHelper} from "./helpers/BottomUpBatchHelper.sol";
 
 struct TestSubnetDefinition {
     GatewayDiamond gateway;
@@ -212,7 +213,8 @@ contract TestSubnetActor is Test, TestParams {
             supplySource: source,
             collateralSource: AssetHelper.native(),
             validatorGater: address(0),
-            validatorRewarder: address(0)
+            validatorRewarder: address(0),
+            genesisSubnetIpcContractsOwner: address(1)
         });
         return params;
     }
@@ -237,7 +239,8 @@ contract TestSubnetActor is Test, TestParams {
             supplySource: source,
             collateralSource: collateral,
             validatorGater: address(0),
-            validatorRewarder: address(0)
+            validatorRewarder: address(0),
+            genesisSubnetIpcContractsOwner: address(1)
         });
         return params;
     }
@@ -272,7 +275,8 @@ contract TestSubnetActor is Test, TestParams {
             supplySource: Asset({kind: AssetKind.ERC20, tokenAddress: tokenAddress}),
             collateralSource: AssetHelper.native(),
             validatorGater: address(0),
-            validatorRewarder: address(0)
+            validatorRewarder: address(0),
+            genesisSubnetIpcContractsOwner: address(1)
         });
         return params;
     }
@@ -309,6 +313,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         );
 
         saDiamond = createSubnetActor(saConstructorParams);
+        gatewayDiamond.manager().approveSubnet(address(saDiamond));
 
         addValidator(TOPDOWN_VALIDATOR_1, 100);
     }
@@ -576,6 +581,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         );
         SubnetActorDiamond diamond = new SubnetActorDiamond(diamondCut, params, address(this));
 
+        approveSubnet(address(diamond), false);
+
         return diamond;
     }
 
@@ -625,7 +632,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             supplySource: AssetHelper.native(),
             collateralSource: AssetHelper.native(),
             validatorGater: address(0),
-            validatorRewarder: address(new ValidatorRewarderMap())
+            validatorRewarder: address(new ValidatorRewarderMap()),
+            genesisSubnetIpcContractsOwner: address(1)
         });
         saDiamond = createSubnetActor(params);
     }
@@ -657,7 +665,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             supplySource: AssetHelper.native(),
             collateralSource: AssetHelper.native(),
             validatorGater: _validatorGater,
-            validatorRewarder: address(new ValidatorRewarderMap())
+            validatorRewarder: address(new ValidatorRewarderMap()),
+            genesisSubnetIpcContractsOwner: address(1)
         });
         saDiamond = createSubnetActor(params);
     }
@@ -696,6 +705,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(gw);
 
         SubnetActorDiamond d = new SubnetActorDiamond(diamondCut, params, address(this));
+        approveSubnet(address(d), false);
 
         return d;
     }
@@ -934,7 +944,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             blockHeight: h,
             blockHash: keccak256(abi.encode(h)),
             nextConfigurationNumber: nextConfigNum - 1,
-            msgs: new IpcEnvelope[](0),
+            msgs: BottomUpBatchHelper.makeCommitment(BottomUpBatchHelper.makeEmptyBatch()),
             activity: CompressedActivityRollup({
                 consensus: Consensus.CompressedSummary({
                     stats: Consensus.AggregatedStats({
@@ -962,6 +972,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     function confirmChange(
         address[] memory validators,
         uint256[] memory privKeys,
+        BottomUpBatch.Commitment memory commitment,
         CompressedActivityRollup memory activities
     ) internal {
         uint256 n = validators.length;
@@ -977,7 +988,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             blockHeight: h,
             blockHash: keccak256(abi.encode(h)),
             nextConfigurationNumber: nextConfigNum - 1,
-            msgs: new IpcEnvelope[](0),
+            msgs: commitment,
             activity: activities
         });
 
@@ -1014,10 +1025,37 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         require(stakedAfter == stakedBefore + stakeAmount, "unexpected stake");
     }
 
+    function approveSubnet(address subnet, bool shouldResumePrank) internal {
+        address previousPrank = msg.sender;
+        (bool isInPrank, ) = address(vm).call(abi.encodeWithSelector(vm.stopPrank.selector));
+
+        vm.prank(gatewayDiamond.ownership().owner());
+        gatewayDiamond.manager().approveSubnet(subnet);
+
+        if (shouldResumePrank && isInPrank) {
+            vm.prank(previousPrank);
+        }
+    }
+
+    function approveSubnet(GatewayManagerFacet manager, address subnet, bool shouldResumePrank) internal {
+        address previousPrank = msg.sender;
+        (bool isInPrank, ) = address(vm).call(abi.encodeWithSelector(vm.stopPrank.selector));
+
+        vm.prank(gatewayDiamond.ownership().owner());
+        manager.approveSubnet(subnet);
+
+        if (shouldResumePrank && isInPrank) {
+            vm.prank(previousPrank);
+        }
+    }
+
     function registerSubnetGW(uint256 collateral, address subnetAddress, GatewayDiamond gw) public {
         GatewayManagerFacet manager = gw.manager();
         GatewayGetterFacet getter = gw.getter();
 
+        approveSubnet(manager, subnetAddress, false);
+
+        vm.prank(subnetAddress);
         manager.register{value: collateral}(0, collateral);
 
         (SubnetID memory id, uint256 stake, uint256 topDownNonce, , uint256 circSupply) = getSubnetGW(

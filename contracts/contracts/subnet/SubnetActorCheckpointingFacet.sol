@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {InvalidBatchEpoch, MaxMsgsPerBatchExceeded, InvalidSignatureErr, DuplicateValidatorSignaturesFound, SignatureAddressesNotSorted, BottomUpCheckpointAlreadySubmitted, CannotSubmitFutureCheckpoint, InvalidCheckpointEpoch} from "../errors/IPCErrors.sol";
+import {InvalidBatchEpoch, InvalidSignatureErr, DuplicateValidatorSignaturesFound, SignatureAddressesNotSorted, BottomUpCheckpointAlreadySubmitted, InvalidCheckpointEpoch} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {BottomUpCheckpoint, BottomUpMsgBatch, BottomUpMsgBatchInfo} from "../structs/CrossNet.sol";
-import {Validator, ValidatorSet} from "../structs/Subnet.sol";
+import {Validator, ValidatorSet, SubnetID} from "../structs/Subnet.sol";
 import {MultisignatureChecker} from "../lib/LibMultisignatureChecker.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
 import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
@@ -14,6 +14,9 @@ import {LibSubnetActor} from "../lib/LibSubnetActor.sol";
 import {Pausable} from "../lib/LibPausable.sol";
 import {LibGateway} from "../lib/LibGateway.sol";
 import {LibActivity} from "../lib/LibActivity.sol";
+import {LibBottomUpBatch} from "../lib/LibBottomUpBatch.sol";
+import {BottomUpBatch} from "../structs/BottomUpBatch.sol";
+import {IpcEnvelope} from "../structs/CrossNet.sol";
 
 contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard, Pausable {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -46,12 +49,13 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         // Commit in gateway to distribute rewards
         IGateway(s.ipcGatewayAddr).commitCheckpoint(checkpoint);
 
+        if (checkpoint.msgs.totalNumMsgs > 0) {
+            LibBottomUpBatch.recordBottomUpBatchCommitment(uint64(checkpoint.blockHeight), checkpoint.msgs);
+        }
         LibActivity.recordActivityRollup(checkpoint.subnetID, uint64(checkpoint.blockHeight), checkpoint.activity);
+
         // confirming the changes in membership in the child
         LibPower.confirmChange(checkpoint.nextConfigurationNumber);
-
-        // Propagate cross messages from checkpoint to other subnets
-        IGateway(s.ipcGatewayAddr).propagateAll();
     }
 
     /// @notice Checks whether the signatures are valid for the provided signatories and hash within the current validator set.
@@ -102,11 +106,6 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
     /// @dev The checkpoint block height must be equal to the last bottom-up checkpoint height or
     /// @dev the next one or the number of bottom up messages exceeds the max batch size.
     function ensureValidCheckpoint(BottomUpCheckpoint calldata checkpoint) internal view {
-        uint64 maxMsgsPerBottomUpBatch = s.maxMsgsPerBottomUpBatch;
-        if (checkpoint.msgs.length > maxMsgsPerBottomUpBatch) {
-            revert MaxMsgsPerBatchExceeded();
-        }
-
         uint256 lastBottomUpCheckpointHeight = s.lastBottomUpCheckpointHeight;
         uint256 bottomUpCheckPeriod = s.bottomUpCheckPeriod;
 
@@ -116,21 +115,34 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         }
 
         uint256 nextCheckpointHeight = LibGateway.getNextEpoch(lastBottomUpCheckpointHeight, bottomUpCheckPeriod);
+        if (checkpoint.blockHeight != nextCheckpointHeight) {
+            revert InvalidCheckpointEpoch();
+        }
+    }
 
-        if (checkpoint.blockHeight > nextCheckpointHeight) {
-            revert CannotSubmitFutureCheckpoint();
+    /// @notice Executes bottom-up messages that have been committed to in a checkpoint.
+    /// @dev Each message in the batch must include a valid Merkle proof of inclusion.
+    ///      This function verifies each proof, processes the message, and submits it to the gateway for execution.
+    ///      It also triggers propagation of cross-subnet messages after successful execution.
+    /// @param checkpointHeight The height of the checkpoint containing the committed messages.
+    /// @param inclusions An array of inclusion proofs and messages to be executed.
+    function execBottomUpMsgBatch(
+        uint256 checkpointHeight,
+        BottomUpBatch.Inclusion[] calldata inclusions
+    ) external whenNotPaused {
+        uint256 len = inclusions.length;
+        IpcEnvelope[] memory msgs = new IpcEnvelope[](len);
+        for (uint256 i = 0; i < len; ) {
+            LibBottomUpBatch.processBottomUpBatchMsg(checkpointHeight, inclusions[i].msg, inclusions[i].proof);
+            msgs[i] = inclusions[i].msg;
+            unchecked {
+                i++;
+            }
         }
 
-        // the expected bottom up checkpoint height, valid height
-        if (checkpoint.blockHeight == nextCheckpointHeight) {
-            return;
-        }
+        IGateway(s.ipcGatewayAddr).execBottomUpMsgBatch(msgs);
 
-        // if the bottom up messages' length is max, we consider that epoch valid, allow early submission
-        if (checkpoint.msgs.length == s.maxMsgsPerBottomUpBatch) {
-            return;
-        }
-
-        revert InvalidCheckpointEpoch();
+        // Propagate cross messages from checkpoint to other subnets
+        IGateway(s.ipcGatewayAddr).propagateAll();
     }
 }
