@@ -8,6 +8,7 @@ use anyhow::{anyhow, Context};
 
 use crate::fvm::{state::CheckStateRef, store::ReadOnlyBlockstore, FvmMessage};
 use cid::Cid;
+use fendermint_vm_actor_interface::evm;
 use fendermint_vm_actor_interface::eam::EAM_ACTOR_ADDR;
 use fendermint_vm_actor_interface::system::{
     is_system_addr, State as SystemState, SYSTEM_ACTOR_ADDR,
@@ -19,10 +20,11 @@ use fvm::engine::MultiEngine;
 use fvm::executor::ApplyRet;
 use fvm::state_tree::StateTree;
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::{CborStore, RawBytes};
+use fvm_ipld_encoding::{from_slice, CborStore, RawBytes};
 use fvm_shared::{address::Address, chainid::ChainID, clock::ChainEpoch, ActorID};
+use fvm_shared::message::Message;
 use num_traits::Zero;
-
+use fendermint_vm_actor_interface::evm::BytecodeReturn;
 use super::{FvmExecState, FvmStateParams};
 
 /// The state over which we run queries. These can interrogate the IPLD block store or the state tree.
@@ -208,10 +210,26 @@ where
                 )?;
 
                 // safe to unwrap because it's just created
-                let state = s.state_tree().get_actor(created.actor_id)?.unwrap();
-                let code = s.state_tree().store().get(&state.code)?.unwrap();
+                let message = Message {
+                    from: SYSTEM_ACTOR_ADDR,
+                    to: Address::from(created.eth_address),
+                    method_num: evm::Method::GetBytecode as u64,
+                    // rest of the params do no matter
+                    version: 0,
+                    sequence: 0,
+                    value: Default::default(),
+                    params: Default::default(),
+                    gas_limit: 0,
+                    gas_fee_cap: Default::default(),
+                    gas_premium: Default::default(),
+                };
+                let (r, _) = s.execute_implicit(message)?;
+                let data = from_slice::<BytecodeReturn>(&r.msg_receipt.return_data)?;
 
-                ret.msg_receipt.return_data = RawBytes::from(code);
+                // safe to unwrap
+                let code_cid = data.code.unwrap();
+                let bytes = s.state_tree().store().get(&code_cid)?.unwrap();
+                ret.msg_receipt.return_data = RawBytes::from(bytes);
             }
 
             Ok((ret, address_map))
