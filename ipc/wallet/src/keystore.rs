@@ -168,7 +168,7 @@ where
                                 _phantom: Default::default(),
                             })
                         } else {
-                            Err(WalletErr::Other(e.to_string()))
+                            Err(WalletErr::IO(e))
                         }
                     }
                 }
@@ -313,20 +313,36 @@ where
         }
     }
 
+    fn available_keys(&self) -> Vec<String> {
+        Vec::from_iter(self.key_info.keys().map(|k| self.key_to_string(k)))
+    }
+
+    fn key_to_string(&self, key: &K) -> String {
+        format!("{key:?}")
+    }
+
     /// Return all of the keys that are stored in the `KeyStore`
     pub fn list(&self) -> Vec<K> {
         Vec::from_iter(self.key_info.keys().cloned())
     }
 
     /// Return `KeyInfo` that corresponds to a given key
-    pub fn get(&self, k: &K) -> Result<I, WalletErr> {
-        self.key_info.get(k).cloned().ok_or(WalletErr::KeyInfo)
+    pub fn get(&self, key: &K) -> Result<I, WalletErr> {
+        self.key_info
+            .get(key)
+            .cloned()
+            .ok_or_else(|| WalletErr::KeyInfo {
+                key: format!("{key:?}"),
+                available_keys: self.available_keys(),
+            })
     }
 
     /// Save a key/`KeyInfo` pair to the `KeyStore`
     pub fn put(&mut self, key: K, key_info: I) -> Result<(), WalletErr> {
         if self.key_info.contains_key(&key) {
-            return Err(WalletErr::KeyExists);
+            return Err(WalletErr::KeyExists {
+                key: self.key_to_string(&key),
+            });
         }
         self.key_info.insert(key, key_info);
 
@@ -364,7 +380,10 @@ where
 
     /// Remove the key and corresponding `KeyInfo` from the `KeyStore`
     pub fn remove(&mut self, key: K) -> Result<I, WalletErr> {
-        let key_out = self.key_info.remove(&key).ok_or(WalletErr::KeyInfo)?;
+        let key_out = self.key_info.remove(&key).ok_or(WalletErr::KeyInfo {
+            key: self.key_to_string(&key),
+            available_keys: self.available_keys(),
+        })?;
 
         if self.plain.is_some() {
             self.flush()?;

@@ -106,7 +106,7 @@ impl Wallet /*<S>*/ {
     pub fn sign(&mut self, addr: &Address, msg: &[u8]) -> Result<Signature, WalletErr> {
         // this will return an error if the key cannot be found in either the keys
         // hashmap or it is not found in the keystore
-        let key = self.find_key(addr).map_err(|_| WalletErr::KeyNotExists)?;
+        let key = self.find_key(addr)?;
         self::helpers::sign(*key.key_info.key_type(), key.key_info.private_key(), msg)
     }
 

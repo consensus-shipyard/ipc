@@ -54,7 +54,10 @@ fn contains_key() {
     assert!(!wallet.has_key(&address));
     // test to make sure that the newly made key cannot be added to the wallet
     // because it is not found in the keystore
-    assert_matches!(wallet.find_key(&address).unwrap_err(), WalletErr::KeyInfo);
+    assert_matches!(
+        wallet.find_key(&address).unwrap_err(),
+        WalletErr::KeyInfo { .. }
+    );
     // sanity check to make sure that the key has not been added to the wallet
     assert!(!wallet.has_key(&address));
 }
@@ -98,7 +101,7 @@ fn import_export() -> anyhow::Result<()> {
     let test_addr = Address::new_secp256k1(pub_key.as_slice()).unwrap();
     let key_info_err = wallet.export(&test_addr).unwrap_err();
     // test to make sure that an error is raised when an incorrect address is added
-    assert_matches!(key_info_err, WalletErr::KeyInfo);
+    assert_matches!(key_info_err, WalletErr::KeyInfo { .. });
 
     let test_key_info = FvmKeyInfo::new(SignatureType::Secp256k1, new_priv_key);
     // make sure that key_info has been imported to wallet
@@ -107,7 +110,7 @@ fn import_export() -> anyhow::Result<()> {
     let duplicate_error = wallet.import(test_key_info).unwrap_err();
     // make sure that error is thrown when attempted to re-import a duplicate
     // key_info
-    let WalletErr::KeyExists = duplicate_error else {
+    let WalletErr::KeyExists { .. } = duplicate_error else {
         return Err(duplicate_error.into());
     };
     Ok(())
@@ -169,7 +172,7 @@ fn get_set_default() {
     let key_store = CrownJewels::new(KeyStoreConfig::InMemory).unwrap();
     let mut wallet = Wallet::new(key_store);
     // check to make sure that there is no default
-    assert_matches!(wallet.get_default().unwrap_err(), WalletErr::KeyInfo);
+    assert_matches!(wallet.get_default().unwrap_err(), WalletErr::KeyInfo { .. });
 
     let new_priv_key = generate(SignatureType::Secp256k1).unwrap();
     let pub_key = helpers::to_public(SignatureType::Secp256k1, new_priv_key.as_slice()).unwrap();
