@@ -17,7 +17,7 @@ use fvm_shared::{
 use libsecp256k1::{Message as SecpMessage, PublicKey as SecpPublic, SecretKey as SecpPrivate};
 use rand::rngs::OsRng;
 
-use crate::{errors::*, AddressDerivator};
+use crate::errors::*;
 
 /// Generates BLAKE2b hash of fixed 32 bytes size.
 pub fn blake2b_256(ingest: &[u8]) -> [u8; 32] {
