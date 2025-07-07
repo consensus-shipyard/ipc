@@ -5,6 +5,7 @@
 
 use fs::{create_dir, File};
 use fs_err as fs;
+use fvm_shared::crypto::signature::SignatureType;
 use std::{
     collections::HashMap,
     io::{BufReader, BufWriter, ErrorKind, Read, Write},
@@ -22,7 +23,7 @@ pub const PLAIN_JSON_KEYSTORE_NAME: &str = "keystore.json";
 /// Environmental variable which holds the `KeyStore` encryption phrase.
 pub const FOREST_KEYSTORE_PHRASE_ENV: &str = "FOREST_KEYSTORE_PHRASE";
 
-use crate::{crypto::*, FvmKeyInfo};
+use crate::{crypto::*, new_address, to_public, FvmKeyInfo};
 
 /// Configuration type for constructing a `KeyStore`
 pub enum KeyStoreConfig {
@@ -75,7 +76,10 @@ pub trait AddressDerivator<Key> {
 }
 impl AddressDerivator<String> for FvmKeyInfo {
     fn as_address(&self) -> String {
-        todo!("as address will be impl'd soon™")
+        let ty = SignatureType::Secp256k1;
+        let pub_key = to_public(ty, &self.private_key).unwrap();
+        let address = new_address(ty, pub_key.as_slice()).unwrap();
+        hex::encode(address.to_bytes())
     }
 }
 
