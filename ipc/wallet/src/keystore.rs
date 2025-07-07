@@ -318,7 +318,7 @@ where
         }
     }
 
-    fn available_keys(&self) -> Vec<String> {
+    fn available_keys_to_vec_of_string(&self) -> Vec<String> {
         Vec::from_iter(self.key_info.keys().map(|addr| self.addr_to_string(addr)))
     }
 
@@ -336,9 +336,9 @@ where
         self.key_info
             .get(addr)
             .cloned()
-            .ok_or_else(|| WalletErr::KeyInfo {
+            .ok_or_else(|| WalletErr::KeyNotFound {
                 key: self.addr_to_string(addr),
-                available_keys: self.available_keys(),
+                available_keys: self.available_keys_to_vec_of_string(),
             })
     }
 
@@ -391,9 +391,9 @@ where
 
     /// Remove the key and corresponding `KeyInfo` from the `KeyStore`
     pub fn remove(&mut self, key: AddrT) -> Result<InfoT, WalletErr> {
-        let key_out = self.key_info.remove(&key).ok_or(WalletErr::KeyInfo {
+        let key_out = self.key_info.remove(&key).ok_or(WalletErr::KeyNotFound {
             key: self.addr_to_string(&key),
-            available_keys: self.available_keys(),
+            available_keys: self.available_keys_to_vec_of_string(),
         })?;
 
         if self.plain.is_some() {

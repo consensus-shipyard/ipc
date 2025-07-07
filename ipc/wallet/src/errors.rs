@@ -8,17 +8,14 @@ use crate::crypto;
 #[derive(Debug, thiserror::Error)]
 pub enum WalletErr {
     /// info that corresponds to key does not exist
-    #[error("Key info not found in keystore for {key}: {available_keys:?}")]
-    KeyInfo {
+    #[error("Key info not found in keystore for {key:?}: {available_keys:?}")]
+    KeyNotFound {
         key: String,
         available_keys: Vec<String>,
     },
 
     #[error("Key already exists in keystore")]
     KeyExists { key: String },
-
-    #[error("Key does not exist in keystore")]
-    KeyNotExists { key: String },
 
     #[error(transparent)]
     IO(#[from] std::io::Error),
