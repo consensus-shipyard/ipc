@@ -9,6 +9,6 @@ fn evm_addr_derivation_integrity() {
     let addr0 = hex::encode(addr0.to_fixed_bytes().as_slice());
 
     let info = EvmKeyInfo::new(sk.to_bytes().as_slice().to_vec());
-    let addr1: String = info.as_address();
-    assert_eq!(&addr0, &addr1);
+    let addr1 = info.as_address();
+    assert_eq!(&addr0, &addr1.to_string());
 }

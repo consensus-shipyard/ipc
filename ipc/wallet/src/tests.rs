@@ -93,7 +93,7 @@ mod encryption {
 
         let key = wallet::generate_key(SignatureType::Secp256k1)?;
 
-        let addr = format!("wallet-{}", key.address);
+        let addr = WrappedFvmAddress::from(key.address);
         ks.put(addr.clone(), key.key_info)?;
         ks.flush().unwrap();
 
@@ -101,7 +101,7 @@ mod encryption {
 
         // Manually parse keystore.json
         let reader = BufReader::new(fs::File::open(keystore_location)?);
-        let persisted_keystore: HashMap<String, PersistentKeyInfo> =
+        let persisted_keystore: HashMap<WrappedFvmAddress, PersistentKeyInfo> =
             dbg!(serde_json::from_reader(reader))?;
 
         let default_key_info = persisted_keystore.get(dbg!(&addr)).unwrap();
@@ -113,7 +113,7 @@ mod encryption {
         );
 
         // Read existing keystore.json
-        let ks_read = CrownJewels::new(KeyStoreConfig::plain(keystore_location))?;
+        let ks_read = FvmCrownJewels::new(KeyStoreConfig::plain(keystore_location))?;
         ensure!(ks == ks_read);
 
         let _ = keystore_location;
