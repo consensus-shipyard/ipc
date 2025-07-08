@@ -34,7 +34,7 @@ impl WalletExport {
             return Ok(BASE64_STANDARD.encode(key_info.private_key()));
         }
 
-        let info = EvmPersistentKeyInfo::new(format!("{:?}", address), &key_info);
+        let info = EvmPersistentKeyInfo::new(address.to_string(), &key_info);
         Ok(serde_json::to_string(&info)?)
     }
 

@@ -16,20 +16,20 @@ pub struct EvmKeyInfo {
     pub(crate) private_key: Vec<u8>,
 }
 
-fn sk_to_pub_secp256k1(sk: &[u8]) -> anyhow::Result<Vec<u8>> {
+fn secret_key_to_pub_secp256k1(sk: &[u8]) -> anyhow::Result<Vec<u8>> {
     let sk = libsecp256k1::SecretKey::parse_slice(sk)?;
     let pk = libsecp256k1::PublicKey::from_secret_key(&sk);
     Ok(pk.serialize().to_vec())
 }
 #[allow(dead_code)]
-fn sk_to_pub_bls(sk: &[u8]) -> anyhow::Result<Vec<u8>> {
+fn secret_key_to_public_bls(sk: &[u8]) -> anyhow::Result<Vec<u8>> {
     use bls_signatures::Serialize;
     let sk = bls_signatures::PrivateKey::from_bytes(sk)?;
     let pk = sk.public_key();
     Ok(pk.as_bytes())
 }
 
-pub fn pk_to_address(pubkey: &[u8]) -> anyhow::Result<[u8; 20]> {
+pub fn public_key_to_address(pubkey: &[u8]) -> anyhow::Result<[u8; 20]> {
     use fvm_shared::address::SECP_PUB_LEN;
     use tiny_keccak::{Hasher, Keccak};
 
@@ -60,10 +60,10 @@ pub fn pk_to_address(pubkey: &[u8]) -> anyhow::Result<[u8; 20]> {
 impl AddressDerivator<String> for EvmKeyInfo {
     fn as_address(&self) -> String {
         // TODO deal with BLS signatures
-        let pubkey =
-            sk_to_pub_secp256k1(self.private_key()).expect("Input is pre-checked at construction");
-        let addr =
-            pk_to_address(&pubkey).expect("Public key to address never fails with valid key");
+        let pubkey = secret_key_to_pub_secp256k1(self.private_key())
+            .expect("Input is pre-checked at construction");
+        let addr = public_key_to_address(&pubkey)
+            .expect("Public key to address never fails with valid key");
         hex::encode(addr.as_slice())
     }
 }
