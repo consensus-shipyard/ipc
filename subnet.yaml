@@ -1,9 +1,8 @@
-# deploy:
-#   enabled: false
-#   url: http://localhost:8545
-#   from: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
-#   chain-id: 31337
-#   contracts-dir: /Users/karlem/work/ipc/contracts/out
+deploy:
+  enabled: false
+  url: http://localhost:8545
+  from: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+  chain-id: 31337
 
 create:
   parent: /r31337

@@ -82,7 +82,15 @@ pub(crate) async fn deploy_contracts(
             )
         })?;
 
-    let hardhat = Hardhat::new(config.contracts_dir.clone());
+    let (artifacts_path, _maybe_tempdir) = match &config.artifacts_path {
+        Some(path) => (path.clone(), None),
+        None => {
+            let (temp_dir, path) = contracts_artifacts::extract_to_tempdir()?;
+            (path, Some(temp_dir))
+        }
+    };
+
+    let hardhat = Hardhat::new(artifacts_path);
 
     let mut deployer = EthContractDeployer::new(
         hardhat,
@@ -118,8 +126,12 @@ pub(crate) struct DeployConfig {
     pub chain_id: u64,
 
     /// Directory containing the compiled contract files.
-    #[arg(short, long, help = "Directory containing the contract files")]
-    pub contracts_dir: PathBuf,
+    #[arg(
+        short,
+        long,
+        help = "Directory containing the contract files. Defaults to builtin contracts."
+    )]
+    pub artifacts_path: Option<PathBuf>,
 
     /// Subnet creation privilege (Unrestricted | Whitelisted | Restricted).
     #[arg(
