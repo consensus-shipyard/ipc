@@ -18,6 +18,7 @@ use async_trait::async_trait;
 use clap::Args;
 use fendermint_app::cmd::genesis::{new_genesis_from_parent, seal_genesis};
 use fendermint_app::options::genesis::{GenesisFromParentArgs, SealGenesisArgs};
+use fendermint_app::options::parse::{parse_network_version, parse_token_amount};
 use fendermint_vm_actor_interface::init::builtin_actor_eth_addr;
 use fendermint_vm_actor_interface::ipc::{self, subnet};
 use fvm_shared::{address::Address, econ::TokenAmount, version::NetworkVersion};
@@ -28,8 +29,7 @@ use ipc_provider::{
     new_evm_keystore_from_config,
 };
 use ipc_types::EthAddress;
-use num_bigint::BigInt;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::{
@@ -120,6 +120,64 @@ pub enum ActivateConfig {
     },
 }
 
+/// Serde deserializer wrapper for `NetworkVersion`
+fn de_network_version<'de, D>(deserializer: D) -> Result<NetworkVersion, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    // Deserialize into a string first
+    let s = String::deserialize(deserializer)?;
+    // Then feed it into your existing parser
+    parse_network_version(&s).map_err(serde::de::Error::custom)
+}
+
+/// Serde deserializer wrapper for `TokenAmount`
+fn de_token_amount<'de, D>(deserializer: D) -> Result<TokenAmount, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    parse_token_amount(&s).map_err(serde::de::Error::custom)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct GenesisConfig {
+    /// Network version, governs which set of built-in actors to use.
+    #[serde(
+        default = "GenesisConfig::default_network_version",
+        deserialize_with = "de_network_version"
+    )]
+    pub network_version: NetworkVersion,
+
+    /// Base fee for running transactions in atto.
+    #[serde(
+        default = "GenesisConfig::default_base_fee",
+        deserialize_with = "de_token_amount"
+    )]
+    pub base_fee: TokenAmount,
+
+    /// Number of decimals to use during converting FIL to Power.
+    #[serde(default = "GenesisConfig::default_power_scale")]
+    pub power_scale: i8,
+}
+
+impl GenesisConfig {
+    fn default_network_version() -> NetworkVersion {
+        // whatever your CLI default was:
+        NetworkVersion::V21
+    }
+
+    fn default_base_fee() -> TokenAmount {
+        // your CLI default of 1 000 atto‐FIL
+        parse_token_amount("1000").expect("hard‐coded default should parse")
+    }
+
+    fn default_power_scale() -> i8 {
+        3
+    }
+}
+
 /// Top‑level YAML schema for `subnet init`.
 #[derive(Debug, Deserialize)]
 struct SubnetInitConfig {
@@ -131,6 +189,9 @@ struct SubnetInitConfig {
     /// Optional subnet activation settings
     #[serde(default)]
     activate: Option<ActivateConfig>,
+    /// Optional genesis parameters
+    #[serde(default)]
+    genesis: Option<GenesisConfig>,
 }
 
 impl SubnetInitConfig {
@@ -324,12 +385,14 @@ impl CommandLineHandler for InitSubnet {
                     log::info!("Collateral activation complete for subnet `{}`", subnet_id);
                 }
             }
+
+            if let Some(genesis_config) = init_config.genesis {
+                let dir = dir_of(&global.config_path());
+                genesis_from_parent(&parent_subnet, &subnet_id, &genesis_config, &dir).await?;
+            }
         } else {
             log::info!("No activation block found; skipping activation");
         }
-
-        let dir = dir_of(&global.config_path());
-        genesis_from_parent(&parent_subnet, &subnet_id, &dir).await?;
 
         Ok(())
     }
@@ -338,6 +401,7 @@ impl CommandLineHandler for InitSubnet {
 async fn genesis_from_parent(
     parent_subnet: &Subnet,
     subnet_id: &SubnetID,
+    genesis_config: &GenesisConfig,
     dir: &PathBuf,
 ) -> anyhow::Result<()> {
     let provider_http = parent_subnet.rpc_http().clone();
@@ -362,14 +426,26 @@ async fn genesis_from_parent(
             parent_auth_token: parent_subnet.auth_token(),
             parent_gateway: parent_subnet.gateway_addr(),
             parent_registry: parent_subnet.registry_addr(),
-            // TODO Karel - pass these from somewhere.
-            network_version: NetworkVersion::from(21),
-            base_fee: TokenAmount::from_atto(BigInt::from(1000)),
-            power_scale: 3,
+            network_version: genesis_config.network_version,
+            base_fee: genesis_config.base_fee.clone(),
+            power_scale: genesis_config.power_scale,
         },
     )
     .await?;
     log::info!("Genesis successfully created at {}", genesis_file.display());
+
+    let sealed_genesis_file = dir.join("sealed-genesis.json");
+
+    seal_genesis(
+        &genesis_file,
+        &SealGenesisArgs {
+            output_path: sealed_genesis_file,
+            custom_actors_path: None,
+            builtin_actors_path: None,
+            artifacts_path: None,
+        },
+    )
+    .await?;
 
     Ok(())
 }

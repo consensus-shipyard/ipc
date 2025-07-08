@@ -323,10 +323,18 @@ pub async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> any
     let builtin_actors =
         actors_car_blob(args.builtin_actors_path.as_ref(), actors_builtin_car::CAR)?;
 
+    let (artifacts_path, _maybe_tempdir) = match &args.artifacts_path {
+        Some(path) => (path.clone(), None),
+        None => {
+            let (temp_dir, path) = contracts_artifacts::extract_to_tempdir()?;
+            (path, Some(temp_dir))
+        }
+    };
+
     let builder = GenesisBuilder::new(
         builtin_actors.as_ref(),
         custom_actors.as_ref(),
-        args.artifacts_path.clone(),
+        artifacts_path,
         genesis_params,
     );
 
