@@ -4,7 +4,10 @@
 
 use async_trait::async_trait;
 use clap::Args;
-use ipc_wallet::{evm::adapter::EthKeyAddress, WalletType};
+use ipc_wallet::{
+    evm::{adapter::EthKeyAddress, WrappedEthAddress},
+    DefaultKey, WalletType,
+};
 use std::fmt::Debug;
 use std::str::FromStr;
 
@@ -24,13 +27,12 @@ impl CommandLineHandler for WalletList {
                 let wallet = provider.evm_wallet()?;
                 let guard = wallet.read().unwrap();
                 for address in guard.list() {
-                    let address = EthKeyAddress::from_str(&address)?;
-                    if address == EthKeyAddress::default() {
+                    if address == WrappedEthAddress::default_key() {
                         continue;
                     }
                     print!("Address: {}", address);
 
-                    let key_info = guard.get(&address.to_string())?;
+                    let key_info = guard.get(&address)?;
                     let sk = libsecp256k1::SecretKey::parse_slice(key_info.private_key())?;
                     let pub_key =
                         hex::encode(libsecp256k1::PublicKey::from_secret_key(&sk).serialize())

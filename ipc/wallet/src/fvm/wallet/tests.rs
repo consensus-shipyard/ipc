@@ -126,8 +126,8 @@ fn list_addr() {
     for i in &key_vec {
         addr_string_vec.push(i.address.to_string());
 
-        let addr_string = format!("wallet-{}", i.address);
-        key_store.put(addr_string, i.key_info.clone()).unwrap();
+        let wrapped = WrappedFvmAddress::from(&i.address);
+        key_store.put(wrapped, i.key_info.clone()).unwrap();
     }
 
     addr_string_vec.sort();
@@ -151,14 +151,17 @@ fn list_addr() {
 fn generate_new_key() {
     let mut wallet = generate_wallet();
     let addr = wallet.generate_addr(SignatureType::BLS).unwrap();
-    let key = wallet.keystore.get(&String::from("default")).unwrap();
+    let key = wallet
+        .keystore
+        .get(&WrappedFvmAddress::default_key())
+        .unwrap();
     // make sure that the newly generated key is the default key - checking by key
     // type
     assert_matches!(key.key_type(), SignatureType::BLS);
 
-    let address = format!("wallet-{addr}");
+    let wrapped = WrappedFvmAddress::from(&addr);
 
-    let key_info = wallet.keystore.get(&address).unwrap();
+    let key_info = wallet.keystore.get(&wrapped).unwrap();
     let key = wallet.in_memory_cache.get(&addr).unwrap();
 
     // these assertions will make sure that the key has actually been added to the
@@ -182,7 +185,7 @@ fn get_set_default() {
     let test_addr = Address::new_secp256k1(pub_key.as_slice()).unwrap();
 
     let key_info = FvmKeyInfo::new(SignatureType::Secp256k1, new_priv_key);
-    let test_addr_string = format!("wallet-{test_addr}");
+    let test_addr_string = WrappedFvmAddress::from(&test_addr);
 
     wallet.keystore.put(test_addr_string, key_info).unwrap();
 

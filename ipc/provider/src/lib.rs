@@ -19,9 +19,8 @@ use ipc_api::{
     subnet::{ConsensusType, ConstructParams},
     subnet_id::SubnetID,
 };
-use ipc_types::EthAddress;
 use ipc_wallet::evm::adapter::{random_eth_key_info, EthKeyAddress};
-use ipc_wallet::evm::EvmCrownJewels;
+use ipc_wallet::evm::{EvmCrownJewels, WrappedEthAddress};
 use ipc_wallet::{AddressDerivator, FvmCrownJewels, KeyStoreConfig, Wallet};
 use lotus::message::wallet::WalletKeyType;
 use manager::{EthSubnetManager, SubnetGenesisInfo, SubnetInfo, SubnetManager};
@@ -225,11 +224,11 @@ impl IpcProvider {
                 if self.sender.is_none() {
                     let wallet = self.evm_wallet()?;
                     let guard = wallet.write().unwrap();
-                    let Some(addr_str) = guard.get_default()? else {
+                    let Some(wrapped) = guard.get_default()? else {
                         anyhow::bail!("no default evm account configured")
                     };
-                    let addr_eth = EthAddress::from_str(&addr_str)?;
-                    let addr = Address::from(&addr_eth);
+                    let addr = wrapped.to_eth_address();
+                    let addr = addr.into();
                     self.sender = Some(addr);
                     return Ok(addr);
                 }
@@ -311,7 +310,10 @@ impl IpcProvider {
         let sender = self.check_sender(subnet_config, from)?;
         let addr = payload_to_evm_address(sender.payload())?;
         let keystore = self.evm_wallet()?;
-        let key_info = keystore.read().unwrap().get(&addr.to_string())?;
+        let key_info = keystore
+            .read()
+            .unwrap()
+            .get(&WrappedEthAddress::from_ethers(&addr))?;
         // TODO carve this out into helper types
         let sk = libsecp256k1::SecretKey::parse_slice(key_info.private_key())?;
         let public_key = libsecp256k1::PublicKey::from_secret_key(&sk).serialize();
@@ -868,11 +870,11 @@ impl IpcProvider {
         let key_info = random_eth_key_info();
         let wallet = self.evm_wallet()?;
 
-        let addr = key_info.as_address();
-        let addr_eth = EthKeyAddress::from_str(&addr)?;
+        let wrapped = key_info.as_address();
+        let addr_eth = wrapped.to_ethers();
         let mut guard = wallet.write().unwrap();
-        guard.put(addr.clone(), key_info)?;
-        Ok(addr_eth)
+        guard.put(wrapped, key_info)?;
+        Ok(EthKeyAddress::from(addr_eth))
     }
 
     pub fn import_fvm_key(&self, keyinfo: &str) -> anyhow::Result<Address> {
@@ -903,9 +905,8 @@ impl IpcProvider {
         let key_info = ipc_wallet::evm::EvmKeyInfo::new(private_key);
 
         let addr = key_info.as_address();
-        let addr_eth = EthKeyAddress::from_str(&addr)?;
-        guard.put(addr.to_string(), key_info)?;
-        Ok(addr_eth)
+        guard.put(addr.clone(), key_info)?;
+        Ok(EthKeyAddress::from(addr.to_ethers()))
     }
 
     pub fn import_evm_key_from_json(&self, keyinfo: &str) -> anyhow::Result<EthKeyAddress> {

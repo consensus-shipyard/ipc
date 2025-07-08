@@ -15,7 +15,7 @@ use ipc_actors_abis::{
 };
 use ipc_api::evm::{fil_to_eth_amount, payload_to_evm_address, subnet_id_to_evm_addresses};
 use ipc_api::validator::from_contract_validators;
-use ipc_wallet::evm::EvmCrownJewels;
+use ipc_wallet::evm::{EvmCrownJewels, WrappedEthAddress};
 use reqwest::header::HeaderValue;
 use reqwest::Client;
 use std::net::{IpAddr, SocketAddr};
@@ -1141,8 +1141,8 @@ impl EthSubnetManager {
         let addr = payload_to_evm_address(addr.payload())?;
         let keystore = self.keystore()?;
         let keystore = keystore.read().unwrap();
-        let private_key = keystore.get(&addr.to_string())?;
-        let wallet = LocalWallet::from_bytes(private_key.private_key())?
+        let key_info = keystore.get(&WrappedEthAddress::from_ethers(&addr))?;
+        let wallet = LocalWallet::from_bytes(key_info.private_key())?
             .with_chain_id(self.ipc_contract_info.chain_id);
 
         use super::gas_estimator_middleware::Eip1559GasEstimatorMiddleware;

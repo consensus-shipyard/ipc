@@ -7,6 +7,7 @@ use fs::{create_dir, File};
 use fs_err as fs;
 use std::{
     collections::HashMap,
+    fmt::Display,
     io::{BufReader, BufWriter, ErrorKind, Read, Write},
     marker::PhantomData,
     path::{Path, PathBuf},
@@ -73,6 +74,7 @@ use core::hash::Hash;
 pub trait AddressDerivator<Key> {
     fn as_address(&self) -> Key;
 }
+
 /// Provides the default key identifier required to lookup the key information
 pub trait DefaultKey {
     fn default_key() -> Self;
@@ -98,7 +100,7 @@ pub struct CrownJewels<K: Hash + PartialEq + Eq + Debug, I, P> {
 
 impl<AddrT, InfoT, PersistReprT> CrownJewels<AddrT, InfoT, PersistReprT>
 where
-    AddrT: Hash + PartialEq + Eq + Debug + Serialize + Clone + for<'de> Deserialize<'de>,
+    AddrT: Hash + PartialEq + Eq + Debug + Display + Serialize + Clone + for<'de> Deserialize<'de>,
     InfoT: AddressDerivator<AddrT>
         + Debug
         + Clone
@@ -323,7 +325,7 @@ where
     }
 
     fn addr_to_string(&self, addr: &AddrT) -> String {
-        dbg!(format!("{addr:?}"))
+        format!("{addr}")
     }
 
     /// Return all of the keys that are stored in the `KeyStore`
@@ -366,12 +368,12 @@ where
 
     /// Set the default key as a delegate/copy to what is referenced
     /// by the existing `key` passed as argument
-    pub fn set_default(&mut self, key: &AddrT) -> Result<(), WalletErr>
+    pub fn set_default(&mut self, addr: &AddrT) -> Result<(), WalletErr>
     where
         AddrT: DefaultKey,
     {
         let default_key = <AddrT as DefaultKey>::default_key();
-        let info = self.get(key)?;
+        let info = self.get(addr)?;
         let _ = self.remove(default_key.clone());
         self.put(default_key, info)?;
         Ok(())

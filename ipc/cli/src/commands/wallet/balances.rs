@@ -9,7 +9,10 @@ use futures_util::future::join_all;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_api::ethers_address_to_fil_address;
 use ipc_api::subnet_id::SubnetID;
-use ipc_wallet::{evm::adapter::EthKeyAddress, WalletType};
+use ipc_wallet::{
+    evm::{adapter::EthKeyAddress, WrappedEthAddress},
+    DefaultKey, WalletType,
+};
 use std::{fmt::Debug, str::FromStr};
 
 pub(crate) struct WalletBalances;
@@ -35,23 +38,22 @@ impl CommandLineHandler for WalletBalances {
                     let provider = provider.clone();
                     let subnet = subnet.clone();
                     async move {
-                        let addr_eth = EthKeyAddress::from_str(addr)?;
                         provider
                             .wallet_balance(
                                 &subnet,
-                                &ethers_address_to_fil_address(addr_eth.clone().into())?,
+                                &ethers_address_to_fil_address(addr.to_ethers())?,
                             )
                             .await
-                            .map(|balance| (balance, addr_eth))
+                            .map(|balance| (balance, addr.clone()))
                     }
                 }));
 
-                let v: Vec<anyhow::Result<(TokenAmount, EthKeyAddress)>> = join_all(r).await;
+                let v: Vec<anyhow::Result<(TokenAmount, WrappedEthAddress)>> = join_all(r).await;
 
                 for r in v.into_iter() {
                     match r {
                         Ok((balance, addr)) => {
-                            if addr.to_string() != "default-key" {
+                            if addr != WrappedEthAddress::default_key() {
                                 println!("{} - Balance: {}", addr, balance);
                             }
                         }

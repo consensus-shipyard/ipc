@@ -10,7 +10,7 @@ pub const KEYSTORE_NAME: &str = "evm_keystore.json";
 
 pub use key::*;
 
-pub type EvmCrownJewels = crate::CrownJewels<String, EvmKeyInfo, EvmPersistentKeyInfo>;
+pub type EvmCrownJewels = crate::CrownJewels<WrappedEthAddress, EvmKeyInfo, EvmPersistentKeyInfo>;
 
 #[cfg(test)]
 mod tests;

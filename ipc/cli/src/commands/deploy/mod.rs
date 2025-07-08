@@ -7,7 +7,9 @@ use ethers::types::Address;
 use fendermint_eth_deployer::{EthContractDeployer, SubnetCreationPrivilege};
 use fendermint_eth_hardhat::Hardhat;
 use ipc_provider::new_evm_keystore_from_config;
+use ipc_wallet::evm::WrappedEthAddress;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::{fmt, sync::Arc};
 
 use crate::{CommandLineHandler, GlobalArguments};
@@ -49,7 +51,7 @@ impl CommandLineHandler for DeployCommand {
         let keystore = new_evm_keystore_from_config(config)?;
 
         // Retrieve the key info for the provided "from" address.
-        let key_info = keystore.get(&args.from.to_string())?;
+        let key_info = keystore.get(&WrappedEthAddress::from_ethers(&args.from))?;
 
         let hardhat = Hardhat::new(args.contracts_dir.clone());
 

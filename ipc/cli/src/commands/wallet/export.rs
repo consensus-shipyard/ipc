@@ -7,7 +7,10 @@ use clap::Args;
 use fs_err as fs;
 use fvm_shared::address::Address;
 use ipc_provider::{lotus::message::wallet::WalletKeyType, IpcProvider, LotusJsonKeyType};
-use ipc_wallet::{evm::EvmPersistentKeyInfo, WalletType};
+use ipc_wallet::{
+    evm::{EvmPersistentKeyInfo, WrappedEthAddress},
+    WalletType, WrappedFvmAddress,
+};
 use std::fmt::Debug;
 use std::fs::Permissions;
 use std::io::Write;
@@ -21,10 +24,10 @@ pub(crate) struct WalletExport;
 impl WalletExport {
     fn export_evm(provider: &IpcProvider, arguments: &WalletExportArgs) -> anyhow::Result<String> {
         let keystore = provider.evm_wallet()?;
-        let address = ethers::types::Address::from_str(&arguments.address)?;
+        let addr = WrappedEthAddress::from_str(&arguments.address)?;
 
         let guard = keystore.read().unwrap();
-        let key_info = guard.get(&address.to_string())?;
+        let key_info = guard.get(&addr)?;
 
         if arguments.hex {
             return Ok(hex::encode(key_info.private_key()));
@@ -34,7 +37,8 @@ impl WalletExport {
             return Ok(BASE64_STANDARD.encode(key_info.private_key()));
         }
 
-        let info = EvmPersistentKeyInfo::new(address.to_string(), &key_info);
+        // TODO make the args typed, it's  bit funny to leave this as string
+        let info = EvmPersistentKeyInfo::new(addr.to_string(), &key_info);
         Ok(serde_json::to_string(&info)?)
     }
 
@@ -123,10 +127,10 @@ impl WalletPublicKey {
     ) -> anyhow::Result<String> {
         let keystore = provider.evm_wallet()?;
         // validation!
-        let address = ethers::types::Address::from_str(&arguments.address)?;
+        let address = WrappedEthAddress::from_str(&arguments.address)?;
 
         let guard = keystore.read().unwrap();
-        let key_info = guard.get(&address.to_string())?;
+        let key_info = guard.get(&address)?;
 
         let sk = libsecp256k1::SecretKey::parse_slice(key_info.private_key())?;
         Ok(hex::encode(libsecp256k1::PublicKey::from_secret_key(&sk).serialize()).to_string())

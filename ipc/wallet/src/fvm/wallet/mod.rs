@@ -12,7 +12,7 @@ use fvm_shared::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::errors::*;
+use crate::{errors::*, AddressDerivator, DefaultKey};
 
 use super::{FvmCrownJewels, FvmKeyInfo};
 
@@ -42,6 +42,68 @@ impl TryFrom<FvmKeyInfo> for FullKey {
             public_key,
             address,
         })
+    }
+}
+
+#[derive(
+    Debug, Clone, Hash, PartialEq, Eq, serde::Serialize, serde::Deserialize, PartialOrd, Ord,
+)]
+#[serde(transparent)]
+pub struct WrappedFvmAddress(String);
+
+impl AddressDerivator<WrappedFvmAddress> for FvmKeyInfo {
+    fn as_address(&self) -> WrappedFvmAddress {
+        WrappedFvmAddress(<FvmKeyInfo as AddressDerivator<String>>::as_address(&self))
+    }
+}
+
+impl core::fmt::Display for WrappedFvmAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl WrappedFvmAddress {
+    pub fn legacy_test_variant(&self) -> Self {
+        let dk = Self::default_key();
+        if self == &dk {
+            return dk;
+        }
+        let mut cc = self.clone();
+
+        // let addr = format!("wallet-{}", k.address);
+        // Try to replace prefix with testnet, for backwards compatibility
+        // * We might be able to remove this, look into variants
+        cc.0.replace_range(8..9, "t");
+        cc
+    }
+}
+
+impl DefaultKey for WrappedFvmAddress {
+    fn default_key() -> Self {
+        Self("default".to_owned())
+    }
+}
+
+impl From<Address> for WrappedFvmAddress {
+    fn from(value: Address) -> Self {
+        Self::from(&value)
+    }
+}
+
+impl From<&Address> for WrappedFvmAddress {
+    fn from(value: &Address) -> Self {
+        Self(format!("wallet-{}", value))
+    }
+}
+
+impl From<&WrappedFvmAddress> for Address {
+    fn from(value: &WrappedFvmAddress) -> Address {
+        let s = value
+            .0
+            .strip_prefix("wallet-")
+            .expect("All keys have a wallet- prefix");
+        Address::from_str(s).expect("Encoding is guaranteed to be correct by construction")
     }
 }
 
@@ -88,13 +150,12 @@ impl Wallet /*<S>*/ {
         if let Some(k) = self.in_memory_cache.get(addr) {
             return Ok(k.clone());
         }
-        let key_string = format!("wallet-{addr}");
-        let key_info = match self.keystore.get(&key_string) {
+        let wrapped = WrappedFvmAddress::from(addr);
+        let key_info = match self.keystore.get(&wrapped) {
             Ok(k) => k,
             Err(_) => {
                 // replace with testnet prefix
-                self.keystore
-                    .get(&format!("wallet-t{}", &addr.to_string()[1..]))?
+                self.keystore.get(&wrapped.legacy_test_variant())?
             }
         };
         let new_key = FullKey::try_from(key_info)?;
@@ -120,7 +181,7 @@ impl Wallet /*<S>*/ {
     /// newly added `KeyInfo`
     pub fn import(&mut self, key_info: FvmKeyInfo) -> Result<Address, WalletErr> {
         let k = FullKey::try_from(key_info)?;
-        let addr = format!("wallet-{}", k.address);
+        let addr = WrappedFvmAddress::from(&k.address);
         self.keystore.put(addr, k.key_info)?;
         Ok(k.address)
     }
@@ -133,12 +194,12 @@ impl Wallet /*<S>*/ {
 
     pub fn remove(&mut self, addr: &Address) -> Result<(), WalletErr> {
         let _ = self.in_memory_cache.remove(addr);
-        self.keystore.remove(addr.to_string())?;
+        self.keystore.remove(WrappedFvmAddress::from(addr))?;
         Ok(())
     }
 
     pub fn get_default_info(&self) -> Result<FvmKeyInfo, WalletErr> {
-        let key_info = self.keystore.get(&String::from("default"))?;
+        let key_info = self.keystore.get(&WrappedFvmAddress::default_key())?;
         Ok(key_info)
     }
 
@@ -151,16 +212,17 @@ impl Wallet /*<S>*/ {
 
     /// Set a default `KeyInfo` to the wallet
     pub fn set_default(&mut self, addr: Address) -> Result<(), WalletErr> {
-        let addr_string = format!("wallet-{addr}");
-        let key_info = self.keystore.get(&addr_string)?;
+        let wrapped = WrappedFvmAddress::from(&addr);
+        let key_info = self.keystore.get(&wrapped)?;
         let default_key_info = self.get_default_info();
         if default_key_info.is_ok() {
-            self.keystore.remove("default".to_string())?; // This line should
-                                                          // unregister current
-                                                          // default key then
-                                                          // continue
+            self.keystore.remove(WrappedFvmAddress::default_key())?; // This line should
+                                                                     // unregister current
+                                                                     // default key then
+                                                                     // continue
         }
-        self.keystore.put("default".to_string(), key_info)?;
+        self.keystore
+            .put(WrappedFvmAddress::default_key(), key_info)?;
         Ok(())
     }
 
@@ -170,13 +232,13 @@ impl Wallet /*<S>*/ {
     /// If no default key is present, makes the generated key the default one!
     pub fn generate_addr(&mut self, typ: SignatureType) -> Result<Address, WalletErr> {
         let key = generate_key(typ)?;
-        let addr = format!("wallet-{}", key.address);
-        self.keystore.put(addr, key.key_info.clone())?;
+        let wrapped = WrappedFvmAddress::from(key.address);
+        self.keystore.put(wrapped, key.key_info.clone())?;
         self.in_memory_cache.insert(key.address, key.clone());
         let value = self.get_default_info();
         if value.is_err() {
             self.keystore
-                .put("default".to_string(), key.key_info.clone())
+                .put(WrappedFvmAddress::default_key(), key.key_info.clone())
                 .map_err(|err| WalletErr::Other(err.to_string()))?;
         }
 
@@ -192,7 +254,7 @@ impl Wallet /*<S>*/ {
 
 /// Return the default address for `KeyStore`
 pub fn get_default(keystore: &FvmCrownJewels) -> Result<Option<Address>, WalletErr> {
-    if let Ok(key_info) = keystore.get(&String::from("default")) {
+    if let Ok(key_info) = keystore.get(&WrappedFvmAddress::default_key()) {
         let k = FullKey::try_from(key_info)?;
         Ok(Some(k.address))
     } else {
@@ -203,42 +265,30 @@ pub fn get_default(keystore: &FvmCrownJewels) -> Result<Option<Address>, WalletE
 /// Return vector of addresses sorted by their string representation in
 /// `KeyStore`
 pub fn list_addrs(keystore: &FvmCrownJewels) -> Result<Vec<Address>, WalletErr> {
-    let mut all = Vec::from_iter(keystore.list());
-    all.sort();
-    let mut out = Vec::new();
-    for i in all {
-        if let Some(addr_str) = i.strip_prefix("wallet-") {
-            if let Ok(addr) = Address::from_str(addr_str) {
-                out.push(addr);
-            }
-        }
-    }
-    Ok(out)
+    let mut list = keystore.list();
+    list.sort();
+    Ok(Vec::<Address>::from_iter(
+        list.into_iter().map(|wrapped| Address::from(&wrapped)),
+    ))
 }
 
 /// Returns a key corresponding to given address
 pub fn find_key(addr: &Address, keystore: &FvmCrownJewels) -> Result<FullKey, WalletErr> {
-    let key_string = format!("wallet-{addr}");
-    let key_info = keystore.get(&key_string)?;
+    let wrapped = WrappedFvmAddress::from(addr);
+    let key_info = keystore.get(&wrapped)?;
     let new_key = FullKey::try_from(key_info)?;
     Ok(new_key)
 }
 
 pub fn try_find(addr: &Address, keystore: &FvmCrownJewels) -> Result<FvmKeyInfo, WalletErr> {
-    let key_string = format!("wallet-{addr}");
-    match keystore.get(&key_string) {
+    let wrapped = WrappedFvmAddress::from(addr);
+    match keystore.get(&wrapped) {
         Ok(k) => Ok(k),
-        Err(_) => {
-            let mut new_addr = addr.to_string();
-
-            // Try to replace prefix with testnet, for backwards compatibility
-            // * We might be able to remove this, look into variants
-            new_addr.replace_range(0..1, "t");
-            let key_string = format!("wallet-{new_addr}");
-            let key_info = match keystore.get(&key_string) {
-                Ok(k) => k,
-                Err(_) => keystore.get(&format!("wallet-f{}", &new_addr[1..]))?,
+        Err(e) => {
+            let Ok(key_info) = keystore.get(&wrapped.legacy_test_variant()) else {
+                return Err(e);
             };
+
             Ok(key_info)
         }
     }
@@ -260,7 +310,7 @@ pub fn generate_key(typ: SignatureType) -> Result<FullKey, WalletErr> {
 /// Import `KeyInfo` into `KeyStore`
 pub fn import(key_info: FvmKeyInfo, keystore: &mut FvmCrownJewels) -> Result<Address, WalletErr> {
     let k = FullKey::try_from(key_info)?;
-    let addr = format!("wallet-{}", k.address);
-    keystore.put(addr, k.key_info)?;
+    let wrapped = WrappedFvmAddress::from(&k.address);
+    keystore.put(wrapped, k.key_info)?;
     Ok(k.address)
 }

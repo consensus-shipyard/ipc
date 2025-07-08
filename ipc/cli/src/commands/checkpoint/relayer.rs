@@ -61,8 +61,7 @@ impl CommandLineHandler for BottomUpRelayer {
             (Some(submitter), _) => require_fil_addr_from_str(submitter)?,
             (None, Some(addr)) => {
                 log::info!("using default address: {addr:?}");
-                let addr = EthKeyAddress::from_str(&addr)?;
-                Address::try_from(addr)?
+                addr.to_fvm_address()
             }
             _ => {
                 return Err(anyhow!("no submitter address provided"));

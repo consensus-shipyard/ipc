@@ -3,7 +3,7 @@
 use base64::{prelude::BASE64_STANDARD, Engine};
 use fvm_shared::crypto::signature::SignatureType;
 
-use crate::{new_address, to_public, AddressDerivator};
+use crate::{new_address, to_public, AddressDerivator, WrappedFvmAddress};
 
 // TODO need to update keyinfo to not use SignatureType, use string instead to
 // save keys like jwt secret
@@ -54,8 +54,8 @@ pub struct PersistentKeyInfo {
 }
 
 // TODO make this a `TryFrom`, we cannot sanity for on-disk stuff
-impl From<(&String, &PersistentKeyInfo)> for FvmKeyInfo {
-    fn from(value: (&String, &PersistentKeyInfo)) -> Self {
+impl From<(&WrappedFvmAddress, &PersistentKeyInfo)> for FvmKeyInfo {
+    fn from(value: (&WrappedFvmAddress, &PersistentKeyInfo)) -> Self {
         Self {
             key_type: value.1.key_type,
             private_key: BASE64_STANDARD
@@ -65,8 +65,8 @@ impl From<(&String, &PersistentKeyInfo)> for FvmKeyInfo {
     }
 }
 
-impl From<(&String, &FvmKeyInfo)> for PersistentKeyInfo {
-    fn from(value: (&String, &FvmKeyInfo)) -> Self {
+impl From<(&WrappedFvmAddress, &FvmKeyInfo)> for PersistentKeyInfo {
+    fn from(value: (&WrappedFvmAddress, &FvmKeyInfo)) -> Self {
         Self {
             key_type: value.1.key_type,
             private_key: BASE64_STANDARD.encode(value.1.private_key()),

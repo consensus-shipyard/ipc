@@ -62,6 +62,7 @@ impl fmt::Display for EthKeyAddress {
         if self == &Self::default() {
             write!(f, "default-key")
         } else {
+            // do NOT elide any bytes! _Must_ use `Debug`!
             write!(f, "{:?}", self.inner)
         }
     }
