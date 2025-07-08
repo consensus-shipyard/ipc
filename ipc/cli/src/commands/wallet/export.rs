@@ -9,7 +9,7 @@ use fvm_shared::address::Address;
 use ipc_provider::{lotus::message::wallet::WalletKeyType, IpcProvider, LotusJsonKeyType};
 use ipc_wallet::{
     evm::{EvmPersistentKeyInfo, WrappedEthAddress},
-    WalletType, WrappedFvmAddress,
+    WalletType,
 };
 use std::fmt::Debug;
 use std::fs::Permissions;

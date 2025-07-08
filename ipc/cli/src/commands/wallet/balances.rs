@@ -9,10 +9,7 @@ use futures_util::future::join_all;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_api::ethers_address_to_fil_address;
 use ipc_api::subnet_id::SubnetID;
-use ipc_wallet::{
-    evm::{adapter::EthKeyAddress, WrappedEthAddress},
-    DefaultKey, WalletType,
-};
+use ipc_wallet::{evm::WrappedEthAddress, DefaultKey, WalletType};
 use std::{fmt::Debug, str::FromStr};
 
 pub(crate) struct WalletBalances;

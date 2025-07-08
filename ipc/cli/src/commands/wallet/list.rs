@@ -4,10 +4,7 @@
 
 use async_trait::async_trait;
 use clap::Args;
-use ipc_wallet::{
-    evm::{adapter::EthKeyAddress, WrappedEthAddress},
-    DefaultKey, WalletType,
-};
+use ipc_wallet::{evm::WrappedEthAddress, DefaultKey, WalletType};
 use std::fmt::Debug;
 use std::str::FromStr;
 

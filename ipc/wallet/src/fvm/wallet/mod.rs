@@ -53,7 +53,7 @@ pub struct WrappedFvmAddress(String);
 
 impl AddressDerivator<WrappedFvmAddress> for FvmKeyInfo {
     fn as_address(&self) -> WrappedFvmAddress {
-        WrappedFvmAddress(<FvmKeyInfo as AddressDerivator<String>>::as_address(&self))
+        WrappedFvmAddress(<FvmKeyInfo as AddressDerivator<String>>::as_address(self))
     }
 }
 

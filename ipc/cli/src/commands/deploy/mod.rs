@@ -9,7 +9,6 @@ use fendermint_eth_hardhat::Hardhat;
 use ipc_provider::new_evm_keystore_from_config;
 use ipc_wallet::evm::WrappedEthAddress;
 use std::path::PathBuf;
-use std::str::FromStr;
 use std::{fmt, sync::Arc};
 
 use crate::{CommandLineHandler, GlobalArguments};
