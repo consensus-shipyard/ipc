@@ -1,9 +1,10 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
+
 use std::str::FromStr;
 
 use fvm_shared::address::Address;
 use ipc_types::EthAddress;
-// Copyright 2022-2024 Protocol Labs
-// SPDX-License-Identifier: Apache-2.0, MIT
 use zeroize::Zeroize;
 
 #[cfg(feature = "ethers")]
