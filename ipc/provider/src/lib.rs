@@ -21,7 +21,7 @@ use ipc_api::{
 };
 use ipc_wallet::evm::adapter::{random_eth_key_info, EthKeyAddress};
 use ipc_wallet::evm::{EvmCrownJewels, WrappedEthAddress};
-use ipc_wallet::{AddressDerivator, FvmCrownJewels, KeyStoreConfig, Wallet};
+use ipc_wallet::{AddressDerivator, FvmCrownJewels, KeyStoreConfig, Wallet, WalletErr};
 use lotus::message::wallet::WalletKeyType;
 use manager::{EthSubnetManager, SubnetGenesisInfo, SubnetInfo, SubnetManager};
 use serde::{Deserialize, Serialize};
@@ -905,7 +905,11 @@ impl IpcProvider {
         let key_info = ipc_wallet::evm::EvmKeyInfo::new(private_key);
 
         let addr = key_info.as_address();
-        guard.put(addr.clone(), key_info)?;
+        match guard.put(addr.clone(), key_info) {
+            Err(WalletErr::KeyExists { .. }) => {}
+            Err(e) => Err(e)?,
+            Ok(()) => {}
+        }
         Ok(EthKeyAddress::from(addr.to_ethers()))
     }
 

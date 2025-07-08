@@ -182,8 +182,11 @@ impl Wallet /*<S>*/ {
     pub fn import(&mut self, key_info: FvmKeyInfo) -> Result<Address, WalletErr> {
         let k = FullKey::try_from(key_info)?;
         let addr = WrappedFvmAddress::from(&k.address);
-        self.keystore.put(addr, k.key_info)?;
-        Ok(k.address)
+        match self.keystore.put(addr, k.key_info) {
+            Ok(()) => Ok(k.address),
+            Err(WalletErr::KeyExists { .. }) => Ok(k.address),
+            Err(e) => Err(e),
+        }
     }
 
     /// Return a vector that contains all of the addresses in the wallet's
