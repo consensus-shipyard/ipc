@@ -6,9 +6,6 @@ sequenceDiagram
     participant ChildLotus as Child Lotus (Validator)
     participant Validator as Validator
 
-    Note over ParentLotus, ParentAgent: Parent Subnet Validator
-    Note over ChildAgent, Validator: Child Subnet Validator
-
     rect rgb(238, 251, 245)
         Note over ParentLotus, ParentAgent: Parent Subnet Validator
     end
@@ -19,64 +16,86 @@ sequenceDiagram
     %% Initialize
     Note over ParentLotus, Validator: Initialize
 
-    ParentAgent->>ParentLotus: subscribe
+    rect rgb(238, 251, 245)
+        ParentAgent->>ParentLotus: subscribe
+    end
 
-    Validator->>ChildLotus: start
-    Validator->>FullLotus: start
-    Validator->>ChildAgent: start
+    rect rgb(254, 239, 236)
+        Validator->>ChildLotus: start
+        Validator->>FullLotus: start
+        Validator->>ChildAgent: start
 
-    ChildAgent->>FullLotus: subscribe
-    ChildAgent->>ChildLotus: subscribe
+        ChildAgent->>FullLotus: subscribe
+        ChildAgent->>ChildLotus: subscribe
 
-    Validator->>+ChildAgent: join subnet
-    ChildAgent->>-ParentLotus: join subnet
-    ParentLotus->>ParentLotus: create block and<br/>execute transaction
+        Validator->>+ChildAgent: join subnet
+    end
+    rect rgb(238, 251, 245)
+        ChildAgent->>-ParentLotus: join subnet
+        ParentLotus->>ParentLotus: create block and<br/>execute transaction
+    end
 
     %% During Epoch
     Note over ParentLotus, Validator: During Epoch
 
     loop Every Block
-        ParentLotus-->>FullLotus: broadcast block
+        rect rgb(238, 251, 245)
+            ParentLotus-->>FullLotus: broadcast block
+        end
         alt if contains top-down messages
-            FullLotus-->>ChildAgent: observe finalized top-down message
-            ChildAgent->>ChildLotus: submit finalized top-down message
-            ChildLotus->>ChildAgent: is finalized on parent?
-            Note right of ChildAgent: Check messages proposed by others.
+            rect rgb(254, 239, 236)
+                FullLotus-->>ChildAgent: observe finalized top-down message
+                ChildAgent->>ChildLotus: submit finalized top-down message
+                ChildLotus->>ChildAgent: is finalized on parent?
+                Note right of ChildAgent: Check messages proposed by others.
+            end
         end
 
         alt if has power to create block
-            ChildLotus->>ChildLotus: create block
+            rect rgb(254, 239, 236)
+                ChildLotus->>ChildLotus: create block
+            end
         end
 
-        ChildLotus->>ChildLotus: receive block
+        rect rgb(254, 239, 236)
+            ChildLotus->>ChildLotus: receive block
+        end
     end
 
     %% End of Epoch
     Note over ParentLotus, Validator: End of Epoch
 
-    ChildLotus->>ChildLotus: next block producer<br/>creates checkpoint
-    Note left of ChildLotus: Ledger rules dictate<br/>checkpoint contents.
-    ChildLotus-->>ChildAgent: observe checkpoint
+    rect rgb(254, 239, 236)
+        ChildLotus->>ChildLotus: next block producer<br/>creates checkpoint
+        Note left of ChildLotus: Ledger rules dictate<br/>checkpoint contents.
+        ChildLotus-->>ChildAgent: observe checkpoint
 
-    alt if validator in epoch
-        ChildAgent->>ChildLotus: submit signature over checkpoint
+        alt if validator in epoch
+            ChildAgent->>ChildLotus: submit signature over checkpoint
+        end
+
+        loop Accumulate Signatures
+            ChildLotus->>ChildLotus: create block
+            Note left of ChildLotus: Accumulate signatures<br/>in the ledger.
+            Note over ChildLotus: ... wait for quorum of signatures ...
+        end
+
+        ChildLotus-->>ChildAgent: observe quorum
     end
+    rect rgb(238, 251, 245)
+        ChildAgent->>ParentLotus: submit checkpoint with quorum certificate
 
-    loop Accumulate Signatures
-        ChildLotus->>ChildLotus: create block
-        Note left of ChildLotus: Accumulate signatures<br/>in the ledger.
-        Note over ChildLotus: ... wait for quorum of signatures ...
+        ParentLotus->>+ParentAgent: resolve checkpoint CID
     end
+    rect rgb(254, 239, 236)
+        ParentAgent->>+ChildAgent: resolve checkpoint CID
+        Note right of ChildAgent: This is where the IPLD Resolver<br/>comes into play.
+        ChildAgent->>ChildLotus: fetch checkpoint contents
+        ChildAgent->>-ParentAgent: checkpoint contents
+    end
+    rect rgb(238, 251, 245)
+        ParentAgent->>-ParentLotus: checkpoint contents
 
-    ChildLotus-->>ChildAgent: observe quorum
-    ChildAgent->>ParentLotus: submit checkpoint with quorum certificate
-
-    ParentLotus->>+ParentAgent: resolve checkpoint CID
-    ParentAgent->>+ChildAgent: resolve checkpoint CID
-    Note right of ChildAgent: This is where the IPLD Resolver<br/>comes into play.
-    ChildAgent->>ChildLotus: fetch checkpoint contents
-    ChildAgent->>-ParentAgent: checkpoint contents
-    ParentAgent->>-ParentLotus: checkpoint contents
-
-    ParentLotus->>ParentLotus: create block and<br/>execute checkpoint
-    ParentLotus-->>FullLotus: broadcast block
+        ParentLotus->>ParentLotus: create block and<br/>execute checkpoint
+        ParentLotus-->>FullLotus: broadcast block
+    end
