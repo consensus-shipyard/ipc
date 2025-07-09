@@ -107,12 +107,8 @@ fn import_export() -> anyhow::Result<()> {
     // make sure that key_info has been imported to wallet
     assert!(wallet.import(test_key_info.clone()).is_ok());
 
-    let duplicate_error = wallet.import(test_key_info).unwrap_err();
-    // make sure that error is thrown when attempted to re-import a duplicate
-    // key_info
-    let WalletErr::KeyExists { .. } = duplicate_error else {
-        return Err(duplicate_error.into());
-    };
+    // XXX behaviour change, we do not error on import for duplicate keys anymore!
+    assert_matches!(wallet.import(test_key_info), Ok(_));
     Ok(())
 }
 
