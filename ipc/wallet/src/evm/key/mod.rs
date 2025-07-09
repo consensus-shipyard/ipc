@@ -98,6 +98,18 @@ pub struct EvmKeyInfo {
     pub(crate) private_key: Vec<u8>,
 }
 
+#[cfg(test)]
+impl EvmKeyInfo {
+    pub(crate) fn random() -> Self {
+        let mut rng = rand::thread_rng();
+        let sk = libsecp256k1::SecretKey::random(&mut rng);
+        let sks = sk.serialize();
+        Self {
+            private_key: sks.to_vec(),
+        }
+    }
+}
+
 fn secret_key_to_pub_secp256k1(sk: &[u8]) -> anyhow::Result<Vec<u8>> {
     let sk = libsecp256k1::SecretKey::parse_slice(sk)?;
     let pk = libsecp256k1::PublicKey::from_secret_key(&sk);

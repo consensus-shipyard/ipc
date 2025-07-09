@@ -15,9 +15,7 @@ fn test_read_write_keystore() {
 
     let mut ks = EvmCrownJewelsTest::new(KeyStoreConfig::plain(keystore_location)).unwrap();
 
-    let key_info = EvmKeyInfo {
-        private_key: vec![0, 1, 2],
-    };
+    let key_info = EvmKeyInfo::random();
     let addr = key_info.as_address();
 
     ks.put(key_info.as_address(), key_info.clone()).unwrap();
@@ -38,9 +36,7 @@ fn test_default() {
 
     let mut ks = EvmCrownJewelsTest::new(KeyStoreConfig::plain(&keystore_location)).unwrap();
 
-    let key_info = EvmKeyInfo {
-        private_key: vec![0, 1, 2],
-    };
+    let key_info = EvmKeyInfo::random();
     let addr = key_info.as_address();
 
     // can't set default if the key hasn't been put yet.
@@ -50,9 +46,7 @@ fn test_default() {
     assert_eq!(ks.get_default().unwrap(), Some(addr.clone()));
 
     // set other default
-    let new_key = EvmKeyInfo {
-        private_key: vec![0, 1, 3],
-    };
+    let new_key = EvmKeyInfo::random();
     let new_addr: WrappedEthAddress = new_key.as_address();
     ks.put(new_addr.clone(), new_key.clone()).unwrap();
     ks.set_default(&new_addr).unwrap();
