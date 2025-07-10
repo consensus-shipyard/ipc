@@ -305,7 +305,7 @@ fn set_ipc_gateway(genesis_file: &PathBuf, args: &GenesisIpcGatewayArgs) -> anyh
     })
 }
 
-async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> anyhow::Result<()> {
+pub async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> anyhow::Result<()> {
     let genesis_params = read_genesis(genesis_file)?;
 
     fn actors_car_blob(
@@ -323,17 +323,25 @@ async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> anyhow:
     let builtin_actors =
         actors_car_blob(args.builtin_actors_path.as_ref(), actors_builtin_car::CAR)?;
 
+    let (artifacts_path, _maybe_tempdir) = match &args.artifacts_path {
+        Some(path) => (path.clone(), None),
+        None => {
+            let (temp_dir, path) = contracts_artifacts::extract_to_tempdir()?;
+            (path, Some(temp_dir))
+        }
+    };
+
     let builder = GenesisBuilder::new(
         builtin_actors.as_ref(),
         custom_actors.as_ref(),
-        args.artifacts_path.clone(),
+        artifacts_path,
         genesis_params,
     );
 
     builder.write_to(args.output_path.clone()).await
 }
 
-async fn new_genesis_from_parent(
+pub async fn new_genesis_from_parent(
     genesis_file: &PathBuf,
     args: &GenesisFromParentArgs,
 ) -> anyhow::Result<()> {

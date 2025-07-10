@@ -31,6 +31,7 @@ const TRANSACTION_RECEIPT_RETRIES: usize = 200;
 type SignerWithFeeEstimator =
     Arc<Eip1559GasEstimatorMiddleware<SignerMiddleware<Provider<Http>, Wallet<SigningKey>>>>;
 
+#[derive(Debug)]
 pub struct DeployedContracts {
     pub registry: eth_types::Address,
     pub gateway: eth_types::Address,
@@ -58,7 +59,7 @@ impl EthContractDeployer {
         let wallet: LocalWallet =
             LocalWallet::from_bytes(private_key).context("invalid private key")?;
         let wallet = wallet.with_chain_id(chain_id);
-        let signer = SignerMiddleware::new(provider, wallet);
+        let signer = SignerMiddleware::new(provider, wallet.clone());
         let client = Eip1559GasEstimatorMiddleware::new(signer);
 
         let (ipc_contracts, top_contracts) =
