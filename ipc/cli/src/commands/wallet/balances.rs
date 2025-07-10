@@ -2,16 +2,15 @@
 // SPDX-License-Identifier: MIT
 //! Wallet balances cli handler
 
+use crate::{get_ipc_provider, CommandLineHandler, GlobalArguments};
 use async_trait::async_trait;
 use clap::Args;
 use futures_util::future::join_all;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_api::ethers_address_to_fil_address;
 use ipc_api::subnet_id::SubnetID;
-use ipc_wallet::{EthKeyAddress, EvmKeyStore, WalletType};
+use ipc_wallet::{evm::WrappedEthAddress, DefaultKey, WalletType};
 use std::{fmt::Debug, str::FromStr};
-
-use crate::{get_ipc_provider, CommandLineHandler, GlobalArguments};
 
 pub(crate) struct WalletBalances;
 
@@ -29,33 +28,29 @@ impl CommandLineHandler for WalletBalances {
         let mut errors = Vec::new();
 
         match wallet_type {
-            WalletType::Evm => {
+            WalletType::Etherium => {
                 let wallet = provider.evm_wallet()?;
-                let addresses = wallet.read().unwrap().list()?;
-                let r = addresses
-                    .iter()
-                    .map(|addr| {
-                        let provider = provider.clone();
-                        let subnet = subnet.clone();
-                        async move {
-                            provider
-                                .wallet_balance(
-                                    &subnet,
-                                    &ethers_address_to_fil_address(&(addr.clone()).into())?,
-                                )
-                                .await
-                                .map(|balance| (balance, addr))
-                        }
-                    })
-                    .collect::<Vec<_>>();
+                let addresses = wallet.read().unwrap().list();
+                let r = Vec::from_iter(addresses.iter().map(|addr| {
+                    let provider = provider.clone();
+                    let subnet = subnet.clone();
+                    async move {
+                        provider
+                            .wallet_balance(
+                                &subnet,
+                                &ethers_address_to_fil_address(addr.to_ethers())?,
+                            )
+                            .await
+                            .map(|balance| (balance, addr.clone()))
+                    }
+                }));
 
-                let v: Vec<anyhow::Result<(TokenAmount, &EthKeyAddress)>> = join_all(r).await;
+                let v: Vec<anyhow::Result<(TokenAmount, WrappedEthAddress)>> = join_all(r).await;
 
                 for r in v.into_iter() {
                     match r {
-                        Ok(i) => {
-                            let (balance, addr) = i;
-                            if addr.to_string() != "default-key" {
+                        Ok((balance, addr)) => {
+                            if addr != WrappedEthAddress::default_key() {
                                 println!("{} - Balance: {}", addr, balance);
                             }
                         }
@@ -74,27 +69,23 @@ impl CommandLineHandler for WalletBalances {
                     return Err(error);
                 }
             }
-            WalletType::Fvm => {
+            WalletType::Filecoin => {
                 let wallet = provider.fvm_wallet()?;
                 let addresses = wallet.read().unwrap().list_addrs()?;
-                let r = addresses
-                    .iter()
-                    .map(|addr| {
-                        let provider = provider.clone();
-                        let subnet = subnet.clone();
-                        async move {
-                            provider
-                                .wallet_balance(&subnet, addr)
-                                .await
-                                .map(|balance| (balance, addr))
-                        }
-                    })
-                    .collect::<Vec<_>>();
+                let r = Vec::from_iter(addresses.iter().map(|addr| {
+                    let provider = provider.clone();
+                    let subnet = subnet.clone();
+                    async move {
+                        provider
+                            .wallet_balance(&subnet, addr)
+                            .await
+                            .map(|balance| (balance, addr))
+                    }
+                }));
 
-                let r = join_all(r)
-                    .await
-                    .into_iter()
-                    .collect::<anyhow::Result<Vec<(TokenAmount, &Address)>>>()?;
+                let r = anyhow::Result::<Vec<(TokenAmount, &Address)>>::from_iter(
+                    join_all(r).await.into_iter(),
+                )?;
                 for (balance, addr) in r {
                     println!("{:?} - Balance: {}", addr, balance);
                 }

@@ -340,6 +340,7 @@ async fn new_genesis_from_parent(
     // provider with the parent.
     let parent_provider = IpcProvider::new_with_subnet(
         None,
+        None,
         ipc_provider::config::Subnet {
             id: args
                 .subnet_id

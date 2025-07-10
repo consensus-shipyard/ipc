@@ -25,7 +25,7 @@ impl CommandLineHandler for WalletImport {
         let wallet_type = WalletType::from_str(&arguments.wallet_type)?;
 
         if let Some(key) = &arguments.private_key {
-            if !matches!(wallet_type, WalletType::Evm) {
+            if !matches!(wallet_type, WalletType::Etherium) {
                 bail!("--private-key only supported by --wallet-type=evm");
             }
             println!(
@@ -35,19 +35,35 @@ impl CommandLineHandler for WalletImport {
             Ok(())
         } else {
             // Get keyinfo from file or stdin
-            let keyinfo = if arguments.path.is_some() {
-                fs::read_to_string(arguments.path.as_ref().unwrap())?
+            let (keyinfo_path, keyinfo) = if let Some(path) = arguments.path.as_ref() {
+                let content = fs::read_to_string(path)?;
+                (std::path::PathBuf::from(path), content)
             } else {
                 // FIXME: Accept keyinfo from stdin
                 bail!("stdin not supported yet")
             };
 
             match wallet_type {
-                WalletType::Fvm => println!("{:?}", provider.import_fvm_key(&keyinfo)?),
-                WalletType::Evm => {
+                WalletType::Filecoin => println!("{:?}", provider.import_fvm_key(&keyinfo)?),
+                WalletType::Etherium => {
                     let key = provider
                         .import_evm_key_from_privkey(&keyinfo)
-                        .or_else(|_| provider.import_evm_key_from_json(&keyinfo))?;
+                        .or_else(|e| {
+                            println!(
+                                "Failed to import file {p} as key private key{e:?}",
+                                e = e,
+                                p = keyinfo_path.display()
+                            );
+                            provider
+                                .import_evm_key_from_json(&keyinfo)
+                                .inspect_err(|e| {
+                                    println!(
+                                        "Failed to import file {p} as json key config {e:?}",
+                                        e = e,
+                                        p = keyinfo_path.display()
+                                    );
+                                })
+                        })?;
 
                     println!("{:?}", key.to_string())
                 }

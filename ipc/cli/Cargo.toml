@@ -15,6 +15,7 @@ bytes = "1.4.0"
 cid = { workspace = true }
 clap = { version = "4.1.4", features = ["env", "derive"] }
 clap_complete = "4.2.1"
+color-eyre = "*"
 env_logger = "0.10.0"
 ethers = { workspace = true }
 ethers-contract = { workspace = true }

@@ -128,6 +128,7 @@ mod tests {
     use fvm_shared::address::Address;
     use ipc_api::subnet_id::SubnetID;
     use ipc_types::EthAddress;
+    use std::collections::HashMap;
     use std::str::FromStr;
 
     const STR: &str = r#"
@@ -179,7 +180,8 @@ mod tests {
     fn test_serialization() {
         let mut config = Config {
             keystore_path: Some(String::from("~/.ipc")),
-            subnets: Default::default(),
+            subnets: HashMap::default(),
+            password: None,
         };
 
         let eth_addr1 = EthAddress::from_str("0x6BE1Ccf648c74800380d0520D797a170c808b624").unwrap();
