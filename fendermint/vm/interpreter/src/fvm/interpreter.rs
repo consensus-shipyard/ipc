@@ -3,7 +3,7 @@
 
 use anyhow::{Context, Result};
 use cid::Cid;
-use fendermint_vm_message::chain::ChainMessage;
+use fendermint_vm_message::chain::{ChainMessage, ValidatorMessage};
 use fendermint_vm_message::ipc::IpcMessage;
 use fendermint_vm_message::query::{FvmQuery, StateParams};
 use fendermint_vm_message::signed::SignedMessage;
@@ -39,6 +39,7 @@ use std::convert::TryInto;
 use crate::fvm::executions::{
     execute_cron_message, execute_signed_message, push_block_to_chainmeta_actor_if_possible,
 };
+use crate::fvm::validator::execute_bottom_up_signature;
 
 struct Actor {
     id: ActorID,
@@ -353,6 +354,7 @@ where
                         }
                         block_gas_usage += signed.message.gas_limit;
                     }
+                    ChainMessage::Validator(_) => {}
                 },
                 Err(e) => {
                     tracing::warn!(error = %e, "failed to decode message in proposal as ChainMessage");
@@ -467,6 +469,11 @@ where
                     })
                 }
             },
+            ChainMessage::Validator(v) => match v {
+                ValidatorMessage::SignBottomUpCheckpoint(signed) => {
+                    execute_bottom_up_signature(state, signed)
+                }
+            },
         }
     }
 
@@ -579,6 +586,7 @@ fn ipld_decode_signed_message(msg: &[u8]) -> Result<SignedMessage> {
 
     match chain_msg {
         ChainMessage::Signed(msg) => Ok(msg),
+        ChainMessage::Validator(ValidatorMessage::SignBottomUpCheckpoint(msg)) => Ok(msg),
         other => Err(CheckMessageError::IllegalMessage(format!("{:?}", other)).into()),
     }
 }
