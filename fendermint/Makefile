@@ -90,18 +90,18 @@ docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(CUSTOM_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 # it can handle for anyone with `DOCKER_BUILDKIT=1`.
 docker-build: docker-deps $(FENDERMINT_CODE)
 	if [ "$(PROFILE)" = "ci" ]; then \
-		cat docker/builder.ci.Dockerfile docker/runner.Dockerfile > docker/Dockerfile ; \
+		cat docker/builder.ci.Dockerfile docker/runner.Dockerfile > docker/.frankenstein.containerfile ; \
 		docker buildx build \
 			$(BUILDX_STORE) \
 			$(BUILDX_FLAGS) \
-			-f docker/Dockerfile \
+			-f docker/.frankenstein.containerfile \
 			-t $(BUILDX_TAG) $(PWD)/..; \
 	else \
-		cat docker/builder.local.Dockerfile docker/runner.Dockerfile > docker/Dockerfile ; \
+		cat docker/builder.local.Dockerfile docker/runner.Dockerfile > docker/.frankenstein.containerfile ; \
 		DOCKER_BUILDKIT=1 \
 		docker build \
 			$(BUILDX_STORE) \
-			-f docker/Dockerfile \
+			-f docker/.frankenstein.containerfile \
 			-t fendermint:latest $(PWD)/..; \
 	fi
 
