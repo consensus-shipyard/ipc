@@ -16,17 +16,31 @@ RUN apt-get update && \
 
 WORKDIR /app
 
+# changes the users shell, so `podman run -it` will use `bash`
 RUN chsh -s $(which bash) $(whoami)
-RUN echo "x$SHELL"
 
-# install nvm <https://github.com/nvm-sh/nvm?tab=readme-ov-file#installing-and-updating>
-RUN curl -sSL -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash - && nvm --version
-# install node.js 20
-RUN nvm install 20 && npm --version
-# install pnpm <https://pnpm.io/installation#using-npm>
-RUN npm install -g pnpm@latest-10 && pnpm --version
+# SHELL ["/bin/bash -c"]would do the same, but it only works for docker format containers
 
 RUN anvil --version && forge --version && cast --version && chisel --version
+
+# install nvm <https://github.com/nvm-sh/nvm?tab=readme-ov-file#installing-and-updating>
+RUN curl -sSL -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash -
+# note: since nvm requires bash, and .bashrc contains the preload of `nvm`, we run a few
+# things in `/bin/bash` rather than the efault `RUN ..` environment, which is a limited
+# shell implementation, and does not source `.bashrc`.
+
+# install node.js 20
+ENV NVM_DIR /root/.nvm
+ENV NODE_VERSION 20.19.4
+RUN /bin/bash -c "source ${NVM_DIR}/nvm.sh && nvm --version && nvm install ${NODE_VERSION} && nvm use --delete-prefix $NODE_VERSION"
+ENV NODE_PATH ${NVM_DIR}/versions/node/${NODE_VERSION}/bin
+ENV PATH ${NODE_PATH}:${PATH}
+RUN echo "PATH=${NVM_DIR}/versions/node/${NODE_VERSION}/bin:${PATH} >> ~/.bashrc"
+RUN /bin/bash -c "source ${NVM_DIR}/nvm.sh && npm --version"
+
+# install pnpm <https://pnpm.io/installation#using-npm>
+RUN /bin/bash -c "source ${NVM_DIR}/nvm.sh && npm install -g pnpm@latest-10 && pnpm --version"
+
 
 COPY . .
 
@@ -36,5 +50,5 @@ COPY . .
 RUN --mount=type=cache,target=target \
   --mount=type=cache,target=$RUSTUP_HOME,from=rust,source=$RUSTUP_HOME \
   --mount=type=cache,target=$CARGO_HOME,from=rust,source=$CARGO_HOME \
-  cargo install --locked --root output --path fendermint/app &&\
-  cargo install --locked --root output --path ipc/cli
+  /bin/bash -c "source ${NVM_DIR}/nvm.sh && cargo install --locked --root output --path fendermint/app" &&\
+  /bin/bash -c "source ${NVM_DIR}/nvm.sh && cargo install --locked --root output --path ipc/cli"

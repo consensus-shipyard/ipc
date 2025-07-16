@@ -88,7 +88,7 @@ docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(CUSTOM_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 # To use `buildx` locally to produce multiplatform images, one needs to run `docker buildx create --use`.
 # After that it looks like even the regular docker build needs the `--load` parameter, which hopefully
 # it can handle for anyone with `DOCKER_BUILDKIT=1`.
-docker-build: docker-deps $(FENDERMINT_CODE)
+docker-build:
 	if [ "$(PROFILE)" = "ci" ]; then \
 		cat docker/builder.ci.Dockerfile docker/runner.Dockerfile > docker/.frankenstein.containerfile ; \
 		docker buildx build \
@@ -98,9 +98,7 @@ docker-build: docker-deps $(FENDERMINT_CODE)
 			-t $(BUILDX_TAG) $(PWD)/..; \
 	else \
 		cat docker/builder.local.Dockerfile docker/runner.Dockerfile > docker/.frankenstein.containerfile ; \
-		DOCKER_BUILDKIT=1 \
-		docker build \
-			$(BUILDX_STORE) \
+		podman build \
 			-f docker/.frankenstein.containerfile \
 			-t fendermint:latest $(PWD)/..; \
 	fi
