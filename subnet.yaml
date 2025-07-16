@@ -46,3 +46,7 @@ activate:
     - 1
     - 1
     - 1
+
+genesis:
+  base-fee: 1000
+  power-scale: 0
