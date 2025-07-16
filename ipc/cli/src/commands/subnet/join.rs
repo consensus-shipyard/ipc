@@ -24,7 +24,7 @@ impl CommandLineHandler for JoinSubnet {
         log::debug!("join subnet with args: {:?}", arguments);
 
         let mut provider = get_ipc_provider(global)?;
-        let epoch = join_subnet(&mut provider, &arguments).await?;
+        let epoch = join_subnet(&mut provider, arguments).await?;
 
         println!("joined at epoch: {epoch}");
 
