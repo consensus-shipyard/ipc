@@ -4,6 +4,7 @@
 
 use crate::commands::{get_ipc_provider, require_fil_addr_from_str};
 use crate::{CommandLineHandler, GlobalArguments};
+use anyhow::Ok;
 use async_trait::async_trait;
 use clap::Args;
 use fvm_shared::address::Address;
@@ -21,35 +22,44 @@ impl CommandLineHandler for crate::commands::subnet::SetFederatedPower {
         log::debug!("set federated power with args: {:?}", arguments);
 
         let provider = get_ipc_provider(global)?;
-        let subnet = SubnetID::from_str(&arguments.subnet)?;
-
-        let addresses: Vec<Address> = arguments
-            .validator_addresses
-            .iter()
-            .map(|address| require_fil_addr_from_str(address).unwrap())
-            .collect();
-
-        let public_keys: Vec<Vec<u8>> = arguments
-            .validator_pubkeys
-            .iter()
-            .map(|key| hex::decode(key).unwrap())
-            .collect();
-
-        let from_address = require_fil_addr_from_str(&arguments.from).unwrap();
-
-        let chain_epoch = provider
-            .set_federated_power(
-                &from_address,
-                &subnet,
-                &addresses,
-                &public_keys,
-                &arguments.validator_power,
-            )
-            .await?;
+        let chain_epoch = set_federated_power(&provider, arguments).await?;
         println!("New federated power is set at epoch {chain_epoch}");
 
         Ok(())
     }
+}
+
+pub(crate) async fn set_federated_power(
+    provider: &ipc_provider::IpcProvider,
+    args: &SetFederatedPowerArgs,
+) -> anyhow::Result<i64> {
+    let subnet = SubnetID::from_str(&args.subnet)?;
+
+    let addresses: Vec<Address> = args
+        .validator_addresses
+        .iter()
+        .map(|address| require_fil_addr_from_str(address).unwrap())
+        .collect();
+
+    let public_keys: Vec<Vec<u8>> = args
+        .validator_pubkeys
+        .iter()
+        .map(|key| hex::decode(key).unwrap())
+        .collect();
+
+    let from_address = require_fil_addr_from_str(&args.from).unwrap();
+
+    let chain_epoch = provider
+        .set_federated_power(
+            &from_address,
+            &subnet,
+            &addresses,
+            &public_keys,
+            &args.validator_power,
+        )
+        .await?;
+
+    Ok(chain_epoch)
 }
 
 #[derive(Debug, Args)]

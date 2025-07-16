@@ -1,6 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
-//! Subnet bootstrap-related commands
+//! Subnet bootstrap node related commands
 
 use async_trait::async_trait;
 use clap::Args;
@@ -9,11 +9,11 @@ use std::{fmt::Debug, str::FromStr};
 
 use crate::{get_ipc_provider, require_fil_addr_from_str, CommandLineHandler, GlobalArguments};
 
-/// The command to add a bootstrap subnet
-pub struct AddBootstrap;
+/// The command to add a bootstrap node to a subnet
+pub struct AddNodeBootstrap;
 
 #[async_trait]
-impl CommandLineHandler for AddBootstrap {
+impl CommandLineHandler for AddNodeBootstrap {
     type Arguments = AddBootstrapArgs;
 
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
@@ -33,7 +33,10 @@ impl CommandLineHandler for AddBootstrap {
 }
 
 #[derive(Debug, Args)]
-#[command(name = "add-bootstrap", about = "Advertise bootstrap in the subnet")]
+#[command(
+    name = "add-bootstrap-node",
+    about = "Advertise bootstrap node in the subnet"
+)]
 pub struct AddBootstrapArgs {
     #[arg(long, help = "The address of the validator adding the bootstrap")]
     pub from: Option<String>,
@@ -44,14 +47,14 @@ pub struct AddBootstrapArgs {
 }
 
 /// The command to list bootstrap nodes in a subnet
-pub struct ListBootstraps;
+pub struct ListBootstrapNodes;
 
 #[async_trait]
-impl CommandLineHandler for ListBootstraps {
+impl CommandLineHandler for ListBootstrapNodes {
     type Arguments = ListBootstrapsArgs;
 
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
-        log::debug!("add subnet bootstrap with args: {:?}", arguments);
+        log::debug!("add subnet bootstrap nodes with args: {:?}", arguments);
 
         let provider = get_ipc_provider(global)?;
         let subnet = SubnetID::from_str(&arguments.subnet)?;
@@ -72,8 +75,11 @@ impl CommandLineHandler for ListBootstraps {
 }
 
 #[derive(Debug, Args)]
-#[command(name = "list-bootstraps", about = "List bootstraps in the subnet")]
+#[command(
+    name = "list-bootstrap-nodes",
+    about = "List bootstrap nodes in the subnet"
+)]
 pub struct ListBootstrapsArgs {
-    #[arg(long, help = "The subnet to list bootstraps from")]
+    #[arg(long, help = "The subnet to list bootstrap nodes from")]
     pub subnet: String,
 }

@@ -91,7 +91,9 @@ impl IpcProvider {
         let fvm_wallet = Arc::new(RwLock::new(Wallet::new(new_fvm_wallet_from_config(
             config.clone(),
         )?)));
-        let evm_keystore = Arc::new(RwLock::new(new_evm_keystore_from_config(config.clone())?));
+        let evm_keystore = Arc::new(RwLock::new(new_evm_keystore_from_arc_config(
+            config.clone(),
+        )?));
         Ok(Self::new(config, fvm_wallet, evm_keystore))
     }
 
@@ -908,8 +910,19 @@ fn new_fvm_wallet_from_config(config: Arc<Config>) -> anyhow::Result<KeyStore> {
     }
 }
 
-pub fn new_evm_keystore_from_config(
+pub fn new_evm_keystore_from_arc_config(
     config: Arc<Config>,
+) -> anyhow::Result<PersistentKeyStore<EthKeyAddress>> {
+    let repo_str = &config.keystore_path;
+    if let Some(repo_str) = repo_str {
+        new_evm_keystore_from_path(repo_str)
+    } else {
+        Err(anyhow!("No keystore repo found in config"))
+    }
+}
+
+pub fn new_evm_keystore_from_config(
+    config: &Config,
 ) -> anyhow::Result<PersistentKeyStore<EthKeyAddress>> {
     let repo_str = &config.keystore_path;
     if let Some(repo_str) = repo_str {
