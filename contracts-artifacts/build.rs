@@ -1,3 +1,5 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: MIT
 // contracts-artifacts/build.rs
 
 use std::{env, fs, path::PathBuf, process::Command};

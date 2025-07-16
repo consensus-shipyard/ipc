@@ -23,25 +23,27 @@ impl CommandLineHandler for WalletImport {
         log::debug!("import wallet with args: {:?}", arguments);
 
         let provider = get_ipc_provider(global)?;
-        import_wallet(&provider, arguments)
+        let address = import_wallet(&provider, arguments)?;
+
+        println!("{:?}", address);
+        Ok(())
     }
 }
 
+/// Import a key into the IPC keystore and return the address
 pub(crate) fn import_wallet(
     provider: &ipc_provider::IpcProvider,
     arguments: &WalletImportArgs,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<String> {
     let wallet_type = WalletType::from_str(&arguments.wallet_type)?;
 
     if let Some(key) = &arguments.private_key {
         if !matches!(wallet_type, WalletType::Evm) {
             bail!("--private-key only supported by --wallet-type=evm");
         }
-        println!(
-            "{:?}",
-            provider.import_evm_key_from_privkey(key)?.to_string()
-        );
-        Ok(())
+        let address = provider.import_evm_key_from_privkey(key)?.to_string();
+        println!("{:?}", address);
+        Ok(address)
     } else {
         // Get keyinfo from file or stdin
         let keyinfo = if arguments.path.is_some() {
@@ -51,17 +53,17 @@ pub(crate) fn import_wallet(
             bail!("stdin not supported yet")
         };
 
-        match wallet_type {
-            WalletType::Fvm => println!("{:?}", provider.import_fvm_key(&keyinfo)?),
+        let address = match wallet_type {
+            WalletType::Fvm => provider.import_fvm_key(&keyinfo)?.to_string(),
             WalletType::Evm => {
                 let key = provider
                     .import_evm_key_from_privkey(&keyinfo)
                     .or_else(|_| provider.import_evm_key_from_json(&keyinfo))?;
-
-                println!("{:?}", key.to_string())
+                key.to_string()
             }
         };
-        Ok(())
+
+        Ok(address)
     }
 }
 

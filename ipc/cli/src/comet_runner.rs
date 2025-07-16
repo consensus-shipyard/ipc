@@ -1,3 +1,6 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: MIT
+
 use std::ffi::OsStr;
 use std::{
     env, fs, io,

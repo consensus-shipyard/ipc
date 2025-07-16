@@ -4,26 +4,24 @@
 use crate::commands::deploy::deploy_contracts as deploy_contracts_cmd;
 use crate::commands::subnet::approve::{approve_subnet as approve_subnet_cmd, ApproveSubnetArgs};
 use crate::commands::subnet::create::create_subnet as create_subnet_cmd;
+use crate::commands::subnet::create_genesis::create_genesis;
 use crate::commands::subnet::init::ipc_config_store::IpcConfigStore;
 use crate::commands::subnet::join::join_subnet;
 use crate::commands::subnet::set_federated_power::set_federated_power;
 use crate::commands::wallet::import::import_wallet;
 
 use crate::commands::subnet::init::config::{
-    ActivateConfig, DeployConfig, GenesisConfig, SubnetCreateConfig, SubnetInitConfig,
-    WalletImportArgs,
+    ActivateConfig, DeployConfig, SubnetCreateConfig, SubnetInitConfig, WalletImportArgs,
 };
 use crate::{get_ipc_provider, GlobalArguments};
 use anyhow::{Context, Result};
-use fendermint_app::cmd::genesis::{new_genesis_from_parent, seal_genesis};
-use fendermint_app::options::genesis::{GenesisFromParentArgs, SealGenesisArgs};
 use fendermint_vm_actor_interface::init::builtin_actor_eth_addr;
 use fendermint_vm_actor_interface::ipc::{self};
 use ipc_api::subnet_id::SubnetID;
+use ipc_provider::new_evm_keystore_from_config;
 use ipc_provider::IpcProvider;
-use ipc_provider::{config::Subnet, new_evm_keystore_from_config};
 use ipc_types::EthAddress;
-use std::{path::PathBuf, str::FromStr};
+use std::str::FromStr;
 use url::Url;
 
 /// Orchestrates the end-to-end `subnet init` workflow.
@@ -170,53 +168,12 @@ async fn create_and_approve_subnet(
     })
 }
 
-/// Generates and seals the genesis file for the subnet.
-async fn create_genesis(
-    cfg: &GenesisConfig,
-    subnet_id: &SubnetID,
-    parent: &Subnet,
-    dir: &PathBuf,
-) -> Result<()> {
-    log::info!("Creating genesis");
-    let genesis_file = dir.join("genesis.json");
-    new_genesis_from_parent(
-        &genesis_file,
-        &GenesisFromParentArgs {
-            subnet_id: subnet_id.clone(),
-            parent_endpoint: parent.rpc_http().clone(),
-            parent_auth_token: parent.auth_token(),
-            parent_gateway: parent.gateway_addr(),
-            parent_registry: parent.registry_addr(),
-            network_version: cfg.network_version,
-            base_fee: cfg.base_fee.clone(),
-            power_scale: cfg.power_scale,
-        },
-    )
-    .await?;
-    log::info!("Genesis created at: {}", genesis_file.display());
-
-    log::info!("Sealing genesis");
-    let sealed = dir.join("sealed-genesis.json");
-    seal_genesis(
-        &genesis_file,
-        &SealGenesisArgs {
-            output_path: sealed.clone(),
-            custom_actors_path: None,
-            builtin_actors_path: None,
-            artifacts_path: None,
-        },
-    )
-    .await?;
-    log::info!("Genesis sealed and stored at: {}", sealed.display());
-
-    Ok(())
-}
-
 /// Imports wallets into the IPC keystore
 fn import_wallets(all_imports: &Vec<WalletImportArgs>, provider: &IpcProvider) -> Result<()> {
     log::info!("Importing wallets");
     for args in all_imports {
-        import_wallet(provider, &args).context("failed to import wallet")?;
+        let address = import_wallet(provider, &args).context("failed to import wallet")?;
+        log::info!("Imported wallet: {}", address);
     }
     log::info!("Wallets imported");
     Ok(())

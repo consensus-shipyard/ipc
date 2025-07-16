@@ -5,18 +5,17 @@
 
 pub(crate) use crate::commands::deploy::DeployConfig;
 pub(crate) use crate::commands::subnet::{
-    create::SubnetCreateConfig, join::JoinSubnetArgs, set_federated_power::SetFederatedPowerArgs,
+    create::SubnetCreateConfig, create_genesis::GenesisConfig, join::JoinSubnetArgs,
+    set_federated_power::SetFederatedPowerArgs,
 };
 pub(crate) use crate::commands::wallet::import::WalletImportArgs;
 
 use anyhow::ensure;
 use ethers::{types::H160, utils::keccak256};
-use fendermint_app::options::parse::{parse_network_version, parse_token_amount};
 use fs_err as fs;
-use fvm_shared::{econ::TokenAmount, version::NetworkVersion};
 use hex::FromHex;
 use ipc_api::subnet::PermissionMode;
-use serde::{Deserialize, Deserializer};
+use serde::Deserialize;
 use std::path::Path;
 
 /// Convert an uncompressed secp256k1 public key (0x04-prefixed) into an Ethereum address
@@ -32,24 +31,6 @@ fn public_key_to_address(hex_str: &str) -> anyhow::Result<H160> {
     );
     let hash = keccak256(&bytes[1..]);
     Ok(H160::from_slice(&hash[12..]))
-}
-
-/// Deserialize a string into `NetworkVersion`
-fn de_network_version<'de, D>(deserializer: D) -> Result<NetworkVersion, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    parse_network_version(&s).map_err(serde::de::Error::custom)
-}
-
-/// Deserialize a string into `TokenAmount`
-fn de_token_amount<'de, D>(deserializer: D) -> Result<TokenAmount, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    parse_token_amount(&s).map_err(serde::de::Error::custom)
 }
 
 /// Config for setting federated or static validator power
@@ -125,50 +106,6 @@ pub enum ActivateConfig {
     Collateral {
         validators: Vec<JoinConfig>,
     },
-}
-
-/// Genesis parameters
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub struct GenesisConfig {
-    #[serde(
-        default = "GenesisConfig::default_network_version",
-        deserialize_with = "de_network_version"
-    )]
-    pub network_version: NetworkVersion,
-
-    #[serde(
-        default = "GenesisConfig::default_base_fee",
-        deserialize_with = "de_token_amount"
-    )]
-    pub base_fee: TokenAmount,
-
-    #[serde(default = "GenesisConfig::default_power_scale")]
-    pub power_scale: i8,
-}
-
-impl Default for GenesisConfig {
-    fn default() -> Self {
-        GenesisConfig {
-            network_version: GenesisConfig::default_network_version(),
-            base_fee: GenesisConfig::default_base_fee(),
-            power_scale: GenesisConfig::default_power_scale(),
-        }
-    }
-}
-
-impl GenesisConfig {
-    const fn default_network_version() -> NetworkVersion {
-        NetworkVersion::V21
-    }
-
-    fn default_base_fee() -> TokenAmount {
-        parse_token_amount("1000").unwrap()
-    }
-
-    const fn default_power_scale() -> i8 {
-        3
-    }
 }
 
 /// Top-level YAML schema for `subnet init`

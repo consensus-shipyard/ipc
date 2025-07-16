@@ -9,6 +9,7 @@ use self::leave::{Claim, ClaimArgs};
 use self::rpc::{ChainIdSubnet, ChainIdSubnetArgs};
 use crate::commands::subnet::approve::{ApproveSubnet, ApproveSubnetArgs};
 pub use crate::commands::subnet::create::{CreateSubnet, CreateSubnetArgs};
+use crate::commands::subnet::create_genesis::{CreateGenesis, CreateGenesisArgs};
 use crate::commands::subnet::genesis_epoch::{GenesisEpoch, GenesisEpochArgs};
 use crate::commands::subnet::init::{InitSubnet, InitSubnetArgs};
 pub use crate::commands::subnet::join::{JoinSubnet, JoinSubnetArgs};
@@ -30,6 +31,7 @@ use clap::{Args, Subcommand};
 pub mod add_bootstrap_node;
 pub mod approve;
 pub mod create;
+mod create_genesis;
 mod genesis_epoch;
 pub mod init;
 pub mod join;
@@ -83,6 +85,7 @@ impl SubnetCommandsArgs {
                 ShowGatewayContractCommitSha::handle(global, args).await
             }
             Commands::SetFederatedPower(args) => SetFederatedPower::handle(global, args).await,
+            Commands::CreateGenesis(args) => CreateGenesis::handle(global, args).await,
         }
     }
 }
@@ -110,4 +113,5 @@ pub(crate) enum Commands {
     GetValidator(ValidatorInfoArgs),
     ShowGatewayContractCommitSha(ShowGatewayContractCommitShaArgs),
     SetFederatedPower(SetFederatedPowerArgs),
+    CreateGenesis(CreateGenesisArgs),
 }

@@ -1,3 +1,6 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: MIT
+
 use anyhow::Context;
 use rust_embed::RustEmbed;
 use std::{fs, path::PathBuf};
