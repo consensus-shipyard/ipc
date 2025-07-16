@@ -47,9 +47,7 @@ pub(crate) async fn set_federated_power(
         .map(|key| hex::decode(key).unwrap())
         .collect();
 
-    println!("set federated power for validators: {0:?}", args.from);
     let from_address = require_fil_addr_from_str(&args.from).unwrap();
-    println!("from address: {from_address:?}");
 
     let chain_epoch = provider
         .set_federated_power(

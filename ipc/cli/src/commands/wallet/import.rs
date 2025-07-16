@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use clap::{ArgGroup, Args};
 use fs_err as fs;
 use ipc_wallet::WalletType;
+use serde::Deserialize;
 use std::fmt::Debug;
 use std::str::FromStr;
 
@@ -22,48 +23,56 @@ impl CommandLineHandler for WalletImport {
         log::debug!("import wallet with args: {:?}", arguments);
 
         let provider = get_ipc_provider(global)?;
-        let wallet_type = WalletType::from_str(&arguments.wallet_type)?;
-
-        if let Some(key) = &arguments.private_key {
-            if !matches!(wallet_type, WalletType::Evm) {
-                bail!("--private-key only supported by --wallet-type=evm");
-            }
-            println!(
-                "{:?}",
-                provider.import_evm_key_from_privkey(key)?.to_string()
-            );
-            Ok(())
-        } else {
-            // Get keyinfo from file or stdin
-            let keyinfo = if arguments.path.is_some() {
-                fs::read_to_string(arguments.path.as_ref().unwrap())?
-            } else {
-                // FIXME: Accept keyinfo from stdin
-                bail!("stdin not supported yet")
-            };
-
-            match wallet_type {
-                WalletType::Fvm => println!("{:?}", provider.import_fvm_key(&keyinfo)?),
-                WalletType::Evm => {
-                    let key = provider
-                        .import_evm_key_from_privkey(&keyinfo)
-                        .or_else(|_| provider.import_evm_key_from_json(&keyinfo))?;
-
-                    println!("{:?}", key.to_string())
-                }
-            };
-            Ok(())
-        }
+        import_wallet(&provider, arguments)
     }
 }
 
-#[derive(Debug, Args)]
+pub(crate) fn import_wallet(
+    provider: &ipc_provider::IpcProvider,
+    arguments: &WalletImportArgs,
+) -> anyhow::Result<()> {
+    let wallet_type = WalletType::from_str(&arguments.wallet_type)?;
+
+    if let Some(key) = &arguments.private_key {
+        if !matches!(wallet_type, WalletType::Evm) {
+            bail!("--private-key only supported by --wallet-type=evm");
+        }
+        println!(
+            "{:?}",
+            provider.import_evm_key_from_privkey(key)?.to_string()
+        );
+        Ok(())
+    } else {
+        // Get keyinfo from file or stdin
+        let keyinfo = if arguments.path.is_some() {
+            fs::read_to_string(arguments.path.as_ref().unwrap())?
+        } else {
+            // FIXME: Accept keyinfo from stdin
+            bail!("stdin not supported yet")
+        };
+
+        match wallet_type {
+            WalletType::Fvm => println!("{:?}", provider.import_fvm_key(&keyinfo)?),
+            WalletType::Evm => {
+                let key = provider
+                    .import_evm_key_from_privkey(&keyinfo)
+                    .or_else(|_| provider.import_evm_key_from_json(&keyinfo))?;
+
+                println!("{:?}", key.to_string())
+            }
+        };
+        Ok(())
+    }
+}
+
+#[derive(Debug, Args, Deserialize)]
 #[command(about = "Import a key into the agent's wallet")]
 #[clap(group(ArgGroup::new("key_source")
 .required(true)
 .multiple(false)
 .args(&["path", "private_key"]),
 ))]
+#[serde(rename_all = "kebab-case")]
 pub(crate) struct WalletImportArgs {
     #[arg(long, help = "The type of the wallet, i.e. fvm, evm")]
     pub wallet_type: String,

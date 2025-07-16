@@ -34,7 +34,7 @@ const CALIBRATION_REGISTRY: &str = "0x0b4e239FF21b40120cDa817fba77bD1B366c1bcD";
 
 /// The top-level struct representing the config. Calls to [`Config::from_file`] deserialize into
 /// this struct.
-#[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
 pub struct Config {
     /// Directory of the keystore that wants to be made available by the provider.
     pub keystore_path: Option<String>,

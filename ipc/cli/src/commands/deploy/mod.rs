@@ -7,7 +7,7 @@ use clap::{Args, ValueEnum};
 use ethers::types::Address;
 use fendermint_eth_deployer::{DeployedContracts, EthContractDeployer, SubnetCreationPrivilege};
 use fendermint_eth_hardhat::Hardhat;
-use ipc_provider::new_evm_keystore_from_config;
+use ipc_provider::new_evm_keystore_from_arc_config;
 use ipc_wallet::EvmKeyStore;
 use ipc_wallet::{EthKeyAddress, PersistentKeyStore};
 use serde::{self, Deserialize};
@@ -57,7 +57,7 @@ impl CommandLineHandler for DeployCommand {
     async fn handle(global: &GlobalArguments, args: &Self::Arguments) -> anyhow::Result<()> {
         // Load configuration and create the keystore.
         let config = Arc::new(global.config()?);
-        let keystore = new_evm_keystore_from_config(config)?;
+        let keystore = new_evm_keystore_from_arc_config(config)?;
         let deployed_contracts = deploy_contracts(keystore, &args.config).await?;
 
         println!("{:=^60}", " Deployed Contracts ");
