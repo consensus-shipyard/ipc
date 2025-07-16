@@ -6,23 +6,23 @@ use std::{cell::RefCell, sync::Arc};
 
 use anyhow::{anyhow, Context};
 
+use super::{FvmExecState, FvmStateParams};
+use crate::fvm::{state::CheckStateRef, store::ReadOnlyBlockstore, FvmMessage};
 use cid::Cid;
+use fendermint_vm_actor_interface::eam::EAM_ACTOR_ADDR;
 use fendermint_vm_actor_interface::system::{
     is_system_addr, State as SystemState, SYSTEM_ACTOR_ADDR,
 };
 use fendermint_vm_core::chainid::HasChainID;
 use fendermint_vm_message::query::ActorState;
+use fil_actor_eam::CreateExternalReturn;
 use fvm::engine::MultiEngine;
 use fvm::executor::ApplyRet;
 use fvm::state_tree::StateTree;
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::CborStore;
+use fvm_ipld_encoding::{from_slice, CborStore, RawBytes};
 use fvm_shared::{address::Address, chainid::ChainID, clock::ChainEpoch, ActorID};
 use num_traits::Zero;
-
-use crate::fvm::{state::CheckStateRef, store::ReadOnlyBlockstore, FvmMessage};
-
-use super::{FvmExecState, FvmStateParams};
 
 /// The state over which we run queries. These can interrogate the IPLD block store or the state tree.
 pub struct FvmQueryState<DB>
@@ -191,12 +191,34 @@ where
                 msg.gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
             }
 
-            if is_system_addr(&msg.from) {
+            let to = msg.to;
+
+            let (mut ret, address_map) = if is_system_addr(&msg.from) {
                 // Explicit execution requires `from` to be an account kind.
-                s.execute_implicit(msg)
+                s.execute_implicit(msg)?
             } else {
-                s.execute_explicit(msg)
+                s.execute_explicit(msg)?
+            };
+
+            // if it is a call to create evm address, align with geth behaviour that returns the code deployed
+            if to == EAM_ACTOR_ADDR && ret.msg_receipt.exit_code.is_success() {
+                let created = fvm_ipld_encoding::from_slice::<CreateExternalReturn>(
+                    &ret.msg_receipt.return_data,
+                )?;
+
+                // safe to unwrap as they are created above
+                let evm_actor = s.state_tree().get_actor(created.actor_id)?.unwrap();
+                let evm_actor_state_raw = s.state_tree().store().get(&evm_actor.state)?.unwrap();
+                let evm_actor_state = from_slice::<fil_actor_evm::State>(&evm_actor_state_raw)?;
+                let actor_code = s
+                    .state_tree()
+                    .store()
+                    .get(&evm_actor_state.bytecode)?
+                    .unwrap();
+                ret.msg_receipt.return_data = RawBytes::from(actor_code);
             }
+
+            Ok((ret, address_map))
         })
         .await
     }
