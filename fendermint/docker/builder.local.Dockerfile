@@ -1,7 +1,14 @@
 # syntax=docker/dockerfile:1
+FROM ghcr.io/foundry-rs/foundry:v1.2.3 AS foundry-provider
 
 # Builder
 FROM rust:bookworm AS builder
+
+# copy the right ones over
+COPY --from=foundry-provider /usr/local/bin/forge /usr/local/bin/
+COPY --from=foundry-provider /usr/local/bin/cast /usr/local/bin/
+COPY --from=foundry-provider /usr/local/bin/chisel /usr/local/bin/
+COPY --from=foundry-provider /usr/local/bin/anvil /usr/local/bin/
 
 RUN apt-get update && \
   apt-get install -y build-essential clang cmake protobuf-compiler curl bash && \
@@ -12,18 +19,14 @@ WORKDIR /app
 RUN chsh -s $(which bash) $(whoami)
 RUN echo "x$SHELL"
 
-# install foundry
-RUN curl -L https://foundry.paradigm.xyz | bash -
-ENV PATH=${PATH}:~/.cargo/bin:~/.foundry/bin
-RUN ls -al ~/.foundry/bin && ~/.foundry/bin/foundryup
+# install nvm <https://github.com/nvm-sh/nvm?tab=readme-ov-file#installing-and-updating>
+RUN curl -sSL -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash - && nvm --version
+# install node.js 20
+RUN nvm install 20 && npm --version
+# install pnpm <https://pnpm.io/installation#using-npm>
+RUN npm install -g pnpm@latest-10 && pnpm --version
 
-# install nvm
-RUN curl -sSL -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash -
-
-# install pnpm
-ENV ENV="~/.bashrc"
-RUN echo $SHELL; curl -sSL https://get.pnpm.io/install.sh | ENV="$ENV" SHELL="$(which sh)" sh -
-ENV PATH=${PATH}:~/.local/share/pnpm
+RUN anvil --version && forge --version && cast --version && chisel --version
 
 COPY . .
 
