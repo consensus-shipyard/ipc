@@ -2,14 +2,15 @@
 // SPDX-License-Identifier: MIT
 // use crate::default_subscriber;
 use crate::comet_runner::run_comet;
-use crate::default_subscriber;
 use crate::{CommandLineHandler, GlobalArguments};
 use anyhow::Ok;
 use async_trait::async_trait;
 use clap::Args;
-use fendermint_app_settings::Settings;
+use fendermint_app::cmd::config::write_default_settings as write_default_fendermint_setting;
+use fendermint_app::cmd::key::{convert_key_to_cometbft, generate_key, key_from_eth};
+use fendermint_app::options::key::{KeyFromEthArgs, KeyGenArgs, KeyIntoTendermintArgs};
 use fs_err as fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub(crate) struct InitNode;
 
@@ -17,20 +18,34 @@ pub(crate) struct InitNode;
 impl CommandLineHandler for InitNode {
     type Arguments = InitNodeArgs;
 
-    async fn handle(global: &GlobalArguments, _arguments: &Self::Arguments) -> anyhow::Result<()> {
-        // TODO Karel - make a home folder a global argument instead
-        let default_home = ipc_provider::default_repo_path();
-        let home = Path::new(&default_home).join("node");
-
+    async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
+        let home = Path::new(&arguments.home);
         create_dir(&home)?;
+
+        let fendermint_home = home.join("fendermint");
+        create_dir(&fendermint_home)?;
+
+        let key_name = "validator".into();
+        if let Some(path) = &arguments.eth_key {
+            log::info!("Using ETH key from {}", path.display());
+            key_from_eth(&KeyFromEthArgs {
+                secret_key: path.to_path_buf(),
+                name: key_name,
+                out_dir: fendermint_home.clone(),
+            })?
+        } else {
+            log::info!("Generating ETH key");
+            generate_key(&KeyGenArgs {
+                name: key_name,
+                out_dir: fendermint_home.clone(),
+            })?
+        };
+
+        init_fendermint(&fendermint_home)?;
 
         let comet_bft_home = home.join("cometbft");
         create_dir(&comet_bft_home)?;
         init_comet_bft(&comet_bft_home).await?;
-
-        let fendermint_home = home.join("fendermint");
-        create_dir(&fendermint_home)?;
-        init_fendermint(&fendermint_home)?;
 
         // TODO Karel - add the keys generation, config override etc...
 
@@ -40,7 +55,15 @@ impl CommandLineHandler for InitNode {
 
 #[derive(Debug, Args)]
 #[command(about = "Arguments to initialize a new node")]
-pub(crate) struct InitNodeArgs {}
+pub(crate) struct InitNodeArgs {
+    /// Path to the home folder.
+    #[arg(short = 'd', long)]
+    pub home: PathBuf,
+
+    /// Path to an existing Ethereum key file. If omitted, a new key is generated.
+    #[arg(short = 'k', long)]
+    pub eth_key: Option<PathBuf>,
+}
 
 fn create_dir(home: &Path) -> anyhow::Result<()> {
     fs::create_dir_all(home).map_err(|e| {
@@ -64,25 +87,7 @@ fn init_fendermint(home: &Path) -> anyhow::Result<()> {
     create_dir(&data_dir)?;
     create_dir(&config_dir)?;
 
-    // Create the default settings.
-    let default_settings = Settings::default();
-    log::info!("Default settings created.");
-
-    // Serialize the settings into a pretty TOML string.
-    let toml_string = toml::to_string_pretty(&default_settings).map_err(|e| {
-        log::error!("Failed to serialize config to TOML: {}", e);
-        e
-    })?;
-    log::info!("Configuration serialized to TOML.");
-
-    // Determine the output file path.
-    let path = config_dir.join("default.toml");
-    // Write the TOML string to the file.
-    fs::write(&path, toml_string).map_err(|e| {
-        log::error!("Failed to write config to file {}: {}", path.display(), e);
-        e
-    })?;
-    log::info!("Default configuration written to: {}", path.display());
+    write_default_fendermint_setting(&config_dir)?;
 
     Ok(())
 }

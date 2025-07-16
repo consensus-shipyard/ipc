@@ -36,13 +36,7 @@ cmd! {
 
 cmd! {
     KeyFromEthArgs(self) {
-        let sk = read_secret_key_hex(&self.secret_key)?;
-        let pk = sk.public_key();
-
-        export(&self.out_dir, &self.name, "sk", &secret_to_b64(&sk))?;
-        export(&self.out_dir, &self.name, "pk", &public_to_b64(&pk))?;
-
-        Ok(())
+        key_from_eth(self)
     }
 }
 
@@ -61,43 +55,13 @@ cmd! {
 
 cmd! {
   KeyGenArgs(self) {
-    let mut rng = ChaCha20Rng::from_entropy();
-    let sk = SecretKey::random(&mut rng);
-    let pk = sk.public_key();
-
-    export(&self.out_dir, &self.name, "sk", &secret_to_b64(&sk))?;
-    export(&self.out_dir, &self.name, "pk", &public_to_b64(&pk))?;
-
-    Ok(())
+    generate_key(self)
   }
 }
 
 cmd! {
   KeyIntoTendermintArgs(self) {
-    let sk = read_secret_key(&self.secret_key)?;
-    let pk = sk.public_key();
-    let vk = tendermint::crypto::default::ecdsa_secp256k1::VerifyingKey::from_sec1_bytes(&pk.serialize())
-      .map_err(|e| anyhow!("failed to convert public key: {e}"))?;
-    let pub_key = tendermint::PublicKey::Secp256k1(vk);
-    let address = tendermint::account::Id::from(pub_key);
-
-    // tendermint-rs doesn't seem to handle Secp256k1 private keys;
-    // if it did, we could use tendermint_config::PrivateValidatorKey
-    // to encode the data structure. Tendermint should be okay with it
-    // though, as long as we match the expected keys in the JSON.
-    let priv_validator_key = json! ({
-        "address": address,
-        "pub_key": pub_key,
-        "priv_key": {
-            "type": "tendermint/PrivKeySecp256k1",
-            "value": secret_to_b64(&sk)
-        }
-    });
-    let json = serde_json::to_string_pretty(&priv_validator_key)?;
-
-    fs::write(&self.out, json)?;
-
-    Ok(())
+    convert_key_to_cometbft(self)
   }
 }
 
@@ -138,6 +102,56 @@ cmd! {
         println!("{}", id);
         Ok(())
     }
+}
+
+pub fn generate_key(args: &KeyGenArgs) -> anyhow::Result<()> {
+    let mut rng = ChaCha20Rng::from_entropy();
+    let sk = SecretKey::random(&mut rng);
+    let pk = sk.public_key();
+
+    export(&args.out_dir, &args.name, "sk", &secret_to_b64(&sk))?;
+    export(&args.out_dir, &args.name, "pk", &public_to_b64(&pk))?;
+
+    Ok(())
+}
+
+pub fn key_from_eth(args: &KeyFromEthArgs) -> anyhow::Result<()> {
+    let sk = read_secret_key_hex(&args.secret_key)?;
+    let pk = sk.public_key();
+
+    export(&args.out_dir, &args.name, "sk", &secret_to_b64(&sk))?;
+    export(&args.out_dir, &args.name, "pk", &public_to_b64(&pk))?;
+
+    Ok(())
+}
+
+pub fn convert_key_to_cometbft(args: &KeyIntoTendermintArgs) -> anyhow::Result<()> {
+    let sk = read_secret_key(&args.secret_key)?;
+    let pk = sk.public_key();
+    let vk = tendermint::crypto::default::ecdsa_secp256k1::VerifyingKey::from_sec1_bytes(
+        &pk.serialize(),
+    )
+    .map_err(|e| anyhow!("failed to convert public key: {e}"))?;
+    let pub_key = tendermint::PublicKey::Secp256k1(vk);
+    let address = tendermint::account::Id::from(pub_key);
+
+    // tendermint-rs doesn't seem to handle Secp256k1 private keys;
+    // if it did, we could use tendermint_config::PrivateValidatorKey
+    // to encode the data structure. Tendermint should be okay with it
+    // though, as long as we match the expected keys in the JSON.
+    let priv_validator_key = json! ({
+        "address": address,
+        "pub_key": pub_key,
+        "priv_key": {
+            "type": "tendermint/PrivKeySecp256k1",
+            "value": secret_to_b64(&sk)
+        }
+    });
+    let json = serde_json::to_string_pretty(&priv_validator_key)?;
+
+    fs::write(&args.out, json)?;
+
+    Ok(())
 }
 
 fn secret_to_b64(sk: &SecretKey) -> String {
