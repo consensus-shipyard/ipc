@@ -35,7 +35,7 @@ impl<'de> Deserialize<'de> for PermissionMode {
         D: Deserializer<'de>,
     {
         struct Visitor;
-        impl<'de> de::Visitor<'de> for Visitor {
+        impl de::Visitor<'_> for Visitor {
             type Value = PermissionMode;
 
             fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -102,7 +102,7 @@ impl<'de> Deserialize<'de> for AssetKind {
         D: Deserializer<'de>,
     {
         struct Visitor;
-        impl<'de> de::Visitor<'de> for Visitor {
+        impl de::Visitor<'_> for Visitor {
             type Value = AssetKind;
 
             fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
