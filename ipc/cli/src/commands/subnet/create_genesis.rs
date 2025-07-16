@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: MIT
 //! Generate and seal the genesis file for a subnet.
 
-use std::{path::PathBuf, str::FromStr};
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -121,7 +124,7 @@ impl CommandLineHandler for CreateGenesis {
         log::debug!("create genesis with args: {:?}", args);
 
         let ipc_config =
-            Config::from_file(&global.config_path()).context("loading network config file")?;
+            Config::from_file(global.config_path()).context("loading network config file")?;
 
         let subnet_id = SubnetID::from_str(&args.subnet).context("invalid subnet SubnetID")?;
 
@@ -145,7 +148,7 @@ pub(crate) async fn create_genesis(
     cfg: &GenesisConfig,
     subnet_id: &SubnetID,
     parent: &Subnet,
-    dir: &PathBuf,
+    dir: &Path,
 ) -> Result<()> {
     log::info!("Creating genesis");
 

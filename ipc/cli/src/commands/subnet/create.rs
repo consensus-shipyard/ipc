@@ -95,8 +95,8 @@ pub(crate) async fn create_subnet(
         None => None,
     };
 
-    let supply_source = parse_supply_source(&config)?;
-    let collateral_source = parse_collateral_source(&config)?;
+    let supply_source = parse_supply_source(config)?;
+    let collateral_source = parse_collateral_source(config)?;
 
     let raw_addr = config
         .validator_gater

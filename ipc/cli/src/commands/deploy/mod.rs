@@ -17,17 +17,12 @@ use std::{fmt, sync::Arc};
 use crate::{CommandLineHandler, GlobalArguments};
 
 /// A CLI-friendly wrapper for `SubnetCreationPrivilege`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum CliSubnetCreationPrivilege {
+    #[default]
     Unrestricted,
     Owner,
-}
-
-impl Default for CliSubnetCreationPrivilege {
-    fn default() -> Self {
-        CliSubnetCreationPrivilege::Unrestricted
-    }
 }
 
 impl fmt::Display for CliSubnetCreationPrivilege {
