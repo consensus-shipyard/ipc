@@ -172,7 +172,7 @@ async fn create_and_approve_subnet(
 fn import_wallets(all_imports: &Vec<WalletImportArgs>, provider: &IpcProvider) -> Result<()> {
     log::info!("Importing wallets");
     for args in all_imports {
-        let address = import_wallet(provider, args).context("failed to import wallet")?;
+        let address = import_wallet(provider, &args).context("failed to import wallet")?;
         log::info!("Imported wallet: {}", address);
     }
     log::info!("Wallets imported");

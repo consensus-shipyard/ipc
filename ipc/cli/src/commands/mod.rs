@@ -7,7 +7,6 @@ mod config;
 mod crossmsg;
 // mod daemon;
 mod deploy;
-mod node;
 mod subnet;
 mod util;
 mod validator;
@@ -36,7 +35,6 @@ use std::str::FromStr;
 
 use crate::commands::config::ConfigCommandsArgs;
 use crate::commands::deploy::{DeployCommand, DeployCommandArgs};
-use crate::commands::node::NodeCommandsArgs;
 use crate::commands::validator::ValidatorCommandsArgs;
 use crate::commands::wallet::WalletCommandsArgs;
 use crate::CommandLineHandler;
@@ -58,7 +56,6 @@ enum Commands {
     Util(UtilCommandsArgs),
     Validator(ValidatorCommandsArgs),
     Deploy(DeployCommandArgs),
-    Node(NodeCommandsArgs),
 }
 
 #[derive(Debug, Parser)]
@@ -149,7 +146,6 @@ pub async fn cli() -> anyhow::Result<()> {
                 Commands::Util(args) => args.handle(global).await,
                 Commands::Validator(args) => args.handle(global).await,
                 Commands::Deploy(args) => DeployCommand::handle(global, args).await,
-                Commands::Node(args) => args.handle(global).await,
             };
 
             r.with_context(|| format!("error processing command {:?}", args.command))
