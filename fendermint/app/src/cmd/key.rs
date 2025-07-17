@@ -36,13 +36,8 @@ cmd! {
 
 cmd! {
     KeyFromEthArgs(self) {
-        let sk = read_secret_key_hex(&self.secret_key)?;
-        let pk = sk.public_key();
-
-        export(&self.out_dir, &self.name, "sk", &secret_to_b64(&sk))?;
-        export(&self.out_dir, &self.name, "pk", &public_to_b64(&pk))?;
-
-        Ok(())
+        let secret_key = read_secret_key_hex(&self.secret_key)?;
+        store_key(&secret_key, &self.name, &self.out_dir)
     }
 }
 
@@ -61,43 +56,13 @@ cmd! {
 
 cmd! {
   KeyGenArgs(self) {
-    let mut rng = ChaCha20Rng::from_entropy();
-    let sk = SecretKey::random(&mut rng);
-    let pk = sk.public_key();
-
-    export(&self.out_dir, &self.name, "sk", &secret_to_b64(&sk))?;
-    export(&self.out_dir, &self.name, "pk", &public_to_b64(&pk))?;
-
-    Ok(())
+    generate_key(self)
   }
 }
 
 cmd! {
   KeyIntoTendermintArgs(self) {
-    let sk = read_secret_key(&self.secret_key)?;
-    let pk = sk.public_key();
-    let vk = tendermint::crypto::default::ecdsa_secp256k1::VerifyingKey::from_sec1_bytes(&pk.serialize())
-      .map_err(|e| anyhow!("failed to convert public key: {e}"))?;
-    let pub_key = tendermint::PublicKey::Secp256k1(vk);
-    let address = tendermint::account::Id::from(pub_key);
-
-    // tendermint-rs doesn't seem to handle Secp256k1 private keys;
-    // if it did, we could use tendermint_config::PrivateValidatorKey
-    // to encode the data structure. Tendermint should be okay with it
-    // though, as long as we match the expected keys in the JSON.
-    let priv_validator_key = json! ({
-        "address": address,
-        "pub_key": pub_key,
-        "priv_key": {
-            "type": "tendermint/PrivKeySecp256k1",
-            "value": secret_to_b64(&sk)
-        }
-    });
-    let json = serde_json::to_string_pretty(&priv_validator_key)?;
-
-    fs::write(&self.out, json)?;
-
-    Ok(())
+    convert_key_to_cometbft(self)
   }
 }
 
@@ -140,6 +105,51 @@ cmd! {
     }
 }
 
+pub fn generate_key(args: &KeyGenArgs) -> anyhow::Result<()> {
+    let mut rng = ChaCha20Rng::from_entropy();
+    let sk = SecretKey::random(&mut rng);
+
+    store_key(&sk, &args.name, &args.out_dir)
+}
+
+pub fn store_key(secret_key: &SecretKey, name: &str, out_dir: &Path) -> anyhow::Result<()> {
+    let public_key = secret_key.public_key();
+
+    export(out_dir, name, "sk", &secret_to_b64(&secret_key))?;
+    export(out_dir, name, "pk", &public_to_b64(&public_key))?;
+
+    Ok(())
+}
+
+pub fn convert_key_to_cometbft(args: &KeyIntoTendermintArgs) -> anyhow::Result<()> {
+    let sk = read_secret_key(&args.secret_key)?;
+    let pk = sk.public_key();
+    let vk = tendermint::crypto::default::ecdsa_secp256k1::VerifyingKey::from_sec1_bytes(
+        &pk.serialize(),
+    )
+    .map_err(|e| anyhow!("failed to convert public key: {e}"))?;
+    let pub_key = tendermint::PublicKey::Secp256k1(vk);
+    let address = tendermint::account::Id::from(pub_key);
+
+    // tendermint-rs doesn't seem to handle Secp256k1 private keys;
+    // if it did, we could use tendermint_config::PrivateValidatorKey
+    // to encode the data structure. Tendermint should be okay with it
+    // though, as long as we match the expected keys in the JSON.
+    let priv_validator_key = json! ({
+        "address": address,
+        "pub_key": pub_key,
+        "priv_key": {
+            "type": "tendermint/PrivKeySecp256k1",
+            "value": secret_to_b64(&sk)
+        }
+    });
+    let json = serde_json::to_string_pretty(&priv_validator_key)?;
+
+    fs::write(&args.out, json)?;
+
+    Ok(())
+}
+
 fn secret_to_b64(sk: &SecretKey) -> String {
     to_b64(sk.serialize().as_ref())
 }
@@ -168,7 +178,11 @@ pub fn read_public_key(public_key: &Path) -> anyhow::Result<PublicKey> {
 
 pub fn read_secret_key_hex(private_key: &Path) -> anyhow::Result<SecretKey> {
     let hex_str = fs::read_to_string(private_key).context("failed to read private key")?;
-    let mut hex_str = hex_str.trim();
+    parse_secret_key_hex(&hex_str)
+}
+
+pub fn parse_secret_key_hex(private_key: &str) -> anyhow::Result<SecretKey> {
+    let mut hex_str = private_key.trim();
     if hex_str.starts_with("0x") {
         hex_str = &hex_str[2..];
     }

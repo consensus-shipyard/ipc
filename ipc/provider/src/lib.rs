@@ -837,6 +837,11 @@ impl Drop for LotusJsonKeyType {
     }
 }
 
+pub struct ImportedKey<A> {
+    pub address: A,
+    pub private_key: Vec<u8>,
+}
+
 // Here I put in some other category the wallet-related
 // function so we can reconcile them easily when we decide to tackle
 // https://github.com/consensus-shipyard/ipc-agent/issues/308
@@ -861,7 +866,7 @@ impl IpcProvider {
         out
     }
 
-    pub fn import_fvm_key(&self, keyinfo: &str) -> anyhow::Result<Address> {
+    pub fn import_fvm_key(&self, keyinfo: &str) -> anyhow::Result<ImportedKey<Address>> {
         let wallet = self.fvm_wallet()?;
         let mut wallet = wallet.write().unwrap();
         let keyinfo = LotusJsonKeyType::from_str(keyinfo)?;
@@ -872,27 +877,46 @@ impl IpcProvider {
             SignatureType::Secp256k1
         };
 
+        let private_key_bytes =
+            base64::engine::general_purpose::STANDARD.decode(&keyinfo.private_key)?;
+
         let key_info = ipc_wallet::json::KeyInfoJson(ipc_wallet::KeyInfo::new(
             key_type,
-            base64::engine::general_purpose::STANDARD.decode(&keyinfo.private_key)?,
+            private_key_bytes.clone(),
         ));
         let key_info = ipc_wallet::KeyInfo::from(key_info);
-        Ok(wallet.import(key_info)?)
+        let address = wallet.import(key_info)?;
+
+        Ok(ImportedKey {
+            address,
+            private_key: private_key_bytes,
+        })
     }
 
-    pub fn import_evm_key_from_privkey(&self, private_key: &str) -> anyhow::Result<EthKeyAddress> {
+    pub fn import_evm_key_from_privkey(
+        &self,
+        private_key: &str,
+    ) -> anyhow::Result<ImportedKey<EthKeyAddress>> {
         let keystore = self.evm_wallet()?;
         let mut keystore = keystore.write().unwrap();
 
-        let private_key = if !private_key.starts_with("0x") {
+        let private_key_bytes = if !private_key.starts_with("0x") {
             hex::decode(private_key)?
         } else {
             hex::decode(&private_key[2..])?
         };
-        keystore.put(ipc_wallet::EvmKeyInfo::new(private_key))
+        let address = keystore.put(ipc_wallet::EvmKeyInfo::new(private_key_bytes.clone()))?;
+
+        Ok(ImportedKey {
+            address,
+            private_key: private_key_bytes,
+        })
     }
 
-    pub fn import_evm_key_from_json(&self, keyinfo: &str) -> anyhow::Result<EthKeyAddress> {
+    pub fn import_evm_key_from_json(
+        &self,
+        keyinfo: &str,
+    ) -> anyhow::Result<ImportedKey<EthKeyAddress>> {
         let persisted: ipc_wallet::PersistentKeyInfo = serde_json::from_str(keyinfo)?;
         let persisted: String = persisted.private_key().parse()?;
         self.import_evm_key_from_privkey(&persisted)
