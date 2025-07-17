@@ -5,10 +5,10 @@ use crate::commands::deploy::deploy_contracts as deploy_contracts_cmd;
 use crate::commands::subnet::approve::{approve_subnet as approve_subnet_cmd, ApproveSubnetArgs};
 use crate::commands::subnet::create::create_subnet as create_subnet_cmd;
 use crate::commands::subnet::create_genesis::create_genesis;
-use crate::commands::subnet::init::ipc_config_store::IpcConfigStore;
 use crate::commands::subnet::join::join_subnet;
 use crate::commands::subnet::set_federated_power::set_federated_power;
 use crate::commands::wallet::import::import_wallet;
+use crate::ipc_config_store::IpcConfigStore;
 
 use crate::commands::subnet::init::config::{
     ActivateConfig, DeployConfig, SubnetCreateConfig, SubnetInitConfig, WalletImportArgs,
@@ -172,8 +172,8 @@ async fn create_and_approve_subnet(
 fn import_wallets(all_imports: &Vec<WalletImportArgs>, provider: &IpcProvider) -> Result<()> {
     log::info!("Importing wallets");
     for args in all_imports {
-        let address = import_wallet(provider, args).context("failed to import wallet")?;
-        log::info!("Imported wallet: {}", address);
+        let imported_wallet = import_wallet(provider, args).context("failed to import wallet")?;
+        log::info!("Imported wallet: {}", imported_wallet.address);
     }
     log::info!("Wallets imported");
     Ok(())

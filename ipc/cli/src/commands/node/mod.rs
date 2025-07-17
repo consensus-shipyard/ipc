@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 
+mod config;
 mod init;
 
 use clap::{Args, Subcommand};

@@ -36,7 +36,8 @@ cmd! {
 
 cmd! {
     KeyFromEthArgs(self) {
-        key_from_eth(self)
+        let secret_key = read_secret_key_hex(&self.secret_key)?;
+        store_key(&secret_key, &self.name, &self.out_dir)
     }
 }
 
@@ -107,20 +108,15 @@ cmd! {
 pub fn generate_key(args: &KeyGenArgs) -> anyhow::Result<()> {
     let mut rng = ChaCha20Rng::from_entropy();
     let sk = SecretKey::random(&mut rng);
-    let pk = sk.public_key();
 
-    export(&args.out_dir, &args.name, "sk", &secret_to_b64(&sk))?;
-    export(&args.out_dir, &args.name, "pk", &public_to_b64(&pk))?;
-
-    Ok(())
+    store_key(&sk, &args.name, &args.out_dir)
 }
 
-pub fn key_from_eth(args: &KeyFromEthArgs) -> anyhow::Result<()> {
-    let sk = read_secret_key_hex(&args.secret_key)?;
-    let pk = sk.public_key();
+pub fn store_key(secret_key: &SecretKey, name: &str, out_dir: &Path) -> anyhow::Result<()> {
+    let public_key = secret_key.public_key();
 
-    export(&args.out_dir, &args.name, "sk", &secret_to_b64(&sk))?;
-    export(&args.out_dir, &args.name, "pk", &public_to_b64(&pk))?;
+    export(out_dir, name, "sk", &secret_to_b64(&secret_key))?;
+    export(out_dir, name, "pk", &public_to_b64(&public_key))?;
 
     Ok(())
 }
@@ -182,7 +178,11 @@ pub fn read_public_key(public_key: &Path) -> anyhow::Result<PublicKey> {
 
 pub fn read_secret_key_hex(private_key: &Path) -> anyhow::Result<SecretKey> {
     let hex_str = fs::read_to_string(private_key).context("failed to read private key")?;
-    let mut hex_str = hex_str.trim();
+    parse_secret_key_hex(&hex_str)
+}
+
+pub fn parse_secret_key_hex(private_key: &str) -> anyhow::Result<SecretKey> {
+    let mut hex_str = private_key.trim();
     if hex_str.starts_with("0x") {
         hex_str = &hex_str[2..];
     }

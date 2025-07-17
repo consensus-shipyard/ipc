@@ -139,8 +139,16 @@ impl CommandLineHandler for CreateGenesis {
 
         let out_dir = args.out_dir.clone().unwrap_or_else(|| global.config_dir());
 
-        create_genesis(&args.config, &subnet_id, &parent, &out_dir).await
+        create_genesis(&args.config, &subnet_id, &parent, &out_dir).await?;
+
+        Ok(())
     }
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct CreatedGenesis {
+    pub genesis: PathBuf,
+    pub sealed: PathBuf,
 }
 
 /// Generates and seals the genesis file for the subnet.
@@ -149,7 +157,7 @@ pub(crate) async fn create_genesis(
     subnet_id: &SubnetID,
     parent: &Subnet,
     dir: &Path,
-) -> Result<()> {
+) -> Result<CreatedGenesis> {
     log::info!("Creating genesis");
 
     let safe_id = sanitize_subnet_id(subnet_id);
@@ -184,5 +192,8 @@ pub(crate) async fn create_genesis(
     .await?;
     log::info!("Genesis sealed and stored at: {}", sealed.display());
 
-    Ok(())
+    Ok(CreatedGenesis {
+        genesis: genesis_file,
+        sealed,
+    })
 }

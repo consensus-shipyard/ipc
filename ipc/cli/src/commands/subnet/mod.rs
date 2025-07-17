@@ -31,7 +31,7 @@ use clap::{Args, Subcommand};
 pub mod add_bootstrap_node;
 pub mod approve;
 pub mod create;
-mod create_genesis;
+pub mod create_genesis;
 mod genesis_epoch;
 pub mod init;
 pub mod join;
