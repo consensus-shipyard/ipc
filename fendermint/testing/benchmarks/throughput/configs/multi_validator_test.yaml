@@ -1,0 +1,88 @@
+name: "Multi-Validator Throughput Test"
+description: "Test throughput across different validator configurations"
+
+# Network configuration
+network:
+  type: "multi_config"
+  test_configs:
+    - name: "single_validator"
+      validators: 1
+      endpoints: ["http://localhost:8545"]
+    - name: "quartet_validators"
+      validators: 4
+      endpoints:
+        - "http://localhost:8545"
+        - "http://localhost:8546"
+        - "http://localhost:8547"
+        - "http://localhost:8548"
+    - name: "byzantine_safe"
+      validators: 7
+      endpoints:
+        - "http://localhost:8545"
+        - "http://localhost:8546"
+        - "http://localhost:8547"
+        - "http://localhost:8548"
+        - "http://localhost:8549"
+        - "http://localhost:8550"
+        - "http://localhost:8551"
+    - name: "ten_validators"
+      validators: 10
+      endpoints:
+        - "http://localhost:8545"
+        - "http://localhost:8546"
+        - "http://localhost:8547"
+        - "http://localhost:8548"
+        - "http://localhost:8549"
+        - "http://localhost:8550"
+        - "http://localhost:8551"
+        - "http://localhost:8552"
+        - "http://localhost:8553"
+        - "http://localhost:8554"
+
+# Load configuration
+load:
+  pattern: "constant"
+  target_tps: 1500
+  duration: "5m"
+  ramp_up_duration: "1m"
+  concurrent_connections: 200
+
+# Transaction configuration
+transactions:
+  - type: "transfer"
+    weight: 70
+    amount: "100000000000000000"  # 0.1 ETH in wei
+    gas_limit: 21000
+  - type: "erc20"
+    weight: 25
+    amount: "1000000000000000000"
+    gas_limit: 65000
+  - type: "contract_call"
+    weight: 5
+    gas_limit: 80000
+
+# Test configuration
+test:
+  warmup_duration: "1m"
+  measurement_duration: "4m"
+  cooldown_duration: "1m"
+  max_retries: 3
+  timeout: "30s"
+  inter_test_delay: "2m"  # Delay between validator configurations
+
+# Metrics configuration
+metrics:
+  collection_interval: "1s"
+  resource_monitoring: true
+  detailed_latency: true
+  percentiles: [50, 90, 95, 99]
+  consensus_metrics: true
+  validator_metrics: true
+
+# Output configuration
+output:
+  format: "json"
+  file: "multi_validator_results.json"
+  detailed: true
+  charts: true
+  comparison_charts: true

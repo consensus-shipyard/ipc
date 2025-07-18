@@ -1,0 +1,67 @@
+name: "Stress Test - Find Maximum TPS"
+description: "Progressive stress test to find maximum sustainable TPS"
+
+# Network configuration
+network:
+  type: "single_subnet"
+  validators: 7
+  endpoints:
+    - "http://localhost:8545"
+    - "http://localhost:8546"
+    - "http://localhost:8547"
+    - "http://localhost:8548"
+    - "http://localhost:8549"
+    - "http://localhost:8550"
+    - "http://localhost:8551"
+
+# Load configuration
+load:
+  pattern: "ramp_up"
+  start_tps: 100
+  max_tps: 5000
+  duration: "10m"
+  ramp_up_duration: "2m"
+  concurrent_connections: 500
+
+# Transaction configuration
+transactions:
+  - type: "transfer"
+    weight: 60
+    amount: "100000000000000000"  # 0.1 ETH in wei
+    gas_limit: 21000
+  - type: "erc20"
+    weight: 30
+    amount: "500000000000000000"
+    gas_limit: 65000
+  - type: "deploy"
+    weight: 5
+    gas_limit: 2000000
+  - type: "contract_call"
+    weight: 5
+    gas_limit: 100000
+
+# Test configuration
+test:
+  warmup_duration: "2m"
+  measurement_duration: "8m"
+  cooldown_duration: "2m"
+  max_retries: 5
+  timeout: "60s"
+  failure_threshold: 0.05  # 5% failure rate threshold
+
+# Metrics configuration
+metrics:
+  collection_interval: "500ms"
+  resource_monitoring: true
+  detailed_latency: true
+  percentiles: [50, 90, 95, 99, 99.9]
+  memory_profiling: true
+  network_monitoring: true
+
+# Output configuration
+output:
+  format: "json"
+  file: "stress_test_results.json"
+  detailed: true
+  charts: true
+  save_raw_data: true

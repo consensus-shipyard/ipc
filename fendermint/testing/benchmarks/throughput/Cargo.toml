@@ -1,0 +1,63 @@
+[package]
+name = "fendermint_benchmarks_throughput"
+description = "Throughput benchmarking tools for IPC subnets"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+bincode = "1.3"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { workspace = true }
+ethers = { workspace = true }
+figment = { version = "0.10", features = ["yaml", "json"] }
+futures = { workspace = true }
+hex = { workspace = true }
+indicatif = "0.17"
+plotters = { version = "0.3", default-features = false, features = ["svg_backend", "bitmap_backend"] }
+rand = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+statrs = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+url = { workspace = true }
+
+# Workspace dependencies
+fendermint_materializer = { path = "../../materializer" }
+fendermint_testing = { path = "../..", features = ["arb"] }
+fendermint_crypto = { path = "../../../crypto" }
+ipc-api = { path = "../../../../ipc/api" }
+ipc-provider = { path = "../../../../ipc/provider" }
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[[bin]]
+name = "throughput-bench"
+path = "src/bin/throughput_bench.rs"
+
+[[bin]]
+name = "stress-test"
+path = "src/bin/stress_test.rs"
+
+[[bin]]
+name = "benchmark-suite"
+path = "src/bin/benchmark_suite.rs"
+
+[[bin]]
+name = "latency-bench"
+path = "src/bin/latency_bench.rs"
+
+[[bin]]
+name = "test-suite"
+path = "src/bin/test_suite.rs"
+
+[[bin]]
+name = "simple-bench"
+path = "src/bin/simple_bench.rs"

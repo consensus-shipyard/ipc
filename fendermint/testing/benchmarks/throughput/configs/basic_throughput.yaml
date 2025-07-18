@@ -1,0 +1,53 @@
+name: "Basic Throughput Test"
+description: "Single subnet throughput test with transfers"
+
+# Network configuration
+network:
+  type: "single_subnet"
+  validators: 4
+  endpoints:
+    - "http://localhost:8545"
+    - "http://localhost:8546"
+    - "http://localhost:8547"
+    - "http://localhost:8548"
+
+# Load configuration
+load:
+  pattern: "constant"
+  target_tps: 1000
+  duration: "5m"
+  ramp_up_duration: "30s"
+  concurrent_connections: 100
+
+# Transaction configuration
+transactions:
+  - type: "transfer"
+    weight: 80
+    amount: "1000000000000000000"  # 1 ETH in wei
+    gas_limit: 21000
+  - type: "erc20"
+    weight: 20
+    amount: "1000000000000000000"
+    gas_limit: 65000
+
+# Test configuration
+test:
+  warmup_duration: "1m"
+  measurement_duration: "3m"
+  cooldown_duration: "1m"
+  max_retries: 3
+  timeout: "30s"
+
+# Metrics configuration
+metrics:
+  collection_interval: "1s"
+  resource_monitoring: true
+  detailed_latency: true
+  percentiles: [50, 90, 95, 99]
+
+# Output configuration
+output:
+  format: "json"
+  file: "basic_throughput_results.json"
+  detailed: true
+  charts: true

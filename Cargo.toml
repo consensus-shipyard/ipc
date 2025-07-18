@@ -32,6 +32,7 @@ members = [
   "fendermint/storage",
   "fendermint/testing",
   "fendermint/testing/materializer",
+  "fendermint/testing/benchmarks/throughput",
   "fendermint/testing/*-test",
   "fendermint/tracing",
   "fendermint/vm/*",

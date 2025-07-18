@@ -1,0 +1,11 @@
+[package]
+name = "simple_benchmark_test"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "test_simple"
+path = "test_simple.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time"] }
