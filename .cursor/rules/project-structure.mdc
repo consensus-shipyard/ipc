@@ -1,0 +1,52 @@
+---
+alwaysApply: true
+---
+
+# IPC Project Structure Guide
+
+**InterPlanetary Consensus (IPC)** is a framework for on-demand horizontal scalability through subnet deployment.
+
+## Main Components
+
+### Rust Components
+- **[ipc/cli](mdc:ipc/cli)** - Command line interface (`ipc-cli`) for user interaction
+- **[ipc/provider](mdc:ipc/provider)** - Core `IpcProvider` library (used by CLI)
+- **[ipc/api](mdc:ipc/api)** - Common types and utilities
+- **[ipc/wallet](mdc:ipc/wallet)** - Key management and identity
+- **[ipc/types](mdc:ipc/types)** - IPC-specific types and data structures
+- **[ipc/observability](mdc:ipc/observability)** - Monitoring and observability tools
+- **[fendermint](mdc:fendermint)** - Tendermint-based subnet peer implementation
+- **[ipld/resolver](mdc:ipld/resolver)** - IPLD-specific types and libraries
+
+### Smart Contracts
+- **[contracts/contracts](mdc:contracts/contracts)** - Reference implementation of IPC protocol actors
+- **[contracts/sdk](mdc:contracts/sdk)** - SDK contracts for developers
+- **[contracts/tasks](mdc:contracts/tasks)** - Deployment and management tasks
+- **[contracts/test](mdc:contracts/test)** - Contract test suites
+
+### External Libraries
+- **[ext/](mdc:ext)** - External libraries and utilities
+  - `frc42_dispatch` - FRC42 dispatch mechanism
+  - `libp2p-bitswap` - Bitswap protocol implementation
+  - `merkle-tree-rs` - Merkle tree utilities
+
+### Build and Configuration
+- **[Cargo.toml](mdc:Cargo.toml)** - Rust workspace configuration
+- **[Makefile](mdc:Makefile)** - Build automation
+- **[contracts/foundry.toml](mdc:contracts/foundry.toml)** - Solidity project configuration
+
+## Key Entry Points
+- Main CLI: `ipc-cli` binary from [ipc/cli](mdc:ipc/cli)
+- Subnet node: `fendermint` binary from [fendermint](mdc:fendermint)
+- Contract deployment: [contracts/tasks](mdc:contracts/tasks)
+
+## Testing
+- Rust tests: `make test` or `cargo test`
+- Contract tests: `forge test` in [contracts/](mdc:contracts)
+- Integration tests: [fendermint/testing](mdc:fendermint/testing)
+
+## Documentation
+- User docs: [docs/](mdc:docs)
+- GitBook docs: [docs-gitbook/](mdc:docs-gitbook)  
+- Contract docs: [docs/ipc/contracts.md](mdc:docs/ipc/contracts.md)
+- Usage guide: [docs/ipc/usage.md](mdc:docs/ipc/usage.md)

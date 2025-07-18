@@ -1,0 +1,82 @@
+---
+description: Build and deployment patterns for IPC project
+---
+
+# Build and Deployment Guide
+
+## Prerequisites
+- Rust toolchain with `wasm32-unknown-unknown` target
+- Node.js and npm
+- Foundry (forge, cast, anvil)
+- Docker and docker-compose
+- cargo-make: `cargo install --force cargo-make`
+
+## Build Process
+
+### Rust Components
+- Main build command: `make` (uses [Makefile](mdc:Makefile))
+- Workspace configuration: [Cargo.toml](mdc:Cargo.toml)
+- Build individual components: `cargo build -p <package-name>`
+- Release build: `cargo build --release`
+
+### Key Binaries
+- `ipc-cli`: Main CLI tool from [ipc/cli](mdc:ipc/cli)
+- `fendermint`: Subnet node from [fendermint](mdc:fendermint)
+
+### Contract Compilation
+- Solidity contracts: `forge build` in [contracts/](mdc:contracts)
+- Configuration: [contracts/foundry.toml](mdc:contracts/foundry.toml)
+- ABI generation: automatically handled by forge
+
+## Deployment
+
+### Contract Deployment
+- Use tasks in [contracts/tasks](mdc:contracts/tasks) for deployment
+- Deploy libraries first: `deploy-libraries.ts`
+- Deploy gateway: `deploy-gateway.ts`
+- Network configuration in task scripts
+
+### Local Development
+- Use Docker for local testing environments
+- Scripts in [infra/fendermint](mdc:infra/fendermint)
+- Configuration files in [fendermint/testing/scripts](mdc:fendermint/testing/scripts)
+
+### Network Deployment
+- Calibration testnet: Use public RPC endpoints
+- Custom networks: Configure in `~/.ipc/config.toml`
+- Contract addresses vary by network
+
+## Environment Setup
+
+### IPC CLI Configuration
+- Initialize: `ipc-cli config init`
+- Config file: `~/.ipc/config.toml`
+- Keystore path: `~/.ipc`
+
+### Required Environment Variables
+- Set appropriate network configurations
+- Configure RPC endpoints for target networks
+- Set up wallet addresses and private keys securely
+
+## Cross-Compilation
+- Use `openssl` with `vendored` feature for cross-compilation
+- Docker builds for different architectures
+- See [fendermint/docker](mdc:fendermint/docker) for container builds
+
+## Dependency Management
+- Workspace dependencies in root [Cargo.toml](mdc:Cargo.toml)
+- Node.js dependencies in [contracts/](mdc:contracts)
+- Git submodules for external contracts in [contracts/lib](mdc:contracts/lib)
+
+## Versioning and Releases
+- Use semantic versioning
+- Tag releases appropriately
+- Update changelogs in [CHANGELOG.md](mdc:CHANGELOG.md)
+
+## Development Workflow
+1. Make changes to code
+2. Run tests: `make test`
+3. Build: `make`
+4. Test deployment locally
+5. Deploy to testnet for integration testing
+6. Create PR with proper testing

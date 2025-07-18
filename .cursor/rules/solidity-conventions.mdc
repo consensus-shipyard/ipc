@@ -1,0 +1,53 @@
+---
+globs: *.sol
+---
+
+# Solidity Code Conventions for IPC
+
+## Version and Licensing
+- Use `pragma solidity ^0.8.23;` (or 0.8.23 for exact version)
+- Start files with `// SPDX-License-Identifier: MIT OR Apache-2.0`
+- Follow the exact pattern used in [contracts/contracts](mdc:contracts/contracts)
+
+## Contract Structure
+- Use Diamond pattern for upgradeable contracts (see [GatewayDiamond.sol](mdc:contracts/contracts/GatewayDiamond.sol))
+- Implement facets for modular functionality
+- Use libraries for shared logic (see [contracts/contracts/lib](mdc:contracts/contracts/lib))
+
+## Import Organization
+- Group imports by type: interfaces, libraries, contracts
+- Use relative imports for project files
+- Use npm package imports for external dependencies
+- Follow the pattern in [GatewayManagerFacet.sol](mdc:contracts/contracts/gateway/GatewayManagerFacet.sol)
+
+## Error Handling
+- Define custom errors in [contracts/contracts/errors/IPCErrors.sol](mdc:contracts/contracts/errors/IPCErrors.sol)
+- Use descriptive error names with parameters
+- Prefer custom errors over require strings for gas efficiency
+
+## Testing
+- Use Forge for testing (configured in [foundry.toml](mdc:contracts/foundry.toml))
+- Place tests in [contracts/test](mdc:contracts/test)
+- Use `IntegrationTestBase.sol` for integration tests
+- Follow naming convention: `ContractName.t.sol`
+
+## Libraries and Helpers
+- Use helper libraries from [contracts/contracts/lib](mdc:contracts/contracts/lib)
+- Common helpers: `SubnetIDHelper`, `CrossMsgHelper`, `AssetHelper`
+- Use `LibGateway` for gateway-related operations
+
+## Constants and Enums
+- Define constants in [contracts/contracts/constants](mdc:contracts/constants)
+- Define enums in [contracts/contracts/enums](mdc:contracts/enums)
+- Use descriptive names for constants
+
+## Deployment
+- Use tasks in [contracts/tasks](mdc:contracts/tasks) for deployment
+- Follow the deployment patterns for libraries and contracts
+- Use proper configuration for different networks
+
+## Code Quality
+- Use NatSpec comments for all public functions
+- Follow consistent naming: PascalCase for contracts, camelCase for functions
+- Use events for important state changes
+- Implement proper access control and modifiers
