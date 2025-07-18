@@ -61,3 +61,7 @@ path = "src/bin/test_suite.rs"
 [[bin]]
 name = "simple-bench"
 path = "src/bin/simple_bench.rs"
+
+[[bin]]
+name = "throughput-bench-simple"
+path = "src/bin/throughput_bench_simple.rs"
