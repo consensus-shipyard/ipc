@@ -5,6 +5,7 @@ docker/Dockerfile
 cometbft
 test-network
 testing/materializer/tests/docker-materializer-data
+testing/benchmarks/throughput/results/
 .idea
 .make
 .contracts-gen

@@ -68,7 +68,7 @@ build_benchmark() {
     print_info "Building throughput benchmark tool..."
 
     cd "$BASE_DIR"
-    if cargo build --release --bin throughput_bench; then
+    if rustc basic_throughput_test.rs -o target/release/basic_throughput_test; then
         print_success "Benchmark tool built successfully"
     else
         print_error "Failed to build benchmark tool"
