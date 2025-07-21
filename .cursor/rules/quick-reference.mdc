@@ -1,0 +1,83 @@
+---
+description: Quick reference guide for IPC development
+---
+
+# IPC Development Quick Reference
+
+## Key Commands
+- **Build all**: `make`
+- **Run tests**: `make test`
+- **CLI help**: `./target/release/ipc-cli --help`
+- **Contract tests**: `cd contracts && forge test`
+- **Documentation**: `cargo doc --open`
+
+## Important Files
+- **Workspace config**: [Cargo.toml](mdc:Cargo.toml)
+- **Build automation**: [Makefile](mdc:Makefile)
+- **Contract config**: [contracts/foundry.toml](mdc:contracts/foundry.toml)
+- **Main CLI**: [ipc/cli/src/main.rs](mdc:ipc/cli/src/main.rs)
+- **Gateway contracts**: [contracts/contracts/gateway](mdc:contracts/contracts/gateway)
+
+## Common Patterns
+
+### Rust Error Handling
+```rust
+use anyhow::{Context, Result};
+
+fn example() -> Result<()> {
+    operation().context("operation failed")?;
+    Ok(())
+}
+```
+
+### Async Function
+```rust
+#[tokio::main]
+async fn main() -> Result<()> {
+    // async code
+}
+```
+
+### Solidity Contract
+```solidity
+// SPDX-License-Identifier: MIT OR Apache-2.0
+pragma solidity ^0.8.23;
+
+import {LibGateway} from "../lib/LibGateway.sol";
+```
+
+## Testing
+- **Rust unit tests**: `cargo test`
+- **Rust integration**: `cargo test --test integration_name`
+- **Contract tests**: `forge test`
+- **E2E tests**: Use [fendermint/testing/materializer](mdc:fendermint/testing/materializer)
+
+## Development Setup
+1. Install prerequisites (Rust, Node.js, Foundry, Docker)
+2. Run `make` to build
+3. Run `make test` to verify setup
+4. Initialize CLI: `ipc-cli config init`
+
+## Common Directories
+- **Rust CLI**: [ipc/cli](mdc:ipc/cli)
+- **Core logic**: [ipc/provider](mdc:ipc/provider)
+- **Contracts**: [contracts/contracts](mdc:contracts/contracts)
+- **Tests**: [contracts/test](mdc:contracts/test)
+- **Documentation**: [docs/](mdc:docs)
+
+## Debugging
+- **Rust logs**: Use `RUST_LOG=debug` environment variable
+- **Contract debugging**: Use `forge test -vvv` for verbose output
+- **Network issues**: Check RPC endpoint configuration
+
+## Resources
+- **User guide**: [docs/ipc/usage.md](mdc:docs/ipc/usage.md)
+- **Developer guide**: [docs/ipc/developers.md](mdc:docs/ipc/developers.md)
+- **Contract docs**: [docs/ipc/contracts.md](mdc:docs/ipc/contracts.md)
+- **Architecture**: [docs/fendermint/architecture.md](mdc:docs/fendermint/architecture.md)
+
+## Getting Help
+- Check existing documentation first
+- Look for similar patterns in the codebase
+- Join #ipc-help in Filecoin Slack
+- Create GitHub issue for bugs or feature requests

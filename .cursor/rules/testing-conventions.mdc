@@ -1,0 +1,61 @@
+---
+description: Testing patterns and conventions used in IPC project
+---
+
+# Testing Conventions for IPC
+
+## Rust Testing
+- Use `cargo test` or `make test` for running tests
+- Use `#[tokio::test]` for async tests
+- Use `#[test]` for synchronous tests
+- Use `quickcheck` for property-based testing
+- Use `serial_test` for tests requiring sequential execution
+
+### Test Organization
+- Unit tests: in same file as implementation with `#[cfg(test)]`
+- Integration tests: in `tests/` directory
+- Use descriptive test names: `test_should_do_something_when_condition`
+
+### Test Utilities
+- Use testing utilities from [fendermint/testing](mdc:fendermint/testing)
+- Use `materializer` for end-to-end testing
+- Use `contract-test` for contract integration tests
+
+## Solidity Testing
+- Use Forge for contract testing (configured in [foundry.toml](mdc:contracts/foundry.toml))
+- Run tests with `forge test` in [contracts/](mdc:contracts) directory
+- Use `IntegrationTestBase.sol` for integration tests
+- Use `IntegrationTestPresets.sol` for common test setups
+
+### Test Structure
+- Test files: `ContractName.t.sol` in [contracts/test](mdc:contracts/test)
+- Use `setUp()` function for test initialization
+- Use descriptive test function names: `test_shouldDoSomething_whenCondition`
+- Use `vm.` cheats for advanced testing scenarios
+
+### Test Categories
+- Unit tests: [contracts/test/unit](mdc:contracts/test/unit)
+- Integration tests: [contracts/test/integration](mdc:contracts/test/integration)
+- Invariant tests: [contracts/test/invariants](mdc:contracts/test/invariants)
+- Helper contracts: [contracts/test/helpers](mdc:contracts/test/helpers)
+
+## End-to-End Testing
+- Use [fendermint/testing/materializer](mdc:fendermint/testing/materializer) for full system tests
+- Use Docker containers for testing complete subnet deployments
+- Use smoke tests for basic functionality verification
+
+## Test Data and Fixtures
+- Use consistent test data across tests
+- Create reusable test fixtures for complex scenarios
+- Use mocks and stubs for external dependencies
+
+## Coverage and Quality
+- Aim for high test coverage on critical paths
+- Use invariant testing for complex state machines
+- Test error conditions and edge cases
+- Verify gas usage in performance-critical contracts
+
+## Continuous Integration
+- All tests must pass in CI
+- Use parallel test execution where possible
+- Separate fast unit tests from slow integration tests
