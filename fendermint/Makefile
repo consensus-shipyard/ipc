@@ -89,6 +89,7 @@ docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(CUSTOM_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 # After that it looks like even the regular docker build needs the `--load` parameter, which hopefully
 # it can handle for anyone with `DOCKER_BUILDKIT=1`.
 docker-build:
+#docker-deps $(FENDERMINT_CODE)
 	if [ "$(PROFILE)" = "ci" ]; then \
 		cat docker/builder.ci.Dockerfile docker/runner.Dockerfile > docker/.frankenstein.containerfile ; \
 		docker buildx build \
