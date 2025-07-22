@@ -1,188 +1,43 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useWizardStore } from '../../stores/wizard'
+import { useTemplatesStore } from '../../stores/templates'
 
 const router = useRouter()
+const wizardStore = useWizardStore()
+const templatesStore = useTemplatesStore()
 
 // Questionnaire state
 const currentQuestion = ref(0)
-const answers = ref<Record<string, string>>({})
+const answers = ref<Record<string, string>>(wizardStore.config.questionnaire || {})
 
-// Questions for template selection
-const questions = [
-  {
-    id: 'useCase',
-    question: "What's your primary use case?",
-    options: [
-      { value: 'development', label: 'Development/Testing', description: 'Local development and experimentation' },
-      { value: 'staging', label: 'Staging/QA', description: 'Pre-production testing environment' },
-      { value: 'production', label: 'Production Launch', description: 'Live production deployment' },
-      { value: 'consortium', label: 'Private Consortium', description: 'Private or consortium network' }
-    ]
-  },
-  {
-    id: 'decentralization',
-    question: "How important is decentralization?",
-    options: [
-      { value: 'critical', label: 'Very Important', description: 'Maximum decentralization with open participation' },
-      { value: 'moderate', label: 'Moderate', description: 'Balanced approach with some barriers' },
-      { value: 'minimal', label: 'Not Critical', description: 'Centralized or federated approach is fine' }
-    ]
-  },
-  {
-    id: 'throughput',
-    question: "Expected transaction volume?",
-    options: [
-      { value: 'low', label: 'Low (< 1,000 tx/day)', description: 'Occasional usage, basic applications' },
-      { value: 'medium', label: 'Medium (1,000-100k tx/day)', description: 'Regular business applications' },
-      { value: 'high', label: 'High (> 100k tx/day)', description: 'High-throughput applications' }
-    ]
-  },
-  {
-    id: 'validators',
-    question: "How many validators do you expect?",
-    options: [
-      { value: 'few', label: 'Few (1-10)', description: 'Small, controlled validator set' },
-      { value: 'medium', label: 'Medium (10-100)', description: 'Moderate validator participation' },
-      { value: 'many', label: 'Many (100+)', description: 'Large, diverse validator network' }
-    ]
-  }
-]
-
-// Template definitions based on our design doc
-const templates = [
-  {
-    id: 'development',
-    name: 'Development Template',
-    description: 'Perfect for local development and testing',
-    icon: '🧪',
-    features: [
-      'Federated mode for quick setup',
-      'Minimal validators (1-3)',
-      'Low stakes and barriers',
-      'Fast checkpoints',
-      'Local network compatible'
-    ],
-    recommended: ['development']
-  },
-  {
-    id: 'staging',
-    name: 'Staging Template',
-    description: 'Pre-production testing with realistic settings',
-    icon: '🚀',
-    features: [
-      'Collateral mode',
-      'Moderate stakes',
-      'Realistic validator count',
-      'Production-like settings',
-      'Lower barriers for testing'
-    ],
-    recommended: ['staging']
-  },
-  {
-    id: 'production',
-    name: 'Production Template',
-    description: 'Battle-tested configuration for live deployments',
-    icon: '🏭',
-    features: [
-      'Collateral mode',
-      'High security settings',
-      'Robust validator requirements',
-      'Conservative parameters',
-      'High stakes protection'
-    ],
-    recommended: ['production']
-  },
-  {
-    id: 'federated',
-    name: 'Federated Network Template',
-    description: 'For consortium and private networks',
-    icon: '🤝',
-    features: [
-      'Federated mode',
-      'Known validator set',
-      'Flexible management',
-      'Controlled access',
-      'Custom governance'
-    ],
-    recommended: ['consortium']
-  },
-  {
-    id: 'l1-integration',
-    name: 'L1 Integration Template',
-    description: 'Connect directly to Ethereum/Filecoin mainnet',
-    icon: '🌐',
-    features: [
-      'Mainnet parent networks',
-      'Production-grade security',
-      'Conservative settings',
-      'High gas considerations',
-      'Enterprise ready'
-    ],
-    recommended: ['production']
-  },
-  {
-    id: 'testnet',
-    name: 'Testnet Template',
-    description: 'Optimized for public testnets',
-    icon: '🧪',
-    features: [
-      'Pre-configured testnet parents',
-      'Moderate security settings',
-      'Testnet-optimized parameters',
-      'Reasonable gas costs',
-      'Easy experimentation'
-    ],
-    recommended: ['staging', 'development']
-  },
-  {
-    id: 'multi-token',
-    name: 'Multi-token Template',
-    description: 'ERC-20 based supply or collateral sources',
-    icon: '🪙',
-    features: [
-      'ERC-20 integration',
-      'Custom token contracts',
-      'Flexible economics',
-      'Token-specific validations',
-      'Multi-asset support'
-    ],
-    recommended: ['production', 'staging']
-  }
-]
+// Load from stores
+const questions = computed(() => templatesStore.questions)
+const templates = computed(() => templatesStore.templates)
 
 // Computed recommended templates based on answers
 const recommendedTemplates = computed(() => {
-  const useCase = answers.value.useCase
-  const decentralization = answers.value.decentralization
-
-  return templates.filter(template => {
-    // Primary filtering by use case
-    if (useCase && template.recommended.includes(useCase)) {
-      return true
-    }
-
-    // Secondary filtering by decentralization preference
-    if (decentralization === 'minimal' && template.id === 'federated') {
-      return true
-    }
-
-    return false
-  })
+  return templatesStore.getRecommendedTemplates(answers.value)
 })
 
 // Show all templates if questionnaire not completed
 const displayedTemplates = computed(() => {
-  return Object.keys(answers.value).length === questions.length
+  return Object.keys(answers.value).length === questions.value.length
     ? recommendedTemplates.value
-    : templates
+    : templates.value
 })
 
 // Navigation functions
 const selectAnswer = (questionId: string, value: string) => {
   answers.value[questionId] = value
 
-  if (currentQuestion.value < questions.length - 1) {
+  // Save to store
+  wizardStore.updateConfig({
+    questionnaire: answers.value
+  })
+
+  if (currentQuestion.value < questions.value.length - 1) {
     currentQuestion.value++
   }
 }
@@ -194,17 +49,35 @@ const goToPreviousQuestion = () => {
 }
 
 const skipQuestionnaire = () => {
-  currentQuestion.value = questions.length
+  currentQuestion.value = questions.value.length
 }
 
 const selectTemplate = (templateId: string) => {
-  // In Phase 2, we'll store this in Pinia store
-  // For now, just navigate to next step
-  router.push({ name: 'wizard-basic', query: { template: templateId } })
+  // Apply template defaults to wizard config
+  const smartDefaults = templatesStore.getSmartDefaults(templateId, answers.value)
+
+  wizardStore.updateConfig({
+    selectedTemplate: templateId,
+    questionnaire: answers.value,
+    ...smartDefaults
+  })
+
+  // Navigate to basic config step
+  router.push({ name: 'wizard-basic' })
 }
 
 const questionnaireCompleted = computed(() => {
-  return Object.keys(answers.value).length === questions.length
+  return Object.keys(answers.value).length === questions.value.length
+})
+
+// Initialize from existing store data
+onMounted(() => {
+  if (wizardStore.config.questionnaire) {
+    answers.value = wizardStore.config.questionnaire
+    if (Object.keys(answers.value).length === questions.value.length) {
+      currentQuestion.value = questions.value.length
+    }
+  }
 })
 </script>
 
