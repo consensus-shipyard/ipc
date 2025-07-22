@@ -13,6 +13,7 @@ import argparse
 import json
 import logging
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -50,49 +51,63 @@ class ThroughputTestRunner:
 
         self.test_name = self.config.get('name', 'throughput_test')
         self.timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        self.testnet_id = None  # Will be set during network startup
 
     def setup_materializer_config(self, validators: int) -> Path:
-        """Generate materializer configuration for the test"""
-        materializer_config = {
-            'materializer': {
-                'mode': 'LocalNet',
-                'nodes': validators,
-                'validators': validators,
-                'consensus': {
-                    'timeout_commit': '1s',
-                    'timeout_propose': '3s',
-                    'create_empty_blocks': True,
-                    'create_empty_blocks_interval': '1s'
+        """Generate materializer manifest for the test"""
+
+        # Generate accounts and validators
+        accounts = {}
+        validator_accounts = {}
+        balances = {}
+        nodes = {}
+
+        # Create accounts for validators
+        for i in range(validators):
+            account_name = f"validator{i}"
+            accounts[account_name] = {}
+            validator_accounts[account_name] = "100"  # Minimum collateral in atto
+            balances[account_name] = "100000000000000000000"  # 100 FIL in atto
+
+            # Create nodes for validators
+            node_name = f"node-{i}"
+            nodes[node_name] = {
+                "mode": {
+                    "type": "Validator",
+                    "validator": account_name
                 },
-                'fendermint': {
-                    'gas_limit': 10000000,
-                    'gas_price': 1000000000,
-                    'block_time': '1s'
-                }
+                "ethapi": i == 0,  # First node has ethapi
+                "seed_nodes": [] if i == 0 else ["node-0"]  # Others seed from first node
+            }
+
+        # Add some extra accounts for testing
+        accounts["alice"] = {}
+        accounts["bob"] = {}
+        balances["alice"] = "200000000000000000000"  # 200 FIL
+        balances["bob"] = "300000000000000000000"    # 300 FIL
+
+        # Create the manifest
+        manifest = {
+            "accounts": accounts,
+            "rootnet": {
+                "type": "New",
+                "validators": validator_accounts,
+                "balances": balances,
+                "ipc_contracts_owner": "validator0",
+                "env": {
+                    "CMT_CONSENSUS_TIMEOUT_COMMIT": "1s",
+                    "CMT_CONSENSUS_TIMEOUT_PROPOSE": "2s",
+                    "FM_LOG_LEVEL": "info,fendermint=debug"
+                },
+                "nodes": nodes
             }
         }
 
-        config_path = self.results_dir / f"materializer_config_{validators}v_{self.timestamp}.toml"
+        config_path = self.results_dir / f"materializer_config_{validators}v_{self.timestamp}.yaml"
 
-        # Convert to TOML format and save
+        # Write YAML manifest
         with open(config_path, 'w') as f:
-            # Simple TOML generation for our specific config
-            f.write(f"""[materializer]
-mode = "LocalNet"
-nodes = {validators}
-validators = {validators}
-
-[materializer.consensus]
-timeout_commit = "1s"
-timeout_propose = "3s"
-create_empty_blocks = true
-create_empty_blocks_interval = "1s"
-
-[materializer.fendermint]
-gas_limit = 10000000
-gas_price = 1000000000
-block_time = "1s"
-""")
+            yaml.dump(manifest, f, default_flow_style=False, sort_keys=False)
 
         return config_path
 
@@ -104,27 +119,41 @@ block_time = "1s"
         config_path = self.setup_materializer_config(validators)
 
         try:
-            # Change to materializer directory
-            os.chdir(self.materializer_dir)
+            # Use the fendermint binary with materializer subcommand
+            fendermint_bin = self.base_dir.parent.parent.parent.parent / "target" / "release" / "fendermint"
+            data_dir = self.results_dir / f"testnet_{validators}v_{self.timestamp}"
+
+            # Create data directory
+            data_dir.mkdir(parents=True, exist_ok=True)
+
+            # Set environment variables to avoid tracing conflicts
+            env = os.environ.copy()
+            env["RUST_LOG"] = "info"
+            env["FM_MATERIALIZER__DATA_DIR"] = str(data_dir)
 
             # Start the network
             cmd = [
-                "cargo", "run", "--bin", "materializer",
-                "--", "setup",
-                "--config", str(config_path),
-                "--output-dir", str(self.results_dir / f"testnet_{validators}v_{self.timestamp}")
+                str(fendermint_bin), "materializer",
+                "--data-dir", str(data_dir),
+                "setup",
+                "--manifest-file", str(config_path),
+                "--validate"
             ]
 
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=600, env=env)
 
             if result.returncode != 0:
                 logger.error(f"Failed to start test network: {result.stderr}")
                 return False
 
             logger.info("Test network started successfully")
+            logger.info(f"Materializer output: {result.stdout}")
+
+            # Store testnet ID for cleanup
+            self.testnet_id = config_path.stem
 
             # Wait for network to be ready
-            time.sleep(10)
+            time.sleep(20)
 
             # Verify network is responding
             return self.verify_network_ready()
@@ -173,48 +202,188 @@ block_time = "1s"
         logger.info("Network is ready")
         return True
 
-    def run_throughput_benchmark(self) -> Optional[Dict]:
-        """Run the throughput benchmark"""
-        logger.info("Starting throughput benchmark")
+    def cleanup_test_network(self):
+        """Clean up the test network"""
+        logger.info("Cleaning up test network")
 
-        # Prepare benchmark command
+        try:
+            # Use fendermint materializer remove
+            fendermint_bin = self.base_dir.parent.parent.parent.parent / "target" / "release" / "fendermint"
+
+            # If we have a testnet ID, use it for cleanup
+            if hasattr(self, 'testnet_id') and self.testnet_id:
+                data_dir = self.results_dir / f"testnet_{self.testnet_id.split('_')[1]}"
+
+                # Set environment variables
+                env = os.environ.copy()
+                env["RUST_LOG"] = "info"
+                env["FM_MATERIALIZER__DATA_DIR"] = str(data_dir)
+
+                cmd = [
+                    str(fendermint_bin), "materializer",
+                    "--data-dir", str(data_dir),
+                    "remove",
+                    "--testnet-id", self.testnet_id
+                ]
+
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, env=env)
+
+                if result.returncode != 0:
+                    logger.warning(f"Failed to remove testnet {self.testnet_id}: {result.stderr}")
+                    logger.info(f"Attempting manual cleanup...")
+                    # Try to remove manually
+                    try:
+                        if data_dir.exists():
+                            shutil.rmtree(data_dir)
+                            logger.info(f"Manually removed {data_dir}")
+                    except Exception as e:
+                        logger.warning(f"Failed to manually remove {data_dir}: {e}")
+                else:
+                    logger.info(f"Successfully removed testnet {self.testnet_id}")
+            else:
+                logger.info("No testnet ID found, trying manual cleanup")
+                # Find and clean up data directories manually
+                data_dirs = list(self.results_dir.glob("testnet_*"))
+
+                for data_dir in data_dirs:
+                    if data_dir.is_dir():
+                        try:
+                            shutil.rmtree(data_dir)
+                            logger.info(f"Manually removed {data_dir}")
+                        except Exception as e:
+                            logger.warning(f"Failed to remove {data_dir}: {e}")
+
+        except Exception as e:
+            logger.error(f"Error during cleanup: {e}")
+
+        logger.info("Cleanup completed")
+
+    def run_throughput_benchmark(self) -> Optional[Dict]:
+        """Run the throughput benchmark with real blockchain transactions"""
+        logger.info("Starting REAL blockchain throughput benchmark")
+
+        # Check if rust-script is available
+        benchmark_script = self.base_dir / "simple_real_benchmark.rs"
+
+        if not benchmark_script.exists():
+            logger.error("Real blockchain benchmark script not found")
+            logger.info("Falling back to standalone test")
+            return self.run_standalone_benchmark()
+
+        # Check if rust-script is installed
+        try:
+            subprocess.run(["rust-script", "--version"],
+                         capture_output=True, text=True, timeout=5)
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            logger.warning("rust-script not found, installing...")
+            try:
+                subprocess.run(["cargo", "install", "rust-script"],
+                             capture_output=True, text=True, timeout=300)
+            except Exception as e:
+                logger.error(f"Failed to install rust-script: {e}")
+                logger.info("Falling back to standalone test")
+                return self.run_standalone_benchmark()
+
+        # Run the real blockchain benchmark
+        result_file = self.results_dir / f"{self.test_name}_{self.timestamp}_results.json"
+
+        # Get network endpoints
+        endpoints = self.config.get('network', {}).get('endpoints', ['http://localhost:8545'])
+        endpoint = endpoints[0] if endpoints else "http://localhost:8545"
+
+        # Get test parameters from config
+        target_tps = self.config.get('performance', {}).get('target_tps', 100)
+        duration = self.config.get('performance', {}).get('duration', 30)
+        concurrent_users = self.config.get('performance', {}).get('concurrent_users', 50)
+
+        cmd = [
+            "rust-script",
+            str(benchmark_script),
+            "--endpoint", endpoint,
+            "--target-tps", str(target_tps),
+            "--duration", str(duration),
+            "--concurrent-users", str(concurrent_users),
+            "--output", str(result_file)
+        ]
+
+        logger.info(f"Running REAL blockchain benchmark: {' '.join(cmd)}")
+        logger.warning("This will send REAL transactions to the blockchain!")
+
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+
+            if result.returncode != 0:
+                logger.error(f"Real blockchain benchmark failed: {result.stderr}")
+                logger.info("Output from failed benchmark:")
+                logger.info(result.stdout)
+                logger.info("Falling back to standalone test")
+                return self.run_standalone_benchmark()
+
+            logger.info("Real blockchain benchmark completed successfully")
+            logger.info(f"Benchmark output: {result.stdout}")
+
+            # Load and return results
+            try:
+                with open(result_file) as f:
+                    results = json.load(f)
+
+                # Add metadata to indicate this was a real blockchain test
+                results["test_type"] = "real_blockchain"
+                results["framework"] = "rust_script_standalone"
+
+                return results
+            except Exception as e:
+                logger.error(f"Failed to load results: {e}")
+                return None
+
+        except subprocess.TimeoutExpired:
+            logger.error("Real blockchain benchmark timeout")
+            return None
+        except Exception as e:
+            logger.error(f"Error running real blockchain benchmark: {e}")
+            return None
+
+    def run_standalone_benchmark(self) -> Optional[Dict]:
+        """Run the standalone benchmark as fallback"""
+        logger.info("Running standalone benchmark")
+
+        # Build standalone test
         benchmark_bin = self.base_dir / "target" / "release" / "basic_throughput_test"
 
-        # Build if not exists
         if not benchmark_bin.exists():
-            logger.info("Building throughput benchmark")
+            logger.info("Building standalone benchmark")
             result = subprocess.run([
                 "rustc", "basic_throughput_test.rs", "-o", "target/release/basic_throughput_test"
             ], cwd=self.base_dir, capture_output=True, text=True)
 
             if result.returncode != 0:
-                logger.error(f"Failed to build benchmark: {result.stderr}")
+                logger.error(f"Failed to build standalone benchmark: {result.stderr}")
                 return None
 
-        # Run benchmark
+        # Run standalone benchmark
         result_file = self.results_dir / f"{self.test_name}_{self.timestamp}_results.json"
 
         cmd = [str(benchmark_bin)]
 
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)  # 30 min timeout
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
 
             if result.returncode != 0:
-                logger.error(f"Benchmark failed: {result.stderr}")
+                logger.error(f"Standalone benchmark failed: {result.stderr}")
                 return None
 
-            logger.info("Benchmark completed successfully")
+            logger.info("Standalone benchmark completed successfully")
             logger.info(f"Output: {result.stdout}")
 
             # Create a simple results structure
-            # Parse the output to extract basic metrics
             results = {
                 "test_name": self.test_name,
                 "timestamp": self.timestamp,
-                "config": str(self.config_path),
+                "config": str(self.config),
                 "success": True,
                 "output": result.stdout,
-                "error": result.stderr
+                "error": result.stderr,
+                "note": "This was a standalone simulation, not real blockchain transactions"
             }
 
             # Save results
@@ -225,32 +394,11 @@ block_time = "1s"
             return results
 
         except subprocess.TimeoutExpired:
-            logger.error("Benchmark timeout")
+            logger.error("Standalone benchmark timeout")
             return None
         except Exception as e:
-            logger.error(f"Error running benchmark: {e}")
+            logger.error(f"Error running standalone benchmark: {e}")
             return None
-
-    def cleanup_test_network(self):
-        """Clean up test network resources"""
-        logger.info("Cleaning up test network")
-
-        try:
-            # Kill any remaining processes
-            subprocess.run(["pkill", "-f", "fendermint"], capture_output=True)
-            subprocess.run(["pkill", "-f", "cometbft"], capture_output=True)
-
-            # Clean up temporary files
-            testnet_dirs = list(self.results_dir.glob(f"testnet_*{self.timestamp}"))
-            for testnet_dir in testnet_dirs:
-                if testnet_dir.is_dir():
-                    import shutil
-                    shutil.rmtree(testnet_dir)
-
-            logger.info("Cleanup completed")
-
-        except Exception as e:
-            logger.warning(f"Error during cleanup: {e}")
 
     def generate_report(self, results: Dict) -> str:
         """Generate a summary report"""
@@ -318,8 +466,9 @@ block_time = "1s"
                     logger.info(f"Running test configuration: {config_name}")
 
                     # Start network for this configuration
-                    logger.info(f"Starting test network with {config_validators} validators")
-                    logger.info("Note: Using standalone benchmark (no actual network setup)")
+                    if not self.start_test_network(config_validators):
+                        logger.error(f"Failed to start network for {config_name}")
+                        continue
 
                     # Update config endpoints for this test
                     original_endpoints = self.config['network']['endpoints']
@@ -333,9 +482,8 @@ block_time = "1s"
                     # Restore original endpoints
                     self.config['network']['endpoints'] = original_endpoints
 
-                    # Cleanup (skip actual cleanup since no network was started)
-                    logger.info("Cleaning up test network")
-                    logger.info("Cleanup completed")
+                    # Cleanup
+                    self.cleanup_test_network()
 
                     # Wait between configurations
                     inter_delay = self.config.get('test', {}).get('inter_test_delay', '2m')
@@ -350,15 +498,18 @@ block_time = "1s"
 
             else:
                 # Single configuration test
-                logger.info(f"Starting test network with {validators} validators")
-                logger.info("Note: Using standalone benchmark (no actual network setup)")
+                if not self.start_test_network(validators):
+                    return False
 
-                results = self.run_throughput_benchmark()
-                if results:
-                    self.generate_report(results)
-                    return True
-
-                return False
+                try:
+                    results = self.run_throughput_benchmark()
+                    if results:
+                        self.generate_report(results)
+                        return True
+                    return False
+                finally:
+                    # Always cleanup
+                    self.cleanup_test_network()
 
         except Exception as e:
             logger.error(f"Test failed: {e}")
