@@ -17,6 +17,7 @@ PACKAGE := $(patsubst %, --package %, $(CRATE))
 # Override PROFILE env var to choose between `local | ci`
 PROFILE ?= local
 
+CONTAINER_EXEC ?= docker
 # Set to `--push` to push the multiarch image during the build.
 # Leave on `--load` for local build, but it only works for a single platform.
 BUILDX_STORE ?= --load
@@ -89,7 +90,6 @@ docker-deps: $(BUILTIN_ACTORS_BUNDLE) $(CUSTOM_ACTORS_BUNDLE) $(IPC_ACTORS_GEN)
 # After that it looks like even the regular docker build needs the `--load` parameter, which hopefully
 # it can handle for anyone with `DOCKER_BUILDKIT=1`.
 docker-build:
-#docker-deps $(FENDERMINT_CODE)
 	if [ "$(PROFILE)" = "ci" ]; then \
 		cat docker/builder.ci.Dockerfile docker/runner.Dockerfile > docker/.frankenstein.containerfile ; \
 		docker buildx build \
@@ -99,10 +99,14 @@ docker-build:
 			-t $(BUILDX_TAG) $(PWD)/..; \
 	else \
 		cat docker/builder.local.Dockerfile docker/runner.Dockerfile > docker/.frankenstein.containerfile ; \
-		podman build \
+		for image in $$(cat docker/.frankenstein.containerfile | rg FROM | cut -d ' ' -f 2) ; do \
+			echo "Pre-fetching $${image}.."; \
+			time $(CONTAINER_EXEC) pull "$${image}"; \
+		done;\
+		time $(CONTAINER_EXEC) build \
 			-f docker/.frankenstein.containerfile \
 			-t fendermint:latest $(PWD)/..; \
-	fi
+	fi \
 
 # Build a bundle CAR; this is so we don't have to have a project reference,
 # which means we are not tied to the release cycle of both FVM _and_ actors;
