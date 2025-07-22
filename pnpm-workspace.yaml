@@ -2,3 +2,4 @@ packages:
   - 'contracts'
   - 'demos/axelar-token'
   - 'demos/linked-token'
+  - 'ipc-ui/frontend'
