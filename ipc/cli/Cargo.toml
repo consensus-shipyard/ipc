@@ -48,13 +48,14 @@ serde_yaml = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tempfile = "3.8"
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["signal"] }
 tokio-tungstenite = { workspace = true }
 toml = "0.7.2"
 url = { workspace = true }
 zeroize = "1.6.0"
 prometheus = { workspace = true }
 prometheus_exporter = { workspace = true }
+fendermint_eth_api = { path = "../../fendermint/eth/api" }
 
 ipc-wallet = { path = "../../ipc/wallet", features = ["with-ethers"] }
 ipc-provider = { path = "../../ipc/provider" }

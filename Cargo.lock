@@ -5842,6 +5842,7 @@ dependencies = [
  "fendermint_app",
  "fendermint_app_settings",
  "fendermint_crypto",
+ "fendermint_eth_api",
  "fendermint_eth_deployer",
  "fendermint_eth_hardhat",
  "fendermint_vm_actor_interface",
