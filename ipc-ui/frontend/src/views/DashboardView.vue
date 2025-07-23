@@ -1,54 +1,51 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import { apiService } from '../services/api'
 
-// Mock data - will be replaced with real data from stores
-const subnets = ref([
-  {
-    id: 'subnet-1',
-    name: 'Production Subnet A',
-    status: 'active',
-    parentNetwork: 'Ethereum Mainnet',
-    subnetId: '/r31337/subnet-1',
-    validators: 5,
-    totalStake: '150.5',
-    blockHeight: 12543,
-    lastCheckpoint: '2 hours ago',
-    children: [
-      { id: 'child-1', name: 'Child Subnet A1', status: 'active' },
-      { id: 'child-2', name: 'Child Subnet A2', status: 'deploying' }
-    ]
-  },
-  {
-    id: 'subnet-2',
-    name: 'Test Environment',
-    status: 'paused',
-    parentNetwork: 'Sepolia Testnet',
-    subnetId: '/r31337/subnet-2',
-    validators: 3,
-    totalStake: '45.0',
-    blockHeight: 8721,
-    lastCheckpoint: '5 hours ago',
-    children: [
-      { id: 'child-3', name: 'Child Subnet B1', status: 'active' }
-    ]
-  },
-  {
-    id: 'subnet-3',
-    name: 'Dev Subnet',
-    status: 'active',
-    parentNetwork: 'Local Network',
-    subnetId: '/r31337/subnet-3',
-    validators: 1,
-    totalStake: '10.0',
-    blockHeight: 1234,
-    lastCheckpoint: '30 minutes ago',
-    children: []
+interface SubnetInstance {
+  id: string
+  name: string
+  status: string
+  template: string
+  parent: string
+  created_at: string
+  validators: Array<{
+    address: string
+    stake: string
+    power: number
+    status: string
+  }>
+  config: Record<string, any>
+}
+
+// State
+const subnets = ref<SubnetInstance[]>([])
+const loading = ref(true)
+const error = ref<string | null>(null)
+
+// Methods
+const fetchSubnets = async () => {
+  try {
+    loading.value = true
+    error.value = null
+
+    const response = await apiService.getInstances()
+
+    if (response.data) {
+      subnets.value = response.data
+    }
+  } catch (err) {
+    console.error('Error fetching subnets:', err)
+    error.value = err instanceof Error ? err.message : 'Failed to load subnets'
+  } finally {
+    loading.value = false
   }
-])
+}
 
+// Computed
 const getStatusColor = (status: string) => {
-  switch (status) {
+  switch (status.toLowerCase()) {
     case 'active': return 'text-green-600 bg-green-50'
     case 'paused': return 'text-yellow-600 bg-yellow-50'
     case 'deploying': return 'text-blue-600 bg-blue-50'
@@ -58,14 +55,24 @@ const getStatusColor = (status: string) => {
 }
 
 const getStatusIcon = (status: string) => {
-  switch (status) {
-    case 'active': return 'M5 13l4 4L19 7'
-    case 'paused': return 'M6 4h4v16H6V4zM14 4h4v16h-4V4z'
-    case 'deploying': return 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'
-    case 'failed': return 'M6 18L18 6M6 6l12 12'
-    default: return 'M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'
+  switch (status.toLowerCase()) {
+    case 'active':
+      return 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
+    case 'paused':
+      return 'M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z'
+    case 'deploying':
+      return 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'
+    case 'failed':
+      return 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z'
+    default:
+      return 'M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M12 21a9 9 0 100-18 9 9 0 000 18z'
   }
 }
+
+// Lifecycle
+onMounted(() => {
+  fetchSubnets()
+})
 </script>
 
 <template>
@@ -113,7 +120,7 @@ const getStatusIcon = (status: string) => {
           <div>
             <p class="text-sm font-medium text-gray-600">Total Validators</p>
             <p class="text-3xl font-bold text-gray-900">
-              {{ subnets.reduce((sum, subnet) => sum + subnet.validators, 0) }}
+              {{ subnets.reduce((sum, subnet) => sum + subnet.validators.length, 0) }}
             </p>
           </div>
           <div class="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
@@ -129,7 +136,7 @@ const getStatusIcon = (status: string) => {
           <div>
             <p class="text-sm font-medium text-gray-600">Total Stake</p>
             <p class="text-3xl font-bold text-purple-600">
-              {{ subnets.reduce((sum, subnet) => sum + parseFloat(subnet.totalStake), 0).toFixed(1) }} FIL
+              {{ subnets.reduce((sum, subnet) => sum + subnet.validators.reduce((s, v) => s + parseFloat(v.stake || '0'), 0), 0).toFixed(1) }} FIL
             </p>
           </div>
           <div class="w-12 h-12 bg-purple-50 rounded-lg flex items-center justify-center">
@@ -141,7 +148,7 @@ const getStatusIcon = (status: string) => {
       </div>
     </div>
 
-    <!-- Subnets List -->
+    <!-- Your Subnets -->
     <div class="card">
       <div class="flex items-center justify-between mb-6">
         <h2 class="text-xl font-semibold text-gray-900">Your Subnets</h2>
@@ -150,7 +157,45 @@ const getStatusIcon = (status: string) => {
         </RouterLink>
       </div>
 
-      <div class="space-y-4">
+      <!-- Loading State -->
+      <div v-if="loading" class="text-center py-8">
+        <div class="animate-spin inline-block w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full"></div>
+        <p class="mt-4 text-gray-600">Loading subnets...</p>
+      </div>
+
+      <!-- Error State -->
+      <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-lg p-6">
+        <div class="flex items-start space-x-3">
+          <svg class="w-6 h-6 text-red-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+          </svg>
+          <div>
+            <h3 class="font-semibold text-red-800 mb-1">Error Loading Subnets</h3>
+            <p class="text-red-700">{{ error }}</p>
+            <button
+              @click="fetchSubnets"
+              class="mt-3 text-red-600 hover:text-red-700 font-medium text-sm"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div v-else-if="subnets.length === 0" class="text-center py-12 text-gray-500">
+        <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 9a2 2 0 00-2 2v2a2 2 0 002 2m0 0h14m-14 0a2 2 0 002 2v2a2 2 0 01-2 2M5 9V7a2 2 0 012-2h10a2 2 0 012 2v2M7 7V5a2 2 0 012-2h6a2 2 0 012 2v2" />
+        </svg>
+        <p class="text-lg font-medium mb-2">No Subnets Found</p>
+        <p class="mb-4">You haven't deployed any subnets yet.</p>
+        <RouterLink to="/wizard" class="btn-primary">
+          Deploy Your First Subnet
+        </RouterLink>
+      </div>
+
+      <!-- Subnets List -->
+      <div v-else class="space-y-4">
         <div
           v-for="subnet in subnets"
           :key="subnet.id"
@@ -182,8 +227,8 @@ const getStatusIcon = (status: string) => {
                   {{ subnet.status.charAt(0).toUpperCase() + subnet.status.slice(1) }}
                 </span>
               </div>
-              <p class="text-gray-600 text-sm mb-1">{{ subnet.subnetId }}</p>
-              <p class="text-gray-500 text-sm">Parent: {{ subnet.parentNetwork }}</p>
+              <p class="text-gray-600 text-sm mb-1">{{ subnet.id }}</p>
+              <p class="text-gray-500 text-sm">Parent: {{ subnet.parent }}</p>
             </div>
 
             <div class="flex space-x-2">
@@ -200,52 +245,21 @@ const getStatusIcon = (status: string) => {
           <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
             <div>
               <p class="text-sm text-gray-500">Validators</p>
-              <p class="font-semibold text-gray-900">{{ subnet.validators }}</p>
+              <p class="font-semibold text-gray-900">{{ subnet.validators.length }}</p>
             </div>
             <div>
               <p class="text-sm text-gray-500">Total Stake</p>
-              <p class="font-semibold text-gray-900">{{ subnet.totalStake }} FIL</p>
+              <p class="font-semibold text-gray-900">{{ subnet.validators.reduce((s, v) => s + parseFloat(v.stake || '0'), 0).toFixed(1) }} FIL</p>
             </div>
             <div>
-              <p class="text-sm text-gray-500">Block Height</p>
-              <p class="font-semibold text-gray-900">{{ subnet.blockHeight.toLocaleString() }}</p>
+              <p class="text-sm text-gray-500">Template</p>
+              <p class="font-semibold text-gray-900">{{ subnet.template }}</p>
             </div>
             <div>
-              <p class="text-sm text-gray-500">Last Checkpoint</p>
-              <p class="font-semibold text-gray-900">{{ subnet.lastCheckpoint }}</p>
+              <p class="text-sm text-gray-500">Created</p>
+              <p class="font-semibold text-gray-900">{{ new Date(subnet.created_at).toLocaleDateString() }}</p>
             </div>
           </div>
-
-          <!-- Child Subnets (if any) -->
-          <div v-if="subnet.children.length > 0" class="border-t pt-4">
-            <p class="text-sm font-medium text-gray-700 mb-2">Child Subnets ({{ subnet.children.length }})</p>
-            <div class="flex flex-wrap gap-2">
-              <span
-                v-for="child in subnet.children"
-                :key="child.id"
-                :class="[
-                  'inline-flex items-center px-3 py-1 rounded-full text-xs font-medium',
-                  getStatusColor(child.status)
-                ]"
-              >
-                {{ child.name }}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Empty State -->
-      <div v-if="subnets.length === 0" class="text-center py-12">
-        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14-7l2 2m0 0l2 2m-2-2v6m-2-2H5m14-7v2a2 2 0 01-2 2H5a2 2 0 01-2-2V4"/>
-        </svg>
-        <h3 class="mt-2 text-sm font-medium text-gray-900">No subnets deployed</h3>
-        <p class="mt-1 text-sm text-gray-500">Get started by deploying your first subnet.</p>
-        <div class="mt-6">
-          <RouterLink to="/wizard" class="btn-primary">
-            Deploy Your First Subnet
-          </RouterLink>
         </div>
       </div>
     </div>
