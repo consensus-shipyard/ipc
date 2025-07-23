@@ -3,7 +3,8 @@
 
 use crate::comet_runner::run_comet;
 use crate::commands::node::config::{GenesisSource, NodeInitConfig};
-use crate::commands::subnet::join::{join_subnet, JoinSubnetArgs};
+use crate::commands::node::config_override::merge_toml_config;
+use crate::commands::subnet::join::join_subnet;
 use crate::{
     get_ipc_provider, ipc_config_store::IpcConfigStore, CommandLineHandler, GlobalArguments,
 };
@@ -15,16 +16,13 @@ use fendermint_app::cmd::genesis::into_tendermint;
 use fendermint_app::options::genesis::GenesisIntoTendermintArgs;
 
 use fendermint_app::cmd::key::store_key;
-use fendermint_app::options::key::{KeyFromEthArgs, KeyGenArgs, KeyIntoTendermintArgs};
 use fendermint_crypto::SecretKey;
 use fs_err as fs;
 use ipc_api::subnet_id::SubnetID;
 use ipc_provider::IpcProvider;
-use ipc_wallet::WalletType;
-use std::ops::Sub;
 use std::path::{Path, PathBuf};
 
-use crate::commands::subnet::create_genesis::{create_genesis, GenesisConfig};
+use crate::commands::subnet::create_genesis::create_genesis;
 use crate::commands::wallet::import::{import_wallet, WalletImportArgs};
 
 pub(crate) struct InitNode;
@@ -36,19 +34,21 @@ impl CommandLineHandler for InitNode {
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
         let ipc_config_store = IpcConfigStore::load_or_init(global).await?;
         let config = NodeInitConfig::load(&arguments.config)?;
+
         let subnet_id: SubnetID = config.subnet.parse().context("invalid subnet ID")?;
         let parent_id: SubnetID = config.parent.parse().context("invalid parent ID")?;
 
         let home = Path::new(&config.home);
-        create_dir(&home)?;
+        create_dir(home)?;
         let fendermint_home = home.join("fendermint");
         create_dir(&fendermint_home)?;
         let comet_bft_home = home.join("cometbft");
         create_dir(&comet_bft_home)?;
 
-        // TODO Karel - move the provider inside..
         let provider = get_ipc_provider(global)?;
+        log::info!("Importing and storing validator key");
         import_and_store_validator_key(&provider, &config.key, &fendermint_home)?;
+        log::info!("Validator key imported and stored");
 
         if let Some(join_config) = &config.join {
             let mut provider = get_ipc_provider(global)?;
@@ -76,20 +76,26 @@ impl CommandLineHandler for InitNode {
             }
         };
 
-        init_comet_bft(&comet_bft_home).await?;
-        init_fendermint(&fendermint_home)?;
+        log::info!("Initializing CometBFT with configuration overrides");
+        init_comet_bft_with_overrides(&comet_bft_home, config.cometbft_overrides.as_ref()).await?;
+        log::info!("CometBFT initialized successfully");
 
+        log::info!("Initializing Fendermint with configuration overrides");
+        init_fendermint_with_overrides(&fendermint_home, config.fendermint_overrides.as_ref())?;
+        log::info!("Fendermint initialized successfully");
+
+        log::info!("Converting genesis to Tendermint format");
         into_tendermint(
             &created_genesis.genesis,
             &GenesisIntoTendermintArgs {
                 app_state: Some(created_genesis.sealed),
                 out: comet_bft_home.join("config/genesis.json"),
-                block_max_bytes: 22020096,
+                block_max_bytes: 22020096, // Default value from GenesisIntoTendermintArgs
             },
         )?;
+        log::info!("Genesis converted to Tendermint format");
 
-        // TODO Karel - add the keys generation, config override etc...
-
+        log::info!("Node initialization completed successfully");
         Ok(())
     }
 }
@@ -99,7 +105,7 @@ pub fn import_and_store_validator_key(
     key_config: &WalletImportArgs,
     dir: &Path,
 ) -> anyhow::Result<()> {
-    let imported_wallet = import_wallet(&provider, key_config)?;
+    let imported_wallet = import_wallet(provider, key_config)?;
 
     // Convert to secp256k1 secret key (validators only support secp256k1)
     let secret_key = SecretKey::try_from(imported_wallet.private_key.clone())
@@ -133,11 +139,29 @@ fn create_dir(home: &Path) -> anyhow::Result<()> {
 
 async fn init_comet_bft(home: &Path) -> anyhow::Result<()> {
     let home = home.to_string_lossy();
-    run_comet(&["init", "--home", &home])?;
+    run_comet(["init", "--home", &home])?;
     Ok(())
 }
 
-// TODO Karel - move this to fendermint as a command
+async fn init_comet_bft_with_overrides(
+    home: &Path,
+    overrides: Option<&toml::Value>,
+) -> anyhow::Result<()> {
+    log::info!("Initializing CometBFT");
+    init_comet_bft(home).await?;
+
+    if let Some(overrides) = overrides {
+        let config_path = home.join("config/config.toml");
+        log::info!("Applying CometBFT configuration overrides");
+        merge_toml_config(&config_path, overrides)?;
+        log::info!("CometBFT configuration overrides applied");
+    } else {
+        log::info!("No CometBFT overrides provided");
+    }
+
+    Ok(())
+}
+
 fn init_fendermint(home: &Path) -> anyhow::Result<()> {
     let data_dir = home.join("data");
     let config_dir = home.join("config");
@@ -145,6 +169,25 @@ fn init_fendermint(home: &Path) -> anyhow::Result<()> {
     create_dir(&config_dir)?;
 
     write_default_fendermint_setting(&config_dir)?;
+
+    Ok(())
+}
+
+fn init_fendermint_with_overrides(
+    home: &Path,
+    overrides: Option<&toml::Value>,
+) -> anyhow::Result<()> {
+    log::info!("Initializing Fendermint");
+    init_fendermint(home)?;
+
+    if let Some(overrides) = overrides {
+        let config_path = home.join("config/default.toml");
+        log::info!("Applying Fendermint configuration overrides");
+        merge_toml_config(&config_path, overrides)?;
+        log::info!("Fendermint configuration overrides applied");
+    } else {
+        log::info!("No Fendermint overrides provided");
+    }
 
     Ok(())
 }

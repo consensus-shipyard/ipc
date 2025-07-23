@@ -31,7 +31,6 @@ impl CommandLineHandler for WalletImport {
 }
 
 pub(crate) struct ImportedWallet {
-    pub wallet_type: WalletType,
     pub address: String,
     pub private_key: Vec<u8>,
 }
@@ -52,7 +51,6 @@ pub(crate) fn import_wallet(
 
         let imported = provider.import_evm_key_from_privkey(private_key)?;
         return Ok(ImportedWallet {
-            wallet_type,
             address: imported.address.to_string(),
             private_key: imported.private_key,
         });
@@ -80,7 +78,6 @@ pub(crate) fn import_wallet(
     };
 
     Ok(ImportedWallet {
-        wallet_type,
         address,
         private_key,
     })

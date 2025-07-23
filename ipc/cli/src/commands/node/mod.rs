@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 mod config;
+mod config_override;
 mod init;
 
 use clap::{Args, Subcommand};
