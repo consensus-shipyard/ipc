@@ -54,6 +54,9 @@ url = { workspace = true }
 zeroize = "1.6.0"
 prometheus = { workspace = true }
 prometheus_exporter = { workspace = true }
+warp = "0.3"
+uuid = { version = "1.0", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
 
 ipc-wallet = { path = "../../ipc/wallet", features = ["with-ethers"] }
 ipc-provider = { path = "../../ipc/provider" }
