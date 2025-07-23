@@ -6,6 +6,15 @@ license-file.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[build-dependencies]
+reqwest = { workspace = true, features = ["blocking", "json"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+hex = { workspace = true }
+sha2 = "0.10"
+flate2 = "1.1"
+tar = "0.4"
+
 [dependencies]
 anyhow = { workspace = true }
 async-channel = { workspace = true }
@@ -35,6 +44,7 @@ serde = { workspace = true }
 serde_bytes = "0.11.9"
 serde_json = { workspace = true }
 serde_tuple = { workspace = true }
+serde_yaml = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
@@ -49,7 +59,12 @@ ipc-wallet = { path = "../../ipc/wallet", features = ["with-ethers"] }
 ipc-provider = { path = "../../ipc/provider" }
 ipc-api = { path = "../../ipc/api" }
 ipc-types = { path = "../../ipc/types" }
+ipc-observability = { path = "../../ipc/observability" }
 tracing-subscriber.workspace = true
 
 fendermint_eth_hardhat = { path = "../../fendermint/eth/hardhat" }
 fendermint_eth_deployer = { path = "../../fendermint/eth/deployer" }
+fendermint_app_settings = { path = "../../fendermint/app/settings" }
+fendermint_vm_actor_interface = { path = "../../fendermint/vm/actor_interface" }
+fendermint_app = { path = "../../fendermint/app" }
+contracts-artifacts = { path = "../../contracts-artifacts" }

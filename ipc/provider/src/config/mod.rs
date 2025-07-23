@@ -16,43 +16,25 @@ use fs_err as fs;
 use std::collections::HashMap;
 use std::path::Path;
 
+use crate::config::deserialize::eth_addr_str_to_address;
 use anyhow::{Context, Result};
 use deserialize::deserialize_subnets_from_vec;
 use ipc_api::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 use serialize::serialize_subnets_to_str;
-pub use subnet::Subnet;
+pub use subnet::{EVMSubnet, Subnet, SubnetConfig};
 
 pub const JSON_RPC_VERSION: &str = "2.0";
 
-/// DefaulDEFAULT_CHAIN_IDSUBNET_e
-pub const DEFAULT_CONFIG_TEMPLATE: &str = r#"
-keystore_path = "~/.ipc"
-
-# Filecoin Calibration
-[[subnets]]
-id = "/r314159"
-
-[subnets.config]
-network_type = "fevm"
-provider_http = "https://api.calibration.node.glif.io/rpc/v1"
-gateway_addr = "0x1AEe8A878a22280fc2753b3C63571C8F895D2FE3"
-registry_addr = "0x0b4e239FF21b40120cDa817fba77bD1B366c1bcD"
-
-# Subnet template - uncomment and adjust before using
-# [[subnets]]
-# id = "/r314159/<SUBNET_ID>"
-
-# [subnets.config]
-# network_type = "fevm"
-# provider_http = "https://<RPC_ADDR>/"
-# gateway_addr = "0x77aa40b105843728088c0132e43fc44348881da8"
-# registry_addr = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
-"#;
+const DEFAULT_KEYSTORE: &str = "~/.ipc";
+const CALIBRATION_ID: &str = "/r314159";
+const CALIBRATION_RPC: &str = "https://api.calibration.node.glif.io/rpc/v1";
+const CALIBRATION_GATEWAY: &str = "0x1AEe8A878a22280fc2753b3C63571C8F895D2FE3";
+const CALIBRATION_REGISTRY: &str = "0x0b4e239FF21b40120cDa817fba77bD1B366c1bcD";
 
 /// The top-level struct representing the config. Calls to [`Config::from_file`] deserialize into
 /// this struct.
-#[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
+#[derive(Deserialize, Serialize, Debug, PartialEq, Eq, Clone)]
 pub struct Config {
     /// Directory of the keystore that wants to be made available by the provider.
     pub keystore_path: Option<String>,
@@ -98,8 +80,15 @@ impl Config {
     }
 
     pub async fn write_to_file_async(&self, path: impl AsRef<Path>) -> Result<()> {
+        // Ensure parent directories exist
+        let path_ref = path.as_ref();
+        if let Some(parent) = path_ref.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+
+        // Serialize and write
         let content = toml::to_string(self)?;
-        tokio::fs::write(path, content.into_bytes()).await?;
+        tokio::fs::write(path_ref, content.into_bytes()).await?;
         Ok(())
     }
 
@@ -114,6 +103,35 @@ impl Config {
 
 impl Default for Config {
     fn default() -> Self {
-        Self::new()
+        let subnet_id: SubnetID = CALIBRATION_ID.parse().expect("hard-coded ID must parse");
+
+        let provider_http = CALIBRATION_RPC.parse().expect("RPC URL is valid");
+
+        let gateway_addr =
+            eth_addr_str_to_address(CALIBRATION_GATEWAY).expect("invalid gateway address");
+        let registry_addr =
+            eth_addr_str_to_address(CALIBRATION_REGISTRY).expect("invalid registry address");
+
+        let fevm = EVMSubnet {
+            provider_http,
+            gateway_addr,
+            registry_addr,
+            provider_timeout: None,
+            auth_token: None,
+        };
+
+        let mut subnets = HashMap::new();
+        subnets.insert(
+            subnet_id.clone(),
+            Subnet {
+                id: subnet_id,
+                config: SubnetConfig::Fevm(fevm),
+            },
+        );
+
+        Config {
+            keystore_path: Some(DEFAULT_KEYSTORE.to_string()),
+            subnets,
+        }
     }
 }

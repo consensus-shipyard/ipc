@@ -17,7 +17,7 @@ use self::remove::{WalletRemove, WalletRemoveArgs};
 mod balances;
 mod default;
 mod export;
-mod import;
+pub mod import;
 mod list;
 mod new;
 mod remove;
