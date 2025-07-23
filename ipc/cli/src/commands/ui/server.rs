@@ -8,7 +8,12 @@ use futures_util::{SinkExt, StreamExt};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
-use warp::Filter;
+use warp::{Filter, Reply};
+use include_dir::{include_dir, Dir};
+use std::path::Path;
+
+// Include the built frontend files at compile time
+static FRONTEND_DIST: Dir = include_dir!("$CARGO_MANIFEST_DIR/../../ipc-ui/frontend/dist");
 
 /// UI Server that handles both frontend serving and backend API
 pub struct UIServer {
@@ -50,25 +55,163 @@ impl UIServer {
 
     /// Start the UI server (both frontend and backend)
     pub async fn start(&mut self) -> Result<()> {
-        // Start backend API server
-        let backend_state = self.state.clone();
-        let backend_addr = format!("{}:{}", self.host, self.backend_port);
-
-        tokio::spawn(async move {
-            if let Err(e) = start_backend_server(backend_addr, backend_state).await {
-                log::error!("Backend server error: {}", e);
-            }
-        });
-
-        // Start frontend server (for now, just log that it would serve static files)
-        let frontend_addr = format!("{}:{}", self.host, self.frontend_port);
-        log::info!("Frontend server would serve static files at {}", frontend_addr);
-        log::info!("In production, this would serve the built Vue.js application");
-
-        // Initialize with some mock data for testing
+        // Initialize with mock data
         self.initialize_mock_data().await?;
 
+        // Create the combined server with both static files and API
+        let addr: SocketAddr = format!("{}:{}", self.host, self.frontend_port)
+            .parse()
+            .map_err(|e| anyhow::anyhow!("Invalid address: {}", e))?;
+
+        let routes = self.create_combined_routes();
+
+        log::info!("UI server starting at http://{}", addr);
+        log::info!("Serving frontend static files and backend API from single port");
+        log::info!("Frontend: http://{}/", addr);
+        log::info!("Backend API: http://{}/api/", addr);
+        log::info!("WebSocket: ws://{}/ws", addr);
+
+        warp::serve(routes)
+            .run(addr)
+            .await;
+
         Ok(())
+    }
+
+    /// Create combined routes for both API and static file serving
+    fn create_combined_routes(&self) -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
+        let api_routes = self.api_routes();
+        let websocket_route = self.websocket_route();
+        let static_routes = self.static_file_routes();
+
+        api_routes
+            .or(websocket_route)
+            .or(static_routes)
+            .with(warp::log("api"))
+    }
+
+    /// Create API routes
+    fn api_routes(&self) -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
+        let state_filter = warp::any().map({
+            let state = self.state.clone();
+            move || state.clone()
+        });
+
+        // GET /api/templates
+        let templates = warp::path!("api" / "templates")
+            .and(warp::get())
+            .and(state_filter.clone())
+            .map(|_state: AppState| {
+                let templates = serde_json::json!([
+                    {
+                        "id": "development",
+                        "name": "Development Template",
+                        "description": "Perfect for local development and testing",
+                        "icon": "🧪",
+                        "features": [
+                            "Federated mode for quick setup",
+                            "Minimal validators (1-3)",
+                            "Low stakes and barriers",
+                            "Fast checkpoints",
+                            "Local network compatible"
+                        ]
+                    },
+                    {
+                        "id": "production",
+                        "name": "Production Template",
+                        "description": "Battle-tested configuration for live deployments",
+                        "icon": "🏭",
+                        "features": [
+                            "Collateral mode",
+                            "High security settings",
+                            "Robust validator requirements",
+                            "Conservative parameters",
+                            "High stakes protection"
+                        ]
+                    }
+                ]);
+                warp::reply::json(&templates)
+            });
+
+        // GET /api/instances
+        let instances = warp::path!("api" / "instances")
+            .and(warp::get())
+            .and(state_filter.clone())
+            .map(|state: AppState| {
+                let instances = state.instances.lock().unwrap();
+                let instances_vec: Vec<_> = instances.values().collect();
+                warp::reply::json(&instances_vec)
+            });
+
+        // GET /api/instances/:id
+        let instance_by_id = warp::path!("api" / "instances" / String)
+            .and(warp::get())
+            .and(state_filter.clone())
+            .map(|id: String, state: AppState| {
+                let instances = state.instances.lock().unwrap();
+                match instances.get(&id) {
+                    Some(instance) => {
+                        warp::reply::with_status(warp::reply::json(instance), warp::http::StatusCode::OK)
+                    }
+                    None => {
+                        warp::reply::with_status(
+                            warp::reply::json(&serde_json::json!({"error": "Instance not found"})),
+                            warp::http::StatusCode::NOT_FOUND
+                        )
+                    }
+                }
+            });
+
+        // POST /api/deploy
+        let deploy = warp::path!("api" / "deploy")
+            .and(warp::post())
+            .and(warp::body::json())
+            .and(state_filter.clone())
+            .map(|config: serde_json::Value, _state: AppState| {
+                log::info!("Received deployment request: {}", config);
+
+                // Generate deployment ID
+                let deployment_id = format!("deploy-{}", chrono::Utc::now().timestamp());
+
+                warp::reply::json(&serde_json::json!({
+                    "deployment_id": deployment_id,
+                    "status": "started",
+                    "message": "Deployment initiated successfully"
+                }))
+            });
+
+        templates
+            .or(instances)
+            .or(instance_by_id)
+            .or(deploy)
+    }
+
+    /// Create WebSocket route
+    fn websocket_route(&self) -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
+        warp::path("ws")
+            .and(warp::ws())
+            .and(warp::any().map({
+                let state = self.state.clone();
+                move || state.clone()
+            }))
+            .map(|ws: warp::ws::Ws, state: AppState| {
+                ws.on_upgrade(move |socket| handle_websocket(socket, state))
+            })
+    }
+
+    /// Create static file serving routes
+    fn static_file_routes(&self) -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
+        // Serve specific files
+        let files = warp::get()
+            .and(warp::path::tail())
+            .and_then(serve_static_file);
+
+        // Serve index.html for all routes (SPA routing)
+        let spa_fallback = warp::get()
+            .and(warp::path::tail())
+            .and_then(serve_spa_fallback);
+
+        files.or(spa_fallback)
     }
 
     /// Initialize with mock subnet instances for testing
@@ -136,143 +279,67 @@ impl UIServer {
     }
 }
 
-/// Start the backend API server
-async fn start_backend_server(addr: String, state: AppState) -> Result<()> {
-    log::info!("Starting backend API server on {}", addr);
+/// Serve static files from the embedded frontend
+async fn serve_static_file(path: warp::path::Tail) -> Result<Box<dyn Reply>, warp::Rejection> {
+    let path_str = path.as_str();
 
-    // CORS configuration
-    let cors = warp::cors()
-        .allow_any_origin()
-        .allow_headers(vec!["content-type", "authorization"])
-        .allow_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"]);
+    // Handle root path
+    if path_str.is_empty() || path_str == "/" {
+        return serve_index_html().await;
+    }
 
-    // API routes
-    let api_routes = api_routes(state.clone());
+    // Try to find the file in the embedded directory
+    if let Some(file) = FRONTEND_DIST.get_file(path_str) {
+        let mime = mime_guess::from_path(path_str).first_or_octet_stream();
 
-    // WebSocket route
-    let ws_route = websocket_route(state.clone());
+        let reply = warp::reply::with_header(
+            file.contents(),
+            "content-type",
+            mime.as_ref(),
+        );
 
-    // Combine all routes
-    let routes = api_routes
-        .or(ws_route)
-        .with(cors)
-        .with(warp::log("api"));
+        let final_reply = warp::reply::with_header(
+            reply,
+            "cache-control",
+            if path_str.contains("assets/") {
+                "public, max-age=31536000" // 1 year for assets
+            } else {
+                "public, max-age=3600" // 1 hour for other files
+            },
+        );
 
-    let socket_addr: SocketAddr = addr.parse()?;
-    warp::serve(routes).run(socket_addr).await;
-
-    Ok(())
+        Ok(Box::new(final_reply))
+    } else {
+        // File not found, reject to try SPA fallback
+        Err(warp::reject::not_found())
+    }
 }
 
-/// Create API routes
-fn api_routes(
-    state: AppState,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    let state_filter = warp::any().map(move || state.clone());
-
-    // GET /api/instances - List all subnet instances
-    let list_instances = warp::path!("api" / "instances")
-        .and(warp::get())
-        .and(state_filter.clone())
-        .map(|state: AppState| {
-            let instances = state.instances.lock().unwrap();
-            let instances_vec: Vec<_> = instances.values().cloned().collect();
-            warp::reply::json(&instances_vec)
-        });
-
-    // GET /api/instances/{id} - Get specific subnet instance
-    let get_instance = warp::path!("api" / "instances" / String)
-        .and(warp::get())
-        .and(state_filter.clone())
-        .map(|id: String, state: AppState| {
-            let instances = state.instances.lock().unwrap();
-            match instances.get(&id) {
-                Some(instance) => warp::reply::with_status(
-                    warp::reply::json(instance),
-                    warp::http::StatusCode::OK,
-                ),
-                None => warp::reply::with_status(
-                    warp::reply::json(&serde_json::json!({"error": "Instance not found"})),
-                    warp::http::StatusCode::NOT_FOUND,
-                ),
-            }
-        });
-
-    // POST /api/deploy - Deploy new subnet
-    let deploy_subnet = warp::path!("api" / "deploy")
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(state_filter.clone())
-                .map(|config: serde_json::Value, _state: AppState| {
-            log::info!("Received deployment request: {}", config);
-
-            // For now, return a mock deployment ID
-            let deployment_id = format!("deploy-{}", chrono::Utc::now().timestamp());
-
-            // In a real implementation, this would:
-            // 1. Validate the configuration
-            // 2. Start the deployment process
-            // 3. Return deployment status via WebSocket
-
-            warp::reply::json(&serde_json::json!({
-                "deployment_id": deployment_id,
-                "status": "started",
-                "message": "Deployment initiated successfully"
-            }))
-        });
-
-    // GET /api/templates - Get available templates
-    let get_templates = warp::path!("api" / "templates")
-        .and(warp::get())
-        .map(|| {
-            // Mock template data matching our frontend templates
-            let templates = serde_json::json!([
-                {
-                    "id": "development",
-                    "name": "Development Template",
-                    "description": "Perfect for local development and testing",
-                    "icon": "🧪",
-                    "features": [
-                        "Federated mode for quick setup",
-                        "Minimal validators (1-3)",
-                        "Low stakes and barriers",
-                        "Fast checkpoints",
-                        "Local network compatible"
-                    ]
-                },
-                {
-                    "id": "production",
-                    "name": "Production Template",
-                    "description": "Battle-tested configuration for live deployments",
-                    "icon": "🏭",
-                    "features": [
-                        "Collateral mode",
-                        "High security settings",
-                        "Robust validator requirements",
-                        "Conservative parameters",
-                        "High stakes protection"
-                    ]
-                }
-            ]);
-            warp::reply::json(&templates)
-        });
-
-    list_instances
-        .or(get_instance)
-        .or(deploy_subnet)
-        .or(get_templates)
+/// Serve SPA fallback (index.html for all routes)
+async fn serve_spa_fallback(_path: warp::path::Tail) -> Result<Box<dyn Reply>, warp::Rejection> {
+    serve_index_html().await
 }
 
-/// Create WebSocket route
-fn websocket_route(
-    state: AppState,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    warp::path("ws")
-        .and(warp::ws())
-        .and(warp::any().map(move || state.clone()))
-        .map(|ws: warp::ws::Ws, state: AppState| {
-            ws.on_upgrade(move |socket| handle_websocket(socket, state))
-        })
+/// Serve the index.html file
+async fn serve_index_html() -> Result<Box<dyn Reply>, warp::Rejection> {
+    if let Some(index_file) = FRONTEND_DIST.get_file("index.html") {
+        let reply = warp::reply::with_header(
+            index_file.contents(),
+            "content-type",
+            "text/html",
+        );
+
+        let final_reply = warp::reply::with_header(
+            reply,
+            "cache-control",
+            "no-cache", // Don't cache index.html for SPA routing
+        );
+
+        Ok(Box::new(final_reply))
+    } else {
+        log::error!("index.html not found in embedded frontend files");
+        Err(warp::reject::not_found())
+    }
 }
 
 /// Handle WebSocket connections
@@ -308,23 +375,11 @@ async fn handle_websocket(ws: warp::ws::WebSocket, state: AppState) {
         match result {
             Ok(msg) => {
                 if msg.is_text() {
-                    if let Ok(text) = msg.to_str() {
-                        log::debug!("Received WebSocket message: {}", text);
-
-                        // Echo message back for now (in real implementation, handle different message types)
-                        let response = serde_json::json!({
-                            "type": "echo",
-                            "data": text
-                        });
-
-                        let clients = state.websocket_clients.lock().unwrap();
-                        for client in clients.iter() {
-                            if client.id == client_id {
-                                let _ = client.sender.send(warp::ws::Message::text(response.to_string()));
-                                break;
-                            }
-                        }
-                    }
+                    log::info!("Received WebSocket message: {}", msg.to_str().unwrap_or("invalid"));
+                    // Handle different message types here
+                } else if msg.is_close() {
+                    log::info!("WebSocket connection closed");
+                    break;
                 }
             }
             Err(e) => {
@@ -334,12 +389,14 @@ async fn handle_websocket(ws: warp::ws::WebSocket, state: AppState) {
         }
     }
 
+    // Clean up
+    send_task.abort();
+
     // Remove client from state
     {
         let mut clients = state.websocket_clients.lock().unwrap();
         clients.retain(|client| client.id != client_id);
     }
 
-    send_task.abort();
-    log::info!("WebSocket connection closed");
+    log::info!("WebSocket connection cleaned up");
 }

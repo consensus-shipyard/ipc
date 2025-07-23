@@ -333,7 +333,9 @@ export const useWizardStore = defineStore('wizard', () => {
         console.log('Deployment started:', deploymentId.value)
 
         // Subscribe to deployment progress updates
-        wsService.subscribeToDeployment(deploymentId.value)
+        if (deploymentId.value) {
+          wsService.subscribeToDeployment(deploymentId.value)
+        }
 
         return deploymentId.value
       } else {

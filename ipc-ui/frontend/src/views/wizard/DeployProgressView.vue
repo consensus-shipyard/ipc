@@ -201,7 +201,7 @@ onUnmounted(() => {
 
             <!-- Status -->
             <div class="text-2xl">
-              {{ getStepIcon(step) }}
+              {{ getStepIcon(step.id, index) }}
             </div>
           </div>
         </div>

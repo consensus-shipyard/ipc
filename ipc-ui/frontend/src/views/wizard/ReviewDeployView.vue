@@ -355,19 +355,19 @@ const formatNumber = (value: number | string, suffix = '') => {
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <dt class="text-sm font-medium text-gray-500">Total Validators</dt>
-              <dd class="text-sm text-gray-900">{{ activationConfig.validators.length }}</dd>
+              <dd class="text-sm text-gray-900">{{ activationConfig.validators?.length || 0 }}</dd>
             </div>
             <div>
               <dt class="text-sm font-medium text-gray-500">Total Stake</dt>
-              <dd class="text-sm text-gray-900">{{ formatNumber(activationConfig.totalStake, 'FIL') }}</dd>
+              <dd class="text-sm text-gray-900">{{ formatNumber(activationConfig.totalStake || 0, 'FIL') }}</dd>
             </div>
             <div>
               <dt class="text-sm font-medium text-gray-500">Total Initial Balance</dt>
-              <dd class="text-sm text-gray-900">{{ formatNumber(activationConfig.totalBalance, 'FIL') }}</dd>
+              <dd class="text-sm text-gray-900">{{ formatNumber(activationConfig.totalBalance || 0, 'FIL') }}</dd>
             </div>
           </div>
 
-          <div v-if="activationConfig.validators.length > 0" class="overflow-x-auto">
+          <div v-if="(activationConfig.validators?.length || 0) > 0" class="overflow-x-auto">
             <table class="min-w-full text-sm">
               <thead class="bg-gray-50">
                 <tr>
@@ -382,7 +382,7 @@ const formatNumber = (value: number | string, suffix = '') => {
                   <td class="px-3 py-2 text-gray-900">{{ index + 1 }}</td>
                   <td class="px-3 py-2 text-gray-900 font-mono">{{ formatAddress(validator.from) }}</td>
                   <td class="px-3 py-2 text-gray-900">{{ formatNumber(validator.collateral, 'FIL') }}</td>
-                  <td class="px-3 py-2 text-gray-900">{{ formatNumber(validator.initialBalance, 'FIL') }}</td>
+                  <td class="px-3 py-2 text-gray-900">{{ formatNumber(validator.initialBalance || 0, 'FIL') }}</td>
                 </tr>
               </tbody>
             </table>
@@ -394,15 +394,15 @@ const formatNumber = (value: number | string, suffix = '') => {
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <dt class="text-sm font-medium text-gray-500">Total Validators</dt>
-              <dd class="text-sm text-gray-900">{{ activationConfig.pubkeys.length }}</dd>
+              <dd class="text-sm text-gray-900">{{ activationConfig.pubkeys?.length || 0 }}</dd>
             </div>
             <div>
               <dt class="text-sm font-medium text-gray-500">Total Voting Power</dt>
-              <dd class="text-sm text-gray-900">{{ formatNumber(activationConfig.totalPower) }}</dd>
+              <dd class="text-sm text-gray-900">{{ formatNumber(activationConfig.totalPower || 0) }}</dd>
             </div>
           </div>
 
-          <div v-if="activationConfig.pubkeys.length > 0" class="overflow-x-auto">
+          <div v-if="(activationConfig.pubkeys?.length || 0) > 0" class="overflow-x-auto">
             <table class="min-w-full text-sm">
               <thead class="bg-gray-50">
                 <tr>

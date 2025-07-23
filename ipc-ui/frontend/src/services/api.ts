@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios'
+import axios, { type AxiosInstance, type AxiosResponse, AxiosError } from 'axios'
 import { API_CONFIG, API_ENDPOINTS } from '../config/api'
 
 // Create axios instance

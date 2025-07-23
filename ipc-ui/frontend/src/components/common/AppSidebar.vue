@@ -71,7 +71,7 @@ const icons = {
               stroke-linecap="round"
               stroke-linejoin="round"
               stroke-width="2"
-              :d="icons[item.icon]"
+              :d="icons[item.icon as keyof typeof icons]"
             />
           </svg>
           {{ item.name }}

@@ -108,8 +108,8 @@ const handleFieldBlur = (field: string) => {
 }
 
 // Handle parent network selection
-const handleParentChange = (value: string) => {
-  formData.value.parent = value
+const handleParentChange = (value: string | number) => {
+  formData.value.parent = String(value)
   validateField('parent')
 }
 

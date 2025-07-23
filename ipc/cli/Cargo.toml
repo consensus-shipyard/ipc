@@ -57,6 +57,8 @@ prometheus_exporter = { workspace = true }
 warp = "0.3"
 uuid = { version = "1.0", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
+mime_guess = "2.0"
+include_dir = "0.7"
 
 ipc-wallet = { path = "../../ipc/wallet", features = ["with-ethers"] }
 ipc-provider = { path = "../../ipc/provider" }

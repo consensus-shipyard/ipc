@@ -1,4 +1,4 @@
-import { API_CONFIG, WSMessage, DeploymentProgress } from '../config/api'
+import { API_CONFIG, type WSMessage, type DeploymentProgress } from '../config/api'
 
 export interface WebSocketCallbacks {
   onOpen?: () => void
@@ -11,11 +11,11 @@ export interface WebSocketCallbacks {
 
 export class WebSocketService {
   private ws: WebSocket | null = null
-  private callbacks: WebSocketCallbacks = {}
+  public callbacks: WebSocketCallbacks = {}
   private reconnectAttempts = 0
   private maxReconnectAttempts = 5
   private reconnectDelay = 1000
-  private pingInterval: NodeJS.Timeout | null = null
+  private pingInterval: number | null = null
   private isConnecting = false
 
   constructor(callbacks: WebSocketCallbacks = {}) {

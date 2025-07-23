@@ -16,7 +16,7 @@ const wizardSteps = [
 
 // Get current step from route meta
 const currentStep = computed(() => {
-  return route.meta?.step || 1
+  return (route.meta?.step as number) || 1
 })
 
 // Calculate progress percentage
