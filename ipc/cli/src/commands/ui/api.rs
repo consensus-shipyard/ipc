@@ -5,8 +5,6 @@
 //! This module will contain specific API endpoint implementations
 //! that can be shared between different server implementations.
 
-use super::{AppState, SubnetInstance};
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 /// API response wrapper

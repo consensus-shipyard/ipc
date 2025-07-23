@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 //! UI Server implementation
 
-use super::{AppState, DeploymentMode, SubnetInstance, WebSocketClient};
+use super::{AppState, DeploymentMode, DeploymentState, SubnetInstance, WebSocketClient};
 use anyhow::Result;
 use futures_util::{SinkExt, StreamExt};
 use std::collections::HashMap;
@@ -10,7 +10,9 @@ use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use warp::{Filter, Reply};
 use include_dir::{include_dir, Dir};
-use std::path::Path;
+use tokio::time::{sleep, Duration};
+use serde_json::json;
+use uuid;
 
 // Include the built frontend files at compile time
 static FRONTEND_DIST: Dir = include_dir!("$CARGO_MANIFEST_DIR/../../ipc-ui/frontend/dist");
@@ -41,6 +43,7 @@ impl UIServer {
             mode: mode.clone(),
             instances: Arc::new(Mutex::new(HashMap::new())),
             websocket_clients: Arc::new(Mutex::new(Vec::new())),
+            deployments: Arc::new(Mutex::new(HashMap::new())),
         };
 
         Ok(UIServer {
@@ -167,17 +170,57 @@ impl UIServer {
             .and(warp::post())
             .and(warp::body::json())
             .and(state_filter.clone())
-            .map(|config: serde_json::Value, _state: AppState| {
+            .and_then(|config: serde_json::Value, state: AppState| async move {
                 log::info!("Received deployment request: {}", config);
+
+                // Parse deployment request
+                let template = config["template"].as_str()
+                    .ok_or_else(|| warp::reject::custom(InvalidRequest("Missing template field".to_string())))?
+                    .to_string();
+
+                let deployment_config = config["config"].clone();
 
                 // Generate deployment ID
                 let deployment_id = format!("deploy-{}", chrono::Utc::now().timestamp());
 
-                warp::reply::json(&serde_json::json!({
+                // Create deployment state
+                let deployment_state = DeploymentState::new(
+                    deployment_id.clone(),
+                    template.clone(),
+                    deployment_config.clone(),
+                );
+
+                // Store deployment state
+                {
+                    let mut deployments = state.deployments.lock().unwrap();
+                    deployments.insert(deployment_id.clone(), deployment_state.clone());
+                }
+
+                // Start background deployment task
+                let state_clone = state.clone();
+                let deployment_id_clone = deployment_id.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = handle_deployment(state_clone.clone(), deployment_id_clone.clone(), template, deployment_config).await {
+                        log::error!("Deployment failed: {}", e);
+
+                        // Update deployment state with error
+                        {
+                            let mut deployments = state_clone.deployments.lock().unwrap();
+                            if let Some(deployment) = deployments.get_mut(&deployment_id_clone) {
+                                deployment.set_error(e.to_string());
+                            }
+                        } // Drop the mutex guard before the await
+
+                        // Broadcast error to WebSocket clients
+                        broadcast_deployment_progress(&state_clone, &deployment_id_clone, "error", 0, "failed", Some(e.to_string())).await;
+                    }
+                });
+
+                Ok::<_, warp::Rejection>(warp::reply::json(&json!({
                     "deployment_id": deployment_id,
                     "status": "started",
                     "message": "Deployment initiated successfully"
-                }))
+                })))
             });
 
         templates
@@ -342,6 +385,280 @@ async fn serve_index_html() -> Result<Box<dyn Reply>, warp::Rejection> {
     }
 }
 
+/// Custom rejection type for invalid requests
+#[derive(Debug)]
+struct InvalidRequest(String);
+
+impl warp::reject::Reject for InvalidRequest {}
+
+/// Handle actual subnet deployment
+async fn handle_deployment(
+    state: AppState,
+    deployment_id: String,
+    _template: String,
+    config: serde_json::Value,
+) -> Result<()> {
+    log::info!("Starting deployment process for {}", deployment_id);
+
+    // Define deployment steps
+    let steps = vec![
+        ("validate", "Validating Configuration", 10),
+        ("prepare", "Preparing Deployment Files", 20),
+        ("contracts", "Deploying Smart Contracts", 40),
+        ("genesis", "Creating Genesis Block", 60),
+        ("validators", "Initializing Validators", 80),
+        ("activation", "Activating Subnet", 90),
+        ("verification", "Running Verification", 100),
+    ];
+
+    for (step_id, step_name, progress) in steps {
+        log::info!("Deployment {}: {}", deployment_id, step_name);
+
+        // Update deployment state
+        {
+            let mut deployments = state.deployments.lock().unwrap();
+            if let Some(deployment) = deployments.get_mut(&deployment_id) {
+                deployment.update_progress(
+                    step_id.to_string(),
+                    progress,
+                    "in_progress".to_string(),
+                    Some(step_name.to_string()),
+                );
+            }
+        }
+
+        // Broadcast progress to WebSocket clients
+        broadcast_deployment_progress(
+            &state,
+            &deployment_id,
+            step_id,
+            progress,
+            "in_progress",
+            Some(step_name.to_string()),
+        ).await;
+
+        // Simulate deployment step processing
+        match step_id {
+            "validate" => {
+                // Validate configuration
+                validate_deployment_config(&config)?;
+                sleep(Duration::from_secs(2)).await;
+            }
+            "prepare" => {
+                // Prepare deployment files
+                prepare_deployment_files(&config).await?;
+                sleep(Duration::from_secs(3)).await;
+            }
+            "contracts" => {
+                // Deploy smart contracts
+                deploy_smart_contracts(&config).await?;
+                sleep(Duration::from_secs(5)).await;
+            }
+            "genesis" => {
+                // Create genesis block
+                create_genesis_block(&config).await?;
+                sleep(Duration::from_secs(3)).await;
+            }
+            "validators" => {
+                // Initialize validators
+                initialize_validators(&config).await?;
+                sleep(Duration::from_secs(4)).await;
+            }
+            "activation" => {
+                // Activate subnet
+                activate_subnet_deployment(&config).await?;
+                sleep(Duration::from_secs(2)).await;
+            }
+            "verification" => {
+                // Run verification
+                verify_deployment(&config).await?;
+                sleep(Duration::from_secs(2)).await;
+            }
+            _ => {}
+        }
+    }
+
+    // Mark deployment as completed
+    {
+        let mut deployments = state.deployments.lock().unwrap();
+        if let Some(deployment) = deployments.get_mut(&deployment_id) {
+            deployment.update_progress(
+                "completed".to_string(),
+                100,
+                "completed".to_string(),
+                Some("Deployment completed successfully".to_string()),
+            );
+        }
+    }
+
+    // Broadcast completion
+    broadcast_deployment_progress(
+        &state,
+        &deployment_id,
+        "completed",
+        100,
+        "completed",
+        Some("Deployment completed successfully".to_string()),
+    ).await;
+
+    // Create subnet instance
+    create_subnet_instance(&state, &deployment_id, &config).await?;
+
+    log::info!("Deployment {} completed successfully", deployment_id);
+    Ok(())
+}
+
+/// Broadcast deployment progress to WebSocket clients
+async fn broadcast_deployment_progress(
+    state: &AppState,
+    deployment_id: &str,
+    step: &str,
+    progress: u8,
+    status: &str,
+    message: Option<String>,
+) {
+    let message = json!({
+        "type": "deployment_progress",
+        "data": {
+            "deployment_id": deployment_id,
+            "step": step,
+            "progress": progress,
+            "status": status,
+            "message": message
+        }
+    });
+
+    let ws_message = warp::ws::Message::text(message.to_string());
+
+    let clients = state.websocket_clients.lock().unwrap();
+    for client in clients.iter() {
+        if let Err(e) = client.sender.send(ws_message.clone()) {
+            log::warn!("Failed to send WebSocket message to client {}: {}", client.id, e);
+        }
+    }
+
+    log::debug!("Broadcasted deployment progress: {} - {} ({}%)", deployment_id, step, progress);
+}
+
+/// Validate deployment configuration
+fn validate_deployment_config(config: &serde_json::Value) -> Result<()> {
+    log::info!("Validating deployment configuration");
+
+    // Check required fields
+    let required_fields = ["parent", "minValidatorStake", "minValidators", "permissionMode"];
+    for field in required_fields {
+        if config.get(field).is_none() {
+            return Err(anyhow::anyhow!("Missing required field: {}", field));
+        }
+    }
+
+    log::info!("Configuration validation completed");
+    Ok(())
+}
+
+/// Prepare deployment files
+async fn prepare_deployment_files(_config: &serde_json::Value) -> Result<()> {
+    log::info!("Preparing deployment files");
+
+    // In a real implementation, this would:
+    // - Create subnet-init.yaml from UI config
+    // - Set up temporary directories
+    // - Prepare wallet configurations
+
+    log::info!("Deployment files prepared");
+    Ok(())
+}
+
+/// Deploy smart contracts
+async fn deploy_smart_contracts(_config: &serde_json::Value) -> Result<()> {
+    log::info!("Deploying smart contracts");
+
+    // In a real implementation, this would:
+    // - Deploy gateway and registry contracts
+    // - Record contract addresses
+    // - Set up subnet contracts
+
+    log::info!("Smart contracts deployed");
+    Ok(())
+}
+
+/// Create genesis block
+async fn create_genesis_block(_config: &serde_json::Value) -> Result<()> {
+    log::info!("Creating genesis block");
+
+    // In a real implementation, this would:
+    // - Generate genesis.json from parent chain
+    // - Seal genesis with validators
+    // - Set up initial state
+
+    log::info!("Genesis block created");
+    Ok(())
+}
+
+/// Initialize validators
+async fn initialize_validators(_config: &serde_json::Value) -> Result<()> {
+    log::info!("Initializing validators");
+
+    // In a real implementation, this would:
+    // - Set up validator nodes
+    // - Configure validator power/stakes
+    // - Initialize validator consensus
+
+    log::info!("Validators initialized");
+    Ok(())
+}
+
+/// Activate subnet deployment
+async fn activate_subnet_deployment(_config: &serde_json::Value) -> Result<()> {
+    log::info!("Activating subnet");
+
+    // In a real implementation, this would:
+    // - Join validators to subnet
+    // - Start subnet consensus
+    // - Begin block production
+
+    log::info!("Subnet activated");
+    Ok(())
+}
+
+/// Verify deployment
+async fn verify_deployment(_config: &serde_json::Value) -> Result<()> {
+    log::info!("Verifying deployment");
+
+    // In a real implementation, this would:
+    // - Check subnet is producing blocks
+    // - Verify validator participation
+    // - Test basic functionality
+
+    log::info!("Deployment verified");
+    Ok(())
+}
+
+/// Create subnet instance after successful deployment
+async fn create_subnet_instance(
+    state: &AppState,
+    deployment_id: &str,
+    config: &serde_json::Value,
+) -> Result<()> {
+    let instance = SubnetInstance {
+        id: deployment_id.to_string(),
+        name: config["name"].as_str().unwrap_or("Unnamed Subnet").to_string(),
+        status: "active".to_string(),
+        template: config.get("template").and_then(|t| t.as_str())
+            .unwrap_or("development").to_string(),
+        parent: config["parent"].as_str().unwrap_or("Unknown").to_string(),
+        created_at: chrono::Utc::now(),
+        validators: vec![], // TODO: Extract from config
+        config: config.clone(),
+    };
+
+    let mut instances = state.instances.lock().unwrap();
+    instances.insert(deployment_id.to_string(), instance);
+
+    log::info!("Created subnet instance for deployment {}", deployment_id);
+    Ok(())
+}
+
 /// Handle WebSocket connections
 async fn handle_websocket(ws: warp::ws::WebSocket, state: AppState) {
     log::info!("New WebSocket connection established");
@@ -375,8 +692,36 @@ async fn handle_websocket(ws: warp::ws::WebSocket, state: AppState) {
         match result {
             Ok(msg) => {
                 if msg.is_text() {
-                    log::info!("Received WebSocket message: {}", msg.to_str().unwrap_or("invalid"));
-                    // Handle different message types here
+                    let text = msg.to_str().unwrap_or("invalid");
+                    log::info!("Received WebSocket message: {}", text);
+
+                    // Parse incoming message
+                    if let Ok(message) = serde_json::from_str::<serde_json::Value>(text) {
+                        match message["type"].as_str() {
+                            Some("subscribe_deployment") => {
+                                if let Some(deployment_id) = message["data"]["deployment_id"].as_str() {
+                                    log::info!("Client {} subscribing to deployment {}", client_id, deployment_id);
+                                    // Client is now subscribed to this deployment
+                                    // In a more complex implementation, we'd track subscriptions per client
+                                }
+                            }
+                            Some("ping") => {
+                                // Respond with pong
+                                let pong_message = json!({
+                                    "type": "pong"
+                                });
+                                let ws_message = warp::ws::Message::text(pong_message.to_string());
+
+                                let clients = state.websocket_clients.lock().unwrap();
+                                if let Some(client) = clients.iter().find(|c| c.id == client_id) {
+                                    let _ = client.sender.send(ws_message);
+                                }
+                            }
+                            _ => {
+                                log::debug!("Unknown WebSocket message type: {}", text);
+                            }
+                        }
+                    }
                 } else if msg.is_close() {
                     log::info!("WebSocket connection closed");
                     break;

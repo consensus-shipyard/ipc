@@ -113,6 +113,54 @@ pub struct AppState {
     pub mode: DeploymentMode,
     pub instances: Arc<Mutex<HashMap<String, SubnetInstance>>>,
     pub websocket_clients: Arc<Mutex<Vec<WebSocketClient>>>,
+    pub deployments: Arc<Mutex<HashMap<String, DeploymentState>>>,
+}
+
+/// Deployment state tracking
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeploymentState {
+    pub id: String,
+    pub template: String,
+    pub config: serde_json::Value,
+    pub status: String,
+    pub current_step: String,
+    pub progress: u8,
+    pub message: Option<String>,
+    pub error: Option<String>,
+    pub started_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl DeploymentState {
+    pub fn new(id: String, template: String, config: serde_json::Value) -> Self {
+        let now = chrono::Utc::now();
+        Self {
+            id,
+            template,
+            config,
+            status: "started".to_string(),
+            current_step: "validate".to_string(),
+            progress: 0,
+            message: Some("Deployment initiated".to_string()),
+            error: None,
+            started_at: now,
+            updated_at: now,
+        }
+    }
+
+    pub fn update_progress(&mut self, step: String, progress: u8, status: String, message: Option<String>) {
+        self.current_step = step;
+        self.progress = progress;
+        self.status = status;
+        self.message = message;
+        self.updated_at = chrono::Utc::now();
+    }
+
+    pub fn set_error(&mut self, error: String) {
+        self.status = "failed".to_string();
+        self.error = Some(error);
+        self.updated_at = chrono::Utc::now();
+    }
 }
 
 /// Subnet instance data
