@@ -110,6 +110,21 @@ const goToDashboard = () => {
   router.push({ name: 'dashboard' })
 }
 
+const retryDeployment = async () => {
+  try {
+    console.log('Retrying deployment...')
+    await wizardStore.retryDeployment()
+    console.log('Deployment retried successfully')
+  } catch (error) {
+    console.error('Failed to retry deployment:', error)
+  }
+}
+
+const editConfiguration = () => {
+  // Go back to the review step to allow editing
+  router.push({ name: 'wizard-review' })
+}
+
 onMounted(async () => {
   // Initialize WebSocket connection for real-time progress updates
   if (!wizardStore.isConnected) {
@@ -224,8 +239,47 @@ onUnmounted(() => {
       </div>
     </div>
 
+    <!-- Error Status -->
+    <div v-if="hasDeploymentError" class="bg-red-50 border border-red-200 rounded-lg p-6">
+      <div class="flex items-start space-x-4">
+        <svg class="w-8 h-8 text-red-600 mt-1" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+        </svg>
+        <div class="flex-1">
+          <h3 class="text-xl font-semibold text-red-800 mb-2">❌ Deployment Failed</h3>
+          <p class="text-red-700 mb-4">
+            The subnet deployment encountered an error and could not be completed. You can retry with the current configuration or edit the configuration and try again.
+          </p>
+          <div class="bg-red-100 border border-red-200 rounded-md p-4 mb-4">
+            <h4 class="font-semibold text-red-800 mb-2">Error Details:</h4>
+            <p class="text-sm text-red-700 font-mono">{{ deploymentError }}</p>
+          </div>
+          <div class="flex space-x-3">
+            <button
+              @click="retryDeployment"
+              class="btn-secondary text-red-700 border-red-300 hover:bg-red-100"
+            >
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Retry Deployment
+            </button>
+            <button
+              @click="editConfiguration"
+              class="btn-secondary"
+            >
+              <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Edit Configuration
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Completion Status -->
-    <div v-if="isDeploymentComplete" class="bg-green-50 border border-green-200 rounded-lg p-6">
+    <div v-else-if="isDeploymentComplete" class="bg-green-50 border border-green-200 rounded-lg p-6">
       <div class="flex items-start space-x-4">
         <svg class="w-8 h-8 text-green-600 mt-1" fill="currentColor" viewBox="0 0 20 20">
           <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
@@ -247,8 +301,9 @@ onUnmounted(() => {
 
     <!-- Actions -->
     <div class="flex justify-center pt-6 border-t border-gray-200">
+      <!-- In Progress Button -->
       <button
-        v-if="!isDeploymentComplete"
+        v-if="!hasDeploymentError && !isDeploymentComplete"
         type="button"
         disabled
         class="btn-secondary opacity-50 cursor-not-allowed"
@@ -260,8 +315,9 @@ onUnmounted(() => {
         Deployment in Progress...
       </button>
 
+      <!-- Success Button -->
       <button
-        v-else
+        v-else-if="isDeploymentComplete"
         type="button"
         @click="goToDashboard"
         class="btn-primary text-lg px-8 py-3"
@@ -271,6 +327,8 @@ onUnmounted(() => {
         </svg>
         Go to Dashboard
       </button>
+
+      <!-- Error State - buttons are handled in the error section above -->
     </div>
 
     <!-- Important Notes -->
@@ -280,12 +338,12 @@ onUnmounted(() => {
           <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
         </svg>
         <div>
-          <h3 class="font-semibold text-blue-800 mb-1">Please Note</h3>
+          <h3 class="font-semibold text-blue-800 mb-1">Real Deployment in Progress</h3>
           <div class="text-blue-700 text-sm space-y-1">
-            <p>• This is a demonstration of the deployment process</p>
-            <p>• In the real implementation, this would connect to the backend service</p>
-            <p>• WebSocket connections would provide real-time progress updates</p>
-            <p>• Error handling and retry mechanisms would be available</p>
+            <p>• This deployment uses real IPC CLI commands to create your subnet</p>
+            <p>• WebSocket connections provide real-time progress updates</p>
+            <p>• If deployment fails, you can retry or edit the configuration</p>
+            <p>• Successfully deployed subnets will appear in your dashboard</p>
           </div>
         </div>
       </div>

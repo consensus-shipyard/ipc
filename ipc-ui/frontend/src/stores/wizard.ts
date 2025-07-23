@@ -287,8 +287,11 @@ export const useWizardStore = defineStore('wizard', () => {
           console.log('Deployment completed successfully')
         } else if (progress.status === 'failed') {
           isDeploying.value = false
-          deploymentError.value = progress.error || 'Deployment failed'
-          console.error('Deployment failed:', progress.error)
+          // Try both error and message fields for compatibility
+          const errorMessage = progress.error || progress.message || 'Deployment failed'
+          deploymentError.value = errorMessage
+          console.error('Deployment failed:', errorMessage)
+          console.log('Full progress object:', progress)
         }
       }
     }
@@ -368,6 +371,22 @@ export const useWizardStore = defineStore('wizard', () => {
     deploymentLogs.value = []
   }
 
+  const retryDeployment = async () => {
+    if (!isConfigComplete.value) {
+      throw new Error('Configuration is incomplete')
+    }
+
+    console.log('Retrying deployment with current config')
+
+    // Reset deployment state but keep the config
+    deploymentError.value = null
+    deploymentLogs.value = []
+    deploymentProgress.value = null
+
+    // Start a new deployment
+    return await startDeployment()
+  }
+
   // Configuration persistence
   const saveConfiguration = async (name: string) => {
     try {
@@ -436,6 +455,7 @@ export const useWizardStore = defineStore('wizard', () => {
     startDeployment,
     cancelDeployment,
     resetDeployment,
+    retryDeployment,
 
     // Configuration management
     saveConfiguration,
