@@ -582,10 +582,21 @@ async fn handle_deployment(
             "genesis" => {
                 // Create and approve subnet
                 if let Some(ref store) = ipc_config_store {
-                    let subnet_info = create_and_approve_subnet(&config, store, &state.config_path).await?;
-                    created_subnet_info = Some(subnet_info);
+                    match create_and_approve_subnet(&config, store, &state.config_path).await {
+                        Ok(subnet_info) => {
+                            created_subnet_info = Some(subnet_info);
+                        }
+                        Err(e) => {
+                            log::error!("🚨 Subnet creation failed, broadcasting error to WebSocket");
+                            let error_msg = format!("Deployment Failed: {}", e);
+                            broadcast_deployment_progress(&state, &deployment_id, "failed", 0, "failed", Some(error_msg)).await;
+                            return Err(e);
+                        }
+                    }
                 } else {
-                    return Err(anyhow::anyhow!("IPC config store not initialized"));
+                    let error_msg = "IPC config store not initialized".to_string();
+                    broadcast_deployment_progress(&state, &deployment_id, "failed", 0, "failed", Some(error_msg.clone())).await;
+                    return Err(anyhow::anyhow!(error_msg));
                 }
                 sleep(Duration::from_secs(3)).await;
             }
@@ -866,20 +877,26 @@ async fn create_and_approve_subnet(config: &serde_json::Value, ipc_config_store:
             } else if error_message.contains("Contract call reverted") {
                 let helpful_error = if error_message.contains("0x5416eb98") {
                     format!(
-                        "Contract call reverted: Insufficient collateral for subnet creation.\n\
+                        "Subnet registration failed: Subnet actor not approved by gateway owner.\n\
                         \n\
-                        The subnet creation requires minimum collateral but your address doesn't have enough funds.\n\
-                        Required: {} FIL (1 FIL as minimum activation collateral)\n\
-                        Address: {}\n\
-                        Parent chain: {}\n\
+                        The subnet actor was created successfully but cannot register because it hasn't been \n\
+                        approved by the Calibration gateway owner. This is a security measure to prevent \n\
+                        unauthorized subnet creation.\n\
                         \n\
-                        Solutions:\n\
-                        1. Add more FIL to your address on the parent chain\n\
-                        2. Reduce the minimum validator stake requirement\n\
-                        3. Check if the gateway contract address is correct\n\
+                        Creator Address: {}\n\
+                        Parent Chain: {}\n\
+                        Gateway Contract: 0x1AEe8A878a22280fc2753b3C63571c8f895D2FE3\n\
+                        \n\
+                        Next Steps:\n\
+                        1. Contact the IPC team or Calibration gateway administrator\n\
+                        2. Request approval for your subnet actor address\n\
+                        3. Once approved, you can retry the deployment\n\
+                        \n\
+                        For Development: Consider using a local network where you control the gateway.\n\
+                        \n\
+                        Technical Details: Error code 0x5416eb98 indicates 'NotAuthorized' from the gateway contract.\n\
                         \n\
                         Original error: {}",
-                        "1.0", // The min_activation_collateral shown in logs
                         subnet_config.from.as_ref().unwrap_or(&"unknown".to_string()),
                         subnet_config.parent,
                         error_message
@@ -951,25 +968,27 @@ async fn create_and_approve_subnet(config: &serde_json::Value, ipc_config_store:
 
     log::info!("✅ Subnet registered in IPC config store");
 
-    // Approve subnet
+    // NOTE: Subnet approval must be done by the gateway owner
     let creator = subnet_config.from.clone().unwrap_or_else(|| "0x0a36d7c34ba5523d5bf783bb47f62371e52e0298".to_string());
-    log::info!("🔐 Approving subnet with creator: {}", creator);
 
-    let approve_args = ApproveSubnetArgs {
-        subnet: subnet_id.to_string(),
-        from: Some(creator.clone()),
-    };
-
-    log::info!("📝 Executing subnet approval command...");
-    approve_subnet_cmd(&mut provider, &approve_args).await
-        .map_err(|e| {
-            log::error!("❌ Subnet approval command failed: {}", e);
-            anyhow::anyhow!("Subnet approval failed: {}", e)
-        })?;
-
-    log::info!("🎉 Subnet creation and approval completed successfully!");
-    log::info!("   - Final Subnet ID: {}", subnet_id);
+    log::info!("⚠️  IMPORTANT: Subnet created but requires manual approval!");
+    log::info!("   - Subnet ID: {}", subnet_id);
+    log::info!("   - Subnet Actor Address: {}", subnet_address);
     log::info!("   - Creator Address: {}", creator);
+    log::info!("   - Gateway Address: 0x1AEe8A878a22280fc2753b3C63571c8f895D2FE3");
+    log::info!("   ");
+    log::info!("🔐 APPROVAL REQUIRED:");
+    log::info!("   The subnet actor needs to be approved by the Calibration gateway owner.");
+    log::info!("   This is a security measure to prevent unauthorized subnet creation.");
+    log::info!("   ");
+    log::info!("📝 NEXT STEPS:");
+    log::info!("   1. Contact the IPC team or gateway administrator");
+    log::info!("   2. Request approval for subnet actor: {}", subnet_address);
+    log::info!("   3. Once approved, the subnet will be able to register and become active");
+    log::info!("   ");
+    log::info!("🎯 For development/testing, consider using a local network where you control the gateway.");
+
+    log::info!("✅ Subnet creation completed (pending approval)!");
 
     Ok((subnet_id, creator))
 }
