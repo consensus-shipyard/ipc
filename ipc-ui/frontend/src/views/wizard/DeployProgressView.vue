@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTemplatesStore } from '../../stores/templates'
 import { useWizardStore } from '../../stores/wizard'
@@ -8,20 +8,34 @@ const router = useRouter()
 const wizardStore = useWizardStore()
 const templatesStore = useTemplatesStore()
 
-// Mock deployment steps
+// Standard deployment steps
 const deploymentSteps = [
-  { id: 'validate', name: 'Validating Configuration', status: 'completed' },
-  { id: 'prepare', name: 'Preparing Deployment Files', status: 'completed' },
-  { id: 'contracts', name: 'Deploying Smart Contracts', status: 'in_progress' },
+  { id: 'validate', name: 'Validating Configuration', status: 'pending' },
+  { id: 'prepare', name: 'Preparing Deployment Files', status: 'pending' },
+  { id: 'contracts', name: 'Deploying Smart Contracts', status: 'pending' },
   { id: 'genesis', name: 'Creating Genesis Block', status: 'pending' },
   { id: 'validators', name: 'Initializing Validators', status: 'pending' },
   { id: 'activation', name: 'Activating Subnet', status: 'pending' },
   { id: 'verification', name: 'Running Verification', status: 'pending' }
 ]
 
-const currentStep = ref(2) // 0-indexed
-const deploymentId = ref('subnet-' + Date.now().toString(36))
+// Real deployment state from wizard store
+const deploymentId = computed(() => wizardStore.deploymentId)
+const deploymentProgress = computed(() => wizardStore.deploymentProgress)
+const deploymentLogs = computed(() => wizardStore.deploymentLogs)
+const deploymentError = computed(() => wizardStore.deploymentError)
+const isDeploying = computed(() => wizardStore.isDeploying)
 const startTime = ref(new Date())
+
+// Current step based on deployment progress
+const currentStep = computed(() => {
+  if (!deploymentProgress.value) return 0
+
+  const stepIndex = deploymentSteps.findIndex(step =>
+    step.id === deploymentProgress.value?.step
+  )
+  return stepIndex >= 0 ? stepIndex : 0
+})
 
 // Get configuration summary
 const config = computed(() => wizardStore.config)
@@ -31,22 +45,33 @@ const selectedTemplate = computed(() => {
     : null
 })
 
-// Mock progress simulation
-const simulateProgress = () => {
-  const interval = setInterval(() => {
-    if (currentStep.value < deploymentSteps.length - 1) {
-      deploymentSteps[currentStep.value].status = 'completed'
-      currentStep.value++
-      deploymentSteps[currentStep.value].status = 'in_progress'
-    } else {
-      deploymentSteps[currentStep.value].status = 'completed'
-      clearInterval(interval)
+// Get step status based on deployment progress
+const getStepStatus = (stepId: string, index: number) => {
+  if (deploymentError.value) {
+    // If there's an error and this step matches the current progress, it failed
+    if (deploymentProgress.value?.step === stepId) {
+      return 'error'
     }
-  }, 3000) // Complete each step after 3 seconds
+    // Steps before the failed step should be completed
+    return index < currentStep.value ? 'completed' : 'pending'
+  }
+
+  if (!deploymentProgress.value) {
+    return index === 0 ? 'in_progress' : 'pending'
+  }
+
+  if (index < currentStep.value) {
+    return 'completed'
+  } else if (index === currentStep.value) {
+    return deploymentProgress.value.status === 'completed' ? 'completed' : 'in_progress'
+  } else {
+    return 'pending'
+  }
 }
 
-const getStepIcon = (step: any) => {
-  switch (step.status) {
+const getStepIcon = (stepId: string, index: number) => {
+  const status = getStepStatus(stepId, index)
+  switch (status) {
     case 'completed':
       return '✅'
     case 'in_progress':
@@ -58,8 +83,9 @@ const getStepIcon = (step: any) => {
   }
 }
 
-const getStepColor = (step: any) => {
-  switch (step.status) {
+const getStepColor = (stepId: string, index: number) => {
+  const status = getStepStatus(stepId, index)
+  switch (status) {
     case 'completed':
       return 'text-green-600 bg-green-50'
     case 'in_progress':
@@ -72,7 +98,11 @@ const getStepColor = (step: any) => {
 }
 
 const isDeploymentComplete = computed(() => {
-  return deploymentSteps.every(step => step.status === 'completed')
+  return deploymentProgress.value?.status === 'completed' && !isDeploying.value
+})
+
+const hasDeploymentError = computed(() => {
+  return !!deploymentError.value
 })
 
 const goToDashboard = () => {
@@ -80,9 +110,21 @@ const goToDashboard = () => {
   router.push({ name: 'dashboard' })
 }
 
-onMounted(() => {
-  // Start the mock deployment simulation
-  simulateProgress()
+onMounted(async () => {
+  // Initialize WebSocket connection for real-time progress updates
+  if (!wizardStore.isConnected) {
+    await wizardStore.initializeWebSocket()
+  }
+
+  // If no deployment is in progress, redirect back to review
+  if (!isDeploying.value && !deploymentId.value) {
+    console.warn('No deployment in progress, redirecting to review')
+    router.push({ name: 'wizard-review' })
+  }
+})
+
+onUnmounted(() => {
+  // WebSocket cleanup is handled by the store
 })
 </script>
 
@@ -134,14 +176,15 @@ onMounted(() => {
           :key="step.id"
           :class="[
             'flex items-center p-4 rounded-lg transition-colors',
-            getStepColor(step)
+            getStepColor(step.id, index)
           ]"
         >
           <div class="flex items-center flex-1 space-x-4">
             <!-- Step Number/Icon -->
             <div class="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-white text-sm font-semibold">
-              <span v-if="step.status === 'completed'">✓</span>
-              <div v-else-if="step.status === 'in_progress'" class="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full"></div>
+              <span v-if="getStepStatus(step.id, index) === 'completed'">✓</span>
+              <div v-else-if="getStepStatus(step.id, index) === 'in_progress'" class="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full"></div>
+              <span v-else-if="getStepStatus(step.id, index) === 'error'">✗</span>
               <span v-else>{{ index + 1 }}</span>
             </div>
 

@@ -1,5 +1,8 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { apiService } from '../services/api'
+import { wsService, type WebSocketCallbacks } from '../services/websocket'
+import type { DeploymentProgress } from '../config/api'
 
 export interface SubnetConfig {
   // Template selection
@@ -69,6 +72,16 @@ export const useWizardStore = defineStore('wizard', () => {
   const validationErrors = ref<ValidationError[]>([])
   const isValidating = ref(false)
   const isDirty = ref(false)
+
+  // Deployment state
+  const isDeploying = ref(false)
+  const deploymentId = ref<string | null>(null)
+  const deploymentProgress = ref<DeploymentProgress | null>(null)
+  const deploymentError = ref<string | null>(null)
+  const deploymentLogs = ref<string[]>([])
+
+  // WebSocket connection state
+  const isConnected = ref(false)
 
   // Computed
   const isConfigComplete = computed(() => {
@@ -244,6 +257,147 @@ export const useWizardStore = defineStore('wizard', () => {
     return config.value
   }
 
+  // WebSocket integration
+  const initializeWebSocket = async () => {
+    const callbacks: WebSocketCallbacks = {
+      onOpen: () => {
+        console.log('WebSocket connected')
+        isConnected.value = true
+      },
+      onClose: () => {
+        console.log('WebSocket disconnected')
+        isConnected.value = false
+      },
+      onError: (error) => {
+        console.error('WebSocket error:', error)
+        isConnected.value = false
+      },
+      onDeploymentProgress: (progress: DeploymentProgress) => {
+        console.log('Deployment progress:', progress)
+        deploymentProgress.value = progress
+
+        // Add to logs
+        if (progress.message) {
+          deploymentLogs.value.push(`[${progress.step}] ${progress.message}`)
+        }
+
+        // Handle completion or failure
+        if (progress.status === 'completed') {
+          isDeploying.value = false
+          console.log('Deployment completed successfully')
+        } else if (progress.status === 'failed') {
+          isDeploying.value = false
+          deploymentError.value = progress.error || 'Deployment failed'
+          console.error('Deployment failed:', progress.error)
+        }
+      }
+    }
+
+    // Initialize WebSocket service with callbacks
+    Object.assign(wsService.callbacks, callbacks)
+
+    try {
+      await wsService.connect()
+    } catch (error) {
+      console.error('Failed to connect to WebSocket:', error)
+    }
+  }
+
+  // Deployment functions
+  const startDeployment = async () => {
+    if (!isConfigComplete.value) {
+      throw new Error('Configuration is incomplete')
+    }
+
+    isDeploying.value = true
+    deploymentError.value = null
+    deploymentLogs.value = []
+    deploymentProgress.value = null
+
+    try {
+      console.log('Starting deployment with config:', config.value)
+
+      // Ensure WebSocket is connected for progress updates
+      if (!isConnected.value) {
+        await initializeWebSocket()
+      }
+
+      // Send deployment request to backend
+      const response = await apiService.deploy({
+        template: config.value.selectedTemplate,
+        config: config.value
+      })
+
+      if (response.data && response.data.deployment_id) {
+        deploymentId.value = response.data.deployment_id
+        console.log('Deployment started:', deploymentId.value)
+
+        // Subscribe to deployment progress updates
+        wsService.subscribeToDeployment(deploymentId.value)
+
+        return deploymentId.value
+      } else {
+        throw new Error('Invalid response from deployment API')
+      }
+    } catch (error) {
+      isDeploying.value = false
+      deploymentError.value = error instanceof Error ? error.message : 'Deployment failed'
+      console.error('Deployment error:', error)
+      throw error
+    }
+  }
+
+  const cancelDeployment = () => {
+    if (deploymentId.value) {
+      // TODO: Implement cancel deployment API call
+      console.log('Canceling deployment:', deploymentId.value)
+    }
+
+    isDeploying.value = false
+    deploymentId.value = null
+    deploymentProgress.value = null
+  }
+
+  const resetDeployment = () => {
+    isDeploying.value = false
+    deploymentId.value = null
+    deploymentProgress.value = null
+    deploymentError.value = null
+    deploymentLogs.value = []
+  }
+
+  // Configuration persistence
+  const saveConfiguration = async (name: string) => {
+    try {
+      const configData = {
+        name,
+        config: config.value,
+        timestamp: new Date().toISOString()
+      }
+
+      await apiService.saveConfig(configData)
+      console.log('Configuration saved:', name)
+    } catch (error) {
+      console.error('Failed to save configuration:', error)
+      throw error
+    }
+  }
+
+  const loadConfiguration = async (name: string) => {
+    try {
+      const response = await apiService.loadConfig(name)
+
+      if (response.data && response.data.config) {
+        config.value = response.data.config
+        isDirty.value = false
+        console.log('Configuration loaded:', name)
+      }
+    } catch (error) {
+      console.error('Failed to load configuration:', error)
+      throw error
+    }
+  }
+
   return {
     // State
     config,
@@ -251,6 +405,14 @@ export const useWizardStore = defineStore('wizard', () => {
     validationErrors,
     isValidating,
     isDirty,
+
+    // Deployment state
+    isDeploying: computed(() => isDeploying.value),
+    deploymentId: computed(() => deploymentId.value),
+    deploymentProgress: computed(() => deploymentProgress.value),
+    deploymentError: computed(() => deploymentError.value),
+    deploymentLogs: computed(() => deploymentLogs.value),
+    isConnected: computed(() => isConnected.value),
 
     // Computed
     isConfigComplete,
@@ -265,6 +427,16 @@ export const useWizardStore = defineStore('wizard', () => {
     setValidationErrors,
     clearValidationErrors,
     resetWizard,
-    exportConfig
+    exportConfig,
+
+    // Deployment actions
+    initializeWebSocket,
+    startDeployment,
+    cancelDeployment,
+    resetDeployment,
+
+    // Configuration management
+    saveConfiguration,
+    loadConfiguration
   }
 })

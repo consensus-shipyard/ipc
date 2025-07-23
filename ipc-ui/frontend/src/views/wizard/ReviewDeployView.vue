@@ -86,9 +86,19 @@ const goToPreviousStep = () => {
   router.push({ name: 'wizard-activation' })
 }
 
-const startDeployment = () => {
-  if (isConfigComplete.value) {
+const startDeployment = async () => {
+  if (!isConfigComplete.value) return
+
+  try {
+    // Start the deployment using the wizard store
+    const deploymentId = await wizardStore.startDeployment()
+    console.log('Deployment started:', deploymentId)
+
+    // Navigate to deployment progress page
     router.push({ name: 'wizard-deploy' })
+  } catch (error) {
+    console.error('Failed to start deployment:', error)
+    // Error state is handled by the wizard store
   }
 }
 
@@ -440,13 +450,17 @@ const formatNumber = (value: number | string, suffix = '') => {
       <button
         type="button"
         @click="startDeployment"
-        :disabled="!isConfigComplete"
+        :disabled="!isConfigComplete || wizardStore.isDeploying"
         class="btn-primary text-lg px-8 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <!-- Loading spinner -->
+        <div v-if="wizardStore.isDeploying" class="animate-spin inline-block w-5 h-5 mr-2 border-2 border-current border-t-transparent rounded-full" role="status" aria-label="loading">
+        </div>
+        <!-- Deploy icon -->
+        <svg v-else class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
         </svg>
-        Deploy Subnet
+        {{ wizardStore.isDeploying ? 'Starting Deployment...' : 'Deploy Subnet' }}
       </button>
     </div>
   </div>

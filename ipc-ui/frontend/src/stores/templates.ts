@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { apiService } from '../services/api'
 import type { SubnetConfig } from './wizard'
 
 export interface Template {
@@ -27,6 +28,11 @@ export interface TemplateQuestion {
 }
 
 export const useTemplatesStore = defineStore('templates', () => {
+  // Loading state
+  const isLoading = ref(false)
+  const error = ref<string | null>(null)
+  const isInitialized = ref(false)
+
   // Template questions for the questionnaire
   const questions = ref<TemplateQuestion[]>([
     {
@@ -356,17 +362,69 @@ export const useTemplatesStore = defineStore('templates', () => {
     return warnings
   }
 
+  // API Integration functions
+  const loadTemplates = async () => {
+    if (isLoading.value || isInitialized.value) return
+
+    isLoading.value = true
+    error.value = null
+
+    try {
+      console.log('Loading templates from API...')
+      const response = await apiService.getTemplates()
+
+      if (response.data && Array.isArray(response.data)) {
+        console.log('Loaded templates from API:', response.data.length)
+        // Convert backend template format to frontend format if needed
+        templates.value = response.data.map((template: any) => ({
+          ...template,
+          defaults: template.defaults || {}
+        }))
+      } else {
+        console.log('Using fallback mock templates')
+        // Keep existing mock templates as fallback
+      }
+
+      isInitialized.value = true
+    } catch (err) {
+      console.error('Failed to load templates from API:', err)
+      error.value = 'Failed to load templates. Using offline templates.'
+      // Keep existing mock templates as fallback
+      isInitialized.value = true
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  const refreshTemplates = async () => {
+    isInitialized.value = false
+    await loadTemplates()
+  }
+
+  // Initialize templates on first access
+  const ensureInitialized = async () => {
+    if (!isInitialized.value && !isLoading.value) {
+      await loadTemplates()
+    }
+  }
+
   return {
     // State
     questions,
-    templates,
+    templates: computed(() => templates.value),
     parentNetworks,
+    isLoading: computed(() => isLoading.value),
+    error: computed(() => error.value),
+    isInitialized: computed(() => isInitialized.value),
 
     // Actions
     getTemplate,
     getRecommendedTemplates,
     getTemplateDefaults,
     getSmartDefaults,
-    validateTemplate
+    validateTemplate,
+    loadTemplates,
+    refreshTemplates,
+    ensureInitialized
   }
 })
