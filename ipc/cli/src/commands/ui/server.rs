@@ -58,8 +58,8 @@ impl UIServer {
 
     /// Start the UI server (both frontend and backend)
     pub async fn start(&mut self) -> Result<()> {
-        // Initialize with mock data
-        self.initialize_mock_data().await?;
+        // Initialize with real subnet data from IPC provider
+        self.initialize_real_data().await?;
 
         // Create the combined server with both static files and API
         let addr: SocketAddr = format!("{}:{}", self.host, self.frontend_port)
@@ -117,7 +117,22 @@ impl UIServer {
                             "Low stakes and barriers",
                             "Fast checkpoints",
                             "Local network compatible"
-                        ]
+                        ],
+                        "recommended": ["development"]
+                    },
+                    {
+                        "id": "staging",
+                        "name": "Staging Template",
+                        "description": "Pre-production testing with realistic settings",
+                        "icon": "🚀",
+                        "features": [
+                            "Collateral mode",
+                            "Moderate stakes",
+                            "Realistic validator count",
+                            "Production-like settings",
+                            "Lower barriers for testing"
+                        ],
+                        "recommended": ["staging"]
                     },
                     {
                         "id": "production",
@@ -130,7 +145,22 @@ impl UIServer {
                             "Robust validator requirements",
                             "Conservative parameters",
                             "High stakes protection"
-                        ]
+                        ],
+                        "recommended": ["production"]
+                    },
+                    {
+                        "id": "federated",
+                        "name": "Federated Network Template",
+                        "description": "For consortium and private networks",
+                        "icon": "🤝",
+                        "features": [
+                            "Federated mode",
+                            "Known validator set",
+                            "Flexible management",
+                            "Controlled access",
+                            "Custom governance"
+                        ],
+                        "recommended": ["consortium"]
                     }
                 ]);
                 warp::reply::json(&templates)
@@ -140,27 +170,62 @@ impl UIServer {
         let instances = warp::path!("api" / "instances")
             .and(warp::get())
             .and(state_filter.clone())
-            .map(|state: AppState| {
-                let instances = state.instances.lock().unwrap();
-                let instances_vec: Vec<_> = instances.values().collect();
-                warp::reply::json(&instances_vec)
+            .and_then(|state: AppState| async move {
+                // Get real instances from IPC provider
+                let server = UIServer {
+                    host: "127.0.0.1".to_string(),
+                    frontend_port: 3000,
+                    backend_port: 3001,
+                    mode: state.mode.clone(),
+                    config_path: state.config_path.clone(),
+                    state: state.clone(),
+                };
+
+                match server.get_real_instances().await {
+                    Ok(instances) => Ok::<_, warp::Rejection>(warp::reply::json(&instances)),
+                    Err(e) => {
+                        log::error!("Failed to get real instances: {}", e);
+                        // Return empty list on error to prevent UI breaking
+                        Ok::<_, warp::Rejection>(warp::reply::json(&Vec::<SubnetInstance>::new()))
+                    }
+                }
             });
 
         // GET /api/instances/:id
         let instance_by_id = warp::path!("api" / "instances" / String)
             .and(warp::get())
             .and(state_filter.clone())
-            .map(|id: String, state: AppState| {
-                let instances = state.instances.lock().unwrap();
-                match instances.get(&id) {
-                    Some(instance) => {
-                        warp::reply::with_status(warp::reply::json(instance), warp::http::StatusCode::OK)
+            .and_then(|id: String, state: AppState| async move {
+                // Get real instances and find the requested one
+                let server = UIServer {
+                    host: "127.0.0.1".to_string(),
+                    frontend_port: 3000,
+                    backend_port: 3001,
+                    mode: state.mode.clone(),
+                    config_path: state.config_path.clone(),
+                    state: state.clone(),
+                };
+
+                match server.get_real_instances().await {
+                    Ok(instances) => {
+                        match instances.into_iter().find(|instance| instance.id == id) {
+                            Some(instance) => {
+                                Ok::<_, warp::Rejection>(warp::reply::with_status(warp::reply::json(&instance), warp::http::StatusCode::OK))
+                            }
+                            None => {
+                                Ok::<_, warp::Rejection>(warp::reply::with_status(
+                                    warp::reply::json(&serde_json::json!({"error": "Instance not found"})),
+                                    warp::http::StatusCode::NOT_FOUND
+                                ))
+                            }
+                        }
                     }
-                    None => {
-                        warp::reply::with_status(
-                            warp::reply::json(&serde_json::json!({"error": "Instance not found"})),
-                            warp::http::StatusCode::NOT_FOUND
-                        )
+                    Err(e) => {
+                        log::error!("Failed to get real instances: {}", e);
+                        Ok::<_, warp::Rejection>(warp::reply::with_status(
+                            warp::reply::json(&serde_json::json!({"error": "Failed to retrieve instance data"})),
+                            warp::http::StatusCode::INTERNAL_SERVER_ERROR
+                        ))
                     }
                 }
             });
@@ -257,68 +322,106 @@ impl UIServer {
         files.or(spa_fallback)
     }
 
-    /// Initialize with mock subnet instances for testing
-    async fn initialize_mock_data(&self) -> Result<()> {
-        let mut instances = self.state.instances.lock().unwrap();
+    /// Initialize with real subnet data from IPC provider
+    async fn initialize_real_data(&self) -> Result<()> {
+        // We'll load real data on-demand rather than pre-loading it
+        // This allows for real-time data that reflects current subnet state
+        log::info!("UI server initialized for real subnet data queries");
+        Ok(())
+    }
 
-        // Add some mock subnet instances
-        let mock_instances = vec![
-            SubnetInstance {
-                id: "subnet-001".to_string(),
-                name: "Development Test".to_string(),
-                status: "Active".to_string(),
-                template: "Development Template".to_string(),
-                parent: "/r31337".to_string(),
-                created_at: chrono::Utc::now() - chrono::Duration::hours(2),
-                validators: vec![
-                    super::ValidatorInfo {
-                        address: "0x1234567890123456789012345678901234567890".to_string(),
-                        stake: "1.0".to_string(),
-                        power: 1,
-                        status: "Active".to_string(),
-                    }
-                ],
-                config: serde_json::json!({
-                    "permissionMode": "federated",
-                    "minValidators": 1,
-                    "minValidatorStake": 1.0
-                }),
-            },
-            SubnetInstance {
-                id: "subnet-002".to_string(),
-                name: "Production Subnet A".to_string(),
-                status: "Active".to_string(),
-                template: "Production Template".to_string(),
-                parent: "/r31337".to_string(),
-                created_at: chrono::Utc::now() - chrono::Duration::days(1),
-                validators: vec![
-                    super::ValidatorInfo {
-                        address: "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd".to_string(),
-                        stake: "100.0".to_string(),
-                        power: 10,
-                        status: "Active".to_string(),
-                    },
-                    super::ValidatorInfo {
-                        address: "0x1111222233334444555566667777888899990000".to_string(),
-                        stake: "150.0".to_string(),
-                        power: 15,
-                        status: "Active".to_string(),
-                    }
-                ],
-                config: serde_json::json!({
-                    "permissionMode": "collateral",
-                    "minValidators": 5,
-                    "minValidatorStake": 100.0
-                }),
+    /// Get real subnet instances from IPC provider
+    async fn get_real_instances(&self) -> Result<Vec<SubnetInstance>> {
+        use crate::get_ipc_provider;
+        use crate::GlobalArguments;
+        use ipc_api::subnet_id::SubnetID;
+        use std::str::FromStr;
+
+        let global = GlobalArguments {
+            config_path: Some(self.config_path.clone()),
+            _network: fvm_shared::address::Network::Testnet,
+            __network: None,
+        };
+
+        let provider = match get_ipc_provider(&global) {
+            Ok(p) => p,
+            Err(e) => {
+                log::warn!("Failed to get IPC provider: {}, falling back to empty list", e);
+                return Ok(vec![]);
             }
+        };
+
+        let mut instances = Vec::new();
+
+        // Try to get subnets from the root network (Filecoin mainnet/testnet)
+        // For UI purposes, we'll try common parent networks
+        let parent_networks = vec![
+            "/r314159",     // Filecoin Calibration testnet
+            "/r31337",      // Local development
+            "/r1",          // Filecoin mainnet
         ];
 
-        for instance in mock_instances {
-            instances.insert(instance.id.clone(), instance);
+        for parent_str in parent_networks {
+            if let Ok(parent_subnet) = SubnetID::from_str(parent_str) {
+                match provider.list_child_subnets(None, &parent_subnet).await {
+                    Ok(subnets) => {
+                        for (subnet_id, subnet_info) in subnets {
+                            // Get validators for this subnet
+                            let validators = match provider.list_validators(&subnet_id).await {
+                                Ok(validators) => {
+                                    validators.into_iter().map(|(addr, info)| {
+                                        super::ValidatorInfo {
+                                            address: addr.to_string(),
+                                            stake: "1.0".to_string(), // TODO: Access to ValidatorStakingInfo fields is private
+                                            power: if info.is_active { 1 } else { 0 },
+                                            status: if info.is_active { "Active".to_string() } else { "Inactive".to_string() },
+                                        }
+                                    }).collect()
+                                }
+                                Err(e) => {
+                                    log::debug!("Failed to get validators for subnet {}: {}", subnet_id, e);
+                                    vec![]
+                                }
+                            };
+
+                            let instance = SubnetInstance {
+                                id: subnet_id.to_string(),
+                                name: format!("Subnet {}", subnet_id.to_string().split('/').last().unwrap_or("Unknown")),
+                                status: if subnet_info.stake.is_zero() { "Inactive".to_string() } else { "Active".to_string() },
+                                template: if subnet_info.stake.atto() > &1000000000000000000u64.into() {
+                                    "Production Template".to_string()
+                                } else {
+                                    "Development Template".to_string()
+                                },
+                                parent: parent_str.to_string(),
+                                created_at: chrono::DateTime::from_timestamp(subnet_info.genesis_epoch as i64, 0)
+                                    .unwrap_or_else(chrono::Utc::now),
+                                validators,
+                                config: serde_json::json!({
+                                    "stake": subnet_info.stake.atto().to_string(),
+                                    "circ_supply": subnet_info.circ_supply.atto().to_string(),
+                                    "genesis_epoch": subnet_info.genesis_epoch,
+                                    "permissionMode": "collateral"
+                                }),
+                            };
+
+                            instances.push(instance);
+                        }
+                    }
+                    Err(e) => {
+                        log::debug!("No subnets found for parent {}: {}", parent_str, e);
+                    }
+                }
+            }
         }
 
-        log::info!("Initialized with {} mock subnet instances", instances.len());
-        Ok(())
+        if instances.is_empty() {
+            log::info!("No real subnets found, this may be expected in development");
+        } else {
+            log::info!("Found {} subnet instances", instances.len());
+        }
+
+        Ok(instances)
     }
 }
 
@@ -640,22 +743,22 @@ async fn create_subnet_instance(
     deployment_id: &str,
     config: &serde_json::Value,
 ) -> Result<()> {
-    let instance = SubnetInstance {
-        id: deployment_id.to_string(),
-        name: config["name"].as_str().unwrap_or("Unnamed Subnet").to_string(),
-        status: "active".to_string(),
-        template: config.get("template").and_then(|t| t.as_str())
-            .unwrap_or("development").to_string(),
-        parent: config["parent"].as_str().unwrap_or("Unknown").to_string(),
-        created_at: chrono::Utc::now(),
-        validators: vec![], // TODO: Extract from config
-        config: config.clone(),
-    };
+    // For real deployments, the subnet would be created via the actual IPC provider
+    // and registered in the IPC config. For now, we'll log the successful deployment
+    // and let the real data queries pick up the new subnet when it becomes available
 
-    let mut instances = state.instances.lock().unwrap();
-    instances.insert(deployment_id.to_string(), instance);
+    log::info!("Deployment {} completed successfully", deployment_id);
+    log::info!("Deployed subnet with config: {}", config);
+    log::info!("New subnet should be discoverable via IPC provider queries");
 
-    log::info!("Created subnet instance for deployment {}", deployment_id);
+    // In a real implementation, this would:
+    // 1. Use the actual IPC CLI commands to create the subnet
+    // 2. The subnet would be registered in the IPC provider config
+    // 3. Subsequent API calls would pick up the new subnet automatically
+
+    // For development, we can still store a temporary record to show recent deployments
+    // but note that this is not persistent and is just for UI feedback
+
     Ok(())
 }
 

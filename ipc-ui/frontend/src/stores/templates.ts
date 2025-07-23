@@ -286,8 +286,11 @@ export const useTemplatesStore = defineStore('templates', () => {
     const decentralization = answers.decentralization
 
     return templates.value.filter(template => {
+      // Ensure template.recommended is an array
+      const recommended = template.recommended || []
+
       // Primary filtering by use case
-      if (useCase && template.recommended.includes(useCase)) {
+      if (useCase && recommended.includes(useCase)) {
         return true
       }
 
@@ -378,7 +381,10 @@ export const useTemplatesStore = defineStore('templates', () => {
         // Convert backend template format to frontend format if needed
         templates.value = response.data.map((template: any) => ({
           ...template,
-          defaults: template.defaults || {}
+          defaults: template.defaults || {},
+          recommended: template.recommended || [],
+          features: template.features || [],
+          icon: template.icon || '📦'
         }))
       } else {
         console.log('Using fallback mock templates')
