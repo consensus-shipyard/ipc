@@ -5961,6 +5961,7 @@ dependencies = [
  "fvm_ipld_blockstore",
  "fvm_ipld_encoding",
  "fvm_ipld_hamt",
+ "fvm_sdk",
  "fvm_shared",
  "hex",
  "indexmap 1.9.3",

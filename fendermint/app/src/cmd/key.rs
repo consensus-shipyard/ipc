@@ -115,7 +115,7 @@ pub fn generate_key(args: &KeyGenArgs) -> anyhow::Result<()> {
 pub fn store_key(secret_key: &SecretKey, name: &str, out_dir: &Path) -> anyhow::Result<()> {
     let public_key = secret_key.public_key();
 
-    export(out_dir, name, "sk", &secret_to_b64(&secret_key))?;
+    export(out_dir, name, "sk", &secret_to_b64(secret_key))?;
     export(out_dir, name, "pk", &public_to_b64(&public_key))?;
 
     Ok(())
