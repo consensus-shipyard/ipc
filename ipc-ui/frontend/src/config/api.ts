@@ -13,6 +13,8 @@ export const API_ENDPOINTS = {
   instances: '/api/instances',
   deploy: '/api/deploy',
   instance: (id: string) => `/api/instances/${id}`,
+  gateways: '/api/gateways',
+  gateway: (id: string) => `/api/gateways/${id}`,
 }
 
 // WebSocket message types

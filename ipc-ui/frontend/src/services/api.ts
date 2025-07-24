@@ -84,6 +84,15 @@ export const apiService = {
     return retryRequest(() => api.get(API_ENDPOINTS.instance(id)))
   },
 
+  // Gateways
+  async getGateways() {
+    return retryRequest(() => api.get(API_ENDPOINTS.gateways))
+  },
+
+  async getGateway(id: string) {
+    return retryRequest(() => api.get(API_ENDPOINTS.gateway(id)))
+  },
+
   // Deployment
   async deploy(config: any) {
     return retryRequest(() => api.post(API_ENDPOINTS.deploy, config))
