@@ -44,9 +44,10 @@ export interface SubnetConfig {
   }>
 
   // Gateway configuration
-  gatewayMode?: 'existing' | 'deploy' | 'custom'
+  gatewayMode?: 'existing' | 'deploy' | 'deployed' | 'custom'
   customGatewayAddress?: string
   customRegistryAddress?: string
+  selectedDeployedGateway?: string
 
   // Deployment settings
   deployConfig?: {
@@ -111,6 +112,9 @@ export const useWizardStore = defineStore('wizard', () => {
     if (config.value.gatewayMode === 'custom') {
       const customGatewayComplete = config.value.customGatewayAddress && config.value.customRegistryAddress
       return isBasicComplete && customGatewayComplete
+    } else if (config.value.gatewayMode === 'deployed') {
+      const deployedGatewaySelected = config.value.selectedDeployedGateway
+      return isBasicComplete && deployedGatewaySelected
     }
 
     return isBasicComplete

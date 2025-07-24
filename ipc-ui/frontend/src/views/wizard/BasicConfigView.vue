@@ -24,8 +24,27 @@ const formData = ref({
   genesisSubnetIpcContractsOwner: wizardStore.config.genesisSubnetIpcContractsOwner || '',
   gatewayMode: wizardStore.config.gatewayMode || 'existing',
   customGatewayAddress: wizardStore.config.customGatewayAddress || '',
-  customRegistryAddress: wizardStore.config.customRegistryAddress || ''
+  customRegistryAddress: wizardStore.config.customRegistryAddress || '',
+  selectedDeployedGateway: wizardStore.config.selectedDeployedGateway || ''
 })
+
+// Gateway type definition
+interface GatewayInfo {
+  id: string
+  name: string
+  gateway_address: string
+  registry_address: string
+  deployer_address: string
+  parent_network: string
+  deployed_at: string
+  status: string
+  subnets_created: number
+  description?: string
+}
+
+// Deployed gateways data
+const deployedGateways = ref<GatewayInfo[]>([])
+const loadingGateways = ref(false)
 
 // Field errors
 const fieldErrors = ref<Record<string, string>>({})
@@ -61,6 +80,11 @@ const gatewayModeOptions = [
     value: 'deploy',
     label: 'Deploy New Gateway',
     description: 'Deploy your own gateway contracts (full control, no approval needed)'
+  },
+  {
+    value: 'deployed',
+    label: 'Use My Deployed Gateway',
+    description: 'Select from gateways you have previously deployed'
   },
   {
     value: 'custom',
@@ -101,6 +125,11 @@ const validateForm = () => {
   if (formData.value.gatewayMode === 'custom') {
     validateField('customGatewayAddress')
     validateField('customRegistryAddress')
+  } else if (formData.value.gatewayMode === 'deployed') {
+    if (!formData.value.selectedDeployedGateway) {
+      fieldErrors.value.selectedDeployedGateway = 'Please select a deployed gateway'
+      return false
+    }
   }
 
   return Object.keys(fieldErrors.value).length === 0
@@ -112,6 +141,26 @@ const saveConfig = () => {
 }
 
 // Navigation
+// Load deployed gateways from API
+const loadDeployedGateways = async () => {
+  try {
+    loadingGateways.value = true
+    const response = await fetch('/api/gateways')
+    if (response.ok) {
+      const gateways: GatewayInfo[] = await response.json()
+      deployedGateways.value = gateways.sort((a, b) => new Date(b.deployed_at).getTime() - new Date(a.deployed_at).getTime())
+    } else {
+      console.error('Failed to load deployed gateways:', response.statusText)
+      deployedGateways.value = []
+    }
+  } catch (error) {
+    console.error('Error loading deployed gateways:', error)
+    deployedGateways.value = []
+  } finally {
+    loadingGateways.value = false
+  }
+}
+
 const goToNextStep = () => {
   if (validateForm()) {
     saveConfig()
@@ -128,6 +177,20 @@ const goToPreviousStep = () => {
 watch(formData, () => {
   saveConfig()
 }, { deep: true })
+
+// Watch gateway mode changes to load deployed gateways when needed
+watch(() => formData.value.gatewayMode, (newMode) => {
+  if (newMode === 'deployed') {
+    loadDeployedGateways()
+  }
+})
+
+// Load deployed gateways on component mount
+onMounted(() => {
+  if (formData.value.gatewayMode === 'deployed') {
+    loadDeployedGateways()
+  }
+})
 
 // Real-time field validation
 const handleFieldBlur = (field: string) => {
@@ -392,6 +455,53 @@ onMounted(() => {
             :error="fieldErrors.gatewayMode"
             help-text="How to handle gateway contracts for subnet management"
           />
+
+          <!-- Deployed Gateway Selection (conditional) -->
+          <div v-if="formData.gatewayMode === 'deployed'" class="space-y-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h4 class="text-sm font-semibold text-gray-700">Select Your Deployed Gateway</h4>
+
+            <div v-if="deployedGateways.length === 0" class="text-center py-8 text-gray-500">
+              <svg class="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14-7l2 2m0 0l2 2m-2-2v6m-2-2H5m14-7v2a2 2 0 01-2 2H5a2 2 0 01-2-2V4"/>
+              </svg>
+              <p class="text-lg font-medium mb-1">No Deployed Gateways Found</p>
+              <p class="text-sm">You haven't deployed any gateways yet. Choose "Deploy New Gateway" to create one.</p>
+            </div>
+
+            <div v-else class="space-y-3">
+              <div class="space-y-2">
+                <div
+                  v-for="gateway in deployedGateways"
+                  :key="gateway.id"
+                  class="flex items-center p-3 border rounded-lg cursor-pointer transition-colors"
+                  :class="formData.selectedDeployedGateway === gateway.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'"
+                  @click="formData.selectedDeployedGateway = gateway.id"
+                >
+                  <input
+                    type="radio"
+                    :value="gateway.id"
+                    v-model="formData.selectedDeployedGateway"
+                    class="mr-3 text-blue-600"
+                  />
+                  <div class="flex-1">
+                    <div class="flex items-center justify-between">
+                      <h5 class="font-medium text-gray-900">{{ gateway.name }}</h5>
+                      <span class="text-xs px-2 py-1 rounded-full"
+                            :class="gateway.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'">
+                        {{ gateway.status }}
+                      </span>
+                    </div>
+                    <p class="text-sm text-gray-600 mt-1">{{ gateway.description || `Deployed on ${gateway.parent_network}` }}</p>
+                    <div class="flex text-xs text-gray-500 mt-2 space-x-4">
+                      <span>Gateway: {{ gateway.gateway_address.slice(0, 8) }}...{{ gateway.gateway_address.slice(-6) }}</span>
+                      <span>Network: {{ gateway.parent_network }}</span>
+                      <span>Deployed: {{ new Date(gateway.deployed_at).toLocaleDateString() }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
           <!-- Custom Gateway Addresses (conditional) -->
           <div v-if="formData.gatewayMode === 'custom'" class="space-y-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">

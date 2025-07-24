@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 //! UI Server implementation
 
-use super::{AppState, DeploymentMode, DeploymentState, SubnetInstance, WebSocketClient};
+use super::{AppState, DeploymentMode, DeploymentState, SubnetInstance, WebSocketClient, GatewayInfo};
 use anyhow::Result;
 use futures_util::{SinkExt, StreamExt};
 use std::collections::HashMap;
@@ -30,6 +30,57 @@ use crate::commands::deploy::{deploy_contracts as deploy_contracts_cmd, DeployCo
 use ipc_provider::new_evm_keystore_from_arc_config;
 use ipc_wallet::EvmKeyStore;
 use ipc_types::EthAddress as IpcEthAddress;
+
+/// Save a deployed gateway to the persistent storage file
+async fn save_deployed_gateway_to_file(
+    gateway_address: String,
+    registry_address: String,
+    deployer_address: String,
+    parent_network: String,
+    name: Option<String>,
+    config_path: &str,
+) -> Result<GatewayInfo> {
+    let gateway_info = GatewayInfo::new(
+        gateway_address,
+        registry_address,
+        deployer_address,
+        parent_network,
+        name,
+    );
+
+    let gateway_file = std::path::Path::new(config_path)
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."))
+        .join("deployed_gateways.json");
+
+    // Load existing gateways
+    let mut gateways: HashMap<String, GatewayInfo> = if gateway_file.exists() {
+        match tokio::fs::read_to_string(&gateway_file).await {
+            Ok(contents) => {
+                serde_json::from_str(&contents).unwrap_or_else(|e| {
+                    log::warn!("Failed to parse existing gateway data: {}, starting fresh", e);
+                    HashMap::new()
+                })
+            }
+            Err(e) => {
+                log::warn!("Failed to read existing gateway file: {}, starting fresh", e);
+                HashMap::new()
+            }
+        }
+    } else {
+        HashMap::new()
+    };
+
+    // Add the new gateway
+    gateways.insert(gateway_info.id.clone(), gateway_info.clone());
+
+    // Save to file
+    let contents = serde_json::to_string_pretty(&gateways)?;
+    tokio::fs::write(&gateway_file, contents).await?;
+
+    log::debug!("Saved gateway {} to persistent storage", gateway_info.id);
+    Ok(gateway_info)
+}
 
 // Include the built frontend files at compile time
 static FRONTEND_DIST: Dir = include_dir!("$CARGO_MANIFEST_DIR/../../ipc-ui/frontend/dist");
@@ -61,6 +112,7 @@ impl UIServer {
             instances: Arc::new(Mutex::new(HashMap::new())),
             websocket_clients: Arc::new(Mutex::new(Vec::new())),
             deployments: Arc::new(Mutex::new(HashMap::new())),
+            deployed_gateways: Arc::new(Mutex::new(HashMap::new())),
         };
 
         Ok(UIServer {
@@ -77,6 +129,9 @@ impl UIServer {
     pub async fn start(&mut self) -> Result<()> {
         // Initialize with real subnet data from IPC provider
         self.initialize_real_data().await?;
+
+        // Load existing gateway data
+        self.load_gateway_data().await?;
 
         // Create the combined server with both static files and API
         let addr: SocketAddr = format!("{}:{}", self.host, self.frontend_port)
@@ -247,6 +302,95 @@ impl UIServer {
                 }
             });
 
+        // GET /api/gateways - List all deployed gateways
+        let gateways = warp::path!("api" / "gateways")
+            .and(warp::get())
+            .and(state_filter.clone())
+            .and_then(|state: AppState| async move {
+                let deployed_gateways = state.deployed_gateways.lock().unwrap();
+                let gateways: Vec<GatewayInfo> = deployed_gateways.values().cloned().collect();
+                Ok::<_, warp::Rejection>(warp::reply::json(&gateways))
+            });
+
+        // GET /api/gateways/:id - Get specific gateway details
+        let gateway_by_id = warp::path!("api" / "gateways" / String)
+            .and(warp::get())
+            .and(state_filter.clone())
+            .and_then(|id: String, state: AppState| async move {
+                let deployed_gateways = state.deployed_gateways.lock().unwrap();
+                match deployed_gateways.get(&id) {
+                    Some(gateway) => {
+                        Ok::<_, warp::Rejection>(warp::reply::with_status(
+                            warp::reply::json(gateway),
+                            warp::http::StatusCode::OK
+                        ))
+                    }
+                    None => {
+                        Ok::<_, warp::Rejection>(warp::reply::with_status(
+                            warp::reply::json(&serde_json::json!({"error": "Gateway not found"})),
+                            warp::http::StatusCode::NOT_FOUND
+                        ))
+                    }
+                }
+            });
+
+                // PUT /api/gateways/:id - Update gateway information (name, description, etc.)
+        let update_gateway = warp::path!("api" / "gateways" / String)
+            .and(warp::put())
+            .and(warp::body::json())
+            .and(state_filter.clone())
+            .and_then(|id: String, update_data: serde_json::Value, state: AppState| async move {
+                let updated_gateway = {
+                    let mut deployed_gateways = state.deployed_gateways.lock().unwrap();
+
+                    match deployed_gateways.get_mut(&id) {
+                        Some(gateway) => {
+                            // Update editable fields
+                            if let Some(name) = update_data.get("name").and_then(|v| v.as_str()) {
+                                gateway.name = name.to_string();
+                            }
+                            if let Some(description) = update_data.get("description").and_then(|v| v.as_str()) {
+                                gateway.description = Some(description.to_string());
+                            }
+                            if let Some(status) = update_data.get("status").and_then(|v| v.as_str()) {
+                                gateway.status = status.to_string();
+                            }
+                            Some(gateway.clone())
+                        }
+                        None => None,
+                    }
+                }; // Lock is released here
+
+                match updated_gateway {
+                    Some(gateway) => {
+                        // Save to disk (now we can safely await)
+                        let server = UIServer {
+                            host: "127.0.0.1".to_string(),
+                            frontend_port: 3000,
+                            backend_port: 3001,
+                            mode: state.mode.clone(),
+                            config_path: state.config_path.clone(),
+                            state: state.clone(),
+                        };
+
+                        if let Err(e) = server.save_gateway_data().await {
+                            log::error!("Failed to save gateway data: {}", e);
+                        }
+
+                        Ok::<_, warp::Rejection>(warp::reply::with_status(
+                            warp::reply::json(&gateway),
+                            warp::http::StatusCode::OK
+                        ))
+                    }
+                    None => {
+                        Ok::<_, warp::Rejection>(warp::reply::with_status(
+                            warp::reply::json(&serde_json::json!({"error": "Gateway not found"})),
+                            warp::http::StatusCode::NOT_FOUND
+                        ))
+                    }
+                }
+            });
+
         // POST /api/deploy
         let deploy = warp::path!("api" / "deploy")
             .and(warp::post())
@@ -310,6 +454,9 @@ impl UIServer {
         templates
             .or(instances)
             .or(instance_by_id)
+            .or(gateways)
+            .or(gateway_by_id)
+            .or(update_gateway)
             .or(deploy)
     }
 
@@ -347,6 +494,87 @@ impl UIServer {
         // This allows for real-time data that reflects current subnet state
         log::info!("UI server initialized for real subnet data queries");
         Ok(())
+    }
+
+    /// Load existing gateway data from persistent storage
+    async fn load_gateway_data(&self) -> Result<()> {
+        let gateway_file = std::path::Path::new(&self.config_path)
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."))
+            .join("deployed_gateways.json");
+
+        if gateway_file.exists() {
+            match tokio::fs::read_to_string(&gateway_file).await {
+                Ok(contents) => {
+                    match serde_json::from_str::<HashMap<String, GatewayInfo>>(&contents) {
+                        Ok(gateways) => {
+                            let mut deployed_gateways = self.state.deployed_gateways.lock().unwrap();
+                            *deployed_gateways = gateways.clone();
+                            log::info!("Loaded {} deployed gateways from storage", gateways.len());
+                        }
+                        Err(e) => {
+                            log::warn!("Failed to parse gateway data: {}", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::warn!("Failed to read gateway file: {}", e);
+                }
+            }
+        } else {
+            log::info!("No existing gateway data found, starting fresh");
+        }
+
+        Ok(())
+    }
+
+    /// Save gateway data to persistent storage
+    async fn save_gateway_data(&self) -> Result<()> {
+        let gateway_file = std::path::Path::new(&self.config_path)
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."))
+            .join("deployed_gateways.json");
+
+        let gateways = {
+            let deployed_gateways = self.state.deployed_gateways.lock().unwrap();
+            deployed_gateways.clone()
+        };
+
+        let contents = serde_json::to_string_pretty(&gateways)?;
+        tokio::fs::write(&gateway_file, contents).await?;
+
+        log::debug!("Saved {} gateways to storage", gateways.len());
+        Ok(())
+    }
+
+    /// Add a newly deployed gateway to the tracking system
+    pub async fn track_deployed_gateway(
+        &self,
+        gateway_address: String,
+        registry_address: String,
+        deployer_address: String,
+        parent_network: String,
+        name: Option<String>,
+    ) -> Result<GatewayInfo> {
+        let gateway_info = GatewayInfo::new(
+            gateway_address,
+            registry_address,
+            deployer_address,
+            parent_network,
+            name,
+        );
+
+        // Add to in-memory store
+        {
+            let mut deployed_gateways = self.state.deployed_gateways.lock().unwrap();
+            deployed_gateways.insert(gateway_info.id.clone(), gateway_info.clone());
+        }
+
+        // Persist to disk
+        self.save_gateway_data().await?;
+
+        log::info!("🎯 Tracked new deployed gateway: {} ({})", gateway_info.name, gateway_info.id);
+        Ok(gateway_info)
     }
 
     /// Get real subnet instances from IPC provider
@@ -520,6 +748,8 @@ async fn handle_deployment(
     _template: String,
     config: serde_json::Value,
 ) -> Result<()> {
+    // Get config path from the state
+    let config_path = &state.config_path;
     log::info!("Starting deployment process for {}", deployment_id);
 
     // Define deployment steps
@@ -579,7 +809,7 @@ async fn handle_deployment(
             "contracts" => {
                 // Deploy smart contracts
                 if let Some(ref store) = ipc_config_store {
-                    let (gateway_addr, registry_addr) = deploy_smart_contracts(&config, store).await?;
+                    let (gateway_addr, registry_addr) = deploy_smart_contracts(&config, store, config_path).await?;
                     if let (Some(gw), Some(reg)) = (gateway_addr, registry_addr) {
                         log::info!("🎯 Custom gateway contracts deployed/configured:");
                         log::info!("   - Gateway: {}", gw);
@@ -799,7 +1029,7 @@ async fn prepare_deployment_files(_config: &serde_json::Value, config_path: &str
 }
 
 /// Deploy smart contracts with gateway deployment options
-async fn deploy_smart_contracts(config: &serde_json::Value, ipc_config_store: &IpcConfigStore) -> Result<(Option<String>, Option<String>)> {
+async fn deploy_smart_contracts(config: &serde_json::Value, ipc_config_store: &IpcConfigStore, config_path: &str) -> Result<(Option<String>, Option<String>)> {
     log::info!("🚀 Starting smart contract deployment phase");
 
     // Log the configuration for debugging
@@ -817,7 +1047,7 @@ async fn deploy_smart_contracts(config: &serde_json::Value, ipc_config_store: &I
             log::info!("🔨 User chose to deploy new gateway contracts");
             log::info!("   - This gives full control over subnet approval");
             log::info!("   - User will be the gateway owner");
-            deploy_new_gateway_contracts(config, ipc_config_store).await
+            deploy_new_gateway_contracts(config, ipc_config_store, config_path).await
         }
         "custom" => {
             log::info!("🔧 User provided custom gateway address");
@@ -1064,7 +1294,7 @@ async fn create_and_approve_subnet(config: &serde_json::Value, ipc_config_store:
 }
 
 /// Deploy new gateway contracts (user becomes owner)
-async fn deploy_new_gateway_contracts(config: &serde_json::Value, ipc_config_store: &IpcConfigStore) -> Result<(Option<String>, Option<String>)> {
+async fn deploy_new_gateway_contracts(config: &serde_json::Value, ipc_config_store: &IpcConfigStore, config_path: &str) -> Result<(Option<String>, Option<String>)> {
     log::info!("🔧 Starting new gateway contract deployment...");
 
     // Extract required configuration parameters
@@ -1159,6 +1389,27 @@ async fn deploy_new_gateway_contracts(config: &serde_json::Value, ipc_config_sto
 
     log::info!("✅ IPC configuration updated with new gateway addresses");
     log::info!("📦 Gateway deployment completed successfully!");
+
+        // Track the newly deployed gateway in our management system
+    log::info!("💾 Adding gateway to tracking system...");
+    if let Some(parent_str) = config.get("parent").and_then(|v| v.as_str()) {
+        match save_deployed_gateway_to_file(
+            gateway_addr.clone(),
+            registry_addr.clone(),
+            from_address.to_string(),
+            parent_str.to_string(),
+            Some(format!("Gateway for {}", parent_str)),
+            &config_path,
+        ).await {
+            Ok(gateway_info) => {
+                log::info!("✅ Gateway tracked successfully: {}", gateway_info.name);
+            }
+            Err(e) => {
+                log::warn!("⚠️  Failed to track gateway in management system: {}", e);
+                // Don't fail the deployment if tracking fails
+            }
+        }
+    }
 
     Ok((Some(gateway_addr), Some(registry_addr)))
 }

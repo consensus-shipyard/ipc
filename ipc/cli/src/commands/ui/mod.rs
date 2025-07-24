@@ -106,6 +106,47 @@ impl std::str::FromStr for DeploymentMode {
     }
 }
 
+/// Gateway information for tracking deployed gateways
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GatewayInfo {
+    pub id: String,
+    pub name: String,
+    pub gateway_address: String,
+    pub registry_address: String,
+    pub deployer_address: String,
+    pub parent_network: String,
+    pub deployed_at: chrono::DateTime<chrono::Utc>,
+    pub status: String, // "active", "inactive", "unknown"
+    pub subnets_created: u32,
+    pub description: Option<String>,
+}
+
+impl GatewayInfo {
+    pub fn new(
+        gateway_address: String,
+        registry_address: String,
+        deployer_address: String,
+        parent_network: String,
+        name: Option<String>,
+    ) -> Self {
+        let id = format!("gateway-{}", chrono::Utc::now().timestamp());
+        let default_name = format!("Gateway {}", &gateway_address[..8]);
+
+        Self {
+            id,
+            name: name.unwrap_or(default_name),
+            gateway_address,
+            registry_address,
+            deployer_address,
+            parent_network,
+            deployed_at: chrono::Utc::now(),
+            status: "active".to_string(),
+            subnets_created: 0,
+            description: None,
+        }
+    }
+}
+
 /// Shared application state
 #[derive(Debug, Clone)]
 pub struct AppState {
@@ -114,6 +155,7 @@ pub struct AppState {
     pub instances: Arc<Mutex<HashMap<String, SubnetInstance>>>,
     pub websocket_clients: Arc<Mutex<Vec<WebSocketClient>>>,
     pub deployments: Arc<Mutex<HashMap<String, DeploymentState>>>,
+    pub deployed_gateways: Arc<Mutex<HashMap<String, GatewayInfo>>>,
 }
 
 /// Deployment state tracking
