@@ -50,7 +50,9 @@ thiserror = { workspace = true }
 tempfile = "3.8"
 tokio = { workspace = true, features = ["signal"] }
 tokio-tungstenite = { workspace = true }
+tokio-util = { workspace = true }
 toml = "0.7.2"
+tracing = { workspace = true }
 url = { workspace = true }
 zeroize = "1.6.0"
 prometheus = { workspace = true }
