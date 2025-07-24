@@ -7,5 +7,6 @@ pub use subnet::{
     TopDownFinalityQuery, TopDownQueryPayload,
 };
 
+pub mod cometbft;
 pub mod evm;
 mod subnet;
