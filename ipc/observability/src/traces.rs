@@ -12,7 +12,20 @@ use tracing_subscriber::{fmt, fmt::Subscriber, layer::SubscriberExt, EnvFilter, 
 
 pub const TRACING_TARGET: &str = "tracing_event";
 
-// Creates a temporary subscriber that logs all traces to stderr. Useful when global tracing is not set yet.
+/// Creates a service-specific subscriber for isolated logging
+pub fn create_service_subscriber(_service_name: &str) -> Subscriber {
+    tracing_subscriber::FmtSubscriber::builder()
+        .with_max_level(Level::TRACE)
+        .with_target(false)
+        .with_file(true)
+        .with_line_number(true)
+        .with_ansi(true)
+        .with_thread_names(true)
+        .with_thread_ids(true)
+        .finish()
+}
+
+/// Creates a temporary subscriber for isolated logging contexts
 pub fn create_temporary_subscriber() -> Subscriber {
     tracing_subscriber::FmtSubscriber::builder()
         .with_max_level(Level::TRACE)
@@ -20,6 +33,14 @@ pub fn create_temporary_subscriber() -> Subscriber {
         .with_file(true)
         .with_line_number(true)
         .finish()
+}
+
+/// Macro for service-specific logging with prefix
+#[macro_export]
+macro_rules! service_log {
+    ($service:expr, $level:ident, $($arg:tt)*) => {
+        tracing::$level!(target: concat!("service.", $service), $($arg)*)
+    };
 }
 
 // Sets the global tracing subscriber.
