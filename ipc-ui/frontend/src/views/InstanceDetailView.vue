@@ -34,6 +34,21 @@ const instance = ref<SubnetInstance | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 const activeTab = ref('overview')
+const approvingSubnet = ref(false)
+
+// Validator management state
+const newValidator = ref({
+  address: '',
+  pubkey: '',
+  power: 1,
+  collateral: 0,
+  initialBalance: 0
+})
+
+const addingValidator = ref(false)
+const removingValidator = ref<Record<string, boolean>>({})
+const updatingStake = ref<Record<string, boolean>>({})
+const stakeAmounts = ref<Record<string, number>>({})
 
 // Computed
 const createdDate = computed(() => {
@@ -147,6 +162,174 @@ const viewLogs = () => {
   console.log('View logs for:', decodeURIComponent(props.id))
 }
 
+const getGatewayOwner = async (): Promise<string> => {
+  if (!instance.value) return '0x0a36d7c34ba5523d5bf783bb47f62371e52e0298'
+
+  try {
+    // Try to get gateway information from the API
+    const gatewaysResponse = await fetch('/api/gateways')
+    const gatewaysResult = await gatewaysResponse.json()
+
+    if (gatewaysResult && Array.isArray(gatewaysResult)) {
+      // Find the gateway that matches this subnet's gateway address
+      const gatewayAddr = instance.value.config?.gateway_addr?.toString()
+      if (gatewayAddr) {
+        const matchingGateway = gatewaysResult.find((gw: any) =>
+          gw.gateway_address === gatewayAddr
+        )
+        if (matchingGateway) {
+          return matchingGateway.deployer_address
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to fetch gateway information:', err)
+  }
+
+  // Fallback to config or default address
+  return instance.value.config?.deployer_address || '0x0a36d7c34ba5523d5bf783bb47f62371e52e0298'
+}
+
+const approveSubnet = async () => {
+  if (!instance.value) return
+
+  try {
+    approvingSubnet.value = true
+
+    // Get the correct gateway owner address
+    const gatewayOwnerAddress = await getGatewayOwner()
+
+    // Use the API service with extended timeout for approval
+    const response = await apiService.approveSubnet(props.id, gatewayOwnerAddress)
+
+    if (response.data?.success) {
+      console.log('Subnet approved successfully:', response.data.message)
+      // Refresh the instance data to show updated status
+      await fetchInstance()
+    } else {
+      console.error('Failed to approve subnet:', response.data?.error)
+      error.value = response.data?.error || 'Failed to approve subnet'
+    }
+  } catch (err: any) {
+    console.error('Error approving subnet:', err)
+    error.value = err?.message || 'Failed to approve subnet'
+  } finally {
+    approvingSubnet.value = false
+  }
+}
+
+// Validator management methods
+const addValidator = async () => {
+  if (!instance.value) return
+
+  addingValidator.value = true
+  try {
+    const validatorData = {
+      subnetId: decodeURIComponent(props.id),
+      address: newValidator.value.address,
+      permissionMode: instance.value.config.permissionMode || 'collateral',
+      ...((instance.value.config.permissionMode === 'collateral') ? {
+        collateral: newValidator.value.collateral,
+        initialBalance: newValidator.value.initialBalance || undefined
+      } : {
+        pubkey: newValidator.value.pubkey,
+        power: newValidator.value.power
+      })
+    }
+
+    const response = await apiService.addValidator(validatorData)
+
+    if (response.data.success) {
+      // Reset form
+      newValidator.value = {
+        address: '',
+        pubkey: '',
+        power: 1,
+        collateral: 0,
+        initialBalance: 0
+      }
+
+      // Refresh instance data
+      await fetchInstance()
+
+      // Show success message (you could add a toast notification here)
+      console.log('Validator added successfully')
+    } else {
+      error.value = response.data.error || 'Failed to add validator'
+    }
+  } catch (err) {
+    console.error('Error adding validator:', err)
+    error.value = err instanceof Error ? err.message : 'Failed to add validator'
+  } finally {
+    addingValidator.value = false
+  }
+}
+
+const removeValidator = async (validatorAddress: string) => {
+  if (!instance.value) return
+
+  removingValidator.value = { ...removingValidator.value, [validatorAddress]: true }
+  try {
+    const validatorData = {
+      subnetId: decodeURIComponent(props.id),
+      address: validatorAddress
+    }
+
+    const response = await apiService.removeValidator(validatorData)
+
+    if (response.data.success) {
+      // Refresh instance data
+      await fetchInstance()
+      console.log('Validator removed successfully')
+    } else {
+      error.value = response.data.error || 'Failed to remove validator'
+    }
+  } catch (err) {
+    console.error('Error removing validator:', err)
+    error.value = err instanceof Error ? err.message : 'Failed to remove validator'
+  } finally {
+    removingValidator.value = { ...removingValidator.value, [validatorAddress]: false }
+  }
+}
+
+const updateStake = async (validatorAddress: string, action: 'stake' | 'unstake') => {
+  if (!instance.value) return
+
+  const amount = stakeAmounts.value[validatorAddress]
+  if (!amount || amount <= 0) {
+    error.value = 'Please enter a valid stake amount'
+    return
+  }
+
+  updatingStake.value = { ...updatingStake.value, [validatorAddress]: true }
+  try {
+    const stakeData = {
+      subnetId: decodeURIComponent(props.id),
+      address: validatorAddress,
+      amount,
+      action
+    }
+
+    const response = await apiService.updateValidatorStake(stakeData)
+
+    if (response.data.success) {
+      // Clear the input
+      stakeAmounts.value = { ...stakeAmounts.value, [validatorAddress]: 0 }
+
+      // Refresh instance data
+      await fetchInstance()
+      console.log(`Stake ${action} successful:`, response.data.message)
+    } else {
+      error.value = response.data.error || `Failed to ${action} validator`
+    }
+  } catch (err) {
+    console.error(`Error ${action}ing validator:`, err)
+    error.value = err instanceof Error ? err.message : `Failed to ${action} validator`
+  } finally {
+    updatingStake.value = { ...updatingStake.value, [validatorAddress]: false }
+  }
+}
+
 // Lifecycle
 onMounted(() => {
   fetchInstance()
@@ -254,6 +437,18 @@ watch(() => props.id, (newId) => {
         </button>
 
         <button
+          v-if="instance.status.toLowerCase() === 'pending approval'"
+          :disabled="approvingSubnet"
+          @click="approveSubnet"
+          class="btn-primary flex items-center"
+        >
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          {{ approvingSubnet ? 'Approving...' : 'Approve Subnet' }}
+        </button>
+
+        <button
           @click="viewLogs"
           class="btn-secondary flex items-center"
         >
@@ -298,6 +493,17 @@ watch(() => props.id, (newId) => {
             ]"
           >
             Validators ({{ instance.validators.length }})
+          </button>
+          <button
+            @click="activeTab = 'validator-management'"
+            :class="[
+              'py-2 px-1 border-b-2 font-medium text-sm',
+              activeTab === 'validator-management'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            ]"
+          >
+            Manage Validators
           </button>
           <button
             @click="activeTab = 'configuration'"
@@ -445,6 +651,184 @@ watch(() => props.id, (newId) => {
                   </tr>
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Validator Management Tab -->
+        <div v-if="activeTab === 'validator-management'" class="space-y-6">
+          <div class="card">
+            <div class="flex items-center justify-between mb-6">
+              <h3 class="text-lg font-semibold text-gray-900">Validator Management</h3>
+              <div class="text-sm text-gray-500">
+                Mode: {{ instance.config.permissionMode || 'Unknown' }}
+              </div>
+            </div>
+
+            <!-- Add Validator Form -->
+            <div class="mb-8 p-6 bg-gray-50 rounded-lg">
+              <h4 class="text-md font-semibold text-gray-800 mb-4">Add New Validator</h4>
+              <form @submit.prevent="addValidator" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                      Validator Address *
+                    </label>
+                    <input
+                      v-model="newValidator.address"
+                      type="text"
+                      placeholder="0x..."
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      required
+                    />
+                  </div>
+
+                  <div v-if="instance.config.permissionMode === 'federated' || instance.config.permissionMode === 'static'">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                      Public Key *
+                    </label>
+                    <input
+                      v-model="newValidator.pubkey"
+                      type="text"
+                      placeholder="0x04..."
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      required
+                    />
+                  </div>
+
+                  <div v-if="instance.config.permissionMode === 'federated' || instance.config.permissionMode === 'static'">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                      Power
+                    </label>
+                    <input
+                      v-model.number="newValidator.power"
+                      type="number"
+                      min="1"
+                      placeholder="1"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+
+                  <div v-if="instance.config.permissionMode === 'collateral'">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                      Collateral (FIL) *
+                    </label>
+                    <input
+                      v-model.number="newValidator.collateral"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="10.0"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      required
+                    />
+                  </div>
+
+                  <div v-if="instance.config.permissionMode === 'collateral'">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                      Initial Balance (FIL)
+                    </label>
+                    <input
+                      v-model.number="newValidator.initialBalance"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.0"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+                </div>
+
+                <div class="flex justify-end">
+                  <button
+                    type="submit"
+                    :disabled="addingValidator"
+                    class="btn-primary"
+                  >
+                    <div v-if="addingValidator" class="animate-spin inline-block w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full"></div>
+                    {{ addingValidator ? 'Adding...' : 'Add Validator' }}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Existing Validators Management -->
+            <div>
+              <h4 class="text-md font-semibold text-gray-800 mb-4">Existing Validators</h4>
+
+              <div v-if="instance.validators.length === 0" class="text-center py-8 text-gray-500">
+                <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <p class="font-medium">No validators configured</p>
+                <p class="text-sm">Add the first validator using the form above.</p>
+              </div>
+
+              <div v-else class="space-y-4">
+                <div
+                  v-for="validator in instance.validators"
+                  :key="validator.address"
+                  class="border border-gray-200 rounded-lg p-4"
+                >
+                  <div class="flex items-center justify-between">
+                    <div class="flex-1">
+                      <div class="flex items-center space-x-3 mb-2">
+                        <span class="font-mono text-sm">{{ validator.address.slice(0, 8) }}...{{ validator.address.slice(-6) }}</span>
+                        <span :class="[
+                          'inline-flex px-2 py-1 text-xs font-semibold rounded-full',
+                          validator.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        ]">
+                          {{ validator.status }}
+                        </span>
+                      </div>
+                      <div class="text-sm text-gray-600">
+                        <span v-if="instance.config.permissionMode === 'collateral'">
+                          Stake: {{ validator.stake }} FIL
+                        </span>
+                        <span v-else>
+                          Power: {{ validator.power }}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div class="flex items-center space-x-2">
+                      <!-- Stake Management for Collateral Mode -->
+                      <div v-if="instance.config.permissionMode === 'collateral'" class="flex items-center space-x-2">
+                        <input
+                          v-model.number="stakeAmounts[validator.address]"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="Amount"
+                          class="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
+                        />
+                        <button
+                          @click="updateStake(validator.address, 'stake')"
+                          :disabled="updatingStake[validator.address]"
+                          class="btn-secondary text-xs px-2 py-1"
+                        >
+                          Stake
+                        </button>
+                        <button
+                          @click="updateStake(validator.address, 'unstake')"
+                          :disabled="updatingStake[validator.address]"
+                          class="btn-secondary text-xs px-2 py-1"
+                        >
+                          Unstake
+                        </button>
+                      </div>
+
+                      <button
+                        @click="removeValidator(validator.address)"
+                        :disabled="removingValidator[validator.address]"
+                        class="text-red-600 hover:text-red-700 text-sm font-medium"
+                      >
+                        {{ removingValidator[validator.address] ? 'Removing...' : 'Remove' }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

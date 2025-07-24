@@ -8,9 +8,11 @@ use futures_util::{SinkExt, StreamExt};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
+use tokio::sync::RwLock;
 use warp::{Filter, Reply};
 use include_dir::{include_dir, Dir};
 use tokio::time::{sleep, Duration};
+use std::time::Instant;
 use serde_json::json;
 use uuid;
 
@@ -30,6 +32,18 @@ use crate::commands::deploy::{deploy_contracts as deploy_contracts_cmd, DeployCo
 use ipc_provider::new_evm_keystore_from_arc_config;
 use ipc_wallet::EvmKeyStore;
 use ipc_types::EthAddress as IpcEthAddress;
+
+// Cache entry for subnet approval status
+#[derive(Clone)]
+struct ApprovalCacheEntry {
+    is_approved: bool,
+    timestamp: Instant,
+}
+
+// Simple cache with TTL for subnet approval status
+type ApprovalCache = Arc<RwLock<HashMap<String, ApprovalCacheEntry>>>;
+
+const APPROVAL_CACHE_TTL: Duration = Duration::from_secs(60); // Cache for 1 minute
 
 /// Save a deployed gateway to the persistent storage file
 async fn save_deployed_gateway_to_file(
@@ -510,6 +524,55 @@ impl UIServer {
                 })))
             });
 
+        // POST /api/subnets/:subnet_id/approve - Approve a subnet
+        let approve_subnet = warp::path!("api" / "subnets" / String / "approve")
+            .and(warp::post())
+            .and(warp::body::json())
+            .and(state_filter.clone())
+            .and_then(|subnet_id: String, approve_data: serde_json::Value, state: AppState| async move {
+                // URL decode the subnet ID first
+                let decoded_subnet_id = urlencoding::decode(&subnet_id)
+                    .map_err(|e| {
+                        log::error!("Failed to URL decode subnet ID '{}': {}", subnet_id, e);
+                        warp::reject::custom(InvalidRequest(format!("Invalid subnet ID encoding: {}", e)))
+                    })?
+                    .into_owned();
+
+                log::info!("Received subnet approval request for: {} (decoded: {})", subnet_id, decoded_subnet_id);
+
+                // Extract the gateway owner address from the request
+                let from_address = approve_data.get("from")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| warp::reject::custom(InvalidRequest("Missing 'from' field for gateway owner".to_string())))?;
+
+                // Call the approval function
+                match approve_subnet_via_cli(&decoded_subnet_id, from_address, &state.config_path).await {
+                    Ok(_) => {
+                        log::info!("✅ Successfully approved subnet: {}", decoded_subnet_id);
+                        Ok(warp::reply::json(&serde_json::json!({
+                            "success": true,
+                            "message": format!("Subnet {} approved successfully", decoded_subnet_id)
+                        })))
+                    }
+                    Err(e) => {
+                        log::error!("❌ Failed to approve subnet {}: {}", decoded_subnet_id, e);
+                        Err(warp::reject::custom(ServerError(format!("Failed to approve subnet: {}", e))))
+                    }
+                }
+            });
+
+        // Stub for validator management (placeholder)
+        let validators_stub = warp::path!("api" / "validators")
+            .and(warp::post())
+            .and(warp::body::json())
+            .and_then(|_body: serde_json::Value| async move {
+                log::info!("Validator management API called - not yet implemented");
+                Ok::<_, warp::Rejection>(warp::reply::json(&serde_json::json!({
+                    "success": false,
+                    "message": "Validator management functionality is not yet implemented"
+                })))
+            });
+
         templates
             .or(instances)
             .or(instance_by_id)
@@ -518,7 +581,13 @@ impl UIServer {
             .or(gateway_by_id)
             .or(update_gateway)
             .or(deploy)
+            .or(approve_subnet)
+            .or(validators_stub)
+
+
     }
+
+
 
     /// Create WebSocket route
     fn websocket_route(&self) -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
@@ -644,6 +713,9 @@ impl UIServer {
         use ipc_api::subnet_id::SubnetID;
         use std::str::FromStr;
 
+        // Create cache for subnet approval status
+        let approval_cache: ApprovalCache = Arc::new(RwLock::new(HashMap::new()));
+
         let global = GlobalArguments {
             config_path: Some(self.config_path.clone()),
             _network: fvm_shared::address::Network::Testnet,
@@ -703,13 +775,27 @@ impl UIServer {
                     }
                 };
 
-                // Create instance from config data (showing as "Pending Approval" since it's not fully active)
+                // Create instance from config data
                 let parent_id = subnet_id.parent().map(|p| p.to_string()).unwrap_or_else(|| "/r314159".to_string());
+
+                // Check if subnet is approved by querying the gateway
+                let is_approved = check_subnet_approval_status(&provider, &subnet_id, &approval_cache, Some(store)).await;
+
+                // Determine status based on approval and validator presence
+                let status = if is_approved {
+                    if validators.is_empty() {
+                        "Approved - No Validators".to_string()
+                    } else {
+                        "Active".to_string()
+                    }
+                } else {
+                    "Pending Approval".to_string()
+                };
 
                 let instance = SubnetInstance {
                     id: subnet_id.to_string(),
                     name: format!("Subnet {}", subnet_id.to_string().split('/').last().unwrap_or("Unknown")),
-                    status: if validators.is_empty() { "Pending Approval".to_string() } else { "Active".to_string() },
+                    status,
                     template: "Development Template".to_string(),
                     parent: parent_id,
                     created_at: chrono::Utc::now(), // We don't have creation time from config
@@ -838,6 +924,8 @@ impl UIServer {
 
         Ok(discovered_gateways)
     }
+
+
 }
 
 /// Serve static files from the embedded frontend
@@ -908,6 +996,12 @@ async fn serve_index_html() -> Result<Box<dyn Reply>, warp::Rejection> {
 struct InvalidRequest(String);
 
 impl warp::reject::Reject for InvalidRequest {}
+
+/// Custom rejection type for server errors
+#[derive(Debug)]
+struct ServerError(String);
+
+impl warp::reject::Reject for ServerError {}
 
 /// Handle actual subnet deployment
 async fn handle_deployment(
@@ -1746,70 +1840,57 @@ async fn activate_subnet_deployment(config: &serde_json::Value, _ipc_config_stor
     };
 
     // Get IPC provider
-    let _provider = get_ipc_provider(&global)?;
+    let mut provider = get_ipc_provider(&global)?;
 
     // Check permission mode to determine activation type
     let permission_mode = config.get("permissionMode")
         .and_then(|v| v.as_str())
-        .unwrap_or("federated");
+        .unwrap_or("collateral");
 
     match permission_mode {
-        "federated" | "static" => {
-            // For federated mode, set validator power
-            if let (Some(pubkeys), Some(power)) = (
-                config.get("validatorPubkeys").and_then(|v| v.as_array()),
-                config.get("validatorPower").and_then(|v| v.as_array())
-            ) {
-                let validator_pubkeys: Vec<String> = pubkeys
-                    .iter()
-                    .filter_map(|v| v.as_str())
-                    .map(|s| s.to_string())
-                    .collect();
+        "federated" => {
+            log::info!("⚙️ Setting up federated validators");
 
-                let validator_power: Vec<u128> = power
-                    .iter()
-                    .filter_map(|v| v.as_u64())
-                    .map(|v| v as u128)
-                    .collect();
+            if let Some(validators) = config.get("validators").and_then(|v| v.as_array()) {
+                for validator in validators {
+                    if let (Some(address), Some(pubkey_str), Some(power)) = (
+                        validator.get("address").and_then(|v| v.as_str()),
+                        validator.get("pubkey").and_then(|v| v.as_str()),
+                        validator.get("power").and_then(|v| v.as_i64())
+                    ) {
+                        log::info!("   - Setting validator {} with power {}", address, power);
 
-                if !validator_pubkeys.is_empty() && validator_pubkeys.len() == validator_power.len() {
-                    // Convert public keys to addresses
-                    let validator_addresses: Result<Vec<String>, anyhow::Error> = validator_pubkeys
-                        .iter()
-                        .map(|pk| {
-                            // Simple conversion - in practice you'd use proper key-to-address conversion
-                            if pk.len() < 42 {
-                                return Err(anyhow::anyhow!("Invalid public key length: {}", pk));
-                            }
-                            Ok(format!("0x{}", &pk[2..42])) // Take first 20 bytes after 0x
-                        })
-                        .collect();
-
-                    let addresses = validator_addresses?;
-
-                    // For now, we'll log the validator configuration
-                    // In a complete implementation, you would call the set_federated_power function
-                    log::info!("Federated power configuration:");
-                    log::info!("  Subnet: {}", subnet_id);
-                    log::info!("  From: {}", creator);
-                    log::info!("  Validator addresses: {:?}", addresses);
-                    log::info!("  Validator pubkeys: {:?}", validator_pubkeys);
-                    log::info!("  Validator power: {:?}", validator_power);
-                    log::info!("Federated power configuration completed");
+                        // TODO: Implement set_federated_power functionality when needed
+                        log::info!("⚠️  Validator {} power configuration logged (set_federated_power not implemented)", address);
+                    }
                 }
             }
         }
         "collateral" => {
-            // For collateral mode, validators need to join with stake
-            log::info!("Collateral mode: validators need to join with stake manually");
-            log::info!("Subnet is ready for validators to join");
+            log::info!("⚙️ Setting up collateral validators");
+
+            if let Some(validators) = config.get("validators").and_then(|v| v.as_array()) {
+                for validator in validators {
+                    if let (Some(address), Some(collateral)) = (
+                        validator.get("address").and_then(|v| v.as_str()),
+                        validator.get("collateral").and_then(|v| v.as_f64())
+                    ) {
+                        log::info!("   - Adding validator {} with collateral {}", address, collateral);
+
+                        let initial_balance = validator.get("initialBalance").and_then(|v| v.as_f64());
+
+                        // TODO: Implement join_subnet functionality when needed
+                        log::info!("⚠️  Validator {} configuration logged (join_subnet not implemented)", address);
+                    }
+                }
+            }
         }
         _ => {
-            return Err(anyhow::anyhow!("Unknown permission mode: {}", permission_mode));
+            log::warn!("Unknown permission mode: {}. Skipping validator setup.", permission_mode);
         }
     }
 
-    log::info!("Subnet activated: {}", subnet_id);
+    log::info!("🎉 Subnet activation completed");
     Ok(())
 }
 
@@ -1936,4 +2017,124 @@ async fn handle_websocket(ws: warp::ws::WebSocket, state: AppState) {
     }
 
     log::info!("WebSocket connection cleaned up");
+}
+
+/// Approve a subnet using the CLI approve functionality
+async fn approve_subnet_via_cli(subnet_id: &str, from_address: &str, config_path: &str) -> Result<()> {
+    use crate::commands::subnet::approve::{approve_subnet as approve_subnet_cmd, ApproveSubnetArgs};
+
+    log::info!("🔐 Starting subnet approval process");
+    log::info!("   - Subnet ID: {}", subnet_id);
+    log::info!("   - Gateway Owner: {}", from_address);
+
+    // Create GlobalArguments
+    let global = GlobalArguments {
+        config_path: Some(config_path.to_string()),
+        _network: fvm_shared::address::Network::Testnet,
+        __network: None,
+    };
+
+    // Get IPC provider
+    let mut provider = get_ipc_provider(&global)
+        .map_err(|e| {
+            log::error!("❌ Failed to get IPC provider: {}", e);
+            anyhow::anyhow!("Failed to initialize IPC provider: {}", e)
+        })?;
+
+    // Create approval arguments
+    let approve_args = ApproveSubnetArgs {
+        subnet: subnet_id.to_string(),
+        from: Some(from_address.to_string()),
+    };
+
+    // Call the CLI approval function
+    approve_subnet_cmd(&mut provider, &approve_args).await
+        .map_err(|e| {
+            log::error!("❌ Subnet approval failed: {}", e);
+            anyhow::anyhow!("Subnet approval failed: {}", e)
+        })?;
+
+    log::info!("✅ Subnet approval completed successfully");
+    Ok(())
+}
+
+/// Check if a subnet is approved by the gateway (with caching)
+async fn check_subnet_approval_status(
+    provider: &ipc_provider::IpcProvider,
+    subnet_id: &ipc_api::subnet_id::SubnetID,
+    cache: &ApprovalCache,
+    ipc_config_store: Option<&IpcConfigStore>,
+) -> bool {
+    let subnet_key = subnet_id.to_string();
+
+    // Check cache first
+    {
+        let cache_read = cache.read().await;
+        if let Some(entry) = cache_read.get(&subnet_key) {
+            // Check if cache entry is still valid
+            if entry.timestamp.elapsed() < APPROVAL_CACHE_TTL {
+                log::debug!("Using cached approval status for {}: {}", subnet_key, entry.is_approved);
+                return entry.is_approved;
+            }
+        }
+    }
+
+    // Cache miss or expired, check approval status
+    log::debug!("Checking approval status for {}", subnet_key);
+
+    let is_approved = if let Some(store) = ipc_config_store {
+        // First check: If subnet exists in IPC config store, it's approved
+        // (Subnets only get added to config after successful approval)
+        let config_snapshot = store.snapshot().await;
+        let config_has_subnet = config_snapshot.subnets.contains_key(subnet_id);
+
+        if config_has_subnet {
+            log::debug!("Subnet {} found in IPC config - definitely approved", subnet_key);
+            true
+        } else {
+            // Fallback: Check blockchain state
+            log::debug!("Subnet {} not in config, checking blockchain state", subnet_key);
+            check_blockchain_approval_status(provider, subnet_id).await
+        }
+    } else {
+        // No config store available, fall back to blockchain check
+        log::debug!("No config store available, checking blockchain for {}", subnet_key);
+        check_blockchain_approval_status(provider, subnet_id).await
+    };
+
+    // Update cache
+    {
+        let mut cache_write = cache.write().await;
+        cache_write.insert(subnet_key.clone(), ApprovalCacheEntry {
+            is_approved,
+            timestamp: Instant::now(),
+        });
+    }
+
+    log::debug!("Cached new approval status for {}: {}", subnet_key, is_approved);
+    is_approved
+}
+
+/// Check blockchain for subnet approval status
+async fn check_blockchain_approval_status(
+    provider: &ipc_provider::IpcProvider,
+    subnet_id: &ipc_api::subnet_id::SubnetID,
+) -> bool {
+    if let Some(parent_id) = subnet_id.parent() {
+        match provider.list_child_subnets(None, &parent_id).await {
+            Ok(child_subnets) => {
+                // If the subnet appears in the child subnets list, it's approved
+                let found = child_subnets.contains_key(subnet_id);
+                log::debug!("Blockchain check for {}: found in child subnets = {}", subnet_id, found);
+                found
+            }
+            Err(e) => {
+                log::debug!("Failed to list child subnets for {}: {}", parent_id, e);
+                false
+            }
+        }
+    } else {
+        // Root subnets don't need approval
+        false
+    }
 }

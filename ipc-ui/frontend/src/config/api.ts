@@ -2,9 +2,17 @@
 export const API_CONFIG = {
   baseURL: import.meta.env.VITE_API_BASE_URL || '', // Use relative URLs with Vite proxy
   wsURL: import.meta.env.VITE_WS_URL || `ws://${window.location.host}/ws`,
-  timeout: 10000,
+  timeout: 30000, // Increased to 30 seconds for blockchain operations
   retryAttempts: 3,
   retryDelay: 1000,
+}
+
+// Specific timeouts for different operations
+export const OPERATION_TIMEOUTS = {
+  default: 30000,      // 30 seconds for general operations
+  blockchain: 45000,   // 45 seconds for blockchain calls
+  deployment: 60000,   // 60 seconds for deployments
+  approval: 45000,     // 45 seconds for subnet approvals
 }
 
 // API endpoints
@@ -16,6 +24,12 @@ export const API_ENDPOINTS = {
   gateways: '/api/gateways',
   gateway: (id: string) => `/api/gateways/${id}`,
   discoverGateways: '/api/gateways-discover',
+  // Validator management endpoints
+  validators: {
+    add: '/api/validators/add',
+    remove: '/api/validators/remove',
+    updateStake: '/api/validators/update-stake',
+  },
 }
 
 // WebSocket message types

@@ -45,6 +45,7 @@ serde_bytes = "0.11.9"
 serde_json = { workspace = true }
 serde_tuple = { workspace = true }
 serde_yaml = { workspace = true }
+sha3 = "0.10"
 strum = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

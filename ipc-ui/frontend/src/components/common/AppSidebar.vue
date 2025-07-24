@@ -145,6 +145,7 @@ const getStatusColor = (status: string) => {
     case 'deploying': return 'text-blue-500'
     case 'failed': return 'text-red-500'
     case 'pending approval': return 'text-orange-500'
+    case 'approved - no validators': return 'text-blue-500'
     case 'inactive': return 'text-gray-500'
     default: return 'text-gray-500'
   }

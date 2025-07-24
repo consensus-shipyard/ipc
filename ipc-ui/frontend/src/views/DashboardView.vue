@@ -23,6 +23,7 @@ interface SubnetInstance {
 const subnets = ref<SubnetInstance[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
+const approvingSubnets = ref<Set<string>>(new Set())
 
 // Methods
 const fetchSubnets = async () => {
@@ -43,6 +44,58 @@ const fetchSubnets = async () => {
   }
 }
 
+const getGatewayOwner = async (subnet: SubnetInstance): Promise<string> => {
+  try {
+    // Try to get gateway information from the API
+    const gatewaysResponse = await fetch('/api/gateways')
+    const gatewaysResult = await gatewaysResponse.json()
+
+    if (gatewaysResult && Array.isArray(gatewaysResult)) {
+      // Find the gateway that matches this subnet's gateway address
+      const gatewayAddr = subnet.config?.gateway_addr?.toString()
+      if (gatewayAddr) {
+        const matchingGateway = gatewaysResult.find((gw: any) =>
+          gw.gateway_address === gatewayAddr
+        )
+        if (matchingGateway) {
+          return matchingGateway.deployer_address
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to fetch gateway information:', err)
+  }
+
+  // Fallback to config or default address
+  return subnet.config?.deployer_address || '0x0a36d7c34ba5523d5bf783bb47f62371e52e0298'
+}
+
+const approveSubnet = async (subnet: SubnetInstance) => {
+  try {
+    approvingSubnets.value.add(subnet.id)
+
+    // Get the correct gateway owner address
+    const gatewayOwnerAddress = await getGatewayOwner(subnet)
+
+    // Use the API service with extended timeout for approval
+    const response = await apiService.approveSubnet(subnet.id, gatewayOwnerAddress)
+
+    if (response.data?.success) {
+      console.log('Subnet approved successfully:', response.data.message)
+      // Refresh the subnet list to show updated status
+      await fetchSubnets()
+    } else {
+      console.error('Failed to approve subnet:', response.data?.error)
+      error.value = response.data?.error || 'Failed to approve subnet'
+    }
+  } catch (err: any) {
+    console.error('Error approving subnet:', err)
+    error.value = err?.message || 'Failed to approve subnet'
+  } finally {
+    approvingSubnets.value.delete(subnet.id)
+  }
+}
+
 // Computed
 const getStatusColor = (status: string) => {
   switch (status.toLowerCase()) {
@@ -50,6 +103,8 @@ const getStatusColor = (status: string) => {
     case 'paused': return 'text-yellow-600 bg-yellow-50'
     case 'deploying': return 'text-blue-600 bg-blue-50'
     case 'failed': return 'text-red-600 bg-red-50'
+    case 'pending approval': return 'text-orange-600 bg-orange-50'
+    case 'approved - no validators': return 'text-blue-600 bg-blue-50'
     default: return 'text-gray-600 bg-gray-50'
   }
 }
@@ -64,6 +119,10 @@ const getStatusIcon = (status: string) => {
       return 'M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15'
     case 'failed':
       return 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z'
+    case 'pending approval':
+      return 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'
+    case 'approved - no validators':
+      return 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'
     default:
       return 'M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M12 21a9 9 0 100-18 9 9 0 000 18z'
   }
@@ -247,6 +306,14 @@ onMounted(() => {
               >
                 View Details
               </RouterLink>
+              <button
+                v-if="subnet.status.toLowerCase() === 'pending approval'"
+                :disabled="approvingSubnets.has(subnet.id)"
+                @click="approveSubnet(subnet)"
+                class="btn-primary text-sm"
+              >
+                {{ approvingSubnets.has(subnet.id) ? 'Approving...' : 'Approve' }}
+              </button>
             </div>
           </div>
 

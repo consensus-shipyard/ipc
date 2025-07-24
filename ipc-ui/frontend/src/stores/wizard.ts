@@ -345,7 +345,7 @@ export const useWizardStore = defineStore('wizard', () => {
 
       // Send deployment request to backend
       const response = await apiService.deploy({
-        template: config.value.selectedTemplate,
+        template: config.value.selectedTemplate || 'default',
         config: config.value
       })
 

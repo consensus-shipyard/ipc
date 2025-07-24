@@ -1,10 +1,37 @@
 import axios, { type AxiosInstance, type AxiosResponse, AxiosError } from 'axios'
-import { API_CONFIG, API_ENDPOINTS } from '../config/api'
+import { API_CONFIG, API_ENDPOINTS, OPERATION_TIMEOUTS } from '../config/api'
 
 // Create axios instance
 const api: AxiosInstance = axios.create({
   baseURL: API_CONFIG.baseURL,
   timeout: API_CONFIG.timeout,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+// Create a separate instance for blockchain operations with longer timeout
+const blockchainApi: AxiosInstance = axios.create({
+  baseURL: API_CONFIG.baseURL,
+  timeout: OPERATION_TIMEOUTS.blockchain,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+// Create instance for deployment operations with even longer timeout
+const deploymentApi: AxiosInstance = axios.create({
+  baseURL: API_CONFIG.baseURL,
+  timeout: OPERATION_TIMEOUTS.deployment,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+
+// Create instance for approval operations
+const approvalApi: AxiosInstance = axios.create({
+  baseURL: API_CONFIG.baseURL,
+  timeout: OPERATION_TIMEOUTS.approval,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -75,13 +102,13 @@ export const apiService = {
     return retryRequest(() => api.get(API_ENDPOINTS.templates))
   },
 
-  // Instances
+  // Instances (using blockchain API for longer timeout)
   async getInstances() {
-    return retryRequest(() => api.get(API_ENDPOINTS.instances))
+    return retryRequest(() => blockchainApi.get(API_ENDPOINTS.instances))
   },
 
   async getInstance(id: string) {
-    return retryRequest(() => api.get(API_ENDPOINTS.instance(id)))
+    return retryRequest(() => blockchainApi.get(API_ENDPOINTS.instance(id)))
   },
 
   // Gateways
@@ -97,9 +124,29 @@ export const apiService = {
     return retryRequest(() => api.get(API_ENDPOINTS.discoverGateways))
   },
 
-  // Deployment
-  async deploy(config: any) {
-    return retryRequest(() => api.post(API_ENDPOINTS.deploy, config))
+  // Deployment (using deployment API for extended timeout)
+  async deploy(config: DeploymentRequest) {
+    return retryRequest(() => deploymentApi.post(API_ENDPOINTS.deploy, config))
+  },
+
+  // Subnet approval (using approval API for extended timeout)
+  async approveSubnet(subnetId: string, gatewayOwnerAddress: string) {
+    return retryRequest(() => approvalApi.post(`/api/subnets/${encodeURIComponent(subnetId)}/approve`, {
+      from: gatewayOwnerAddress
+    }))
+  },
+
+  // Validator management
+  async addValidator(validatorData: ValidatorManagementRequest) {
+    return retryRequest(() => api.post(API_ENDPOINTS.validators.add, validatorData))
+  },
+
+  async removeValidator(validatorData: ValidatorRemovalRequest) {
+    return retryRequest(() => api.post(API_ENDPOINTS.validators.remove, validatorData))
+  },
+
+  async updateValidatorStake(stakeData: ValidatorStakeUpdateRequest) {
+    return retryRequest(() => api.post(API_ENDPOINTS.validators.updateStake, stakeData))
   },
 
   // Configuration management
@@ -117,3 +164,40 @@ export const apiService = {
 }
 
 export default api
+
+interface DeploymentProgress {
+  deployment_id: string
+  step: string
+  progress: number
+  status: 'pending' | 'in_progress' | 'completed' | 'failed'
+  message?: string
+  error?: string
+}
+
+// Validator management interfaces
+interface ValidatorManagementRequest {
+  subnetId: string
+  address: string
+  permissionMode: 'federated' | 'collateral' | 'static'
+  collateral?: number // For collateral mode
+  initialBalance?: number // For collateral mode
+  pubkey?: string // For federated mode
+  power?: number // For federated mode
+}
+
+interface ValidatorRemovalRequest {
+  subnetId: string
+  address: string
+}
+
+interface ValidatorStakeUpdateRequest {
+  subnetId: string
+  address: string
+  amount: number
+  action: 'stake' | 'unstake'
+}
+
+interface DeploymentRequest {
+  template: string
+  config: any
+}
