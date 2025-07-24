@@ -1,4 +1,4 @@
-.PHONY: all build test lint license check-fmt check-clippy diagrams
+.PHONY: all build build-ui build-with-ui test lint license check-fmt check-clippy diagrams
 
 CRATE   := ipc-cli ipc-wallet ipc-provider ipc-api ipc-types
 PACKAGE := $(patsubst %, --package %, $(CRATE))
@@ -7,6 +7,16 @@ all: test build
 
 build:
 	cargo build --locked --release
+
+build-ui:
+	@echo "Building frontend assets..."
+	cd ../ipc-ui/frontend && npm ci && npm run build
+	@echo "Frontend build complete!"
+
+build-with-ui: build-ui
+	@echo "Building IPC CLI with embedded frontend assets..."
+	cargo build --locked --release
+	@echo "IPC CLI build complete with UI assets!"
 
 install:
 	cargo install --locked --path cli
