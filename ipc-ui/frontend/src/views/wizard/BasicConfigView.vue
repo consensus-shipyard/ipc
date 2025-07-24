@@ -21,7 +21,10 @@ const formData = ref({
   supplySourceKind: wizardStore.config.supplySourceKind || 'native',
   supplySourceAddress: wizardStore.config.supplySourceAddress || '',
   minCrossMsgFee: wizardStore.config.minCrossMsgFee || 0.000001,
-  genesisSubnetIpcContractsOwner: wizardStore.config.genesisSubnetIpcContractsOwner || ''
+  genesisSubnetIpcContractsOwner: wizardStore.config.genesisSubnetIpcContractsOwner || '',
+  gatewayMode: wizardStore.config.gatewayMode || 'existing',
+  customGatewayAddress: wizardStore.config.customGatewayAddress || '',
+  customRegistryAddress: wizardStore.config.customRegistryAddress || ''
 })
 
 // Field errors
@@ -48,6 +51,24 @@ const supplySourceOptions = [
   { value: 'erc20', label: 'ERC-20', description: 'Use custom ERC-20 token contract' }
 ]
 
+const gatewayModeOptions = [
+  {
+    value: 'existing',
+    label: 'Use Existing Gateway',
+    description: 'Use the pre-deployed Calibration gateway (requires approval)'
+  },
+  {
+    value: 'deploy',
+    label: 'Deploy New Gateway',
+    description: 'Deploy your own gateway contracts (full control, no approval needed)'
+  },
+  {
+    value: 'custom',
+    label: 'Custom Gateway',
+    description: 'Use previously deployed gateway contracts you own'
+  }
+]
+
 // Validation
 const validateField = (field: string) => {
   const value = formData.value[field as keyof typeof formData.value]
@@ -65,7 +86,7 @@ const validateForm = () => {
   fieldErrors.value = {}
 
   // Validate all required fields
-  const requiredFields = ['parent', 'minValidatorStake', 'minValidators', 'bottomupCheckPeriod', 'permissionMode', 'supplySourceKind', 'genesisSubnetIpcContractsOwner']
+  const requiredFields = ['parent', 'minValidatorStake', 'minValidators', 'bottomupCheckPeriod', 'permissionMode', 'supplySourceKind', 'genesisSubnetIpcContractsOwner', 'gatewayMode']
 
   requiredFields.forEach(field => {
     validateField(field)
@@ -74,6 +95,12 @@ const validateForm = () => {
   // Conditional validations
   if (formData.value.supplySourceKind === 'erc20') {
     validateField('supplySourceAddress')
+  }
+
+  // Gateway mode specific validations
+  if (formData.value.gatewayMode === 'custom') {
+    validateField('customGatewayAddress')
+    validateField('customRegistryAddress')
   }
 
   return Object.keys(fieldErrors.value).length === 0
@@ -333,6 +360,91 @@ onMounted(() => {
             help-text="Address that will own the IPC diamond contracts at genesis"
             @blur="handleFieldBlur('genesisSubnetIpcContractsOwner')"
           />
+        </div>
+
+        <!-- Gateway Configuration Section -->
+        <div class="space-y-6">
+          <h3 class="text-lg font-semibold text-gray-800 border-b border-gray-200 pb-2">
+            Gateway Configuration
+          </h3>
+
+          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div class="flex items-start space-x-3">
+              <svg class="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+              </svg>
+              <div class="text-sm text-blue-800">
+                <p class="font-medium mb-1">Choose Your Gateway Strategy</p>
+                <p>
+                  <strong>Deploy New:</strong> Creates your own gateway contracts where you have full control and can approve subnets instantly.<br>
+                  <strong>Existing:</strong> Uses Calibration's gateway but requires manual approval from the gateway owner.<br>
+                  <strong>Custom:</strong> Uses previously deployed gateway contracts that you own.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <FormSelect
+            v-model="formData.gatewayMode"
+            label="Gateway Mode"
+            :options="gatewayModeOptions"
+            required
+            :error="fieldErrors.gatewayMode"
+            help-text="How to handle gateway contracts for subnet management"
+          />
+
+          <!-- Custom Gateway Addresses (conditional) -->
+          <div v-if="formData.gatewayMode === 'custom'" class="space-y-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+            <h4 class="text-sm font-semibold text-gray-700">Custom Gateway Contracts</h4>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormInput
+                v-model="formData.customGatewayAddress"
+                label="Gateway Contract Address"
+                placeholder="0x..."
+                required
+                :error="fieldErrors.customGatewayAddress"
+                help-text="Address of your deployed gateway contract"
+                @blur="handleFieldBlur('customGatewayAddress')"
+              />
+
+              <FormInput
+                v-model="formData.customRegistryAddress"
+                label="Registry Contract Address"
+                placeholder="0x..."
+                required
+                :error="fieldErrors.customRegistryAddress"
+                help-text="Address of your deployed registry contract"
+                @blur="handleFieldBlur('customRegistryAddress')"
+              />
+            </div>
+          </div>
+
+          <!-- Deploy Mode Info -->
+          <div v-if="formData.gatewayMode === 'deploy'" class="p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div class="flex items-start space-x-3">
+              <svg class="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+              </svg>
+              <div class="text-sm text-green-800">
+                <p class="font-medium mb-1">✨ Recommended for Development</p>
+                <p>New gateway contracts will be deployed to the parent chain using your address. You'll become the gateway owner with full control over subnet approvals.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Existing Mode Warning -->
+          <div v-if="formData.gatewayMode === 'existing'" class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div class="flex items-start space-x-3">
+              <svg class="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+              </svg>
+              <div class="text-sm text-yellow-800">
+                <p class="font-medium mb-1">⚠️ Requires Manual Approval</p>
+                <p>Using the existing Calibration gateway requires approval from the gateway owner. Your subnet will be created but won't be active until approved.</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Navigation -->

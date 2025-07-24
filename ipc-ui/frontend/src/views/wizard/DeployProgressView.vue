@@ -223,17 +223,17 @@ onUnmounted(() => {
       </div>
 
       <!-- Progress Bar -->
-      <div class="mt-6">
+              <div class="mt-6">
         <div class="flex items-center justify-between mb-2">
           <span class="text-sm text-gray-600">Overall Progress</span>
           <span class="text-sm font-semibold text-gray-900">
-            {{ Math.round(((currentStep + (deploymentSteps[currentStep]?.status === 'completed' ? 1 : 0)) / deploymentSteps.length) * 100) }}%
+            {{ deploymentProgress?.progress || 0 }}%
           </span>
         </div>
         <div class="w-full bg-gray-200 rounded-full h-2">
           <div
             class="bg-primary-600 h-2 rounded-full transition-all duration-1000 ease-out"
-            :style="{ width: `${((currentStep + (deploymentSteps[currentStep]?.status === 'completed' ? 1 : 0)) / deploymentSteps.length) * 100}%` }"
+            :style="{ width: `${deploymentProgress?.progress || 0}%` }"
           ></div>
         </div>
       </div>

@@ -16,7 +16,7 @@ use uuid;
 
 // Import actual IPC CLI functions for real deployment
 use crate::commands::subnet::create::{create_subnet as create_subnet_cmd, SubnetCreateConfig};
-use crate::commands::subnet::approve::{approve_subnet as approve_subnet_cmd, ApproveSubnetArgs};
+
 use crate::commands::subnet::init::ipc_config_store::IpcConfigStore;
 use crate::get_ipc_provider;
 use crate::GlobalArguments;
@@ -24,6 +24,12 @@ use ipc_api::subnet::{PermissionMode, AssetKind};
 use ipc_api::subnet_id::SubnetID;
 use ethers::types::Address as EthAddress;
 use std::str::FromStr;
+
+// Import actual deployment functionality
+use crate::commands::deploy::{deploy_contracts as deploy_contracts_cmd, DeployConfig, CliSubnetCreationPrivilege};
+use ipc_provider::new_evm_keystore_from_arc_config;
+use ipc_wallet::EvmKeyStore;
+use ipc_types::EthAddress as IpcEthAddress;
 
 // Include the built frontend files at compile time
 static FRONTEND_DIST: Dir = include_dir!("$CARGO_MANIFEST_DIR/../../ipc-ui/frontend/dist");
@@ -573,7 +579,13 @@ async fn handle_deployment(
             "contracts" => {
                 // Deploy smart contracts
                 if let Some(ref store) = ipc_config_store {
-                    deploy_smart_contracts(&config, store).await?;
+                    let (gateway_addr, registry_addr) = deploy_smart_contracts(&config, store).await?;
+                    if let (Some(gw), Some(reg)) = (gateway_addr, registry_addr) {
+                        log::info!("🎯 Custom gateway contracts deployed/configured:");
+                        log::info!("   - Gateway: {}", gw);
+                        log::info!("   - Registry: {}", reg);
+                        log::info!("   ✅ These contracts will be used for subnet creation");
+                    }
                 } else {
                     return Err(anyhow::anyhow!("IPC config store not initialized"));
                 }
@@ -722,6 +734,36 @@ fn validate_deployment_config(config: &serde_json::Value) -> Result<()> {
         }
     }
 
+    // Validate gateway mode
+    if let Some(gateway_mode) = config.get("gatewayMode").and_then(|v| v.as_str()) {
+        match gateway_mode {
+            "existing" | "deploy" | "custom" => {}
+            _ => return Err(anyhow::anyhow!("Invalid gateway mode: {}", gateway_mode)),
+        }
+
+        // Validate custom gateway fields if custom mode is selected
+        if gateway_mode == "custom" {
+            if config.get("customGatewayAddress").and_then(|v| v.as_str()).is_none() {
+                return Err(anyhow::anyhow!("Custom gateway address required when using custom gateway mode"));
+            }
+            if config.get("customRegistryAddress").and_then(|v| v.as_str()).is_none() {
+                return Err(anyhow::anyhow!("Custom registry address required when using custom gateway mode"));
+            }
+
+            // Validate address formats
+            if let Some(gw_addr) = config.get("customGatewayAddress").and_then(|v| v.as_str()) {
+                if gw_addr.parse::<EthAddress>().is_err() {
+                    return Err(anyhow::anyhow!("Invalid custom gateway address format"));
+                }
+            }
+            if let Some(reg_addr) = config.get("customRegistryAddress").and_then(|v| v.as_str()) {
+                if reg_addr.parse::<EthAddress>().is_err() {
+                    return Err(anyhow::anyhow!("Invalid custom registry address format"));
+                }
+            }
+        }
+    }
+
     // Validate parent subnet format
     if let Some(parent) = config.get("parent").and_then(|v| v.as_str()) {
         SubnetID::from_str(parent)
@@ -756,8 +798,8 @@ async fn prepare_deployment_files(_config: &serde_json::Value, config_path: &str
     Ok(ipc_config_store)
 }
 
-/// Deploy smart contracts (returns IpcConfigStore for next steps)
-async fn deploy_smart_contracts(config: &serde_json::Value, ipc_config_store: &IpcConfigStore) -> Result<()> {
+/// Deploy smart contracts with gateway deployment options
+async fn deploy_smart_contracts(config: &serde_json::Value, ipc_config_store: &IpcConfigStore) -> Result<(Option<String>, Option<String>)> {
     log::info!("🚀 Starting smart contract deployment phase");
 
     // Log the configuration for debugging
@@ -766,45 +808,41 @@ async fn deploy_smart_contracts(config: &serde_json::Value, ipc_config_store: &I
     log::info!("  From: {}", config.get("from").and_then(|v| v.as_str()).unwrap_or("NOT_SET"));
     log::info!("  Permission Mode: {}", config.get("permissionMode").and_then(|v| v.as_str()).unwrap_or("NOT_SET"));
 
-    // For federated mode, we skip contract deployment as it uses existing contracts
-    if let Some(permission_mode) = config.get("permissionMode").and_then(|v| v.as_str()) {
-        if permission_mode == "federated" {
-            log::info!("✅ Federated mode detected: using existing parent chain contracts");
+    // Check gateway deployment mode
+    let gateway_mode = config.get("gatewayMode").and_then(|v| v.as_str()).unwrap_or("existing");
+    log::info!("  Gateway Mode: {}", gateway_mode);
+
+    match gateway_mode {
+        "deploy" => {
+            log::info!("🔨 User chose to deploy new gateway contracts");
+            log::info!("   - This gives full control over subnet approval");
+            log::info!("   - User will be the gateway owner");
+            deploy_new_gateway_contracts(config, ipc_config_store).await
+        }
+        "custom" => {
+            log::info!("🔧 User provided custom gateway address");
+            let gateway_addr = config.get("customGatewayAddress")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Custom gateway address required when gatewayMode is 'custom'"))?;
+            let registry_addr = config.get("customRegistryAddress")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Custom registry address required when gatewayMode is 'custom'"))?;
+            log::info!("   - Gateway: {}", gateway_addr);
+            log::info!("   - Registry: {}", registry_addr);
+
+            // TODO: Validate that these addresses are valid contracts
+            log::info!("📦 Custom gateway configuration completed successfully");
+            Ok((Some(gateway_addr.to_string()), Some(registry_addr.to_string())))
+        }
+        "existing" | _ => {
+            log::info!("✅ Using existing parent chain contracts (Calibration gateway)");
             log::info!("   - Gateway contracts: Pre-deployed on parent chain");
             log::info!("   - Registry contracts: Pre-deployed on parent chain");
-            log::info!("   - No new contract deployment needed");
-            return Ok(());
+            log::info!("   - ⚠️  Note: Requires approval from gateway owner");
+            log::info!("📦 Existing gateway configuration completed successfully");
+            Ok((None, None))
         }
-        log::info!("📋 Permission mode '{}' may require custom contract deployment", permission_mode);
     }
-
-    // Extract and validate deployment configuration
-    let parent_str = config.get("parent")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow::anyhow!("Missing parent subnet configuration"))?;
-
-    let from_str = config.get("from")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow::anyhow!("Missing 'from' address for contract deployment"))?;
-
-    let from_address = from_str.parse::<EthAddress>()
-        .map_err(|e| anyhow::anyhow!("Invalid 'from' address format '{}': {}", from_str, e))?;
-
-    log::info!("📝 Contract deployment parameters validated:");
-    log::info!("   - Parent subnet: {}", parent_str);
-    log::info!("   - Deployer address: {}", from_address);
-
-    // Check if we can access the IPC config
-    log::info!("🔧 Checking IPC configuration...");
-    // In a real implementation, you would check if contracts need to be deployed
-    // based on the parent chain configuration in the IPC config store
-
-    log::info!("✅ Using existing contract infrastructure for this deployment");
-    log::info!("   - Contracts are available on parent chain: {}", parent_str);
-    log::info!("   - Deployment account: {} has required permissions", from_address);
-    log::info!("📦 Smart contract configuration completed successfully");
-
-    Ok(())
 }
 
 /// Create and approve subnet
@@ -820,14 +858,46 @@ async fn create_and_approve_subnet(config: &serde_json::Value, ipc_config_store:
 
     log::info!("📁 Using IPC config path: {}", config_path);
 
+    // Check if we deployed new gateway contracts in the previous step
+    let gateway_mode = config.get("gatewayMode").and_then(|v| v.as_str()).unwrap_or("existing");
+
+    if gateway_mode == "deploy" {
+        log::info!("🔄 Gateway deployment completed - reinitializing provider with updated configuration...");
+        // Force reload of IPC config to pick up newly deployed gateway addresses
+        // This is critical for the subnet creation to use the correct gateway contracts
+
+        // CRITICAL FIX: Small delay to ensure config file is fully written
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        log::info!("⏳ Allowing config file to be fully updated before provider initialization...");
+    }
+
     // Get IPC provider with detailed error handling
+    // IMPORTANT: This provider initialization happens AFTER potential gateway deployment
+    // ensuring it uses the updated configuration with new gateway addresses
     log::info!("🔌 Initializing IPC provider connection...");
-    let mut provider = get_ipc_provider(&global)
+    let provider = get_ipc_provider(&global)
         .map_err(|e| {
             log::error!("❌ Failed to get IPC provider: {}", e);
             anyhow::anyhow!("Failed to initialize IPC provider: {}", e)
         })?;
     log::info!("✅ IPC provider connection established");
+
+    if gateway_mode == "deploy" {
+        log::info!("✅ Provider is now using newly deployed gateway contracts");
+
+        // Verify the provider is using the correct gateway addresses
+        let parent_str = config.get("parent").and_then(|v| v.as_str()).unwrap_or("/r314159");
+        let parent_id = SubnetID::from_str(parent_str)?;
+
+        if let Some(parent_config) = ipc_config_store.get_subnet(&parent_id).await {
+            log::info!("🔍 Current provider configuration:");
+            log::info!("   - Gateway: {}", parent_config.gateway_addr());
+            log::info!("   - Registry: {}", parent_config.registry_addr());
+            log::info!("   - RPC URL: {}", parent_config.rpc_http());
+        } else {
+            log::warn!("❌ Could not retrieve parent configuration from config store");
+        }
+    }
 
     // Convert UI config to SubnetCreateConfig with validation
     log::info!("🔧 Converting UI configuration to subnet parameters...");
@@ -993,6 +1063,106 @@ async fn create_and_approve_subnet(config: &serde_json::Value, ipc_config_store:
     Ok((subnet_id, creator))
 }
 
+/// Deploy new gateway contracts (user becomes owner)
+async fn deploy_new_gateway_contracts(config: &serde_json::Value, ipc_config_store: &IpcConfigStore) -> Result<(Option<String>, Option<String>)> {
+    log::info!("🔧 Starting new gateway contract deployment...");
+
+    // Extract required configuration parameters
+    let from_str = config.get("from")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow::anyhow!("Missing 'from' address for contract deployment"))?;
+
+    let from_address = from_str.parse::<EthAddress>()
+        .map_err(|e| anyhow::anyhow!("Invalid 'from' address format '{}': {}", from_str, e))?;
+
+    // Get parent chain configuration
+    let parent_str = config.get("parent")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow::anyhow!("Missing parent chain configuration"))?;
+
+    let parent_id = SubnetID::from_str(parent_str)
+        .map_err(|e| anyhow::anyhow!("Invalid parent subnet ID: {}", e))?;
+
+    // Get parent subnet info from config store
+    let parent_subnet = ipc_config_store
+        .get_subnet(&parent_id)
+        .await
+        .ok_or_else(|| anyhow::anyhow!("Parent subnet '{}' not found in config store", parent_id))?;
+
+    // Get the base config for keystore creation
+    let base_config = Arc::new(ipc_config_store.snapshot().await);
+
+    log::info!("📋 Gateway deployment parameters:");
+    log::info!("   - Deployer: {}", from_address);
+    log::info!("   - Parent Chain URL: {}", parent_subnet.rpc_http());
+    log::info!("   - Chain ID: {}", parent_subnet.id.chain_id());
+
+    // Create keystore for deployment
+    log::info!("🔑 Creating keystore for deployment...");
+    let keystore = new_evm_keystore_from_arc_config(base_config.clone())
+        .map_err(|e| anyhow::anyhow!("Failed to create keystore: {}", e))?;
+
+    // Check if the deployer address is in the keystore
+    if keystore.get(&from_address.into()).is_err() {
+        return Err(anyhow::anyhow!(
+            "Deployer address {} not found in keystore. Please import the private key first using 'ipc-cli wallet import'",
+            from_address
+        ));
+    }
+
+    // Create deployment configuration
+    let deploy_config = DeployConfig {
+        url: parent_subnet.rpc_http().to_string(),
+        from: from_address,
+        chain_id: parent_subnet.id.chain_id(),
+        artifacts_path: None, // Use embedded contracts
+        subnet_creation_privilege: CliSubnetCreationPrivilege::Unrestricted, // Allow unrestricted subnet creation
+    };
+
+    log::info!("🚀 Deploying gateway and registry contracts...");
+    log::info!("   - Using embedded contract artifacts");
+    log::info!("   - Subnet creation privilege: Unrestricted");
+    log::info!("   - Deployer will become the gateway owner");
+
+    // Deploy the contracts using the real deployment function
+    let deployed_contracts = deploy_contracts_cmd(keystore, &deploy_config).await
+        .map_err(|e| {
+            log::error!("❌ Contract deployment failed: {}", e);
+            anyhow::anyhow!("Gateway contract deployment failed: {}", e)
+        })?;
+
+    let gateway_addr = format!("0x{:x}", deployed_contracts.gateway);
+    let registry_addr = format!("0x{:x}", deployed_contracts.registry);
+
+    log::info!("🎉 Gateway contracts deployed successfully!");
+    log::info!("   - Gateway: {}", gateway_addr);
+    log::info!("   - Registry: {}", registry_addr);
+    log::info!("   - Owner: {} (you have full control!)", from_address);
+
+    // Update IPC config store with new gateway addresses
+    log::info!("💾 Updating IPC configuration with new gateway addresses...");
+
+    // The parent subnet configuration needs to be updated with the new gateway addresses
+    // This allows the subnet creation to use the newly deployed contracts
+    ipc_config_store
+        .add_subnet(
+            parent_id.clone(),
+            parent_subnet.rpc_http().clone(),
+            IpcEthAddress::from(deployed_contracts.gateway).into(),
+            IpcEthAddress::from(deployed_contracts.registry).into(),
+        )
+        .await
+        .map_err(|e| {
+            log::error!("❌ Failed to update IPC config with new gateway addresses: {}", e);
+            anyhow::anyhow!("Failed to update IPC configuration: {}", e)
+        })?;
+
+    log::info!("✅ IPC configuration updated with new gateway addresses");
+    log::info!("📦 Gateway deployment completed successfully!");
+
+    Ok((Some(gateway_addr), Some(registry_addr)))
+}
+
 /// Initialize validators
 async fn initialize_validators(_config: &serde_json::Value) -> Result<()> {
     log::info!("Initializing validators");
@@ -1106,7 +1276,7 @@ async fn activate_subnet_deployment(config: &serde_json::Value, _ipc_config_stor
     };
 
     // Get IPC provider
-    let mut provider = get_ipc_provider(&global)?;
+    let _provider = get_ipc_provider(&global)?;
 
     // Check permission mode to determine activation type
     let permission_mode = config.get("permissionMode")

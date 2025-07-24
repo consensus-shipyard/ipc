@@ -43,6 +43,11 @@ export interface SubnetConfig {
     initialBalance?: number
   }>
 
+  // Gateway configuration
+  gatewayMode?: 'existing' | 'deploy' | 'custom'
+  customGatewayAddress?: string
+  customRegistryAddress?: string
+
   // Deployment settings
   deployConfig?: {
     enabled?: boolean
@@ -93,13 +98,22 @@ export const useWizardStore = defineStore('wizard', () => {
       'bottomupCheckPeriod',
       'permissionMode',
       'supplySourceKind',
-      'genesisSubnetIpcContractsOwner'
+      'genesisSubnetIpcContractsOwner',
+      'gatewayMode'
     ]
 
-    return required.every(field => {
+    const isBasicComplete = required.every(field => {
       const value = config.value[field as keyof SubnetConfig]
       return value !== undefined && value !== null && value !== ''
     })
+
+    // Check gateway mode specific requirements
+    if (config.value.gatewayMode === 'custom') {
+      const customGatewayComplete = config.value.customGatewayAddress && config.value.customRegistryAddress
+      return isBasicComplete && customGatewayComplete
+    }
+
+    return isBasicComplete
   })
 
   const hasErrors = computed(() => validationErrors.value.length > 0)
