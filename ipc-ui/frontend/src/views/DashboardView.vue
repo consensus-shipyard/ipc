@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { apiService } from '../services/api'
 
@@ -128,9 +128,142 @@ const getStatusIcon = (status: string) => {
   }
 }
 
-const formatAddress = (address: string) => {
-  if (!address || address === 'N/A') return address
-  return `${address.slice(0, 6)}...${address.slice(-4)}`
+// Helper function to format addresses
+const formatAddress = (address: any) => {
+  if (!address) return 'N/A'
+
+  // Handle different address formats
+  let addressStr = ''
+
+  if (typeof address === 'string') {
+    // Already a string, check if it needs 0x prefix
+    addressStr = address
+  } else if (Array.isArray(address)) {
+    // Handle byte arrays - convert to hex string
+    if (address.length >= 20 && address.every(b => typeof b === 'number' && b >= 0 && b <= 255)) {
+      // This is a 20-byte (or longer) Ethereum address as array of numbers
+      // Take only the first 20 bytes for the address
+      const addressBytes = address.slice(0, 20)
+      addressStr = '0x' + addressBytes.map(b => b.toString(16).padStart(2, '0')).join('')
+    } else {
+      return 'N/A (invalid array)'
+    }
+  } else if (typeof address === 'object') {
+    // Handle object format
+    if (address.route && Array.isArray(address.route)) {
+      // Subnet ID format - extract the address from route
+      const lastRoute = address.route[address.route.length - 1]
+      if (lastRoute && Array.isArray(lastRoute) && lastRoute.length === 20) {
+        addressStr = '0x' + lastRoute.map(b => b.toString(16).padStart(2, '0')).join('')
+      } else {
+        return 'N/A (invalid route)'
+      }
+    } else {
+      return 'N/A (invalid object)'
+    }
+  } else if (typeof address === 'number') {
+    return 'N/A (single number)'
+  } else {
+    return 'N/A (unknown format)'
+  }
+
+  // Ensure we have a valid hex address format
+  if (addressStr && !addressStr.startsWith('0x') && addressStr.length === 40) {
+    addressStr = '0x' + addressStr
+  }
+
+  // Validate the address length
+  if (addressStr.startsWith('0x') && addressStr.length !== 42) {
+    return 'N/A (invalid length)'
+  }
+
+  return addressStr
+}
+
+// Helper function to format address for short display
+const formatAddressShort = (address: any) => {
+  const fullAddress = formatAddress(address)
+  if (fullAddress === 'N/A' || !fullAddress.startsWith('0x')) return fullAddress
+  if (fullAddress.length < 14) return fullAddress // Don't truncate short addresses
+  return `${fullAddress.slice(0, 8)}...${fullAddress.slice(-6)}`
+}
+
+// Helper function to get formatted gateway address for a subnet
+const getGatewayAddressShort = (subnet: any) => {
+  if (!subnet?.config?.gateway_addr) return 'N/A'
+  return formatAddressShort(subnet.config.gateway_addr)
+}
+
+const getGatewayAddressFull = (subnet: any) => {
+  if (!subnet?.config?.gateway_addr) return 'N/A'
+  return formatAddress(subnet.config.gateway_addr)
+}
+
+// Gateway grouping and collapsible sections
+const collapsedGateways = ref<Set<string>>(new Set())
+
+const groupedSubnets = computed(() => {
+  const groups = new Map<string, SubnetInstance[]>()
+
+  subnets.value.forEach(subnet => {
+    const gatewayAddr = getGatewayAddressFull(subnet)
+    if (!groups.has(gatewayAddr)) {
+      groups.set(gatewayAddr, [])
+    }
+    groups.get(gatewayAddr)!.push(subnet)
+  })
+
+  return Array.from(groups.entries()).map(([gateway, subnets]) => ({
+    gateway,
+    subnets,
+    count: subnets.length,
+    activeCount: subnets.filter(s => s.status === 'active').length,
+    totalValidators: subnets.reduce((sum, s) => sum + s.validators.length, 0),
+    totalStake: subnets.reduce((sum, s) => sum + s.validators.reduce((s: number, v: any) => s + parseFloat(v.stake || '0'), 0), 0)
+  }))
+})
+
+const toggleGateway = (gateway: string) => {
+  if (collapsedGateways.value.has(gateway)) {
+    collapsedGateways.value.delete(gateway)
+  } else {
+    collapsedGateways.value.add(gateway)
+  }
+}
+
+const isGatewayCollapsed = (gateway: string) => {
+  return collapsedGateways.value.has(gateway)
+}
+
+// Copy to clipboard functionality
+const copyingAddress = ref<string | null>(null)
+
+const copyToClipboard = async (text: string, subnetId: string) => {
+  try {
+    await navigator.clipboard.writeText(text)
+    copyingAddress.value = subnetId
+    setTimeout(() => {
+      copyingAddress.value = null
+    }, 2000)
+  } catch (err) {
+    console.error('Failed to copy to clipboard:', err)
+    // Fallback for older browsers
+    const textArea = document.createElement('textarea')
+    textArea.value = text
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+    try {
+      document.execCommand('copy')
+      copyingAddress.value = subnetId
+      setTimeout(() => {
+        copyingAddress.value = null
+      }, 2000)
+    } catch (fallbackErr) {
+      console.error('Fallback copy failed:', fallbackErr)
+    }
+    document.body.removeChild(textArea)
+  }
 }
 
 // Lifecycle
@@ -200,7 +333,7 @@ onMounted(() => {
           <div>
             <p class="text-sm font-medium text-gray-600">Total Stake</p>
             <p class="text-3xl font-bold text-purple-600">
-              {{ subnets.reduce((sum, subnet) => sum + subnet.validators.reduce((s, v) => s + parseFloat(v.stake || '0'), 0), 0).toFixed(1) }} FIL
+              {{ subnets.reduce((sum, subnet) => sum + subnet.validators.reduce((s: number, v: any) => s + parseFloat(v.stake || '0'), 0), 0).toFixed(1) }} FIL
             </p>
           </div>
           <div class="w-12 h-12 bg-purple-50 rounded-lg flex items-center justify-center">
@@ -258,86 +391,210 @@ onMounted(() => {
         </RouterLink>
       </div>
 
-      <!-- Subnets List -->
-      <div v-else class="space-y-4">
+      <!-- Gateway-Grouped Subnets -->
+      <div v-else class="space-y-6">
         <div
-          v-for="subnet in subnets"
-          :key="subnet.id"
-          class="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow"
+          v-for="group in groupedSubnets"
+          :key="group.gateway"
+          class="border border-gray-200 rounded-lg overflow-hidden"
         >
-          <div class="flex items-start justify-between mb-4">
-            <div class="flex-1">
-              <div class="flex items-center space-x-3 mb-2">
-                <h3 class="text-lg font-semibold text-gray-900">{{ subnet.name }}</h3>
-                <span
-                  :class="[
-                    'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-                    getStatusColor(subnet.status)
-                  ]"
+          <!-- Gateway Header -->
+          <div
+            @click="toggleGateway(group.gateway)"
+            class="gateway-header bg-gray-50 border-b border-gray-200 p-4 cursor-pointer"
+            :class="{
+              'rounded-b-lg border-b-0': isGatewayCollapsed(group.gateway),
+              'hover:shadow-sm': true
+            }"
+          >
+            <div class="flex items-center justify-between">
+              <div class="flex items-center space-x-3">
+                <!-- Expand/Collapse Icon -->
+                <svg
+                  class="w-5 h-5 text-gray-500 transition-transform duration-200"
+                  :class="{ 'rotate-90': !isGatewayCollapsed(group.gateway) }"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
                 >
-                  <svg
-                    :class="['w-3 h-3 mr-1']"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      :d="getStatusIcon(subnet.status)"
-                    />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+
+                <!-- Gateway Icon -->
+                <div class="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">
+                  <svg class="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
-                  {{ subnet.status.charAt(0).toUpperCase() + subnet.status.slice(1) }}
-                </span>
+                </div>
+
+                <div>
+                  <h3 class="text-lg font-semibold text-gray-900">Gateway</h3>
+                  <button
+                    @click.stop="copyToClipboard(group.gateway, `gateway-${group.gateway}`)"
+                    class="text-sm text-gray-600 font-mono hover:bg-gray-200 px-2 py-1 rounded transition-colors"
+                    :title="copyingAddress === `gateway-${group.gateway}` ? 'Copied!' : `Click to copy: ${group.gateway}`"
+                  >
+                    {{ group.gateway.length > 20 ? `${group.gateway.slice(0, 8)}...${group.gateway.slice(-6)}` : group.gateway }}
+                    <svg v-if="copyingAddress === `gateway-${group.gateway}`" class="inline-block w-3 h-3 ml-1 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
               </div>
-              <p class="text-gray-600 text-sm mb-1">{{ subnet.id }}</p>
-              <p class="text-gray-500 text-sm">Parent: {{ subnet.parent }}</p>
-              <!-- Gateway Information -->
-              <p v-if="subnet.config?.gateway_addr" class="text-gray-500 text-sm">
-                Gateway: {{ formatAddress(subnet.config.gateway_addr.toString()) }}
-              </p>
-            </div>
 
-            <div class="flex space-x-2">
-              <RouterLink
-                :to="`/instance/${encodeURIComponent(subnet.id)}`"
-                class="btn-secondary text-sm"
-              >
-                View Details
-              </RouterLink>
-              <button
-                v-if="subnet.status.toLowerCase() === 'pending approval'"
-                :disabled="approvingSubnets.has(subnet.id)"
-                @click="approveSubnet(subnet)"
-                class="btn-primary text-sm"
-              >
-                {{ approvingSubnets.has(subnet.id) ? 'Approving...' : 'Approve' }}
-              </button>
+              <!-- Gateway Summary -->
+              <div class="flex items-center space-x-6 text-sm text-gray-600">
+                <div class="text-center">
+                  <p class="font-semibold text-gray-900">{{ group.count }}</p>
+                  <p>{{ group.count === 1 ? 'Subnet' : 'Subnets' }}</p>
+                </div>
+                <div class="text-center">
+                  <p class="font-semibold text-green-600">{{ group.activeCount }}</p>
+                  <p>Active</p>
+                </div>
+                <div class="text-center">
+                  <p class="font-semibold text-gray-900">{{ group.totalValidators }}</p>
+                  <p>Validators</p>
+                </div>
+                <div class="text-center">
+                  <p class="font-semibold text-purple-600">{{ group.totalStake.toFixed(1) }}</p>
+                  <p>FIL Stake</p>
+                                </div>
+              </div>
             </div>
           </div>
 
-          <!-- Subnet Metrics -->
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-            <div>
-              <p class="text-sm text-gray-500">Validators</p>
-              <p class="font-semibold text-gray-900">{{ subnet.validators.length }}</p>
-            </div>
-            <div>
-              <p class="text-sm text-gray-500">Total Stake</p>
-              <p class="font-semibold text-gray-900">{{ subnet.validators.reduce((s, v) => s + parseFloat(v.stake || '0'), 0).toFixed(1) }} FIL</p>
-            </div>
-            <div>
-              <p class="text-sm text-gray-500">Template</p>
-              <p class="font-semibold text-gray-900">{{ subnet.template }}</p>
-            </div>
-            <div>
-              <p class="text-sm text-gray-500">Created</p>
-              <p class="font-semibold text-gray-900">{{ new Date(subnet.created_at).toLocaleDateString() }}</p>
+          <!-- Subnets in Gateway -->
+          <Transition
+            name="gateway-collapse"
+            enter-active-class="gateway-collapse-enter-active"
+            leave-active-class="gateway-collapse-leave-active"
+            enter-from-class="gateway-collapse-enter-from"
+            leave-to-class="gateway-collapse-leave-to"
+          >
+            <div
+              v-if="!isGatewayCollapsed(group.gateway)"
+              class="divide-y divide-gray-200"
+            >
+            <div
+              v-for="subnet in group.subnets"
+              :key="subnet.id"
+              class="p-6 hover:bg-gray-50 transition-colors"
+            >
+              <div class="flex items-start justify-between mb-4">
+                <div class="flex-1">
+                  <div class="flex items-center space-x-3 mb-2">
+                    <h4 class="text-lg font-semibold text-gray-900">{{ subnet.name }}</h4>
+                    <span
+                      :class="[
+                        'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
+                        getStatusColor(subnet.status)
+                      ]"
+                    >
+                      <svg
+                        :class="['w-3 h-3 mr-1']"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          :d="getStatusIcon(subnet.status)"
+                        />
+                      </svg>
+                      {{ subnet.status.charAt(0).toUpperCase() + subnet.status.slice(1) }}
+                    </span>
+                  </div>
+                  <p class="text-gray-600 text-sm mb-1">{{ subnet.id }}</p>
+                  <p class="text-gray-500 text-sm">Parent: {{ subnet.parent }}</p>
+                </div>
+
+                <div class="flex space-x-2">
+                  <RouterLink
+                    :to="`/instance/${encodeURIComponent(subnet.id)}`"
+                    class="btn-secondary text-sm"
+                  >
+                    View Details
+                  </RouterLink>
+                  <button
+                    v-if="subnet.status.toLowerCase() === 'pending approval'"
+                    :disabled="approvingSubnets.has(subnet.id)"
+                    @click="approveSubnet(subnet)"
+                    class="btn-primary text-sm"
+                  >
+                    {{ approvingSubnets.has(subnet.id) ? 'Approving...' : 'Approve' }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Subnet Metrics -->
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <p class="text-sm text-gray-500">Validators</p>
+                  <p class="font-semibold text-gray-900">{{ subnet.validators.length }}</p>
+                </div>
+                <div>
+                  <p class="text-sm text-gray-500">Total Stake</p>
+                  <p class="font-semibold text-gray-900">{{ subnet.validators.reduce((s: number, v: any) => s + parseFloat(v.stake || '0'), 0).toFixed(1) }} FIL</p>
+                </div>
+                <div>
+                  <p class="text-sm text-gray-500">Template</p>
+                  <p class="font-semibold text-gray-900">{{ subnet.template }}</p>
+                </div>
+                <div>
+                  <p class="text-sm text-gray-500">Created</p>
+                  <p class="font-semibold text-gray-900">{{ new Date(subnet.created_at).toLocaleDateString() }}</p>
+                </div>
+              </div>
             </div>
           </div>
+          </Transition>
         </div>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.address-button {
+  @apply transition-all duration-200;
+}
+
+.address-button:hover {
+  @apply bg-gray-100 shadow-sm;
+}
+
+.btn-primary {
+  @apply inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500;
+}
+
+.gateway-header {
+  transition: all 0.2s ease-in-out;
+}
+
+.gateway-header:hover {
+  background-color: #f9fafb;
+}
+
+.rotate-90 {
+  transform: rotate(90deg);
+}
+
+.gateway-collapse-enter-active,
+.gateway-collapse-leave-active {
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.gateway-collapse-enter-from,
+.gateway-collapse-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
+</style>

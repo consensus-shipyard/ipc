@@ -81,6 +81,47 @@ const totalPower = computed(() => {
     .reduce((sum, v) => sum + (v.power || 0), 0)
 })
 
+const gatewayAddress = computed(() => {
+  if (!instance.value?.config?.gateway_addr) return 'N/A'
+  return formatAddress(instance.value.config.gateway_addr)
+})
+
+const gatewayAddressShort = computed(() => {
+  if (!instance.value?.config?.gateway_addr) return 'N/A'
+  return formatAddressShort(instance.value.config.gateway_addr)
+})
+
+// Copy to clipboard functionality
+const copyingAddress = ref<string | null>(null)
+
+const copyToClipboard = async (text: string, type: string = 'address') => {
+  try {
+    await navigator.clipboard.writeText(text)
+    copyingAddress.value = type
+    setTimeout(() => {
+      copyingAddress.value = null
+    }, 2000)
+  } catch (err) {
+    console.error('Failed to copy to clipboard:', err)
+    // Fallback for older browsers
+    const textArea = document.createElement('textarea')
+    textArea.value = text
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+    try {
+      document.execCommand('copy')
+      copyingAddress.value = type
+      setTimeout(() => {
+        copyingAddress.value = null
+      }, 2000)
+    } catch (fallbackErr) {
+      console.error('Fallback copy failed:', fallbackErr)
+    }
+    document.body.removeChild(textArea)
+  }
+}
+
 const statusColor = computed(() => {
   if (!instance.value || !instance.value.status) return 'text-gray-600 bg-gray-50'
 
@@ -120,6 +161,66 @@ const fetchInstance = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// Helper function to format addresses
+const formatAddress = (address: any) => {
+  if (!address) return 'N/A'
+
+  // Handle different address formats
+  let addressStr = ''
+
+  if (typeof address === 'string') {
+    // Already a string, check if it needs 0x prefix
+    addressStr = address
+  } else if (Array.isArray(address)) {
+    // Handle byte arrays - convert to hex string
+    if (address.length >= 20 && address.every(b => typeof b === 'number' && b >= 0 && b <= 255)) {
+      // This is a 20-byte (or longer) Ethereum address as array of numbers
+      // Take only the first 20 bytes for the address
+      const addressBytes = address.slice(0, 20)
+      addressStr = '0x' + addressBytes.map(b => b.toString(16).padStart(2, '0')).join('')
+    } else {
+      return 'N/A (invalid array)'
+    }
+  } else if (typeof address === 'object') {
+    // Handle object format
+    if (address.route && Array.isArray(address.route)) {
+      // Subnet ID format - extract the address from route
+      const lastRoute = address.route[address.route.length - 1]
+      if (lastRoute && Array.isArray(lastRoute) && lastRoute.length === 20) {
+        addressStr = '0x' + lastRoute.map(b => b.toString(16).padStart(2, '0')).join('')
+      } else {
+        return 'N/A (invalid route)'
+      }
+    } else {
+      return 'N/A (invalid object)'
+    }
+  } else if (typeof address === 'number') {
+    return 'N/A (single number)'
+  } else {
+    return 'N/A (unknown format)'
+  }
+
+  // Ensure we have a valid hex address format
+  if (addressStr && !addressStr.startsWith('0x') && addressStr.length === 40) {
+    addressStr = '0x' + addressStr
+  }
+
+  // Validate the address length
+  if (addressStr.startsWith('0x') && addressStr.length !== 42) {
+    return 'N/A (invalid length)'
+  }
+
+  return addressStr
+}
+
+// Helper function to format address for short display
+const formatAddressShort = (address: any) => {
+  const fullAddress = formatAddress(address)
+  if (fullAddress === 'N/A' || !fullAddress.startsWith('0x')) return fullAddress
+  if (fullAddress.length < 14) return fullAddress // Don't truncate short addresses
+  return `${fullAddress.slice(0, 8)}...${fullAddress.slice(-6)}`
 }
 
 const goBack = () => {
@@ -563,6 +664,21 @@ watch(() => props.id, (newId) => {
                 <dd class="text-sm text-gray-900 font-mono">{{ instance.parent }}</dd>
               </div>
               <div class="flex justify-between">
+                <dt class="text-sm font-medium text-gray-500">Gateway Contract</dt>
+                <dd class="text-sm text-gray-900 font-mono relative">
+                  <button
+                    @click="copyToClipboard(gatewayAddress, 'gateway')"
+                    class="hover:bg-gray-100 px-2 py-1 rounded transition-colors cursor-pointer text-left"
+                    :title="copyingAddress === 'gateway' ? 'Copied!' : `Click to copy: ${gatewayAddress}`"
+                  >
+                    {{ gatewayAddressShort }}
+                    <svg v-if="copyingAddress === 'gateway'" class="inline-block w-4 h-4 ml-1 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                </dd>
+              </div>
+              <div class="flex justify-between">
                 <dt class="text-sm font-medium text-gray-500">Created</dt>
                 <dd class="text-sm text-gray-900">{{ createdDate }}</dd>
               </div>
@@ -846,6 +962,17 @@ watch(() => props.id, (newId) => {
                   <span v-if="typeof value === 'boolean'" :class="value ? 'text-green-600' : 'text-red-600'">
                     {{ value ? 'Yes' : 'No' }}
                   </span>
+                  <button
+                    v-else-if="key === 'gateway_addr' || key === 'registry_addr'"
+                    @click="copyToClipboard(formatAddress(value), key)"
+                    class="font-mono hover:bg-gray-100 px-2 py-1 rounded transition-colors cursor-pointer text-left"
+                    :title="copyingAddress === key ? 'Copied!' : `Click to copy: ${formatAddress(value)}`"
+                  >
+                    {{ formatAddressShort(value) }}
+                    <svg v-if="copyingAddress === key" class="inline-block w-4 h-4 ml-1 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
                   <span v-else-if="typeof value === 'string' && value.startsWith('0x')" class="font-mono">
                     {{ value.slice(0, 8) }}...{{ value.slice(-6) }}
                   </span>
@@ -945,5 +1072,13 @@ watch(() => props.id, (newId) => {
 
 .btn-secondary {
   @apply inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500;
+}
+
+.address-button {
+  @apply transition-all duration-200;
+}
+
+.address-button:hover {
+  @apply bg-gray-100 shadow-sm;
 }
 </style>

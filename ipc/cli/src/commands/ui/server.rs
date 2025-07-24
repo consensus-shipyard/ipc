@@ -561,16 +561,77 @@ impl UIServer {
                 }
             });
 
-        // Stub for validator management (placeholder)
-        let validators_stub = warp::path!("api" / "validators")
+        // Validator management endpoints
+        let add_validator = warp::path!("api" / "validators" / "add")
             .and(warp::post())
             .and(warp::body::json())
-            .and_then(|_body: serde_json::Value| async move {
-                log::info!("Validator management API called - not yet implemented");
-                Ok::<_, warp::Rejection>(warp::reply::json(&serde_json::json!({
-                    "success": false,
-                    "message": "Validator management functionality is not yet implemented"
-                })))
+            .and(state_filter.clone())
+            .and_then(|validator_data: serde_json::Value, state: AppState| async move {
+                log::info!("Received add validator request: {:?}", validator_data);
+
+                match add_validator_via_cli(validator_data, &state.config_path).await {
+                    Ok(message) => {
+                        Ok::<_, warp::Rejection>(warp::reply::json(&serde_json::json!({
+                            "success": true,
+                            "message": message
+                        })))
+                    }
+                    Err(e) => {
+                        log::error!("Failed to add validator: {}", e);
+                        Ok::<_, warp::Rejection>(warp::reply::json(&serde_json::json!({
+                            "success": false,
+                            "error": format!("Failed to add validator: {}", e)
+                        })))
+                    }
+                }
+            });
+
+        let remove_validator = warp::path!("api" / "validators" / "remove")
+            .and(warp::post())
+            .and(warp::body::json())
+            .and(state_filter.clone())
+            .and_then(|validator_data: serde_json::Value, state: AppState| async move {
+                log::info!("Received remove validator request: {:?}", validator_data);
+
+                match remove_validator_via_cli(validator_data, &state.config_path).await {
+                    Ok(message) => {
+                        Ok::<_, warp::Rejection>(warp::reply::json(&serde_json::json!({
+                            "success": true,
+                            "message": message
+                        })))
+                    }
+                    Err(e) => {
+                        log::error!("Failed to remove validator: {}", e);
+                        Ok::<_, warp::Rejection>(warp::reply::json(&serde_json::json!({
+                            "success": false,
+                            "error": format!("Failed to remove validator: {}", e)
+                        })))
+                    }
+                }
+            });
+
+        let update_validator_stake = warp::path!("api" / "validators" / "update-stake")
+            .and(warp::post())
+            .and(warp::body::json())
+            .and(state_filter.clone())
+            .and_then(|stake_data: serde_json::Value, state: AppState| async move {
+                log::info!("Received update validator stake request: {:?}", stake_data);
+
+                match update_validator_stake_via_cli(stake_data, &state.config_path).await {
+                    Ok(message) => {
+                        Ok::<_, warp::Rejection>(warp::reply::json(&serde_json::json!({
+                            "success": true,
+                            "message": message
+                        })))
+                    }
+                    Err(e) => {
+                        log::error!("Failed to update validator stake: {}", e);
+                        Ok::<_, warp::Rejection>(warp::reply::json(&serde_json::json!({
+                            "success": false,
+                            "error": format!("Failed to update validator stake: {}", e)
+                        })))
+                    }
+                }
             });
 
         templates
@@ -582,7 +643,9 @@ impl UIServer {
             .or(update_gateway)
             .or(deploy)
             .or(approve_subnet)
-            .or(validators_stub)
+            .or(add_validator)
+            .or(remove_validator)
+            .or(update_validator_stake)
 
 
     }
@@ -2136,5 +2199,259 @@ async fn check_blockchain_approval_status(
     } else {
         // Root subnets don't need approval
         false
+    }
+}
+
+/// Add a validator to a subnet using the CLI functionality
+async fn add_validator_via_cli(validator_data: serde_json::Value, config_path: &str) -> Result<String> {
+    log::info!("🔹 Starting add validator process");
+
+    // Extract required fields from the request
+    let subnet_id = validator_data.get("subnetId")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow::anyhow!("Missing 'subnetId' field"))?;
+
+    let validator_address = validator_data.get("address")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow::anyhow!("Missing 'address' field"))?;
+
+    let permission_mode = validator_data.get("permissionMode")
+        .and_then(|v| v.as_str())
+        .unwrap_or("collateral");
+
+    log::info!("   - Subnet ID: {}", subnet_id);
+    log::info!("   - Validator Address: {}", validator_address);
+    log::info!("   - Permission Mode: {}", permission_mode);
+
+    // Create GlobalArguments
+    let global = GlobalArguments {
+        config_path: Some(config_path.to_string()),
+        _network: fvm_shared::address::Network::Testnet,
+        __network: None,
+    };
+
+    // Get IPC provider
+    let mut provider = get_ipc_provider(&global)
+        .map_err(|e| anyhow::anyhow!("Failed to get IPC provider: {}", e))?;
+
+    // Handle different permission modes
+    match permission_mode {
+        "collateral" => {
+            // For collateral mode, we need to join the subnet first
+            let collateral = validator_data.get("collateral")
+                .and_then(|v| v.as_f64())
+                .ok_or_else(|| anyhow::anyhow!("Missing 'collateral' field for collateral mode"))?;
+
+            let initial_balance = validator_data.get("initialBalance")
+                .and_then(|v| v.as_f64());
+
+            log::info!("   - Collateral: {}", collateral);
+            log::info!("   - Initial Balance: {:?}", initial_balance);
+
+            // Use the subnet join functionality
+            use crate::commands::subnet::join::{join_subnet, JoinSubnetArgs};
+
+            let args = JoinSubnetArgs {
+                from: Some(validator_address.to_string()),
+                subnet: subnet_id.to_string(),
+                collateral,
+                initial_balance,
+            };
+
+            join_subnet(&mut provider, &args).await
+                .map_err(|e| anyhow::anyhow!("Failed to join subnet as validator: {}", e))?;
+
+            Ok(format!("Successfully added validator {} to subnet {} with {} collateral",
+                      validator_address, subnet_id, collateral))
+        }
+        "federated" => {
+            // For federated mode, we need to set federated power
+            let power = validator_data.get("power")
+                .and_then(|v| v.as_u64())
+                .ok_or_else(|| anyhow::anyhow!("Missing 'power' field for federated mode"))?;
+
+            let public_key = validator_data.get("pubkey")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Missing 'pubkey' field for federated mode"))?;
+
+            // Strip "0x" prefix from public key if present
+            let clean_public_key = if public_key.starts_with("0x") || public_key.starts_with("0X") {
+                &public_key[2..]
+            } else {
+                public_key
+            };
+
+            log::info!("   - Power: {}", power);
+            log::info!("   - Public Key: {}", public_key);
+            log::info!("   - Cleaned Public Key: {}", clean_public_key);
+
+            // Use the set federated power functionality
+            use crate::commands::subnet::set_federated_power::{set_federated_power, SetFederatedPowerArgs};
+
+            let args = SetFederatedPowerArgs {
+                from: validator_address.to_string(),
+                subnet: subnet_id.to_string(),
+                validator_addresses: vec![validator_address.to_string()],
+                validator_pubkeys: vec![clean_public_key.to_string()],
+                validator_power: vec![power as u128],
+            };
+
+            set_federated_power(&mut provider, &args).await
+                .map_err(|e| anyhow::anyhow!("Failed to set federated power for validator: {}", e))?;
+
+            Ok(format!("Successfully added federated validator {} to subnet {} with power {}",
+                      validator_address, subnet_id, power))
+        }
+        _ => {
+            Err(anyhow::anyhow!("Unsupported permission mode: {}", permission_mode))
+        }
+    }
+}
+
+/// Remove a validator from a subnet using the CLI functionality
+async fn remove_validator_via_cli(validator_data: serde_json::Value, config_path: &str) -> Result<String> {
+    log::info!("🔹 Starting remove validator process");
+
+    let subnet_id = validator_data.get("subnetId")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow::anyhow!("Missing 'subnetId' field"))?;
+
+    let validator_address = validator_data.get("address")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow::anyhow!("Missing 'address' field"))?;
+
+    log::info!("   - Subnet ID: {}", subnet_id);
+    log::info!("   - Validator Address: {}", validator_address);
+
+    // Create GlobalArguments
+    let global = GlobalArguments {
+        config_path: Some(config_path.to_string()),
+        _network: fvm_shared::address::Network::Testnet,
+        __network: None,
+    };
+
+    // Get IPC provider
+    let mut provider = get_ipc_provider(&global)
+        .map_err(|e| anyhow::anyhow!("Failed to get IPC provider: {}", e))?;
+
+    // Use the subnet leave functionality
+    use crate::commands::subnet::leave::{LeaveSubnetArgs};
+
+    let args = LeaveSubnetArgs {
+        from: Some(validator_address.to_string()),
+        subnet: subnet_id.to_string(),
+    };
+
+    // Use the provider method directly
+    let subnet_id_parsed = ipc_api::subnet_id::SubnetID::from_str(subnet_id)
+        .map_err(|e| anyhow::anyhow!("Invalid subnet ID '{}': {}", subnet_id, e))?;
+
+    let from_addr = crate::require_fil_addr_from_str(validator_address)
+        .map_err(|e| anyhow::anyhow!("Invalid from address '{}': {}", validator_address, e))?;
+
+    provider.leave_subnet(subnet_id_parsed, Some(from_addr)).await
+        .map_err(|e| anyhow::anyhow!("Failed to remove validator from subnet: {}", e))?;
+
+    Ok(format!("Successfully removed validator {} from subnet {}", validator_address, subnet_id))
+}
+
+/// Update validator stake using the CLI functionality
+async fn update_validator_stake_via_cli(stake_data: serde_json::Value, config_path: &str) -> Result<String> {
+    log::info!("🔹 Starting update validator stake process");
+
+    let subnet_id = stake_data.get("subnetId")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow::anyhow!("Missing 'subnetId' field"))?;
+
+    let amount = stake_data.get("amount")
+        .and_then(|v| v.as_f64())
+        .ok_or_else(|| anyhow::anyhow!("Missing 'amount' field"))?;
+
+    let operation = stake_data.get("operation")
+        .and_then(|v| v.as_str())
+        .unwrap_or("stake"); // Default to stake operation
+
+    let validator_address = stake_data.get("address")
+        .and_then(|v| v.as_str())
+        .unwrap_or(""); // Optional address
+
+    log::info!("   - Subnet ID: {}", subnet_id);
+    log::info!("   - Amount: {}", amount);
+    log::info!("   - Operation: {}", operation);
+    log::info!("   - Validator Address: {}", validator_address);
+
+    // Create GlobalArguments
+    let global = GlobalArguments {
+        config_path: Some(config_path.to_string()),
+        _network: fvm_shared::address::Network::Testnet,
+        __network: None,
+    };
+
+    // Get IPC provider
+    let mut provider = get_ipc_provider(&global)
+        .map_err(|e| anyhow::anyhow!("Failed to get IPC provider: {}", e))?;
+
+    match operation {
+        "stake" => {
+            // Use the stake functionality
+            use crate::commands::subnet::join::{StakeSubnetArgs};
+
+            let args = StakeSubnetArgs {
+                from: if validator_address.is_empty() { None } else { Some(validator_address.to_string()) },
+                subnet: subnet_id.to_string(),
+                collateral: amount,
+            };
+
+            // Use provider method directly
+            let subnet_id_parsed = ipc_api::subnet_id::SubnetID::from_str(subnet_id)
+                .map_err(|e| anyhow::anyhow!("Invalid subnet ID '{}': {}", subnet_id, e))?;
+
+            let from_addr = if validator_address.is_empty() {
+                None
+            } else {
+                Some(crate::require_fil_addr_from_str(validator_address)
+                    .map_err(|e| anyhow::anyhow!("Invalid from address '{}': {}", validator_address, e))?)
+            };
+
+            let token_amount = crate::f64_to_token_amount(amount)
+                .map_err(|e| anyhow::anyhow!("Invalid token amount: {}", e))?;
+
+            provider.stake(subnet_id_parsed, from_addr, token_amount).await
+                .map_err(|e| anyhow::anyhow!("Failed to stake in subnet: {}", e))?;
+
+            Ok(format!("Successfully staked {} tokens in subnet {}", amount, subnet_id))
+        }
+        "unstake" => {
+            // Use the unstake functionality
+            use crate::commands::subnet::join::{UnstakeSubnetArgs};
+
+            let args = UnstakeSubnetArgs {
+                from: if validator_address.is_empty() { None } else { Some(validator_address.to_string()) },
+                subnet: subnet_id.to_string(),
+                collateral: amount,
+            };
+
+            // Use provider method directly
+            let subnet_id_parsed = ipc_api::subnet_id::SubnetID::from_str(subnet_id)
+                .map_err(|e| anyhow::anyhow!("Invalid subnet ID '{}': {}", subnet_id, e))?;
+
+            let from_addr = if validator_address.is_empty() {
+                None
+            } else {
+                Some(crate::require_fil_addr_from_str(validator_address)
+                    .map_err(|e| anyhow::anyhow!("Invalid from address '{}': {}", validator_address, e))?)
+            };
+
+            let token_amount = crate::f64_to_token_amount(amount)
+                .map_err(|e| anyhow::anyhow!("Invalid token amount: {}", e))?;
+
+            provider.unstake(subnet_id_parsed, from_addr, token_amount).await
+                .map_err(|e| anyhow::anyhow!("Failed to unstake from subnet: {}", e))?;
+
+            Ok(format!("Successfully unstaked {} tokens from subnet {}", amount, subnet_id))
+        }
+        _ => {
+            Err(anyhow::anyhow!("Unsupported stake operation: {}", operation))
+        }
     }
 }
