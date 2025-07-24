@@ -29,7 +29,6 @@ impl Service for FendermintService {
     async fn run(&self, shutdown: CancellationToken) -> Result<()> {
         info!(target: "service.fendermint", "Starting Fendermint ABCI application");
 
-        // Use isolated tracing context like in single-binary-runner
         subscriber::with_default(create_temporary_subscriber(), || {
             tracing::info!(
                 "Fendermint service starting with home: {:?}",

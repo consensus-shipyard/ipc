@@ -30,7 +30,6 @@ impl Service for CometBftService {
     async fn run(&self, shutdown: CancellationToken) -> Result<()> {
         info!(target: "service.cometbft", "Starting CometBFT consensus service");
 
-        // Use isolated tracing context like in single-binary-runner
         subscriber::with_default(create_temporary_subscriber(), || {
             tracing::info!("CometBFT service starting with home: {:?}", self.home);
         });

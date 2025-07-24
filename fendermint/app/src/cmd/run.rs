@@ -40,7 +40,7 @@ use crate::{cmd, options::run::RunArgs, settings::Settings};
 
 cmd! {
   RunArgs(self, settings) {
-    run(settings).await
+    crate::service::node::run(settings, None).await
   }
 }
 

@@ -30,7 +30,6 @@ impl NodeManager {
             self.home.display()
         );
 
-        // Use isolated tracing context like in single-binary-runner
         subscriber::with_default(create_temporary_subscriber(), || {
             tracing::info!("Node manager starting with home: {:?}", self.home);
         });

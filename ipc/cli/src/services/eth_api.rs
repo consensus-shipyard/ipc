@@ -35,7 +35,6 @@ impl Service for EthApiService {
     async fn run(&self, shutdown: CancellationToken) -> Result<()> {
         info!(target: "service.eth_api", "Starting ETH API service");
 
-        // Use isolated tracing context like in single-binary-runner
         subscriber::with_default(create_temporary_subscriber(), || {
             tracing::info!(
                 "ETH API service starting on: {:?}",
