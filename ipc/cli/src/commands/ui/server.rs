@@ -268,6 +268,12 @@ impl UIServer {
             .and(warp::get())
             .and(state_filter.clone())
             .and_then(|id: String, state: AppState| async move {
+                // URL decode the ID parameter since subnet IDs contain forward slashes
+                let decoded_id = urlencoding::decode(&id).map_err(|e| {
+                    log::warn!("Failed to decode instance ID '{}': {}", id, e);
+                    warp::reject::not_found()
+                })?.into_owned();
+
                 // Get real instances and find the requested one
                 let server = UIServer {
                     host: "127.0.0.1".to_string(),
@@ -280,11 +286,12 @@ impl UIServer {
 
                 match server.get_real_instances().await {
                     Ok(instances) => {
-                        match instances.into_iter().find(|instance| instance.id == id) {
+                        match instances.into_iter().find(|instance| instance.id == decoded_id) {
                             Some(instance) => {
                                 Ok::<_, warp::Rejection>(warp::reply::with_status(warp::reply::json(&instance), warp::http::StatusCode::OK))
                             }
                             None => {
+                                log::debug!("Instance not found with decoded ID: '{}' (original: '{}')", decoded_id, id);
                                 Ok::<_, warp::Rejection>(warp::reply::with_status(
                                     warp::reply::json(&serde_json::json!({"error": "Instance not found"})),
                                     warp::http::StatusCode::NOT_FOUND
@@ -330,6 +337,44 @@ impl UIServer {
                             warp::reply::json(&serde_json::json!({"error": "Gateway not found"})),
                             warp::http::StatusCode::NOT_FOUND
                         ))
+                    }
+                }
+            });
+
+        // GET /api/gateways/discover - Discover gateways from IPC config
+        let discover_gateways = warp::path!("api" / "gateways" / "discover")
+            .and(warp::get())
+            .and(state_filter.clone())
+            .and_then(|state: AppState| async move {
+                let server = UIServer {
+                    host: "127.0.0.1".to_string(),
+                    frontend_port: 3000,
+                    backend_port: 3001,
+                    mode: state.mode.clone(),
+                    config_path: state.config_path.clone(),
+                    state: state.clone(),
+                };
+
+                match server.discover_gateways_from_config().await {
+                    Ok(discovered_gateways) => {
+                        // Add discovered gateways to the tracked list
+                        {
+                            let mut deployed_gateways = state.deployed_gateways.lock().unwrap();
+                            for gateway in &discovered_gateways {
+                                deployed_gateways.insert(gateway.id.clone(), gateway.clone());
+                            }
+                        }
+
+                        // Save to persistent storage
+                        if let Err(e) = server.save_gateway_data().await {
+                            log::warn!("Failed to save discovered gateways: {}", e);
+                        }
+
+                        Ok::<_, warp::Rejection>(warp::reply::json(&discovered_gateways))
+                    }
+                    Err(e) => {
+                        log::error!("Failed to discover gateways: {}", e);
+                        Ok::<_, warp::Rejection>(warp::reply::json(&Vec::<GatewayInfo>::new()))
                     }
                 }
             });
@@ -457,6 +502,7 @@ impl UIServer {
             .or(gateways)
             .or(gateway_by_id)
             .or(update_gateway)
+            .or(discover_gateways)
             .or(deploy)
     }
 
@@ -598,10 +644,75 @@ impl UIServer {
             }
         };
 
+        // Also get config store to find configured subnets
+        let global = GlobalArguments {
+            config_path: Some(self.config_path.clone()),
+            _network: fvm_shared::address::Network::Testnet,
+            __network: None,
+        };
+
+        let ipc_config_store = match IpcConfigStore::load_or_init(&global).await {
+            Ok(store) => Some(store),
+            Err(e) => {
+                log::debug!("Failed to get IPC config store: {}, using provider only", e);
+                None
+            }
+        };
+
         let mut instances = Vec::new();
 
-        // Try to get subnets from the root network (Filecoin mainnet/testnet)
-        // For UI purposes, we'll try common parent networks
+        // First, try to get subnets from the IPC config store (includes deployed but not yet approved subnets)
+        if let Some(ref store) = ipc_config_store {
+            let config_snapshot = store.snapshot().await;
+
+            for (subnet_id, subnet_config) in config_snapshot.subnets.iter() {
+                // Skip root networks, only show actual child subnets
+                if subnet_id.is_root() {
+                    continue;
+                }
+
+                // Try to get validators using the provider
+                let validators = match provider.list_validators(&subnet_id).await {
+                    Ok(validators) => {
+                        validators.into_iter().map(|(addr, info)| {
+                            super::ValidatorInfo {
+                                address: addr.to_string(),
+                                stake: "0".to_string(), // TODO: ValidatorStakingInfo fields are private
+                                power: if info.is_active { 1 } else { 0 },
+                                status: if info.is_active { "Active".to_string() } else { "Inactive".to_string() },
+                            }
+                        }).collect()
+                    }
+                    Err(e) => {
+                        log::debug!("Failed to get validators for subnet {}: {}", subnet_id, e);
+                        vec![]
+                    }
+                };
+
+                // Create instance from config data (showing as "Pending Approval" since it's not fully active)
+                let parent_id = subnet_id.parent().map(|p| p.to_string()).unwrap_or_else(|| "/r314159".to_string());
+
+                let instance = SubnetInstance {
+                    id: subnet_id.to_string(),
+                    name: format!("Subnet {}", subnet_id.to_string().split('/').last().unwrap_or("Unknown")),
+                    status: if validators.is_empty() { "Pending Approval".to_string() } else { "Active".to_string() },
+                    template: "Development Template".to_string(),
+                    parent: parent_id,
+                    created_at: chrono::Utc::now(), // We don't have creation time from config
+                    validators,
+                    config: serde_json::json!({
+                        "rpc_url": subnet_config.rpc_http(),
+                        "gateway_addr": subnet_config.gateway_addr(),
+                        "registry_addr": subnet_config.registry_addr(),
+                        "permissionMode": "federated"
+                    }),
+                };
+
+                instances.push(instance);
+            }
+        }
+
+        // Also try the original provider-based discovery for backward compatibility
         let parent_networks = vec![
             "/r314159",     // Filecoin Calibration testnet
             "/r31337",      // Local development
@@ -613,13 +724,18 @@ impl UIServer {
                 match provider.list_child_subnets(None, &parent_subnet).await {
                     Ok(subnets) => {
                         for (subnet_id, subnet_info) in subnets {
+                            // Skip if we already have this subnet from config store
+                            if instances.iter().any(|inst| inst.id == subnet_id.to_string()) {
+                                continue;
+                            }
+
                             // Get validators for this subnet
                             let validators = match provider.list_validators(&subnet_id).await {
                                 Ok(validators) => {
                                     validators.into_iter().map(|(addr, info)| {
                                         super::ValidatorInfo {
                                             address: addr.to_string(),
-                                            stake: "1.0".to_string(), // TODO: Access to ValidatorStakingInfo fields is private
+                                            stake: "0".to_string(), // TODO: ValidatorStakingInfo fields are private
                                             power: if info.is_active { 1 } else { 0 },
                                             status: if info.is_active { "Active".to_string() } else { "Inactive".to_string() },
                                         }
@@ -669,6 +785,44 @@ impl UIServer {
         }
 
         Ok(instances)
+    }
+
+    /// Discover gateways from the IPC config store that are not yet tracked
+    async fn discover_gateways_from_config(&self) -> Result<Vec<GatewayInfo>> {
+        let global = GlobalArguments {
+            config_path: Some(self.config_path.clone()),
+            _network: fvm_shared::address::Network::Testnet,
+            __network: None,
+        };
+
+        let ipc_config_store = IpcConfigStore::load_or_init(&global).await?;
+        let config_snapshot = ipc_config_store.snapshot().await;
+
+        let mut discovered_gateways = Vec::new();
+
+        for (subnet_id, subnet_config) in config_snapshot.subnets.iter() {
+            let gateway_addr = subnet_config.gateway_addr().to_string();
+            let registry_addr = subnet_config.registry_addr().to_string();
+            let parent_str = subnet_id.parent().map(|p| p.to_string()).unwrap_or_else(|| "/r314159".to_string());
+
+            // Create a unique ID based on gateway address to avoid duplicates
+            let gateway_id = format!("gateway-{}", gateway_addr);
+
+            // Only add if not already tracked
+            if self.state.deployed_gateways.lock().unwrap().get(&gateway_id).is_none() {
+                let gateway_info = GatewayInfo::new(
+                    gateway_addr.clone(),
+                    registry_addr.clone(),
+                    "IPC Config".to_string(), // Indicate it's discovered from config
+                    parent_str.clone(),
+                    Some(format!("Discovered Gateway for {}", parent_str)),
+                );
+                log::info!("Discovered gateway: {} (Parent: {})", gateway_info.name, gateway_info.parent_network);
+                discovered_gateways.push(gateway_info);
+            }
+        }
+
+        Ok(discovered_gateways)
     }
 }
 
@@ -1112,13 +1266,14 @@ async fn create_and_approve_subnet(config: &serde_json::Value, ipc_config_store:
         })?;
     log::info!("✅ IPC provider connection established");
 
+    // Get parent chain configuration for gateway tracking
+    let parent_str = config.get("parent").and_then(|v| v.as_str()).unwrap_or("/r314159");
+    let parent_id = SubnetID::from_str(parent_str)?;
+
     if gateway_mode == "deploy" {
         log::info!("✅ Provider is now using newly deployed gateway contracts");
 
         // Verify the provider is using the correct gateway addresses
-        let parent_str = config.get("parent").and_then(|v| v.as_str()).unwrap_or("/r314159");
-        let parent_id = SubnetID::from_str(parent_str)?;
-
         if let Some(parent_config) = ipc_config_store.get_subnet(&parent_id).await {
             log::info!("🔍 Current provider configuration:");
             log::info!("   - Gateway: {}", parent_config.gateway_addr());
@@ -1126,6 +1281,41 @@ async fn create_and_approve_subnet(config: &serde_json::Value, ipc_config_store:
             log::info!("   - RPC URL: {}", parent_config.rpc_http());
         } else {
             log::warn!("❌ Could not retrieve parent configuration from config store");
+        }
+    }
+
+    // Track gateway information (whether newly deployed or existing)
+    if let Some(parent_config) = ipc_config_store.get_subnet(&parent_id).await {
+        let gateway_addr = parent_config.gateway_addr().to_string();
+        let registry_addr = parent_config.registry_addr().to_string();
+        let from_address = config.get("from")
+            .and_then(|v| v.as_str())
+            .unwrap_or("0x0a36d7c34ba5523d5bf783bb47f62371e52e0298");
+
+        log::info!("📊 Tracking gateway usage for subnet deployment:");
+        log::info!("   - Gateway: {}", gateway_addr);
+        log::info!("   - Registry: {}", registry_addr);
+        log::info!("   - Mode: {}", gateway_mode);
+
+        // Save gateway information to tracking system
+        match save_deployed_gateway_to_file(
+            gateway_addr.clone(),
+            registry_addr.clone(),
+            from_address.to_string(),
+            parent_str.to_string(),
+            Some(match gateway_mode {
+                "deploy" => format!("Custom Gateway for {}", parent_str),
+                _ => format!("Calibration Gateway for {}", parent_str),
+            }),
+            config_path,
+        ).await {
+            Ok(gateway_info) => {
+                log::info!("✅ Gateway tracked successfully: {}", gateway_info.name);
+            }
+            Err(e) => {
+                log::warn!("⚠️  Failed to track gateway in management system: {}", e);
+                // Don't fail the deployment if tracking fails
+            }
         }
     }
 
@@ -1167,37 +1357,23 @@ async fn create_and_approve_subnet(config: &serde_json::Value, ipc_config_store:
                     error_message
                 );
                 anyhow::anyhow!("{}", helpful_error)
-            } else if error_message.contains("nonce") {
-                anyhow::anyhow!(
-                    "Transaction nonce error: Unable to get transaction nonce for address. \
-                    This usually means the address has no transaction history on the parent chain. \
-                    Original error: {}",
-                    error_message
-                )
-            } else if error_message.contains("Contract call reverted") {
-                let helpful_error = if error_message.contains("0x5416eb98") {
+            } else if error_message.contains("revert") || error_message.contains("execution reverted") {
+                // Handle smart contract revert errors with more helpful context
+                let helpful_error = if error_message.contains("insufficient") {
                     format!(
-                        "Subnet registration failed: Subnet actor not approved by gateway owner.\n\
+                        "Insufficient funds: Your address ({}) doesn't have enough balance to cover the subnet creation costs.\n\
                         \n\
-                        The subnet actor was created successfully but cannot register because it hasn't been \n\
-                        approved by the Calibration gateway owner. This is a security measure to prevent \n\
-                        unauthorized subnet creation.\n\
+                        This includes:\n\
+                        1. Minimum validator stake: {} FIL\n\
+                        2. Gas fees for the transaction\n\
+                        3. Potential collateral requirements\n\
                         \n\
-                        Creator Address: {}\n\
-                        Parent Chain: {}\n\
-                        Gateway Contract: 0x1AEe8A878a22280fc2753b3C63571c8f895D2FE3\n\
+                        Parent chain: {}\n\
                         \n\
-                        Next Steps:\n\
-                        1. Contact the IPC team or Calibration gateway administrator\n\
-                        2. Request approval for your subnet actor address\n\
-                        3. Once approved, you can retry the deployment\n\
-                        \n\
-                        For Development: Consider using a local network where you control the gateway.\n\
-                        \n\
-                        Technical Details: Error code 0x5416eb98 indicates 'NotAuthorized' from the gateway contract.\n\
-                        \n\
+                        Please add funds to your address and try again.\n\
                         Original error: {}",
                         subnet_config.from.as_ref().unwrap_or(&"unknown".to_string()),
+                        subnet_config.min_validator_stake,
                         subnet_config.parent,
                         error_message
                     )

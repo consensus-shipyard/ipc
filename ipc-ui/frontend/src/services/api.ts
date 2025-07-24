@@ -93,6 +93,10 @@ export const apiService = {
     return retryRequest(() => api.get(API_ENDPOINTS.gateway(id)))
   },
 
+  async discoverGateways() {
+    return retryRequest(() => api.get(API_ENDPOINTS.discoverGateways))
+  },
+
   // Deployment
   async deploy(config: any) {
     return retryRequest(() => api.post(API_ENDPOINTS.deploy, config))

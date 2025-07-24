@@ -80,13 +80,26 @@ const fetchSystemStatus = async () => {
   }
 
   try {
-    // Check deployed gateways
+    // Discover gateways from IPC config first (finds previously deployed gateways)
+    await apiService.discoverGateways()
+    console.log('Discovered gateways from IPC config')
+
+    // Then check deployed gateways count
     const gatewaysResponse = await apiService.getGateways()
     if (gatewaysResponse.data) {
       systemStatus.value.gateways = gatewaysResponse.data.length
     }
   } catch (err) {
     console.error('Gateway check failed:', err)
+    // Still try to get the count even if discovery fails
+    try {
+      const gatewaysResponse = await apiService.getGateways()
+      if (gatewaysResponse.data) {
+        systemStatus.value.gateways = gatewaysResponse.data.length
+      }
+    } catch (countErr) {
+      console.error('Gateway count check also failed:', countErr)
+    }
   }
 
   // For wallets, we can estimate based on subnets data
@@ -109,6 +122,8 @@ const getStatusColor = (status) => {
     case 'paused': return 'text-yellow-500'
     case 'deploying': return 'text-blue-500'
     case 'failed': return 'text-red-500'
+    case 'pending approval': return 'text-orange-500'
+    case 'inactive': return 'text-gray-500'
     default: return 'text-gray-500'
   }
 }

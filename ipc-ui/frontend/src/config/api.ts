@@ -15,6 +15,7 @@ export const API_ENDPOINTS = {
   instance: (id: string) => `/api/instances/${id}`,
   gateways: '/api/gateways',
   gateway: (id: string) => `/api/gateways/${id}`,
+  discoverGateways: '/api/gateways/discover',
 }
 
 // WebSocket message types
