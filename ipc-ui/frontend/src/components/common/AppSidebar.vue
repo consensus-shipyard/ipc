@@ -36,14 +36,19 @@ const currentNavigationItems = computed(() => {
 })
 
 // Real subnet data state
-const recentSubnets = ref([])
+const recentSubnets = ref<any[]>([])
 const loading = ref(true)
-const error = ref(null)
+const error = ref<string | null>(null)
 const systemStatus = ref({
   cliConnection: 'Unknown',
   walletsConfigured: 0,
   gateways: 0
 })
+
+// Gateway data state
+const deployedGateways = ref<any[]>([])
+const gatewaysLoading = ref(false)
+const gatewaysError = ref<string | null>(null)
 
 // Fetch real subnet data
 const fetchRecentSubnets = async () => {
@@ -55,12 +60,12 @@ const fetchRecentSubnets = async () => {
     if (response.data) {
       // Get the 5 most recent subnets for the sidebar
       recentSubnets.value = response.data
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, 5)
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error('Error fetching recent subnets:', err)
-    error.value = err.message || 'Failed to load subnets'
+    error.value = err?.message || 'Failed to load subnets'
   } finally {
     loading.value = false
   }
@@ -88,35 +93,52 @@ const fetchSystemStatus = async () => {
     const gatewaysResponse = await apiService.getGateways()
     if (gatewaysResponse.data) {
       systemStatus.value.gateways = gatewaysResponse.data.length
+      deployedGateways.value = gatewaysResponse.data.slice(0, 3) // Show up to 3 gateways in sidebar
     }
   } catch (err) {
-    console.error('Gateway check failed:', err)
-    // Still try to get the count even if discovery fails
-    try {
-      const gatewaysResponse = await apiService.getGateways()
-      if (gatewaysResponse.data) {
-        systemStatus.value.gateways = gatewaysResponse.data.length
-      }
-    } catch (countErr) {
-      console.error('Gateway count check also failed:', countErr)
-    }
+    console.error('Gateway discovery failed:', err)
+    systemStatus.value.gateways = 0
   }
+}
 
-  // For wallets, we can estimate based on subnets data
-  // In a real implementation, this would be a separate API endpoint
-  if (recentSubnets.value.length > 0) {
-    systemStatus.value.walletsConfigured = 1 // At least one wallet must be configured to create subnets
+// Fetch deployed gateways specifically
+const fetchDeployedGateways = async () => {
+  try {
+    gatewaysLoading.value = true
+    gatewaysError.value = null
+
+    // First try to discover gateways from config
+    await apiService.discoverGateways()
+
+    // Then fetch the full list
+    const response = await apiService.getGateways()
+    if (response.data) {
+      deployedGateways.value = response.data
+      systemStatus.value.gateways = response.data.length
+    }
+  } catch (err: any) {
+    console.error('Error fetching deployed gateways:', err)
+    gatewaysError.value = err?.message || 'Failed to load gateways'
+  } finally {
+    gatewaysLoading.value = false
   }
 }
 
 // Format subnet ID for display
-const formatSubnetId = (id) => {
+const formatSubnetId = (id: string) => {
+  if (!id) return 'Unknown'
   const parts = id.split('/')
-  return parts[parts.length - 1] || id
+  return parts[parts.length - 1]?.substring(0, 8) + '...' || 'Unknown'
+}
+
+// Format address for display
+const formatAddress = (address: string) => {
+  if (!address) return 'Unknown'
+  return `${address.slice(0, 6)}...${address.slice(-4)}`
 }
 
 // Get status color for display
-const getStatusColor = (status) => {
+const getStatusColor = (status: string) => {
   switch (status.toLowerCase()) {
     case 'active': return 'text-green-500'
     case 'paused': return 'text-yellow-500'
@@ -137,8 +159,11 @@ const icons = {
 
 // Lifecycle
 onMounted(async () => {
-  await fetchRecentSubnets()
-  await fetchSystemStatus()
+  await Promise.all([
+    fetchRecentSubnets(),
+    fetchSystemStatus(),
+    fetchDeployedGateways()
+  ])
 })
 </script>
 
@@ -219,6 +244,60 @@ onMounted(async () => {
               </span>
             </div>
           </RouterLink>
+        </div>
+      </div>
+
+      <!-- Deployed Gateways Section -->
+      <div class="mt-8">
+        <h3 class="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+          Deployed Gateways
+        </h3>
+
+        <!-- Loading State -->
+        <div v-if="gatewaysLoading" class="mt-3 px-4">
+          <div class="animate-pulse space-y-2">
+            <div class="h-10 bg-gray-200 rounded"></div>
+            <div class="h-10 bg-gray-200 rounded"></div>
+          </div>
+        </div>
+
+        <!-- Error State -->
+        <div v-else-if="gatewaysError" class="mt-3 px-4 py-2 text-xs text-red-600 bg-red-50 rounded-lg">
+          Failed to load gateways
+        </div>
+
+        <!-- No Gateways -->
+        <div v-else-if="deployedGateways.length === 0" class="mt-3 px-4 py-2 text-sm text-gray-500">
+          No gateways found
+        </div>
+
+        <!-- Gateway Entries -->
+        <div v-else class="mt-3 space-y-1">
+          <div
+            v-for="gateway in deployedGateways.slice(0, 3)"
+            :key="gateway.id"
+            class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors"
+          >
+            <div class="font-medium truncate">{{ gateway.name }}</div>
+            <div class="flex items-center justify-between text-xs">
+              <span :class="gateway.status === 'active' ? 'text-green-500' : 'text-gray-400'">
+                {{ gateway.status }}
+              </span>
+              <span class="text-gray-400 truncate ml-2" :title="gateway.gateway_address">
+                {{ formatAddress(gateway.gateway_address) }}
+              </span>
+            </div>
+            <div class="text-xs text-gray-400 mt-1">
+              {{ gateway.parent_network }}
+            </div>
+          </div>
+
+          <!-- View All Link -->
+          <div v-if="deployedGateways.length > 3" class="mt-2 px-4">
+            <button class="text-xs text-primary-600 hover:text-primary-700 font-medium">
+              View all {{ deployedGateways.length }} gateways
+            </button>
+          </div>
         </div>
       </div>
 

@@ -263,16 +263,24 @@ impl UIServer {
                 }
             });
 
-        // GET /api/instances/:id
-        let instance_by_id = warp::path!("api" / "instances" / String)
+        // GET /api/instance?id=<subnet_id> (using query param to avoid URL encoding issues)
+        let instance_by_id = warp::path!("api" / "instance")
             .and(warp::get())
+            .and(warp::query::<HashMap<String, String>>())
             .and(state_filter.clone())
-            .and_then(|id: String, state: AppState| async move {
-                // URL decode the ID parameter since subnet IDs contain forward slashes
-                let decoded_id = urlencoding::decode(&id).map_err(|e| {
-                    log::warn!("Failed to decode instance ID '{}': {}", id, e);
-                    warp::reject::not_found()
-                })?.into_owned();
+            .and_then(|query: HashMap<String, String>, state: AppState| async move {
+                let id = match query.get("id") {
+                    Some(id) => id.clone(),
+                    None => {
+                        log::warn!("Missing 'id' query parameter");
+                        return Ok::<_, warp::Rejection>(warp::reply::with_status(
+                            warp::reply::json(&serde_json::json!({"error": "Missing 'id' parameter"})),
+                            warp::http::StatusCode::BAD_REQUEST
+                        ));
+                    }
+                };
+
+                log::info!("🔍 Looking for instance with query param ID: '{}'", id);
 
                 // Get real instances and find the requested one
                 let server = UIServer {
@@ -286,12 +294,18 @@ impl UIServer {
 
                 match server.get_real_instances().await {
                     Ok(instances) => {
-                        match instances.into_iter().find(|instance| instance.id == decoded_id) {
+                        log::info!("📋 Available instances:");
+                        for instance in &instances {
+                            log::info!("   - ID: '{}' (len={})", instance.id, instance.id.len());
+                        }
+
+                        match instances.iter().find(|instance| instance.id == id) {
                             Some(instance) => {
-                                Ok::<_, warp::Rejection>(warp::reply::with_status(warp::reply::json(&instance), warp::http::StatusCode::OK))
+                                log::info!("✅ Found instance: '{}'", instance.id);
+                                Ok::<_, warp::Rejection>(warp::reply::with_status(warp::reply::json(instance), warp::http::StatusCode::OK))
                             }
                             None => {
-                                log::debug!("Instance not found with decoded ID: '{}' (original: '{}')", decoded_id, id);
+                                log::warn!("❌ Instance not found with ID: '{}'", id);
                                 Ok::<_, warp::Rejection>(warp::reply::with_status(
                                     warp::reply::json(&serde_json::json!({"error": "Instance not found"})),
                                     warp::http::StatusCode::NOT_FOUND
@@ -341,8 +355,8 @@ impl UIServer {
                 }
             });
 
-        // GET /api/gateways/discover - Discover gateways from IPC config
-        let discover_gateways = warp::path!("api" / "gateways" / "discover")
+        // GET /api/gateways-discover - Discover gateways from IPC config (using different path to avoid conflicts)
+        let discover_gateways = warp::path!("api" / "gateways-discover")
             .and(warp::get())
             .and(state_filter.clone())
             .and_then(|state: AppState| async move {
@@ -500,9 +514,9 @@ impl UIServer {
             .or(instances)
             .or(instance_by_id)
             .or(gateways)
+            .or(discover_gateways)  // More specific route must come before generic :id route
             .or(gateway_by_id)
             .or(update_gateway)
-            .or(discover_gateways)
             .or(deploy)
     }
 
@@ -963,7 +977,7 @@ async fn handle_deployment(
             "contracts" => {
                 // Deploy smart contracts
                 if let Some(ref store) = ipc_config_store {
-                    let (gateway_addr, registry_addr) = deploy_smart_contracts(&config, store, config_path).await?;
+                    let (gateway_addr, registry_addr) = deploy_smart_contracts(&config, store, config_path, &state).await?;
                     if let (Some(gw), Some(reg)) = (gateway_addr, registry_addr) {
                         log::info!("🎯 Custom gateway contracts deployed/configured:");
                         log::info!("   - Gateway: {}", gw);
@@ -1121,8 +1135,15 @@ fn validate_deployment_config(config: &serde_json::Value) -> Result<()> {
     // Validate gateway mode
     if let Some(gateway_mode) = config.get("gatewayMode").and_then(|v| v.as_str()) {
         match gateway_mode {
-            "existing" | "deploy" | "custom" => {}
+            "existing" | "deploy" | "deployed" | "custom" => {}
             _ => return Err(anyhow::anyhow!("Invalid gateway mode: {}", gateway_mode)),
+        }
+
+        // Validate deployed gateway selection if deployed mode is selected
+        if gateway_mode == "deployed" {
+            if config.get("selectedDeployedGateway").and_then(|v| v.as_str()).is_none() {
+                return Err(anyhow::anyhow!("Selected deployed gateway required when using deployed gateway mode"));
+            }
         }
 
         // Validate custom gateway fields if custom mode is selected
@@ -1182,8 +1203,8 @@ async fn prepare_deployment_files(_config: &serde_json::Value, config_path: &str
     Ok(ipc_config_store)
 }
 
-/// Deploy smart contracts with gateway deployment options
-async fn deploy_smart_contracts(config: &serde_json::Value, ipc_config_store: &IpcConfigStore, config_path: &str) -> Result<(Option<String>, Option<String>)> {
+/// Deploy or configure smart contracts based on gateway mode
+async fn deploy_smart_contracts(config: &serde_json::Value, ipc_config_store: &IpcConfigStore, config_path: &str, state: &AppState) -> Result<(Option<String>, Option<String>)> {
     log::info!("🚀 Starting smart contract deployment phase");
 
     // Log the configuration for debugging
@@ -1202,6 +1223,28 @@ async fn deploy_smart_contracts(config: &serde_json::Value, ipc_config_store: &I
             log::info!("   - This gives full control over subnet approval");
             log::info!("   - User will be the gateway owner");
             deploy_new_gateway_contracts(config, ipc_config_store, config_path).await
+        }
+        "deployed" => {
+            log::info!("🔨 User chose to use an existing deployed gateway");
+            let selected_gateway_id = config.get("selectedDeployedGateway")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Missing selectedDeployedGateway field"))?;
+
+            let deployed_gateways = state.deployed_gateways.lock().unwrap();
+            if let Some(gateway) = deployed_gateways.get(selected_gateway_id) {
+                log::info!("   - Selected Gateway: {}", gateway.name);
+                log::info!("   - Gateway Address: {}", gateway.gateway_address);
+                log::info!("   - Registry Address: {}", gateway.registry_address);
+                log::info!("   - Parent Network: {}", gateway.parent_network);
+                log::info!("   - Owner: {}", gateway.deployer_address);
+                log::info!("   - Status: {}", gateway.status);
+                log::info!("   - ID: {}", gateway.id);
+
+                // For deployed mode, we just return the existing gateway addresses
+                Ok((Some(gateway.gateway_address.clone()), Some(gateway.registry_address.clone())))
+            } else {
+                return Err(anyhow::anyhow!("Selected deployed gateway with ID '{}' not found", selected_gateway_id));
+            }
         }
         "custom" => {
             log::info!("🔧 User provided custom gateway address");

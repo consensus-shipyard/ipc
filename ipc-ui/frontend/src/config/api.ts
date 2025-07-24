@@ -12,10 +12,10 @@ export const API_ENDPOINTS = {
   templates: '/api/templates',
   instances: '/api/instances',
   deploy: '/api/deploy',
-  instance: (id: string) => `/api/instances/${id}`,
+  instance: (id: string) => `/api/instance?id=${encodeURIComponent(id)}`,
   gateways: '/api/gateways',
   gateway: (id: string) => `/api/gateways/${id}`,
-  discoverGateways: '/api/gateways/discover',
+  discoverGateways: '/api/gateways-discover',
 }
 
 // WebSocket message types

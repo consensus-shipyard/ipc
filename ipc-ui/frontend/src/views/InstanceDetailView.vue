@@ -37,14 +37,20 @@ const activeTab = ref('overview')
 
 // Computed
 const createdDate = computed(() => {
-  if (!instance.value) return ''
-  return new Date(instance.value.created_at).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  if (!instance.value || !instance.value.created_at) return 'Unknown'
+
+  try {
+    return new Date(instance.value.created_at).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  } catch (error) {
+    console.warn('Error parsing created_at date:', instance.value.created_at)
+    return 'Invalid Date'
+  }
 })
 
 const totalStake = computed(() => {
@@ -61,7 +67,7 @@ const totalPower = computed(() => {
 })
 
 const statusColor = computed(() => {
-  if (!instance.value) return 'text-gray-600 bg-gray-50'
+  if (!instance.value || !instance.value.status) return 'text-gray-600 bg-gray-50'
 
   switch (instance.value.status.toLowerCase()) {
     case 'active': return 'text-green-600 bg-green-50'
@@ -78,7 +84,15 @@ const fetchInstance = async () => {
     loading.value = true
     error.value = null
 
-    const response = await apiService.getInstance(props.id)
+    // Decode the URL-encoded ID parameter
+    const decodedId = decodeURIComponent(props.id)
+    const response = await apiService.getInstance(decodedId)
+
+    // Check if we got HTML instead of JSON (indicates backend routing issue)
+    if (typeof response.data === 'string' && response.data.includes('<!DOCTYPE html>')) {
+      error.value = 'Backend routing error: API endpoint returned HTML instead of JSON data. This usually means the route is not properly configured.'
+      return
+    }
 
     if (response.data) {
       instance.value = response.data
@@ -120,17 +134,17 @@ const exportConfig = () => {
 
 const pauseSubnet = async () => {
   // TODO: Implement pause functionality
-  console.log('Pause subnet:', props.id)
+  console.log('Pause subnet:', decodeURIComponent(props.id))
 }
 
 const resumeSubnet = async () => {
   // TODO: Implement resume functionality
-  console.log('Resume subnet:', props.id)
+  console.log('Resume subnet:', decodeURIComponent(props.id))
 }
 
 const viewLogs = () => {
   // TODO: Implement log viewing
-  console.log('View logs for:', props.id)
+  console.log('View logs for:', decodeURIComponent(props.id))
 }
 
 // Lifecycle
@@ -166,7 +180,7 @@ watch(() => props.id, (newId) => {
               <h1 class="text-2xl font-bold text-gray-900">
                 {{ instance?.name || 'Loading...' }}
               </h1>
-              <p class="text-gray-600 mt-1">Subnet ID: {{ props.id }}</p>
+              <p class="text-gray-600 mt-1">Subnet ID: {{ decodeURIComponent(props.id) }}</p>
             </div>
           </div>
 
@@ -177,7 +191,7 @@ watch(() => props.id, (newId) => {
                 statusColor
               ]"
             >
-              {{ instance.status.charAt(0).toUpperCase() + instance.status.slice(1) }}
+              {{ (instance.status || 'Unknown').charAt(0).toUpperCase() + (instance.status || 'unknown').slice(1) }}
             </span>
           </div>
         </div>
@@ -330,7 +344,7 @@ watch(() => props.id, (newId) => {
                 <dt class="text-sm font-medium text-gray-500">Status</dt>
                 <dd>
                   <span :class="['inline-flex items-center px-2 py-1 rounded-full text-xs font-medium', statusColor]">
-                    {{ instance.status.charAt(0).toUpperCase() + instance.status.slice(1) }}
+                    {{ (instance.status || 'Unknown').charAt(0).toUpperCase() + (instance.status || 'unknown').slice(1) }}
                   </span>
                 </dd>
               </div>

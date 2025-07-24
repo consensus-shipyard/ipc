@@ -35,9 +35,9 @@ const fetchSubnets = async () => {
     if (response.data) {
       subnets.value = response.data
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error('Error fetching subnets:', err)
-    error.value = err instanceof Error ? err.message : 'Failed to load subnets'
+    error.value = err?.message || 'Failed to load subnets'
   } finally {
     loading.value = false
   }
@@ -67,6 +67,11 @@ const getStatusIcon = (status: string) => {
     default:
       return 'M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M12 21a9 9 0 100-18 9 9 0 000 18z'
   }
+}
+
+const formatAddress = (address: string) => {
+  if (!address || address === 'N/A') return address
+  return `${address.slice(0, 6)}...${address.slice(-4)}`
 }
 
 // Lifecycle
@@ -229,11 +234,15 @@ onMounted(() => {
               </div>
               <p class="text-gray-600 text-sm mb-1">{{ subnet.id }}</p>
               <p class="text-gray-500 text-sm">Parent: {{ subnet.parent }}</p>
+              <!-- Gateway Information -->
+              <p v-if="subnet.config?.gateway_addr" class="text-gray-500 text-sm">
+                Gateway: {{ formatAddress(subnet.config.gateway_addr.toString()) }}
+              </p>
             </div>
 
             <div class="flex space-x-2">
               <RouterLink
-                :to="`/instance/${subnet.id}`"
+                :to="`/instance/${encodeURIComponent(subnet.id)}`"
                 class="btn-secondary text-sm"
               >
                 View Details

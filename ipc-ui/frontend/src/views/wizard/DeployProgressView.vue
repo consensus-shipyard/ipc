@@ -60,6 +60,11 @@ const getStepStatus = (stepId: string, index: number) => {
     return index === 0 ? 'in_progress' : 'pending'
   }
 
+  // If the entire deployment is complete, mark all steps as completed
+  if (isDeploymentComplete.value) {
+    return 'completed'
+  }
+
   if (index < currentStep.value) {
     return 'completed'
   } else if (index === currentStep.value) {
