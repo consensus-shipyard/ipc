@@ -137,7 +137,9 @@ pub async fn cli() -> anyhow::Result<()> {
     } else {
         let global = &args.global_params;
         if let Some(c) = &args.command {
-            default_subscriber();
+            if !matches!(c, Commands::Node(_)) {
+                default_subscriber();
+            }
 
             let r = match &c {
                 // Commands::Daemon(args) => LaunchDaemon::handle(global, args).await,

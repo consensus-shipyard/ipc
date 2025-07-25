@@ -4,11 +4,13 @@
 mod config;
 mod config_override;
 mod init;
+mod start;
 
 use clap::{Args, Subcommand};
 use std::fmt::Debug;
 
 use crate::commands::node::init::{InitNode, InitNodeArgs};
+use crate::commands::node::start::{StartNode, StartNodeArgs};
 use crate::{CommandLineHandler, GlobalArguments};
 
 #[derive(Debug, Args)]
@@ -23,6 +25,7 @@ impl NodeCommandsArgs {
     pub async fn handle(&self, global: &GlobalArguments) -> anyhow::Result<()> {
         match &self.command {
             Commands::Init(args) => InitNode::handle(global, args).await,
+            Commands::Start(args) => StartNode::handle(global, args).await,
         }
     }
 }
@@ -30,4 +33,5 @@ impl NodeCommandsArgs {
 #[derive(Debug, Subcommand)]
 pub(crate) enum Commands {
     Init(InitNodeArgs),
+    Start(StartNodeArgs),
 }

@@ -36,6 +36,7 @@ tendermint-config = { workspace = true }
 tendermint-rpc = { workspace = true }
 tendermint-proto = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { workspace = true }
 tower = { workspace = true }
 tower-abci = { workspace = true }
 tracing = { workspace = true }
