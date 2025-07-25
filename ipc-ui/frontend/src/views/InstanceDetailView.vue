@@ -56,6 +56,16 @@ const removingValidator = ref<Record<string, boolean>>({})
 const updatingStake = ref<Record<string, boolean>>({})
 const stakeAmounts = ref<Record<string, number>>({})
 
+// Bulk federated validator management state
+const showBulkManagement = ref(false)
+const bulkValidators = ref<Array<{
+  address: string
+  pubkey: string
+  power: number
+  isNew?: boolean
+}>>([])
+const settingFederatedPower = ref(false)
+
 // Computed
 const createdDate = computed(() => {
   if (!instance.value || !instance.value.created_at) return 'Unknown'
@@ -434,6 +444,84 @@ const updateStake = async (validatorAddress: string, action: 'stake' | 'unstake'
     error.value = err instanceof Error ? err.message : `Failed to ${action} validator`
   } finally {
     updatingStake.value = { ...updatingStake.value, [validatorAddress]: false }
+  }
+}
+
+// Bulk federated validator management methods
+const initializeBulkManagement = () => {
+  if (!instance.value) return
+
+  // Initialize with existing validators
+  bulkValidators.value = instance.value.validators.map(validator => ({
+    address: validator.address,
+    pubkey: '', // Will need to be filled in manually
+    power: validator.power || 1,
+    isNew: false
+  }))
+
+  showBulkManagement.value = true
+}
+
+const addBulkValidator = () => {
+  bulkValidators.value.push({
+    address: '',
+    pubkey: '',
+    power: 1,
+    isNew: true
+  })
+}
+
+const removeBulkValidator = (index: number) => {
+  bulkValidators.value.splice(index, 1)
+}
+
+const setBulkFederatedPower = async () => {
+  if (!instance.value || bulkValidators.value.length === 0) return
+
+  // Validate all validators have required fields
+  const invalidValidators = bulkValidators.value.filter(v =>
+    !v.address.trim() || !v.pubkey.trim() || v.power <= 0
+  )
+
+  if (invalidValidators.length > 0) {
+    error.value = 'All validators must have a valid address, public key, and power > 0'
+    return
+  }
+
+  settingFederatedPower.value = true
+  try {
+    // Find the first existing validator to use as fromAddress
+    const fromAddress = instance.value.validators.length > 0 ?
+      instance.value.validators[0].address :
+      bulkValidators.value[0].address
+
+    const powerData = {
+      subnetId: decodeURIComponent(props.id),
+      fromAddress,
+      validators: bulkValidators.value.map(v => ({
+        address: v.address,
+        pubkey: v.pubkey,
+        power: v.power
+      }))
+    }
+
+    const response = await apiService.setFederatedPower(powerData)
+
+    if (response.data.success) {
+      showBulkManagement.value = false
+
+      // Refresh instance data
+      await fetchInstance()
+
+      console.log('Bulk federated power set successfully:', response.data.message)
+    } else {
+      error.value = response.data.error || 'Failed to set federated power'
+    }
+  } catch (err) {
+    console.error('Error setting bulk federated power:', err)
+    error.value = err instanceof Error ? err.message : 'Failed to set federated power'
+  } finally {
+    settingFederatedPower.value = false
   }
 }
 
@@ -829,6 +917,118 @@ watch(() => props.id, (newId) => {
 
               <div v-else class="text-blue-700 text-sm">
                 <p>Unknown permission mode. Please check your subnet configuration.</p>
+              </div>
+            </div>
+
+            <!-- Bulk Federated Management (Federated Mode Only) -->
+            <div v-if="instance.config.permissionMode === 'federated'" class="mb-8 p-6 bg-blue-50 rounded-lg">
+              <div class="flex items-center justify-between mb-4">
+                <h4 class="text-md font-semibold text-gray-800 flex items-center">
+                  <svg class="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                  Advanced Federated Management
+                </h4>
+                <button
+                  v-if="!showBulkManagement"
+                  @click="initializeBulkManagement"
+                  class="btn-secondary text-sm"
+                >
+                  Manage All Validators
+                </button>
+                <button
+                  v-else
+                  @click="showBulkManagement = false"
+                  class="btn-secondary text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+
+              <div v-if="!showBulkManagement" class="text-sm text-blue-700">
+                <p class="mb-2">💡 <strong>Tip:</strong> Use bulk management to:</p>
+                <ul class="list-disc list-inside space-y-1 ml-4">
+                  <li>Set power for all validators at once</li>
+                  <li>Add multiple validators simultaneously</li>
+                  <li>Manage the complete validator set in one operation</li>
+                </ul>
+              </div>
+
+              <!-- Bulk Management Form -->
+              <div v-if="showBulkManagement" class="space-y-4">
+                <div class="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
+                  <p class="text-yellow-800 text-sm">
+                    <strong>⚠️ Important:</strong> This will set the complete validator set. All validators not listed here will be removed from the subnet.
+                  </p>
+                </div>
+
+                <div class="space-y-3">
+                  <div v-for="(validator, index) in bulkValidators" :key="index"
+                       class="grid grid-cols-12 gap-2 items-center p-3 bg-white rounded border">
+                    <div class="col-span-4">
+                      <input
+                        v-model="validator.address"
+                        type="text"
+                        placeholder="Validator Address (0x...)"
+                        class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
+                      />
+                    </div>
+                    <div class="col-span-4">
+                      <input
+                        v-model="validator.pubkey"
+                        type="text"
+                        placeholder="Public Key (0x04...)"
+                        class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
+                      />
+                    </div>
+                    <div class="col-span-2">
+                      <input
+                        v-model.number="validator.power"
+                        type="number"
+                        min="1"
+                        placeholder="Power"
+                        class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
+                      />
+                    </div>
+                    <div class="col-span-1">
+                      <span v-if="validator.isNew" class="text-xs text-green-600 font-medium">NEW</span>
+                      <span v-else class="text-xs text-blue-600 font-medium">EXISTING</span>
+                    </div>
+                    <div class="col-span-1">
+                      <button
+                        @click="removeBulkValidator(index)"
+                        type="button"
+                        class="text-red-600 hover:text-red-800 p-1"
+                      >
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between">
+                  <button
+                    @click="addBulkValidator"
+                    type="button"
+                    class="btn-secondary text-sm"
+                  >
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    Add Validator
+                  </button>
+
+                  <button
+                    @click="setBulkFederatedPower"
+                    :disabled="settingFederatedPower || bulkValidators.length === 0"
+                    class="btn-primary"
+                  >
+                    <div v-if="settingFederatedPower" class="animate-spin inline-block w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full"></div>
+                    {{ settingFederatedPower ? 'Setting Power...' : 'Set Federated Power' }}
+                  </button>
+                </div>
               </div>
             </div>
 

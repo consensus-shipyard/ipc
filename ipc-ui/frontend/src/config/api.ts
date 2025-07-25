@@ -29,6 +29,7 @@ export const API_ENDPOINTS = {
     add: '/api/validators/add',
     remove: '/api/validators/remove',
     updateStake: '/api/validators/update-stake',
+    setFederatedPower: '/api/validators/set-federated-power',
   },
 }
 

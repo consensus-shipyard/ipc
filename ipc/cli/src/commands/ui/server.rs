@@ -706,18 +706,50 @@ impl UIServer {
                 log::info!("Received add validator request: {:?}", validator_data);
 
                 match add_validator_via_cli(validator_data, &state.config_path).await {
-                    Ok(message) => {
-                        Ok::<_, warp::Rejection>(warp::reply::json(&serde_json::json!({
-                            "success": true,
-                            "message": message
-                        })))
+                    Ok(result) => {
+                        log::info!("Successfully added validator: {}", result);
+                        Ok(warp::reply::with_status(
+                            warp::reply::json(&serde_json::json!({"success": true, "message": result})),
+                            warp::http::StatusCode::OK,
+                        ))
                     }
                     Err(e) => {
                         log::error!("Failed to add validator: {}", e);
-                        Ok::<_, warp::Rejection>(warp::reply::json(&serde_json::json!({
-                            "success": false,
-                            "error": format!("Failed to add validator: {}", e)
-                        })))
+                        Ok(warp::reply::with_status(
+                            warp::reply::json(&serde_json::json!({
+                                "success": false,
+                                "error": format!("Failed to add validator: {}", e)
+                            })),
+                            warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+                        ))
+                    }
+                }
+            });
+
+        let set_federated_power = warp::path!("api" / "validators" / "set-federated-power")
+            .and(warp::post())
+            .and(warp::body::json())
+            .and(state_filter.clone())
+            .and_then(|power_data: serde_json::Value, state: AppState| async move {
+                log::info!("Received set federated power request: {:?}", power_data);
+
+                match set_federated_power_via_cli(power_data, &state.config_path).await {
+                    Ok(result) => {
+                        log::info!("Successfully set federated power: {}", result);
+                        Ok(warp::reply::with_status(
+                            warp::reply::json(&serde_json::json!({"success": true, "message": result})),
+                            warp::http::StatusCode::OK,
+                        ))
+                    }
+                    Err(e) => {
+                        log::error!("Failed to set federated power: {}", e);
+                        Ok(warp::reply::with_status(
+                            warp::reply::json(&serde_json::json!({
+                                "success": false,
+                                "error": format!("Failed to set federated power: {}", e)
+                            })),
+                            warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+                        ))
                     }
                 }
             });
@@ -730,18 +762,22 @@ impl UIServer {
                 log::info!("Received remove validator request: {:?}", validator_data);
 
                 match remove_validator_via_cli(validator_data, &state.config_path).await {
-                    Ok(message) => {
-                        Ok::<_, warp::Rejection>(warp::reply::json(&serde_json::json!({
-                            "success": true,
-                            "message": message
-                        })))
+                    Ok(result) => {
+                        log::info!("Successfully removed validator: {}", result);
+                        Ok(warp::reply::with_status(
+                            warp::reply::json(&serde_json::json!({"success": true, "message": result})),
+                            warp::http::StatusCode::OK,
+                        ))
                     }
                     Err(e) => {
                         log::error!("Failed to remove validator: {}", e);
-                        Ok::<_, warp::Rejection>(warp::reply::json(&serde_json::json!({
-                            "success": false,
-                            "error": format!("Failed to remove validator: {}", e)
-                        })))
+                        Ok(warp::reply::with_status(
+                            warp::reply::json(&serde_json::json!({
+                                "success": false,
+                                "error": format!("Failed to remove validator: {}", e)
+                            })),
+                            warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+                        ))
                     }
                 }
             });
@@ -754,18 +790,22 @@ impl UIServer {
                 log::info!("Received update validator stake request: {:?}", stake_data);
 
                 match update_validator_stake_via_cli(stake_data, &state.config_path).await {
-                    Ok(message) => {
-                        Ok::<_, warp::Rejection>(warp::reply::json(&serde_json::json!({
-                            "success": true,
-                            "message": message
-                        })))
+                    Ok(result) => {
+                        log::info!("Successfully updated validator stake: {}", result);
+                        Ok(warp::reply::with_status(
+                            warp::reply::json(&serde_json::json!({"success": true, "message": result})),
+                            warp::http::StatusCode::OK,
+                        ))
                     }
                     Err(e) => {
                         log::error!("Failed to update validator stake: {}", e);
-                        Ok::<_, warp::Rejection>(warp::reply::json(&serde_json::json!({
-                            "success": false,
-                            "error": format!("Failed to update validator stake: {}", e)
-                        })))
+                        Ok(warp::reply::with_status(
+                            warp::reply::json(&serde_json::json!({
+                                "success": false,
+                                "error": format!("Failed to update validator stake: {}", e)
+                            })),
+                            warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+                        ))
                     }
                 }
             });
@@ -780,6 +820,7 @@ impl UIServer {
             .or(deploy)
             .or(approve_subnet)
             .or(add_validator)
+            .or(set_federated_power)
             .or(remove_validator)
             .or(update_validator_stake)
             .or(contracts)
@@ -2451,44 +2492,89 @@ async fn add_validator_via_cli(validator_data: serde_json::Value, config_path: &
                       validator_address, subnet_id, collateral))
         }
         "federated" => {
-            // For federated mode, we need to set federated power
-            // NOTE: For now, we'll just set power for the single new validator
-            // A more complete implementation would merge with existing validators
+            // For federated mode, we need to merge with existing validators
             let power = validator_data.get("power")
-                .and_then(|v| v.as_u64())
+                .and_then(|v| v.as_f64())
                 .ok_or_else(|| anyhow::anyhow!("Missing 'power' field for federated mode"))?;
 
             let public_key = validator_data.get("pubkey")
                 .and_then(|v| v.as_str())
                 .ok_or_else(|| anyhow::anyhow!("Missing 'pubkey' field for federated mode"))?;
 
-            // Strip "0x" prefix from public key if present
-            let clean_public_key = if public_key.starts_with("0x") || public_key.starts_with("0X") {
-                &public_key[2..]
-            } else {
-                public_key
-            };
+            let from_address = validator_data.get("fromAddress")
+                .and_then(|v| v.as_str())
+                .unwrap_or(validator_address);
 
             log::info!("   - Power: {}", power);
             log::info!("   - Public Key: {}", public_key);
-            log::info!("   - Cleaned Public Key: {}", clean_public_key);
+            log::info!("   - From Address: {}", from_address);
 
-            // For federated subnets, we use set_federated_power with the new validator
-            // TODO: In a complete implementation, this should merge with existing validators
+            // Get current validators and merge with the new one
+            let subnet_id_parsed = ipc_api::subnet_id::SubnetID::from_str(subnet_id)
+                .map_err(|e| anyhow::anyhow!("Invalid subnet ID '{}': {}", subnet_id, e))?;
+
+            let current_validators = provider.list_validators(&subnet_id_parsed).await
+                .map_err(|e| anyhow::anyhow!("Failed to get current validators: {}", e))?;
+
+            log::info!("Found {} existing validators", current_validators.len());
+
+            // Build merged validator lists
+            let mut validator_addresses = Vec::new();
+            let mut validator_pubkeys = Vec::new();
+            let mut validator_powers = Vec::new();
+
+            // Add existing validators
+            for (addr, info) in current_validators {
+                let addr_str = format!("{:#x}", addr);
+                if addr_str.to_lowercase() != validator_address.to_lowercase() {
+                    validator_addresses.push(addr_str);
+
+                    // Extract public key from metadata (hex string)
+                    let metadata_hex = format!("{:#x}", info.metadata);
+                    let pubkey = if metadata_hex.starts_with("0x") || metadata_hex.starts_with("0X") {
+                        metadata_hex[2..].to_string()
+                    } else {
+                        metadata_hex
+                    };
+                    validator_pubkeys.push(pubkey);
+
+                    // Convert power to wei
+                    let current_power = (info.current_power * 1e18) as u128;
+                    validator_powers.push(current_power);
+                }
+            }
+
+            // Add the new validator
+            validator_addresses.push(validator_address.to_string());
+
+            // Strip "0x" prefix from public key if present
+            let clean_public_key = if public_key.starts_with("0x") || public_key.starts_with("0X") {
+                public_key[2..].to_string()
+            } else {
+                public_key.to_string()
+            };
+            validator_pubkeys.push(clean_public_key);
+
+            let new_power = (power * 1e18) as u128;
+            validator_powers.push(new_power);
+
+            log::info!("Merged validator set: {} validators total", validator_addresses.len());
+
+            // Use set_federated_power with the merged validator set
             use crate::commands::subnet::set_federated_power::{set_federated_power, SetFederatedPowerArgs};
 
             let args = SetFederatedPowerArgs {
-                from: validator_address.to_string(),
+                from: from_address.to_string(),
                 subnet: subnet_id.to_string(),
-                validator_addresses: vec![validator_address.to_string()],
-                validator_pubkeys: vec![clean_public_key.to_string()],
-                validator_power: vec![(power as f64 * 1e18) as u128],  // Convert to wei
+                validator_addresses,
+                validator_pubkeys,
+                validator_power: validator_powers,
             };
 
             set_federated_power(&provider, &args).await
-                .map_err(|e| anyhow::anyhow!("Failed to set federated power for validator: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to set federated power for merged validator set: {}", e))?;
 
-            Ok(format!("Successfully added federated validator {} to subnet {} with power {}. Note: This replaces existing validator set.",
+            Ok(format!("Successfully added federated validator {} to subnet {} with power {} (merged with existing validators)",
                       validator_address, subnet_id, power))
         }
         _ => {
@@ -2643,4 +2729,87 @@ async fn update_validator_stake_via_cli(stake_data: serde_json::Value, config_pa
             Err(anyhow::anyhow!("Unsupported stake operation: {}", operation))
         }
     }
+}
+
+/// Set federated power for a complete validator set
+async fn set_federated_power_via_cli(power_data: serde_json::Value, config_path: &str) -> Result<String> {
+    log::info!("🔹 Starting set federated power process");
+
+    // Extract required fields from the request
+    let subnet_id = power_data.get("subnetId")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow::anyhow!("Missing 'subnetId' field"))?;
+
+    let from_address = power_data.get("fromAddress")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow::anyhow!("Missing 'fromAddress' field"))?;
+
+    let validators = power_data.get("validators")
+        .and_then(|v| v.as_array())
+        .ok_or_else(|| anyhow::anyhow!("Missing 'validators' field"))?;
+
+    log::info!("   - Subnet ID: {}", subnet_id);
+    log::info!("   - From Address: {}", from_address);
+    log::info!("   - Validators count: {}", validators.len());
+
+    // Create GlobalArguments
+    let global = GlobalArguments {
+        config_path: Some(config_path.to_string()),
+        _network: fvm_shared::address::Network::Testnet,
+        __network: None,
+    };
+
+    // Get IPC provider
+    let provider = get_ipc_provider(&global)
+        .map_err(|e| anyhow::anyhow!("Failed to get IPC provider: {}", e))?;
+
+    // Parse validators from the request
+    let mut validator_addresses = Vec::new();
+    let mut validator_pubkeys = Vec::new();
+    let mut validator_powers = Vec::new();
+
+    for validator in validators {
+        let address = validator.get("address")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'address' field in validator"))?;
+
+        let pubkey = validator.get("pubkey")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'pubkey' field in validator"))?;
+
+        let power = validator.get("power")
+            .and_then(|v| v.as_f64())
+            .ok_or_else(|| anyhow::anyhow!("Missing 'power' field in validator"))?;
+
+        validator_addresses.push(address.to_string());
+
+        // Strip "0x" prefix from public key if present
+        let clean_public_key = if pubkey.starts_with("0x") || pubkey.starts_with("0X") {
+            pubkey[2..].to_string()
+        } else {
+            pubkey.to_string()
+        };
+        validator_pubkeys.push(clean_public_key);
+
+        let power_wei = (power * 1e18) as u128;
+        validator_powers.push(power_wei);
+
+        log::info!("   - Validator: {} (power: {})", address, power);
+    }
+
+    // Use set_federated_power with the complete validator set
+    use crate::commands::subnet::set_federated_power::{set_federated_power, SetFederatedPowerArgs};
+
+    let args = SetFederatedPowerArgs {
+        from: from_address.to_string(),
+        subnet: subnet_id.to_string(),
+        validator_addresses,
+        validator_pubkeys,
+        validator_power: validator_powers,
+    };
+
+    set_federated_power(&provider, &args).await
+        .map_err(|e| anyhow::anyhow!("Failed to set federated power: {}", e))?;
+
+    Ok(format!("Successfully set federated power for {} validators in subnet {}", validators.len(), subnet_id))
 }

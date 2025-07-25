@@ -174,6 +174,10 @@ export const apiService = {
     return retryRequest(() => api.post(API_ENDPOINTS.validators.updateStake, stakeData))
   },
 
+  async setFederatedPower(powerData: FederatedPowerRequest) {
+    return retryRequest(() => api.post(API_ENDPOINTS.validators.setFederatedPower, powerData))
+  },
+
   // Configuration management
   async saveConfig(config: any) {
     return retryRequest(() => api.post('/api/config/save', config))
@@ -220,6 +224,16 @@ interface ValidatorStakeUpdateRequest {
   address: string
   amount: number
   action: 'stake' | 'unstake'
+}
+
+interface FederatedPowerRequest {
+  subnetId: string
+  fromAddress: string
+  validators: Array<{
+    address: string
+    pubkey: string
+    power: number
+  }>
 }
 
 interface DeploymentRequest {
