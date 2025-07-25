@@ -129,8 +129,8 @@ impl GatewayInfo {
         parent_network: String,
         name: Option<String>,
     ) -> Self {
-        let id = format!("gateway-{}", chrono::Utc::now().timestamp());
-        let default_name = format!("Gateway {}", &gateway_address[..8]);
+        let id = format!("gw-{}", gateway_address.chars().take(8).collect::<String>());
+        let default_name = format!("Gateway ({}...)", gateway_address.chars().take(8).collect::<String>());
 
         Self {
             id,
@@ -144,6 +144,23 @@ impl GatewayInfo {
             subnets_created: 0,
             description: None,
         }
+    }
+
+    /// Convert to JSON format suitable for contracts API
+    pub fn to_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "id": format!("gateway-{}", self.id),
+            "name": self.name,
+            "type": "gateway",
+            "address": self.gateway_address,
+            "deployer": self.deployer_address,
+            "network": self.parent_network,
+            "deployed_at": self.deployed_at,
+            "status": if self.status == "active" { "active" } else { "inactive" },
+            "description": self.description,
+            "subnets_created": self.subnets_created,
+            "actions": ["inspect", "configure", "approve-subnets"]
+        })
     }
 }
 

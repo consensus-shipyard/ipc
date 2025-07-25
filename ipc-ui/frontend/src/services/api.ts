@@ -124,6 +124,31 @@ export const apiService = {
     return retryRequest(() => api.get(API_ENDPOINTS.discoverGateways))
   },
 
+  // Contracts
+  async getContracts() {
+    return retryRequest(() => api.get('/api/contracts'))
+  },
+
+  async getContract(id: string) {
+    return retryRequest(() => api.get(`/api/contracts/${id}`))
+  },
+
+  async inspectContract(contractAddress: string) {
+    return retryRequest(() => api.get(`/api/contracts/inspect/${contractAddress}`))
+  },
+
+  async configureContract(contractId: string, config: any) {
+    return retryRequest(() => api.put(`/api/contracts/${contractId}/configure`, config))
+  },
+
+  async upgradeContract(contractId: string, upgradeData: any) {
+    return retryRequest(() => api.post(`/api/contracts/${contractId}/upgrade`, upgradeData))
+  },
+
+  async getContractABI(contractAddress: string) {
+    return retryRequest(() => api.get(`/api/contracts/${contractAddress}/abi`))
+  },
+
   // Deployment (using deployment API for extended timeout)
   async deploy(config: DeploymentRequest) {
     return retryRequest(() => deploymentApi.post(API_ENDPOINTS.deploy, config))

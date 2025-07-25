@@ -8,6 +8,12 @@ interface Validator {
   stake: string
   power: number
   status: string
+  // Additional properties for federated mode
+  current_power?: number
+  next_power?: number
+  waiting?: boolean
+  // Additional properties for collateral mode
+  initial_balance?: number
 }
 
 interface SubnetInstance {
@@ -618,6 +624,17 @@ watch(() => props.id, (newId) => {
             Configuration
           </button>
           <button
+            @click="activeTab = 'contracts'"
+            :class="[
+              'py-2 px-1 border-b-2 font-medium text-sm',
+              activeTab === 'contracts'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            ]"
+          >
+            Contracts
+          </button>
+          <button
             @click="activeTab = 'metrics'"
             :class="[
               'py-2 px-1 border-b-2 font-medium text-sm',
@@ -781,9 +798,62 @@ watch(() => props.id, (newId) => {
               </div>
             </div>
 
+            <!-- Permission Mode Explanation -->
+            <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h4 class="text-md font-semibold text-blue-800 mb-2 flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {{ instance.config.permissionMode === 'federated' ? 'Federated Mode' : 'Collateral Mode' }}
+              </h4>
+
+              <div v-if="instance.config.permissionMode === 'federated'" class="text-blue-700 text-sm">
+                <p class="mb-2"><strong>Federated subnets</strong> use centralized validator management:</p>
+                <ul class="list-disc list-inside space-y-1 ml-4">
+                  <li>Validators are added by setting their power directly</li>
+                  <li>No collateral staking required</li>
+                  <li>Network owner controls validator set</li>
+                  <li>Changes are applied to all validators simultaneously</li>
+                </ul>
+              </div>
+
+              <div v-else-if="instance.config.permissionMode === 'collateral'" class="text-blue-700 text-sm">
+                <p class="mb-2"><strong>Collateral subnets</strong> use stake-based validator management:</p>
+                <ul class="list-disc list-inside space-y-1 ml-4">
+                  <li>Validators join by staking FIL collateral</li>
+                  <li>Minimum stake requirement: {{ instance.config.minValidatorStake || 'Not set' }} FIL</li>
+                  <li>Validators can increase/decrease their stake</li>
+                  <li>Higher stake generally means higher voting power</li>
+                </ul>
+              </div>
+
+              <div v-else class="text-blue-700 text-sm">
+                <p>Unknown permission mode. Please check your subnet configuration.</p>
+              </div>
+            </div>
+
             <!-- Add Validator Form -->
             <div class="mb-8 p-6 bg-gray-50 rounded-lg">
-              <h4 class="text-md font-semibold text-gray-800 mb-4">Add New Validator</h4>
+              <h4 class="text-md font-semibold text-gray-800 mb-4 flex items-center">
+                <svg class="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Add New Validator
+              </h4>
+
+              <!-- Mode-specific instructions -->
+              <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                <div v-if="instance.config.permissionMode === 'federated'" class="text-yellow-800 text-sm">
+                  <p class="font-medium mb-1">📋 Federated Mode Instructions:</p>
+                  <p>Enter the validator's Ethereum address, public key, and desired power level. The validator will be added to the network with the specified power.</p>
+                </div>
+
+                <div v-else-if="instance.config.permissionMode === 'collateral'" class="text-yellow-800 text-sm">
+                  <p class="font-medium mb-1">💰 Collateral Mode Instructions:</p>
+                  <p>Enter the validator's address and collateral amount. The validator must have sufficient FIL to stake the specified collateral.</p>
+                </div>
+              </div>
+
               <form @submit.prevent="addValidator" class="space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -870,7 +940,15 @@ watch(() => props.id, (newId) => {
 
             <!-- Existing Validators Management -->
             <div>
-              <h4 class="text-md font-semibold text-gray-800 mb-4">Existing Validators</h4>
+              <h4 class="text-md font-semibold text-gray-800 mb-4 flex items-center">
+                <svg class="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                Existing Validators
+                <span class="ml-2 px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded-full">
+                  {{ instance.validators.length }} total
+                </span>
+              </h4>
 
               <div v-if="instance.validators.length === 0" class="text-center py-8 text-gray-500">
                 <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -884,26 +962,53 @@ watch(() => props.id, (newId) => {
                 <div
                   v-for="validator in instance.validators"
                   :key="validator.address"
-                  class="border border-gray-200 rounded-lg p-4"
+                  class="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow"
                 >
                   <div class="flex items-center justify-between">
                     <div class="flex-1">
                       <div class="flex items-center space-x-3 mb-2">
-                        <span class="font-mono text-sm">{{ validator.address.slice(0, 8) }}...{{ validator.address.slice(-6) }}</span>
+                        <span class="font-mono text-sm font-medium">{{ validator.address.slice(0, 8) }}...{{ validator.address.slice(-6) }}</span>
                         <span :class="[
                           'inline-flex px-2 py-1 text-xs font-semibold rounded-full',
                           validator.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                         ]">
                           {{ validator.status }}
                         </span>
+
+                        <!-- Power transition indicator for federated mode -->
+                        <span v-if="instance.config.permissionMode === 'federated' && validator.current_power !== validator.next_power"
+                              class="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+                          Power Changing
+                        </span>
                       </div>
+
                       <div class="text-sm text-gray-600">
-                        <span v-if="instance.config.permissionMode === 'collateral'">
-                          Stake: {{ validator.stake }} FIL
-                        </span>
-                        <span v-else>
-                          Power: {{ validator.power }}
-                        </span>
+                        <div v-if="instance.config.permissionMode === 'collateral'">
+                          <span class="font-medium">Stake:</span> {{ validator.stake }} FIL
+                          <span v-if="validator.initial_balance" class="ml-3">
+                            <span class="font-medium">Initial Balance:</span> {{ validator.initial_balance }} FIL
+                          </span>
+                        </div>
+
+                        <div v-else-if="instance.config.permissionMode === 'federated'">
+                          <div class="flex items-center space-x-4">
+                            <span>
+                              <span class="font-medium">Current Power:</span> {{ validator.current_power || validator.power || '0' }}
+                            </span>
+                            <span v-if="validator.next_power !== undefined && validator.current_power !== validator.next_power"
+                                  class="text-blue-600">
+                              <span class="font-medium">→ Next Power:</span> {{ validator.next_power }}
+                            </span>
+                          </div>
+
+                          <div v-if="validator.waiting" class="mt-1 text-yellow-600 text-xs">
+                            ⏳ Validator changes pending epoch transition
+                          </div>
+                        </div>
+
+                        <div v-else>
+                          <span class="font-medium">Power:</span> {{ validator.power || 'Unknown' }}
+                        </div>
                       </div>
                     </div>
 
@@ -934,10 +1039,21 @@ watch(() => props.id, (newId) => {
                         </button>
                       </div>
 
+                      <!-- Federated mode notice -->
+                      <div v-else-if="instance.config.permissionMode === 'federated'" class="text-xs text-gray-500 mr-3">
+                        <div class="text-center">
+                          <svg class="w-4 h-4 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <p>Federated</p>
+                          <p>management</p>
+                        </div>
+                      </div>
+
                       <button
                         @click="removeValidator(validator.address)"
                         :disabled="removingValidator[validator.address]"
-                        class="text-red-600 hover:text-red-700 text-sm font-medium"
+                        class="text-red-600 hover:text-red-700 text-sm font-medium px-3 py-1 border border-red-300 rounded hover:bg-red-50 transition-colors"
                       >
                         {{ removingValidator[validator.address] ? 'Removing...' : 'Remove' }}
                       </button>
@@ -978,6 +1094,300 @@ watch(() => props.id, (newId) => {
                   </span>
                   <span v-else>{{ value }}</span>
                 </dd>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contracts Tab -->
+        <div v-if="activeTab === 'contracts'" class="space-y-6">
+          <!-- Related Contracts Overview -->
+          <div class="card">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Related Contracts</h3>
+            <p class="text-gray-600 mb-6">Smart contracts associated with this subnet and its operations.</p>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <!-- Gateway Contract -->
+              <div class="border border-gray-200 rounded-lg p-4">
+                <div class="flex items-start justify-between mb-4">
+                  <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+                      <svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 class="font-semibold text-gray-900">Gateway Contract</h4>
+                      <p class="text-sm text-gray-600">Manages subnet registration and cross-chain messaging</p>
+                    </div>
+                  </div>
+                  <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+                    Gateway
+                  </span>
+                </div>
+
+                <div class="space-y-3 mb-4">
+                  <div class="flex justify-between items-center">
+                    <span class="text-sm font-medium text-gray-500">Address</span>
+                    <button
+                      @click="copyToClipboard(gatewayAddress, 'gateway')"
+                      class="text-sm font-mono text-gray-900 hover:bg-gray-100 px-2 py-1 rounded transition-colors"
+                      :title="copyingAddress === 'gateway' ? 'Copied!' : `Click to copy: ${gatewayAddress}`"
+                    >
+                      {{ gatewayAddressShort }}
+                      <svg v-if="copyingAddress === 'gateway'" class="inline-block w-4 h-4 ml-1 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div class="flex justify-between items-center">
+                    <span class="text-sm font-medium text-gray-500">Network</span>
+                    <span class="text-sm text-gray-900 font-mono">{{ instance.parent }}</span>
+                  </div>
+
+                  <div class="flex justify-between items-center">
+                    <span class="text-sm font-medium text-gray-500">Status</span>
+                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      Active
+                    </span>
+                  </div>
+                </div>
+
+                <div class="flex space-x-2 pt-3 border-t border-gray-200">
+                  <button class="btn-secondary text-xs flex-1">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Inspect
+                  </button>
+                  <RouterLink :to="`/contracts`" class="btn-secondary text-xs">
+                    Manage
+                  </RouterLink>
+                </div>
+              </div>
+
+              <!-- Registry Contract -->
+              <div class="border border-gray-200 rounded-lg p-4">
+                <div class="flex items-start justify-between mb-4">
+                  <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M9 12h6m-6 4h6M7 20l4-16m6 16l-4-16" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 class="font-semibold text-gray-900">Registry Contract</h4>
+                      <p class="text-sm text-gray-600">Stores subnet metadata and configurations</p>
+                    </div>
+                  </div>
+                  <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    Registry
+                  </span>
+                </div>
+
+                <div class="space-y-3 mb-4">
+                  <div class="flex justify-between items-center">
+                    <span class="text-sm font-medium text-gray-500">Address</span>
+                    <button
+                      @click="copyToClipboard(instance.config?.registry_addr ? formatAddress(instance.config.registry_addr) : 'N/A', 'registry')"
+                      class="text-sm font-mono text-gray-900 hover:bg-gray-100 px-2 py-1 rounded transition-colors"
+                      :title="copyingAddress === 'registry' ? 'Copied!' : `Click to copy registry address`"
+                    >
+                      {{ instance.config?.registry_addr ? formatAddressShort(instance.config.registry_addr) : 'N/A' }}
+                      <svg v-if="copyingAddress === 'registry'" class="inline-block w-4 h-4 ml-1 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div class="flex justify-between items-center">
+                    <span class="text-sm font-medium text-gray-500">Network</span>
+                    <span class="text-sm text-gray-900 font-mono">{{ instance.parent }}</span>
+                  </div>
+
+                  <div class="flex justify-between items-center">
+                    <span class="text-sm font-medium text-gray-500">Status</span>
+                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      Active
+                    </span>
+                  </div>
+                </div>
+
+                <div class="flex space-x-2 pt-3 border-t border-gray-200">
+                  <button class="btn-secondary text-xs flex-1">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Inspect
+                  </button>
+                  <RouterLink :to="`/contracts`" class="btn-secondary text-xs">
+                    Manage
+                  </RouterLink>
+                </div>
+              </div>
+
+              <!-- Subnet Actor Contract -->
+              <div class="border border-gray-200 rounded-lg p-4">
+                <div class="flex items-start justify-between mb-4">
+                  <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                      <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M19 11H5m14-7H3m14 14H9m6-7l-6 6-4-4" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 class="font-semibold text-gray-900">Subnet Actor</h4>
+                      <p class="text-sm text-gray-600">Core subnet logic and validator management</p>
+                    </div>
+                  </div>
+                  <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    Subnet
+                  </span>
+                </div>
+
+                <div class="space-y-3 mb-4">
+                  <div class="flex justify-between items-center">
+                    <span class="text-sm font-medium text-gray-500">Subnet ID</span>
+                    <button
+                      @click="copyToClipboard(instance.id, 'subnet-id')"
+                      class="text-sm font-mono text-gray-900 hover:bg-gray-100 px-2 py-1 rounded transition-colors"
+                      :title="copyingAddress === 'subnet-id' ? 'Copied!' : `Click to copy: ${instance.id}`"
+                    >
+                      {{ instance.id.slice(0, 20) }}...
+                      <svg v-if="copyingAddress === 'subnet-id'" class="inline-block w-4 h-4 ml-1 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div class="flex justify-between items-center">
+                    <span class="text-sm font-medium text-gray-500">Permission Mode</span>
+                    <span class="text-sm text-gray-900 capitalize">{{ instance.config?.permissionMode || 'N/A' }}</span>
+                  </div>
+
+                  <div class="flex justify-between items-center">
+                    <span class="text-sm font-medium text-gray-500">Status</span>
+                    <span :class="['inline-flex items-center px-2 py-1 rounded-full text-xs font-medium', statusColor]">
+                      {{ (instance.status || 'Unknown').charAt(0).toUpperCase() + (instance.status || 'unknown').slice(1) }}
+                    </span>
+                  </div>
+                </div>
+
+                <div class="flex space-x-2 pt-3 border-t border-gray-200">
+                  <button class="btn-secondary text-xs flex-1">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Inspect
+                  </button>
+                  <button
+                    v-if="instance.status.toLowerCase() === 'pending approval'"
+                    :disabled="approvingSubnet"
+                    @click="approveSubnet"
+                    class="btn-primary text-xs"
+                  >
+                    {{ approvingSubnet ? 'Approving...' : 'Approve' }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Additional IPC Contracts (if any) -->
+              <div class="border border-gray-200 rounded-lg p-4">
+                <div class="flex items-start justify-between mb-4">
+                  <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                      <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 class="font-semibold text-gray-900">IPC Contracts</h4>
+                      <p class="text-sm text-gray-600">Additional subnet-specific contracts</p>
+                    </div>
+                  </div>
+                  <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                    IPC
+                  </span>
+                </div>
+
+                <div class="text-center py-6 text-gray-500">
+                  <svg class="mx-auto h-8 w-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M9 12h6m-6 4h6M7 20l4-16m6 16l-4-16" />
+                  </svg>
+                  <p class="text-sm">No additional contracts deployed</p>
+                  <button class="text-primary-600 hover:text-primary-700 text-sm font-medium mt-1">
+                    Deploy IPC Contract
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Contract Configuration -->
+          <div class="card">
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Contract Configuration</h3>
+            <div class="bg-gray-50 rounded-lg p-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h4 class="font-medium text-gray-900 mb-3">Gateway Settings</h4>
+                  <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">Min Validator Stake</span>
+                      <span class="font-mono">{{ instance.config?.minValidatorStake || 'N/A' }} FIL</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">Min Validators</span>
+                      <span class="font-mono">{{ instance.config?.minValidators || 'N/A' }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">Bottom-up Period</span>
+                      <span class="font-mono">{{ instance.config?.bottomupCheckPeriod || 'N/A' }} blocks</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 class="font-medium text-gray-900 mb-3">Subnet Settings</h4>
+                  <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">Supply Source</span>
+                      <span class="capitalize">{{ instance.config?.supplySourceKind || 'N/A' }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">Collateral Source</span>
+                      <span class="capitalize">{{ instance.config?.collateralSourceKind || 'N/A' }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-gray-600">Cross-msg Fee</span>
+                      <span class="font-mono">{{ instance.config?.minCrossMsgFee || 'N/A' }} FIL</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-6 pt-4 border-t border-gray-200">
+                <div class="flex justify-between items-center">
+                  <div>
+                    <h4 class="font-medium text-gray-900">Contract Upgrades</h4>
+                    <p class="text-sm text-gray-600">Manage contract versions and upgrades</p>
+                  </div>
+                  <button class="btn-secondary text-sm">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                    </svg>
+                    Check for Updates
+                  </button>
+                </div>
               </div>
             </div>
           </div>

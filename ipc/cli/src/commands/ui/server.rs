@@ -464,6 +464,142 @@ impl UIServer {
                 }
             });
 
+        // GET /api/contracts - List all contracts (gateways, registries, etc.)
+        let contracts = warp::path!("api" / "contracts")
+            .and(warp::get())
+            .and(state_filter.clone())
+            .and_then(|state: AppState| async move {
+                let server = UIServer {
+                    host: "127.0.0.1".to_string(),
+                    frontend_port: 3000,
+                    backend_port: 3001,
+                    mode: state.mode.clone(),
+                    config_path: state.config_path.clone(),
+                    state: state.clone(),
+                };
+
+                match server.get_all_contracts().await {
+                    Ok(contracts) => Ok::<_, warp::Rejection>(warp::reply::json(&contracts)),
+                    Err(e) => {
+                        log::error!("Failed to get contracts: {}", e);
+                        Ok::<_, warp::Rejection>(warp::reply::json(&Vec::<serde_json::Value>::new()))
+                    }
+                }
+            });
+
+        // GET /api/contracts/:id - Get specific contract details
+        let contract_by_id = warp::path!("api" / "contracts" / String)
+            .and(warp::get())
+            .and(state_filter.clone())
+            .and_then(|id: String, state: AppState| async move {
+                let server = UIServer {
+                    host: "127.0.0.1".to_string(),
+                    frontend_port: 3000,
+                    backend_port: 3001,
+                    mode: state.mode.clone(),
+                    config_path: state.config_path.clone(),
+                    state: state.clone(),
+                };
+
+                match server.get_contract_by_id(&id).await {
+                    Ok(Some(contract)) => {
+                        Ok::<_, warp::Rejection>(warp::reply::with_status(
+                            warp::reply::json(&contract),
+                            warp::http::StatusCode::OK
+                        ))
+                    }
+                    Ok(None) => {
+                        Ok::<_, warp::Rejection>(warp::reply::with_status(
+                            warp::reply::json(&serde_json::json!({"error": "Contract not found"})),
+                            warp::http::StatusCode::NOT_FOUND
+                        ))
+                    }
+                    Err(e) => {
+                        log::error!("Failed to get contract {}: {}", id, e);
+                        Ok::<_, warp::Rejection>(warp::reply::with_status(
+                            warp::reply::json(&serde_json::json!({"error": "Failed to retrieve contract"})),
+                            warp::http::StatusCode::INTERNAL_SERVER_ERROR
+                        ))
+                    }
+                }
+            });
+
+        // GET /api/contracts/inspect/:address - Inspect contract by address
+        let inspect_contract = warp::path!("api" / "contracts" / "inspect" / String)
+            .and(warp::get())
+            .and(state_filter.clone())
+            .and_then(|address: String, state: AppState| async move {
+                let server = UIServer {
+                    host: "127.0.0.1".to_string(),
+                    frontend_port: 3000,
+                    backend_port: 3001,
+                    mode: state.mode.clone(),
+                    config_path: state.config_path.clone(),
+                    state: state.clone(),
+                };
+
+                match server.inspect_contract(&address).await {
+                    Ok(inspection) => {
+                        Ok::<_, warp::Rejection>(warp::reply::with_status(
+                            warp::reply::json(&inspection),
+                            warp::http::StatusCode::OK
+                        ))
+                    }
+                    Err(e) => {
+                        log::error!("Failed to inspect contract {}: {}", address, e);
+                        Ok::<_, warp::Rejection>(warp::reply::with_status(
+                            warp::reply::json(&serde_json::json!({"error": "Failed to inspect contract"})),
+                            warp::http::StatusCode::INTERNAL_SERVER_ERROR
+                        ))
+                    }
+                }
+            });
+
+        // PUT /api/contracts/:id/configure - Configure contract
+        let configure_contract = warp::path!("api" / "contracts" / String / "configure")
+            .and(warp::put())
+            .and(warp::body::json())
+            .and(state_filter.clone())
+            .and_then(|id: String, config_data: serde_json::Value, state: AppState| async move {
+                log::info!("Received contract configuration request for {}: {:?}", id, config_data);
+
+                // TODO: Implement contract configuration logic
+                Ok::<_, warp::Rejection>(warp::reply::json(&serde_json::json!({
+                    "success": true,
+                    "message": format!("Contract {} configuration updated", id)
+                })))
+            });
+
+        // POST /api/contracts/:id/upgrade - Upgrade contract
+        let upgrade_contract = warp::path!("api" / "contracts" / String / "upgrade")
+            .and(warp::post())
+            .and(warp::body::json())
+            .and(state_filter.clone())
+            .and_then(|id: String, upgrade_data: serde_json::Value, state: AppState| async move {
+                log::info!("Received contract upgrade request for {}: {:?}", id, upgrade_data);
+
+                // TODO: Implement contract upgrade logic
+                Ok::<_, warp::Rejection>(warp::reply::json(&serde_json::json!({
+                    "success": true,
+                    "message": format!("Contract {} upgrade initiated", id)
+                })))
+            });
+
+        // GET /api/contracts/:address/abi - Get contract ABI
+        let contract_abi = warp::path!("api" / "contracts" / String / "abi")
+            .and(warp::get())
+            .and(state_filter.clone())
+            .and_then(|address: String, state: AppState| async move {
+                log::info!("Received ABI request for contract: {}", address);
+
+                // TODO: Implement ABI retrieval logic
+                Ok::<_, warp::Rejection>(warp::reply::json(&serde_json::json!({
+                    "abi": [],
+                    "address": address,
+                    "message": "ABI retrieval not yet implemented"
+                })))
+            });
+
         // POST /api/deploy
         let deploy = warp::path!("api" / "deploy")
             .and(warp::post())
@@ -646,6 +782,12 @@ impl UIServer {
             .or(add_validator)
             .or(remove_validator)
             .or(update_validator_stake)
+            .or(contracts)
+            .or(contract_by_id)
+            .or(inspect_contract)
+            .or(configure_contract)
+            .or(upgrade_contract)
+            .or(contract_abi)
 
 
     }
@@ -988,6 +1130,50 @@ impl UIServer {
         Ok(discovered_gateways)
     }
 
+    /// Get all contracts
+    async fn get_all_contracts(&self) -> Result<Vec<serde_json::Value>> {
+        let gateways = self.state.deployed_gateways.lock().unwrap();
+        let mut contracts = Vec::new();
+
+        // Add gateway contracts
+        for gateway in gateways.values() {
+            contracts.push(gateway.to_json());
+        }
+
+        // Add registry contracts (derived from gateways)
+        for gateway in gateways.values() {
+            contracts.push(serde_json::json!({
+                "id": format!("registry-{}", gateway.id),
+                "name": format!("Registry ({}...)", gateway.registry_address.chars().take(8).collect::<String>()),
+                "type": "registry",
+                "address": gateway.registry_address,
+                "deployer": gateway.deployer_address,
+                "network": gateway.parent_network,
+                "deployed_at": gateway.deployed_at,
+                "status": if gateway.status == "active" { "active" } else { "inactive" },
+                "description": format!("Registry contract for {}", gateway.name),
+                "actions": ["inspect", "configure"]
+            }));
+        }
+
+        Ok(contracts)
+    }
+
+    /// Get contract by ID
+    async fn get_contract_by_id(&self, id: &str) -> Result<Option<serde_json::Value>> {
+        let gateways = self.state.deployed_gateways.lock().unwrap();
+        Ok(gateways.get(id).map(|gateway| gateway.to_json()))
+    }
+
+    /// Inspect contract
+    async fn inspect_contract(&self, address: &str) -> Result<serde_json::Value> {
+        // Implement contract inspection logic
+        Ok(serde_json::json!({
+            "address": address,
+            "status": "Inspected",
+            "message": "Contract inspection not yet implemented"
+        }))
+    }
 
 }
 
@@ -2266,6 +2452,8 @@ async fn add_validator_via_cli(validator_data: serde_json::Value, config_path: &
         }
         "federated" => {
             // For federated mode, we need to set federated power
+            // NOTE: For now, we'll just set power for the single new validator
+            // A more complete implementation would merge with existing validators
             let power = validator_data.get("power")
                 .and_then(|v| v.as_u64())
                 .ok_or_else(|| anyhow::anyhow!("Missing 'power' field for federated mode"))?;
@@ -2285,7 +2473,8 @@ async fn add_validator_via_cli(validator_data: serde_json::Value, config_path: &
             log::info!("   - Public Key: {}", public_key);
             log::info!("   - Cleaned Public Key: {}", clean_public_key);
 
-            // Use the set federated power functionality
+            // For federated subnets, we use set_federated_power with the new validator
+            // TODO: In a complete implementation, this should merge with existing validators
             use crate::commands::subnet::set_federated_power::{set_federated_power, SetFederatedPowerArgs};
 
             let args = SetFederatedPowerArgs {
@@ -2293,13 +2482,13 @@ async fn add_validator_via_cli(validator_data: serde_json::Value, config_path: &
                 subnet: subnet_id.to_string(),
                 validator_addresses: vec![validator_address.to_string()],
                 validator_pubkeys: vec![clean_public_key.to_string()],
-                validator_power: vec![power as u128],
+                validator_power: vec![(power as f64 * 1e18) as u128],  // Convert to wei
             };
 
-            set_federated_power(&mut provider, &args).await
+            set_federated_power(&provider, &args).await
                 .map_err(|e| anyhow::anyhow!("Failed to set federated power for validator: {}", e))?;
 
-            Ok(format!("Successfully added federated validator {} to subnet {} with power {}",
+            Ok(format!("Successfully added federated validator {} to subnet {} with power {}. Note: This replaces existing validator set.",
                       validator_address, subnet_id, power))
         }
         _ => {

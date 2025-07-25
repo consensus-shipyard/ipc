@@ -66,6 +66,18 @@ const router = createRouter({
       props: true
     },
     {
+      path: '/subnets',
+      name: 'subnets',
+      component: () => import('../views/SubnetsView.vue'),
+      meta: { title: 'Subnets' }
+    },
+    {
+      path: '/contracts',
+      name: 'contracts',
+      component: () => import('../views/ContractsView.vue'),
+      meta: { title: 'Contracts' }
+    },
+    {
       path: '/settings',
       name: 'settings',
       component: () => import('../views/SettingsView.vue'),
