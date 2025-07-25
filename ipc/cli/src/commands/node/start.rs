@@ -2,34 +2,58 @@
 // SPDX-License-Identifier: MIT
 
 use crate::services::node_manager::NodeManager;
-use crate::{CommandLineHandler, GlobalArguments};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use clap::Args;
-use fendermint_app::settings::Settings;
+use fendermint_app_settings::Settings;
+use ipc_observability::config::{
+    ConsoleLayerSettings, FileLayerSettings, RotationKind, TracingSettings,
+};
+use ipc_observability::traces::set_global_tracing_subscriber;
 use std::path::{Path, PathBuf};
 use tracing::info;
 
 pub(crate) struct StartNode;
 
 #[async_trait]
-impl CommandLineHandler for StartNode {
+impl crate::CommandLineHandler for StartNode {
     type Arguments = StartNodeArgs;
 
-    async fn handle(_global: &GlobalArguments, arguments: &Self::Arguments) -> Result<()> {
-        let home = Path::new(&arguments.home);
-
-        // Validate that the node home directory exists and contains required files
+    async fn handle(_global: &crate::GlobalArguments, arguments: &Self::Arguments) -> Result<()> {
+        let home = &arguments.home;
         validate_node_home(home)?;
 
-        // Load Fendermint settings
-        let settings = load_fendermint_settings(home)?;
+        // Create logs directory
+        let log_dir = home.join("logs");
+        std::fs::create_dir_all(&log_dir)?;
 
-        // Set up unified logging using existing observability infrastructure
-        let _trace_file_guard =
-            ipc_observability::traces::set_global_tracing_subscriber(&settings.tracing);
+        // Set up proper logging using traces.rs
+        let tracing_config = TracingSettings {
+            console: Some(ConsoleLayerSettings {
+                level: Some("info".to_string()),
+            }),
+            file: Some(FileLayerSettings {
+                enabled: true,
+                directory: Some(log_dir.clone()),
+                level: Some("info".to_string()),
+                max_log_files: Some(5),
+                rotation: Some(RotationKind::Daily),
+                domain_filter: None,
+                events_filter: None,
+            }),
+        };
+
+        let _guards = set_global_tracing_subscriber(&tracing_config);
 
         info!("Starting IPC node from home directory: {}", home.display());
+        info!("Logs will be written to: {}", log_dir.display());
+
+        // Load Fendermint settings with correct home directory
+        let settings = load_fendermint_settings(home)?;
+        info!(
+            "Fendermint settings loaded with home: {}",
+            settings.home_dir().display()
+        );
 
         // Create and start node manager with all services
         let node_manager = NodeManager::new(home.to_path_buf(), settings);
@@ -98,7 +122,7 @@ fn load_fendermint_settings(home: &Path) -> Result<Settings> {
     let fendermint_home = home.join("fendermint");
     let settings = Settings::new(
         &fendermint_home.join("config"),
-        &fendermint_home,
+        &fendermint_home, // Use the fendermint home directory
         "validator",
     )
     .context("failed to load Fendermint settings")?;

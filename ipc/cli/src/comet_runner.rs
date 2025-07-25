@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 use anyhow::{Context, Result};
+use ipc_observability::traces::CONSENSUS_TARGET;
 use std::ffi::OsStr;
 use std::{
     env, fs, io,
@@ -92,13 +93,13 @@ impl CometDaemon {
 
         loop {
             if shutdown.is_cancelled() {
-                info!(target: "cometbft", "Shutdown signal received");
+                info!(target: CONSENSUS_TARGET, "Shutdown signal received");
                 break;
             }
 
             match self.spawn_daemon().await {
                 Ok(mut child) => {
-                    info!(target: "cometbft", "CometBFT daemon started");
+                    info!(target: CONSENSUS_TARGET, "CometBFT daemon started");
 
                     // Wait for either process exit or shutdown signal
                     let exit_status = tokio::select! {
@@ -111,13 +112,13 @@ impl CometDaemon {
 
                     match exit_status {
                         Ok(status) if status.success() => {
-                            info!(target: "cometbft", "CometBFT exited cleanly");
+                            info!(target: CONSENSUS_TARGET, "CometBFT exited cleanly");
                             break;
                         }
                         Ok(status) => {
                             attempts += 1;
                             error!(
-                                target: "cometbft",
+                                target: CONSENSUS_TARGET,
                                 "CometBFT crashed with code {}. Restart attempt {}/{}",
                                 status.code().unwrap_or(-1),
                                 attempts,
@@ -127,7 +128,7 @@ impl CometDaemon {
                         Err(e) => {
                             attempts += 1;
                             error!(
-                                target: "cometbft",
+                                target: CONSENSUS_TARGET,
                                 "Error waiting for CometBFT: {}. Restart attempt {}/{}",
                                 e,
                                 attempts,
@@ -139,7 +140,7 @@ impl CometDaemon {
                 Err(e) => {
                     attempts += 1;
                     error!(
-                        target: "cometbft",
+                        target: CONSENSUS_TARGET,
                         "Failed to spawn CometBFT: {}. Restart attempt {}/{}",
                         e,
                         attempts,
@@ -149,7 +150,7 @@ impl CometDaemon {
             }
 
             if attempts >= self.max_restarts {
-                error!(target: "cometbft", "Max restarts reached, giving up");
+                error!(target: CONSENSUS_TARGET, "Max restarts reached, giving up");
                 return Err(anyhow::anyhow!(
                     "CometBFT failed after {} restart attempts",
                     attempts
@@ -157,7 +158,7 @@ impl CometDaemon {
             }
 
             info!(
-                target: "cometbft",
+                target: CONSENSUS_TARGET,
                 "Waiting {} seconds before restart attempt {}",
                 self.restart_delay.as_secs(),
                 attempts + 1
@@ -191,7 +192,7 @@ impl CometDaemon {
             let mut reader = BufReader::new(stdout).lines();
             tokio::spawn(async move {
                 while let Ok(Some(line)) = reader.next_line().await {
-                    info!(target: "cometbft", "stdout: {}", line);
+                    info!(target: CONSENSUS_TARGET, "stdout: {}", line);
                 }
             });
         }
@@ -201,7 +202,7 @@ impl CometDaemon {
             let mut reader = BufReader::new(stderr).lines();
             tokio::spawn(async move {
                 while let Ok(Some(line)) = reader.next_line().await {
-                    error!(target: "cometbft", "stderr: {}", line);
+                    error!(target: CONSENSUS_TARGET, "stderr: {}", line);
                 }
             });
         }
@@ -213,7 +214,7 @@ impl CometDaemon {
     async fn kill_process(&self, child: &mut Child) {
         if let Some(pid) = child.id() {
             let _ = child.kill().await;
-            info!(target: "cometbft", "CometBFT process (pid={}) killed", pid);
+            info!(target: CONSENSUS_TARGET, "CometBFT process (pid={}) killed", pid);
         }
     }
 }

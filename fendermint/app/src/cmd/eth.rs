@@ -5,7 +5,6 @@ use std::time::Duration;
 
 use anyhow::Context;
 use fendermint_eth_api::HybridClient;
-use tracing::info;
 
 use crate::{
     cmd,

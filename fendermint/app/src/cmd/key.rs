@@ -62,7 +62,8 @@ cmd! {
 
 cmd! {
   KeyIntoTendermintArgs(self) {
-    convert_key_to_cometbft(self)
+    let sk = read_secret_key(&self.secret_key)?;
+    convert_key_to_cometbft(&sk, &self.out)
   }
 }
 
@@ -121,9 +122,8 @@ pub fn store_key(secret_key: &SecretKey, name: &str, out_dir: &Path) -> anyhow::
     Ok(())
 }
 
-pub fn convert_key_to_cometbft(args: &KeyIntoTendermintArgs) -> anyhow::Result<()> {
-    let sk = read_secret_key(&args.secret_key)?;
-    let pk = sk.public_key();
+pub fn convert_key_to_cometbft(secret_key: &SecretKey, out: &Path) -> anyhow::Result<()> {
+    let pk = secret_key.public_key();
     let vk = tendermint::crypto::default::ecdsa_secp256k1::VerifyingKey::from_sec1_bytes(
         &pk.serialize(),
     )
@@ -140,12 +140,12 @@ pub fn convert_key_to_cometbft(args: &KeyIntoTendermintArgs) -> anyhow::Result<(
         "pub_key": pub_key,
         "priv_key": {
             "type": "tendermint/PrivKeySecp256k1",
-            "value": secret_to_b64(&sk)
+            "value": secret_to_b64(&secret_key)
         }
     });
     let json = serde_json::to_string_pretty(&priv_validator_key)?;
 
-    fs::write(&args.out, json)?;
+    fs::write(&out, json)?;
 
     Ok(())
 }
