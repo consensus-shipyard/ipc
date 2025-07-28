@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import AddressSelector from '../../components/common/AddressSelector.vue'
 import FormInput from '../../components/common/FormInput.vue'
 import FormSelect from '../../components/common/FormSelect.vue'
 import { useTemplatesStore } from '../../stores/templates'
@@ -304,12 +305,14 @@ onMounted(() => {
           </div>
 
           <!-- From Address -->
-          <FormInput
+          <AddressSelector
             v-model="formData.from"
             label="From Address (Optional)"
-            placeholder="0x..."
+            placeholder="0x... or select from wallet"
             help-text="Address creating the subnet (defaults to global sender if not specified)"
             :error="fieldErrors.from"
+            field-name="fromAddress"
+            network-type="both"
             @blur="handleFieldBlur('from')"
           />
         </div>
@@ -414,13 +417,15 @@ onMounted(() => {
             Governance Configuration
           </h3>
 
-          <FormInput
+          <AddressSelector
             v-model="formData.genesisSubnetIpcContractsOwner"
             label="Genesis Contracts Owner"
-            placeholder="0x..."
+            placeholder="0x... or select from wallet"
             required
             :error="fieldErrors.genesisSubnetIpcContractsOwner"
             help-text="Address that will own the IPC diamond contracts at genesis"
+            field-name="genesisContractsOwner"
+            network-type="both"
             @blur="handleFieldBlur('genesisSubnetIpcContractsOwner')"
           />
         </div>

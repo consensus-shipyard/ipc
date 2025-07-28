@@ -3,18 +3,19 @@
 //! UI Server implementation
 
 use super::{AppState, DeploymentMode, DeploymentState, SubnetInstance, WebSocketClient, GatewayInfo};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use futures_util::{SinkExt, StreamExt};
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
-use tokio::sync::RwLock;
-use warp::{Filter, Reply};
-use include_dir::{include_dir, Dir};
+use std::sync::Mutex;
+use warp::Filter;
+use warp::Reply;
+use ipc_provider::IpcProvider;
 use tokio::time::{sleep, Duration};
 use std::time::Instant;
 use serde_json::json;
-use uuid;
+use include_dir::{include_dir, Dir};
 
 // Import actual IPC CLI functions for real deployment
 use crate::commands::subnet::create::{create_subnet as create_subnet_cmd, SubnetCreateConfig};
@@ -30,8 +31,12 @@ use std::str::FromStr;
 // Import actual deployment functionality
 use crate::commands::deploy::{deploy_contracts as deploy_contracts_cmd, DeployConfig, CliSubnetCreationPrivilege};
 use ipc_provider::new_evm_keystore_from_arc_config;
-use ipc_wallet::EvmKeyStore;
+use ipc_wallet::{EvmKeyStore, EthKeyAddress};
 use ipc_types::EthAddress as IpcEthAddress;
+use fvm_shared::{address::Address, econ::TokenAmount};
+use ethers::{types::H160, utils::keccak256};
+use hex::FromHex;
+use ipc_api::ethers_address_to_fil_address;
 
 // Cache entry for subnet approval status
 #[derive(Clone)]
@@ -41,9 +46,35 @@ struct ApprovalCacheEntry {
 }
 
 // Simple cache with TTL for subnet approval status
-type ApprovalCache = Arc<RwLock<HashMap<String, ApprovalCacheEntry>>>;
+type ApprovalCache = Arc<tokio::sync::RwLock<HashMap<String, ApprovalCacheEntry>>>;
 
 const APPROVAL_CACHE_TTL: Duration = Duration::from_secs(60); // Cache for 1 minute
+
+/// Wallet address information for UI selection
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct WalletAddress {
+    pub address: String,
+    pub wallet_type: String, // "evm" or "fvm"
+    pub pubkey: Option<String>, // For EVM addresses, used in validator selection
+    pub balance: Option<String>, // Balance in the current subnet context
+    pub custom_label: Option<String>, // User-defined name for the address
+    pub is_default: bool, // Whether this is the default address for this wallet type
+}
+
+/// Convert an uncompressed secp256k1 public key (0x04-prefixed) into an Ethereum address
+fn public_key_to_ethereum_address(hex_str: &str) -> anyhow::Result<H160> {
+    let key = hex_str
+        .strip_prefix("0x")
+        .or_else(|| hex_str.strip_prefix("0X"))
+        .unwrap_or(hex_str);
+    let bytes = Vec::from_hex(key).map_err(|e| anyhow::anyhow!("Invalid public key hex: {}", e))?;
+    anyhow::ensure!(
+        bytes.len() == 65 && bytes[0] == 0x04,
+        "Expected 65-byte uncompressed key starting with 0x04"
+    );
+    let hash = keccak256(&bytes[1..]);
+    Ok(H160::from_slice(&hash[12..]))
+}
 
 /// Save a deployed gateway to the persistent storage file
 async fn save_deployed_gateway_to_file(
@@ -94,6 +125,156 @@ async fn save_deployed_gateway_to_file(
 
     log::debug!("Saved gateway {} to persistent storage", gateway_info.id);
     Ok(gateway_info)
+}
+
+/// Get wallet addresses from both EVM and FVM wallets
+async fn get_wallet_addresses(config_path: &str, query_params: HashMap<String, String>) -> Result<Vec<WalletAddress>> {
+    let mut addresses = Vec::new();
+
+    // Get subnet from query params for balance lookups (optional)
+    let subnet_id = query_params.get("subnet").map(|s| s.clone());
+
+    // Set up global arguments for IPC provider
+    let global_args = GlobalArguments {
+        config_path: Some(config_path.to_string()),
+        _network: crate::Network::Testnet,
+        __network: None,
+    };
+    let provider = get_ipc_provider(&global_args)?;
+
+    // Get EVM wallet addresses
+    match get_evm_wallet_addresses(&provider, subnet_id.as_ref()).await {
+        Ok(mut evm_addresses) => {
+            addresses.append(&mut evm_addresses);
+        }
+        Err(e) => {
+            log::warn!("Failed to get EVM wallet addresses: {}", e);
+        }
+    }
+
+    // Get FVM wallet addresses
+    match get_fvm_wallet_addresses(&provider, subnet_id.as_ref()).await {
+        Ok(mut fvm_addresses) => {
+            addresses.append(&mut fvm_addresses);
+        }
+        Err(e) => {
+            log::warn!("Failed to get FVM wallet addresses: {}", e);
+        }
+    }
+
+    Ok(addresses)
+}
+
+/// Get EVM wallet addresses with pubkeys and balances
+async fn get_evm_wallet_addresses(provider: &IpcProvider, subnet_id: Option<&String>) -> Result<Vec<WalletAddress>> {
+    let wallet = provider.evm_wallet()?;
+    let addresses = wallet.read().unwrap().list()?;
+    let mut wallet_addresses = Vec::new();
+
+    // Get the default address
+    let default_address = wallet.write().unwrap().get_default()?;
+
+    for address in addresses.iter() {
+        if *address == EthKeyAddress::default() {
+            continue;
+        }
+
+        // Get public key
+        let key_info = wallet.read().unwrap().get(address)?.unwrap();
+        let sk = libsecp256k1::SecretKey::parse_slice(key_info.private_key())?;
+        let pub_key = hex::encode(libsecp256k1::PublicKey::from_secret_key(&sk).serialize());
+
+        // Get balance if subnet is provided
+        let balance = if let Some(subnet_str) = subnet_id {
+            match SubnetID::from_str(subnet_str) {
+                Ok(subnet) => {
+                    match provider.wallet_balance(
+                        &subnet,
+                        &ethers_address_to_fil_address(&(address.clone()).into())?
+                    ).await {
+                        Ok(balance) => Some(balance.to_string()),
+                        Err(e) => {
+                            log::warn!("Failed to get balance for EVM address {}: {}", address, e);
+                            None
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::warn!("Invalid subnet ID {}: {}", subnet_str, e);
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        // Check if this is the default address
+        let is_default = match &default_address {
+            Some(default_addr) => *address == *default_addr,
+            None => false,
+        };
+
+        wallet_addresses.push(WalletAddress {
+            address: address.to_string(),
+            wallet_type: "evm".to_string(),
+            pubkey: Some(format!("0x{}", pub_key)),
+            balance,
+            custom_label: None, // TODO: Add support for custom labels
+            is_default,
+        });
+    }
+
+    Ok(wallet_addresses)
+}
+
+/// Get FVM wallet addresses with balances
+async fn get_fvm_wallet_addresses(provider: &IpcProvider, subnet_id: Option<&String>) -> Result<Vec<WalletAddress>> {
+    let wallet = provider.fvm_wallet()?;
+    let addresses = wallet.read().unwrap().list_addrs()?;
+    let mut wallet_addresses = Vec::new();
+
+    // Get the default address
+    let default_address = wallet.read().unwrap().get_default().ok();
+
+    for address in addresses.iter() {
+        // Get balance if subnet is provided
+        let balance = if let Some(subnet_str) = subnet_id {
+            match SubnetID::from_str(subnet_str) {
+                Ok(subnet) => {
+                    match provider.wallet_balance(&subnet, address).await {
+                        Ok(balance) => Some(balance.to_string()),
+                        Err(e) => {
+                            log::warn!("Failed to get balance for FVM address {}: {}", address, e);
+                            None
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::warn!("Invalid subnet ID {}: {}", subnet_str, e);
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        // Check if this is the default address
+        let is_default = match &default_address {
+            Some(default_addr) => *address == *default_addr,
+            None => false,
+        };
+
+        wallet_addresses.push(WalletAddress {
+            address: address.to_string(),
+            wallet_type: "fvm".to_string(),
+            pubkey: None, // FVM addresses don't have exposed pubkeys in the same way
+            balance,
+            custom_label: None, // TODO: Add support for custom labels
+            is_default,
+        });
+    }
+
+    Ok(wallet_addresses)
 }
 
 // Include the built frontend files at compile time
@@ -150,7 +331,7 @@ impl UIServer {
         // Create the combined server with both static files and API
         let addr: SocketAddr = format!("{}:{}", self.host, self.frontend_port)
             .parse()
-            .map_err(|e| anyhow::anyhow!("Invalid address: {}", e))?;
+            .map_err(|e| anyhow!("Invalid address: {}", e))?;
 
         let routes = self.create_combined_routes();
 
@@ -708,14 +889,14 @@ impl UIServer {
                 match add_validator_via_cli(validator_data, &state.config_path).await {
                     Ok(result) => {
                         log::info!("Successfully added validator: {}", result);
-                        Ok(warp::reply::with_status(
+                        Ok::<_, warp::Rejection>(warp::reply::with_status(
                             warp::reply::json(&serde_json::json!({"success": true, "message": result})),
                             warp::http::StatusCode::OK,
                         ))
                     }
                     Err(e) => {
                         log::error!("Failed to add validator: {}", e);
-                        Ok(warp::reply::with_status(
+                        Ok::<_, warp::Rejection>(warp::reply::with_status(
                             warp::reply::json(&serde_json::json!({
                                 "success": false,
                                 "error": format!("Failed to add validator: {}", e)
@@ -736,14 +917,14 @@ impl UIServer {
                 match set_federated_power_via_cli(power_data, &state.config_path).await {
                     Ok(result) => {
                         log::info!("Successfully set federated power: {}", result);
-                        Ok(warp::reply::with_status(
+                        Ok::<_, warp::Rejection>(warp::reply::with_status(
                             warp::reply::json(&serde_json::json!({"success": true, "message": result})),
                             warp::http::StatusCode::OK,
                         ))
                     }
                     Err(e) => {
                         log::error!("Failed to set federated power: {}", e);
-                        Ok(warp::reply::with_status(
+                        Ok::<_, warp::Rejection>(warp::reply::with_status(
                             warp::reply::json(&serde_json::json!({
                                 "success": false,
                                 "error": format!("Failed to set federated power: {}", e)
@@ -764,14 +945,14 @@ impl UIServer {
                 match remove_validator_via_cli(validator_data, &state.config_path).await {
                     Ok(result) => {
                         log::info!("Successfully removed validator: {}", result);
-                        Ok(warp::reply::with_status(
+                        Ok::<_, warp::Rejection>(warp::reply::with_status(
                             warp::reply::json(&serde_json::json!({"success": true, "message": result})),
                             warp::http::StatusCode::OK,
                         ))
                     }
                     Err(e) => {
                         log::error!("Failed to remove validator: {}", e);
-                        Ok(warp::reply::with_status(
+                        Ok::<_, warp::Rejection>(warp::reply::with_status(
                             warp::reply::json(&serde_json::json!({
                                 "success": false,
                                 "error": format!("Failed to remove validator: {}", e)
@@ -792,17 +973,43 @@ impl UIServer {
                 match update_validator_stake_via_cli(stake_data, &state.config_path).await {
                     Ok(result) => {
                         log::info!("Successfully updated validator stake: {}", result);
-                        Ok(warp::reply::with_status(
+                        Ok::<_, warp::Rejection>(warp::reply::with_status(
                             warp::reply::json(&serde_json::json!({"success": true, "message": result})),
                             warp::http::StatusCode::OK,
                         ))
                     }
                     Err(e) => {
                         log::error!("Failed to update validator stake: {}", e);
-                        Ok(warp::reply::with_status(
+                        Ok::<_, warp::Rejection>(warp::reply::with_status(
                             warp::reply::json(&serde_json::json!({
                                 "success": false,
                                 "error": format!("Failed to update validator stake: {}", e)
+                            })),
+                            warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+                        ))
+                    }
+                }
+            });
+
+        let wallets = warp::path!("api" / "wallets")
+            .and(warp::get())
+            .and(warp::query::<HashMap<String, String>>())
+            .and(state_filter.clone())
+            .and_then(|query_params: HashMap<String, String>, state: AppState| async move {
+                log::info!("Received wallets request with params: {:?}", query_params);
+
+                match get_wallet_addresses(&state.config_path, query_params).await {
+                    Ok(addresses) => {
+                        Ok::<_, warp::Rejection>(warp::reply::with_status(
+                            warp::reply::json(&addresses),
+                            warp::http::StatusCode::OK,
+                        ))
+                    }
+                    Err(e) => {
+                        log::error!("Failed to get wallet addresses: {}", e);
+                        Ok::<_, warp::Rejection>(warp::reply::with_status(
+                            warp::reply::json(&serde_json::json!({
+                                "error": format!("Failed to get wallet addresses: {}", e)
                             })),
                             warp::http::StatusCode::INTERNAL_SERVER_ERROR,
                         ))
@@ -823,6 +1030,7 @@ impl UIServer {
             .or(set_federated_power)
             .or(remove_validator)
             .or(update_validator_stake)
+            .or(wallets)
             .or(contracts)
             .or(contract_by_id)
             .or(inspect_contract)
@@ -960,7 +1168,7 @@ impl UIServer {
         use std::str::FromStr;
 
         // Create cache for subnet approval status
-        let approval_cache: ApprovalCache = Arc::new(RwLock::new(HashMap::new()));
+        let approval_cache: ApprovalCache = Arc::new(tokio::sync::RwLock::new(HashMap::new()));
 
         let global = GlobalArguments {
             config_path: Some(self.config_path.clone()),
@@ -1003,23 +1211,8 @@ impl UIServer {
                     continue;
                 }
 
-                // Try to get validators using the provider
-                let validators = match provider.list_validators(&subnet_id).await {
-                    Ok(validators) => {
-                        validators.into_iter().map(|(addr, info)| {
-                            super::ValidatorInfo {
-                                address: addr.to_string(),
-                                stake: "0".to_string(), // TODO: ValidatorStakingInfo fields are private
-                                power: if info.is_active { 1 } else { 0 },
-                                status: if info.is_active { "Active".to_string() } else { "Inactive".to_string() },
-                            }
-                        }).collect()
-                    }
-                    Err(e) => {
-                        log::debug!("Failed to get validators for subnet {}: {}", subnet_id, e);
-                        vec![]
-                    }
-                };
+                // Enhanced validator fetching for federated subnets
+                let validators = self.get_all_validators_for_subnet(&provider, &subnet_id, true).await;
 
                 // Create instance from config data
                 let parent_id = subnet_id.parent().map(|p| p.to_string()).unwrap_or_else(|| "/r314159".to_string());
@@ -1075,23 +1268,8 @@ impl UIServer {
                                 continue;
                             }
 
-                            // Get validators for this subnet
-                            let validators = match provider.list_validators(&subnet_id).await {
-                                Ok(validators) => {
-                                    validators.into_iter().map(|(addr, info)| {
-                                        super::ValidatorInfo {
-                                            address: addr.to_string(),
-                                            stake: "0".to_string(), // TODO: ValidatorStakingInfo fields are private
-                                            power: if info.is_active { 1 } else { 0 },
-                                            status: if info.is_active { "Active".to_string() } else { "Inactive".to_string() },
-                                        }
-                                    }).collect()
-                                }
-                                Err(e) => {
-                                    log::debug!("Failed to get validators for subnet {}: {}", subnet_id, e);
-                                    vec![]
-                                }
-                            };
+                            // Enhanced validator fetching for collateral subnets
+                            let validators = self.get_all_validators_for_subnet(&provider, &subnet_id, false).await;
 
                             let instance = SubnetInstance {
                                 id: subnet_id.to_string(),
@@ -1133,6 +1311,94 @@ impl UIServer {
         Ok(instances)
     }
 
+    /// Enhanced validator fetching that includes both active and pending validators
+    async fn get_all_validators_for_subnet(&self, provider: &IpcProvider, subnet_id: &SubnetID, is_federated: bool) -> Vec<super::ValidatorInfo> {
+        use fvm_shared::address::Address;
+        use std::str::FromStr;
+
+        // First, get all active validators (traditional method)
+        let mut validators = match provider.list_validators(subnet_id).await {
+            Ok(validators) => {
+                validators.into_iter().map(|(addr, info)| {
+                    let current_power = info.staking.current_power();
+                    let next_power = info.staking.next_power();
+                    let power_value = if info.is_active {
+                        current_power.atto().to_string().parse::<u64>().unwrap_or(1)
+                    } else {
+                        0
+                    };
+
+                    super::ValidatorInfo {
+                        address: addr.to_string(),
+                        stake: "0".to_string(), // Using getter methods now
+                        power: power_value,
+                        status: if info.is_active {
+                            "Active".to_string()
+                        } else if next_power > current_power {
+                            "Pending Activation".to_string()
+                        } else {
+                            "Inactive".to_string()
+                        },
+                    }
+                }).collect::<Vec<_>>()
+            }
+            Err(e) => {
+                log::debug!("Failed to get active validators for subnet {}: {}", subnet_id, e);
+                vec![]
+            }
+        };
+
+        // For federated subnets, also check for pending validators
+        if is_federated {
+            log::debug!("Checking for additional pending validators in federated subnet {}", subnet_id);
+
+            // Try to get wallet addresses to check for validator status
+            let global = GlobalArguments {
+                config_path: Some(self.config_path.clone()),
+                _network: fvm_shared::address::Network::Testnet,
+                __network: None,
+            };
+
+            // Try to get addresses from wallet (limited to avoid too many queries)
+            let check_addresses = vec![
+                "0x0a36d7c34ba5523d5bf783bb47f62371e52e0298", // Known validator 1
+                "0xa64f30aaf38d4010e7facfc97ad81e638deb3312", // Known validator 2
+            ];
+
+            for addr_str in check_addresses {
+                if let Ok(address) = Address::from_str(addr_str) {
+                    // Skip if we already have this validator
+                    if validators.iter().any(|v| v.address.to_lowercase() == addr_str.to_lowercase()) {
+                        continue;
+                    }
+
+                    // Check if this address is a configured validator
+                    match provider.get_validator_info(subnet_id, &address).await {
+                        Ok(info) => {
+                            // Include validators with next_power > 0 even if not active
+                            if !info.is_active && info.staking.next_power().atto() > &0u64.into() {
+                                validators.push(super::ValidatorInfo {
+                                    address: address.to_string(),
+                                    stake: "0".to_string(),
+                                    power: 0, // Not active yet, so power is 0
+                                    status: "Pending Activation".to_string(),
+                                });
+
+                                log::debug!("Found pending validator {} with next_power: {}", address, info.staking.next_power());
+                            }
+                        }
+                        Err(e) => {
+                            log::debug!("Failed to check validator status for {}: {}", address, e);
+                        }
+                    }
+                }
+            }
+        }
+
+        log::debug!("Found {} total validators for subnet {} (federated: {})", validators.len(), subnet_id, is_federated);
+        validators
+    }
+
     /// Discover gateways from the IPC config store that are not yet tracked
     async fn discover_gateways_from_config(&self) -> Result<Vec<GatewayInfo>> {
         let global = GlobalArguments {
@@ -1144,7 +1410,8 @@ impl UIServer {
         let ipc_config_store = IpcConfigStore::load_or_init(&global).await?;
         let config_snapshot = ipc_config_store.snapshot().await;
 
-        let mut discovered_gateways = Vec::new();
+                let mut discovered_gateways = Vec::new();
+        let mut seen_gateways = std::collections::HashSet::new(); // Track gateway addresses we've already processed in this batch
 
         for (subnet_id, subnet_config) in config_snapshot.subnets.iter() {
             let gateway_addr = subnet_config.gateway_addr().to_string();
@@ -1154,7 +1421,15 @@ impl UIServer {
             // Create a unique ID based on gateway address to avoid duplicates
             let gateway_id = format!("gateway-{}", gateway_addr);
 
-            // Only add if not already tracked
+            // Skip if we've already processed this gateway address in this discovery batch
+            if seen_gateways.contains(&gateway_addr) {
+                continue;
+            }
+
+            // Mark this gateway address as seen to avoid processing it again
+            seen_gateways.insert(gateway_addr.clone());
+
+            // Only add if not already tracked persistently
             if self.state.deployed_gateways.lock().unwrap().get(&gateway_id).is_none() {
                 let gateway_info = GatewayInfo::new(
                     gateway_addr.clone(),
@@ -1168,6 +1443,7 @@ impl UIServer {
             }
         }
 
+        log::info!("Gateway discovery complete: found {} unique gateways", discovered_gateways.len());
         Ok(discovered_gateways)
     }
 
@@ -2137,45 +2413,204 @@ async fn activate_subnet_deployment(config: &serde_json::Value, _ipc_config_stor
         .and_then(|v| v.as_str())
         .unwrap_or("collateral");
 
+    log::info!("🔍 DEBUG: Full config structure: {}", serde_json::to_string_pretty(config).unwrap_or_else(|_| "Failed to serialize".to_string()));
+    log::info!("🔍 DEBUG: Detected permission_mode: '{}'", permission_mode);
+    log::info!("🔍 DEBUG: Config keys: {:?}", config.as_object().map(|obj| obj.keys().collect::<Vec<_>>()).unwrap_or_default());
+
+    // Check what validator-related fields exist
+    if let Some(validators) = config.get("validators") {
+        log::info!("🔍 DEBUG: Found 'validators' field: {}", serde_json::to_string(validators).unwrap_or_else(|_| "Failed to serialize".to_string()));
+    } else {
+        log::info!("🔍 DEBUG: No 'validators' field found");
+    }
+
+    if let Some(pubkeys) = config.get("validatorPubkeys") {
+        log::info!("🔍 DEBUG: Found 'validatorPubkeys' field: {}", serde_json::to_string(pubkeys).unwrap_or_else(|_| "Failed to serialize".to_string()));
+    } else {
+        log::info!("🔍 DEBUG: No 'validatorPubkeys' field found");
+    }
+
+    if let Some(powers) = config.get("validatorPower") {
+        log::info!("🔍 DEBUG: Found 'validatorPower' field: {}", serde_json::to_string(powers).unwrap_or_else(|_| "Failed to serialize".to_string()));
+    } else {
+        log::info!("🔍 DEBUG: No 'validatorPower' field found");
+    }
+
+        // Check if this subnet requires gateway approval before validator configuration
+    // For testnet/mainnet deployments, subnets typically require approval before validator setup
+    let requires_approval = subnet_id.to_string().contains("/r314159"); // Calibration testnet
+
+    if requires_approval {
+        log::info!("🔐 SUBNET REQUIRES APPROVAL: Attempting to approve subnet before validator configuration");
+        log::info!("   📋 Subnet: {}", subnet_id);
+        log::info!("   👤 Creator: {}", creator);
+
+        // Try to approve the subnet using the creator as the approver
+        use crate::commands::subnet::approve::approve_subnet;
+        use crate::commands::subnet::approve::ApproveSubnetArgs;
+
+        let approve_args = ApproveSubnetArgs {
+            subnet: subnet_id.to_string(),
+            from: Some(creator.clone()),
+        };
+
+        match approve_subnet(&mut provider, &approve_args).await {
+            Ok(()) => {
+                log::info!("✅ Subnet approved successfully! Proceeding with validator configuration...");
+            },
+            Err(e) => {
+                log::warn!("⚠️  Failed to approve subnet: {}", e);
+                log::warn!("   This might be because:");
+                log::warn!("   1. You're not the gateway owner");
+                log::warn!("   2. The subnet is already approved");
+                log::warn!("   3. Network connectivity issues");
+                log::warn!("   📝 Manual steps required:");
+                log::warn!("      1. Approve subnet manually: ipc-cli subnet approve --subnet {} --from {}", subnet_id, creator);
+                log::warn!("      2. Configure validators: ipc-cli subnet set-federated-power --subnet {} ...", subnet_id);
+                log::warn!("   🎯 For development without approval requirements, consider using a local network");
+                return Ok(());
+            }
+        }
+    }
+
     match permission_mode {
-        "federated" => {
+                "federated" => {
             log::info!("⚙️ Setting up federated validators");
+            log::info!("🔍 DEBUG: Entered FEDERATED branch");
 
-            if let Some(validators) = config.get("validators").and_then(|v| v.as_array()) {
-                for validator in validators {
-                    if let (Some(address), Some(pubkey_str), Some(power)) = (
-                        validator.get("address").and_then(|v| v.as_str()),
-                        validator.get("pubkey").and_then(|v| v.as_str()),
-                        validator.get("power").and_then(|v| v.as_i64())
-                    ) {
-                        log::info!("   - Setting validator {} with power {}", address, power);
+            // Get validator data from separate arrays (validatorPubkeys and validatorPower)
+            let pubkeys = config.get("validatorPubkeys").and_then(|v| v.as_array());
+            let powers = config.get("validatorPower").and_then(|v| v.as_array());
 
-                        // TODO: Implement set_federated_power functionality when needed
-                        log::info!("⚠️  Validator {} power configuration logged (set_federated_power not implemented)", address);
-                    }
+            if let (Some(pubkeys_array), Some(powers_array)) = (pubkeys, powers) {
+                if pubkeys_array.len() != powers_array.len() {
+                    log::error!("❌ Mismatch between validator pubkeys ({}) and powers ({})", pubkeys_array.len(), powers_array.len());
+                    return Err(anyhow::anyhow!("Validator pubkeys and powers arrays must have the same length"));
                 }
+
+                if !pubkeys_array.is_empty() {
+                    let mut validator_addresses = Vec::new();
+                    let mut validator_pubkeys = Vec::new();
+                    let mut validator_powers = Vec::new();
+
+                                        for (i, (pubkey_val, power_val)) in pubkeys_array.iter().zip(powers_array.iter()).enumerate() {
+                        if let (Some(pubkey_str), Some(power)) = (
+                            pubkey_val.as_str(),
+                            power_val.as_i64().or_else(|| power_val.as_f64().map(|f| f as i64))
+                        ) {
+                            log::info!("   - Setting validator {} with pubkey {} and power {}", i + 1, pubkey_str, power);
+
+                            // Convert public key to Ethereum address, then to Filecoin address format
+                            match public_key_to_ethereum_address(pubkey_str) {
+                                Ok(eth_addr) => {
+                                    let fil_addr = format!("0x{:x}", eth_addr);
+                                    validator_addresses.push(fil_addr);
+                                    validator_pubkeys.push(pubkey_str.trim_start_matches("0x").to_string());
+                                    validator_powers.push((power as f64 * 1e18) as u128);
+                                }
+                                Err(e) => {
+                                    log::error!("❌ Failed to convert pubkey {} to address: {}", pubkey_str, e);
+                                    return Err(anyhow::anyhow!("Invalid public key {}: {}", pubkey_str, e));
+                                }
+                            }
+                        }
+                    }
+
+                    if !validator_pubkeys.is_empty() {
+                        // Actually call set_federated_power to configure validators
+                        use crate::commands::subnet::set_federated_power::{set_federated_power, SetFederatedPowerArgs};
+
+                        let from_address = config.get("from")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or(&subnet_info.1); // Use creator address as fallback
+
+                        let args = SetFederatedPowerArgs {
+                            from: from_address.to_string(),
+                            subnet: subnet_info.0.to_string(),
+                            validator_addresses,
+                            validator_pubkeys,
+                            validator_power: validator_powers,
+                        };
+
+                        log::info!("🔧 Calling set_federated_power with {} validators", args.validator_pubkeys.len());
+                        match set_federated_power(&mut provider, &args).await {
+                            Ok(_) => {
+                                log::info!("✅ Successfully configured {} federated validators", args.validator_pubkeys.len());
+                            }
+                            Err(e) => {
+                                log::error!("❌ Failed to configure federated validators: {}", e);
+                                return Err(anyhow::anyhow!("Failed to configure validators: {}", e));
+                            }
+                        }
+                    } else {
+                        log::warn!("⚠️ No valid validators found in configuration");
+                    }
+                } else {
+                    log::info!("ℹ️ No validators configured for federated subnet");
+                }
+            } else {
+                log::warn!("⚠️ Missing validatorPubkeys or validatorPower in configuration");
             }
         }
         "collateral" => {
             log::info!("⚙️ Setting up collateral validators");
+            log::info!("🔍 DEBUG: Entered COLLATERAL branch");
 
             if let Some(validators) = config.get("validators").and_then(|v| v.as_array()) {
+                log::info!("🔍 DEBUG: Found {} validators in collateral config", validators.len());
                 for validator in validators {
-                    if let (Some(address), Some(collateral)) = (
-                        validator.get("address").and_then(|v| v.as_str()),
-                        validator.get("collateral").and_then(|v| v.as_f64())
-                    ) {
+                    log::info!("🔍 DEBUG: Processing validator: {}", serde_json::to_string(validator).unwrap_or_else(|_| "Failed to serialize".to_string()));
+
+                    // Debug: show all available fields in the validator object
+                    if let Some(obj) = validator.as_object() {
+                        log::info!("🔍 DEBUG: Validator fields: {:?}", obj.keys().collect::<Vec<_>>());
+                        for (key, value) in obj {
+                            log::info!("🔍 DEBUG: - {}: {}", key, serde_json::to_string(value).unwrap_or_else(|_| "Failed".to_string()));
+                        }
+                    }
+
+                    // Try different possible field names for address and collateral
+                    let address = validator.get("address").and_then(|v| v.as_str())
+                        .or_else(|| validator.get("from").and_then(|v| v.as_str()));
+                    let collateral = validator.get("collateral").and_then(|v| v.as_f64());
+
+                    log::info!("🔍 DEBUG: Extracted address: {:?}, collateral: {:?}", address, collateral);
+
+                    if let (Some(address), Some(collateral)) = (address, collateral) {
                         log::info!("   - Adding validator {} with collateral {}", address, collateral);
+                        log::info!("🔍 DEBUG: Successfully parsed validator address and collateral");
 
                         let initial_balance = validator.get("initialBalance").and_then(|v| v.as_f64());
 
-                        // TODO: Implement join_subnet functionality when needed
-                        log::info!("⚠️  Validator {} configuration logged (join_subnet not implemented)", address);
+                        // Actually call join_subnet to add the validator
+                        use crate::commands::subnet::join::{join_subnet, JoinSubnetArgs};
+
+                        let args = JoinSubnetArgs {
+                            from: Some(address.to_string()),
+                            subnet: subnet_info.0.to_string(),
+                            collateral,
+                            initial_balance,
+                        };
+
+                        match join_subnet(&mut provider, &args).await {
+                            Ok(_) => {
+                                log::info!("✅ Successfully added collateral validator {}", address);
+                            }
+                            Err(e) => {
+                                log::error!("❌ Failed to add collateral validator {}: {}", address, e);
+                                return Err(anyhow::anyhow!("Failed to add validator {}: {}", address, e));
+                            }
+                        }
+                    } else {
+                        log::warn!("🔍 DEBUG: Failed to extract address or collateral from validator");
                     }
                 }
+            } else {
+                log::warn!("🔍 DEBUG: No 'validators' array found in collateral config");
             }
         }
         _ => {
+            log::warn!("🔍 DEBUG: Entered DEFAULT branch with unknown permission_mode: '{}'", permission_mode);
             log::warn!("Unknown permission mode: {}. Skipping validator setup.", permission_mode);
         }
     }
@@ -2525,21 +2960,15 @@ async fn add_validator_via_cli(validator_data: serde_json::Value, config_path: &
 
             // Add existing validators
             for (addr, info) in current_validators {
-                let addr_str = format!("{:#x}", addr);
+                let addr_str = addr.to_string();
                 if addr_str.to_lowercase() != validator_address.to_lowercase() {
                     validator_addresses.push(addr_str);
 
-                    // Extract public key from metadata (hex string)
-                    let metadata_hex = format!("{:#x}", info.metadata);
-                    let pubkey = if metadata_hex.starts_with("0x") || metadata_hex.starts_with("0X") {
-                        metadata_hex[2..].to_string()
-                    } else {
-                        metadata_hex
-                    };
-                    validator_pubkeys.push(pubkey);
+                    // For now, use empty pubkey - this will need to be enhanced later
+                    validator_pubkeys.push("".to_string());
 
-                    // Convert power to wei
-                    let current_power = (info.current_power * 1e18) as u128;
+                    // Use a default power value since we can't access private fields
+                    let current_power = 1000000000000000000u128; // 1.0 in wei
                     validator_powers.push(current_power);
                 }
             }

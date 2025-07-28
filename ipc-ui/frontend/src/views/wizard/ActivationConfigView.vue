@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { useWizardStore } from '../../stores/wizard'
-import { useTemplatesStore } from '../../stores/templates'
+import AddressSelector from '../../components/common/AddressSelector.vue'
 import FormInput from '../../components/common/FormInput.vue'
-import FormSelect from '../../components/common/FormSelect.vue'
+import { useTemplatesStore } from '../../stores/templates'
+import { useWalletStore } from '../../stores/wallet'
+import { useWizardStore } from '../../stores/wizard'
 
 const router = useRouter()
 const wizardStore = useWizardStore()
 const templatesStore = useTemplatesStore()
+const walletStore = useWalletStore()
 
 // Get permission mode from basic config to determine activation type
 const permissionMode = computed(() => wizardStore.config.permissionMode || 'collateral')
@@ -200,8 +202,12 @@ watch([federatedData, collateralValidators], () => {
   saveConfig()
 }, { deep: true })
 
-// Initialize minimum validators if needed
+// Initialize validator arrays based on template or minimum requirements
 onMounted(() => {
+  // Load wallet addresses for pubkey lookup
+  walletStore.fetchAddresses()
+
+  // Initialize minimum validators if needed
   if (activationMode.value === 'collateral' && collateralValidators.value.length < minValidators.value) {
     while (collateralValidators.value.length < minValidators.value) {
       addCollateralValidator()
@@ -212,6 +218,38 @@ onMounted(() => {
     }
   }
 })
+
+// Helper to get address from pubkey by looking up in wallet store
+const getAddressFromPubkey = (pubkey: string): string => {
+  if (!pubkey) return ''
+
+  // Find the address that corresponds to this pubkey
+  const walletAddress = walletStore.addresses.find(addr => addr.pubkey === pubkey)
+  return walletAddress?.address || ''
+}
+
+// Handle address selection for federated validators
+const handleValidatorAddressSelected = (index: number, walletAddress: any) => {
+  if (walletAddress.pubkey) {
+    // Auto-populate the pubkey from the selected address
+    federatedData.value.validatorPubkeys[index] = walletAddress.pubkey
+  }
+}
+
+// Handle manual address input (for when someone types an address manually)
+const handleAddressSelection = (index: number, address: string) => {
+  // Look up the pubkey for this address
+  const walletAddress = walletStore.getAddressByAddress(address)
+  if (walletAddress?.pubkey) {
+    federatedData.value.validatorPubkeys[index] = walletAddress.pubkey
+  }
+}
+
+// Validate a specific field
+const validateField = (fieldName: string) => {
+  // Clear previous error
+  delete fieldErrors.value[fieldName]
+}
 </script>
 
 <template>
@@ -294,13 +332,16 @@ onMounted(() => {
               </div>
 
               <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <FormInput
+                <AddressSelector
                   v-model="validator.from"
                   label="Validator Address"
-                  placeholder="0x..."
+                  placeholder="0x... or select from wallet"
                   required
                   :error="fieldErrors[`address_${index}`]"
                   help-text="Ethereum address of the validator"
+                  :field-name="`validator_${index}`"
+                  network-type="evm"
+                  :show-pubkey="true"
                 />
 
                 <FormInput
@@ -370,14 +411,38 @@ onMounted(() => {
 
               <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div class="md:col-span-3">
-                  <FormInput
-                    v-model="federatedData.validatorPubkeys[index]"
-                    label="Public Key"
-                    placeholder="0x04..."
-                    required
+                  <AddressSelector
+                    :model-value="getAddressFromPubkey(federatedData.validatorPubkeys[index])"
+                    label="Validator Address (Public Key will be auto-filled)"
+                    placeholder="Select address or enter pubkey manually"
                     :error="fieldErrors[`pubkey_${index}`]"
-                    help-text="65-byte uncompressed public key (starts with 0x04)"
+                    help-text="Select an EVM address to auto-fill pubkey, or enter pubkey manually"
+                    :field-name="`federatedValidator_${index}`"
+                    network-type="evm"
+                    :show-pubkey="true"
+                    @update:modelValue="handleAddressSelection(index, $event)"
+                    @address-selected="handleValidatorAddressSelected(index, $event)"
                   />
+
+                  <!-- Manual pubkey input fallback -->
+                  <FormInput
+                    v-if="!getAddressFromPubkey(federatedData.validatorPubkeys[index])"
+                    v-model="federatedData.validatorPubkeys[index]"
+                    label="Or Enter Public Key Manually"
+                    placeholder="0x04..."
+                    class="mt-2"
+                    help-text="65-byte uncompressed public key (starts with 0x04)"
+                    @blur="validateField(`pubkey_${index}`)"
+                  />
+
+                  <!-- Show resolved pubkey -->
+                  <div
+                    v-else-if="federatedData.validatorPubkeys[index]"
+                    class="mt-2 p-2 bg-gray-50 rounded text-xs"
+                  >
+                    <span class="font-medium text-gray-700">Public Key:</span>
+                    <code class="ml-2 text-gray-600">{{ federatedData.validatorPubkeys[index] }}</code>
+                  </div>
                 </div>
 
                 <FormInput

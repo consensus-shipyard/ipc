@@ -39,6 +39,9 @@ const pageTitle = computed(() => {
           Deploy New Subnet
         </RouterLink>
 
+        <!-- Wallet Selector -->
+        <WalletSelector />
+
         <!-- Settings -->
         <RouterLink
           to="/settings"
