@@ -283,51 +283,15 @@ async fn load_fendermint_settings(home: &Path) -> Result<Settings> {
 /// Start all node services and handle graceful shutdown
 ///
 /// Creates the NodeManager and starts CometBFT, Fendermint, and ETH API services.
-/// Listens for shutdown signals (Ctrl+C) and ensures clean shutdown of all services.
+/// The NodeManager handles all shutdown signals internally.
 async fn start_services(home: &Path, settings: Settings) -> Result<()> {
     info!("Starting node services");
 
     // Create and start node manager with all services
     let node_manager = NodeManager::new(home.to_path_buf(), settings);
 
-    // Start all services
-    let services_handle = tokio::spawn(async move { node_manager.start_all_services().await });
-
-    // Set up graceful shutdown handling
-    let shutdown_signal = async {
-        tokio::signal::ctrl_c()
-            .await
-            .expect("failed to install Ctrl+C signal handler");
-        info!("Shutdown signal received, initiating graceful shutdown...");
-    };
-
-    // Wait for either services to complete or shutdown signal
-    tokio::select! {
-        result = services_handle => {
-            match result {
-                Ok(Ok(())) => {
-                    info!("All services completed successfully");
-                }
-                Ok(Err(e)) => {
-                    return Err(e).context("node services encountered an error");
-                }
-                Err(e) => {
-                    return Err(anyhow::anyhow!("service task panicked: {}", e));
-                }
-            }
-        }
-        _ = shutdown_signal => {
-            info!("Graceful shutdown initiated");
-            // Note: In a more complete implementation, we would:
-            // 1. Send shutdown signal to NodeManager
-            // 2. Wait for services to shutdown cleanly with timeout
-            // 3. Force shutdown if timeout exceeded
-            // For now, we just log and exit
-        }
-    }
-
-    info!("Node shutdown completed");
-    Ok(())
+    // Start all services - NodeManager handles shutdown signals internally
+    node_manager.start_all_services().await
 }
 
 /// CLI arguments for starting a node

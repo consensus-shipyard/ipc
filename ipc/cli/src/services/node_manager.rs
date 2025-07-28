@@ -14,6 +14,24 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, subscriber, warn};
 
+/// Configuration for service restart behavior
+#[derive(Debug, Clone)]
+struct RestartConfig {
+    max_restarts: u32,
+    initial_delay: Duration,
+    max_delay: Duration,
+}
+
+impl Default for RestartConfig {
+    fn default() -> Self {
+        Self {
+            max_restarts: 5,
+            initial_delay: Duration::from_secs(1),
+            max_delay: Duration::from_secs(30),
+        }
+    }
+}
+
 /// Configuration for NodeManager startup behavior
 #[derive(Debug, Clone)]
 pub struct NodeManagerConfig {
@@ -119,11 +137,68 @@ fn init_temporary_tracing() -> impl Drop {
     TracingGuard { _subscriber: guard }
 }
 
+/// Generic service restart function
+///
+/// Runs a service with automatic restart on failure, using exponential backoff.
+/// Respects cancellation tokens for clean shutdown.
+async fn run_service_with_restart<S, F>(
+    service_name: &str,
+    service_factory: F,
+    cancel_token: CancellationToken,
+    config: RestartConfig,
+) -> Result<()>
+where
+    S: Service,
+    F: Fn() -> S + Send + 'static,
+{
+    let mut attempts = 0u32;
+    let mut delay = config.initial_delay;
+
+    loop {
+        if cancel_token.is_cancelled() {
+            return Ok(());
+        }
+
+        let service = service_factory();
+
+        match service.run(cancel_token.clone()).await {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                attempts += 1;
+                if attempts > config.max_restarts {
+                    return Err(e)
+                        .context(format!("{} service exceeded max restarts", service_name));
+                }
+
+                warn!(
+                    target: "service.node_manager",
+                    "{} service failed (attempt {}/{}): {} – restarting in {}s",
+                    service_name,
+                    attempts,
+                    config.max_restarts,
+                    e,
+                    delay.as_secs()
+                );
+
+                // Wait, but abort early if we are shutting down.
+                tokio::select! {
+                    _ = tokio::time::sleep(delay) => {},
+                    _ = cancel_token.cancelled() => return Ok(()),
+                }
+
+                // Exponential back-off capped at max_delay.
+                delay = std::cmp::min(delay * 2, config.max_delay);
+            }
+        }
+    }
+}
+
 /// Set up graceful shutdown signal handling
 ///
 /// Listens for SIGINT/SIGTERM and triggers cancellation when received.
 /// Returns a handle to the shutdown task.
 fn setup_graceful_shutdown(cancel_token: CancellationToken) -> JoinHandle<()> {
+    let token = cancel_token.clone();
     tokio::spawn(async move {
         let ctrl_c = async {
             tokio::signal::ctrl_c()
@@ -152,7 +227,7 @@ fn setup_graceful_shutdown(cancel_token: CancellationToken) -> JoinHandle<()> {
             }
         }
 
-        cancel_token.cancel();
+        token.cancel();
         info!(target: "service.node_manager", "Shutdown signal sent to all services");
     })
 }
@@ -168,50 +243,16 @@ async fn start_fendermint(
 
     let settings = settings.clone();
     let token = cancel_token.clone();
-
-    // Restart parameters.
-    const MAX_RESTARTS: u32 = 5;
-    const INITIAL_DELAY: Duration = Duration::from_secs(1);
+    let config = RestartConfig::default();
 
     let handle = tokio::spawn(async move {
-        let mut attempts = 0u32;
-        let mut delay = INITIAL_DELAY;
-
-        loop {
-            if token.is_cancelled() {
-                return Ok(());
-            }
-
-            let service = FendermintService::new(settings.clone());
-
-            match service.run(token.clone()).await {
-                Ok(()) => return Ok(()),
-                Err(e) => {
-                    attempts += 1;
-                    if attempts > MAX_RESTARTS {
-                        return Err(e).context("Fendermint service exceeded max restarts");
-                    }
-
-                    warn!(
-                        target: "service.node_manager",
-                        "Fendermint service failed (attempt {}/{}): {} – restarting in {}s",
-                        attempts,
-                        MAX_RESTARTS,
-                        e,
-                        delay.as_secs()
-                    );
-
-                    // Wait, but abort early if we are shutting down.
-                    tokio::select! {
-                        _ = tokio::time::sleep(delay) => {},
-                        _ = token.cancelled() => return Ok(()),
-                    }
-
-                    // Exponential back-off capped at 30 s.
-                    delay = std::cmp::min(delay * 2, Duration::from_secs(30));
-                }
-            }
-        }
+        run_service_with_restart(
+            "Fendermint",
+            move || FendermintService::new(settings.clone()),
+            token,
+            config,
+        )
+        .await
     });
 
     Ok(handle)
@@ -360,51 +401,18 @@ async fn start_eth_api(
 
     let settings = settings.clone();
     let token = cancel_token.clone();
-
-    // Restart parameters.
-    const MAX_RESTARTS: u32 = 5;
-    const INITIAL_DELAY: Duration = Duration::from_secs(1);
+    let config = RestartConfig::default();
 
     let handle = tokio::spawn(async move {
-        let mut attempts = 0u32;
-        let mut delay = INITIAL_DELAY;
-
-        loop {
-            if token.is_cancelled() {
-                return Ok(());
-            }
-
-            let service = EthApiService::new(settings.clone(), Duration::from_secs(5));
-
-            match service.run(token.clone()).await {
-                Ok(()) => return Ok(()),
-                Err(e) => {
-                    attempts += 1;
-                    if attempts > MAX_RESTARTS {
-                        return Err(e).context("ETH API service exceeded max restarts");
-                    }
-
-                    warn!(
-                        target: "service.node_manager",
-                        "ETH API service failed (attempt {}/{}): {} – restarting in {}s",
-                        attempts,
-                        MAX_RESTARTS,
-                        e,
-                        delay.as_secs()
-                    );
-
-                    tokio::select! {
-                        _ = tokio::time::sleep(delay) => {},
-                        _ = token.cancelled() => return Ok(()),
-                    }
-
-                    delay = std::cmp::min(delay * 2, Duration::from_secs(30));
-                }
-            }
-        }
+        run_service_with_restart(
+            "ETH API",
+            move || EthApiService::new(settings.clone(), Duration::from_secs(5)),
+            token,
+            config,
+        )
+        .await
     });
 
-    // We don't need a post-spawn sleep here; readiness is handled by the service itself.
     Ok(handle)
 }
 
