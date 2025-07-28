@@ -97,11 +97,8 @@ cmd! {
 cmd! {
     KeyShowPeerIdArgs(self) {
         let pk = read_public_key(&self.public_key)?;
-        // Just using this type because it does the conversion we need.
-        let vk = ipc_ipld_resolver::ValidatorKey::from(pk);
-        let pk: libp2p::identity::PublicKey = vk.into();
-        let id = pk.to_peer_id();
-        println!("{}", id);
+        let peer_id = derive_peer_id_from_public_key(&pk)?;
+        println!("{}", peer_id);
         Ok(())
     }
 }
@@ -174,6 +171,15 @@ pub fn read_public_key(public_key: &Path) -> anyhow::Result<PublicKey> {
     let b64 = fs::read_to_string(public_key).context("failed to read public key")?;
     let pk = b64_to_public(&b64).context("failed to parse public key")?;
     Ok(pk)
+}
+
+/// Derive libp2p peer ID from a PublicKey
+pub fn derive_peer_id_from_public_key(pk: &PublicKey) -> anyhow::Result<String> {
+    // Just using this type because it does the conversion we need.
+    let vk = ipc_ipld_resolver::ValidatorKey::from(*pk);
+    let libp2p_pk: libp2p::identity::PublicKey = vk.into();
+    let peer_id = libp2p_pk.to_peer_id();
+    Ok(peer_id.to_string())
 }
 
 pub fn read_secret_key_hex(private_key: &Path) -> anyhow::Result<SecretKey> {

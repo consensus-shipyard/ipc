@@ -34,6 +34,7 @@ fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true }
 hex = { workspace = true }
 libsecp256k1 = { workspace = true }
+libp2p = { workspace = true }
 log = { workspace = true }
 num-derive = "0.3.3"
 num-bigint = { workspace = true }
@@ -48,6 +49,9 @@ serde_yaml = { workspace = true }
 strum = { workspace = true }
 thiserror = { workspace = true }
 tempfile = "3.8"
+sha2 = "0.10"
+rand = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
 tokio = { workspace = true, features = ["signal"] }
 tokio-tungstenite = { workspace = true }
 tokio-util = { workspace = true }
@@ -72,4 +76,5 @@ fendermint_app_settings = { path = "../../fendermint/app/settings" }
 fendermint_vm_actor_interface = { path = "../../fendermint/vm/actor_interface" }
 fendermint_app = { path = "../../fendermint/app" }
 fendermint_crypto = { path = "../../fendermint/crypto" }
+ipc_ipld_resolver = { path = "../../ipld/resolver" }
 contracts-artifacts = { path = "../../contracts-artifacts" }

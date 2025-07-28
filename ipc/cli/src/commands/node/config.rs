@@ -29,16 +29,107 @@ where
 {
     use serde::de::Error;
 
-    // Try to deserialize as Option<String> first to handle missing fields
-    let opt_s: Option<String> = Option::deserialize(deserializer)?;
-
-    match opt_s {
-        Some(s) => {
-            // Then parse the string as TOML
-            toml::from_str(&s).map(Some).map_err(Error::custom)
+    let s: Option<String> = Option::deserialize(deserializer)?;
+    match s {
+        Some(s) if !s.trim().is_empty() => {
+            let value: toml::Value = s.parse().map_err(D::Error::custom)?;
+            Ok(Some(value))
         }
-        None => Ok(None),
+        _ => Ok(None),
     }
+}
+
+/// P2P networking configuration
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub struct P2pConfig {
+    /// External IP address for peer connections (defaults to "127.0.0.1")
+    pub external_ip: Option<String>,
+    /// Network port configuration
+    pub ports: Option<P2pPortsConfig>,
+    /// Peer configuration from various sources
+    pub peers: Option<P2pPeersConfig>,
+}
+
+/// Port configuration for different P2P services
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub struct P2pPortsConfig {
+    /// CometBFT P2P port (defaults to 26656)
+    pub cometbft: Option<u16>,
+    /// IPLD Resolver P2P port (defaults to disabled)
+    pub resolver: Option<u16>,
+}
+
+/// Peer configuration sources
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub struct P2pPeersConfig {
+    /// List of peer info JSON files (local paths or URLs)
+    pub peer_files: Option<Vec<String>>,
+}
+
+impl Default for P2pConfig {
+    fn default() -> Self {
+        Self {
+            external_ip: Some("127.0.0.1".to_string()),
+            ports: Some(P2pPortsConfig::default()),
+            peers: None,
+        }
+    }
+}
+
+impl Default for P2pPortsConfig {
+    fn default() -> Self {
+        Self {
+            cometbft: Some(26656),
+            resolver: None, // Disabled by default
+        }
+    }
+}
+
+/// Peer information that gets serialized to peer-info.json
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+pub struct PeerInfo {
+    /// General node information
+    pub node_info: NodeInfo,
+    /// CometBFT peer information
+    pub cometbft: CometBftPeerInfo,
+    /// Fendermint resolver peer information  
+    pub fendermint: FendermintPeerInfo,
+}
+
+/// General node information
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+pub struct NodeInfo {
+    /// External IP address configured for this node
+    pub external_ip: String,
+    /// Timestamp when this peer info was generated
+    pub generated_at: String,
+}
+
+/// CometBFT peer connection information
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+pub struct CometBftPeerInfo {
+    /// CometBFT node ID (hex-encoded)
+    pub node_id: String,
+    /// Port where CometBFT P2P listens
+    pub listen_port: u16,
+    /// Full external address for peer connections
+    pub external_address: String,
+    /// Ready-to-use peer string for CometBFT config
+    pub peer_string: String,
+}
+
+/// Fendermint IPLD resolver peer information
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+pub struct FendermintPeerInfo {
+    /// Libp2p peer ID (base58-encoded)
+    pub peer_id: String,
+    /// Port where resolver listens (if enabled)
+    pub listen_port: Option<u16>,
+    /// Full multiaddr for peer connections (if resolver enabled)
+    pub multiaddr: Option<String>,
 }
 
 /// Defines how the genesis state should be obtained
@@ -62,6 +153,8 @@ pub struct NodeInitConfig {
     pub parent: String,
     /// Validator key to import. Must be a secp256k1 key
     pub key: WalletImportArgs,
+    /// P2P networking configuration
+    pub p2p: Option<P2pConfig>,
     /// Optional TOML overrides for CometBFT configuration
     #[serde(deserialize_with = "deserialize_toml_override", default)]
     pub cometbft_overrides: Option<toml::Value>,

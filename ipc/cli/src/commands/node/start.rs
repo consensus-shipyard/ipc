@@ -120,6 +120,7 @@ fn validate_node_home(home: &Path) -> Result<()> {
 
 fn load_fendermint_settings(home: &Path) -> Result<Settings> {
     let fendermint_home = home.join("fendermint");
+
     let settings = Settings::new(
         &fendermint_home.join("config"),
         &fendermint_home, // Use the fendermint home directory

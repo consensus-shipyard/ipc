@@ -334,7 +334,6 @@ impl Default for MetricsSettings {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Settings {
     /// Home directory configured on the CLI, to which all paths in settings can be set relative.
-    #[serde(skip)]
     home_dir: PathBuf,
     /// Database files.
     data_dir: PathBuf,
