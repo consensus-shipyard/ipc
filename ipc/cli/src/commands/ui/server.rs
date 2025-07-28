@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 //! UI Server implementation
 
-use super::{AppState, DeploymentMode, DeploymentState, SubnetInstance, WebSocketClient, GatewayInfo};
+use super::{AppState, DeploymentMode, DeploymentState, SubnetInstance, WebSocketClient, GatewayInfo, SubnetMetadata};
 use anyhow::{anyhow, Result};
 use futures_util::{SinkExt, StreamExt};
 use std::collections::HashMap;
@@ -308,6 +308,7 @@ impl UIServer {
             websocket_clients: Arc::new(Mutex::new(Vec::new())),
             deployments: Arc::new(Mutex::new(HashMap::new())),
             deployed_gateways: Arc::new(Mutex::new(HashMap::new())),
+            subnet_metadata: Arc::new(Mutex::new(HashMap::new())),
         };
 
         Ok(UIServer {
@@ -327,6 +328,13 @@ impl UIServer {
 
         // Load existing gateway data
         self.load_gateway_data().await?;
+
+        // Load existing subnet metadata
+        self.load_subnet_metadata().await?;
+
+        // Note: Subnet creation dates will now use actual values from metadata
+        // For existing subnets without correct dates, they will show discovery time
+        log::info!("📝 Subnet metadata system initialized - creation dates will be preserved for new subnets");
 
         // Create the combined server with both static files and API
         let addr: SocketAddr = format!("{}:{}", self.host, self.frontend_port)
@@ -566,20 +574,34 @@ impl UIServer {
 
                 match server.discover_gateways_from_config().await {
                     Ok(discovered_gateways) => {
-                        // Add discovered gateways to the tracked list
+                        // Add discovered gateways to the tracked list with proper deduplication
+                        let mut actually_added = Vec::new();
                         {
                             let mut deployed_gateways = state.deployed_gateways.lock().unwrap();
                             for gateway in &discovered_gateways {
-                                deployed_gateways.insert(gateway.id.clone(), gateway.clone());
+                                // Double-check for duplicates before adding (handles concurrent calls)
+                                if !deployed_gateways.contains_key(&gateway.id) {
+                                    deployed_gateways.insert(gateway.id.clone(), gateway.clone());
+                                    actually_added.push(gateway.clone());
+                                }
                             }
                         }
 
-                        // Save to persistent storage
-                        if let Err(e) = server.save_gateway_data().await {
-                            log::warn!("Failed to save discovered gateways: {}", e);
+                        // Only save to persistent storage if we actually added new gateways
+                        if !actually_added.is_empty() {
+                            if let Err(e) = server.save_gateway_data().await {
+                                log::warn!("Failed to save discovered gateways: {}", e);
+                            }
+                            log::info!("Added {} new gateways to tracking", actually_added.len());
                         }
 
-                        Ok::<_, warp::Rejection>(warp::reply::json(&discovered_gateways))
+                        // Always return the current list of all gateways, not just discovered ones
+                        let all_gateways = {
+                            let deployed_gateways = state.deployed_gateways.lock().unwrap();
+                            deployed_gateways.values().cloned().collect::<Vec<_>>()
+                        };
+
+                        Ok::<_, warp::Rejection>(warp::reply::json(&all_gateways))
                     }
                     Err(e) => {
                         log::error!("Failed to discover gateways: {}", e);
@@ -1130,6 +1152,57 @@ impl UIServer {
         Ok(())
     }
 
+    /// Load subnet metadata from persistent storage
+    async fn load_subnet_metadata(&self) -> Result<()> {
+        let metadata_file = std::path::Path::new(&self.config_path)
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."))
+            .join("subnet_metadata.json");
+
+        if metadata_file.exists() {
+            match tokio::fs::read_to_string(&metadata_file).await {
+                Ok(contents) => {
+                    match serde_json::from_str::<HashMap<String, SubnetMetadata>>(&contents) {
+                        Ok(metadata) => {
+                            let mut subnet_metadata = self.state.subnet_metadata.lock().unwrap();
+                            *subnet_metadata = metadata.clone();
+                            log::info!("Loaded {} subnet metadata entries from storage", metadata.len());
+                        }
+                        Err(e) => {
+                            log::warn!("Failed to parse subnet metadata: {}", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::warn!("Failed to read subnet metadata file: {}", e);
+                }
+            }
+        } else {
+            log::info!("No existing subnet metadata found, starting fresh");
+        }
+
+        Ok(())
+    }
+
+    /// Save subnet metadata to persistent storage
+    async fn save_subnet_metadata(&self) -> Result<()> {
+        let metadata_file = std::path::Path::new(&self.config_path)
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."))
+            .join("subnet_metadata.json");
+
+        let metadata = {
+            let subnet_metadata = self.state.subnet_metadata.lock().unwrap();
+            subnet_metadata.clone()
+        };
+
+        let contents = serde_json::to_string_pretty(&metadata)?;
+        tokio::fs::write(&metadata_file, contents).await?;
+
+        log::debug!("Saved {} subnet metadata entries to storage", metadata.len());
+        Ok(())
+    }
+
     /// Add a newly deployed gateway to the tracking system
     pub async fn track_deployed_gateway(
         &self,
@@ -1231,13 +1304,48 @@ impl UIServer {
                     "Pending Approval".to_string()
                 };
 
+                // Get or create subnet metadata for creation time tracking
+                let subnet_id_str = subnet_id.to_string();
+                let (created_at, needs_save) = {
+                    let subnet_metadata = self.state.subnet_metadata.lock().unwrap();
+                    if let Some(metadata) = subnet_metadata.get(&subnet_id_str) {
+                        (metadata.created_at, false)
+                    } else {
+                        // New subnet discovered - record the current time as creation time
+                        let now = chrono::Utc::now();
+                        drop(subnet_metadata); // Release the lock before acquiring it again
+
+                        let metadata = SubnetMetadata {
+                            id: subnet_id_str.clone(),
+                            created_at: now,
+                            name: None,
+                            template: Some("Development Template".to_string()),
+                        };
+
+                        // Store the metadata
+                        {
+                            let mut subnet_metadata = self.state.subnet_metadata.lock().unwrap();
+                            subnet_metadata.insert(subnet_id_str.clone(), metadata);
+                        } // Lock is dropped here
+
+                        (now, true)
+                    }
+                };
+
+                // Save to persistent storage if needed (outside of any locks)
+                if needs_save {
+                    if let Err(e) = self.save_subnet_metadata().await {
+                        log::warn!("Failed to save subnet metadata: {}", e);
+                    }
+                }
+
                 let instance = SubnetInstance {
-                    id: subnet_id.to_string(),
+                    id: subnet_id_str,
                     name: format!("Subnet {}", subnet_id.to_string().split('/').last().unwrap_or("Unknown")),
                     status,
                     template: "Development Template".to_string(),
                     parent: parent_id,
-                    created_at: chrono::Utc::now(), // We don't have creation time from config
+                    created_at,
                     validators,
                     config: serde_json::json!({
                         "rpc_url": subnet_config.rpc_http(),
@@ -1271,18 +1379,55 @@ impl UIServer {
                             // Enhanced validator fetching for collateral subnets
                             let validators = self.get_all_validators_for_subnet(&provider, &subnet_id, false).await;
 
+                            // Get or create subnet metadata for creation time tracking
+                            let subnet_id_str = subnet_id.to_string();
+                            let template_name = if subnet_info.stake.atto() > &1000000000000000000u64.into() {
+                                "Production Template".to_string()
+                            } else {
+                                "Development Template".to_string()
+                            };
+
+                                                        let (created_at, needs_save) = {
+                                let subnet_metadata = self.state.subnet_metadata.lock().unwrap();
+                                if let Some(metadata) = subnet_metadata.get(&subnet_id_str) {
+                                    (metadata.created_at, false)
+                                } else {
+                                    // New subnet discovered - genesis_epoch is not a timestamp (it's a block/epoch number)
+                                    // Use current time as discovery time since we don't have actual creation time
+                                    let creation_time = chrono::Utc::now();
+                                    drop(subnet_metadata); // Release the lock before acquiring it again
+
+                                    let metadata = SubnetMetadata {
+                                        id: subnet_id_str.clone(),
+                                        created_at: creation_time,
+                                        name: None,
+                                        template: Some(template_name.clone()),
+                                    };
+
+                                    // Store the metadata
+                                    {
+                                        let mut subnet_metadata = self.state.subnet_metadata.lock().unwrap();
+                                        subnet_metadata.insert(subnet_id_str.clone(), metadata);
+                                    } // Lock is dropped here
+
+                                    (creation_time, true)
+                                }
+                            };
+
+                            // Save to persistent storage if needed (outside of any locks)
+                            if needs_save {
+                                if let Err(e) = self.save_subnet_metadata().await {
+                                    log::warn!("Failed to save subnet metadata: {}", e);
+                                }
+                            }
+
                             let instance = SubnetInstance {
-                                id: subnet_id.to_string(),
+                                id: subnet_id_str,
                                 name: format!("Subnet {}", subnet_id.to_string().split('/').last().unwrap_or("Unknown")),
                                 status: if subnet_info.stake.is_zero() { "Inactive".to_string() } else { "Active".to_string() },
-                                template: if subnet_info.stake.atto() > &1000000000000000000u64.into() {
-                                    "Production Template".to_string()
-                                } else {
-                                    "Development Template".to_string()
-                                },
+                                template: template_name,
                                 parent: parent_str.to_string(),
-                                created_at: chrono::DateTime::from_timestamp(subnet_info.genesis_epoch as i64, 0)
-                                    .unwrap_or_else(chrono::Utc::now),
+                                created_at,
                                 validators,
                                 config: serde_json::json!({
                                     "stake": subnet_info.stake.atto().to_string(),
@@ -1418,8 +1563,8 @@ impl UIServer {
             let registry_addr = subnet_config.registry_addr().to_string();
             let parent_str = subnet_id.parent().map(|p| p.to_string()).unwrap_or_else(|| "/r314159".to_string());
 
-            // Create a unique ID based on gateway address to avoid duplicates
-            let gateway_id = format!("gateway-{}", gateway_addr);
+            // Create a unique ID based on gateway address to avoid duplicates (use same format as GatewayInfo::new)
+            let gateway_id = format!("gw-{}", gateway_addr.chars().take(8).collect::<String>());
 
             // Skip if we've already processed this gateway address in this discovery batch
             if seen_gateways.contains(&gateway_addr) {
@@ -1492,6 +1637,44 @@ impl UIServer {
         }))
     }
 
+        /// Manually correct subnet creation dates from external data
+    async fn update_subnet_creation_date(&self, subnet_id: &str, creation_date: chrono::DateTime<chrono::Utc>) -> Result<()> {
+        log::info!("📅 Updating creation date for subnet {}: {}", subnet_id, creation_date.format("%Y-%m-%d %H:%M:%S UTC"));
+
+        // Update metadata with correct creation date
+        {
+            let mut subnet_metadata = self.state.subnet_metadata.lock().unwrap();
+            if let Some(metadata) = subnet_metadata.get_mut(subnet_id) {
+                metadata.created_at = creation_date;
+            } else {
+                // Create new metadata entry
+                let metadata = SubnetMetadata {
+                    id: subnet_id.to_string(),
+                    created_at: creation_date,
+                    name: None,
+                    template: Some("Development Template".to_string()),
+                };
+                subnet_metadata.insert(subnet_id.to_string(), metadata);
+            }
+        }
+
+        // Update the instance with correct creation date
+        {
+            let mut instances = self.state.instances.lock().unwrap();
+            if let Some(instance) = instances.get_mut(subnet_id) {
+                instance.created_at = creation_date;
+            }
+        }
+
+        // Save updated metadata to persistent storage
+        if let Err(e) = self.save_subnet_metadata().await {
+            log::warn!("Failed to save updated subnet metadata: {}", e);
+            return Err(e);
+        }
+
+        log::info!("✅ Successfully updated creation date for subnet {}", subnet_id);
+        Ok(())
+    }
 }
 
 /// Serve static files from the embedded frontend
@@ -1654,7 +1837,28 @@ async fn handle_deployment(
                 if let Some(ref store) = ipc_config_store {
                     match create_and_approve_subnet(&config, store, &state.config_path).await {
                         Ok(subnet_info) => {
-                            created_subnet_info = Some(subnet_info);
+                            created_subnet_info = Some(subnet_info.clone());
+
+                            // Store subnet metadata for creation time tracking
+                            let template_name = config.get("selectedTemplate")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string())
+                                .unwrap_or_else(|| "Custom Template".to_string());
+
+                            let metadata = SubnetMetadata {
+                                id: subnet_info.0.to_string(),
+                                created_at: chrono::Utc::now(),
+                                name: None,
+                                template: Some(template_name),
+                            };
+
+                            // Store the metadata
+                            {
+                                let mut subnet_metadata = state.subnet_metadata.lock().unwrap();
+                                subnet_metadata.insert(subnet_info.0.to_string(), metadata);
+                            }
+
+                            log::info!("📝 Stored metadata for newly created subnet: {}", subnet_info.0);
                         }
                         Err(e) => {
                             log::error!("🚨 Subnet creation failed, broadcasting error to WebSocket");
@@ -1722,6 +1926,22 @@ async fn handle_deployment(
 
     // Create subnet instance
     create_subnet_instance(&state, &deployment_id, &config).await?;
+
+    // Save subnet metadata to persistent storage
+    let server = UIServer {
+        host: "127.0.0.1".to_string(),
+        frontend_port: 3000,
+        backend_port: 3001,
+        mode: state.mode.clone(),
+        config_path: state.config_path.clone(),
+        state: state.clone(),
+    };
+
+    if let Err(e) = server.save_subnet_metadata().await {
+        log::warn!("Failed to save subnet metadata to persistent storage: {}", e);
+    } else {
+        log::info!("📝 Subnet metadata saved to persistent storage");
+    }
 
     log::info!("Deployment {} completed successfully", deployment_id);
     Ok(())

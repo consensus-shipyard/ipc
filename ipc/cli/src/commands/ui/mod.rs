@@ -173,6 +173,7 @@ pub struct AppState {
     pub websocket_clients: Arc<Mutex<Vec<WebSocketClient>>>,
     pub deployments: Arc<Mutex<HashMap<String, DeploymentState>>>,
     pub deployed_gateways: Arc<Mutex<HashMap<String, GatewayInfo>>>,
+    pub subnet_metadata: Arc<Mutex<HashMap<String, SubnetMetadata>>>,
 }
 
 /// Deployment state tracking
@@ -233,6 +234,15 @@ pub struct SubnetInstance {
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub validators: Vec<ValidatorInfo>,
     pub config: serde_json::Value,
+}
+
+/// Subnet metadata for persistent storage
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubnetMetadata {
+    pub id: String,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub name: Option<String>,
+    pub template: Option<String>,
 }
 
 /// Validator information

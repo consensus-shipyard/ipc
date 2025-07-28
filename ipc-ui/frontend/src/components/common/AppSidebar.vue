@@ -98,11 +98,10 @@ const fetchSystemStatus = async () => {
 
   try {
     // Discover gateways from IPC config first (finds previously deployed gateways)
-    await apiService.discoverGateways()
+    const gatewaysResponse = await apiService.discoverGateways()
     console.log('Discovered gateways from IPC config')
 
-    // Then check deployed gateways count
-    const gatewaysResponse = await apiService.getGateways()
+    // Use the response from discovery which now returns the full list
     if (gatewaysResponse.data) {
       systemStatus.value.gateways = gatewaysResponse.data.length
       deployedGateways.value = gatewaysResponse.data.slice(0, 3) // Show up to 3 gateways in sidebar
@@ -119,10 +118,8 @@ const fetchDeployedGateways = async () => {
     gatewaysLoading.value = true
     gatewaysError.value = null
 
-    // First try to discover gateways from config
-    await apiService.discoverGateways()
-
-    // Then fetch the full list
+    // Just fetch the current list without discovering again
+    // (discovery is handled by fetchSystemStatus)
     const response = await apiService.getGateways()
     if (response.data) {
       deployedGateways.value = response.data
@@ -176,9 +173,9 @@ const icons = {
 onMounted(async () => {
   await Promise.all([
     fetchRecentSubnets(),
-    fetchSystemStatus(),
-    fetchDeployedGateways()
+    fetchSystemStatus()
   ])
+  // fetchDeployedGateways is now redundant since fetchSystemStatus handles gateway discovery
 })
 </script>
 
