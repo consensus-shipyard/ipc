@@ -356,6 +356,8 @@ library LibPower {
 
     uint64 internal constant INITIAL_CONFIGURATION_NUMBER = 1;
 
+    error NotActiveValidator();
+
     event ConfigurationNumberConfirmed(uint64 number);
     event CollateralClaimed(address validator, uint256 amount);
 
@@ -371,6 +373,15 @@ library LibPower {
     function isActiveValidator(address validator) internal view returns (bool) {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
         return s.validatorSet.isActiveValidator(validator);
+    }
+
+    function getActiveValidatorAddressByIndex(uint16 index) internal view returns (address validator) {
+        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
+        validator = s.validatorSet.activeValidators.inner.posToAddress[index];
+
+        if (validator == address(0)) {
+            revert NotActiveValidator();
+        }
     }
 
     /// @notice Checks if the validator is a waiting validator

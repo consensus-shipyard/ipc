@@ -1,13 +1,15 @@
 // Copyright 2022-2025 Protocol Labs
 // SPDX-License-Identifier: MIT
 
+use std::fmt::{Display, Formatter};
 use fvm_shared::clock::ChainEpoch;
-use tendermint::block::signed_header::SignedHeader;
 use tendermint_rpc::Client;
 
 pub struct CometbftClient {
     client: tendermint_rpc::HttpClient,
 }
+
+pub struct SignedHeader(tendermint::block::signed_header::SignedHeader);
 
 impl CometbftClient {
     pub fn new_from_url(url: &str) -> Self {
@@ -20,6 +22,19 @@ impl CometbftClient {
         let h = tendermint::block::Height::from(height as u32);
         let query_response = self.client.commit(h).await?;
 
-        Ok(query_response.signed_header)
+        Ok(SignedHeader(query_response.signed_header))
+    }
+}
+
+impl Display for SignedHeader {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "SignedHeader(\
+                header: (
+                  
+                )
+            )"
+        )
     }
 }
