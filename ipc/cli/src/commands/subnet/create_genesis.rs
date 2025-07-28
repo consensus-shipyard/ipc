@@ -145,7 +145,7 @@ impl CommandLineHandler for CreateGenesis {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub(crate) struct CreatedGenesis {
     pub genesis: PathBuf,
     pub sealed: PathBuf,

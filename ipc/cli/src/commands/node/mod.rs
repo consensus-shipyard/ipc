@@ -1,10 +1,11 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 
-mod config;
-mod config_override;
-mod init;
-mod start;
+pub mod config;
+pub mod config_override;
+pub mod init;
+pub mod peer;
+pub mod start;
 
 use clap::{Args, Subcommand};
 use std::fmt::Debug;

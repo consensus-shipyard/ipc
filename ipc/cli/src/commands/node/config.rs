@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 use fs_err as fs;
-use serde::{Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::path::{Path, PathBuf};
 
 use crate::commands::subnet::create_genesis::{CreatedGenesis, GenesisConfig};
@@ -31,11 +31,141 @@ where
 
     let s: Option<String> = Option::deserialize(deserializer)?;
     match s {
-        Some(s) if !s.trim().is_empty() => {
-            let value: toml::Value = s.parse().map_err(D::Error::custom)?;
-            Ok(Some(value))
+        Some(s) => {
+            if s.trim().is_empty() {
+                // Empty string should parse as empty TOML table
+                Ok(Some(toml::Value::Table(toml::Table::new())))
+            } else {
+                let value: toml::Value = s.parse().map_err(D::Error::custom)?;
+                Ok(Some(value))
+            }
         }
-        _ => Ok(None),
+        None => Ok(None),
+    }
+}
+
+/// Schema-driven CometBFT overrides instead of manual toml::Value manipulation
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CometBftOverrides {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub consensus: Option<ConsensusConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rpc: Option<RpcConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub p2p: Option<P2pCometConfig>,
+    // Allow additional unknown fields for flexibility
+    #[serde(flatten)]
+    pub extra: toml::Table,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ConsensusConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timeout_commit: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timeout_propose: Option<String>,
+    #[serde(flatten)]
+    pub extra: toml::Table,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RpcConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub laddr: Option<String>,
+    #[serde(flatten)]
+    pub extra: toml::Table,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct P2pCometConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub laddr: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub persistent_peers: Option<String>,
+    #[serde(flatten)]
+    pub extra: toml::Table,
+}
+
+impl CometBftOverrides {
+    pub fn from_toml_value(value: toml::Value) -> anyhow::Result<Self> {
+        let override_config: Self = value.try_into().map_err(|e| {
+            anyhow::anyhow!("invalid CometBFT override configuration structure: {}", e)
+        })?;
+        Ok(override_config)
+    }
+
+    pub fn to_toml_value(&self) -> anyhow::Result<toml::Value> {
+        toml::Value::try_from(self)
+            .map_err(|e| anyhow::anyhow!("failed to serialize CometBFT overrides: {}", e))
+    }
+}
+
+/// Schema-driven Fendermint overrides
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FendermintOverrides {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub app: Option<AppConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub broadcast: Option<BroadcastConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resolver: Option<ResolverOverrideConfig>,
+    #[serde(flatten)]
+    pub extra: toml::Table,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AppConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_validators: Option<u64>,
+    #[serde(flatten)]
+    pub extra: toml::Table,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BroadcastConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub gas_overestimation_rate: Option<f64>,
+    #[serde(flatten)]
+    pub extra: toml::Table,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ResolverOverrideConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub connection: Option<ConnectionOverrideConfig>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub discovery: Option<DiscoveryOverrideConfig>,
+    #[serde(flatten)]
+    pub extra: toml::Table,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ConnectionOverrideConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub listen_addr: Option<String>,
+    #[serde(flatten)]
+    pub extra: toml::Table,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DiscoveryOverrideConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub static_addresses: Option<Vec<String>>,
+    #[serde(flatten)]
+    pub extra: toml::Table,
+}
+
+impl FendermintOverrides {
+    pub fn from_toml_value(value: toml::Value) -> anyhow::Result<Self> {
+        let override_config: Self = value.try_into().map_err(|e| {
+            anyhow::anyhow!("invalid Fendermint override configuration structure: {}", e)
+        })?;
+        Ok(override_config)
+    }
+
+    pub fn to_toml_value(&self) -> anyhow::Result<toml::Value> {
+        toml::Value::try_from(self)
+            .map_err(|e| anyhow::anyhow!("failed to serialize Fendermint overrides: {}", e))
     }
 }
 
@@ -127,8 +257,10 @@ pub struct FendermintPeerInfo {
     /// Libp2p peer ID (base58-encoded)
     pub peer_id: String,
     /// Port where resolver listens (if enabled)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub listen_port: Option<u16>,
     /// Full multiaddr for peer connections (if resolver enabled)
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub multiaddr: Option<String>,
 }
 
@@ -169,6 +301,7 @@ pub struct NodeInitConfig {
 
 impl NodeInitConfig {
     /// Load and parse a YAML config file into `NodeInitConfig`
+    #[cfg_attr(not(test), allow(dead_code))]
     pub fn load<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
         let contents = fs::read_to_string(&path)?;
         let cfg: NodeInitConfig = serde_yaml::from_str(&contents)
