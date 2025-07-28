@@ -85,6 +85,17 @@ async fn save_deployed_gateway_to_file(
     name: Option<String>,
     config_path: &str,
 ) -> Result<GatewayInfo> {
+    // Validate inputs before creating gateway info
+    if gateway_address.is_empty() || gateway_address == "N/A" {
+        return Err(anyhow::anyhow!("Invalid gateway address: {}", gateway_address));
+    }
+    if registry_address.is_empty() || registry_address == "N/A" {
+        return Err(anyhow::anyhow!("Invalid registry address: {}", registry_address));
+    }
+    if parent_network.is_empty() {
+        return Err(anyhow::anyhow!("Invalid parent network: {}", parent_network));
+    }
+
     let gateway_info = GatewayInfo::new(
         gateway_address,
         registry_address,
@@ -574,13 +585,57 @@ impl UIServer {
 
                 match server.discover_gateways_from_config().await {
                     Ok(discovered_gateways) => {
-                        // Add discovered gateways to the tracked list with proper deduplication
+                        // Filter out invalid gateways and deduplicate properly
+                        let valid_discovered = discovered_gateways.into_iter()
+                            .filter(|gateway| {
+                                // Validate gateway has required fields
+                                !gateway.gateway_address.is_empty() &&
+                                gateway.gateway_address != "N/A" &&
+                                !gateway.parent_network.is_empty() &&
+                                !gateway.deployed_at.to_string().is_empty()
+                            })
+                            .collect::<Vec<_>>();
+
+                        log::info!("Filtered {} valid gateways from discovery", valid_discovered.len());
+
+                        // Deduplicate against existing gateways using gateway_address + parent_network
                         let mut actually_added = Vec::new();
                         {
                             let mut deployed_gateways = state.deployed_gateways.lock().unwrap();
-                            for gateway in &discovered_gateways {
-                                // Double-check for duplicates before adding (handles concurrent calls)
-                                if !deployed_gateways.contains_key(&gateway.id) {
+
+                            for gateway in &valid_discovered {
+                                let unique_key = format!("{}-{}",
+                                    gateway.gateway_address.to_lowercase(),
+                                    gateway.parent_network);
+
+                                // Check if we already have a gateway with the same address and network
+                                let mut is_duplicate = false;
+                                let mut existing_to_replace: Option<String> = None;
+
+                                for (existing_id, existing_gateway) in deployed_gateways.iter() {
+                                    let existing_key = format!("{}-{}",
+                                        existing_gateway.gateway_address.to_lowercase(),
+                                        existing_gateway.parent_network);
+
+                                    if existing_key == unique_key {
+                                        is_duplicate = true;
+                                        // Keep the newer deployment
+                                        if gateway.deployed_at > existing_gateway.deployed_at {
+                                            existing_to_replace = Some(existing_id.clone());
+                                            log::info!("Replacing older gateway {} with newer {}", existing_id, gateway.id);
+                                        } else {
+                                            log::info!("Skipping older discovered gateway {}", gateway.id);
+                                        }
+                                        break;
+                                    }
+                                }
+
+                                if !is_duplicate {
+                                    deployed_gateways.insert(gateway.id.clone(), gateway.clone());
+                                    actually_added.push(gateway.clone());
+                                    log::info!("Added new gateway: {}", gateway.id);
+                                } else if let Some(old_id) = existing_to_replace {
+                                    deployed_gateways.remove(&old_id);
                                     deployed_gateways.insert(gateway.id.clone(), gateway.clone());
                                     actually_added.push(gateway.clone());
                                 }
@@ -592,7 +647,9 @@ impl UIServer {
                             if let Err(e) = server.save_gateway_data().await {
                                 log::warn!("Failed to save discovered gateways: {}", e);
                             }
-                            log::info!("Added {} new gateways to tracking", actually_added.len());
+                            log::info!("Added {} new unique gateways to tracking", actually_added.len());
+                        } else {
+                            log::info!("No new unique gateways discovered");
                         }
 
                         // Always return the current list of all gateways, not just discovered ones
@@ -1111,11 +1168,34 @@ impl UIServer {
         if gateway_file.exists() {
             match tokio::fs::read_to_string(&gateway_file).await {
                 Ok(contents) => {
-                    match serde_json::from_str::<HashMap<String, GatewayInfo>>(&contents) {
+                                        match serde_json::from_str::<HashMap<String, GatewayInfo>>(&contents) {
                         Ok(gateways) => {
+                            let original_count = gateways.len();
+
+                            // Filter out invalid entries during load
+                            let valid_gateways: HashMap<String, GatewayInfo> = gateways.into_iter()
+                                .filter(|(_, gateway)| {
+                                    // Validate that gateway has required fields
+                                    !gateway.gateway_address.is_empty() &&
+                                    gateway.gateway_address != "N/A" &&
+                                    !gateway.parent_network.is_empty() &&
+                                    !gateway.deployed_at.to_string().is_empty()
+                                })
+                                .collect();
+
+                            let filtered_count = original_count - valid_gateways.len();
+
+                            if filtered_count > 0 {
+                                log::warn!("Filtered out {} invalid gateway entries during load", filtered_count);
+                                // Save the cleaned data back to storage
+                                if let Err(e) = self.save_cleaned_gateway_data(&valid_gateways).await {
+                                    log::warn!("Failed to save cleaned gateway data: {}", e);
+                                }
+                            }
+
                             let mut deployed_gateways = self.state.deployed_gateways.lock().unwrap();
-                            *deployed_gateways = gateways.clone();
-                            log::info!("Loaded {} deployed gateways from storage", gateways.len());
+                            *deployed_gateways = valid_gateways.clone();
+                            log::info!("Loaded {} valid deployed gateways from storage", valid_gateways.len());
                         }
                         Err(e) => {
                             log::warn!("Failed to parse gateway data: {}", e);
@@ -1149,6 +1229,20 @@ impl UIServer {
         tokio::fs::write(&gateway_file, contents).await?;
 
         log::debug!("Saved {} gateways to storage", gateways.len());
+        Ok(())
+    }
+
+    /// Save cleaned gateway data to persistent storage (used during filtering)
+    async fn save_cleaned_gateway_data(&self, gateways: &HashMap<String, GatewayInfo>) -> Result<()> {
+        let gateway_file = std::path::Path::new(&self.config_path)
+            .parent()
+            .unwrap_or_else(|| std::path::Path::new("."))
+            .join("deployed_gateways.json");
+
+        let contents = serde_json::to_string_pretty(gateways)?;
+        tokio::fs::write(&gateway_file, contents).await?;
+
+        log::info!("Saved {} cleaned gateways to storage", gateways.len());
         Ok(())
     }
 

@@ -98,38 +98,69 @@ const fetchSystemStatus = async () => {
 
   try {
     // Discover gateways from IPC config first (finds previously deployed gateways)
+    console.log('[AppSidebar] Starting gateway discovery...')
     const gatewaysResponse = await apiService.discoverGateways()
-    console.log('Discovered gateways from IPC config')
+    console.log('[AppSidebar] Gateway discovery response:', gatewaysResponse.data)
 
     // Use the response from discovery which now returns the full list
-    if (gatewaysResponse.data) {
+    if (gatewaysResponse.data && Array.isArray(gatewaysResponse.data)) {
+      console.log(`[AppSidebar] Found ${gatewaysResponse.data.length} gateways from discovery`)
+
+      // Log gateway details for debugging
+      gatewaysResponse.data.forEach((gateway: any, index: number) => {
+        console.log(`[AppSidebar] Gateway ${index + 1}:`, {
+          id: gateway.id,
+          name: gateway.name,
+          gateway_address: gateway.gateway_address,
+          parent_network: gateway.parent_network,
+          status: gateway.status
+        })
+      })
+
       systemStatus.value.gateways = gatewaysResponse.data.length
       deployedGateways.value = gatewaysResponse.data.slice(0, 3) // Show up to 3 gateways in sidebar
+      console.log(`[AppSidebar] Set sidebar to show ${deployedGateways.value.length} gateways`)
+    } else {
+      console.warn('[AppSidebar] Invalid or empty gateway discovery response')
+      systemStatus.value.gateways = 0
+      deployedGateways.value = []
     }
   } catch (err) {
-    console.error('Gateway discovery failed:', err)
+    console.error('[AppSidebar] Gateway discovery failed:', err)
     systemStatus.value.gateways = 0
+    deployedGateways.value = []
   }
 }
 
 // Fetch deployed gateways specifically
 const fetchDeployedGateways = async () => {
   try {
+    console.log('[AppSidebar] Fetching deployed gateways specifically...')
     gatewaysLoading.value = true
     gatewaysError.value = null
 
     // Just fetch the current list without discovering again
     // (discovery is handled by fetchSystemStatus)
     const response = await apiService.getGateways()
-    if (response.data) {
+    console.log('[AppSidebar] Deployed gateways response:', response.data)
+
+    if (response.data && Array.isArray(response.data)) {
+      console.log(`[AppSidebar] Fetched ${response.data.length} deployed gateways`)
       deployedGateways.value = response.data
       systemStatus.value.gateways = response.data.length
+    } else {
+      console.warn('[AppSidebar] Invalid deployed gateways response')
+      deployedGateways.value = []
+      systemStatus.value.gateways = 0
     }
   } catch (err: any) {
-    console.error('Error fetching deployed gateways:', err)
+    console.error('[AppSidebar] Error fetching deployed gateways:', err)
     gatewaysError.value = err?.message || 'Failed to load gateways'
+    deployedGateways.value = []
+    systemStatus.value.gateways = 0
   } finally {
     gatewaysLoading.value = false
+    console.log('[AppSidebar] Deployed gateways fetch completed')
   }
 }
 

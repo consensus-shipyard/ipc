@@ -6,6 +6,7 @@ import FormInput from '../../components/common/FormInput.vue'
 import FormSelect from '../../components/common/FormSelect.vue'
 import { useTemplatesStore } from '../../stores/templates'
 import { useWizardStore } from '../../stores/wizard'
+import { apiService } from '../../services/api'
 
 const router = useRouter()
 const wizardStore = useWizardStore()
@@ -142,24 +143,134 @@ const saveConfig = () => {
 }
 
 // Navigation
-// Load deployed gateways from API
+// Load deployed gateways from API with discovery and deduplication
 const loadDeployedGateways = async () => {
   try {
+    console.log('[Gateway Discovery] Starting gateway discovery process...')
     loadingGateways.value = true
-    const response = await fetch('/api/gateways')
-    if (response.ok) {
-      const gateways: GatewayInfo[] = await response.json()
-      deployedGateways.value = gateways.sort((a, b) => new Date(b.deployed_at).getTime() - new Date(a.deployed_at).getTime())
+
+    // First, discover gateways from IPC config (this will also handle deduplication)
+    console.log('[Gateway Discovery] Calling discoverGateways API...')
+    const discoverResponse = await apiService.discoverGateways()
+
+    console.log('[Gateway Discovery] Raw discovery response:', discoverResponse.data)
+
+    if (discoverResponse.data && Array.isArray(discoverResponse.data)) {
+      const discoveredGateways: GatewayInfo[] = discoverResponse.data
+      console.log(`[Gateway Discovery] Found ${discoveredGateways.length} gateways from discovery`)
+
+      // Log each gateway for debugging
+      discoveredGateways.forEach((gateway, index) => {
+        console.log(`[Gateway Discovery] Gateway ${index + 1}:`, {
+          id: gateway.id,
+          name: gateway.name,
+          gateway_address: gateway.gateway_address,
+          parent_network: gateway.parent_network,
+          deployed_at: gateway.deployed_at,
+          status: gateway.status
+        })
+      })
+
+      // Apply frontend deduplication as a backup (in case backend missed something)
+      const uniqueGateways = deduplicateGateways(discoveredGateways)
+      console.log(`[Gateway Discovery] After frontend deduplication: ${uniqueGateways.length} unique gateways`)
+
+      // Sort by deployment date (newest first)
+      deployedGateways.value = uniqueGateways.sort((a, b) =>
+        new Date(b.deployed_at).getTime() - new Date(a.deployed_at).getTime()
+      )
+
+      console.log('[Gateway Discovery] Final gateway list:', deployedGateways.value.map(g => ({
+        id: g.id,
+        name: g.name,
+        address: g.gateway_address
+      })))
     } else {
-      console.error('Failed to load deployed gateways:', response.statusText)
+      console.warn('[Gateway Discovery] Invalid or empty discovery response')
       deployedGateways.value = []
     }
   } catch (error) {
-    console.error('Error loading deployed gateways:', error)
-    deployedGateways.value = []
+    console.error('[Gateway Discovery] Error during gateway discovery:', error)
+    // Fallback to regular gateways API if discovery fails
+    try {
+      console.log('[Gateway Discovery] Falling back to regular gateways API...')
+      const fallbackResponse = await apiService.getGateways()
+      if (fallbackResponse.data && Array.isArray(fallbackResponse.data)) {
+        const fallbackGateways = deduplicateGateways(fallbackResponse.data)
+        deployedGateways.value = fallbackGateways.sort((a, b) =>
+          new Date(b.deployed_at).getTime() - new Date(a.deployed_at).getTime()
+        )
+        console.log(`[Gateway Discovery] Fallback loaded ${fallbackGateways.length} gateways`)
+      } else {
+        deployedGateways.value = []
+      }
+    } catch (fallbackError) {
+      console.error('[Gateway Discovery] Fallback also failed:', fallbackError)
+      deployedGateways.value = []
+    }
   } finally {
     loadingGateways.value = false
+    console.log('[Gateway Discovery] Gateway loading completed')
   }
+}
+
+// Deduplicate gateways based on gateway address and parent network
+const deduplicateGateways = (gateways: GatewayInfo[]): GatewayInfo[] => {
+  console.log('[Gateway Deduplication] Starting deduplication process...')
+
+  const seen = new Map<string, GatewayInfo>()
+  const duplicates: GatewayInfo[] = []
+
+  gateways.forEach((gateway, index) => {
+    // Create a unique key based on gateway address and parent network
+    const uniqueKey = `${gateway.gateway_address.toLowerCase()}-${gateway.parent_network}`
+
+    if (seen.has(uniqueKey)) {
+      const existing = seen.get(uniqueKey)!
+      console.log(`[Gateway Deduplication] Found duplicate gateway:`, {
+        duplicate: {
+          id: gateway.id,
+          name: gateway.name,
+          address: gateway.gateway_address,
+          network: gateway.parent_network,
+          deployed_at: gateway.deployed_at
+        },
+        existing: {
+          id: existing.id,
+          name: existing.name,
+          address: existing.gateway_address,
+          network: existing.parent_network,
+          deployed_at: existing.deployed_at
+        }
+      })
+
+      // Keep the one with the more recent deployment date
+      if (new Date(gateway.deployed_at) > new Date(existing.deployed_at)) {
+        console.log(`[Gateway Deduplication] Replacing existing with newer duplicate`)
+        duplicates.push(existing)
+        seen.set(uniqueKey, gateway)
+      } else {
+        console.log(`[Gateway Deduplication] Keeping existing, discarding duplicate`)
+        duplicates.push(gateway)
+      }
+    } else {
+      seen.set(uniqueKey, gateway)
+    }
+  })
+
+  const uniqueGateways = Array.from(seen.values())
+  console.log(`[Gateway Deduplication] Removed ${duplicates.length} duplicates, kept ${uniqueGateways.length} unique gateways`)
+
+  if (duplicates.length > 0) {
+    console.log('[Gateway Deduplication] Removed duplicates:', duplicates.map(d => ({
+      id: d.id,
+      name: d.name,
+      address: d.gateway_address,
+      network: d.parent_network
+    })))
+  }
+
+  return uniqueGateways
 }
 
 const goToNextStep = () => {

@@ -31,44 +31,56 @@ const searchQuery = ref<string>('')
 // Methods
 const fetchContracts = async () => {
   try {
+    console.log('[ContractsView] Starting contract fetch...')
     loading.value = true
     error.value = null
 
-    // Fetch gateways as the primary source of contracts
-    const gatewaysResponse = await apiService.getGateways()
+    // Discover gateways first to ensure we have the most up-to-date and deduplicated list
+    console.log('[ContractsView] Discovering gateways...')
+    const gatewaysResponse = await apiService.discoverGateways()
     const gateways = gatewaysResponse.data || []
+    console.log(`[ContractsView] Found ${gateways.length} gateways from discovery`)
 
     // Transform gateways into contract format
-    const gatewayContracts: ContractInfo[] = gateways.map((gateway: any) => ({
-      id: `gateway-${gateway.id}`,
-      name: gateway.name || `Gateway (${gateway.gateway_address.slice(0, 8)}...)`,
-      type: 'gateway' as const,
-      address: gateway.gateway_address,
-      deployer: gateway.deployer_address,
-      network: gateway.parent_network,
-      deployed_at: gateway.deployed_at,
-      status: gateway.status === 'active' ? 'active' as const : 'inactive' as const,
-      description: gateway.description,
-      subnets_created: gateway.subnets_created || 0,
-      actions: ['inspect', 'configure', 'approve-subnets']
-    }))
+    console.log('[ContractsView] Transforming gateways into contracts...')
+    const gatewayContracts: ContractInfo[] = gateways.map((gateway: any) => {
+      console.log(`[ContractsView] Processing gateway: ${gateway.id} - ${gateway.name}`)
+      return {
+        id: `gateway-${gateway.id}`,
+        name: gateway.name || `Gateway (${gateway.gateway_address.slice(0, 8)}...)`,
+        type: 'gateway' as const,
+        address: gateway.gateway_address,
+        deployer: gateway.deployer_address,
+        network: gateway.parent_network,
+        deployed_at: gateway.deployed_at,
+        status: gateway.status === 'active' ? 'active' as const : 'inactive' as const,
+        description: gateway.description,
+        subnets_created: gateway.subnets_created || 0,
+        actions: ['inspect', 'configure', 'approve-subnets']
+      }
+    })
 
     // Also create registry contracts from the same data
-    const registryContracts: ContractInfo[] = gateways.map((gateway: any) => ({
-      id: `registry-${gateway.id}`,
-      name: `Registry (${gateway.registry_address.slice(0, 8)}...)`,
-      type: 'registry' as const,
-      address: gateway.registry_address,
-      deployer: gateway.deployer_address,
-      network: gateway.parent_network,
-      deployed_at: gateway.deployed_at,
-      status: gateway.status === 'active' ? 'active' as const : 'inactive' as const,
-      description: `Registry contract for ${gateway.name}`,
-      actions: ['inspect', 'configure']
-    }))
+    console.log('[ContractsView] Creating registry contracts from gateways...')
+    const registryContracts: ContractInfo[] = gateways.map((gateway: any) => {
+      console.log(`[ContractsView] Creating registry for gateway: ${gateway.id}`)
+      return {
+        id: `registry-${gateway.id}`,
+        name: `Registry (${gateway.registry_address.slice(0, 8)}...)`,
+        type: 'registry' as const,
+        address: gateway.registry_address,
+        deployer: gateway.deployer_address,
+        network: gateway.parent_network,
+        deployed_at: gateway.deployed_at,
+        status: gateway.status === 'active' ? 'active' as const : 'inactive' as const,
+        description: `Registry contract for ${gateway.name}`,
+        actions: ['inspect', 'configure']
+      }
+    })
 
     // Combine all contracts
     contracts.value = [...gatewayContracts, ...registryContracts]
+    console.log(`[ContractsView] Created ${gatewayContracts.length} gateway contracts and ${registryContracts.length} registry contracts`)
   } catch (err: any) {
     console.error('Error fetching contracts:', err)
     error.value = err?.message || 'Failed to load contracts'

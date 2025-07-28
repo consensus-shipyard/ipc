@@ -46,28 +46,40 @@ const fetchSubnets = async () => {
 
 const getGatewayOwner = async (subnet: SubnetInstance): Promise<string> => {
   try {
-    // Try to get gateway information from the API
-    const gatewaysResponse = await fetch('/api/gateways')
-    const gatewaysResult = await gatewaysResponse.json()
+    console.log('[DashboardView] Getting gateway owner for subnet:', subnet.id)
+    // Use the proper API service instead of direct fetch
+    const gatewaysResponse = await apiService.getGateways()
+    const gatewaysResult = gatewaysResponse.data
 
     if (gatewaysResult && Array.isArray(gatewaysResult)) {
+      console.log(`[DashboardView] Found ${gatewaysResult.length} gateways from API`)
       // Find the gateway that matches this subnet's gateway address
       const gatewayAddr = subnet.config?.gateway_addr?.toString()
       if (gatewayAddr) {
+        console.log(`[DashboardView] Looking for gateway with address: ${gatewayAddr}`)
         const matchingGateway = gatewaysResult.find((gw: any) =>
           gw.gateway_address === gatewayAddr
         )
         if (matchingGateway) {
+          console.log(`[DashboardView] Found matching gateway, owner: ${matchingGateway.deployer_address}`)
           return matchingGateway.deployer_address
+        } else {
+          console.log('[DashboardView] No matching gateway found')
         }
+      } else {
+        console.log('[DashboardView] No gateway address found in subnet config')
       }
+    } else {
+      console.warn('[DashboardView] Invalid gateway API response')
     }
   } catch (err) {
-    console.warn('Failed to fetch gateway information:', err)
+    console.warn('[DashboardView] Failed to fetch gateway information:', err)
   }
 
   // Fallback to config or default address
-  return subnet.config?.deployer_address || '0x0a36d7c34ba5523d5bf783bb47f62371e52e0298'
+  const fallbackAddress = subnet.config?.deployer_address || '0x0a36d7c34ba5523d5bf783bb47f62371e52e0298'
+  console.log(`[DashboardView] Using fallback address: ${fallbackAddress}`)
+  return fallbackAddress
 }
 
 const approveSubnet = async (subnet: SubnetInstance) => {
