@@ -25,16 +25,3 @@ impl CometbftClient {
         Ok(SignedHeader(query_response.signed_header))
     }
 }
-
-impl Display for SignedHeader {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "SignedHeader(\
-                header: (
-                  
-                )
-            )"
-        )
-    }
-}
