@@ -1,7 +1,6 @@
 // Copyright 2022-2025 Protocol Labs
 // SPDX-License-Identifier: MIT
 
-use std::fmt::{Display, Formatter};
 use fvm_shared::clock::ChainEpoch;
 use tendermint_rpc::Client;
 
