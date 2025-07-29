@@ -1,0 +1,30 @@
+{
+  "chain_name": "/r314159/t410fubc6inglk4fleyzt44l2r7qkjbrz7etxvy45ogq",
+  "chain_id": null,
+  "timestamp": 2880051,
+  "network_version": 21,
+  "base_fee": "1000",
+  "power_scale": 3,
+  "validators": [
+    {
+      "public_key": "BIMAJ2/HFZx6mb6MwlHXrC0SM47tlukT5TEM+NLauOvdkppXhw1WDjGs2ilqV6hZcXAKLVZ98YYS+CQ3WUhEuL4=",
+      "power": "1000000000000000000"
+    },
+    {
+      "public_key": "BBXc/ztVAc1izbWkQ5alksoHMqLOxNDAYWPHaigA65aefkf0kXpd0hTa2CUHQKN+Fu+o9IvqxBI8RTPZYfO2ShU=",
+      "power": "1000000000000000000"
+    }
+  ],
+  "accounts": [],
+  "eam_permission_mode": {
+    "mode": "unrestricted"
+  },
+  "ipc": {
+    "gateway": {
+      "subnet_id": "/r314159/t410fubc6inglk4fleyzt44l2r7qkjbrz7etxvy45ogq",
+      "bottom_up_check_period": 100,
+      "majority_percentage": 67,
+      "active_validators_limit": 100
+    }
+  }
+}
