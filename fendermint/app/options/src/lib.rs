@@ -23,7 +23,7 @@ pub mod materializer;
 pub mod rpc;
 pub mod run;
 
-mod parse;
+pub mod parse;
 
 use parse::parse_network;
 

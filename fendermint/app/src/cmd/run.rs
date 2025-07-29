@@ -1,11 +1,11 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::ipc::{AppParentFinalityQuery, AppVote};
+use crate::{App, AppConfig, AppStore, BitswapBlockstore};
 use anyhow::{anyhow, bail, Context};
 use async_stm::atomically_or_err;
 use fendermint_abci::ApplicationService;
-use fendermint_app::ipc::{AppParentFinalityQuery, AppVote};
-use fendermint_app::{App, AppConfig, AppStore, BitswapBlockstore};
 use fendermint_app_settings::AccountKind;
 use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
@@ -35,8 +35,8 @@ use tower::ServiceBuilder;
 use tracing::info;
 
 use crate::cmd::key::read_secret_key;
+use crate::observe::register_metrics as register_consensus_metrics;
 use crate::{cmd, options::run::RunArgs, settings::Settings};
-use fendermint_app::observe::register_metrics as register_consensus_metrics;
 
 cmd! {
   RunArgs(self, settings) {

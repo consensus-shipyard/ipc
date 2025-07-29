@@ -22,6 +22,8 @@ use clap::{Command, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Generator, Shell};
 use fvm_shared::econ::TokenAmount;
 use ipc_api::ethers_address_to_fil_address;
+use tracing_subscriber::prelude::*;
+use tracing_subscriber::{fmt, EnvFilter};
 
 use fvm_shared::address::set_current_network;
 use ipc_api::subnet_id::SubnetID;
@@ -132,6 +134,8 @@ pub async fn cli() -> anyhow::Result<()> {
     } else {
         let global = &args.global_params;
         if let Some(c) = &args.command {
+            default_subscriber();
+
             let r = match &c {
                 // Commands::Daemon(args) => LaunchDaemon::handle(global, args).await,
                 Commands::Config(args) => args.handle(global).await,
@@ -149,6 +153,13 @@ pub async fn cli() -> anyhow::Result<()> {
             Ok(())
         }
     }
+}
+
+pub fn default_subscriber() {
+    tracing_subscriber::registry()
+        .with(fmt::layer())
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .init();
 }
 
 fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
