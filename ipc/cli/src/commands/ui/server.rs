@@ -1102,9 +1102,17 @@ impl UIServer {
             .and(warp::get())
             .and(state_filter.clone())
             .and_then(|subnet_id: String, state: AppState| async move {
-                log::info!("Received subnet stats request for: {}", subnet_id);
+                // URL decode the subnet ID first
+                let decoded_subnet_id = urlencoding::decode(&subnet_id)
+                    .map_err(|e| {
+                        log::error!("Failed to URL decode subnet ID '{}': {}", subnet_id, e);
+                        warp::reject::custom(InvalidRequest(format!("Invalid subnet ID encoding: {}", e)))
+                    })?
+                    .into_owned();
 
-                match get_subnet_stats(&state.config_path, &subnet_id).await {
+                log::info!("Received subnet stats request for: {} (decoded: {})", subnet_id, decoded_subnet_id);
+
+                match get_subnet_stats(&state.config_path, &decoded_subnet_id).await {
                     Ok(stats) => {
                         Ok::<_, warp::Rejection>(warp::reply::with_status(
                             warp::reply::json(&stats),
@@ -1126,9 +1134,17 @@ impl UIServer {
             .and(warp::get())
             .and(state_filter.clone())
             .and_then(|subnet_id: String, state: AppState| async move {
-                log::info!("Received subnet status request for: {}", subnet_id);
+                // URL decode the subnet ID first
+                let decoded_subnet_id = urlencoding::decode(&subnet_id)
+                    .map_err(|e| {
+                        log::error!("Failed to URL decode subnet ID '{}': {}", subnet_id, e);
+                        warp::reject::custom(InvalidRequest(format!("Invalid subnet ID encoding: {}", e)))
+                    })?
+                    .into_owned();
 
-                match get_subnet_status(&state.config_path, &subnet_id).await {
+                log::info!("Received subnet status request for: {} (decoded: {})", subnet_id, decoded_subnet_id);
+
+                match get_subnet_status(&state.config_path, &decoded_subnet_id).await {
                     Ok(status) => {
                         Ok::<_, warp::Rejection>(warp::reply::with_status(
                             warp::reply::json(&status),
@@ -1151,9 +1167,17 @@ impl UIServer {
             .and(warp::body::json())
             .and(state_filter.clone())
             .and_then(|subnet_id: String, test_tx_data: serde_json::Value, state: AppState| async move {
-                log::info!("Received test transaction request for subnet: {}", subnet_id);
+                // URL decode the subnet ID first
+                let decoded_subnet_id = urlencoding::decode(&subnet_id)
+                    .map_err(|e| {
+                        log::error!("Failed to URL decode subnet ID '{}': {}", subnet_id, e);
+                        warp::reject::custom(InvalidRequest(format!("Invalid subnet ID encoding: {}", e)))
+                    })?
+                    .into_owned();
 
-                match send_test_transaction(&state.config_path, &subnet_id, test_tx_data).await {
+                log::info!("Received test transaction request for subnet: {} (decoded: {})", subnet_id, decoded_subnet_id);
+
+                match send_test_transaction(&state.config_path, &decoded_subnet_id, test_tx_data).await {
                     Ok(result) => {
                         Ok::<_, warp::Rejection>(warp::reply::with_status(
                             warp::reply::json(&result),
@@ -1513,6 +1537,13 @@ impl UIServer {
                     }
                 }
 
+                // Query the actual permission mode from the subnet contract
+                let permission_mode = self.get_subnet_permission_mode(&provider, &subnet_id).await
+                    .unwrap_or_else(|e| {
+                        log::error!("Failed to get permission mode for subnet {}: {}", subnet_id, e);
+                        "unknown".to_string()
+                    });
+
                 let instance = SubnetInstance {
                     id: subnet_id_str,
                     name: format!("Subnet {}", subnet_id.to_string().split('/').last().unwrap_or("Unknown")),
@@ -1525,7 +1556,7 @@ impl UIServer {
                         "rpc_url": subnet_config.rpc_http(),
                         "gateway_addr": subnet_config.gateway_addr(),
                         "registry_addr": subnet_config.registry_addr(),
-                        "permissionMode": "federated"
+                        "permissionMode": permission_mode
                     }),
                 };
 
@@ -1595,6 +1626,13 @@ impl UIServer {
                                 }
                             }
 
+                            // Query the actual permission mode from the subnet contract
+                            let permission_mode = self.get_subnet_permission_mode(&provider, &subnet_id).await
+                                .unwrap_or_else(|e| {
+                                    log::error!("Failed to get permission mode for subnet {}: {}", subnet_id, e);
+                                    "unknown".to_string()
+                                });
+
                             let instance = SubnetInstance {
                                 id: subnet_id_str,
                                 name: format!("Subnet {}", subnet_id.to_string().split('/').last().unwrap_or("Unknown")),
@@ -1607,7 +1645,7 @@ impl UIServer {
                                     "stake": subnet_info.stake.atto().to_string(),
                                     "circ_supply": subnet_info.circ_supply.atto().to_string(),
                                     "genesis_epoch": subnet_info.genesis_epoch,
-                                    "permissionMode": "collateral"
+                                    "permissionMode": permission_mode
                                 }),
                             };
 
@@ -1848,6 +1886,71 @@ impl UIServer {
 
         log::info!("✅ Successfully updated creation date for subnet {}", subnet_id);
         Ok(())
+    }
+
+                /// Query the permission mode from a subnet contract
+    async fn get_subnet_permission_mode(&self, provider: &IpcProvider, subnet_id: &SubnetID) -> Result<String> {
+        use ipc_actors_abis::subnet_actor_getter_facet;
+        use ethers::providers::{Http, Provider};
+        use crate::commands::subnet::init::ipc_config_store::IpcConfigStore;
+
+        // Get parent subnet
+        let parent = subnet_id.parent().ok_or_else(|| anyhow!("Subnet has no parent"))?;
+
+        // Load the IPC config store to find parent's configuration
+        let global = GlobalArguments {
+            config_path: Some(self.config_path.clone()),
+            _network: fvm_shared::address::Network::Testnet,
+            __network: None,
+        };
+
+        let ipc_config_store = IpcConfigStore::load_or_init(&global).await?;
+        let config_snapshot = ipc_config_store.snapshot().await;
+
+        // Find the parent subnet config
+        let parent_config = config_snapshot.subnets.get(&parent)
+            .ok_or_else(|| anyhow!("Parent subnet not found in config"))?;
+
+        // Get the parent's RPC URL
+        let rpc_url = match &parent_config.config {
+            ipc_provider::config::SubnetConfig::Fevm(evm) => evm.provider_http.as_str(),
+        };
+
+        // Get the subnet actor contract address
+        let subnet_address = subnet_id.subnet_actor();
+        let contract_address = ipc_api::evm::payload_to_evm_address(subnet_address.payload())?;
+
+        // Create a provider for the parent network
+        let provider = Provider::<Http>::try_from(rpc_url)?;
+        let provider_arc = std::sync::Arc::new(provider);
+
+        // Create contract instance
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            contract_address,
+            provider_arc,
+        );
+
+        // Query permission mode
+        match contract.permission_mode().call().await {
+            Ok(permission_mode_value) => {
+                // Convert numeric value to string
+                let mode_str = match permission_mode_value {
+                    0 => "collateral",
+                    1 => "federated",
+                    2 => "static",
+                    _ => {
+                        log::warn!("Unknown permission mode value for subnet {}: {}", subnet_id, permission_mode_value);
+                        "unknown"
+                    }
+                };
+                Ok(mode_str.to_string())
+            }
+            Err(e) => {
+                log::error!("Failed to query permission mode for subnet {}: {}", subnet_id, e);
+                // Return the error instead of defaulting
+                Err(anyhow!("Failed to query permission mode: {}", e))
+            }
+        }
     }
 }
 
@@ -2729,11 +2832,11 @@ fn ui_config_to_subnet_create_config(config: &serde_json::Value) -> Result<Subne
 
     let permission_mode = match config.get("permissionMode")
         .and_then(|v| v.as_str())
-        .unwrap_or("federated") {
+        .unwrap_or("collateral") {
         "federated" => PermissionMode::Federated,
         "collateral" => PermissionMode::Collateral,
         "static" => PermissionMode::Static,
-        _ => PermissionMode::Federated,
+        _ => PermissionMode::Collateral,
     };
 
     let supply_source_kind = match config.get("supplySourceKind")
@@ -3641,13 +3744,6 @@ async fn set_federated_power_via_cli(power_data: serde_json::Value, config_path:
 async fn get_subnet_stats(config_path: &str, subnet_id: &str) -> Result<serde_json::Value> {
     log::info!("Getting chain stats for subnet: {}", subnet_id);
 
-    // URL decode the subnet ID first
-    let decoded_subnet_id = urlencoding::decode(subnet_id)
-        .map_err(|e| {
-            log::error!("Failed to URL decode subnet ID '{}': {}", subnet_id, e);
-            anyhow::anyhow!("Failed to URL decode subnet ID '{}': {}", subnet_id, e)
-        })?;
-
     // Initialize IPC provider
     let global_args = GlobalArguments {
         config_path: Some(config_path.to_string()),
@@ -3655,8 +3751,8 @@ async fn get_subnet_stats(config_path: &str, subnet_id: &str) -> Result<serde_js
     };
 
     let provider = get_ipc_provider(&global_args)?;
-    let subnet_id = SubnetID::from_str(&decoded_subnet_id)
-        .map_err(|e| anyhow::anyhow!("Invalid subnet ID '{}': {}", decoded_subnet_id, e))?;
+    let subnet_id = SubnetID::from_str(subnet_id)
+        .map_err(|e| anyhow::anyhow!("Invalid subnet ID '{}': {}", subnet_id, e))?;
 
         // Mock chain statistics with reasonable values
     let now = SystemTime::now();
@@ -3683,13 +3779,6 @@ async fn get_subnet_stats(config_path: &str, subnet_id: &str) -> Result<serde_js
 async fn get_subnet_status(config_path: &str, subnet_id: &str) -> Result<serde_json::Value> {
     log::info!("Getting subnet status for: {}", subnet_id);
 
-    // URL decode the subnet ID first
-    let decoded_subnet_id = urlencoding::decode(subnet_id)
-        .map_err(|e| {
-            log::error!("Failed to URL decode subnet ID '{}': {}", subnet_id, e);
-            anyhow::anyhow!("Failed to URL decode subnet ID '{}': {}", subnet_id, e)
-        })?;
-
     // Initialize IPC provider
     let global_args = GlobalArguments {
         config_path: Some(config_path.to_string()),
@@ -3697,8 +3786,8 @@ async fn get_subnet_status(config_path: &str, subnet_id: &str) -> Result<serde_j
     };
 
     let provider = get_ipc_provider(&global_args)?;
-    let subnet_id = SubnetID::from_str(&decoded_subnet_id)
-        .map_err(|e| anyhow::anyhow!("Invalid subnet ID '{}': {}", decoded_subnet_id, e))?;
+    let subnet_id = SubnetID::from_str(subnet_id)
+        .map_err(|e| anyhow::anyhow!("Invalid subnet ID '{}': {}", subnet_id, e))?;
 
     // For now, mock the status based on available information
     let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
@@ -3728,14 +3817,7 @@ async fn get_subnet_status(config_path: &str, subnet_id: &str) -> Result<serde_j
 
 /// Send a test transaction to verify subnet is working
 async fn send_test_transaction(config_path: &str, subnet_id: &str, test_tx_data: serde_json::Value) -> Result<serde_json::Value> {
-    // URL decode the subnet ID first
-    let decoded_subnet_id = urlencoding::decode(subnet_id)
-        .map_err(|e| {
-            log::error!("Failed to URL decode subnet ID '{}': {}", subnet_id, e);
-            anyhow::anyhow!("Failed to URL decode subnet ID '{}': {}", subnet_id, e)
-        })?;
-
-    log::info!("Sending test transaction to subnet: {} (decoded: {})", subnet_id, decoded_subnet_id);
+    log::info!("Sending test transaction to subnet: {}", subnet_id);
 
     // Parse the test transaction data
     let tx_type = test_tx_data.get("type")

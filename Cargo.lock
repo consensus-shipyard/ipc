@@ -5879,6 +5879,7 @@ dependencies = [
  "ipc-provider",
  "ipc-types",
  "ipc-wallet",
+ "ipc_actors_abis",
  "libsecp256k1",
  "log",
  "mime_guess",
