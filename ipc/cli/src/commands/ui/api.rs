@@ -48,4 +48,52 @@ pub struct DeploymentResponse {
     pub message: String,
 }
 
+/// Chain statistics response
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ChainStats {
+    pub block_height: u64,
+    pub latest_block_time: String,
+    pub transaction_count: u64,
+    pub validator_count: u32,
+    pub tps: f64,
+    pub avg_block_time: f64,
+    pub last_checkpoint: String,
+    pub total_supply: String,
+    pub circulating_supply: String,
+    pub fees_collected: String,
+    pub pending_transactions: Option<u64>,
+}
+
+/// Subnet status response
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SubnetStatus {
+    pub is_active: bool,
+    pub last_block_time: String,
+    pub block_height: u64,
+    pub validators_online: u32,
+    pub consensus_status: String, // "healthy", "degraded", "offline"
+    pub sync_status: String, // "synced", "syncing", "behind"
+}
+
+/// Test transaction request
+#[derive(Debug, Deserialize)]
+pub struct TestTransactionRequest {
+    pub tx_type: String, // "simple", "transfer", "contract_call"
+    pub from: Option<String>,
+    pub to: Option<String>,
+    pub amount: Option<String>,
+    pub data: Option<String>,
+    pub gas_limit: Option<u64>,
+}
+
+/// Test transaction response
+#[derive(Debug, Serialize)]
+pub struct TestTransactionResponse {
+    pub success: bool,
+    pub tx_hash: Option<String>,
+    pub block_number: Option<u64>,
+    pub gas_used: Option<u64>,
+    pub error: Option<String>,
+}
+
 // Future API implementations will go here

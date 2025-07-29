@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { apiService } from '../services/api'
 
@@ -27,6 +27,33 @@ interface SubnetInstance {
   config: Record<string, any>
 }
 
+interface ChainStats {
+  total_supply: string
+  circulating_supply: string
+  fees_collected: string
+  active_validators: number
+  last_checkpoint: string
+  uptime: string
+  block_height: number
+  transaction_count: number
+  tps: number
+  avg_block_time: number
+  latest_block_time: string
+  consensus_status: string
+  validators_online: number
+  pending_transactions?: number
+}
+
+interface SubnetStatus {
+  status: string
+  message: string
+  is_active: boolean
+  block_height: number
+  validators_online: number
+  consensus_status: string
+  sync_status?: string
+}
+
 const route = useRoute()
 const router = useRouter()
 
@@ -41,6 +68,26 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const activeTab = ref('overview')
 const approvingSubnet = ref(false)
+
+// Chain statistics state
+const chainStats = ref<ChainStats | null>(null)
+const subnetStatus = ref<SubnetStatus | null>(null)
+const loadingStats = ref(false)
+const statsError = ref<string | null>(null)
+const statsRefreshInterval = ref<number | null>(null)
+
+// Test transaction state
+const showTestTxModal = ref(false)
+const sendingTestTx = ref(false)
+const testTxResult = ref<string | null>(null)
+const testTxData = ref({
+  type: 'simple' as 'transfer' | 'contract_call' | 'simple',
+  from: '',
+  to: '',
+  amount: '0.001',
+  data: '',
+  gas_limit: 21000
+})
 
 // Validator management state
 const newValidator = ref({
@@ -65,6 +112,9 @@ const bulkValidators = ref<Array<{
   isNew?: boolean
 }>>([])
 const settingFederatedPower = ref(false)
+
+// Add validator modal state
+const showAddValidatorModal = ref(false)
 
 // Computed
 const createdDate = computed(() => {
@@ -366,6 +416,9 @@ const addValidator = async () => {
         initialBalance: 0
       }
 
+      // Close modal
+      showAddValidatorModal.value = false
+
       // Refresh instance data
       await fetchInstance()
 
@@ -525,16 +578,129 @@ const setBulkFederatedPower = async () => {
   }
 }
 
+// Chain statistics methods
+const fetchChainStats = async () => {
+  if (!instance.value) return
+
+  try {
+    loadingStats.value = true
+    statsError.value = null
+
+    const [statsResponse, statusResponse] = await Promise.all([
+      apiService.getSubnetStats(decodeURIComponent(props.id)),
+      apiService.getSubnetStatus(decodeURIComponent(props.id))
+    ])
+
+    if (statsResponse.data) {
+      chainStats.value = statsResponse.data
+    }
+
+    if (statusResponse.data) {
+      subnetStatus.value = statusResponse.data
+    }
+  } catch (err) {
+    console.error('Error fetching chain stats:', err)
+    statsError.value = err instanceof Error ? err.message : 'Failed to load chain statistics'
+  } finally {
+    loadingStats.value = false
+  }
+}
+
+const startStatsRefresh = () => {
+  // Fetch stats immediately
+  fetchChainStats()
+
+  // Set up periodic refresh every 10 seconds
+  if (statsRefreshInterval.value) {
+    clearInterval(statsRefreshInterval.value)
+  }
+
+  statsRefreshInterval.value = setInterval(() => {
+    fetchChainStats()
+  }, 10000)
+}
+
+const stopStatsRefresh = () => {
+  if (statsRefreshInterval.value) {
+    clearInterval(statsRefreshInterval.value)
+    statsRefreshInterval.value = null
+  }
+}
+
+// Test transaction methods
+const openTestTxModal = () => {
+  showTestTxModal.value = true
+  testTxResult.value = null
+
+  // Set default from address if available
+  if (instance.value?.validators && instance.value.validators.length > 0) {
+    testTxData.value.from = instance.value.validators[0].address
+  }
+
+  // Set default to address as a different validator or gateway
+  if (instance.value?.validators && instance.value.validators.length > 1) {
+    testTxData.value.to = instance.value.validators[1].address
+  } else if (instance.value?.config?.gateway_addr) {
+    testTxData.value.to = instance.value.config.gateway_addr
+  }
+}
+
+const sendTestTransaction = async () => {
+  if (!instance.value) return
+
+  sendingTestTx.value = true
+  testTxResult.value = null
+
+  try {
+    const response = await apiService.sendTestTransaction(
+      decodeURIComponent(props.id),
+      testTxData.value
+    )
+
+    if (response.data.success) {
+      testTxResult.value = `Test transaction sent successfully!
+        Transaction Hash: ${response.data.txHash || 'N/A'}
+        Block: ${response.data.blockNumber || 'Pending'}
+        Gas Used: ${response.data.gasUsed || 'N/A'}`
+
+      // Refresh stats after successful transaction
+      setTimeout(() => {
+        fetchChainStats()
+      }, 2000)
+    } else {
+      testTxResult.value = `Transaction failed: ${response.data.error || 'Unknown error'}`
+    }
+  } catch (err) {
+    console.error('Error sending test transaction:', err)
+    testTxResult.value = `Transaction failed: ${err instanceof Error ? err.message : 'Network error'}`
+  } finally {
+    sendingTestTx.value = false
+  }
+}
+
+const closeTestTxModal = () => {
+  showTestTxModal.value = false
+  testTxResult.value = null
+  sendingTestTx.value = false
+}
+
 // Lifecycle
 onMounted(() => {
   fetchInstance()
+  startStatsRefresh()
 })
 
 // Watch for route changes
 watch(() => props.id, (newId) => {
   if (newId) {
     fetchInstance()
+    startStatsRefresh()
   }
+})
+
+// Cleanup on unmount
+onUnmounted(() => {
+  stopStatsRefresh()
 })
 </script>
 
@@ -644,6 +810,17 @@ watch(() => props.id, (newId) => {
         </button>
 
         <button
+          v-if="instance.status === 'active' || instance.status === 'Active'"
+          @click="openTestTxModal"
+          class="btn-primary flex items-center"
+        >
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+          </svg>
+          Send Test Transaction
+        </button>
+
+        <button
           @click="viewLogs"
           class="btn-secondary flex items-center"
         >
@@ -688,17 +865,6 @@ watch(() => props.id, (newId) => {
             ]"
           >
             Validators ({{ instance.validators.length }})
-          </button>
-          <button
-            @click="activeTab = 'validator-management'"
-            :class="[
-              'py-2 px-1 border-b-2 font-medium text-sm',
-              activeTab === 'validator-management'
-                ? 'border-primary-500 text-primary-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            ]"
-          >
-            Manage Validators
           </button>
           <button
             @click="activeTab = 'configuration'"
@@ -792,35 +958,240 @@ watch(() => props.id, (newId) => {
 
           <!-- Quick Stats -->
           <div class="card">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Quick Stats</h3>
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold text-gray-900">Chain Statistics</h3>
+              <div class="flex items-center space-x-2">
+                <div v-if="loadingStats" class="animate-spin w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full"></div>
+                <div v-else-if="subnetStatus?.is_active" class="flex items-center text-green-600">
+                  <div class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                  <span class="text-sm font-medium">Active</span>
+                </div>
+                <div v-else class="flex items-center text-red-600">
+                  <div class="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
+                  <span class="text-sm font-medium">Inactive</span>
+                </div>
+              </div>
+            </div>
+
             <div class="grid grid-cols-2 gap-4">
+              <div class="text-center p-4 bg-gray-50 rounded-lg">
+                <div class="text-2xl font-bold text-gray-900">
+                  {{ chainStats?.block_height || subnetStatus?.block_height || 'N/A' }}
+                </div>
+                <div class="text-sm text-gray-500">Block Height</div>
+                <div v-if="chainStats?.latest_block_time" class="text-xs text-gray-400 mt-1">
+                  {{ new Date(chainStats.latest_block_time).toLocaleTimeString() }}
+                </div>
+              </div>
+
               <div class="text-center p-4 bg-gray-50 rounded-lg">
                 <div class="text-2xl font-bold text-gray-900">{{ instance.validators.length }}</div>
                 <div class="text-sm text-gray-500">Validators</div>
+                <div v-if="subnetStatus?.validators_online !== undefined" class="text-xs text-gray-400 mt-1">
+                  {{ subnetStatus.validators_online }} online
+                </div>
               </div>
+
               <div class="text-center p-4 bg-gray-50 rounded-lg">
-                <div class="text-2xl font-bold text-gray-900">{{ totalStake }}</div>
-                <div class="text-sm text-gray-500">Total Stake (FIL)</div>
+                <div class="text-2xl font-bold text-gray-900">
+                  {{ chainStats?.transaction_count || 'N/A' }}
+                </div>
+                <div class="text-sm text-gray-500">Total Transactions</div>
+                <div v-if="chainStats?.tps" class="text-xs text-gray-400 mt-1">
+                  {{ chainStats.tps.toFixed(1) }} TPS
+                </div>
               </div>
+
               <div class="text-center p-4 bg-gray-50 rounded-lg">
-                <div class="text-2xl font-bold text-gray-900">{{ totalPower }}</div>
-                <div class="text-sm text-gray-500">Total Power</div>
+                <div class="text-2xl font-bold text-gray-900">
+                  <span v-if="subnetStatus?.consensus_status === 'healthy'" class="text-green-600">●</span>
+                  <span v-else-if="subnetStatus?.consensus_status === 'degraded'" class="text-yellow-600">●</span>
+                  <span v-else-if="subnetStatus?.consensus_status === 'offline'" class="text-red-600">●</span>
+                  <span v-else class="text-gray-400">●</span>
+                  {{ subnetStatus?.consensus_status || 'Unknown' }}
+                </div>
+                <div class="text-sm text-gray-500">Consensus</div>
+                <div v-if="chainStats?.avg_block_time" class="text-xs text-gray-400 mt-1">
+                  {{ chainStats.avg_block_time.toFixed(1) }}s avg block
+                </div>
               </div>
-              <div class="text-center p-4 bg-gray-50 rounded-lg">
-                <div class="text-2xl font-bold text-gray-900">{{ instance.config.permissionMode || 'N/A' }}</div>
-                <div class="text-sm text-gray-500">Mode</div>
-              </div>
+            </div>
+
+            <!-- Error state for stats -->
+            <div v-if="statsError" class="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p class="text-red-700 text-sm">{{ statsError }}</p>
+              <button @click="fetchChainStats" class="text-red-600 hover:text-red-700 text-sm font-medium mt-1">
+                Retry
+              </button>
             </div>
           </div>
         </div>
 
         <!-- Validators Tab -->
         <div v-if="activeTab === 'validators'" class="space-y-6">
+          <!-- Permission Mode Explanation -->
+          <div class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h4 class="text-md font-semibold text-blue-800 mb-2 flex items-center">
+              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {{ instance.config.permissionMode === 'federated' ? 'Federated Mode' : 'Collateral Mode' }}
+            </h4>
+
+            <div v-if="instance.config.permissionMode === 'federated'" class="text-blue-700 text-sm">
+              <p class="mb-2"><strong>Federated subnets</strong> use centralized validator management:</p>
+              <ul class="list-disc list-inside space-y-1 ml-4">
+                <li>Validators are added by setting their power directly</li>
+                <li>No collateral staking required</li>
+                <li>Network owner controls validator set</li>
+                <li>Changes are applied to all validators simultaneously</li>
+              </ul>
+            </div>
+
+            <div v-else-if="instance.config.permissionMode === 'collateral'" class="text-blue-700 text-sm">
+              <p class="mb-2"><strong>Collateral subnets</strong> use stake-based validator management:</p>
+              <ul class="list-disc list-inside space-y-1 ml-4">
+                <li>Validators join by staking FIL collateral</li>
+                <li>Minimum stake requirement: {{ instance.config.minValidatorStake || 'Not set' }} FIL</li>
+                <li>Validators can increase/decrease their stake</li>
+                <li>Higher stake generally means higher voting power</li>
+              </ul>
+            </div>
+
+            <div v-else class="text-blue-700 text-sm">
+              <p>Unknown permission mode. Please check your subnet configuration.</p>
+            </div>
+          </div>
+
+          <!-- Bulk Federated Management (Federated Mode Only) -->
+          <div v-if="instance.config.permissionMode === 'federated'" class="p-6 bg-blue-50 rounded-lg">
+            <div class="flex items-center justify-between mb-4">
+              <h4 class="text-md font-semibold text-gray-800 flex items-center">
+                <svg class="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+                Advanced Federated Management
+              </h4>
+              <button
+                v-if="!showBulkManagement"
+                @click="initializeBulkManagement"
+                class="btn-secondary text-sm"
+              >
+                Manage All Validators
+              </button>
+              <button
+                v-else
+                @click="showBulkManagement = false"
+                class="btn-secondary text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+
+            <div v-if="!showBulkManagement" class="text-sm text-blue-700">
+              <p class="mb-2">💡 <strong>Tip:</strong> Use bulk management to:</p>
+              <ul class="list-disc list-inside space-y-1 ml-4">
+                <li>Set power for all validators at once</li>
+                <li>Add multiple validators simultaneously</li>
+                <li>Manage the complete validator set in one operation</li>
+              </ul>
+            </div>
+
+            <!-- Bulk Management Form -->
+            <div v-if="showBulkManagement" class="space-y-4">
+              <div class="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
+                <p class="text-yellow-800 text-sm">
+                  <strong>⚠️ Important:</strong> This will set the complete validator set. All validators not listed here will be removed from the subnet.
+                </p>
+              </div>
+
+              <div class="space-y-3">
+                <div v-for="(validator, index) in bulkValidators" :key="index"
+                     class="grid grid-cols-12 gap-2 items-center p-3 bg-white rounded border">
+                  <div class="col-span-4">
+                    <input
+                      v-model="validator.address"
+                      type="text"
+                      placeholder="Validator Address (0x...)"
+                      class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    />
+                  </div>
+                  <div class="col-span-4">
+                    <input
+                      v-model="validator.pubkey"
+                      type="text"
+                      placeholder="Public Key (0x04...)"
+                      class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    />
+                  </div>
+                  <div class="col-span-2">
+                    <input
+                      v-model.number="validator.power"
+                      type="number"
+                      min="1"
+                      placeholder="Power"
+                      class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    />
+                  </div>
+                  <div class="col-span-1">
+                    <span v-if="validator.isNew" class="text-xs text-green-600 font-medium">NEW</span>
+                    <span v-else class="text-xs text-blue-600 font-medium">EXISTING</span>
+                  </div>
+                  <div class="col-span-1">
+                    <button
+                      @click="removeBulkValidator(index)"
+                      type="button"
+                      class="text-red-600 hover:text-red-800 p-1"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between">
+                <button
+                  @click="addBulkValidator"
+                  type="button"
+                  class="btn-secondary text-sm"
+                >
+                  <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  Add Validator
+                </button>
+
+                <button
+                  @click="setBulkFederatedPower"
+                  :disabled="settingFederatedPower || bulkValidators.length === 0"
+                  class="btn-primary"
+                >
+                  <div v-if="settingFederatedPower" class="animate-spin inline-block w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full"></div>
+                  {{ settingFederatedPower ? 'Setting Power...' : 'Set Federated Power' }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Validators Table -->
           <div class="card">
             <div class="flex items-center justify-between mb-4">
               <h3 class="text-lg font-semibold text-gray-900">Validators</h3>
-              <div class="text-sm text-gray-500">
-                {{ instance.validators.length }} validator{{ instance.validators.length !== 1 ? 's' : '' }}
+              <div class="flex items-center space-x-3">
+                <div class="text-sm text-gray-500">
+                  {{ instance.validators.length }} validator{{ instance.validators.length !== 1 ? 's' : '' }}
+                </div>
+                <button
+                  @click="showAddValidatorModal = true"
+                  class="btn-primary"
+                  title="Add new validator"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                </button>
               </div>
             </div>
 
@@ -830,6 +1201,12 @@ watch(() => props.id, (newId) => {
               </svg>
               <p class="font-medium">No validators configured</p>
               <p class="text-sm">This subnet has no validators set up yet.</p>
+              <button
+                @click="showAddValidatorModal = true"
+                class="mt-4 btn-primary"
+              >
+                Add First Validator
+              </button>
             </div>
 
             <div v-else class="overflow-x-auto">
@@ -848,18 +1225,55 @@ watch(() => props.id, (newId) => {
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
+                    <th v-if="instance.config.permissionMode === 'collateral'" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Remove
+                    </th>
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
                   <tr v-for="validator in instance.validators" :key="validator.address">
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
-                      {{ validator.address.slice(0, 8) }}...{{ validator.address.slice(-6) }}
+                      <button
+                        @click="copyToClipboard(validator.address, validator.address)"
+                        class="hover:bg-gray-100 px-2 py-1 rounded transition-colors cursor-pointer text-left"
+                        :title="copyingAddress === validator.address ? 'Copied!' : `Click to copy: ${validator.address}`"
+                      >
+                        {{ validator.address }}
+                        <svg v-if="copyingAddress === validator.address" class="inline-block w-4 h-4 ml-1 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                        </svg>
+                      </button>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {{ validator.stake }} FIL
+                      <div v-if="instance.config.permissionMode === 'collateral'">
+                        {{ validator.stake }} FIL
+                        <span v-if="validator.initial_balance" class="block text-xs text-gray-500">
+                          Initial: {{ validator.initial_balance }} FIL
+                        </span>
+                      </div>
+                      <div v-else>
+                        {{ validator.stake }} FIL
+                      </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {{ validator.power }}
+                      <div v-if="instance.config.permissionMode === 'federated'">
+                        <div class="flex items-center space-x-2">
+                          <span>{{ validator.current_power || validator.power || '0' }}</span>
+                          <span v-if="validator.next_power !== undefined && validator.current_power !== validator.next_power"
+                                class="text-blue-600 text-xs">
+                            → {{ validator.next_power }}
+                          </span>
+                        </div>
+                        <div v-if="validator.waiting" class="text-yellow-600 text-xs">
+                          ⏳ Pending
+                        </div>
+                      </div>
+                      <div v-else>
+                        {{ validator.power }}
+                      </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                       <span :class="[
@@ -868,194 +1282,89 @@ watch(() => props.id, (newId) => {
                       ]">
                         {{ validator.status }}
                       </span>
+                      <!-- Power transition indicator for federated mode -->
+                      <span v-if="instance.config.permissionMode === 'federated' && validator.current_power !== validator.next_power"
+                            class="ml-2 inline-flex px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+                        Power Changing
+                      </span>
+                    </td>
+                    <td v-if="instance.config.permissionMode === 'collateral'" class="px-6 py-4 whitespace-nowrap">
+                      <div class="flex items-center space-x-2">
+                        <input
+                          v-model.number="stakeAmounts[validator.address]"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="Amount"
+                          class="w-20 px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
+                        />
+                        <button
+                          @click="updateStake(validator.address, 'stake')"
+                          :disabled="updatingStake[validator.address]"
+                          class="btn-secondary text-xs px-2 py-1"
+                        >
+                          Stake
+                        </button>
+                        <button
+                          @click="updateStake(validator.address, 'unstake')"
+                          :disabled="updatingStake[validator.address]"
+                          class="btn-secondary text-xs px-2 py-1"
+                        >
+                          Unstake
+                        </button>
+                      </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right">
+                      <button
+                        @click="removeValidator(validator.address)"
+                        :disabled="removingValidator[validator.address]"
+                        class="text-red-600 hover:text-red-700 p-2 rounded hover:bg-red-50 transition-colors"
+                        :title="removingValidator[validator.address] ? 'Removing...' : 'Remove validator'"
+                      >
+                        <svg v-if="removingValidator[validator.address]" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
           </div>
-        </div>
 
-        <!-- Validator Management Tab -->
-        <div v-if="activeTab === 'validator-management'" class="space-y-6">
-          <div class="card">
-            <div class="flex items-center justify-between mb-6">
-              <h3 class="text-lg font-semibold text-gray-900">Validator Management</h3>
-              <div class="text-sm text-gray-500">
-                Mode: {{ instance.config.permissionMode || 'Unknown' }}
-              </div>
-            </div>
-
-            <!-- Permission Mode Explanation -->
-            <div class="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h4 class="text-md font-semibold text-blue-800 mb-2 flex items-center">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                {{ instance.config.permissionMode === 'federated' ? 'Federated Mode' : 'Collateral Mode' }}
-              </h4>
-
-              <div v-if="instance.config.permissionMode === 'federated'" class="text-blue-700 text-sm">
-                <p class="mb-2"><strong>Federated subnets</strong> use centralized validator management:</p>
-                <ul class="list-disc list-inside space-y-1 ml-4">
-                  <li>Validators are added by setting their power directly</li>
-                  <li>No collateral staking required</li>
-                  <li>Network owner controls validator set</li>
-                  <li>Changes are applied to all validators simultaneously</li>
-                </ul>
-              </div>
-
-              <div v-else-if="instance.config.permissionMode === 'collateral'" class="text-blue-700 text-sm">
-                <p class="mb-2"><strong>Collateral subnets</strong> use stake-based validator management:</p>
-                <ul class="list-disc list-inside space-y-1 ml-4">
-                  <li>Validators join by staking FIL collateral</li>
-                  <li>Minimum stake requirement: {{ instance.config.minValidatorStake || 'Not set' }} FIL</li>
-                  <li>Validators can increase/decrease their stake</li>
-                  <li>Higher stake generally means higher voting power</li>
-                </ul>
-              </div>
-
-              <div v-else class="text-blue-700 text-sm">
-                <p>Unknown permission mode. Please check your subnet configuration.</p>
-              </div>
-            </div>
-
-            <!-- Bulk Federated Management (Federated Mode Only) -->
-            <div v-if="instance.config.permissionMode === 'federated'" class="mb-8 p-6 bg-blue-50 rounded-lg">
-              <div class="flex items-center justify-between mb-4">
-                <h4 class="text-md font-semibold text-gray-800 flex items-center">
-                  <svg class="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                  Advanced Federated Management
-                </h4>
-                <button
-                  v-if="!showBulkManagement"
-                  @click="initializeBulkManagement"
-                  class="btn-secondary text-sm"
-                >
-                  Manage All Validators
-                </button>
-                <button
-                  v-else
-                  @click="showBulkManagement = false"
-                  class="btn-secondary text-sm"
-                >
-                  Cancel
-                </button>
-              </div>
-
-              <div v-if="!showBulkManagement" class="text-sm text-blue-700">
-                <p class="mb-2">💡 <strong>Tip:</strong> Use bulk management to:</p>
-                <ul class="list-disc list-inside space-y-1 ml-4">
-                  <li>Set power for all validators at once</li>
-                  <li>Add multiple validators simultaneously</li>
-                  <li>Manage the complete validator set in one operation</li>
-                </ul>
-              </div>
-
-              <!-- Bulk Management Form -->
-              <div v-if="showBulkManagement" class="space-y-4">
-                <div class="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
-                  <p class="text-yellow-800 text-sm">
-                    <strong>⚠️ Important:</strong> This will set the complete validator set. All validators not listed here will be removed from the subnet.
-                  </p>
+          <!-- Add Validator Modal -->
+          <div v-if="showAddValidatorModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-md shadow-lg rounded-md bg-white">
+              <div class="mt-3">
+                <div class="flex items-center justify-between mb-4">
+                  <h3 class="text-lg font-medium text-gray-900">Add New Validator</h3>
+                  <button
+                    @click="showAddValidatorModal = false"
+                    class="text-gray-400 hover:text-gray-600"
+                  >
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
                 </div>
 
-                <div class="space-y-3">
-                  <div v-for="(validator, index) in bulkValidators" :key="index"
-                       class="grid grid-cols-12 gap-2 items-center p-3 bg-white rounded border">
-                    <div class="col-span-4">
-                      <input
-                        v-model="validator.address"
-                        type="text"
-                        placeholder="Validator Address (0x...)"
-                        class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
-                      />
-                    </div>
-                    <div class="col-span-4">
-                      <input
-                        v-model="validator.pubkey"
-                        type="text"
-                        placeholder="Public Key (0x04...)"
-                        class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
-                      />
-                    </div>
-                    <div class="col-span-2">
-                      <input
-                        v-model.number="validator.power"
-                        type="number"
-                        min="1"
-                        placeholder="Power"
-                        class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
-                      />
-                    </div>
-                    <div class="col-span-1">
-                      <span v-if="validator.isNew" class="text-xs text-green-600 font-medium">NEW</span>
-                      <span v-else class="text-xs text-blue-600 font-medium">EXISTING</span>
-                    </div>
-                    <div class="col-span-1">
-                      <button
-                        @click="removeBulkValidator(index)"
-                        type="button"
-                        class="text-red-600 hover:text-red-800 p-1"
-                      >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
+                <!-- Mode-specific instructions -->
+                <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <div v-if="instance.config.permissionMode === 'federated'" class="text-yellow-800 text-sm">
+                    <p class="font-medium mb-1">📋 Federated Mode Instructions:</p>
+                    <p>Enter the validator's Ethereum address, public key, and desired power level. The validator will be added to the network with the specified power.</p>
+                  </div>
+
+                  <div v-else-if="instance.config.permissionMode === 'collateral'" class="text-yellow-800 text-sm">
+                    <p class="font-medium mb-1">💰 Collateral Mode Instructions:</p>
+                    <p>Enter the validator's address and collateral amount. The validator must have sufficient FIL to stake the specified collateral.</p>
                   </div>
                 </div>
 
-                <div class="flex items-center justify-between">
-                  <button
-                    @click="addBulkValidator"
-                    type="button"
-                    class="btn-secondary text-sm"
-                  >
-                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    Add Validator
-                  </button>
-
-                  <button
-                    @click="setBulkFederatedPower"
-                    :disabled="settingFederatedPower || bulkValidators.length === 0"
-                    class="btn-primary"
-                  >
-                    <div v-if="settingFederatedPower" class="animate-spin inline-block w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full"></div>
-                    {{ settingFederatedPower ? 'Setting Power...' : 'Set Federated Power' }}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Add Validator Form -->
-            <div class="mb-8 p-6 bg-gray-50 rounded-lg">
-              <h4 class="text-md font-semibold text-gray-800 mb-4 flex items-center">
-                <svg class="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                Add New Validator
-              </h4>
-
-              <!-- Mode-specific instructions -->
-              <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                <div v-if="instance.config.permissionMode === 'federated'" class="text-yellow-800 text-sm">
-                  <p class="font-medium mb-1">📋 Federated Mode Instructions:</p>
-                  <p>Enter the validator's Ethereum address, public key, and desired power level. The validator will be added to the network with the specified power.</p>
-                </div>
-
-                <div v-else-if="instance.config.permissionMode === 'collateral'" class="text-yellow-800 text-sm">
-                  <p class="font-medium mb-1">💰 Collateral Mode Instructions:</p>
-                  <p>Enter the validator's address and collateral amount. The validator must have sufficient FIL to stake the specified collateral.</p>
-                </div>
-              </div>
-
-              <form @submit.prevent="addValidator" class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <form @submit.prevent="addValidator" class="space-y-4">
                   <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">
                       Validator Address *
@@ -1123,143 +1432,158 @@ watch(() => props.id, (newId) => {
                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                     />
                   </div>
-                </div>
 
-                <div class="flex justify-end">
+                  <div class="flex justify-end space-x-3 pt-4">
+                    <button
+                      type="button"
+                      @click="showAddValidatorModal = false"
+                      class="btn-secondary"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      :disabled="addingValidator"
+                      class="btn-primary"
+                    >
+                      <div v-if="addingValidator" class="animate-spin inline-block w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full"></div>
+                      {{ addingValidator ? 'Adding...' : 'Add Validator' }}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <!-- Test Transaction Modal -->
+          <div v-if="showTestTxModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-lg shadow-lg rounded-md bg-white">
+              <div class="mt-3">
+                <div class="flex items-center justify-between mb-4">
+                  <h3 class="text-lg font-medium text-gray-900">Send Test Transaction</h3>
                   <button
-                    type="submit"
-                    :disabled="addingValidator"
-                    class="btn-primary"
+                    @click="closeTestTxModal"
+                    class="text-gray-400 hover:text-gray-600"
                   >
-                    <div v-if="addingValidator" class="animate-spin inline-block w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full"></div>
-                    {{ addingValidator ? 'Adding...' : 'Add Validator' }}
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                   </button>
                 </div>
-              </form>
-            </div>
 
-            <!-- Existing Validators Management -->
-            <div>
-              <h4 class="text-md font-semibold text-gray-800 mb-4 flex items-center">
-                <svg class="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                Existing Validators
-                <span class="ml-2 px-2 py-1 bg-gray-200 text-gray-700 text-xs rounded-full">
-                  {{ instance.validators.length }} total
-                </span>
-              </h4>
-
-              <div v-if="instance.validators.length === 0" class="text-center py-8 text-gray-500">
-                <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                <p class="font-medium">No validators configured</p>
-                <p class="text-sm">Add the first validator using the form above.</p>
-              </div>
-
-              <div v-else class="space-y-4">
-                <div
-                  v-for="validator in instance.validators"
-                  :key="validator.address"
-                  class="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow"
-                >
-                  <div class="flex items-center justify-between">
-                    <div class="flex-1">
-                      <div class="flex items-center space-x-3 mb-2">
-                        <span class="font-mono text-sm font-medium">{{ validator.address.slice(0, 8) }}...{{ validator.address.slice(-6) }}</span>
-                        <span :class="[
-                          'inline-flex px-2 py-1 text-xs font-semibold rounded-full',
-                          validator.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        ]">
-                          {{ validator.status }}
-                        </span>
-
-                        <!-- Power transition indicator for federated mode -->
-                        <span v-if="instance.config.permissionMode === 'federated' && validator.current_power !== validator.next_power"
-                              class="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
-                          Power Changing
-                        </span>
-                      </div>
-
-                      <div class="text-sm text-gray-600">
-                        <div v-if="instance.config.permissionMode === 'collateral'">
-                          <span class="font-medium">Stake:</span> {{ validator.stake }} FIL
-                          <span v-if="validator.initial_balance" class="ml-3">
-                            <span class="font-medium">Initial Balance:</span> {{ validator.initial_balance }} FIL
-                          </span>
-                        </div>
-
-                        <div v-else-if="instance.config.permissionMode === 'federated'">
-                          <div class="flex items-center space-x-4">
-                            <span>
-                              <span class="font-medium">Current Power:</span> {{ validator.current_power || validator.power || '0' }}
-                            </span>
-                            <span v-if="validator.next_power !== undefined && validator.current_power !== validator.next_power"
-                                  class="text-blue-600">
-                              <span class="font-medium">→ Next Power:</span> {{ validator.next_power }}
-                            </span>
-                          </div>
-
-                          <div v-if="validator.waiting" class="mt-1 text-yellow-600 text-xs">
-                            ⏳ Validator changes pending epoch transition
-                          </div>
-                        </div>
-
-                        <div v-else>
-                          <span class="font-medium">Power:</span> {{ validator.power || 'Unknown' }}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div class="flex items-center space-x-2">
-                      <!-- Stake Management for Collateral Mode -->
-                      <div v-if="instance.config.permissionMode === 'collateral'" class="flex items-center space-x-2">
-                        <input
-                          v-model.number="stakeAmounts[validator.address]"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="Amount"
-                          class="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
-                        />
-                        <button
-                          @click="updateStake(validator.address, 'stake')"
-                          :disabled="updatingStake[validator.address]"
-                          class="btn-secondary text-xs px-2 py-1"
-                        >
-                          Stake
-                        </button>
-                        <button
-                          @click="updateStake(validator.address, 'unstake')"
-                          :disabled="updatingStake[validator.address]"
-                          class="btn-secondary text-xs px-2 py-1"
-                        >
-                          Unstake
-                        </button>
-                      </div>
-
-                      <!-- Federated mode notice -->
-                      <div v-else-if="instance.config.permissionMode === 'federated'" class="text-xs text-gray-500 mr-3">
-                        <div class="text-center">
-                          <svg class="w-4 h-4 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          <p>Federated</p>
-                          <p>management</p>
-                        </div>
-                      </div>
-
-                      <button
-                        @click="removeValidator(validator.address)"
-                        :disabled="removingValidator[validator.address]"
-                        class="text-red-600 hover:text-red-700 text-sm font-medium px-3 py-1 border border-red-300 rounded hover:bg-red-50 transition-colors"
-                      >
-                        {{ removingValidator[validator.address] ? 'Removing...' : 'Remove' }}
-                      </button>
-                    </div>
+                <!-- Transaction type explanation -->
+                <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                  <div class="text-blue-800 text-sm">
+                    <p class="font-medium mb-1">🔍 Test Transaction</p>
+                    <p>This will send a simple transaction to verify that the subnet is processing transactions correctly. The transaction will help confirm that validators are online and consensus is working.</p>
                   </div>
                 </div>
+
+                <form @submit.prevent="sendTestTransaction" class="space-y-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                      Transaction Type
+                    </label>
+                    <select
+                      v-model="testTxData.type"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value="simple">Simple Test Transaction</option>
+                      <option value="transfer">FIL Transfer</option>
+                      <option value="contract_call">Contract Call</option>
+                    </select>
+                  </div>
+
+                  <div v-if="testTxData.type === 'transfer' || testTxData.type === 'contract_call'">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                      From Address
+                    </label>
+                    <input
+                      v-model="testTxData.from"
+                      type="text"
+                      placeholder="0x..."
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+
+                  <div v-if="testTxData.type === 'transfer' || testTxData.type === 'contract_call'">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                      To Address
+                    </label>
+                    <input
+                      v-model="testTxData.to"
+                      type="text"
+                      placeholder="0x..."
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+
+                  <div v-if="testTxData.type === 'transfer'">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                      Amount (FIL)
+                    </label>
+                    <input
+                      v-model="testTxData.amount"
+                      type="number"
+                      step="0.001"
+                      min="0"
+                      placeholder="0.001"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+
+                  <div v-if="testTxData.type === 'contract_call'">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                      Contract Data (Hex)
+                    </label>
+                    <textarea
+                      v-model="testTxData.data"
+                      placeholder="0x..."
+                      rows="3"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    ></textarea>
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                      Gas Limit
+                    </label>
+                    <input
+                      v-model.number="testTxData.gas_limit"
+                      type="number"
+                      min="21000"
+                      placeholder="21000"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                  </div>
+
+                  <!-- Transaction Result -->
+                  <div v-if="testTxResult" class="p-3 rounded-md"
+                       :class="testTxResult.includes('successfully') ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'">
+                    <div class="text-sm"
+                         :class="testTxResult.includes('successfully') ? 'text-green-800' : 'text-red-800'">
+                      <pre class="whitespace-pre-wrap">{{ testTxResult }}</pre>
+                    </div>
+                  </div>
+
+                  <div class="flex justify-end space-x-3 pt-4">
+                    <button
+                      type="button"
+                      @click="closeTestTxModal"
+                      class="btn-secondary"
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="submit"
+                      :disabled="sendingTestTx"
+                      class="btn-primary"
+                    >
+                      <div v-if="sendingTestTx" class="animate-spin inline-block w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full"></div>
+                      {{ sendingTestTx ? 'Sending...' : 'Send Test Transaction' }}
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           </div>
@@ -1602,15 +1926,27 @@ watch(() => props.id, (newId) => {
               <div class="space-y-3">
                 <div class="flex justify-between">
                   <span class="text-sm text-gray-500">Block Height</span>
-                  <span class="text-sm font-medium text-gray-900">{{ Math.floor(Math.random() * 10000) + 1000 }}</span>
+                  <span class="text-sm font-medium text-gray-900">
+                    {{ chainStats?.block_height || subnetStatus?.block_height || 'N/A' }}
+                  </span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-sm text-gray-500">Avg Block Time</span>
-                  <span class="text-sm font-medium text-gray-900">2.1s</span>
+                  <span class="text-sm font-medium text-gray-900">
+                    {{ chainStats?.avg_block_time ? `${chainStats.avg_block_time.toFixed(1)}s` : 'N/A' }}
+                  </span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-sm text-gray-500">TPS</span>
-                  <span class="text-sm font-medium text-gray-900">{{ Math.floor(Math.random() * 100) + 50 }}</span>
+                  <span class="text-sm font-medium text-gray-900">
+                    {{ chainStats?.tps ? chainStats.tps.toFixed(1) : 'N/A' }}
+                  </span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-sm text-gray-500">Pending Transactions</span>
+                  <span class="text-sm font-medium text-gray-900">
+                    {{ chainStats?.pending_transactions || 'N/A' }}
+                  </span>
                 </div>
               </div>
             </div>
@@ -1621,15 +1957,19 @@ watch(() => props.id, (newId) => {
               <div class="space-y-3">
                 <div class="flex justify-between">
                   <span class="text-sm text-gray-500">Total Supply</span>
-                  <span class="text-sm font-medium text-gray-900">{{ (Math.random() * 1000000).toFixed(0) }} FIL</span>
+                  <span class="text-sm font-medium text-gray-900">{{ chainStats?.total_supply || 'N/A' }} FIL</span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-sm text-gray-500">Circulating</span>
-                  <span class="text-sm font-medium text-gray-900">{{ (Math.random() * 500000).toFixed(0) }} FIL</span>
+                  <span class="text-sm font-medium text-gray-900">{{ chainStats?.circulating_supply || 'N/A' }} FIL</span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-sm text-gray-500">Fees Collected</span>
-                  <span class="text-sm font-medium text-gray-900">{{ (Math.random() * 1000).toFixed(2) }} FIL</span>
+                  <span class="text-sm font-medium text-gray-900">{{ chainStats?.fees_collected || 'N/A' }} FIL</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-sm text-gray-500">Total Stake</span>
+                  <span class="text-sm font-medium text-gray-900">{{ totalStake }} FIL</span>
                 </div>
               </div>
             </div>
@@ -1643,26 +1983,84 @@ watch(() => props.id, (newId) => {
                   <span class="text-sm font-medium text-gray-900">{{ instance.validators.length }}</span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-sm text-gray-500">Last Checkpoint</span>
-                  <span class="text-sm font-medium text-gray-900">{{ Math.floor(Math.random() * 60) + 1 }}m ago</span>
+                  <span class="text-sm text-gray-500">Validators Online</span>
+                  <span class="text-sm font-medium text-gray-900">
+                    {{ subnetStatus?.validators_online !== undefined ? subnetStatus.validators_online : 'N/A' }}
+                  </span>
                 </div>
                 <div class="flex justify-between">
-                  <span class="text-sm text-gray-500">Uptime</span>
-                  <span class="text-sm font-medium text-gray-900">{{ (Math.random() * 10 + 90).toFixed(1) }}%</span>
+                  <span class="text-sm text-gray-500">Last Checkpoint</span>
+                  <span class="text-sm font-medium text-gray-900">
+                    {{ chainStats?.last_checkpoint || 'N/A' }}
+                  </span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-sm text-gray-500">Consensus Status</span>
+                  <span class="text-sm font-medium"
+                        :class="{
+                          'text-green-600': subnetStatus?.consensus_status === 'healthy',
+                          'text-yellow-600': subnetStatus?.consensus_status === 'degraded',
+                          'text-red-600': subnetStatus?.consensus_status === 'offline',
+                          'text-gray-900': !subnetStatus?.consensus_status
+                        }">
+                    {{ subnetStatus?.consensus_status || 'Unknown' }}
+                  </span>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Activity Chart Placeholder -->
+          <!-- Real-time Activity Chart Placeholder -->
           <div class="card">
-            <h4 class="text-md font-semibold text-gray-900 mb-4">Activity Overview</h4>
-            <div class="bg-gray-50 rounded-lg p-8 text-center">
+            <div class="flex items-center justify-between mb-4">
+              <h4 class="text-md font-semibold text-gray-900">Real-time Activity</h4>
+              <div class="flex items-center space-x-2">
+                <div v-if="loadingStats" class="animate-spin w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full"></div>
+                <span class="text-xs text-gray-500">
+                  Last updated: {{ chainStats?.latest_block_time ? new Date(chainStats.latest_block_time).toLocaleTimeString() : 'Never' }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Chain Health Indicators -->
+            <div v-if="chainStats || subnetStatus" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div class="text-center p-4 border rounded-lg">
+                <div class="text-lg font-semibold mb-1"
+                     :class="{
+                       'text-green-600': subnetStatus?.is_active,
+                       'text-red-600': subnetStatus?.is_active === false
+                     }">
+                  {{ subnetStatus?.is_active ? 'ACTIVE' : 'INACTIVE' }}
+                </div>
+                <div class="text-sm text-gray-500">Chain Status</div>
+              </div>
+
+              <div class="text-center p-4 border rounded-lg">
+                <div class="text-lg font-semibold mb-1">
+                  {{ chainStats?.transaction_count || 'N/A' }}
+                </div>
+                <div class="text-sm text-gray-500">Total Transactions</div>
+              </div>
+
+              <div class="text-center p-4 border rounded-lg">
+                <div class="text-lg font-semibold mb-1"
+                     :class="{
+                       'text-green-600': subnetStatus?.sync_status === 'synced',
+                       'text-yellow-600': subnetStatus?.sync_status === 'syncing',
+                       'text-red-600': subnetStatus?.sync_status === 'behind'
+                     }">
+                  {{ subnetStatus?.sync_status?.toUpperCase() || 'UNKNOWN' }}
+                </div>
+                <div class="text-sm text-gray-500">Sync Status</div>
+              </div>
+            </div>
+
+            <div v-else class="bg-gray-50 rounded-lg p-8 text-center">
               <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
-              <p class="text-gray-600">Activity charts and detailed metrics will be available here</p>
-              <p class="text-sm text-gray-500 mt-1">Real-time performance monitoring coming soon</p>
+              <p class="text-gray-600">Loading real-time metrics...</p>
+              <p class="text-sm text-gray-500 mt-1">Chain statistics will appear here once available</p>
             </div>
           </div>
         </div>

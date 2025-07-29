@@ -24,6 +24,10 @@ export const API_ENDPOINTS = {
   gateways: '/api/gateways',
   gateway: (id: string) => `/api/gateways/${id}`,
   discoverGateways: '/api/gateways-discover',
+  // Subnet statistics endpoints
+  subnetStats: (id: string) => `/api/subnet/${encodeURIComponent(id)}/stats`,
+  subnetStatus: (id: string) => `/api/subnet/${encodeURIComponent(id)}/status`,
+  sendTestTx: (id: string) => `/api/subnet/${encodeURIComponent(id)}/test-transaction`,
   // Validator management endpoints
   validators: {
     add: '/api/validators/add',

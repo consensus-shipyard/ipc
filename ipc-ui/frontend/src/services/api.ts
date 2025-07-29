@@ -111,6 +111,20 @@ export const apiService = {
     return retryRequest(() => blockchainApi.get(API_ENDPOINTS.instance(id)))
   },
 
+  // Chain statistics for subnets
+  async getSubnetStats(subnetId: string) {
+    return retryRequest(() => blockchainApi.get(API_ENDPOINTS.subnetStats(subnetId)))
+  },
+
+  async getSubnetStatus(subnetId: string) {
+    return retryRequest(() => blockchainApi.get(API_ENDPOINTS.subnetStatus(subnetId)))
+  },
+
+  // Test transaction functionality
+  async sendTestTransaction(subnetId: string, testTxData: TestTransactionRequest) {
+    return retryRequest(() => blockchainApi.post(API_ENDPOINTS.sendTestTx(subnetId), testTxData))
+  },
+
   // Gateways
   async getGateways() {
     return retryRequest(() => api.get(API_ENDPOINTS.gateways))
@@ -239,4 +253,36 @@ interface FederatedPowerRequest {
 interface DeploymentRequest {
   template: string
   config: any
+}
+
+// Test transaction interface
+interface TestTransactionRequest {
+  type: 'transfer' | 'contract_call' | 'simple'
+  from?: string
+  to?: string
+  amount?: string
+  data?: string
+  gas_limit?: number
+}
+
+// Chain statistics interfaces
+interface ChainStats {
+  block_height: number
+  latest_block_time: string
+  transaction_count: number
+  validator_count: number
+  tps: number
+  avg_block_time: number
+  last_checkpoint: string
+  network_hash_rate?: string
+  pending_transactions?: number
+}
+
+interface SubnetStatus {
+  is_active: boolean
+  last_block_time: string
+  block_height: number
+  validators_online: number
+  consensus_status: 'healthy' | 'degraded' | 'offline'
+  sync_status: 'synced' | 'syncing' | 'behind'
 }
