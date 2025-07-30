@@ -21,6 +21,7 @@ const deploymentSteps = [
 
 // Real deployment state from wizard store
 const deploymentId = computed(() => wizardStore.deploymentId)
+const subnetId = computed(() => wizardStore.subnetId)
 const deploymentProgress = computed(() => wizardStore.deploymentProgress)
 const deploymentLogs = computed(() => wizardStore.deploymentLogs)
 const deploymentError = computed(() => wizardStore.deploymentError)
@@ -295,8 +296,8 @@ onUnmounted(() => {
             Your subnet has been successfully deployed and is now active. You can now manage it from your dashboard.
           </p>
           <div class="space-y-2 text-sm text-green-700">
-            <div><strong>Subnet ID:</strong> <span class="font-mono">{{ deploymentId }}</span></div>
-            <div><strong>Network Path:</strong> <span class="font-mono">{{ config.parent }}/{{ deploymentId }}</span></div>
+            <div><strong>Subnet ID:</strong> <span class="font-mono">{{ subnetId }}</span></div>
+            <div><strong>Network Path:</strong> <span class="font-mono">{{ config.parent }}/{{ subnetId }}</span></div>
             <div><strong>Status:</strong> Active</div>
             <div><strong>Validators:</strong> {{ config.validators?.length || config.validatorPubkeys?.length || 0 }} initialized</div>
           </div>

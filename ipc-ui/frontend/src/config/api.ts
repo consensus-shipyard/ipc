@@ -51,4 +51,5 @@ export interface DeploymentProgress {
   status: 'pending' | 'in_progress' | 'completed' | 'failed'
   message?: string
   error?: string
+  subnet_id?: string // The actual subnet ID generated during deployment
 }

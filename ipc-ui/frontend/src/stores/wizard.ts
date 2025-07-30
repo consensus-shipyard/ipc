@@ -82,6 +82,7 @@ export const useWizardStore = defineStore('wizard', () => {
   // Deployment state
   const isDeploying = ref(false)
   const deploymentId = ref<string | null>(null)
+  const subnetId = ref<string | null>(null) // Actual subnet ID from deployment result
   const deploymentProgress = ref<DeploymentProgress | null>(null)
   const deploymentError = ref<string | null>(null)
   const deploymentLogs = ref<string[]>([])
@@ -302,7 +303,13 @@ export const useWizardStore = defineStore('wizard', () => {
         // Handle completion or failure
         if (progress.status === 'completed') {
           isDeploying.value = false
-          console.log('Deployment completed successfully')
+          // Extract actual subnet ID from deployment progress
+          if (progress.subnet_id) {
+            subnetId.value = progress.subnet_id
+            console.log('Deployment completed successfully, subnet ID:', progress.subnet_id)
+          } else {
+            console.log('Deployment completed successfully')
+          }
         } else if (progress.status === 'failed') {
           isDeploying.value = false
           // Try both error and message fields for compatibility
@@ -378,12 +385,14 @@ export const useWizardStore = defineStore('wizard', () => {
 
     isDeploying.value = false
     deploymentId.value = null
+    subnetId.value = null
     deploymentProgress.value = null
   }
 
   const resetDeployment = () => {
     isDeploying.value = false
     deploymentId.value = null
+    subnetId.value = null
     deploymentProgress.value = null
     deploymentError.value = null
     deploymentLogs.value = []
@@ -448,6 +457,7 @@ export const useWizardStore = defineStore('wizard', () => {
     // Deployment state
     isDeploying: computed(() => isDeploying.value),
     deploymentId: computed(() => deploymentId.value),
+    subnetId: computed(() => subnetId.value),
     deploymentProgress: computed(() => deploymentProgress.value),
     deploymentError: computed(() => deploymentError.value),
     deploymentLogs: computed(() => deploymentLogs.value),

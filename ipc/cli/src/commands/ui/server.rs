@@ -2191,14 +2191,16 @@ async fn handle_deployment(
         }
     }
 
-    // Broadcast completion
-    broadcast_deployment_progress(
+    // Broadcast completion with subnet ID
+    let subnet_id_str = created_subnet_info.as_ref().map(|(subnet_id, _)| subnet_id.to_string());
+    broadcast_deployment_progress_with_subnet_id(
         &state,
         &deployment_id,
         "completed",
         100,
         "completed",
         Some("Deployment completed successfully".to_string()),
+        subnet_id_str,
     ).await;
 
     // Create subnet instance
@@ -2233,6 +2235,19 @@ async fn broadcast_deployment_progress(
     status: &str,
     message: Option<String>,
 ) {
+    broadcast_deployment_progress_with_subnet_id(state, deployment_id, step, progress, status, message, None).await;
+}
+
+/// Broadcast deployment progress to WebSocket clients with optional subnet ID
+async fn broadcast_deployment_progress_with_subnet_id(
+    state: &AppState,
+    deployment_id: &str,
+    step: &str,
+    progress: u8,
+    status: &str,
+    message: Option<String>,
+    subnet_id: Option<String>,
+) {
     let mut data = json!({
         "deployment_id": deployment_id,
         "step": step,
@@ -2240,6 +2255,11 @@ async fn broadcast_deployment_progress(
         "status": status,
         "message": message
     });
+
+    // Include subnet_id if provided
+    if let Some(subnet_id) = subnet_id {
+        data["subnet_id"] = subnet_id.into();
+    }
 
     // For failed status, also add error field for frontend compatibility
     if status == "failed" {

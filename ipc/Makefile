@@ -10,7 +10,7 @@ build:
 
 build-ui:
 	@echo "Building frontend assets..."
-	cd ../ipc-ui/frontend && npm ci && npm run build
+	cd ../ipc-ui/frontend && pnpm install && pnpm run build
 	@echo "Frontend build complete!"
 
 build-with-ui: build-ui
