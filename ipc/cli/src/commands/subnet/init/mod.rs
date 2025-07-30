@@ -4,4 +4,5 @@
 pub mod command;
 pub mod config;
 pub mod handlers;
+pub mod info;
 pub use command::{InitSubnet, InitSubnetArgs};

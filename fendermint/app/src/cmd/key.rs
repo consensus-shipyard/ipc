@@ -62,7 +62,8 @@ cmd! {
 
 cmd! {
   KeyIntoTendermintArgs(self) {
-    convert_key_to_cometbft(self)
+    let sk = read_secret_key(&self.secret_key)?;
+    convert_key_to_cometbft(&sk, &self.out)
   }
 }
 
@@ -96,11 +97,8 @@ cmd! {
 cmd! {
     KeyShowPeerIdArgs(self) {
         let pk = read_public_key(&self.public_key)?;
-        // Just using this type because it does the conversion we need.
-        let vk = ipc_ipld_resolver::ValidatorKey::from(pk);
-        let pk: libp2p::identity::PublicKey = vk.into();
-        let id = pk.to_peer_id();
-        println!("{}", id);
+        let peer_id = derive_peer_id_from_public_key(&pk)?;
+        println!("{}", peer_id);
         Ok(())
     }
 }
@@ -121,9 +119,8 @@ pub fn store_key(secret_key: &SecretKey, name: &str, out_dir: &Path) -> anyhow::
     Ok(())
 }
 
-pub fn convert_key_to_cometbft(args: &KeyIntoTendermintArgs) -> anyhow::Result<()> {
-    let sk = read_secret_key(&args.secret_key)?;
-    let pk = sk.public_key();
+pub fn convert_key_to_cometbft(secret_key: &SecretKey, out: &Path) -> anyhow::Result<()> {
+    let pk = secret_key.public_key();
     let vk = tendermint::crypto::default::ecdsa_secp256k1::VerifyingKey::from_sec1_bytes(
         &pk.serialize(),
     )
@@ -140,12 +137,12 @@ pub fn convert_key_to_cometbft(args: &KeyIntoTendermintArgs) -> anyhow::Result<(
         "pub_key": pub_key,
         "priv_key": {
             "type": "tendermint/PrivKeySecp256k1",
-            "value": secret_to_b64(&sk)
+            "value": secret_to_b64(secret_key)
         }
     });
     let json = serde_json::to_string_pretty(&priv_validator_key)?;
 
-    fs::write(&args.out, json)?;
+    fs::write(out, json)?;
 
     Ok(())
 }
@@ -174,6 +171,15 @@ pub fn read_public_key(public_key: &Path) -> anyhow::Result<PublicKey> {
     let b64 = fs::read_to_string(public_key).context("failed to read public key")?;
     let pk = b64_to_public(&b64).context("failed to parse public key")?;
     Ok(pk)
+}
+
+/// Derive libp2p peer ID from a PublicKey
+pub fn derive_peer_id_from_public_key(pk: &PublicKey) -> anyhow::Result<String> {
+    // Just using this type because it does the conversion we need.
+    let vk = ipc_ipld_resolver::ValidatorKey::from(*pk);
+    let libp2p_pk: libp2p::identity::PublicKey = vk.into();
+    let peer_id = libp2p_pk.to_peer_id();
+    Ok(peer_id.to_string())
 }
 
 pub fn read_secret_key_hex(private_key: &Path) -> anyhow::Result<SecretKey> {

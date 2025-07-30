@@ -44,7 +44,8 @@ members = [
   "fendermint/actors/eam",
   "fendermint/actors/gas_market/eip1559",
 
-  "build-rs-utils", "contracts-artifacts",
+  "build-rs-utils",
+  "contracts-artifacts",
 ]
 
 [workspace.package]
@@ -212,7 +213,7 @@ fvm_ipld_amt = "0.6.2"
 # fvm_ipld_encoding = { path = "../ref-fvm/ipld/encoding" }
 # fvm_ipld_car = { path = "../ref-fvm/ipld/car" }
 # fvm_ipld_hamt = { path = "../ref-fvm/ipld/hamt" }
-# fvm_shared = { path = "../ref-fvm/shared" }
+# fvm_shared = { path = "../ref-fvm/ipld/shared" }
 
 # We are using the bundle for the builtin-actors dependency, and repeating DTO classes on our side,
 # to cut down the time it takes to compile everything. However, some projects have a "shared" part,
@@ -251,6 +252,8 @@ fvm_ipld_car = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
 fvm_ipld_encoding = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
 fvm_ipld_hamt = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
 fvm_ipld_amt = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+yamux = { git = "https://github.com/paritytech/yamux", tag = "yamux-v0.13.4" }
+
 
 [profile.wasm]
 inherits = "release"

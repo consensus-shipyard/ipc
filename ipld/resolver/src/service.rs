@@ -22,7 +22,7 @@ use libp2p::swarm::SwarmEvent;
 use libp2p::{
     core::{muxing::StreamMuxerBox, transport::Boxed},
     identity::Keypair,
-    noise, yamux, Multiaddr, PeerId, Swarm, Transport,
+    noise, Multiaddr, PeerId, Swarm, Transport,
 };
 use libp2p::{identify, ping};
 use libp2p_bitswap::{BitswapResponse, BitswapStore};
@@ -570,11 +570,7 @@ pub fn build_transport(local_key: Keypair) -> Boxed<(PeerId, StreamMuxerBox)> {
     let mplex_config = {
         let mut mplex_config = MplexConfig::new();
         mplex_config.set_max_buffer_size(usize::MAX);
-
-        // FIXME: Yamux will end up beaing deprecated.
-        let yamux_config = yamux::Config::default();
-        // yamux_config.set_window_update_mode(WindowUpdateMode::OnRead);
-        libp2p::core::upgrade::SelectUpgrade::new(yamux_config, mplex_config)
+        mplex_config
     };
 
     transport

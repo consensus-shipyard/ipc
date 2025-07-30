@@ -8,6 +8,7 @@ use clap::{ArgGroup, Args};
 use fs_err as fs;
 use ipc_wallet::WalletType;
 use serde::Deserialize;
+use serde::Serialize;
 use std::fmt::Debug;
 use std::str::FromStr;
 
@@ -83,7 +84,7 @@ pub(crate) fn import_wallet(
     })
 }
 
-#[derive(Debug, Args, Deserialize)]
+#[derive(Debug, Args, Deserialize, Serialize)]
 #[command(about = "Import a key into the agent's wallet")]
 #[clap(group(ArgGroup::new("key_source")
 .required(true)

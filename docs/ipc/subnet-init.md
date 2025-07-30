@@ -1,8 +1,8 @@
 # Subnet Init Configuration
 
-Bootstraps a new child subnet end-to-end from a YAML spec.
+Bootstraps a new child subnet end-to-end from a YAML spec and generates ready-to-use configuration files for validators.
 
-> **Note:** While each of the underlying steps (deploy, create, activate, and genesis) can be invoked manually via their respective subcommands, `subnet init` provides a convenient declarative workflow.
+> **Note:** While each of the underlying steps (deploy, create, set-federated-power/join, and genesis) can be invoked manually via their respective subcommands, `subnet init` provides a convenient declarative workflow that also generates validator-ready configuration files.
 
 ---
 
@@ -11,6 +11,49 @@ Bootstraps a new child subnet end-to-end from a YAML spec.
 ```sh
 ipc-cli subnet init --config <path/to/subnet-init.yaml>
 ```
+
+---
+
+## What This Command Does
+
+The `subnet init` command performs the following steps in sequence:
+
+1. **Import Wallets** (optional): Import specified wallets into the IPC CLI keystore
+2. **Deploy Contracts** (optional): Deploy gateway/registry contracts on the parent chain
+3. **Create Subnet**: Create the subnet actor on the parent chain
+4. **Activate Subnet** (optional): Activate the subnet with validators
+   - **Federated/Static**: Use `set-federated-power` to set validator power
+   - **Collateral**: Multiple validators join with sufficient collateral
+5. **Generate Genesis** (optional): Create genesis files for the subnet
+6. **Generate Configuration Files**: Create ready-to-use files for validators:
+   - `node_SUBNET_ID.yaml` - Complete node configuration file
+   - `subnet-SUBNET_ID.json` - Subnet information and metadata
+
+---
+
+## Generated Files
+
+After successful execution, the following files are created in `~/.ipc/`:
+
+### `node_SUBNET_ID.yaml`
+
+A complete, ready-to-use node configuration file that validators can use with `ipc-cli node init`. This file includes:
+
+- **Smart Genesis Configuration**:
+  - If subnet is activated: Uses existing genesis file path
+  - If subnet is NOT activated: Uses genesis creation configuration
+- **P2P Configuration**: Basic external IP setup for user customization
+- **Join Configuration**: For collateral-based subnets (if applicable)
+- **All Required Fields**: Home directory, subnet ID, parent ID, validator key setup
+
+### `subnet-SUBNET_ID.json`
+
+Comprehensive subnet information including:
+
+- **General Info**: Subnet ID, parent ID, creation timestamp, network name
+- **Contract Addresses**: Gateway, registry, and parent contract addresses
+- **Genesis Info**: File paths, network version, base fee, power scale
+- **Activation Info**: Mode, validators, collateral amounts (if applicable)
 
 ---
 
@@ -170,3 +213,116 @@ genesis:
   base-fee: 1000
   power-scale: 0
 ```
+
+---
+
+## Output Example
+
+After running `subnet init`, you'll see output like:
+
+```
+✅ Subnet created successfully: /r31337/t410fkzrz3mlkyufisiuae3scumllgalzuu3wxlxa2ly
+✅ Genesis files generated
+📄 Node config saved to: node_r31337_t410fkzrz3mlkyufisiuae3scumllgalzuu3wxlxa2ly.yaml
+
+📋 Subnet Information:
+{
+  "subnet_info": {
+    "subnet_id": "/r31337/t410fkzrz3mlkyufisiuae3scumllgalzuu3wxlxa2ly",
+    "parent_id": "/r31337",
+    "name": null,
+    "created_at": "2024-01-15T10:30:00Z",
+    "network": "testnet"
+  },
+  "contracts": {
+    "gateway_address": "0x1234...",
+    "registry_address": "0x5678...",
+    "parent_gateway": "0x9abc...",
+    "parent_registry": "0xdef0..."
+  },
+  "genesis": {
+    "genesis_path": "~/.ipc/genesis_r31337_t410fkzrz3mlkyufisiuae3scumllgalzuu3wxlxa2ly.car",
+    "sealed_genesis_path": "~/.ipc/genesis_sealed_r31337_t410fkzrz3mlkyufisiuae3scumllgalzuu3wxlxa2ly.car",
+    "network_version": 21,
+    "base_fee": "1000",
+    "power_scale": 0
+  },
+  "activation": {
+    "mode": "federated",
+    "validators": [
+      {
+        "address": "0x1234...",
+        "public_key": "0x04...",
+        "power": 1
+      }
+    ]
+  }
+}
+```
+
+---
+
+## Workflow for Validators
+
+After the subnet creator runs `subnet init`, validators can:
+
+1. **Get Configuration Files**: The subnet creator shares the generated `node_SUBNET_ID.yaml` file
+2. **Initialize Node**: Run `ipc-cli node init --config node_SUBNET_ID.yaml`
+3. **Start Node**: Run `ipc-cli node start --home ~/.node-ipc`
+
+For collateral-based subnets, validators must first join the subnet using `ipc-cli subnet join` before running `node init`.
+
+---
+
+## Manual Commands (Alternative to subnet init)
+
+If you prefer to run steps manually instead of using `subnet init`:
+
+### For Federated/Static Subnets
+
+```sh
+# 1. Deploy contracts (if needed)
+ipc-cli subnet deploy --url http://localhost:8545 --from 0x... --chain-id 31337
+
+# 2. Create subnet
+ipc-cli subnet create --parent /r31337 --from 0x... --min-validator-stake 1.0 --min-validators 3 --permission-mode federated
+
+# 3. Set federated power (activates the subnet)
+ipc-cli subnet set-federated-power \
+  --subnet /r31337/t410fkzrz3mlkyufisiuae3scumllgalzuu3wxlxa2ly \
+  --validator-pubkeys 0x04...,0x04...,0x04... \
+  --validator-power 1,1,1
+
+# 4. Generate genesis
+ipc-cli subnet create-genesis --subnet /r31337/t410fkzrz3mlkyufisiuae3scumllgalzuu3wxlxa2ly
+```
+
+### For Collateral Subnets
+
+```sh
+# 1. Deploy contracts (if needed)
+ipc-cli subnet deploy --url http://localhost:8545 --from 0x... --chain-id 31337
+
+# 2. Create subnet
+ipc-cli subnet create --parent /r31337 --from 0x... --min-validator-stake 10.0 --min-validators 3 --permission-mode collateral
+
+# 3. Validators join individually (activates when enough join with sufficient collateral)
+ipc-cli subnet join --subnet /r31337/t410fkzrz3mlkyufisiuae3scumllgalzuu3wxlxa2ly --from 0x... --collateral 10.0
+ipc-cli subnet join --subnet /r31337/t410fkzrz3mlkyufisiuae3scumllgalzuu3wxlxa2ly --from 0x... --collateral 10.0
+ipc-cli subnet join --subnet /r31337/t410fkzrz3mlkyufisiuae3scumllgalzuu3wxlxa2ly --from 0x... --collateral 10.0
+
+# 4. Generate genesis (after enough validators have joined)
+ipc-cli subnet create-genesis --subnet /r31337/t410fkzrz3mlkyufisiuae3scumllgalzuu3wxlxa2ly
+```
+
+---
+
+## Important Notes
+
+- **Each Step is Independent**: You can run individual steps (deploy, create, set-federated-power/join, genesis) separately using their respective commands
+- **Configuration Files**: Generated files are placed in `~/.ipc/` for easy access
+- **Smart Genesis**: The generated `node.yaml` automatically uses the correct genesis configuration based on whether the subnet is activated
+- **Validator Workflow**: Validators receive ready-to-use configuration files, making node setup much simpler
+- **Activation Commands**:
+  - Federated/Static: Use `ipc-cli subnet set-federated-power`
+  - Collateral: Use `ipc-cli subnet join` (multiple validators must join with sufficient collateral)
