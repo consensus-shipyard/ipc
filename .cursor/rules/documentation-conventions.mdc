@@ -1,0 +1,81 @@
+---
+globs: *.md,*.rs,*.sol
+---
+
+# Documentation Conventions for IPC
+
+## Code Documentation
+
+### Rust Documentation
+- Use `///` for public API documentation
+- Use `//!` for module-level documentation
+- Document all public functions, structs, and traits
+- Include examples in doc comments when helpful
+- Use `#[doc = "..."]` for complex documentation
+
+### Solidity Documentation
+- Use NatSpec comments for all public functions
+- Document contract purpose and behavior
+- Include `@param` and `@return` tags
+- Document events and their purposes
+- Use `@notice` for user-facing descriptions
+
+## Project Documentation
+
+### User Documentation
+- User guides in [docs/](mdc:docs)
+- GitBook documentation in [docs-gitbook/](mdc:docs-gitbook)
+- Quick start guide: [docs-gitbook/quickstarts/deploy-a-subnet.md](mdc:docs-gitbook/quickstarts/deploy-a-subnet.md)
+
+### Developer Documentation
+- Developer guides in [docs/ipc/developers.md](mdc:docs/ipc/developers.md)
+- Contract documentation in [docs/ipc/contracts.md](mdc:docs/ipc/contracts.md)
+- Usage documentation in [docs/ipc/usage.md](mdc:docs/ipc/usage.md)
+
+### Technical Documentation
+- Architecture docs in [docs/fendermint/architecture.md](mdc:docs/fendermint/architecture.md)
+- Specifications in [specs/](mdc:specs) directory
+- Network configuration and deployment guides
+
+## README Files
+- Every major component should have a README
+- Include setup instructions
+- Document build and test procedures
+- Provide usage examples
+- Link to relevant documentation
+
+## Change Documentation
+- Update [CHANGELOG.md](mdc:CHANGELOG.md) for significant changes
+- Document breaking changes clearly
+- Include migration guides when needed
+
+## Code Comments
+- Use `//` for single-line comments
+- Use `/* */` for multi-line comments
+- Comment complex algorithms and business logic
+- Avoid obvious comments
+- Keep comments up-to-date with code changes
+
+## Documentation Standards
+- Use clear, concise language
+- Provide working examples
+- Include troubleshooting sections
+- Use consistent formatting
+- Link between related documentation
+
+## API Documentation
+- Generate API docs with `cargo doc`
+- Ensure examples compile and work
+- Document error conditions
+- Include performance considerations
+
+## Diagrams and Visuals
+- Use diagrams for complex architectures
+- Store diagrams in [docs/fendermint/diagrams](mdc:docs/fendermint/diagrams)
+- Use consistent diagramming style
+- Keep diagrams up-to-date
+
+## External Documentation
+- Link to external specifications (FVM, Tendermint, etc.)
+- Reference relevant RFCs and standards
+- Provide context for external dependencies

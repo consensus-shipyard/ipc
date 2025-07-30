@@ -1,0 +1,54 @@
+---
+globs: *.rs
+---
+
+# Rust Code Conventions for IPC
+
+## Error Handling
+- Use `anyhow::Result` for error propagation in application code
+- Use `anyhow::Context` to add context to errors: `.context("descriptive message")`
+- Use `anyhow::anyhow!` for custom error messages
+- Use `anyhow::bail!` for early returns with errors
+
+## Async Programming
+- Use `tokio` for async runtime
+- Mark functions as `async fn` when performing async operations
+- Use `await` for async operations
+- Use `async-trait` for async traits
+
+## Logging and Tracing
+- Use `tracing` crate for structured logging
+- Initialize tracing with `tracing_subscriber` in main functions
+- Use appropriate log levels: `error!`, `warn!`, `info!`, `debug!`, `trace!`
+- Use `tracing` macros for structured logging with context
+
+## Module Organization
+- Use `mod.rs` or single file modules appropriately
+- Re-export important types in parent modules
+- Use `pub(crate)` for internal APIs
+- Use `pub` only for public APIs
+
+## Dependencies
+- Follow workspace dependencies defined in root [Cargo.toml](mdc:Cargo.toml)
+- Use `serde` with `derive` feature for serialization
+- Use `clap` with `derive` feature for CLI parsing
+- Use `tokio` with appropriate features (rt-multi-thread, macros, etc.)
+
+## Testing
+- Use `#[tokio::test]` for async tests
+- Use `#[test]` for sync tests
+- Use `quickcheck` for property-based testing
+- Use `serial_test` for tests that can't run in parallel
+
+## Code Structure
+- Use `Result<T, E>` for fallible operations
+- Use `Option<T>` for optional values
+- Implement `Debug` and `Clone` for most types
+- Use `derive` macros when possible
+- Use `thiserror` for custom error types in libraries
+
+## Filecoin/IPC Specific
+- Use `fvm` crate for FVM-related operations
+- Use `libipld` for IPLD operations
+- Use `tendermint` crate for consensus operations
+- Use `ethers` for Ethereum-related operations

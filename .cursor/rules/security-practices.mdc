@@ -1,0 +1,134 @@
+---
+description: Security practices and best practices for IPC development
+---
+
+# Security and Best Practices for IPC
+
+## ⚠️ Security Warning
+**All IPC modules are experimental and not audited. Do not use with real value on mainnet.**
+
+## Smart Contract Security
+
+### Common Vulnerabilities
+- Reentrancy: Use `ReentrancyGuard` from [contracts/contracts/lib/LibReentrancyGuard.sol](mdc:contracts/contracts/lib/LibReentrancyGuard.sol)
+- Integer overflow: Use Solidity 0.8.x built-in checks
+- Access control: Implement proper authorization checks
+- Input validation: Validate all external inputs
+
+### Best Practices
+- Use established patterns from [contracts/contracts/lib](mdc:contracts/contracts/lib)
+- Follow checks-effects-interactions pattern
+- Use custom errors instead of strings
+- Implement proper access control modifiers
+- Test edge cases and error conditions
+
+### Code Review
+- Review all external calls
+- Check for proper error handling
+- Verify access control logic
+- Validate state changes
+- Test gas usage and limits
+
+## Rust Security
+
+### Memory Safety
+- Use safe Rust patterns
+- Avoid `unsafe` blocks unless necessary
+- Use `Option` and `Result` for safe error handling
+- Validate all external inputs
+
+### Async Safety
+- Use proper async/await patterns
+- Avoid blocking operations in async context
+- Handle cancellation properly
+- Use appropriate synchronization primitives
+
+### Cryptographic Operations
+- Use established cryptographic libraries
+- Follow proper key management practices
+- Validate signatures and cryptographic proofs
+- Use secure random number generation
+
+## Network Security
+
+### RPC Security
+- Validate all RPC inputs
+- Implement proper authentication
+- Use rate limiting
+- Log suspicious activities
+
+### P2P Security
+- Validate peer messages
+- Implement proper peer authentication
+- Use secure communication channels
+- Handle malicious peers gracefully
+
+## Development Security
+
+### Environment Security
+- Use secure development environments
+- Keep dependencies updated
+- Use dependency scanning tools
+- Implement proper secret management
+
+### Testing Security
+- Test with malicious inputs
+- Use fuzzing for edge cases
+- Test failure modes
+- Validate security properties
+
+## Deployment Security
+
+### Configuration Security
+- Use secure configuration management
+- Validate configuration parameters
+- Implement proper access controls
+- Use secure communication protocols
+
+### Key Management
+- Use secure key storage
+- Implement proper key rotation
+- Use hardware security modules when possible
+- Follow principle of least privilege
+
+## Monitoring and Incident Response
+
+### Security Monitoring
+- Monitor for suspicious activities
+- Implement proper logging
+- Use security metrics and alerts
+- Regular security assessments
+
+### Incident Response
+- Have incident response procedures
+- Implement emergency stops if needed
+- Maintain security contact information
+- Document security incidents
+
+## Code Quality
+
+### General Practices
+- Follow secure coding guidelines
+- Use static analysis tools
+- Implement proper error handling
+- Keep code simple and readable
+
+### Dependencies
+- Regularly update dependencies
+- Use dependency scanning
+- Verify dependency signatures
+- Minimize attack surface
+
+## Compliance and Auditing
+
+### Code Auditing
+- Conduct regular code reviews
+- Use automated security tools
+- Implement security testing
+- Document security decisions
+
+### Compliance
+- Follow relevant regulations
+- Implement proper data protection
+- Maintain audit trails
+- Regular compliance assessments

@@ -1,0 +1,97 @@
+---
+description: Git workflow and contribution guidelines for IPC project
+---
+
+# Git Workflow and Contribution Guidelines
+
+## Branch Strategy
+- `main` branch: stable, production-ready code
+- Feature branches: `feature/description` or `feat/description`
+- Bug fixes: `fix/description` or `bugfix/description`
+- Use descriptive branch names
+
+## Commit Messages
+- Use conventional commit format: `type(scope): description`
+- Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
+- Examples:
+  - `feat(cli): add subnet creation command`
+  - `fix(contracts): resolve reentrancy issue in gateway`
+  - `docs(readme): update installation instructions`
+
+## Pull Request Process
+1. Create feature branch from `main`
+2. Make focused, atomic commits
+3. Write clear PR description
+4. Link related issues
+5. Ensure all tests pass
+6. Request appropriate reviews
+
+## Code Review Guidelines
+- Review for correctness and security
+- Check test coverage
+- Verify documentation updates
+- Ensure consistent code style
+- Test locally when possible
+
+## Development Workflow
+1. Fork the repository
+2. Create feature branch
+3. Make changes with tests
+4. Run full test suite: `make test`
+5. Update documentation if needed
+6. Submit pull request
+
+## Testing Requirements
+- All new code must include tests
+- Existing tests must pass
+- Integration tests for new features
+- Performance tests for critical paths
+
+## Documentation Updates
+- Update relevant documentation
+- Add examples for new features
+- Update [CHANGELOG.md](mdc:CHANGELOG.md)
+- Update API documentation
+
+## License and Headers
+- All files must include appropriate license headers
+- Use `// Copyright 2022-2024 Protocol Labs`
+- Use `// SPDX-License-Identifier: MIT OR Apache-2.0`
+
+## Issue Management
+- Use GitHub issues for bug reports
+- Use issue templates when available
+- Provide reproduction steps
+- Label issues appropriately
+
+## Release Process
+- Use semantic versioning (semver)
+- Tag releases properly
+- Update [CHANGELOG.md](mdc:CHANGELOG.md)
+- Test release candidates thoroughly
+
+## Git Best Practices
+- Write clear commit messages
+- Make atomic commits
+- Use interactive rebase for clean history
+- Sign commits when possible
+- Keep commits focused on single changes
+
+## Collaboration
+- Communicate clearly in PRs and issues
+- Be respectful and constructive
+- Help with code reviews
+- Share knowledge and best practices
+
+## Quality Standards
+- Follow established coding conventions
+- Maintain high test coverage
+- Document public APIs
+- Keep dependencies updated
+- Follow security best practices
+
+## Continuous Integration
+- All PRs must pass CI checks
+- Address CI failures promptly
+- Don't merge with failing tests
+- Keep CI configuration updated
