@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 use async_trait::async_trait;
-use ethers::providers::{Http, HttpClientError, JsonRpcClient};
-use ipc_actors_abis::error_parser::{ContractErrorParser, ParsedError};
+use ethers::providers::{Http, HttpClientError, JsonRpcClient, JsonRpcError};
+use ipc_actors_abis::error_parser::ContractErrorParser;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::fmt::{Debug, Formatter};
@@ -39,151 +39,106 @@ impl JsonRpcClient for ErrorParserHttp {
             .request(method, params)
             .await
             .map_err(|client_error| match client_error {
-                HttpClientError::JsonRpcError(e) => {
-                    let Some(raw_error) = e.data.as_ref() else {
-                        return HttpClientError::JsonRpcError(e);
-                    };
-
-                    let Some(err_str) = raw_error.as_str() else {
-                        return HttpClientError::JsonRpcError(e);
-                    };
-
-                    // Try to parse the error with enhanced parsing
-                    match ContractErrorParser::parse_from_hex_str(err_str) {
-                        Ok(parsed_error) => {
-                            // Log the enhanced error information
-                            match parsed_error.error_type {
-                                ipc_actors_abis::error_parser::ErrorType::IpcContract => {
-                                    tracing::error!(
-                                        "IPC contract reverted with error: {}",
-                                        parsed_error.name
-                                    );
-                                    if let Some(params) = parsed_error.parameters {
-                                        tracing::error!("Error parameters: {:?}", params);
-                                    }
-                                }
-                                ipc_actors_abis::error_parser::ErrorType::StandardRevert => {
-                                    if let Some(message) = parsed_error.message {
-                                        tracing::error!(
-                                            "Contract reverted with message: {}",
-                                            message
-                                        );
-                                    } else {
-                                        tracing::error!(
-                                            "Contract reverted with standard Error(string)"
-                                        );
-                                    }
-                                }
-                                ipc_actors_abis::error_parser::ErrorType::Panic => {
-                                    if let Some(message) = parsed_error.message {
-                                        tracing::error!("Contract panicked: {}", message);
-                                    } else {
-                                        tracing::error!("Contract panicked");
-                                    }
-                                    if let Some(params) = parsed_error.parameters {
-                                        tracing::error!("Panic parameters: {:?}", params);
-                                    }
-                                }
-                                ipc_actors_abis::error_parser::ErrorType::Unknown => {
-                                    tracing::error!(
-                                        "Contract reverted with unknown error: {}",
-                                        parsed_error.name
-                                    );
-                                }
-                            }
-                        }
-                        Err(_) => {
-                            // Fallback to legacy parsing for backward compatibility
-                            if let Ok(name) =
-                                ContractErrorParser::parse_from_hex_str_legacy(err_str)
-                            {
-                                tracing::error!("contract reverted with error: {name}");
-                            } else {
-                                tracing::error!(
-                                    "contract reverted with unparseable error: {err_str}"
-                                );
-                            }
-                        }
-                    }
-
-                    HttpClientError::JsonRpcError(e)
-                }
+                HttpClientError::JsonRpcError(e) => handle_json_rpc_error(e),
                 e => e,
             })
     }
 }
 
-/// Enhanced error information for better user experience
-#[derive(Debug, Clone)]
-pub struct EnhancedContractError {
-    pub error_type: String,
-    pub name: String,
-    pub message: Option<String>,
-    pub parameters: Option<Vec<String>>,
-    pub contract_address: Option<String>,
-    pub function_name: Option<String>,
-    pub suggestions: Option<Vec<String>>,
-}
+fn handle_json_rpc_error(e: JsonRpcError) -> HttpClientError {
+    let Some(raw_error) = e.data.as_ref() else {
+        return HttpClientError::JsonRpcError(e);
+    };
 
-impl EnhancedContractError {
-    pub fn from_parsed_error(parsed: ParsedError) -> Self {
-        let suggestions = match parsed.error_type {
-            ipc_actors_abis::error_parser::ErrorType::IpcContract => match parsed.name.as_str() {
-                "BottomUpCheckpointAlreadySubmitted" => Some(vec![
-                    "This checkpoint has already been submitted".to_string(),
-                    "Check if you're trying to submit the same checkpoint twice".to_string(),
-                ]),
-                "InsufficientFunds" => Some(vec![
-                    "Ensure you have sufficient funds for this operation".to_string(),
-                    "Check your balance and collateral requirements".to_string(),
-                ]),
-                "NotAuthorized" => Some(vec![
-                    "You are not authorized to perform this action".to_string(),
-                    "Check if you have the required permissions".to_string(),
-                ]),
-                _ => None,
-            },
-            ipc_actors_abis::error_parser::ErrorType::StandardRevert => Some(vec![
-                "This is a standard Solidity revert".to_string(),
-                "Check the revert message for specific details".to_string(),
-            ]),
-            ipc_actors_abis::error_parser::ErrorType::Panic => Some(vec![
-                "This is a Solidity panic".to_string(),
-                "Check the panic code and message for details".to_string(),
-            ]),
-            ipc_actors_abis::error_parser::ErrorType::Unknown => None,
-        };
+    let Some(err_str) = raw_error.as_str() else {
+        return HttpClientError::JsonRpcError(e);
+    };
 
-        Self {
-            error_type: format!("{:?}", parsed.error_type),
-            name: parsed.name,
-            message: parsed.message,
-            parameters: parsed.parameters,
-            contract_address: None, // TODO: Extract from context
-            function_name: None,    // TODO: Extract from context
-            suggestions,
-        }
-    }
-
-    pub fn to_user_friendly_message(&self) -> String {
-        let mut message = format!("Contract Error: {}", self.name);
-
-        if let Some(msg) = &self.message {
-            message.push_str(&format!("\nMessage: {}", msg));
-        }
-
-        if let Some(params) = &self.parameters {
-            message.push_str(&format!("\nParameters: {:?}", params));
-        }
-
-        if let Some(suggestions) = &self.suggestions {
-            message.push_str("\n\nSuggestions:");
-            for suggestion in suggestions {
-                message.push_str(&format!("\n- {}", suggestion));
+    // Try to parse the error with enhanced parsing
+    let err_str_clean = err_str.strip_prefix("0x").unwrap_or(err_str);
+    match ContractErrorParser::parse_from_hex_str(err_str_clean) {
+        Ok(parsed_error) => {
+            // Log the enhanced error information
+            match parsed_error.error_type {
+                ipc_actors_abis::error_parser::ErrorType::IpcContract => {
+                    tracing::error!("IPC contract reverted with error: {}", parsed_error.name);
+                    if let Some(ref params) = parsed_error.parameters {
+                        tracing::error!("Error parameters: {:?}", params);
+                    }
+                    // Return the original error without modification
+                    HttpClientError::JsonRpcError(e)
+                }
+                ipc_actors_abis::error_parser::ErrorType::StandardRevert => {
+                    if let Some(message) = parsed_error.message {
+                        tracing::error!("Contract reverted with message: {}", message);
+                        // Replace the error message with the parsed revert message
+                        let mut new_rpc_error = e.clone();
+                        new_rpc_error.message = format!("Contract reverted: {}", message);
+                        HttpClientError::JsonRpcError(new_rpc_error)
+                    } else {
+                        tracing::error!("Contract reverted with standard Error(string)");
+                        // Replace the error message with a generic revert message
+                        let mut new_rpc_error = e.clone();
+                        new_rpc_error.message =
+                            "Contract reverted with standard Error(string)".to_string();
+                        HttpClientError::JsonRpcError(new_rpc_error)
+                    }
+                }
+                ipc_actors_abis::error_parser::ErrorType::Panic => {
+                    if let Some(message) = parsed_error.message {
+                        tracing::error!("Contract panicked: {}", message);
+                        // Replace the error message with the panic message
+                        let mut new_rpc_error = e.clone();
+                        new_rpc_error.message = format!("Contract panicked: {}", message);
+                        if let Some(ref params) = parsed_error.parameters {
+                            new_rpc_error
+                                .message
+                                .push_str(&format!(" (code: {:?})", params));
+                        }
+                        HttpClientError::JsonRpcError(new_rpc_error)
+                    } else {
+                        tracing::error!("Contract panicked");
+                        // Replace the error message with a generic panic message
+                        let mut new_rpc_error = e.clone();
+                        new_rpc_error.message = "Contract panicked".to_string();
+                        if let Some(ref params) = parsed_error.parameters {
+                            new_rpc_error
+                                .message
+                                .push_str(&format!(" (code: {:?})", params));
+                        }
+                        HttpClientError::JsonRpcError(new_rpc_error)
+                    }
+                }
+                ipc_actors_abis::error_parser::ErrorType::Unknown => {
+                    tracing::error!(
+                        "Contract reverted with unknown error: {} (selector: {})",
+                        parsed_error.name,
+                        err_str_clean
+                    );
+                    // Replace the error message with the unknown error name
+                    let mut new_rpc_error = e.clone();
+                    new_rpc_error.message = format!(
+                        "Contract reverted with unknown error: {} (selector: {})",
+                        parsed_error.name, err_str_clean
+                    );
+                    HttpClientError::JsonRpcError(new_rpc_error)
+                }
             }
         }
-
-        message
+        Err(_) => {
+            // Fallback to legacy parsing for backward compatibility
+            if let Ok(name) = ContractErrorParser::parse_from_hex_str_legacy(err_str_clean) {
+                tracing::error!("contract reverted with error: {name}");
+                // Replace the error message with the legacy parsed error name
+                let mut new_rpc_error = e.clone();
+                new_rpc_error.message = format!("Contract reverted with error: {}", name);
+                HttpClientError::JsonRpcError(new_rpc_error)
+            } else {
+                tracing::error!("contract reverted with unparseable error: {err_str}");
+                // Keep the original error message for unparseable errors
+                HttpClientError::JsonRpcError(e)
+            }
+        }
     }
 }
 
@@ -237,22 +192,33 @@ mod tests {
     }
 
     #[test]
-    fn test_enhanced_error_creation() {
-        let test_error = "d6bb62dd";
-        let parsed = ContractErrorParser::parse_from_hex_str(test_error).unwrap();
-        let enhanced = EnhancedContractError::from_parsed_error(parsed);
-
-        assert_eq!(enhanced.name, "BottomUpCheckpointAlreadySubmitted");
-        assert!(enhanced.suggestions.is_some());
-        println!("✓ Enhanced error created with suggestions");
-    }
-
-    #[test]
     fn test_error_parser_http_creation() {
         // Test that we can create the proxy
         let url = Url::parse("http://localhost:8545").unwrap();
         let http_provider = Http::new(url);
         let _error_parser_http = ErrorParserHttp::from(http_provider);
         println!("✓ ErrorParserHttp proxy created successfully");
+    }
+
+    #[test]
+    fn test_not_owner_of_public_key_error() {
+        // Test that the NotOwnerOfPublicKey error is parsed correctly
+        let test_error = "97d24a3a"; // NotOwnerOfPublicKey selector
+        match ContractErrorParser::parse_from_hex_str(test_error) {
+            Ok(parsed_error) => {
+                assert_eq!(parsed_error.name, "NotOwnerOfPublicKey");
+                assert!(matches!(
+                    parsed_error.error_type,
+                    ipc_actors_abis::error_parser::ErrorType::IpcContract
+                ));
+                println!(
+                    "✓ NotOwnerOfPublicKey error parsing works: {}",
+                    parsed_error.name
+                );
+            }
+            Err(e) => {
+                panic!("NotOwnerOfPublicKey error parsing failed: {:?}", e);
+            }
+        }
     }
 }

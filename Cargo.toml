@@ -254,7 +254,6 @@ fvm_ipld_hamt = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
 fvm_ipld_amt = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
 yamux = { git = "https://github.com/paritytech/yamux", tag = "yamux-v0.13.4" }
 
-
 [profile.wasm]
 inherits = "release"
 panic = "abort"

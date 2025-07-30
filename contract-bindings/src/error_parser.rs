@@ -89,18 +89,19 @@ impl ContractErrorParser {
         match selector.as_str() {
             ERROR_STRING_SELECTOR => {
                 // Handle Error(string)
-                if bytes.len() >= 68 { // 4 bytes selector + 32 bytes offset + 32 bytes length
+                if bytes.len() >= 68 {
+                    // 4 bytes selector + 32 bytes offset + 32 bytes length
                     let length_start = 36; // 4 + 32
                     let length_end = 68; // 4 + 32 + 32
-                    
+
                     if bytes.len() >= length_end {
                         let length_bytes = &bytes[length_start..length_end];
                         let length_u256 = ethers::types::U256::from_big_endian(length_bytes);
                         let length = length_u256.as_u64();
-                        
+
                         let message_start = length_end;
                         let message_end = message_start + length as usize;
-                        
+
                         if bytes.len() >= message_end {
                             let message_bytes = &bytes[message_start..message_end];
                             if let Ok(message) = String::from_utf8(message_bytes.to_vec()) {
@@ -114,7 +115,7 @@ impl ContractErrorParser {
                         }
                     }
                 }
-                
+
                 // Fallback if parsing fails
                 Ok(ParsedError {
                     error_type: ErrorType::StandardRevert,
@@ -125,11 +126,12 @@ impl ContractErrorParser {
             }
             PANIC_SELECTOR => {
                 // Handle Panic(uint256)
-                if bytes.len() >= 36 { // 4 bytes selector + 32 bytes panic code
+                if bytes.len() >= 36 {
+                    // 4 bytes selector + 32 bytes panic code
                     let panic_code_bytes = &bytes[4..36];
                     let panic_code_u256 = ethers::types::U256::from_big_endian(panic_code_bytes);
                     let panic_code = panic_code_u256.as_u64();
-                    
+
                     let panic_message = match panic_code {
                         0x00 => "Generic panic",
                         0x01 => "Assertion failed",
@@ -143,7 +145,7 @@ impl ContractErrorParser {
                         0x51 => "Zero-initialized variable of internal function type",
                         _ => "Unknown panic",
                     };
-                    
+
                     return Ok(ParsedError {
                         error_type: ErrorType::Panic,
                         name: "Panic".to_string(),
@@ -151,7 +153,7 @@ impl ContractErrorParser {
                         parameters: Some(vec![format!("0x{:x}", panic_code)]),
                     });
                 }
-                
+
                 Ok(ParsedError {
                     error_type: ErrorType::Panic,
                     name: "Panic".to_string(),
@@ -162,17 +164,25 @@ impl ContractErrorParser {
             _ => {
                 // Check for IPC contract errors
                 let Some(error) = crate::gen::MAP.get(&selector) else {
-                    return Err(ParseContractError::ErrorNotFound { selector });
+                    // Instead of returning ErrorNotFound, treat as Unknown error
+                    return Ok(ParsedError {
+                        error_type: ErrorType::Unknown,
+                        name: format!("UnknownError_{}", selector),
+                        message: None,
+                        parameters: None,
+                    });
                 };
-                
+
                 // Try to decode the error with parameters
                 let mut parameters = None;
                 if let Ok(decoded) = error.decode(bytes) {
-                    // For now, just convert parameters to strings
-                    // In the future, we could provide more structured parameter information
-                    parameters = Some(vec![format!("{:?}", decoded)]);
+                    // Only show parameters if they contain meaningful data
+                    let decoded_str = format!("{:?}", decoded);
+                    if !decoded_str.contains("[]") && !decoded_str.is_empty() {
+                        parameters = Some(vec![decoded_str]);
+                    }
                 }
-                
+
                 Ok(ParsedError {
                     error_type: ErrorType::IpcContract,
                     name: error.name.clone(),
@@ -212,17 +222,23 @@ mod tests {
 
         let result = ContractErrorParser::parse_from_bytes(err_bytes.as_ref()).unwrap();
         assert_eq!(result.name, "BottomUpCheckpointAlreadySubmitted");
-        assert!(matches!(result.error_type, crate::error_parser::ErrorType::IpcContract));
+        assert!(matches!(
+            result.error_type,
+            crate::error_parser::ErrorType::IpcContract
+        ));
     }
 
     #[test]
     fn test_parse_standard_revert() {
         // Standard Solidity Error(string) with message "This is a test error message"
         let revert_string = "08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001a5468697320697320612074657374206572726f72206d6573736167650000000000";
-        
+
         let result = ContractErrorParser::parse_from_hex_str(revert_string).unwrap();
         assert_eq!(result.name, "RevertString");
-        assert!(matches!(result.error_type, crate::error_parser::ErrorType::StandardRevert));
+        assert!(matches!(
+            result.error_type,
+            crate::error_parser::ErrorType::StandardRevert
+        ));
         // The message should contain "This is a test error" (may be truncated due to padding)
         assert!(result.message.is_some());
         let message = result.message.unwrap();
@@ -232,12 +248,20 @@ mod tests {
     #[test]
     fn test_parse_panic() {
         // Panic with code 0x11 (arithmetic overflow)
-        let panic_bytes = hex::decode("4e487b710000000000000000000000000000000000000000000000000000000000000011").unwrap();
-        
+        let panic_bytes =
+            hex::decode("4e487b710000000000000000000000000000000000000000000000000000000000000011")
+                .unwrap();
+
         let result = ContractErrorParser::parse_from_bytes(panic_bytes.as_ref()).unwrap();
         assert_eq!(result.name, "Panic");
-        assert!(matches!(result.error_type, crate::error_parser::ErrorType::Panic));
-        assert_eq!(result.message, Some("Arithmetic overflow/underflow".to_string()));
+        assert!(matches!(
+            result.error_type,
+            crate::error_parser::ErrorType::Panic
+        ));
+        assert_eq!(
+            result.message,
+            Some("Arithmetic overflow/underflow".to_string())
+        );
         assert_eq!(result.parameters, Some(vec!["0x11".to_string()]));
     }
 
