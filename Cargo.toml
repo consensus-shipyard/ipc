@@ -102,7 +102,7 @@ lazy_static = "1.4"
 libipld = { version = "0.16", default-features = false, features = [
   "dag-cbor",
 ] }
-libp2p = { version = "0.52", default-features = false, features = [
+libp2p = { version = "0.53", default-features = false, features = [
   "gossipsub",
   "kad",
   "identify",
@@ -119,11 +119,6 @@ libp2p = { version = "0.52", default-features = false, features = [
   "secp256k1",
   "plaintext",
 ] }
-
-# Pin yamux to a version that doesn't use unstable features
-# yamux = "=0.12.1"
-# Pin yamux to a version that doesn't use unstable features
-yamux = "0.12.1"
 libp2p-mplex = { version = "0.41" }
 libp2p-bitswap = { path = "ext/libp2p-bitswap" }
 libsecp256k1 = "0.7"
@@ -256,8 +251,6 @@ fvm_ipld_car = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
 fvm_ipld_encoding = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
 fvm_ipld_hamt = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
 fvm_ipld_amt = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
-
-# Remove yamux patch (moved to workspace dependencies)
 
 [profile.wasm]
 inherits = "release"

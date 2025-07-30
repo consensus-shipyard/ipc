@@ -31,6 +31,7 @@ use libipld::{error::BlockNotFound, store::StoreParams, Block, Cid, Result};
 #[cfg(feature = "compat")]
 use libp2p::core::either::EitherOutput;
 use libp2p::core::{Endpoint, Multiaddr};
+use libp2p::request_response::OutboundRequestId;
 use libp2p::swarm::derive_prelude::{ConnectionClosed, DialFailure, FromSwarm, ListenFailure};
 use libp2p::swarm::{
     ConnectionDenied, ConnectionId, THandler, THandlerInEvent, THandlerOutEvent, ToSwarm,
@@ -40,7 +41,7 @@ use libp2p::swarm::{ConnectionHandlerSelect, NotifyHandler, OneShotHandler};
 use libp2p::PeerId;
 use libp2p::{
     request_response::{
-        self, InboundFailure, OutboundFailure, ProtocolSupport, ResponseChannel,
+        self, InboundFailure, InboundRequestId, OutboundFailure, ProtocolSupport, ResponseChannel,
     },
     swarm::NetworkBehaviour,
 };
@@ -99,7 +100,7 @@ impl Default for BitswapConfig {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum BitswapId {
-    Bitswap(usize), // Using usize as generic request ID
+    Bitswap(OutboundRequestId),
     #[cfg(feature = "compat")]
     Compat(Cid),
 }
@@ -130,8 +131,8 @@ pub struct Bitswap<P: StoreParams> {
 impl<P: StoreParams> Bitswap<P> {
     /// Creates a new `Bitswap` behaviour.
     pub fn new<S: BitswapStore<Params = P>>(config: BitswapConfig, store: S) -> Self {
-        let mut rr_config = request_response::Config::default();
-        rr_config.set_request_timeout(config.request_timeout);
+        let rr_config =
+            request_response::Config::default().with_request_timeout(config.request_timeout);
         let protocols = std::iter::once((BitswapProtocol, ProtocolSupport::Full));
         let inner = request_response::Behaviour::with_codec(
             BitswapCodec::<P>::default(),
@@ -315,7 +316,7 @@ impl<P: StoreParams> Bitswap<P> {
     fn inject_outbound_failure(
         &mut self,
         peer: &PeerId,
-        request_id: usize, // Generic request ID
+        request_id: OutboundRequestId,
         error: &OutboundFailure,
     ) {
         tracing::debug!(
@@ -341,13 +342,16 @@ impl<P: StoreParams> Bitswap<P> {
                     .with_label_values(&["unsupported_protocols"])
                     .inc();
             }
+            OutboundFailure::Io(_) => {
+                INBOUND_FAILURE.with_label_values(&["io_error"]).inc();
+            }
         }
     }
 
     fn inject_inbound_failure(
         &mut self,
         peer: &PeerId,
-        request_id: usize, // Generic request ID
+        request_id: InboundRequestId,
         error: &InboundFailure,
     ) {
         tracing::error!(
@@ -374,6 +378,9 @@ impl<P: StoreParams> Bitswap<P> {
                 INBOUND_FAILURE
                     .with_label_values(&["response_omission"])
                     .inc();
+            }
+            InboundFailure::Io(_) => {
+                INBOUND_FAILURE.with_label_values(&["io_error"]).inc();
             }
         }
     }
@@ -443,7 +450,7 @@ impl<P: StoreParams> NetworkBehaviour for Bitswap<P> {
             .handle_established_outbound_connection(connection_id, peer, addr, role_override)
     }
 
-    fn on_swarm_event(&mut self, event: FromSwarm<'_, Self::ConnectionHandler>) {
+    fn on_swarm_event(&mut self, event: FromSwarm) {
         match event {
             FromSwarm::ConnectionEstablished(ev) => self
                 .inner
@@ -542,7 +549,7 @@ impl<P: StoreParams> NetworkBehaviour for Bitswap<P> {
         }
     }
 
-    fn poll<T>(&mut self, cx: &mut Context, params: &mut impl libp2p::swarm::PollParameters) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
+    fn poll(&mut self, cx: &mut Context) -> Poll<ToSwarm<Self::ToSwarm, THandlerInEvent<Self>>> {
         let mut exit = false;
         while !exit {
             exit = true;
