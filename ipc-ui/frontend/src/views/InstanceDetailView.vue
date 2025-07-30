@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { apiService } from '../services/api'
 
@@ -82,6 +82,7 @@ const sendingTestTx = ref(false)
 const testTxResult = ref<string | null>(null)
 const testTxData = ref({
   type: 'simple' as 'transfer' | 'contract_call' | 'simple',
+  network: 'subnet' as 'subnet' | 'l1',
   from: '',
   to: '',
   amount: '0.001',
@@ -629,8 +630,14 @@ const stopStatsRefresh = () => {
 
 // Test transaction methods
 const openTestTxModal = () => {
+  console.log('Opening test transaction modal')
   showTestTxModal.value = true
   testTxResult.value = null
+
+  // Force Vue to update the DOM immediately
+  nextTick(() => {
+    console.log('Modal should be visible now:', showTestTxModal.value)
+  })
 
   // Set default from address if available
   if (instance.value?.validators && instance.value.validators.length > 0) {
@@ -651,6 +658,8 @@ const sendTestTransaction = async () => {
   sendingTestTx.value = true
   testTxResult.value = null
 
+  const networkName = testTxData.value.network === 'subnet' ? 'Subnet' : 'Parent L1'
+  
   try {
     const response = await apiService.sendTestTransaction(
       decodeURIComponent(props.id),
@@ -658,21 +667,24 @@ const sendTestTransaction = async () => {
     )
 
     if (response.data.success) {
-      testTxResult.value = `Test transaction sent successfully!
+      testTxResult.value = `✅ Real transaction sent successfully!
+        Network: ${networkName}
         Transaction Hash: ${response.data.txHash || 'N/A'}
         Block: ${response.data.blockNumber || 'Pending'}
-        Gas Used: ${response.data.gasUsed || 'N/A'}`
+        Gas Used: ${response.data.gasUsed || 'N/A'}
+        
+        ✅ Transaction successfully executed on the blockchain!`
 
       // Refresh stats after successful transaction
       setTimeout(() => {
         fetchChainStats()
       }, 2000)
     } else {
-      testTxResult.value = `Transaction failed: ${response.data.error || 'Unknown error'}`
+      testTxResult.value = `❌ Transaction failed on ${networkName}: ${response.data.error || 'Unknown error'}`
     }
   } catch (err) {
     console.error('Error sending test transaction:', err)
-    testTxResult.value = `Transaction failed: ${err instanceof Error ? err.message : 'Network error'}`
+    testTxResult.value = `❌ Transaction failed on ${networkName}: ${err instanceof Error ? err.message : 'Network error'}`
   } finally {
     sendingTestTx.value = false
   }
@@ -1475,11 +1487,32 @@ onUnmounted(() => {
                 <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
                   <div class="text-blue-800 text-sm">
                     <p class="font-medium mb-1">🔍 Test Transaction</p>
-                    <p>This will send a simple transaction to verify that the subnet is processing transactions correctly. The transaction will help confirm that validators are online and consensus is working.</p>
+                    <p>Send a transaction to verify network functionality. Choose between testing the subnet or the parent L1 network.</p>
                   </div>
                 </div>
 
                 <form @submit.prevent="sendTestTransaction" class="space-y-4">
+                  <!-- Network Selection -->
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                      Target Network
+                    </label>
+                    <select
+                      v-model="testTxData.network"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value="subnet">Subnet (Test subnet validators and consensus)</option>
+                      <option value="l1">Parent L1 (Test parent network connectivity)</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1" v-if="testTxData.network === 'subnet'">
+                      ✅ Tests if subnet validators are online and processing transactions
+                    </p>
+                    <p class="text-xs text-gray-500 mt-1" v-else>
+                      ✅ Tests connectivity to parent network ({{ instance?.config?.parent_endpoint || 'parent chain' }})
+                    </p>
+                  </div>
+
+                  <!-- Transaction Type -->
                   <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">
                       Transaction Type

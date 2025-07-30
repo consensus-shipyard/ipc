@@ -79,6 +79,7 @@ pub struct SubnetStatus {
 #[derive(Debug, Deserialize)]
 pub struct TestTransactionRequest {
     pub tx_type: String, // "simple", "transfer", "contract_call"
+    pub network: String, // "subnet", "l1"
     pub from: Option<String>,
     pub to: Option<String>,
     pub amount: Option<String>,
@@ -94,6 +95,7 @@ pub struct TestTransactionResponse {
     pub block_number: Option<u64>,
     pub gas_used: Option<u64>,
     pub error: Option<String>,
+    pub network: String, // Which network the transaction was sent to
 }
 
 // Future API implementations will go here

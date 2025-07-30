@@ -259,6 +259,7 @@ interface DeploymentRequest {
 // Test transaction interface
 interface TestTransactionRequest {
   type: 'transfer' | 'contract_call' | 'simple'
+  network: 'subnet' | 'l1'
   from?: string
   to?: string
   amount?: string
