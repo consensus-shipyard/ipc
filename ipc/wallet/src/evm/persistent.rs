@@ -237,7 +237,7 @@ mod tests {
 
     #[test]
     fn test_read_write_keystore() {
-        let keystore_folder = tempfile::tempdir().unwrap().into_path();
+        let keystore_folder = tempfile::tempdir().unwrap().keep();
         let keystore_location = keystore_folder.join("eth_keystore");
 
         let mut ks = PersistentKeyStore::new(keystore_location.clone()).unwrap();
@@ -262,7 +262,7 @@ mod tests {
 
     #[test]
     fn test_default() {
-        let keystore_folder = tempfile::tempdir().unwrap().into_path();
+        let keystore_folder = tempfile::tempdir().unwrap().keep();
         let keystore_location = keystore_folder.join("eth_keystore");
 
         let mut ks = PersistentKeyStore::new(keystore_location.clone()).unwrap();
