@@ -33,12 +33,19 @@ pub fn create_temporary_subscriber() -> Subscriber {
 // Returns a guard that can be used to drop the subscriber.
 pub fn set_global_tracing_subscriber(config: &TracingSettings) -> Vec<WorkerGuard> {
     let console_layer = {
-        let filter: EnvFilter = config
+        let mut filter: EnvFilter = config
             .console
             .as_ref()
             .and_then(|c| c.level.clone())
             .unwrap_or_default()
             .into();
+
+        // Exclude traces from console output (they should go to their dedicated file)
+        filter = filter.add_directive(
+            format!("{TRACING_TARGET}=off")
+                .parse()
+                .expect("invalid traces level"),
+        );
 
         // log all traces to stderr (reserving stdout for any actual output such as from the CLI commands)
         fmt::layer()
