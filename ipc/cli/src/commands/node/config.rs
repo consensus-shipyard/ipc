@@ -44,6 +44,28 @@ where
     }
 }
 
+/// Serialize a TOML value as a YAML literal block string
+///
+/// This function converts TOML values back to YAML literal blocks for serialization.
+fn serialize_toml_override<S>(value: &Option<toml::Value>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    // use serde::ser::Error; // Not needed for this implementation
+
+    match value {
+        Some(value) => {
+            let s = value.to_string();
+            if s.trim().is_empty() {
+                serializer.serialize_none()
+            } else {
+                serializer.serialize_str(&s)
+            }
+        }
+        None => serializer.serialize_none(),
+    }
+}
+
 /// Schema-driven CometBFT overrides instead of manual toml::Value manipulation
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CometBftOverrides {
@@ -170,7 +192,7 @@ impl FendermintOverrides {
 }
 
 /// P2P networking configuration
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct P2pConfig {
     /// External IP address for peer connections (defaults to "127.0.0.1")
@@ -182,7 +204,7 @@ pub struct P2pConfig {
 }
 
 /// Port configuration for different P2P services
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct P2pPortsConfig {
     /// CometBFT P2P port (defaults to 26656)
@@ -192,7 +214,7 @@ pub struct P2pPortsConfig {
 }
 
 /// Peer configuration sources
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct P2pPeersConfig {
     /// List of peer info JSON files (local paths or URLs)
@@ -265,7 +287,7 @@ pub struct FendermintPeerInfo {
 }
 
 /// Defines how the genesis state should be obtained
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum GenesisSource {
     /// Create genesis by fetching from parent subnet using the provided config
@@ -274,7 +296,7 @@ pub enum GenesisSource {
     Path(CreatedGenesis),
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct NodeInitConfig {
     /// Home directory of the node. Will be created if it does not exist
@@ -288,10 +310,18 @@ pub struct NodeInitConfig {
     /// P2P networking configuration
     pub p2p: Option<P2pConfig>,
     /// Optional TOML overrides for CometBFT configuration
-    #[serde(deserialize_with = "deserialize_toml_override", default)]
+    #[serde(
+        deserialize_with = "deserialize_toml_override",
+        serialize_with = "serialize_toml_override",
+        default
+    )]
     pub cometbft_overrides: Option<toml::Value>,
     /// Optional TOML overrides for FenderMint configuration
-    #[serde(deserialize_with = "deserialize_toml_override", default)]
+    #[serde(
+        deserialize_with = "deserialize_toml_override",
+        serialize_with = "serialize_toml_override",
+        default
+    )]
     pub fendermint_overrides: Option<toml::Value>,
     /// Whether to automatically join the subnet as a validator (collateral-based subnets only)
     pub join: Option<JoinConfig>,

@@ -15,7 +15,7 @@ use ethers::{types::H160, utils::keccak256};
 use fs_err as fs;
 use hex::FromHex;
 use ipc_api::subnet::PermissionMode;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 /// Convert an uncompressed secp256k1 public key (0x04-prefixed) into an Ethereum address
@@ -72,7 +72,7 @@ impl PowerConfig {
 }
 
 /// Config for joining a subnet
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct JoinConfig {
     pub from: String,

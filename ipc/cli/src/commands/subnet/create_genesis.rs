@@ -10,7 +10,7 @@ use std::{
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use clap::Args;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use fendermint_app::cmd::genesis::{new_genesis_from_parent, seal_genesis};
 use fendermint_app::options::genesis::{GenesisFromParentArgs, SealGenesisArgs};
@@ -48,7 +48,7 @@ where
 }
 
 /// Genesis parameters, configurable via CLI flags or YAML/JSON.
-#[derive(Debug, Clone, Args, Deserialize)]
+#[derive(Debug, Clone, Args, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct GenesisConfig {
     /// Network version, governs which set of built-in actors to use.
@@ -145,7 +145,7 @@ impl CommandLineHandler for CreateGenesis {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct CreatedGenesis {
     pub genesis: PathBuf,
     pub sealed: PathBuf,

@@ -137,12 +137,12 @@ pub fn convert_key_to_cometbft(secret_key: &SecretKey, out: &Path) -> anyhow::Re
         "pub_key": pub_key,
         "priv_key": {
             "type": "tendermint/PrivKeySecp256k1",
-            "value": secret_to_b64(&secret_key)
+            "value": secret_to_b64(secret_key)
         }
     });
     let json = serde_json::to_string_pretty(&priv_validator_key)?;
 
-    fs::write(&out, json)?;
+    fs::write(out, json)?;
 
     Ok(())
 }
