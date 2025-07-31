@@ -23,6 +23,15 @@ fn print_user_friendly_error(error: &anyhow::Error) {
         eprintln!("\n💡 Suggestion: {}", suggestion);
     }
 
+    // Check if this might be a contract-related error and suggest the documentation
+    if is_contract_related_error(&error_msg) {
+        eprintln!("\n📖 For detailed information about contract errors, see:");
+        eprintln!(
+            "   https://github.com/consensus-shipyard/ipc/blob/main/docs/ipc/contract-errors.md"
+        );
+        eprintln!("   or run: ipc-cli --help");
+    }
+
     // For debugging, show the full error chain if RUST_BACKTRACE is set
     if std::env::var("RUST_BACKTRACE").is_ok() {
         eprintln!("\n🔍 Full error details:");
@@ -65,6 +74,30 @@ fn extract_meaningful_error(error: &anyhow::Error) -> String {
     } else {
         root_cause
     }
+}
+
+fn is_contract_related_error(error_msg: &str) -> bool {
+    let error_lower = error_msg.to_lowercase();
+
+    // Check for common contract error patterns
+    error_lower.contains("contract")
+        || error_lower.contains("revert")
+        || error_lower.contains("not owner")
+        || error_lower.contains("not authorized")
+        || error_lower.contains("insufficient")
+        || error_lower.contains("invalid")
+        || error_lower.contains("already exists")
+        || error_lower.contains("not found")
+        || error_lower.contains("permission")
+        || error_lower.contains("unauthorized")
+        || error_lower.contains("subnet")
+        || error_lower.contains("validator")
+        || error_lower.contains("checkpoint")
+        || error_lower.contains("batch")
+        || error_lower.contains("signature")
+        || error_lower.contains("collateral")
+        || error_lower.contains("balance")
+        || error_lower.contains("funds")
 }
 
 fn get_error_suggestion(error_msg: &str) -> Option<&'static str> {
