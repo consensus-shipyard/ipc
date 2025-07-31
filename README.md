@@ -40,7 +40,7 @@ sudo usermod -aG docker $USER && newgrp docker
 # clone this repo and build
 git clone https://github.com/consensus-shipyard/ipc.git
 cd ipc
-make
+make ( or make build-with-ui )
 
 # building will generate the following binaries
 ./target/release/ipc-cli --version
