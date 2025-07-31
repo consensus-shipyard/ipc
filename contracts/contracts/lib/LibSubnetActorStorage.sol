@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import {ConsensusType} from "../enums/ConsensusType.sol";
 import {NotGateway, SubnetAlreadyKilled} from "../errors/IPCErrors.sol";
-import {BottomUpCheckpoint, BottomUpMsgBatchInfo} from "../structs/CrossNet.sol";
+import {BottomUpCheckpoint, StateCommitment} from "../structs/CrossNet.sol";
 import {SubnetID, ValidatorSet, PowerChangeLog, StakingReleaseQueue, Asset, Validator, PermissionMode} from "../structs/Subnet.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
@@ -60,6 +60,9 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
         EnumerableSet.AddressSet bootstrapOwners;
         /// @notice contains all committed bottom-up checkpoint at specific epoch
         mapping(uint256 => BottomUpCheckpoint) committedCheckpoints;
+        /// @notice contains all committed subnet state hash and block header
+        mapping(uint64 => StateCommitment) stateCommitments;
+        string chainID;
         /// @notice initial set of validators joining in genesis
         Validator[] genesisValidators;
         /// @notice genesis balance to be allocated to the subnet in genesis.

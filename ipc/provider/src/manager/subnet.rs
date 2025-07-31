@@ -19,6 +19,7 @@ use ipc_api::subnet::{Asset, ConstructParams, PermissionMode};
 use ipc_api::subnet_id::SubnetID;
 use ipc_api::validator::Validator;
 use std::collections::{BTreeMap, HashMap};
+use crate::manager::cometbft::SignedHeader;
 
 /// Trait to interact with a subnet and handle its lifecycle.
 #[async_trait]
@@ -191,6 +192,10 @@ pub trait SubnetManager:
     /// Lists all the validators
     async fn list_validators(&self, subnet: &SubnetID) -> Result<Vec<(Address, ValidatorInfo)>>;
 
+    async fn list_subnet_active_validators(&self, subnet: &SubnetID) -> Result<Vec<(Address, ValidatorInfo)>>;
+
+    async fn list_waiting_validators(&self, subnet: &SubnetID) -> Result<Vec<(Address, ValidatorInfo)>>;
+
     async fn set_federated_power(
         &self,
         from: &Address,
@@ -252,6 +257,24 @@ pub trait TopDownFinalityQuery: Send + Sync {
     ) -> Result<TopDownQueryPayload<Vec<PowerChangeRequest>>>;
     /// Returns the latest parent finality committed in a child subnet
     async fn latest_parent_finality(&self) -> Result<ChainEpoch>;
+}
+
+#[async_trait]
+pub trait SignedHeaderRelayer: Send + Sync {
+    async fn submit_signed_header(
+        &self,
+        submitter: &Address,
+        subnet_id: &SubnetID,
+        header: SignedHeader,
+    ) -> Result<ChainEpoch>;
+    
+    async fn last_submission_height(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
+    
+    async fn submission_period(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
+
+    async fn current_epoch(&self) -> Result<ChainEpoch>;
+
+    async fn list_active_validators(&self, subnet: &SubnetID) -> Result<Vec<(Address, ValidatorInfo)>>;
 }
 
 /// The bottom up checkpoint manager that handles the bottom up relaying from child subnet to the parent
