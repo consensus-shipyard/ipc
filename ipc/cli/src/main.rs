@@ -43,21 +43,17 @@ fn print_user_friendly_error(error: &anyhow::Error) {
 
 fn extract_meaningful_error(error: &anyhow::Error) -> String {
     // Get the root cause of the error chain
-    let current = error;
     let mut root_cause = error.to_string();
 
-    while let Some(source) = current.source() {
+    // Get the first source error if available
+    if let Some(source) = error.source() {
         root_cause = source.to_string();
-        // We can't directly assign source to current since they have different types
-        // Instead, we'll just keep track of the root cause
-        break; // For now, just get the first source to avoid the type issue
     }
 
     // Clean up common error patterns
     let cleaned = root_cause
         .replace("error processing command Some(", "")
         .replace("main process failed: ", "")
-        .replace(": ", ": ")
         .trim()
         .to_string();
 
