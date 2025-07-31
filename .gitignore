@@ -20,3 +20,6 @@ validator-nodes/
 
 # Vim swap files
 *.swp
+
+# Runtime data files
+data/

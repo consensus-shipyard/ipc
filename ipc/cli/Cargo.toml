@@ -34,6 +34,7 @@ fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true }
 hex = { workspace = true }
 libsecp256k1 = { workspace = true }
+libp2p = { workspace = true }
 log = { workspace = true }
 num-derive = "0.3.3"
 num-bigint = { workspace = true }
@@ -48,10 +49,16 @@ serde_yaml = { workspace = true }
 sha3 = "0.10"
 strum = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true }
 urlencoding = "2.1"
+tempfile = "3.8"
+sha2 = "0.10"
+rand = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+tokio = { workspace = true, features = ["signal"] }
 tokio-tungstenite = { workspace = true }
+tokio-util = { workspace = true }
 toml = "0.7.2"
+tracing = { workspace = true }
 url = { workspace = true }
 zeroize = "1.6.0"
 prometheus = { workspace = true }
@@ -61,6 +68,7 @@ uuid = { version = "1.0", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 mime_guess = "2.0"
 include_dir = "0.7"
+fendermint_eth_api = { path = "../../fendermint/eth/api" }
 
 ipc-wallet = { path = "../../ipc/wallet", features = ["with-ethers"] }
 ipc-provider = { path = "../../ipc/provider" }
@@ -74,5 +82,7 @@ fendermint_eth_deployer = { path = "../../fendermint/eth/deployer" }
 fendermint_app_settings = { path = "../../fendermint/app/settings" }
 fendermint_vm_actor_interface = { path = "../../fendermint/vm/actor_interface" }
 fendermint_app = { path = "../../fendermint/app" }
+fendermint_crypto = { path = "../../fendermint/crypto" }
+ipc_ipld_resolver = { path = "../../ipld/resolver" }
 contracts-artifacts = { path = "../../contracts-artifacts" }
 ipc_actors_abis = { path = "../../contract-bindings" }

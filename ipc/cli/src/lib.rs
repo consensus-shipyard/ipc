@@ -11,6 +11,8 @@ mod commands;
 
 pub use commands::*;
 pub mod comet_runner;
+mod ipc_config_store;
+pub mod services;
 use ipc_provider::config::Config;
 
 /// The trait that represents the abstraction of a command line handler. To implement a new command

@@ -27,6 +27,8 @@ pub mod parse;
 
 use parse::parse_network;
 
+pub const DEFAULT_HOME_DIR: &str = "~/.fendermint";
+
 lazy_static! {
     static ref ENV_ALIASES: Vec<(&'static str, Vec<&'static str>)> = vec![
         ("FM_NETWORK", vec!["IPC_NETWORK", "NETWORK"]),
@@ -90,7 +92,7 @@ pub struct Options {
     #[arg(
         short = 'd',
         long,
-        default_value = "~/.fendermint",
+        default_value = DEFAULT_HOME_DIR,
         env = "FM_HOME_DIR"
     )]
     pub home_dir: PathBuf,
