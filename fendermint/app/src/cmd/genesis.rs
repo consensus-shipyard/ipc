@@ -231,7 +231,10 @@ fn set_eam_permissions(
     })
 }
 
-fn into_tendermint(genesis_file: &PathBuf, args: &GenesisIntoTendermintArgs) -> anyhow::Result<()> {
+pub fn into_tendermint(
+    genesis_file: &PathBuf,
+    args: &GenesisIntoTendermintArgs,
+) -> anyhow::Result<()> {
     let genesis = read_genesis(genesis_file)?;
     let app_state: Option<String> = match args.app_state {
         Some(ref path) if path.exists() => {

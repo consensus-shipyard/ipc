@@ -36,13 +36,8 @@ cmd! {
 
 cmd! {
     KeyFromEthArgs(self) {
-        let sk = read_secret_key_hex(&self.secret_key)?;
-        let pk = sk.public_key();
-
-        export(&self.out_dir, &self.name, "sk", &secret_to_b64(&sk))?;
-        export(&self.out_dir, &self.name, "pk", &public_to_b64(&pk))?;
-
-        Ok(())
+        let secret_key = read_secret_key_hex(&self.secret_key)?;
+        store_key(&secret_key, &self.name, &self.out_dir)
     }
 }
 
@@ -61,43 +56,14 @@ cmd! {
 
 cmd! {
   KeyGenArgs(self) {
-    let mut rng = ChaCha20Rng::from_entropy();
-    let sk = SecretKey::random(&mut rng);
-    let pk = sk.public_key();
-
-    export(&self.out_dir, &self.name, "sk", &secret_to_b64(&sk))?;
-    export(&self.out_dir, &self.name, "pk", &public_to_b64(&pk))?;
-
-    Ok(())
+    generate_key(self)
   }
 }
 
 cmd! {
   KeyIntoTendermintArgs(self) {
     let sk = read_secret_key(&self.secret_key)?;
-    let pk = sk.public_key();
-    let vk = tendermint::crypto::default::ecdsa_secp256k1::VerifyingKey::from_sec1_bytes(&pk.serialize())
-      .map_err(|e| anyhow!("failed to convert public key: {e}"))?;
-    let pub_key = tendermint::PublicKey::Secp256k1(vk);
-    let address = tendermint::account::Id::from(pub_key);
-
-    // tendermint-rs doesn't seem to handle Secp256k1 private keys;
-    // if it did, we could use tendermint_config::PrivateValidatorKey
-    // to encode the data structure. Tendermint should be okay with it
-    // though, as long as we match the expected keys in the JSON.
-    let priv_validator_key = json! ({
-        "address": address,
-        "pub_key": pub_key,
-        "priv_key": {
-            "type": "tendermint/PrivKeySecp256k1",
-            "value": secret_to_b64(&sk)
-        }
-    });
-    let json = serde_json::to_string_pretty(&priv_validator_key)?;
-
-    fs::write(&self.out, json)?;
-
-    Ok(())
+    convert_key_to_cometbft(&sk, &self.out)
   }
 }
 
@@ -131,13 +97,54 @@ cmd! {
 cmd! {
     KeyShowPeerIdArgs(self) {
         let pk = read_public_key(&self.public_key)?;
-        // Just using this type because it does the conversion we need.
-        let vk = ipc_ipld_resolver::ValidatorKey::from(pk);
-        let pk: libp2p::identity::PublicKey = vk.into();
-        let id = pk.to_peer_id();
-        println!("{}", id);
+        let peer_id = derive_peer_id_from_public_key(&pk)?;
+        println!("{}", peer_id);
         Ok(())
     }
+}
+
+pub fn generate_key(args: &KeyGenArgs) -> anyhow::Result<()> {
+    let mut rng = ChaCha20Rng::from_entropy();
+    let sk = SecretKey::random(&mut rng);
+
+    store_key(&sk, &args.name, &args.out_dir)
+}
+
+pub fn store_key(secret_key: &SecretKey, name: &str, out_dir: &Path) -> anyhow::Result<()> {
+    let public_key = secret_key.public_key();
+
+    export(out_dir, name, "sk", &secret_to_b64(secret_key))?;
+    export(out_dir, name, "pk", &public_to_b64(&public_key))?;
+
+    Ok(())
+}
+
+pub fn convert_key_to_cometbft(secret_key: &SecretKey, out: &Path) -> anyhow::Result<()> {
+    let pk = secret_key.public_key();
+    let vk = tendermint::crypto::default::ecdsa_secp256k1::VerifyingKey::from_sec1_bytes(
+        &pk.serialize(),
+    )
+    .map_err(|e| anyhow!("failed to convert public key: {e}"))?;
+    let pub_key = tendermint::PublicKey::Secp256k1(vk);
+    let address = tendermint::account::Id::from(pub_key);
+
+    // tendermint-rs doesn't seem to handle Secp256k1 private keys;
+    // if it did, we could use tendermint_config::PrivateValidatorKey
+    // to encode the data structure. Tendermint should be okay with it
+    // though, as long as we match the expected keys in the JSON.
+    let priv_validator_key = json! ({
+        "address": address,
+        "pub_key": pub_key,
+        "priv_key": {
+            "type": "tendermint/PrivKeySecp256k1",
+            "value": secret_to_b64(secret_key)
+        }
+    });
+    let json = serde_json::to_string_pretty(&priv_validator_key)?;
+
+    fs::write(out, json)?;
+
+    Ok(())
 }
 
 fn secret_to_b64(sk: &SecretKey) -> String {
@@ -166,9 +173,22 @@ pub fn read_public_key(public_key: &Path) -> anyhow::Result<PublicKey> {
     Ok(pk)
 }
 
+/// Derive libp2p peer ID from a PublicKey
+pub fn derive_peer_id_from_public_key(pk: &PublicKey) -> anyhow::Result<String> {
+    // Just using this type because it does the conversion we need.
+    let vk = ipc_ipld_resolver::ValidatorKey::from(*pk);
+    let libp2p_pk: libp2p::identity::PublicKey = vk.into();
+    let peer_id = libp2p_pk.to_peer_id();
+    Ok(peer_id.to_string())
+}
+
 pub fn read_secret_key_hex(private_key: &Path) -> anyhow::Result<SecretKey> {
     let hex_str = fs::read_to_string(private_key).context("failed to read private key")?;
-    let mut hex_str = hex_str.trim();
+    parse_secret_key_hex(&hex_str)
+}
+
+pub fn parse_secret_key_hex(private_key: &str) -> anyhow::Result<SecretKey> {
+    let mut hex_str = private_key.trim();
     if hex_str.starts_with("0x") {
         hex_str = &hex_str[2..];
     }

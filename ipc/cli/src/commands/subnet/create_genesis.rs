@@ -10,7 +10,7 @@ use std::{
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use clap::Args;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use fendermint_app::cmd::genesis::{new_genesis_from_parent, seal_genesis};
 use fendermint_app::options::genesis::{GenesisFromParentArgs, SealGenesisArgs};
@@ -48,7 +48,7 @@ where
 }
 
 /// Genesis parameters, configurable via CLI flags or YAML/JSON.
-#[derive(Debug, Clone, Args, Deserialize)]
+#[derive(Debug, Clone, Args, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct GenesisConfig {
     /// Network version, governs which set of built-in actors to use.
@@ -139,8 +139,16 @@ impl CommandLineHandler for CreateGenesis {
 
         let out_dir = args.out_dir.clone().unwrap_or_else(|| global.config_dir());
 
-        create_genesis(&args.config, &subnet_id, &parent, &out_dir).await
+        create_genesis(&args.config, &subnet_id, &parent, &out_dir).await?;
+
+        Ok(())
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub(crate) struct CreatedGenesis {
+    pub genesis: PathBuf,
+    pub sealed: PathBuf,
 }
 
 /// Generates and seals the genesis file for the subnet.
@@ -149,7 +157,7 @@ pub(crate) async fn create_genesis(
     subnet_id: &SubnetID,
     parent: &Subnet,
     dir: &Path,
-) -> Result<()> {
+) -> Result<CreatedGenesis> {
     log::info!("Creating genesis");
 
     let safe_id = sanitize_subnet_id(subnet_id);
@@ -184,5 +192,8 @@ pub(crate) async fn create_genesis(
     .await?;
     log::info!("Genesis sealed and stored at: {}", sealed.display());
 
-    Ok(())
+    Ok(CreatedGenesis {
+        genesis: genesis_file,
+        sealed,
+    })
 }
