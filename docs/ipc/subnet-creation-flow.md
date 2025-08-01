@@ -63,7 +63,7 @@ deploy:
   chain-id: 31337
 
 create:
-  parent: /r314159
+  parent: /r31337
   from: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
   min-validator-stake: 1.0
   min-validators: 3
