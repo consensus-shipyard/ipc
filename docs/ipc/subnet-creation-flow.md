@@ -60,10 +60,10 @@ deploy:
   enabled: true
   url: http://localhost:8545
   from: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
-  chain-id: 31337
+  chain-id: 314159
 
 create:
-  parent: /r31337
+  parent: /r314159
   from: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
   min-validator-stake: 1.0
   min-validators: 3
