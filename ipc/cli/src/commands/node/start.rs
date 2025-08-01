@@ -1,8 +1,9 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 
+use crate::errors::{CliError, NodeError};
 use crate::services::node_manager::NodeManager;
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use async_trait::async_trait;
 use clap::Args;
 use fendermint_app_settings::Settings;
@@ -89,11 +90,17 @@ async fn validate_node_home(home: &Path) -> Result<()> {
 
     // Check home directory exists and is accessible
     if !home.exists() {
-        bail!("Node home directory does not exist: {}", home.display());
+        return Err(NodeError::HomeDirectoryNotFound {
+            path: home.to_path_buf(),
+        }
+        .into());
     }
 
     if !home.is_dir() {
-        bail!("Node home path is not a directory: {}", home.display());
+        return Err(NodeError::HomeNotDirectory {
+            path: home.to_path_buf(),
+        }
+        .into());
     }
 
     // Check for required subdirectories
@@ -101,17 +108,19 @@ async fn validate_node_home(home: &Path) -> Result<()> {
     let cometbft_dir = home.join("cometbft");
 
     if !fendermint_dir.exists() {
-        bail!(
-            "Fendermint directory not found - run 'ipc-cli node init' first: {}",
-            fendermint_dir.display()
-        );
+        return Err(NodeError::NodeNotInitialized {
+            path: home.to_path_buf(),
+            missing_file: "fendermint directory".to_string(),
+        }
+        .into());
     }
 
     if !cometbft_dir.exists() {
-        bail!(
-            "CometBFT directory not found - run 'ipc-cli node init' first: {}",
-            cometbft_dir.display()
-        );
+        return Err(NodeError::NodeNotInitialized {
+            path: home.to_path_buf(),
+            missing_file: "cometbft directory".to_string(),
+        }
+        .into());
     }
 
     // Validate required configuration files exist
@@ -150,22 +159,29 @@ async fn validate_required_config_files(fendermint_dir: &Path, cometbft_dir: &Pa
 
     for (config_path, description) in configs_to_check {
         if !config_path.exists() {
-            bail!(
-                "{} not found: {} - run 'ipc-cli node init' first",
-                description,
-                config_path.display()
-            );
+            let home = config_path
+                .parent()
+                .and_then(|p| p.parent())
+                .unwrap_or_else(|| Path::new("."));
+            return Err(NodeError::NodeNotInitialized {
+                path: home.to_path_buf(),
+                missing_file: config_path
+                    .strip_prefix(home)
+                    .unwrap_or(&config_path)
+                    .display()
+                    .to_string(),
+            }
+            .into());
         }
 
         // Verify file is readable
         tokio::fs::read_to_string(&config_path)
             .await
-            .with_context(|| {
-                format!(
-                    "failed to read {} at {}",
-                    description,
-                    config_path.display()
-                )
+            .map_err(|_| {
+                NodeError::InvalidNodeConfig {
+                    path: config_path.clone(),
+                    details: format!("Cannot read {}", description),
+                }
             })?;
     }
 
@@ -179,26 +195,32 @@ async fn validate_required_data_files(fendermint_dir: &Path, cometbft_dir: &Path
 
     // Check data directories exist (they should be created during init)
     if !fendermint_data.exists() {
-        bail!(
-            "Fendermint data directory not found: {} - run 'ipc-cli node init' first",
-            fendermint_data.display()
-        );
+        let home = fendermint_dir.parent().unwrap_or_else(|| Path::new("."));
+        return Err(NodeError::NodeNotInitialized {
+            path: home.to_path_buf(),
+            missing_file: "fendermint/data directory".to_string(),
+        }
+        .into());
     }
 
     if !cometbft_data.exists() {
-        bail!(
-            "CometBFT data directory not found: {} - run 'ipc-cli node init' first",
-            cometbft_data.display()
-        );
+        let home = cometbft_dir.parent().unwrap_or_else(|| Path::new("."));
+        return Err(NodeError::NodeNotInitialized {
+            path: home.to_path_buf(),
+            missing_file: "cometbft/data directory".to_string(),
+        }
+        .into());
     }
 
     // Verify validator key exists in Fendermint
     let validator_key_path = fendermint_dir.join("validator.sk");
     if !validator_key_path.exists() {
-        bail!(
-            "Validator private key not found: {} - run 'ipc-cli node init' first",
-            validator_key_path.display()
-        );
+        let home = fendermint_dir.parent().unwrap_or_else(|| Path::new("."));
+        return Err(NodeError::NodeNotInitialized {
+            path: home.to_path_buf(),
+            missing_file: "fendermint/validator.sk".to_string(),
+        }
+        .into());
     }
 
     Ok(())

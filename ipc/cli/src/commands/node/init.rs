@@ -12,6 +12,7 @@ use crate::{
     default_subscriber, get_ipc_provider, ipc_config_store::IpcConfigStore, CommandLineHandler,
     GlobalArguments,
 };
+use crate::errors::{CliError, NodeError, ValidationError, WalletError};
 use anyhow::{bail, Context, Result};
 use async_trait::async_trait;
 use clap::Args;
@@ -233,13 +234,15 @@ async fn import_and_store_key(
 ) -> Result<SecretKey> {
     log::info!("Importing validator key");
 
-    let imported_wallet = import_wallet(provider, key_config)
-        .context("failed to import wallet - check key format and permissions")?;
+    let imported_wallet = import_wallet(provider, key_config)?;
 
     // Convert to secp256k1 secret key (validators only support secp256k1)
-    let secret_key = SecretKey::try_from(imported_wallet.private_key.clone()).context(
-        "validator keys must be secp256k1 format - BLS keys are not supported for validators",
-    )?;
+    let secret_key = SecretKey::try_from(imported_wallet.private_key.clone()).map_err(|e| {
+        CliError::Internal(format!(
+            "Validator keys must be secp256k1 format.\nBLS keys are not supported for validators.\nError: {}",
+            e
+        ))
+    })?;
 
     log::info!("Validator key imported successfully");
     Ok(secret_key)

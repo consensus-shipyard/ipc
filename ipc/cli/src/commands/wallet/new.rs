@@ -9,6 +9,7 @@ use ipc_wallet::WalletType;
 use std::fmt::Debug;
 use std::str::FromStr;
 
+use crate::errors::{CliError, WalletError};
 use crate::{get_ipc_provider, CommandLineHandler, GlobalArguments};
 
 pub(crate) struct WalletNew;
@@ -22,19 +23,32 @@ impl CommandLineHandler for WalletNew {
 
         let provider = get_ipc_provider(global)?;
 
-        let wallet_type = WalletType::from_str(&arguments.wallet_type)?;
+        let wallet_type = WalletType::from_str(&arguments.wallet_type)
+            .map_err(|_| WalletError::UnsupportedWalletType {
+                wallet_type: arguments.wallet_type.clone(),
+            })?;
+            
         match wallet_type {
             WalletType::Evm => {
-                println!("{:?}", provider.new_evm_key()?.to_string());
+                let address = provider.new_evm_key()
+                    .map_err(|e| CliError::Internal(format!("Failed to create EVM wallet: {}", e)))?;
+                println!("{:?}", address.to_string());
             }
             WalletType::Fvm => {
-                let tp = WalletKeyType::from_str(
-                    &arguments
-                        .key_type
-                        .clone()
-                        .expect("fvm key type not specified"),
-                )?;
-                println!("{:?}", provider.new_fvm_key(tp)?)
+                let key_type_str = arguments
+                    .key_type
+                    .as_ref()
+                    .ok_or(WalletError::FvmKeyTypeRequired)?;
+                    
+                let tp = WalletKeyType::from_str(key_type_str)
+                    .map_err(|_| CliError::Internal(format!(
+                        "Invalid FVM key type '{}'. Valid types are: secp256k1, bls, secp256k1-ledger",
+                        key_type_str
+                    )))?;
+                    
+                let address = provider.new_fvm_key(tp)
+                    .map_err(|e| CliError::Internal(format!("Failed to create FVM wallet: {}", e)))?;
+                println!("{:?}", address)
             }
         };
 

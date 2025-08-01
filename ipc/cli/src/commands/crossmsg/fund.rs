@@ -14,6 +14,7 @@ use crate::{
     f64_to_token_amount, get_ipc_provider, require_fil_addr_from_str, CommandLineHandler,
     GlobalArguments,
 };
+use crate::errors::{CliError, CrossMsgError, ValidationError};
 
 /// The command to send funds to a subnet from parent
 pub(crate) struct Fund;
@@ -139,7 +140,9 @@ impl CommandLineHandler for FundWithToken {
         };
 
         let amount = BigInt::from_str_radix(arguments.amount.as_str(), 10)
-            .map_err(|e| anyhow::anyhow!("not a token amount: {e}"))
+            .map_err(|_| CrossMsgError::InvalidTokenAmount {
+                input: arguments.amount.clone(),
+            })
             .map(TokenAmount::from_atto)?;
 
         if arguments.approve {
