@@ -8,6 +8,7 @@ use num_traits::cast::FromPrimitive;
 use std::path::{Path, PathBuf};
 
 mod commands;
+pub mod errors;
 
 pub use commands::*;
 pub mod comet_runner;
