@@ -1,0 +1,18 @@
+home: /Users/philip/.ipc/nodes/anvil_node_1
+subnet: /r31337/t410fbspclp5h4scn627bv42ytlqssmbel2fztd6vnzi
+parent: /r31337
+key:
+  wallet-type: evm
+  private-key: ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+p2p:
+  external-ip: 127.0.0.1
+  ports:
+    cometbft: 26656
+    resolver: 26657
+  peers: null
+cometbft-overrides: null
+fendermint-overrides: null
+join: null
+genesis: !path
+  genesis: /Users/philip/.ipc/genesis_r31337_t410fbspclp5h4scn627bv42ytlqssmbel2fztd6vnzi.json
+  sealed: /Users/philip/.ipc/genesis_sealed_r31337_t410fbspclp5h4scn627bv42ytlqssmbel2fztd6vnzi.json
