@@ -113,6 +113,11 @@ contract SubnetActorGetterFacet {
         return s.minActivationCollateral;
     }
 
+    /// @notice Obtain the active validator address by its position index in the validator list array.
+    function getActiveValidatorAddressByIndex(uint16 index) external view returns (address) {
+        return LibPower.getActiveValidatorAddressByIndex(index);
+    }
+
     /// @notice Returns detailed information about a specific validator.
     /// @param validatorAddress The address of the validator to query information for.
     function getValidator(address validatorAddress) external view returns (ValidatorInfo memory validator) {
