@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import NetworkSelector from './NetworkSelector.vue'
+import WalletSelector from './WalletSelector.vue'
 
 const route = useRoute()
 
@@ -28,6 +30,9 @@ const pageTitle = computed(() => {
 
       <!-- Right side actions -->
       <div class="flex items-center space-x-4">
+        <!-- Network Selector -->
+        <NetworkSelector />
+
         <!-- Deploy New Subnet Button -->
         <RouterLink
           to="/wizard"

@@ -1,4 +1,5 @@
-import { API_CONFIG, type WSMessage, type DeploymentProgress } from '../config/api'
+import { STATIC_API_CONFIG, type WSMessage, type DeploymentProgress } from '../config/api'
+import { useNetworkStore } from '@/stores/network'
 
 export interface WebSocketCallbacks {
   onOpen?: () => void
@@ -17,22 +18,63 @@ export class WebSocketService {
   private reconnectDelay = 1000
   private pingInterval: number | null = null
   private isConnecting = false
+  private currentNetworkId: string | null = null
 
   constructor(callbacks: WebSocketCallbacks = {}) {
     this.callbacks = callbacks
   }
 
+  private getWebSocketURL(): string {
+    try {
+      const networkStore = useNetworkStore()
+      const selectedNetwork = networkStore.selectedNetwork
+
+      // If there's a selected network with a WebSocket URL, use it
+      // Otherwise fall back to the configured WebSocket URL
+      if (selectedNetwork?.wsUrl) {
+        return selectedNetwork.wsUrl
+      }
+    } catch {
+      // Store not available, use default
+    }
+
+    return STATIC_API_CONFIG.wsURL
+  }
+
+  private shouldReconnectForNetworkChange(): boolean {
+    try {
+      const networkStore = useNetworkStore()
+      const currentNetworkId = networkStore.selectedNetwork?.id
+
+      if (this.currentNetworkId !== currentNetworkId) {
+        this.currentNetworkId = currentNetworkId || null
+        return true
+      }
+    } catch {
+      // Store not available
+    }
+
+    return false
+  }
+
   connect(): Promise<void> {
+    // Check if we need to reconnect due to network change
+    if (this.ws && this.ws.readyState === WebSocket.OPEN && this.shouldReconnectForNetworkChange()) {
+      console.log('Network changed, reconnecting WebSocket...')
+      this.disconnect()
+    }
+
     if (this.isConnecting || (this.ws && this.ws.readyState === WebSocket.OPEN)) {
       return Promise.resolve()
     }
 
     this.isConnecting = true
-    console.log('Connecting to WebSocket:', API_CONFIG.wsURL)
+    const wsURL = this.getWebSocketURL()
+    console.log('Connecting to WebSocket:', wsURL)
 
     return new Promise((resolve, reject) => {
       try {
-        this.ws = new WebSocket(API_CONFIG.wsURL)
+        this.ws = new WebSocket(wsURL)
 
         this.ws.onopen = () => {
           console.log('WebSocket connected')
@@ -49,7 +91,7 @@ export class WebSocketService {
           this.stopPing()
           this.callbacks.onClose?.()
 
-          // Attempt to reconnect if not closed intentionally
+          // Auto-reconnect if not intentionally closed
           if (event.code !== 1000 && this.reconnectAttempts < this.maxReconnectAttempts) {
             this.scheduleReconnect()
           }
@@ -68,87 +110,87 @@ export class WebSocketService {
             console.log('WebSocket message received:', message)
 
             // Handle specific message types
-            switch (message.type) {
-              case 'deployment_progress':
-                this.callbacks.onDeploymentProgress?.(message.data as DeploymentProgress)
-                break
-              case 'instance_update':
-                this.callbacks.onInstanceUpdate?.(message.data)
-                break
-              case 'pong':
-                // Handle ping-pong for connection health
-                break
-              default:
-                this.callbacks.onMessage?.(message)
+            if (message.type === 'deployment_progress' && message.data) {
+              this.callbacks.onDeploymentProgress?.(message.data)
+            } else if (message.type === 'instance_update' && message.data) {
+              this.callbacks.onInstanceUpdate?.(message.data)
             }
+
+            // Call generic message handler
+            this.callbacks.onMessage?.(message)
           } catch (error) {
-            console.error('Error parsing WebSocket message:', error)
+            console.error('Failed to parse WebSocket message:', error, event.data)
           }
         }
 
+        // Connection timeout
+        setTimeout(() => {
+          if (this.isConnecting) {
+            this.ws?.close()
+            this.isConnecting = false
+            reject(new Error('WebSocket connection timeout'))
+          }
+        }, 10000)
+
       } catch (error) {
         this.isConnecting = false
+        console.error('Failed to create WebSocket:', error)
         reject(error)
       }
     })
   }
 
-  disconnect() {
-    console.log('Disconnecting WebSocket')
+  disconnect(): void {
     this.stopPing()
 
     if (this.ws) {
       this.ws.close(1000, 'Client disconnect')
       this.ws = null
     }
+
+    this.reconnectAttempts = this.maxReconnectAttempts // Prevent auto-reconnect
   }
 
-  send(message: WSMessage) {
+  send(message: WSMessage): boolean {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      console.log('Sending WebSocket message:', message)
-      this.ws.send(JSON.stringify(message))
+      try {
+        this.ws.send(JSON.stringify(message))
+        console.log('WebSocket message sent:', message)
+        return true
+      } catch (error) {
+        console.error('Failed to send WebSocket message:', error)
+        return false
+      }
     } else {
-      console.warn('WebSocket not connected, cannot send message:', message)
+      console.warn('WebSocket is not connected, cannot send message:', message)
+      return false
     }
   }
 
-  // Specific message senders
-  subscribeToDeployment(deploymentId: string) {
-    this.send({
-      type: 'subscribe_deployment',
-      data: { deployment_id: deploymentId }
-    })
-  }
-
-  subscribeToInstance(instanceId: string) {
-    this.send({
-      type: 'subscribe_instance',
-      data: { instance_id: instanceId }
-    })
-  }
-
-  private scheduleReconnect() {
+  private scheduleReconnect(): void {
     this.reconnectAttempts++
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1) // Exponential backoff
 
-    console.log(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
+    console.log(`Scheduling WebSocket reconnect attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`)
 
     setTimeout(() => {
       if (this.reconnectAttempts <= this.maxReconnectAttempts) {
-        this.connect().catch((error) => {
-          console.error('Reconnection failed:', error)
+        this.connect().catch(error => {
+          console.error('WebSocket reconnect failed:', error)
         })
       }
     }, delay)
   }
 
-  private startPing() {
-    this.pingInterval = setInterval(() => {
-      this.send({ type: 'ping' })
+  private startPing(): void {
+    this.pingInterval = window.setInterval(() => {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.send({ type: 'ping' })
+      }
     }, 30000) // Ping every 30 seconds
   }
 
-  private stopPing() {
+  private stopPing(): void {
     if (this.pingInterval) {
       clearInterval(this.pingInterval)
       this.pingInterval = null
@@ -159,16 +201,23 @@ export class WebSocketService {
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN
   }
 
-  get connectionState(): string {
-    if (!this.ws) return 'disconnected'
+  get connectionState(): number {
+    return this.ws?.readyState ?? WebSocket.CLOSED
+  }
 
-    switch (this.ws.readyState) {
-      case WebSocket.CONNECTING: return 'connecting'
-      case WebSocket.OPEN: return 'connected'
-      case WebSocket.CLOSING: return 'closing'
-      case WebSocket.CLOSED: return 'closed'
-      default: return 'unknown'
-    }
+  // Specific message senders for backward compatibility
+  subscribeToDeployment(deploymentId: string): boolean {
+    return this.send({
+      type: 'subscribe_deployment',
+      data: { deployment_id: deploymentId }
+    })
+  }
+
+  subscribeToInstance(instanceId: string): boolean {
+    return this.send({
+      type: 'subscribe_instance',
+      data: { instance_id: instanceId }
+    })
   }
 }
 

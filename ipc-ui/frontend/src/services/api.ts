@@ -1,10 +1,10 @@
 import axios, { type AxiosInstance, type AxiosResponse, AxiosError } from 'axios'
-import { API_CONFIG, API_ENDPOINTS, OPERATION_TIMEOUTS } from '../config/api'
+import { STATIC_API_CONFIG, API_ENDPOINTS, OPERATION_TIMEOUTS, getNetworkHeaders } from '../config/api'
 
 // Create axios instance
 const api: AxiosInstance = axios.create({
-  baseURL: API_CONFIG.baseURL,
-  timeout: API_CONFIG.timeout,
+  baseURL: STATIC_API_CONFIG.baseURL,
+  timeout: STATIC_API_CONFIG.timeout,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -12,7 +12,7 @@ const api: AxiosInstance = axios.create({
 
 // Create a separate instance for blockchain operations with longer timeout
 const blockchainApi: AxiosInstance = axios.create({
-  baseURL: API_CONFIG.baseURL,
+  baseURL: STATIC_API_CONFIG.baseURL,
   timeout: OPERATION_TIMEOUTS.blockchain,
   headers: {
     'Content-Type': 'application/json',
@@ -21,7 +21,7 @@ const blockchainApi: AxiosInstance = axios.create({
 
 // Create instance for deployment operations with even longer timeout
 const deploymentApi: AxiosInstance = axios.create({
-  baseURL: API_CONFIG.baseURL,
+  baseURL: STATIC_API_CONFIG.baseURL,
   timeout: OPERATION_TIMEOUTS.deployment,
   headers: {
     'Content-Type': 'application/json',
@@ -30,23 +30,72 @@ const deploymentApi: AxiosInstance = axios.create({
 
 // Create instance for approval operations
 const approvalApi: AxiosInstance = axios.create({
-  baseURL: API_CONFIG.baseURL,
+  baseURL: STATIC_API_CONFIG.baseURL,
   timeout: OPERATION_TIMEOUTS.approval,
   headers: {
     'Content-Type': 'application/json',
   },
 })
 
+// Function to add network headers to all axios instances
+const addNetworkHeaders = () => {
+  const networkHeaders = getNetworkHeaders()
+
+  // Update headers for all instances
+  Object.assign(api.defaults.headers, networkHeaders)
+  Object.assign(blockchainApi.defaults.headers, networkHeaders)
+  Object.assign(deploymentApi.defaults.headers, networkHeaders)
+  Object.assign(approvalApi.defaults.headers, networkHeaders)
+}
+
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
+    // Add network headers to each request
+    const networkHeaders = getNetworkHeaders()
+    Object.assign(config.headers, networkHeaders)
+
     console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`)
+    if (Object.keys(networkHeaders).length > 0) {
+      console.log('Network Headers:', networkHeaders)
+    }
     return config
   },
   (error) => {
     console.error('API Request Error:', error)
     return Promise.reject(error)
   }
+)
+
+// Add request interceptors to other instances as well
+blockchainApi.interceptors.request.use(
+  (config) => {
+    const networkHeaders = getNetworkHeaders()
+    Object.assign(config.headers, networkHeaders)
+    console.log(`Blockchain API Request: ${config.method?.toUpperCase()} ${config.url}`)
+    return config
+  },
+  (error) => Promise.reject(error)
+)
+
+deploymentApi.interceptors.request.use(
+  (config) => {
+    const networkHeaders = getNetworkHeaders()
+    Object.assign(config.headers, networkHeaders)
+    console.log(`Deployment API Request: ${config.method?.toUpperCase()} ${config.url}`)
+    return config
+  },
+  (error) => Promise.reject(error)
+)
+
+approvalApi.interceptors.request.use(
+  (config) => {
+    const networkHeaders = getNetworkHeaders()
+    Object.assign(config.headers, networkHeaders)
+    console.log(`Approval API Request: ${config.method?.toUpperCase()} ${config.url}`)
+    return config
+  },
+  (error) => Promise.reject(error)
 )
 
 // Response interceptor
@@ -72,13 +121,13 @@ api.interceptors.response.use(
 )
 
 // Retry function for failed requests
-const retryRequest = async (fn: () => Promise<any>, attempts = API_CONFIG.retryAttempts): Promise<any> => {
+const retryRequest = async (fn: () => Promise<any>, attempts = STATIC_API_CONFIG.retryAttempts): Promise<any> => {
   try {
     return await fn()
   } catch (error) {
     if (attempts > 0 && axios.isAxiosError(error) && error.code !== 'ERR_CANCELED') {
-      console.log(`Retrying request in ${API_CONFIG.retryDelay}ms... (${API_CONFIG.retryAttempts - attempts + 1}/${API_CONFIG.retryAttempts})`)
-      await new Promise(resolve => setTimeout(resolve, API_CONFIG.retryDelay))
+      console.log(`Retrying request in ${STATIC_API_CONFIG.retryDelay}ms... (${STATIC_API_CONFIG.retryAttempts - attempts + 1}/${STATIC_API_CONFIG.retryAttempts})`)
+      await new Promise(resolve => setTimeout(resolve, STATIC_API_CONFIG.retryDelay))
       return retryRequest(fn, attempts - 1)
     }
     throw error
