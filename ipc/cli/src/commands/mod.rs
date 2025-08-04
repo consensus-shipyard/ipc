@@ -7,6 +7,7 @@ mod config;
 mod crossmsg;
 // mod daemon;
 mod deploy;
+mod node;
 mod subnet;
 mod util;
 mod validator;
@@ -35,6 +36,7 @@ use std::str::FromStr;
 
 use crate::commands::config::ConfigCommandsArgs;
 use crate::commands::deploy::{DeployCommand, DeployCommandArgs};
+use crate::commands::node::NodeCommandsArgs;
 use crate::commands::validator::ValidatorCommandsArgs;
 use crate::commands::wallet::WalletCommandsArgs;
 use crate::CommandLineHandler;
@@ -56,13 +58,15 @@ enum Commands {
     Util(UtilCommandsArgs),
     Validator(ValidatorCommandsArgs),
     Deploy(DeployCommandArgs),
+    Node(NodeCommandsArgs),
 }
 
 #[derive(Debug, Parser)]
 #[command(
     name = "ipc-agent",
-    about = "The IPC agent command line tool",
-    version = "v0.0.1"
+    about = "The IPC agent command line tool for managing subnets, validators, and cross-messages",
+    version = "v0.0.1",
+    after_help = "For detailed information about contract errors, see: https://github.com/consensus-shipyard/ipc/blob/main/docs/ipc/contract-errors.md"
 )]
 #[command(propagate_version = true, arg_required_else_help = true)]
 struct IPCAgentCliCommands {
@@ -134,7 +138,9 @@ pub async fn cli() -> anyhow::Result<()> {
     } else {
         let global = &args.global_params;
         if let Some(c) = &args.command {
-            default_subscriber();
+            if !matches!(c, Commands::Node(_)) {
+                default_subscriber();
+            }
 
             let r = match &c {
                 // Commands::Daemon(args) => LaunchDaemon::handle(global, args).await,
@@ -146,6 +152,7 @@ pub async fn cli() -> anyhow::Result<()> {
                 Commands::Util(args) => args.handle(global).await,
                 Commands::Validator(args) => args.handle(global).await,
                 Commands::Deploy(args) => DeployCommand::handle(global, args).await,
+                Commands::Node(args) => args.handle(global).await,
             };
 
             r.with_context(|| format!("error processing command {:?}", args.command))

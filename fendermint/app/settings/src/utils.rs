@@ -35,11 +35,16 @@ macro_rules! home_relative {
 /// * relative to the configured `--home-dir` directory, e.g. "foo/bar"
 pub fn expand_path(home_dir: &Path, path: &Path) -> PathBuf {
     if path.starts_with("/") {
+        // Absolute path - use as-is
         PathBuf::from(path)
     } else if path.starts_with("~") {
+        // Tilde-prefixed path - expand relative to system $HOME
         expand_tilde(path)
     } else {
-        expand_tilde(home_dir.join(path))
+        // Relative path - join with the configured home directory
+        // First expand the home_dir in case it contains ~
+        let expanded_home = expand_tilde(home_dir);
+        expanded_home.join(path)
     }
 }
 
@@ -139,7 +144,7 @@ pub(crate) mod tests {
 
     use crate::utils::find_vars;
 
-    use super::{expand_tilde, interpolate_vars};
+    use super::{expand_path, expand_tilde, interpolate_vars};
 
     /// Set some env vars, run a fallible piece of code, then unset the variables otherwise they would affect the next test.
     pub fn with_env_vars<F, T, E>(vars: Vec<(&str, &str)>, f: F) -> Result<T, E>
@@ -163,6 +168,39 @@ pub(crate) mod tests {
         assert_eq!(expand_tilde("~/.project"), home_project);
         assert_eq!(expand_tilde("/foo/bar"), PathBuf::from("/foo/bar"));
         assert_eq!(expand_tilde("~foo/bar"), PathBuf::from("~foo/bar"));
+    }
+
+    #[test]
+    fn test_expand_path() {
+        use std::path::Path;
+
+        let home_dir = Path::new("/custom/home");
+
+        // Test absolute path - should use as-is
+        assert_eq!(
+            expand_path(home_dir, Path::new("/absolute/path")),
+            PathBuf::from("/absolute/path")
+        );
+
+        // Test tilde path - should expand to system home
+        let system_home = std::env::var("HOME").expect("HOME should be set");
+        assert_eq!(
+            expand_path(home_dir, Path::new("~/tilde/path")),
+            PathBuf::from(format!("{}/tilde/path", system_home))
+        );
+
+        // Test relative path - should be relative to provided home_dir
+        assert_eq!(
+            expand_path(home_dir, Path::new("relative/path")),
+            PathBuf::from("/custom/home/relative/path")
+        );
+
+        // Test with tilde in home_dir itself
+        let home_with_tilde = Path::new("~/custom");
+        assert_eq!(
+            expand_path(home_with_tilde, Path::new("data")),
+            PathBuf::from(format!("{}/custom/data", system_home))
+        );
     }
 
     #[test]

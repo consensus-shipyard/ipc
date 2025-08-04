@@ -20,6 +20,10 @@ The original idea of IPC is presented in these [paper](https://research.protocol
 
 The current specification draft is available [here](https://github.com/consensus-shipyard/IPC-design-reference-spec/blob/main/main.pdf).
 
+## Contract Errors Reference
+
+For a comprehensive reference of all possible contract errors and how to resolve them, see [docs/ipc/contract-errors.md](../docs/ipc/contract-errors.md). This document provides detailed information about error types, when they occur, and how to fix them.
+
 # Deploying IPC Solidity contracts
 
 Before deploying the contract, you'll need to configure the `RPC_URL` and `PRIVATE_KEY` environmental variables
