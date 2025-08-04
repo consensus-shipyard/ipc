@@ -20,9 +20,10 @@ use include_dir::{include_dir, Dir};
 // Import actual IPC CLI functions for real deployment
 use crate::commands::subnet::create::{create_subnet as create_subnet_cmd, SubnetCreateConfig};
 
-use crate::commands::subnet::init::ipc_config_store::IpcConfigStore;
+use crate::ipc_config_store::IpcConfigStore;
 use crate::get_ipc_provider;
 use crate::GlobalArguments;
+use ipc_provider::config::Config;
 use ipc_api::subnet::{PermissionMode, AssetKind};
 use ipc_api::subnet_id::SubnetID;
 use ethers::types::Address as EthAddress;
@@ -1462,7 +1463,7 @@ impl UIServer {
             __network: None,
         };
 
-        let ipc_config_store = match IpcConfigStore::load_or_init(&global).await {
+        let ipc_config_store: Option<IpcConfigStore> = match IpcConfigStore::load_or_init(&global).await {
             Ok(store) => Some(store),
             Err(e) => {
                 log::debug!("Failed to get IPC config store: {}, using provider only", e);
@@ -1892,7 +1893,7 @@ impl UIServer {
     async fn get_subnet_permission_mode(&self, _provider: &IpcProvider, subnet_id: &SubnetID) -> Result<String> {
         use ipc_actors_abis::subnet_actor_getter_facet;
         use ethers::providers::{Http, Provider};
-        use crate::commands::subnet::init::ipc_config_store::IpcConfigStore;
+        use crate::ipc_config_store::IpcConfigStore;
 
         // Get parent subnet
         let parent = subnet_id.parent().ok_or_else(|| anyhow!("Subnet has no parent"))?;
@@ -2716,7 +2717,7 @@ async fn deploy_new_gateway_contracts(config: &serde_json::Value, ipc_config_sto
         .ok_or_else(|| anyhow::anyhow!("Parent subnet '{}' not found in config store", parent_id))?;
 
     // Get the base config for keystore creation
-    let base_config = Arc::new(ipc_config_store.snapshot().await);
+    let base_config: Arc<Config> = Arc::new(ipc_config_store.snapshot().await);
 
     log::info!("📋 Gateway deployment parameters:");
     log::info!("   - Deployer: {}", from_address);

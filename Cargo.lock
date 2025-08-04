@@ -5878,6 +5878,7 @@ dependencies = [
  "ipc-provider",
  "ipc-types",
  "ipc-wallet",
+ "ipc_actors_abis",
  "ipc_ipld_resolver",
  "libp2p",
  "libsecp256k1",
@@ -13102,3 +13103,8 @@ dependencies = [
  "cc",
  "pkg-config",
 ]
+
+[[patch.unused]]
+name = "yamux"
+version = "0.13.4"
+source = "git+https://github.com/paritytech/yamux?tag=yamux-v0.13.4#3f9e8c3649ba4215937c9d6344f729ff97c747c2"
