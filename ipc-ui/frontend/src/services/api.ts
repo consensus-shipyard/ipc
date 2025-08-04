@@ -184,7 +184,7 @@ export const apiService = {
   },
 
   async discoverGateways() {
-    return retryRequest(() => api.get(API_ENDPOINTS.discoverGateways))
+    return retryRequest(() => api.post(API_ENDPOINTS.discoverGateways))
   },
 
   // Contracts

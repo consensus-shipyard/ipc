@@ -1,167 +1,39 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
-//! UI service command for starting the web interface backend
 
-use crate::{CommandLineHandler, GlobalArguments};
-use anyhow::{anyhow, Result};
-use async_trait::async_trait;
-use clap::Args;
-use serde::{Deserialize, Serialize};
+//! UI module for the IPC CLI
+//!
+//! This module provides a web-based user interface for managing IPC operations.
+
+use anyhow::Result;
+use clap::{Args, Subcommand};
 use std::collections::HashMap;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
-mod server;
-mod api;
-mod websocket;
+pub mod api;
+pub mod server;
+pub mod services;
+pub mod websocket;
 
-use server::UIServer;
+/// Import the simplified server function
+pub use server::start_ui_server;
 
-/// The UI service command
-pub struct UICommand;
+/// WebSocket client handle
+pub type WebSocketClient = std::sync::Arc<tokio::sync::Mutex<futures_util::stream::SplitSink<warp::ws::WebSocket, warp::ws::Message>>>;
 
-#[async_trait]
-impl CommandLineHandler for UICommand {
-    type Arguments = UICommandArgs;
-
-    async fn handle(global: &GlobalArguments, args: &Self::Arguments) -> Result<()> {
-        log::info!("Starting IPC UI service...");
-        log::info!("Frontend: http://{}:{}", args.host, args.port);
-        log::info!("Backend API: http://{}:{}", args.host, args.backend_port);
-        log::info!("WebSocket: ws://{}:{}/ws", args.host, args.backend_port);
-
-        // Create the UI server
-        let mut server = UIServer::new(
-            args.host.clone(),
-            args.port,
-            args.backend_port,
-            args.mode.clone(),
-            global.config_path(),
-        )?;
-
-        // Start the server
-        server.start().await?;
-
-        // Open browser if requested
-        if !args.no_browser {
-            let url = format!("http://{}:{}", args.host, args.port);
-            if let Err(e) = open_browser(&url) {
-                log::warn!("Failed to open browser: {}", e);
-                log::info!("Please open {} in your browser", url);
-            }
-        }
-
-        log::info!("UI service started successfully");
-        log::info!("Press Ctrl+C to stop");
-
-        // Keep the service running
-        tokio::signal::ctrl_c().await?;
-        log::info!("Shutting down UI service...");
-
-        Ok(())
-    }
-}
-
-#[derive(Debug, Args)]
-#[command(name = "ui", about = "Start the IPC web UI service")]
-pub struct UICommandArgs {
-    /// Host to bind to
-    #[arg(long, default_value = "127.0.0.1", help = "Host address to bind to")]
-    pub host: String,
-
-    /// Port for the frontend server
-    #[arg(long, default_value = "3000", help = "Port for the frontend server")]
-    pub port: u16,
-
-    /// Port for the backend API server
-    #[arg(long, default_value = "3001", help = "Port for the backend API server")]
-    pub backend_port: u16,
-
-    /// Deployment mode
-    #[arg(long, default_value = "development", help = "Deployment mode (development, testnet, mainnet)")]
-    pub mode: String,
-
-    /// Don't automatically open browser
-    #[arg(long, help = "Don't automatically open browser")]
-    pub no_browser: bool,
-}
-
-/// Deployment modes for different network configurations
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum DeploymentMode {
-    Development,
-    Testnet,
-    Mainnet,
-}
-
-impl std::str::FromStr for DeploymentMode {
-    type Err = anyhow::Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "development" | "dev" => Ok(DeploymentMode::Development),
-            "testnet" | "test" => Ok(DeploymentMode::Testnet),
-            "mainnet" | "main" => Ok(DeploymentMode::Mainnet),
-            _ => Err(anyhow!("Invalid deployment mode: {}", s)),
-        }
-    }
-}
-
-/// Gateway information for tracking deployed gateways
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GatewayInfo {
+/// Deployment state tracking
+#[derive(Debug, Clone)]
+pub struct DeploymentState {
     pub id: String,
-    pub name: String,
-    pub gateway_address: String,
-    pub registry_address: String,
-    pub deployer_address: String,
-    pub parent_network: String,
-    pub deployed_at: chrono::DateTime<chrono::Utc>,
-    pub status: String, // "active", "inactive", "unknown"
-    pub subnets_created: u32,
-    pub description: Option<String>,
-}
-
-impl GatewayInfo {
-    pub fn new(
-        gateway_address: String,
-        registry_address: String,
-        deployer_address: String,
-        parent_network: String,
-        name: Option<String>,
-    ) -> Self {
-        let id = format!("gw-{}", gateway_address.chars().take(8).collect::<String>());
-        let default_name = format!("Gateway ({}...)", gateway_address.chars().take(8).collect::<String>());
-
-        Self {
-            id,
-            name: name.unwrap_or(default_name),
-            gateway_address,
-            registry_address,
-            deployer_address,
-            parent_network,
-            deployed_at: chrono::Utc::now(),
-            status: "active".to_string(),
-            subnets_created: 0,
-            description: None,
-        }
-    }
-
-    /// Convert to JSON format suitable for contracts API
-    pub fn to_json(&self) -> serde_json::Value {
-        serde_json::json!({
-            "id": format!("gateway-{}", self.id),
-            "name": self.name,
-            "type": "gateway",
-            "address": self.gateway_address,
-            "deployer": self.deployer_address,
-            "network": self.parent_network,
-            "deployed_at": self.deployed_at,
-            "status": if self.status == "active" { "active" } else { "inactive" },
-            "description": self.description,
-            "subnets_created": self.subnets_created,
-            "actions": ["inspect", "configure", "approve-subnets"]
-        })
-    }
+    pub template: String,
+    pub status: String,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub config: serde_json::Value,
+    pub progress: u8,
+    pub step: String,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
 /// Shared application state
@@ -169,113 +41,60 @@ impl GatewayInfo {
 pub struct AppState {
     pub config_path: String,
     pub mode: DeploymentMode,
-    pub instances: Arc<Mutex<HashMap<String, SubnetInstance>>>,
-    pub websocket_clients: Arc<Mutex<Vec<WebSocketClient>>>,
     pub deployments: Arc<Mutex<HashMap<String, DeploymentState>>>,
-    pub deployed_gateways: Arc<Mutex<HashMap<String, GatewayInfo>>>,
-    pub subnet_metadata: Arc<Mutex<HashMap<String, SubnetMetadata>>>,
+    pub instances: Arc<Mutex<HashMap<String, serde_json::Value>>>,
+    pub websocket_clients: Arc<Mutex<Vec<WebSocketClient>>>,
+    pub deployed_gateways: Arc<Mutex<HashMap<String, serde_json::Value>>>,
+    pub subnet_metadata: Arc<Mutex<HashMap<String, serde_json::Value>>>,
 }
 
-/// Deployment state tracking
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DeploymentState {
-    pub id: String,
-    pub template: String,
-    pub config: serde_json::Value,
-    pub status: String,
-    pub current_step: String,
-    pub progress: u8,
-    pub message: Option<String>,
-    pub error: Option<String>,
-    pub started_at: chrono::DateTime<chrono::Utc>,
-    pub updated_at: chrono::DateTime<chrono::Utc>,
+/// Deployment mode for the UI
+#[derive(Debug, Clone)]
+pub enum DeploymentMode {
+    Development,
+    Production,
 }
 
-impl DeploymentState {
-    pub fn new(id: String, template: String, config: serde_json::Value) -> Self {
-        let now = chrono::Utc::now();
-        Self {
-            id,
-            template,
-            config,
-            status: "started".to_string(),
-            current_step: "validate".to_string(),
-            progress: 0,
-            message: Some("Deployment initiated".to_string()),
-            error: None,
-            started_at: now,
-            updated_at: now,
+/// UI command arguments
+#[derive(Debug, Args)]
+pub struct UICommandArgs {
+    /// Address to bind the UI server to (default: 127.0.0.1)
+    #[clap(long, default_value = "127.0.0.1")]
+    pub address: String,
+
+    /// Port to bind the UI server to (default: 3000)
+    #[clap(long, default_value = "3000")]
+    pub port: u16,
+
+    /// Configuration file path
+    #[clap(long)]
+    pub config_path: Option<String>,
+}
+
+/// UI subcommand
+#[derive(Debug, Subcommand)]
+pub enum UICommand {
+    /// Start the UI server
+    Start,
+}
+
+/// Run the UI command
+pub async fn run_ui_command(
+    global: crate::GlobalArguments,
+    command: UICommand,
+    args: UICommandArgs,
+) -> Result<()> {
+    match command {
+        UICommand::Start => {
+            let ip: IpAddr = args.address.parse()
+                .unwrap_or_else(|_| IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
+            let addr = SocketAddr::new(ip, args.port);
+
+            let config_path = args.config_path
+                .or(global.config_path)
+                .unwrap_or_else(|| "~/.ipc".to_string());
+
+            start_ui_server(config_path, addr).await
         }
     }
-
-    pub fn update_progress(&mut self, step: String, progress: u8, status: String, message: Option<String>) {
-        self.current_step = step;
-        self.progress = progress;
-        self.status = status;
-        self.message = message;
-        self.updated_at = chrono::Utc::now();
-    }
-
-    pub fn set_error(&mut self, error: String) {
-        self.status = "failed".to_string();
-        self.error = Some(error);
-        self.updated_at = chrono::Utc::now();
-    }
-}
-
-/// Subnet instance data
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SubnetInstance {
-    pub id: String,
-    pub name: String,
-    pub status: String,
-    pub template: String,
-    pub parent: String,
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    pub validators: Vec<ValidatorInfo>,
-    pub config: serde_json::Value,
-}
-
-/// Subnet metadata for persistent storage
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SubnetMetadata {
-    pub id: String,
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    pub name: Option<String>,
-    pub template: Option<String>,
-}
-
-/// Validator information
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ValidatorInfo {
-    pub address: String,
-    pub stake: String,
-    pub power: u64,
-    pub status: String,
-}
-
-/// WebSocket client connection
-#[derive(Debug)]
-pub struct WebSocketClient {
-    pub id: String,
-    pub sender: tokio::sync::mpsc::UnboundedSender<warp::ws::Message>,
-}
-
-/// Open browser utility function
-fn open_browser(url: &str) -> Result<()> {
-    #[cfg(target_os = "macos")]
-    {
-        std::process::Command::new("open").arg(url).spawn()?;
-    }
-    #[cfg(target_os = "linux")]
-    {
-        std::process::Command::new("xdg-open").arg(url).spawn()?;
-    }
-    #[cfg(target_os = "windows")]
-    {
-        std::process::Command::new("cmd")
-            .args(&["/c", "start", url])
-            .spawn()?;
-    }
-    Ok(())
 }

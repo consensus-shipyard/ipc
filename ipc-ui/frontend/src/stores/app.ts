@@ -1,0 +1,108 @@
+import { defineStore } from 'pinia'
+import { ref, computed, readonly } from 'vue'
+import { useNetworkStore } from './network'
+import { useSubnetsStore } from './subnets'
+import { useGatewaysStore } from './gateways'
+
+interface AppLoadingState {
+  isInitializing: boolean
+  hasInitialized: boolean
+  initializationError: string | null
+}
+
+export const useAppStore = defineStore('app', () => {
+  // State
+  const loadingState = ref<AppLoadingState>({
+    isInitializing: false,
+    hasInitialized: false,
+    initializationError: null
+  })
+
+  // Get other stores
+  const networkStore = useNetworkStore()
+  const subnetsStore = useSubnetsStore()
+  const gatewaysStore = useGatewaysStore()
+
+  // Computed
+  const isLoading = computed(() =>
+    loadingState.value.isInitializing ||
+    subnetsStore.loading ||
+    gatewaysStore.loading
+  )
+
+  const hasError = computed(() =>
+    loadingState.value.initializationError ||
+    subnetsStore.error ||
+    gatewaysStore.error
+  )
+
+  // Actions
+  const initializeApp = async (force = false) => {
+    // Don't initialize again if already done and not forced
+    if (loadingState.value.hasInitialized && !force) {
+      return
+    }
+
+    try {
+      loadingState.value.isInitializing = true
+      loadingState.value.initializationError = null
+
+      console.log('[AppStore] Starting app initialization...')
+
+      // Initialize network store first (this is fast - just localStorage)
+      await networkStore.initializeNetworks()
+
+      // Then fetch data in parallel for better performance
+      console.log('[AppStore] Fetching initial data...')
+      await Promise.all([
+        subnetsStore.fetchSubnets(force),
+        gatewaysStore.fetchGateways(force)
+      ])
+
+      loadingState.value.hasInitialized = true
+      console.log('[AppStore] App initialization completed successfully')
+
+    } catch (error: any) {
+      console.error('[AppStore] App initialization failed:', error)
+      loadingState.value.initializationError = error.message || 'Failed to initialize app'
+    } finally {
+      loadingState.value.isInitializing = false
+    }
+  }
+
+  const refreshAllData = async () => {
+    console.log('[AppStore] Refreshing all data...')
+
+    try {
+      // Refresh all data stores in parallel
+      await Promise.all([
+        subnetsStore.refreshSubnets(),
+        gatewaysStore.refreshGateways()
+      ])
+
+      console.log('[AppStore] Data refresh completed')
+    } catch (error: any) {
+      console.error('[AppStore] Data refresh failed:', error)
+    }
+  }
+
+  const clearCache = () => {
+    console.log('[AppStore] Clearing all cached data...')
+    loadingState.value.hasInitialized = false
+    // The individual stores will clear their own caches when fetched next time
+  }
+
+  return {
+    // State
+    loadingState: readonly(loadingState),
+
+    // Computed
+    isLoading,
+    hasError,
+
+    // Actions
+    initializeApp,
+    refreshAllData,
+    clearCache
+  }
+})

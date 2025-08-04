@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useSubnetsStore } from '@/stores/subnets'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { apiService } from '../../services/api'
@@ -47,8 +48,10 @@ const currentNavigationItems = computed(() => {
   }))
 })
 
+// Stores
+const subnetsStore = useSubnetsStore()
+
 // Real subnet data state
-const recentSubnets = ref<any[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 const systemStatus = ref({
@@ -62,26 +65,11 @@ const deployedGateways = ref<any[]>([])
 const gatewaysLoading = ref(false)
 const gatewaysError = ref<string | null>(null)
 
-// Fetch real subnet data
-const fetchRecentSubnets = async () => {
-  try {
-    loading.value = true
-    error.value = null
+// Get recent subnets from store
+const recentSubnets = computed(() => subnetsStore.recentSubnets)
 
-    const response = await apiService.getInstances()
-    if (response.data) {
-      // Get the 5 most recent subnets for the sidebar
-      recentSubnets.value = response.data
-        .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-        .slice(0, 5)
-    }
-  } catch (err: any) {
-    console.error('Error fetching recent subnets:', err)
-    error.value = err?.message || 'Failed to load subnets'
-  } finally {
-    loading.value = false
-  }
-}
+// Fetch real subnet data
+const fetchRecentSubnets = () => subnetsStore.fetchSubnets()
 
 // Fetch system status
 const fetchSystemStatus = async () => {
@@ -202,11 +190,9 @@ const icons = {
 
 // Lifecycle
 onMounted(async () => {
-  await Promise.all([
-    fetchRecentSubnets(),
-    fetchSystemStatus()
-  ])
-  // fetchDeployedGateways is now redundant since fetchSystemStatus handles gateway discovery
+  // Data fetching is now handled by the centralized app store
+  // Just fetch system status which is sidebar-specific
+  await fetchSystemStatus()
 })
 </script>
 

@@ -1,9 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
-//! WebSocket message handling for the UI service
-//!
-//! This module contains WebSocket message types and handlers
-//! for real-time communication with the frontend.
+//! WebSocket message types and connection state
 
 use serde::{Deserialize, Serialize};
 

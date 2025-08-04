@@ -1,23 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { apiService } from '../services/api'
-
-interface SubnetInstance {
-  id: string
-  name: string
-  status: string
-  template: string
-  parent: string
-  created_at: string
-  validators: Array<{
-    address: string
-    stake: string
-    power: number
-    status: string
-  }>
-  config: Record<string, any>
-}
+import { useNetworkStore } from '../stores/network'
+import { useSubnetsStore, type SubnetInstance } from '../stores/subnets'
 
 interface SubnetNode {
   subnet: SubnetInstance
@@ -25,30 +10,21 @@ interface SubnetNode {
   depth: number
 }
 
+// Stores
+const subnetsStore = useSubnetsStore()
+const networkStore = useNetworkStore()
+
 // State
-const subnets = ref<SubnetInstance[]>([])
-const loading = ref(true)
-const error = ref<string | null>(null)
 const expandedNodes = ref<Set<string>>(new Set())
 const viewMode = ref<'hierarchy' | 'list'>('hierarchy')
 
-// Methods
-const fetchSubnets = async () => {
-  try {
-    loading.value = true
-    error.value = null
+// Use store data instead of local state
+const subnets = computed(() => subnetsStore.filteredSubnets)
+const loading = computed(() => subnetsStore.loading)
+const error = computed(() => subnetsStore.error)
 
-    const response = await apiService.getInstances()
-    if (response.data) {
-      subnets.value = response.data
-    }
-  } catch (err: any) {
-    console.error('Error fetching subnets:', err)
-    error.value = err?.message || 'Failed to load subnets'
-  } finally {
-    loading.value = false
-  }
-}
+// Methods
+const fetchSubnets = () => subnetsStore.fetchSubnets()
 
 // Build hierarchical tree structure
 const subnetTree = computed(() => {
@@ -174,9 +150,10 @@ const getIndentStyle = (depth: number) => {
 }
 
 // Lifecycle
-onMounted(() => {
-  fetchSubnets()
-})
+// Data fetching is now handled by the centralized app store
+// onMounted(() => {
+//   fetchSubnets() // Removed - handled by app store
+// })
 </script>
 
 <template>

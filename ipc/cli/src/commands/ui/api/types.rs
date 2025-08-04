@@ -1,9 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
-//! API endpoints for the UI service
-//!
-//! This module will contain specific API endpoint implementations
-//! that can be shared between different server implementations.
+//! API type definitions for the UI service
 
 use serde::{Deserialize, Serialize};
 
@@ -98,4 +95,47 @@ pub struct TestTransactionResponse {
     pub network: String, // Which network the transaction was sent to
 }
 
-// Future API implementations will go here
+/// Wallet address information for UI selection
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct WalletAddress {
+    pub address: String,
+    pub wallet_type: String, // "evm" or "fvm"
+    pub pubkey: Option<String>, // For EVM addresses, used in validator selection
+    pub balance: Option<String>, // Balance in the current subnet context
+    pub custom_label: Option<String>, // User-defined name for the address
+    pub is_default: bool, // Whether this is the default address for this wallet type
+}
+
+/// Gateway information
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct GatewayInfo {
+    pub id: String,
+    pub address: String,
+    pub registry_address: String,
+    pub deployer_address: String,
+    pub parent_network: String,
+    pub name: Option<String>,
+    pub subnet_count: u64,
+    pub is_active: bool,
+    pub deployed_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// Subnet metadata for tracking
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SubnetMetadata {
+    pub id: String,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub name: Option<String>,
+    pub template: Option<String>,
+}
+
+/// Error types for better error handling
+#[derive(Debug)]
+pub struct InvalidRequest(pub String);
+
+impl warp::reject::Reject for InvalidRequest {}
+
+#[derive(Debug)]
+pub struct ServerError(pub String);
+
+impl warp::reject::Reject for ServerError {}

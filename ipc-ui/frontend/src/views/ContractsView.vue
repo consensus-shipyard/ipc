@@ -1,109 +1,43 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { apiService } from '../services/api'
+import { useGatewaysStore, type ContractInfo } from '../stores/gateways'
+import { useNetworkStore } from '../stores/network'
 
-interface ContractInfo {
-  id: string
-  name: string
-  type: 'gateway' | 'registry' | 'subnet' | 'other'
-  address: string
-  deployer: string
-  network: string
-  deployed_at: string
-  status: 'active' | 'inactive' | 'unknown'
-  version?: string
-  description?: string
-  subnets_created?: number
-  actions?: string[]
-}
+// Stores
+const gatewaysStore = useGatewaysStore()
+const networkStore = useNetworkStore()
 
 // State
-const contracts = ref<ContractInfo[]>([])
-const loading = ref(true)
-const error = ref<string | null>(null)
 const selectedContract = ref<ContractInfo | null>(null)
 const showInspectModal = ref(false)
 const filterType = ref<string>('all')
 const filterNetwork = ref<string>('all')
 const searchQuery = ref<string>('')
 
+// Use store data instead of local state
+const allContracts = computed(() => gatewaysStore.contracts)
+const loading = computed(() => gatewaysStore.loading)
+const error = computed(() => gatewaysStore.error)
+
 // Methods
-const fetchContracts = async () => {
-  try {
-    console.log('[ContractsView] Starting contract fetch...')
-    loading.value = true
-    error.value = null
-
-    // Discover gateways first to ensure we have the most up-to-date and deduplicated list
-    console.log('[ContractsView] Discovering gateways...')
-    const gatewaysResponse = await apiService.discoverGateways()
-    const gateways = gatewaysResponse.data || []
-    console.log(`[ContractsView] Found ${gateways.length} gateways from discovery`)
-
-    // Transform gateways into contract format
-    console.log('[ContractsView] Transforming gateways into contracts...')
-    const gatewayContracts: ContractInfo[] = gateways.map((gateway: any) => {
-      console.log(`[ContractsView] Processing gateway: ${gateway.id} - ${gateway.name}`)
-      return {
-        id: `gateway-${gateway.id}`,
-        name: gateway.name || `Gateway (${gateway.gateway_address.slice(0, 8)}...)`,
-        type: 'gateway' as const,
-        address: gateway.gateway_address,
-        deployer: gateway.deployer_address,
-        network: gateway.parent_network,
-        deployed_at: gateway.deployed_at,
-        status: gateway.status === 'active' ? 'active' as const : 'inactive' as const,
-        description: gateway.description,
-        subnets_created: gateway.subnets_created || 0,
-        actions: ['inspect', 'configure', 'approve-subnets']
-      }
-    })
-
-    // Also create registry contracts from the same data
-    console.log('[ContractsView] Creating registry contracts from gateways...')
-    const registryContracts: ContractInfo[] = gateways.map((gateway: any) => {
-      console.log(`[ContractsView] Creating registry for gateway: ${gateway.id}`)
-      return {
-        id: `registry-${gateway.id}`,
-        name: `Registry (${gateway.registry_address.slice(0, 8)}...)`,
-        type: 'registry' as const,
-        address: gateway.registry_address,
-        deployer: gateway.deployer_address,
-        network: gateway.parent_network,
-        deployed_at: gateway.deployed_at,
-        status: gateway.status === 'active' ? 'active' as const : 'inactive' as const,
-        description: `Registry contract for ${gateway.name}`,
-        actions: ['inspect', 'configure']
-      }
-    })
-
-    // Combine all contracts
-    contracts.value = [...gatewayContracts, ...registryContracts]
-    console.log(`[ContractsView] Created ${gatewayContracts.length} gateway contracts and ${registryContracts.length} registry contracts`)
-  } catch (err: any) {
-    console.error('Error fetching contracts:', err)
-    error.value = err?.message || 'Failed to load contracts'
-  } finally {
-    loading.value = false
-  }
-}
+const fetchContracts = () => gatewaysStore.fetchGateways()
 
 // Computed properties
 const uniqueNetworks = computed(() => {
-  const networks = new Set(contracts.value.map(c => c.network))
+  const networks = new Set(allContracts.value.map(c => c.network))
   return Array.from(networks).sort()
 })
 
 const filteredContracts = computed(() => {
-  let filtered = contracts.value
+  let filtered = allContracts.value
 
   // Filter by type
   if (filterType.value !== 'all') {
     filtered = filtered.filter(c => c.type === filterType.value)
   }
 
-  // Filter by network
+  // Filter by network (this is redundant now since store already filters by network)
   if (filterNetwork.value !== 'all') {
     filtered = filtered.filter(c => c.network === filterNetwork.value)
   }
@@ -123,18 +57,18 @@ const filteredContracts = computed(() => {
 })
 
 const contractTypeStats = computed(() => {
-  const stats = contracts.value.reduce((acc, contract) => {
+  const stats = allContracts.value.reduce((acc, contract) => {
     acc[contract.type] = (acc[contract.type] || 0) + 1
     return acc
   }, {} as Record<string, number>)
 
   return {
-    total: contracts.value.length,
+    total: allContracts.value.length,
     gateway: stats.gateway || 0,
     registry: stats.registry || 0,
     subnet: stats.subnet || 0,
     other: stats.other || 0,
-    active: contracts.value.filter(c => c.status === 'active').length
+    active: allContracts.value.filter((c: ContractInfo) => c.status === 'active').length
   }
 })
 
@@ -224,9 +158,10 @@ const upgradeContract = (contract: ContractInfo) => {
 }
 
 // Lifecycle
-onMounted(() => {
-  fetchContracts()
-})
+// Data fetching is now handled by the centralized app store
+// onMounted(() => {
+//   fetchContracts() // Removed - handled by app store
+// })
 </script>
 
 <template>
@@ -411,12 +346,12 @@ onMounted(() => {
                 d="M9 12h6m-6 4h6M7 20l4-16m6 16l-4-16" />
         </svg>
         <h3 class="text-lg font-medium text-gray-900 mb-2">
-          {{ contracts.length === 0 ? 'No contracts found' : 'No contracts match your filters' }}
+          {{ allContracts.length === 0 ? 'No contracts found' : 'No contracts match your filters' }}
         </h3>
         <p class="text-gray-600 mb-6">
-          {{ contracts.length === 0 ? 'Deploy your first gateway to get started' : 'Try adjusting your search or filters' }}
+          {{ allContracts.length === 0 ? 'Deploy your first gateway to get started' : 'Try adjusting your search or filters' }}
         </p>
-        <RouterLink v-if="contracts.length === 0" to="/wizard" class="btn-primary">
+        <RouterLink v-if="allContracts.length === 0" to="/wizard" class="btn-primary">
           Deploy Your First Gateway
         </RouterLink>
         <button v-else @click="searchQuery = ''; filterType = 'all'; filterNetwork = 'all'" class="btn-secondary">

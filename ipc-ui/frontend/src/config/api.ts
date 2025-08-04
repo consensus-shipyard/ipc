@@ -55,7 +55,7 @@ export const API_ENDPOINTS = {
   instance: (id: string) => `/api/instance?id=${encodeURIComponent(id)}`,
   gateways: '/api/gateways',
   gateway: (id: string) => `/api/gateways/${id}`,
-  discoverGateways: '/api/gateways-discover',
+  discoverGateways: '/api/gateways/discover',
   // Subnet statistics endpoints
   subnetStats: (id: string) => `/api/subnet/${encodeURIComponent(id)}/stats`,
   subnetStatus: (id: string) => `/api/subnet/${encodeURIComponent(id)}/status`,

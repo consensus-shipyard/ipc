@@ -46,91 +46,110 @@ export const useNetworkStore = defineStore('network', () => {
   const availableNetworks = computed(() => networks.value)
 
   // Actions
-  const initializeNetworks = () => {
+  const initializeNetworks = async () => {
     // Load networks from localStorage or use defaults
     const savedNetworks = localStorage.getItem('ipc-networks')
     const savedSelectedId = localStorage.getItem('ipc-selected-network')
 
     if (savedNetworks) {
       try {
-        networks.value = JSON.parse(savedNetworks)
+        const parsed = JSON.parse(savedNetworks)
+        if (Array.isArray(parsed)) {
+          networks.value = parsed
+        }
       } catch (error) {
-        console.warn('Failed to parse saved networks, using defaults:', error)
+        console.error('Failed to parse saved networks:', error)
         networks.value = [...DEFAULT_NETWORKS]
       }
     } else {
       networks.value = [...DEFAULT_NETWORKS]
     }
 
+    // Set selected network
     if (savedSelectedId && networks.value.find(n => n.id === savedSelectedId)) {
       selectedNetworkId.value = savedSelectedId
     } else {
-      // Select first network as default
-      selectedNetworkId.value = networks.value[0]?.id || ''
+      selectedNetworkId.value = networks.value[0]?.id || DEFAULT_NETWORKS[0].id
     }
+
+    console.log('[NetworkStore] Networks initialized')
   }
+
+  // Initialize on store creation
+  initializeNetworks()
 
   const selectNetwork = (networkId: string) => {
     const network = networks.value.find(n => n.id === networkId)
     if (network) {
       selectedNetworkId.value = networkId
       localStorage.setItem('ipc-selected-network', networkId)
+      return true
     }
+    return false
   }
 
   const addNetwork = (network: Omit<Network, 'id'>) => {
+    const errors = validateNetwork(network)
+    if (errors.length > 0) {
+      throw new Error(errors.join(', '))
+    }
+
+    // Generate unique ID
+    const id = `custom-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`
     const newNetwork: Network = {
       ...network,
-      id: `custom-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id,
       isDefault: false
     }
 
     networks.value.push(newNetwork)
     saveNetworks()
-
-    return newNetwork.id
+    return newNetwork
   }
 
-  const updateNetwork = (networkId: string, updates: Partial<Omit<Network, 'id' | 'isDefault'>>) => {
-    const index = networks.value.findIndex(n => n.id === networkId)
-    if (index !== -1) {
-      // Don't allow updating default networks' core properties
-      if (networks.value[index].isDefault) {
-        // Only allow updating name for default networks
-        if (updates.name) {
-          networks.value[index].name = updates.name
-        }
-      } else {
-        networks.value[index] = { ...networks.value[index], ...updates }
+  const updateNetwork = (id: string, updates: Partial<Network>) => {
+    const networkIndex = networks.value.findIndex(n => n.id === id)
+    if (networkIndex === -1) return false
+
+    const network = networks.value[networkIndex]
+
+    // Don't allow updating default networks' core properties
+    if (network.isDefault) {
+      const allowedUpdates = { name: updates.name }
+      Object.assign(network, allowedUpdates)
+    } else {
+      // Validate the updated network
+      const updatedNetwork = { ...network, ...updates }
+      const errors = validateNetwork(updatedNetwork)
+      if (errors.length > 0) {
+        throw new Error(errors.join(', '))
       }
-      saveNetworks()
-      return true
+      Object.assign(network, updates)
     }
-    return false
+
+    saveNetworks()
+    return true
   }
 
-  const removeNetwork = (networkId: string) => {
-    const network = networks.value.find(n => n.id === networkId)
+  const removeNetwork = (id: string) => {
+    const network = networks.value.find(n => n.id === id)
+    if (!network) return false
 
     // Don't allow removing default networks
-    if (network?.isDefault) {
-      return false
+    if (network.isDefault) {
+      throw new Error('Cannot remove default networks')
     }
 
-    const index = networks.value.findIndex(n => n.id === networkId)
-    if (index !== -1) {
-      networks.value.splice(index, 1)
+    networks.value = networks.value.filter(n => n.id !== id)
 
-      // If the removed network was selected, select the first available network
-      if (selectedNetworkId.value === networkId) {
-        selectedNetworkId.value = networks.value[0]?.id || ''
-        localStorage.setItem('ipc-selected-network', selectedNetworkId.value)
-      }
-
-      saveNetworks()
-      return true
+    // If the removed network was selected, select the first available
+    if (selectedNetworkId.value === id) {
+      selectedNetworkId.value = networks.value[0]?.id || DEFAULT_NETWORKS[0].id
+      localStorage.setItem('ipc-selected-network', selectedNetworkId.value)
     }
-    return false
+
+    saveNetworks()
+    return true
   }
 
   const resetToDefaults = () => {
@@ -182,9 +201,6 @@ export const useNetworkStore = defineStore('network', () => {
       n.name.toLowerCase() === name.toLowerCase() && n.id !== excludeId
     )
   }
-
-  // Initialize on store creation
-  initializeNetworks()
 
   return {
     // State
