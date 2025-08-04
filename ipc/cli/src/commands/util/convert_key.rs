@@ -4,9 +4,8 @@
 
 use async_trait::async_trait;
 use clap::Args;
-use ethers::core::k256::ecdsa::SigningKey;
-use ethers::core::utils::keccak256;
-use hex;
+use ethers::types::H160;
+use ipc_types::{PrivateKey, KeyFormat, EthAddress};
 use std::fmt::Debug;
 
 use crate::{CommandLineHandler, GlobalArguments};
@@ -17,50 +16,25 @@ pub(crate) struct ConvertKey;
 impl CommandLineHandler for ConvertKey {
     type Arguments = ConvertKeyArgs;
 
-        async fn handle(_global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
-        // Remove 0x prefix if present
-        let key_hex = arguments.private_key.strip_prefix("0x").unwrap_or(&arguments.private_key);
+    async fn handle(_global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
+        // Parse the private key using the new type-safe approach
+        let private_key = PrivateKey::from_hex(&arguments.private_key)?;
 
-        // Decode hex to bytes
-        let private_key_bytes = hex::decode(key_hex)
-            .map_err(|e| anyhow::anyhow!("Failed to decode private key: {}", e))?;
+        // Generate public key in the requested format
+        let format = if arguments.compressed { KeyFormat::Compressed } else { KeyFormat::Uncompressed };
+        let public_key = private_key.public_key(format);
 
-        // Parse as secp256k1 secret key using ethers k256 for better public key handling
-        let signing_key = SigningKey::from_slice(&private_key_bytes)
-            .map_err(|e| anyhow::anyhow!("Failed to parse private key: {}", e))?;
-
-        let verifying_key = signing_key.verifying_key();
-
-        if arguments.compressed {
-            // Output compressed public key (33 bytes)
-            let compressed_point = verifying_key.to_encoded_point(true);
-            let public_key_hex = hex::encode(compressed_point.as_bytes());
-            println!("0x{}", public_key_hex);
-        } else {
-            // Output uncompressed public key (65 bytes) - default
-            let uncompressed_point = verifying_key.to_encoded_point(false);
-            let public_key_hex = hex::encode(uncompressed_point.as_bytes());
-            println!("0x{}", public_key_hex);
-        }
+        // Print the public key
+        println!("{}", public_key.to_hex());
 
         // Optionally show Ethereum address
         if arguments.show_address {
-            let uncompressed_point = verifying_key.to_encoded_point(false);
-            let public_key_bytes = uncompressed_point.as_bytes();
-            let eth_address = ethereum_address_from_public_key(&public_key_bytes[1..]);
-            println!("Ethereum Address: 0x{}", hex::encode(eth_address));
+            let eth_address: EthAddress = private_key.into();
+            println!("Ethereum Address: {:#x}", H160::from(eth_address.0));
         }
 
         Ok(())
     }
-}
-
-/// Calculate Ethereum address from uncompressed public key (without 0x04 prefix)
-fn ethereum_address_from_public_key(public_key_bytes: &[u8]) -> [u8; 20] {
-    let hash = keccak256(public_key_bytes);
-    let mut address = [0u8; 20];
-    address.copy_from_slice(&hash[12..]);
-    address
 }
 
 #[derive(Debug, Args)]

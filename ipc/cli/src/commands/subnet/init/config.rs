@@ -10,27 +10,18 @@ pub(crate) use crate::commands::subnet::{
 };
 pub(crate) use crate::commands::wallet::import::WalletImportArgs;
 
-use anyhow::ensure;
-use ethers::{types::H160, utils::keccak256};
+use ethers::types::H160;
 use fs_err as fs;
-use hex::FromHex;
 use ipc_api::subnet::PermissionMode;
+use ipc_types::{PublicKey, EthAddress};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 /// Convert an uncompressed secp256k1 public key (0x04-prefixed) into an Ethereum address
 fn public_key_to_address(hex_str: &str) -> anyhow::Result<H160> {
-    let key = hex_str
-        .strip_prefix("0x")
-        .or_else(|| hex_str.strip_prefix("0X"))
-        .unwrap_or(hex_str);
-    let bytes = Vec::from_hex(key).map_err(|e| anyhow::anyhow!("Invalid public key hex: {}", e))?;
-    ensure!(
-        bytes.len() == 65 && bytes[0] == 0x04,
-        "Expected 65-byte uncompressed key starting with 0x04"
-    );
-    let hash = keccak256(&bytes[1..]);
-    Ok(H160::from_slice(&hash[12..]))
+    let public_key = PublicKey::from_hex(hex_str)?;
+    let eth_address: EthAddress = public_key.into();
+    Ok(H160::from(eth_address.0))
 }
 
 /// Config for setting federated or static validator power
