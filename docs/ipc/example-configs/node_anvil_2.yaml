@@ -1,4 +1,4 @@
-home:  /Users/philip/.ipc/nodes/anvil_node_2
+home:  /Users/myuser/.ipc/nodes/anvil_node_2
 subnet: /r31337/t410fbspclp5h4scn627bv42ytlqssmbel2fztd6vnzi
 parent: /r31337
 key:
@@ -12,7 +12,7 @@ p2p:
     resolver: 26767
   peers:
     peer-files:
-      - "/Users/philip/.ipc/nodes/anvil_node_2/peer-info-1.json"
+      - "/Users/myuser/.ipc/nodes/anvil_node_2/peer-info-1.json"
 cometbft-overrides: |
   proxy_app = "tcp://127.0.0.1:26758"
   [rpc]
@@ -34,5 +34,5 @@ fendermint-overrides: |
   listen_addr = "/ip4/127.0.0.1/tcp/26757"
 join: null
 genesis: !path
-  genesis: /Users/philip/.ipc/genesis_r31337_t410fbspclp5h4scn627bv42ytlqssmbel2fztd6vnzi.json
-  sealed: /Users/philip/.ipc/genesis_sealed_r31337_t410fbspclp5h4scn627bv42ytlqssmbel2fztd6vnzi.json
+  genesis: /Users/myuser/.ipc/genesis_r31337_t410fbspclp5h4scn627bv42ytlqssmbel2fztd6vnzi.json
+  sealed: /Users/myuser/.ipc/genesis_sealed_r31337_t410fbspclp5h4scn627bv42ytlqssmbel2fztd6vnzi.json
