@@ -319,8 +319,14 @@ where
     fn maybe_update_app_state(
         &self,
         gas_market: &Reading,
+        light_client_commitments: Option<LightClientCommitments>,
     ) -> Result<Option<TendermintConsensusParams>> {
         let mut state = self.committed_state()?;
+
+        if let Some(commitment) = light_client_commitments {
+            state.light_client_commitments = Some(commitment);
+        }
+
         let current = state
             .app_state
             .state_params
@@ -890,7 +896,7 @@ where
         let EndBlockResponse {
             power_updates,
             gas_market,
-            events,
+            light_client_commitments,
         } = response;
 
         // Convert the incoming power updates to Tendermint validator updates.
@@ -904,16 +910,13 @@ where
 
         // Maybe update the app state with the new block gas limit.
         let consensus_param_updates = self
-            .maybe_update_app_state(&gas_market)
+            .maybe_update_app_state(&gas_market, light_client_commitments)
             .context("failed to update block gas limit")?;
 
         let ret = response::EndBlock {
             validator_updates,
             consensus_param_updates,
-            events: events
-                .into_iter()
-                .flat_map(|(stamped, emitters)| to_events("event", stamped, emitters))
-                .collect::<Vec<_>>(),
+            events: vec![],
         };
 
         Ok(ret)

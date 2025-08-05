@@ -10,7 +10,7 @@ use ethers::abi::{AbiEncode, Tokenizable};
 use fendermint_vm_genesis::{Power, Validator};
 use fvm_ipld_blockstore::Blockstore;
 use ipc_actors_abis::checkpointing_facet as checkpoint;
-use ipc_actors_abis::checkpointing_facet::{Commitment, FvmAddress, Ipcaddress, SubnetID};
+use ipc_actors_abis::checkpointing_facet::{FvmAddress, Ipcaddress, SubnetID};
 use ipc_actors_abis::gateway_getter_facet::gateway_getter_facet;
 use ipc_api::checkpoint::{abi_encode_envelope, abi_encode_envelope_fields};
 use ipc_api::merkle::MerkleGen;
@@ -27,23 +27,55 @@ pub struct PowerTable(pub Vec<Validator<Power>>);
 #[derive(Debug, Clone, Default)]
 pub struct PowerUpdates(pub Vec<Validator<Power>>);
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MessageBatchCommitment {
     pub total_num_msgs: u64,
     pub msgs_root: [u8; 32],
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LightClientCommitments {
     pub msg_batch_commitment: MessageBatchCommitment,
     pub validator_next_configuration_number: u64,
     pub activity_commitment: [u8; 32],
 }
 
+pub struct EndBlockOutcome {
+    pub light_client_commitments: LightClientCommitments,
+    pub power_updates: PowerUpdates
+}
+
+#[derive(Clone, Default)]
+pub struct EndBlockManager<DB>
+where
+    DB: Blockstore + Clone + 'static + Send + Sync,
+{
+    // Gateway caller for IPC gateway interactions
+    gateway_caller: GatewayCaller<DB>,
+}
+
+impl<DB> EndBlockManager<DB>
+where
+    DB: Blockstore + Clone + 'static + Send + Sync,
+{
+    pub fn new() -> Self {
+        Self {
+            gateway_caller: GatewayCaller::default(),
+        }
+    }
+
+    pub fn trigger_end_block_hook(
+        &self,
+        state: &mut FvmExecState<DB>,
+    ) -> anyhow::Result<Option<EndBlockOutcome>> {
+        ipc_end_block_hook(&self.gateway_caller, state)
+    }
+}
+
 pub fn ipc_end_block_hook<DB>(
     gateway: &GatewayCaller<DB>,
     state: &mut FvmExecState<DB>,
-) -> anyhow::Result<Option<(LightClientCommitments, PowerUpdates)>>
+) -> anyhow::Result<Option<EndBlockOutcome>>
 where
     DB: Blockstore + Sync + Send + Clone + 'static,
 {
@@ -119,7 +151,8 @@ where
         validator_next_configuration_number: next_configuration_number,
         activity_commitment: ethers::utils::keccak256(activity_commitment.encode()),
     };
-    Ok(Some((commitments, power_updates)))
+
+    Ok(Some(EndBlockOutcome { light_client_commitments: commitments, power_updates }))
 }
 
 fn convert_envelopes(msgs: Vec<gateway_getter_facet::IpcEnvelope>) -> Vec<checkpoint::IpcEnvelope> {

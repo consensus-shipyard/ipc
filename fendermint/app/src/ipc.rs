@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! IPC related execution
 
-use crate::app::{AppState, AppStoreKey, SubnetAppState};
+use crate::app::{AppStoreKey, SubnetAppState};
 use crate::{App, BlockHeight};
 use ethers::abi::AbiEncode;
 use fendermint_storage::{Codec, Encode, KVReadable, KVStore, KVWritable};
