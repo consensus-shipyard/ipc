@@ -7,7 +7,12 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use ethers_contract::{ContractError, EthLogDecode, LogMeta};
-use ipc_actors_abis::{checkpointing_facet, gateway_getter_facet, gateway_manager_facet, lib_gateway, lib_power_change_log, lib_quorum, register_subnet_facet, subnet_actor_activity_facet, subnet_actor_checkpoint_facet, subnet_actor_checkpointing_facet, subnet_actor_getter_facet, subnet_actor_manager_facet, subnet_actor_reward_facet};
+use ipc_actors_abis::{
+    checkpointing_facet, gateway_getter_facet, gateway_manager_facet, lib_gateway,
+    lib_power_change_log, lib_quorum, register_subnet_facet, subnet_actor_activity_facet,
+    subnet_actor_checkpoint_facet, subnet_actor_checkpointing_facet, subnet_actor_getter_facet,
+    subnet_actor_manager_facet, subnet_actor_reward_facet,
+};
 use ipc_api::evm::{fil_to_eth_amount, payload_to_evm_address, subnet_id_to_evm_addresses};
 use ipc_api::validator::from_contract_validators;
 use reqwest::header::HeaderValue;
@@ -37,6 +42,7 @@ use ethers::signers::{LocalWallet, Wallet};
 use ethers::types::{Bytes, Eip1559TransactionRequest, ValueOrArray, H256, U256};
 
 use super::gas_estimator_middleware::Eip1559GasEstimatorMiddleware;
+use crate::manager::cometbft::SignedHeader;
 use crate::manager::evm::error_parsing::ErrorParserHttp;
 use ethers::middleware::Middleware;
 use fvm_shared::clock::ChainEpoch;
@@ -57,7 +63,6 @@ use ipc_observability::lazy_static;
 use ipc_wallet::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
 use num_traits::ToPrimitive;
 use std::result;
-use crate::manager::cometbft::SignedHeader;
 
 pub type SignerWithFeeEstimatorMiddleware =
     Eip1559GasEstimatorMiddleware<SignerMiddleware<Provider<ErrorParserHttp>, Wallet<SigningKey>>>;
@@ -877,7 +882,10 @@ impl SubnetManager for EthSubnetManager {
         })
     }
 
-    async fn list_waiting_validators(&self, subnet: &SubnetID) -> Result<Vec<(Address, ValidatorInfo)>> {
+    async fn list_waiting_validators(
+        &self,
+        subnet: &SubnetID,
+    ) -> Result<Vec<(Address, ValidatorInfo)>> {
         let address = contract_address_from_subnet(subnet)?;
         let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
             address,
@@ -906,7 +914,10 @@ impl SubnetManager for EthSubnetManager {
         Ok(addresses.into_iter().zip(validators).collect())
     }
 
-    async fn list_subnet_active_validators(&self, subnet: &SubnetID) -> Result<Vec<(Address, ValidatorInfo)>> {
+    async fn list_subnet_active_validators(
+        &self,
+        subnet: &SubnetID,
+    ) -> Result<Vec<(Address, ValidatorInfo)>> {
         let address = contract_address_from_subnet(subnet)?;
         let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
             address,
@@ -1476,16 +1487,19 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
 
 #[async_trait]
 impl SignedHeaderRelayer for EthSubnetManager {
-    async fn submit_signed_header(&self, submitter: &Address, subnet_id: &SubnetID, header: SignedHeader) -> Result<ChainEpoch> {
+    async fn submit_signed_header(
+        &self,
+        submitter: &Address,
+        subnet_id: &SubnetID,
+        header: SignedHeader,
+    ) -> Result<ChainEpoch> {
         let bytes = ethers::abi::encode(header.into_tokens().as_slice());
 
         let address = contract_address_from_subnet(subnet_id)?;
 
         let signer = Arc::new(self.get_signer_with_fee_estimator(submitter)?);
-        let contract = subnet_actor_checkpoint_facet::SubnetActorCheckpointFacet::new(
-            address,
-            signer.clone(),
-        );
+        let contract =
+            subnet_actor_checkpoint_facet::SubnetActorCheckpointFacet::new(address, signer.clone());
         let call = contract.submit_signed_header(Bytes::from(bytes));
         let call = extend_call_with_pending_block(call).await?;
 
@@ -1530,7 +1544,10 @@ impl SignedHeaderRelayer for EthSubnetManager {
         Ok(epoch as ChainEpoch)
     }
 
-    async fn list_active_validators(&self, subnet: &SubnetID) -> Result<Vec<(Address, ValidatorInfo)>> {
+    async fn list_active_validators(
+        &self,
+        subnet: &SubnetID,
+    ) -> Result<Vec<(Address, ValidatorInfo)>> {
         self.list_subnet_active_validators(subnet).await
     }
 }

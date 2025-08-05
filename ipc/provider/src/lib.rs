@@ -35,12 +35,12 @@ use std::{
 use zeroize::Zeroize;
 
 pub mod checkpoint;
+mod checkpoint_v2;
 pub mod config;
 pub mod jsonrpc;
 pub mod lotus;
 pub mod manager;
 pub mod observe;
-mod checkpoint_v2;
 
 const DEFAULT_REPO_PATH: &str = ".ipc";
 const DEFAULT_CONFIG_NAME: &str = "config.toml";

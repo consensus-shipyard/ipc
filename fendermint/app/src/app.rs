@@ -35,6 +35,8 @@ use fendermint_vm_interpreter::types::{
 };
 use fendermint_vm_interpreter::MessagesInterpreter;
 
+use crate::ipc::derive_subnet_app_hash;
+use fendermint_vm_interpreter::fvm::end_block_hook::LightClientCommitments;
 use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_snapshot::{SnapshotClient, SnapshotError};
 use fvm::engine::MultiEngine;
@@ -71,6 +73,14 @@ pub enum AppError {
     NotInitialized = 54,
 }
 
+/// The application state extended with subnet light client commitment
+#[derive(Serialize, Deserialize)]
+pub struct SubnetAppState {
+    app_state: AppState,
+    /// Only certain block height will trigger light client commitment payload
+    light_client_commitments: Option<LightClientCommitments>,
+}
+
 /// The application state record we keep a history of in the database.
 #[derive(Serialize, Deserialize)]
 pub struct AppState {
@@ -80,6 +90,19 @@ pub struct AppState {
     oldest_state_height: BlockHeight,
     /// Last committed version of the evolving state of the FVM.
     state_params: FvmStateParams,
+}
+
+impl SubnetAppState {
+    pub fn app_hash(&self) -> tendermint::hash::AppHash {
+        derive_subnet_app_hash(self)
+    }
+    pub fn state_params(&self) -> &FvmStateParams {
+        &self.app_state.state_params
+    }
+
+    pub fn light_client_commitments(&self) -> Option<&LightClientCommitments> {
+        self.light_client_commitments.as_ref()
+    }
 }
 
 impl AppState {
@@ -166,7 +189,7 @@ where
 impl<DB, BS, KV, MI> App<DB, BS, KV, MI>
 where
     KV: KVStore
-        + Codec<AppState>
+        + Codec<SubnetAppState>
         + Encode<AppStoreKey>
         + Encode<BlockHeight>
         + Codec<FvmStateParams>,
@@ -203,7 +226,7 @@ where
 impl<DB, BS, KV, MI> App<DB, BS, KV, MI>
 where
     KV: KVStore
-        + Codec<AppState>
+        + Codec<SubnetAppState>
         + Encode<AppStoreKey>
         + Encode<BlockHeight>
         + Codec<FvmStateParams>,
@@ -223,7 +246,7 @@ where
             let mut state_tree = empty_state_tree(self.state_store_clone())
                 .context("failed to create empty state tree")?;
             let state_root = state_tree.flush()?;
-            let state = AppState {
+            let app_state = AppState {
                 block_height: 0,
                 oldest_state_height: 0,
                 state_params: FvmStateParams {
@@ -238,20 +261,24 @@ where
                     consensus_params: None,
                 },
             };
+            let state = SubnetAppState {
+                app_state,
+                light_client_commitments: None,
+            };
             self.set_committed_state(state)?;
         }
         Ok(())
     }
 
     /// Get the last committed state, if exists.
-    fn get_committed_state(&self) -> Result<Option<AppState>> {
+    fn get_committed_state(&self) -> Result<Option<SubnetAppState>> {
         let tx = self.db.read();
         tx.get(&self.namespace, &AppStoreKey::State)
             .context("get failed")
     }
 
     /// Get the last committed state; return error if it doesn't exist.
-    fn committed_state(&self) -> Result<AppState> {
+    fn committed_state(&self) -> Result<SubnetAppState> {
         match self.get_committed_state()? {
             Some(state) => Ok(state),
             None => Err(anyhow!("app state not found")),
@@ -259,22 +286,23 @@ where
     }
 
     /// Set the last committed state.
-    fn set_committed_state(&self, mut state: AppState) -> Result<()> {
+    fn set_committed_state(&self, mut state: SubnetAppState) -> Result<()> {
         self.db
             .with_write(|tx| {
                 // Insert latest state history point at the `block_height + 1`,
                 // to be consistent with how CometBFT queries are supposed to work.
-                let state_height = state.state_height();
+                let state_height = state.app_state.state_height();
 
                 self.state_hist
-                    .put(tx, &state_height, &state.state_params)?;
+                    .put(tx, &state_height, &state.app_state.state_params)?;
 
                 // Prune state history.
                 if self.state_hist_size > 0 && state_height >= self.state_hist_size {
                     let prune_height = state_height.saturating_sub(self.state_hist_size);
-                    while state.oldest_state_height <= prune_height {
-                        self.state_hist.delete(tx, &state.oldest_state_height)?;
-                        state.oldest_state_height += 1;
+                    while state.app_state.oldest_state_height <= prune_height {
+                        self.state_hist
+                            .delete(tx, &state.app_state.oldest_state_height)?;
+                        state.app_state.oldest_state_height += 1;
                     }
                 }
 
@@ -294,6 +322,7 @@ where
     ) -> Result<Option<TendermintConsensusParams>> {
         let mut state = self.committed_state()?;
         let current = state
+            .app_state
             .state_params
             .consensus_params
             .ok_or_else(|| anyhow!("no current consensus params in state"))?;
@@ -305,7 +334,7 @@ where
         // Proceeding with update.
         let mut updated = current;
         updated.block.max_gas = gas_market.block_gas_limit as i64;
-        state.state_params.consensus_params = Some(updated.clone());
+        state.app_state.state_params.consensus_params = Some(updated.clone());
         self.set_committed_state(state)?;
 
         Ok(Some(updated))
@@ -348,13 +377,13 @@ where
         &self,
         height: Option<BlockHeight>,
     ) -> Result<Option<FvmExecState<ReadOnlyBlockstore<Arc<BS>>>>> {
-        let app_state = match self.get_committed_state()? {
+        let state = match self.get_committed_state()? {
             Some(app_state) => app_state,
             None => return Ok(None),
         };
 
-        let block_height = height.unwrap_or(app_state.block_height);
-        let state_params = app_state.state_params;
+        let block_height = height.unwrap_or(state.app_state.block_height);
+        let state_params = state.app_state.state_params;
 
         // wait for block production
         if !Self::can_query_state(block_height, &state_params) {
@@ -396,7 +425,7 @@ where
             }
         }
         let state = self.committed_state()?;
-        Ok((state.state_params, state.block_height))
+        Ok((state.app_state.state_params, state.app_state.block_height))
     }
 
     /// Check whether the state has been initialized by genesis.
@@ -467,7 +496,7 @@ where
 impl<DB, BS, KV, MI> Application for App<DB, BS, KV, MI>
 where
     KV: KVStore
-        + Codec<AppState>
+        + Codec<SubnetAppState>
         + Encode<AppStoreKey>
         + Encode<BlockHeight>
         + Codec<FvmStateParams>,
@@ -480,12 +509,12 @@ where
     async fn info(&self, _request: request::Info) -> AbciResult<response::Info> {
         let state = self.committed_state()?;
 
-        let height = tendermint::block::Height::try_from(state.block_height)?;
+        let height = tendermint::block::Height::try_from(state.app_state.block_height)?;
 
         let info = response::Info {
             data: "fendermint".to_string(),
             version: VERSION.to_owned(),
-            app_version: state.state_params.app_version,
+            app_version: state.app_state.state_params.app_version,
             last_block_height: height,
             last_block_app_hash: state.app_hash(),
         };
@@ -544,7 +573,11 @@ where
             "init chain"
         );
 
-        self.set_committed_state(app_state)?;
+        let state = SubnetAppState {
+            app_state,
+            light_client_commitments: None,
+        };
+        self.set_committed_state(state)?;
 
         Ok(response)
     }
@@ -611,8 +644,8 @@ where
                 FvmExecState::new(
                     ReadOnlyBlockstore::new(db),
                     self.multi_engine.as_ref(),
-                    state.block_height.try_into()?,
-                    state.state_params,
+                    state.app_state.block_height.try_into()?,
+                    state.app_state.state_params,
                 )
                 .context("error creating check state")?
             }
@@ -762,7 +795,7 @@ where
 
         let db = self.state_store_clone();
         let state = self.committed_state()?;
-        let mut state_params = state.state_params.clone();
+        let mut state_params = state.app_state.state_params.clone();
 
         tracing::debug!(
             height = block_height,
@@ -892,8 +925,8 @@ where
 
         // Commit the execution state to the datastore.
         let mut state = self.committed_state()?;
-        state.block_height = exec_state.block_height().try_into()?;
-        state.state_params.timestamp = exec_state.timestamp();
+        state.app_state.block_height = exec_state.block_height().try_into()?;
+        state.app_state.state_params.timestamp = exec_state.timestamp();
 
         let (
             state_root,
@@ -906,14 +939,14 @@ where
             _,
         ) = exec_state.commit().context("failed to commit FVM")?;
 
-        state.state_params.state_root = state_root;
-        state.state_params.app_version = app_version;
-        state.state_params.base_fee = base_fee;
-        state.state_params.circ_supply = circ_supply;
-        state.state_params.power_scale = power_scale;
+        state.app_state.state_params.state_root = state_root;
+        state.app_state.state_params.app_version = app_version;
+        state.app_state.state_params.base_fee = base_fee;
+        state.app_state.state_params.circ_supply = circ_supply;
+        state.app_state.state_params.power_scale = power_scale;
 
         let app_hash = state.app_hash();
-        let block_height = state.block_height;
+        let block_height = state.app_state.block_height;
 
         // Tell CometBFT how much of the block history it can forget.
         let retain_height = if self.state_hist_size == 0 {
@@ -926,7 +959,7 @@ where
             block_height,
             state_root = state_root.to_string(),
             app_hash = app_hash.to_string(),
-            timestamp = state.state_params.timestamp.0,
+            timestamp = state.app_state.state_params.timestamp.0,
             "commit state"
         );
 
@@ -960,7 +993,8 @@ where
         //    CometBFT is going to offer it with the `app_hash` of 901, but in this case that's good, because
         //    that hash reflects the changes made by block 900, which this state param is the result of.
         if let Some(ref snapshots) = self.snapshots {
-            atomically(|| snapshots.notify(block_height, state.state_params.clone())).await;
+            atomically(|| snapshots.notify(block_height, state.app_state.state_params.clone()))
+                .await;
         }
 
         // Commit app state to the datastore.
@@ -1106,8 +1140,8 @@ where
                         let mut state = self.committed_state()?;
 
                         // The height reflects that it was produced in `commit`.
-                        state.block_height = snapshot.manifest.block_height;
-                        state.state_params = snapshot.manifest.state_params;
+                        state.app_state.block_height = snapshot.manifest.block_height;
+                        state.app_state.state_params = snapshot.manifest.state_params;
                         self.set_committed_state(state)?;
 
                         // TODO: We can remove the `current_download` from the STM

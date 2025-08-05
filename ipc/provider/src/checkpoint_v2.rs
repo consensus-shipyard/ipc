@@ -2,23 +2,17 @@
 // SPDX-License-Identifier: MIT
 //! Bottom up checkpoint manager
 
-use ethers::prelude::*;
-
 use crate::config::Subnet;
-use crate::manager::{SignedHeaderRelayer, EthSubnetManager};
+use crate::manager::cometbft::CometbftClient;
+use crate::manager::{EthSubnetManager, SignedHeaderRelayer};
 use anyhow::{anyhow, Result};
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
-use ipc_actors_abis::subnet_actor_checkpointing_facet::Inclusion;
-use ipc_api::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
-use ipc_api::subnet_id::SubnetID;
-use ipc_observability::{emit, serde::HexEncodableBlockHash};
 use ipc_wallet::{EthKeyAddress, PersistentKeyStore};
 use std::cmp::max;
 use std::fmt::{Display, Formatter};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-use crate::manager::cometbft::CometbftClient;
 
 /// Tracks the config required for bottom up checkpoint submissions
 /// parent/child subnet and checkpoint period.
@@ -137,10 +131,14 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManagerV2
             .map_err(|e| {
                 anyhow!("cannot obtain the last bottom up checkpoint height due to: {e:}")
             })?;
-        
+
         let next_checkpoint_epoch = last_checkpoint_epoch + self.metadata.period;
 
-        tracing::info!(last_checkpoint_epoch, next_checkpoint_epoch, "last and next checkpoint submission heights");
+        tracing::info!(
+            last_checkpoint_epoch,
+            next_checkpoint_epoch,
+            "last and next checkpoint submission heights"
+        );
 
         let current_height = self.child_handler.current_epoch().await?;
         let finalized_height = max(1, current_height - self.finalization_blocks);
@@ -151,13 +149,23 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManagerV2
             return Ok(());
         }
 
-        let active_validators = self.parent_handler.list_active_validators(&self.metadata.source.id).await?;
-        let pubkeys = active_validators.iter().map(|(_, info)| info.staking.metadata.as_slice());
+        let active_validators = self
+            .parent_handler
+            .list_active_validators(&self.metadata.source.id)
+            .await?;
+        let pubkeys = active_validators
+            .iter()
+            .map(|(_, info)| info.staking.metadata.as_slice());
 
-        let mut header = self.cometbft_client.fetch_signed_header(next_checkpoint_epoch).await?;
+        let mut header = self
+            .cometbft_client
+            .fetch_signed_header(next_checkpoint_epoch)
+            .await?;
         header.order_commit_against(pubkeys)?;
-        
-        self.parent_handler.submit_signed_header(&submitter, &self.source_subnet().id, header).await?;
+
+        self.parent_handler
+            .submit_signed_header(&submitter, &self.source_subnet().id, header)
+            .await?;
 
         Ok(())
     }
