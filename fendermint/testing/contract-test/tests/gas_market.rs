@@ -14,7 +14,6 @@ use fendermint_vm_actor_interface::gas_market::GAS_MARKET_ACTOR_ADDR;
 use fendermint_vm_actor_interface::system::SYSTEM_ACTOR_ADDR;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Account, Actor, ActorMeta, Genesis, PermissionMode, SignerAddr};
-use fendermint_vm_interpreter::fvm::bottomup::BottomUpManager;
 use fendermint_vm_interpreter::fvm::store::memory::MemoryBlockstore;
 use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeScheduler};
@@ -37,6 +36,7 @@ use lazy_static::lazy_static;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use tendermint_rpc::Client;
+use fendermint_vm_interpreter::fvm::end_block_hook::EndBlockManager;
 
 lazy_static! {
     static ref SECRET: SecretKey = rand_secret_key();
@@ -46,7 +46,7 @@ lazy_static! {
 }
 
 const CHAIN_NAME: &str = "mychain";
-type I = FvmMessagesInterpreter<MemoryBlockstore, NeverCallClient>;
+type I = FvmMessagesInterpreter<MemoryBlockstore>;
 
 // returns a seeded secret key which is guaranteed to be the same every time
 fn rand_secret_key() -> SecretKey {
@@ -64,13 +64,13 @@ async fn tester_with_upgrader(
 ) -> (Tester<I>, PublicKey) {
     let validator = rand_secret_key().public_key();
 
-    let bottom_up_manager = BottomUpManager::new(NeverCallClient, None);
+    let end_block_manager = EndBlockManager::default();
     let finality_provider = Arc::new(Toggle::disabled());
     let vote_tally = VoteTally::empty();
     let top_down_manager = TopDownManager::new(finality_provider, vote_tally);
 
-    let interpreter: FvmMessagesInterpreter<MemoryBlockstore, _> = FvmMessagesInterpreter::new(
-        bottom_up_manager,
+    let interpreter: FvmMessagesInterpreter<MemoryBlockstore,> = FvmMessagesInterpreter::new(
+        end_block_manager,
         top_down_manager,
         upgrade_scheduler,
         false,

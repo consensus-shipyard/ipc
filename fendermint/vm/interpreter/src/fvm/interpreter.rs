@@ -12,10 +12,8 @@ use fvm_ipld_encoding::{self};
 use fvm_shared::{address::Address, error::ExitCode};
 use std::sync::Arc;
 use std::time::Instant;
-use tendermint_rpc::Client as TendermintClient;
 
 use crate::errors::*;
-use crate::fvm::bottomup::{BottomUpManager, PowerUpdates};
 use crate::fvm::gas_estimation::{estimate_gassed_msg, gas_search};
 use crate::fvm::topdown::TopDownManager;
 use crate::fvm::{
@@ -35,7 +33,7 @@ use fvm_shared::state::ActorState;
 use fvm_shared::ActorID;
 use ipc_observability::emit;
 use std::convert::TryInto;
-
+use crate::fvm::end_block_hook::{EndBlockManager, PowerUpdates};
 use crate::fvm::executions::{
     execute_cron_message, execute_signed_message, push_block_to_chainmeta_actor_if_possible,
 };
@@ -47,12 +45,12 @@ struct Actor {
 
 /// Interprets messages as received from the ABCI layer
 #[derive(Clone)]
-pub struct FvmMessagesInterpreter<DB, C>
+pub struct FvmMessagesInterpreter<DB>
 where
     DB: Blockstore + Clone + Send + Sync + 'static,
-    C: TendermintClient + Clone + Send + Sync + 'static,
 {
-    bottom_up_manager: BottomUpManager<DB, C>,
+    end_block_manager: EndBlockManager<DB>,
+
     top_down_manager: TopDownManager<DB>,
     upgrade_scheduler: UpgradeScheduler<DB>,
 
@@ -63,13 +61,12 @@ where
     gas_search_step: f64,
 }
 
-impl<DB, C> FvmMessagesInterpreter<DB, C>
+impl<DB> FvmMessagesInterpreter<DB>
 where
     DB: Blockstore + Clone + Send + Sync + 'static,
-    C: TendermintClient + Clone + Send + Sync + 'static,
 {
     pub fn new(
-        bottom_up_manager: BottomUpManager<DB, C>,
+        end_block_manager: EndBlockManager<DB>,
         top_down_manager: TopDownManager<DB>,
         upgrade_scheduler: UpgradeScheduler<DB>,
         push_block_data_to_chainmeta_actor: bool,
@@ -78,7 +75,7 @@ where
         gas_search_step: f64,
     ) -> Self {
         Self {
-            bottom_up_manager,
+            end_block_manager,
             top_down_manager,
             upgrade_scheduler,
             push_block_data_to_chainmeta_actor,
@@ -197,10 +194,9 @@ where
 }
 
 #[async_trait::async_trait]
-impl<DB, C> MessagesInterpreter<DB> for FvmMessagesInterpreter<DB, C>
+impl<DB> MessagesInterpreter<DB> for FvmMessagesInterpreter<DB>
 where
     DB: Blockstore + Clone + Send + Sync + 'static,
-    C: TendermintClient + Clone + Send + Sync + 'static,
 {
     async fn check_message(
         &self,
@@ -401,15 +397,12 @@ where
             state.activity_tracker().record_block_committed(pubkey)?;
         }
 
-        let checkpoint_outcome = self.bottom_up_manager.create_checkpoint_if_needed(state)?;
+        let maybe_result = self.end_block_manager.trigger_end_block_hook(state)?;
 
-        let (power_updates, block_end_events) = if let Some(outcome) = checkpoint_outcome {
-            self.bottom_up_manager
-                .cast_validator_signatures_for_incomplete_checkpoints(outcome.checkpoint, state)
-                .await?;
-            (outcome.power_updates, outcome.block_end_events)
+        let (power_updates, maybe_commitment) = if let Some(outcome) = maybe_result {
+            (outcome.power_updates, Some(outcome.light_client_commitments))
         } else {
-            (PowerUpdates::default(), BlockEndEvents::default())
+            (PowerUpdates::default(), None)
         };
 
         let next_gas_market = state.finalize_gas_market()?;
@@ -423,7 +416,7 @@ where
         let response = EndBlockResponse {
             power_updates,
             gas_market: next_gas_market,
-            events: block_end_events,
+            light_client_commitments: maybe_commitment,
         };
         Ok(response)
     }

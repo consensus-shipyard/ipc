@@ -11,10 +11,12 @@ import {Bytes} from "tendermint-sol/utils/Bytes.sol";
 
 import {ISubnetActor} from "../../interfaces/ISubnetActor.sol";
 import {ValidatorInfo} from "../../structs/Subnet.sol";
+import {LibPower} from "../LibPower.sol";
+import {LibSubnetActorStorage, SubnetActorStorage} from "../LibSubnetActorStorage.sol";
 
 import {DuplicateValidatorSignaturesFound, SignatureAddressesNotSorted} from "../../errors/IPCErrors.sol";
 
-contract CometbftLightClient {
+library CometbftLightClient {
     using TendermintHelper for SignedHeader.Data;
     using TendermintHelper for Vote.Data;
 
@@ -26,24 +28,15 @@ contract CometbftLightClient {
     error InvalidSignature(bytes32 message, bytes signature, address validator, ECDSA.RecoverError err);
     error NotSigner(bytes32 message, bytes signature, address recovered, address expected);
 
-    string public chainID;
-    ISubnetActor public subnetActor;
-
-    constructor(string memory _chainID, address _subnetActor) {
-        chainID = _chainID;
-        subnetActor = ISubnetActor(_subnetActor);
-    }
-
     /// This method validates the quorum certificate of cometbft pre-commit votes.
-    function verifyValidatorsQuorum(SignedHeader.Data calldata header) external view {
+    function verifyValidatorsQuorum(SignedHeader.Data memory header) internal view {
         checkCommitHash(header);
 
         uint256 totalPower = 0;
         uint256 powerSoFar = 0;
 
-        CommitSig.Data calldata commitSig;
-        string memory _chainID = chainID;
-
+        CommitSig.Data memory commitSig;
+        
         for (uint256 i = 0; i < header.commit.signatures.length; i++) {
             commitSig = header.commit.signatures[i];
             // no need to verify absent or nil votes.
@@ -53,7 +46,7 @@ contract CometbftLightClient {
 
             (uint256 power, address validator) = ensureValidatorSubmission(i, commitSig.validator_address);
 
-            bytes memory message = voteSignBytesDelim(header.commit, _chainID, i);
+            bytes memory message = voteSignBytesDelim(header.commit, LibSubnetActorStorage.appStorage().chainID, i);
             bytes32 messageHash = sha256(message);
 
             ensureValidSignature(messageHash, commitSig.signature, validator);
@@ -66,13 +59,13 @@ contract CometbftLightClient {
         }
     }
 
-    function checkCommitHash(SignedHeader.Data calldata header) internal pure {
+    function checkCommitHash(SignedHeader.Data memory header) internal pure {
         bytes32 expected = header.hash();
         bytes32 actual = toBytes32(header.commit.block_id.hash);
         if (actual != expected) revert InvalidCommitHash(expected, actual);
     }
 
-    function ensureValidSignature(bytes32 messageHash, bytes calldata signature, address validator) internal view {
+    function ensureValidSignature(bytes32 messageHash, bytes memory signature, address validator) internal pure {
         (address recovered, ECDSA.RecoverError ecdsaErr) = verify(messageHash, signature, validator);
 
         if (ecdsaErr != ECDSA.RecoverError.NoError) {
@@ -93,8 +86,8 @@ contract CometbftLightClient {
     }
 
     function ensureValidatorSubmission(uint256 i, bytes memory incomingValidator) internal view returns (uint256 power, address validator) {
-        validator = subnetActor.getActiveValidatorAddressByIndex(uint16(i));
-        ValidatorInfo memory info = subnetActor.getValidator(validator);
+        validator = LibPower.getActiveValidatorAddressByIndex(uint16(i));
+        ValidatorInfo memory info = LibPower.getActiveValidatorInfo(validator);
 
         bytes20 expectedCometbftAccountId = toCometBFTAddress(info.metadata);
 
@@ -113,7 +106,7 @@ contract CometbftLightClient {
     }
 
     function voteSignBytesDelim(
-        Commit.Data calldata commit,
+        Commit.Data memory commit,
         string memory _chainID,
         uint256 idx
     ) internal pure returns (bytes memory) {

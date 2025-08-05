@@ -35,6 +35,7 @@ use std::{
 use zeroize::Zeroize;
 
 pub mod checkpoint;
+mod checkpoint_v2;
 pub mod config;
 pub mod jsonrpc;
 pub mod lotus;

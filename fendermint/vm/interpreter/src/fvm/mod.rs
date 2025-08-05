@@ -17,6 +17,7 @@ pub use interpreter::FvmMessagesInterpreter;
 pub mod bundle;
 
 pub mod activity;
+pub mod end_block_hook;
 pub(crate) mod gas;
 pub(crate) mod gas_estimation;
 

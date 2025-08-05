@@ -1,7 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::fvm::bottomup::PowerUpdates;
 use crate::fvm::FvmMessage;
 use actors_custom_api::gas_market::Reading;
 use cid::Cid;
@@ -10,6 +9,7 @@ use fendermint_vm_message::signed::DomainHash;
 use fvm::executor::ApplyRet;
 use fvm_shared::{address::Address, error::ExitCode, event::StampedEvent, ActorID, MethodNum};
 use std::collections::HashMap;
+use crate::fvm::end_block_hook::{PowerUpdates, LightClientCommitments};
 
 /// Response for checking a transaction.
 /// The check result is expressed by an exit code (and optional info) so that
@@ -90,8 +90,7 @@ pub struct BeginBlockResponse {
 pub struct EndBlockResponse {
     pub power_updates: PowerUpdates,
     pub gas_market: Reading,
-    /// End-block events to be recorded.
-    pub events: BlockEndEvents,
+    pub light_client_commitments: Option<LightClientCommitments>,
 }
 
 /// Response for preparing messages for a block.

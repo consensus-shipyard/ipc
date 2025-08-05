@@ -1,7 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use crate::fvm::PowerUpdates;
 use async_stm::atomically;
 use fendermint_tracing::emit;
 use fendermint_vm_event::ParentFinalityMissingQuorum;
@@ -25,7 +24,7 @@ use fvm_ipld_blockstore::Blockstore;
 
 use crate::types::AppliedMessage;
 use ipc_api::cross::IpcEnvelope;
-
+use crate::fvm::end_block_hook::PowerUpdates;
 use crate::fvm::state::ipc::tokens_to_mint;
 
 type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxyWithLatency>>>;
