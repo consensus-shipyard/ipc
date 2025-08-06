@@ -135,6 +135,10 @@ lazy_static! {
                             name: "SubnetGetterFacet",
                             abi: ia::subnet_getter_facet::SUBNETGETTERFACET_ABI.to_owned(),
                         },
+                        EthFacet {
+                            name: "SubnetActorCheckpointFacet",
+                            abi: ia::subnet_actor_checkpoint_facet::SUBNETACTORCHECKPOINTFACET_ABI.to_owned(),
+                        },
                     ],
                 },
             ),
@@ -188,6 +192,10 @@ lazy_static! {
                         EthFacet {
                             name: "OwnershipFacet",
                             abi: ia::ownership_facet::OWNERSHIPFACET_ABI.to_owned(),
+                        },
+                        EthFacet {
+                            name: "SubnetActorCheckpointFacet",
+                            abi: ia::subnet_actor_checkpoint_facet::SUBNETACTORCHECKPOINTFACET_ABI.to_owned(),
                         },
                     ],
                 },
