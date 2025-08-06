@@ -209,6 +209,11 @@ async fn handle_subnet_stats(
     subnet_id: String,
     state: AppState,
 ) -> Result<impl Reply, warp::Rejection> {
+    // URL decode the subnet_id parameter
+    let decoded_subnet_id = urlencoding::decode(&subnet_id)
+        .map_err(|e| warp::reject::custom(ServerError(format!("Invalid subnet ID encoding: {}", e))))?
+        .to_string();
+
     let global = GlobalArguments {
         config_path: Some(state.config_path.clone()),
         _network: fvm_shared::address::Network::Testnet,
@@ -217,7 +222,7 @@ async fn handle_subnet_stats(
 
     let service = SubnetService::new(global);
 
-    match service.get_subnet_stats(&subnet_id).await {
+    match service.get_subnet_stats(&decoded_subnet_id).await {
         Ok(stats) => Ok(warp::reply::json(&ApiResponse::success(stats))),
         Err(e) => {
             log::error!("Get subnet stats failed: {}", e);
@@ -231,6 +236,11 @@ async fn handle_subnet_status(
     subnet_id: String,
     state: AppState,
 ) -> Result<impl Reply, warp::Rejection> {
+    // URL decode the subnet_id parameter
+    let decoded_subnet_id = urlencoding::decode(&subnet_id)
+        .map_err(|e| warp::reject::custom(ServerError(format!("Invalid subnet ID encoding: {}", e))))?
+        .to_string();
+
     let global = GlobalArguments {
         config_path: Some(state.config_path.clone()),
         _network: fvm_shared::address::Network::Testnet,
@@ -239,7 +249,7 @@ async fn handle_subnet_status(
 
     let service = SubnetService::new(global);
 
-    match service.get_subnet_status(&subnet_id).await {
+    match service.get_subnet_status(&decoded_subnet_id).await {
         Ok(status) => Ok(warp::reply::json(&ApiResponse::success(status))),
         Err(e) => {
             log::error!("Failed to get subnet status: {}", e);

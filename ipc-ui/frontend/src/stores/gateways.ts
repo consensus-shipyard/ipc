@@ -138,10 +138,10 @@ export const useGatewaysStore = defineStore('gateways', () => {
         timeoutPromise
       ]) as any
 
-      if (response.data) {
-        allGateways.value = response.data
+      if (response.data && response.data.data) {
+        allGateways.value = response.data.data
         lastFetch.value = new Date()
-        console.log(`[GatewaysStore] Successfully fetched ${response.data.length} gateways`)
+        console.log(`[GatewaysStore] Successfully fetched ${response.data.data.length} gateways`)
       }
     } catch (err: any) {
       console.error(`[GatewaysStore] Error fetching gateways (attempt ${retryCount + 1}):`, err)

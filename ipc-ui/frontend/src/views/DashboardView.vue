@@ -14,7 +14,7 @@ const approvingSubnets = ref<Set<string>>(new Set())
 const approvalError = ref<string | null>(null)
 
 // Use store data instead of local state
-const subnets = computed(() => subnetsStore.filteredSubnets)
+const subnets = computed(() => subnetsStore.filteredSubnets || [])
 const loading = computed(() => subnetsStore.loading)
 const error = computed(() => subnetsStore.error)
 
@@ -207,8 +207,8 @@ const groupedSubnets = computed(() => {
     subnets,
     count: subnets.length,
     activeCount: subnets.filter(s => s.status === 'active').length,
-    totalValidators: subnets.reduce((sum, s) => sum + s.validators.length, 0),
-    totalStake: subnets.reduce((sum, s) => sum + s.validators.reduce((s: number, v: any) => s + parseFloat(v.stake || '0'), 0), 0)
+    totalValidators: subnets.reduce((sum, s) => sum + s.validators?.length, 0),
+    totalStake: subnets.reduce((sum, s) => sum + s.validators?.reduce((s: number, v: any) => s + parseFloat(v.stake || '0'), 0), 0)
   }))
 })
 
@@ -275,7 +275,7 @@ const copyToClipboard = async (text: string, subnetId: string) => {
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-medium text-gray-600">Total Subnets</p>
-            <p class="text-3xl font-bold text-gray-900">{{ subnets.length }}</p>
+            <p class="text-3xl font-bold text-gray-900">{{ subnets?.length || 0 }}</p>
           </div>
           <div class="w-12 h-12 bg-primary-50 rounded-lg flex items-center justify-center">
             <svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -289,8 +289,8 @@ const copyToClipboard = async (text: string, subnetId: string) => {
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-medium text-gray-600">Active Subnets</p>
-            <p class="text-3xl font-bold text-green-600">
-              {{ subnets.filter(s => s.status === 'active').length }}
+            <p class="text-2xl font-bold text-green-600">
+              {{ subnets?.filter(s => s.status === 'active')?.length || 0 }}
             </p>
           </div>
           <div class="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
@@ -305,8 +305,8 @@ const copyToClipboard = async (text: string, subnetId: string) => {
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-medium text-gray-600">Total Validators</p>
-            <p class="text-3xl font-bold text-gray-900">
-              {{ subnets.reduce((sum, subnet) => sum + subnet.validators.length, 0) }}
+            <p class="text-2xl font-bold text-blue-600">
+              {{ subnets?.reduce((sum, subnet) => sum + (subnet.validators?.length || 0), 0) || 0 }}
             </p>
           </div>
           <div class="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
@@ -322,7 +322,7 @@ const copyToClipboard = async (text: string, subnetId: string) => {
           <div>
             <p class="text-sm font-medium text-gray-600">Total Stake</p>
             <p class="text-3xl font-bold text-purple-600">
-              {{ subnets.reduce((sum, subnet) => sum + subnet.validators.reduce((s: number, v: any) => s + parseFloat(v.stake || '0'), 0), 0).toFixed(1) }} FIL
+              {{ subnets.reduce((sum, subnet) => sum + subnet.validators?.reduce((s: number, v: any) => s + parseFloat(v.stake || '0'), 0), 0).toFixed(1) }} FIL
             </p>
           </div>
           <div class="w-12 h-12 bg-purple-50 rounded-lg flex items-center justify-center">
@@ -369,15 +369,15 @@ const copyToClipboard = async (text: string, subnetId: string) => {
       </div>
 
       <!-- Empty State -->
-      <div v-else-if="subnets.length === 0" class="text-center py-12 text-gray-500">
-        <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 9a2 2 0 00-2 2v2a2 2 0 002 2m0 0h14m-14 0a2 2 0 002 2v2a2 2 0 01-2 2M5 9V7a2 2 0 012-2h10a2 2 0 012 2v2M7 7V5a2 2 0 012-2h6a2 2 0 012 2v2" />
-        </svg>
-        <p class="text-lg font-medium mb-2">No Subnets Found</p>
-        <p class="mb-4">You haven't deployed any subnets yet.</p>
-        <RouterLink to="/wizard" class="btn-primary">
-          Deploy Your First Subnet
-        </RouterLink>
+      <div v-else-if="(subnets?.length || 0) === 0" class="text-center py-12 text-gray-500">
+        <div class="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+          <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+          </svg>
+        </div>
+        <h3 class="text-lg font-medium text-gray-900 mb-2">No Subnets Found</h3>
+        <p class="text-gray-600 mb-6">No subnets are currently deployed in this network.</p>
+        <RouterLink to="/wizard" class="btn-primary">Deploy Your First Subnet</RouterLink>
       </div>
 
       <!-- Gateway-Grouped Subnets -->
@@ -423,7 +423,7 @@ const copyToClipboard = async (text: string, subnetId: string) => {
                     class="text-sm text-gray-600 font-mono hover:bg-gray-200 px-2 py-1 rounded transition-colors"
                     :title="copyingAddress === `gateway-${group.gateway}` ? 'Copied!' : `Click to copy: ${group.gateway}`"
                   >
-                    {{ group.gateway.length > 20 ? `${group.gateway.slice(0, 8)}...${group.gateway.slice(-6)}` : group.gateway }}
+                    {{ (group.gateway?.length || 0) > 20 ? `${group.gateway?.slice(0, 8)}...${group.gateway?.slice(-6)}` : group.gateway || 'N/A' }}
                     <svg v-if="copyingAddress === `gateway-${group.gateway}`" class="inline-block w-3 h-3 ml-1 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                       <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
                     </svg>
@@ -522,11 +522,11 @@ const copyToClipboard = async (text: string, subnetId: string) => {
               <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <p class="text-sm text-gray-500">Validators</p>
-                  <p class="font-semibold text-gray-900">{{ subnet.validators.length }}</p>
+                  <p class="font-semibold text-gray-900">{{ subnet.validators?.length }}</p>
                 </div>
                 <div>
                   <p class="text-sm text-gray-500">Total Stake</p>
-                  <p class="font-semibold text-gray-900">{{ subnet.validators.reduce((s: number, v: any) => s + parseFloat(v.stake || '0'), 0).toFixed(1) }} FIL</p>
+                  <p class="font-semibold text-gray-900">{{ subnet.validators?.reduce((s: number, v: any) => s + parseFloat(v.stake || '0'), 0).toFixed(1) }} FIL</p>
                 </div>
                 <div>
                   <p class="text-sm text-gray-500">Template</p>

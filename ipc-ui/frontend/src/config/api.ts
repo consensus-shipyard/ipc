@@ -57,8 +57,8 @@ export const API_ENDPOINTS = {
   gateway: (id: string) => `/api/gateways/${id}`,
   discoverGateways: '/api/gateways/discover',
   // Subnet statistics endpoints
-  subnetStats: (id: string) => `/api/subnet/${encodeURIComponent(id)}/stats`,
-  subnetStatus: (id: string) => `/api/subnet/${encodeURIComponent(id)}/status`,
+  subnetStats: (id: string) => `/api/subnets/${encodeURIComponent(id)}/stats`,
+  subnetStatus: (id: string) => `/api/subnets/${encodeURIComponent(id)}/status`,
   sendTestTx: (id: string) => `/api/subnet/${encodeURIComponent(id)}/test-transaction`,
   // Validator management endpoints
   validators: {

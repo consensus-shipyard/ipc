@@ -171,11 +171,31 @@ impl SubnetService {
         // Convert subnet configurations to instances
         for (config_subnet_id, subnet_config) in &config.subnets {
             let subnet_id_str = config_subnet_id.to_string();
+
+            // Determine parent from subnet ID
+            let parent = if config_subnet_id.is_root() {
+                // This is a root network, so it has no parent, but for UI purposes we'll use itself
+                subnet_id_str.clone()
+            } else {
+                // This is a subnet, get its parent
+                if let Some(parent_subnet) = config_subnet_id.parent() {
+                    parent_subnet.to_string()
+                } else {
+                    // Fallback: extract from string representation
+                    let parts: Vec<&str> = subnet_id_str.split('/').collect();
+                    if parts.len() >= 2 {
+                        format!("/{}", parts[1]) // e.g., "/r31337" or "/r314159"
+                    } else {
+                        "/r314159".to_string() // fallback
+                    }
+                }
+            };
+
             let instance = serde_json::json!({
                 "id": subnet_id_str,
                 "name": format!("Subnet {}", subnet_id_str),
                 "status": "Active",
-                "parent": "/r314159",
+                "parent": parent,
                 "type": "subnet",
                 "created_at": chrono::Utc::now().to_rfc3339(),
                 "last_updated": chrono::Utc::now().to_rfc3339(),

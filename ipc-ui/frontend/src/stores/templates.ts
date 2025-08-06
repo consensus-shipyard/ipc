@@ -278,6 +278,7 @@ export const useTemplatesStore = defineStore('templates', () => {
 
   // Actions
   const getTemplate = (id: string): Template | undefined => {
+    if (!Array.isArray(templates.value)) return undefined
     return templates.value.find(template => template.id === id)
   }
 

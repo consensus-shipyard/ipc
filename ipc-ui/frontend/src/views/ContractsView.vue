@@ -16,7 +16,7 @@ const filterNetwork = ref<string>('all')
 const searchQuery = ref<string>('')
 
 // Use store data instead of local state
-const allContracts = computed(() => gatewaysStore.contracts)
+const allContracts = computed(() => gatewaysStore.contracts || [])
 const loading = computed(() => gatewaysStore.loading)
 const error = computed(() => gatewaysStore.error)
 
@@ -25,6 +25,7 @@ const fetchContracts = () => gatewaysStore.fetchGateways()
 
 // Computed properties
 const uniqueNetworks = computed(() => {
+  if (!Array.isArray(allContracts.value)) return []
   const networks = new Set(allContracts.value.map(c => c.network))
   return Array.from(networks).sort()
 })
@@ -255,7 +256,7 @@ const upgradeContract = (contract: ContractInfo) => {
           <div class="flex items-center">
             <div class="flex-1">
               <p class="text-sm font-medium text-gray-600">Networks</p>
-              <p class="text-2xl font-bold text-gray-900">{{ uniqueNetworks.length }}</p>
+              <p class="text-2xl font-bold text-gray-900">{{ uniqueNetworks?.length || 0 }}</p>
             </div>
             <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
               <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -340,23 +341,20 @@ const upgradeContract = (contract: ContractInfo) => {
       </div>
 
       <!-- Empty State -->
-      <div v-else-if="filteredContracts.length === 0" class="text-center py-12 bg-white rounded-lg shadow-sm">
-        <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M9 12h6m-6 4h6M7 20l4-16m6 16l-4-16" />
+      <div v-else-if="(filteredContracts?.length || 0) === 0" class="text-center py-12 bg-white rounded-lg shadow-sm">
+        <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
-        <h3 class="text-lg font-medium text-gray-900 mb-2">
-          {{ allContracts.length === 0 ? 'No contracts found' : 'No contracts match your filters' }}
-        </h3>
-        <p class="text-gray-600 mb-6">
-          {{ allContracts.length === 0 ? 'Deploy your first gateway to get started' : 'Try adjusting your search or filters' }}
+        <h3 class="text-lg font-medium text-gray-900 mb-2">No Contracts Found</h3>
+        <p class="text-gray-600 mb-4">
+          {{ (allContracts?.length || 0) === 0 ? 'No contracts found' : 'No contracts match your filters' }}
         </p>
-        <RouterLink v-if="allContracts.length === 0" to="/wizard" class="btn-primary">
-          Deploy Your First Gateway
+        <p class="text-gray-500 text-sm">
+          {{ (allContracts?.length || 0) === 0 ? 'Deploy your first gateway to get started' : 'Try adjusting your search or filters' }}
+        </p>
+        <RouterLink v-if="(allContracts?.length || 0) === 0" to="/wizard" class="btn-primary">
+          Deploy Gateway
         </RouterLink>
-        <button v-else @click="searchQuery = ''; filterType = 'all'; filterNetwork = 'all'" class="btn-secondary">
-          Clear Filters
-        </button>
       </div>
 
       <!-- Contracts Grid -->

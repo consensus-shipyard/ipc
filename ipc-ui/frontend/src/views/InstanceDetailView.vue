@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch, nextTick } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { apiService } from '../services/api'
 
@@ -659,7 +659,7 @@ const sendTestTransaction = async () => {
   testTxResult.value = null
 
   const networkName = testTxData.value.network === 'subnet' ? 'Subnet' : 'Parent L1'
-  
+
   try {
     const response = await apiService.sendTestTransaction(
       decodeURIComponent(props.id),
@@ -672,7 +672,7 @@ const sendTestTransaction = async () => {
         Transaction Hash: ${response.data.txHash || 'N/A'}
         Block: ${response.data.blockNumber || 'Pending'}
         Gas Used: ${response.data.gasUsed || 'N/A'}
-        
+
         ✅ Transaction successfully executed on the blockchain!`
 
       // Refresh stats after successful transaction
@@ -810,7 +810,7 @@ onUnmounted(() => {
         </button>
 
         <button
-          v-if="instance.status.toLowerCase() === 'pending approval'"
+          v-if="instance.status?.toLowerCase() === 'pending approval'"
           :disabled="approvingSubnet"
           @click="approveSubnet"
           class="btn-primary flex items-center"
@@ -876,7 +876,7 @@ onUnmounted(() => {
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             ]"
           >
-            Validators ({{ instance.validators.length }})
+            Validators ({{ instance.validators?.length || 0 }} validator{{ (instance.validators?.length || 0) !== 1 ? 's' : '' }})
           </button>
           <button
             @click="activeTab = 'configuration'"
@@ -997,7 +997,7 @@ onUnmounted(() => {
               </div>
 
               <div class="text-center p-4 bg-gray-50 rounded-lg">
-                <div class="text-2xl font-bold text-gray-900">{{ instance.validators.length }}</div>
+                <div class="text-2xl font-bold text-gray-900">{{ instance.validators?.length }}</div>
                 <div class="text-sm text-gray-500">Validators</div>
                 <div v-if="subnetStatus?.validators_online !== undefined" class="text-xs text-gray-400 mt-1">
                   {{ subnetStatus.validators_online }} online
@@ -1193,7 +1193,7 @@ onUnmounted(() => {
               <h3 class="text-lg font-semibold text-gray-900">Validators</h3>
               <div class="flex items-center space-x-3">
                 <div class="text-sm text-gray-500">
-                  {{ instance.validators.length }} validator{{ instance.validators.length !== 1 ? 's' : '' }}
+                  {{ instance.validators?.length || 0 }} validator{{ (instance.validators?.length || 0) !== 1 ? 's' : '' }}
                 </div>
                 <button
                   @click="showAddValidatorModal = true"
@@ -1207,7 +1207,7 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <div v-if="instance.validators.length === 0" class="text-center py-8 text-gray-500">
+            <div v-if="(instance.validators?.length || 0) === 0" class="text-center py-8 text-gray-500">
               <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
@@ -2013,7 +2013,7 @@ onUnmounted(() => {
               <div class="space-y-3">
                 <div class="flex justify-between">
                   <span class="text-sm text-gray-500">Active Validators</span>
-                  <span class="text-sm font-medium text-gray-900">{{ instance.validators.length }}</span>
+                  <span class="text-sm font-medium text-gray-900">{{ instance.validators?.length || 0 }}</span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-sm text-gray-500">Validators Online</span>

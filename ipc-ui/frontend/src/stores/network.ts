@@ -39,9 +39,13 @@ export const useNetworkStore = defineStore('network', () => {
   const isLoading = ref(false)
 
   // Computed
-  const selectedNetwork = computed(() =>
-    networks.value.find(network => network.id === selectedNetworkId.value)
-  )
+  const selectedNetwork = computed(() => {
+    // Ensure networks.value is always an array to prevent find() errors
+    if (!Array.isArray(networks.value)) {
+      return undefined
+    }
+    return networks.value.find(network => network.id === selectedNetworkId.value)
+  })
 
   const availableNetworks = computed(() => networks.value)
 

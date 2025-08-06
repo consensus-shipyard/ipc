@@ -91,11 +91,12 @@ const fetchSystemStatus = async () => {
     console.log('[AppSidebar] Gateway discovery response:', gatewaysResponse.data)
 
     // Use the response from discovery which now returns the full list
-    if (gatewaysResponse.data && Array.isArray(gatewaysResponse.data)) {
-      console.log(`[AppSidebar] Found ${gatewaysResponse.data.length} gateways from discovery`)
+    if (gatewaysResponse.data && gatewaysResponse.data.data && Array.isArray(gatewaysResponse.data.data)) {
+      const gateways = gatewaysResponse.data.data
+      console.log(`[AppSidebar] Found ${gateways.length} gateways from discovery`)
 
       // Log gateway details for debugging
-      gatewaysResponse.data.forEach((gateway: any, index: number) => {
+      gateways.forEach((gateway: any, index: number) => {
         console.log(`[AppSidebar] Gateway ${index + 1}:`, {
           id: gateway.id,
           name: gateway.name,
@@ -105,8 +106,8 @@ const fetchSystemStatus = async () => {
         })
       })
 
-      systemStatus.value.gateways = gatewaysResponse.data.length
-      deployedGateways.value = gatewaysResponse.data.slice(0, 3) // Show up to 3 gateways in sidebar
+      systemStatus.value.gateways = gateways.length
+      deployedGateways.value = gateways.slice(0, 3) // Show up to 3 gateways in sidebar
       console.log(`[AppSidebar] Set sidebar to show ${deployedGateways.value.length} gateways`)
     } else {
       console.warn('[AppSidebar] Invalid or empty gateway discovery response')
@@ -132,10 +133,10 @@ const fetchDeployedGateways = async () => {
     const response = await apiService.getGateways()
     console.log('[AppSidebar] Deployed gateways response:', response.data)
 
-    if (response.data && Array.isArray(response.data)) {
-      console.log(`[AppSidebar] Fetched ${response.data.length} deployed gateways`)
-      deployedGateways.value = response.data
-      systemStatus.value.gateways = response.data.length
+    if (response.data && response.data.data && Array.isArray(response.data.data)) {
+      console.log(`[AppSidebar] Fetched ${response.data.data.length} deployed gateways`)
+      deployedGateways.value = response.data.data
+      systemStatus.value.gateways = response.data.data.length
     } else {
       console.warn('[AppSidebar] Invalid deployed gateways response')
       deployedGateways.value = []

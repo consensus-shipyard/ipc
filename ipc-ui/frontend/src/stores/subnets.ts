@@ -94,10 +94,10 @@ export const useSubnetsStore = defineStore('subnets', () => {
         timeoutPromise
       ]) as any
 
-      if (response.data) {
-        allSubnets.value = response.data
+      if (response.data && response.data.data) {
+        allSubnets.value = response.data.data
         lastFetch.value = new Date()
-        console.log(`[SubnetsStore] Successfully fetched ${response.data.length} subnets`)
+        console.log(`[SubnetsStore] Successfully fetched ${response.data.data.length} subnets`)
       }
     } catch (err: any) {
       console.error(`[SubnetsStore] Error fetching subnets (attempt ${retryCount + 1}):`, err)

@@ -22,20 +22,23 @@ export const useWalletStore = defineStore('wallet', () => {
   const CACHE_DURATION = 30 * 1000
 
   // Computed
-  const evmAddresses = computed(() =>
-    addresses.value.filter(addr => addr.wallet_type === 'evm')
-  )
+  const evmAddresses = computed(() => {
+    if (!Array.isArray(addresses.value)) return []
+    return addresses.value.filter(addr => addr.wallet_type === 'evm')
+  })
 
-  const fvmAddresses = computed(() =>
-    addresses.value.filter(addr => addr.wallet_type === 'fvm')
-  )
+  const fvmAddresses = computed(() => {
+    if (!Array.isArray(addresses.value)) return []
+    return addresses.value.filter(addr => addr.wallet_type === 'fvm')
+  })
 
-  const compatibleAddresses = computed(() =>
-    addresses.value.filter(addr => addr.is_compatible !== false)
-  )
+  const compatibleAddresses = computed(() => {
+    if (!Array.isArray(addresses.value)) return []
+    return addresses.value.filter(addr => addr.is_compatible !== false)
+  })
 
   const defaultAddressDetails = computed(() => {
-    if (!defaultAddress.value) return null
+    if (!defaultAddress.value || !Array.isArray(addresses.value)) return null
     return addresses.value.find(addr => addr.address === defaultAddress.value) || null
   })
 
@@ -110,6 +113,7 @@ export const useWalletStore = defineStore('wallet', () => {
   }
 
   const updateNetworkCompatibility = (networkType: 'evm' | 'fvm' | 'both') => {
+    if (!Array.isArray(addresses.value)) return
     addresses.value = addresses.value.map(addr => ({
       ...addr,
       is_compatible: networkType === 'both' || addr.wallet_type === networkType
@@ -117,10 +121,12 @@ export const useWalletStore = defineStore('wallet', () => {
   }
 
   const getAddressByAddress = (address: string): WalletAddress | undefined => {
+    if (!Array.isArray(addresses.value)) return undefined
     return addresses.value.find(addr => addr.address === address)
   }
 
   const getAddressWithPubkey = (address: string): WalletAddress | undefined => {
+    if (!Array.isArray(addresses.value)) return undefined
     return addresses.value.find(addr => addr.address === address && addr.pubkey)
   }
 

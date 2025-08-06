@@ -19,7 +19,7 @@ const expandedNodes = ref<Set<string>>(new Set())
 const viewMode = ref<'hierarchy' | 'list'>('hierarchy')
 
 // Use store data instead of local state
-const subnets = computed(() => subnetsStore.filteredSubnets)
+const subnets = computed(() => subnetsStore.filteredSubnets || [])
 const loading = computed(() => subnetsStore.loading)
 const error = computed(() => subnetsStore.error)
 
@@ -28,7 +28,7 @@ const fetchSubnets = () => subnetsStore.fetchSubnets()
 
 // Build hierarchical tree structure
 const subnetTree = computed(() => {
-  if (subnets.value.length === 0) return []
+  if (!Array.isArray(subnets.value) || subnets.value.length === 0) return []
 
   const nodeMap = new Map<string, SubnetNode>()
   const roots: SubnetNode[] = []
@@ -242,16 +242,13 @@ const getIndentStyle = (depth: number) => {
       </div>
 
       <!-- Empty State -->
-      <div v-else-if="subnets.length === 0" class="text-center py-12 bg-white rounded-lg shadow-sm">
-        <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M19 11H5m14-7H3m14 14H9m6-7l-6 6-4-4" />
+      <div v-else-if="(subnets?.length || 0) === 0" class="text-center py-12 bg-white rounded-lg shadow-sm">
+        <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 9a2 2 0 00-2 2v2a2 2 0 002 2m0 0h14m-14 0a2 2 0 002 2v2a2 2 0 01-2 2M5 9V7a2 2 0 012-2h10a2 2 0 012 2v2M7 7V5a2 2 0 012-2h6a2 2 0 012 2v2" />
         </svg>
-        <h3 class="text-lg font-medium text-gray-900 mb-2">No subnets found</h3>
-        <p class="text-gray-600 mb-6">Get started by deploying your first subnet</p>
-        <RouterLink to="/wizard" class="btn-primary">
-          Deploy Your First Subnet
-        </RouterLink>
+        <h3 class="text-lg font-medium text-gray-900 mb-2">No Subnets Found</h3>
+        <p class="text-gray-600 mb-6">No subnets are currently deployed in this network.</p>
+        <RouterLink to="/wizard" class="btn-primary">Deploy Your First Subnet</RouterLink>
       </div>
 
       <!-- Hierarchy View -->
@@ -268,7 +265,7 @@ const getIndentStyle = (depth: number) => {
                   <div class="flex items-center space-x-3 mb-3">
                     <!-- Expand/Collapse Button -->
                     <button
-                      v-if="node.children.length > 0"
+                      v-if="(node.children?.length || 0) > 0"
                       @click="toggleNode(node.subnet.id)"
                       class="p-1 hover:bg-gray-100 rounded transition-colors"
                     >
@@ -326,12 +323,12 @@ const getIndentStyle = (depth: number) => {
                   <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                     <div>
                       <p class="text-sm text-gray-500">Validators</p>
-                      <p class="font-semibold text-gray-900">{{ node.subnet.validators.length }}</p>
+                      <p class="font-semibold text-gray-900">{{ node.subnet.validators?.length || 0 }}</p>
                     </div>
                     <div>
                       <p class="text-sm text-gray-500">Total Stake</p>
                       <p class="font-semibold text-gray-900">
-                        {{ node.subnet.validators.reduce((s: number, v: any) => s + parseFloat(v.stake || '0'), 0).toFixed(1) }} FIL
+                        {{ (node.subnet.validators || []).reduce((s: number, v: any) => s + parseFloat(v.stake || '0'), 0).toFixed(1) }} FIL
                       </p>
                     </div>
                     <div>
@@ -345,13 +342,13 @@ const getIndentStyle = (depth: number) => {
                   </div>
 
                   <!-- Child subnets count -->
-                  <div v-if="node.children.length > 0" class="mt-4 pt-4 border-t border-gray-200">
+                  <div v-if="(node.children?.length || 0) > 0" class="mt-4 pt-4 border-t border-gray-200">
                     <p class="text-sm text-gray-600">
                       <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                               d="M19 11H5m14-7H3m14 14H9m6-7l-6 6-4-4" />
                       </svg>
-                      {{ node.children.length }} child subnet{{ node.children.length !== 1 ? 's' : '' }}
+                      {{ node.children?.length || 0 }} child subnet{{ (node.children?.length || 0) !== 1 ? 's' : '' }}
                     </p>
                   </div>
                 </div>
@@ -405,12 +402,12 @@ const getIndentStyle = (depth: number) => {
                       <div class="grid grid-cols-4 gap-4 text-sm">
                         <div>
                           <p class="text-gray-500">Validators</p>
-                          <p class="font-semibold">{{ childNode.subnet.validators.length }}</p>
+                          <p class="font-semibold">{{ childNode.subnet.validators?.length || 0 }}</p>
                         </div>
                         <div>
                           <p class="text-gray-500">Stake</p>
                           <p class="font-semibold">
-                            {{ childNode.subnet.validators.reduce((s: number, v: any) => s + parseFloat(v.stake || '0'), 0).toFixed(1) }}
+                            {{ (childNode.subnet.validators || []).reduce((s: number, v: any) => s + parseFloat(v.stake || '0'), 0).toFixed(1) }}
                           </p>
                         </div>
                         <div>
@@ -487,10 +484,10 @@ const getIndentStyle = (depth: number) => {
                   {{ subnet.parent }}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {{ subnet.validators.length }}
+                  {{ subnet.validators?.length || 0 }}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {{ subnet.validators.reduce((s: number, v: any) => s + parseFloat(v.stake || '0'), 0).toFixed(1) }} FIL
+                  {{ (subnet.validators || []).reduce((s: number, v: any) => s + parseFloat(v.stake || '0'), 0).toFixed(1) }} FIL
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {{ formatDate(subnet.created_at) }}

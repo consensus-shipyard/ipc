@@ -23,3 +23,7 @@ validator-nodes/
 
 # Runtime data files
 data/
+
+# Frontend build artifacts and embedded UI assets
+ipc/cli/static/
+ipc-ui/frontend/dist/
