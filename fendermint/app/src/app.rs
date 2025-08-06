@@ -172,6 +172,8 @@ where
     /// Interpreter for messages and the block lifecycle events.
     messages_interpreter: Arc<MI>,
 
+    light_client_commitments: Arc<tokio::sync::Mutex<Option<LightClientCommitments>>>,
+
     /// Interface to the snapshotter, if enabled.
     snapshots: Option<SnapshotClient>,
     /// State accumulating changes during block execution.
@@ -213,6 +215,7 @@ where
             state_hist: KVCollection::new(config.state_hist_namespace),
             state_hist_size: config.state_hist_size,
             messages_interpreter: Arc::new(interpreter),
+            light_client_commitments: Arc::new(tokio::sync::Mutex::new(None)),
             snapshots,
             exec_state: Arc::new(tokio::sync::Mutex::new(None)),
             check_state: Arc::new(tokio::sync::Mutex::new(None)),
@@ -319,13 +322,8 @@ where
     fn maybe_update_app_state(
         &self,
         gas_market: &Reading,
-        light_client_commitments: Option<LightClientCommitments>,
     ) -> Result<Option<TendermintConsensusParams>> {
         let mut state = self.committed_state()?;
-
-        if let Some(commitment) = light_client_commitments {
-            state.light_client_commitments = Some(commitment);
-        }
 
         let current = state
             .app_state
@@ -899,6 +897,9 @@ where
             light_client_commitments,
         } = response;
 
+        let mut c = self.light_client_commitments.lock().await;
+        *c = light_client_commitments;
+
         // Convert the incoming power updates to Tendermint validator updates.
         let validator_updates =
             to_validator_updates(power_updates.0).context("failed to convert validator updates")?;
@@ -910,7 +911,7 @@ where
 
         // Maybe update the app state with the new block gas limit.
         let consensus_param_updates = self
-            .maybe_update_app_state(&gas_market, light_client_commitments)
+            .maybe_update_app_state(&gas_market)
             .context("failed to update block gas limit")?;
 
         let ret = response::EndBlock {
@@ -947,6 +948,12 @@ where
         state.app_state.state_params.base_fee = base_fee;
         state.app_state.state_params.circ_supply = circ_supply;
         state.app_state.state_params.power_scale = power_scale;
+
+        let mut c = self.light_client_commitments.lock().await;
+        // because of the take, no need to *c = None
+        if let Some(commitment) = c.take() {
+            state.light_client_commitments = Some(commitment);
+        }
 
         let app_hash = state.app_hash();
         let block_height = state.app_state.block_height;
