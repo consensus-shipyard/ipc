@@ -951,9 +951,7 @@ where
 
         let mut c = self.light_client_commitments.lock().await;
         // because of the take, no need to *c = None
-        if let Some(commitment) = c.take() {
-            state.light_client_commitments = Some(commitment);
-        }
+        state.light_client_commitments = c.take();
 
         let app_hash = state.app_hash();
         let block_height = state.app_state.block_height;
