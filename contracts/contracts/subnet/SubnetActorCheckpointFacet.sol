@@ -80,7 +80,6 @@ contract SubnetActorCheckpointFacet is SubnetActorModifiers, ReentrancyGuard, Pa
 
         // Propagate cross messages from checkpoint to other subnets
         IGateway(s.ipcGatewayAddr).propagateAll();
-
     }
 
     function recordActivityRollup(

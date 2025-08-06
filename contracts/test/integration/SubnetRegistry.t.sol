@@ -16,6 +16,7 @@ import {SubnetActorGetterFacet} from "../../contracts/subnet/SubnetActorGetterFa
 import {SubnetActorManagerFacet} from "../../contracts/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorPauseFacet} from "../../contracts/subnet/SubnetActorPauseFacet.sol";
 import {SubnetActorCheckpointingFacet} from "../../contracts/subnet/SubnetActorCheckpointingFacet.sol";
+import {SubnetActorCheckpointFacet} from "../../contracts/subnet/SubnetActorCheckpointFacet.sol";
 import {SubnetActorRewardFacet} from "../../contracts/subnet/SubnetActorRewardFacet.sol";
 import {SubnetActorDiamond} from "../../contracts/SubnetActorDiamond.sol";
 import {SubnetActorActivityFacet} from "../../contracts/subnet/SubnetActorActivityFacet.sol";
@@ -64,6 +65,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         params.managerFacet = address(new SubnetActorManagerFacet());
         params.rewarderFacet = address(new SubnetActorRewardFacet());
         params.checkpointerFacet = address(new SubnetActorCheckpointingFacet());
+        params.checkpointFacet = address(new SubnetActorCheckpointFacet());
         params.pauserFacet = address(new SubnetActorPauseFacet());
         params.diamondCutFacet = address(new DiamondCutFacet());
         params.diamondLoupeFacet = address(new DiamondLoupeFacet());
@@ -79,7 +81,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         params.subnetActorDiamondLoupeSelectors = SelectorLibrary.resolveSelectors("DiamondLoupeFacet");
         params.subnetActorOwnershipSelectors = SelectorLibrary.resolveSelectors("OwnershipFacet");
         params.subnetActorActivitySelectors = SelectorLibrary.resolveSelectors("SubnetActorActivityFacet");
-
+        params.subnetActorCheckpointSelectors = SelectorLibrary.resolveSelectors("SubnetActorCheckpointFacet");
         params.creationPrivileges = SubnetCreationPrivileges.Unrestricted;
 
         return params;
@@ -175,6 +177,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
 
         params.ownershipFacet = address(8);
         params.activityFacet = address(9);
+        params.checkpointFacet = address(10);
         new SubnetRegistryDiamond(diamondCut, params);
     }
 

@@ -11,6 +11,7 @@ import {SubnetActorGetterFacet} from "../../contracts/subnet/SubnetActorGetterFa
 import {SubnetActorManagerFacet} from "../../contracts/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorPauseFacet} from "../../contracts/subnet/SubnetActorPauseFacet.sol";
 import {SubnetActorCheckpointingFacet} from "../../contracts/subnet/SubnetActorCheckpointingFacet.sol";
+import {SubnetActorCheckpointFacet} from "../../contracts/subnet/SubnetActorCheckpointFacet.sol";
 import {SubnetActorRewardFacet} from "../../contracts/subnet/SubnetActorRewardFacet.sol";
 import {SubnetID} from "../../contracts/structs/Subnet.sol";
 import {RegisterSubnetFacet} from "../../contracts/subnetregistry/RegisterSubnetFacet.sol";
@@ -53,6 +54,7 @@ contract SubnetRegistryInvariants is StdInvariant, Test, TestRegistry, Integrati
         params.diamondLoupeFacet = address(new DiamondLoupeFacet());
         params.ownershipFacet = address(new OwnershipFacet());
         params.activityFacet = address(new SubnetActorActivityFacet());
+        params.checkpointFacet = address(new SubnetActorCheckpointFacet());
 
         params.subnetActorGetterSelectors = mockedSelectors;
         params.subnetActorManagerSelectors = mockedSelectors2;
@@ -63,6 +65,7 @@ contract SubnetRegistryInvariants is StdInvariant, Test, TestRegistry, Integrati
         params.subnetActorDiamondLoupeSelectors = SelectorLibrary.resolveSelectors("DiamondLoupeFacet");
         params.subnetActorOwnershipSelectors = SelectorLibrary.resolveSelectors("OwnershipFacet");
         params.subnetActorActivitySelectors = SelectorLibrary.resolveSelectors("SubnetActorActivityFacet");
+        params.subnetActorCheckpointSelectors = SelectorLibrary.resolveSelectors("SubnetActorCheckpointFacet");
 
         registryDiamond = createSubnetRegistry(params);
         registryHandler = new SubnetRegistryHandler(registryDiamond);

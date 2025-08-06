@@ -41,6 +41,10 @@ task('deploy-registry')
                 name: 'SubnetActorCheckpointingFacet',
                 libraries: ['SubnetIDHelper'],
             },
+            {
+                name: 'SubnetActorCheckpointFacet',
+                libraries: ['SubnetIDHelper'],
+            },
             { name: 'DiamondCutFacet' },
             { name: 'DiamondLoupeFacet' },
             { name: 'OwnershipFacet' },

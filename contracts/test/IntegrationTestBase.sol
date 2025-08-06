@@ -28,6 +28,7 @@ import {SubnetActorMock} from "./mocks/SubnetActorMock.sol";
 import {SubnetActorManagerFacet} from "../contracts/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorPauseFacet} from "../contracts/subnet/SubnetActorPauseFacet.sol";
 import {SubnetActorCheckpointingFacet} from "../contracts/subnet/SubnetActorCheckpointingFacet.sol";
+import {SubnetActorCheckpointFacet} from "../contracts/subnet/SubnetActorCheckpointFacet.sol";
 import {SubnetActorRewardFacet} from "../contracts/subnet/SubnetActorRewardFacet.sol";
 import {SubnetActorGetterFacet} from "../contracts/subnet/SubnetActorGetterFacet.sol";
 
@@ -164,6 +165,7 @@ contract TestSubnetActor is Test, TestParams {
     bytes4[] saPauserSelectors;
     bytes4[] saRewarderSelectors;
     bytes4[] saCheckpointerSelectors;
+    bytes4[] saCheckpointSelectors;
     bytes4[] saManagerMockedSelectors;
     bytes4[] saCutterSelectors;
     bytes4[] saLouperSelectors;
@@ -178,6 +180,7 @@ contract TestSubnetActor is Test, TestParams {
         saManagerSelectors = SelectorLibrary.resolveSelectors("SubnetActorManagerFacet");
         saPauserSelectors = SelectorLibrary.resolveSelectors("SubnetActorPauseFacet");
         saRewarderSelectors = SelectorLibrary.resolveSelectors("SubnetActorRewardFacet");
+        saCheckpointSelectors = SelectorLibrary.resolveSelectors("SubnetActorCheckpointFacet");
         saCheckpointerSelectors = SelectorLibrary.resolveSelectors("SubnetActorCheckpointingFacet");
         saManagerMockedSelectors = SelectorLibrary.resolveSelectors("SubnetActorMock");
         saCutterSelectors = SelectorLibrary.resolveSelectors("DiamondCutFacet");
@@ -501,12 +504,13 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         SubnetActorPauseFacet pauser = new SubnetActorPauseFacet();
         SubnetActorRewardFacet rewarder = new SubnetActorRewardFacet();
         SubnetActorCheckpointingFacet checkpointer = new SubnetActorCheckpointingFacet();
+        SubnetActorCheckpointFacet checkpoint = new SubnetActorCheckpointFacet();
         DiamondLoupeFacet louper = new DiamondLoupeFacet();
         DiamondCutFacet cutter = new DiamondCutFacet();
         OwnershipFacet ownership = new OwnershipFacet();
         SubnetActorActivityFacet activity = new SubnetActorActivityFacet();
 
-        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](9);
+        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](10);
 
         diamondCut[0] = (
             IDiamond.FacetCut({
@@ -577,6 +581,14 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
                 facetAddress: address(activity),
                 action: IDiamond.FacetCutAction.Add,
                 functionSelectors: saActivitySelectors
+            })
+        );
+
+        diamondCut[9] = (
+            IDiamond.FacetCut({
+                facetAddress: address(checkpoint),
+                action: IDiamond.FacetCutAction.Add,
+                functionSelectors: saCheckpointSelectors
             })
         );
         SubnetActorDiamond diamond = new SubnetActorDiamond(diamondCut, params, address(this));
