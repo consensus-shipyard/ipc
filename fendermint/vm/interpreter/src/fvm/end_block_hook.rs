@@ -42,7 +42,7 @@ pub struct LightClientCommitments {
 
 pub struct EndBlockOutcome {
     pub light_client_commitments: LightClientCommitments,
-    pub power_updates: PowerUpdates
+    pub power_updates: PowerUpdates,
 }
 
 #[derive(Clone, Default)]
@@ -152,7 +152,10 @@ where
         activity_commitment: ethers::utils::keccak256(activity_commitment.encode()),
     };
 
-    Ok(Some(EndBlockOutcome { light_client_commitments: commitments, power_updates }))
+    Ok(Some(EndBlockOutcome {
+        light_client_commitments: commitments,
+        power_updates,
+    }))
 }
 
 fn convert_envelopes(msgs: Vec<gateway_getter_facet::IpcEnvelope>) -> Vec<checkpoint::IpcEnvelope> {

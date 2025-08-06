@@ -22,10 +22,10 @@ use crate::fvm::state::FvmExecState;
 use anyhow::{bail, Context};
 use fvm_ipld_blockstore::Blockstore;
 
-use crate::types::AppliedMessage;
-use ipc_api::cross::IpcEnvelope;
 use crate::fvm::end_block_hook::PowerUpdates;
 use crate::fvm::state::ipc::tokens_to_mint;
+use crate::types::AppliedMessage;
+use ipc_api::cross::IpcEnvelope;
 
 type TopDownFinalityProvider = Arc<Toggle<CachedFinalityProvider<IPCProviderProxyWithLatency>>>;
 

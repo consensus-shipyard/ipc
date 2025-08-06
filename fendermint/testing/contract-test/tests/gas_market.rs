@@ -25,6 +25,7 @@ use fendermint_vm_topdown::voting::VoteTally;
 use fendermint_vm_topdown::Toggle;
 use fvm_shared::chainid::ChainID;
 
+use fendermint_vm_interpreter::fvm::end_block_hook::EndBlockManager;
 use fvm::executor::{ApplyKind, Executor};
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
@@ -36,7 +37,6 @@ use lazy_static::lazy_static;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 use tendermint_rpc::Client;
-use fendermint_vm_interpreter::fvm::end_block_hook::EndBlockManager;
 
 lazy_static! {
     static ref SECRET: SecretKey = rand_secret_key();
@@ -69,7 +69,7 @@ async fn tester_with_upgrader(
     let vote_tally = VoteTally::empty();
     let top_down_manager = TopDownManager::new(finality_provider, vote_tally);
 
-    let interpreter: FvmMessagesInterpreter<MemoryBlockstore,> = FvmMessagesInterpreter::new(
+    let interpreter: FvmMessagesInterpreter<MemoryBlockstore> = FvmMessagesInterpreter::new(
         end_block_manager,
         top_down_manager,
         upgrade_scheduler,
