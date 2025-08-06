@@ -10,7 +10,6 @@ use std::str::FromStr;
 pub mod address;
 pub mod checkpoint;
 pub mod cross;
-pub mod crypto;
 pub mod error;
 pub mod gateway;
 #[cfg(feature = "fil-actor")]
