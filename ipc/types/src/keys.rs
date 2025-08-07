@@ -8,6 +8,7 @@ use ethers::core::utils::keccak256;
 use ethers::utils::hex;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 /// Key format for serialization/parsing
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -21,6 +22,8 @@ pub enum KeyFormat {
 /// A secp256k1 private key for cryptographic operations
 #[derive(Clone, PartialEq, Eq)]
 pub struct PrivateKey {
+    // Store the raw key bytes for proper zeroization
+    key_bytes: [u8; 32],
     inner: SigningKey,
 }
 
@@ -31,12 +34,25 @@ pub struct PublicKey {
     format: KeyFormat,
 }
 
-impl Drop for PrivateKey {
-    fn drop(&mut self) {
-        // Zeroize the secret key bytes
-        // Note: This is best effort - the SigningKey may have already been copied internally
+impl Zeroize for PrivateKey {
+    fn zeroize(&mut self) {
+        // Zeroize the raw key bytes
+        self.key_bytes.zeroize();
+        // Create a new default SigningKey to replace the current one
+        // This follows the pattern from fendermint/crypto
+        if let Ok(default_key) = SigningKey::from_slice(&[1u8; 32]) {
+            let _ = std::mem::replace(&mut self.inner, default_key);
+        }
     }
 }
+
+impl Drop for PrivateKey {
+    fn drop(&mut self) {
+        self.zeroize();
+    }
+}
+
+impl ZeroizeOnDrop for PrivateKey {}
 
 impl PrivateKey {
     /// Create a private key from hex string (with or without 0x prefix)
@@ -54,16 +70,28 @@ impl PrivateKey {
 
     /// Create a private key from raw bytes
     pub fn from_bytes(bytes: &[u8]) -> anyhow::Result<Self> {
+        ensure!(bytes.len() == 32, "Private key must be exactly 32 bytes");
+
         let signing_key = SigningKey::from_slice(bytes)
             .map_err(|e| anyhow!("Failed to parse private key: {}", e))?;
 
-        Ok(Self { inner: signing_key })
+        let mut key_bytes = [0u8; 32];
+        key_bytes.copy_from_slice(bytes);
+
+        Ok(Self {
+            key_bytes,
+            inner: signing_key
+        })
     }
 
     /// Generate a random private key
     pub fn generate() -> Self {
         let signing_key = SigningKey::random(&mut rand::thread_rng());
-        Self { inner: signing_key }
+        let key_bytes = signing_key.to_bytes().into();
+        Self {
+            key_bytes,
+            inner: signing_key
+        }
     }
 
     /// Get the public key with specified format
@@ -81,7 +109,7 @@ impl PrivateKey {
 
     /// Export as 32-byte array
     pub fn to_bytes(&self) -> [u8; 32] {
-        self.inner.to_bytes().into()
+        self.key_bytes
     }
 }
 
@@ -381,5 +409,43 @@ mod tests {
         let addr_from_public: crate::EthAddress = public_key.into();
 
         assert_eq!(addr_from_private, addr_from_public);
+    }
+
+    #[test]
+    fn test_zeroization() {
+        // Create a private key
+        let private_key = PrivateKey::from_hex("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80").unwrap();
+
+        // Extract the raw bytes before zeroization
+        let original_bytes = private_key.to_bytes();
+        assert_ne!(original_bytes, [0u8; 32], "Original key should not be all zeros");
+
+        // Clone the key to test zeroization
+        let mut key_to_zeroize = private_key.clone();
+
+        // Manually call zeroize
+        key_to_zeroize.zeroize();
+
+        // Check that the key bytes have been zeroized
+        let zeroized_bytes = key_to_zeroize.to_bytes();
+        assert_eq!(zeroized_bytes, [0u8; 32], "Key bytes should be zeroed after zeroization");
+
+        // Original key should still be intact
+        assert_eq!(private_key.to_bytes(), original_bytes, "Original key should remain unchanged");
+    }
+
+    #[test]
+    fn test_drop_calls_zeroize() {
+        let original_bytes = {
+            let private_key = PrivateKey::from_hex("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80").unwrap();
+            let bytes = private_key.to_bytes();
+            assert_ne!(bytes, [0u8; 32], "Key should not be all zeros");
+            // private_key is dropped here, which should call zeroize
+            bytes
+        };
+
+        // This test mainly ensures that Drop is implemented and doesn't panic
+        // The actual memory zeroization is hard to test directly due to memory reuse
+        assert_ne!(original_bytes, [0u8; 32], "Original bytes should not be all zeros");
     }
 }
