@@ -109,11 +109,7 @@ impl AppState {
     pub fn state_root(&self) -> Cid {
         self.state_params.state_root
     }
-
-    pub fn chain_id(&self) -> ChainID {
-        ChainID::from(self.state_params.chain_id)
-    }
-
+    
     pub fn app_hash(&self) -> tendermint::hash::AppHash {
         to_app_hash(&self.state_params)
     }
