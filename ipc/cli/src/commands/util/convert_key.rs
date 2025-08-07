@@ -5,7 +5,7 @@
 use async_trait::async_trait;
 use clap::Args;
 use ethers::types::H160;
-use ipc_types::{PrivateKey, KeyFormat, EthAddress};
+use ipc_types::{EthAddress, KeyFormat, PrivateKey};
 use std::fmt::Debug;
 
 use crate::{CommandLineHandler, GlobalArguments};
@@ -21,7 +21,11 @@ impl CommandLineHandler for ConvertKey {
         let private_key = PrivateKey::from_hex(&arguments.private_key)?;
 
         // Generate public key in the requested format
-        let format = if arguments.compressed { KeyFormat::Compressed } else { KeyFormat::Uncompressed };
+        let format = if arguments.compressed {
+            KeyFormat::Compressed
+        } else {
+            KeyFormat::Uncompressed
+        };
         let public_key = private_key.public_key(format);
 
         // Print the public key
@@ -43,7 +47,10 @@ pub(crate) struct ConvertKeyArgs {
     #[arg(help = "Private key to convert (hex string, with or without 0x prefix)")]
     pub private_key: String,
 
-    #[arg(long, help = "Output compressed public key (33 bytes) instead of uncompressed (65 bytes)")]
+    #[arg(
+        long,
+        help = "Output compressed public key (33 bytes) instead of uncompressed (65 bytes)"
+    )]
     pub compressed: bool,
 
     #[arg(long, help = "Also show the corresponding Ethereum address")]

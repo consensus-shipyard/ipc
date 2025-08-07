@@ -62,8 +62,8 @@ impl PrivateKey {
             .or_else(|| hex.strip_prefix("0X"))
             .unwrap_or(hex);
 
-        let private_key_bytes = hex::decode(key_hex)
-            .map_err(|e| anyhow!("Failed to decode private key: {}", e))?;
+        let private_key_bytes =
+            hex::decode(key_hex).map_err(|e| anyhow!("Failed to decode private key: {}", e))?;
 
         Self::from_bytes(&private_key_bytes)
     }
@@ -80,7 +80,7 @@ impl PrivateKey {
 
         Ok(Self {
             key_bytes,
-            inner: signing_key
+            inner: signing_key,
         })
     }
 
@@ -90,7 +90,7 @@ impl PrivateKey {
         let key_bytes = signing_key.to_bytes().into();
         Self {
             key_bytes,
-            inner: signing_key
+            inner: signing_key,
         }
     }
 
@@ -121,8 +121,8 @@ impl PublicKey {
             .or_else(|| hex.strip_prefix("0X"))
             .unwrap_or(hex);
 
-        let bytes = hex::decode(key_hex)
-            .map_err(|e| anyhow!("Failed to decode public key: {}", e))?;
+        let bytes =
+            hex::decode(key_hex).map_err(|e| anyhow!("Failed to decode public key: {}", e))?;
 
         Self::from_bytes(&bytes)
     }
@@ -293,15 +293,24 @@ mod tests {
 
     #[test]
     fn test_private_key_from_hex() {
-        let private_key = PrivateKey::from_hex("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80").unwrap();
-        assert_eq!(private_key.to_hex(), "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
+        let private_key = PrivateKey::from_hex(
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+        )
+        .unwrap();
+        assert_eq!(
+            private_key.to_hex(),
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+        );
     }
 
     #[test]
     fn test_private_key_from_hex_without_prefix() {
         let hex_without_prefix = "ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
         let private_key = PrivateKey::from_hex(hex_without_prefix).unwrap();
-        assert_eq!(private_key.to_hex(), "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
+        assert_eq!(
+            private_key.to_hex(),
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+        );
     }
 
     #[test]
@@ -313,7 +322,10 @@ mod tests {
 
     #[test]
     fn test_public_key_formats() {
-        let private_key = PrivateKey::from_hex("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80").unwrap();
+        let private_key = PrivateKey::from_hex(
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+        )
+        .unwrap();
 
         let compressed = private_key.public_key(KeyFormat::Compressed);
         let uncompressed = private_key.public_key(KeyFormat::Uncompressed);
@@ -326,7 +338,10 @@ mod tests {
 
     #[test]
     fn test_public_key_format_conversion() {
-        let private_key = PrivateKey::from_hex("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80").unwrap();
+        let private_key = PrivateKey::from_hex(
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+        )
+        .unwrap();
         let compressed = private_key.public_key(KeyFormat::Compressed);
         let uncompressed = compressed.with_format(KeyFormat::Uncompressed);
 
@@ -340,7 +355,10 @@ mod tests {
 
     #[test]
     fn test_public_key_from_hex_detection() {
-        let private_key = PrivateKey::from_hex("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80").unwrap();
+        let private_key = PrivateKey::from_hex(
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+        )
+        .unwrap();
 
         // Generate actual corresponding public keys
         let compressed_key = private_key.public_key(KeyFormat::Compressed);
@@ -356,8 +374,14 @@ mod tests {
 
     #[test]
     fn test_string_conversions() {
-        let private_key: PrivateKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80".parse().unwrap();
-        assert_eq!(private_key.to_string(), "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80");
+        let private_key: PrivateKey =
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+                .parse()
+                .unwrap();
+        assert_eq!(
+            private_key.to_string(),
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+        );
 
         let public_key = private_key.public_key(KeyFormat::Compressed);
         let public_key_parsed: PublicKey = public_key.to_string().parse().unwrap();
@@ -366,7 +390,10 @@ mod tests {
 
     #[test]
     fn test_private_to_public_conversion() {
-        let private_key = PrivateKey::from_hex("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80").unwrap();
+        let private_key = PrivateKey::from_hex(
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+        )
+        .unwrap();
         let public_key: PublicKey = private_key.into();
 
         // Should default to uncompressed
@@ -376,7 +403,10 @@ mod tests {
 
     #[test]
     fn test_private_key_to_eth_address() {
-        let private_key = PrivateKey::from_hex("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80").unwrap();
+        let private_key = PrivateKey::from_hex(
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+        )
+        .unwrap();
         let eth_address: crate::EthAddress = private_key.clone().into();
 
         // The address should be deterministic for the same private key
@@ -386,7 +416,10 @@ mod tests {
 
     #[test]
     fn test_public_key_to_eth_address() {
-        let private_key = PrivateKey::from_hex("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80").unwrap();
+        let private_key = PrivateKey::from_hex(
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+        )
+        .unwrap();
         let public_key_compressed = private_key.public_key(KeyFormat::Compressed);
         let public_key_uncompressed = private_key.public_key(KeyFormat::Uncompressed);
 
@@ -401,7 +434,10 @@ mod tests {
 
     #[test]
     fn test_consistent_address_derivation() {
-        let private_key = PrivateKey::from_hex("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80").unwrap();
+        let private_key = PrivateKey::from_hex(
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+        )
+        .unwrap();
 
         // All these should give the same address
         let addr_from_private: crate::EthAddress = (&private_key).into();
@@ -414,11 +450,17 @@ mod tests {
     #[test]
     fn test_zeroization() {
         // Create a private key
-        let private_key = PrivateKey::from_hex("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80").unwrap();
+        let private_key = PrivateKey::from_hex(
+            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+        )
+        .unwrap();
 
         // Extract the raw bytes before zeroization
         let original_bytes = private_key.to_bytes();
-        assert_ne!(original_bytes, [0u8; 32], "Original key should not be all zeros");
+        assert_ne!(
+            original_bytes, [0u8; 32],
+            "Original key should not be all zeros"
+        );
 
         // Clone the key to test zeroization
         let mut key_to_zeroize = private_key.clone();
@@ -428,16 +470,26 @@ mod tests {
 
         // Check that the key bytes have been zeroized
         let zeroized_bytes = key_to_zeroize.to_bytes();
-        assert_eq!(zeroized_bytes, [0u8; 32], "Key bytes should be zeroed after zeroization");
+        assert_eq!(
+            zeroized_bytes, [0u8; 32],
+            "Key bytes should be zeroed after zeroization"
+        );
 
         // Original key should still be intact
-        assert_eq!(private_key.to_bytes(), original_bytes, "Original key should remain unchanged");
+        assert_eq!(
+            private_key.to_bytes(),
+            original_bytes,
+            "Original key should remain unchanged"
+        );
     }
 
     #[test]
     fn test_drop_calls_zeroize() {
         let original_bytes = {
-            let private_key = PrivateKey::from_hex("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80").unwrap();
+            let private_key = PrivateKey::from_hex(
+                "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80",
+            )
+            .unwrap();
             let bytes = private_key.to_bytes();
             assert_ne!(bytes, [0u8; 32], "Key should not be all zeros");
             // private_key is dropped here, which should call zeroize
@@ -446,6 +498,9 @@ mod tests {
 
         // This test mainly ensures that Drop is implemented and doesn't panic
         // The actual memory zeroization is hard to test directly due to memory reuse
-        assert_ne!(original_bytes, [0u8; 32], "Original bytes should not be all zeros");
+        assert_ne!(
+            original_bytes, [0u8; 32],
+            "Original bytes should not be all zeros"
+        );
     }
 }

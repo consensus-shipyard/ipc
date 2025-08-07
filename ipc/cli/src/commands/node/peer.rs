@@ -1,13 +1,13 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 
+use crate::comet_runner::binary::init_comet_binary;
 use crate::commands::node::config::{
     CometBftOverrides, CometBftPeerInfo, ConnectionOverrideConfig, DiscoveryOverrideConfig,
     FendermintOverrides, FendermintPeerInfo, NodeInfo, P2pCometConfig, P2pConfig, PeerInfo,
     ResolverOverrideConfig,
 };
 use crate::commands::node::config_override::merge_toml_config;
-use crate::comet_runner::binary::init_comet_binary;
 use anyhow::{bail, Context, Result};
 use fendermint_app::cmd::key::derive_peer_id_from_public_key;
 use fendermint_crypto::SecretKey;

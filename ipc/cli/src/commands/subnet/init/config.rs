@@ -13,7 +13,7 @@ pub(crate) use crate::commands::wallet::import::WalletImportArgs;
 use ethers::types::H160;
 use fs_err as fs;
 use ipc_api::subnet::PermissionMode;
-use ipc_types::{PublicKey, EthAddress};
+use ipc_types::{EthAddress, PublicKey};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
