@@ -4,9 +4,11 @@ use crate::{CommandLineHandler, GlobalArguments};
 
 use clap::{Args, Subcommand};
 
+use self::convert_key::{ConvertKey, ConvertKeyArgs};
 use self::eth::{F4ToEthAddr, F4ToEthAddrArgs};
 use self::f4::{EthToF4Addr, EthToF4AddrArgs};
 
+mod convert_key;
 mod eth;
 mod f4;
 
@@ -21,6 +23,7 @@ pub(crate) struct UtilCommandsArgs {
 impl UtilCommandsArgs {
     pub async fn handle(&self, global: &GlobalArguments) -> anyhow::Result<()> {
         match &self.command {
+            Commands::ConvertKey(args) => ConvertKey::handle(global, args).await,
             Commands::EthToF4Addr(args) => EthToF4Addr::handle(global, args).await,
             Commands::F4ToEthAddr(args) => F4ToEthAddr::handle(global, args).await,
         }
@@ -29,6 +32,7 @@ impl UtilCommandsArgs {
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum Commands {
+    ConvertKey(ConvertKeyArgs),
     EthToF4Addr(EthToF4AddrArgs),
     F4ToEthAddr(F4ToEthAddrArgs),
 }

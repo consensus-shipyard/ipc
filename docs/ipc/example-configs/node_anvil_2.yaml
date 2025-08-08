@@ -1,0 +1,38 @@
+home:  /Users/myuser/.ipc/nodes/anvil_node_2
+subnet: /r31337/t410fbspclp5h4scn627bv42ytlqssmbel2fztd6vnzi
+parent: /r31337
+key:
+  wallet-type: evm
+  path: null
+  private-key: 0x867c766fa9ea9fab8929a6ec6a4fe32ccf33969035d3d7f2262f6eb8021b56d8
+p2p:
+  external-ip: 127.0.0.1
+  ports:
+    cometbft: 26756
+    resolver: 26767
+  peers:
+    peer-files:
+      - "/Users/myuser/.ipc/nodes/anvil_node_2/peer-info-1.json"
+cometbft-overrides: |
+  proxy_app = "tcp://127.0.0.1:26758"
+  [rpc]
+  laddr = "tcp://0.0.0.0:26757"
+  [instrumentation]
+  prometheus_listen_addr = ":26761"
+fendermint-overrides: |
+  tendermint_rpc_url = "http://127.0.0.1:26757"
+  tendermint_websocket_url = "ws://127.0.0.1:26757/websocket"
+  [abci.listen]
+  port = 26758
+  [eth.listen]
+  port = 8645
+  [eth.metrics.listen]
+  port = 9185
+  [metrics.listen]
+  port = 9186
+  [resolver.connection]
+  listen_addr = "/ip4/127.0.0.1/tcp/26757"
+join: null
+genesis: !path
+  genesis: /Users/myuser/.ipc/genesis_r31337_t410fbspclp5h4scn627bv42ytlqssmbel2fztd6vnzi.json
+  sealed: /Users/myuser/.ipc/genesis_sealed_r31337_t410fbspclp5h4scn627bv42ytlqssmbel2fztd6vnzi.json
