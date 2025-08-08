@@ -292,6 +292,7 @@ impl SubnetManager for EthSubnetManager {
             validator_gater: payload_to_evm_address(params.validator_gater.payload())?,
             validator_rewarder: payload_to_evm_address(params.validator_rewarder.payload())?,
             genesis_subnet_ipc_contracts_owner: params.genesis_subnet_ipc_contracts_owner,
+            chain_id: params.chain_id,
         };
 
         tracing::info!("creating subnet on evm with params: {params:?}");
@@ -801,7 +802,11 @@ impl SubnetManager for EthSubnetManager {
         let genesis_subnet_ipc_contracts_owner =
             contract.genesis_subnet_ipc_contracts_owner().call().await?;
 
+        let chain_id = contract.chain_id().await?;
+        let chain_id = u64::from_str_radix(&chain_id, 10).context(format!("invalid chain id, expected u64, found {}", chain_id))?;
+
         Ok(SubnetGenesisInfo {
+            chain_id,
             // Active validators limit set for the child subnet.
             active_validators_limit: contract.active_validators_limit().call().await?,
             // Bottom-up checkpoint period set in the subnet actor.

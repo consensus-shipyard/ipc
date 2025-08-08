@@ -381,7 +381,7 @@ async fn new_genesis_from_parent(
         accounts: Vec::new(),
         eam_permission_mode: PermissionMode::Unrestricted,
         ipc: Some(ipc_params),
-        chain_id: None,
+        chain_id: Some(genesis_info.chain_id),
         ipc_contracts_owner: genesis_info.genesis_subnet_ipc_contracts_owner,
     };
 

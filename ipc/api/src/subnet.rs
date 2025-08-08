@@ -90,6 +90,7 @@ pub struct ConstructParams {
     pub validator_gater: Address,
     pub validator_rewarder: Address,
     pub genesis_subnet_ipc_contracts_owner: ethers::types::Address,
+    pub chain_id: u64,
 }
 
 /// Consensus types supported by hierarchical consensus

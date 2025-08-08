@@ -65,6 +65,7 @@ impl CreateSubnet {
                 validator_gater,
                 validator_rewarder,
                 arguments.genesis_subnet_ipc_contracts_owner,
+                arguments.chain_id,
             )
             .await?;
 
@@ -194,4 +195,10 @@ This address lives on the subnet network and controls contract-level administrat
 for every IPC diamond contract within the subnet. Ownership can be transferred later via an on-chain transaction."
     )]
     pub genesis_subnet_ipc_contracts_owner: ethers::types::Address,
+
+    #[arg(
+        long,
+        help = "The chain id for the subnet, make sure it's unique across existing known chain ids"
+    )]
+    pub chain_id: u64,
 }

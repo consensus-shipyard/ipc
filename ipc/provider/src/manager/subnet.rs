@@ -214,6 +214,7 @@ pub trait SubnetManager:
 
 #[derive(Debug)]
 pub struct SubnetGenesisInfo {
+    pub chain_id: u64,
     pub bottom_up_checkpoint_period: u64,
     pub majority_percentage: u8,
     pub active_validators_limit: u16,
