@@ -48,20 +48,22 @@ export const useSubnetsStore = defineStore('subnets', () => {
 
   // Helper function to extract network information from subnet
   const extractNetworkFromSubnet = (subnet: SubnetInstance, selectedNetwork: any): string => {
-    // For Calibration testnet, check if parent starts with /r314159
+    // Use the chain ID from the selected network to construct the root network path
+    if (selectedNetwork.chainId) {
+      const expectedRootPath = `/r${selectedNetwork.chainId}`
+      // Check if parent starts with the expected root path for this network
+      if (subnet.parent.startsWith(expectedRootPath)) {
+        return selectedNetwork.id
+      }
+    }
+
+    // Fallback: if no chainId is available, try legacy hardcoded checks for backwards compatibility
     if (selectedNetwork.id === 'calibration') {
       return subnet.parent.startsWith('/r314159') ? 'calibration' : 'unknown'
     }
 
-    // For Local Anvil, check if parent starts with /r31337
     if (selectedNetwork.id === 'local-anvil') {
       return subnet.parent.startsWith('/r31337') ? 'local-anvil' : 'unknown'
-    }
-
-    // For custom networks, try to match based on chain ID in the parent
-    if (selectedNetwork.chainId) {
-      const chainIdPattern = new RegExp(`/r${selectedNetwork.chainId}`)
-      return chainIdPattern.test(subnet.parent) ? selectedNetwork.id : 'unknown'
     }
 
     return 'unknown'

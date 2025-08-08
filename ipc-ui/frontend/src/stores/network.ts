@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { apiService, type NetworkConnectionStatus } from '@/services/api'
 
 export interface Network {
@@ -33,6 +33,11 @@ const DEFAULT_NETWORKS: Network[] = [
   }
 ]
 
+// Connection testing configuration
+const CONNECTION_TEST_INTERVAL = 30000 // 30 seconds
+const FAST_RETRY_INTERVAL = 5000 // 5 seconds for fast retries when disconnected
+const MAX_FAST_RETRIES = 3 // Number of fast retries before falling back to normal interval
+
 export const useNetworkStore = defineStore('network', () => {
   // State
   const networks = ref<Network[]>([])
@@ -40,6 +45,9 @@ export const useNetworkStore = defineStore('network', () => {
   const isLoading = ref(false)
   const networkStatuses = ref<Map<string, NetworkConnectionStatus>>(new Map())
   const isTestingConnection = ref(false)
+  const connectionTestInterval = ref<number | null>(null)
+  const fastRetryCount = ref(0)
+  const isPeriodicTestingEnabled = ref(true)
 
   // Computed
   const selectedNetwork = computed(() => {
@@ -56,6 +64,22 @@ export const useNetworkStore = defineStore('network', () => {
   })
 
   const availableNetworks = computed(() => networks.value)
+
+  // Watch for network selection changes to restart connection testing
+  watch(selectedNetworkId, (newNetworkId, oldNetworkId) => {
+    if (newNetworkId !== oldNetworkId && newNetworkId) {
+      console.log(`[NetworkStore] Network changed from ${oldNetworkId} to ${newNetworkId}`)
+
+      // Reset fast retry count
+      fastRetryCount.value = 0
+
+      // Test connection immediately
+      testSelectedNetworkConnection()
+
+      // Restart periodic testing
+      startPeriodicConnectionTesting()
+    }
+  })
 
   // Actions
   const initializeNetworks = async () => {
@@ -86,9 +110,10 @@ export const useNetworkStore = defineStore('network', () => {
 
     console.log('[NetworkStore] Networks initialized')
 
-    // Test connection to selected network
+    // Test connection to selected network and start periodic testing
     if (selectedNetworkId.value) {
       await testSelectedNetworkConnection()
+      startPeriodicConnectionTesting()
     }
   }
 
@@ -100,10 +125,6 @@ export const useNetworkStore = defineStore('network', () => {
     if (network) {
       selectedNetworkId.value = networkId
       localStorage.setItem('ipc-selected-network', networkId)
-
-      // Test connection to newly selected network
-      testSelectedNetworkConnection()
-
       return true
     }
     return false
@@ -117,9 +138,16 @@ export const useNetworkStore = defineStore('network', () => {
   }
 
   const testNetworkConnection = async (network: Network) => {
+    if (isTestingConnection.value) {
+      console.log(`[NetworkStore] Connection test already in progress for ${network.name}`)
+      return
+    }
+
     isTestingConnection.value = true
 
     try {
+      console.log(`[NetworkStore] Testing connection to ${network.name} (${network.rpcUrl})`)
+
       const status = await apiService.testNetworkConnection({
         network_id: network.id,
         network_name: network.name,
@@ -127,8 +155,24 @@ export const useNetworkStore = defineStore('network', () => {
         network_type: network.type
       })
 
+      // Update the status
+      const oldStatus = networkStatuses.value.get(network.id)
       networkStatuses.value.set(network.id, status)
-      console.log(`[NetworkStore] Connection test for ${network.name}:`, status.connected ? 'CONNECTED' : 'FAILED')
+
+      // Log status change
+      if (!oldStatus || oldStatus.connected !== status.connected) {
+        console.log(`[NetworkStore] Connection status changed for ${network.name}: ${status.connected ? 'CONNECTED' : 'DISCONNECTED'}`)
+
+        if (status.connected) {
+          fastRetryCount.value = 0 // Reset fast retry count on successful connection
+        }
+      }
+
+      // If this is the selected network and it just connected, notify
+      if (network.id === selectedNetworkId.value && status.connected && (!oldStatus || !oldStatus.connected)) {
+        console.log(`[NetworkStore] Selected network ${network.name} is now connected`)
+      }
+
     } catch (error) {
       console.error(`[NetworkStore] Failed to test connection for ${network.name}:`, error)
 
@@ -142,10 +186,73 @@ export const useNetworkStore = defineStore('network', () => {
         last_checked: new Date().toISOString()
       }
 
+      const oldStatus = networkStatuses.value.get(network.id)
       networkStatuses.value.set(network.id, failedStatus)
+
+      // Log status change
+      if (!oldStatus || oldStatus.connected !== failedStatus.connected) {
+        console.log(`[NetworkStore] Connection failed for ${network.name}: ${failedStatus.error}`)
+      }
     } finally {
       isTestingConnection.value = false
     }
+  }
+
+  const startPeriodicConnectionTesting = () => {
+    // Clear existing interval
+    stopPeriodicConnectionTesting()
+
+    if (!isPeriodicTestingEnabled.value) {
+      console.log('[NetworkStore] Periodic connection testing is disabled')
+      return
+    }
+
+    console.log('[NetworkStore] Starting periodic connection testing')
+
+    const runPeriodicTest = () => {
+      if (!selectedNetwork.value) return
+
+      const currentStatus = selectedNetworkStatus.value
+      let nextInterval = CONNECTION_TEST_INTERVAL
+
+      // Use fast retry interval if we're disconnected and haven't exceeded max fast retries
+      if (!currentStatus?.connected && fastRetryCount.value < MAX_FAST_RETRIES) {
+        nextInterval = FAST_RETRY_INTERVAL
+        fastRetryCount.value++
+        console.log(`[NetworkStore] Using fast retry (${fastRetryCount.value}/${MAX_FAST_RETRIES}) - next test in ${nextInterval/1000}s`)
+      } else if (!currentStatus?.connected) {
+        console.log(`[NetworkStore] Max fast retries reached - using normal interval (${nextInterval/1000}s)`)
+      }
+
+      // Test the current selected network
+      testSelectedNetworkConnection().then(() => {
+        // Schedule next test
+        if (isPeriodicTestingEnabled.value && selectedNetwork.value) {
+          connectionTestInterval.value = setTimeout(runPeriodicTest, nextInterval)
+        }
+      })
+    }
+
+    // Schedule first test
+    connectionTestInterval.value = setTimeout(runPeriodicTest, CONNECTION_TEST_INTERVAL)
+  }
+
+  const stopPeriodicConnectionTesting = () => {
+    if (connectionTestInterval.value) {
+      clearTimeout(connectionTestInterval.value)
+      connectionTestInterval.value = null
+      console.log('[NetworkStore] Stopped periodic connection testing')
+    }
+  }
+
+  const enablePeriodicTesting = () => {
+    isPeriodicTestingEnabled.value = true
+    startPeriodicConnectionTesting()
+  }
+
+  const disablePeriodicTesting = () => {
+    isPeriodicTestingEnabled.value = false
+    stopPeriodicConnectionTesting()
   }
 
   const testAllNetworkConnections = async () => {
@@ -224,11 +331,6 @@ export const useNetworkStore = defineStore('network', () => {
     if (selectedNetworkId.value === id) {
       selectedNetworkId.value = networks.value[0]?.id || DEFAULT_NETWORKS[0].id
       localStorage.setItem('ipc-selected-network', selectedNetworkId.value)
-
-      // Test connection to newly selected network
-      if (selectedNetworkId.value) {
-        testSelectedNetworkConnection()
-      }
     }
 
     saveNetworks()
@@ -239,11 +341,12 @@ export const useNetworkStore = defineStore('network', () => {
     networks.value = [...DEFAULT_NETWORKS]
     selectedNetworkId.value = DEFAULT_NETWORKS[0].id
     networkStatuses.value.clear()
+    fastRetryCount.value = 0
     saveNetworks()
     localStorage.setItem('ipc-selected-network', selectedNetworkId.value)
 
-    // Test connection to default network
-    testSelectedNetworkConnection()
+    // Restart connection testing
+    startPeriodicConnectionTesting()
   }
 
   const saveNetworks = () => {
@@ -289,6 +392,11 @@ export const useNetworkStore = defineStore('network', () => {
     )
   }
 
+  // Cleanup function for when the store is destroyed
+  const cleanup = () => {
+    stopPeriodicConnectionTesting()
+  }
+
   return {
     // State
     networks: availableNetworks,
@@ -298,6 +406,7 @@ export const useNetworkStore = defineStore('network', () => {
     networkStatuses: computed(() => networkStatuses.value),
     isLoading,
     isTestingConnection,
+    isPeriodicTestingEnabled: computed(() => isPeriodicTestingEnabled.value),
 
     // Actions
     selectNetwork,
@@ -310,6 +419,11 @@ export const useNetworkStore = defineStore('network', () => {
     initializeNetworks,
     testSelectedNetworkConnection,
     testNetworkConnection,
-    testAllNetworkConnections
+    testAllNetworkConnections,
+    startPeriodicConnectionTesting,
+    stopPeriodicConnectionTesting,
+    enablePeriodicTesting,
+    disablePeriodicTesting,
+    cleanup
   }
 })

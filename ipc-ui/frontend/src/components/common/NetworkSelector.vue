@@ -23,6 +23,19 @@
         {{ networkStore.selectedNetwork?.name || 'No Network' }}
       </span>
 
+      <!-- Manual refresh button -->
+      <button
+        @click.stop="refreshConnection"
+        :disabled="networkStore.isTestingConnection"
+        class="p-1 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded transition-colors"
+        :class="{ 'animate-spin': networkStore.isTestingConnection }"
+        title="Test network connection"
+      >
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+      </button>
+
       <!-- Network type badge -->
       <span
         v-if="networkStore.selectedNetwork"
@@ -57,8 +70,16 @@
     >
       <div class="py-1">
         <!-- Current network header -->
-        <div class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">
-          Available Networks
+        <div class="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100 flex items-center justify-between">
+          <span>Available Networks</span>
+          <button
+            @click="testAllNetworks"
+            :disabled="networkStore.isTestingConnection"
+            class="text-xs text-primary-600 hover:text-primary-700 font-medium disabled:opacity-50"
+            :class="{ 'animate-pulse': networkStore.isTestingConnection }"
+          >
+            Test All
+          </button>
         </div>
 
         <!-- Network list -->
@@ -87,6 +108,18 @@
                 <div>
                   <div class="font-medium text-gray-900">{{ network.name }}</div>
                   <div class="text-xs text-gray-500 truncate max-w-48">{{ network.rpcUrl }}</div>
+                  <!-- Connection details -->
+                  <div v-if="getNetworkStatus(network.id)" class="text-xs text-gray-400 mt-1">
+                    <span v-if="getNetworkStatus(network.id)?.connected && getNetworkStatus(network.id)?.response_time_ms">
+                      {{ getNetworkStatus(network.id)?.response_time_ms }}ms
+                    </span>
+                    <span v-else-if="!getNetworkStatus(network.id)?.connected && getNetworkStatus(network.id)?.error" class="text-red-500">
+                      {{ getNetworkStatus(network.id)?.error?.substring(0, 30) }}{{ (getNetworkStatus(network.id)?.error?.length || 0) > 30 ? '...' : '' }}
+                    </span>
+                    <span v-if="getNetworkStatus(network.id)?.last_checked">
+                      • {{ formatLastChecked(getNetworkStatus(network.id)?.last_checked || '') }}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -174,6 +207,18 @@ const closeManageNetworks = () => {
   showManageModal.value = false
 }
 
+const refreshConnection = async () => {
+  if (!networkStore.isTestingConnection) {
+    await networkStore.testSelectedNetworkConnection()
+  }
+}
+
+const testAllNetworks = async () => {
+  if (!networkStore.isTestingConnection) {
+    await networkStore.testAllNetworkConnections()
+  }
+}
+
 const getNetworkStatus = (networkId: string) => {
   return networkStore.networkStatuses.get(networkId) || null
 }
@@ -184,9 +229,11 @@ const getConnectionStatusTitle = () => {
 
   if (status.connected) {
     const timeInfo = status.response_time_ms ? ` (${status.response_time_ms}ms)` : ''
-    return `Connected${timeInfo}`
+    const lastChecked = status.last_checked ? ` - Last checked: ${formatLastChecked(status.last_checked)}` : ''
+    return `Connected${timeInfo}${lastChecked}`
   } else {
-    return status.error ? `Disconnected: ${status.error}` : 'Disconnected'
+    const lastChecked = status.last_checked ? ` - Last checked: ${formatLastChecked(status.last_checked)}` : ''
+    return status.error ? `Disconnected: ${status.error}${lastChecked}` : `Disconnected${lastChecked}`
   }
 }
 
@@ -196,9 +243,31 @@ const getNetworkConnectionTitle = (networkId: string) => {
 
   if (status.connected) {
     const timeInfo = status.response_time_ms ? ` (${status.response_time_ms}ms)` : ''
-    return `Connected${timeInfo}`
+    const lastChecked = status.last_checked ? ` - Last checked: ${formatLastChecked(status.last_checked)}` : ''
+    return `Connected${timeInfo}${lastChecked}`
   } else {
-    return status.error ? `Disconnected: ${status.error}` : 'Disconnected'
+    const lastChecked = status.last_checked ? ` - Last checked: ${formatLastChecked(status.last_checked)}` : ''
+    return status.error ? `Disconnected: ${status.error}${lastChecked}` : `Disconnected${lastChecked}`
+  }
+}
+
+const formatLastChecked = (timestamp: string) => {
+  try {
+    const date = new Date(timestamp)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffSeconds = Math.floor(diffMs / 1000)
+    const diffMinutes = Math.floor(diffSeconds / 60)
+
+    if (diffSeconds < 60) {
+      return `${diffSeconds}s ago`
+    } else if (diffMinutes < 60) {
+      return `${diffMinutes}m ago`
+    } else {
+      return date.toLocaleTimeString()
+    }
+  } catch {
+    return 'Unknown'
   }
 }
 

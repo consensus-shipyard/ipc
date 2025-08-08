@@ -4,12 +4,16 @@ import { RouterView, useRoute } from 'vue-router'
 import AppHeader from './components/common/AppHeader.vue'
 import AppLoadingState from './components/common/AppLoadingState.vue'
 import AppSidebar from './components/common/AppSidebar.vue'
+import { useNetworkMonitoring } from './composables/useNetworkMonitoring'
 import { useAppStore } from './stores/app'
 
 const route = useRoute()
 
 // Initialize app store for centralized data loading
 const appStore = useAppStore()
+
+// Initialize network monitoring for real-time connection status
+const { networkStore } = useNetworkMonitoring()
 
 // Check if we're in the wizard flow to show different layout
 const isWizardRoute = computed(() => {

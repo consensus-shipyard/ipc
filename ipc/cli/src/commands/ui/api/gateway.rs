@@ -17,11 +17,13 @@ pub fn gateway_routes(
 ) -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
     let gateways_route = warp::path("gateways")
         .and(warp::get())
+        .and(warp::header::headers_cloned())
         .and(with_state(state.clone()))
         .and_then(handle_get_gateways);
 
     let discover_route = warp::path!("gateways" / "discover")
         .and(warp::post())
+        .and(warp::header::headers_cloned())
         .and(with_state(state.clone()))
         .and_then(handle_discover_gateways);
 
@@ -51,8 +53,11 @@ fn with_state(
 
 /// Handle get gateways request
 async fn handle_get_gateways(
+    headers: warp::http::HeaderMap,
     state: AppState,
 ) -> Result<impl Reply, warp::Rejection> {
+    log::debug!("Get gateways request with headers: {:?}", headers);
+
     let global = GlobalArguments {
         config_path: Some(state.config_path.clone()),
         _network: fvm_shared::address::Network::Testnet,
@@ -61,8 +66,11 @@ async fn handle_get_gateways(
 
     let service = GatewayService::new(global);
 
-    match service.discover_gateways().await {
-        Ok(gateways) => Ok(warp::reply::json(&ApiResponse::success(gateways))),
+    match service.discover_gateways(Some(&headers)).await {
+        Ok(gateways) => {
+            log::info!("Found {} gateways for selected network", gateways.len());
+            Ok(warp::reply::json(&ApiResponse::success(gateways)))
+        },
         Err(e) => {
             log::error!("Get gateways failed: {}", e);
             Err(warp::reject::custom(ServerError(e.to_string())))
@@ -72,8 +80,11 @@ async fn handle_get_gateways(
 
 /// Handle discover gateways request
 async fn handle_discover_gateways(
+    headers: warp::http::HeaderMap,
     state: AppState,
 ) -> Result<impl Reply, warp::Rejection> {
+    log::debug!("Discover gateways request with headers: {:?}", headers);
+
     let global = GlobalArguments {
         config_path: Some(state.config_path.clone()),
         _network: fvm_shared::address::Network::Testnet,
@@ -82,8 +93,11 @@ async fn handle_discover_gateways(
 
     let service = GatewayService::new(global);
 
-    match service.discover_gateways().await {
-        Ok(gateways) => Ok(warp::reply::json(&ApiResponse::success(gateways))),
+    match service.discover_gateways(Some(&headers)).await {
+        Ok(gateways) => {
+            log::info!("Discovered {} gateways for selected network", gateways.len());
+            Ok(warp::reply::json(&ApiResponse::success(gateways)))
+        },
         Err(e) => {
             log::error!("Discover gateways failed: {}", e);
             Err(warp::reject::custom(ServerError(e.to_string())))

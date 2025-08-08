@@ -10,6 +10,8 @@ use crate::{GlobalArguments, get_ipc_provider};
 use anyhow::{Result, Context};
 use serde::{Serialize, Deserialize};
 use std::str::FromStr;
+use warp::http::HeaderMap;
+use ipc_api::subnet_id::SubnetID;
 
 /// Gateway information
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,15 +37,79 @@ impl GatewayService {
         Self { global }
     }
 
-    /// Discover gateways from the IPC configuration
-    pub async fn discover_gateways(&self) -> Result<Vec<GatewayInfo>> {
+    /// Get the parent network from network headers or default
+    fn get_parent_network_from_headers(headers: &HeaderMap) -> String {
+        // Extract chain ID from network headers
+        if let Some(chain_id_header) = headers.get("x-network-chain-id") {
+            if let Ok(chain_id_str) = chain_id_header.to_str() {
+                if let Ok(chain_id) = chain_id_str.parse::<u64>() {
+                    // Map common chain IDs to their subnet IDs
+                    return match chain_id {
+                        31337 => "/r31337".to_string(),      // Local Anvil
+                        314159 => "/r314159".to_string(),    // Calibration Testnet
+                        1 => "/r1".to_string(),              // Ethereum Mainnet
+                        _ => format!("/r{}", chain_id),      // Generic mapping
+                    };
+                }
+            }
+        }
+
+        // Try to get from network type header as fallback
+        if let Some(network_type_header) = headers.get("x-network-type") {
+            if let Ok(network_type) = network_type_header.to_str() {
+                return match network_type {
+                    "local" => "/r31337".to_string(),
+                    "testnet" => "/r314159".to_string(),
+                    "mainnet" => "/r1".to_string(),
+                    _ => "/r314159".to_string(), // Default to testnet
+                };
+            }
+        }
+
+        // Default fallback
+        "/r314159".to_string()
+    }
+
+    /// Discover gateways from the IPC configuration, optionally filtered by network
+    pub async fn discover_gateways(&self, headers: Option<&HeaderMap>) -> Result<Vec<GatewayInfo>> {
         let config_store = IpcConfigStore::load_or_init(&self.global).await?;
         let config = config_store.snapshot().await;
 
         let mut gateways = Vec::new();
+        let target_network = headers.map(|h| Self::get_parent_network_from_headers(h));
+
+        log::info!("Discovering gateways, target network: {:?}", target_network);
 
         // Iterate through subnets in the configuration to find gateway information
         for (subnet_id_str, subnet_config) in &config.subnets {
+            // Filter by target network if specified
+            if let Some(ref target) = target_network {
+                // Check if this subnet belongs to the target parent network
+                if let Ok(subnet_id) = SubnetID::from_str(&subnet_id_str.to_string()) {
+                    if subnet_id.is_root() {
+                        // This is a root network, check if it matches
+                        if subnet_id_str.to_string() != *target {
+                            continue;
+                        }
+                    } else {
+                        // This is a subnet, check if its parent matches
+                        if let Some(parent_subnet) = subnet_id.parent() {
+                            if parent_subnet.to_string() != *target {
+                                continue;
+                            }
+                        } else {
+                            // Fallback: check if the subnet string contains the target
+                            if !subnet_id_str.to_string().starts_with(target) {
+                                continue;
+                            }
+                        }
+                    }
+                } else {
+                    log::warn!("Failed to parse subnet ID: {}", subnet_id_str.to_string());
+                    continue;
+                }
+            }
+
             // Try to get gateway information from the subnet configuration
             match &subnet_config.config {
                 ipc_provider::config::SubnetConfig::Fevm(evm_subnet) => {
@@ -58,6 +124,7 @@ impl GatewayService {
                         is_active: true, // Assume active if in config
                         deployed_at: chrono::Utc::now(), // TODO: Track actual deployment time
                     };
+                    log::info!("Found gateway for subnet: {} (parent: {})", subnet_id_str, gateway_info.parent_network);
                     gateways.push(gateway_info);
                 }
                 _ => {
@@ -67,12 +134,13 @@ impl GatewayService {
             }
         }
 
+        log::info!("Discovered {} gateways for target network {:?}", gateways.len(), target_network);
         Ok(gateways)
     }
 
     /// List deployed contracts for gateways
     pub async fn list_deployed_contracts(&self) -> Result<Vec<serde_json::Value>> {
-        let gateways = self.discover_gateways().await?;
+        let gateways = self.discover_gateways(None).await?; // No headers for this call
         let mut contracts = Vec::new();
 
         for gateway in &gateways {
@@ -106,7 +174,7 @@ impl GatewayService {
 
     /// Get detailed information about a specific gateway
     pub async fn get_gateway_info(&self, gateway_id: &str) -> Result<Option<GatewayInfo>> {
-        let gateways = self.discover_gateways().await?;
+        let gateways = self.discover_gateways(None).await?; // No headers for this call
         Ok(gateways.into_iter().find(|g| g.id == gateway_id))
     }
 
@@ -197,7 +265,7 @@ impl GatewayService {
 
     /// Get all contracts associated with gateways
     pub async fn get_gateway_contracts(&self) -> Result<Vec<serde_json::Value>> {
-        let gateways = self.discover_gateways().await?;
+        let gateways = self.discover_gateways(None).await?; // No headers for this call
 
         let mut contracts = Vec::new();
 

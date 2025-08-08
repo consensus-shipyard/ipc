@@ -18,6 +18,7 @@ pub fn deployment_routes(
     let deploy_route = warp::path("deploy")
         .and(warp::post())
         .and(warp::body::json())
+        .and(warp::header::headers_cloned())
         .and(with_state(state.clone()))
         .and_then(handle_deploy_request);
 
@@ -39,9 +40,11 @@ fn with_state(
 /// Handle deployment request
 async fn handle_deploy_request(
     request: DeploymentRequest,
+    headers: warp::http::HeaderMap,
     state: AppState,
 ) -> Result<impl Reply, warp::Rejection> {
     log::info!("Received deployment request: {:?}", request);
+    log::debug!("Request headers: {:?}", headers);
 
     let global = crate::GlobalArguments {
         config_path: Some(state.config_path.clone()),
@@ -51,7 +54,7 @@ async fn handle_deploy_request(
 
     let service = DeploymentService::new(global);
 
-    match service.deploy_subnet(request.config.clone()).await {
+    match service.deploy_subnet(request.config.clone(), &headers).await {
         Ok(result) => {
             let deployment_id = uuid::Uuid::new_v4().to_string();
             let response = DeploymentResponse {
@@ -91,53 +94,27 @@ async fn handle_deploy_request(
 
 /// Handle get templates request
 async fn handle_get_templates(
-    _state: AppState,
+    state: AppState,
 ) -> Result<impl Reply, warp::Rejection> {
     log::info!("Received get templates request");
 
-    // Return available deployment templates
-    let templates = vec![
-        serde_json::json!({
-            "id": "basic-subnet",
-            "name": "Basic Subnet",
-            "description": "A simple subnet configuration with default settings",
-            "category": "basic",
-            "config": {
-                "min_validator_stake": 1.0,
-                "min_validators": 1,
-                "bottomup_check_period": 100,
-                "permission_mode": "Collateral",
-                "supply_source_kind": "Native"
-            }
-        }),
-        serde_json::json!({
-            "id": "advanced-subnet",
-            "name": "Advanced Subnet",
-            "description": "A subnet with advanced configuration options",
-            "category": "advanced",
-            "config": {
-                "min_validator_stake": 10.0,
-                "min_validators": 3,
-                "bottomup_check_period": 50,
-                "permission_mode": "Federated",
-                "supply_source_kind": "ERC20"
-            }
-        }),
-        serde_json::json!({
-            "id": "enterprise-subnet",
-            "name": "Enterprise Subnet",
-            "description": "A high-performance subnet for enterprise use",
-            "category": "enterprise",
-            "config": {
-                "min_validator_stake": 100.0,
-                "min_validators": 5,
-                "bottomup_check_period": 30,
-                "permission_mode": "Collateral",
-                "supply_source_kind": "Native"
-            }
-        })
-    ];
+    let global = crate::GlobalArguments {
+        config_path: Some(state.config_path.clone()),
+        _network: fvm_shared::address::Network::Testnet,
+        __network: None,
+    };
 
-    let response = super::types::ApiResponse::success(templates);
-    Ok(warp::reply::json(&response))
+    let service = DeploymentService::new(global);
+
+    match service.get_templates().await {
+        Ok(templates) => {
+            let response = ApiResponse::success(templates);
+            Ok(warp::reply::json(&response))
+        }
+        Err(e) => {
+            log::error!("Failed to get templates: {}", e);
+            let response = ApiResponse::<Vec<serde_json::Value>>::error(format!("Failed to get templates: {}", e));
+            Ok(warp::reply::json(&response))
+        }
+    }
 }

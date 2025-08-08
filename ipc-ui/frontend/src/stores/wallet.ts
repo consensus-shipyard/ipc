@@ -96,7 +96,8 @@ export const useWalletStore = defineStore('wallet', () => {
         throw new Error(`Failed to fetch wallet addresses: ${response.statusText}`)
       }
 
-      const walletAddresses: WalletAddress[] = await response.json()
+      const responseData = await response.json()
+      const walletAddresses: WalletAddress[] = responseData.data || []
       addresses.value = walletAddresses
       lastFetchTime.value = now
 
@@ -130,7 +131,7 @@ export const useWalletStore = defineStore('wallet', () => {
     return addresses.value.find(addr => addr.address === address && addr.pubkey)
   }
 
-  // Initialize on store creation
+  // Initialize default address from localStorage on store creation
   loadDefaultAddress()
 
   return {
