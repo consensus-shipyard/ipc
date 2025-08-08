@@ -267,7 +267,8 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
             collateralSource: AssetHelper.native(),
             validatorGater: address(0),
             validatorRewarder: address(new ValidatorRewarderMap()),
-            genesisSubnetIpcContractsOwner: address(1)
+            genesisSubnetIpcContractsOwner: address(1),
+            chainID: uint64(1671263715227509)
         });
 
         registrySubnetFacet.newSubnetActor(params);

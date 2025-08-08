@@ -217,7 +217,8 @@ contract TestSubnetActor is Test, TestParams {
             collateralSource: AssetHelper.native(),
             validatorGater: address(0),
             validatorRewarder: address(0),
-            genesisSubnetIpcContractsOwner: address(1)
+            genesisSubnetIpcContractsOwner: address(1),
+            chainID: uint64(1671263715227509)
         });
         return params;
     }
@@ -243,7 +244,8 @@ contract TestSubnetActor is Test, TestParams {
             collateralSource: collateral,
             validatorGater: address(0),
             validatorRewarder: address(0),
-            genesisSubnetIpcContractsOwner: address(1)
+            genesisSubnetIpcContractsOwner: address(1),
+            chainID: uint64(1671263715227509)
         });
         return params;
     }
@@ -279,7 +281,8 @@ contract TestSubnetActor is Test, TestParams {
             collateralSource: AssetHelper.native(),
             validatorGater: address(0),
             validatorRewarder: address(0),
-            genesisSubnetIpcContractsOwner: address(1)
+            genesisSubnetIpcContractsOwner: address(1),
+            chainID: uint64(1671263715227509)
         });
         return params;
     }
@@ -645,7 +648,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             collateralSource: AssetHelper.native(),
             validatorGater: address(0),
             validatorRewarder: address(new ValidatorRewarderMap()),
-            genesisSubnetIpcContractsOwner: address(1)
+            genesisSubnetIpcContractsOwner: address(1),
+            chainID: uint64(1671263715227509)
         });
         saDiamond = createSubnetActor(params);
     }
@@ -678,7 +682,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             collateralSource: AssetHelper.native(),
             validatorGater: _validatorGater,
             validatorRewarder: address(new ValidatorRewarderMap()),
-            genesisSubnetIpcContractsOwner: address(1)
+            genesisSubnetIpcContractsOwner: address(1),
+            chainID: uint64(1671263715227509)
         });
         saDiamond = createSubnetActor(params);
     }
