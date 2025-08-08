@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useNetworkStore } from '@/stores/network'
 import { useSubnetsStore } from '@/stores/subnets'
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
@@ -50,6 +51,7 @@ const currentNavigationItems = computed(() => {
 
 // Stores
 const subnetsStore = useSubnetsStore()
+const networkStore = useNetworkStore()
 
 // Real subnet data state
 const loading = ref(true)
@@ -180,6 +182,26 @@ const getStatusColor = (status: string) => {
   }
 }
 
+// Get network connection status display
+const getNetworkConnectionStatus = computed(() => {
+  const status = networkStore.selectedNetworkStatus
+  if (!status) return { text: 'Unknown', color: 'text-gray-500', bgColor: 'bg-gray-500' }
+
+  if (status.connected) {
+    return {
+      text: 'Connected',
+      color: 'text-green-600',
+      bgColor: 'bg-green-500'
+    }
+  } else {
+    return {
+      text: 'Disconnected',
+      color: 'text-red-600',
+      bgColor: 'bg-red-500'
+    }
+  }
+})
+
 // SVG icons
 const icons = {
   home: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z M9 22V12h6v10',
@@ -199,7 +221,7 @@ onMounted(async () => {
 
 <template>
   <aside class="fixed top-16 left-0 z-40 w-64 h-screen bg-white border-r border-gray-200 shadow-sm">
-    <div class="h-full px-3 py-4 overflow-y-auto">
+    <div class="flex flex-col h-full px-4 py-4 overflow-y-auto">
       <!-- Navigation -->
       <nav class="space-y-2">
         <RouterLink
@@ -346,6 +368,19 @@ onMounted(async () => {
                   ]"
                 ></div>
                 {{ systemStatus.cliConnection }}
+              </span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-gray-600">Network</span>
+              <span class="flex items-center" :class="getNetworkConnectionStatus.color">
+                <div
+                  :class="[
+                    'w-2 h-2 rounded-full mr-2',
+                    getNetworkConnectionStatus.bgColor,
+                    { 'animate-pulse': networkStore.isTestingConnection }
+                  ]"
+                ></div>
+                {{ getNetworkConnectionStatus.text }}
               </span>
             </div>
             <div class="flex items-center justify-between">

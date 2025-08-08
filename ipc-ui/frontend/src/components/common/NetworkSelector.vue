@@ -6,15 +6,16 @@
       class="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
       :class="{ 'bg-gray-50': showDropdown }"
     >
-      <!-- Network status indicator -->
+      <!-- Network connection status indicator -->
       <div
         class="w-2 h-2 rounded-full"
         :class="{
-          'bg-green-500': networkStore.selectedNetwork?.type === 'mainnet',
-          'bg-yellow-500': networkStore.selectedNetwork?.type === 'testnet',
-          'bg-blue-500': networkStore.selectedNetwork?.type === 'local',
-          'bg-gray-500': networkStore.selectedNetwork?.type === 'custom' || !networkStore.selectedNetwork
+          'bg-green-500': networkStore.selectedNetworkStatus?.connected === true,
+          'bg-red-500': networkStore.selectedNetworkStatus?.connected === false,
+          'bg-gray-400': !networkStore.selectedNetworkStatus,
+          'animate-pulse': networkStore.isTestingConnection
         }"
+        :title="getConnectionStatusTitle()"
       ></div>
 
       <!-- Network name -->
@@ -71,15 +72,16 @@
           >
             <div class="flex items-center justify-between">
               <div class="flex items-center space-x-3">
-                <!-- Status indicator -->
+                <!-- Connection status indicator -->
                 <div
-                  class="w-2 h-2 rounded-full"
+                  class="w-2 h-2 rounded-full flex-shrink-0"
                   :class="{
-                    'bg-green-500': network.type === 'mainnet',
-                    'bg-yellow-500': network.type === 'testnet',
-                    'bg-blue-500': network.type === 'local',
-                    'bg-gray-500': network.type === 'custom'
+                    'bg-green-500': getNetworkStatus(network.id)?.connected === true,
+                    'bg-red-500': getNetworkStatus(network.id)?.connected === false,
+                    'bg-gray-400': !getNetworkStatus(network.id),
+                    'animate-pulse': networkStore.isTestingConnection
                   }"
+                  :title="getNetworkConnectionTitle(network.id)"
                 ></div>
 
                 <div>
@@ -170,6 +172,34 @@ const openManageNetworks = () => {
 
 const closeManageNetworks = () => {
   showManageModal.value = false
+}
+
+const getNetworkStatus = (networkId: string) => {
+  return networkStore.networkStatuses.get(networkId) || null
+}
+
+const getConnectionStatusTitle = () => {
+  const status = networkStore.selectedNetworkStatus
+  if (!status) return 'Connection status unknown'
+
+  if (status.connected) {
+    const timeInfo = status.response_time_ms ? ` (${status.response_time_ms}ms)` : ''
+    return `Connected${timeInfo}`
+  } else {
+    return status.error ? `Disconnected: ${status.error}` : 'Disconnected'
+  }
+}
+
+const getNetworkConnectionTitle = (networkId: string) => {
+  const status = getNetworkStatus(networkId)
+  if (!status) return 'Connection status unknown'
+
+  if (status.connected) {
+    const timeInfo = status.response_time_ms ? ` (${status.response_time_ms}ms)` : ''
+    return `Connected${timeInfo}`
+  } else {
+    return status.error ? `Disconnected: ${status.error}` : 'Disconnected'
+  }
 }
 
 // Close dropdown when clicking outside

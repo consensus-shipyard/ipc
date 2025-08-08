@@ -10,6 +10,7 @@ pub mod subnet;
 pub mod wallet;
 pub mod gateway;
 pub mod transactions;
+pub mod network;
 
 pub use types::*;
 pub use deployment::*;
@@ -17,3 +18,4 @@ pub use subnet::*;
 pub use wallet::*;
 pub use gateway::*;
 pub use transactions::*;
+pub use network::*;

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { apiService, type NetworkConnectionStatus } from '@/services/api'
 
 export interface Network {
   id: string
@@ -37,6 +38,8 @@ export const useNetworkStore = defineStore('network', () => {
   const networks = ref<Network[]>([])
   const selectedNetworkId = ref<string>('')
   const isLoading = ref(false)
+  const networkStatuses = ref<Map<string, NetworkConnectionStatus>>(new Map())
+  const isTestingConnection = ref(false)
 
   // Computed
   const selectedNetwork = computed(() => {
@@ -45,6 +48,11 @@ export const useNetworkStore = defineStore('network', () => {
       return undefined
     }
     return networks.value.find(network => network.id === selectedNetworkId.value)
+  })
+
+  const selectedNetworkStatus = computed(() => {
+    if (!selectedNetworkId.value) return null
+    return networkStatuses.value.get(selectedNetworkId.value) || null
   })
 
   const availableNetworks = computed(() => networks.value)
@@ -77,6 +85,11 @@ export const useNetworkStore = defineStore('network', () => {
     }
 
     console.log('[NetworkStore] Networks initialized')
+
+    // Test connection to selected network
+    if (selectedNetworkId.value) {
+      await testSelectedNetworkConnection()
+    }
   }
 
   // Initialize on store creation
@@ -87,9 +100,57 @@ export const useNetworkStore = defineStore('network', () => {
     if (network) {
       selectedNetworkId.value = networkId
       localStorage.setItem('ipc-selected-network', networkId)
+
+      // Test connection to newly selected network
+      testSelectedNetworkConnection()
+
       return true
     }
     return false
+  }
+
+  const testSelectedNetworkConnection = async () => {
+    const network = selectedNetwork.value
+    if (!network) return
+
+    await testNetworkConnection(network)
+  }
+
+  const testNetworkConnection = async (network: Network) => {
+    isTestingConnection.value = true
+
+    try {
+      const status = await apiService.testNetworkConnection({
+        network_id: network.id,
+        network_name: network.name,
+        rpc_url: network.rpcUrl,
+        network_type: network.type
+      })
+
+      networkStatuses.value.set(network.id, status)
+      console.log(`[NetworkStore] Connection test for ${network.name}:`, status.connected ? 'CONNECTED' : 'FAILED')
+    } catch (error) {
+      console.error(`[NetworkStore] Failed to test connection for ${network.name}:`, error)
+
+      // Create a failed status
+      const failedStatus: NetworkConnectionStatus = {
+        network_id: network.id,
+        network_name: network.name,
+        rpc_url: network.rpcUrl,
+        connected: false,
+        error: error instanceof Error ? error.message : 'Connection test failed',
+        last_checked: new Date().toISOString()
+      }
+
+      networkStatuses.value.set(network.id, failedStatus)
+    } finally {
+      isTestingConnection.value = false
+    }
+  }
+
+  const testAllNetworkConnections = async () => {
+    const testPromises = networks.value.map(network => testNetworkConnection(network))
+    await Promise.allSettled(testPromises)
   }
 
   const addNetwork = (network: Omit<Network, 'id'>) => {
@@ -108,6 +169,10 @@ export const useNetworkStore = defineStore('network', () => {
 
     networks.value.push(newNetwork)
     saveNetworks()
+
+    // Test connection to new network
+    testNetworkConnection(newNetwork)
+
     return newNetwork
   }
 
@@ -132,6 +197,12 @@ export const useNetworkStore = defineStore('network', () => {
     }
 
     saveNetworks()
+
+    // Re-test connection if RPC URL changed
+    if (updates.rpcUrl) {
+      testNetworkConnection(network)
+    }
+
     return true
   }
 
@@ -146,10 +217,18 @@ export const useNetworkStore = defineStore('network', () => {
 
     networks.value = networks.value.filter(n => n.id !== id)
 
+    // Remove connection status
+    networkStatuses.value.delete(id)
+
     // If the removed network was selected, select the first available
     if (selectedNetworkId.value === id) {
       selectedNetworkId.value = networks.value[0]?.id || DEFAULT_NETWORKS[0].id
       localStorage.setItem('ipc-selected-network', selectedNetworkId.value)
+
+      // Test connection to newly selected network
+      if (selectedNetworkId.value) {
+        testSelectedNetworkConnection()
+      }
     }
 
     saveNetworks()
@@ -159,8 +238,12 @@ export const useNetworkStore = defineStore('network', () => {
   const resetToDefaults = () => {
     networks.value = [...DEFAULT_NETWORKS]
     selectedNetworkId.value = DEFAULT_NETWORKS[0].id
+    networkStatuses.value.clear()
     saveNetworks()
     localStorage.setItem('ipc-selected-network', selectedNetworkId.value)
+
+    // Test connection to default network
+    testSelectedNetworkConnection()
   }
 
   const saveNetworks = () => {
@@ -211,7 +294,10 @@ export const useNetworkStore = defineStore('network', () => {
     networks: availableNetworks,
     selectedNetwork,
     selectedNetworkId: computed(() => selectedNetworkId.value),
+    selectedNetworkStatus,
+    networkStatuses: computed(() => networkStatuses.value),
     isLoading,
+    isTestingConnection,
 
     // Actions
     selectNetwork,
@@ -221,6 +307,9 @@ export const useNetworkStore = defineStore('network', () => {
     resetToDefaults,
     validateNetwork,
     isNetworkNameUnique,
-    initializeNetworks
+    initializeNetworks,
+    testSelectedNetworkConnection,
+    testNetworkConnection,
+    testAllNetworkConnections
   }
 })

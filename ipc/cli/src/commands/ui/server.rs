@@ -5,6 +5,7 @@
 use super::api::{
     deployment::deployment_routes,
     gateway::gateway_routes,
+    network::network_routes,
     subnet::subnet_routes,
     transactions::transaction_routes,
     wallet::wallet_routes,
@@ -54,6 +55,7 @@ pub async fn start_ui_server(
                 .or(gateway_routes(state.clone()))
                 .or(deployment_routes(state.clone()))
                 .or(transaction_routes(state.clone()))
+                .or(network_routes(state.clone()))
         );
 
     // Create WebSocket routes

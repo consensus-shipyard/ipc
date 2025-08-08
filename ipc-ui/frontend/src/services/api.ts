@@ -146,6 +146,12 @@ export const apiService = {
     }
   },
 
+  // Network connection testing
+  async testNetworkConnection(networkData: NetworkConnectionTestRequest): Promise<NetworkConnectionStatus> {
+    const response = await retryRequest(() => api.post(API_ENDPOINTS.networkTestConnection, networkData))
+    return response.data.data
+  },
+
   // Templates
   async getTemplates() {
     return retryRequest(() => api.get(API_ENDPOINTS.templates))
@@ -265,6 +271,24 @@ interface DeploymentProgress {
   message?: string
   error?: string
   subnet_id?: string // The actual subnet ID generated during deployment
+}
+
+// Network connection status types
+export interface NetworkConnectionStatus {
+  network_id: string
+  network_name: string
+  rpc_url: string
+  connected: boolean
+  response_time_ms?: number
+  error?: string
+  last_checked: string
+}
+
+export interface NetworkConnectionTestRequest {
+  network_id: string
+  network_name: string
+  rpc_url: string
+  network_type: string
 }
 
 // Validator management interfaces

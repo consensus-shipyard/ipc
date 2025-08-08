@@ -67,6 +67,9 @@ export const API_ENDPOINTS = {
     updateStake: '/api/validators/update-stake',
     setFederatedPower: '/api/validators/set-federated-power',
   },
+  // Network connection testing
+  networkTestConnection: '/api/network/test-connection',
+  health: '/api/health',
 }
 
 // Helper function to get current network headers
