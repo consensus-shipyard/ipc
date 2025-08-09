@@ -94,9 +94,9 @@ cargo build --release
 {% endtab %}
 {% endtabs %}
 
-### Step 2: Initialise your config
+### Step 2: Initialize your config
 
-- Initialise the config
+- Initialize the config
 
 {% tabs %}
 {% tab title="Linux/MacOS" %}
@@ -110,6 +110,10 @@ ipc-cli config init
 {% endtabs %}
 
 This should have populated a default config file with all the parameters required to connect to calibration at `~/.ipc/config.toml`. Feel free to update this configuration to fit your needs.
+
+You have two options for setting up the contracts: use the public shared contracts or deploy your own private contracts.
+
+#### Option A: Use Public Shared Contracts
 
 The IPC stack is changing rapidly. To make sure you use the latest contracts deployed on Filecoin Calibration:
 
@@ -133,30 +137,100 @@ registry_addr = "<REGISTRY_ADDR>"
   [![Gateway Address](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fconsensus-shipyard%2Fipc%2Fcd%2Fcontracts%2Fdeployments%2Fr314159.json&query=%24.gateway_addr&label=Gateway%20Address)](https://github.com/consensus-shipyard/ipc/blob/cd/contracts/deployments/r314159.json)
   [![Registry Address](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fconsensus-shipyard%2Fipc%2Fcd%2Fcontracts%2Fdeployments%2Fr314159.json&query=%24.registry_addr&label=Registry%20Address)](https://github.com/consensus-shipyard/ipc/blob/cd/contracts/deployments/r314159.json)
 
-If you want to deploy your own custom ipc stack of contracts:
+#### Option B: Deploy Your Own Private Contracts
+
+If you want to deploy your own custom IPC stack of contracts (recommended for production or private testing):
+
+{% hint style="info" %}
+**When to use your own contracts:**
+- You want full control over the IPC infrastructure
+- You're developing custom functionality
+- You need a private testing environment
+- You want to avoid potential conflicts with other users on shared contracts
+{% endhint %}
+
+**Step 1: Prepare for contract deployment**
 
 ```bash
 cd contracts
 ```
 
-- Populate `.env` file with your `PRIVATE_KEY` and `RPC_URL`.
-- Set your `NETWORK` variable to `calibrationnet` value.
+**Step 2: Ensure you have a funded address**
+
+Make sure you have an Ethereum address with funds from the [Calibration faucet](https://faucet.calibration.fildev.network/):
+
+1. Get your address: `ipc-cli wallet show --wallet-type evm`
+2. Fund it at: https://faucet.calibration.fildev.network/
+3. Note your address - you'll need it for the deployment command
+
+{% hint style="info" %}
+**Why you need a funded Ethereum address:**
+
+Throughout IPC, you'll use Ethereum-format addresses (0x...) for:
+- **Contract deployment** (paying gas fees)
+- **Subnet operations** (creating, joining, managing subnets)
+- **Cross-subnet messaging** (sending funds between subnets)
+- **Checkpoint relaying** (submitting checkpoint transactions)
+
+This address must be funded with testnet tokens and stored in your IPC keystore.
+{% endhint %}
+
+**Step 3: Compile contracts**
+
+```bash
+# Build the contract artifacts
+make build
+```
+
+**Step 4: Deploy the contracts using ipc-cli**
+
+```bash
+# Deploy the complete IPC contract stack
+../target/release/ipc-cli deploy \
+  --url https://api.calibration.node.glif.io/rpc/v1 \
+  --chain-id 314159 \
+  --from <YOUR_ADDRESS_HERE> \
+  --contracts-dir ./out/
+```
+
+{% hint style="info" %}
+**About the Submitter Address (`--from` parameter):**
+
+The submitter address is **your own Ethereum address** (0x format) that will:
+- **Deploy the contracts** to the blockchain
+- **Pay for gas fees** during deployment
+- **Own the deployed contracts** (you'll be the contract owner)
+
+**Requirements:**
+- Must be an Ethereum-format address (0x...), not Filecoin format (t4...)
+- Must have sufficient funds to pay for deployment gas costs
+- Must be in your IPC keystore (the address you got from `ipc-cli wallet show --wallet-type evm`)
+{% endhint %}
+
+{% hint style="warning" %}
+**Important:** Replace `<YOUR_ADDRESS_HERE>` with your actual Ethereum address that has funds from the faucet. Use the address from step 2 above.
+{% endhint %}
+
+**Step 5: Note the deployed contract addresses**
+
+After deployment, look for output similar to this in your terminal:
 
 ```
-export NETWORK = calibrationnet
+======================== Deployed Contracts ========================
+Registry: 0x0987654321098765432109876543210987654321
+Gateway : 0x1234567890123456789012345678901234567890
+================================================================
 ```
 
-- Run the following command to deploy the contracts:
+{% hint style="warning" %}
+**Important:** Save these addresses! You'll need them for configuration and they represent YOUR deployed contracts.
+{% endhint %}
 
-```
-make deploy-stack
-```
+**Step 6: Update your IPC configuration**
 
-- Look for `GatewayDiamond` and `SubnetRegistryDiamond` addresses for later configuration steps.
+Run `nano ~/.ipc/config.toml` to edit your configuration file and replace the addresses with your newly deployed contracts:
 
-- Run `nano ~/.ipc/config.toml` to edit your configuration file. Replace the `gateway_addr` and `registry_addr` with the values you received from the `make deploy-stack` command.
-
-```
+```toml
 keystore_path = "~/.ipc"
 
 [[subnets]]
@@ -165,9 +239,22 @@ id = "/r314159"
 [subnets.config]
 network_type = "fevm"
 provider_http = "https://api.calibration.node.glif.io/rpc/v1"
-gateway_addr = "<GATEWAY_ADDR>"
-registry_addr = "<REGISTRY_ADDR>"
+gateway_addr = "0x1234567890123456789012345678901234567890"    # Your GatewayDiamond address
+registry_addr = "0x0987654321098765432109876543210987654321"   # Your SubnetRegistryDiamond address
 ```
+
+**Step 7: Verify deployment (Optional)**
+
+You can verify your contracts are working by checking them on the [Calibration Explorer](https://calibration.filfox.info/en):
+- Go to https://calibration.filfox.info/en
+- Search for your Gateway and Registry contract addresses
+- Verify they exist and have been deployed correctly
+
+---
+
+{% hint style="info" %}
+**Note:** If you deployed your own contracts, make sure to use YOUR contract addresses in all subsequent steps in this guide, particularly when setting up the validators with `PARENT_GATEWAY` and `PARENT_REGISTRY` environment variables.
+{% endhint %}
 
 ### Step 3: Set up your wallets
 
@@ -241,6 +328,9 @@ ipc-cli wallet export --wallet-type evm --address <PLEASE PUT ADDRESS 4> --hex >
 
 Let's start our first validator which the rest of the validators will bootstrap from. Make sure you have docker running before running this command.
 
+{% tabs %}
+{% tab title="Using Public Shared Contracts" %}
+
 ```
 cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=validator-1 \
@@ -256,7 +346,9 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     child-validator
 ```
 
-To start a validator with your own ipc stack, use the addresses of the previously deployed contracts in the `PARENT_GATEWAY` and `PARENT_REGISTRY` fields:
+{% endtab %}
+
+{% tab title="Using Your Own Deployed Contracts" %}
 
 ```
 cargo make --makefile infra/fendermint/Makefile.toml \
@@ -267,12 +359,16 @@ cargo make --makefile infra/fendermint/Makefile.toml \
    -e CMT_RPC_HOST_PORT=26657 \
    -e ETHAPI_HOST_PORT=8545 \
    -e RESOLVER_HOST_PORT=26655 \
-   -e PARENT_GATEWAY=<PLEASE PUT GATEWAY DIAMOND ADDRESS YOU GOT FROM THE LOGS> \
-   -e PARENT_REGISTRY=<PLEASE PUT SUBNET REGISTRY DIAMOND ADDRESS YOU GOT FROM THE LOGS> \
+   -e PARENT_GATEWAY=<YOUR_GATEWAY_DIAMOND_ADDRESS> \
+   -e PARENT_REGISTRY=<YOUR_SUBNET_REGISTRY_DIAMOND_ADDRESS> \
    -e FM_PULL_SKIP=1 \
    child-validator
-
 ```
+
+Replace `<YOUR_GATEWAY_DIAMOND_ADDRESS>` and `<YOUR_SUBNET_REGISTRY_DIAMOND_ADDRESS>` with the addresses you got from the `make deploy-stack` command in Step 2.
+
+{% endtab %}
+{% endtabs %}
 
 Once the first validator is up and running, it will print out the relative information for this validator.&#x20;
 
@@ -329,6 +425,9 @@ You'll need the final component of the `IPLD Resolver Multiaddress` (the `peer I
 
 Now, run the 2nd validator in a separate terminal.&#x20;
 
+{% tabs %}
+{% tab title="Using Public Shared Contracts" %}
+
 ```
 cargo make --makefile infra/fendermint/Makefile.toml \
     -e NODE_NAME=validator-2 \
@@ -345,7 +444,33 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     child-validator
 ```
 
+{% endtab %}
+
+{% tab title="Using Your Own Deployed Contracts" %}
+
+```
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=validator-2 \
+    -e PRIVATE_KEY_PATH=<PLEASE PUT FULL PATH TO validator_2.sk> \
+    -e SUBNET_ID=<PLEASE PUT SUBNET ID> \
+    -e CMT_P2P_HOST_PORT=26756 \
+    -e CMT_RPC_HOST_PORT=26757 \
+    -e ETHAPI_HOST_PORT=8645 \
+    -e RESOLVER_HOST_PORT=26755 \
+    -e BOOTSTRAPS=<PLEASE PUT COMETBFT NODE ID of VALIDATOR-1>@validator-1-cometbft:26656 \
+    -e RESOLVER_BOOTSTRAPS=/dns/validator-1-fendermint/tcp/26655/p2p/<PLEASE PUT PEER_ID of VALIDATOR-1> \
+    -e PARENT_GATEWAY=<YOUR_GATEWAY_DIAMOND_ADDRESS> \
+    -e PARENT_REGISTRY=<YOUR_SUBNET_REGISTRY_DIAMOND_ADDRESS> \
+    child-validator
+```
+
+{% endtab %}
+{% endtabs %}
+
 Now, the 3rd:
+
+{% tabs %}
+{% tab title="Using Public Shared Contracts" %}
 
 ```
 cargo make --makefile infra/fendermint/Makefile.toml \
@@ -363,7 +488,33 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     child-validator
 ```
 
+{% endtab %}
+
+{% tab title="Using Your Own Deployed Contracts" %}
+
+```
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=validator-3 \
+    -e PRIVATE_KEY_PATH=<PLEASE PUT FULL PATH TO validator_3.sk> \
+    -e SUBNET_ID=<PLEASE PUT SUBNET ID> \
+    -e CMT_P2P_HOST_PORT=26856 \
+    -e CMT_RPC_HOST_PORT=26857 \
+    -e ETHAPI_HOST_PORT=8745 \
+    -e RESOLVER_HOST_PORT=26855 \
+    -e BOOTSTRAPS=<PLEASE PUT COMETBFT NODE ID of VALIDATOR-1>@validator-1-cometbft:26656 \
+    -e RESOLVER_BOOTSTRAPS=/dns/validator-1-fendermint/tcp/26655/p2p/<PLEASE PUT PEER_ID of VALIDATOR-1> \
+    -e PARENT_GATEWAY=<YOUR_GATEWAY_DIAMOND_ADDRESS> \
+    -e PARENT_REGISTRY=<YOUR_SUBNET_REGISTRY_DIAMOND_ADDRESS> \
+    child-validator
+```
+
+{% endtab %}
+{% endtabs %}
+
 And finally, the 4th:
+
+{% tabs %}
+{% tab title="Using Public Shared Contracts" %}
 
 ```
 cargo make --makefile infra/fendermint/Makefile.toml \
@@ -380,6 +531,29 @@ cargo make --makefile infra/fendermint/Makefile.toml \
     -e PARENT_REGISTRY=`curl -s https://raw.githubusercontent.com/consensus-shipyard/ipc/cd/contracts/deployments/r314159.json | jq -r '.registry_addr'` \
     child-validator
 ```
+
+{% endtab %}
+
+{% tab title="Using Your Own Deployed Contracts" %}
+
+```
+cargo make --makefile infra/fendermint/Makefile.toml \
+    -e NODE_NAME=validator-4 \
+    -e PRIVATE_KEY_PATH=<PLEASE PUT FULL PATH TO validator_4.sk> \
+    -e SUBNET_ID=<PLEASE PUT SUBNET ID> \
+    -e CMT_P2P_HOST_PORT=26956 \
+    -e CMT_RPC_HOST_PORT=26957 \
+    -e ETHAPI_HOST_PORT=8845 \
+    -e RESOLVER_HOST_PORT=26955 \
+    -e BOOTSTRAPS=<PLEASE PUT COMETBFT NODE ID of VALIDATOR-1>@validator-1-cometbft:26656 \
+    -e RESOLVER_BOOTSTRAPS=/dns/validator-1-fendermint/tcp/26655/p2p/<PLEASE PUT PEER_ID of VALIDATOR-1> \
+    -e PARENT_GATEWAY=<YOUR_GATEWAY_DIAMOND_ADDRESS> \
+    -e PARENT_REGISTRY=<YOUR_SUBNET_REGISTRY_DIAMOND_ADDRESS> \
+    child-validator
+```
+
+{% endtab %}
+{% endtabs %}
 
 {% hint style="info" %}
 NOTE:

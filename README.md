@@ -72,6 +72,7 @@ For further documentation, see:
 - [docs/contracts.md](./docs/ipc/contracts.md) for instructions on how to deploy FEVM actors on subnets.
 - [docs/usage.md](./docs/ipc/usage.md) for instructions on how to use the `ipc-cli` to interact with subnets (from managing your identities, to sending funds to a subnet).
 - [docs/deploying-hierarchy.md](./docs/ipc/deploying-hierarchy.md) for instructions on how to deploy your own instance of IPC on a network.
+- [docs/contract-errors.md](./docs/ipc/contract-errors.md) for a comprehensive reference of all possible contract errors and how to resolve them.
 
 If you are a developer, see:
 

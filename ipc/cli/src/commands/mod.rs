@@ -67,8 +67,9 @@ enum Commands {
 #[derive(Debug, Parser)]
 #[command(
     name = "ipc-agent",
-    about = "The IPC agent command line tool",
-    version = "v0.0.1"
+    about = "The IPC agent command line tool for managing subnets, validators, and cross-messages",
+    version = "v0.0.1",
+    after_help = "For detailed information about contract errors, see: https://github.com/consensus-shipyard/ipc/blob/main/docs/ipc/contract-errors.md"
 )]
 #[command(propagate_version = true, arg_required_else_help = true)]
 struct IPCAgentCliCommands {
