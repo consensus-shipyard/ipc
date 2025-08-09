@@ -46,8 +46,10 @@ serde_bytes = "0.11.9"
 serde_json = { workspace = true }
 serde_tuple = { workspace = true }
 serde_yaml = { workspace = true }
+sha3 = "0.10"
 strum = { workspace = true }
 thiserror = { workspace = true }
+urlencoding = "2.1"
 tempfile = "3.8"
 sha2 = "0.10"
 rand = "0.8"
@@ -61,6 +63,10 @@ url = { workspace = true }
 zeroize = "1.6.0"
 prometheus = { workspace = true }
 prometheus_exporter = { workspace = true }
+warp = "0.3"
+uuid = { version = "1.0", features = ["v4"] }
+mime_guess = "2.0"
+include_dir = "0.7"
 fendermint_eth_api = { path = "../../fendermint/eth/api" }
 
 ipc-wallet = { path = "../../ipc/wallet", features = ["with-ethers"] }
@@ -78,3 +84,4 @@ fendermint_app = { path = "../../fendermint/app" }
 fendermint_crypto = { path = "../../fendermint/crypto" }
 ipc_ipld_resolver = { path = "../../ipld/resolver" }
 contracts-artifacts = { path = "../../contracts-artifacts" }
+ipc_actors_abis = { path = "../../contract-bindings" }

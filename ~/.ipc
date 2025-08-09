@@ -1,0 +1,10 @@
+keystore_path = "~/.ipc"
+
+[[subnets]]
+id = "/r314159"
+
+[subnets.config]
+network_type = "fevm"
+provider_http = "https://api.calibration.node.glif.io/rpc/v1"
+registry_addr = "0x0b4e239ff21b40120cda817fba77bd1b366c1bcd"
+gateway_addr = "0x1aee8a878a22280fc2753b3c63571c8f895d2fe3"
