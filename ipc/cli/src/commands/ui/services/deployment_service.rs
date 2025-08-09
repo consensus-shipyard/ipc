@@ -3,15 +3,15 @@
 //! This service wraps existing CLI handlers for deployment operations.
 
 use super::super::api::types::{ApiResponse, InvalidRequest, ServerError};
-use crate::commands::subnet::create::CreateSubnet;
-use crate::commands::deploy::{DeployCommand, DeployConfig, CliSubnetCreationPrivilege};
+use crate::commands::subnet::create::{CreateSubnet, CreateSubnetArgs};
+use crate::commands::deploy::{DeployCommand, DeployConfig, CliSubnetCreationPrivilege, deploy_contracts};
 use crate::commands::subnet::init::config::SubnetCreateConfig;
 use crate::{GlobalArguments, get_ipc_provider};
 use anyhow::{Result, Context};
 use fvm_shared::address::Address;
 use ipc_api::subnet::{PermissionMode, AssetKind, Asset};
 use ipc_api::subnet_id::SubnetID;
-use ipc_provider::config::Config;
+use ipc_provider::{config::Config, new_evm_keystore_from_config};
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -34,6 +34,30 @@ pub struct DeploymentService {
 impl DeploymentService {
     pub fn new(global: GlobalArguments) -> Self {
         Self { global }
+    }
+
+    /// Validate that the deployment address has sufficient balance
+    async fn validate_deployment_balance(&self, rpc_url: &str, address: ethers::types::Address) -> Result<(), anyhow::Error> {
+        use ethers::prelude::*;
+
+        let provider = Provider::<Http>::try_from(rpc_url)
+            .context("Failed to create provider for balance check")?;
+
+        let balance = provider.get_balance(address, None).await
+            .context("Failed to get balance for deployment address")?;
+
+        // Require at least 0.1 ETH for deployment (conservative estimate)
+        let min_balance = U256::from_dec_str("100000000000000000").unwrap(); // 0.1 ETH in wei
+
+        if balance < min_balance {
+            let balance_eth = balance.as_u128() as f64 / 1e18;
+            return Err(anyhow::anyhow!(
+                "Insufficient balance for deployment. Address {} has {:.6} ETH but needs at least 0.1 ETH for contract deployment. Please fund this address before deploying.",
+                address, balance_eth
+            ));
+        }
+
+        Ok(())
     }
 
     /// Get the parent network from network headers or default
@@ -157,32 +181,50 @@ impl DeploymentService {
             .and_then(|s| s.parse::<u64>().ok())
             .unwrap_or(31337);
 
-        // Create deployment configuration if needed
-        let deploy_config = if ui_config.get("deploy_gateway").and_then(|v| v.as_bool()).unwrap_or(false) {
-            let from_str = ui_config.get("from")
-                .and_then(|v| v.as_str())
-                .unwrap_or("0x0000000000000000000000000000000000000000");
-            let from_address = ethers::types::Address::from_str(from_str)
-                .unwrap_or(ethers::types::Address::zero());
+        // Always deploy contracts for new networks (like Anvil) that don't have them yet
+        let from_str = ui_config.get("from")
+            .and_then(|v| v.as_str())
+            .unwrap_or("0x0000000000000000000000000000000000000000");
+        let from_address = ethers::types::Address::from_str(from_str)
+            .unwrap_or(ethers::types::Address::zero());
 
-            Some(DeployConfig {
-                url: rpc_url.to_string(),
-                from: from_address,
-                chain_id,
-                artifacts_path: None, // Use default builtin contracts
-                subnet_creation_privilege: CliSubnetCreationPrivilege::Unrestricted,
-            })
-        } else {
-            None
+        // Validate that the from address has sufficient balance for deployment
+        self.validate_deployment_balance(rpc_url, from_address).await?;
+
+        let deploy_config = DeployConfig {
+            url: rpc_url.to_string(),
+            from: from_address,
+            chain_id,
+            artifacts_path: None, // Use default builtin contracts
+            subnet_creation_privilege: CliSubnetCreationPrivilege::Unrestricted,
         };
 
-        // For now, return a placeholder result
-        // TODO: Implement actual subnet creation using the CLI handlers
+        // Deploy the IPC contracts first (gateway and registry)
+        log::info!("Deploying IPC contracts to {}", rpc_url);
+        let deployed_contracts = crate::commands::deploy::deploy_contracts(
+            new_evm_keystore_from_config(&self.global.config()?)?,
+            &deploy_config
+        ).await?;
+
+        log::info!("Deployed contracts - Registry: {:?}, Gateway: {:?}",
+                   deployed_contracts.registry, deployed_contracts.gateway);
+
+        // Create the subnet using the actual CLI logic
+        let subnet_args = CreateSubnetArgs {
+            config: subnet_config,
+        };
+        let subnet_addr_str = CreateSubnet::create(&self.global, &subnet_args).await?;
+
+        // Build subnet ID from parent + new address
+        let subnet_id = format!("{}/{}", parent, subnet_addr_str);
+
+        log::info!("Successfully created subnet: {}", subnet_id);
+
         Ok(SubnetDeploymentResult {
-            subnet_id: format!("{}/r{}", parent, chrono::Utc::now().timestamp()),
+            subnet_id,
             parent_id: parent.to_string(),
-            gateway_address: deploy_config.as_ref().map(|_| "0x1234567890123456789012345678901234567890".to_string()),
-            registry_address: deploy_config.as_ref().map(|_| "0x0987654321098765432109876543210987654321".to_string()),
+            gateway_address: Some(format!("{:?}", deployed_contracts.gateway)),
+            registry_address: Some(format!("{:?}", deployed_contracts.registry)),
         })
     }
 }

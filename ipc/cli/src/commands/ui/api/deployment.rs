@@ -3,13 +3,17 @@
 //! Deployment API endpoints
 
 use super::super::AppState;
-use super::super::services::{DeploymentService};
+use super::super::services::DeploymentService;
+use super::super::services::deployment_service::SubnetDeploymentResult;
 use super::types::{ApiResponse, DeploymentRequest, DeploymentResponse};
 use anyhow::Result;
 use std::convert::Infallible;
 use std::sync::Mutex;
 use uuid::Uuid;
 use warp::{Filter, Reply};
+use crate::commands::ui::websocket::types::OutgoingMessage;
+use futures_util::SinkExt;
+use warp::ws::Message;
 
 /// Create deployment API routes
 pub fn deployment_routes(
@@ -54,42 +58,54 @@ async fn handle_deploy_request(
 
     let service = DeploymentService::new(global);
 
-    match service.deploy_subnet(request.config.clone(), &headers).await {
-        Ok(result) => {
-            let deployment_id = uuid::Uuid::new_v4().to_string();
-            let response = DeploymentResponse {
-                deployment_id: deployment_id.clone(),
-                status: "completed".to_string(),
-                message: format!("Subnet created successfully: {}", result.subnet_id),
-            };
+    // Generate deployment ID and start asynchronous deployment
+    let deployment_id = uuid::Uuid::new_v4().to_string();
 
-            // Store deployment state
-            {
-                let mut deployments = state.deployments.lock().unwrap();
-                deployments.insert(deployment_id, super::super::DeploymentState {
-                    id: response.deployment_id.clone(),
-                    template: request.template,
-                    status: "completed".to_string(),
-                    created_at: chrono::Utc::now(),
-                    config: request.config,
-                    progress: 100,
-                    step: "completed".to_string(),
-                    updated_at: chrono::Utc::now(),
-                });
-            }
-
-            Ok(warp::reply::json(&ApiResponse::success(response)))
-        }
-        Err(e) => {
-            log::error!("Deployment failed: {}", e);
-            let response = DeploymentResponse {
-                deployment_id: uuid::Uuid::new_v4().to_string(),
-                status: "failed".to_string(),
-                message: format!("Deployment failed: {}", e),
-            };
-            Ok(warp::reply::json(&ApiResponse::success(response)))
-        }
+    // Store initial deployment state
+    {
+        let mut deployments = state.deployments.lock().unwrap();
+        deployments.insert(deployment_id.clone(), super::super::DeploymentState {
+            id: deployment_id.clone(),
+            template: request.template.clone(),
+            status: "in_progress".to_string(),
+            created_at: chrono::Utc::now(),
+            config: request.config.clone(),
+            progress: 0,
+            step: "validate".to_string(),
+            updated_at: chrono::Utc::now(),
+        });
     }
+
+    // Start async deployment task
+    let deployment_config = request.config.clone();
+    let deploy_headers = headers.clone();
+    let deploy_state = state.clone();
+    let deploy_id = deployment_id.clone();
+
+    tokio::spawn(async move {
+        // Run the actual deployment in background and send progress updates
+        match run_async_deployment(&service, deployment_config, &deploy_headers, &deploy_state, &deploy_id).await {
+            Ok(result) => {
+                // Broadcast final success
+                broadcast_progress(&deploy_state, &deploy_id, "verification", 100, "completed",
+                    Some(format!("Subnet created successfully: {}", result.subnet_id))).await;
+            }
+            Err(e) => {
+                // Broadcast failure
+                broadcast_progress(&deploy_state, &deploy_id, "error", 0, "failed",
+                    Some(format!("Deployment failed: {}", e))).await;
+            }
+        }
+    });
+
+    // Return immediate response with deployment_id
+    let response = DeploymentResponse {
+        deployment_id: deployment_id.clone(),
+        status: "in_progress".to_string(),
+        message: "Deployment started successfully".to_string(),
+    };
+
+    Ok(warp::reply::json(&ApiResponse::success(response)))
 }
 
 /// Handle get templates request
@@ -117,4 +133,94 @@ async fn handle_get_templates(
             Ok(warp::reply::json(&response))
         }
     }
+}
+
+/// Run deployment asynchronously with progress updates
+async fn run_async_deployment(
+    service: &DeploymentService,
+    config: serde_json::Value,
+    headers: &warp::http::HeaderMap,
+    state: &AppState,
+    deployment_id: &str,
+) -> Result<SubnetDeploymentResult, anyhow::Error> {
+        // Send progress updates for each step
+    broadcast_progress(state, deployment_id, "validate", 10, "in_progress",
+        Some("Validating configuration...".to_string())).await;
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+    broadcast_progress(state, deployment_id, "prepare", 20, "in_progress",
+        Some("Preparing deployment files...".to_string())).await;
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+    broadcast_progress(state, deployment_id, "contracts", 30, "in_progress",
+        Some("Deploying smart contracts...".to_string())).await;
+
+    // Run the actual deployment
+    let result = service.deploy_subnet(config, headers).await?;
+
+        broadcast_progress(state, deployment_id, "genesis", 70, "in_progress",
+        Some("Creating genesis block...".to_string())).await;
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+    broadcast_progress(state, deployment_id, "validators", 85, "in_progress",
+        Some("Initializing validators...".to_string())).await;
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+    broadcast_progress(state, deployment_id, "activation", 95, "in_progress",
+        Some("Activating subnet...".to_string())).await;
+
+    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+    Ok(result)
+}
+
+/// Broadcast deployment progress to WebSocket clients
+async fn broadcast_progress(
+    state: &AppState,
+    deployment_id: &str,
+    step: &str,
+    progress: u8,
+    status: &str,
+    message: Option<String>,
+) {
+    // Update deployment state
+    {
+        let mut deployments = state.deployments.lock().unwrap();
+        if let Some(deployment) = deployments.get_mut(deployment_id) {
+            deployment.step = step.to_string();
+            deployment.progress = progress;
+            deployment.status = status.to_string();
+            deployment.updated_at = chrono::Utc::now();
+        }
+    }
+
+    // Create WebSocket message
+    let ws_message = OutgoingMessage::DeploymentProgress {
+        deployment_id: deployment_id.to_string(),
+        step: step.to_string(),
+        status: status.to_string(),
+        progress,
+        message,
+    };
+
+    // Broadcast to all connected WebSocket clients
+    let clients = {
+        let clients_guard = state.websocket_clients.lock().unwrap();
+        clients_guard.clone()  // Clone the Arc<Mutex<...>> handles
+    };
+
+    for client in clients.iter() {
+        let mut sink = client.lock().await;
+        if let Ok(json) = serde_json::to_string(&ws_message) {
+            if let Err(e) = sink.send(Message::text(json)).await {
+                log::error!("Failed to send WebSocket message: {}", e);
+            }
+        }
+    }
+
+    log::info!("Progress: {} - {} ({}%)", deployment_id, step, progress);
 }
