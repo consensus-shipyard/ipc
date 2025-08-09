@@ -82,7 +82,10 @@ async fn handle_list_wallets(
                                     match libsecp256k1::SecretKey::parse_slice(key_info.private_key()) {
                                         Ok(sk) => {
                                             let pub_key = libsecp256k1::PublicKey::from_secret_key(&sk);
-                                            Some(hex::encode(pub_key.serialize()))
+                                            // Return compressed key with 0x prefix for now as a simple fix
+                                            // Frontend validation should be updated to accept compressed keys
+                                            let compressed = pub_key.serialize();
+                                            Some(format!("0x{}", hex::encode(compressed)))
                                         }
                                         Err(_) => None,
                                     }
@@ -150,7 +153,10 @@ async fn handle_list_wallets(
                                     match libsecp256k1::SecretKey::parse_slice(key_info.private_key()) {
                                         Ok(sk) => {
                                             let pub_key = libsecp256k1::PublicKey::from_secret_key(&sk);
-                                            Some(hex::encode(pub_key.serialize()))
+                                            // Return compressed key with 0x prefix for now as a simple fix
+                                            // Frontend validation should be updated to accept compressed keys
+                                            let compressed = pub_key.serialize();
+                                            Some(format!("0x{}", hex::encode(compressed)))
                                         }
                                         Err(_) => None,
                                     }

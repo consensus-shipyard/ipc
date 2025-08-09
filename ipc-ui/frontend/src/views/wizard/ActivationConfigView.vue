@@ -56,8 +56,9 @@ const validateEthereumAddress = (address: string): string | null => {
 
 const validatePubkey = (pubkey: string): string | null => {
   if (!pubkey) return 'Public key is required'
-  if (!/^0x04[a-fA-F0-9]{128}$/.test(pubkey)) {
-    return 'Must be a valid 65-byte uncompressed public key (0x04...)'
+  // Accept both compressed (0x02/0x03 + 64 hex chars) and uncompressed (0x04 + 128 hex chars) public keys
+  if (!/^0x(02|03)[a-fA-F0-9]{64}$/.test(pubkey) && !/^0x04[a-fA-F0-9]{128}$/.test(pubkey)) {
+    return 'Must be a valid compressed (0x02/0x03...) or uncompressed (0x04...) public key'
   }
   return null
 }

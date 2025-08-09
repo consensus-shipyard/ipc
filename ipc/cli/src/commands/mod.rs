@@ -156,9 +156,9 @@ pub async fn cli() -> anyhow::Result<()> {
                 Commands::Deploy(args) => DeployCommand::handle(global, args).await,
                 Commands::Ui(args) => {
                     let ui_args = UICommandArgs {
-                        address: "127.0.0.1".to_string(),
-                        port: 3000,
-                        config_path: global.config_path.clone(),
+                        address: args.address.clone(),
+                        port: args.port,
+                        config_path: args.config_path.clone().or(global.config_path.clone()),
                     };
                     run_ui_command(global.clone(), UICommand::Start, ui_args).await
                 }

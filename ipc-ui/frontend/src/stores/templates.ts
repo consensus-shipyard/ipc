@@ -264,6 +264,32 @@ export const useTemplatesStore = defineStore('templates', () => {
         powerScale: 3,
         activationMode: 'collateral'
       }
+    },
+    {
+      id: 'manual',
+      name: 'Manual Configuration',
+      description: 'Start with minimal defaults and configure everything yourself',
+      icon: '⚙️',
+      features: [
+        'Minimal defaults provided',
+        'Full manual configuration',
+        'No pre-filled settings',
+        'Complete control',
+        'Expert-level customization'
+      ],
+      recommended: [],
+      defaults: {
+        permissionMode: 'collateral',
+        minValidators: 1,
+        minValidatorStake: 1.0,
+        bottomupCheckPeriod: 50,
+        supplySourceKind: 'native',
+        minCrossMsgFee: 0.001,
+        networkVersion: 21,
+        baseFee: 1000,
+        powerScale: 3,
+        activationMode: 'collateral'
+      }
     }
   ])
 

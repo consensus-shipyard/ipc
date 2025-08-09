@@ -8,6 +8,7 @@ export interface SubnetConfig {
   // Template selection
   selectedTemplate?: string
   questionnaire?: Record<string, string>
+  questionnaireSkipped?: boolean
 
   // Basic configuration (mandatory)
   parent?: string
@@ -128,7 +129,8 @@ export const useWizardStore = defineStore('wizard', () => {
       case 1: // Template selection
         return {
           selectedTemplate: config.value.selectedTemplate,
-          questionnaire: config.value.questionnaire
+          questionnaire: config.value.questionnaire,
+          questionnaireSkipped: config.value.questionnaireSkipped
         }
       case 2: // Basic config
         return {
