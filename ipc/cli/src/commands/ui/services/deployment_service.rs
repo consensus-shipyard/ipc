@@ -166,19 +166,107 @@ impl DeploymentService {
         deploy_contracts_with_progress(keystore, deploy_config, Some(progress_callback)).await
     }
 
-    /// Simple deploy_subnet method that just returns a mock result for now
+    /// Get access to the IPC configuration store
+    pub async fn get_config_store(&self) -> Result<crate::ipc_config_store::IpcConfigStore> {
+        crate::ipc_config_store::IpcConfigStore::load_or_init(&self.global).await
+    }
+
+    /// Deploy a subnet using the real CLI subnet creation logic
     pub async fn deploy_subnet(
         &self,
-        _config: serde_json::Value,
-        _headers: &warp::http::HeaderMap,
+        config: serde_json::Value,
+        headers: &warp::http::HeaderMap,
     ) -> Result<SubnetDeploymentResult> {
-        // For now, return a simple mock result to make compilation work
-        // The real implementation can be added later when the struct issues are resolved
-        Ok(SubnetDeploymentResult {
-            subnet_id: "mock/subnet".to_string(),
-            parent_id: "mock/parent".to_string(),
-            gateway_address: Some("0x0000000000000000000000000000000000000000".to_string()),
-            registry_address: Some("0x0000000000000000000000000000000000000000".to_string()),
-        })
+        log::info!("Starting real subnet deployment with config: {}", serde_json::to_string_pretty(&config)?);
+
+        // Extract required fields from config
+        let parent_network = config["parent"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing required field: parent"))?;
+
+        let from_address_str = config["from"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing required field: from"))?;
+
+        let min_validators = config["minValidators"]
+            .as_u64()
+            .unwrap_or(1) as u64;
+
+        let min_validator_stake = config["minValidatorStake"]
+            .as_f64()
+            .unwrap_or(1.0);
+
+        let bottomup_check_period = config["bottomupCheckPeriod"]
+            .as_i64()
+            .unwrap_or(100) as i64;
+
+        let permission_mode = match config["permissionMode"].as_str().unwrap_or("collateral") {
+            "federated" => PermissionMode::Federated,
+            "static" => PermissionMode::Static,
+            _ => PermissionMode::Collateral,
+        };
+
+        // Create subnet creation config
+        let subnet_config = SubnetCreateConfig {
+            parent: parent_network.to_string(),
+            from: Some(from_address_str.to_string()),
+            min_validators,
+            min_validator_stake,
+            bottomup_check_period,
+            active_validators_limit: Some(100),
+            min_cross_msg_fee: 0.001, // 0.001 FIL
+            permission_mode,
+            supply_source_kind: AssetKind::Native,
+            supply_source_address: None,
+            collateral_source_kind: Some(AssetKind::Native),
+            collateral_source_address: None,
+            validator_gater: None,
+            validator_rewarder: None,
+            genesis_subnet_ipc_contracts_owner: EthAddress::from_str(&from_address_str)?,
+        };
+
+        log::info!("Created subnet config: {:?}", subnet_config);
+
+        // Get IPC provider for subnet creation
+        let mut provider = get_ipc_provider(&self.global)?;
+
+        // Create the subnet using the existing CLI logic
+        log::info!("About to call create_subnet with provider and config");
+        let subnet_actor_addr = match crate::commands::subnet::create::create_subnet(provider.clone(), &subnet_config).await {
+            Ok(addr) => {
+                log::info!("Successfully created subnet actor with address: {}", addr);
+                addr
+            }
+            Err(e) => {
+                log::error!("Failed to create subnet: {}", e);
+                return Err(anyhow::anyhow!("Failed to create subnet: {}", e));
+            }
+        };
+
+        log::info!("Subnet actor created with address: {}", subnet_actor_addr);
+
+        // Convert the subnet actor address to a subnet ID
+        let parent_id = SubnetID::from_str(parent_network)?;
+        let subnet_id = SubnetID::new_from_parent(&parent_id, subnet_actor_addr);
+
+        log::info!("Generated subnet ID: {}", subnet_id);
+
+        // Get gateway and registry addresses from parent network configuration
+        let ipc_config_store = crate::ipc_config_store::IpcConfigStore::load_or_init(&self.global).await?;
+        let parent_subnet = ipc_config_store.get_subnet(&parent_id).await
+            .context("Failed to get parent subnet configuration")?;
+
+        let gateway_address = parent_subnet.gateway_addr();
+        let registry_address = parent_subnet.registry_addr();
+
+        let result = SubnetDeploymentResult {
+            subnet_id: subnet_id.to_string(),
+            parent_id: parent_network.to_string(),
+            gateway_address: Some(format!("{:?}", gateway_address)),
+            registry_address: Some(format!("{:?}", registry_address)),
+        };
+
+        log::info!("Subnet deployment completed successfully: {:?}", result);
+        Ok(result)
     }
 }

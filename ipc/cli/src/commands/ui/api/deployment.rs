@@ -5,7 +5,7 @@
 use super::super::services::deployment_service::{DeploymentService, SubnetDeploymentResult, ContractDeploymentProgress};
 use super::types::{ApiResponse, DeploymentRequest, DeploymentResponse};
 use super::super::{AppState, DeploymentState};
-use anyhow::Result;
+use anyhow::{Result, Context};
 use chrono;
 use futures_util::SinkExt;
 use serde_json;
@@ -18,6 +18,8 @@ use uuid::Uuid;
 use std::str::FromStr;
 use ethers::types::Address;
 use crate::commands::deploy::{DeployConfig, CliSubnetCreationPrivilege};
+use url;
+use ipc_types;
 
 /// Create deployment API routes
 pub fn deployment_routes(
@@ -91,9 +93,9 @@ async fn handle_deploy_request(
         // Run the actual deployment in background and send progress updates
         match run_async_deployment(&service, deployment_config, &deploy_headers, &deploy_state, &deploy_id).await {
             Ok(result) => {
-                // Broadcast final success
-                broadcast_progress(&deploy_state, &deploy_id, "verification", 100, "completed",
-                    Some(format!("Subnet created successfully: {}", result.subnet_id))).await;
+                // Broadcast final success with subnet_id
+                broadcast_progress_with_subnet_id(&deploy_state, &deploy_id, "verification", 100, "completed",
+                    Some(format!("Subnet created successfully: {}", result.subnet_id)), Some(result.subnet_id.clone())).await;
             }
             Err(e) => {
                 // Broadcast failure
@@ -245,7 +247,26 @@ async fn run_async_deployment(
     };
 
     // Deploy contracts with real progress tracking directly (without spawn)
-    let _deployed_contracts = service.deploy_contracts_with_real_progress(&deploy_config, progress_callback).await?;
+    let deployed_contracts = service.deploy_contracts_with_real_progress(&deploy_config, progress_callback).await?;
+
+    // Register the deployed contracts in the IPC configuration store
+    log::info!("Registering deployed contracts in IPC config: gateway={:?}, registry={:?}",
+               deployed_contracts.gateway, deployed_contracts.registry);
+
+    let ipc_config_store = service.get_config_store().await?;
+    let subnet_id = ipc_api::subnet_id::SubnetID::new_root(chain_id);
+    let rpc_url: url::Url = rpc_url.parse().context("invalid RPC URL")?;
+
+    ipc_config_store
+        .add_subnet(
+            subnet_id.clone(),
+            rpc_url,
+            ipc_types::EthAddress::from(deployed_contracts.gateway).into(),
+            ipc_types::EthAddress::from(deployed_contracts.registry).into(),
+        )
+        .await?;
+
+    log::info!("Successfully registered subnet {} in IPC config", subnet_id);
 
     // Continue with the rest of the deployment
     broadcast_progress(state, deployment_id, "genesis", 70, "in_progress",
@@ -308,6 +329,65 @@ async fn broadcast_progress(
     }
 
     log::info!("Progress: {} - {} ({}%)", deployment_id, step, progress);
+}
+
+/// Broadcast deployment progress with subnet_id to WebSocket clients
+async fn broadcast_progress_with_subnet_id(
+    state: &AppState,
+    deployment_id: &str,
+    step: &str,
+    progress: u8,
+    status: &str,
+    message: Option<String>,
+    subnet_id: Option<String>,
+) {
+    // Update deployment state
+    {
+        let mut deployments = state.deployments.lock().unwrap();
+        if let Some(deployment) = deployments.get_mut(deployment_id) {
+            deployment.step = step.to_string();
+            deployment.progress = progress;
+            deployment.status = status.to_string();
+            deployment.updated_at = chrono::Utc::now();
+        }
+    }
+
+    // Create message in format frontend expects: { type: "deployment_progress", data: {...} }
+    let mut progress_data = serde_json::json!({
+        "deployment_id": deployment_id,
+        "step": step,
+        "progress": progress,
+        "status": status,
+        "message": message
+    });
+
+    // Add subnet_id if provided
+    if let Some(subnet_id) = subnet_id {
+        progress_data["subnet_id"] = serde_json::Value::String(subnet_id);
+    }
+
+    let ws_message = serde_json::json!({
+        "type": "deployment_progress",
+        "data": progress_data
+    });
+
+    // Broadcast to all connected WebSocket clients
+    let clients = {
+        let clients_guard = state.websocket_clients.lock().unwrap();
+        log::info!("Broadcasting progress with subnet_id to {} WebSocket clients", clients_guard.len());
+        clients_guard.clone()  // Clone the Arc<Mutex<...>> handles
+    };
+
+    for client in clients.iter() {
+        let mut sink = client.lock().await;
+        if let Ok(json) = serde_json::to_string(&ws_message) {
+            if let Err(e) = sink.send(Message::text(json)).await {
+                log::error!("Failed to send WebSocket message: {}", e);
+            }
+        }
+    }
+
+    log::info!("Progress with subnet_id: {} - {} ({}%)", deployment_id, step, progress);
 }
 
 /// Broadcast deployment progress with contract details to WebSocket clients

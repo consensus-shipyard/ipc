@@ -8,3 +8,12 @@ network_type = "fevm"
 provider_http = "https://api.calibration.node.glif.io/rpc/v1"
 registry_addr = "0x0b4e239ff21b40120cda817fba77bd1b366c1bcd"
 gateway_addr = "0x1aee8a878a22280fc2753b3c63571c8f895d2fe3"
+
+[[subnets]]
+id = "/r31337"
+
+[subnets.config]
+network_type = "fevm"
+provider_http = "http://localhost:8545/"
+registry_addr = "0x821f3361d454cc98b7555221a06be563a7e2e0a6"
+gateway_addr = "0x02df3a3f960393f5b349e40a599feda91a7cc1a7"
