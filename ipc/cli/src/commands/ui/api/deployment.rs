@@ -200,16 +200,24 @@ async fn run_async_deployment(
     };
 
     // Create deploy config - extract network info from headers instead of config
+    log::info!("=== DEBUGGING NETWORK CONFIGURATION ===");
+    log::info!("Available headers: {:?}", headers.keys().collect::<Vec<_>>());
+    log::info!("Config object: {}", serde_json::to_string_pretty(&config).unwrap_or_else(|_| "Failed to serialize config".to_string()));
+
     let rpc_url = headers
         .get("x-network-rpc-url")
         .and_then(|v| v.to_str().ok())
         .ok_or_else(|| anyhow::anyhow!("Missing required header: X-Network-RPC-URL"))?;
+
+    log::info!("Found RPC URL from header: {}", rpc_url);
 
     let chain_id = headers
         .get("x-network-chain-id")
         .and_then(|v| v.to_str().ok())
         .and_then(|s| s.parse::<u64>().ok())
         .ok_or_else(|| anyhow::anyhow!("Missing or invalid header: X-Network-Chain-ID"))?;
+
+    log::info!("Found Chain ID from header: {}", chain_id);
 
     // For deployment address, check config first, then fall back to a default
     let from_address_str = config["deployment"]["fromAddress"]
