@@ -155,8 +155,8 @@ const loadDeployedGateways = async () => {
 
     console.log('[Gateway Discovery] Raw discovery response:', discoverResponse.data)
 
-    if (discoverResponse.data && Array.isArray(discoverResponse.data)) {
-      const discoveredGateways: GatewayInfo[] = discoverResponse.data
+    if (discoverResponse.data && discoverResponse.data.data && Array.isArray(discoverResponse.data.data)) {
+      const discoveredGateways: GatewayInfo[] = discoverResponse.data.data
       console.log(`[Gateway Discovery] Found ${discoveredGateways.length} gateways from discovery`)
 
       // Log each gateway for debugging
