@@ -10,6 +10,7 @@ use super::api::{
     transactions::transaction_routes,
     wallet::wallet_routes,
 };
+use super::websocket::types::{IncomingMessage, OutgoingMessage};
 use super::{AppState, DeploymentMode};
 use anyhow::Result;
 use std::collections::HashMap;
@@ -52,12 +53,43 @@ async fn handle_websocket_connection(websocket: warp::ws::WebSocket, state: AppS
                 if let Ok(text) = msg.to_str() {
                     log::debug!("Received WebSocket message: {}", text);
 
-                    // Handle ping messages
-                    if text.contains("ping") {
-                        let mut sink = tx.lock().await;
-                        if let Err(e) = sink.send(warp::ws::Message::text("pong")).await {
-                            log::error!("Failed to send pong: {}", e);
-                            break;
+                    // Try to parse as structured message first
+                    match serde_json::from_str::<IncomingMessage>(&text) {
+                        Ok(incoming_msg) => {
+                            match incoming_msg {
+                                IncomingMessage::Ping => {
+                                    // Send structured pong response
+                                    let pong_response = OutgoingMessage::Pong;
+                                    if let Ok(pong_json) = serde_json::to_string(&pong_response) {
+                                        let mut sink = tx.lock().await;
+                                        if let Err(e) = sink.send(warp::ws::Message::text(pong_json)).await {
+                                            log::error!("Failed to send pong: {}", e);
+                                            break;
+                                        }
+                                    }
+                                }
+                                IncomingMessage::SubscribeDeployment { deployment_id } => {
+                                    log::info!("Client subscribed to deployment: {}", deployment_id);
+                                    // TODO: Handle deployment subscription
+                                }
+                                IncomingMessage::SubscribeInstance { instance_id } => {
+                                    log::info!("Client subscribed to instance: {}", instance_id);
+                                    // TODO: Handle instance subscription
+                                }
+                            }
+                        }
+                        Err(_) => {
+                            // Fallback: handle legacy ping messages
+                            if text.contains("ping") {
+                                let pong_response = OutgoingMessage::Pong;
+                                if let Ok(pong_json) = serde_json::to_string(&pong_response) {
+                                    let mut sink = tx.lock().await;
+                                    if let Err(e) = sink.send(warp::ws::Message::text(pong_json)).await {
+                                        log::error!("Failed to send pong: {}", e);
+                                        break;
+                                    }
+                                }
+                            }
                         }
                     }
                 }

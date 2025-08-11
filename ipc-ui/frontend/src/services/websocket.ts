@@ -1,4 +1,4 @@
-import { STATIC_API_CONFIG, type WSMessage, type DeploymentProgress } from '../config/api'
+import { STATIC_API_CONFIG, type WSMessage, type DeploymentProgress, type InstanceUpdate } from '../config/api'
 import { useNetworkStore } from '@/stores/network'
 
 export interface WebSocketCallbacks {
@@ -6,7 +6,7 @@ export interface WebSocketCallbacks {
   onClose?: () => void
   onError?: (error: Event) => void
   onDeploymentProgress?: (progress: DeploymentProgress) => void
-  onInstanceUpdate?: (instance: any) => void
+  onInstanceUpdate?: (instance: InstanceUpdate) => void
   onMessage?: (message: WSMessage) => void
 }
 
@@ -104,6 +104,10 @@ export class WebSocketService {
               this.callbacks.onDeploymentProgress?.(message.data)
             } else if (message.type === 'instance_update' && message.data) {
               this.callbacks.onInstanceUpdate?.(message.data)
+            } else if (message.type === 'pong') {
+              // Handle pong response - just log for debugging
+              console.debug('Received pong response')
+              return // Don't call generic handler for pong
             }
 
             // Call generic message handler

@@ -98,6 +98,13 @@ export interface WSMessage {
   error?: string
 }
 
+export interface InstanceUpdate {
+  instance_id: string
+  status: string
+  message?: string
+  data?: Record<string, any>
+}
+
 export interface DeploymentProgress {
   deployment_id: string
   step: string
