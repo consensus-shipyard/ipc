@@ -33,7 +33,7 @@ use crate::manager::subnet::{
 use crate::manager::{EthManager, SignedHeaderRelayer, SubnetManager};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
-use ethers::abi::{Tokenizable, Tokenize};
+use ethers::abi::Tokenizable;
 use ethers::contract::abigen;
 use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::{Signer, SignerMiddleware};
@@ -1498,7 +1498,8 @@ impl SignedHeaderRelayer for EthSubnetManager {
         subnet_id: &SubnetID,
         header: SignedHeader,
     ) -> Result<ChainEpoch> {
-        let bytes = ethers::abi::encode(header.into_tokens().as_slice());
+        let tokens = vec![header.into_token()];
+        let bytes = ethers::abi::encode(&tokens);
 
         let address = contract_address_from_subnet(subnet_id)?;
 
