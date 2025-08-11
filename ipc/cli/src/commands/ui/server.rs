@@ -17,16 +17,65 @@ use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use warp::Filter;
 
-/// Create WebSocket routes (placeholder function)
+/// Create WebSocket routes
 fn websocket_routes(state: AppState) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::path("ws")
         .and(warp::ws())
         .map(move |ws: warp::ws::Ws| {
-            let _state = state.clone();
-            ws.on_upgrade(move |_socket| async move {
-                // WebSocket handling placeholder
+            let state = state.clone();
+            ws.on_upgrade(move |socket| async move {
+                handle_websocket_connection(socket, state).await;
             })
         })
+}
+
+/// Handle WebSocket connection
+async fn handle_websocket_connection(websocket: warp::ws::WebSocket, state: AppState) {
+    use futures_util::{SinkExt, StreamExt};
+    use tokio::sync::Mutex;
+    use std::sync::Arc;
+
+    let (tx, mut rx) = websocket.split();
+    let tx = Arc::new(Mutex::new(tx));
+
+    // Add client to the list
+    {
+        let mut clients_guard = state.websocket_clients.lock().unwrap();
+        clients_guard.push(tx.clone());
+        log::info!("WebSocket client connected. Total clients: {}", clients_guard.len());
+    }
+
+    // Handle incoming messages
+    while let Some(result) = rx.next().await {
+        match result {
+            Ok(msg) => {
+                if let Ok(text) = msg.to_str() {
+                    log::debug!("Received WebSocket message: {}", text);
+
+                    // Handle ping messages
+                    if text.contains("ping") {
+                        let mut sink = tx.lock().await;
+                        if let Err(e) = sink.send(warp::ws::Message::text("pong")).await {
+                            log::error!("Failed to send pong: {}", e);
+                            break;
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                log::error!("WebSocket error: {}", e);
+                break;
+            }
+        }
+    }
+
+    // Remove client when connection closes
+    {
+        let mut clients_guard = state.websocket_clients.lock().unwrap();
+        let initial_count = clients_guard.len();
+        clients_guard.retain(|client| !Arc::ptr_eq(client, &tx));
+        log::info!("WebSocket client disconnected. Clients: {} -> {}", initial_count, clients_guard.len());
+    }
 }
 
 /// Start the UI server

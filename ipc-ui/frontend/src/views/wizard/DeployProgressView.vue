@@ -35,6 +35,13 @@ const currentStep = computed(() => {
   const stepIndex = deploymentSteps.findIndex(step =>
     step.id === deploymentProgress.value?.step
   )
+
+  console.log('Computing current step:', {
+    deploymentProgressStep: deploymentProgress.value?.step,
+    foundStepIndex: stepIndex,
+    deploymentSteps: deploymentSteps.map(s => s.id)
+  })
+
   return stepIndex >= 0 ? stepIndex : 0
 })
 
@@ -48,6 +55,7 @@ const selectedTemplate = computed(() => {
 
 // Get step status based on deployment progress
 const getStepStatus = (stepId: string, index: number) => {
+  // If there's a deployment error
   if (deploymentError.value) {
     // If there's an error and this step matches the current progress, it failed
     if (deploymentProgress.value?.step === stepId) {
@@ -57,6 +65,7 @@ const getStepStatus = (stepId: string, index: number) => {
     return index < currentStep.value ? 'completed' : 'pending'
   }
 
+  // If no deployment progress yet, show first step as in progress
   if (!deploymentProgress.value) {
     return index === 0 ? 'in_progress' : 'pending'
   }
@@ -66,9 +75,11 @@ const getStepStatus = (stepId: string, index: number) => {
     return 'completed'
   }
 
+  // Compare with current step index
   if (index < currentStep.value) {
     return 'completed'
   } else if (index === currentStep.value) {
+    // Check if current step is completed or still in progress
     return deploymentProgress.value.status === 'completed' ? 'completed' : 'in_progress'
   } else {
     return 'pending'
@@ -132,9 +143,22 @@ const editConfiguration = () => {
 }
 
 onMounted(async () => {
+  console.log('DeployProgressView mounted')
+  console.log('Current deployment state:', {
+    isDeploying: wizardStore.isDeploying,
+    deploymentId: wizardStore.deploymentId,
+    deploymentProgress: wizardStore.deploymentProgress,
+    deploymentError: wizardStore.deploymentError,
+    isConnected: wizardStore.isConnected
+  })
+
   // Initialize WebSocket connection for real-time progress updates
   if (!wizardStore.isConnected) {
+    console.log('Initializing WebSocket connection...')
     await wizardStore.initializeWebSocket()
+    console.log('WebSocket initialized')
+  } else {
+    console.log('WebSocket already connected')
   }
 
   // If no deployment is in progress, redirect back to review

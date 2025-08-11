@@ -82,44 +82,6 @@ export const useNetworkStore = defineStore('network', () => {
   })
 
   // Actions
-  const initializeNetworks = async () => {
-    // Load networks from localStorage or use defaults
-    const savedNetworks = localStorage.getItem('ipc-networks')
-    const savedSelectedId = localStorage.getItem('ipc-selected-network')
-
-    if (savedNetworks) {
-      try {
-        const parsed = JSON.parse(savedNetworks)
-        if (Array.isArray(parsed)) {
-          networks.value = parsed
-        }
-      } catch (error) {
-        console.error('Failed to parse saved networks:', error)
-        networks.value = [...DEFAULT_NETWORKS]
-      }
-    } else {
-      networks.value = [...DEFAULT_NETWORKS]
-    }
-
-    // Set selected network
-    if (savedSelectedId && networks.value.find(n => n.id === savedSelectedId)) {
-      selectedNetworkId.value = savedSelectedId
-    } else {
-      selectedNetworkId.value = networks.value[0]?.id || DEFAULT_NETWORKS[0].id
-    }
-
-    console.log('[NetworkStore] Networks initialized')
-
-    // Test connection to selected network and start periodic testing
-    if (selectedNetworkId.value) {
-      await testSelectedNetworkConnection()
-      startPeriodicConnectionTesting()
-    }
-  }
-
-  // Initialize on store creation
-  initializeNetworks()
-
   const selectNetwork = (networkId: string) => {
     const network = networks.value.find(n => n.id === networkId)
     if (network) {
@@ -197,6 +159,44 @@ export const useNetworkStore = defineStore('network', () => {
       isTestingConnection.value = false
     }
   }
+
+  const initializeNetworks = async () => {
+    // Load networks from localStorage or use defaults
+    const savedNetworks = localStorage.getItem('ipc-networks')
+    const savedSelectedId = localStorage.getItem('ipc-selected-network')
+
+    if (savedNetworks) {
+      try {
+        const parsed = JSON.parse(savedNetworks)
+        if (Array.isArray(parsed)) {
+          networks.value = parsed
+        }
+      } catch (error) {
+        console.error('Failed to parse saved networks:', error)
+        networks.value = [...DEFAULT_NETWORKS]
+      }
+    } else {
+      networks.value = [...DEFAULT_NETWORKS]
+    }
+
+    // Set selected network
+    if (savedSelectedId && networks.value.find(n => n.id === savedSelectedId)) {
+      selectedNetworkId.value = savedSelectedId
+    } else {
+      selectedNetworkId.value = networks.value[0]?.id || DEFAULT_NETWORKS[0].id
+    }
+
+    console.log('[NetworkStore] Networks initialized')
+
+    // Test connection to selected network and start periodic testing
+    if (selectedNetworkId.value) {
+      await testSelectedNetworkConnection()
+      startPeriodicConnectionTesting()
+    }
+  }
+
+  // Initialize on store creation
+  initializeNetworks()
 
   const startPeriodicConnectionTesting = () => {
     // Clear existing interval

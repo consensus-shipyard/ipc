@@ -14,6 +14,7 @@ use warp::{Filter, Reply};
 use crate::commands::ui::websocket::types::OutgoingMessage;
 use futures_util::SinkExt;
 use warp::ws::Message;
+use serde_json;
 
 /// Create deployment API routes
 pub fn deployment_routes(
@@ -60,6 +61,7 @@ async fn handle_deploy_request(
 
     // Generate deployment ID and start asynchronous deployment
     let deployment_id = uuid::Uuid::new_v4().to_string();
+    log::info!("Generated deployment ID: {}", deployment_id);
 
     // Store initial deployment state
     {
@@ -105,7 +107,11 @@ async fn handle_deploy_request(
         message: "Deployment started successfully".to_string(),
     };
 
-    Ok(warp::reply::json(&ApiResponse::success(response)))
+    log::info!("Deployment response created: {:?}", response);
+    let api_response = ApiResponse::success(response);
+    log::info!("About to return successful API response with deployment_id: {}", deployment_id);
+
+    Ok(warp::reply::json(&api_response))
 }
 
 /// Handle get templates request
@@ -198,18 +204,24 @@ async fn broadcast_progress(
         }
     }
 
-    // Create WebSocket message
-    let ws_message = OutgoingMessage::DeploymentProgress {
-        deployment_id: deployment_id.to_string(),
-        step: step.to_string(),
-        status: status.to_string(),
-        progress,
-        message,
-    };
+    // Create message in format frontend expects: { type: "deployment_progress", data: {...} }
+    let progress_data = serde_json::json!({
+        "deployment_id": deployment_id,
+        "step": step,
+        "progress": progress,
+        "status": status,
+        "message": message
+    });
+
+    let ws_message = serde_json::json!({
+        "type": "deployment_progress",
+        "data": progress_data
+    });
 
     // Broadcast to all connected WebSocket clients
     let clients = {
         let clients_guard = state.websocket_clients.lock().unwrap();
+        log::info!("Broadcasting progress to {} WebSocket clients", clients_guard.len());
         clients_guard.clone()  // Clone the Arc<Mutex<...>> handles
     };
 

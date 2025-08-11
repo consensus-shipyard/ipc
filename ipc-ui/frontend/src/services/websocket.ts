@@ -25,19 +25,8 @@ export class WebSocketService {
   }
 
   private getWebSocketURL(): string {
-    try {
-      const networkStore = useNetworkStore()
-      const selectedNetwork = networkStore.selectedNetwork
-
-      // If there's a selected network with a WebSocket URL, use it
-      // Otherwise fall back to the configured WebSocket URL
-      if (selectedNetwork?.wsUrl) {
-        return selectedNetwork.wsUrl
-      }
-    } catch {
-      // Store not available, use default
-    }
-
+    // Always use the IPC UI server's WebSocket URL, not the network's WebSocket URL
+    // The network's wsUrl is for blockchain WebSocket connections, not UI progress updates
     return STATIC_API_CONFIG.wsURL
   }
 
@@ -106,8 +95,9 @@ export class WebSocketService {
 
         this.ws.onmessage = (event) => {
           try {
+            console.log('WebSocket message received:', event.data)
             const message: WSMessage = JSON.parse(event.data)
-            console.log('WebSocket message received:', message)
+            //console.log('WebSocket message received:', message)
 
             // Handle specific message types
             if (message.type === 'deployment_progress' && message.data) {

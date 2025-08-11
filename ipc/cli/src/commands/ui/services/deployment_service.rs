@@ -136,41 +136,6 @@ impl DeploymentService {
         // Create a default address for missing fields
         let default_address = fvm_shared::address::Address::new_id(0);
 
-        // Convert UI config to SubnetCreateConfig - using only the fields that actually exist
-        let subnet_config = SubnetCreateConfig {
-            from: ui_config.get("from").and_then(|v| v.as_str()).map(|s| s.to_string()),
-            parent: parent.to_string(),
-            min_validator_stake: ui_config.get("min_validator_stake")
-                .and_then(|v| v.as_str())
-                .and_then(|s| s.parse::<f64>().ok())
-                .unwrap_or(1.0),
-            min_validators: ui_config.get("min_validators")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(1),
-            bottomup_check_period: ui_config.get("bottomup_check_period")
-                .and_then(|v| v.as_i64())
-                .unwrap_or(100),
-            active_validators_limit: ui_config.get("active_validators_limit")
-                .and_then(|v| v.as_u64())
-                .map(|v| v as u16),
-            min_cross_msg_fee: ui_config.get("min_cross_msg_fee")
-                .and_then(|v| v.as_f64())
-                .unwrap_or(0.000001),
-            permission_mode: PermissionMode::Collateral,
-            supply_source_kind: AssetKind::Native,
-            supply_source_address: ui_config.get("supply_source_address")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
-            validator_gater: ui_config.get("validator_gater")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string()),
-            // Add missing required fields with defaults
-            collateral_source_kind: Some(AssetKind::Native),
-            collateral_source_address: None,
-            genesis_subnet_ipc_contracts_owner: ethers::types::Address::zero(),
-            validator_rewarder: None,
-        };
-
         // Get RPC URL and chain ID from headers for deployment config
         let rpc_url = headers.get("x-network-rpc-url")
             .and_then(|h| h.to_str().ok())
@@ -181,12 +146,91 @@ impl DeploymentService {
             .and_then(|s| s.parse::<u64>().ok())
             .unwrap_or(31337);
 
+        // Debug: Print the entire UI config to see what we're receiving
+        log::info!("UI Config received: {:#?}", ui_config);
+
         // Always deploy contracts for new networks (like Anvil) that don't have them yet
         let from_str = ui_config.get("from")
             .and_then(|v| v.as_str())
             .unwrap_or("0x0000000000000000000000000000000000000000");
         let from_address = ethers::types::Address::from_str(from_str)
             .unwrap_or(ethers::types::Address::zero());
+
+        // Convert UI config to SubnetCreateConfig - using the correct field names from the UI
+        let subnet_config = SubnetCreateConfig {
+            from: ui_config.get("from").and_then(|v| v.as_str()).map(|s| s.to_string()),
+            parent: parent.to_string(),
+            min_validator_stake: ui_config.get("minValidatorStake")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(1.0),
+            min_validators: ui_config.get("minValidators")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(1),
+            bottomup_check_period: ui_config.get("bottomupCheckPeriod")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(100),
+            active_validators_limit: ui_config.get("activeValidatorsLimit")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as u16),
+            min_cross_msg_fee: ui_config.get("minCrossMsgFee")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.000001),
+            permission_mode: {
+                let mode_str = ui_config.get("permissionMode")
+                    .and_then(|v| v.as_str());
+                log::info!("Permission mode from UI: {:?}", mode_str);
+
+                let permission_mode = mode_str.and_then(|s| match s {
+                    "collateral" => Some(PermissionMode::Collateral),
+                    "federated" => Some(PermissionMode::Federated),
+                    "static" => Some(PermissionMode::Static),
+                    _ => None,
+                })
+                .unwrap_or(PermissionMode::Collateral);
+                log::info!("Parsed permission mode: {:?}", permission_mode);
+                permission_mode
+            },
+            supply_source_kind: ui_config.get("supplySourceKind")
+                .and_then(|v| v.as_str())
+                .and_then(|s| match s {
+                    "native" => Some(AssetKind::Native),
+                    "erc20" => Some(AssetKind::ERC20),
+                    _ => None,
+                })
+                .unwrap_or(AssetKind::Native),
+            supply_source_address: ui_config.get("supplySourceAddress")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            validator_gater: ui_config.get("validatorGater")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            // Add missing required fields with defaults
+            collateral_source_kind: ui_config.get("collateralSourceKind")
+                .and_then(|v| v.as_str())
+                .and_then(|s| match s {
+                    "native" => Some(AssetKind::Native),
+                    "erc20" => Some(AssetKind::ERC20),
+                    _ => None,
+                }),
+            collateral_source_address: ui_config.get("collateralSourceAddress")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string()),
+            genesis_subnet_ipc_contracts_owner: {
+                let owner_str = ui_config.get("genesisSubnetIpcContractsOwner")
+                    .and_then(|v| v.as_str());
+                log::info!("Genesis contracts owner from UI: {:?}", owner_str);
+
+                let parsed_address = owner_str
+                    .and_then(|s| s.parse::<ethers::types::Address>().ok());
+                log::info!("Parsed genesis contracts owner: {:?}", parsed_address);
+
+                parsed_address.unwrap_or_else(|| {
+                    log::warn!("Failed to parse genesis contracts owner, using from_address: {:?}", from_address);
+                    from_address
+                })
+            },
+            validator_rewarder: None,
+        };
 
         // Validate that the from address has sufficient balance for deployment
         self.validate_deployment_balance(rpc_url, from_address).await?;

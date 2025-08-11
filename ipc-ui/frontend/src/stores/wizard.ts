@@ -348,8 +348,13 @@ export const useWizardStore = defineStore('wizard', () => {
       console.log('Starting deployment with config:', config.value)
 
       // Ensure WebSocket is connected for progress updates
+      console.log('Checking WebSocket connection, isConnected:', isConnected.value)
       if (!isConnected.value) {
+        console.log('WebSocket not connected, initializing...')
         await initializeWebSocket()
+        console.log('WebSocket initialization completed, isConnected:', isConnected.value)
+      } else {
+        console.log('WebSocket already connected')
       }
 
       // Send deployment request to backend
@@ -358,8 +363,16 @@ export const useWizardStore = defineStore('wizard', () => {
         config: config.value
       })
 
-      if (response.data && response.data.deployment_id) {
-        deploymentId.value = response.data.deployment_id
+      console.log('Deployment API response:', response)
+      console.log('Response data structure:', JSON.stringify(response.data, null, 2))
+
+      // Handle ApiResponse wrapper structure: { success: true, data: { deployment_id, status, message }, error: null }
+      const deploymentResponse = response.data?.data || response.data
+      console.log('Deployment response data:', deploymentResponse)
+      console.log('Deployment ID from response:', deploymentResponse?.deployment_id)
+
+      if (deploymentResponse && deploymentResponse.deployment_id) {
+        deploymentId.value = deploymentResponse.deployment_id
         console.log('Deployment started:', deploymentId.value)
 
         // Subscribe to deployment progress updates
@@ -369,7 +382,9 @@ export const useWizardStore = defineStore('wizard', () => {
 
         return deploymentId.value
       } else {
-        throw new Error('Invalid response from deployment API')
+        console.error('Missing deployment_id in response:', deploymentResponse)
+        console.error('Full response structure:', response)
+        throw new Error('Invalid response from deployment API - missing deployment_id')
       }
     } catch (error) {
       isDeploying.value = false
