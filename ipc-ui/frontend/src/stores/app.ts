@@ -3,6 +3,7 @@ import { ref, computed, readonly } from 'vue'
 import { useNetworkStore } from './network'
 import { useSubnetsStore } from './subnets'
 import { useGatewaysStore } from './gateways'
+import { updateConsoleStatus } from '../utils/banner'
 
 interface AppLoadingState {
   isInitializing: boolean
@@ -40,6 +41,7 @@ export const useAppStore = defineStore('app', () => {
   const initializeApp = async (force = false) => {
     // Don't initialize again if already done and not forced
     if (loadingState.value.hasInitialized && !force) {
+      updateConsoleStatus('Already initialized', 'Skipping initialization')
       return
     }
 
@@ -48,12 +50,15 @@ export const useAppStore = defineStore('app', () => {
       loadingState.value.initializationError = null
 
       console.log('[AppStore] Starting app initialization...')
+      updateConsoleStatus('Initializing', 'Starting app initialization...')
 
       // Initialize network store first (this is fast - just localStorage)
+      updateConsoleStatus('Networks', 'Loading network configurations...')
       await networkStore.initializeNetworks()
 
       // Then fetch data in parallel for better performance
       console.log('[AppStore] Fetching initial data...')
+      updateConsoleStatus('Data loading', 'Fetching subnets and gateways...')
       await Promise.all([
         subnetsStore.fetchSubnets(force),
         gatewaysStore.fetchGateways(force)
@@ -61,9 +66,11 @@ export const useAppStore = defineStore('app', () => {
 
       loadingState.value.hasInitialized = true
       console.log('[AppStore] App initialization completed successfully')
+      updateConsoleStatus('Initialization complete', 'All data loaded successfully! ✨')
 
     } catch (error: any) {
       console.error('[AppStore] App initialization failed:', error)
+      updateConsoleStatus('Initialization failed', error.message || 'Unknown error')
       loadingState.value.initializationError = error.message || 'Failed to initialize app'
     } finally {
       loadingState.value.isInitializing = false
@@ -72,6 +79,7 @@ export const useAppStore = defineStore('app', () => {
 
   const refreshAllData = async () => {
     console.log('[AppStore] Refreshing all data...')
+    updateConsoleStatus('Refreshing', 'Updating all data...')
 
     try {
       // Refresh all data stores in parallel

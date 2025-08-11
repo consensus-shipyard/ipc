@@ -1,13 +1,18 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import AppHeader from './components/common/AppHeader.vue'
 import AppLoadingState from './components/common/AppLoadingState.vue'
 import AppSidebar from './components/common/AppSidebar.vue'
+import SplashScreen from './components/common/SplashScreen.vue'
 import { useNetworkMonitoring } from './composables/useNetworkMonitoring'
 import { useAppStore } from './stores/app'
+import { updateConsoleStatus } from './utils/banner'
 
 const route = useRoute()
+
+// Splash screen state
+const showSplash = ref(false)
 
 // Initialize app store for centralized data loading
 const appStore = useAppStore()
@@ -21,13 +26,37 @@ const isWizardRoute = computed(() => {
 })
 
 // Initialize app data on mount
-onMounted(() => {
+onMounted(async () => {
   console.log('[App] Initializing application...')
-  appStore.initializeApp()
+  updateConsoleStatus('App mounted', 'Starting initialization sequence...')
+
+  try {
+    updateConsoleStatus('Loading stores', 'Initializing data stores...')
+    await appStore.initializeApp()
+
+    updateConsoleStatus('App ready', 'All systems operational! 🚀')
+
+    // Show splash screen for a minimum time for better UX
+    setTimeout(() => {
+      showSplash.value = false
+      updateConsoleStatus('UI ready', 'Welcome to IPC! 🌌')
+    }, 2500)
+
+  } catch (error) {
+    console.error('[App] Initialization failed:', error)
+    updateConsoleStatus('Error', `Initialization failed: ${error}`)
+    // Still hide splash on error after a short delay
+    setTimeout(() => {
+      showSplash.value = false
+    }, 1500)
+  }
 })
 </script>
 
 <template>
+  <!-- Splash Screen -->
+  <SplashScreen :show="showSplash" />
+
   <div class="min-h-screen bg-gray-50">
     <!-- Global Loading State -->
     <AppLoadingState />
