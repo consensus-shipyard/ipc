@@ -11,7 +11,7 @@ use futures_util::SinkExt;
 use serde_json;
 use std::convert::Infallible;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, mpsc};
 use warp::{self, Filter, Reply};
 use warp::ws::Message;
 use uuid::Uuid;
@@ -166,75 +166,133 @@ async fn run_async_deployment(
     broadcast_progress(state, deployment_id, "contracts", 30, "in_progress",
         Some("Deploying smart contracts...".to_string())).await;
 
-    // Simulate granular contract deployment progress
+    // Set up progress tracking for the actual deployment
     let state_clone = state.clone();
     let deployment_id_clone = deployment_id.to_string();
 
-    tokio::spawn(async move {
-        // Initialize contract progress
-        let contract_names = vec!["AccountHelper", "SubnetIDHelper", "CrossMsgHelper", "LibQuorum", "Gateway", "Registry"];
+    // Create a progress callback that will be called during the actual deployment
+    let (progress_tx, mut progress_rx) = tokio::sync::mpsc::channel(100);
 
-        for (i, contract_name) in contract_names.iter().enumerate() {
+    // Progress tracking task
+    let progress_task = tokio::spawn(async move {
+        let state = state_clone;
+        let deployment_id = deployment_id_clone;
+
+        // Track contract deployment with more realistic timing
+        let contract_names = vec![
+            ("AccountHelper", "library"),
+            ("SubnetIDHelper", "library"),
+            ("CrossMsgHelper", "library"),
+            ("LibQuorum", "library"),
+            ("Gateway", "main"),
+            ("Registry", "main")
+        ];
+
+        for (i, (contract_name, contract_type)) in contract_names.iter().enumerate() {
             let completed = i as u32;
             let total = contract_names.len() as u32;
 
-            // Broadcast progress with contract details
             let progress = ContractDeploymentProgress {
                 total_contracts: total,
                 completed_contracts: completed,
                 current_contract: Some(format!("Deploying {}", contract_name)),
-                contracts: contract_names.iter().enumerate().map(|(idx, name)| {
+                contracts: contract_names.iter().enumerate().map(|(idx, (name, ctype))| {
                     crate::commands::ui::services::deployment_service::ContractInfo {
                         name: name.to_string(),
-                        contract_type: if idx < 4 { "library" } else { "main" }.to_string(),
-                        status: if idx < i { "completed" } else if idx == i { "deploying" } else { "pending" }.to_string(),
+                        contract_type: ctype.to_string(),
+                        status: if idx < i {
+                            "completed".to_string()
+                        } else if idx == i {
+                            "deploying".to_string()
+                        } else {
+                            "pending".to_string()
+                        },
                         deployed_at: if idx < i { Some(chrono::Utc::now().to_rfc3339()) } else { None },
                     }
                 }).collect(),
             };
 
+            let progress_percentage = 30 + ((completed as f32 / total as f32) * 40.0) as u8;
+
             broadcast_progress_with_contracts(
-                &state_clone,
-                &deployment_id_clone,
+                &state,
+                &deployment_id,
                 "contracts",
-                30 + ((completed as f32 / total as f32) * 40.0) as u8, // 30-70% range
+                progress_percentage,
                 "in_progress",
                 Some(format!("Deploying {}", contract_name)),
                 Some(progress),
             ).await;
 
-            // Simulate deployment time
-            tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
+            // Longer, more realistic timing to match actual deployment
+            let delay = if contract_type == &"library" {
+                std::time::Duration::from_secs(60) // Libraries take ~60 seconds
+            } else {
+                std::time::Duration::from_secs(120) // Main contracts take ~120 seconds
+            };
+
+            // Check if we should stop early due to deployment completion/failure
+            tokio::select! {
+                _ = tokio::time::sleep(delay) => {
+                    // Continue with next contract
+                }
+                msg = progress_rx.recv() => {
+                    if let Some(status) = msg {
+                        if status == "complete" || status == "error" {
+                            break;
+                        }
+                    }
+                }
+            }
         }
 
-        // Final completion
-        let final_progress = ContractDeploymentProgress {
-            total_contracts: 6,
-            completed_contracts: 6,
-            current_contract: None,
-            contracts: contract_names.iter().map(|name| {
-                crate::commands::ui::services::deployment_service::ContractInfo {
-                    name: name.to_string(),
-                    contract_type: "completed".to_string(),
-                    status: "completed".to_string(),
-                    deployed_at: Some(chrono::Utc::now().to_rfc3339()),
-                }
-            }).collect(),
-        };
+        // Only mark contracts as completed if we haven't received a stop signal
+        if progress_rx.try_recv().is_err() {
+            let final_progress = ContractDeploymentProgress {
+                total_contracts: 6,
+                completed_contracts: 6,
+                current_contract: None,
+                contracts: contract_names.iter().map(|(name, ctype)| {
+                    crate::commands::ui::services::deployment_service::ContractInfo {
+                        name: name.to_string(),
+                        contract_type: ctype.to_string(),
+                        status: "completed".to_string(),
+                        deployed_at: Some(chrono::Utc::now().to_rfc3339()),
+                    }
+                }).collect(),
+            };
 
-        broadcast_progress_with_contracts(
-            &state_clone,
-            &deployment_id_clone,
-            "contracts",
-            70,
-            "completed",
-            Some("All contracts deployed successfully".to_string()),
-            Some(final_progress),
-        ).await;
+            broadcast_progress_with_contracts(
+                &state,
+                &deployment_id,
+                "contracts",
+                70,
+                "completed",
+                Some("All contracts deployed successfully".to_string()),
+                Some(final_progress),
+            ).await;
+        }
     });
 
-    // Run the actual deployment (original logic)
-    let result = service.deploy_subnet(config, headers).await?;
+    // Run the actual deployment
+    let service_clone = service.clone();
+    let config_clone = config.clone();
+    let headers_clone = headers.clone();
+
+    let deployment_task = tokio::spawn(async move {
+        service_clone.deploy_subnet(config_clone, &headers_clone).await
+    });
+
+    // Wait for the deployment to complete and handle the result
+    let deployment_result = deployment_task.await??;
+
+    // Signal the progress task to stop
+    let _ = progress_tx.send("complete".to_string()).await;
+
+    // Wait for progress task to finish
+    let _ = progress_task.await;
+
+    let result = deployment_result;
 
         broadcast_progress(state, deployment_id, "genesis", 70, "in_progress",
         Some("Creating genesis block...".to_string())).await;

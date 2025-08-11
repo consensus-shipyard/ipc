@@ -53,6 +53,7 @@ pub struct SubnetDeploymentResult {
     pub registry_address: Option<String>,
 }
 
+#[derive(Clone)]
 pub struct DeploymentService {
     global: GlobalArguments,
 }
