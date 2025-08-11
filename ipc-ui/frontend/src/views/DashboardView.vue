@@ -177,6 +177,22 @@ const formatAddressShort = (address: any) => {
   return `${fullAddress.slice(0, 8)}...${fullAddress.slice(-6)}`
 }
 
+// Helper functions to safely calculate metrics and avoid NaN values
+const safeParseStake = (stake: any): number => {
+  if (stake === null || stake === undefined || stake === '') return 0
+  const parsed = parseFloat(stake)
+  return isNaN(parsed) ? 0 : parsed
+}
+
+const safeCalculateSubnetStake = (subnet: SubnetInstance): number => {
+  if (!subnet.validators || !Array.isArray(subnet.validators)) return 0
+  return subnet.validators.reduce((sum, validator) => sum + safeParseStake(validator.stake), 0)
+}
+
+const safeGetValidatorCount = (subnet: SubnetInstance): number => {
+  return subnet.validators?.length || 0
+}
+
 // Helper function to get formatted gateway address for a subnet
 const getGatewayAddressShort = (subnet: any) => {
   if (!subnet?.config?.gateway_addr) return 'N/A'
@@ -207,8 +223,8 @@ const groupedSubnets = computed(() => {
     subnets,
     count: subnets.length,
     activeCount: subnets.filter(s => s.status === 'active').length,
-    totalValidators: subnets.reduce((sum, s) => sum + s.validators?.length, 0),
-    totalStake: subnets.reduce((sum, s) => sum + s.validators?.reduce((s: number, v: any) => s + parseFloat(v.stake || '0'), 0), 0)
+    totalValidators: subnets.reduce((sum, s) => sum + safeGetValidatorCount(s), 0),
+    totalStake: subnets.reduce((sum, s) => sum + safeCalculateSubnetStake(s), 0)
   }))
 })
 
@@ -322,7 +338,7 @@ const copyToClipboard = async (text: string, subnetId: string) => {
           <div>
             <p class="text-sm font-medium text-gray-600">Total Stake</p>
             <p class="text-3xl font-bold text-purple-600">
-              {{ subnets.reduce((sum, subnet) => sum + subnet.validators?.reduce((s: number, v: any) => s + parseFloat(v.stake || '0'), 0), 0).toFixed(1) }} FIL
+              {{ subnets.reduce((sum, subnet) => sum + safeCalculateSubnetStake(subnet), 0).toFixed(1) }} FIL
             </p>
           </div>
           <div class="w-12 h-12 bg-purple-50 rounded-lg flex items-center justify-center">
@@ -522,11 +538,11 @@ const copyToClipboard = async (text: string, subnetId: string) => {
               <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <p class="text-sm text-gray-500">Validators</p>
-                  <p class="font-semibold text-gray-900">{{ subnet.validators?.length }}</p>
+                  <p class="font-semibold text-gray-900">{{ safeGetValidatorCount(subnet) }}</p>
                 </div>
                 <div>
                   <p class="text-sm text-gray-500">Total Stake</p>
-                  <p class="font-semibold text-gray-900">{{ subnet.validators?.reduce((s: number, v: any) => s + parseFloat(v.stake || '0'), 0).toFixed(1) }} FIL</p>
+                  <p class="font-semibold text-gray-900">{{ safeCalculateSubnetStake(subnet).toFixed(1) }} FIL</p>
                 </div>
                 <div>
                   <p class="text-sm text-gray-500">Template</p>

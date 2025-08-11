@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { apiService } from '../services/api'
 import { wsService, type WebSocketCallbacks } from '../services/websocket'
 import type { DeploymentProgress } from '../config/api'
@@ -87,6 +87,9 @@ export const useWizardStore = defineStore('wizard', () => {
   const deploymentProgress = ref<DeploymentProgress | null>(null)
   const deploymentError = ref<string | null>(null)
   const deploymentLogs = ref<string[]>([])
+  const gatewayAddress = ref<string | null>(null)
+  const registryAddress = ref<string | null>(null)
+  const parentId = ref<string | null>(null)
 
   // WebSocket connection state
   const isConnected = ref(false)
@@ -305,11 +308,24 @@ export const useWizardStore = defineStore('wizard', () => {
         // Handle completion or failure
         if (progress.status === 'completed') {
           isDeploying.value = false
-          // Extract actual subnet ID from deployment progress
+          // Extract deployment result data from deployment progress
           if (progress.subnet_id) {
             subnetId.value = progress.subnet_id
             console.log('Deployment completed successfully, subnet ID:', progress.subnet_id)
-          } else {
+          }
+          if (progress.gateway_address) {
+            gatewayAddress.value = progress.gateway_address
+            console.log('Gateway address:', progress.gateway_address)
+          }
+          if (progress.registry_address) {
+            registryAddress.value = progress.registry_address
+            console.log('Registry address:', progress.registry_address)
+          }
+          if (progress.parent_id) {
+            parentId.value = progress.parent_id
+            console.log('Parent ID:', progress.parent_id)
+          }
+          if (!progress.subnet_id) {
             console.log('Deployment completed successfully')
           }
         } else if (progress.status === 'failed') {
@@ -479,6 +495,9 @@ export const useWizardStore = defineStore('wizard', () => {
     deploymentError: computed(() => deploymentError.value),
     deploymentLogs: computed(() => deploymentLogs.value),
     isConnected: computed(() => isConnected.value),
+    gatewayAddress: computed(() => gatewayAddress.value),
+    registryAddress: computed(() => registryAddress.value),
+    parentId: computed(() => parentId.value),
 
     // Computed
     isConfigComplete,

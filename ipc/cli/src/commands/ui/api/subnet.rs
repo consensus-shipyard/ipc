@@ -11,6 +11,10 @@ use serde_json;
 use std::collections::HashMap;
 use std::convert::Infallible;
 use warp::{Filter, Reply};
+use warp::reply;
+use warp::hyper::HeaderMap;
+use warp::Rejection;
+use std::sync::Arc;
 
 /// Create subnet API routes
 pub fn subnet_routes(
@@ -67,6 +71,11 @@ pub fn subnet_routes(
         .and(with_state(state.clone()))
         .and_then(handle_get_instance);
 
+    let pending_approvals_route = warp::path!("gateways" / String / "pending-approvals")
+        .and(warp::get())
+        .and(with_state(state.clone()))
+        .and_then(handle_list_pending_approvals);
+
     approve_route
         .or(add_validator_route)
         .or(remove_validator_route)
@@ -76,6 +85,7 @@ pub fn subnet_routes(
         .or(status_route)
         .or(instances_route)
         .or(instance_route)
+        .or(pending_approvals_route)
 }
 
 /// Helper to pass state to handlers
@@ -99,14 +109,39 @@ async fn handle_approve_subnet(
 
     let service = SubnetService::new(global);
 
-    let from_address = approval_data.get("from")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| warp::reject::custom(InvalidRequest("from address required".to_string())))?;
+    // URL decode the subnet ID
+    let decoded_subnet_id = urlencoding::decode(&subnet_id)
+        .map_err(|e| warp::reject::custom(InvalidRequest(format!("Invalid subnet ID encoding: {}", e))))?;
 
-    match service.approve_subnet(&subnet_id, from_address).await {
-        Ok(message) => Ok(warp::reply::json(&ApiResponse::success(message))),
+    let from_address = approval_data.get("from")
+        .and_then(|v| v.as_str());
+
+    match service.approve_subnet(&decoded_subnet_id, from_address).await {
+        Ok(_) => Ok(warp::reply::json(&ApiResponse::success(format!("Subnet {} approved successfully", decoded_subnet_id)))),
         Err(e) => {
             log::error!("Subnet approval failed: {}", e);
+            Err(warp::reject::custom(ServerError(e.to_string())))
+        }
+    }
+}
+
+/// Handle list pending approvals request
+async fn handle_list_pending_approvals(
+    gateway_address: String,
+    state: AppState,
+) -> Result<impl Reply, warp::Rejection> {
+    let global = GlobalArguments {
+        config_path: Some(state.config_path.clone()),
+        _network: fvm_shared::address::Network::Testnet,
+        __network: None,
+    };
+
+    let service = SubnetService::new(global);
+
+    match service.list_pending_approvals(&gateway_address).await {
+        Ok(pending_subnets) => Ok(warp::reply::json(&ApiResponse::success(pending_subnets))),
+        Err(e) => {
+            log::error!("Failed to list pending approvals: {}", e);
             Err(warp::reject::custom(ServerError(e.to_string())))
         }
     }
@@ -316,6 +351,59 @@ async fn handle_get_instance(
         Err(e) => {
             log::error!("Failed to get instance {}: {}", instance_id, e);
             Err(warp::reject::custom(ServerError(e.to_string())))
+        }
+    }
+}
+
+/// Approve a subnet
+pub async fn approve_subnet(
+    headers: Option<&HeaderMap>,
+    subnet_service: Arc<SubnetService>,
+    subnet_id: String,
+    from_address: Option<String>,
+) -> Result<impl Reply, Rejection> {
+    log::info!("Approving subnet: {}", subnet_id);
+
+    match subnet_service.approve_subnet(&subnet_id, from_address.as_deref()).await {
+        Ok(_) => {
+            log::info!("Successfully approved subnet: {}", subnet_id);
+            Ok(reply::json(&serde_json::json!({
+                "success": true,
+                "message": format!("Subnet {} approved successfully", subnet_id)
+            })))
+        }
+        Err(e) => {
+            log::error!("Failed to approve subnet {}: {}", subnet_id, e);
+            Ok(reply::json(&serde_json::json!({
+                "success": false,
+                "error": format!("Failed to approve subnet: {}", e)
+            })))
+        }
+    }
+}
+
+/// List pending subnet approvals for a gateway
+pub async fn list_pending_approvals(
+    headers: Option<&HeaderMap>,
+    subnet_service: Arc<SubnetService>,
+    gateway_address: String,
+) -> Result<impl Reply, Rejection> {
+    log::info!("Listing pending approvals for gateway: {}", gateway_address);
+
+    match subnet_service.list_pending_approvals(&gateway_address).await {
+        Ok(pending_subnets) => {
+            log::info!("Found {} pending approvals", pending_subnets.len());
+            Ok(reply::json(&serde_json::json!({
+                "success": true,
+                "data": pending_subnets
+            })))
+        }
+        Err(e) => {
+            log::error!("Failed to list pending approvals: {}", e);
+            Ok(reply::json(&serde_json::json!({
+                "success": false,
+                "error": format!("Failed to list pending approvals: {}", e)
+            })))
         }
     }
 }

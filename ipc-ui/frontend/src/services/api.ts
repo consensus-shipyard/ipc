@@ -259,6 +259,11 @@ export const apiService = {
   async listConfigs() {
     return retryRequest(() => api.get('/api/config/list'))
   },
+
+  async listPendingApprovals(gatewayAddress: string): Promise<AxiosResponse<any>> {
+    addNetworkHeaders()
+    return retryRequest(() => api.get(`/api/gateways/${gatewayAddress}/pending-approvals`))
+  },
 }
 
 export default api
@@ -278,6 +283,9 @@ export interface DeploymentProgress {
   message?: string
   error?: string
   subnet_id?: string // The actual subnet ID generated during deployment
+  gateway_address?: string // Gateway contract address
+  registry_address?: string // Registry contract address
+  parent_id?: string // Parent network ID
   // Contract deployment details for granular progress
   contract_progress?: {
     total_contracts: number

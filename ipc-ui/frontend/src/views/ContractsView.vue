@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useGatewaysStore, type ContractInfo } from '../stores/gateways'
 import { useNetworkStore } from '../stores/network'
+import SubnetApprovalsModal from '@/components/SubnetApprovalsModal.vue'
 
 // Stores
 const gatewaysStore = useGatewaysStore()
@@ -148,9 +149,12 @@ const configureContract = (contract: ContractInfo) => {
   console.log('Configure contract:', contract)
 }
 
+const showApprovalsModal = ref(false)
+const selectedGatewayAddress = ref('')
+
 const approveSubnets = (contract: ContractInfo) => {
-  // TODO: Implement subnet approval management
-  console.log('Manage subnet approvals for:', contract)
+  selectedGatewayAddress.value = contract.address
+  showApprovalsModal.value = true
 }
 
 const upgradeContract = (contract: ContractInfo) => {
@@ -545,7 +549,11 @@ const upgradeContract = (contract: ContractInfo) => {
                   <div class="font-medium text-gray-900">Export ABI</div>
                   <div class="text-sm text-gray-600">Download contract interface definition</div>
                 </button>
-                <button v-if="selectedContract.type === 'gateway'" class="w-full text-left p-3 bg-white rounded border hover:bg-gray-50 transition-colors">
+                <button
+                  v-if="selectedContract.type === 'gateway'"
+                  @click="approveSubnets(selectedContract); showInspectModal = false"
+                  class="w-full text-left p-3 bg-white rounded border hover:bg-gray-50 transition-colors"
+                >
                   <div class="font-medium text-gray-900">Manage Subnet Approvals</div>
                   <div class="text-sm text-gray-600">Approve or reject subnet registration requests</div>
                 </button>
@@ -570,6 +578,17 @@ const upgradeContract = (contract: ContractInfo) => {
         </div>
       </div>
     </div>
+
+    <!-- Subnet Approvals Modal -->
+    <SubnetApprovalsModal
+      :show="showApprovalsModal"
+      :gateway-address="selectedGatewayAddress"
+      @close="showApprovalsModal = false"
+      @approved="(subnetId) => {
+        console.log('Subnet approved:', subnetId)
+        // Optionally refresh data or show success message
+      }"
+    />
   </div>
 </template>
 

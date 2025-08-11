@@ -93,9 +93,9 @@ async fn handle_deploy_request(
         // Run the actual deployment in background and send progress updates
         match run_async_deployment(&service, deployment_config, &deploy_headers, &deploy_state, &deploy_id).await {
             Ok(result) => {
-                // Broadcast final success with subnet_id
-                broadcast_progress_with_subnet_id(&deploy_state, &deploy_id, "verification", 100, "completed",
-                    Some(format!("Subnet created successfully: {}", result.subnet_id)), Some(result.subnet_id.clone())).await;
+                // Broadcast final success with subnet_id and contract addresses
+                broadcast_progress_with_deployment_result(&deploy_state, &deploy_id, "verification", 100, "completed",
+                    Some(format!("Subnet created successfully: {}", result.subnet_id)), &result).await;
             }
             Err(e) => {
                 // Broadcast failure
@@ -362,8 +362,17 @@ async fn broadcast_progress_with_subnet_id(
     });
 
     // Add subnet_id if provided
-    if let Some(subnet_id) = subnet_id {
-        progress_data["subnet_id"] = serde_json::Value::String(subnet_id);
+    if let Some(ref subnet_id_str) = subnet_id {
+        progress_data["subnet_id"] = serde_json::Value::String(subnet_id_str.clone());
+
+        // If this is a completion message, try to extract parent_id from subnet_id
+        if status == "completed" {
+            if let Ok(parsed_subnet_id) = ipc_api::subnet_id::SubnetID::from_str(subnet_id_str) {
+                if let Some(parent_subnet) = parsed_subnet_id.parent() {
+                    progress_data["parent_id"] = serde_json::Value::String(parent_subnet.to_string());
+                }
+            }
+        }
     }
 
     let ws_message = serde_json::json!({
@@ -388,6 +397,64 @@ async fn broadcast_progress_with_subnet_id(
     }
 
     log::info!("Progress with subnet_id: {} - {} ({}%)", deployment_id, step, progress);
+}
+
+/// Broadcast deployment progress with full deployment result to WebSocket clients
+async fn broadcast_progress_with_deployment_result(
+    state: &AppState,
+    deployment_id: &str,
+    step: &str,
+    progress: u8,
+    status: &str,
+    message: Option<String>,
+    result: &SubnetDeploymentResult,
+) {
+    // Update deployment state
+    {
+        let mut deployments = state.deployments.lock().unwrap();
+        if let Some(deployment) = deployments.get_mut(deployment_id) {
+            deployment.step = step.to_string();
+            deployment.progress = progress;
+            deployment.status = status.to_string();
+            deployment.updated_at = chrono::Utc::now();
+        }
+    }
+
+    // Create message in format frontend expects: { type: "deployment_progress", data: {...} }
+    let mut progress_data = serde_json::json!({
+        "deployment_id": deployment_id,
+        "step": step,
+        "progress": progress,
+        "status": status,
+        "message": message,
+        "subnet_id": result.subnet_id,
+        "parent_id": result.parent_id,
+        "gateway_address": result.gateway_address,
+        "registry_address": result.registry_address
+    });
+
+    let ws_message = serde_json::json!({
+        "type": "deployment_progress",
+        "data": progress_data
+    });
+
+    // Broadcast to all connected WebSocket clients
+    let clients = {
+        let clients_guard = state.websocket_clients.lock().unwrap();
+        log::info!("Broadcasting progress with deployment result to {} WebSocket clients", clients_guard.len());
+        clients_guard.clone()  // Clone the Arc<Mutex<...>> handles
+    };
+
+    for client in clients.iter() {
+        let mut sink = client.lock().await;
+        if let Ok(json) = serde_json::to_string(&ws_message) {
+            if let Err(e) = sink.send(Message::text(json)).await {
+                log::error!("Failed to send WebSocket message: {}", e);
+            }
+        }
+    }
+
+    log::info!("Progress with deployment result: {} - {} ({}%)", deployment_id, step, progress);
 }
 
 /// Broadcast deployment progress with contract details to WebSocket clients

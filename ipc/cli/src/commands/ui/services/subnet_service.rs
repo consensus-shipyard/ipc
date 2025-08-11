@@ -61,13 +61,12 @@ impl SubnetService {
     }
 
     /// Approve a subnet to join
-    pub async fn approve_subnet(&self, subnet_id: &str, from_address: &str) -> Result<String> {
+    pub async fn approve_subnet(&self, subnet_id: &str, from_address: Option<&str>) -> Result<String> {
         let subnet = SubnetID::from_str(subnet_id)?;
-        let from = crate::require_fil_addr_from_str(from_address)?;
 
         let args = ApproveSubnetArgs {
             subnet: subnet_id.to_string(),
-            from: Some(from_address.to_string()),
+            from: from_address.map(|s| s.to_string()),
         };
 
         let mut provider = get_ipc_provider(&self.global)?;
@@ -298,5 +297,55 @@ impl SubnetService {
                 "last_checkpoint": chrono::Utc::now().to_rfc3339()
             }
         }))
+    }
+
+
+
+        /// List pending subnet approvals for a gateway
+    pub async fn list_pending_approvals(&self, gateway_address: &str) -> anyhow::Result<Vec<serde_json::Value>> {
+        log::info!("Listing pending approvals for gateway: {}", gateway_address);
+
+        // For now, we'll check the config for subnets that might need approval
+        // This is a simplified implementation - in a real scenario, you'd query the gateway contract
+        let config_store = crate::ipc_config_store::IpcConfigStore::load_or_init(&self.global).await?;
+        let config = config_store.snapshot().await;
+
+        let mut pending_subnets = Vec::new();
+
+        // Find subnets that have this gateway address but might not be approved yet
+        for (subnet_id, subnet_config) in &config.subnets {
+            match &subnet_config.config {
+                                ipc_provider::config::SubnetConfig::Fevm(evm_subnet) => {
+                                        // Convert both addresses to Ethereum hex format for comparison
+                    let config_gateway_eth = evm_subnet.gateway_addr.to_string().to_lowercase();
+
+                    // For now, try simple comparison - TODO: implement proper address conversion
+                    let target_gateway_eth = gateway_address.to_lowercase();
+
+                    log::info!("Comparing gateway addresses: config_eth={}, target_eth={}", config_gateway_eth, target_gateway_eth);
+
+                    if config_gateway_eth == target_gateway_eth {
+                        // This subnet uses this gateway, so it might need approval
+                        let parent_id = subnet_id.parent().unwrap_or_else(|| subnet_id.clone());
+
+                        log::info!("Found subnet {} that uses gateway {}", subnet_id, gateway_address);
+
+                        let subnet_info = serde_json::json!({
+                            "subnet_id": subnet_id.to_string(),
+                            "gateway_address": evm_subnet.gateway_addr.to_string(),
+                            "registry_address": evm_subnet.registry_addr.to_string(),
+                            "parent_id": parent_id.to_string(),
+                            "status": "pending_approval", // This would need real blockchain query in production
+                            "created_at": chrono::Utc::now().to_rfc3339(),
+                        });
+
+                        pending_subnets.push(subnet_info);
+                    }
+                }
+            }
+        }
+
+        log::info!("Found {} pending subnets for gateway {}", pending_subnets.len(), gateway_address);
+        Ok(pending_subnets)
     }
 }

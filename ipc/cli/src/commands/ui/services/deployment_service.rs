@@ -251,6 +251,23 @@ impl DeploymentService {
 
         log::info!("Generated subnet ID: {}", subnet_id);
 
+        // Approve the subnet automatically
+        log::info!("Auto-approving subnet: {}", subnet_id);
+        let approve_args = crate::commands::subnet::approve::ApproveSubnetArgs {
+            subnet: subnet_id.to_string(),
+            from: Some(from_address_str.to_string()),
+        };
+
+        match crate::commands::subnet::approve::approve_subnet(&mut provider, &approve_args).await {
+            Ok(_) => {
+                log::info!("Successfully auto-approved subnet: {}", subnet_id);
+            }
+            Err(e) => {
+                log::warn!("Failed to auto-approve subnet {}: {}", subnet_id, e);
+                // Don't fail the deployment if approval fails - user can approve manually
+            }
+        }
+
         // Get gateway and registry addresses from parent network configuration
         let ipc_config_store = crate::ipc_config_store::IpcConfigStore::load_or_init(&self.global).await?;
         let parent_subnet = ipc_config_store.get_subnet(&parent_id).await
@@ -259,11 +276,27 @@ impl DeploymentService {
         let gateway_address = parent_subnet.gateway_addr();
         let registry_address = parent_subnet.registry_addr();
 
+        // Add the newly created subnet to the IPC configuration store
+        let parent_rpc_url = parent_subnet.rpc_http().clone();
+        log::info!("Adding subnet {} to IPC config with parent RPC URL: {}", subnet_id, parent_rpc_url);
+
+        ipc_config_store
+            .add_subnet(
+                subnet_id.clone(),
+                parent_rpc_url,
+                gateway_address,
+                registry_address,
+            )
+            .await
+            .context("Failed to add subnet to IPC configuration")?;
+
+        log::info!("Successfully added subnet {} to IPC config", subnet_id);
+
         let result = SubnetDeploymentResult {
             subnet_id: subnet_id.to_string(),
-            parent_id: parent_network.to_string(),
-            gateway_address: Some(format!("{:?}", gateway_address)),
-            registry_address: Some(format!("{:?}", registry_address)),
+            parent_id: parent_id.to_string(), // Use parent_id instead of parent_network to avoid duplication
+            gateway_address: Some(format!("{}", gateway_address)), // Clean format without Debug
+            registry_address: Some(format!("{}", registry_address)), // Clean format without Debug
         };
 
         log::info!("Subnet deployment completed successfully: {:?}", result);

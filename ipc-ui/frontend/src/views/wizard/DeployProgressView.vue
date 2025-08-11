@@ -343,9 +343,11 @@ onUnmounted(() => {
           </p>
           <div class="space-y-2 text-sm text-green-700">
             <div><strong>Subnet ID:</strong> <span class="font-mono">{{ subnetId }}</span></div>
-            <div><strong>Network Path:</strong> <span class="font-mono">{{ config.parent }}/{{ subnetId }}</span></div>
+            <div><strong>Network Path:</strong> <span class="font-mono">{{ subnetId }}</span></div>
             <div><strong>Status:</strong> Active</div>
             <div><strong>Validators:</strong> {{ config.validators?.length || config.validatorPubkeys?.length || 0 }} initialized</div>
+            <div v-if="wizardStore.gatewayAddress"><strong>Gateway:</strong> <span class="font-mono text-xs">{{ wizardStore.gatewayAddress }}</span></div>
+            <div v-if="wizardStore.registryAddress"><strong>Registry:</strong> <span class="font-mono text-xs">{{ wizardStore.registryAddress }}</span></div>
           </div>
         </div>
       </div>
