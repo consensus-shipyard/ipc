@@ -236,7 +236,29 @@ onUnmounted(() => {
             <!-- Step Info -->
             <div class="flex-1">
               <div class="font-semibold">{{ step.name }}</div>
-              <div v-if="step.status === 'in_progress'" class="text-sm opacity-75">
+
+              <!-- Contract deployment sub-progress for contracts step -->
+              <div v-if="step.id === 'contracts' && getStepStatus(step.id, index) === 'in_progress' && deploymentProgress?.contract_progress" class="mt-2">
+                <div class="text-sm opacity-75 mb-2">
+                  Deploying {{ deploymentProgress.contract_progress.completed_contracts }} of {{ deploymentProgress.contract_progress.total_contracts }} contracts
+                </div>
+
+                <!-- Contract progress bar -->
+                <div class="w-full bg-gray-300 rounded-full h-1.5 mb-2">
+                  <div
+                    class="bg-blue-500 h-1.5 rounded-full transition-all duration-500"
+                    :style="{ width: `${(deploymentProgress.contract_progress.completed_contracts / deploymentProgress.contract_progress.total_contracts) * 100}%` }"
+                  ></div>
+                </div>
+
+                <!-- Current contract being deployed -->
+                <div v-if="deploymentProgress.contract_progress.current_contract" class="text-xs opacity-60">
+                  Currently: {{ deploymentProgress.contract_progress.current_contract }}
+                </div>
+              </div>
+
+              <!-- Standard status messages for other cases -->
+              <div v-else-if="step.status === 'in_progress'" class="text-sm opacity-75">
                 This may take a few minutes...
               </div>
               <div v-else-if="step.status === 'completed'" class="text-sm opacity-75">

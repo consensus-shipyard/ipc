@@ -263,7 +263,14 @@ export const apiService = {
 
 export default api
 
-interface DeploymentProgress {
+export interface ContractDeploymentInfo {
+  name: string
+  type: 'library' | 'gateway' | 'registry' | 'facet'
+  status: 'pending' | 'deploying' | 'completed' | 'failed'
+  deployedAt?: string // timestamp or address
+}
+
+export interface DeploymentProgress {
   deployment_id: string
   step: string
   progress: number
@@ -271,6 +278,13 @@ interface DeploymentProgress {
   message?: string
   error?: string
   subnet_id?: string // The actual subnet ID generated during deployment
+  // Contract deployment details for granular progress
+  contract_progress?: {
+    total_contracts: number
+    completed_contracts: number
+    current_contract?: string
+    contracts: ContractDeploymentInfo[]
+  }
 }
 
 // Network connection status types

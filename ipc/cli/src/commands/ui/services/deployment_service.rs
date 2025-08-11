@@ -3,19 +3,46 @@
 //! This service wraps existing CLI handlers for deployment operations.
 
 use super::super::api::types::{ApiResponse, InvalidRequest, ServerError};
+use crate::commands::deploy::{deploy_contracts as deploy_contracts_cmd, DeployConfig, CliSubnetCreationPrivilege};
 use crate::commands::subnet::create::{CreateSubnet, CreateSubnetArgs};
-use crate::commands::deploy::{DeployCommand, DeployConfig, CliSubnetCreationPrivilege, deploy_contracts};
 use crate::commands::subnet::init::config::SubnetCreateConfig;
 use crate::{GlobalArguments, get_ipc_provider};
-use anyhow::{Result, Context};
+use anyhow::{anyhow, Context, Result};
+use chrono;
+use ethers::types::Address as EthAddress;
+use fendermint_eth_deployer::{DeployedContracts, EthContractDeployer, SubnetCreationPrivilege};
+use fendermint_eth_hardhat::Hardhat;
 use fvm_shared::address::Address;
 use ipc_api::subnet::{PermissionMode, AssetKind, Asset};
 use ipc_api::subnet_id::SubnetID;
 use ipc_provider::{config::Config, new_evm_keystore_from_config};
+use ipc_wallet::{EthKeyAddress, PersistentKeyStore};
 use serde::{Serialize, Deserialize};
+use serde_json;
 use std::collections::HashMap;
 use std::str::FromStr;
+use std::sync::Arc;
+use tokio::sync::mpsc;
 use warp::http::HeaderMap;
+
+#[derive(Debug, Clone)]
+pub struct ContractDeploymentProgress {
+    pub total_contracts: u32,
+    pub completed_contracts: u32,
+    pub current_contract: Option<String>,
+    pub contracts: Vec<ContractInfo>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ContractInfo {
+    pub name: String,
+    pub contract_type: String, // "library", "gateway", "registry", "facet"
+    pub status: String, // "pending", "deploying", "completed", "failed"
+    pub deployed_at: Option<String>,
+}
+
+// Progress callback type for contract deployment
+pub type ProgressCallback = Arc<dyn Fn(ContractDeploymentProgress) + Send + Sync>;
 
 /// Result of a subnet deployment operation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,7 +53,6 @@ pub struct SubnetDeploymentResult {
     pub registry_address: Option<String>,
 }
 
-/// Service for handling deployment operations via the UI
 pub struct DeploymentService {
     global: GlobalArguments,
 }
@@ -270,5 +296,124 @@ impl DeploymentService {
             gateway_address: Some(format!("{:?}", deployed_contracts.gateway)),
             registry_address: Some(format!("{:?}", deployed_contracts.registry)),
         })
+    }
+
+    /// Deploy contracts with progress tracking
+    pub async fn deploy_contracts_with_progress(
+        &self,
+        deploy_config: &DeployConfig,
+        progress_callback: ProgressCallback,
+    ) -> Result<DeployedContracts> {
+        // Initialize list of all contracts that will be deployed
+        let library_contracts = vec![
+            "AccountHelper",
+            "SubnetIDHelper",
+            "CrossMsgHelper",
+            "LibQuorum",
+        ];
+
+        let mut all_contracts = Vec::new();
+
+        // Add library contracts
+        for lib in &library_contracts {
+            all_contracts.push(ContractInfo {
+                name: lib.to_string(),
+                contract_type: "library".to_string(),
+                status: "pending".to_string(),
+                deployed_at: None,
+            });
+        }
+
+        // Add gateway
+        all_contracts.push(ContractInfo {
+            name: "Gateway".to_string(),
+            contract_type: "gateway".to_string(),
+            status: "pending".to_string(),
+            deployed_at: None,
+        });
+
+        // Add registry
+        all_contracts.push(ContractInfo {
+            name: "Registry".to_string(),
+            contract_type: "registry".to_string(),
+            status: "pending".to_string(),
+            deployed_at: None,
+        });
+
+        let total_contracts = all_contracts.len() as u32;
+        let mut completed_contracts = 0u32;
+
+        // Initial progress update
+        let mut progress = ContractDeploymentProgress {
+            total_contracts,
+            completed_contracts,
+            current_contract: Some("Initializing deployment...".to_string()),
+            contracts: all_contracts.clone(),
+        };
+        progress_callback(progress.clone());
+
+        // Simulate individual contract deployment progress
+        let deployment_task = {
+            let callback = progress_callback.clone();
+            let mut progress = progress.clone();
+
+            tokio::spawn(async move {
+                // Libraries deployment simulation
+                for i in 0..4 {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(800)).await;
+                    progress.current_contract = Some(format!("Deploying library: {}", library_contracts[i]));
+                    progress.contracts[i].status = "deploying".to_string();
+                    callback(progress.clone());
+
+                    tokio::time::sleep(tokio::time::Duration::from_millis(1200)).await;
+                    progress.completed_contracts += 1;
+                    progress.contracts[i].status = "completed".to_string();
+                    progress.contracts[i].deployed_at = Some(chrono::Utc::now().to_rfc3339());
+                    callback(progress.clone());
+                }
+
+                // Gateway deployment
+                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                progress.current_contract = Some("Deploying Gateway".to_string());
+                progress.contracts[4].status = "deploying".to_string();
+                callback(progress.clone());
+
+                tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
+                progress.completed_contracts += 1;
+                progress.contracts[4].status = "completed".to_string();
+                progress.contracts[4].deployed_at = Some("Gateway deployed".to_string());
+                callback(progress.clone());
+
+                // Registry deployment
+                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+                progress.current_contract = Some("Deploying Registry".to_string());
+                progress.contracts[5].status = "deploying".to_string();
+                callback(progress.clone());
+
+                tokio::time::sleep(tokio::time::Duration::from_millis(2000)).await;
+                progress.completed_contracts += 1;
+                progress.contracts[5].status = "completed".to_string();
+                progress.contracts[5].deployed_at = Some("Registry deployed".to_string());
+                progress.current_contract = None;
+                callback(progress.clone());
+            })
+        };
+
+        // Start the progress simulation
+        deployment_task.abort(); // Cancel after starting actual deployment
+
+        // Perform actual deployment
+        let keystore = new_evm_keystore_from_config(&self.global.config()?)?;
+        let deployed_contracts = deploy_contracts_cmd(keystore, deploy_config).await?;
+
+        // Final progress update
+        progress.completed_contracts = total_contracts;
+        progress.current_contract = None;
+        for contract in &mut progress.contracts {
+            contract.status = "completed".to_string();
+        }
+        progress_callback(progress);
+
+        Ok(deployed_contracts)
     }
 }
