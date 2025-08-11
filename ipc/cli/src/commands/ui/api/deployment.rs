@@ -199,11 +199,39 @@ async fn run_async_deployment(
         });
     };
 
-    // Create deploy config
+    // Create deploy config - extract network info from headers instead of config
+    let rpc_url = headers
+        .get("x-network-rpc-url")
+        .and_then(|v| v.to_str().ok())
+        .ok_or_else(|| anyhow::anyhow!("Missing required header: X-Network-RPC-URL"))?;
+
+    let chain_id = headers
+        .get("x-network-chain-id")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.parse::<u64>().ok())
+        .ok_or_else(|| anyhow::anyhow!("Missing or invalid header: X-Network-Chain-ID"))?;
+
+    // For deployment address, check config first, then fall back to a default
+    let from_address_str = config["deployment"]["fromAddress"]
+        .as_str()
+        .or_else(|| config["from"].as_str())
+        .ok_or_else(|| anyhow::anyhow!("Missing required field: deployment.fromAddress or from"))?;
+
+    let from_address = ethers::types::Address::from_str(from_address_str)
+        .map_err(|e| anyhow::anyhow!("Invalid fromAddress '{}': {}", from_address_str, e))?;
+
+    // Validate RPC URL format
+    if rpc_url.is_empty() {
+        return Err(anyhow::anyhow!("RPC URL cannot be empty"));
+    }
+
+    log::info!("Deploying contracts to RPC URL: {}, from address: {}, chain ID: {}",
+               rpc_url, from_address, chain_id);
+
     let deploy_config = DeployConfig {
-        url: config["network"]["rpcUrl"].as_str().unwrap_or("").to_string(),
-        from: ethers::types::Address::from_str(config["deployment"]["fromAddress"].as_str().unwrap_or("")).unwrap_or_default(),
-        chain_id: config["network"]["chainId"].as_u64().unwrap_or(0),
+        url: rpc_url.to_string(),
+        from: from_address,
+        chain_id,
         artifacts_path: None,
         subnet_creation_privilege: CliSubnetCreationPrivilege::Unrestricted,
     };
