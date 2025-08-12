@@ -1,33 +1,61 @@
 <template>
   <div class="network-selector relative">
-    <!-- Network selector button -->
-    <button
-      @click="toggleDropdown"
-      class="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
-      :class="{ 'bg-gray-50': showDropdown }"
-    >
-      <!-- Network connection status indicator -->
-      <div
-        class="w-2 h-2 rounded-full"
-        :class="{
-          'bg-green-500': networkStore.selectedNetworkStatus?.connected === true,
-          'bg-red-500': networkStore.selectedNetworkStatus?.connected === false,
-          'bg-gray-400': !networkStore.selectedNetworkStatus,
-          'animate-pulse': networkStore.isTestingConnection
-        }"
-        :title="getConnectionStatusTitle()"
-      ></div>
+    <!-- Network selector and refresh buttons container -->
+    <div class="flex items-center space-x-1">
+      <!-- Network selector button -->
+      <button
+        @click="toggleDropdown"
+        class="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-l-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+        :class="{ 'bg-gray-50': showDropdown }"
+      >
+        <!-- Network connection status indicator -->
+        <div
+          class="w-2 h-2 rounded-full"
+          :class="{
+            'bg-green-500': networkStore.selectedNetworkStatus?.connected === true,
+            'bg-red-500': networkStore.selectedNetworkStatus?.connected === false,
+            'bg-gray-400': !networkStore.selectedNetworkStatus,
+            'animate-pulse': networkStore.isTestingConnection
+          }"
+          :title="getConnectionStatusTitle()"
+        ></div>
 
-      <!-- Network name -->
-      <span class="max-w-32 truncate">
-        {{ networkStore.selectedNetwork?.name || 'No Network' }}
-      </span>
+        <!-- Network name -->
+        <span class="max-w-32 truncate">
+          {{ networkStore.selectedNetwork?.name || 'No Network' }}
+        </span>
 
-      <!-- Manual refresh button -->
+        <!-- Network type badge -->
+        <span
+          v-if="networkStore.selectedNetwork"
+          class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium"
+          :class="{
+            'bg-green-100 text-green-700': networkStore.selectedNetwork.type === 'mainnet',
+            'bg-yellow-100 text-yellow-700': networkStore.selectedNetwork.type === 'testnet',
+            'bg-blue-100 text-blue-700': networkStore.selectedNetwork.type === 'local',
+            'bg-gray-100 text-gray-700': networkStore.selectedNetwork.type === 'custom'
+          }"
+        >
+          {{ networkStore.selectedNetwork.type.toUpperCase() }}
+        </span>
+
+        <!-- Dropdown arrow -->
+        <svg
+          class="w-4 h-4 text-gray-400 transition-transform"
+          :class="{ 'rotate-180': showDropdown }"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      <!-- Manual refresh button - now separate from main button -->
       <button
         @click.stop="refreshConnection"
         :disabled="networkStore.isTestingConnection"
-        class="p-1 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500 rounded transition-colors"
+        class="p-2 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white border border-l-0 border-gray-300 rounded-r-md hover:bg-gray-50 transition-colors"
         :class="{ 'animate-spin': networkStore.isTestingConnection }"
         title="Test network connection"
       >
@@ -35,32 +63,7 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
         </svg>
       </button>
-
-      <!-- Network type badge -->
-      <span
-        v-if="networkStore.selectedNetwork"
-        class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium"
-        :class="{
-          'bg-green-100 text-green-700': networkStore.selectedNetwork.type === 'mainnet',
-          'bg-yellow-100 text-yellow-700': networkStore.selectedNetwork.type === 'testnet',
-          'bg-blue-100 text-blue-700': networkStore.selectedNetwork.type === 'local',
-          'bg-gray-100 text-gray-700': networkStore.selectedNetwork.type === 'custom'
-        }"
-      >
-        {{ networkStore.selectedNetwork.type.toUpperCase() }}
-      </span>
-
-      <!-- Dropdown arrow -->
-      <svg
-        class="w-4 h-4 text-gray-400 transition-transform"
-        :class="{ 'rotate-180': showDropdown }"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-      </svg>
-    </button>
+    </div>
 
     <!-- Dropdown menu -->
     <div

@@ -90,9 +90,9 @@ pub async fn run_ui_command(
                 .unwrap_or_else(|_| IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
             let addr = SocketAddr::new(ip, args.port);
 
+            // Fix config path resolution - use global.config_path() which handles defaults properly
             let config_path = args.config_path
-                .or(global.config_path)
-                .unwrap_or_else(|| "~/.ipc".to_string());
+                .unwrap_or_else(|| global.config_path());
 
             start_ui_server(config_path, addr).await
         }

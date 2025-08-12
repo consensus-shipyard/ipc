@@ -16,6 +16,7 @@ use anyhow::Result;
 use fvm_shared::address::Address;
 use ipc_api::subnet_id::SubnetID;
 use std::str::FromStr;
+use num_traits::ToPrimitive;
 
 /// Subnet information for UI display
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -165,74 +166,70 @@ impl SubnetService {
         let config_store = crate::ipc_config_store::IpcConfigStore::load_or_init(&self.global).await?;
         let config = config_store.snapshot().await;
 
-        let mut instances = Vec::new();
+        log::info!("Loading subnet configurations from config store");
+        log::info!("Found {} subnets in configuration", config.subnets.len());
 
-        // Convert subnet configurations to instances
+        // Log all found subnets with their details
+        for (subnet_id, subnet_config) in &config.subnets {
+            let subnet_id_str = subnet_id.to_string();
+            log::info!("Raw subnet found: ID='{}', is_root={}, gateway={:?}, registry={:?}",
+                subnet_id_str,
+                subnet_id.is_root(),
+                match &subnet_config.config {
+                    ipc_provider::config::SubnetConfig::Fevm(evm_subnet) => evm_subnet.gateway_addr.to_string(),
+                },
+                match &subnet_config.config {
+                    ipc_provider::config::SubnetConfig::Fevm(evm_subnet) => evm_subnet.registry_addr.to_string(),
+                }
+            );
+        }
+
+        let mut instances = Vec::new();
+        let mut root_networks_filtered = 0;
+
+        // Convert subnet configurations to instances, filtering out root networks
         for (config_subnet_id, subnet_config) in &config.subnets {
             let subnet_id_str = config_subnet_id.to_string();
 
-            // Determine parent from subnet ID
-            let parent = if config_subnet_id.is_root() {
-                // This is a root network, so it has no parent, but for UI purposes we'll use itself
-                subnet_id_str.clone()
-            } else {
-                // This is a subnet, get its parent
-                if let Some(parent_subnet) = config_subnet_id.parent() {
-                    parent_subnet.to_string()
-                } else {
-                    // Fallback: extract from string representation
-                    let parts: Vec<&str> = subnet_id_str.split('/').collect();
-                    if parts.len() >= 2 {
-                        format!("/{}", parts[1]) // e.g., "/r31337" or "/r314159"
-                    } else {
-                        "/r314159".to_string() // fallback
-                    }
-                }
-            };
+            // Skip root networks (they are not subnets to be displayed in UI)
+            if config_subnet_id.is_root() {
+                log::info!("Skipping root network (not a subnet): {}", subnet_id_str);
+                root_networks_filtered += 1;
+                continue;
+            }
+
+            log::info!("Processing actual subnet: {}", subnet_id_str);
+
+            // Get validators from the blockchain
+            let validators = self.get_validators_for_subnet(&subnet_id_str).await.unwrap_or_else(|e| {
+                log::warn!("Failed to fetch validators for subnet {}: {}", subnet_id_str, e);
+                Vec::new()
+            });
 
             let instance = serde_json::json!({
                 "id": subnet_id_str,
-                "name": format!("Subnet {}", subnet_id_str),
-                "status": "Active",
-                "parent": parent,
-                "type": "subnet",
-                "created_at": chrono::Utc::now().to_rfc3339(),
-                "last_updated": chrono::Utc::now().to_rfc3339(),
-                "validator_count": 1,
-                "is_active": true,
-                "chain_id": subnet_config.id.chain_id(),
+                "name": format!("Subnet {}", subnet_id_str.split('/').last().unwrap_or(&subnet_id_str)),
+                "status": "active", // You might want to determine this dynamically
+                "validators": validators,
                 "config": {
+                    "permissionMode": "collateral", // Add default permission mode
                     "gateway_addr": match &subnet_config.config {
                         ipc_provider::config::SubnetConfig::Fevm(evm_subnet) => evm_subnet.gateway_addr.to_string(),
                     },
                     "registry_addr": match &subnet_config.config {
                         ipc_provider::config::SubnetConfig::Fevm(evm_subnet) => evm_subnet.registry_addr.to_string(),
                     }
-                }
+                },
+                "parent": config_subnet_id.parent().map(|p| p.to_string()),
+                "chain_head": serde_json::Value::Null,
+                "nonce": 0,
+                "circulating_supply": "0"
             });
+
             instances.push(instance);
         }
 
-        // If no configured subnets, return a placeholder
-        if instances.is_empty() {
-            instances.push(serde_json::json!({
-                "id": "/r314159/t410fmynl4ow2m7u6lgfpaxlklj6kn7lw5u6lnwi",
-                "name": "Example Subnet",
-                "status": "Active",
-                "parent": "/r314159",
-                "type": "subnet",
-                "created_at": chrono::Utc::now().to_rfc3339(),
-                "last_updated": chrono::Utc::now().to_rfc3339(),
-                "validator_count": 1,
-                "is_active": true,
-                "chain_id": 31415926,
-                "config": {
-                    "gateway_addr": "t410fmynl4ow2m7u6lgfpaxlklj6kn7lw5u6lnwi",
-                    "registry_addr": "t410fbnhchh7sdnabedg2qf73u555dm3gyg6nlg4nnaq"
-                }
-            }));
-        }
-
+        log::info!("Returning {} subnet instances (after filtering out {} root networks)", instances.len(), root_networks_filtered);
         Ok(instances)
     }
 
@@ -241,21 +238,53 @@ impl SubnetService {
         let config_store = crate::ipc_config_store::IpcConfigStore::load_or_init(&self.global).await?;
         let config = config_store.snapshot().await;
 
+        log::info!("Looking for subnet with ID: {}", subnet_id);
+        log::info!("Available subnets in config: {:?}", config.subnets.keys().collect::<Vec<_>>());
+
         // Try to find the subnet in configuration by iterating through subnets
         for (config_subnet_id, subnet_config) in &config.subnets {
             if config_subnet_id.to_string() == subnet_id {
+                log::info!("Found matching subnet configuration for: {}", subnet_id);
+
+                // Determine parent from subnet ID
+                let parent = if config_subnet_id.is_root() {
+                    // This is a root network, so it has no parent, but for UI purposes we'll use itself
+                    subnet_id.to_string()
+                } else {
+                    // This is a subnet, get its parent
+                    if let Some(parent_subnet) = config_subnet_id.parent() {
+                        parent_subnet.to_string()
+                    } else {
+                        // Fallback: extract from string representation
+                        let parts: Vec<&str> = subnet_id.split('/').collect();
+                        if parts.len() >= 2 {
+                            format!("/{}", parts[1]) // e.g., "/r31337" or "/r314159"
+                        } else {
+                            "/r314159".to_string() // fallback
+                        }
+                    }
+                };
+
+                // Get validators from the blockchain
+                let validators = self.get_validators_for_subnet(subnet_id).await.unwrap_or_else(|e| {
+                    log::warn!("Failed to fetch validators for subnet {}: {}", subnet_id, e);
+                    Vec::new()
+                });
+
                 let instance = serde_json::json!({
                     "id": subnet_id,
                     "name": format!("Subnet {}", subnet_id),
                     "status": "Active",
-                    "parent": "/r314159",
+                    "parent": parent,
                     "type": "subnet",
                     "created_at": chrono::Utc::now().to_rfc3339(),
                     "last_updated": chrono::Utc::now().to_rfc3339(),
-                    "validator_count": 1,
+                    "validator_count": validators.len(),
                     "is_active": true,
                     "chain_id": subnet_config.id.chain_id(),
+                    "validators": validators,
                     "config": {
+                        "permissionMode": "collateral", // Add default permission mode
                         "gateway_addr": match &subnet_config.config {
                             ipc_provider::config::SubnetConfig::Fevm(evm_subnet) => evm_subnet.gateway_addr.to_string(),
                         },
@@ -266,7 +295,7 @@ impl SubnetService {
                     "stats": {
                         "block_height": 1000,
                         "transaction_count": 50,
-                        "validator_count": 1,
+                        "validator_count": validators.len(),
                         "last_checkpoint": chrono::Utc::now().to_rfc3339()
                     }
                 });
@@ -274,31 +303,54 @@ impl SubnetService {
             }
         }
 
-        // Return placeholder for unknown subnet ID
-        Ok(serde_json::json!({
-            "id": subnet_id,
-            "name": format!("Subnet {}", subnet_id),
-            "status": "Active",
-            "parent": "/r314159",
-            "type": "subnet",
-            "created_at": chrono::Utc::now().to_rfc3339(),
-            "last_updated": chrono::Utc::now().to_rfc3339(),
-            "validator_count": 1,
-            "is_active": true,
-            "chain_id": 31415926,
-            "config": {
-                "gateway_addr": "t410fmynl4ow2m7u6lgfpaxlklj6kn7lw5u6lnwi",
-                "registry_addr": "t410fbnhchh7sdnabedg2qf73u555dm3gyg6nlg4nnaq"
-            },
-            "stats": {
-                "block_height": 1000,
-                "transaction_count": 50,
-                "validator_count": 1,
-                "last_checkpoint": chrono::Utc::now().to_rfc3339()
-            }
-        }))
+        // If subnet not found in config, return an error instead of placeholder
+        anyhow::bail!("Subnet with ID '{}' not found in configuration", subnet_id)
     }
 
+    /// Helper method to get validators for a subnet
+    async fn get_validators_for_subnet(&self, subnet_id: &str) -> Result<Vec<serde_json::Value>> {
+        let provider = crate::get_ipc_provider(&self.global)?;
+        let subnet = SubnetID::from_str(subnet_id)?;
+
+        // Check if this is a root subnet (no parent)
+        if subnet.is_root() {
+            log::info!("Subnet {} is a root subnet, no validators to fetch from parent", subnet_id);
+            // For root subnets, we might want to return local validator configuration
+            // or indicate that validators are managed differently
+            return Ok(vec![]);
+        }
+
+        let validators = provider.list_validators(&subnet).await?;
+
+        let mut validator_list = Vec::new();
+        for (address, validator_info) in validators {
+            // Convert TokenAmount to string for stake/power
+            let stake = validator_info.staking.current_power().to_string();
+            let power = validator_info.staking.next_power().atto().to_u64().unwrap_or(0);
+
+            // Determine status based on validator state
+            let status = if validator_info.is_active {
+                "active"
+            } else if validator_info.is_waiting {
+                "waiting"
+            } else {
+                "inactive"
+            };
+
+            validator_list.push(serde_json::json!({
+                "address": address.to_string(),
+                "stake": stake,
+                "power": power,
+                "status": status,
+                "is_active": validator_info.is_active,
+                "is_waiting": validator_info.is_waiting,
+                "current_power": validator_info.staking.current_power().to_string(),
+                "next_power": validator_info.staking.next_power().to_string()
+            }));
+        }
+
+        Ok(validator_list)
+    }
 
 
         /// List pending subnet approvals for a gateway
