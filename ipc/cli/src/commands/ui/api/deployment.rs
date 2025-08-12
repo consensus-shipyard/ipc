@@ -20,6 +20,7 @@ use ethers::types::Address;
 use crate::commands::deploy::{DeployConfig, CliSubnetCreationPrivilege};
 use url;
 use ipc_types;
+use fvm_shared::address::Address as FilecoinAddress;
 
 /// Create deployment API routes
 pub fn deployment_routes(
@@ -154,7 +155,7 @@ async fn run_async_deployment(
     state: &AppState,
     deployment_id: &str,
 ) -> Result<SubnetDeploymentResult, anyhow::Error> {
-        // Send progress updates for each step
+    // Send progress updates for each step
     broadcast_progress(state, deployment_id, "validate", 10, "in_progress",
         Some("Validating configuration...".to_string())).await;
 
@@ -165,53 +166,25 @@ async fn run_async_deployment(
 
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-    broadcast_progress(state, deployment_id, "contracts", 30, "in_progress",
-        Some("Deploying smart contracts...".to_string())).await;
+    // Check gateway mode to determine if we need to deploy contracts
+    log::info!("=== GATEWAY MODE DEBUGGING ===");
+    log::info!("Full config received: {}", serde_json::to_string_pretty(&config).unwrap_or_else(|_| "Failed to serialize config".to_string()));
 
-    // Use real contract deployment progress tracking
-    let state_clone = state.clone();
-    let deployment_id_clone = deployment_id.to_string();
+    let gateway_mode = config.get("gatewayMode").and_then(|v| v.as_str()).unwrap_or("deploy");
+    log::info!("Extracted gateway mode: '{}'", gateway_mode);
+    log::info!("Gateway mode type: {:?}", config.get("gatewayMode"));
 
-    // Create a progress callback that converts real deployment progress to UI updates
-    let progress_callback = move |contract_name: &str, contract_type: &str, current_step: usize, total_steps: usize| {
-        let state = state_clone.clone();
-        let deployment_id = deployment_id_clone.clone();
-        let contract_name = contract_name.to_string();
-        let contract_type = contract_type.to_string();
+    if gateway_mode == "deployed" {
+        log::info!("SHOULD SKIP CONTRACT DEPLOYMENT - Using deployed gateway mode");
+    } else {
+        log::info!("WILL DEPLOY CONTRACTS - Gateway mode is '{}'", gateway_mode);
+    }
 
-        tokio::spawn(async move {
-            let progress_percent = ((current_step + 1) as f32 / total_steps as f32 * 40.0) + 30.0; // Scale to 30-70%
-
-            let contract_progress = ContractDeploymentProgress {
-                total_contracts: total_steps as u32,
-                completed_contracts: current_step as u32,
-                current_contract: Some(contract_name.clone()),
-                contracts: vec![], // We'll populate this with actual contract statuses
-            };
-
-            broadcast_progress_with_contracts(
-                &state,
-                &deployment_id,
-                "contracts",
-                progress_percent as u8,
-                if current_step + 1 == total_steps { "completed" } else { "in_progress" },
-                Some(format!("Deploying {} ({}/{})", contract_name, current_step + 1, total_steps)),
-                Some(contract_progress),
-            ).await;
-        });
-    };
-
-    // Create deploy config - extract network info from headers instead of config
-    log::info!("=== DEBUGGING NETWORK CONFIGURATION ===");
-    log::info!("Available headers: {:?}", headers.keys().collect::<Vec<_>>());
-    log::info!("Config object: {}", serde_json::to_string_pretty(&config).unwrap_or_else(|_| "Failed to serialize config".to_string()));
-
+    // Extract network configuration needed for all modes
     let rpc_url = headers
         .get("x-network-rpc-url")
         .and_then(|v| v.to_str().ok())
         .ok_or_else(|| anyhow::anyhow!("Missing required header: X-Network-RPC-URL"))?;
-
-    log::info!("Found RPC URL from header: {}", rpc_url);
 
     let chain_id = headers
         .get("x-network-chain-id")
@@ -219,54 +192,175 @@ async fn run_async_deployment(
         .and_then(|s| s.parse::<u64>().ok())
         .ok_or_else(|| anyhow::anyhow!("Missing or invalid header: X-Network-Chain-ID"))?;
 
-    log::info!("Found Chain ID from header: {}", chain_id);
+    let deployed_contracts = match gateway_mode {
+        "deployed" => {
+            // Use existing deployed gateway - get gateway info and skip contract deployment
+            broadcast_progress(state, deployment_id, "contracts", 50, "in_progress",
+                Some("Using existing deployed gateway...".to_string())).await;
 
-    // For deployment address, check config first, then fall back to a default
-    let from_address_str = config["deployment"]["fromAddress"]
-        .as_str()
-        .or_else(|| config["from"].as_str())
-        .ok_or_else(|| anyhow::anyhow!("Missing required field: deployment.fromAddress or from"))?;
+            let selected_gateway_id = config.get("selectedDeployedGateway")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Selected deployed gateway ID is required when using deployed gateway mode"))?;
 
-    let from_address = ethers::types::Address::from_str(from_address_str)
-        .map_err(|e| anyhow::anyhow!("Invalid fromAddress '{}': {}", from_address_str, e))?;
+            log::info!("Using deployed gateway: {}", selected_gateway_id);
 
-    // Validate RPC URL format
-    if rpc_url.is_empty() {
-        return Err(anyhow::anyhow!("RPC URL cannot be empty"));
-    }
+            // Get gateway information from the gateway service
+            let gateway_service = super::super::services::GatewayService::new(crate::GlobalArguments {
+                config_path: Some(state.config_path.clone()),
+                _network: fvm_shared::address::Network::Testnet,
+                __network: None,
+            });
 
-    log::info!("Deploying contracts to RPC URL: {}, from address: {}, chain ID: {}",
-               rpc_url, from_address, chain_id);
+            let discovered_gateways = gateway_service.discover_gateways(Some(headers)).await
+                .map_err(|e| anyhow::anyhow!("Failed to discover gateways: {}", e))?;
 
-    let deploy_config = DeployConfig {
-        url: rpc_url.to_string(),
-        from: from_address,
-        chain_id,
-        artifacts_path: None,
-        subnet_creation_privilege: CliSubnetCreationPrivilege::Unrestricted,
+            let selected_gateway = discovered_gateways.iter()
+                .find(|g| g.id == selected_gateway_id)
+                .ok_or_else(|| anyhow::anyhow!("Selected gateway not found: {}", selected_gateway_id))?;
+
+            log::info!("Found selected gateway: {} at address {}", selected_gateway.id, selected_gateway.address);
+
+            // Convert Filecoin addresses to Ethereum format
+            // Parse the Filecoin addresses first
+            let gateway_fil_addr = FilecoinAddress::from_str(&selected_gateway.address)
+                .map_err(|e| anyhow::anyhow!("Invalid Filecoin gateway address '{}': {}", selected_gateway.address, e))?;
+            let registry_fil_addr = FilecoinAddress::from_str(&selected_gateway.registry_address)
+                .map_err(|e| anyhow::anyhow!("Invalid Filecoin registry address '{}': {}", selected_gateway.registry_address, e))?;
+
+            // Convert to Ethereum format
+            let gateway_addr = ipc_api::evm::payload_to_evm_address(gateway_fil_addr.payload())
+                .map_err(|e| anyhow::anyhow!("Failed to convert gateway address to Ethereum format: {}", e))?;
+            let registry_addr = ipc_api::evm::payload_to_evm_address(registry_fil_addr.payload())
+                .map_err(|e| anyhow::anyhow!("Failed to convert registry address to Ethereum format: {}", e))?;
+
+            log::info!("Converted gateway address from {} to 0x{:x}", selected_gateway.address, gateway_addr);
+            log::info!("Converted registry address from {} to 0x{:x}", selected_gateway.registry_address, registry_addr);
+
+            fendermint_eth_deployer::DeployedContracts {
+                gateway: gateway_addr,
+                registry: registry_addr,
+            }
+        },
+        "custom" => {
+            // Use custom gateway addresses provided by user
+            broadcast_progress(state, deployment_id, "contracts", 50, "in_progress",
+                Some("Using custom gateway addresses...".to_string())).await;
+
+            let gateway_address = config.get("customGatewayAddress")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Custom gateway address is required when using custom gateway mode"))?;
+
+            let registry_address = config.get("customRegistryAddress")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Custom registry address is required when using custom gateway mode"))?;
+
+            let gateway_addr = ethers::types::Address::from_str(gateway_address)
+                .map_err(|e| anyhow::anyhow!("Invalid custom gateway address: {}", e))?;
+            let registry_addr = ethers::types::Address::from_str(registry_address)
+                .map_err(|e| anyhow::anyhow!("Invalid custom registry address: {}", e))?;
+
+            fendermint_eth_deployer::DeployedContracts {
+                gateway: gateway_addr,
+                registry: registry_addr,
+            }
+        },
+        _ => {
+            // Deploy new gateway contracts (default behavior)
+            broadcast_progress(state, deployment_id, "contracts", 30, "in_progress",
+                Some("Deploying smart contracts...".to_string())).await;
+
+            // Use real contract deployment progress tracking
+            let state_clone = state.clone();
+            let deployment_id_clone = deployment_id.to_string();
+
+            // Create a progress callback that converts real deployment progress to UI updates
+            let progress_callback = move |contract_name: &str, contract_type: &str, current_step: usize, total_steps: usize| {
+                let state = state_clone.clone();
+                let deployment_id = deployment_id_clone.clone();
+                let contract_name = contract_name.to_string();
+                let contract_type = contract_type.to_string();
+
+                tokio::spawn(async move {
+                    let progress_percent = ((current_step + 1) as f32 / total_steps as f32 * 40.0) + 30.0; // Scale to 30-70%
+
+                    let contract_progress = ContractDeploymentProgress {
+                        total_contracts: total_steps as u32,
+                        completed_contracts: current_step as u32,
+                        current_contract: Some(contract_name.clone()),
+                        contracts: vec![], // We'll populate this with actual contract statuses
+                    };
+
+                    broadcast_progress_with_contracts(
+                        &state,
+                        &deployment_id,
+                        "contracts",
+                        progress_percent as u8,
+                        if current_step + 1 == total_steps { "completed" } else { "in_progress" },
+                        Some(format!("Deploying {} ({}/{})", contract_name, current_step + 1, total_steps)),
+                        Some(contract_progress),
+                    ).await;
+                });
+            };
+
+            log::info!("=== DEBUGGING NETWORK CONFIGURATION ===");
+            log::info!("Available headers: {:?}", headers.keys().collect::<Vec<_>>());
+            log::info!("Config object: {}", serde_json::to_string_pretty(&config).unwrap_or_else(|_| "Failed to serialize config".to_string()));
+
+            log::info!("Found RPC URL from header: {}", rpc_url);
+            log::info!("Found Chain ID from header: {}", chain_id);
+
+            // For deployment address, check config first, then fall back to a default
+            let from_address_str = config["deployment"]["fromAddress"]
+                .as_str()
+                .or_else(|| config["from"].as_str())
+                .ok_or_else(|| anyhow::anyhow!("Missing required field: deployment.fromAddress or from"))?;
+
+            let from_address = ethers::types::Address::from_str(from_address_str)
+                .map_err(|e| anyhow::anyhow!("Invalid fromAddress '{}': {}", from_address_str, e))?;
+
+            // Validate RPC URL format
+            if rpc_url.is_empty() {
+                return Err(anyhow::anyhow!("RPC URL cannot be empty"));
+            }
+
+            log::info!("Deploying contracts to RPC URL: {}, from address: {}, chain ID: {}",
+                       rpc_url, from_address, chain_id);
+
+            let deploy_config = DeployConfig {
+                url: rpc_url.to_string(),
+                from: from_address,
+                chain_id,
+                artifacts_path: None,
+                subnet_creation_privilege: CliSubnetCreationPrivilege::Unrestricted,
+            };
+
+            // Deploy contracts with real progress tracking directly (without spawn)
+            service.deploy_contracts_with_real_progress(&deploy_config, progress_callback).await?
+        }
     };
 
-    // Deploy contracts with real progress tracking directly (without spawn)
-    let deployed_contracts = service.deploy_contracts_with_real_progress(&deploy_config, progress_callback).await?;
+    // Register the deployed contracts in the IPC configuration store (only for newly deployed contracts)
+    if gateway_mode != "deployed" && gateway_mode != "custom" {
+        log::info!("Registering newly deployed contracts in IPC config: gateway={:?}, registry={:?}",
+                   deployed_contracts.gateway, deployed_contracts.registry);
 
-    // Register the deployed contracts in the IPC configuration store
-    log::info!("Registering deployed contracts in IPC config: gateway={:?}, registry={:?}",
-               deployed_contracts.gateway, deployed_contracts.registry);
+        let ipc_config_store = service.get_config_store().await?;
+        let subnet_id = ipc_api::subnet_id::SubnetID::new_root(chain_id);
+        let rpc_url_parsed: url::Url = rpc_url.parse().context("invalid RPC URL")?;
 
-    let ipc_config_store = service.get_config_store().await?;
-    let subnet_id = ipc_api::subnet_id::SubnetID::new_root(chain_id);
-    let rpc_url: url::Url = rpc_url.parse().context("invalid RPC URL")?;
+        ipc_config_store
+            .add_subnet(
+                subnet_id.clone(),
+                rpc_url_parsed,
+                ipc_types::EthAddress::from(deployed_contracts.gateway).into(),
+                ipc_types::EthAddress::from(deployed_contracts.registry).into(),
+            )
+            .await?;
 
-    ipc_config_store
-        .add_subnet(
-            subnet_id.clone(),
-            rpc_url,
-            ipc_types::EthAddress::from(deployed_contracts.gateway).into(),
-            ipc_types::EthAddress::from(deployed_contracts.registry).into(),
-        )
-        .await?;
-
-    log::info!("Successfully registered subnet {} in IPC config", subnet_id);
+        log::info!("Successfully registered subnet {} in IPC config", subnet_id);
+    } else {
+        log::info!("Skipping contract registration - using existing gateway (mode: {})", gateway_mode);
+    }
 
     // Continue with the rest of the deployment
     broadcast_progress(state, deployment_id, "genesis", 70, "in_progress",

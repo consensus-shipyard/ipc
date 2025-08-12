@@ -4,9 +4,9 @@ import { useRouter } from 'vue-router'
 import AddressSelector from '../../components/common/AddressSelector.vue'
 import FormInput from '../../components/common/FormInput.vue'
 import FormSelect from '../../components/common/FormSelect.vue'
+import { apiService } from '../../services/api'
 import { useTemplatesStore } from '../../stores/templates'
 import { useWizardStore } from '../../stores/wizard'
-import { apiService } from '../../services/api'
 
 const router = useRouter()
 const wizardStore = useWizardStore()
@@ -24,7 +24,7 @@ const formData = ref({
   supplySourceAddress: wizardStore.config.supplySourceAddress || '',
   minCrossMsgFee: wizardStore.config.minCrossMsgFee || 0.000001,
   genesisSubnetIpcContractsOwner: wizardStore.config.genesisSubnetIpcContractsOwner || '',
-  gatewayMode: wizardStore.config.gatewayMode || 'existing',
+  gatewayMode: wizardStore.config.gatewayMode || 'deploy',
   customGatewayAddress: wizardStore.config.customGatewayAddress || '',
   customRegistryAddress: wizardStore.config.customRegistryAddress || '',
   selectedDeployedGateway: wizardStore.config.selectedDeployedGateway || ''
@@ -33,14 +33,14 @@ const formData = ref({
 // Gateway type definition
 interface GatewayInfo {
   id: string
-  name: string
-  gateway_address: string
+  name?: string
+  address: string
   registry_address: string
   deployer_address: string
   parent_network: string
   deployed_at: string
-  status: string
-  subnets_created: number
+  is_active: boolean
+  subnet_count: number
   description?: string
 }
 
@@ -73,11 +73,6 @@ const supplySourceOptions = [
 ]
 
 const gatewayModeOptions = [
-  {
-    value: 'existing',
-    label: 'Use Existing Gateway',
-    description: 'Use the pre-deployed Calibration gateway (requires approval)'
-  },
   {
     value: 'deploy',
     label: 'Deploy New Gateway',
@@ -164,27 +159,56 @@ const loadDeployedGateways = async () => {
         console.log(`[Gateway Discovery] Gateway ${index + 1}:`, {
           id: gateway.id,
           name: gateway.name,
-          gateway_address: gateway.gateway_address,
+          address: gateway.address,
           parent_network: gateway.parent_network,
           deployed_at: gateway.deployed_at,
-          status: gateway.status
+          status: gateway.is_active
         })
       })
 
       // Apply frontend deduplication as a backup (in case backend missed something)
       const uniqueGateways = deduplicateGateways(discoveredGateways)
-      console.log(`[Gateway Discovery] After frontend deduplication: ${uniqueGateways.length} unique gateways`)
+      console.log(`[Gateway Deduplication] After frontend deduplication: ${uniqueGateways.length} unique gateways`)
+
+      // Filter out root networks - they are not deployable gateways
+      const deployableGateways = uniqueGateways.filter(gateway => {
+        // Root networks have simple paths like "/r31337", while subnets have longer paths
+        // We want to exclude root networks as they represent the L1 network itself, not a gateway contract
+        const networkParts = gateway.parent_network.split('/').filter(part => part !== '')
+        const isRootNetwork = networkParts.length === 1 && networkParts[0].startsWith('r')
+
+        console.log(`[Gateway Filtering] Gateway ${gateway.name || gateway.id}:`, {
+          parent_network: gateway.parent_network,
+          networkParts,
+          isRootNetwork,
+          shouldInclude: !isRootNetwork
+        })
+
+        // Include only gateways that are not root networks
+        return !isRootNetwork
+      })
+
+      console.log(`[Gateway Filtering] Filtered out ${uniqueGateways.length - deployableGateways.length} root networks`)
 
       // Sort by deployment date (newest first)
-      deployedGateways.value = uniqueGateways.sort((a, b) =>
+      deployedGateways.value = deployableGateways.sort((a, b) =>
         new Date(b.deployed_at).getTime() - new Date(a.deployed_at).getTime()
       )
 
       console.log('[Gateway Discovery] Final gateway list:', deployedGateways.value.map(g => ({
         id: g.id,
         name: g.name,
-        address: g.gateway_address
+        address: g.address
       })))
+
+      // Debug: Check for duplicate IDs
+      const ids = deployedGateways.value.map(g => g.id)
+      const uniqueIds = new Set(ids)
+      if (ids.length !== uniqueIds.size) {
+        console.warn('[Gateway Discovery] Duplicate IDs detected:', ids)
+        const duplicateIds = ids.filter((id, index) => ids.indexOf(id) !== index)
+        console.warn('[Gateway Discovery] Duplicate IDs found:', duplicateIds)
+      }
     } else {
       console.warn('[Gateway Discovery] Invalid or empty discovery response')
       deployedGateways.value = []
@@ -217,13 +241,20 @@ const loadDeployedGateways = async () => {
 // Deduplicate gateways based on gateway address and parent network
 const deduplicateGateways = (gateways: GatewayInfo[]): GatewayInfo[] => {
   console.log('[Gateway Deduplication] Starting deduplication process...')
+  console.log('[Gateway Deduplication] Input gateways:', gateways.map(g => ({ id: g.id, address: g.address, network: g.parent_network })))
 
   const seen = new Map<string, GatewayInfo>()
   const duplicates: GatewayInfo[] = []
 
   gateways.forEach((gateway, index) => {
     // Create a unique key based on gateway address and parent network
-    const uniqueKey = `${gateway.gateway_address.toLowerCase()}-${gateway.parent_network}`
+    const uniqueKey = `${gateway.address.toLowerCase()}-${gateway.parent_network}`
+    console.log(`[Gateway Deduplication] Processing gateway ${index + 1}:`, {
+      id: gateway.id,
+      address: gateway.address,
+      network: gateway.parent_network,
+      uniqueKey
+    })
 
     if (seen.has(uniqueKey)) {
       const existing = seen.get(uniqueKey)!
@@ -231,14 +262,14 @@ const deduplicateGateways = (gateways: GatewayInfo[]): GatewayInfo[] => {
         duplicate: {
           id: gateway.id,
           name: gateway.name,
-          address: gateway.gateway_address,
+          address: gateway.address,
           network: gateway.parent_network,
           deployed_at: gateway.deployed_at
         },
         existing: {
           id: existing.id,
           name: existing.name,
-          address: existing.gateway_address,
+          address: existing.address,
           network: existing.parent_network,
           deployed_at: existing.deployed_at
         }
@@ -265,7 +296,7 @@ const deduplicateGateways = (gateways: GatewayInfo[]): GatewayInfo[] => {
     console.log('[Gateway Deduplication] Removed duplicates:', duplicates.map(d => ({
       id: d.id,
       name: d.name,
-      address: d.gateway_address,
+      address: d.address,
       network: d.parent_network
     })))
   }
@@ -336,6 +367,13 @@ onMounted(() => {
     validateForm()
   }, 100)
 })
+
+const selectGateway = (gatewayId: string) => {
+  console.log('[Gateway Selection] Selecting gateway:', gatewayId)
+  console.log('[Gateway Selection] Current selected:', formData.value.selectedDeployedGateway)
+  formData.value.selectedDeployedGateway = gatewayId
+  console.log('[Gateway Selection] New selected:', formData.value.selectedDeployedGateway)
+}
 </script>
 
 <template>
@@ -556,7 +594,7 @@ onMounted(() => {
                 <p class="font-medium mb-1">Choose Your Gateway Strategy</p>
                 <p>
                   <strong>Deploy New:</strong> Creates your own gateway contracts where you have full control and can approve subnets instantly.<br>
-                  <strong>Existing:</strong> Uses Calibration's gateway but requires manual approval from the gateway owner.<br>
+                  <strong>Use My Deployed Gateway:</strong> Uses gateways you have previously deployed and own.<br>
                   <strong>Custom:</strong> Uses previously deployed gateway contracts that you own.
                 </p>
               </div>
@@ -591,25 +629,27 @@ onMounted(() => {
                   :key="gateway.id"
                   class="flex items-center p-3 border rounded-lg cursor-pointer transition-colors"
                   :class="formData.selectedDeployedGateway === gateway.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'"
-                  @click="formData.selectedDeployedGateway = gateway.id"
+                  @click="selectGateway(gateway.id)"
                 >
                   <input
                     type="radio"
+                    name="deployed-gateway"
                     :value="gateway.id"
                     v-model="formData.selectedDeployedGateway"
                     class="mr-3 text-blue-600"
+                    @click.stop
                   />
                   <div class="flex-1">
                     <div class="flex items-center justify-between">
                       <h5 class="font-medium text-gray-900">{{ gateway.name }}</h5>
                       <span class="text-xs px-2 py-1 rounded-full"
-                            :class="gateway.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'">
-                        {{ gateway.status }}
+                            :class="gateway.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'">
+                        {{ gateway.is_active ? 'Active' : 'Inactive' }}
                       </span>
                     </div>
                     <p class="text-sm text-gray-600 mt-1">{{ gateway.description || `Deployed on ${gateway.parent_network}` }}</p>
                     <div class="flex text-xs text-gray-500 mt-2 space-x-4">
-                      <span>Gateway: {{ gateway.gateway_address.slice(0, 8) }}...{{ gateway.gateway_address.slice(-6) }}</span>
+                      <span>Gateway: {{ gateway.address.slice(0, 8) }}...{{ gateway.address.slice(-6) }}</span>
                       <span>Network: {{ gateway.parent_network }}</span>
                       <span>Deployed: {{ new Date(gateway.deployed_at).toLocaleDateString() }}</span>
                     </div>
@@ -655,19 +695,6 @@ onMounted(() => {
               <div class="text-sm text-green-800">
                 <p class="font-medium mb-1">✨ Recommended for Development</p>
                 <p>New gateway contracts will be deployed to the parent chain using your address. You'll become the gateway owner with full control over subnet approvals.</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Existing Mode Warning -->
-          <div v-if="formData.gatewayMode === 'existing'" class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div class="flex items-start space-x-3">
-              <svg class="w-5 h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
-              </svg>
-              <div class="text-sm text-yellow-800">
-                <p class="font-medium mb-1">⚠️ Requires Manual Approval</p>
-                <p>Using the existing Calibration gateway requires approval from the gateway owner. Your subnet will be created but won't be active until approved.</p>
               </div>
             </div>
           </div>

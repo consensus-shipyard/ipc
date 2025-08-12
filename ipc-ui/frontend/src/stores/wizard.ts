@@ -45,7 +45,7 @@ export interface SubnetConfig {
   }>
 
   // Gateway configuration
-  gatewayMode?: 'existing' | 'deploy' | 'deployed' | 'custom'
+  gatewayMode?: 'deploy' | 'deployed' | 'custom'
   customGatewayAddress?: string
   customRegistryAddress?: string
   selectedDeployedGateway?: string
