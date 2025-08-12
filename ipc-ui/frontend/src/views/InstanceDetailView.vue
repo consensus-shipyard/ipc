@@ -1046,7 +1046,12 @@ onUnmounted(() => {
               <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              {{ instance?.config?.permissionMode === 'federated' ? 'Federated Mode' : 'Collateral Mode' }}
+              {{
+                instance?.config?.permissionMode === 'federated' ? 'Federated Mode' :
+                instance?.config?.permissionMode === 'collateral' ? 'Collateral Mode' :
+                instance?.config?.permissionMode === 'static' ? 'Static Mode' :
+                `Unknown Mode (${instance?.config?.permissionMode || 'not set'})`
+              }}
             </h4>
 
             <div v-if="instance?.config?.permissionMode === 'federated'" class="text-blue-700 text-sm">
@@ -1070,10 +1075,13 @@ onUnmounted(() => {
             </div>
 
             <div v-else class="text-blue-700 text-sm">
-              <p class="mb-2"><strong>Unknown permission mode</strong> - configuration may still be loading:</p>
+              <p class="mb-2"><strong>{{ instance?.config?.permissionMode === 'unknown' ? 'Permission mode could not be determined' : 'Unknown permission mode' }}</strong>:</p>
               <ul class="list-disc list-inside space-y-1 ml-4">
-                <li>Please wait for the subnet configuration to load</li>
-                <li>Check network connectivity if this persists</li>
+                <li v-if="instance?.config?.permissionMode === 'unknown'">Failed to retrieve permission mode from parent network</li>
+                <li v-else>Unrecognized permission mode: "{{ instance?.config?.permissionMode }}"</li>
+                <li>Check if the parent network is properly configured</li>
+                <li>Verify network connectivity to the parent network</li>
+                <li>Check the subnet configuration and deployment status</li>
               </ul>
             </div>
           </div>

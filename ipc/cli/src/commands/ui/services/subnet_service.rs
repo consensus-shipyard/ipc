@@ -162,43 +162,58 @@ impl SubnetService {
     }
 
     /// Helper method to get the permission mode for a subnet
-    async fn get_permission_mode(&self, subnet_id: &str) -> String {
-        let provider = match crate::get_ipc_provider(&self.global) {
-            Ok(provider) => provider,
-            Err(e) => {
-                log::warn!("Failed to get IPC provider for permission mode: {}", e);
-                return "collateral".to_string(); // fallback to default
-            }
-        };
+    async fn get_permission_mode(&self, subnet_id: &str) -> Result<String> {
+        log::info!("=== GETTING PERMISSION MODE FOR SUBNET: {} ===", subnet_id);
 
-        let subnet = match SubnetID::from_str(subnet_id) {
-            Ok(subnet) => subnet,
-            Err(e) => {
-                log::warn!("Failed to parse subnet ID {}: {}", subnet_id, e);
-                return "collateral".to_string(); // fallback to default
-            }
-        };
+        log::info!("Step 1: Getting IPC provider...");
+        let provider = crate::get_ipc_provider(&self.global).map_err(|e| {
+            log::error!("Failed to get IPC provider for permission mode: {}", e);
+            e
+        })?;
+        log::info!("Step 1: ✓ Successfully got IPC provider");
+
+        log::info!("Step 2: Parsing subnet ID '{}'...", subnet_id);
+        let subnet = SubnetID::from_str(subnet_id).map_err(|e| {
+            log::error!("Failed to parse subnet ID '{}': {}", subnet_id, e);
+            e
+        })?;
+        log::info!("Step 2: ✓ Successfully parsed subnet ID: {:?}", subnet);
 
         // Check if this is a root subnet (no parent)
         if subnet.is_root() {
-            log::info!("Subnet {} is a root subnet, using default permission mode", subnet_id);
-            return "collateral".to_string(); // root subnets use default
+            log::error!("Step 3: ✗ Subnet {} is a root subnet - cannot get permission mode for root subnets", subnet_id);
+            return Err(anyhow::anyhow!("Cannot get permission mode for root subnet {}", subnet_id));
+        }
+        log::info!("Step 3: ✓ Subnet is not a root subnet");
+
+        // Log parent information
+        if let Some(parent) = subnet.parent() {
+            log::info!("Step 4: Subnet parent is: {}", parent);
+        } else {
+            log::error!("Step 4: ✗ Subnet has no parent but is not root - this is unexpected");
+            return Err(anyhow::anyhow!("Subnet {} has no parent but is not root", subnet_id));
         }
 
         // Get genesis info which contains the permission mode
+        log::info!("Step 5: Getting genesis info from provider...");
         match provider.get_genesis_info(&subnet).await {
             Ok(genesis_info) => {
+                log::info!("Step 5: ✓ Successfully got genesis info");
+                log::info!("Genesis info: permission_mode={:?}", genesis_info.permission_mode);
+
                 let permission_mode = match genesis_info.permission_mode {
                     ipc_api::subnet::PermissionMode::Collateral => "collateral",
                     ipc_api::subnet::PermissionMode::Federated => "federated",
                     ipc_api::subnet::PermissionMode::Static => "static",
                 };
-                log::info!("Retrieved permission mode for subnet {}: {}", subnet_id, permission_mode);
-                permission_mode.to_string()
+                log::info!("Step 6: ✓ Mapped permission mode to string: '{}'", permission_mode);
+                log::info!("=== PERMISSION MODE RETRIEVAL SUCCESSFUL: {} ===", permission_mode);
+                Ok(permission_mode.to_string())
             }
             Err(e) => {
-                log::warn!("Failed to get genesis info for subnet {}: {}", subnet_id, e);
-                "collateral".to_string() // fallback to default
+                log::error!("Step 5: ✗ Failed to get genesis info for subnet {}: {}", subnet_id, e);
+                log::error!("=== PERMISSION MODE RETRIEVAL FAILED ===");
+                Err(anyhow::anyhow!("Failed to get genesis info for subnet {}: {}", subnet_id, e))
             }
         }
     }
@@ -249,7 +264,16 @@ impl SubnetService {
             });
 
             // Get the actual permission mode from the subnet contract
-            let permission_mode = self.get_permission_mode(&subnet_id_str).await;
+            let permission_mode = match self.get_permission_mode(&subnet_id_str).await {
+                Ok(mode) => {
+                    log::info!("Successfully retrieved permission mode for subnet {}: {}", subnet_id_str, mode);
+                    mode
+                }
+                Err(e) => {
+                    log::error!("Failed to get permission mode for subnet {}: {}", subnet_id_str, e);
+                    "unknown".to_string()
+                }
+            };
 
             let instance = serde_json::json!({
                 "id": subnet_id_str,
@@ -317,7 +341,16 @@ impl SubnetService {
                 });
 
                 // Get the actual permission mode from the subnet contract
-                let permission_mode = self.get_permission_mode(subnet_id).await;
+                let permission_mode = match self.get_permission_mode(subnet_id).await {
+                    Ok(mode) => {
+                        log::info!("Successfully retrieved permission mode for subnet {}: {}", subnet_id, mode);
+                        mode
+                    }
+                    Err(e) => {
+                        log::error!("Failed to get permission mode for subnet {}: {}", subnet_id, e);
+                        "unknown".to_string()
+                    }
+                };
 
                 let instance = serde_json::json!({
                     "id": subnet_id,
@@ -355,39 +388,66 @@ impl SubnetService {
         anyhow::bail!("Subnet with ID '{}' not found in configuration", subnet_id)
     }
 
-    /// Helper method to get validators for a subnet
+        /// Helper method to get validators for a subnet
     async fn get_validators_for_subnet(&self, subnet_id: &str) -> Result<Vec<serde_json::Value>> {
-        let provider = crate::get_ipc_provider(&self.global)?;
-        let subnet = SubnetID::from_str(subnet_id)?;
+        log::info!("=== FETCHING VALIDATORS FOR SUBNET: {} ===", subnet_id);
+
+        log::info!("Step 1: Getting IPC provider...");
+        let provider = crate::get_ipc_provider(&self.global).map_err(|e| {
+            log::error!("Failed to get IPC provider: {}", e);
+            e
+        })?;
+        log::info!("Step 1: ✓ Successfully got IPC provider");
+
+        log::info!("Step 2: Parsing subnet ID '{}'...", subnet_id);
+        let subnet = SubnetID::from_str(subnet_id).map_err(|e| {
+            log::error!("Failed to parse subnet ID '{}': {}", subnet_id, e);
+            e
+        })?;
+        log::info!("Step 2: ✓ Successfully parsed subnet ID: {:?}", subnet);
 
         // Check if this is a root subnet (no parent)
         if subnet.is_root() {
-            log::info!("Subnet {} is a root subnet, no validators to fetch from parent", subnet_id);
-            // For root subnets, we might want to return local validator configuration
-            // or indicate that validators are managed differently
+            log::info!("Step 3: Subnet {} is a root subnet, no validators to fetch from parent", subnet_id);
+            log::info!("=== VALIDATOR FETCHING SKIPPED FOR ROOT SUBNET ===");
             return Ok(vec![]);
         }
+        log::info!("Step 3: ✓ Subnet is not a root subnet");
 
-                log::info!("Attempting to fetch validators for subnet: {}", subnet_id);
-
-        // First, let's debug what we're working with
+        log::info!("Step 4: Getting parent subnet...");
         let parent = subnet.parent();
         match &parent {
             Some(parent_subnet) => {
-                log::info!("Subnet {} has parent: {}", subnet_id, parent_subnet);
+                log::info!("Step 4: ✓ Subnet {} has parent: {}", subnet_id, parent_subnet);
+
+                // Log available connections to help diagnose
+                let connections = provider.list_connections();
+                let available_subnets: Vec<String> = connections.keys().map(|k| k.to_string()).collect();
+                log::info!("Available configured subnets in provider: {:?}", available_subnets);
+
+                if !connections.contains_key(parent_subnet) {
+                    log::error!("Step 4: ✗ Parent subnet {} is NOT configured in the IPC provider!", parent_subnet);
+                    log::error!("You need to configure the parent network ({}) in your IPC config", parent_subnet);
+                } else {
+                    log::info!("Step 4: ✓ Parent subnet {} is configured in the IPC provider", parent_subnet);
+                }
             }
             None => {
-                log::warn!("Subnet {} has no parent - this may be a root subnet", subnet_id);
+                log::error!("Step 4: ✗ Subnet {} has no parent but is not root - this is unexpected", subnet_id);
                 return Ok(vec![]);
             }
         }
 
-        match provider.list_validators(&subnet).await {
+        log::info!("Step 5: Attempting to fetch validators for subnet: {}", subnet_id);
+
+                match provider.list_validators(&subnet).await {
             Ok(validators) => {
-                log::info!("Successfully fetched {} validators for subnet {}", validators.len(), subnet_id);
+                log::info!("Step 5: ✓ Successfully fetched {} validators for subnet {}", validators.len(), subnet_id);
 
                 let mut validator_list = Vec::new();
-                for (address, validator_info) in validators {
+                for (i, (address, validator_info)) in validators.iter().enumerate() {
+                    log::info!("Step 6.{}: Processing validator {}: {}", i+1, i+1, address);
+
                     // Convert TokenAmount to string for stake/power
                     let stake = validator_info.staking.current_power().to_string();
                     let power = validator_info.staking.next_power().atto().to_u64().unwrap_or(0);
@@ -412,24 +472,25 @@ impl SubnetService {
                         "next_power": validator_info.staking.next_power().to_string()
                     });
 
-                    log::debug!("Validator {}: {:?}", address, validator_json);
+                    log::info!("Step 6.{}: ✓ Validator {} - status: {}, stake: {}, power: {}",
+                        i+1, address, status, stake, power);
                     validator_list.push(validator_json);
                 }
 
+                log::info!("=== VALIDATOR FETCHING SUCCESSFUL: {} validators ===", validator_list.len());
                 Ok(validator_list)
             }
             Err(e) => {
                 // Enhanced error logging to help diagnose the issue
-                log::error!("Failed to fetch validators for subnet {}: {}", subnet_id, e);
+                log::error!("Step 5: ✗ Failed to fetch validators for subnet {}: {}", subnet_id, e);
+                log::error!("Error details: {:?}", e);
 
                 if let Some(parent_subnet) = &parent {
-                    // Log available connections to help diagnose
-                    let connections = provider.list_connections();
-                    let available_subnets: Vec<String> = connections.keys().map(|k| k.to_string()).collect();
-                    log::error!("Parent subnet {} not found. Available configured subnets: {:?}", parent_subnet, available_subnets);
-                    log::error!("This suggests the parent network ({}) is not properly configured in the IPC provider config", parent_subnet);
+                    log::error!("This error occurred while trying to query parent network: {}", parent_subnet);
+                    log::error!("Make sure the parent network ({}) is properly configured and accessible", parent_subnet);
                 }
 
+                log::error!("=== VALIDATOR FETCHING FAILED ===");
                 // Always return empty list - no mock data
                 Ok(vec![])
             }
