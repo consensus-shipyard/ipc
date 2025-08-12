@@ -161,6 +161,48 @@ impl SubnetService {
         })
     }
 
+    /// Helper method to get the permission mode for a subnet
+    async fn get_permission_mode(&self, subnet_id: &str) -> String {
+        let provider = match crate::get_ipc_provider(&self.global) {
+            Ok(provider) => provider,
+            Err(e) => {
+                log::warn!("Failed to get IPC provider for permission mode: {}", e);
+                return "collateral".to_string(); // fallback to default
+            }
+        };
+
+        let subnet = match SubnetID::from_str(subnet_id) {
+            Ok(subnet) => subnet,
+            Err(e) => {
+                log::warn!("Failed to parse subnet ID {}: {}", subnet_id, e);
+                return "collateral".to_string(); // fallback to default
+            }
+        };
+
+        // Check if this is a root subnet (no parent)
+        if subnet.is_root() {
+            log::info!("Subnet {} is a root subnet, using default permission mode", subnet_id);
+            return "collateral".to_string(); // root subnets use default
+        }
+
+        // Get genesis info which contains the permission mode
+        match provider.get_genesis_info(&subnet).await {
+            Ok(genesis_info) => {
+                let permission_mode = match genesis_info.permission_mode {
+                    ipc_api::subnet::PermissionMode::Collateral => "collateral",
+                    ipc_api::subnet::PermissionMode::Federated => "federated",
+                    ipc_api::subnet::PermissionMode::Static => "static",
+                };
+                log::info!("Retrieved permission mode for subnet {}: {}", subnet_id, permission_mode);
+                permission_mode.to_string()
+            }
+            Err(e) => {
+                log::warn!("Failed to get genesis info for subnet {}: {}", subnet_id, e);
+                "collateral".to_string() // fallback to default
+            }
+        }
+    }
+
     /// List all subnets/instances
     pub async fn list_subnets(&self) -> Result<Vec<serde_json::Value>> {
         let config_store = crate::ipc_config_store::IpcConfigStore::load_or_init(&self.global).await?;
@@ -206,13 +248,16 @@ impl SubnetService {
                 Vec::new()
             });
 
+            // Get the actual permission mode from the subnet contract
+            let permission_mode = self.get_permission_mode(&subnet_id_str).await;
+
             let instance = serde_json::json!({
                 "id": subnet_id_str,
                 "name": format!("Subnet {}", subnet_id_str.split('/').last().unwrap_or(&subnet_id_str)),
                 "status": "active", // You might want to determine this dynamically
                 "validators": validators,
                 "config": {
-                    "permissionMode": "collateral", // Add default permission mode
+                    "permissionMode": permission_mode,
                     "gateway_addr": match &subnet_config.config {
                         ipc_provider::config::SubnetConfig::Fevm(evm_subnet) => evm_subnet.gateway_addr.to_string(),
                     },
@@ -271,6 +316,9 @@ impl SubnetService {
                     Vec::new()
                 });
 
+                // Get the actual permission mode from the subnet contract
+                let permission_mode = self.get_permission_mode(subnet_id).await;
+
                 let instance = serde_json::json!({
                     "id": subnet_id,
                     "name": format!("Subnet {}", subnet_id),
@@ -284,7 +332,7 @@ impl SubnetService {
                     "chain_id": subnet_config.id.chain_id(),
                     "validators": validators,
                     "config": {
-                        "permissionMode": "collateral", // Add default permission mode
+                        "permissionMode": permission_mode,
                         "gateway_addr": match &subnet_config.config {
                             ipc_provider::config::SubnetConfig::Fevm(evm_subnet) => evm_subnet.gateway_addr.to_string(),
                         },
@@ -320,36 +368,72 @@ impl SubnetService {
             return Ok(vec![]);
         }
 
-        let validators = provider.list_validators(&subnet).await?;
+                log::info!("Attempting to fetch validators for subnet: {}", subnet_id);
 
-        let mut validator_list = Vec::new();
-        for (address, validator_info) in validators {
-            // Convert TokenAmount to string for stake/power
-            let stake = validator_info.staking.current_power().to_string();
-            let power = validator_info.staking.next_power().atto().to_u64().unwrap_or(0);
-
-            // Determine status based on validator state
-            let status = if validator_info.is_active {
-                "active"
-            } else if validator_info.is_waiting {
-                "waiting"
-            } else {
-                "inactive"
-            };
-
-            validator_list.push(serde_json::json!({
-                "address": address.to_string(),
-                "stake": stake,
-                "power": power,
-                "status": status,
-                "is_active": validator_info.is_active,
-                "is_waiting": validator_info.is_waiting,
-                "current_power": validator_info.staking.current_power().to_string(),
-                "next_power": validator_info.staking.next_power().to_string()
-            }));
+        // First, let's debug what we're working with
+        let parent = subnet.parent();
+        match &parent {
+            Some(parent_subnet) => {
+                log::info!("Subnet {} has parent: {}", subnet_id, parent_subnet);
+            }
+            None => {
+                log::warn!("Subnet {} has no parent - this may be a root subnet", subnet_id);
+                return Ok(vec![]);
+            }
         }
 
-        Ok(validator_list)
+        match provider.list_validators(&subnet).await {
+            Ok(validators) => {
+                log::info!("Successfully fetched {} validators for subnet {}", validators.len(), subnet_id);
+
+                let mut validator_list = Vec::new();
+                for (address, validator_info) in validators {
+                    // Convert TokenAmount to string for stake/power
+                    let stake = validator_info.staking.current_power().to_string();
+                    let power = validator_info.staking.next_power().atto().to_u64().unwrap_or(0);
+
+                    // Determine status based on validator state
+                    let status = if validator_info.is_active {
+                        "active"
+                    } else if validator_info.is_waiting {
+                        "waiting"
+                    } else {
+                        "inactive"
+                    };
+
+                    let validator_json = serde_json::json!({
+                        "address": address.to_string(),
+                        "stake": stake,
+                        "power": power,
+                        "status": status,
+                        "is_active": validator_info.is_active,
+                        "is_waiting": validator_info.is_waiting,
+                        "current_power": validator_info.staking.current_power().to_string(),
+                        "next_power": validator_info.staking.next_power().to_string()
+                    });
+
+                    log::debug!("Validator {}: {:?}", address, validator_json);
+                    validator_list.push(validator_json);
+                }
+
+                Ok(validator_list)
+            }
+            Err(e) => {
+                // Enhanced error logging to help diagnose the issue
+                log::error!("Failed to fetch validators for subnet {}: {}", subnet_id, e);
+
+                if let Some(parent_subnet) = &parent {
+                    // Log available connections to help diagnose
+                    let connections = provider.list_connections();
+                    let available_subnets: Vec<String> = connections.keys().map(|k| k.to_string()).collect();
+                    log::error!("Parent subnet {} not found. Available configured subnets: {:?}", parent_subnet, available_subnets);
+                    log::error!("This suggests the parent network ({}) is not properly configured in the IPC provider config", parent_subnet);
+                }
+
+                // Always return empty list - no mock data
+                Ok(vec![])
+            }
+        }
     }
 
 

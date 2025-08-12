@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { apiService } from '../services/api'
 
 interface Validator {
@@ -54,7 +54,6 @@ interface SubnetStatus {
   sync_status?: string
 }
 
-const route = useRoute()
 const router = useRouter()
 
 // Props
@@ -1047,10 +1046,10 @@ onUnmounted(() => {
               <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              {{ instance.config.permissionMode === 'federated' ? 'Federated Mode' : 'Collateral Mode' }}
+              {{ instance?.config?.permissionMode === 'federated' ? 'Federated Mode' : 'Collateral Mode' }}
             </h4>
 
-            <div v-if="instance.config.permissionMode === 'federated'" class="text-blue-700 text-sm">
+            <div v-if="instance?.config?.permissionMode === 'federated'" class="text-blue-700 text-sm">
               <p class="mb-2"><strong>Federated subnets</strong> use centralized validator management:</p>
               <ul class="list-disc list-inside space-y-1 ml-4">
                 <li>Validators are added by setting their power directly</li>
@@ -1060,23 +1059,27 @@ onUnmounted(() => {
               </ul>
             </div>
 
-            <div v-else-if="instance.config.permissionMode === 'collateral'" class="text-blue-700 text-sm">
+            <div v-else-if="instance?.config?.permissionMode === 'collateral'" class="text-blue-700 text-sm">
               <p class="mb-2"><strong>Collateral subnets</strong> use stake-based validator management:</p>
               <ul class="list-disc list-inside space-y-1 ml-4">
                 <li>Validators join by staking FIL collateral</li>
-                <li>Minimum stake requirement: {{ instance.config.minValidatorStake || 'Not set' }} FIL</li>
+                <li>Minimum stake requirement: {{ instance?.config?.minValidatorStake || 'Not set' }} FIL</li>
                 <li>Validators can increase/decrease their stake</li>
                 <li>Higher stake generally means higher voting power</li>
               </ul>
             </div>
 
             <div v-else class="text-blue-700 text-sm">
-              <p>Unknown permission mode. Please check your subnet configuration.</p>
+              <p class="mb-2"><strong>Unknown permission mode</strong> - configuration may still be loading:</p>
+              <ul class="list-disc list-inside space-y-1 ml-4">
+                <li>Please wait for the subnet configuration to load</li>
+                <li>Check network connectivity if this persists</li>
+              </ul>
             </div>
           </div>
 
           <!-- Bulk Federated Management (Federated Mode Only) -->
-          <div v-if="instance.config.permissionMode === 'federated'" class="p-6 bg-blue-50 rounded-lg">
+          <div v-if="instance?.config?.permissionMode === 'federated'" class="p-6 bg-blue-50 rounded-lg">
             <div class="flex items-center justify-between mb-4">
               <h4 class="text-md font-semibold text-gray-800 flex items-center">
                 <svg class="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1211,13 +1214,28 @@ onUnmounted(() => {
               <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
-              <p class="font-medium">No validators configured</p>
-              <p class="text-sm">This subnet has no validators set up yet.</p>
+              <div class="space-y-2">
+                <p class="font-medium text-gray-900">No Validators Found</p>
+                <p class="text-sm text-gray-500 max-w-md mx-auto">
+                  {{ instance?.config?.permissionMode === 'federated'
+                     ? 'No validators have been configured for this federated subnet yet.'
+                     : 'No validators have joined this subnet by staking collateral yet.' }}
+                </p>
+                <div class="mt-4 text-xs text-gray-400 space-y-1">
+                  <p><strong>Possible reasons:</strong></p>
+                  <ul class="list-disc list-inside space-y-1 max-w-lg mx-auto text-left">
+                    <li>The subnet was recently created and validators haven't joined yet</li>
+                    <li>The parent network may not be properly configured in your IPC settings</li>
+                    <li>Network connectivity issues preventing validator data retrieval</li>
+                    <li>Validators may be configured but not yet visible due to synchronization delays</li>
+                  </ul>
+                </div>
+              </div>
               <button
                 @click="showAddValidatorModal = true"
-                class="mt-4 btn-primary"
+                class="mt-6 btn-primary"
               >
-                Add First Validator
+                Add Validator
               </button>
             </div>
 
@@ -1237,7 +1255,7 @@ onUnmounted(() => {
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
-                    <th v-if="instance.config.permissionMode === 'collateral'" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th v-if="instance?.config?.permissionMode === 'collateral'" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
                     </th>
                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
