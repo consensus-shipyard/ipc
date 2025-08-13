@@ -19,6 +19,7 @@ import {IpcEnvelope, SubnetID, IpcMsgKind} from "../../structs/CrossNet.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
 
 import {ActivityRollupRecorded, FullActivityRollup} from "../../structs/Activity.sol";
+import {StateCommitmentBreakDown} from "../../lib/cometbft/CometbftLightClient.sol";
 
 contract CheckpointingFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
@@ -26,6 +27,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
 
     /// @dev Emitted when a checkpoint is committed to gateway.
     event CheckpointCommitted(address indexed subnet, uint256 subnetHeight);
+    event StateCommitmentCreated(uint64 checkpointHeight, StateCommitmentBreakDown breakdown);
 
     /// @notice submit a verified checkpoint in the gateway to trigger side-effects.
     /// @dev this method is called by the corresponding subnet actor.
@@ -88,6 +90,12 @@ contract CheckpointingFacet is GatewayActorModifiers {
 
         emit BottomUpBatchRecorded(uint64(checkpoint.blockHeight), msgs);
         emit ActivityRollupRecorded(uint64(checkpoint.blockHeight), activity);
+    }
+
+    function recordLightClientCommitments(
+        StateCommitmentBreakDown calldata commitment
+    ) external systemActorOnly {
+        emit StateCommitmentCreated(uint64(block.number), commitment);
     }
 
     /// @notice checks whether the provided checkpoint signature for the block at height `height` is valid and accumulates that it

@@ -20,15 +20,7 @@ import {LibBottomUpBatch} from "../lib/LibBottomUpBatch.sol";
 import {BottomUpBatch} from "../structs/BottomUpBatch.sol";
 import {IpcEnvelope, StateCommitment} from "../structs/CrossNet.sol";
 import {CompressedActivityRollup} from "../structs/Activity.sol";
-import {CometbftLightClient} from "../lib/cometbft/CometbftLightClient.sol";
-
-/// Breakdown how the app hash is generated
-struct StateCommitmentBreakDown {
-    bytes stateRoot; // fvm state root
-    BottomUpBatch.Commitment msgBatchCommitment;
-    uint64 validatorNextConfigurationNumber;
-    bytes32 activityCommitment;
-}
+import {CometbftLightClient, StateCommitmentBreakDown} from "../lib/cometbft/CometbftLightClient.sol";
 
 contract SubnetActorCheckpointFacet is SubnetActorModifiers, ReentrancyGuard, Pausable {
     using EnumerableSet for EnumerableSet.AddressSet;

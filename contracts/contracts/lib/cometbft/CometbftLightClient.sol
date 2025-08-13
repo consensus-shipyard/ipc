@@ -11,10 +11,19 @@ import {Bytes} from "tendermint-sol/utils/Bytes.sol";
 
 import {ISubnetActor} from "../../interfaces/ISubnetActor.sol";
 import {ValidatorInfo} from "../../structs/Subnet.sol";
+import {BottomUpBatch} from "../../structs/BottomUpBatch.sol";
 import {LibPower} from "../LibPower.sol";
 import {LibSubnetActorStorage, SubnetActorStorage} from "../LibSubnetActorStorage.sol";
-
 import {DuplicateValidatorSignaturesFound, SignatureAddressesNotSorted} from "../../errors/IPCErrors.sol";
+
+/// Breakdown how the app hash is generated
+struct StateCommitmentBreakDown {
+    bytes stateRoot; // fvm state root
+    BottomUpBatch.Commitment msgBatchCommitment;
+    uint64 validatorNextConfigurationNumber;
+    bytes32 activityCommitment;
+}
+
 
 library CometbftLightClient {
     using TendermintHelper for SignedHeader.Data;

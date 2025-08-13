@@ -933,24 +933,27 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     function testSubnetActorDiamond_submitSignedHeader() public {
         SignedHeader.Data memory header = SignedHeader.Data({
             header: LightHeader.Data({
-                version: ConsensusData.Data({block: 11, app: 0}),
+                version: ConsensusData.Data({
+                    block: 11,
+                    app: 0
+                }),
                 chain_id: "1671263715227509",
                 height: 10,
-                time: Timestamp.Data({Seconds: 1754564443, nanos: 323591975}),
+                time: Timestamp.Data({Seconds: 1754924475, nanos: 753738680}),
                 last_block_id: BlockID.Data({
-                    hash: hex"974634b426b03f09ce54e7e54f660feb1b45896cc471831cb571b302b713eae7",
+                    hash: hex"cdf54989b2af7335f147497cce3462143805ace148e54e87a2478070da92c4ed",
                     part_set_header: PartSetHeader.Data({
                         total: 1,
-                        hash: hex"ae8a5b168eeb47092e41a9f310e3f9afbbbb5599f5bb1be960f5d6084338b5f1"
+                        hash: hex"76434337d10b011ab9d18dd8f0c9ccc58a7ccf069e0ace8c07772569489a489e"
                     })
                 }),
-                last_commit_hash: hex"5f4332785e3075e91e9de1f9a60a85ce376423dd7db0f790a3d6233e769f7996",
-                data_hash: hex"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                last_commit_hash: hex"8da7c3c5ccacf3277b63b0ecbc1897fd57e3f17372c3aeaa7eb366b69855d9a7",
+                data_hash: hex"b8b9fe4ec01144702ae02277199c9f5de07e26614bb378fa434cb3410d847551",
                 validators_hash: hex"6aa2b4fb8892eb46abe6d5b9b5e7e86a749d1fbd8e355e3a6b5f5426ef3e6790",
                 next_validators_hash: hex"6aa2b4fb8892eb46abe6d5b9b5e7e86a749d1fbd8e355e3a6b5f5426ef3e6790",
                 consensus_hash: hex"895734b58a6cb41a56bfe448f135d54fa01dc948164ee7e409960f0d8958d42c",
-                app_hash: hex"8ecce6dabb71c194946ecfebff8278b8c038576a94a205e6d08a0b4fdf79f78a",
-                last_results_hash: hex"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                app_hash: hex"fcbeb04f3c0175e06b8ef9d731476e88f2d37b98bca65b7e983356c92c9c53e9",
+                last_results_hash: hex"7e23c5dbd335ecce8cad567dc6bf69373995bd718d63b562b46126a3d6574b95",
                 evidence_hash: hex"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                 proposer_address: hex"905b1c0098887ea9033946de1eab5427c97a82ad"
             }),
@@ -958,10 +961,10 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
                 height: 10,
                 round: 0,
                 block_id: BlockID.Data({
-                    hash: hex"0cfc9be376211074799c6b19630328f120c12178f86843785cfed9ae5ae3e978",
+                    hash: hex"910035b9ff5ddd3f2434d198d718cbe1c97b3a484b6799b4106f072070a046ce",
                     part_set_header: PartSetHeader.Data({
                         total: 1,
-                        hash: hex"83e9575df2a578a709b82319a2b94131151c0698b25712a19f5fdca4321bd3ae"
+                        hash: hex"648d2cb39485249faf92acb13db138eac1212579c433a8a2aa6e85e05d69f2bd"
                     })
                 }),
                 signatures: new CommitSig.Data[](1)
@@ -971,8 +974,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         header.commit.signatures[0] = CommitSig.Data({
             block_id_flag: TENDERMINTLIGHT_PROTO_GLOBAL_ENUMS.BlockIDFlag.BLOCK_ID_FLAG_COMMIT,
             validator_address: hex"905b1c0098887ea9033946de1eab5427c97a82ad",
-            timestamp: Timestamp.Data({Seconds: 1754564444, nanos: 375897446}),
-            signature: hex"068ba686855ec6d52f97da8badeb874ee21ecc5f8a5a9a301fcf6190914bab5961bbffa99583adc364a56fee5cad613280f3f890b5bb26f56cccf707887669a1"
+            timestamp: Timestamp.Data({Seconds: 1754924476, nanos: 811159237}),
+            signature: hex"284f7f673bf73a515a8829dd29edc8671094e62d94db5cfa869bb62b4e8b6eff51c44f2662fb6fef1e37239d9a7d14707971feeddd1e9ba87c2ca5bafc1b6d9e"
         });
 
         address validator = address(0x1A79385eAd0e873FE0C441C034636D3Edf7014cC);

@@ -397,7 +397,9 @@ where
             state.activity_tracker().record_block_committed(pubkey)?;
         }
 
-        let maybe_result = self.end_block_manager.trigger_end_block_hook(state)?;
+        let mut end_block_events = BlockEndEvents::default();
+
+        let maybe_result = self.end_block_manager.trigger_end_block_hook(state, &mut end_block_events)?;
 
         let (power_updates, maybe_commitment) = if let Some(outcome) = maybe_result {
             (
@@ -420,6 +422,7 @@ where
             power_updates,
             gas_market: next_gas_market,
             light_client_commitments: maybe_commitment,
+            end_block_events,
         };
         Ok(response)
     }

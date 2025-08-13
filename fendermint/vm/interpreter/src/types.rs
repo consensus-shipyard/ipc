@@ -91,6 +91,7 @@ pub struct EndBlockResponse {
     pub power_updates: PowerUpdates,
     pub gas_market: Reading,
     pub light_client_commitments: Option<LightClientCommitments>,
+    pub end_block_events: BlockEndEvents,
 }
 
 /// Response for preparing messages for a block.

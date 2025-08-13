@@ -891,6 +891,7 @@ where
             power_updates,
             gas_market,
             light_client_commitments,
+            end_block_events
         } = response;
 
         let mut c = self.light_client_commitments.lock().await;
@@ -913,7 +914,10 @@ where
         let ret = response::EndBlock {
             validator_updates,
             consensus_param_updates,
-            events: vec![],
+            events: end_block_events
+                .into_iter()
+                .flat_map(|(stamped, emitters)| to_events("event", stamped, emitters))
+                .collect::<Vec<_>>(),
         };
 
         Ok(ret)

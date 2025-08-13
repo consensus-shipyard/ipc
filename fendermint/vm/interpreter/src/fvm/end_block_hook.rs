@@ -18,6 +18,7 @@ use ipc_api::staking::ConfigurationNumber;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tendermint::block::Height;
+use crate::types::BlockEndEvents;
 
 /// Validator voting power snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -67,13 +68,15 @@ where
     pub fn trigger_end_block_hook(
         &self,
         state: &mut FvmExecState<DB>,
+        end_block_events: &mut BlockEndEvents,
     ) -> anyhow::Result<Option<EndBlockOutcome>> {
-        ipc_end_block_hook(&self.gateway_caller, state)
+        ipc_end_block_hook(&self.gateway_caller, end_block_events, state)
     }
 }
 
 pub fn ipc_end_block_hook<DB>(
     gateway: &GatewayCaller<DB>,
+    end_block_events: &mut BlockEndEvents,
     state: &mut FvmExecState<DB>,
 ) -> anyhow::Result<Option<EndBlockOutcome>>
 where
@@ -151,6 +154,15 @@ where
         validator_next_configuration_number: next_configuration_number,
         activity_commitment: ethers::utils::keccak256(activity_commitment.encode()),
     };
+
+    let ret = gateway
+        .record_light_client_commitments(
+            state,
+            &commitments
+        )
+        .context("failed to store checkpoint")?;
+
+    end_block_events.push((ret.apply_ret.events, ret.emitters));
 
     Ok(Some(EndBlockOutcome {
         light_client_commitments: commitments,
