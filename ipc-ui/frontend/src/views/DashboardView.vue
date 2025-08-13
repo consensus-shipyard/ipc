@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import SubnetStatusIndicator from '../components/common/SubnetStatusIndicator.vue'
 import { apiService } from '../services/api'
 import { useNetworkStore } from '../stores/network'
 import { useSubnetsStore, type SubnetInstance } from '../stores/subnets'
@@ -14,12 +15,12 @@ const approvingSubnets = ref<Set<string>>(new Set())
 const approvalError = ref<string | null>(null)
 
 // Use store data instead of local state
-const subnets = computed(() => subnetsStore.filteredSubnets || [])
-const loading = computed(() => subnetsStore.loading)
+const subnets = computed(() => subnetsStore.subnets || [])
+const loading = computed(() => subnetsStore.isLoading)
 const error = computed(() => subnetsStore.error)
 
 // Methods
-const fetchSubnets = () => subnetsStore.fetchSubnets()
+const fetchSubnets = () => subnetsStore.loadSubnets()
 
 const getGatewayOwner = async (subnet: SubnetInstance): Promise<string> => {
   try {
@@ -271,6 +272,19 @@ const copyToClipboard = async (text: string, subnetId: string) => {
   }
 }
 
+// Enhanced subnet status event handlers
+const handleStartValidators = (subnet: SubnetInstance) => {
+  console.log('Start validators for subnet:', subnet.id)
+  // TODO: Implement validator setup workflow
+  // Could open a modal with step-by-step validator setup instructions
+}
+
+const handleTroubleshoot = (subnet: SubnetInstance) => {
+  console.log('Troubleshoot subnet:', subnet.id)
+  // TODO: Implement troubleshooting workflow
+  // Could show detailed error information and suggested solutions
+}
+
 // Lifecycle - Data fetching is now handled by the centralized app store
 // onMounted(() => {
 //   fetchSubnets() // Removed - handled by app store
@@ -490,28 +504,15 @@ const copyToClipboard = async (text: string, subnetId: string) => {
                 <div class="flex-1">
                   <div class="flex items-center space-x-3 mb-2">
                     <h4 class="text-lg font-semibold text-gray-900">{{ subnet.name }}</h4>
-                    <span
-                      :class="[
-                        'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium',
-                        getStatusColor(subnet.status)
-                      ]"
-                    >
-                      <svg
-                        :class="['w-3 h-3 mr-1']"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          :d="getStatusIcon(subnet.status)"
-                        />
-                      </svg>
-                      {{ subnet.status.charAt(0).toUpperCase() + subnet.status.slice(1) }}
-                    </span>
                   </div>
+
+                  <!-- Enhanced status with new component -->
+                  <SubnetStatusIndicator
+                    :subnet="subnet"
+                    :show-details="false"
+                    @start-validators="handleStartValidators(subnet)"
+                    @troubleshoot="handleTroubleshoot(subnet)"
+                  />
                   <p class="text-gray-600 text-sm mb-1">{{ subnet.id }}</p>
                   <p class="text-gray-500 text-sm">Parent: {{ subnet.parent }}</p>
                 </div>
@@ -545,10 +546,10 @@ const copyToClipboard = async (text: string, subnetId: string) => {
                   <p class="font-semibold text-gray-900">{{ safeCalculateSubnetStake(subnet).toFixed(1) }} FIL</p>
                 </div>
                 <div>
-                  <p class="text-sm text-gray-500">Template</p>
-                  <p class="font-semibold text-gray-900">{{ subnet.template }}</p>
+                  <p class="text-sm text-gray-500">Permission Mode</p>
+                  <p class="font-semibold text-gray-900 capitalize">{{ subnet.status_info.permission_mode || 'Unknown' }}</p>
                 </div>
-                <div>
+                <div v-if="subnet.created_at">
                   <p class="text-sm text-gray-500">Created</p>
                   <p class="font-semibold text-gray-900">{{ new Date(subnet.created_at).toLocaleDateString() }}</p>
                 </div>

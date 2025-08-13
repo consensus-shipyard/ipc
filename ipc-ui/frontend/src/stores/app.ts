@@ -3,6 +3,7 @@ import { ref, computed, readonly } from 'vue'
 import { useNetworkStore } from './network'
 import { useSubnetsStore } from './subnets'
 import { useGatewaysStore } from './gateways'
+import { useL1GatewaysStore } from './l1-gateways'
 import { updateConsoleStatus } from '../utils/banner'
 
 interface AppLoadingState {
@@ -23,11 +24,12 @@ export const useAppStore = defineStore('app', () => {
   const networkStore = useNetworkStore()
   const subnetsStore = useSubnetsStore()
   const gatewaysStore = useGatewaysStore()
+  const l1GatewaysStore = useL1GatewaysStore()
 
   // Computed
   const isLoading = computed(() =>
     loadingState.value.isInitializing ||
-    subnetsStore.loading ||
+    subnetsStore.isLoading ||
     gatewaysStore.loading
   )
 
@@ -60,8 +62,9 @@ export const useAppStore = defineStore('app', () => {
       console.log('[AppStore] Fetching initial data...')
       updateConsoleStatus('Data loading', 'Fetching subnets and gateways...')
       await Promise.all([
-        subnetsStore.fetchSubnets(force),
-        gatewaysStore.fetchGateways(force)
+        subnetsStore.loadSubnets(),
+        gatewaysStore.fetchGateways(force),
+        l1GatewaysStore.loadL1Gateways()
       ])
 
       loadingState.value.hasInitialized = true
@@ -84,8 +87,9 @@ export const useAppStore = defineStore('app', () => {
     try {
       // Refresh all data stores in parallel
       await Promise.all([
-        subnetsStore.refreshSubnets(),
-        gatewaysStore.refreshGateways()
+        subnetsStore.loadSubnets(),
+        gatewaysStore.refreshGateways(),
+        l1GatewaysStore.loadL1Gateways()
       ])
 
       console.log('[AppStore] Data refresh completed')

@@ -5,6 +5,7 @@
 use super::api::{
     deployment::deployment_routes,
     gateway::gateway_routes,
+    l1_gateways::l1_gateway_routes,
     network::network_routes,
     subnet::subnet_routes,
     transactions::transaction_routes,
@@ -134,6 +135,7 @@ pub async fn start_ui_server(
             wallet_routes(state.clone())
                 .or(subnet_routes(state.clone()))
                 .or(gateway_routes(state.clone()))
+                .or(l1_gateway_routes(state.clone()))
                 .or(deployment_routes(state.clone()))
                 .or(transaction_routes(state.clone()))
                 .or(network_routes(state.clone()))

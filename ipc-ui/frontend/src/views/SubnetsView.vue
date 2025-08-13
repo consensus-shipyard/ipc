@@ -19,12 +19,12 @@ const expandedNodes = ref<Set<string>>(new Set())
 const viewMode = ref<'hierarchy' | 'list'>('hierarchy')
 
 // Use store data instead of local state
-const subnets = computed(() => subnetsStore.filteredSubnets || [])
-const loading = computed(() => subnetsStore.loading)
+const subnets = computed(() => subnetsStore.subnets || [])
+const loading = computed(() => subnetsStore.isLoading)
 const error = computed(() => subnetsStore.error)
 
 // Methods
-const fetchSubnets = () => subnetsStore.fetchSubnets()
+const fetchSubnets = () => subnetsStore.loadSubnets()
 
 // Build hierarchical tree structure
 const subnetTree = computed(() => {
@@ -58,18 +58,22 @@ const subnetTree = computed(() => {
     }
   })
 
-  // Sort children by creation date
+  // Sort children by creation date (with safe date handling)
   const sortChildren = (node: SubnetNode) => {
-    node.children.sort((a, b) =>
-      new Date(b.subnet.created_at).getTime() - new Date(a.subnet.created_at).getTime()
-    )
+    node.children.sort((a, b) => {
+      const dateA = a.subnet.created_at ? new Date(a.subnet.created_at).getTime() : 0
+      const dateB = b.subnet.created_at ? new Date(b.subnet.created_at).getTime() : 0
+      return dateB - dateA
+    })
     node.children.forEach(sortChildren)
   }
 
   roots.forEach(sortChildren)
-  return roots.sort((a, b) =>
-    new Date(b.subnet.created_at).getTime() - new Date(a.subnet.created_at).getTime()
-  )
+  return roots.sort((a, b) => {
+    const dateA = a.subnet.created_at ? new Date(a.subnet.created_at).getTime() : 0
+    const dateB = b.subnet.created_at ? new Date(b.subnet.created_at).getTime() : 0
+    return dateB - dateA
+  })
 })
 
 // Helper functions
@@ -129,7 +133,8 @@ const formatAddress = (address: any) => {
   return 'N/A'
 }
 
-const formatDate = (dateStr: string) => {
+const formatDate = (dateStr?: string) => {
+  if (!dateStr) return 'N/A'
   try {
     return new Date(dateStr).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -332,8 +337,8 @@ const getIndentStyle = (depth: number) => {
                       </p>
                     </div>
                     <div>
-                      <p class="text-sm text-gray-500">Template</p>
-                      <p class="font-semibold text-gray-900">{{ node.subnet.template }}</p>
+                      <p class="text-sm text-gray-500">Permission Mode</p>
+                      <p class="font-semibold text-gray-900 capitalize">{{ node.subnet.status_info.permission_mode || 'Unknown' }}</p>
                     </div>
                     <div>
                       <p class="text-sm text-gray-500">Created</p>
@@ -411,8 +416,8 @@ const getIndentStyle = (depth: number) => {
                           </p>
                         </div>
                         <div>
-                          <p class="text-gray-500">Template</p>
-                          <p class="font-semibold">{{ childNode.subnet.template }}</p>
+                          <p class="text-gray-500">Permission Mode</p>
+                          <p class="font-semibold capitalize">{{ childNode.subnet.status_info.permission_mode || 'Unknown' }}</p>
                         </div>
                         <div>
                           <p class="text-gray-500">Created</p>

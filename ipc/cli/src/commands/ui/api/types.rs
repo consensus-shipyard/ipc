@@ -61,15 +61,102 @@ pub struct ChainStats {
     pub pending_transactions: Option<u64>,
 }
 
-/// Subnet status response
-#[derive(Debug, Serialize, Deserialize)]
-pub struct SubnetStatus {
-    pub is_active: bool,
-    pub last_block_time: String,
-    pub block_height: u64,
-    pub validators_online: u32,
-    pub consensus_status: String, // "healthy", "degraded", "offline"
-    pub sync_status: String, // "synced", "syncing", "behind"
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum SubnetLifecycleState {
+    // Deployment states
+    #[serde(rename = "deploying")]
+    Deploying,
+    #[serde(rename = "deployed")]
+    Deployed,
+
+    // Initialization states
+    #[serde(rename = "initializing")]
+    Initializing,
+    #[serde(rename = "waiting_for_validators")]
+    WaitingForValidators,
+
+    // Active states
+    #[serde(rename = "active")]
+    Active,
+    #[serde(rename = "syncing")]
+    Syncing,
+    #[serde(rename = "healthy")]
+    Healthy,
+
+    // Problem states
+    #[serde(rename = "degraded")]
+    Degraded,
+    #[serde(rename = "offline")]
+    Offline,
+    #[serde(rename = "failed")]
+    Failed,
+    #[serde(rename = "unknown")]
+    Unknown,
+}
+
+impl Default for SubnetLifecycleState {
+    fn default() -> Self {
+        SubnetLifecycleState::Unknown
+    }
+}
+
+impl std::fmt::Display for SubnetLifecycleState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SubnetLifecycleState::Deploying => write!(f, "deploying"),
+            SubnetLifecycleState::Deployed => write!(f, "deployed"),
+            SubnetLifecycleState::Initializing => write!(f, "initializing"),
+            SubnetLifecycleState::WaitingForValidators => write!(f, "waiting_for_validators"),
+            SubnetLifecycleState::Active => write!(f, "active"),
+            SubnetLifecycleState::Syncing => write!(f, "syncing"),
+            SubnetLifecycleState::Healthy => write!(f, "healthy"),
+            SubnetLifecycleState::Degraded => write!(f, "degraded"),
+            SubnetLifecycleState::Offline => write!(f, "offline"),
+            SubnetLifecycleState::Failed => write!(f, "failed"),
+            SubnetLifecycleState::Unknown => write!(f, "unknown"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubnetStatusInfo {
+    pub lifecycle_state: SubnetLifecycleState,
+    pub genesis_available: bool,
+    pub validator_count: usize,
+    pub active_validators: usize,
+    pub permission_mode: Option<String>,
+    pub deployment_time: Option<String>,
+    pub last_block_time: Option<String>,
+    pub error_message: Option<String>,
+    pub next_action_required: Option<String>,
+}
+
+impl Default for SubnetStatusInfo {
+    fn default() -> Self {
+        SubnetStatusInfo {
+            lifecycle_state: SubnetLifecycleState::Unknown,
+            genesis_available: false,
+            validator_count: 0,
+            active_validators: 0,
+            permission_mode: None,
+            deployment_time: None,
+            last_block_time: None,
+            error_message: None,
+            next_action_required: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubnetInstanceResponse {
+    pub id: String,
+    pub name: String,
+    pub parent: String,
+    pub status: SubnetLifecycleState,
+    pub status_info: SubnetStatusInfo,
+    pub validators: Vec<serde_json::Value>,
+    pub created_at: Option<String>,
+    pub config: Option<serde_json::Value>,
 }
 
 /// Test transaction request

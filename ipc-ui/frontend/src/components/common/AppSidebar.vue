@@ -68,10 +68,14 @@ const gatewaysLoading = ref(false)
 const gatewaysError = ref<string | null>(null)
 
 // Get recent subnets from store
-const recentSubnets = computed(() => subnetsStore.recentSubnets)
+const recentSubnets = computed(() =>
+  subnetsStore.subnets
+    .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+    .slice(0, 5)
+)
 
 // Fetch real subnet data
-const fetchRecentSubnets = () => subnetsStore.fetchSubnets()
+const fetchRecentSubnets = () => subnetsStore.loadSubnets()
 
 // Fetch system status
 const fetchSystemStatus = async () => {

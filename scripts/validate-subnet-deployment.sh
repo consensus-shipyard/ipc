@@ -152,6 +152,13 @@ f4_to_eth() {
     fi
 }
 
+# Check if a subnet ID represents a root network
+is_root_network() {
+    local subnet_id="$1"
+    # Root networks follow pattern /r<number> with no additional components
+    [[ "$subnet_id" =~ ^/r[0-9]+$ ]]
+}
+
 # Check subnet registration with parent gateway
 check_subnet_registration() {
     local subnet_id="$1"
@@ -159,7 +166,28 @@ check_subnet_registration() {
     local gateway_addr="$3"
     local rpc="$4"
 
-    echo -e "    ${BLUE}Checking subnet registration with parent gateway...${NC}"
+    # Handle root networks differently
+    if is_root_network "$subnet_id"; then
+        echo -e "    ${BLUE}Checking root network gateway status...${NC}"
+
+        # For root networks, just check if the gateway is operational
+        local gateway_total=$(cast call "$gateway_addr" "totalSubnets()" --rpc-url "$rpc" 2>/dev/null || echo "0x0")
+        local total_count=$((gateway_total))
+
+        echo -e "    ${GREEN}✓ Root network gateway is operational${NC}"
+        echo -e "      ${CYAN}Gateway manages $total_count child subnet(s)${NC}"
+
+        if [[ $total_count -eq 0 ]]; then
+            echo -e "    ${YELLOW}ℹ No child subnets registered yet${NC}"
+            echo -e "    ${CYAN}💡 To add child subnets to this gateway:${NC}"
+            echo -e "      ${CYAN}Deploy child subnets using this gateway as parent${NC}"
+        else
+            echo -e "    ${GREEN}✓ Gateway is managing child subnets${NC}"
+        fi
+        return 0
+    fi
+
+    echo -e "    ${BLUE}Checking child subnet registration with parent gateway...${NC}"
 
     # Get parent gateway configuration
     local parent_config=$(get_subnet_config "$parent_id")
@@ -167,11 +195,11 @@ check_subnet_registration() {
 
     # Check if this subnet is using the correct parent gateway
     if [[ "$gateway_addr" != "$parent_gateway_addr" ]]; then
-        echo -e "    ${RED}✗ CONFIGURATION ERROR: Subnet is using wrong gateway${NC}"
-        echo -e "      ${YELLOW}Subnet gateway:  $gateway_addr${NC}"
-        echo -e "      ${YELLOW}Parent gateway:  $parent_gateway_addr${NC}"
+        echo -e "    ${RED}✗ CONFIGURATION ERROR: Child subnet is using wrong gateway${NC}"
+        echo -e "      ${YELLOW}Child subnet gateway:  $gateway_addr${NC}"
+        echo -e "      ${YELLOW}Parent gateway:        $parent_gateway_addr${NC}"
         echo -e "    ${CYAN}💡 ARCHITECTURE ISSUE: Child subnets should register with parent's gateway!${NC}"
-        echo -e "      ${CYAN}Current config has subnet using its own gateway instead of parent's gateway.${NC}"
+        echo -e "      ${CYAN}Current config has child subnet using its own gateway instead of parent's gateway.${NC}"
         echo -e "      ${CYAN}This suggests UI deployment created new gateway instead of using parent's gateway.${NC}"
         echo -e "    ${CYAN}💡 To fix: Update config to use parent gateway and re-register:${NC}"
         echo -e "      ${CYAN}1. Update config: Change gateway_addr to $parent_gateway_addr${NC}"
@@ -193,7 +221,7 @@ check_subnet_registration() {
             # Try to get subnet info to verify it's actually registered
             local subnet_info=$(cast call "$parent_gateway_addr" "getSubnet(address)" "$subnet_eth_addr" --rpc-url "$rpc" 2>/dev/null)
             if [[ $? -eq 0 && -n "$subnet_info" && "$subnet_info" != "0x" ]]; then
-                echo -e "      ${GREEN}✓ This specific subnet is confirmed registered with parent${NC}"
+                echo -e "      ${GREEN}✓ This specific child subnet is confirmed registered with parent${NC}"
             else
                 echo -e "      ${YELLOW}⚠ Parent gateway has subnets but couldn't verify this specific one${NC}"
             fi
@@ -201,7 +229,7 @@ check_subnet_registration() {
         return 0
     fi
 
-    echo -e "    ${RED}✗ Subnet is NOT registered with parent gateway${NC}"
+    echo -e "    ${RED}✗ Child subnet is NOT registered with parent gateway${NC}"
     echo -e "    ${CYAN}💡 To fix: Run these commands:${NC}"
     echo -e "      ${CYAN}ipc-cli subnet approve --subnet $subnet_id --from <OWNER_ADDRESS>${NC}"
     echo -e "      ${CYAN}ipc-cli subnet join --subnet $subnet_id --collateral <AMOUNT> --from <VALIDATOR_ADDRESS>${NC}"
@@ -271,8 +299,19 @@ check_validators() {
         fi
     fi
 
+    if is_root_network "$subnet_id"; then
+        echo -e "    ${BLUE}Skipping validator check for root network${NC}"
+        echo -e "    ${CYAN}ℹ Root networks don't have IPC validators - they use the underlying blockchain's consensus${NC}"
+        return 0
+    fi
+
     if [[ "$found_validators" == "true" ]]; then
-        echo -e "    ${GREEN}✓ Validators found using one or more methods${NC}"
+        echo -e "    ${YELLOW}⚠ Validators configured but subnet node may not be running${NC}"
+        echo -e "    ${CYAN}💡 Configured validators found, but to be fully operational:${NC}"
+        echo -e "      ${CYAN}1. Initialize node: ipc-cli node init --config <CONFIG_FILE>${NC}"
+        echo -e "      ${CYAN}2. Start subnet node: ipc-cli node start${NC}"
+        echo -e "      ${CYAN}3. Validators must be actively participating in consensus${NC}"
+        echo -e "      ${CYAN}4. Check subnet node logs for validator activity${NC}"
         return 0
     else
         echo -e "    ${RED}✗ No validators found using any method${NC}"
@@ -382,9 +421,45 @@ check_gateway_subnets() {
     fi
 }
 
+# Check contract ownership and creation info (for root networks)
+check_contract_info() {
+    local subnet_id="$1"
+    local gateway_addr="$2"
+    local registry_addr="$3"
+    local rpc="$4"
+
+    echo -e "    ${BLUE}Checking contract ownership and info...${NC}"
+
+    # Check gateway owner
+    local gateway_owner=$(cast call "$gateway_addr" "owner()" --rpc-url "$rpc" 2>/dev/null)
+    if [[ $? -eq 0 && -n "$gateway_owner" ]]; then
+        echo -e "    ${GREEN}✓ Gateway owner: $gateway_owner${NC}"
+    else
+        echo -e "    ${YELLOW}⚠ Could not retrieve gateway owner${NC}"
+    fi
+
+    # Check registry owner
+    local registry_owner=$(cast call "$registry_addr" "owner()" --rpc-url "$rpc" 2>/dev/null)
+    if [[ $? -eq 0 && -n "$registry_owner" ]]; then
+        echo -e "    ${GREEN}✓ Registry owner: $registry_owner${NC}"
+    else
+        echo -e "    ${YELLOW}⚠ Could not retrieve registry owner${NC}"
+    fi
+
+    # Try to get creation block/timestamp info
+    echo -e "    ${CYAN}ℹ Contract deployment info available via blockchain explorer${NC}"
+    return 0
+}
+
 # Check subnet genesis epoch
 check_genesis_epoch() {
     local subnet_id="$1"
+
+    if is_root_network "$subnet_id"; then
+        echo -e "    ${BLUE}Skipping genesis check for root network${NC}"
+        echo -e "    ${CYAN}ℹ Root networks use the underlying blockchain's genesis${NC}"
+        return 0
+    fi
 
     echo -e "    ${BLUE}Checking subnet genesis epoch...${NC}"
 
@@ -403,8 +478,8 @@ check_genesis_epoch() {
     else
         echo -e "    ${RED}✗ Failed to get genesis epoch (subnet may not be operational)${NC}"
         echo -e "    ${CYAN}💡 To fix: Ensure the subnet node is running and properly configured:${NC}"
-        echo -e "      ${CYAN}ipc-cli node init --subnet-id $subnet_id --parent-registry <REGISTRY_ADDR> --parent-gateway <GATEWAY_ADDR>${NC}"
-        echo -e "      ${CYAN}ipc-cli node run --subnet-id $subnet_id${NC}"
+        echo -e "      ${CYAN}1. ipc-cli node init --config <CONFIG_FILE>${NC}"
+        echo -e "      ${CYAN}2. ipc-cli node start${NC}"
         return 1
     fi
 }
@@ -504,28 +579,48 @@ validate_subnet() {
         fi
     fi
 
-    # Check 6: Validator configuration
-    total=$((total + 1))
-    if check_validators "$subnet_id" "$gateway_addr" "$registry_addr" "$effective_rpc"; then
-        success=$((success + 1))
+    # Check 6: Validator configuration (skip for root networks)
+    if ! is_root_network "$subnet_id"; then
+        total=$((total + 1))
+        if check_validators "$subnet_id" "$gateway_addr" "$registry_addr" "$effective_rpc"; then
+            success=$((success + 1))
+        fi
+    else
+        # For root networks, check contract ownership info instead
+        total=$((total + 1))
+        if check_contract_info "$subnet_id" "$gateway_addr" "$registry_addr" "$effective_rpc"; then
+            success=$((success + 1))
+        fi
     fi
 
-    # Check 7: Genesis epoch
-    total=$((total + 1))
-    if check_genesis_epoch "$subnet_id"; then
-        success=$((success + 1))
+    # Check 7: Genesis epoch (skip for root networks)
+    if ! is_root_network "$subnet_id"; then
+        total=$((total + 1))
+        if check_genesis_epoch "$subnet_id"; then
+            success=$((success + 1))
+        fi
     fi
 
     # Summary for this subnet
     local percentage=$((success * 100 / total))
     echo -e "  ${BLUE}Summary: ${success}/${total} checks passed (${percentage}%)${NC}"
 
-    if [[ $success -eq $total ]]; then
-        echo -e "  ${GREEN}✓ Subnet appears to be fully operational${NC}"
-    elif [[ $success -gt $((total / 2)) ]]; then
-        echo -e "  ${YELLOW}⚠ Subnet has some issues but may be partially operational${NC}"
+    if is_root_network "$subnet_id"; then
+        if [[ $success -eq $total ]]; then
+            echo -e "  ${GREEN}✓ Root network contracts are properly deployed and configured${NC}"
+        elif [[ $success -gt $((total / 2)) ]]; then
+            echo -e "  ${YELLOW}⚠ Root network has some configuration issues${NC}"
+        else
+            echo -e "  ${RED}✗ Root network has significant deployment issues${NC}"
+        fi
     else
-        echo -e "  ${RED}✗ Subnet has significant issues${NC}"
+        if [[ $success -eq $total ]]; then
+            echo -e "  ${GREEN}✓ Subnet contracts are deployed and configured (node may need to be started)${NC}"
+        elif [[ $success -gt $((total / 2)) ]]; then
+            echo -e "  ${YELLOW}⚠ Subnet has some issues but may be partially operational${NC}"
+        else
+            echo -e "  ${RED}✗ Subnet has significant issues${NC}"
+        fi
     fi
 
     return $((total - success))

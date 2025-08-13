@@ -264,6 +264,23 @@ export const apiService = {
     addNetworkHeaders()
     return retryRequest(() => api.get(`/api/gateways/${gatewayAddress}/pending-approvals`))
   },
+
+  // L1 Gateway Configuration Management
+  async getL1GatewayConfig() {
+    return retryRequest(() => api.get('/api/l1-gateways/config'))
+  },
+
+  async updateL1GatewaySelection(gatewayId: string) {
+    return retryRequest(() => api.put('/api/l1-gateways/selection', { gateway_id: gatewayId }))
+  },
+
+  async addL1Gateway(gateway: any) {
+    return retryRequest(() => api.post('/api/l1-gateways', gateway))
+  },
+
+  async removeL1Gateway(gatewayId: string) {
+    return retryRequest(() => api.delete(`/api/l1-gateways/${gatewayId}`))
+  },
 }
 
 export default api

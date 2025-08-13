@@ -5,12 +5,14 @@ import AddressSelector from '../../components/common/AddressSelector.vue'
 import FormInput from '../../components/common/FormInput.vue'
 import FormSelect from '../../components/common/FormSelect.vue'
 import { apiService } from '../../services/api'
+import { useL1GatewaysStore } from '../../stores/l1-gateways'
 import { useTemplatesStore } from '../../stores/templates'
 import { useWizardStore } from '../../stores/wizard'
 
 const router = useRouter()
 const wizardStore = useWizardStore()
 const templatesStore = useTemplatesStore()
+const l1GatewaysStore = useL1GatewaysStore()
 
 // Form state
 const formData = ref({
@@ -27,7 +29,8 @@ const formData = ref({
   gatewayMode: wizardStore.config.gatewayMode || 'deploy',
   customGatewayAddress: wizardStore.config.customGatewayAddress || '',
   customRegistryAddress: wizardStore.config.customRegistryAddress || '',
-  selectedDeployedGateway: wizardStore.config.selectedDeployedGateway || ''
+  selectedDeployedGateway: wizardStore.config.selectedDeployedGateway || '',
+  selectedL1Gateway: wizardStore.config.selectedL1Gateway || ''
 })
 
 // Gateway type definition
@@ -79,9 +82,14 @@ const gatewayModeOptions = [
     description: 'Deploy your own gateway contracts (full control, no approval needed)'
   },
   {
-    value: 'deployed',
-    label: 'Use My Deployed Gateway',
-    description: 'Select from gateways you have previously deployed'
+    value: 'l1-gateway',
+    label: 'L1 Gateway',
+    description: 'Deploy to selected L1 gateway from the top menu'
+  },
+  {
+    value: 'subnet-gateway',
+    label: 'Subnet Gateway',
+    description: 'Deploy to one of your existing subnet gateways'
   },
   {
     value: 'custom',
@@ -122,9 +130,14 @@ const validateForm = () => {
   if (formData.value.gatewayMode === 'custom') {
     validateField('customGatewayAddress')
     validateField('customRegistryAddress')
-  } else if (formData.value.gatewayMode === 'deployed') {
+  } else if (formData.value.gatewayMode === 'subnet-gateway') {
     if (!formData.value.selectedDeployedGateway) {
       fieldErrors.value.selectedDeployedGateway = 'Please select a deployed gateway'
+      return false
+    }
+  } else if (formData.value.gatewayMode === 'l1-gateway') {
+    if (!formData.value.selectedL1Gateway && !l1GatewaysStore.selectedGateway) {
+      fieldErrors.value.selectedL1Gateway = 'Please select an L1 gateway from the top menu'
       return false
     }
   }
@@ -304,16 +317,23 @@ watch(formData, () => {
   saveConfig()
 }, { deep: true })
 
+// Watch L1 gateway selection changes from the top menu
+watch(() => l1GatewaysStore.selectedGatewayId, (newGatewayId) => {
+  if (formData.value.gatewayMode === 'l1-gateway') {
+    formData.value.selectedL1Gateway = newGatewayId
+  }
+}, { immediate: true })
+
 // Watch gateway mode changes to load deployed gateways when needed
 watch(() => formData.value.gatewayMode, (newMode) => {
-  if (newMode === 'deployed') {
+  if (newMode === 'subnet-gateway') {
     loadDeployedGateways()
   }
 })
 
 // Load deployed gateways on component mount
 onMounted(() => {
-  if (formData.value.gatewayMode === 'deployed') {
+  if (formData.value.gatewayMode === 'subnet-gateway') {
     loadDeployedGateways()
   }
 })
@@ -579,7 +599,8 @@ const selectGateway = (gatewayId: string) => {
                 <p class="font-medium mb-1">Choose Your Gateway Strategy</p>
                 <p>
                   <strong>Deploy New:</strong> Creates your own gateway contracts where you have full control and can approve subnets instantly.<br>
-                  <strong>Use My Deployed Gateway:</strong> Uses gateways you have previously deployed and own.<br>
+                  <strong>L1 Gateway:</strong> Uses the L1 gateway selected in the top menu bar for deployment to the root network.<br>
+                  <strong>Subnet Gateway:</strong> Deploy under one of your existing subnet gateways.<br>
                   <strong>Custom:</strong> Uses previously deployed gateway contracts that you own.
                 </p>
               </div>
@@ -595,8 +616,22 @@ const selectGateway = (gatewayId: string) => {
             help-text="How to handle gateway contracts for subnet management"
           />
 
-          <!-- Deployed Gateway Selection (conditional) -->
-          <div v-if="formData.gatewayMode === 'deployed'" class="space-y-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <!-- L1 Gateway Selection (conditional) -->
+          <div v-if="formData.gatewayMode === 'l1-gateway'" class="space-y-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <h4 class="text-sm font-semibold text-gray-700">Using Selected L1 Gateway</h4>
+            <div class="flex items-center space-x-3 p-3 bg-white border border-blue-200 rounded-lg">
+              <svg class="w-5 h-5 text-blue-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14-7l2 2m0 0l2 2m-2-2v6m-2-2H5m14-7v2a2 2 0 01-2 2H5a2 2 0 01-2-2V4"/>
+              </svg>
+              <div class="flex-1">
+                <p class="text-sm font-medium text-gray-900">Gateway selection managed in top menu</p>
+                <p class="text-xs text-gray-600 mt-1">Use the gateway selector in the top menu bar to choose your L1 gateway</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Subnet Gateway Selection (conditional) -->
+          <div v-if="formData.gatewayMode === 'subnet-gateway'" class="space-y-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <h4 class="text-sm font-semibold text-gray-700">Select Your Deployed Gateway</h4>
 
             <div v-if="deployedGateways.length === 0" class="text-center py-8 text-gray-500">

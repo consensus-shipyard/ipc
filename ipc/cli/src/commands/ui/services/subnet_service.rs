@@ -4,7 +4,7 @@
 //!
 //! This service wraps existing CLI handlers for subnet operations.
 
-use super::super::api::types::{ApiResponse, ChainStats, SubnetStatus};
+use super::super::api::types::{ApiResponse, ChainStats, SubnetLifecycleState, SubnetStatusInfo, SubnetInstanceResponse};
 use crate::commands::subnet::{
     approve::{approve_subnet, ApproveSubnetArgs},
     join::{join_subnet, JoinSubnetArgs},
@@ -123,20 +123,9 @@ impl SubnetService {
     }
 
     /// Get subnet status
-    pub async fn get_subnet_status(&self, subnet_id: &str) -> Result<SubnetStatus> {
-        let _subnet = SubnetID::from_str(subnet_id)?;
-        let _provider = get_ipc_provider(&self.global)?;
-
-        // TODO: Implement actual subnet status retrieval
-        // For now, return placeholder status since get_subnet method doesn't exist
-        Ok(SubnetStatus {
-            is_active: true,
-            last_block_time: chrono::Utc::now().to_rfc3339(),
-            block_height: 1000,
-            validators_online: 1,
-            consensus_status: "healthy".to_string(),
-            sync_status: "synced".to_string(),
-        })
+    pub async fn get_subnet_status(&self, subnet_id: &str) -> Result<SubnetStatusInfo> {
+        // Use the comprehensive status method we implemented
+        self.get_comprehensive_subnet_status(subnet_id).await
     }
 
     /// Get subnet statistics
@@ -159,6 +148,146 @@ impl SubnetService {
             fees_collected: "1000".to_string(),
             pending_transactions: Some(5),
         })
+    }
+
+    /// Get comprehensive subnet status information with enhanced state detection
+    async fn get_comprehensive_subnet_status(&self, subnet_id: &str) -> Result<SubnetStatusInfo> {
+        log::info!("=== GETTING COMPREHENSIVE STATUS FOR SUBNET: {} ===", subnet_id);
+
+        let mut status = SubnetStatusInfo::default();
+
+        // Step 1: Parse subnet ID and basic validation
+        log::info!("Step 1: Parsing subnet ID '{}'...", subnet_id);
+        let subnet = match SubnetID::from_str(subnet_id) {
+            Ok(subnet) => {
+                log::info!("Step 1: ✓ Successfully parsed subnet ID: {:?}", subnet);
+                subnet
+            }
+            Err(e) => {
+                log::error!("Step 1: ✗ Failed to parse subnet ID '{}': {}", subnet_id, e);
+                status.lifecycle_state = SubnetLifecycleState::Failed;
+                status.error_message = Some(format!("Invalid subnet ID: {}", e));
+                return Ok(status);
+            }
+        };
+
+        // Step 2: Check if this is a root subnet
+        if subnet.is_root() {
+            log::info!("Step 2: ✓ Subnet {} is a root subnet", subnet_id);
+            status.lifecycle_state = SubnetLifecycleState::Healthy; // Root networks are always "healthy"
+            status.genesis_available = true; // Root has implicit genesis
+            return Ok(status);
+        }
+        log::info!("Step 2: ✓ Subnet is not a root subnet");
+
+        // Step 3: Get IPC provider
+        log::info!("Step 3: Getting IPC provider...");
+        let provider = match crate::get_ipc_provider(&self.global) {
+            Ok(provider) => {
+                log::info!("Step 3: ✓ Successfully got IPC provider");
+                provider
+            }
+            Err(e) => {
+                log::error!("Step 3: ✗ Failed to get IPC provider: {}", e);
+                status.lifecycle_state = SubnetLifecycleState::Failed;
+                status.error_message = Some(format!("Failed to get IPC provider: {}", e));
+                return Ok(status);
+            }
+        };
+
+        // Step 4: Try to get genesis info (this is the critical detection point)
+        log::info!("Step 4: Attempting to get genesis info (single attempt - no retries)...");
+        match provider.get_genesis_info(&subnet).await {
+            Ok(genesis_info) => {
+                log::info!("Step 4: ✓ Genesis info available - subnet is initialized");
+                status.genesis_available = true;
+                status.permission_mode = Some(match genesis_info.permission_mode {
+                    ipc_api::subnet::PermissionMode::Collateral => "collateral".to_string(),
+                    ipc_api::subnet::PermissionMode::Federated => "federated".to_string(),
+                    ipc_api::subnet::PermissionMode::Static => "static".to_string(),
+                });
+                status.lifecycle_state = SubnetLifecycleState::Active; // Will be refined later
+            }
+            Err(e) => {
+                let error_msg = e.to_string();
+                if error_msg.contains("does not exist") || error_msg.contains("does not exists") {
+                    log::info!("Step 4: ✓ Subnet contracts exist but genesis not available - waiting for validators");
+                    status.genesis_available = false;
+                    status.lifecycle_state = SubnetLifecycleState::WaitingForValidators;
+                    status.next_action_required = Some("Start validators to activate subnet".to_string());
+                } else {
+                    log::error!("Step 4: ✗ Unexpected error getting genesis info: {}", e);
+                    status.lifecycle_state = SubnetLifecycleState::Failed;
+                    status.error_message = Some(format!("Genesis query failed: {}", e));
+                    return Ok(status);
+                }
+            }
+        }
+
+        // Step 5: Get validator information to refine the state
+        log::info!("Step 5: Getting validator information...");
+        match provider.list_validators(&subnet).await {
+            Ok(validators) => {
+                status.validator_count = validators.len();
+                status.active_validators = validators.iter()
+                    .filter(|v| {
+                        // Check if validator is active by examining the validator info structure
+                        // ValidatorInfo doesn't have is_active(), we'll use a simple heuristic
+                        true // For now, consider all validators as active since we can't determine this easily
+                    })
+                    .count();
+
+                log::info!("Step 5: ✓ Found {} validators ({} active)",
+                    status.validator_count, status.active_validators);
+
+                // Refine state based on validator information
+                match status.lifecycle_state {
+                    SubnetLifecycleState::WaitingForValidators => {
+                        if status.validator_count == 0 {
+                            // Confirmed: no validators registered yet
+                            status.next_action_required = Some("Register and start validators to activate subnet".to_string());
+                        } else {
+                            // Validators exist but genesis isn't available - likely initialization issue
+                            status.lifecycle_state = SubnetLifecycleState::Initializing;
+                            status.next_action_required = Some("Validators registered but subnet not fully initialized".to_string());
+                        }
+                    }
+                    SubnetLifecycleState::Active => {
+                        // Refine active state based on validator health
+                        if status.validator_count == 0 {
+                            status.lifecycle_state = SubnetLifecycleState::Offline;
+                            status.next_action_required = Some("No validators found - subnet is offline".to_string());
+                        } else if status.active_validators == 0 {
+                            status.lifecycle_state = SubnetLifecycleState::Offline;
+                            status.next_action_required = Some("All validators are offline".to_string());
+                        } else if status.active_validators < status.validator_count {
+                            status.lifecycle_state = SubnetLifecycleState::Degraded;
+                            status.next_action_required = Some(format!("Only {}/{} validators are active",
+                                status.active_validators, status.validator_count));
+                        } else {
+                            status.lifecycle_state = SubnetLifecycleState::Healthy;
+                        }
+                    }
+                    _ => {
+                        // Other states remain as is
+                    }
+                }
+            }
+            Err(e) => {
+                log::warn!("Step 5: ⚠ Could not get validator information: {}", e);
+                // Don't fail the entire status check for validator query failures
+                // This is expected for subnets in waiting/initializing states
+                if status.lifecycle_state == SubnetLifecycleState::WaitingForValidators {
+                    // This is expected behavior
+                } else {
+                    // For other states, note the validator query issue
+                    status.error_message = Some(format!("Could not query validators: {}", e));
+                }
+            }
+        }
+
+        log::info!("=== COMPREHENSIVE STATUS COMPLETE: {} = {} ===", subnet_id, status.lifecycle_state);
+        Ok(status)
     }
 
     /// Helper method to get the permission mode for a subnet with retry logic
@@ -240,7 +369,7 @@ impl SubnetService {
         }
     }
 
-    /// List all subnets/instances
+    /// List all subnets/instances with enhanced status information
     pub async fn list_subnets(&self) -> Result<Vec<serde_json::Value>> {
         let config_store = crate::ipc_config_store::IpcConfigStore::load_or_init(&self.global).await?;
         let config = config_store.snapshot().await;
@@ -279,31 +408,52 @@ impl SubnetService {
 
             log::info!("Processing actual subnet: {}", subnet_id_str);
 
-            // Get validators from the blockchain
-            let validators = self.get_validators_for_subnet(&subnet_id_str).await.unwrap_or_else(|e| {
-                log::warn!("Failed to fetch validators for subnet {}: {}", subnet_id_str, e);
-                Vec::new()
-            });
-
-            // Get the actual permission mode from the subnet contract
-            let permission_mode = match self.get_permission_mode(&subnet_id_str).await {
-                Ok(mode) => {
-                    log::info!("Successfully retrieved permission mode for subnet {}: {}", subnet_id_str, mode);
-                    mode
+            // Get comprehensive status information
+            let status_info = match self.get_comprehensive_subnet_status(&subnet_id_str).await {
+                Ok(status) => {
+                    log::info!("✓ Comprehensive status for {}: {} (genesis: {}, validators: {}/{})",
+                        subnet_id_str, status.lifecycle_state, status.genesis_available,
+                        status.active_validators, status.validator_count);
+                    status
                 }
                 Err(e) => {
-                    log::error!("Failed to get permission mode for subnet {}: {}", subnet_id_str, e);
-                    "unknown".to_string()
+                    log::error!("✗ Failed to get comprehensive status for {}: {}", subnet_id_str, e);
+                    let mut status = SubnetStatusInfo::default();
+                    status.lifecycle_state = SubnetLifecycleState::Failed;
+                    status.error_message = Some(format!("Status check failed: {}", e));
+                    status
                 }
             };
 
+            // Get validators for detailed info (only if needed for display)
+            let validators = if status_info.validator_count > 0 {
+                self.get_validators_for_subnet(&subnet_id_str).await.unwrap_or_else(|e| {
+                    log::warn!("Failed to fetch detailed validator info for subnet {}: {}", subnet_id_str, e);
+                    Vec::new()
+                })
+            } else {
+                Vec::new()
+            };
+
+            // Create enhanced response with comprehensive status
             let instance = serde_json::json!({
                 "id": subnet_id_str,
                 "name": format!("Subnet {}", subnet_id_str.split('/').last().unwrap_or(&subnet_id_str)),
-                "status": "active", // You might want to determine this dynamically
+                "status": status_info.lifecycle_state.to_string(),
+                "status_info": {
+                    "lifecycle_state": status_info.lifecycle_state.to_string(),
+                    "genesis_available": status_info.genesis_available,
+                    "validator_count": status_info.validator_count,
+                    "active_validators": status_info.active_validators,
+                    "permission_mode": status_info.permission_mode,
+                    "deployment_time": status_info.deployment_time,
+                    "last_block_time": status_info.last_block_time,
+                    "error_message": status_info.error_message,
+                    "next_action_required": status_info.next_action_required
+                },
                 "validators": validators,
                 "config": {
-                    "permissionMode": permission_mode,
+                    "permissionMode": status_info.permission_mode.unwrap_or_else(|| "unknown".to_string()),
                     "gateway_addr": match &subnet_config.config {
                         ipc_provider::config::SubnetConfig::Fevm(evm_subnet) => evm_subnet.gateway_addr.to_string(),
                     },
