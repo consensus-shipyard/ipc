@@ -75,7 +75,7 @@ impl GatewayService {
         let config_store = IpcConfigStore::load_or_init(&self.global).await?;
         let config = config_store.snapshot().await;
 
-        let mut gateways = Vec::new();
+        let mut gateways_map: std::collections::HashMap<String, GatewayInfo> = std::collections::HashMap::new();
         let target_network = headers.map(|h| Self::get_parent_network_from_headers(h));
 
         log::info!("Discovering gateways, target network: {:?}", target_network);
@@ -113,19 +113,43 @@ impl GatewayService {
             // Try to get gateway information from the subnet configuration
             match &subnet_config.config {
                 ipc_provider::config::SubnetConfig::Fevm(evm_subnet) => {
-                    let gateway_info = GatewayInfo {
-                        id: format!("gateway-{}", evm_subnet.gateway_addr),
-                        address: evm_subnet.gateway_addr.to_string(),
-                        registry_address: evm_subnet.registry_addr.to_string(),
-                        deployer_address: "unknown".to_string(), // TODO: Track deployer
-                        parent_network: subnet_id_str.to_string(),
-                        name: Some(format!("Gateway for {}", subnet_id_str)),
-                        subnet_count: 1, // Each gateway typically serves one subnet
-                        is_active: true, // Assume active if in config
-                        deployed_at: chrono::Utc::now(), // TODO: Track actual deployment time
-                    };
-                    log::info!("Found gateway for subnet: {} (parent: {})", subnet_id_str, gateway_info.parent_network);
-                    gateways.push(gateway_info);
+                    let gateway_addr_str = evm_subnet.gateway_addr.to_string();
+                    let registry_addr_str = evm_subnet.registry_addr.to_string();
+
+                    // Use gateway address as the key for deduplication
+                    let gateway_key = gateway_addr_str.clone();
+
+                    if let Some(existing_gateway) = gateways_map.get_mut(&gateway_key) {
+                        // Gateway already exists, increment subnet count
+                        existing_gateway.subnet_count += 1;
+                        log::info!("Found additional subnet {} for existing gateway {}", subnet_id_str, gateway_addr_str);
+                    } else {
+                        // New gateway, create entry
+                        let parent_network = if let Ok(subnet_id) = SubnetID::from_str(&subnet_id_str.to_string()) {
+                            if subnet_id.is_root() {
+                                subnet_id_str.to_string()
+                            } else {
+                                subnet_id.parent().map(|p| p.to_string()).unwrap_or_else(|| subnet_id_str.to_string())
+                            }
+                        } else {
+                            subnet_id_str.to_string()
+                        };
+
+                        let gateway_info = GatewayInfo {
+                            id: format!("gateway-{}", &gateway_addr_str[gateway_addr_str.len().saturating_sub(12)..]),
+                            address: gateway_addr_str.clone(),
+                            registry_address: registry_addr_str,
+                            deployer_address: "unknown".to_string(), // TODO: Track deployer
+                            parent_network,
+                            name: Some(format!("Gateway {}", &gateway_addr_str[gateway_addr_str.len().saturating_sub(8)..])),
+                            subnet_count: 1,
+                            is_active: true, // Assume active if in config
+                            deployed_at: chrono::Utc::now(), // TODO: Track actual deployment time
+                        };
+
+                        log::info!("Found new gateway: {} with ID: {} serving subnet: {}", gateway_addr_str, gateway_info.id, subnet_id_str);
+                        gateways_map.insert(gateway_key, gateway_info);
+                    }
                 }
                 _ => {
                     // Skip non-EVM subnets for now
@@ -134,7 +158,10 @@ impl GatewayService {
             }
         }
 
-        log::info!("Discovered {} gateways for target network {:?}", gateways.len(), target_network);
+        // Convert HashMap to Vec
+        let gateways: Vec<GatewayInfo> = gateways_map.into_values().collect();
+        log::info!("Discovered {} unique gateways for target network {:?}", gateways.len(), target_network);
+
         Ok(gateways)
     }
 

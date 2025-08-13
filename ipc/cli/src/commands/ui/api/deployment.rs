@@ -366,8 +366,13 @@ async fn run_async_deployment(
     broadcast_progress(state, deployment_id, "genesis", 70, "in_progress",
         Some("Creating genesis block...".to_string())).await;
 
-    // Now continue with the subnet creation part (without re-deploying contracts)
-    let result = service.deploy_subnet(config.clone(), headers).await?;
+    // Now continue with the subnet creation part, passing the selected gateway addresses
+    let result = service.deploy_subnet_with_gateway(
+        config.clone(),
+        headers,
+        Some(deployed_contracts.gateway),
+        Some(deployed_contracts.registry)
+    ).await?;
 
     Ok(result)
 }

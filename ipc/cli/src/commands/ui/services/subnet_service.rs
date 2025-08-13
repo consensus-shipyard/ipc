@@ -161,7 +161,7 @@ impl SubnetService {
         })
     }
 
-    /// Helper method to get the permission mode for a subnet
+    /// Helper method to get the permission mode for a subnet with retry logic
     async fn get_permission_mode(&self, subnet_id: &str) -> Result<String> {
         log::info!("=== GETTING PERMISSION MODE FOR SUBNET: {} ===", subnet_id);
 
@@ -194,26 +194,48 @@ impl SubnetService {
             return Err(anyhow::anyhow!("Subnet {} has no parent but is not root", subnet_id));
         }
 
-        // Get genesis info which contains the permission mode
-        log::info!("Step 5: Getting genesis info from provider...");
-        match provider.get_genesis_info(&subnet).await {
-            Ok(genesis_info) => {
-                log::info!("Step 5: ✓ Successfully got genesis info");
-                log::info!("Genesis info: permission_mode={:?}", genesis_info.permission_mode);
+        // Get genesis info with retry logic for newly deployed subnets
+        log::info!("Step 5: Getting genesis info from provider with retry logic...");
+        let max_retries = 5;
+        let mut retry_count = 0;
+        let mut delay_ms = 1000; // Start with 1 second
 
-                let permission_mode = match genesis_info.permission_mode {
-                    ipc_api::subnet::PermissionMode::Collateral => "collateral",
-                    ipc_api::subnet::PermissionMode::Federated => "federated",
-                    ipc_api::subnet::PermissionMode::Static => "static",
-                };
-                log::info!("Step 6: ✓ Mapped permission mode to string: '{}'", permission_mode);
-                log::info!("=== PERMISSION MODE RETRIEVAL SUCCESSFUL: {} ===", permission_mode);
-                Ok(permission_mode.to_string())
-            }
-            Err(e) => {
-                log::error!("Step 5: ✗ Failed to get genesis info for subnet {}: {}", subnet_id, e);
-                log::error!("=== PERMISSION MODE RETRIEVAL FAILED ===");
-                Err(anyhow::anyhow!("Failed to get genesis info for subnet {}: {}", subnet_id, e))
+        loop {
+            match provider.get_genesis_info(&subnet).await {
+                Ok(genesis_info) => {
+                    log::info!("Step 5: ✓ Successfully got genesis info (attempt {})", retry_count + 1);
+                    log::info!("Genesis info: permission_mode={:?}", genesis_info.permission_mode);
+
+                    let permission_mode = match genesis_info.permission_mode {
+                        ipc_api::subnet::PermissionMode::Collateral => "collateral",
+                        ipc_api::subnet::PermissionMode::Federated => "federated",
+                        ipc_api::subnet::PermissionMode::Static => "static",
+                    };
+                    log::info!("Step 6: ✓ Mapped permission mode to string: '{}'", permission_mode);
+                    log::info!("=== PERMISSION MODE RETRIEVAL SUCCESSFUL: {} ===", permission_mode);
+                    return Ok(permission_mode.to_string());
+                }
+                Err(e) => {
+                    retry_count += 1;
+                    if retry_count >= max_retries {
+                        log::error!("Step 5: ✗ Failed to get genesis info for subnet {} after {} attempts: {}", subnet_id, max_retries, e);
+                        log::error!("=== PERMISSION MODE RETRIEVAL FAILED ===");
+                        return Err(anyhow::anyhow!("Failed to get genesis info for subnet {} after {} retries: {}", subnet_id, max_retries, e));
+                    }
+
+                    // Check if this is a "subnet does not exist" error - if so, retry
+                    let error_msg = e.to_string();
+                    if error_msg.contains("does not exists") || error_msg.contains("does not exist") {
+                        log::warn!("Step 5: Subnet not found (attempt {}), retrying in {}ms... Error: {}", retry_count, delay_ms, e);
+                        tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
+                        delay_ms = std::cmp::min(delay_ms * 2, 10000); // Exponential backoff, max 10 seconds
+                    } else {
+                        // For other errors, fail immediately
+                        log::error!("Step 5: ✗ Non-retryable error getting genesis info for subnet {}: {}", subnet_id, e);
+                        log::error!("=== PERMISSION MODE RETRIEVAL FAILED ===");
+                        return Err(anyhow::anyhow!("Failed to get genesis info for subnet {}: {}", subnet_id, e));
+                    }
+                }
             }
         }
     }
@@ -438,61 +460,78 @@ impl SubnetService {
             }
         }
 
-        log::info!("Step 5: Attempting to fetch validators for subnet: {}", subnet_id);
+        log::info!("Step 5: Attempting to fetch validators for subnet with retry logic: {}", subnet_id);
 
-                match provider.list_validators(&subnet).await {
-            Ok(validators) => {
-                log::info!("Step 5: ✓ Successfully fetched {} validators for subnet {}", validators.len(), subnet_id);
+        // Retry logic for validator fetching (newly deployed subnets may not be immediately queryable)
+        let max_retries = 3;
+        let mut retry_count = 0;
+        let mut delay_ms = 2000; // Start with 2 seconds for validators
 
-                let mut validator_list = Vec::new();
-                for (i, (address, validator_info)) in validators.iter().enumerate() {
-                    log::info!("Step 6.{}: Processing validator {}: {}", i+1, i+1, address);
+        loop {
+            match provider.list_validators(&subnet).await {
+                Ok(validators) => {
+                    log::info!("Step 5: ✓ Successfully fetched {} validators for subnet {} (attempt {})", validators.len(), subnet_id, retry_count + 1);
 
-                    // Convert TokenAmount to string for stake/power
-                    let stake = validator_info.staking.current_power().to_string();
-                    let power = validator_info.staking.next_power().atto().to_u64().unwrap_or(0);
+                    let mut validator_list = Vec::new();
+                    for (i, (address, validator_info)) in validators.iter().enumerate() {
+                        log::info!("Step 6.{}: Processing validator {}: {}", i+1, i+1, address);
 
-                    // Determine status based on validator state
-                    let status = if validator_info.is_active {
-                        "active"
-                    } else if validator_info.is_waiting {
-                        "waiting"
-                    } else {
-                        "inactive"
-                    };
+                        // Convert TokenAmount to string for stake/power
+                        let stake = validator_info.staking.current_power().to_string();
+                        let power = validator_info.staking.next_power().atto().to_u64().unwrap_or(0);
 
-                    let validator_json = serde_json::json!({
-                        "address": address.to_string(),
-                        "stake": stake,
-                        "power": power,
-                        "status": status,
-                        "is_active": validator_info.is_active,
-                        "is_waiting": validator_info.is_waiting,
-                        "current_power": validator_info.staking.current_power().to_string(),
-                        "next_power": validator_info.staking.next_power().to_string()
-                    });
+                        // Determine status based on validator state
+                        let status = if validator_info.is_active {
+                            "active"
+                        } else if validator_info.is_waiting {
+                            "waiting"
+                        } else {
+                            "inactive"
+                        };
 
-                    log::info!("Step 6.{}: ✓ Validator {} - status: {}, stake: {}, power: {}",
-                        i+1, address, status, stake, power);
-                    validator_list.push(validator_json);
+                        let validator_json = serde_json::json!({
+                            "address": address.to_string(),
+                            "stake": stake,
+                            "power": power,
+                            "status": status,
+                            "is_active": validator_info.is_active,
+                            "is_waiting": validator_info.is_waiting,
+                            "current_power": validator_info.staking.current_power().to_string(),
+                            "next_power": validator_info.staking.next_power().to_string()
+                        });
+
+                        log::info!("Step 6.{}: ✓ Validator {} - status: {}, stake: {}, power: {}",
+                            i+1, address, status, stake, power);
+                        validator_list.push(validator_json);
+                    }
+
+                    log::info!("=== VALIDATOR FETCHING SUCCESSFUL: {} validators ===", validator_list.len());
+                    return Ok(validator_list);
                 }
+                Err(e) => {
+                    retry_count += 1;
+                    let error_msg = e.to_string();
 
-                log::info!("=== VALIDATOR FETCHING SUCCESSFUL: {} validators ===", validator_list.len());
-                Ok(validator_list)
-            }
-            Err(e) => {
-                // Enhanced error logging to help diagnose the issue
-                log::error!("Step 5: ✗ Failed to fetch validators for subnet {}: {}", subnet_id, e);
-                log::error!("Error details: {:?}", e);
+                    // Enhanced error logging to help diagnose the issue
+                    log::error!("Step 5: ✗ Failed to fetch validators for subnet {} (attempt {}): {}", subnet_id, retry_count, e);
+                    log::error!("Error details: {:?}", e);
 
-                if let Some(parent_subnet) = &parent {
-                    log::error!("This error occurred while trying to query parent network: {}", parent_subnet);
-                    log::error!("Make sure the parent network ({}) is properly configured and accessible", parent_subnet);
+                    if let Some(parent_subnet) = &parent {
+                        log::error!("This error occurred while trying to query parent network: {}", parent_subnet);
+                    }
+
+                    // Check if this might be a timing issue with newly deployed subnets
+                    if retry_count < max_retries && (error_msg.contains("does not exists") || error_msg.contains("does not exist") || error_msg.contains("not found")) {
+                        log::warn!("Step 5: Subnet-related error (attempt {}), retrying in {}ms... Error: {}", retry_count, delay_ms, e);
+                        tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
+                        delay_ms = std::cmp::min(delay_ms * 2, 8000); // Exponential backoff, max 8 seconds
+                        continue;
+                    }
+
+                    log::error!("=== VALIDATOR FETCHING FAILED ===");
+                    // Always return empty list - no mock data
+                    return Ok(vec![]);
                 }
-
-                log::error!("=== VALIDATOR FETCHING FAILED ===");
-                // Always return empty list - no mock data
-                Ok(vec![])
             }
         }
     }

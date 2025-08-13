@@ -170,35 +170,18 @@ const loadDeployedGateways = async () => {
       const uniqueGateways = deduplicateGateways(discoveredGateways)
       console.log(`[Gateway Deduplication] After frontend deduplication: ${uniqueGateways.length} unique gateways`)
 
-      // Filter out root networks - they are not deployable gateways
-      const deployableGateways = uniqueGateways.filter(gateway => {
-        // Root networks have simple paths like "/r31337", while subnets have longer paths
-        // We want to exclude root networks as they represent the L1 network itself, not a gateway contract
-        const networkParts = gateway.parent_network.split('/').filter(part => part !== '')
-        const isRootNetwork = networkParts.length === 1 && networkParts[0].startsWith('r')
-
-        console.log(`[Gateway Filtering] Gateway ${gateway.name || gateway.id}:`, {
-          parent_network: gateway.parent_network,
-          networkParts,
-          isRootNetwork,
-          shouldInclude: !isRootNetwork
-        })
-
-        // Include only gateways that are not root networks
-        return !isRootNetwork
-      })
-
-      console.log(`[Gateway Filtering] Filtered out ${uniqueGateways.length - deployableGateways.length} root networks`)
-
-      // Sort by deployment date (newest first)
-      deployedGateways.value = deployableGateways.sort((a, b) =>
+      // The backend already handles filtering and deduplication properly
+      // No need for additional filtering here since all returned gateways are valid deployable gateways
+      deployedGateways.value = uniqueGateways.sort((a, b) =>
         new Date(b.deployed_at).getTime() - new Date(a.deployed_at).getTime()
       )
 
       console.log('[Gateway Discovery] Final gateway list:', deployedGateways.value.map(g => ({
         id: g.id,
         name: g.name,
-        address: g.address
+        address: g.address,
+        parent_network: g.parent_network,
+        subnet_count: g.subnet_count
       })))
 
       // Debug: Check for duplicate IDs
@@ -371,6 +354,8 @@ onMounted(() => {
 const selectGateway = (gatewayId: string) => {
   console.log('[Gateway Selection] Selecting gateway:', gatewayId)
   console.log('[Gateway Selection] Current selected:', formData.value.selectedDeployedGateway)
+  console.log('[Gateway Selection] Available gateway IDs:', deployedGateways.value.map(g => g.id))
+  console.log('[Gateway Selection] Gateway clicked details:', deployedGateways.value.find(g => g.id === gatewayId))
   formData.value.selectedDeployedGateway = gatewayId
   console.log('[Gateway Selection] New selected:', formData.value.selectedDeployedGateway)
 }
@@ -642,12 +627,17 @@ const selectGateway = (gatewayId: string) => {
                   <div class="flex-1">
                     <div class="flex items-center justify-between">
                       <h5 class="font-medium text-gray-900">{{ gateway.name }}</h5>
-                      <span class="text-xs px-2 py-1 rounded-full"
-                            :class="gateway.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'">
-                        {{ gateway.is_active ? 'Active' : 'Inactive' }}
-                      </span>
+                      <div class="flex items-center space-x-2">
+                        <span class="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                          {{ gateway.subnet_count }} subnet{{ gateway.subnet_count !== 1 ? 's' : '' }}
+                        </span>
+                        <span class="text-xs px-2 py-1 rounded-full"
+                              :class="gateway.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'">
+                          {{ gateway.is_active ? 'Active' : 'Inactive' }}
+                        </span>
+                      </div>
                     </div>
-                    <p class="text-sm text-gray-600 mt-1">{{ gateway.description || `Deployed on ${gateway.parent_network}` }}</p>
+                    <p class="text-sm text-gray-600 mt-1">Gateway contract serving {{ gateway.subnet_count }} subnet{{ gateway.subnet_count !== 1 ? 's' : '' }}</p>
                     <div class="flex text-xs text-gray-500 mt-2 space-x-4">
                       <span>Gateway: {{ gateway.address.slice(0, 8) }}...{{ gateway.address.slice(-6) }}</span>
                       <span>Network: {{ gateway.parent_network }}</span>
