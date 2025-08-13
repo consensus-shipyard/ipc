@@ -24,7 +24,6 @@ struct StateCommitmentBreakDown {
     bytes32 activityCommitment;
 }
 
-
 library CometbftLightClient {
     using TendermintHelper for SignedHeader.Data;
     using TendermintHelper for Vote.Data;
