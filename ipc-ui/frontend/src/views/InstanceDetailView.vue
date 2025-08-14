@@ -610,7 +610,7 @@ const showNodeConfig = async (validatorAddress: string) => {
   showNodeConfigModal.value = true
 
   try {
-    const subnetId = encodeURIComponent(instance.value.id)
+    const subnetId = encodeURIComponent(instance.value.data?.id || instance.value.id || '')
 
     // Fetch both node config and commands in parallel
     const [configResponse, commandsResponse] = await Promise.all([
