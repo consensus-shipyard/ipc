@@ -19,6 +19,7 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+use ipc_provider::manager::cometbft::CometbftClient;
 
 const DEFAULT_POLLING_INTERVAL: u64 = 15;
 
@@ -80,7 +81,7 @@ impl CommandLineHandler for BottomUpRelayer {
             parent.clone(),
             child.clone(),
             Arc::new(RwLock::new(keystore)),
-            arguments.max_parallelism,
+            CometbftClient::new_from_url("http://127.0.0.1:26657"),
         )
         .await?;
 

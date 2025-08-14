@@ -109,11 +109,7 @@ impl AppState {
     pub fn state_root(&self) -> Cid {
         self.state_params.state_root
     }
-
-    pub fn chain_id(&self) -> ChainID {
-        ChainID::from(self.state_params.chain_id)
-    }
-
+    
     pub fn app_hash(&self) -> tendermint::hash::AppHash {
         to_app_hash(&self.state_params)
     }
@@ -172,6 +168,8 @@ where
     /// Interpreter for messages and the block lifecycle events.
     messages_interpreter: Arc<MI>,
 
+    light_client_commitments: Arc<tokio::sync::Mutex<Option<LightClientCommitments>>>,
+
     /// Interface to the snapshotter, if enabled.
     snapshots: Option<SnapshotClient>,
     /// State accumulating changes during block execution.
@@ -213,6 +211,7 @@ where
             state_hist: KVCollection::new(config.state_hist_namespace),
             state_hist_size: config.state_hist_size,
             messages_interpreter: Arc::new(interpreter),
+            light_client_commitments: Arc::new(tokio::sync::Mutex::new(None)),
             snapshots,
             exec_state: Arc::new(tokio::sync::Mutex::new(None)),
             check_state: Arc::new(tokio::sync::Mutex::new(None)),
@@ -319,13 +318,8 @@ where
     fn maybe_update_app_state(
         &self,
         gas_market: &Reading,
-        light_client_commitments: Option<LightClientCommitments>,
     ) -> Result<Option<TendermintConsensusParams>> {
         let mut state = self.committed_state()?;
-
-        if let Some(commitment) = light_client_commitments {
-            state.light_client_commitments = Some(commitment);
-        }
 
         let current = state
             .app_state
@@ -897,7 +891,11 @@ where
             power_updates,
             gas_market,
             light_client_commitments,
+            end_block_events
         } = response;
+
+        let mut c = self.light_client_commitments.lock().await;
+        *c = light_client_commitments;
 
         // Convert the incoming power updates to Tendermint validator updates.
         let validator_updates =
@@ -910,13 +908,16 @@ where
 
         // Maybe update the app state with the new block gas limit.
         let consensus_param_updates = self
-            .maybe_update_app_state(&gas_market, light_client_commitments)
+            .maybe_update_app_state(&gas_market)
             .context("failed to update block gas limit")?;
 
         let ret = response::EndBlock {
             validator_updates,
             consensus_param_updates,
-            events: vec![],
+            events: end_block_events
+                .into_iter()
+                .flat_map(|(stamped, emitters)| to_events("event", stamped, emitters))
+                .collect::<Vec<_>>(),
         };
 
         Ok(ret)
@@ -947,6 +948,10 @@ where
         state.app_state.state_params.base_fee = base_fee;
         state.app_state.state_params.circ_supply = circ_supply;
         state.app_state.state_params.power_scale = power_scale;
+
+        let mut c = self.light_client_commitments.lock().await;
+        // because of the take, no need to *c = None
+        state.light_client_commitments = c.take();
 
         let app_hash = state.app_hash();
         let block_height = state.app_state.block_height;

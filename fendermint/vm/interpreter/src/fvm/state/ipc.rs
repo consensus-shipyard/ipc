@@ -29,7 +29,7 @@ use ipc_actors_abis::xnet_messaging_facet::XnetMessagingFacet;
 use ipc_actors_abis::{checkpointing_facet, top_down_finality_facet, xnet_messaging_facet};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::{ConfigurationNumber, PowerChangeRequest};
-
+use crate::fvm::end_block_hook::LightClientCommitments;
 use super::{
     fevm::{ContractCaller, MockProvider, NoRevert},
     FvmExecState,
@@ -110,6 +110,26 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
             c.bottom_up_msg_batch(ethers::types::U256::from(height))
         })?;
         Ok(batch)
+    }
+
+    pub fn record_light_client_commitments(
+        &self,
+        state: &mut FvmExecState<DB>,
+        commitment: &LightClientCommitments,
+    ) -> anyhow::Result<AppliedMessage>  {
+        let commitment = checkpointing_facet::StateCommitmentBreakDown {
+            state_root: Default::default(),
+            msg_batch_commitment: checkpointing_facet::Commitment {
+                total_num_msgs: commitment.msg_batch_commitment.total_num_msgs,
+                msgs_root: commitment.msg_batch_commitment.msgs_root,
+            },
+            validator_next_configuration_number: commitment.validator_next_configuration_number,
+            activity_commitment: commitment.activity_commitment.clone(),
+        };
+        Ok(self.checkpointing.call_with_return(state, |c| {
+            c.record_light_client_commitments(commitment)
+        })?
+            .into_return())
     }
 
     /// Insert a new checkpoint at the period boundary.

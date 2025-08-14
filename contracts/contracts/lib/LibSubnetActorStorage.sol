@@ -7,12 +7,19 @@ import {BottomUpCheckpoint, StateCommitment} from "../structs/CrossNet.sol";
 import {SubnetID, ValidatorSet, PowerChangeLog, StakingReleaseQueue, Asset, Validator, PermissionMode} from "../structs/Subnet.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
+struct LastCommitmentHeights {
+    uint64 signedHeader;
+    uint64 configNumber;
+    uint64 activity;
+}
+
     struct SubnetActorStorage {
         /// @notice initial circulating supply provided by genesis validators to use when bootstrapping
         /// the network.
         uint256 genesisCircSupply;
         /// @notice The height of the last committed bottom-up checkpoint.
         uint256 lastBottomUpCheckpointHeight;
+        uint256 last;
         /// @notice Minimal activation collateral
         uint256 minActivationCollateral;
         /// @notice number of blocks in a bottom-up epoch
@@ -62,6 +69,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
         mapping(uint256 => BottomUpCheckpoint) committedCheckpoints;
         /// @notice contains all committed subnet state hash and block header
         mapping(uint64 => StateCommitment) stateCommitments;
+        LastCommitmentHeights commitmentHeights;
         string chainID;
         /// @notice initial set of validators joining in genesis
         Validator[] genesisValidators;

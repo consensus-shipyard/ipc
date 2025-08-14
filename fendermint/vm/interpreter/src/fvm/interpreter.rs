@@ -14,6 +14,10 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::errors::*;
+use crate::fvm::end_block_hook::{EndBlockManager, PowerUpdates};
+use crate::fvm::executions::{
+    execute_cron_message, execute_signed_message, push_block_to_chainmeta_actor_if_possible,
+};
 use crate::fvm::gas_estimation::{estimate_gassed_msg, gas_search};
 use crate::fvm::topdown::TopDownManager;
 use crate::fvm::{
@@ -33,10 +37,6 @@ use fvm_shared::state::ActorState;
 use fvm_shared::ActorID;
 use ipc_observability::emit;
 use std::convert::TryInto;
-use crate::fvm::end_block_hook::{EndBlockManager, PowerUpdates};
-use crate::fvm::executions::{
-    execute_cron_message, execute_signed_message, push_block_to_chainmeta_actor_if_possible,
-};
 
 struct Actor {
     id: ActorID,
@@ -397,10 +397,15 @@ where
             state.activity_tracker().record_block_committed(pubkey)?;
         }
 
-        let maybe_result = self.end_block_manager.trigger_end_block_hook(state)?;
+        let mut end_block_events = BlockEndEvents::default();
+
+        let maybe_result = self.end_block_manager.trigger_end_block_hook(state, &mut end_block_events)?;
 
         let (power_updates, maybe_commitment) = if let Some(outcome) = maybe_result {
-            (outcome.power_updates, Some(outcome.light_client_commitments))
+            (
+                outcome.power_updates,
+                Some(outcome.light_client_commitments),
+            )
         } else {
             (PowerUpdates::default(), None)
         };
@@ -417,6 +422,7 @@ where
             power_updates,
             gas_market: next_gas_market,
             light_client_commitments: maybe_commitment,
+            end_block_events,
         };
         Ok(response)
     }

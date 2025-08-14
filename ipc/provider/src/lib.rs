@@ -35,7 +35,6 @@ use std::{
 use zeroize::Zeroize;
 
 pub mod checkpoint;
-mod checkpoint_v2;
 pub mod config;
 pub mod jsonrpc;
 pub mod lotus;
@@ -260,6 +259,7 @@ impl IpcProvider {
         validator_gater: Address,
         validator_rewarder: Address,
         subnet_ipc_contracts_owner: ethers::types::Address,
+        chain_id: u64,
     ) -> anyhow::Result<Address> {
         let conn = self.get_connection(&parent)?;
 
@@ -281,6 +281,7 @@ impl IpcProvider {
             validator_gater,
             validator_rewarder,
             genesis_subnet_ipc_contracts_owner: subnet_ipc_contracts_owner,
+            chain_id,
         };
 
         conn.manager()

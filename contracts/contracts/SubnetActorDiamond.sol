@@ -13,6 +13,7 @@ import {PermissionMode, SubnetID, AssetKind, Asset} from "./structs/Subnet.sol";
 import {SubnetIDHelper} from "./lib/SubnetIDHelper.sol";
 import {LibPower} from "./lib/LibPower.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import {AssetHelper} from "./lib/AssetHelper.sol";
 import {LibActivity} from "./lib/LibActivity.sol";
 
@@ -44,6 +45,8 @@ contract SubnetActorDiamond {
         ///         The address lives on the subnet network and controls contract‐level administrative functions
         ///         (e.g. pausing, upgrading, facet management) for every IPC diamond contract within the subnet.
         address genesisSubnetIpcContractsOwner;
+        /// The chain id for the subnet
+        uint64 chainID;
     }
 
     constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params, address owner) {
@@ -104,6 +107,8 @@ contract SubnetActorDiamond {
         // Set the supply strategy.
         s.supplySource = params.supplySource;
         s.collateralSource = params.collateralSource;
+
+        s.chainID = Strings.toString(params.chainID);
 
         if (params.validatorGater != address(0)) {
             s.validatorGater = params.validatorGater;

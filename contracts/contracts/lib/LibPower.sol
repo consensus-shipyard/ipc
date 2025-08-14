@@ -384,8 +384,7 @@ library LibPower {
 
     function getActiveValidatorAddressByIndex(uint16 index) internal view returns (address validator) {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        validator = s.validatorSet.activeValidators.inner.posToAddress[index];
-
+        validator = s.validatorSet.activeValidators.inner.posToAddress[index + 1];
         if (validator == address(0)) {
             revert NotActiveValidator();
         }

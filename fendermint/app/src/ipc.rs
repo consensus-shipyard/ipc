@@ -15,8 +15,8 @@ use fendermint_vm_topdown::sync::ParentFinalityStateQuery;
 use fendermint_vm_topdown::IPCParentFinality;
 use fvm_ipld_blockstore::Blockstore;
 use ipc_actors_abis::subnet_actor_checkpoint_facet::{Commitment, StateCommitmentBreakDown};
-use std::sync::Arc;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 pub fn derive_subnet_app_hash(state: &SubnetAppState) -> tendermint::hash::AppHash {
     let state_params_cid = fendermint_vm_message::cid(state.state_params())

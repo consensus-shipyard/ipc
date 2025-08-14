@@ -51,6 +51,8 @@ import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
 import {ActivityHelper} from "../helpers/ActivityHelper.sol";
 import {BottomUpBatchHelper} from "../helpers/BottomUpBatchHelper.sol";
 
+import {Timestamp, SignedHeader, BlockID, Commit, PartSetHeader, CommitSig, LightHeader, Consensus as ConsensusData, TENDERMINTLIGHT_PROTO_GLOBAL_ENUMS} from "tendermint-sol/proto/TendermintLight.sol";
+
 contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
     using FilAddress for address;
@@ -89,7 +91,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testSubnetActorDiamondReal_LoupeFunction() public view {
-        require(saDiamond.diamondLouper().facets().length == 9, "unexpected length");
+        require(saDiamond.diamondLouper().facets().length == 10, "unexpected length");
         require(
             saDiamond.diamondLouper().supportsInterface(type(IERC165).interfaceId) == true,
             "IERC165 not supported"
@@ -387,7 +389,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
                 collateralSource: AssetHelper.native(),
                 validatorGater: address(0),
                 validatorRewarder: address(0),
-                genesisSubnetIpcContractsOwner: address(1)
+                genesisSubnetIpcContractsOwner: address(1),
+                chainID: uint64(1671263715227509)
             }),
             address(saDupGetterFaucet),
             address(saDupMangerFaucet),
@@ -925,6 +928,65 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
         vm.prank(validators[0]);
         saDiamond.checkpointer().submitCheckpoint(checkpoint, validators, signatures);
+    }
+
+    function testSubnetActorDiamond_submitSignedHeader() public {
+        SignedHeader.Data memory header = SignedHeader.Data({
+            header: LightHeader.Data({
+                version: ConsensusData.Data({
+                    block: 11,
+                    app: 0
+                }),
+                chain_id: "1671263715227509",
+                height: 10,
+                time: Timestamp.Data({Seconds: 1754924475, nanos: 753738680}),
+                last_block_id: BlockID.Data({
+                    hash: hex"cdf54989b2af7335f147497cce3462143805ace148e54e87a2478070da92c4ed",
+                    part_set_header: PartSetHeader.Data({
+                        total: 1,
+                        hash: hex"76434337d10b011ab9d18dd8f0c9ccc58a7ccf069e0ace8c07772569489a489e"
+                    })
+                }),
+                last_commit_hash: hex"8da7c3c5ccacf3277b63b0ecbc1897fd57e3f17372c3aeaa7eb366b69855d9a7",
+                data_hash: hex"b8b9fe4ec01144702ae02277199c9f5de07e26614bb378fa434cb3410d847551",
+                validators_hash: hex"6aa2b4fb8892eb46abe6d5b9b5e7e86a749d1fbd8e355e3a6b5f5426ef3e6790",
+                next_validators_hash: hex"6aa2b4fb8892eb46abe6d5b9b5e7e86a749d1fbd8e355e3a6b5f5426ef3e6790",
+                consensus_hash: hex"895734b58a6cb41a56bfe448f135d54fa01dc948164ee7e409960f0d8958d42c",
+                app_hash: hex"fcbeb04f3c0175e06b8ef9d731476e88f2d37b98bca65b7e983356c92c9c53e9",
+                last_results_hash: hex"7e23c5dbd335ecce8cad567dc6bf69373995bd718d63b562b46126a3d6574b95",
+                evidence_hash: hex"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                proposer_address: hex"905b1c0098887ea9033946de1eab5427c97a82ad"
+            }),
+            commit: Commit.Data({
+                height: 10,
+                round: 0,
+                block_id: BlockID.Data({
+                    hash: hex"910035b9ff5ddd3f2434d198d718cbe1c97b3a484b6799b4106f072070a046ce",
+                    part_set_header: PartSetHeader.Data({
+                        total: 1,
+                        hash: hex"648d2cb39485249faf92acb13db138eac1212579c433a8a2aa6e85e05d69f2bd"
+                    })
+                }),
+                signatures: new CommitSig.Data[](1)
+            })
+        });
+
+        header.commit.signatures[0] = CommitSig.Data({
+            block_id_flag: TENDERMINTLIGHT_PROTO_GLOBAL_ENUMS.BlockIDFlag.BLOCK_ID_FLAG_COMMIT,
+            validator_address: hex"905b1c0098887ea9033946de1eab5427c97a82ad",
+            timestamp: Timestamp.Data({Seconds: 1754924476, nanos: 811159237}),
+            signature: hex"284f7f673bf73a515a8829dd29edc8671094e62d94db5cfa869bb62b4e8b6eff51c44f2662fb6fef1e37239d9a7d14707971feeddd1e9ba87c2ca5bafc1b6d9e"
+        });
+
+        address validator = address(0x1A79385eAd0e873FE0C441C034636D3Edf7014cC);
+        bytes
+            memory pubkey = hex"047efe505fb55f56756514db73ff1e3a8d7fc08f7c5bbc3cbf10d646be71c2593766d6a8785f468ed6701c427d9b2a6a8d8a7d7146bc77a7e7a94c49bbcbd39f7f";
+
+        vm.deal(validator, 11 ether);
+        vm.prank(validator);
+        saDiamond.manager().join{value: 10 ether}(pubkey, 10 ether);
+
+        saDiamond.checkpoint().submitSignedHeader(abi.encode(header));
     }
 
     function testSubnetActorDiamond_DiamondCut() public {

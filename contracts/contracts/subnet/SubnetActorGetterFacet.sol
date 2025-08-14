@@ -83,6 +83,10 @@ contract SubnetActorGetterFacet {
         return (addresses, balances);
     }
 
+    function chainID() external view returns (string memory) {
+        return s.chainID;
+    }
+
     /// @notice Returns the period for bottom-up checkpointing operations.
     function bottomUpCheckPeriod() external view returns (uint256) {
         return s.bottomUpCheckPeriod;
