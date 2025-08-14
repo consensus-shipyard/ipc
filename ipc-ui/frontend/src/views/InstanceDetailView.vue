@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import FieldLoadingIndicator from '../components/common/FieldLoadingIndicator.vue'
 import { apiService } from '../services/api'
 
 interface Validator {
@@ -24,6 +25,7 @@ interface SubnetInstance {
   parent: string
   created_at: string
   validators: Validator[]
+  validator_count?: number
   config: Record<string, any>
 }
 
@@ -67,6 +69,11 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const activeTab = ref('overview')
 const approvingSubnet = ref(false)
+
+// Individual loading states for granular control
+const loadingBasicInfo = ref(true)
+const loadingChainStats = ref(false)
+const basicInfoError = ref<string | null>(null)
 
 // Chain statistics state
 const chainStats = ref<ChainStats | null>(null)
@@ -214,7 +221,9 @@ const statusColor = computed(() => {
 const fetchInstance = async () => {
   try {
     loading.value = true
+    loadingBasicInfo.value = true
     error.value = null
+    basicInfoError.value = null
 
     // Decode the URL-encoded ID parameter
     const decodedId = decodeURIComponent(props.id)
@@ -222,20 +231,27 @@ const fetchInstance = async () => {
 
     // Check if we got HTML instead of JSON (indicates backend routing issue)
     if (typeof response.data === 'string' && response.data.includes('<!DOCTYPE html>')) {
-      error.value = 'Backend routing error: API endpoint returned HTML instead of JSON data. This usually means the route is not properly configured.'
+      const errorMsg = 'Backend routing error: API endpoint returned HTML instead of JSON data. This usually means the route is not properly configured.'
+      error.value = errorMsg
+      basicInfoError.value = errorMsg
       return
     }
 
     if (response.data) {
       instance.value = response.data
     } else {
-      error.value = 'Instance not found'
+      const errorMsg = 'Instance not found'
+      error.value = errorMsg
+      basicInfoError.value = errorMsg
     }
   } catch (err) {
     console.error('Error fetching instance:', err)
-    error.value = err instanceof Error ? err.message : 'Failed to load instance'
+    const errorMsg = err instanceof Error ? err.message : 'Failed to load instance'
+    error.value = errorMsg
+    basicInfoError.value = errorMsg
   } finally {
     loading.value = false
+    loadingBasicInfo.value = false
   }
 }
 
@@ -661,6 +677,7 @@ const fetchChainStats = async () => {
 
   try {
     loadingStats.value = true
+    loadingChainStats.value = true
     statsError.value = null
 
     const [statsResponse, statusResponse] = await Promise.all([
@@ -680,6 +697,7 @@ const fetchChainStats = async () => {
     statsError.value = err instanceof Error ? err.message : 'Failed to load chain statistics'
   } finally {
     loadingStats.value = false
+    loadingChainStats.value = false
   }
 }
 
@@ -952,7 +970,7 @@ onUnmounted(() => {
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             ]"
           >
-            Validators ({{ instance.validators?.length || 0 }} validator{{ (instance.validators?.length || 0) !== 1 ? 's' : '' }})
+                            Validators ({{ instance.validator_count || instance.validators?.length || 0 }} validator{{ (instance.validator_count || instance.validators?.length || 0) !== 1 ? 's' : '' }})
           </button>
           <button
             @click="activeTab = 'configuration'"
@@ -1000,46 +1018,106 @@ onUnmounted(() => {
             <dl class="space-y-3">
               <div class="flex justify-between">
                 <dt class="text-sm font-medium text-gray-500">Subnet ID</dt>
-                <dd class="text-sm text-gray-900 font-mono">{{ instance.id }}</dd>
+                <dd class="text-sm text-gray-900 font-mono">
+                  <FieldLoadingIndicator
+                    :is-loading="loadingBasicInfo"
+                    :has-error="!!basicInfoError"
+                    loading-text="Loading..."
+                    @retry="fetchInstance"
+                  >
+                    {{ instance?.id }}
+                  </FieldLoadingIndicator>
+                </dd>
               </div>
               <div class="flex justify-between">
                 <dt class="text-sm font-medium text-gray-500">Name</dt>
-                <dd class="text-sm text-gray-900">{{ instance.name }}</dd>
+                <dd class="text-sm text-gray-900">
+                  <FieldLoadingIndicator
+                    :is-loading="loadingBasicInfo"
+                    :has-error="!!basicInfoError"
+                    loading-text="Loading..."
+                    @retry="fetchInstance"
+                  >
+                    {{ instance?.name }}
+                  </FieldLoadingIndicator>
+                </dd>
               </div>
               <div class="flex justify-between">
                 <dt class="text-sm font-medium text-gray-500">Status</dt>
                 <dd>
-                  <span :class="['inline-flex items-center px-2 py-1 rounded-full text-xs font-medium', statusColor]">
-                    {{ (instance.status || 'Unknown').charAt(0).toUpperCase() + (instance.status || 'unknown').slice(1) }}
-                  </span>
+                  <FieldLoadingIndicator
+                    :is-loading="loadingBasicInfo"
+                    :has-error="!!basicInfoError"
+                    loading-text="Loading..."
+                    @retry="fetchInstance"
+                  >
+                    <span v-if="instance" :class="['inline-flex items-center px-2 py-1 rounded-full text-xs font-medium', statusColor]">
+                      {{ (instance.status || 'Unknown').charAt(0).toUpperCase() + (instance.status || 'unknown').slice(1) }}
+                    </span>
+                  </FieldLoadingIndicator>
                 </dd>
               </div>
               <div class="flex justify-between">
                 <dt class="text-sm font-medium text-gray-500">Template</dt>
-                <dd class="text-sm text-gray-900">{{ instance.template }}</dd>
+                <dd class="text-sm text-gray-900">
+                  <FieldLoadingIndicator
+                    :is-loading="loadingBasicInfo"
+                    :has-error="!!basicInfoError"
+                    loading-text="Loading..."
+                    @retry="fetchInstance"
+                  >
+                    {{ instance?.template }}
+                  </FieldLoadingIndicator>
+                </dd>
               </div>
               <div class="flex justify-between">
                 <dt class="text-sm font-medium text-gray-500">Parent Network</dt>
-                <dd class="text-sm text-gray-900 font-mono">{{ instance.parent }}</dd>
+                <dd class="text-sm text-gray-900 font-mono">
+                  <FieldLoadingIndicator
+                    :is-loading="loadingBasicInfo"
+                    :has-error="!!basicInfoError"
+                    loading-text="Loading..."
+                    @retry="fetchInstance"
+                  >
+                    {{ instance?.parent }}
+                  </FieldLoadingIndicator>
+                </dd>
               </div>
               <div class="flex justify-between">
                 <dt class="text-sm font-medium text-gray-500">Gateway Contract</dt>
                 <dd class="text-sm text-gray-900 font-mono relative">
-                  <button
-                    @click="copyToClipboard(gatewayAddress, 'gateway')"
-                    class="hover:bg-gray-100 px-2 py-1 rounded transition-colors cursor-pointer text-left"
-                    :title="copyingAddress === 'gateway' ? 'Copied!' : `Click to copy: ${gatewayAddress}`"
+                  <FieldLoadingIndicator
+                    :is-loading="loadingBasicInfo"
+                    :has-error="!!basicInfoError"
+                    loading-text="Loading..."
+                    @retry="fetchInstance"
                   >
-                    {{ gatewayAddressShort }}
-                    <svg v-if="copyingAddress === 'gateway'" class="inline-block w-4 h-4 ml-1 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                    </svg>
-                  </button>
+                    <button
+                      v-if="instance"
+                      @click="copyToClipboard(gatewayAddress, 'gateway')"
+                      class="hover:bg-gray-100 px-2 py-1 rounded transition-colors cursor-pointer text-left"
+                      :title="copyingAddress === 'gateway' ? 'Copied!' : `Click to copy: ${gatewayAddress}`"
+                    >
+                      {{ gatewayAddressShort }}
+                      <svg v-if="copyingAddress === 'gateway'" class="inline-block w-4 h-4 ml-1 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                      </svg>
+                    </button>
+                  </FieldLoadingIndicator>
                 </dd>
               </div>
               <div class="flex justify-between">
                 <dt class="text-sm font-medium text-gray-500">Created</dt>
-                <dd class="text-sm text-gray-900">{{ createdDate }}</dd>
+                <dd class="text-sm text-gray-900">
+                  <FieldLoadingIndicator
+                    :is-loading="loadingBasicInfo"
+                    :has-error="!!basicInfoError"
+                    loading-text="Loading..."
+                    @retry="fetchInstance"
+                  >
+                    {{ createdDate }}
+                  </FieldLoadingIndicator>
+                </dd>
               </div>
             </dl>
           </div>
@@ -1049,22 +1127,35 @@ onUnmounted(() => {
             <div class="flex items-center justify-between mb-4">
               <h3 class="text-lg font-semibold text-gray-900">Chain Statistics</h3>
               <div class="flex items-center space-x-2">
-                <div v-if="loadingStats" class="animate-spin w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full"></div>
-                <div v-else-if="subnetStatus?.is_active" class="flex items-center text-green-600">
-                  <div class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-                  <span class="text-sm font-medium">Active</span>
-                </div>
-                <div v-else class="flex items-center text-red-600">
-                  <div class="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
-                  <span class="text-sm font-medium">Inactive</span>
-                </div>
+                <FieldLoadingIndicator
+                  :is-loading="loadingChainStats"
+                  :has-error="!!statsError"
+                  loading-text="Loading..."
+                  @retry="fetchChainStats"
+                >
+                  <div v-if="subnetStatus?.is_active" class="flex items-center text-green-600">
+                    <div class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                    <span class="text-sm font-medium">Active</span>
+                  </div>
+                  <div v-else class="flex items-center text-red-600">
+                    <div class="w-2 h-2 bg-red-500 rounded-full mr-2"></div>
+                    <span class="text-sm font-medium">Inactive</span>
+                  </div>
+                </FieldLoadingIndicator>
               </div>
             </div>
 
             <div class="grid grid-cols-2 gap-4">
               <div class="text-center p-4 bg-gray-50 rounded-lg">
                 <div class="text-2xl font-bold text-gray-900">
-                  {{ chainStats?.block_height || subnetStatus?.block_height || 'N/A' }}
+                  <FieldLoadingIndicator
+                    :is-loading="loadingChainStats"
+                    :has-error="!!statsError"
+                    loading-text="Loading..."
+                    @retry="fetchChainStats"
+                  >
+                    {{ chainStats?.block_height || subnetStatus?.block_height || 'N/A' }}
+                  </FieldLoadingIndicator>
                 </div>
                 <div class="text-sm text-gray-500">Block Height</div>
                 <div v-if="chainStats?.latest_block_time" class="text-xs text-gray-400 mt-1">
@@ -1073,34 +1164,78 @@ onUnmounted(() => {
               </div>
 
               <div class="text-center p-4 bg-gray-50 rounded-lg">
-                <div class="text-2xl font-bold text-gray-900">{{ instance.validators?.length }}</div>
+                <div class="text-2xl font-bold text-gray-900">
+                  <FieldLoadingIndicator
+                    :is-loading="loadingBasicInfo"
+                    :has-error="!!basicInfoError"
+                    loading-text="Loading..."
+                    @retry="fetchInstance"
+                  >
+                    {{ instance?.data?.validator_count || instance?.data?.validators?.length || 0 }}
+                  </FieldLoadingIndicator>
+                </div>
                 <div class="text-sm text-gray-500">Validators</div>
-                <div v-if="subnetStatus?.validators_online !== undefined" class="text-xs text-gray-400 mt-1">
-                  {{ subnetStatus.validators_online }} online
+                <div class="text-xs text-gray-400 mt-1">
+                  <FieldLoadingIndicator
+                    :is-loading="loadingChainStats"
+                    :has-error="!!statsError"
+                    loading-text="Loading..."
+                    @retry="fetchChainStats"
+                  >
+                    {{ subnetStatus?.validators_online !== undefined ? `${subnetStatus.validators_online} online` : 'N/A online' }}
+                  </FieldLoadingIndicator>
                 </div>
               </div>
 
               <div class="text-center p-4 bg-gray-50 rounded-lg">
                 <div class="text-2xl font-bold text-gray-900">
-                  {{ chainStats?.transaction_count || 'N/A' }}
+                  <FieldLoadingIndicator
+                    :is-loading="loadingChainStats"
+                    :has-error="!!statsError"
+                    loading-text="Loading..."
+                    @retry="fetchChainStats"
+                  >
+                    {{ chainStats?.transaction_count || 'N/A' }}
+                  </FieldLoadingIndicator>
                 </div>
                 <div class="text-sm text-gray-500">Total Transactions</div>
-                <div v-if="chainStats?.tps" class="text-xs text-gray-400 mt-1">
-                  {{ chainStats.tps.toFixed(1) }} TPS
+                <div class="text-xs text-gray-400 mt-1">
+                  <FieldLoadingIndicator
+                    :is-loading="loadingChainStats"
+                    :has-error="!!statsError"
+                    loading-text="Loading..."
+                    @retry="fetchChainStats"
+                  >
+                    {{ chainStats?.tps ? `${chainStats.tps.toFixed(1)} TPS` : 'N/A TPS' }}
+                  </FieldLoadingIndicator>
                 </div>
               </div>
 
               <div class="text-center p-4 bg-gray-50 rounded-lg">
                 <div class="text-2xl font-bold text-gray-900">
-                  <span v-if="subnetStatus?.consensus_status === 'healthy'" class="text-green-600">●</span>
-                  <span v-else-if="subnetStatus?.consensus_status === 'degraded'" class="text-yellow-600">●</span>
-                  <span v-else-if="subnetStatus?.consensus_status === 'offline'" class="text-red-600">●</span>
-                  <span v-else class="text-gray-400">●</span>
-                  {{ subnetStatus?.consensus_status || 'Unknown' }}
+                  <FieldLoadingIndicator
+                    :is-loading="loadingChainStats"
+                    :has-error="!!statsError"
+                    loading-text="Loading..."
+                    @retry="fetchChainStats"
+                  >
+                    <span v-if="subnetStatus?.consensus_status === 'healthy'" class="text-green-600">●</span>
+                    <span v-else-if="subnetStatus?.consensus_status === 'degraded'" class="text-yellow-600">●</span>
+                    <span v-else-if="subnetStatus?.consensus_status === 'offline'" class="text-red-600">●</span>
+                    <span v-else class="text-gray-400">●</span>
+                    {{ subnetStatus?.consensus_status || 'Unknown' }}
+                  </FieldLoadingIndicator>
                 </div>
                 <div class="text-sm text-gray-500">Consensus</div>
-                <div v-if="chainStats?.avg_block_time" class="text-xs text-gray-400 mt-1">
-                  {{ chainStats.avg_block_time.toFixed(1) }}s avg block
+                <div class="text-xs text-gray-400 mt-1">
+                  <FieldLoadingIndicator
+                    :is-loading="loadingChainStats"
+                    :has-error="!!statsError"
+                    loading-text="Loading..."
+                    @retry="fetchChainStats"
+                  >
+                    {{ chainStats?.avg_block_time ? `${chainStats.avg_block_time.toFixed(1)}s avg block` : 'N/A avg block' }}
+                  </FieldLoadingIndicator>
                 </div>
               </div>
             </div>
@@ -1310,7 +1445,7 @@ onUnmounted(() => {
               <h3 class="text-lg font-semibold text-gray-900">Validators</h3>
               <div class="flex items-center space-x-3">
                 <div class="text-sm text-gray-500">
-                  {{ instance.validators?.length || 0 }} validator{{ (instance.validators?.length || 0) !== 1 ? 's' : '' }}
+                  {{ instance.validator_count || instance.validators?.length || 0 }} validator{{ (instance.validator_count || instance.validators?.length || 0) !== 1 ? 's' : '' }}
                 </div>
                 <button
                   @click="showAddValidatorModal = true"
@@ -2298,7 +2433,7 @@ onUnmounted(() => {
               <div class="space-y-3">
                 <div class="flex justify-between">
                   <span class="text-sm text-gray-500">Active Validators</span>
-                  <span class="text-sm font-medium text-gray-900">{{ instance.validators?.length || 0 }}</span>
+                  <span class="text-sm font-medium text-gray-900">{{ instance.validator_count || instance.validators?.length || 0 }}</span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-sm text-gray-500">Validators Online</span>

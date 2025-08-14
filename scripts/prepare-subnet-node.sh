@@ -341,23 +341,32 @@ get_subnet_validators() {
             if [[ "$contract_exists" == "true" ]]; then
                 echo -e "${GREEN}✓ Found subnet actor contract at: $subnet_actor_addr${NC}"
 
-                # Try to get active validators from the subnet actor
+                                # Try to get active validators from the subnet actor
                 echo -e "${BLUE}Querying active validators from subnet actor...${NC}"
                 local active_validators=""
                 active_validators=$(cast call "$subnet_actor_addr" "getActiveValidators()" --rpc-url "$rpc" 2>/dev/null || echo "")
 
-                if [[ -n "$active_validators" && "$active_validators" != "0x" ]]; then
-                    # Extract addresses from the response
-                    local addresses=$(echo "$active_validators" | grep -oE '0x[a-fA-F0-9]{40}' | sort -u || echo "")
-                    if [[ -n "$addresses" ]]; then
-                        echo -e "${GREEN}✓ Found validators in subnet actor:${NC}"
-                        while read -r addr; do
-                            if [[ -n "$addr" ]]; then
-                                echo -e "  ${CYAN}Validator: $addr${NC}"
-                            fi
-                        done <<< "$addresses"
-                        echo "$addresses"
-                        return 0
+                if [[ -n "$active_validators" && "$active_validators" != "0x" && "$active_validators" != "0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" ]]; then
+                    # The response is ABI-encoded array of addresses
+                    # Use cast to properly decode it
+                    local decoded_addresses=""
+                    decoded_addresses=$(cast abi-decode "address[]" "$active_validators" 2>/dev/null || echo "")
+
+                    if [[ -n "$decoded_addresses" && "$decoded_addresses" != "[]" ]]; then
+                        # Extract addresses from the decoded output - format is like [0x123..., 0x456...]
+                        local addresses=$(echo "$decoded_addresses" | grep -oE '0x[a-fA-F0-9]{40}' | sort -u || echo "")
+                        if [[ -n "$addresses" ]]; then
+                            echo -e "${GREEN}✓ Found validators in subnet actor:${NC}"
+                            while read -r addr; do
+                                if [[ -n "$addr" ]]; then
+                                    echo -e "  ${CYAN}Validator: $addr${NC}"
+                                fi
+                            done <<< "$addresses"
+                            echo "$addresses"
+                            return 0
+                        fi
+                    else
+                        echo -e "${YELLOW}⚠ Subnet actor exists but has no active validators yet${NC}"
                     fi
                 else
                     echo -e "${YELLOW}⚠ Subnet actor exists but has no active validators yet${NC}"
@@ -370,61 +379,33 @@ get_subnet_validators() {
         fi
     fi
 
-    # Fallback: Get list of all subnets from gateway
-    echo -e "${BLUE}Trying gateway listSubnets() as fallback...${NC}"
-    local subnet_list=""
-    subnet_list=$(cast call "$gateway_addr" "listSubnets()" --rpc-url "$rpc" 2>/dev/null || echo "")
+        # Fallback: Try to get waiting validators if no active validators found
+    if [[ -n "$subnet_actor_addr" && "$subnet_actor_addr" != N/A-* ]]; then
+        local contract_exists=$(check_contract_exists "$subnet_actor_addr" "$rpc" 2>/dev/null || echo "false")
+        if [[ "$contract_exists" == "true" ]]; then
+            echo -e "${BLUE}Checking for waiting validators as fallback...${NC}"
+            local waiting_validators=""
+            waiting_validators=$(cast call "$subnet_actor_addr" "getWaitingValidators()" --rpc-url "$rpc" 2>/dev/null || echo "")
 
-    if [[ -n "$subnet_list" && "$subnet_list" != "0x" ]]; then
-        echo -e "${CYAN}Gateway returned: ${subnet_list:0:50}...${NC}"
+            if [[ -n "$waiting_validators" && "$waiting_validators" != "0x" && "$waiting_validators" != "0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" ]]; then
+                local decoded_addresses=""
+                decoded_addresses=$(cast abi-decode "address[]" "$waiting_validators" 2>/dev/null || echo "")
 
-        # Extract Ethereum addresses from the response
-        local addresses=$(echo "$subnet_list" | grep -oE '0x[a-fA-F0-9]{40}' | sort -u || echo "")
-
-        if [[ -n "$addresses" ]]; then
-            echo -e "${GREEN}✓ Found deployed subnet actor contracts from gateway${NC}"
-
-            # For each address, check if it's our subnet and get validator details
-            local validator_list=()
-            while read -r addr; do
-                if [[ -n "$addr" ]]; then
-                    echo -e "  ${CYAN}Checking subnet actor: $addr${NC}"
-                    # If we have a specific subnet actor address, only process that one
-                    if [[ -n "$subnet_actor_addr" && "$addr" != "$subnet_actor_addr" ]]; then
-                        echo -e "    ${YELLOW}Skipping (not our target subnet)${NC}"
-                        continue
-                    fi
-
-                    # Try to get validator info for this subnet
-                    local active_validators=""
-                    active_validators=$(cast call "$addr" "getActiveValidators()" --rpc-url "$rpc" 2>/dev/null || echo "")
-
-                    if [[ -n "$active_validators" && "$active_validators" != "0x" ]]; then
-                        local val_addresses=$(echo "$active_validators" | grep -oE '0x[a-fA-F0-9]{40}' | sort -u || echo "")
-                        if [[ -n "$val_addresses" ]]; then
-                            while read -r val_addr; do
-                                if [[ -n "$val_addr" ]]; then
-                                    validator_list+=("$val_addr")
-                                    echo -e "    ${GREEN}Found validator: $val_addr${NC}"
-                                fi
-                            done <<< "$val_addresses"
-                        fi
-                    else
-                        echo -e "    ${YELLOW}No validators found for this subnet actor${NC}"
+                if [[ -n "$decoded_addresses" && "$decoded_addresses" != "[]" ]]; then
+                    local addresses=$(echo "$decoded_addresses" | grep -oE '0x[a-fA-F0-9]{40}' | sort -u || echo "")
+                    if [[ -n "$addresses" ]]; then
+                        echo -e "${GREEN}✓ Found waiting validators in subnet actor:${NC}"
+                        while read -r addr; do
+                            if [[ -n "$addr" ]]; then
+                                echo -e "  ${CYAN}Waiting Validator: $addr${NC}"
+                            fi
+                        done <<< "$addresses"
+                        echo "$addresses"
+                        return 0
                     fi
                 fi
-            done <<< "$addresses"
-
-            # Return the list
-            if [[ ${#validator_list[@]} -gt 0 ]]; then
-                printf '%s\n' "${validator_list[@]}"
-                return 0
             fi
-        else
-            echo -e "${YELLOW}No addresses found in gateway response${NC}"
         fi
-    else
-        echo -e "${YELLOW}Gateway returned empty or invalid response${NC}"
     fi
 
     echo -e "${YELLOW}⚠ No validators found via gateway queries${NC}"
@@ -541,10 +522,6 @@ discover_validators() {
             echo -e "${YELLOW}No validators found via automatic discovery.${NC}"
             echo -e "${CYAN}This is normal for newly deployed subnets that haven't been activated yet.${NC}"
             echo -e "${CYAN}You can provide the validator address manually.${NC}"
-            echo ""
-            echo -e "${YELLOW}From your logs, I can see these details that might help:${NC}"
-            echo -e "${CYAN}  - Validator public key: 0x04ba5734d8f7091719471e7f7ed6b9df170dc70cc661ca05e688601ad984f068b0d67351e5f06073092499336ab0839ef8a521afd334e53807205fa2f08eec74f4${NC}"
-            echo -e "${CYAN}  - Validator address: 0x70997970c51812dc3a010c7d01b50e0d17dc79c8${NC}"
             echo ""
             echo -e "${YELLOW}Please enter the validator address you want to prepare:${NC}"
             read -p "Validator address [0x70997970c51812dc3a010c7d01b50e0d17dc79c8]: " VALIDATOR_ADDRESS
@@ -771,16 +748,9 @@ EOF
         echo ""
     fi
 
-    echo -e "${GREEN}✓ Node configuration generated${NC}"
-
-    # Display the configuration (but mask the private key for security)
-    echo ""
-    echo -e "${CYAN}Generated configuration (private key masked):${NC}"
-    local masked_config=$(cat "$config_file" | sed "s/$private_key_value/0x***MASKED***/g")
-    echo -e "${CYAN}$masked_config${NC}"
-
-    echo ""
-    echo -e "${GREEN}Configuration saved to: $config_file${NC}"
+        echo -e "${GREEN}✓ Node configuration generated${NC}"
+    echo -e "${CYAN}Configuration saved to: $config_file${NC}"
+    echo -e "${CYAN}You can inspect the configuration file if needed before proceeding.${NC}"
 }
 
 # Initialize the node
