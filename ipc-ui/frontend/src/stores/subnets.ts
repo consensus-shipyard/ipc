@@ -137,7 +137,7 @@ export const useSubnetsStore = defineStore('subnets', () => {
     try {
       const response = await apiService.getInstances()
 
-      if (response.data?.data) {
+            if (response.data?.data) {
         // Map the API response to our enhanced SubnetInstance interface
         subnets.value = response.data.data.map((subnet: any): SubnetInstance => ({
           id: subnet.id,

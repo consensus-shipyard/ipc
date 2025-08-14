@@ -669,11 +669,11 @@ const fetchChainStats = async () => {
     ])
 
     if (statsResponse.data) {
-      chainStats.value = statsResponse.data
+      chainStats.value = statsResponse.data.data
     }
 
     if (statusResponse.data) {
-      subnetStatus.value = statusResponse.data
+      subnetStatus.value = statusResponse.data.data
     }
   } catch (err) {
     console.error('Error fetching chain stats:', err)
