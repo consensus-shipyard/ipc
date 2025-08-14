@@ -259,8 +259,8 @@ onMounted(async () => {
         </RouterLink>
       </nav>
 
-      <!-- Recent Subnets Section -->
-      <div class="mt-8">
+      <!-- Recent Subnets Section - Hidden -->
+      <div v-if="false" class="mt-8">
         <h3 class="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">
           Recent Subnets
         </h3>
@@ -303,8 +303,8 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- Deployed Gateways Section -->
-      <div class="mt-8">
+      <!-- Deployed Gateways Section - Hidden -->
+      <div v-if="false" class="mt-8">
         <h3 class="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">
           Deployed Gateways
         </h3>

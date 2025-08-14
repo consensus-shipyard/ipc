@@ -178,6 +178,52 @@ const gatewayAddressShort = computed(() => {
   return formatAddressShort(instance.value.data?.config?.gateway_addr)
 })
 
+// Add after the existing computed properties (around line 180)
+
+const subnetActorAddress = computed(() => {
+  if (!instance.value?.data?.id) return 'N/A'
+
+  // Extract the subnet actor address from the subnet ID
+  // For IPC subnets, the format is typically /r{chainId}/{actorAddress}
+  // The last part of the route is the subnet actor contract address
+  try {
+    const subnetId = instance.value.data.id
+    const parts = subnetId.split('/')
+
+    if (parts.length >= 3) {
+      // The last part should be the subnet actor address
+      const actorAddress = parts[parts.length - 1]
+
+      // Validate that it looks like an Ethereum address (40 hex chars)
+      if (actorAddress.length === 40 && /^[a-fA-F0-9]+$/.test(actorAddress)) {
+        return '0x' + actorAddress
+      }
+      // If it's already prefixed with 0x
+      if (actorAddress.startsWith('0x') && actorAddress.length === 42) {
+        return actorAddress
+      }
+    }
+
+    // Fallback: try to extract from the raw ID if it contains an address
+    const addressMatch = subnetId.match(/0x[a-fA-F0-9]{40}/)
+    if (addressMatch) {
+      return addressMatch[0]
+    }
+
+    return 'N/A (unable to parse from subnet ID)'
+  } catch (err) {
+    console.warn('Error parsing subnet actor address from subnet ID:', err)
+    return 'N/A (parse error)'
+  }
+})
+
+const subnetActorAddressShort = computed(() => {
+  const fullAddress = subnetActorAddress.value
+  if (fullAddress === 'N/A' || !fullAddress.startsWith('0x')) return fullAddress
+  if (fullAddress.length < 14) return fullAddress // Don't truncate short addresses
+  return `${fullAddress.slice(0, 8)}...${fullAddress.slice(-6)}`
+})
+
 // Copy to clipboard functionality
 const copyingAddress = ref<string | null>(null)
 
@@ -902,7 +948,7 @@ onUnmounted(() => {
       <!-- Quick Actions -->
       <div class="flex flex-wrap gap-3 mb-6">
         <button
-          v-if="instance.status === 'active'"
+          v-if="instance?.data?.status === 'active'"
           @click="pauseSubnet"
           class="btn-secondary flex items-center"
         >
@@ -913,7 +959,7 @@ onUnmounted(() => {
         </button>
 
         <button
-          v-else-if="instance.status === 'paused'"
+          v-else-if="instance?.data?.status === 'paused'"
           @click="resumeSubnet"
           class="btn-primary flex items-center"
         >
@@ -924,7 +970,7 @@ onUnmounted(() => {
         </button>
 
         <button
-          v-if="instance.status?.toLowerCase() === 'pending approval'"
+          v-if="instance?.data?.status?.toLowerCase() === 'pending approval'"
           :disabled="approvingSubnet"
           @click="approveSubnet"
           class="btn-primary flex items-center"
@@ -936,7 +982,7 @@ onUnmounted(() => {
         </button>
 
         <button
-          v-if="instance.status === 'active' || instance.status === 'Active'"
+          v-if="instance?.data?.status === 'active' || instance?.data?.status === 'Active'"
           @click="openTestTxModal"
           class="btn-primary flex items-center"
         >
@@ -1689,12 +1735,12 @@ onUnmounted(() => {
 
                 <!-- Mode-specific instructions -->
                 <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                  <div v-if="instance.config.permissionMode === 'federated'" class="text-yellow-800 text-sm">
+                  <div v-if="instance?.data?.config?.permissionMode === 'federated'" class="text-yellow-800 text-sm">
                     <p class="font-medium mb-1">📋 Federated Mode Instructions:</p>
                     <p>Enter the validator's Ethereum address, public key, and desired power level. The validator will be added to the network with the specified power.</p>
                   </div>
 
-                  <div v-else-if="instance.config.permissionMode === 'collateral'" class="text-yellow-800 text-sm">
+                  <div v-else-if="instance?.data?.config?.permissionMode === 'collateral'" class="text-yellow-800 text-sm">
                     <p class="font-medium mb-1">💰 Collateral Mode Instructions:</p>
                     <p>Enter the validator's address and collateral amount. The validator must have sufficient FIL to stake the specified collateral.</p>
                   </div>
@@ -1714,7 +1760,7 @@ onUnmounted(() => {
                     />
                   </div>
 
-                  <div v-if="instance.config.permissionMode === 'federated' || instance.config.permissionMode === 'static'">
+                  <div v-if="instance?.data?.config?.permissionMode === 'federated' || instance?.data?.config?.permissionMode === 'static'">
                     <label class="block text-sm font-medium text-gray-700 mb-2">
                       Public Key *
                     </label>
@@ -1727,7 +1773,7 @@ onUnmounted(() => {
                     />
                   </div>
 
-                  <div v-if="instance.config.permissionMode === 'federated' || instance.config.permissionMode === 'static'">
+                  <div v-if="instance?.data?.config?.permissionMode === 'federated' || instance?.data?.config?.permissionMode === 'static'">
                     <label class="block text-sm font-medium text-gray-700 mb-2">
                       Power
                     </label>
@@ -1740,7 +1786,7 @@ onUnmounted(() => {
                     />
                   </div>
 
-                  <div v-if="instance.config.permissionMode === 'collateral'">
+                  <div v-if="instance?.data?.config?.permissionMode === 'collateral'">
                     <label class="block text-sm font-medium text-gray-700 mb-2">
                       Collateral (FIL) *
                     </label>
@@ -1755,7 +1801,7 @@ onUnmounted(() => {
                     />
                   </div>
 
-                  <div v-if="instance.config.permissionMode === 'collateral'">
+                  <div v-if="instance?.data?.config?.permissionMode === 'collateral'">
                     <label class="block text-sm font-medium text-gray-700 mb-2">
                       Initial Balance (FIL)
                     </label>
@@ -2141,7 +2187,7 @@ onUnmounted(() => {
 
                   <div class="flex justify-between items-center">
                     <span class="text-sm font-medium text-gray-500">Network</span>
-                    <span class="text-sm text-gray-900 font-mono">{{ instance.parent }}</span>
+                    <span class="text-sm text-gray-900 font-mono">{{ instance?.data?.parent || instance?.parent }}</span>
                   </div>
 
                   <div class="flex justify-between items-center">
@@ -2190,11 +2236,11 @@ onUnmounted(() => {
                   <div class="flex justify-between items-center">
                     <span class="text-sm font-medium text-gray-500">Address</span>
                     <button
-                      @click="copyToClipboard(instance.config?.registry_addr ? formatAddress(instance.config.registry_addr) : 'N/A', 'registry')"
+                      @click="copyToClipboard(instance?.data?.config?.registry_addr ? formatAddress(instance.data.config.registry_addr) : 'N/A', 'registry')"
                       class="text-sm font-mono text-gray-900 hover:bg-gray-100 px-2 py-1 rounded transition-colors"
                       :title="copyingAddress === 'registry' ? 'Copied!' : `Click to copy registry address`"
                     >
-                      {{ instance.config?.registry_addr ? formatAddressShort(instance.config.registry_addr) : 'N/A' }}
+                      {{ instance?.data?.config?.registry_addr ? formatAddressShort(instance.data.config.registry_addr) : 'N/A' }}
                       <svg v-if="copyingAddress === 'registry'" class="inline-block w-4 h-4 ml-1 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
                       </svg>
@@ -2203,7 +2249,7 @@ onUnmounted(() => {
 
                   <div class="flex justify-between items-center">
                     <span class="text-sm font-medium text-gray-500">Network</span>
-                    <span class="text-sm text-gray-900 font-mono">{{ instance.parent }}</span>
+                    <span class="text-sm text-gray-900 font-mono">{{ instance?.data?.parent || instance?.parent }}</span>
                   </div>
 
                   <div class="flex justify-between items-center">
@@ -2250,13 +2296,27 @@ onUnmounted(() => {
 
                 <div class="space-y-3 mb-4">
                   <div class="flex justify-between items-center">
+                    <span class="text-sm font-medium text-gray-500">Contract Address</span>
+                    <button
+                      @click="copyToClipboard(subnetActorAddress, 'subnet-actor')"
+                      class="text-sm font-mono text-gray-900 hover:bg-gray-100 px-2 py-1 rounded transition-colors"
+                      :title="copyingAddress === 'subnet-actor' ? 'Copied!' : `Click to copy: ${subnetActorAddress}`"
+                    >
+                      {{ subnetActorAddressShort }}
+                      <svg v-if="copyingAddress === 'subnet-actor'" class="inline-block w-4 h-4 ml-1 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  <div class="flex justify-between items-center">
                     <span class="text-sm font-medium text-gray-500">Subnet ID</span>
                     <button
-                      @click="copyToClipboard(instance.id, 'subnet-id')"
+                      @click="copyToClipboard(instance?.data?.id || instance?.id || '', 'subnet-id')"
                       class="text-sm font-mono text-gray-900 hover:bg-gray-100 px-2 py-1 rounded transition-colors"
-                      :title="copyingAddress === 'subnet-id' ? 'Copied!' : `Click to copy: ${instance.id}`"
+                      :title="copyingAddress === 'subnet-id' ? 'Copied!' : `Click to copy: ${instance?.data?.id || instance?.id}`"
                     >
-                      {{ instance.id.slice(0, 20) }}...
+                      {{ (instance?.data?.id || instance?.id || '').slice(0, 20) }}...
                       <svg v-if="copyingAddress === 'subnet-id'" class="inline-block w-4 h-4 ml-1 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                         <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
                       </svg>
@@ -2264,14 +2324,19 @@ onUnmounted(() => {
                   </div>
 
                   <div class="flex justify-between items-center">
+                    <span class="text-sm font-medium text-gray-500">Network</span>
+                    <span class="text-sm text-gray-900 font-mono">{{ instance?.data?.parent || instance?.parent }}</span>
+                  </div>
+
+                  <div class="flex justify-between items-center">
                     <span class="text-sm font-medium text-gray-500">Permission Mode</span>
-                    <span class="text-sm text-gray-900 capitalize">{{ instance.config?.permissionMode || 'N/A' }}</span>
+                    <span class="text-sm text-gray-900 capitalize">{{ instance?.data?.config?.permissionMode || 'N/A' }}</span>
                   </div>
 
                   <div class="flex justify-between items-center">
                     <span class="text-sm font-medium text-gray-500">Status</span>
                     <span :class="['inline-flex items-center px-2 py-1 rounded-full text-xs font-medium', statusColor]">
-                      {{ (instance.status || 'Unknown').charAt(0).toUpperCase() + (instance.status || 'unknown').slice(1) }}
+                      {{ (instance?.data?.status || 'Unknown').charAt(0).toUpperCase() + (instance?.data?.status || 'unknown').slice(1) }}
                     </span>
                   </div>
                 </div>
@@ -2285,7 +2350,7 @@ onUnmounted(() => {
                     Inspect
                   </button>
                   <button
-                    v-if="instance.status.toLowerCase() === 'pending approval'"
+                    v-if="instance?.data?.status?.toLowerCase() === 'pending approval'"
                     :disabled="approvingSubnet"
                     @click="approveSubnet"
                     class="btn-primary text-xs"
@@ -2337,18 +2402,18 @@ onUnmounted(() => {
                 <div>
                   <h4 class="font-medium text-gray-900 mb-3">Gateway Settings</h4>
                   <div class="space-y-2 text-sm">
-                    <div class="flex justify-between">
-                      <span class="text-gray-600">Min Validator Stake</span>
-                      <span class="font-mono">{{ instance.config?.minValidatorStake || 'N/A' }} FIL</span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-600">Min Validators</span>
-                      <span class="font-mono">{{ instance.config?.minValidators || 'N/A' }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-gray-600">Bottom-up Period</span>
-                      <span class="font-mono">{{ instance.config?.bottomupCheckPeriod || 'N/A' }} blocks</span>
-                    </div>
+                                          <div class="flex justify-between">
+                        <span class="text-gray-600">Min Validator Stake</span>
+                        <span class="font-mono">{{ instance.config?.minValidatorStake || 'N/A' }} FIL</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-600">Min Validators</span>
+                        <span class="font-mono">{{ instance.config?.minValidators || 'N/A' }}</span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span class="text-gray-600">Bottom-up Period</span>
+                        <span class="font-mono">{{ instance.config?.bottomupCheckPeriod || 'N/A' }} blocks</span>
+                      </div>
                   </div>
                 </div>
 
@@ -2357,15 +2422,15 @@ onUnmounted(() => {
                   <div class="space-y-2 text-sm">
                     <div class="flex justify-between">
                       <span class="text-gray-600">Supply Source</span>
-                      <span class="capitalize">{{ instance.config?.supplySourceKind || 'N/A' }}</span>
+                      <span class="capitalize">{{ instance?.data?.config?.supplySourceKind || 'N/A' }}</span>
                     </div>
                     <div class="flex justify-between">
                       <span class="text-gray-600">Collateral Source</span>
-                      <span class="capitalize">{{ instance.config?.collateralSourceKind || 'N/A' }}</span>
+                      <span class="capitalize">{{ instance?.data?.config?.collateralSourceKind || 'N/A' }}</span>
                     </div>
                     <div class="flex justify-between">
                       <span class="text-gray-600">Cross-msg Fee</span>
-                      <span class="font-mono">{{ instance.config?.minCrossMsgFee || 'N/A' }} FIL</span>
+                      <span class="font-mono">{{ instance?.data?.config?.minCrossMsgFee || 'N/A' }} FIL</span>
                     </div>
                   </div>
                 </div>

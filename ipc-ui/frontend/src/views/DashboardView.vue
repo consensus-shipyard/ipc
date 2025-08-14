@@ -170,26 +170,26 @@ const getGatewayAddressFull = (subnet: SubnetInstance): string => {
 // Gateway grouping and collapsible sections
 const collapsedGateways = ref<Set<string>>(new Set())
 
-const groupedSubnets = computed(() => {
-  const groups = new Map<string, SubnetInstance[]>()
+  const groupedSubnets = computed(() => {
+    const groups = new Map<string, SubnetInstance[]>()
 
-  subnets.value.forEach(subnet => {
-    const gatewayAddr = getGatewayAddressFull(subnet)
-    if (!groups.has(gatewayAddr)) {
-      groups.set(gatewayAddr, [])
-    }
-    groups.get(gatewayAddr)!.push(subnet)
+    subnets.value.forEach(subnet => {
+      const gatewayAddr = getGatewayAddressFull(subnet)
+      if (!groups.has(gatewayAddr)) {
+        groups.set(gatewayAddr, [])
+      }
+      groups.get(gatewayAddr)!.push(subnet)
+    })
+
+    return Array.from(groups.entries()).map(([gateway, subnets]) => ({
+      gateway,
+      subnets,
+      count: subnets.length,
+      activeCount: subnets.filter(s => ['active', 'healthy', 'syncing'].includes(s.status)).length,
+      totalValidators: subnets.reduce((sum, s) => sum + safeGetValidatorCount(s), 0),
+      totalStake: subnets.reduce((sum, s) => sum + safeCalculateSubnetStake(s), 0)
+    }))
   })
-
-  return Array.from(groups.entries()).map(([gateway, subnets]) => ({
-    gateway,
-    subnets,
-    count: subnets.length,
-    activeCount: subnets.filter(s => s.status === 'active').length,
-    totalValidators: subnets.reduce((sum, s) => sum + safeGetValidatorCount(s), 0),
-    totalStake: subnets.reduce((sum, s) => sum + safeCalculateSubnetStake(s), 0)
-  }))
-})
 
 const toggleGateway = (gateway: string) => {
   if (collapsedGateways.value.has(gateway)) {
@@ -287,7 +287,7 @@ const handleSubnetRetry = (subnetId: string) => {
           <div>
             <p class="text-sm font-medium text-gray-600">Active Subnets</p>
             <p class="text-2xl font-bold text-green-600">
-              {{ subnets?.filter(s => s.status === 'active')?.length || 0 }}
+              {{ subnets?.filter(s => ['active', 'healthy', 'syncing'].includes(s.status))?.length || 0 }}
             </p>
           </div>
           <div class="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
