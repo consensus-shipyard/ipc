@@ -101,7 +101,10 @@ export class WebSocketService {
 
             // Handle specific message types
             if (message.type === 'deployment_progress' && message.data) {
-              this.callbacks.onDeploymentProgress?.(message.data)
+              const result = this.callbacks.onDeploymentProgress?.(message.data)
+              if (result instanceof Promise) {
+                result.catch(error => console.error('Error in deployment progress callback:', error))
+              }
             } else if (message.type === 'instance_update' && message.data) {
               this.callbacks.onInstanceUpdate?.(message.data)
             } else if (message.type === 'pong') {
