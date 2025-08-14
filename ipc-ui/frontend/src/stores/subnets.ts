@@ -50,6 +50,9 @@ export interface SubnetInstance {
     registry_addr?: string
     [key: string]: any
   }
+  // Per-subnet loading state
+  isLoading?: boolean
+  loadError?: string | null
 }
 
 export interface SubnetHierarchyNode {
@@ -64,6 +67,8 @@ export const useSubnetsStore = defineStore('subnets', () => {
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const lastUpdated = ref<Date | null>(null)
+  const subnetLoadingStates = ref<Map<string, boolean>>(new Map())
+  const subnetErrors = ref<Map<string, string>>(new Map())
 
   // Computed
   const subnetCount = computed(() => subnets.value.length)
@@ -130,16 +135,21 @@ export const useSubnetsStore = defineStore('subnets', () => {
   })
 
   // Actions
-  const loadSubnets = async () => {
-    isLoading.value = true
+  const loadSubnets = async (showInitialLoading = true) => {
+    if (showInitialLoading) {
+      isLoading.value = true
+    }
     error.value = null
 
     try {
       const response = await apiService.getInstances()
 
-            if (response.data?.data) {
+      if (response.data?.data) {
+        // Get existing subnet IDs to preserve loading states
+        const existingSubnetIds = new Set(subnets.value.map(s => s.id))
+
         // Map the API response to our enhanced SubnetInstance interface
-        subnets.value = response.data.data.map((subnet: any): SubnetInstance => ({
+        const newSubnets = response.data.data.map((subnet: any): SubnetInstance => ({
           id: subnet.id,
           name: subnet.name,
           parent: subnet.parent,
@@ -157,9 +167,12 @@ export const useSubnetsStore = defineStore('subnets', () => {
           },
           validators: subnet.validators || [],
           created_at: subnet.created_at,
-          config: subnet.config
+          config: subnet.config,
+          isLoading: subnetLoadingStates.value.get(subnet.id) || false,
+          loadError: subnetErrors.value.get(subnet.id) || null
         }))
 
+        subnets.value = newSubnets
         lastUpdated.value = new Date()
         console.log(`Loaded ${subnets.value.length} subnets with enhanced status`)
       }
@@ -167,7 +180,47 @@ export const useSubnetsStore = defineStore('subnets', () => {
       console.error('Failed to load subnets:', err)
       error.value = err instanceof Error ? err.message : 'Failed to load subnets'
     } finally {
-      isLoading.value = false
+      if (showInitialLoading) {
+        isLoading.value = false
+      }
+    }
+  }
+
+  const setSubnetLoading = (subnetId: string, loading: boolean) => {
+    subnetLoadingStates.value.set(subnetId, loading)
+    // Update the subnet in the array
+    const subnet = subnets.value.find(s => s.id === subnetId)
+    if (subnet) {
+      subnet.isLoading = loading
+    }
+  }
+
+  const setSubnetError = (subnetId: string, error: string | null) => {
+    if (error) {
+      subnetErrors.value.set(subnetId, error)
+    } else {
+      subnetErrors.value.delete(subnetId)
+    }
+    // Update the subnet in the array
+    const subnet = subnets.value.find(s => s.id === subnetId)
+    if (subnet) {
+      subnet.loadError = error
+    }
+  }
+
+  const loadSubnetDetails = async (subnetId: string) => {
+    setSubnetLoading(subnetId, true)
+    setSubnetError(subnetId, null)
+
+    try {
+      // For now, refresh all subnets but could be optimized to load individual subnet
+      await loadSubnets(false)
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load subnet details'
+      setSubnetError(subnetId, errorMessage)
+      console.error(`Failed to load subnet ${subnetId}:`, err)
+    } finally {
+      setSubnetLoading(subnetId, false)
     }
   }
 
@@ -206,6 +259,9 @@ export const useSubnetsStore = defineStore('subnets', () => {
     // Actions
     loadSubnets,
     getSubnet,
-    refreshSubnet
+    refreshSubnet,
+    setSubnetLoading,
+    setSubnetError,
+    loadSubnetDetails
   }
 })

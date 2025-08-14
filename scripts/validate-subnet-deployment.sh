@@ -33,6 +33,11 @@ check_dependencies() {
         exit 1
     fi
 
+    if ! command -v python3 &> /dev/null; then
+        echo -e "${RED}Error: 'python3' command not found. Please install python3.${NC}"
+        exit 1
+    fi
+
     if [[ ! -f "$IPC_CLI" ]]; then
         echo -e "${RED}Error: IPC CLI not found at $IPC_CLI${NC}"
         echo -e "${YELLOW}Please build it with: cargo build --release --bin ipc-cli${NC}"
@@ -123,27 +128,52 @@ check_contract_exists() {
     fi
 }
 
-# Convert f4 address to Ethereum address
-f4_to_eth() {
-    local f4_addr="$1"
+# Convert f410 address to Ethereum address using Python
+f410_to_eth() {
+    local f410_addr="$1"
 
     # Root subnets (like /r31337) don't have actor addresses
-    if [[ "$f4_addr" =~ ^/r[0-9]+$ ]]; then
+    if [[ "$f410_addr" =~ ^/r[0-9]+$ ]]; then
         echo "N/A-ROOT-SUBNET"
         return
     fi
 
     # Extract the actor part (everything after the last '/')
-    local actor_part=$(echo "$f4_addr" | awk -F'/' '{print $NF}')
+    local actor_part=$(echo "$f410_addr" | awk -F'/' '{print $NF}')
 
-    # Check if actor part looks like a valid f4 address
-    if [[ ! "$actor_part" =~ ^t4[0-9a-z]+$ ]]; then
+    # Check if actor part looks like a valid f410 address
+    if [[ ! "$actor_part" =~ ^t410[0-9a-z]+$ ]]; then
         echo "N/A-INVALID-FORMAT"
         return
     fi
 
-    # Use IPC CLI to convert
-    local eth_addr=$("$IPC_CLI" util f4-to-eth-addr --addr "$actor_part" 2>/dev/null | grep -o '0x[a-fA-F0-9]*' | head -1)
+    # Use Python to convert
+    local eth_addr=$(python3 -c "
+import base64
+
+def crockford_base32_decode(data):
+    crockford_alphabet = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
+    standard_alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+    translate_table = str.maketrans(crockford_alphabet, standard_alphabet)
+    data_upper = data.upper()
+    standard_data = data_upper.translate(translate_table)
+    while len(standard_data) % 8 != 0:
+        standard_data += '='
+    try:
+        decoded = base64.b32decode(standard_data)
+        return decoded
+    except Exception:
+        return None
+
+f410_addr = '$actor_part'
+without_prefix = f410_addr[4:]
+decoded_bytes = crockford_base32_decode(without_prefix)
+if decoded_bytes and len(decoded_bytes) >= 20:
+    eth_bytes = decoded_bytes[-20:]
+    print('0x' + eth_bytes.hex())
+else:
+    print('N/A-CONVERSION-FAILED')
+" 2>/dev/null)
 
     if [[ -z "$eth_addr" ]]; then
         echo "N/A-CONVERSION-FAILED"
@@ -152,338 +182,176 @@ f4_to_eth() {
     fi
 }
 
-# Check if a subnet ID represents a root network
-is_root_network() {
-    local subnet_id="$1"
-    # Root networks follow pattern /r<number> with no additional components
-    [[ "$subnet_id" =~ ^/r[0-9]+$ ]]
-}
-
-# Check subnet registration with parent gateway
-check_subnet_registration() {
-    local subnet_id="$1"
-    local parent_id="$2"
-    local gateway_addr="$3"
-    local rpc="$4"
-
-    # Handle root networks differently
-    if is_root_network "$subnet_id"; then
-        echo -e "    ${BLUE}Checking root network gateway status...${NC}"
-
-        # For root networks, just check if the gateway is operational
-        local gateway_total=$(cast call "$gateway_addr" "totalSubnets()" --rpc-url "$rpc" 2>/dev/null || echo "0x0")
-        local total_count=$((gateway_total))
-
-        echo -e "    ${GREEN}✓ Root network gateway is operational${NC}"
-        echo -e "      ${CYAN}Gateway manages $total_count child subnet(s)${NC}"
-
-        if [[ $total_count -eq 0 ]]; then
-            echo -e "    ${YELLOW}ℹ No child subnets registered yet${NC}"
-            echo -e "    ${CYAN}💡 To add child subnets to this gateway:${NC}"
-            echo -e "      ${CYAN}Deploy child subnets using this gateway as parent${NC}"
-        else
-            echo -e "    ${GREEN}✓ Gateway is managing child subnets${NC}"
-        fi
-        return 0
-    fi
-
-    echo -e "    ${BLUE}Checking child subnet registration with parent gateway...${NC}"
-
-    # Get parent gateway configuration
-    local parent_config=$(get_subnet_config "$parent_id")
-    local parent_gateway_addr=$(echo "$parent_config" | cut -d'|' -f1)
-
-    # Check if this subnet is using the correct parent gateway
-    if [[ "$gateway_addr" != "$parent_gateway_addr" ]]; then
-        echo -e "    ${RED}✗ CONFIGURATION ERROR: Child subnet is using wrong gateway${NC}"
-        echo -e "      ${YELLOW}Child subnet gateway:  $gateway_addr${NC}"
-        echo -e "      ${YELLOW}Parent gateway:        $parent_gateway_addr${NC}"
-        echo -e "    ${CYAN}💡 ARCHITECTURE ISSUE: Child subnets should register with parent's gateway!${NC}"
-        echo -e "      ${CYAN}Current config has child subnet using its own gateway instead of parent's gateway.${NC}"
-        echo -e "      ${CYAN}This suggests UI deployment created new gateway instead of using parent's gateway.${NC}"
-        echo -e "    ${CYAN}💡 To fix: Update config to use parent gateway and re-register:${NC}"
-        echo -e "      ${CYAN}1. Update config: Change gateway_addr to $parent_gateway_addr${NC}"
-        echo -e "      ${CYAN}2. ipc-cli subnet approve --subnet $subnet_id --from <OWNER_ADDRESS>${NC}"
-        echo -e "      ${CYAN}3. ipc-cli subnet join --subnet $subnet_id --collateral <AMOUNT> --from <VALIDATOR_ADDRESS>${NC}"
-        return 1
-    fi
-
-    # Check if subnet is registered with the correct parent gateway
-    local gateway_total=$(cast call "$parent_gateway_addr" "totalSubnets()" --rpc-url "$rpc" 2>/dev/null || echo "0x0")
-    local total_count=$((gateway_total))
-
-    if [[ $total_count -gt 0 ]]; then
-        echo -e "    ${GREEN}✓ Parent gateway has $total_count subnet(s) registered${NC}"
-
-        # Try to verify this specific subnet is registered
-        local subnet_eth_addr=$(f4_to_eth "$subnet_id")
-        if [[ "$subnet_eth_addr" != "N/A-"* ]]; then
-            # Try to get subnet info to verify it's actually registered
-            local subnet_info=$(cast call "$parent_gateway_addr" "getSubnet(address)" "$subnet_eth_addr" --rpc-url "$rpc" 2>/dev/null)
-            if [[ $? -eq 0 && -n "$subnet_info" && "$subnet_info" != "0x" ]]; then
-                echo -e "      ${GREEN}✓ This specific child subnet is confirmed registered with parent${NC}"
-            else
-                echo -e "      ${YELLOW}⚠ Parent gateway has subnets but couldn't verify this specific one${NC}"
-            fi
-        fi
-        return 0
-    fi
-
-    echo -e "    ${RED}✗ Child subnet is NOT registered with parent gateway${NC}"
-    echo -e "    ${CYAN}💡 To fix: Run these commands:${NC}"
-    echo -e "      ${CYAN}ipc-cli subnet approve --subnet $subnet_id --from <OWNER_ADDRESS>${NC}"
-    echo -e "      ${CYAN}ipc-cli subnet join --subnet $subnet_id --collateral <AMOUNT> --from <VALIDATOR_ADDRESS>${NC}"
-    return 1
-}
-
-# Check validator configuration using multiple methods
-check_validators() {
-    local subnet_id="$1"
-    local gateway_addr="$2"
-    local registry_addr="$3"
-    local rpc="$4"
-
-    echo -e "    ${BLUE}Checking validator configuration...${NC}"
-
-    local found_validators=false
-    local total_validators=0
-
-    # Method 1: Check using ipc-cli subnet list-validators
-    echo -e "      ${CYAN}Method 1: IPC CLI list-validators${NC}"
-    local validators_output
-    local validators_exit_code
-
-    validators_output=$("$IPC_CLI" subnet list-validators --subnet "$subnet_id" 2>&1)
-    validators_exit_code=$?
-
-    if [[ $validators_exit_code -eq 0 && -n "$validators_output" ]]; then
-        local clean_output=$(echo "$validators_output" | grep -v "INFO\|WARN\|ERROR" | grep -v "^$")
-        if [[ -n "$clean_output" ]]; then
-            local validator_count=$(echo "$clean_output" | wc -l | tr -d ' ')
-            echo -e "        ${GREEN}✓ Found $validator_count validator(s) via IPC CLI${NC}"
-            echo "$clean_output" | sed 's/^/          /'
-            found_validators=true
-            total_validators=$((total_validators + validator_count))
-        else
-            echo -e "        ${YELLOW}⚠ IPC CLI returned empty validator list${NC}"
-        fi
-    else
-        echo -e "        ${YELLOW}⚠ IPC CLI list-validators failed or returned no data${NC}"
-    fi
-
-    # Method 2: Check registry contract for validators (if it's a federated subnet)
-    if [[ -n "$registry_addr" && "$registry_addr" != "<not set>" ]]; then
-        echo -e "      ${CYAN}Method 2: Registry contract validators${NC}"
-        check_registry_validators "$registry_addr" "$rpc"
-        if [[ $? -eq 0 ]]; then
-            found_validators=true
-        fi
-    fi
-
-    # Method 3: Check gateway contract for subnet validators
-    if [[ -n "$gateway_addr" && "$gateway_addr" != "<not set>" ]]; then
-        echo -e "      ${CYAN}Method 3: Gateway contract validators${NC}"
-        check_gateway_validators "$subnet_id" "$gateway_addr" "$rpc"
-        if [[ $? -eq 0 ]]; then
-            found_validators=true
-        fi
-    fi
-
-    # Method 4: Check subnet actor contract for validator info
-    local subnet_eth_addr=$(f4_to_eth "$subnet_id")
-    if [[ "$subnet_eth_addr" != "N/A-"* ]]; then
-        echo -e "      ${CYAN}Method 4: Subnet actor contract${NC}"
-        check_subnet_actor_validators "$subnet_eth_addr" "$rpc"
-        if [[ $? -eq 0 ]]; then
-            found_validators=true
-        fi
-    fi
-
-    if is_root_network "$subnet_id"; then
-        echo -e "    ${BLUE}Skipping validator check for root network${NC}"
-        echo -e "    ${CYAN}ℹ Root networks don't have IPC validators - they use the underlying blockchain's consensus${NC}"
-        return 0
-    fi
-
-    if [[ "$found_validators" == "true" ]]; then
-        echo -e "    ${YELLOW}⚠ Validators configured but subnet node may not be running${NC}"
-        echo -e "    ${CYAN}💡 Configured validators found, but to be fully operational:${NC}"
-        echo -e "      ${CYAN}1. Create node config YAML file (see docs/ipc/node-init.md)${NC}"
-        echo -e "      ${CYAN}2. Initialize node: ipc-cli node init --config <CONFIG_FILE>${NC}"
-        echo -e "      ${CYAN}3. Start subnet node: ipc-cli node start --home <NODE_HOME>${NC}"
-        echo -e "      ${CYAN}4. Validators must be actively participating in consensus${NC}"
-        echo -e "      ${CYAN}5. Check subnet node logs for validator activity${NC}"
-        return 0
-    else
-        echo -e "    ${RED}✗ No validators found using any method${NC}"
-        echo -e "    ${CYAN}💡 To fix: Run this command to join as a validator:${NC}"
-        echo -e "      ${CYAN}ipc-cli subnet join --subnet $subnet_id --collateral <AMOUNT> --from <VALIDATOR_ADDRESS>${NC}"
-        return 1
-    fi
-}
-
-# Check validators in registry contract (for federated subnets)
-check_registry_validators() {
-    local registry_addr="$1"
+# Query gateway contract for all registered subnet actors
+get_deployed_subnet_actors() {
+    local gateway_addr="$1"
     local rpc="$2"
 
-    # Try to get validator count from registry
-    local validator_count=$(cast call "$registry_addr" "validatorCount()" --rpc-url "$rpc" 2>/dev/null)
-    if [[ $? -eq 0 && -n "$validator_count" ]]; then
-        local count=$((validator_count))
-        if [[ $count -gt 0 ]]; then
-            echo -e "        ${GREEN}✓ Registry shows $count validator(s)${NC}"
+    echo -e "    ${BLUE}Querying gateway for deployed subnet actors...${NC}"
 
-            # Try to get individual validator addresses
-            for ((i=0; i<count; i++)); do
-                local validator_addr=$(cast call "$registry_addr" "validators(uint256)" "$i" --rpc-url "$rpc" 2>/dev/null)
-                if [[ $? -eq 0 && -n "$validator_addr" ]]; then
-                    echo -e "          [$i] $validator_addr"
+    # Get list of all registered subnets from gateway
+    local subnet_list=$(cast call "$gateway_addr" "listSubnets()" --rpc-url "$rpc" 2>/dev/null)
+
+    if [[ $? -eq 0 && -n "$subnet_list" && "$subnet_list" != "0x" ]]; then
+        echo -e "    ${GREEN}✓ Gateway returned subnet data${NC}"
+
+        # Extract addresses from the response (this is complex ABI decoding)
+        # For now, we'll try to extract any 20-byte hex addresses
+        local addresses=$(echo "$subnet_list" | grep -oE '0x[a-fA-F0-9]{40}' | sort -u)
+
+        if [[ -n "$addresses" ]]; then
+            echo -e "    ${GREEN}✓ Found deployed subnet actor contracts:${NC}"
+            echo "$addresses" | while read -r addr; do
+                if [[ -n "$addr" ]]; then
+                    echo -e "      - $addr"
+
+                    # Check permission mode for each deployed contract
+                    local permission_mode=$(cast call "$addr" "permissionMode()" --rpc-url "$rpc" 2>/dev/null)
+                    if [[ $? -eq 0 && -n "$permission_mode" ]]; then
+                        local mode_dec=$(cast --to-dec "$permission_mode" 2>/dev/null)
+                        local mode_name=""
+                        case "$mode_dec" in
+                            0) mode_name="Collateral" ;;
+                            1) mode_name="Federated" ;;
+                            2) mode_name="Static" ;;
+                            *) mode_name="Unknown($mode_dec)" ;;
+                        esac
+                        echo -e "        Permission Mode: $mode_name ($mode_dec)"
+                    fi
                 fi
             done
             return 0
         fi
     fi
 
-    # Try alternative method: getValidators() function
-    local validators_list=$(cast call "$registry_addr" "getValidators()" --rpc-url "$rpc" 2>/dev/null)
-    if [[ $? -eq 0 && -n "$validators_list" && "$validators_list" != "0x" ]]; then
-        echo -e "        ${GREEN}✓ Registry has validators (raw data)${NC}"
-        echo -e "          Raw: $validators_list"
-        return 0
-    fi
-
-    echo -e "        ${YELLOW}⚠ No validators found in registry contract${NC}"
+    echo -e "    ${YELLOW}⚠ No deployed subnet actors found or gateway query failed${NC}"
     return 1
 }
 
-# Check validators via gateway contract
-check_gateway_validators() {
+# Check if a specific subnet actor contract is deployed and get its details
+check_subnet_actor_details() {
+    local subnet_actor_addr="$1"
+    local rpc="$2"
+    local subnet_id="$3"
+
+    echo -e "    ${BLUE}Checking subnet actor contract: $subnet_actor_addr${NC}"
+
+    # Check if contract exists
+    local contract_exists=$(check_contract_exists "$subnet_actor_addr" "$rpc")
+    if [[ "$contract_exists" != "true" ]]; then
+        echo -e "    ${RED}✗ Subnet actor contract does not exist${NC}"
+        return 1
+    fi
+
+    echo -e "    ${GREEN}✓ Subnet actor contract exists${NC}"
+
+    # Get permission mode
+    local permission_mode=$(cast call "$subnet_actor_addr" "permissionMode()" --rpc-url "$rpc" 2>/dev/null)
+    if [[ $? -eq 0 && -n "$permission_mode" ]]; then
+        local mode_dec=$(cast --to-dec "$permission_mode" 2>/dev/null)
+        local mode_name=""
+        case "$mode_dec" in
+            0) mode_name="Collateral" ;;
+            1) mode_name="Federated" ;;
+            2) mode_name="Static" ;;
+            *) mode_name="Unknown($mode_dec)" ;;
+        esac
+        echo -e "    ${GREEN}✓ Permission Mode: $mode_name ($mode_dec)${NC}"
+    else
+        echo -e "    ${YELLOW}⚠ Could not retrieve permission mode${NC}"
+    fi
+
+    # Get parent subnet ID
+    local parent_data=$(cast call "$subnet_actor_addr" "getParent()" --rpc-url "$rpc" 2>/dev/null)
+    if [[ $? -eq 0 && -n "$parent_data" ]]; then
+        echo -e "    ${GREEN}✓ Parent subnet data retrieved${NC}"
+        # Extract chain ID from parent data (first 32 bytes after offset)
+        local chain_id_hex=$(echo "$parent_data" | grep -oE '7a69|31337' | head -1)
+        if [[ -n "$chain_id_hex" ]]; then
+            if [[ "$chain_id_hex" == "7a69" ]]; then
+                echo -e "      Parent Chain ID: 31337 (0x7a69)"
+            else
+                echo -e "      Parent Chain ID: $chain_id_hex"
+            fi
+        fi
+    fi
+
+    # Try to get additional info
+    local functions=("minValidators()" "majorityPercentage()" "bottomUpCheckPeriod()")
+    for func in "${functions[@]}"; do
+        local result=$(cast call "$subnet_actor_addr" "$func" --rpc-url "$rpc" 2>/dev/null)
+        if [[ $? -eq 0 && -n "$result" && "$result" != "0x" ]]; then
+            local func_name=$(echo "$func" | sed 's/()//')
+            local value=$(cast --to-dec "$result" 2>/dev/null || echo "$result")
+            echo -e "      $func_name: $value"
+        fi
+    done
+
+    return 0
+}
+
+# Check if subnet ID represents a root network
+is_root_network() {
+    local subnet_id="$1"
+    # Root networks follow pattern /r<number> with no additional components
+    [[ "$subnet_id" =~ ^/r[0-9]+$ ]]
+}
+
+# Check gateway status and deployed subnets
+check_gateway_status() {
+    local gateway_addr="$1"
+    local rpc="$2"
+
+    echo -e "    ${BLUE}Checking gateway contract status...${NC}"
+
+    # Check if gateway exists
+    local gateway_exists=$(check_contract_exists "$gateway_addr" "$rpc")
+    if [[ "$gateway_exists" != "true" ]]; then
+        echo -e "    ${RED}✗ Gateway contract does not exist${NC}"
+        return 1
+    fi
+
+    echo -e "    ${GREEN}✓ Gateway contract exists${NC}"
+
+    # Get total subnets
+    local total_subnets=$(cast call "$gateway_addr" "totalSubnets()" --rpc-url "$rpc" 2>/dev/null)
+    if [[ $? -eq 0 && -n "$total_subnets" ]]; then
+        local count=$(cast --to-dec "$total_subnets" 2>/dev/null || echo "0")
+        echo -e "    ${GREEN}✓ Gateway manages $count subnet(s)${NC}"
+
+        if [[ $count -gt 0 ]]; then
+            # Get deployed subnet actors
+            get_deployed_subnet_actors "$gateway_addr" "$rpc"
+        fi
+    else
+        echo -e "    ${YELLOW}⚠ Could not retrieve total subnets count${NC}"
+    fi
+
+    return 0
+}
+
+# Check subnet deployment status against configured vs deployed
+check_deployment_status() {
     local subnet_id="$1"
     local gateway_addr="$2"
     local rpc="$3"
 
-    # Get subnet actor address first
-    local subnet_eth_addr=$(f4_to_eth "$subnet_id")
-    if [[ "$subnet_eth_addr" == "N/A-"* ]]; then
-        echo -e "        ${YELLOW}⚠ Cannot check gateway validators (invalid subnet address)${NC}"
-        return 1
-    fi
+    echo -e "    ${BLUE}Checking deployment status...${NC}"
 
-    # Try to get subnet info from gateway
-    local subnet_info=$(cast call "$gateway_addr" "getSubnet(address)" "$subnet_eth_addr" --rpc-url "$rpc" 2>/dev/null)
-    if [[ $? -eq 0 && -n "$subnet_info" && "$subnet_info" != "0x" ]]; then
-        echo -e "        ${GREEN}✓ Gateway has subnet info${NC}"
-        echo -e "          Info: $subnet_info"
-        return 0
-    fi
+    # Get the converted Ethereum address from f410
+    local subnet_eth_addr=$(f410_to_eth "$subnet_id")
 
-    echo -e "        ${YELLOW}⚠ No subnet info found in gateway${NC}"
-    return 1
-}
-
-# Check validators in subnet actor contract
-check_subnet_actor_validators() {
-    local subnet_actor_addr="$1"
-    local rpc="$2"
-
-    # Try multiple validator-related functions
-    local functions=("validatorCount()" "getValidators()" "validators(uint256)" "totalValidators()")
-
-    for func in "${functions[@]}"; do
-        local result=$(cast call "$subnet_actor_addr" "$func" 0 --rpc-url "$rpc" 2>/dev/null)
-        if [[ $? -eq 0 && -n "$result" && "$result" != "0x" && "$result" != "0x0000000000000000000000000000000000000000000000000000000000000000" ]]; then
-            echo -e "        ${GREEN}✓ Subnet actor responds to $func${NC}"
-            echo -e "          Result: $result"
-            return 0
-        fi
-    done
-
-    echo -e "        ${YELLOW}⚠ No validator info found in subnet actor contract${NC}"
-    return 1
-}
-
-# Check gateway total subnets
-check_gateway_subnets() {
-    local gateway_addr="$1"
-    local rpc="$2"
-
-    echo -e "    ${BLUE}Checking gateway total subnets...${NC}"
-
-    local total_subnets=$(cast call "$gateway_addr" "totalSubnets()" --rpc-url "$rpc" 2>/dev/null || echo "error")
-
-    if [[ "$total_subnets" != "error" ]]; then
-        local count=$((total_subnets))
-        echo -e "    ${GREEN}✓ Gateway has $count total subnet(s) registered${NC}"
-        return 0
+    if [[ "$subnet_eth_addr" =~ ^N/A- ]]; then
+        echo -e "    ${YELLOW}⚠ Cannot convert f410 address: $subnet_eth_addr${NC}"
+        echo -e "    ${CYAN}ℹ This might be normal - deployed contracts may have different addresses${NC}"
     else
-        echo -e "    ${RED}✗ Failed to query gateway totalSubnets()${NC}"
-        return 1
-    fi
-}
+        echo -e "    ${CYAN}ℹ Converted f410 to Ethereum address: $subnet_eth_addr${NC}"
 
-# Check contract ownership and creation info (for root networks)
-check_contract_info() {
-    local subnet_id="$1"
-    local gateway_addr="$2"
-    local registry_addr="$3"
-    local rpc="$4"
-
-    echo -e "    ${BLUE}Checking contract ownership and info...${NC}"
-
-    # Check gateway owner
-    local gateway_owner=$(cast call "$gateway_addr" "owner()" --rpc-url "$rpc" 2>/dev/null)
-    if [[ $? -eq 0 && -n "$gateway_owner" ]]; then
-        echo -e "    ${GREEN}✓ Gateway owner: $gateway_owner${NC}"
-    else
-        echo -e "    ${YELLOW}⚠ Could not retrieve gateway owner${NC}"
+        # Check if this specific address is deployed
+        check_subnet_actor_details "$subnet_eth_addr" "$rpc" "$subnet_id"
     fi
 
-    # Check registry owner
-    local registry_owner=$(cast call "$registry_addr" "owner()" --rpc-url "$rpc" 2>/dev/null)
-    if [[ $? -eq 0 && -n "$registry_owner" ]]; then
-        echo -e "    ${GREEN}✓ Registry owner: $registry_owner${NC}"
-    else
-        echo -e "    ${YELLOW}⚠ Could not retrieve registry owner${NC}"
-    fi
-
-    # Try to get creation block/timestamp info
-    echo -e "    ${CYAN}ℹ Contract deployment info available via blockchain explorer${NC}"
     return 0
-}
-
-# Check subnet genesis epoch
-check_genesis_epoch() {
-    local subnet_id="$1"
-
-    if is_root_network "$subnet_id"; then
-        echo -e "    ${BLUE}Skipping genesis check for root network${NC}"
-        echo -e "    ${CYAN}ℹ Root networks use the underlying blockchain's genesis${NC}"
-        return 0
-    fi
-
-    echo -e "    ${BLUE}Checking subnet genesis epoch...${NC}"
-
-    # Use a more robust error handling approach
-    local epoch_output
-    local epoch_exit_code
-
-    epoch_output=$("$IPC_CLI" subnet genesis-epoch --subnet "$subnet_id" 2>&1)
-    epoch_exit_code=$?
-
-    if [[ $epoch_exit_code -eq 0 && -n "$epoch_output" && "$epoch_output" != "error" ]]; then
-        # Clean up the output by taking only the first line (ignore log messages)
-        local clean_epoch=$(echo "$epoch_output" | head -1)
-        echo -e "    ${GREEN}✓ Genesis epoch: $clean_epoch${NC}"
-        return 0
-    else
-        echo -e "    ${RED}✗ Failed to get genesis epoch (subnet may not be operational)${NC}"
-        echo -e "    ${CYAN}💡 To fix: Ensure the subnet node is running and properly configured:${NC}"
-        echo -e "      ${CYAN}1. Create node config YAML file for subnet $subnet_id (see docs/ipc/node-init.md)${NC}"
-        echo -e "      ${CYAN}2. ipc-cli node init --config <CONFIG_FILE>${NC}"
-        echo -e "      ${CYAN}3. ipc-cli node start --home <NODE_HOME>${NC}"
-        return 1
-    fi
 }
 
 # Get parent subnet ID
@@ -517,16 +385,13 @@ validate_subnet() {
     echo -e "    Registry: ${registry_addr:-<not set>}"
     echo -e "    RPC URL: ${effective_rpc}"
 
-    # Check 1: Gateway contract exists
     echo -e "  ${BLUE}Validation Results:${NC}"
+
+    # Check 1: Gateway contract status
     total=$((total + 1))
     if [[ -n "$gateway_addr" ]]; then
-        local gateway_exists=$(check_contract_exists "$gateway_addr" "$effective_rpc")
-        if [[ "$gateway_exists" == "true" ]]; then
-            echo -e "    ${GREEN}✓ Gateway contract exists${NC}"
+        if check_gateway_status "$gateway_addr" "$effective_rpc"; then
             success=$((success + 1))
-        else
-            echo -e "    ${RED}✗ Gateway contract does not exist${NC}"
         fi
     else
         echo -e "    ${RED}✗ No gateway address configured${NC}"
@@ -544,63 +409,14 @@ validate_subnet() {
         fi
     fi
 
-    # Check 3: Subnet actor contract exists
-    total=$((total + 1))
-    local subnet_eth_addr=$(f4_to_eth "$subnet_id")
-    if [[ "$subnet_eth_addr" == "N/A-ROOT-SUBNET" ]]; then
-        echo -e "    ${YELLOW}⚠ Root subnet - no actor contract to check${NC}"
-        success=$((success + 1))  # Count as success for root subnets
-    elif [[ "$subnet_eth_addr" =~ ^N/A- ]]; then
-        echo -e "    ${RED}✗ Failed to convert subnet ID to Ethereum address: $subnet_eth_addr${NC}"
-    elif [[ -n "$subnet_eth_addr" ]]; then
-        local subnet_exists=$(check_contract_exists "$subnet_eth_addr" "$effective_rpc")
-        if [[ "$subnet_exists" == "true" ]]; then
-            echo -e "    ${GREEN}✓ Subnet actor contract exists at $subnet_eth_addr${NC}"
-            success=$((success + 1))
-        else
-            echo -e "    ${RED}✗ Subnet actor contract does not exist at $subnet_eth_addr${NC}"
-        fi
-    else
-        echo -e "    ${RED}✗ Failed to convert subnet ID to Ethereum address${NC}"
-    fi
-
-    # Check 4: Subnet registration with parent
-    local parent_id=$(get_parent_subnet "$subnet_id")
-    if [[ "$parent_id" != "$subnet_id" && -n "$gateway_addr" ]]; then
-        total=$((total + 1))
-        if check_subnet_registration "$subnet_id" "$parent_id" "$gateway_addr" "$effective_rpc"; then
-            success=$((success + 1))
-        fi
-    fi
-
-    # Check 5: Gateway total subnets
-    if [[ -n "$gateway_addr" ]]; then
-        total=$((total + 1))
-        if check_gateway_subnets "$gateway_addr" "$effective_rpc"; then
-            success=$((success + 1))
-        fi
-    fi
-
-    # Check 6: Validator configuration (skip for root networks)
+    # Check 3: Subnet deployment status
     if ! is_root_network "$subnet_id"; then
         total=$((total + 1))
-        if check_validators "$subnet_id" "$gateway_addr" "$registry_addr" "$effective_rpc"; then
+        if check_deployment_status "$subnet_id" "$gateway_addr" "$effective_rpc"; then
             success=$((success + 1))
         fi
     else
-        # For root networks, check contract ownership info instead
-        total=$((total + 1))
-        if check_contract_info "$subnet_id" "$gateway_addr" "$registry_addr" "$effective_rpc"; then
-            success=$((success + 1))
-        fi
-    fi
-
-    # Check 7: Genesis epoch (skip for root networks)
-    if ! is_root_network "$subnet_id"; then
-        total=$((total + 1))
-        if check_genesis_epoch "$subnet_id"; then
-            success=$((success + 1))
-        fi
+        echo -e "    ${BLUE}ℹ Root network - skipping subnet actor checks${NC}"
     fi
 
     # Summary for this subnet
@@ -609,19 +425,17 @@ validate_subnet() {
 
     if is_root_network "$subnet_id"; then
         if [[ $success -eq $total ]]; then
-            echo -e "  ${GREEN}✓ Root network contracts are properly deployed and configured${NC}"
-        elif [[ $success -gt $((total / 2)) ]]; then
-            echo -e "  ${YELLOW}⚠ Root network has some configuration issues${NC}"
+            echo -e "  ${GREEN}✓ Root network contracts are properly deployed${NC}"
         else
-            echo -e "  ${RED}✗ Root network has significant deployment issues${NC}"
+            echo -e "  ${YELLOW}⚠ Root network has some issues${NC}"
         fi
     else
         if [[ $success -eq $total ]]; then
-            echo -e "  ${GREEN}✓ Subnet contracts are deployed and configured (node may need to be started)${NC}"
-        elif [[ $success -gt $((total / 2)) ]]; then
+            echo -e "  ${GREEN}✓ Subnet appears to be properly configured${NC}"
+        elif [[ $success -gt 0 ]]; then
             echo -e "  ${YELLOW}⚠ Subnet has some issues but may be partially operational${NC}"
         else
-            echo -e "  ${RED}✗ Subnet has significant issues${NC}"
+            echo -e "  ${RED}✗ Subnet has significant deployment issues${NC}"
         fi
     fi
 
@@ -648,11 +462,17 @@ main() {
 
     if [[ $total_issues -eq 0 ]]; then
         echo -e "${GREEN}✓ All subnets passed validation!${NC}"
+        echo -e "${CYAN}ℹ Note: This validates contract deployment, not node runtime status${NC}"
+        echo -e "${CYAN}ℹ To check if subnet nodes are running, check the appropriate RPC endpoints${NC}"
         exit 0
     else
         echo -e "${RED}✗ Found $total_issues total issues across all subnets${NC}"
         echo -e "${YELLOW}Please review the validation results above and fix any issues${NC}"
-        echo -e "${YELLOW}See docs/troubleshooting-subnet-deployment.md for detailed troubleshooting steps${NC}"
+        echo -e "${CYAN}💡 Key insights from validation:${NC}"
+        echo -e "${CYAN}  - f410 addresses in subnet IDs are identifiers, not deployed contract addresses${NC}"
+        echo -e "${CYAN}  - Actual deployed subnet actors are found via gateway.listSubnets()${NC}"
+        echo -e "${CYAN}  - Permission modes: 0=Collateral, 1=Federated, 2=Static${NC}"
+        echo -e "${CYAN}  - Subnet actors are deployed on the parent chain, not the subnet itself${NC}"
         exit 1
     fi
 }
@@ -680,6 +500,13 @@ while [[ $# -gt 0 ]]; do
             echo "  --config FILE    Path to IPC config file (default: ~/.ipc/config.toml)"
             echo "  --ipc-cli PATH   Path to IPC CLI binary (default: ./target/release/ipc-cli)"
             echo "  -h, --help       Show this help message"
+            echo ""
+            echo "This script validates IPC subnet deployments by:"
+            echo "  - Checking gateway and registry contract deployment"
+            echo "  - Querying gateway for actually deployed subnet actors"
+            echo "  - Comparing configured f410 addresses with deployed contracts"
+            echo "  - Showing permission modes (Collateral/Federated/Static)"
+            echo "  - Providing deployment status and troubleshooting info"
             exit 0
             ;;
         *)

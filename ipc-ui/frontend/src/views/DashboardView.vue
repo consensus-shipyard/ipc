@@ -247,6 +247,11 @@ const handleTroubleshoot = (subnet: SubnetInstance) => {
   // Could show detailed error information and suggested solutions
 }
 
+const handleSubnetRetry = (subnetId: string) => {
+  console.log('Retrying load for subnet:', subnetId)
+  subnetsStore.loadSubnetDetails(subnetId)
+}
+
 // Lifecycle - Data fetching is now handled by the centralized app store
 // onMounted(() => {
 //   fetchSubnets() // Removed - handled by app store
@@ -335,14 +340,8 @@ const handleTroubleshoot = (subnet: SubnetInstance) => {
         </RouterLink>
       </div>
 
-      <!-- Loading State -->
-      <div v-if="loading" class="text-center py-8">
-        <div class="animate-spin inline-block w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full"></div>
-        <p class="mt-4 text-gray-600">Loading subnets...</p>
-      </div>
-
-      <!-- Error State -->
-      <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-lg p-6">
+      <!-- Global Error State (only for initial load failures) -->
+      <div v-if="error && (subnets?.length || 0) === 0" class="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
         <div class="flex items-start space-x-3">
           <svg class="w-6 h-6 text-red-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
@@ -360,8 +359,14 @@ const handleTroubleshoot = (subnet: SubnetInstance) => {
         </div>
       </div>
 
+      <!-- Initial Loading State (only when no subnets exist) -->
+      <div v-if="loading && (subnets?.length || 0) === 0" class="text-center py-8">
+        <div class="animate-spin inline-block w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full"></div>
+        <p class="mt-4 text-gray-600">Loading subnets...</p>
+      </div>
+
       <!-- Empty State -->
-      <div v-else-if="(subnets?.length || 0) === 0" class="text-center py-12 text-gray-500">
+      <div v-else-if="!loading && (subnets?.length || 0) === 0" class="text-center py-12 text-gray-500">
         <div class="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
           <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
@@ -373,7 +378,7 @@ const handleTroubleshoot = (subnet: SubnetInstance) => {
       </div>
 
       <!-- Gateway-Grouped Subnets -->
-      <div v-else class="space-y-6">
+      <div v-if="(subnets?.length || 0) > 0" class="space-y-6">
         <div
           v-for="group in groupedSubnets"
           :key="group.gateway"
@@ -460,8 +465,17 @@ const handleTroubleshoot = (subnet: SubnetInstance) => {
             <div
               v-for="subnet in group.subnets"
               :key="subnet.id"
-              class="p-6 hover:bg-gray-50 transition-colors"
+              class="relative p-6 hover:bg-gray-50 transition-colors"
             >
+              <!-- Per-subnet loading indicator -->
+              <SubnetLoadingIndicator
+                :is-loading="subnet.isLoading"
+                :has-error="!!subnet.loadError"
+                :error-message="subnet.loadError || 'Failed to load subnet data'"
+                :loading-text="'Loading subnet data...'"
+                @retry="handleSubnetRetry(subnet.id)"
+              />
+
               <div class="flex items-start justify-between mb-4">
                 <div class="flex-1">
                   <div class="flex items-center space-x-3 mb-2">

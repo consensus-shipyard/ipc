@@ -5,7 +5,7 @@ export interface WebSocketCallbacks {
   onOpen?: () => void
   onClose?: () => void
   onError?: (error: Event) => void
-  onDeploymentProgress?: (progress: DeploymentProgress) => void
+  onDeploymentProgress?: (progress: DeploymentProgress) => void | Promise<void>
   onInstanceUpdate?: (instance: InstanceUpdate) => void
   onMessage?: (message: WSMessage) => void
 }

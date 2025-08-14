@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { apiService } from '../services/api'
 import { wsService, type WebSocketCallbacks } from '../services/websocket'
 import type { DeploymentProgress } from '../config/api'
+import { useL1GatewaysStore } from './l1-gateways'
 
 export interface SubnetConfig {
   // Template selection
@@ -285,6 +286,14 @@ export const useWizardStore = defineStore('wizard', () => {
     return config.value
   }
 
+  // Helper function to determine if gateways should be refreshed
+  const shouldRefreshGateways = (): boolean => {
+    const gatewayMode = config.value.gatewayMode
+    // Only refresh if we deployed a new gateway (not using existing ones)
+    // The 'deploy' mode creates a brand new gateway that should be added to the config
+    return gatewayMode === 'deploy' || gatewayMode === undefined
+  }
+
   // WebSocket integration
   const initializeWebSocket = async () => {
     const callbacks: WebSocketCallbacks = {
@@ -300,7 +309,7 @@ export const useWizardStore = defineStore('wizard', () => {
         console.error('WebSocket error:', error)
         isConnected.value = false
       },
-      onDeploymentProgress: (progress: DeploymentProgress) => {
+      onDeploymentProgress: async (progress: DeploymentProgress) => {
         console.log('Deployment progress:', progress)
         deploymentProgress.value = progress
 
@@ -331,6 +340,19 @@ export const useWizardStore = defineStore('wizard', () => {
           }
           if (!progress.subnet_id) {
             console.log('Deployment completed successfully')
+          }
+
+          // Auto-refresh gateways if a new gateway was deployed
+          if (progress.gateway_address && shouldRefreshGateways()) {
+            console.log('New gateway deployed, refreshing gateway list...')
+            try {
+              const gatewayStore = useL1GatewaysStore()
+              await gatewayStore.loadL1Gateways()
+              console.log('Gateway list refreshed successfully')
+            } catch (error) {
+              console.error('Failed to refresh gateway list:', error)
+              // Don't fail the deployment over gateway refresh issues
+            }
           }
         } else if (progress.status === 'failed') {
           isDeploying.value = false
