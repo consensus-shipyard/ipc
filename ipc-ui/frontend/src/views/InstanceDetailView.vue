@@ -116,6 +116,16 @@ const settingFederatedPower = ref(false)
 // Add validator modal state
 const showAddValidatorModal = ref(false)
 
+// Node config modal state
+const showNodeConfigModal = ref(false)
+const nodeConfigData = ref<{
+  validatorAddress: string
+  configYaml: string
+  commands: any
+  filename: string
+} | null>(null)
+const loadingNodeConfig = ref(false)
+
 // Computed
 const createdDate = computed(() => {
   if (!instance.value || !instance.value.created_at) return 'Unknown'
@@ -498,6 +508,73 @@ const updateStake = async (validatorAddress: string, action: 'stake' | 'unstake'
   } finally {
     updatingStake.value = { ...updatingStake.value, [validatorAddress]: false }
   }
+}
+
+// Node configuration methods
+const showNodeConfig = async (validatorAddress: string) => {
+  if (!instance.value) return
+
+  loadingNodeConfig.value = true
+  showNodeConfigModal.value = true
+
+  try {
+    const subnetId = encodeURIComponent(instance.value.id)
+
+    // Fetch both node config and commands in parallel
+    const [configResponse, commandsResponse] = await Promise.all([
+      fetch(`/api/subnets/${subnetId}/node-config?validator_address=${encodeURIComponent(validatorAddress)}`).then(r => r.json()),
+      fetch(`/api/subnets/${subnetId}/node-commands?validator_address=${encodeURIComponent(validatorAddress)}`).then(r => r.json())
+    ])
+
+    if (configResponse.success && commandsResponse.success) {
+      nodeConfigData.value = {
+        validatorAddress,
+        configYaml: configResponse.data.config_yaml,
+        commands: commandsResponse.data,
+        filename: configResponse.data.filename
+      }
+    } else {
+      error.value = 'Failed to generate node configuration'
+      showNodeConfigModal.value = false
+    }
+  } catch (err) {
+    console.error('Error fetching node config:', err)
+    error.value = err instanceof Error ? err.message : 'Failed to generate node configuration'
+    showNodeConfigModal.value = false
+  } finally {
+    loadingNodeConfig.value = false
+  }
+}
+
+const closeNodeConfigModal = () => {
+  showNodeConfigModal.value = false
+  nodeConfigData.value = null
+}
+
+const copyNodeConfig = async () => {
+  if (!nodeConfigData.value) return
+
+  try {
+    await navigator.clipboard.writeText(nodeConfigData.value.configYaml)
+    // You could add a toast notification here
+    console.log('Node configuration copied to clipboard')
+  } catch (err) {
+    console.error('Failed to copy to clipboard:', err)
+  }
+}
+
+const downloadNodeConfig = () => {
+  if (!nodeConfigData.value) return
+
+  const blob = new Blob([nodeConfigData.value.configYaml], { type: 'text/yaml' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = nodeConfigData.value.filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
 }
 
 // Bulk federated validator management methods
@@ -1050,6 +1127,8 @@ onUnmounted(() => {
                 instance?.config?.permissionMode === 'federated' ? 'Federated Mode' :
                 instance?.config?.permissionMode === 'collateral' ? 'Collateral Mode' :
                 instance?.config?.permissionMode === 'static' ? 'Static Mode' :
+                instance?.config?.permissionMode === 'root' ? 'Root Network' :
+                instance?.config?.permissionMode === 'unknown' ? 'Unknown Mode (not set)' :
                 `Unknown Mode (${instance?.config?.permissionMode || 'not set'})`
               }}
             </h4>
@@ -1074,14 +1153,41 @@ onUnmounted(() => {
               </ul>
             </div>
 
-            <div v-else class="text-blue-700 text-sm">
-              <p class="mb-2"><strong>{{ instance?.config?.permissionMode === 'unknown' ? 'Permission mode could not be determined' : 'Unknown permission mode' }}</strong>:</p>
+            <div v-else-if="instance?.config?.permissionMode === 'static'" class="text-blue-700 text-sm">
+              <p class="mb-2"><strong>Static subnets</strong> use predefined validator sets:</p>
               <ul class="list-disc list-inside space-y-1 ml-4">
-                <li v-if="instance?.config?.permissionMode === 'unknown'">Failed to retrieve permission mode from parent network</li>
+                <li>Validators are defined at subnet creation time</li>
+                <li>No dynamic joining or leaving of validators</li>
+                <li>Fixed validator set for the subnet's lifetime</li>
+                <li>No staking or power changes after deployment</li>
+              </ul>
+            </div>
+
+            <div v-else-if="instance?.config?.permissionMode === 'root'" class="text-blue-700 text-sm">
+              <p class="mb-2"><strong>Root networks</strong> are the base layer networks:</p>
+              <ul class="list-disc list-inside space-y-1 ml-4">
+                <li>This is a root network, not a subnet</li>
+                <li>Root networks don't have permission modes</li>
+                <li>They serve as parent networks for subnets</li>
+                <li>Validator management depends on the underlying consensus mechanism</li>
+              </ul>
+            </div>
+
+            <div v-else class="text-yellow-700 text-sm">
+              <p class="mb-2"><strong>{{ instance?.config?.permissionMode === 'unknown' ? 'Permission mode could not be determined' : 'Unrecognized permission mode' }}</strong>:</p>
+              <ul class="list-disc list-inside space-y-1 ml-4">
+                <li v-if="instance?.config?.permissionMode === 'unknown'">Unable to retrieve permission mode from the blockchain</li>
                 <li v-else>Unrecognized permission mode: "{{ instance?.config?.permissionMode }}"</li>
-                <li>Check if the parent network is properly configured</li>
-                <li>Verify network connectivity to the parent network</li>
-                <li>Check the subnet configuration and deployment status</li>
+                <li><strong>Possible causes:</strong></li>
+                <li class="ml-4">• Parent network connectivity issues</li>
+                <li class="ml-4">• Subnet not fully deployed or synchronized</li>
+                <li class="ml-4">• IPC configuration problems</li>
+                <li class="ml-4">• Network or blockchain synchronization delays</li>
+                <li><strong>Troubleshooting:</strong></li>
+                <li class="ml-4">• Check parent network configuration in IPC settings</li>
+                <li class="ml-4">• Verify network connectivity</li>
+                <li class="ml-4">• Wait for blockchain synchronization to complete</li>
+                <li class="ml-4">• Check subnet deployment status</li>
               </ul>
             </div>
           </div>
@@ -1225,26 +1331,50 @@ onUnmounted(() => {
               <div class="space-y-2">
                 <p class="font-medium text-gray-900">No Validators Found</p>
                 <p class="text-sm text-gray-500 max-w-md mx-auto">
-                  {{ instance?.config?.permissionMode === 'federated'
-                     ? 'No validators have been configured for this federated subnet yet.'
-                     : 'No validators have joined this subnet by staking collateral yet.' }}
+                  {{
+                    instance?.config?.permissionMode === 'federated' ? 'No validators have been configured for this federated subnet yet.' :
+                    instance?.config?.permissionMode === 'collateral' ? 'No validators have joined this subnet by staking collateral yet.' :
+                    instance?.config?.permissionMode === 'static' ? 'No validators are configured for this static subnet.' :
+                    instance?.config?.permissionMode === 'root' ? 'Root networks manage validators through their underlying consensus mechanism.' :
+                    instance?.config?.permissionMode === 'unknown' ? 'Unable to retrieve validator information due to configuration issues.' :
+                    'No validators have been configured for this subnet yet.'
+                  }}
                 </p>
                 <div class="mt-4 text-xs text-gray-400 space-y-1">
                   <p><strong>Possible reasons:</strong></p>
                   <ul class="list-disc list-inside space-y-1 max-w-lg mx-auto text-left">
-                    <li>The subnet was recently created and validators haven't joined yet</li>
-                    <li>The parent network may not be properly configured in your IPC settings</li>
-                    <li>Network connectivity issues preventing validator data retrieval</li>
-                    <li>Validators may be configured but not yet visible due to synchronization delays</li>
+                    <li v-if="instance?.config?.permissionMode === 'root'">Root networks don't display validators in the subnet interface</li>
+                    <li v-else-if="instance?.config?.permissionMode === 'unknown'">Permission mode could not be determined - check network connectivity</li>
+                    <li v-else>The subnet was recently created and validators haven't joined yet</li>
+                    <li v-if="instance?.config?.permissionMode !== 'root'">The parent network may not be properly configured in your IPC settings</li>
+                    <li v-if="instance?.config?.permissionMode !== 'root'">Network connectivity issues preventing validator data retrieval</li>
+                    <li v-if="instance?.config?.permissionMode !== 'root'">Validators may be configured but not yet visible due to synchronization delays</li>
+                    <li v-if="instance?.config?.permissionMode === 'unknown'">Blockchain synchronization is still in progress</li>
                   </ul>
+                </div>
+                <div v-if="instance?.config?.permissionMode === 'unknown'" class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <p class="text-yellow-800 text-sm font-medium mb-2">⚠️ Configuration Issue Detected</p>
+                  <p class="text-yellow-700 text-xs">
+                    The subnet's permission mode could not be determined. This usually indicates a connectivity or configuration problem.
+                    Check the browser console and server logs for more details.
+                  </p>
                 </div>
               </div>
               <button
+                v-if="instance?.config?.permissionMode !== 'root' && instance?.config?.permissionMode !== 'unknown'"
                 @click="showAddValidatorModal = true"
                 class="mt-6 btn-primary"
               >
                 Add Validator
               </button>
+              <div v-else-if="instance?.config?.permissionMode === 'unknown'" class="mt-6 space-x-2">
+                <button
+                  @click="fetchInstance"
+                  class="btn-secondary"
+                >
+                  Retry Loading
+                </button>
+              </div>
             </div>
 
             <div v-else class="overflow-x-auto">
@@ -1263,11 +1393,11 @@ onUnmounted(() => {
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
-                    <th v-if="instance?.config?.permissionMode === 'collateral'" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
+                                        <th v-if="instance?.config?.permissionMode === 'collateral'" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Stake Actions
                     </th>
                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Remove
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -1353,19 +1483,32 @@ onUnmounted(() => {
                       </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-right">
-                      <button
-                        @click="removeValidator(validator.address)"
-                        :disabled="removingValidator[validator.address]"
-                        class="text-red-600 hover:text-red-700 p-2 rounded hover:bg-red-50 transition-colors"
-                        :title="removingValidator[validator.address] ? 'Removing...' : 'Remove validator'"
-                      >
-                        <svg v-if="removingValidator[validator.address]" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                        <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
+                      <div class="flex items-center justify-end space-x-2">
+                        <!-- Node Config Button -->
+                        <button
+                          @click="showNodeConfig(validator.address)"
+                          class="text-blue-600 hover:text-blue-700 p-2 rounded hover:bg-blue-50 transition-colors"
+                          title="View node configuration"
+                        >
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                        </button>
+                        <!-- Remove Button -->
+                        <button
+                          @click="removeValidator(validator.address)"
+                          :disabled="removingValidator[validator.address]"
+                          class="text-red-600 hover:text-red-700 p-2 rounded hover:bg-red-50 transition-colors"
+                          :title="removingValidator[validator.address] ? 'Removing...' : 'Remove validator'"
+                        >
+                          <svg v-if="removingValidator[validator.address]" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                          <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 </tbody>
@@ -1489,6 +1632,122 @@ onUnmounted(() => {
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          </div>
+
+          <!-- Node Config Modal -->
+          <div v-if="showNodeConfigModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+            <div class="relative top-10 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+              <div class="mt-3">
+                <div class="flex items-center justify-between mb-4">
+                  <h3 class="text-lg font-medium text-gray-900">
+                    Node Configuration for {{ nodeConfigData?.validatorAddress || 'Validator' }}
+                  </h3>
+                  <button
+                    @click="closeNodeConfigModal"
+                    class="text-gray-400 hover:text-gray-600"
+                  >
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div v-if="loadingNodeConfig" class="flex items-center justify-center py-8">
+                  <div class="animate-spin inline-block w-8 h-8 border-4 border-current border-t-transparent rounded-full text-blue-600"></div>
+                  <span class="ml-3 text-gray-600">Generating node configuration...</span>
+                </div>
+
+                <div v-else-if="nodeConfigData" class="space-y-6">
+                  <!-- Configuration File Section -->
+                  <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="flex items-center justify-between mb-3">
+                      <h4 class="text-md font-semibold text-gray-900">Node Configuration File</h4>
+                      <div class="flex space-x-2">
+                        <button
+                          @click="copyNodeConfig"
+                          class="btn-secondary text-sm"
+                          title="Copy to clipboard"
+                        >
+                          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                          Copy
+                        </button>
+                        <button
+                          @click="downloadNodeConfig"
+                          class="btn-primary text-sm"
+                          title="Download file"
+                        >
+                          <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-4-4m4 4l4-4m3 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Download
+                        </button>
+                      </div>
+                    </div>
+                    <p class="text-sm text-gray-600 mb-3">
+                      Save this configuration as <code class="bg-gray-200 px-1 rounded">{{ nodeConfigData.filename }}</code>
+                    </p>
+                    <pre class="bg-white border rounded p-3 text-sm overflow-x-auto max-h-64"><code>{{ nodeConfigData.configYaml }}</code></pre>
+                  </div>
+
+                  <!-- Commands Section -->
+                  <div class="bg-blue-50 rounded-lg p-4">
+                    <h4 class="text-md font-semibold text-gray-900 mb-3">Setup Commands</h4>
+                    <p class="text-sm text-gray-600 mb-4">
+                      Run these commands in order to set up and start your validator node:
+                    </p>
+
+                    <div class="space-y-4">
+                      <div v-for="command in nodeConfigData.commands.commands" :key="command.step" class="bg-white rounded border p-3">
+                        <div class="flex items-start justify-between mb-2">
+                          <div>
+                            <h5 class="font-medium text-gray-900">Step {{ command.step }}: {{ command.title }}</h5>
+                            <p class="text-sm text-gray-600">{{ command.description }}</p>
+                          </div>
+                          <span v-if="command.required" class="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
+                            Required
+                          </span>
+                        </div>
+                        <pre class="bg-gray-100 rounded p-2 text-sm overflow-x-auto"><code>{{ command.command }}</code></pre>
+                        <p v-if="command.condition" class="text-xs text-gray-500 mt-1">{{ command.condition }}</p>
+                      </div>
+                    </div>
+
+                    <!-- Prerequisites -->
+                    <div class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                      <h5 class="font-medium text-yellow-800 mb-2">Prerequisites:</h5>
+                      <ul class="text-sm text-yellow-700 space-y-1">
+                        <li v-for="prerequisite in nodeConfigData.commands.prerequisites" :key="prerequisite" class="flex items-start">
+                          <span class="mr-2">•</span>
+                          <span>{{ prerequisite }}</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <!-- Important Notes -->
+                    <div class="mt-4 p-3 bg-orange-50 border border-orange-200 rounded">
+                      <h5 class="font-medium text-orange-800 mb-2">Important Notes:</h5>
+                      <ul class="text-sm text-orange-700 space-y-1">
+                        <li v-for="note in nodeConfigData.commands.notes" :key="note" class="flex items-start">
+                          <span class="mr-2">⚠️</span>
+                          <span>{{ note }}</span>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex justify-end pt-4">
+                  <button
+                    @click="closeNodeConfigModal"
+                    class="btn-secondary"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
           </div>

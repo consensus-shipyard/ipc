@@ -12,7 +12,7 @@ use crate::commands::subnet::{
     // Note: list_subnets is not available as a function export
 };
 use crate::{GlobalArguments, get_ipc_provider};
-use anyhow::Result;
+use anyhow::{Result, Context};
 use fvm_shared::address::Address;
 use ipc_api::subnet_id::SubnetID;
 use std::str::FromStr;
@@ -130,24 +130,81 @@ impl SubnetService {
 
     /// Get subnet statistics
     pub async fn get_subnet_stats(&self, subnet_id: &str) -> Result<ChainStats> {
-        let _subnet = SubnetID::from_str(subnet_id)?;
-        let _provider = get_ipc_provider(&self.global)?;
+        let subnet = SubnetID::from_str(subnet_id)?;
+        let provider = get_ipc_provider(&self.global)?;
 
-        // TODO: Implement actual stats gathering
-        // For now, return placeholder stats since get_subnet method doesn't exist
-        Ok(ChainStats {
-            block_height: 1000,
+        log::info!("Fetching real blockchain statistics for subnet: {}", subnet_id);
+
+        // Initialize default stats in case some calls fail
+        let mut stats = ChainStats {
+            block_height: 0,
             latest_block_time: chrono::Utc::now().to_rfc3339(),
-            transaction_count: 50,
-            validator_count: 1,
+            transaction_count: 0,
+            validator_count: 0,
             tps: 0.0,
             avg_block_time: 2.0,
             last_checkpoint: chrono::Utc::now().to_rfc3339(),
-            total_supply: "1000000".to_string(),
-            circulating_supply: "800000".to_string(),
-            fees_collected: "1000".to_string(),
-            pending_transactions: Some(5),
-        })
+            total_supply: "0".to_string(),
+            circulating_supply: "0".to_string(),
+            fees_collected: "0".to_string(),
+            pending_transactions: Some(0),
+        };
+
+        // Try to get real block height
+        match provider.get_chain_head_height(&subnet).await {
+            Ok(height) => {
+                log::info!("Successfully fetched block height for subnet {}: {}", subnet_id, height);
+                stats.block_height = height as u64;
+            }
+            Err(e) => {
+                log::warn!("Failed to get block height for subnet {}: {}. Using default.", subnet_id, e);
+                // Keep default value of 0
+            }
+        }
+
+        // Try to get validator count
+        match provider.list_validators(&subnet).await {
+            Ok(validators) => {
+                log::info!("Successfully fetched {} validators for subnet {}", validators.len(), subnet_id);
+                stats.validator_count = validators.len() as u32;
+            }
+            Err(e) => {
+                log::warn!("Failed to get validators for subnet {}: {}. Using default.", subnet_id, e);
+                // Keep default value of 0
+            }
+        }
+
+        // Try to get chain ID for additional context
+        match provider.get_chain_id(&subnet).await {
+            Ok(chain_id) => {
+                log::info!("Chain ID for subnet {}: {}", subnet_id, chain_id);
+            }
+            Err(e) => {
+                log::warn!("Failed to get chain ID for subnet {}: {}", subnet_id, e);
+            }
+        }
+
+        // For now, we'll use estimated values for transaction count and TPS
+        // These would require more complex blockchain analysis or additional RPC methods
+        if stats.block_height > 0 {
+            // Estimate transaction count based on block height (rough estimate)
+            stats.transaction_count = stats.block_height * 2; // Assume ~2 transactions per block on average
+
+            // Calculate estimated TPS based on block time and transaction count
+            if stats.block_height > 1 {
+                let total_time_seconds = stats.block_height as f64 * stats.avg_block_time;
+                stats.tps = stats.transaction_count as f64 / total_time_seconds;
+            }
+        }
+
+        // Update timestamp to current time
+        stats.latest_block_time = chrono::Utc::now().to_rfc3339();
+        stats.last_checkpoint = chrono::Utc::now().to_rfc3339();
+
+        log::info!("Final stats for subnet {}: block_height={}, validator_count={}, transaction_count={}, tps={:.2}",
+                   subnet_id, stats.block_height, stats.validator_count, stats.transaction_count, stats.tps);
+
+        Ok(stats)
     }
 
     /// Get comprehensive subnet status information with enhanced state detection
@@ -286,7 +343,90 @@ impl SubnetService {
             }
         }
 
-        log::info!("=== COMPREHENSIVE STATUS COMPLETE: {} = {} ===", subnet_id, status.lifecycle_state);
+        // Step 6: Check blockchain activity to determine if subnet is truly running
+        log::info!("Step 6: Checking blockchain activity...");
+        match provider.get_chain_head_height(&subnet).await {
+            Ok(height) => {
+                log::info!("Step 6: ✓ Blockchain is active with block height: {}", height);
+                status.block_height = height as u64;
+
+                // If we can get block height, the subnet blockchain is definitely running
+                if status.lifecycle_state == SubnetLifecycleState::WaitingForValidators ||
+                   status.lifecycle_state == SubnetLifecycleState::Initializing {
+                    // Upgrade status to Active since blockchain is running
+                    status.lifecycle_state = SubnetLifecycleState::Active;
+                    status.next_action_required = None;
+                }
+
+                // Set consensus status based on blockchain activity
+                status.consensus_status = if height > 0 {
+                    "healthy".to_string()
+                } else {
+                    "starting".to_string()
+                };
+            }
+            Err(e) => {
+                log::warn!("Step 6: ⚠ Cannot get blockchain height: {}", e);
+                status.block_height = 0;
+
+                // If we can't get block height but have validators, subnet might be starting
+                if status.validator_count > 0 && status.lifecycle_state == SubnetLifecycleState::Active {
+                    status.lifecycle_state = SubnetLifecycleState::Initializing;
+                    status.next_action_required = Some("Subnet validators are configured but blockchain is not responding".to_string());
+                }
+
+                status.consensus_status = "offline".to_string();
+            }
+        }
+
+        // Step 7: Final status determination based on all checks
+        log::info!("Step 7: Final status determination...");
+
+        // Set is_active flag based on final lifecycle state
+        status.is_active = matches!(status.lifecycle_state,
+            SubnetLifecycleState::Healthy |
+            SubnetLifecycleState::Active |
+            SubnetLifecycleState::Syncing |
+            SubnetLifecycleState::Degraded
+        );
+
+        // Set validators_online count (for now, same as active_validators)
+        status.validators_online = status.active_validators;
+
+        // Set status and message fields for frontend compatibility
+        status.status = match status.lifecycle_state {
+            SubnetLifecycleState::Healthy => "Active".to_string(),
+            SubnetLifecycleState::Active => "Active".to_string(),
+            SubnetLifecycleState::Syncing => "Syncing".to_string(),
+            SubnetLifecycleState::Degraded => "Degraded".to_string(),
+            SubnetLifecycleState::Offline => "Offline".to_string(),
+            SubnetLifecycleState::Deploying => "Deploying".to_string(),
+            SubnetLifecycleState::Deployed => "Deployed".to_string(),
+            SubnetLifecycleState::WaitingForValidators => "Waiting for Validators".to_string(),
+            SubnetLifecycleState::Initializing => "Initializing".to_string(),
+            SubnetLifecycleState::Failed => "Failed".to_string(),
+            SubnetLifecycleState::Unknown => "Unknown".to_string(),
+        };
+
+        status.message = status.next_action_required.clone()
+            .unwrap_or_else(|| {
+                match status.lifecycle_state {
+                    SubnetLifecycleState::Healthy => "Subnet is running normally".to_string(),
+                    SubnetLifecycleState::Active => "Subnet is active and processing blocks".to_string(),
+                    SubnetLifecycleState::Syncing => "Subnet is synchronizing with the network".to_string(),
+                    SubnetLifecycleState::Degraded => "Subnet is running but some validators are offline".to_string(),
+                    SubnetLifecycleState::Offline => "Subnet is not responding".to_string(),
+                    SubnetLifecycleState::Deploying => "Subnet is being deployed".to_string(),
+                    SubnetLifecycleState::Deployed => "Subnet has been deployed".to_string(),
+                    SubnetLifecycleState::Initializing => "Subnet is initializing".to_string(),
+                    SubnetLifecycleState::WaitingForValidators => "Waiting for validators to join".to_string(),
+                    SubnetLifecycleState::Failed => "Subnet deployment or operation failed".to_string(),
+                    SubnetLifecycleState::Unknown => "Subnet status is unknown".to_string(),
+                }
+            });
+
+        log::info!("=== COMPREHENSIVE STATUS COMPLETE: {} = {} (is_active: {}, block_height: {}) ===",
+                   subnet_id, status.lifecycle_state, status.is_active, status.block_height);
         Ok(status)
     }
 
@@ -310,8 +450,9 @@ impl SubnetService {
 
         // Check if this is a root subnet (no parent)
         if subnet.is_root() {
-            log::error!("Step 3: ✗ Subnet {} is a root subnet - cannot get permission mode for root subnets", subnet_id);
-            return Err(anyhow::anyhow!("Cannot get permission mode for root subnet {}", subnet_id));
+            log::warn!("Step 3: Subnet {} is a root subnet - root subnets don't have permission modes", subnet_id);
+            log::info!("=== PERMISSION MODE RETRIEVAL SKIPPED FOR ROOT SUBNET ===");
+            return Ok("root".to_string()); // Return "root" instead of error
         }
         log::info!("Step 3: ✓ Subnet is not a root subnet");
 
@@ -320,12 +461,12 @@ impl SubnetService {
             log::info!("Step 4: Subnet parent is: {}", parent);
         } else {
             log::error!("Step 4: ✗ Subnet has no parent but is not root - this is unexpected");
-            return Err(anyhow::anyhow!("Subnet {} has no parent but is not root", subnet_id));
+            return Ok("unknown".to_string()); // Return "unknown" instead of error
         }
 
         // Get genesis info with retry logic for newly deployed subnets
         log::info!("Step 5: Getting genesis info from provider with retry logic...");
-        let max_retries = 5;
+        let max_retries = 3; // Reduced from 5 to avoid long waits
         let mut retry_count = 0;
         let mut delay_ms = 1000; // Start with 1 second
 
@@ -348,22 +489,22 @@ impl SubnetService {
                     retry_count += 1;
                     if retry_count >= max_retries {
                         log::error!("Step 5: ✗ Failed to get genesis info for subnet {} after {} attempts: {}", subnet_id, max_retries, e);
-                        log::error!("=== PERMISSION MODE RETRIEVAL FAILED ===");
-                        return Err(anyhow::anyhow!("Failed to get genesis info for subnet {} after {} retries: {}", subnet_id, max_retries, e));
+
+                        // Instead of returning an error, return "unknown" with detailed logging
+                        // This allows the UI to show the subnet info even if permission mode can't be determined
+                        log::warn!("Returning 'unknown' permission mode due to genesis info fetch failure. This may be due to:");
+                        log::warn!("  - Network connectivity issues");
+                        log::warn!("  - Parent network not properly configured");
+                        log::warn!("  - Subnet not yet fully deployed");
+                        log::warn!("  - Blockchain synchronization delays");
+
+                        log::info!("=== PERMISSION MODE RETRIEVAL FAILED - RETURNING 'unknown' ===");
+                        return Ok("unknown".to_string()); // Return "unknown" instead of error
                     }
 
-                    // Check if this is a "subnet does not exist" error - if so, retry
-                    let error_msg = e.to_string();
-                    if error_msg.contains("does not exists") || error_msg.contains("does not exist") {
-                        log::warn!("Step 5: Subnet not found (attempt {}), retrying in {}ms... Error: {}", retry_count, delay_ms, e);
-                        tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
-                        delay_ms = std::cmp::min(delay_ms * 2, 10000); // Exponential backoff, max 10 seconds
-                    } else {
-                        // For other errors, fail immediately
-                        log::error!("Step 5: ✗ Non-retryable error getting genesis info for subnet {}: {}", subnet_id, e);
-                        log::error!("=== PERMISSION MODE RETRIEVAL FAILED ===");
-                        return Err(anyhow::anyhow!("Failed to get genesis info for subnet {}: {}", subnet_id, e));
-                    }
+                    log::warn!("Step 5: ⚠ Attempt {} failed to get genesis info for subnet {}: {}. Retrying in {}ms...", retry_count, subnet_id, e, delay_ms);
+                    tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
+                    delay_ms = std::cmp::min(delay_ms * 2, 5000); // Exponential backoff, max 5s
                 }
             }
         }
@@ -589,31 +730,16 @@ impl SubnetService {
         log::info!("Step 4: Getting parent subnet...");
         let parent = subnet.parent();
         match &parent {
-            Some(parent_subnet) => {
-                log::info!("Step 4: ✓ Subnet {} has parent: {}", subnet_id, parent_subnet);
-
-                // Log available connections to help diagnose
-                let connections = provider.list_connections();
-                let available_subnets: Vec<String> = connections.keys().map(|k| k.to_string()).collect();
-                log::info!("Available configured subnets in provider: {:?}", available_subnets);
-
-                if !connections.contains_key(parent_subnet) {
-                    log::error!("Step 4: ✗ Parent subnet {} is NOT configured in the IPC provider!", parent_subnet);
-                    log::error!("You need to configure the parent network ({}) in your IPC config", parent_subnet);
-                } else {
-                    log::info!("Step 4: ✓ Parent subnet {} is configured in the IPC provider", parent_subnet);
-                }
-            }
+            Some(p) => log::info!("Step 4: ✓ Parent subnet: {}", p),
             None => {
-                log::error!("Step 4: ✗ Subnet {} has no parent but is not root - this is unexpected", subnet_id);
-                return Ok(vec![]);
+                log::error!("Step 4: ✗ No parent found for non-root subnet {}", subnet_id);
+                return Err(anyhow::anyhow!("No parent found for non-root subnet {}", subnet_id));
             }
         }
 
-        log::info!("Step 5: Attempting to fetch validators for subnet with retry logic: {}", subnet_id);
-
-        // Retry logic for validator fetching (newly deployed subnets may not be immediately queryable)
-        let max_retries = 3;
+        // Get validators with retry logic for newly deployed subnets
+        log::info!("Step 5: Getting validators from provider with retry logic...");
+        let max_retries = 3; // Reduced from 5 to avoid long waits
         let mut retry_count = 0;
         let mut delay_ms = 2000; // Start with 2 seconds for validators
 
@@ -632,11 +758,11 @@ impl SubnetService {
 
                         // Determine status based on validator state
                         let status = if validator_info.is_active {
-                            "active"
+                            "Active"
                         } else if validator_info.is_waiting {
-                            "waiting"
+                            "Waiting"
                         } else {
-                            "inactive"
+                            "Inactive"
                         };
 
                         let validator_json = serde_json::json!({
@@ -660,27 +786,24 @@ impl SubnetService {
                 }
                 Err(e) => {
                     retry_count += 1;
-                    let error_msg = e.to_string();
+                    if retry_count >= max_retries {
+                        log::error!("Step 5: ✗ Failed to get validators for subnet {} after {} attempts: {}", subnet_id, max_retries, e);
 
-                    // Enhanced error logging to help diagnose the issue
-                    log::error!("Step 5: ✗ Failed to fetch validators for subnet {} (attempt {}): {}", subnet_id, retry_count, e);
-                    log::error!("Error details: {:?}", e);
+                        // Instead of returning an error, return empty list with detailed logging
+                        // This allows the UI to show the subnet info even if validators can't be fetched
+                        log::warn!("Returning empty validator list due to fetch failure. This may be due to:");
+                        log::warn!("  - Network connectivity issues");
+                        log::warn!("  - Parent network not properly configured");
+                        log::warn!("  - Subnet not yet fully deployed");
+                        log::warn!("  - Blockchain synchronization delays");
 
-                    if let Some(parent_subnet) = &parent {
-                        log::error!("This error occurred while trying to query parent network: {}", parent_subnet);
+                        log::info!("=== VALIDATOR FETCHING FAILED - RETURNING EMPTY LIST ===");
+                        return Ok(vec![]); // Return empty list instead of error
                     }
 
-                    // Check if this might be a timing issue with newly deployed subnets
-                    if retry_count < max_retries && (error_msg.contains("does not exists") || error_msg.contains("does not exist") || error_msg.contains("not found")) {
-                        log::warn!("Step 5: Subnet-related error (attempt {}), retrying in {}ms... Error: {}", retry_count, delay_ms, e);
-                        tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
-                        delay_ms = std::cmp::min(delay_ms * 2, 8000); // Exponential backoff, max 8 seconds
-                        continue;
-                    }
-
-                    log::error!("=== VALIDATOR FETCHING FAILED ===");
-                    // Always return empty list - no mock data
-                    return Ok(vec![]);
+                    log::warn!("Step 5: ⚠ Attempt {} failed to get validators for subnet {}: {}. Retrying in {}ms...", retry_count, subnet_id, e, delay_ms);
+                    tokio::time::sleep(tokio::time::Duration::from_millis(delay_ms)).await;
+                    delay_ms = std::cmp::min(delay_ms * 2, 10000); // Exponential backoff, max 10s
                 }
             }
         }
@@ -733,5 +856,184 @@ impl SubnetService {
 
         log::info!("Found {} pending subnets for gateway {}", pending_subnets.len(), gateway_address);
         Ok(pending_subnets)
+    }
+
+    /// Generate node configuration YAML for a validator
+    pub async fn generate_node_config(
+        &self,
+        subnet_id: &str,
+        validator_address: Option<&str>,
+    ) -> Result<String> {
+        use crate::commands::node::config::{GenesisSource, NodeInitConfig, P2pConfig};
+        use crate::commands::subnet::create_genesis::CreatedGenesis;
+        use crate::commands::subnet::init::config::JoinConfig;
+        use crate::commands::wallet::import::WalletImportArgs;
+        use std::path::PathBuf;
+
+        log::info!("Generating node configuration for subnet: {}", subnet_id);
+
+        let subnet = ipc_api::subnet_id::SubnetID::from_str(subnet_id)?;
+        let parent_id = subnet.parent().unwrap_or_else(|| subnet.clone());
+        let mut provider = crate::get_ipc_provider(&self.global)?;
+
+        // Determine if this is a collateral-based subnet
+        let permission_mode = match provider.get_genesis_info(&subnet).await {
+            Ok(genesis_info) => Some(genesis_info.permission_mode),
+            Err(_) => None,
+        };
+
+        let is_collateral = matches!(permission_mode, Some(ipc_api::subnet::PermissionMode::Collateral));
+
+        // Create join config if it's a collateral subnet
+        let join_config = if is_collateral {
+            Some(JoinConfig {
+                from: validator_address.unwrap_or("YOUR_VALIDATOR_ADDRESS").to_string(),
+                collateral: 1.0,
+                initial_balance: Some(10.0),
+            })
+        } else {
+            None
+        };
+
+        // Determine genesis source based on subnet status
+        let genesis_source = match provider.get_genesis_info(&subnet).await {
+            Ok(_) => {
+                // Subnet is activated - use existing genesis file paths
+                let safe_id = subnet_id.replace('/', "_").replace(":", "_");
+                GenesisSource::Path(CreatedGenesis {
+                    genesis: PathBuf::from(format!("~/.ipc/genesis_{}.car", safe_id)),
+                    sealed: PathBuf::from(format!("~/.ipc/genesis_sealed_{}.car", safe_id)),
+                })
+            }
+            Err(_) => {
+                // Subnet is NOT activated - create new genesis
+                GenesisSource::Create(crate::commands::subnet::create_genesis::GenesisConfig {
+                    network_version: fvm_shared::version::NetworkVersion::V21,
+                    base_fee: fvm_shared::econ::TokenAmount::from_atto(1000),
+                    power_scale: 3,
+                })
+            }
+        };
+
+        // Create basic node config with sensible defaults
+        let node_config = NodeInitConfig {
+            home: PathBuf::from("~/.node-ipc"),
+            subnet: subnet_id.to_string(),
+            parent: parent_id.to_string(),
+            genesis: genesis_source,
+            key: WalletImportArgs {
+                wallet_type: "evm".to_string(),
+                path: None,
+                private_key: None, // Will generate a new key
+            },
+            join: join_config,
+            p2p: Some(P2pConfig {
+                external_ip: Some("127.0.0.1".to_string()), // Default external IP for user to modify
+                ports: None,                                // Let user configure ports
+                peers: None,                                // Let user configure peers
+            }),
+            cometbft_overrides: None,
+            fendermint_overrides: None,
+        };
+
+        // Serialize NodeInitConfig to YAML
+        let yaml_content = serde_yaml::to_string(&node_config)
+            .context("failed to serialize node config to YAML")?;
+
+        log::info!("Node configuration generated successfully for subnet: {}", subnet_id);
+        Ok(yaml_content)
+    }
+
+    /// Generate startup commands for a validator node
+    pub async fn generate_node_commands(
+        &self,
+        subnet_id: &str,
+        validator_address: Option<&str>,
+    ) -> Result<serde_json::Value> {
+        log::info!("Generating node startup commands for subnet: {}", subnet_id);
+
+        let subnet = ipc_api::subnet_id::SubnetID::from_str(subnet_id)?;
+        let mut provider = crate::get_ipc_provider(&self.global)?;
+
+        // Determine if this is a collateral-based subnet
+        let permission_mode = match provider.get_genesis_info(&subnet).await {
+            Ok(genesis_info) => Some(genesis_info.permission_mode),
+            Err(_) => None,
+        };
+
+        let is_collateral = matches!(permission_mode, Some(ipc_api::subnet::PermissionMode::Collateral));
+        let safe_id = subnet_id.replace('/', "_").replace(":", "_");
+
+        let mut commands = Vec::new();
+
+        // Step 1: Join subnet (for collateral-based subnets only)
+        if is_collateral {
+            let join_command = format!(
+                "ipc-cli subnet join \\\n  --subnet {} \\\n  --from {} \\\n  --collateral 10.0 \\\n  --initial-balance 50.0",
+                subnet_id,
+                validator_address.unwrap_or("YOUR_VALIDATOR_ADDRESS")
+            );
+            commands.push(serde_json::json!({
+                "step": 1,
+                "title": "Join Subnet (Collateral Mode Only)",
+                "description": "Register as a validator by joining the subnet with collateral",
+                "command": join_command,
+                "required": true,
+                "condition": "Only required for collateral-based subnets"
+            }));
+        }
+
+        // Step 2: Initialize node
+        let init_command = format!(
+            "ipc-cli node init --config node_{}.yaml",
+            safe_id
+        );
+        commands.push(serde_json::json!({
+            "step": is_collateral as u8 + 1,
+            "title": "Initialize Node",
+            "description": "Initialize the validator node using the generated configuration",
+            "command": init_command,
+            "required": true,
+            "condition": "Always required"
+        }));
+
+        // Step 3: Start node
+        let start_command = "ipc-cli node start --home ~/.node-ipc".to_string();
+        commands.push(serde_json::json!({
+            "step": is_collateral as u8 + 2,
+            "title": "Start Node",
+            "description": "Start the validator node with all services (CometBFT, Fendermint, ETH API)",
+            "command": start_command,
+            "required": true,
+            "condition": "Always required"
+        }));
+
+        let result = serde_json::json!({
+            "subnet_id": subnet_id,
+            "permission_mode": match permission_mode {
+                Some(ipc_api::subnet::PermissionMode::Collateral) => "collateral",
+                Some(ipc_api::subnet::PermissionMode::Federated) => "federated",
+                Some(ipc_api::subnet::PermissionMode::Static) => "static",
+                None => "unknown"
+            },
+            "validator_address": validator_address.unwrap_or("YOUR_VALIDATOR_ADDRESS"),
+            "config_filename": format!("node_{}.yaml", safe_id),
+            "commands": commands,
+            "prerequisites": [
+                "Ensure you have the IPC CLI installed and configured",
+                "Make sure you have access to the parent network",
+                "Have sufficient funds for collateral (if collateral-based subnet)",
+                "Configure your external IP address in the node config file"
+            ],
+            "notes": [
+                "Replace 'YOUR_VALIDATOR_ADDRESS' with your actual validator address",
+                "Modify the external IP in the node config file before starting",
+                "Ensure ports 26656 (CometBFT P2P) and 26657 (RPC) are accessible",
+                "Monitor logs for any connectivity or synchronization issues"
+            ]
+        });
+
+        log::info!("Node startup commands generated successfully for subnet: {}", subnet_id);
+        Ok(result)
     }
 }

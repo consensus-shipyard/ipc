@@ -129,6 +129,14 @@ pub struct SubnetStatusInfo {
     pub last_block_time: Option<String>,
     pub error_message: Option<String>,
     pub next_action_required: Option<String>,
+    // Additional fields for frontend compatibility
+    pub is_active: bool,
+    pub block_height: u64,
+    pub validators_online: usize,
+    pub consensus_status: String,
+    pub sync_status: Option<String>,
+    pub status: String,
+    pub message: String,
 }
 
 impl Default for SubnetStatusInfo {
@@ -143,6 +151,13 @@ impl Default for SubnetStatusInfo {
             last_block_time: None,
             error_message: None,
             next_action_required: None,
+            is_active: false,
+            block_height: 0,
+            validators_online: 0,
+            consensus_status: String::new(),
+            sync_status: None,
+            status: String::new(),
+            message: String::new(),
         }
     }
 }

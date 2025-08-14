@@ -308,10 +308,11 @@ check_validators() {
     if [[ "$found_validators" == "true" ]]; then
         echo -e "    ${YELLOW}⚠ Validators configured but subnet node may not be running${NC}"
         echo -e "    ${CYAN}💡 Configured validators found, but to be fully operational:${NC}"
-        echo -e "      ${CYAN}1. Initialize node: ipc-cli node init --config <CONFIG_FILE>${NC}"
-        echo -e "      ${CYAN}2. Start subnet node: ipc-cli node start${NC}"
-        echo -e "      ${CYAN}3. Validators must be actively participating in consensus${NC}"
-        echo -e "      ${CYAN}4. Check subnet node logs for validator activity${NC}"
+        echo -e "      ${CYAN}1. Create node config YAML file (see docs/ipc/node-init.md)${NC}"
+        echo -e "      ${CYAN}2. Initialize node: ipc-cli node init --config <CONFIG_FILE>${NC}"
+        echo -e "      ${CYAN}3. Start subnet node: ipc-cli node start --home <NODE_HOME>${NC}"
+        echo -e "      ${CYAN}4. Validators must be actively participating in consensus${NC}"
+        echo -e "      ${CYAN}5. Check subnet node logs for validator activity${NC}"
         return 0
     else
         echo -e "    ${RED}✗ No validators found using any method${NC}"
@@ -478,8 +479,9 @@ check_genesis_epoch() {
     else
         echo -e "    ${RED}✗ Failed to get genesis epoch (subnet may not be operational)${NC}"
         echo -e "    ${CYAN}💡 To fix: Ensure the subnet node is running and properly configured:${NC}"
-        echo -e "      ${CYAN}1. ipc-cli node init --config <CONFIG_FILE>${NC}"
-        echo -e "      ${CYAN}2. ipc-cli node start${NC}"
+        echo -e "      ${CYAN}1. Create node config YAML file for subnet $subnet_id (see docs/ipc/node-init.md)${NC}"
+        echo -e "      ${CYAN}2. ipc-cli node init --config <CONFIG_FILE>${NC}"
+        echo -e "      ${CYAN}3. ipc-cli node start --home <NODE_HOME>${NC}"
         return 1
     fi
 }
