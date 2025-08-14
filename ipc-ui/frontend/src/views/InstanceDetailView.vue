@@ -185,7 +185,7 @@ const subnetActorAddress = computed(() => {
 
   // Extract the subnet actor address from the subnet ID
   // For IPC subnets, the format is typically /r{chainId}/{actorAddress}
-  // The last part of the route is the subnet actor contract address
+  // The address can be in Filecoin format (t410...) or Ethereum format (0x...)
   try {
     const subnetId = instance.value.data.id
     const parts = subnetId.split('/')
@@ -194,20 +194,41 @@ const subnetActorAddress = computed(() => {
       // The last part should be the subnet actor address
       const actorAddress = parts[parts.length - 1]
 
-      // Validate that it looks like an Ethereum address (40 hex chars)
+      // Handle Filecoin t410 addresses (delegated/Ethereum-compatible addresses)
+      if (actorAddress.startsWith('t410f')) {
+        // t410f addresses are Filecoin representations of Ethereum addresses
+        // The format is t410f{32-byte-address-in-base32}
+        // For display purposes, we'll show the full Filecoin address
+        return actorAddress
+      }
+
+      // Handle Ethereum addresses (with 0x prefix)
+      if (actorAddress.startsWith('0x') && actorAddress.length === 42) {
+        return actorAddress
+      }
+
+      // Handle raw hex addresses (40 hex chars without 0x)
       if (actorAddress.length === 40 && /^[a-fA-F0-9]+$/.test(actorAddress)) {
         return '0x' + actorAddress
       }
-      // If it's already prefixed with 0x
-      if (actorAddress.startsWith('0x') && actorAddress.length === 42) {
+
+      // Handle other Filecoin address formats (f0, f1, f2, f3, f4)
+      if (/^[tf][0-4]/.test(actorAddress)) {
         return actorAddress
       }
     }
 
-    // Fallback: try to extract from the raw ID if it contains an address
-    const addressMatch = subnetId.match(/0x[a-fA-F0-9]{40}/)
-    if (addressMatch) {
-      return addressMatch[0]
+    // Fallback: try to extract any address pattern from the raw ID
+    // Look for Ethereum addresses
+    const ethAddressMatch = subnetId.match(/0x[a-fA-F0-9]{40}/)
+    if (ethAddressMatch) {
+      return ethAddressMatch[0]
+    }
+
+    // Look for Filecoin addresses
+    const filAddressMatch = subnetId.match(/[tf][0-4][a-zA-Z0-9]+/)
+    if (filAddressMatch) {
+      return filAddressMatch[0]
     }
 
     return 'N/A (unable to parse from subnet ID)'
@@ -218,10 +239,8 @@ const subnetActorAddress = computed(() => {
 })
 
 const subnetActorAddressShort = computed(() => {
-  const fullAddress = subnetActorAddress.value
-  if (fullAddress === 'N/A' || !fullAddress.startsWith('0x')) return fullAddress
-  if (fullAddress.length < 14) return fullAddress // Don't truncate short addresses
-  return `${fullAddress.slice(0, 8)}...${fullAddress.slice(-6)}`
+  // Always return the full address - no truncation
+  return subnetActorAddress.value
 })
 
 // Copy to clipboard functionality
@@ -2113,16 +2132,16 @@ onUnmounted(() => {
           <div class="card">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Configuration Details</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div v-for="(value, key) in instance.data?.config" :key="key" class="flex justify-between py-2 border-b border-gray-100">
+              <div v-for="(value, key) in instance?.data?.config" :key="key" class="flex justify-between py-2 border-b border-gray-100">
                 <dt class="text-sm font-medium text-gray-500 capitalize">
-                  {{ key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()) }}
+                  {{ typeof key === 'string' ? key.replace(/([A-Z])/g, ' $1').replace(/^./, (str: string) => str.toUpperCase()) : key }}
                 </dt>
                 <dd class="text-sm text-gray-900">
                   <span v-if="typeof value === 'boolean'" :class="value ? 'text-green-600' : 'text-red-600'">
                     {{ value ? 'Yes' : 'No' }}
                   </span>
                   <button
-                    v-else-if="key === 'gateway_addr' || key === 'registry_addr'"
+                    v-else-if="(typeof key === 'string' && key === 'gateway_addr') || (typeof key === 'string' && key === 'registry_addr')"
                     @click="copyToClipboard(formatAddress(value), key)"
                     class="font-mono hover:bg-gray-100 px-2 py-1 rounded transition-colors cursor-pointer text-left"
                     :title="copyingAddress === key ? 'Copied!' : `Click to copy: ${formatAddress(value)}`"
