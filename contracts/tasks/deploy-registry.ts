@@ -41,6 +41,10 @@ task('deploy-registry')
                 name: 'SubnetActorCheckpointingFacet',
                 libraries: ['SubnetIDHelper'],
             },
+            {
+                name: 'SubnetActorCheckpointFacet',
+                libraries: ['SubnetIDHelper'],
+            },
             { name: 'DiamondCutFacet' },
             { name: 'DiamondLoupeFacet' },
             { name: 'OwnershipFacet' },
@@ -93,6 +97,7 @@ task('deploy-registry')
             diamondLoupeFacet: subnetActorFacets.addresses['DiamondLoupeFacet'],
             ownershipFacet: subnetActorFacets.addresses['OwnershipFacet'],
             activityFacet: subnetActorFacets.addresses['SubnetActorActivityFacet'],
+            checkpointFacet: subnetActorFacets.addresses['SubnetActorCheckpointFacet'],
 
             subnetActorGetterSelectors: selectors(subnetActorFacets.contracts['SubnetActorGetterFacet']),
             subnetActorManagerSelectors: selectors(subnetActorFacets.contracts['SubnetActorManagerFacet']),
@@ -103,6 +108,7 @@ task('deploy-registry')
             subnetActorDiamondLoupeSelectors: selectors(subnetActorFacets.contracts['DiamondLoupeFacet']),
             subnetActorOwnershipSelectors: selectors(subnetActorFacets.contracts['OwnershipFacet']),
             subnetActorActivitySelectors: selectors(subnetActorFacets.contracts['SubnetActorActivityFacet']),
+            subnetActorCheckpointSelectors: selectors(subnetActorFacets.contracts['SubnetActorCheckpointFacet']),
 
             creationPrivileges: Number(mode),
         }

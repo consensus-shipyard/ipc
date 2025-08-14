@@ -135,6 +135,10 @@ lazy_static! {
                             name: "SubnetGetterFacet",
                             abi: ia::subnet_getter_facet::SUBNETGETTERFACET_ABI.to_owned(),
                         },
+                        EthFacet {
+                            name: "SubnetActorCheckpointFacet",
+                            abi: ia::subnet_actor_checkpoint_facet::SUBNETACTORCHECKPOINTFACET_ABI.to_owned(),
+                        },
                     ],
                 },
             ),
@@ -188,6 +192,10 @@ lazy_static! {
                         EthFacet {
                             name: "OwnershipFacet",
                             abi: ia::ownership_facet::OWNERSHIPFACET_ABI.to_owned(),
+                        },
+                        EthFacet {
+                            name: "SubnetActorCheckpointFacet",
+                            abi: ia::subnet_actor_checkpoint_facet::SUBNETACTORCHECKPOINTFACET_ABI.to_owned(),
                         },
                     ],
                 },
@@ -477,6 +485,7 @@ pub mod registry {
         pub diamond_loupe_facet: Address,
         pub ownership_facet: Address,
         pub activity_facet: Address,
+        pub checkpoint_facet: Address,
         pub subnet_getter_selectors: Vec<FunctionSelector>,
         pub subnet_manager_selectors: Vec<FunctionSelector>,
         pub subnet_rewarder_selectors: Vec<FunctionSelector>,
@@ -486,6 +495,7 @@ pub mod registry {
         pub subnet_actor_diamond_loupe_selectors: Vec<FunctionSelector>,
         pub subnet_actor_ownership_selectors: Vec<FunctionSelector>,
         pub subnet_actor_activity_selectors: Vec<FunctionSelector>,
+        pub subnet_checkpoint_selectors: Vec<FunctionSelector>,
         pub creation_privileges: u8, // 0 = Unrestricted, 1 = Owner.
     }
 }

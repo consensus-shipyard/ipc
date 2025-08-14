@@ -11,6 +11,8 @@ import {PermissionMode, StakingReleaseQueue, PowerChangeLog, PowerChange, PowerC
 import {PowerReductionMoreThanTotal, NotValidator, CannotConfirmFutureChanges, NoCollateralToWithdraw, AddressShouldBeValidator, InvalidConfigurationNumber} from "../errors/IPCErrors.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
+import {ValidatorInfo} from "../structs/Subnet.sol";
+
 library LibAddressStakingReleases {
     /// @notice Add new release to the storage. Caller makes sure the release.releasedAt is ordered
     /// @notice in ascending order. This method does not do checks on this.
@@ -375,10 +377,14 @@ library LibPower {
         return s.validatorSet.isActiveValidator(validator);
     }
 
+    function getActiveValidatorInfo(address validator) internal view returns (ValidatorInfo memory) {
+        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
+        return s.validatorSet.validators[validator];
+    }
+
     function getActiveValidatorAddressByIndex(uint16 index) internal view returns (address validator) {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
-        validator = s.validatorSet.activeValidators.inner.posToAddress[index];
-
+        validator = s.validatorSet.activeValidators.inner.posToAddress[index + 1];
         if (validator == address(0)) {
             revert NotActiveValidator();
         }

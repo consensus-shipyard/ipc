@@ -2,21 +2,47 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! IPC related execution
 
-use crate::app::{AppState, AppStoreKey};
+use crate::app::{AppStoreKey, SubnetAppState};
 use crate::{App, BlockHeight};
+use ethers::abi::AbiEncode;
 use fendermint_storage::{Codec, Encode, KVReadable, KVStore, KVWritable};
 use fendermint_vm_genesis::{Power, Validator};
 use fendermint_vm_interpreter::fvm::state::ipc::GatewayCaller;
 use fendermint_vm_interpreter::fvm::state::{FvmExecState, FvmStateParams};
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
+use fendermint_vm_interpreter::MessagesInterpreter;
 use fendermint_vm_topdown::sync::ParentFinalityStateQuery;
 use fendermint_vm_topdown::IPCParentFinality;
 use fvm_ipld_blockstore::Blockstore;
+use ipc_actors_abis::subnet_actor_checkpoint_facet::{Commitment, StateCommitmentBreakDown};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use fendermint_vm_interpreter::MessagesInterpreter;
+pub fn derive_subnet_app_hash(state: &SubnetAppState) -> tendermint::hash::AppHash {
+    let state_params_cid = fendermint_vm_message::cid(state.state_params())
+        .expect("state params have a CID")
+        .to_bytes();
 
-use serde::{Deserialize, Serialize};
+    let mut submission = StateCommitmentBreakDown {
+        state_root: state_params_cid.into(),
+        msg_batch_commitment: Commitment::default(),
+        validator_next_configuration_number: 0,
+        activity_commitment: [0; 32],
+    };
+
+    if let Some(commitment) = state.light_client_commitments() {
+        submission.activity_commitment = commitment.activity_commitment;
+        submission.msg_batch_commitment = Commitment {
+            total_num_msgs: commitment.msg_batch_commitment.total_num_msgs,
+            msgs_root: commitment.msg_batch_commitment.msgs_root,
+        };
+        submission.validator_next_configuration_number =
+            commitment.validator_next_configuration_number;
+    }
+
+    let app_hash_bytes = ethers::utils::keccak256(submission.encode());
+    tendermint::hash::AppHash::try_from(app_hash_bytes.to_vec()).expect("hash can be wrapped")
+}
 
 /// All the things that can be voted on in a subnet.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -40,7 +66,7 @@ where
 impl<DB, SS, S, I> AppParentFinalityQuery<DB, SS, S, I>
 where
     S: KVStore
-        + Codec<AppState>
+        + Codec<SubnetAppState>
         + Encode<AppStoreKey>
         + Encode<BlockHeight>
         + Codec<FvmStateParams>,
@@ -69,7 +95,7 @@ where
 impl<DB, SS, S, I> ParentFinalityStateQuery for AppParentFinalityQuery<DB, SS, S, I>
 where
     S: KVStore
-        + Codec<AppState>
+        + Codec<SubnetAppState>
         + Encode<AppStoreKey>
         + Encode<BlockHeight>
         + Codec<FvmStateParams>,

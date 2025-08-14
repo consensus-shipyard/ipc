@@ -33,6 +33,7 @@ task('gen-selector-library', 'Generates a Solidity library with contract selecto
             'SubnetActorPauseFacet',
             'SubnetActorRewardFacet',
             'SubnetActorCheckpointingFacet',
+            'SubnetActorCheckpointFacet',
             'RegisterSubnetFacet',
             'SubnetGetterFacet',
             'SubnetActorMock',

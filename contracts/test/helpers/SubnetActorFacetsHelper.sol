@@ -4,6 +4,7 @@ pragma solidity ^0.8.23;
 import {SubnetActorManagerFacet} from "../../contracts/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorPauseFacet} from "../../contracts/subnet/SubnetActorPauseFacet.sol";
 import {SubnetActorCheckpointingFacet} from "../../contracts/subnet/SubnetActorCheckpointingFacet.sol";
+import {SubnetActorCheckpointFacet} from "../../contracts/subnet/SubnetActorCheckpointFacet.sol";
 import {SubnetActorActivityFacet} from "../../contracts/subnet/SubnetActorActivityFacet.sol";
 import {SubnetActorRewardFacet} from "../../contracts/subnet/SubnetActorRewardFacet.sol";
 import {SubnetActorGetterFacet} from "../../contracts/subnet/SubnetActorGetterFacet.sol";
@@ -64,6 +65,11 @@ library SubnetActorFacetsHelper {
 
     function checkpointer(SubnetActorDiamond sa) internal pure returns (SubnetActorCheckpointingFacet) {
         SubnetActorCheckpointingFacet facet = SubnetActorCheckpointingFacet(address(sa));
+        return facet;
+    }
+
+    function checkpoint(SubnetActorDiamond sa) internal pure returns (SubnetActorCheckpointFacet) {
+        SubnetActorCheckpointFacet facet = SubnetActorCheckpointFacet(address(sa));
         return facet;
     }
 
