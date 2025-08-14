@@ -224,10 +224,14 @@ const statusColor = computed(() => {
 // Methods
 const fetchInstance = async () => {
   try {
+    console.log('[InstanceDetailView] Starting fetchInstance, setting loading states...')
     loading.value = true
     loadingBasicInfo.value = true
     error.value = null
     basicInfoError.value = null
+
+    // Add a small delay to ensure loading state is visible
+    await new Promise(resolve => setTimeout(resolve, 100))
 
     // Decode the URL-encoded ID parameter
     const decodedId = decodeURIComponent(props.id)
@@ -243,6 +247,8 @@ const fetchInstance = async () => {
 
     if (response.data) {
       instance.value = response.data
+      // Now that we have instance data, fetch chain stats
+      fetchChainStats()
     } else {
       const errorMsg = 'Instance not found'
       error.value = errorMsg
@@ -254,6 +260,7 @@ const fetchInstance = async () => {
     error.value = errorMsg
     basicInfoError.value = errorMsg
   } finally {
+    console.log('[InstanceDetailView] Finishing fetchInstance, clearing loading states...')
     loading.value = false
     loadingBasicInfo.value = false
   }
@@ -677,12 +684,21 @@ const setBulkFederatedPower = async () => {
 
 // Chain statistics methods
 const fetchChainStats = async () => {
-  if (!instance.value) return
+  console.log('[InstanceDetailView] Fetching chain stats... instance:', instance.value)
 
   try {
+    // Always set loading states to show loading indicators
     loadingStats.value = true
     loadingChainStats.value = true
     statsError.value = null
+
+    console.log('[InstanceDetailView] Fetching chain stats... loadingStats:', loadingStats.value, 'loadingChainStats:', loadingChainStats.value)
+
+    // Only make API calls if we have instance data
+    if (!instance.value) {
+      console.log('[InstanceDetailView] No instance data yet, skipping API calls but keeping loading state')
+      return
+    }
 
     const [statsResponse, statusResponse] = await Promise.all([
       apiService.getSubnetStats(decodeURIComponent(props.id)),
@@ -832,7 +848,7 @@ onUnmounted(() => {
             </button>
             <div>
               <h1 class="text-2xl font-bold text-gray-900">
-                {{ instance?.name || 'Loading...' }}
+                {{ instance?.data?.name || 'Loading...' }}
               </h1>
               <p class="text-gray-600 mt-1">Subnet ID: {{ decodeURIComponent(props.id) }}</p>
             </div>
@@ -845,7 +861,7 @@ onUnmounted(() => {
                 statusColor
               ]"
             >
-              {{ (instance.status || 'Unknown').charAt(0).toUpperCase() + (instance.status || 'unknown').slice(1) }}
+              {{ (instance.data?.status || 'Unknown').charAt(0).toUpperCase() + (instance.data?.status || 'unknown').slice(1) }}
             </span>
           </div>
         </div>
@@ -882,7 +898,7 @@ onUnmounted(() => {
     </div>
 
     <!-- Main Content -->
-    <div v-else-if="instance" class="max-w-7xl mx-auto px-6 py-8">
+    <div v-else-if="instance || loadingBasicInfo" class="max-w-7xl mx-auto px-6 py-8">
       <!-- Quick Actions -->
       <div class="flex flex-wrap gap-3 mb-6">
         <button
@@ -2051,7 +2067,7 @@ onUnmounted(() => {
           <div class="card">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Configuration Details</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div v-for="(value, key) in instance.config" :key="key" class="flex justify-between py-2 border-b border-gray-100">
+              <div v-for="(value, key) in instance.data?.config" :key="key" class="flex justify-between py-2 border-b border-gray-100">
                 <dt class="text-sm font-medium text-gray-500 capitalize">
                   {{ key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()) }}
                 </dt>
