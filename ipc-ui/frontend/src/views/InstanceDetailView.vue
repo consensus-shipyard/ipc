@@ -21,12 +21,16 @@ interface SubnetInstance {
   id: string
   name: string
   status: string
-  template: string
+  template?: string
   parent: string
   created_at: string
   validators: Validator[]
-  validator_count?: number
   config: Record<string, any>
+  data?: {
+    validator_count?: number
+    validators?: Validator[]
+    [key: string]: any
+  }
 }
 
 interface ChainStats {
@@ -138,7 +142,7 @@ const createdDate = computed(() => {
   if (!instance.value || !instance.value.created_at) return 'Unknown'
 
   try {
-    return new Date(instance.value.created_at).toLocaleDateString('en-US', {
+    return new Date(instance.value.data?.created_at).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
@@ -146,32 +150,32 @@ const createdDate = computed(() => {
       minute: '2-digit'
     })
   } catch (error) {
-    console.warn('Error parsing created_at date:', instance.value.created_at)
+    console.warn('Error parsing created_at date:', instance.value.data?.created_at)
     return 'Invalid Date'
   }
 })
 
 const totalStake = computed(() => {
-  if (!instance.value?.validators) return '0'
-  return instance.value.validators
+  if (!instance.value?.data?.validators) return '0'
+  return instance.value.data?.validators
     .reduce((sum, v) => sum + parseFloat(v.stake || '0'), 0)
     .toFixed(2)
 })
 
 const totalPower = computed(() => {
-  if (!instance.value?.validators) return 0
-  return instance.value.validators
+  if (!instance.value?.data?.validators) return 0
+  return instance.value.data?.validators
     .reduce((sum, v) => sum + (v.power || 0), 0)
 })
 
 const gatewayAddress = computed(() => {
-  if (!instance.value?.config?.gateway_addr) return 'N/A'
-  return formatAddress(instance.value.config.gateway_addr)
+  if (!instance.value?.data?.config?.gateway_addr) return 'N/A'
+  return formatAddress(instance.value.data?.config?.gateway_addr)
 })
 
 const gatewayAddressShort = computed(() => {
-  if (!instance.value?.config?.gateway_addr) return 'N/A'
-  return formatAddressShort(instance.value.config.gateway_addr)
+  if (!instance.value?.data?.config?.gateway_addr) return 'N/A'
+  return formatAddressShort(instance.value.data?.config?.gateway_addr)
 })
 
 // Copy to clipboard functionality
@@ -970,7 +974,7 @@ onUnmounted(() => {
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             ]"
           >
-                            Validators ({{ instance.validator_count || instance.validators?.length || 0 }} validator{{ (instance.validator_count || instance.validators?.length || 0) !== 1 ? 's' : '' }})
+                            Validators ({{ instance.data?.validator_count || instance.validators?.length || 0 }} validator{{ (instance.data?.validator_count || instance.validators?.length || 0) !== 1 ? 's' : '' }})
           </button>
           <button
             @click="activeTab = 'configuration'"
@@ -1025,7 +1029,7 @@ onUnmounted(() => {
                     loading-text="Loading..."
                     @retry="fetchInstance"
                   >
-                    {{ instance?.id }}
+                    {{ instance?.data?.id }}
                   </FieldLoadingIndicator>
                 </dd>
               </div>
@@ -1038,7 +1042,7 @@ onUnmounted(() => {
                     loading-text="Loading..."
                     @retry="fetchInstance"
                   >
-                    {{ instance?.name }}
+                    {{ instance?.data?.name }}
                   </FieldLoadingIndicator>
                 </dd>
               </div>
@@ -1052,7 +1056,7 @@ onUnmounted(() => {
                     @retry="fetchInstance"
                   >
                     <span v-if="instance" :class="['inline-flex items-center px-2 py-1 rounded-full text-xs font-medium', statusColor]">
-                      {{ (instance.status || 'Unknown').charAt(0).toUpperCase() + (instance.status || 'unknown').slice(1) }}
+                      {{ (instance.data?.status || 'Unknown').charAt(0).toUpperCase() + (instance.data?.status || 'unknown').slice(1) }}
                     </span>
                   </FieldLoadingIndicator>
                 </dd>
@@ -1066,7 +1070,7 @@ onUnmounted(() => {
                     loading-text="Loading..."
                     @retry="fetchInstance"
                   >
-                    {{ instance?.template }}
+                    {{ instance?.data?.template }}
                   </FieldLoadingIndicator>
                 </dd>
               </div>
@@ -1079,7 +1083,7 @@ onUnmounted(() => {
                     loading-text="Loading..."
                     @retry="fetchInstance"
                   >
-                    {{ instance?.parent }}
+                    {{ instance?.data?.parent }}
                   </FieldLoadingIndicator>
                 </dd>
               </div>
@@ -1259,16 +1263,16 @@ onUnmounted(() => {
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               {{
-                instance?.config?.permissionMode === 'federated' ? 'Federated Mode' :
-                instance?.config?.permissionMode === 'collateral' ? 'Collateral Mode' :
-                instance?.config?.permissionMode === 'static' ? 'Static Mode' :
-                instance?.config?.permissionMode === 'root' ? 'Root Network' :
-                instance?.config?.permissionMode === 'unknown' ? 'Unknown Mode (not set)' :
-                `Unknown Mode (${instance?.config?.permissionMode || 'not set'})`
+                instance?.data?.config?.permissionMode === 'federated' ? 'Federated Mode' :
+                instance?.data?.config?.permissionMode === 'collateral' ? 'Collateral Mode' :
+                instance?.data?.config?.permissionMode === 'static' ? 'Static Mode' :
+                instance?.data?.config?.permissionMode === 'root' ? 'Root Network' :
+                instance?.data?.config?.permissionMode === 'unknown' ? 'Unknown Mode (not set)' :
+                `Unknown Mode (${instance?.data?.config?.permissionMode || 'not set'})`
               }}
             </h4>
 
-            <div v-if="instance?.config?.permissionMode === 'federated'" class="text-blue-700 text-sm">
+            <div v-if="instance?.data?.config?.permissionMode === 'federated'" class="text-blue-700 text-sm">
               <p class="mb-2"><strong>Federated subnets</strong> use centralized validator management:</p>
               <ul class="list-disc list-inside space-y-1 ml-4">
                 <li>Validators are added by setting their power directly</li>
@@ -1445,7 +1449,7 @@ onUnmounted(() => {
               <h3 class="text-lg font-semibold text-gray-900">Validators</h3>
               <div class="flex items-center space-x-3">
                 <div class="text-sm text-gray-500">
-                  {{ instance.validator_count || instance.validators?.length || 0 }} validator{{ (instance.validator_count || instance.validators?.length || 0) !== 1 ? 's' : '' }}
+                  {{ instance.data?.validator_count || instance.validators?.length || 0 }} validator{{ (instance.data?.validator_count || instance.validators?.length || 0) !== 1 ? 's' : '' }}
                 </div>
                 <button
                   @click="showAddValidatorModal = true"
@@ -1459,7 +1463,7 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <div v-if="(instance.validators?.length || 0) === 0" class="text-center py-8 text-gray-500">
+            <div v-if="(instance.data?.validators?.length || 0) === 0" class="text-center py-8 text-gray-500">
               <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
@@ -1487,7 +1491,7 @@ onUnmounted(() => {
                     <li v-if="instance?.config?.permissionMode === 'unknown'">Blockchain synchronization is still in progress</li>
                   </ul>
                 </div>
-                <div v-if="instance?.config?.permissionMode === 'unknown'" class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                <div v-if="instance?.data?.config?.permissionMode === 'unknown'" class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
                   <p class="text-yellow-800 text-sm font-medium mb-2">⚠️ Configuration Issue Detected</p>
                   <p class="text-yellow-700 text-xs">
                     The subnet's permission mode could not be determined. This usually indicates a connectivity or configuration problem.
@@ -1496,13 +1500,13 @@ onUnmounted(() => {
                 </div>
               </div>
               <button
-                v-if="instance?.config?.permissionMode !== 'root' && instance?.config?.permissionMode !== 'unknown'"
+                v-if="instance?.data?.config?.permissionMode !== 'root' && instance?.data?.config?.permissionMode !== 'unknown'"
                 @click="showAddValidatorModal = true"
                 class="mt-6 btn-primary"
               >
                 Add Validator
               </button>
-              <div v-else-if="instance?.config?.permissionMode === 'unknown'" class="mt-6 space-x-2">
+              <div v-else-if="instance?.data?.config?.permissionMode === 'unknown'" class="mt-6 space-x-2">
                 <button
                   @click="fetchInstance"
                   class="btn-secondary"
@@ -1528,7 +1532,7 @@ onUnmounted(() => {
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
-                                        <th v-if="instance?.config?.permissionMode === 'collateral'" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th v-if="instance?.data?.config?.permissionMode === 'collateral'" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Stake Actions
                     </th>
                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1537,7 +1541,7 @@ onUnmounted(() => {
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
-                  <tr v-for="validator in instance.validators" :key="validator.address">
+                  <tr v-for="validator in (instance.data?.validators || instance.validators)" :key="validator.address">
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
                       <button
                         @click="copyToClipboard(validator.address, validator.address)"
@@ -1551,7 +1555,7 @@ onUnmounted(() => {
                       </button>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div v-if="instance.config.permissionMode === 'collateral'">
+                      <div v-if="instance.data?.config?.permissionMode === 'collateral'">
                         {{ validator.stake }} FIL
                         <span v-if="validator.initial_balance" class="block text-xs text-gray-500">
                           Initial: {{ validator.initial_balance }} FIL
@@ -1562,7 +1566,7 @@ onUnmounted(() => {
                       </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div v-if="instance.config.permissionMode === 'federated'">
+                      <div v-if="instance.data?.config?.permissionMode === 'federated'">
                         <div class="flex items-center space-x-2">
                           <span>{{ validator.current_power || validator.power || '0' }}</span>
                           <span v-if="validator.next_power !== undefined && validator.current_power !== validator.next_power"
@@ -1586,12 +1590,12 @@ onUnmounted(() => {
                         {{ validator.status }}
                       </span>
                       <!-- Power transition indicator for federated mode -->
-                      <span v-if="instance.config.permissionMode === 'federated' && validator.current_power !== validator.next_power"
+                      <span v-if="instance.data?.config?.permissionMode === 'federated' && validator.current_power !== validator.next_power"
                             class="ml-2 inline-flex px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
                         Power Changing
                       </span>
                     </td>
-                    <td v-if="instance.config.permissionMode === 'collateral'" class="px-6 py-4 whitespace-nowrap">
+                    <td v-if="instance.data?.config?.permissionMode === 'collateral'" class="px-6 py-4 whitespace-nowrap">
                       <div class="flex items-center space-x-2">
                         <input
                           v-model.number="stakeAmounts[validator.address]"
@@ -2433,7 +2437,7 @@ onUnmounted(() => {
               <div class="space-y-3">
                 <div class="flex justify-between">
                   <span class="text-sm text-gray-500">Active Validators</span>
-                  <span class="text-sm font-medium text-gray-900">{{ instance.validator_count || instance.validators?.length || 0 }}</span>
+                  <span class="text-sm font-medium text-gray-900">{{ instance.data?.validator_count || instance.validators?.length || 0 }}</span>
                 </div>
                 <div class="flex justify-between">
                   <span class="text-sm text-gray-500">Validators Online</span>
