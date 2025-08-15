@@ -137,6 +137,46 @@ pub struct SubnetStatusInfo {
     pub sync_status: Option<String>,
     pub status: String,
     pub message: String,
+    // New fields for detailed subnet setup status
+    pub setup_checklist: SubnetSetupChecklist,
+}
+
+/// Detailed checklist of subnet setup steps
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubnetSetupChecklist {
+    pub permission_mode: String, // "federated", "collateral", "static"
+    pub steps: Vec<SetupStep>,
+    pub next_required_action: Option<String>,
+    pub all_complete: bool,
+}
+
+/// Individual setup step with status and action info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SetupStep {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub status: StepStatus,
+    pub required: bool,
+    pub action_available: bool,
+    pub action_button_text: Option<String>,
+    pub action_type: Option<String>, // "set_federated_power", "approve_subnet", etc.
+    pub details: Option<serde_json::Value>, // Additional data for the action
+}
+
+/// Status of an individual setup step
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum StepStatus {
+    #[serde(rename = "completed")]
+    Completed,
+    #[serde(rename = "pending")]
+    Pending,
+    #[serde(rename = "in_progress")]
+    InProgress,
+    #[serde(rename = "failed")]
+    Failed,
+    #[serde(rename = "not_applicable")]
+    NotApplicable,
 }
 
 impl Default for SubnetStatusInfo {
@@ -158,6 +198,18 @@ impl Default for SubnetStatusInfo {
             sync_status: None,
             status: String::new(),
             message: String::new(),
+            setup_checklist: SubnetSetupChecklist::default(),
+        }
+    }
+}
+
+impl Default for SubnetSetupChecklist {
+    fn default() -> Self {
+        SubnetSetupChecklist {
+            permission_mode: "unknown".to_string(),
+            steps: Vec::new(),
+            next_required_action: None,
+            all_complete: false,
         }
     }
 }

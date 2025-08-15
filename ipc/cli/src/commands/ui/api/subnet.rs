@@ -115,6 +115,10 @@ async fn handle_approve_subnet(
     approval_data: serde_json::Value,
     state: AppState,
 ) -> Result<impl Reply, warp::Rejection> {
+    log::info!("=== SUBNET APPROVAL REQUEST ===");
+    log::info!("Subnet ID (encoded): {}", subnet_id);
+    log::info!("Approval data: {}", approval_data);
+
     let global = GlobalArguments {
         config_path: Some(state.config_path.clone()),
         _network: fvm_shared::address::Network::Testnet,
@@ -125,15 +129,29 @@ async fn handle_approve_subnet(
 
     // URL decode the subnet ID
     let decoded_subnet_id = urlencoding::decode(&subnet_id)
-        .map_err(|e| warp::reject::custom(InvalidRequest(format!("Invalid subnet ID encoding: {}", e))))?;
+        .map_err(|e| {
+            log::error!("Failed to decode subnet ID: {}", e);
+            warp::reject::custom(InvalidRequest(format!("Invalid subnet ID encoding: {}", e)))
+        })?;
+
+    log::info!("Decoded subnet ID: {}", decoded_subnet_id);
 
     let from_address = approval_data.get("from")
         .and_then(|v| v.as_str());
 
+    log::info!("From address: {:?}", from_address);
+    log::info!("Calling service.approve_subnet...");
+
     match service.approve_subnet(&decoded_subnet_id, from_address).await {
-        Ok(_) => Ok(warp::reply::json(&ApiResponse::success(format!("Subnet {} approved successfully", decoded_subnet_id)))),
+        Ok(msg) => {
+            log::info!("✓ APPROVAL SUCCESS: {}", msg);
+            log::info!("=== END SUBNET APPROVAL (SUCCESS) ===");
+            Ok(warp::reply::json(&ApiResponse::success(format!("Subnet {} approved successfully", decoded_subnet_id))))
+        }
         Err(e) => {
-            log::error!("Subnet approval failed: {}", e);
+            log::error!("✗ APPROVAL FAILED: {}", e);
+            log::error!("Error details: {:?}", e);
+            log::error!("=== END SUBNET APPROVAL (FAILED) ===");
             Err(warp::reject::custom(ServerError(e.to_string())))
         }
     }
@@ -144,6 +162,9 @@ async fn handle_list_pending_approvals(
     gateway_address: String,
     state: AppState,
 ) -> Result<impl Reply, warp::Rejection> {
+    log::info!("=== LIST PENDING APPROVALS REQUEST ===");
+    log::info!("Gateway address: {}", gateway_address);
+
     let global = GlobalArguments {
         config_path: Some(state.config_path.clone()),
         _network: fvm_shared::address::Network::Testnet,
@@ -153,9 +174,19 @@ async fn handle_list_pending_approvals(
     let service = SubnetService::new(global);
 
     match service.list_pending_approvals(&gateway_address).await {
-        Ok(pending_subnets) => Ok(warp::reply::json(&ApiResponse::success(pending_subnets))),
+        Ok(pending_subnets) => {
+            log::info!("Found {} pending subnets", pending_subnets.len());
+            for subnet in &pending_subnets {
+                if let Some(id) = subnet.get("subnet_id").and_then(|v| v.as_str()) {
+                    log::info!("  - Pending subnet: {}", id);
+                }
+            }
+            log::info!("=== END LIST PENDING APPROVALS ===");
+            Ok(warp::reply::json(&ApiResponse::success(pending_subnets)))
+        }
         Err(e) => {
             log::error!("Failed to list pending approvals: {}", e);
+            log::error!("=== END LIST PENDING APPROVALS (ERROR) ===");
             Err(warp::reject::custom(ServerError(e.to_string())))
         }
     }

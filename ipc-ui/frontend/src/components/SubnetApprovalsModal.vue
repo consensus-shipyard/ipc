@@ -125,6 +125,7 @@
 
 <script setup lang="ts">
 import { apiService } from '@/services/api'
+import { useWalletStore } from '@/stores/wallet'
 import { onMounted, ref, watch } from 'vue'
 
 interface PendingSubnet {
@@ -177,9 +178,22 @@ const approveSubnet = async (subnetId: string) => {
   approvingSubnets.value.add(subnetId)
 
   try {
-    console.log('Approving subnet:', subnetId, 'with gateway:', props.gatewayAddress)
-    // The gateway address is NOT the owner address for approval - it's the child subnet ID
-    const response = await apiService.approveSubnet(subnetId, props.gatewayAddress)
+    console.log('Approving subnet:', subnetId)
+
+    // Get the user's default wallet address to sign the approval transaction
+    const walletStore = useWalletStore()
+    await walletStore.fetchAddresses()
+
+    const fromAddress = walletStore.defaultAddress
+    if (!fromAddress) {
+      error.value = 'Please select a wallet address to approve the subnet'
+      approvingSubnets.value.delete(subnetId)
+      return
+    }
+
+    console.log('Using wallet address for approval:', fromAddress)
+    const response = await apiService.approveSubnet(subnetId, fromAddress)
+
     if (response.data.success) {
       // Remove from pending list
       pendingSubnets.value = pendingSubnets.value.filter(s => s.subnet_id !== subnetId)

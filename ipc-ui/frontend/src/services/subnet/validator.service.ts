@@ -35,7 +35,13 @@ export class ValidatorService {
    * Set federated power for validators
    */
   static async setFederatedPower(data: FederatedPowerData) {
-    return apiService.setFederatedPower(data)
+    return apiService.setFederatedPower(
+      data.subnetId,
+      data.validators.map(v => v.address),
+      data.validators.map(v => v.pubkey),
+      data.validators.map(v => v.power),
+      data.fromAddress
+    )
   }
 
   /**

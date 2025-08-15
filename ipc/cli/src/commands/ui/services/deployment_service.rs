@@ -2,27 +2,17 @@
 //!
 //! This service wraps existing CLI handlers for deployment operations.
 
-use super::super::api::types::{ApiResponse, InvalidRequest, ServerError};
-use crate::commands::deploy::{deploy_contracts as deploy_contracts_cmd, DeployConfig, CliSubnetCreationPrivilege};
-use crate::commands::subnet::create::{CreateSubnet, CreateSubnetArgs};
-use crate::commands::subnet::init::config::SubnetCreateConfig;
+use crate::commands::subnet::init::config::{SubnetCreateConfig, DeployConfig};
 use crate::{GlobalArguments, get_ipc_provider, f64_to_token_amount, require_fil_addr_from_str};
-use anyhow::{anyhow, Context, Result};
-use chrono;
+use anyhow::{Context, Result};
 use ethers::types::Address as EthAddress;
-use fendermint_eth_deployer::{DeployedContracts, EthContractDeployer, SubnetCreationPrivilege};
-use fendermint_eth_hardhat::Hardhat;
-use fvm_shared::address::Address;
+use fendermint_eth_deployer::DeployedContracts;
 use ipc_api::subnet::{PermissionMode, AssetKind, Asset};
 use ipc_api::subnet_id::SubnetID;
-use ipc_provider::{config::Config, new_evm_keystore_from_config};
-use ipc_wallet::{EthKeyAddress, PersistentKeyStore};
+use ipc_provider::new_evm_keystore_from_config;
 use serde::{Serialize, Deserialize};
 use serde_json;
-use std::collections::HashMap;
 use std::str::FromStr;
-use std::sync::Arc;
-use tokio::sync::mpsc;
 use warp::http::HeaderMap;
 use ipc_types::EthAddress as IpcEthAddress;
 
@@ -44,8 +34,7 @@ pub struct ContractInfo {
     pub deployed_at: Option<String>,
 }
 
-// Progress callback type for contract deployment
-pub type ProgressCallback = Arc<dyn Fn(ContractDeploymentProgress) + Send + Sync>;
+
 
 /// Result of a subnet deployment operation
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,6 +43,8 @@ pub struct SubnetDeploymentResult {
     pub parent_id: String,
     pub gateway_address: Option<String>,
     pub registry_address: Option<String>,
+    pub status: String,
+    pub message: Option<String>,
 }
 
 #[derive(Clone)]
@@ -178,7 +169,7 @@ impl DeploymentService {
     pub async fn deploy_subnet(
         &self,
         config: serde_json::Value,
-        headers: &warp::http::HeaderMap,
+        _headers: &warp::http::HeaderMap,
     ) -> Result<SubnetDeploymentResult> {
         log::info!("Starting real subnet deployment with config: {}", serde_json::to_string_pretty(&config)?);
 
@@ -261,15 +252,17 @@ impl DeploymentService {
             from: Some(from_address_str.to_string()),
         };
 
-        match crate::commands::subnet::approve::approve_subnet(&mut provider, &approve_args).await {
+        let auto_approval_error = match crate::commands::subnet::approve::approve_subnet(&mut provider, &approve_args).await {
             Ok(_) => {
                 log::info!("Successfully auto-approved subnet: {}", subnet_id);
+                None
             }
             Err(e) => {
                 log::warn!("Failed to auto-approve subnet {}: {}", subnet_id, e);
                 // Don't fail the deployment if approval fails - user can approve manually
+                Some(format!("Subnet created but not approved: {}. Please approve manually.", e))
             }
-        }
+        };
 
         // Get gateway and registry addresses from parent network configuration
         let ipc_config_store = crate::ipc_config_store::IpcConfigStore::load_or_init(&self.global).await?;
@@ -300,6 +293,8 @@ impl DeploymentService {
             parent_id: parent_id.to_string(), // Use parent_id instead of parent_network to avoid duplication
             gateway_address: Some(format!("{}", gateway_address)), // Clean format without Debug
             registry_address: Some(format!("{}", registry_address)), // Clean format without Debug
+            status: if auto_approval_error.is_some() { "pending-approval".to_string() } else { "active".to_string() },
+            message: auto_approval_error,
         };
 
         log::info!("Subnet deployment completed successfully: {:?}", result);
@@ -461,6 +456,8 @@ impl DeploymentService {
                 parent_id: parent_id.to_string(),
                 gateway_address: Some(ethers_address_to_fil_address(&gateway_addr)?.to_string()),
                 registry_address: Some(ethers_address_to_fil_address(&registry_addr)?.to_string()),
+                status: "active".to_string(),
+                message: None,
             };
 
             log::info!("Subnet deployment completed successfully: {:?}", result);

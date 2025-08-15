@@ -153,7 +153,7 @@ check_contract_exists() {
     fi
 }
 
-# Convert f410 address to Ethereum address using Python
+# Convert f410 address to Ethereum address using IPC CLI
 f410_to_eth() {
     local f410_addr="$1"
 
@@ -172,7 +172,16 @@ f410_to_eth() {
         return
     fi
 
-    # Use Python to convert
+    # Use IPC CLI to convert if available
+    if [[ -f "$IPC_CLI" ]]; then
+        local eth_addr=$($IPC_CLI util f4-to-eth-addr --addr "$actor_part" 2>&1 | grep -oE '0x[a-fA-F0-9]{40}' | head -1)
+        if [[ -n "$eth_addr" ]]; then
+            echo "$eth_addr"
+            return
+        fi
+    fi
+
+    # Fallback to Python conversion (with corrected logic)
     local eth_addr=$(python3 -c "
 import base64
 
@@ -194,6 +203,7 @@ f410_addr = '$actor_part'
 without_prefix = f410_addr[4:]
 decoded_bytes = crockford_base32_decode(without_prefix)
 if decoded_bytes and len(decoded_bytes) >= 20:
+    # Note: This is a simplified conversion that may not always match IPC CLI
     eth_bytes = decoded_bytes[-20:]
     print('0x' + eth_bytes.hex())
 else:
@@ -430,7 +440,7 @@ get_subnet_by_id() {
     return 1
 }
 
-# Check subnet deployment status against configured vs deployed
+# Check subnet deployment status and approval
 check_deployment_status() {
     local subnet_id="$1"
     local gateway_addr="$2"
@@ -438,65 +448,116 @@ check_deployment_status() {
 
     echo -e "    ${BLUE}Checking deployment status for subnet: $subnet_id${NC}"
 
-    # Query the gateway for all deployed subnets
-    local subnet_list=$(cast call "$gateway_addr" "listSubnets()" --rpc-url "$rpc" 2>/dev/null)
+    # First, check if the subnet actor exists based on the subnet ID
+    # Convert subnet ID to expected actor address
+    local expected_actor_addr=""
+    local subnet_f410_part=$(echo "$subnet_id" | grep -oE 't410[0-9a-z]+$')
 
-    if [[ $? -ne 0 || -z "$subnet_list" || "$subnet_list" == "0x" ]]; then
-        echo -e "    ${RED}✗ Failed to query gateway for subnet list${NC}"
-        return 1
-    fi
+    if [[ -n "$subnet_f410_part" ]]; then
+        # Convert f410 address to Ethereum address
+        expected_actor_addr=$(f410_to_eth "$subnet_f410_part")
 
-    # Extract subnet actor addresses from the response
-    # The last address in each subnet's route array is the subnet actor address
-    # This is a simplified extraction - in practice you'd need proper ABI decoding
-    local found_match=false
-    local subnet_actor_addr=""
+        if [[ "$expected_actor_addr" =~ ^0x[a-fA-F0-9]{40}$ ]]; then
+            echo -e "    ${CYAN}ℹ Expected subnet actor address: $expected_actor_addr${NC}"
 
-    # Try to find subnet actors from the decoded data
-    # Look for addresses that appear to be subnet actors (not gateway addresses)
-    local potential_actors=""
+            # Check if contract exists at expected address
+            local actor_exists=$(check_contract_exists "$expected_actor_addr" "$rpc")
+            if [[ "$actor_exists" == "true" ]]; then
+                echo -e "    ${GREEN}✓ Subnet actor contract exists at expected address${NC}"
 
-    # Extract addresses from the ABI-encoded response
-    # First, convert the response to a continuous string and extract 64-char chunks
-    local hex_data=$(echo "$subnet_list" | tr -d '\n ' | sed 's/^0x//')
-
-    # Extract potential addresses by looking for 64-char hex strings that end with
-    # what looks like a valid address (not all zeros)
-    potential_actors=$(echo "$hex_data" | fold -w 64 | \
-                      grep -E '^0{24}[1-9a-fA-F]' | \
-                      sed 's/^0\{24\}/0x/' | sort -u)
-
-    # Also check for addresses that might not be zero-padded
-    if [[ -z "$potential_actors" ]]; then
-        potential_actors=$(echo "$hex_data" | grep -oE '[1-9a-fA-F][0-9a-fA-F]{39}' | \
-                          grep -v '^0\+$' | while read addr; do echo "0x$addr"; done | sort -u)
-    fi
-
-    while read -r actor_addr; do
-        if [[ -n "$actor_addr" && "$actor_addr" != "$gateway_addr" ]]; then
-            # Check if this is a subnet actor by trying to call permissionMode()
-            local permission_mode=$(cast call "$actor_addr" "permissionMode()" --rpc-url "$rpc" 2>/dev/null)
-            if [[ $? -eq 0 && -n "$permission_mode" ]]; then
-                echo -e "    ${GREEN}✓ Found potential subnet actor at: $actor_addr${NC}"
-
-                # Try to get the subnet ID from this actor
-                local actor_subnet_id=$(cast call "$actor_addr" "getParent()(uint64,address[])" --rpc-url "$rpc" 2>/dev/null)
-
-                # Check details for this subnet actor
-                check_subnet_actor_details "$actor_addr" "$rpc" "$subnet_id"
-                found_match=true
-                subnet_actor_addr="$actor_addr"
+                # Check if it's a valid subnet actor
+                local permission_mode=$(cast call "$expected_actor_addr" "permissionMode()" --rpc-url "$rpc" 2>/dev/null)
+                if [[ $? -eq 0 && -n "$permission_mode" ]]; then
+                    echo -e "    ${GREEN}✓ Contract is a valid subnet actor${NC}"
+                else
+                    echo -e "    ${RED}✗ Contract exists but is not a valid subnet actor${NC}"
+                    return 1
+                fi
+            else
+                echo -e "    ${RED}✗ Subnet actor contract does not exist at expected address${NC}"
+                echo -e "    ${CYAN}ℹ Subnet may not be deployed yet${NC}"
+                return 1
             fi
+        else
+            echo -e "    ${YELLOW}⚠ Could not convert subnet ID to expected actor address${NC}"
         fi
-    done <<< "$potential_actors"
-
-    if [[ "$found_match" != "true" ]]; then
-        echo -e "    ${YELLOW}⚠ Could not find a matching deployed subnet actor${NC}"
-        echo -e "    ${CYAN}ℹ This subnet may not be deployed yet${NC}"
-        return 1
     fi
 
-    return 0
+    # Now check if the subnet is approved (registered in the gateway)
+    echo -e "    ${BLUE}Checking subnet approval status using direct getSubnet() method...${NC}"
+
+    # Extract components from subnet ID for SubnetID struct
+    local root_chain=$(echo "$subnet_id" | grep -oE '/r[0-9]+' | sed 's|/r||')
+    local actor_addresses=()
+
+    # Parse the subnet ID to extract actor addresses in the route
+    # For /r31337/t410... format
+    if [[ "$subnet_id" =~ ^/r[0-9]+/(.+) ]]; then
+        local route_part="${BASH_REMATCH[1]}"
+
+        # Split by '/' and convert each f410 address to Ethereum address
+        IFS='/' read -ra ADDR_PARTS <<< "$route_part"
+        for addr_part in "${ADDR_PARTS[@]}"; do
+            if [[ "$addr_part" =~ ^t410[0-9a-z]+$ ]]; then
+                local eth_addr=$(f410_to_eth "$addr_part")
+                if [[ "$eth_addr" =~ ^0x[a-fA-F0-9]{40}$ ]]; then
+                    actor_addresses+=("$eth_addr")
+                fi
+            elif [[ "$addr_part" =~ ^0x[a-fA-F0-9]{40}$ ]]; then
+                actor_addresses+=("$addr_part")
+            fi
+        done
+    fi
+
+    # Construct the route array for cast command
+    local route_array=""
+    if [[ ${#actor_addresses[@]} -gt 0 ]]; then
+        route_array=$(IFS=,; echo "[${actor_addresses[*]}]")
+    else
+        route_array="[]"
+    fi
+
+    # Call getSubnet with proper SubnetID struct
+    local get_subnet_result=$(cast call "$gateway_addr" \
+        "getSubnet((uint64,address[]))(bool,(uint256,uint256,uint256,uint64,uint64,(uint64,address[])))" \
+        "($root_chain,$route_array)" \
+        --rpc-url "$rpc" 2>/dev/null)
+
+    if [[ $? -eq 0 && -n "$get_subnet_result" ]]; then
+        # Parse the first returned value (bool found)
+        # The result is hex-encoded, first 32 bytes represent the boolean
+        local found_hex=$(echo "$get_subnet_result" | cut -c3-66)  # Remove 0x and get first 32 bytes
+        local found_dec=$(cast --to-dec "0x$found_hex" 2>/dev/null || echo "0")
+
+        if [[ "$found_dec" == "1" ]]; then
+            echo -e "    ${GREEN}✓ Subnet is APPROVED and registered in gateway${NC}"
+            echo -e "    ${CYAN}ℹ Used direct getSubnet() method - more reliable than listSubnets()${NC}"
+
+            # If we have the expected actor address, check its details
+            if [[ -n "$expected_actor_addr" ]]; then
+                check_subnet_actor_details "$expected_actor_addr" "$rpc" "$subnet_id"
+            fi
+            return 0
+        else
+            echo -e "    ${RED}✗ Subnet is NOT APPROVED - getSubnet() returned false${NC}"
+            echo -e "    ${YELLOW}⚠ Run: ipc-cli subnet approve --subnet $subnet_id${NC}"
+            return 1
+        fi
+    else
+        echo -e "    ${YELLOW}⚠ Failed to call getSubnet() - falling back to listSubnets() method${NC}"
+
+        # Fallback to the old method if getSubnet fails
+        local total_subnets=$(cast call "$gateway_addr" "totalSubnets()" --rpc-url "$rpc" 2>/dev/null)
+        local count=$(cast --to-dec "$total_subnets" 2>/dev/null || echo "0")
+
+        if [[ "$count" == "0" ]]; then
+            echo -e "    ${RED}✗ Subnet is NOT APPROVED - Gateway has no registered subnets${NC}"
+            echo -e "    ${YELLOW}⚠ Run: ipc-cli subnet approve --subnet $subnet_id${NC}"
+        else
+            echo -e "    ${RED}✗ Failed to query gateway for subnet status${NC}"
+        fi
+        return 1
+    fi
 }
 
 # Decode subnet information from gateway more accurately
@@ -821,7 +882,7 @@ validate_subnet() {
         fi
     fi
 
-    # Check 3: Subnet deployment status
+    # Check 3: Subnet deployment and approval status
     if ! is_root_network "$subnet_id"; then
         total=$((total + 1))
         if check_deployment_status "$subnet_id" "$gateway_addr" "$effective_rpc"; then

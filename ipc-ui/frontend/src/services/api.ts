@@ -243,8 +243,21 @@ export const apiService = {
     return retryRequest(() => api.post(API_ENDPOINTS.validators.updateStake, stakeData))
   },
 
-  async setFederatedPower(powerData: FederatedPowerRequest) {
-    return retryRequest(() => api.post(API_ENDPOINTS.validators.setFederatedPower, powerData))
+  async setFederatedPower(
+    subnetId: string,
+    validatorAddresses: string[],
+    validatorPubkeys: string[],
+    validatorPowers: number[],
+    fromAddress: string
+  ) {
+    const powerData = {
+      subnetId,
+      validatorAddresses,
+      validatorPubkeys,
+      validatorPowers,
+      fromAddress
+    }
+    return retryRequest(() => api.post(`/api/subnets/${encodeURIComponent(subnetId)}/power`, powerData))
   },
 
   // Configuration management

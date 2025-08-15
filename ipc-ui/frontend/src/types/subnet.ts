@@ -25,6 +25,7 @@ export interface SubnetInstance {
   validators: Validator[]
   config: SubnetConfig
   data?: SubnetData
+  status_info?: SubnetStatusInfo
 }
 
 export interface SubnetData {
@@ -37,6 +38,7 @@ export interface SubnetData {
   validator_count?: number
   validators?: Validator[]
   config?: SubnetConfig
+  status_info?: SubnetStatusInfo
   [key: string]: unknown
 }
 
@@ -160,4 +162,44 @@ export interface FederatedPowerData {
     pubkey: string
     power: number
   }>
+}
+
+// Subnet setup checklist types
+export interface SubnetStatusInfo {
+  lifecycle_state: string
+  genesis_available: boolean
+  validator_count: number
+  active_validators: number
+  permission_mode?: string
+  deployment_time?: string
+  last_block_time?: string
+  error_message?: string
+  next_action_required?: string
+  is_active: boolean
+  block_height: number
+  validators_online: number
+  consensus_status: string
+  sync_status?: string
+  status: string
+  message: string
+  setup_checklist: SubnetSetupChecklist
+}
+
+export interface SubnetSetupChecklist {
+  permission_mode: string
+  steps: SetupStep[]
+  next_required_action?: string
+  all_complete: boolean
+}
+
+export interface SetupStep {
+  id: string
+  title: string
+  description: string
+  status: 'completed' | 'pending' | 'in_progress' | 'failed' | 'not_applicable'
+  required: boolean
+  action_available: boolean
+  action_button_text?: string
+  action_type?: string
+  details?: any
 }

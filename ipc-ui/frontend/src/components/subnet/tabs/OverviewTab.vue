@@ -2,6 +2,7 @@
 import FieldLoadingIndicator from '@/components/common/FieldLoadingIndicator.vue'
 import type { ChainStats, SubnetInstance, SubnetStatus } from '@/types/subnet'
 import { computed } from 'vue'
+import SubnetStatusDashboard from '../SubnetStatusDashboard.vue'
 
 interface Props {
   instance: SubnetInstance | null
@@ -35,7 +36,16 @@ const loadingChainStats = computed(() => props.loadingStats)
 </script>
 
 <template>
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <div class="space-y-6">
+    <!-- Subnet Setup Status Dashboard -->
+    <SubnetStatusDashboard
+      :subnet-id="instance?.data?.id || instance?.id || ''"
+      :checklist="instance?.data?.status_info?.setup_checklist || instance?.status_info?.setup_checklist"
+      :loading="loading"
+      @refresh="emit('fetchInstance')"
+    />
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <!-- Basic Information -->
     <div class="card">
       <h3 class="text-lg font-semibold text-gray-900 mb-4">Basic Information</h3>
@@ -271,6 +281,7 @@ const loadingChainStats = computed(() => props.loadingStats)
           Retry
         </button>
       </div>
+    </div>
     </div>
   </div>
 </template>

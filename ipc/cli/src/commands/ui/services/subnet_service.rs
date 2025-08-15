@@ -63,19 +63,35 @@ impl SubnetService {
 
     /// Approve a subnet to join
     pub async fn approve_subnet(&self, subnet_id: &str, from_address: Option<&str>) -> Result<String> {
+        log::info!("SubnetService::approve_subnet called");
+        log::info!("  Subnet ID: {}", subnet_id);
+        log::info!("  From address: {:?}", from_address);
+
         let subnet = SubnetID::from_str(subnet_id)?;
+        log::info!("  Parsed subnet ID: {:?}", subnet);
 
         let args = ApproveSubnetArgs {
             subnet: subnet_id.to_string(),
             from: from_address.map(|s| s.to_string()),
         };
+        log::info!("  Created ApproveSubnetArgs: {:?}", args);
 
         let mut provider = get_ipc_provider(&self.global)?;
+        log::info!("  Got IPC provider");
 
         // Use the existing approve_subnet handler
-        approve_subnet(&mut provider, &args).await?;
-
-        Ok(format!("Subnet {} approved successfully", subnet_id))
+        log::info!("  Calling approve_subnet command handler...");
+        match approve_subnet(&mut provider, &args).await {
+            Ok(()) => {
+                log::info!("  ✓ approve_subnet command succeeded");
+                Ok(format!("Subnet {} approved successfully", subnet_id))
+            }
+            Err(e) => {
+                log::error!("  ✗ approve_subnet command failed: {}", e);
+                log::error!("  Error chain: {:?}", e);
+                Err(e)
+            }
+        }
     }
 
     /// Add a validator to a subnet
@@ -617,6 +633,9 @@ impl SubnetService {
                 }
             });
 
+        // Generate setup checklist based on subnet status
+        status.setup_checklist = self.generate_setup_checklist(&subnet, &status, provider).await;
+
         log::info!("=== COMPREHENSIVE STATUS COMPLETE: {} = {} (is_active: {}, block_height: {}) ===",
                    subnet_id, status.lifecycle_state, status.is_active, status.block_height);
         Ok(status)
@@ -1014,51 +1033,331 @@ impl SubnetService {
     }
 
 
+        /// Generate detailed setup checklist for a subnet based on its current status
+    async fn generate_setup_checklist(
+        &self,
+        subnet: &ipc_api::subnet_id::SubnetID,
+        status_info: &crate::commands::ui::api::types::SubnetStatusInfo,
+        mut provider: ipc_provider::IpcProvider,
+    ) -> crate::commands::ui::api::types::SubnetSetupChecklist {
+        use crate::commands::ui::api::types::{SubnetSetupChecklist, SetupStep, StepStatus};
+
+        log::info!("Generating setup checklist for subnet: {}", subnet);
+
+        let permission_mode = status_info.permission_mode.as_deref().unwrap_or("unknown").to_lowercase();
+        let mut steps = Vec::new();
+        let mut all_complete = true;
+        let mut next_action = None;
+
+        match permission_mode.as_str() {
+            "federated" => {
+                log::info!("Generating federated subnet checklist");
+
+                // Step 1: Check if federated power is set (validators configured)
+                let federated_power_set = self.check_federated_power_status(subnet, &mut provider).await;
+                steps.push(SetupStep {
+                    id: "federated_power".to_string(),
+                    title: "Configure Validators".to_string(),
+                    description: "Set federated power for initial validators".to_string(),
+                    status: if federated_power_set { StepStatus::Completed } else { StepStatus::Pending },
+                    required: true,
+                    action_available: !federated_power_set,
+                    action_button_text: if federated_power_set { None } else { Some("Set Federated Power".to_string()) },
+                    action_type: if federated_power_set { None } else { Some("set_federated_power".to_string()) },
+                    details: Some(serde_json::json!({
+                        "subnet_id": subnet.to_string(),
+                        "min_validators": 1, // This could be fetched from subnet config
+                    })),
+                });
+
+                if !federated_power_set {
+                    all_complete = false;
+                    if next_action.is_none() {
+                        next_action = Some("Set federated power for validators to bootstrap the subnet".to_string());
+                    }
+                }
+
+                // Step 2: Check if subnet is bootstrapped
+                let is_bootstrapped = self.check_bootstrap_status(subnet, &mut provider).await;
+                steps.push(SetupStep {
+                    id: "bootstrap".to_string(),
+                    title: "Subnet Bootstrapped".to_string(),
+                    description: "Subnet has been bootstrapped with initial validators".to_string(),
+                    status: if is_bootstrapped { StepStatus::Completed } else if federated_power_set { StepStatus::InProgress } else { StepStatus::Pending },
+                    required: true,
+                    action_available: false, // Bootstrap happens automatically after federated power is set
+                    action_button_text: None,
+                    action_type: None,
+                    details: None,
+                });
+
+                if !is_bootstrapped {
+                    all_complete = false;
+                    if next_action.is_none() && federated_power_set {
+                        next_action = Some("Subnet should bootstrap automatically. If not, check validator configuration.".to_string());
+                    }
+                }
+
+                // Step 3: Check if subnet is approved in gateway
+                let is_approved = self.check_subnet_approval_status(subnet, "").await; // Will get gateway from config
+                steps.push(SetupStep {
+                    id: "gateway_approval".to_string(),
+                    title: "Gateway Approval".to_string(),
+                    description: "Subnet is approved and registered in the gateway".to_string(),
+                    status: if is_approved { StepStatus::Completed } else { StepStatus::Pending },
+                    required: true,
+                    action_available: is_bootstrapped && !is_approved,
+                    action_button_text: if is_approved { None } else if is_bootstrapped { Some("Approve Subnet".to_string()) } else { None },
+                    action_type: if is_approved { None } else if is_bootstrapped { Some("approve_subnet".to_string()) } else { None },
+                    details: Some(serde_json::json!({
+                        "subnet_id": subnet.to_string(),
+                    })),
+                });
+
+                if !is_approved {
+                    all_complete = false;
+                    if next_action.is_none() && is_bootstrapped {
+                        next_action = Some("Approve subnet in the gateway to complete setup".to_string());
+                    }
+                }
+            }
+
+            "collateral" => {
+                log::info!("Generating collateral subnet checklist");
+
+                // Step 1: Check minimum collateral
+                let min_collateral_met = self.check_minimum_collateral_status(subnet, &mut provider).await;
+                steps.push(SetupStep {
+                    id: "minimum_collateral".to_string(),
+                    title: "Minimum Collateral".to_string(),
+                    description: "Subnet has reached minimum collateral threshold".to_string(),
+                    status: if min_collateral_met { StepStatus::Completed } else { StepStatus::Pending },
+                    required: true,
+                    action_available: !min_collateral_met,
+                    action_button_text: if min_collateral_met { None } else { Some("Join as Validator".to_string()) },
+                    action_type: if min_collateral_met { None } else { Some("join_subnet".to_string()) },
+                    details: Some(serde_json::json!({
+                        "subnet_id": subnet.to_string(),
+                    })),
+                });
+
+                if !min_collateral_met {
+                    all_complete = false;
+                    if next_action.is_none() {
+                        next_action = Some("Add validators with collateral to reach minimum threshold".to_string());
+                    }
+                }
+
+                // Step 2: Bootstrap status (automatic for collateral subnets)
+                let is_bootstrapped = self.check_bootstrap_status(subnet, &mut provider).await;
+                steps.push(SetupStep {
+                    id: "bootstrap".to_string(),
+                    title: "Subnet Bootstrapped".to_string(),
+                    description: "Subnet has been bootstrapped automatically when minimum collateral was reached".to_string(),
+                    status: if is_bootstrapped { StepStatus::Completed } else if min_collateral_met { StepStatus::InProgress } else { StepStatus::Pending },
+                    required: true,
+                    action_available: false,
+                    action_button_text: None,
+                    action_type: None,
+                    details: None,
+                });
+
+                if !is_bootstrapped {
+                    all_complete = false;
+                }
+
+                // Step 3: Gateway approval
+                let is_approved = self.check_subnet_approval_status(subnet, "").await;
+                steps.push(SetupStep {
+                    id: "gateway_approval".to_string(),
+                    title: "Gateway Approval".to_string(),
+                    description: "Subnet is approved and registered in the gateway".to_string(),
+                    status: if is_approved { StepStatus::Completed } else { StepStatus::Pending },
+                    required: true,
+                    action_available: is_bootstrapped && !is_approved,
+                    action_button_text: if is_approved { None } else if is_bootstrapped { Some("Approve Subnet".to_string()) } else { None },
+                    action_type: if is_approved { None } else if is_bootstrapped { Some("approve_subnet".to_string()) } else { None },
+                    details: Some(serde_json::json!({
+                        "subnet_id": subnet.to_string(),
+                    })),
+                });
+
+                if !is_approved {
+                    all_complete = false;
+                    if next_action.is_none() && is_bootstrapped {
+                        next_action = Some("Approve subnet in the gateway to complete setup".to_string());
+                    }
+                }
+            }
+
+            _ => {
+                log::warn!("Unknown permission mode: {}", permission_mode);
+                steps.push(SetupStep {
+                    id: "unknown_mode".to_string(),
+                    title: "Unknown Permission Mode".to_string(),
+                    description: format!("Subnet has unknown permission mode: {}", permission_mode),
+                    status: StepStatus::Failed,
+                    required: true,
+                    action_available: false,
+                    action_button_text: None,
+                    action_type: None,
+                    details: None,
+                });
+                all_complete = false;
+            }
+        }
+
+        SubnetSetupChecklist {
+            permission_mode,
+            steps,
+            next_required_action: next_action,
+            all_complete,
+        }
+    }
+
+    /// Check if federated power has been set for a subnet
+    async fn check_federated_power_status(&self, subnet: &ipc_api::subnet_id::SubnetID, provider: &mut ipc_provider::IpcProvider) -> bool {
+        log::debug!("Checking federated power status for subnet: {}", subnet);
+
+        // Try to get genesis info to check if validators are configured
+        match provider.get_genesis_info(subnet).await {
+            Ok(genesis_info) => {
+                log::debug!("Genesis info found, validators configured: {}", !genesis_info.validators.is_empty());
+                !genesis_info.validators.is_empty()
+            }
+            Err(e) => {
+                log::debug!("No genesis info found (federated power not set): {}", e);
+                false
+            }
+        }
+    }
+
+        /// Check if subnet is bootstrapped
+    async fn check_bootstrap_status(&self, subnet: &ipc_api::subnet_id::SubnetID, provider: &mut ipc_provider::IpcProvider) -> bool {
+        log::debug!("Checking bootstrap status for subnet: {}", subnet);
+
+        // Try to get genesis info - if it exists and has validators, it's bootstrapped
+        match provider.get_genesis_info(subnet).await {
+            Ok(genesis_info) => {
+                log::debug!("Subnet is bootstrapped (genesis info found)");
+                !genesis_info.validators.is_empty()
+            }
+            Err(e) => {
+                log::debug!("Subnet is not bootstrapped: {}", e);
+                false
+            }
+        }
+    }
+
+    /// Check if minimum collateral threshold is met for collateral subnets
+    async fn check_minimum_collateral_status(&self, subnet: &ipc_api::subnet_id::SubnetID, provider: &mut ipc_provider::IpcProvider) -> bool {
+        log::debug!("Checking minimum collateral status for subnet: {}", subnet);
+
+        // This is a simplified check - in reality we'd need to query the subnet actor contract
+        // to check current collateral vs minimum required collateral
+        match provider.get_genesis_info(subnet).await {
+            Ok(genesis_info) => {
+                log::debug!("Genesis info found, assuming minimum collateral met");
+                true
+            }
+            Err(_) => {
+                log::debug!("No genesis info found, minimum collateral not met");
+                false
+            }
+        }
+    }
+
+    /// Check if a subnet is approved in the gateway contract
+    async fn check_subnet_approval_status(&self, subnet_id: &ipc_api::subnet_id::SubnetID, gateway_address: &str) -> bool {
+        log::debug!("Checking approval status for subnet {} in gateway {}", subnet_id, gateway_address);
+
+        // Try to get the subnet info using IPC provider
+        let mut provider = match crate::get_ipc_provider(&self.global) {
+            Ok(provider) => provider,
+            Err(e) => {
+                log::warn!("Failed to get IPC provider for approval check: {}", e);
+                return false;
+            }
+        };
+
+        // For approval status, we need to check the parent subnet's registry
+        let parent_id = match subnet_id.parent() {
+            Some(parent) => parent,
+            None => {
+                log::debug!("Root subnet is always considered approved");
+                return true;
+            }
+        };
+
+        // List child subnets of the parent to see if our subnet is registered
+        match provider.list_child_subnets(None, &parent_id).await {
+            Ok(child_subnets) => {
+                let is_approved = child_subnets.contains_key(subnet_id);
+                log::debug!("Subnet {} approval status: {}", subnet_id, is_approved);
+                is_approved
+            }
+            Err(e) => {
+                log::debug!("Failed to check subnet approval status: {}", e);
+                false
+            }
+        }
+    }
+
         /// List pending subnet approvals for a gateway
     pub async fn list_pending_approvals(&self, gateway_address: &str) -> anyhow::Result<Vec<serde_json::Value>> {
         log::info!("Listing pending approvals for gateway: {}", gateway_address);
 
-        // For now, we'll check the config for subnets that might need approval
-        // This is a simplified implementation - in a real scenario, you'd query the gateway contract
         let config_store = crate::ipc_config_store::IpcConfigStore::load_or_init(&self.global).await?;
         let config = config_store.snapshot().await;
 
         let mut pending_subnets = Vec::new();
 
-        // Find subnets that have this gateway address but might not be approved yet
+        // Find subnets that have this gateway address and check their actual approval status
         for (subnet_id, subnet_config) in &config.subnets {
             match &subnet_config.config {
-                                ipc_provider::config::SubnetConfig::Fevm(evm_subnet) => {
-                                        // Convert both addresses to Ethereum hex format for comparison
+                ipc_provider::config::SubnetConfig::Fevm(evm_subnet) => {
+                    // Convert both addresses to Ethereum hex format for comparison
                     let config_gateway_eth = evm_subnet.gateway_addr.to_string().to_lowercase();
-
-                    // For now, try simple comparison - TODO: implement proper address conversion
                     let target_gateway_eth = gateway_address.to_lowercase();
 
-                    log::info!("Comparing gateway addresses: config_eth={}, target_eth={}", config_gateway_eth, target_gateway_eth);
+                    log::debug!("Comparing gateway addresses: config_eth={}, target_eth={}", config_gateway_eth, target_gateway_eth);
 
                     if config_gateway_eth == target_gateway_eth {
-                        // This subnet uses this gateway, so it might need approval
-                        let parent_id = subnet_id.parent().unwrap_or_else(|| subnet_id.clone());
+                        // Skip root networks - they don't need approval
+                        if subnet_id.parent().is_none() {
+                            log::debug!("Skipping root network {} - doesn't need approval", subnet_id);
+                            continue;
+                        }
 
-                        log::info!("Found subnet {} that uses gateway {}", subnet_id, gateway_address);
+                        let parent_id = subnet_id.parent().unwrap();
+                        log::debug!("Checking subnet {} that uses gateway {}", subnet_id, gateway_address);
 
-                        let subnet_info = serde_json::json!({
-                            "subnet_id": subnet_id.to_string(),
-                            "gateway_address": evm_subnet.gateway_addr.to_string(),
-                            "registry_address": evm_subnet.registry_addr.to_string(),
-                            "parent_id": parent_id.to_string(),
-                            "status": "pending_approval", // This would need real blockchain query in production
-                            "created_at": chrono::Utc::now().to_rfc3339(),
-                        });
+                        // NEW: Actually check if the subnet is approved by querying the gateway contract
+                        let is_approved = self.check_subnet_approval_status(subnet_id, gateway_address).await;
 
-                        pending_subnets.push(subnet_info);
+                        if !is_approved {
+                            // Only include subnets that are NOT approved
+                            log::info!("Subnet {} is pending approval", subnet_id);
+
+                            let subnet_info = serde_json::json!({
+                                "subnet_id": subnet_id.to_string(),
+                                "gateway_address": evm_subnet.gateway_addr.to_string(),
+                                "registry_address": evm_subnet.registry_addr.to_string(),
+                                "parent_id": parent_id.to_string(),
+                                "status": "pending_approval",
+                                "created_at": chrono::Utc::now().to_rfc3339(),
+                            });
+
+                            pending_subnets.push(subnet_info);
+                        } else {
+                            log::debug!("Subnet {} is already approved, skipping", subnet_id);
+                        }
                     }
                 }
             }
         }
 
-        log::info!("Found {} pending subnets for gateway {}", pending_subnets.len(), gateway_address);
+        log::info!("Found {} truly pending subnets for gateway {}", pending_subnets.len(), gateway_address);
         Ok(pending_subnets)
     }
 
