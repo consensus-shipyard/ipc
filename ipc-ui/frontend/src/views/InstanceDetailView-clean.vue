@@ -19,8 +19,8 @@ import { useClipboard } from '@/utils/clipboard'
 
 // Types
 import type {
-  BulkValidator,
-  NodeConfigData
+    BulkValidator,
+    NodeConfigData
 } from '@/types/subnet'
 
 // Services
@@ -91,9 +91,9 @@ const nodeConfigData = ref<NodeConfigData | null>(null)
 const loadingNodeConfig = ref(false)
 
 // Additional computed properties needed for backward compatibility
-const copyingAddress = computed((): string | null => {
-  // For backward compatibility - would check if any item is being copied
-  return null // This would be used by the full tab components
+const copyingAddress = computed(() => {
+  // Return the current copying item from the clipboard composable
+  return isCopying
 })
 
 // Copy to clipboard handler wrapper
@@ -123,7 +123,7 @@ const viewLogs = () => {
 }
 
 const approveSubnet = async () => {
-    approvingSubnet.value = true
+  approvingSubnet.value = true
   try {
     const result = await approveSubnetAction()
     if (!result.success) {
@@ -138,7 +138,7 @@ const approveSubnet = async () => {
 
 // Validator management methods
 const handleValidatorAdded = async () => {
-      await fetchInstance()
+  await fetchInstance()
 }
 
 const removeValidator = async (validatorAddress: string) => {
@@ -306,17 +306,17 @@ const setBulkFederatedPower = async () => {
 
 // Event handlers for test transactions
 const handleTransactionSent = () => {
-      // Refresh stats after successful transaction
-      setTimeout(() => {
+  // Refresh stats after successful transaction
+  setTimeout(() => {
     startStatsRefresh()
-      }, 2000)
+  }, 2000)
 }
 
 // Lifecycle
 onMounted(async () => {
   await fetchInstance()
   if (instance.value) {
-  startStatsRefresh()
+    startStatsRefresh()
   }
 })
 
@@ -325,7 +325,7 @@ watch(() => props.id, async (newId) => {
   if (newId) {
     await fetchInstance()
     if (instance.value) {
-    startStatsRefresh()
+      startStatsRefresh()
     }
   }
 })
@@ -394,7 +394,7 @@ watch(() => props.id, async (newId) => {
       <div class="bg-white rounded-lg shadow p-6">
         <p class="text-gray-600">Tab content for "{{ activeTab }}" would be displayed here.</p>
         <p class="text-sm text-gray-500 mt-2">The tab components need to be created separately to complete the refactoring.</p>
-          </div>
+      </div>
 
       <!-- Modals -->
       <AddValidatorModal

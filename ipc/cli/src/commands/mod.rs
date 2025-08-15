@@ -16,7 +16,7 @@ mod wallet;
 
 use crate::commands::checkpoint::CheckpointCommandsArgs;
 use crate::commands::crossmsg::CrossMsgsCommandsArgs;
-use crate::commands::ui::{run_ui_command, UICommand, UICommandArgs};
+use crate::commands::ui::{run_ui_command, UICommandArgs};
 use crate::commands::util::UtilCommandsArgs;
 use crate::GlobalArguments;
 use anyhow::{anyhow, Context, Result};
@@ -156,12 +156,7 @@ pub async fn cli() -> anyhow::Result<()> {
                 Commands::Validator(args) => args.handle(global).await,
                 Commands::Deploy(args) => DeployCommand::handle(global, args).await,
                 Commands::Ui(args) => {
-                    let ui_args = UICommandArgs {
-                        address: args.address.clone(),
-                        port: args.port,
-                        config_path: args.config_path.clone().or(global.config_path.clone()),
-                    };
-                    run_ui_command(global.clone(), UICommand::Start, ui_args).await
+                    run_ui_command(global.clone(), args.clone()).await
                 }
                 Commands::Node(args) => args.handle(global).await,
             };

@@ -56,7 +56,7 @@ pub enum DeploymentMode {
 }
 
 /// UI command arguments
-#[derive(Debug, Args)]
+#[derive(Debug, Clone, Args)]
 pub struct UICommandArgs {
     /// Address to bind the UI server to (default: 127.0.0.1)
     #[clap(long, default_value = "127.0.0.1")]
@@ -71,30 +71,18 @@ pub struct UICommandArgs {
     pub config_path: Option<String>,
 }
 
-/// UI subcommand
-#[derive(Debug, Subcommand)]
-pub enum UICommand {
-    /// Start the UI server
-    Start,
-}
-
 /// Run the UI command
 pub async fn run_ui_command(
     global: crate::GlobalArguments,
-    command: UICommand,
     args: UICommandArgs,
 ) -> Result<()> {
-    match command {
-        UICommand::Start => {
-            let ip: IpAddr = args.address.parse()
-                .unwrap_or_else(|_| IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
-            let addr = SocketAddr::new(ip, args.port);
+    let ip: IpAddr = args.address.parse()
+        .unwrap_or_else(|_| IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
+    let addr = SocketAddr::new(ip, args.port);
 
-            // Fix config path resolution - use global.config_path() which handles defaults properly
-            let config_path = args.config_path
-                .unwrap_or_else(|| global.config_path());
+    // Fix config path resolution - use global.config_path() which handles defaults properly
+    let config_path = args.config_path
+        .unwrap_or_else(|| global.config_path());
 
-            start_ui_server(config_path, addr).await
-        }
-    }
+    start_ui_server(config_path, addr).await
 }
