@@ -19,6 +19,11 @@
 # IMPORTANT: The f410 addresses in subnet IDs (e.g., /r31337/t410...) are just
 # identifiers. The actual subnet actor contracts are deployed at different
 # Ethereum addresses that must be queried from the gateway.
+#
+# USAGE MODES:
+# - Default: Validates all subnets in the config
+# - --root-gateway-only: Only validates subnets using the root network's gateway/registry
+# - --select-gateway: Interactive mode to choose a gateway/registry and update root config
 
 # set -e removed to prevent early exit on command failures
 
@@ -34,6 +39,10 @@ NC='\033[0m' # No Color
 CONFIG_FILE="$HOME/.ipc/config.toml"
 RPC_URL="${RPC_URL:-http://localhost:8545}"
 IPC_CLI="${IPC_CLI:-./target/release/ipc-cli}"
+
+# Script modes
+ROOT_GATEWAY_ONLY=false
+SELECT_GATEWAY=false
 
 # Check if required tools are available
 check_dependencies() {
@@ -536,6 +545,235 @@ get_parent_subnet() {
     echo "$subnet_id" | sed 's|/[^/]*$||'
 }
 
+# Get root network configuration
+get_root_network_config() {
+    # Find the root network in the config (e.g., /r31337)
+    local root_subnet=$(grep '^id = "/r[0-9]\+"' "$CONFIG_FILE" | head -1 | cut -d'"' -f2)
+
+    if [[ -z "$root_subnet" ]]; then
+        echo "ERROR: No root network found in configuration"
+        return 1
+    fi
+
+    # Get the configuration for this root network
+    local config=$(get_subnet_config "$root_subnet")
+    echo "$root_subnet|$config"
+}
+
+# Get all unique gateway/registry pairs from config
+get_all_gateways() {
+    echo -e "${BLUE}Scanning for all configured gateways and registries...${NC}"
+
+    # Extract all gateway and registry addresses from the config
+    local gateway_registry_pairs=()
+    local current_subnet=""
+    local current_gateway=""
+    local current_registry=""
+
+    while IFS= read -r line; do
+        # Check for subnet ID
+        if [[ "$line" =~ ^id[[:space:]]*=[[:space:]]*\"(.+)\" ]]; then
+            current_subnet="${BASH_REMATCH[1]}"
+        # Check for gateway address
+        elif [[ "$line" =~ ^gateway_addr[[:space:]]*=[[:space:]]*\"(.+)\" ]]; then
+            current_gateway="${BASH_REMATCH[1]}"
+        # Check for registry address
+        elif [[ "$line" =~ ^registry_addr[[:space:]]*=[[:space:]]*\"(.+)\" ]]; then
+            current_registry="${BASH_REMATCH[1]}"
+
+            # If we have all three, add to our list
+            if [[ -n "$current_subnet" && -n "$current_gateway" && -n "$current_registry" ]]; then
+                gateway_registry_pairs+=("$current_gateway|$current_registry|$current_subnet")
+            fi
+        fi
+    done < "$CONFIG_FILE"
+
+    # Deduplicate based on gateway|registry pair
+    local unique_pairs=()
+    local seen_pairs=()
+
+    for pair in "${gateway_registry_pairs[@]}"; do
+        local gateway=$(echo "$pair" | cut -d'|' -f1)
+        local registry=$(echo "$pair" | cut -d'|' -f2)
+        local subnet=$(echo "$pair" | cut -d'|' -f3)
+        local key="$gateway|$registry"
+
+        if [[ ! " ${seen_pairs[@]} " =~ " ${key} " ]]; then
+            seen_pairs+=("$key")
+            unique_pairs+=("$pair")
+        fi
+    done
+
+    # Sort and display
+    printf '%s\n' "${unique_pairs[@]}" | sort
+}
+
+# Interactive gateway selection
+select_gateway_interactive() {
+    echo -e "${BLUE}=== Gateway Selection Mode ===${NC}"
+    echo ""
+
+    local gateways=($(get_all_gateways))
+
+    if [[ ${#gateways[@]} -eq 0 ]]; then
+        echo -e "${RED}No gateways found in configuration${NC}"
+        return 1
+    fi
+
+    echo -e "${CYAN}Found ${#gateways[@]} unique gateway/registry pair(s):${NC}"
+    echo ""
+
+    # Display options
+    local i=1
+    for gateway_info in "${gateways[@]}"; do
+        local gateway=$(echo "$gateway_info" | cut -d'|' -f1)
+        local registry=$(echo "$gateway_info" | cut -d'|' -f2)
+        local subnet=$(echo "$gateway_info" | cut -d'|' -f3)
+
+        echo -e "${YELLOW}[$i]${NC} Gateway:  $gateway"
+        echo "    Registry: $registry"
+        echo "    Used by:  $subnet"
+
+        # Check how many subnets are on this gateway
+        local subnet_count=$(cast call "$gateway" "totalSubnets()" --rpc-url "$RPC_URL" 2>/dev/null | cast --to-dec 2>/dev/null || echo "?")
+        echo "    Subnets:  $subnet_count"
+        echo ""
+
+        i=$((i + 1))
+    done
+
+    # Get user selection
+    echo -n "Select gateway/registry pair to use for root network (1-${#gateways[@]}): "
+    read selection
+
+    if [[ ! "$selection" =~ ^[0-9]+$ ]] || [[ $selection -lt 1 ]] || [[ $selection -gt ${#gateways[@]} ]]; then
+        echo -e "${RED}Invalid selection${NC}"
+        return 1
+    fi
+
+    # Get selected gateway info
+    local selected_idx=$((selection - 1))
+    local selected="${gateways[$selected_idx]}"
+    local gateway=$(echo "$selected" | cut -d'|' -f1)
+    local registry=$(echo "$selected" | cut -d'|' -f2)
+
+    echo ""
+    echo -e "${GREEN}Selected:${NC}"
+    echo "  Gateway:  $gateway"
+    echo "  Registry: $registry"
+    echo ""
+
+    # Find root network
+    local root_subnet=$(grep '^id = "/r[0-9]\+"' "$CONFIG_FILE" | head -1 | cut -d'"' -f2)
+
+    if [[ -z "$root_subnet" ]]; then
+        echo -e "${RED}No root network found in configuration${NC}"
+        return 1
+    fi
+
+    echo -n "Update root network $root_subnet to use this gateway? (y/N): "
+    read confirm
+
+    if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        update_root_network_gateway "$root_subnet" "$gateway" "$registry"
+    else
+        echo -e "${YELLOW}Cancelled${NC}"
+    fi
+}
+
+# Update root network gateway configuration
+update_root_network_gateway() {
+    local root_subnet="$1"
+    local new_gateway="$2"
+    local new_registry="$3"
+
+    echo -e "${BLUE}Updating root network configuration...${NC}"
+
+    # Create a temporary file
+    local temp_file=$(mktemp)
+    local in_root_subnet=false
+    local in_config_section=false
+    local updated=false
+
+    while IFS= read -r line; do
+        # Check if we're entering the root subnet section
+        if [[ "$line" =~ ^id[[:space:]]*=[[:space:]]*\"$root_subnet\" ]]; then
+            in_root_subnet=true
+            echo "$line" >> "$temp_file"
+        # Check if we're in the config section
+        elif [[ "$in_root_subnet" == true ]] && [[ "$line" =~ ^\[subnets\.config\] ]]; then
+            in_config_section=true
+            echo "$line" >> "$temp_file"
+        # Update gateway address
+        elif [[ "$in_config_section" == true ]] && [[ "$line" =~ ^gateway_addr ]]; then
+            echo "gateway_addr = \"$new_gateway\"" >> "$temp_file"
+            updated=true
+        # Update registry address
+        elif [[ "$in_config_section" == true ]] && [[ "$line" =~ ^registry_addr ]]; then
+            echo "registry_addr = \"$new_registry\"" >> "$temp_file"
+        # Reset when we hit a new subnet
+        elif [[ "$line" =~ ^\[\[subnets\]\] ]] && [[ "$in_root_subnet" == true ]]; then
+            in_root_subnet=false
+            in_config_section=false
+            echo "$line" >> "$temp_file"
+        else
+            echo "$line" >> "$temp_file"
+        fi
+    done < "$CONFIG_FILE"
+
+    if [[ "$updated" == true ]]; then
+        # Backup original config
+        cp "$CONFIG_FILE" "$CONFIG_FILE.bak"
+        # Replace with updated config
+        mv "$temp_file" "$CONFIG_FILE"
+        echo -e "${GREEN}✓ Updated root network configuration${NC}"
+        echo -e "${CYAN}  Backup saved to: $CONFIG_FILE.bak${NC}"
+    else
+        rm "$temp_file"
+        echo -e "${RED}Failed to update configuration${NC}"
+        return 1
+    fi
+}
+
+# Filter subnets based on root gateway
+filter_subnets_by_root_gateway() {
+    local all_subnets=("$@")
+
+    # Get root network configuration
+    local root_config=$(get_root_network_config)
+    if [[ $? -ne 0 ]]; then
+        echo -e "${RED}Failed to get root network configuration${NC}"
+        return 1
+    fi
+
+    local root_subnet=$(echo "$root_config" | cut -d'|' -f1)
+    local root_gateway=$(echo "$root_config" | cut -d'|' -f2)
+    local root_registry=$(echo "$root_config" | cut -d'|' -f3)
+
+    echo -e "${CYAN}Root network: $root_subnet${NC}"
+    echo -e "${CYAN}Root gateway: $root_gateway${NC}"
+    echo -e "${CYAN}Root registry: $root_registry${NC}"
+    echo ""
+
+    # Filter subnets that use the same gateway/registry
+    local filtered_subnets=()
+
+    for subnet in "${all_subnets[@]}"; do
+        local config=$(get_subnet_config "$subnet")
+        local gateway=$(echo "$config" | cut -d'|' -f1)
+        local registry=$(echo "$config" | cut -d'|' -f2)
+
+        if [[ "$gateway" == "$root_gateway" && "$registry" == "$root_registry" ]]; then
+            filtered_subnets+=("$subnet")
+        fi
+    done
+
+    echo -e "${GREEN}Found ${#filtered_subnets[@]} subnet(s) using root network's gateway/registry${NC}"
+
+    # Return filtered subnets
+    printf '%s\n' "${filtered_subnets[@]}"
+}
+
 # Validate a single subnet
 validate_subnet() {
     local subnet_id="$1"
@@ -618,15 +856,39 @@ validate_subnet() {
 
 # Main function
 main() {
+    # Handle special modes first
+    if [[ "$SELECT_GATEWAY" == true ]]; then
+        select_gateway_interactive
+        exit $?
+    fi
+
     echo -e "${BLUE}IPC Subnet Deployment Validation${NC}"
     echo -e "${BLUE}=================================${NC}"
 
     check_dependencies
     parse_config
 
+    local subnets_to_validate=("${subnets[@]}")
+
+    # Filter subnets if --root-gateway-only is specified
+    if [[ "$ROOT_GATEWAY_ONLY" == true ]]; then
+        echo -e "${YELLOW}Running in root-gateway-only mode${NC}"
+        echo ""
+
+        # Get filtered subnet list
+        local filtered=($(filter_subnets_by_root_gateway "${subnets[@]}"))
+
+        if [[ ${#filtered[@]} -eq 0 ]]; then
+            echo -e "${YELLOW}No subnets found using the root network's gateway/registry${NC}"
+            exit 0
+        fi
+
+        subnets_to_validate=("${filtered[@]}")
+    fi
+
     local total_issues=0
 
-    for subnet in "${subnets[@]}"; do
+    for subnet in "${subnets_to_validate[@]}"; do
         validate_subnet "$subnet"
         total_issues=$((total_issues + $?))
     done
@@ -635,19 +897,22 @@ main() {
     echo -e "${BLUE}=== Overall Summary ===${NC}"
 
     if [[ $total_issues -eq 0 ]]; then
-        echo -e "${GREEN}✓ All subnets passed validation!${NC}"
+        echo -e "${GREEN}✓ All validated subnets passed!${NC}"
+        if [[ "$ROOT_GATEWAY_ONLY" == true ]]; then
+            echo -e "${CYAN}ℹ Only validated subnets using root network's gateway/registry${NC}"
+        fi
         echo -e "${CYAN}ℹ Note: This validates contract deployment, not node runtime status${NC}"
         echo -e "${CYAN}ℹ To check if subnet nodes are running, check the appropriate RPC endpoints${NC}"
         exit 0
     else
-        echo -e "${RED}✗ Found $total_issues total issues across all subnets${NC}"
+        echo -e "${RED}✗ Found $total_issues total issues across validated subnets${NC}"
         echo -e "${YELLOW}Please review the validation results above and fix any issues${NC}"
-            echo -e "${CYAN}💡 Key insights from validation:${NC}"
-    echo -e "${CYAN}  - Subnet actors are deployed on the PARENT chain, not the subnet itself${NC}"
-    echo -e "${CYAN}  - Query gateway.listSubnets() on parent chain to find subnet actors${NC}"
-    echo -e "${CYAN}  - Call permissionMode() on subnet actor contracts to get their mode${NC}"
-    echo -e "${CYAN}  - Permission modes: 0=Collateral, 1=Federated, 2=Static${NC}"
-    echo -e "${CYAN}  - f410 addresses in subnet IDs are identifiers, not contract addresses${NC}"
+        echo -e "${CYAN}💡 Key insights from validation:${NC}"
+        echo -e "${CYAN}  - Subnet actors are deployed on the PARENT chain, not the subnet itself${NC}"
+        echo -e "${CYAN}  - Query gateway.listSubnets() on parent chain to find subnet actors${NC}"
+        echo -e "${CYAN}  - Call permissionMode() on subnet actor contracts to get their mode${NC}"
+        echo -e "${CYAN}  - Permission modes: 0=Collateral, 1=Federated, 2=Static${NC}"
+        echo -e "${CYAN}  - f410 addresses in subnet IDs are identifiers, not contract addresses${NC}"
         exit 1
     fi
 }
@@ -667,14 +932,29 @@ while [[ $# -gt 0 ]]; do
             IPC_CLI="$2"
             shift 2
             ;;
+        --root-gateway-only)
+            ROOT_GATEWAY_ONLY=true
+            shift
+            ;;
+        --select-gateway)
+            SELECT_GATEWAY=true
+            shift
+            ;;
         -h|--help)
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  --rpc-url URL    RPC URL to use (default: http://localhost:8545)"
-            echo "  --config FILE    Path to IPC config file (default: ~/.ipc/config.toml)"
-            echo "  --ipc-cli PATH   Path to IPC CLI binary (default: ./target/release/ipc-cli)"
-            echo "  -h, --help       Show this help message"
+            echo "  --rpc-url URL           RPC URL to use (default: http://localhost:8545)"
+            echo "  --config FILE           Path to IPC config file (default: ~/.ipc/config.toml)"
+            echo "  --ipc-cli PATH          Path to IPC CLI binary (default: ./target/release/ipc-cli)"
+            echo "  --root-gateway-only     Only validate subnets using the root network's gateway/registry"
+            echo "  --select-gateway        Interactive mode to select a gateway/registry for the root network"
+            echo "  -h, --help              Show this help message"
+            echo ""
+            echo "Usage modes:"
+            echo "  Default mode:           Validates all subnets in the config"
+            echo "  --root-gateway-only:    Only validates subnets using the same gateway/registry as the root network"
+            echo "  --select-gateway:       Allows you to choose a gateway/registry from your config and update the root network"
             echo ""
             echo "This script validates IPC subnet deployments by:"
             echo "  - Checking gateway and registry contract deployment"
@@ -682,10 +962,16 @@ while [[ $# -gt 0 ]]; do
             echo "  - Comparing configured f410 addresses with deployed contracts"
             echo "  - Showing permission modes (Collateral/Federated/Static)"
             echo "  - Providing deployment status and troubleshooting info"
+            echo ""
+            echo "Examples:"
+            echo "  $0                                    # Validate all subnets"
+            echo "  $0 --root-gateway-only                # Only validate subnets on root's gateway"
+            echo "  $0 --select-gateway                   # Choose a gateway for the root network"
             exit 0
             ;;
         *)
             echo "Unknown option: $1"
+            echo "Use --help for usage information"
             exit 1
             ;;
     esac
