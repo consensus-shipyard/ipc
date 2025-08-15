@@ -5,6 +5,7 @@ import ConfigurationTab from './tabs/ConfigurationTab.vue'
 import ContractsTab from './tabs/ContractsTab.vue'
 import MetricsTab from './tabs/MetricsTab.vue'
 import OverviewTab from './tabs/OverviewTab.vue'
+import ValidatorsTab from './tabs/ValidatorsTab.vue'
 
 interface Props {
   activeTab: string
@@ -101,13 +102,32 @@ const validatorCount = computed(() => {
     />
 
     <!-- Validators Tab -->
-    <div v-else-if="activeTab === 'validators'" class="space-y-6">
-      <!-- Placeholder for now - will be replaced with ValidatorsTab component -->
-      <div class="card">
-        <p class="text-gray-600">Validators tab content to be implemented</p>
-        <p class="text-sm text-gray-500 mt-2">Will include validator list, permission mode info, and management controls</p>
-      </div>
-    </div>
+    <ValidatorsTab
+      v-else-if="activeTab === 'validators'"
+      :instance="instance"
+      :show-add-validator-modal="showAddValidatorModal"
+      :show-bulk-management="showBulkManagement"
+      :removing-validator="removingValidator"
+      :updating-stake="updatingStake"
+      :stake-amounts="stakeAmounts"
+      :bulk-validators="bulkValidators"
+      :setting-federated-power="settingFederatedPower"
+      :copying-address="copyingAddress"
+      :approving-subnet="approvingSubnet"
+      @update:show-add-validator-modal="emit('update:showAddValidatorModal', $event)"
+      @update:show-bulk-management="emit('update:showBulkManagement', $event)"
+      @remove-validator="emit('removeValidator', $event)"
+      @update-stake="(address, action) => emit('updateStake', address, action)"
+      @show-node-config="emit('showNodeConfig', $event)"
+      @initialize-bulk-management="emit('initializeBulkManagement')"
+      @add-bulk-validator="emit('addBulkValidator')"
+      @remove-bulk-validator="emit('removeBulkValidator', $event)"
+      @set-bulk-federated-power="emit('setBulkFederatedPower')"
+      @update:bulk-validators="emit('update:bulkValidators', $event)"
+      @update:stake-amounts="emit('update:stakeAmounts', $event)"
+      @copy-to-clipboard="(text, type) => emit('copyToClipboard', text, type)"
+      @approve-subnet="emit('approveSubnet')"
+    />
 
     <!-- Configuration Tab -->
     <ConfigurationTab

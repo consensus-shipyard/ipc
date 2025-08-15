@@ -15,14 +15,15 @@ const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 // Helper to format config key names
-const formatConfigKey = (key: string): string => {
-  if (typeof key !== 'string') return String(key)
-  return key.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase())
+const formatConfigKey = (key: string | number | symbol): string => {
+  const keyStr = String(key)
+  return keyStr.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase())
 }
 
 // Helper to determine if a value is an address
-const isAddress = (key: string): boolean => {
-  return typeof key === 'string' && (key === 'gateway_addr' || key === 'registry_addr')
+const isAddress = (key: string | number | symbol): boolean => {
+  const keyStr = String(key)
+  return keyStr === 'gateway_addr' || keyStr === 'registry_addr'
 }
 </script>
 
@@ -41,12 +42,12 @@ const isAddress = (key: string): boolean => {
             </span>
             <button
               v-else-if="isAddress(key)"
-              @click="emit('copyToClipboard', formatAddress(value), key)"
+              @click="emit('copyToClipboard', formatAddress(value), String(key))"
               class="font-mono hover:bg-gray-100 px-2 py-1 rounded transition-colors cursor-pointer text-left"
-              :title="copyingAddress === key ? 'Copied!' : `Click to copy: ${formatAddress(value)}`"
+              :title="copyingAddress === String(key) ? 'Copied!' : `Click to copy: ${formatAddress(value)}`"
             >
               {{ formatAddressShort(value) }}
-              <svg v-if="copyingAddress === key" class="inline-block w-4 h-4 ml-1 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+              <svg v-if="copyingAddress === String(key)" class="inline-block w-4 h-4 ml-1 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
               </svg>
             </button>
