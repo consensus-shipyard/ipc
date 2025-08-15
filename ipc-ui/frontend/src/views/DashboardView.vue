@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import ProgressiveLoader from '../components/common/ProgressiveLoader.vue'
 import SubnetLoadingIndicator from '../components/common/SubnetLoadingIndicator.vue'
 import SubnetStatusIndicator from '../components/common/SubnetStatusIndicator.vue'
 import { apiService } from '../services/api'
@@ -13,6 +14,7 @@ const subnetsStore = useSubnetsStore()
 const approvingSubnets = ref<Set<string>>(new Set())
 const approvalError = ref<string | null>(null)
 const hasEverLoadedSubnets = ref(false)
+const gatewayOwnerCache = reactive<Record<string, { loading: boolean; value?: string; error?: string }>>({})
 
 // Use store data instead of local state
 const subnets = computed(() => subnetsStore.subnets || [])
@@ -20,12 +22,19 @@ const loading = computed(() => subnetsStore.isLoading)
 const error = computed(() => subnetsStore.error)
 
 // Track when we've successfully loaded subnets at least once
-const isInitialLoad = computed(() => loading.value && !hasEverLoadedSubnets.value)
+const isInitialLoad = computed(() => loading.value && !hasEverLoadedSubnets.value && subnets.value.length === 0)
 
 // Watch for successful subnet loads
 watch(subnets, (newSubnets: SubnetInstance[]) => {
   if (newSubnets && newSubnets.length > 0) {
     hasEverLoadedSubnets.value = true
+
+    // Load gateway owners for all subnets that don't have them cached
+    newSubnets.forEach(subnet => {
+      if (!gatewayOwnerCache[subnet.id]) {
+        loadGatewayOwner(subnet)
+      }
+    })
   }
 }, { immediate: true })
 
@@ -37,9 +46,18 @@ interface Gateway {
   deployer_address: string
 }
 
-const getGatewayOwner = async (subnet: SubnetInstance): Promise<string> => {
+const loadGatewayOwner = async (subnet: SubnetInstance): Promise<void> => {
+  const subnetId = subnet.id
+
+  // Initialize cache entry
+  if (!gatewayOwnerCache[subnetId]) {
+    gatewayOwnerCache[subnetId] = { loading: true }
+  } else {
+    gatewayOwnerCache[subnetId].loading = true
+  }
+
   try {
-    console.log('[DashboardView] Getting gateway owner for subnet:', subnet.id)
+    console.log('[DashboardView] Getting gateway owner for subnet:', subnetId)
     // Use the proper API service instead of direct fetch
     const gatewaysResponse = await apiService.getGateways()
     const gatewaysResult = gatewaysResponse.data
@@ -55,7 +73,11 @@ const getGatewayOwner = async (subnet: SubnetInstance): Promise<string> => {
         )
         if (matchingGateway) {
           console.log(`[DashboardView] Found matching gateway, owner: ${matchingGateway.deployer_address}`)
-          return matchingGateway.deployer_address
+          gatewayOwnerCache[subnetId] = {
+            loading: false,
+            value: matchingGateway.deployer_address
+          }
+          return
         } else {
           console.log('[DashboardView] No matching gateway found')
         }
@@ -67,12 +89,19 @@ const getGatewayOwner = async (subnet: SubnetInstance): Promise<string> => {
     }
   } catch (err) {
     console.warn('[DashboardView] Failed to fetch gateway information:', err)
+    gatewayOwnerCache[subnetId] = {
+      loading: false,
+      error: 'Failed to load'
+    }
   }
 
   // Fallback to config or default address
   const fallbackAddress = subnet.config?.deployer_address || '0x0a36d7c34ba5523d5bf783bb47f62371e52e0298'
   console.log(`[DashboardView] Using fallback address: ${fallbackAddress}`)
-  return fallbackAddress
+  gatewayOwnerCache[subnetId] = {
+    loading: false,
+    value: fallbackAddress
+  }
 }
 
 const approveSubnet = async (subnet: SubnetInstance) => {
@@ -80,7 +109,10 @@ const approveSubnet = async (subnet: SubnetInstance) => {
     approvingSubnets.value.add(subnet.id)
 
     // Get the correct gateway owner address
-    const gatewayOwnerAddress = await getGatewayOwner(subnet)
+    if (!gatewayOwnerCache[subnet.id]?.value) {
+      await loadGatewayOwner(subnet)
+    }
+    const gatewayOwnerAddress = gatewayOwnerCache[subnet.id]?.value || '0x0a36d7c34ba5523d5bf783bb47f62371e52e0298'
 
     // Use the API service with extended timeout for approval
     const response = await apiService.approveSubnet(subnet.id, gatewayOwnerAddress)
@@ -193,14 +225,23 @@ const collapsedGateways = ref<Set<string>>(new Set())
       groups.get(gatewayAddr)!.push(subnet)
     })
 
-    return Array.from(groups.entries()).map(([gateway, subnets]) => ({
-      gateway,
-      subnets,
-      count: subnets.length,
-      activeCount: subnets.filter(s => ['active', 'healthy', 'syncing'].includes(s.status)).length,
-      totalValidators: subnets.reduce((sum, s) => sum + safeGetValidatorCount(s), 0),
-      totalStake: subnets.reduce((sum, s) => sum + safeCalculateSubnetStake(s), 0)
-    }))
+    return Array.from(groups.entries()).map(([gateway, gatewaySubnets]) => {
+      // Get owner data from the first subnet in this gateway group
+      const firstSubnet = gatewaySubnets[0]
+      const ownerData = gatewayOwnerCache[firstSubnet.id]
+
+      return {
+        gateway,
+        subnets: gatewaySubnets,
+        count: gatewaySubnets.length,
+        activeCount: gatewaySubnets.filter(s => ['active', 'healthy', 'syncing'].includes(s.status)).length,
+        totalValidators: gatewaySubnets.reduce((sum, s) => sum + safeGetValidatorCount(s), 0),
+        totalStake: gatewaySubnets.reduce((sum, s) => sum + safeCalculateSubnetStake(s), 0),
+        ownerLoading: ownerData?.loading || false,
+        ownerAddress: ownerData?.value,
+        ownerError: ownerData?.error
+      }
+    })
   })
 
 const toggleGateway = (gateway: string) => {
@@ -437,6 +478,17 @@ const handleSubnetRetry = (subnetId: string) => {
                       <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
                     </svg>
                   </button>
+                  <div class="mt-1 text-xs text-gray-500">
+                    <span>Owner: </span>
+                    <span v-if="group.ownerLoading" class="inline-flex items-center">
+                      <ProgressiveLoader :show-text="false" :inline="true" />
+                    </span>
+                    <span v-else-if="group.ownerError" class="text-red-600">{{ group.ownerError }}</span>
+                    <span v-else-if="group.ownerAddress" class="font-mono">
+                      {{ formatAddress(group.ownerAddress) }}
+                    </span>
+                    <span v-else class="text-gray-400">Unknown</span>
+                  </div>
                 </div>
               </div>
 

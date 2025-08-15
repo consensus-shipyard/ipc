@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import SubnetApprovalsModal from '@/components/SubnetApprovalsModal.vue'
+import ProgressiveLoader from '@/components/common/ProgressiveLoader.vue'
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useGatewaysStore, type ContractInfo } from '../stores/gateways'
 import { useNetworkStore } from '../stores/network'
-import SubnetApprovalsModal from '@/components/SubnetApprovalsModal.vue'
 
 // Stores
 const gatewaysStore = useGatewaysStore()
@@ -319,8 +320,8 @@ const upgradeContract = (contract: ContractInfo) => {
         </div>
       </div>
 
-      <!-- Loading State -->
-      <div v-if="loading" class="text-center py-12">
+      <!-- Loading State (only show if no contracts at all) -->
+      <div v-if="loading && allContracts.length === 0" class="text-center py-12">
         <div class="animate-spin inline-block w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full"></div>
         <p class="mt-4 text-gray-600">Loading contracts...</p>
       </div>
@@ -362,7 +363,7 @@ const upgradeContract = (contract: ContractInfo) => {
       </div>
 
       <!-- Contracts Grid -->
-      <div v-else class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div v-else-if="filteredContracts.length > 0 || loading" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div
           v-for="contract in filteredContracts"
           :key="contract.id"
@@ -426,9 +427,14 @@ const upgradeContract = (contract: ContractInfo) => {
                 <span class="text-sm text-gray-900">{{ formatDate(contract.deployed_at) }}</span>
               </div>
 
-              <div v-if="contract.type === 'gateway' && contract.subnets_created !== undefined" class="flex justify-between items-center">
+              <div v-if="contract.type === 'gateway'" class="flex justify-between items-center">
                 <span class="text-sm font-medium text-gray-500">Subnets Created</span>
-                <span class="text-sm text-gray-900 font-semibold">{{ contract.subnets_created }}</span>
+                <span class="text-sm text-gray-900 font-semibold">
+                  <span v-if="loading && contract.subnets_created === undefined">
+                    <ProgressiveLoader :show-text="false" :inline="true" />
+                  </span>
+                  <span v-else>{{ contract.subnets_created ?? 0 }}</span>
+                </span>
               </div>
             </div>
 

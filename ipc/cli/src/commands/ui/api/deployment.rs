@@ -174,8 +174,8 @@ async fn run_async_deployment(
     log::info!("Extracted gateway mode: '{}'", gateway_mode);
     log::info!("Gateway mode type: {:?}", config.get("gatewayMode"));
 
-    if gateway_mode == "deployed" {
-        log::info!("SHOULD SKIP CONTRACT DEPLOYMENT - Using deployed gateway mode");
+    if gateway_mode == "deployed" || gateway_mode == "l1-gateway" {
+        log::info!("SHOULD SKIP CONTRACT DEPLOYMENT - Using {} mode", gateway_mode);
     } else {
         log::info!("WILL DEPLOY CONTRACTS - Gateway mode is '{}'", gateway_mode);
     }
@@ -222,6 +222,53 @@ async fn run_async_deployment(
 
             // Convert Filecoin addresses to Ethereum format
             // Parse the Filecoin addresses first
+            let gateway_fil_addr = FilecoinAddress::from_str(&selected_gateway.address)
+                .map_err(|e| anyhow::anyhow!("Invalid Filecoin gateway address '{}': {}", selected_gateway.address, e))?;
+            let registry_fil_addr = FilecoinAddress::from_str(&selected_gateway.registry_address)
+                .map_err(|e| anyhow::anyhow!("Invalid Filecoin registry address '{}': {}", selected_gateway.registry_address, e))?;
+
+            // Convert to Ethereum format
+            let gateway_addr = ipc_api::evm::payload_to_evm_address(gateway_fil_addr.payload())
+                .map_err(|e| anyhow::anyhow!("Failed to convert gateway address to Ethereum format: {}", e))?;
+            let registry_addr = ipc_api::evm::payload_to_evm_address(registry_fil_addr.payload())
+                .map_err(|e| anyhow::anyhow!("Failed to convert registry address to Ethereum format: {}", e))?;
+
+            log::info!("Converted gateway address from {} to 0x{:x}", selected_gateway.address, gateway_addr);
+            log::info!("Converted registry address from {} to 0x{:x}", selected_gateway.registry_address, registry_addr);
+
+            fendermint_eth_deployer::DeployedContracts {
+                gateway: gateway_addr,
+                registry: registry_addr,
+            }
+        },
+        "l1-gateway" => {
+            // Use L1 gateway selected from the top menu
+            broadcast_progress(state, deployment_id, "contracts", 50, "in_progress",
+                Some("Using selected L1 gateway...".to_string())).await;
+
+            let selected_gateway_id = config.get("selectedL1Gateway")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| anyhow::anyhow!("Selected L1 gateway ID is required when using l1-gateway mode"))?;
+
+            log::info!("Using L1 gateway: {}", selected_gateway_id);
+
+            // Get gateway information from the gateway service
+            let gateway_service = super::super::services::GatewayService::new(crate::GlobalArguments {
+                config_path: Some(state.config_path.clone()),
+                _network: fvm_shared::address::Network::Testnet,
+                __network: None,
+            });
+
+            let discovered_gateways = gateway_service.discover_gateways(Some(headers)).await
+                .map_err(|e| anyhow::anyhow!("Failed to discover gateways: {}", e))?;
+
+            let selected_gateway = discovered_gateways.iter()
+                .find(|g| g.id == selected_gateway_id)
+                .ok_or_else(|| anyhow::anyhow!("Selected L1 gateway not found: {}", selected_gateway_id))?;
+
+            log::info!("Found selected L1 gateway: {} at address {}", selected_gateway.id, selected_gateway.address);
+
+            // Convert Filecoin addresses to Ethereum format
             let gateway_fil_addr = FilecoinAddress::from_str(&selected_gateway.address)
                 .map_err(|e| anyhow::anyhow!("Invalid Filecoin gateway address '{}': {}", selected_gateway.address, e))?;
             let registry_fil_addr = FilecoinAddress::from_str(&selected_gateway.registry_address)
@@ -340,7 +387,7 @@ async fn run_async_deployment(
     };
 
     // Register the deployed contracts in the IPC configuration store (only for newly deployed contracts)
-    if gateway_mode != "deployed" && gateway_mode != "custom" {
+    if gateway_mode != "deployed" && gateway_mode != "custom" && gateway_mode != "l1-gateway" {
         log::info!("Registering newly deployed contracts in IPC config: gateway={:?}, registry={:?}",
                    deployed_contracts.gateway, deployed_contracts.registry);
 

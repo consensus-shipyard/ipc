@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import ProgressiveLoader from '../components/common/ProgressiveLoader.vue'
 import { useNetworkStore } from '../stores/network'
 import { useSubnetsStore, type SubnetInstance } from '../stores/subnets'
 
@@ -328,17 +329,32 @@ const getIndentStyle = (depth: number) => {
                   <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                     <div>
                       <p class="text-sm text-gray-500">Validators</p>
-                      <p class="font-semibold text-gray-900">{{ node.subnet.validators?.length || 0 }}</p>
+                      <p class="font-semibold text-gray-900">
+                        <span v-if="node.subnet.isLoading">
+                          <ProgressiveLoader :show-text="false" :inline="true" />
+                        </span>
+                        <span v-else>{{ node.subnet.validators?.length || 0 }}</span>
+                      </p>
                     </div>
                     <div>
                       <p class="text-sm text-gray-500">Total Stake</p>
                       <p class="font-semibold text-gray-900">
-                        {{ (node.subnet.validators || []).reduce((s: number, v: any) => s + parseFloat(v.stake || '0'), 0).toFixed(1) }} FIL
+                        <span v-if="node.subnet.isLoading">
+                          <ProgressiveLoader :show-text="false" :inline="true" />
+                        </span>
+                        <span v-else>
+                          {{ (node.subnet.validators || []).reduce((s: number, v: any) => s + parseFloat(v.stake || '0'), 0).toFixed(1) }} FIL
+                        </span>
                       </p>
                     </div>
                     <div>
                       <p class="text-sm text-gray-500">Permission Mode</p>
-                      <p class="font-semibold text-gray-900 capitalize">{{ node.subnet.status_info.permission_mode || 'Unknown' }}</p>
+                      <p class="font-semibold text-gray-900 capitalize">
+                        <span v-if="node.subnet.isLoading">
+                          <ProgressiveLoader :show-text="false" :inline="true" />
+                        </span>
+                        <span v-else>{{ node.subnet.status_info.permission_mode || 'Unknown' }}</span>
+                      </p>
                     </div>
                     <div>
                       <p class="text-sm text-gray-500">Created</p>
@@ -407,17 +423,32 @@ const getIndentStyle = (depth: number) => {
                       <div class="grid grid-cols-4 gap-4 text-sm">
                         <div>
                           <p class="text-gray-500">Validators</p>
-                          <p class="font-semibold">{{ childNode.subnet.validators?.length || 0 }}</p>
+                          <p class="font-semibold">
+                            <span v-if="childNode.subnet.isLoading">
+                              <ProgressiveLoader :show-text="false" :inline="true" />
+                            </span>
+                            <span v-else>{{ childNode.subnet.validators?.length || 0 }}</span>
+                          </p>
                         </div>
                         <div>
                           <p class="text-gray-500">Stake</p>
                           <p class="font-semibold">
-                            {{ (childNode.subnet.validators || []).reduce((s: number, v: any) => s + parseFloat(v.stake || '0'), 0).toFixed(1) }}
+                            <span v-if="childNode.subnet.isLoading">
+                              <ProgressiveLoader :show-text="false" :inline="true" />
+                            </span>
+                            <span v-else>
+                              {{ (childNode.subnet.validators || []).reduce((s: number, v: any) => s + parseFloat(v.stake || '0'), 0).toFixed(1) }}
+                            </span>
                           </p>
                         </div>
                         <div>
                           <p class="text-gray-500">Permission Mode</p>
-                          <p class="font-semibold capitalize">{{ childNode.subnet.status_info.permission_mode || 'Unknown' }}</p>
+                          <p class="font-semibold capitalize">
+                            <span v-if="childNode.subnet.isLoading">
+                              <ProgressiveLoader :show-text="false" :inline="true" />
+                            </span>
+                            <span v-else>{{ childNode.subnet.status_info.permission_mode || 'Unknown' }}</span>
+                          </p>
                         </div>
                         <div>
                           <p class="text-gray-500">Created</p>
@@ -489,10 +520,16 @@ const getIndentStyle = (depth: number) => {
                   {{ subnet.parent }}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {{ subnet.validators?.length || 0 }}
+                  <span v-if="subnet.isLoading">
+                    <ProgressiveLoader :show-text="false" :inline="true" />
+                  </span>
+                  <span v-else>{{ subnet.validators?.length || 0 }}</span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {{ (subnet.validators || []).reduce((s: number, v: any) => s + parseFloat(v.stake || '0'), 0).toFixed(1) }} FIL
+                  <span v-if="subnet.isLoading">
+                    <ProgressiveLoader :show-text="false" :inline="true" />
+                  </span>
+                  <span v-else>{{ (subnet.validators || []).reduce((s: number, v: any) => s + parseFloat(v.stake || '0'), 0).toFixed(1) }} FIL</span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {{ formatDate(subnet.created_at) }}
