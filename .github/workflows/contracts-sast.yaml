@@ -39,13 +39,8 @@ jobs:
           cache: false
           version: v0.3.0
 
-      - name: Setup Rust for aderyn
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.89.0
-
       - name: Install aderyn
-        run: cargo install aderyn
+        run: cargo install aderyn --locked
 
       - name: Make deps
         run: cd contracts && make deps
