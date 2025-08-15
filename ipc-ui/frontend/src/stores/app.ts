@@ -29,8 +29,7 @@ export const useAppStore = defineStore('app', () => {
   // Computed
   const isLoading = computed(() =>
     loadingState.value.isInitializing ||
-    subnetsStore.isLoading ||
-    gatewaysStore.loading
+    (!loadingState.value.hasInitialized && (subnetsStore.isLoading || gatewaysStore.loading))
   )
 
   const hasError = computed(() =>

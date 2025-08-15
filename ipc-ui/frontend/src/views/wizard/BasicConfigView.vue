@@ -318,18 +318,32 @@ watch(formData, () => {
 }, { deep: true })
 
 // Watch L1 gateway selection changes from the top menu
-watch(() => l1GatewaysStore.selectedGatewayId, (newGatewayId) => {
+watch(() => l1GatewaysStore.selectedGatewayId, (newGatewayId, oldGatewayId) => {
+  console.log('[BasicConfig] L1 Gateway selection changed:', { newGatewayId, oldGatewayId, gatewayMode: formData.value.gatewayMode })
+
   if (formData.value.gatewayMode === 'l1-gateway') {
-    formData.value.selectedL1Gateway = newGatewayId
+    formData.value.selectedL1Gateway = newGatewayId || ''
+    console.log('[BasicConfig] Updated form selectedL1Gateway:', formData.value.selectedL1Gateway)
   }
 }, { immediate: true })
 
-// Watch gateway mode changes to load deployed gateways when needed
-watch(() => formData.value.gatewayMode, (newMode) => {
-  if (newMode === 'subnet-gateway') {
+// Watch gateway mode changes to sync L1 gateway selection when switching to l1-gateway mode
+watch(() => formData.value.gatewayMode, (newMode, oldMode) => {
+  console.log('[BasicConfig] Gateway mode changed:', { newMode, oldMode })
+
+  if (newMode === 'l1-gateway') {
+    // When switching to L1 gateway mode, sync the current selection
+    const currentL1Selection = l1GatewaysStore.selectedGatewayId
+    if (currentL1Selection) {
+      formData.value.selectedL1Gateway = currentL1Selection
+      console.log('[BasicConfig] Synced L1 gateway on mode change:', currentL1Selection)
+    }
+  } else if (newMode === 'subnet-gateway') {
     loadDeployedGateways()
   }
 })
+
+
 
 // Load deployed gateways on component mount
 onMounted(() => {

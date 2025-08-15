@@ -1055,7 +1055,7 @@ onUnmounted(() => {
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             ]"
           >
-                            Validators ({{ instance.data?.validator_count || instance.validators?.length || 0 }} validator{{ (instance.data?.validator_count || instance.validators?.length || 0) !== 1 ? 's' : '' }})
+                            Validators ({{ instance?.data?.validator_count || instance?.validators?.length || 0 }} validator{{ (instance?.data?.validator_count || instance?.validators?.length || 0) !== 1 ? 's' : '' }})
           </button>
           <button
             @click="activeTab = 'configuration'"
@@ -1530,7 +1530,7 @@ onUnmounted(() => {
               <h3 class="text-lg font-semibold text-gray-900">Validators</h3>
               <div class="flex items-center space-x-3">
                 <div class="text-sm text-gray-500">
-                  {{ instance.data?.validator_count || instance.validators?.length || 0 }} validator{{ (instance.data?.validator_count || instance.validators?.length || 0) !== 1 ? 's' : '' }}
+                  {{ instance?.data?.validator_count || instance?.validators?.length || 0 }} validator{{ (instance?.data?.validator_count || instance?.validators?.length || 0) !== 1 ? 's' : '' }}
                 </div>
                 <button
                   @click="showAddValidatorModal = true"
@@ -1544,7 +1544,7 @@ onUnmounted(() => {
               </div>
             </div>
 
-            <div v-if="(instance.data?.validators?.length || 0) === 0" class="text-center py-8 text-gray-500">
+            <div v-if="(instance?.data?.validators?.length || 0) === 0" class="text-center py-8 text-gray-500">
               <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
@@ -1622,7 +1622,7 @@ onUnmounted(() => {
                   </tr>
                 </thead>
                 <tbody class="bg-white divide-y divide-gray-200">
-                  <tr v-for="validator in (instance.data?.validators || instance.validators)" :key="validator.address">
+                  <tr v-for="validator in (instance?.data?.validators || instance?.validators)" :key="validator.address">
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
                       <button
                         @click="copyToClipboard(validator.address, validator.address)"
@@ -1636,7 +1636,7 @@ onUnmounted(() => {
                       </button>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div v-if="instance.data?.config?.permissionMode === 'collateral'">
+                      <div v-if="instance?.data?.config?.permissionMode === 'collateral'">
                         {{ validator.stake }} FIL
                         <span v-if="validator.initial_balance" class="block text-xs text-gray-500">
                           Initial: {{ validator.initial_balance }} FIL
@@ -2134,7 +2134,7 @@ onUnmounted(() => {
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div v-for="(value, key) in instance?.data?.config" :key="key" class="flex justify-between py-2 border-b border-gray-100">
                 <dt class="text-sm font-medium text-gray-500 capitalize">
-                  {{ typeof key === 'string' ? key.replace(/([A-Z])/g, ' $1').replace(/^./, (str: string) => str.toUpperCase()) : key }}
+                  {{ typeof key === 'string' ? (key as string).replace(/([A-Z])/g, ' $1').replace(/^./, (str: string) => str.toUpperCase()) : key }}
                 </dt>
                 <dd class="text-sm text-gray-900">
                   <span v-if="typeof value === 'boolean'" :class="value ? 'text-green-600' : 'text-red-600'">

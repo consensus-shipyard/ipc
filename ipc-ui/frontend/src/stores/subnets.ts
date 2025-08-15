@@ -172,7 +172,32 @@ export const useSubnetsStore = defineStore('subnets', () => {
           loadError: subnetErrors.value.get(subnet.id) || null
         }))
 
-        subnets.value = newSubnets
+        // Update subnets more gracefully to avoid clearing the array
+        if (showInitialLoading || subnets.value.length === 0) {
+          // On initial load or when empty, replace the entire array
+          subnets.value = newSubnets
+        } else {
+          // On refresh, update existing subnets and add new ones
+          const existingSubnetsMap = new Map(subnets.value.map(s => [s.id, s]))
+          const updatedSubnets: SubnetInstance[] = []
+
+          // Update existing subnets and add new ones
+          newSubnets.forEach((newSubnet: SubnetInstance) => {
+            const existing = existingSubnetsMap.get(newSubnet.id)
+            if (existing) {
+              // Preserve loading states during updates
+              updatedSubnets.push({
+                ...newSubnet,
+                isLoading: existing.isLoading,
+                loadError: existing.loadError
+              })
+            } else {
+              updatedSubnets.push(newSubnet)
+            }
+          })
+
+          subnets.value = updatedSubnets
+        }
         lastUpdated.value = new Date()
         console.log(`Loaded ${subnets.value.length} subnets with enhanced status`)
       }
@@ -238,8 +263,8 @@ export const useSubnetsStore = defineStore('subnets', () => {
     }
   }
 
-  // Initialize
-  loadSubnets()
+  // Note: Initialization is handled by the app store to prevent premature loading overlays
+  // loadSubnets() - removed automatic initialization
 
   return {
     // State

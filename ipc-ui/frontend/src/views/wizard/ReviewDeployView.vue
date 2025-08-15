@@ -65,7 +65,7 @@ const activationConfig = computed(() => {
 
 // Check if configuration is complete
 const isConfigComplete = computed(() => wizardStore.isConfigComplete)
-const configErrors = computed(() => wizardStore.validationErrors)
+const configErrors = computed(() => wizardStore.configValidationErrors)
 
 // Export configuration
 const exportConfig = () => {

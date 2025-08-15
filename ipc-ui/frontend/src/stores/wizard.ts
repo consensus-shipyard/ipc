@@ -97,37 +97,66 @@ export const useWizardStore = defineStore('wizard', () => {
   const isConnected = ref(false)
 
   // Computed
-  const isConfigComplete = computed(() => {
-    // Check if all mandatory fields are filled
-    const required = [
-      'parent',
-      'minValidatorStake',
-      'minValidators',
-      'bottomupCheckPeriod',
-      'permissionMode',
-      'supplySourceKind',
-      'genesisSubnetIpcContractsOwner',
-      'gatewayMode'
+  const configValidationErrors = computed(() => {
+    const errors: ValidationError[] = []
+
+    // Check all mandatory fields
+    const required: { field: keyof SubnetConfig; label: string }[] = [
+      { field: 'parent', label: 'Parent Network' },
+      { field: 'minValidatorStake', label: 'Minimum Validator Stake' },
+      { field: 'minValidators', label: 'Minimum Validators' },
+      { field: 'bottomupCheckPeriod', label: 'Bottom-up Check Period' },
+      { field: 'permissionMode', label: 'Permission Mode' },
+      { field: 'supplySourceKind', label: 'Supply Source Kind' },
+      { field: 'genesisSubnetIpcContractsOwner', label: 'Genesis Owner Address' },
+      { field: 'gatewayMode', label: 'Gateway Mode' }
     ]
 
-    const isBasicComplete = required.every(field => {
-      const value = config.value[field as keyof SubnetConfig]
-      return value !== undefined && value !== null && value !== ''
+    required.forEach(({ field, label }) => {
+      const value = config.value[field]
+      if (value === undefined || value === null || value === '') {
+        errors.push({ field, message: `${label} is required` })
+      }
     })
 
     // Check gateway mode specific requirements
     if (config.value.gatewayMode === 'custom') {
-      const customGatewayComplete = config.value.customGatewayAddress && config.value.customRegistryAddress
-      return isBasicComplete && customGatewayComplete
+      if (!config.value.customGatewayAddress) {
+        errors.push({ field: 'customGatewayAddress', message: 'Custom Gateway Address is required' })
+      }
+      if (!config.value.customRegistryAddress) {
+        errors.push({ field: 'customRegistryAddress', message: 'Custom Registry Address is required' })
+      }
     } else if (config.value.gatewayMode === 'subnet-gateway') {
-      const deployedGatewaySelected = config.value.selectedDeployedGateway
-      return isBasicComplete && deployedGatewaySelected
-    } else if (config.value.gatewayMode === 'l1-gateway') {
-      const l1GatewaySelected = config.value.selectedL1Gateway
-      return isBasicComplete && l1GatewaySelected
+      if (!config.value.selectedDeployedGateway) {
+        errors.push({ field: 'selectedDeployedGateway', message: 'Please select a deployed gateway' })
+      }
+        } else if (config.value.gatewayMode === 'l1-gateway') {
+      const l1GatewaysStore = useL1GatewaysStore()
+      const hasL1GatewaySelected = config.value.selectedL1Gateway || l1GatewaysStore.selectedGateway
+
+      if (!hasL1GatewaySelected) {
+        // Debug information for troubleshooting
+        const debugInfo = {
+          configSelected: config.value.selectedL1Gateway,
+          storeSelected: l1GatewaysStore.selectedGateway,
+          storeSelectedId: l1GatewaysStore.selectedGatewayId,
+          availableGateways: l1GatewaysStore.l1Gateways?.length || 0
+        }
+        console.log('[Wizard Validation] L1 Gateway validation failed. Debug info:', debugInfo)
+
+                errors.push({
+          field: 'selectedL1Gateway',
+          message: 'Please select an L1 gateway from the top menu'
+        })
+      }
     }
 
-    return isBasicComplete
+    return errors
+  })
+
+  const isConfigComplete = computed(() => {
+    return configValidationErrors.value.length === 0
   })
 
   const hasErrors = computed(() => validationErrors.value.length > 0)
@@ -342,17 +371,19 @@ export const useWizardStore = defineStore('wizard', () => {
             console.log('Deployment completed successfully')
           }
 
-          // Auto-refresh gateways if a new gateway was deployed
-          if (progress.gateway_address && shouldRefreshGateways()) {
-            console.log('New gateway deployed, refreshing gateway list...')
-            try {
-              const gatewayStore = useL1GatewaysStore()
-              await gatewayStore.loadL1Gateways()
-              console.log('Gateway list refreshed successfully')
-            } catch (error) {
-              console.error('Failed to refresh gateway list:', error)
-              // Don't fail the deployment over gateway refresh issues
-            }
+          // Auto-refresh data stores if deployment was successful
+          try {
+            console.log('Deployment completed, refreshing all data stores...')
+
+            // Import app store to trigger full refresh
+            const { useAppStore } = await import('./app')
+            const appStore = useAppStore()
+            await appStore.refreshAllData()
+
+            console.log('All data stores refreshed successfully after deployment')
+          } catch (error) {
+            console.error('Failed to refresh data stores after deployment:', error)
+            // Don't fail the deployment over refresh issues
           }
         } else if (progress.status === 'failed') {
           isDeploying.value = false
@@ -387,7 +418,20 @@ export const useWizardStore = defineStore('wizard', () => {
     deploymentProgress.value = null
 
     try {
+      // Debug: Log the full config being sent to deployment
       console.log('Starting deployment with config:', config.value)
+      console.log('Gateway Mode:', config.value.gatewayMode)
+      console.log('Selected L1 Gateway:', config.value.selectedL1Gateway)
+
+      // Additional debugging for L1 gateway setup
+      if (config.value.gatewayMode === 'l1-gateway') {
+        const l1GatewaysStore = useL1GatewaysStore()
+        console.log('L1 Gateway Store State:', {
+          selectedGatewayId: l1GatewaysStore.selectedGatewayId,
+          selectedGateway: l1GatewaysStore.selectedGateway,
+          availableGateways: l1GatewaysStore.l1Gateways?.length
+        })
+      }
 
       // Ensure WebSocket is connected for progress updates
       console.log('Checking WebSocket connection, isConnected:', isConnected.value)
@@ -527,6 +571,7 @@ export const useWizardStore = defineStore('wizard', () => {
 
     // Computed
     isConfigComplete,
+    configValidationErrors,
     hasErrors,
     currentStepConfig,
 

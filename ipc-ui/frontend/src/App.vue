@@ -58,8 +58,6 @@ onMounted(async () => {
   <SplashScreen :show="showSplash" />
 
   <div class="min-h-screen bg-gray-50">
-    <!-- Global Loading State -->
-    <AppLoadingState />
 
     <!-- App Header -->
     <AppHeader />

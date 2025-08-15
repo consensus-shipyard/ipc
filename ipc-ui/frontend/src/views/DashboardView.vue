@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import SubnetLoadingIndicator from '../components/common/SubnetLoadingIndicator.vue'
 import SubnetStatusIndicator from '../components/common/SubnetStatusIndicator.vue'
 import { apiService } from '../services/api'
 import { useSubnetsStore, type SubnetInstance } from '../stores/subnets'
@@ -11,11 +12,22 @@ const subnetsStore = useSubnetsStore()
 // State
 const approvingSubnets = ref<Set<string>>(new Set())
 const approvalError = ref<string | null>(null)
+const hasEverLoadedSubnets = ref(false)
 
 // Use store data instead of local state
 const subnets = computed(() => subnetsStore.subnets || [])
 const loading = computed(() => subnetsStore.isLoading)
 const error = computed(() => subnetsStore.error)
+
+// Track when we've successfully loaded subnets at least once
+const isInitialLoad = computed(() => loading.value && !hasEverLoadedSubnets.value)
+
+// Watch for successful subnet loads
+watch(subnets, (newSubnets: SubnetInstance[]) => {
+  if (newSubnets && newSubnets.length > 0) {
+    hasEverLoadedSubnets.value = true
+  }
+}, { immediate: true })
 
 // Methods
 const fetchSubnets = () => subnetsStore.loadSubnets()
@@ -359,14 +371,14 @@ const handleSubnetRetry = (subnetId: string) => {
         </div>
       </div>
 
-      <!-- Initial Loading State (only when no subnets exist) -->
-      <div v-if="loading && (subnets?.length || 0) === 0" class="text-center py-8">
+      <!-- Initial Loading State (only on true initial load) -->
+      <div v-if="isInitialLoad" class="text-center py-8">
         <div class="animate-spin inline-block w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full"></div>
         <p class="mt-4 text-gray-600">Loading subnets...</p>
       </div>
 
       <!-- Empty State -->
-      <div v-else-if="!loading && (subnets?.length || 0) === 0" class="text-center py-12 text-gray-500">
+      <div v-else-if="!isInitialLoad && (subnets?.length || 0) === 0" class="text-center py-12 text-gray-500">
         <div class="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
           <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
