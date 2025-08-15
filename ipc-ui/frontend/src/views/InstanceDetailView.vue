@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 // Components
 import SubnetHeader from '@/components/subnet/SubnetHeader.vue'
 import SubnetQuickActions from '@/components/subnet/SubnetQuickActions.vue'
+import TabContent from '@/components/subnet/TabContent.vue'
 import SubnetTabNavigation from '@/components/subnet/tabs/SubnetTabNavigation.vue'
 
 // Modals
@@ -389,12 +390,49 @@ watch(() => props.id, async (newId) => {
         :instance="instance"
       />
 
-      <!-- Tab Content would go here -->
-      <!-- For now, showing a placeholder -->
-      <div class="bg-white rounded-lg shadow p-6">
-        <p class="text-gray-600">Tab content for "{{ activeTab }}" would be displayed here.</p>
-        <p class="text-sm text-gray-500 mt-2">The tab components need to be created separately to complete the refactoring.</p>
-          </div>
+            <!-- Tab Content -->
+      <TabContent
+        :active-tab="activeTab"
+        :instance="instance"
+        :loading="loading"
+        :error="error"
+        :created-date="createdDate"
+        :total-stake="totalStake"
+        :gateway-address="gatewayAddress"
+        :gateway-address-short="gatewayAddressShort"
+        :subnet-actor-address="subnetActorAddress"
+        :subnet-actor-address-short="subnetActorAddressShort"
+        :status-color="statusColor"
+        :copying-address="copyingAddress"
+        :chain-stats="chainStats"
+        :subnet-status="subnetStatus"
+        :loading-stats="loadingStats"
+        :stats-error="statsError"
+        :show-add-validator-modal="showAddValidatorModal"
+        :show-bulk-management="showBulkManagement"
+        :removing-validator="removingValidator"
+        :updating-stake="updatingStake"
+        :stake-amounts="stakeAmounts"
+        :bulk-validators="bulkValidators"
+        :setting-federated-power="settingFederatedPower"
+        :loading-node-config="loadingNodeConfig"
+        :approving-subnet="approvingSubnet"
+        @copy-to-clipboard="copyToClipboard"
+        @fetch-instance="fetchInstance"
+        @fetch-chain-stats="startStatsRefresh"
+        @update:show-add-validator-modal="showAddValidatorModal = $event"
+        @update:show-bulk-management="showBulkManagement = $event"
+        @remove-validator="removeValidator"
+        @update-stake="updateStake"
+        @show-node-config="showNodeConfig"
+        @initialize-bulk-management="initializeBulkManagement"
+        @add-bulk-validator="addBulkValidator"
+        @remove-bulk-validator="removeBulkValidator"
+        @set-bulk-federated-power="setBulkFederatedPower"
+        @update:bulk-validators="bulkValidators = $event"
+        @update:stake-amounts="stakeAmounts = $event"
+        @approve-subnet="approveSubnet"
+      />
 
       <!-- Modals -->
       <AddValidatorModal
