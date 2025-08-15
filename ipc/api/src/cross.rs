@@ -161,15 +161,16 @@ pub struct CrossMsgs {
     pub msgs: Vec<IpcEnvelope>,
 }
 
-#[derive(Serialize_tuple, Deserialize_tuple, Clone)]
-struct ApplyMsgParams {
-    pub cross_msg: IpcEnvelope,
-}
-
 impl CrossMsgs {
     pub fn new() -> Self {
         Self::default()
     }
+}
+
+#[cfg(feature = "fil-actor")]
+#[derive(Serialize_tuple, Deserialize_tuple, Clone)]
+struct ApplyMsgParams {
+    pub cross_msg: IpcEnvelope,
 }
 
 #[cfg(feature = "fil-actor")]
