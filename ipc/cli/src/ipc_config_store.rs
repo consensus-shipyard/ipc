@@ -22,14 +22,20 @@ impl IpcConfigStore {
     /// Load the config from disk, or if none exists, create one with defaults, persist it, and return it.
     pub async fn load_or_init(global: &GlobalArguments) -> anyhow::Result<Self> {
         let path = global.config_path();
-        let path = PathBuf::from(path);
+        // Properly expand tilde if present
+        let path = if path.starts_with("~") {
+            ipc_provider::expand_tilde(&path)
+        } else {
+            PathBuf::from(path)
+        };
 
         let cfg = if path.exists() {
             Config::from_file(&path)?
         } else {
-            let default = Config::default();
-            default.write_to_file_async(&path).await?;
-            default
+            // Use empty config instead of default to avoid injecting r314159
+            let empty_config = Config::new();
+            empty_config.write_to_file_async(&path).await?;
+            empty_config
         };
 
         Ok(Self {
