@@ -138,6 +138,7 @@ pub struct SubnetStatusInfo {
     pub status: String,
     pub message: String,
     // New fields for detailed subnet setup status
+    #[serde(default)]
     pub setup_checklist: SubnetSetupChecklist,
 }
 
@@ -207,8 +208,18 @@ impl Default for SubnetSetupChecklist {
     fn default() -> Self {
         SubnetSetupChecklist {
             permission_mode: "unknown".to_string(),
-            steps: Vec::new(),
-            next_required_action: None,
+            steps: vec![SetupStep {
+                id: "loading".to_string(),
+                title: "Loading Setup Status".to_string(),
+                description: "Checking subnet configuration...".to_string(),
+                status: StepStatus::InProgress,
+                required: true,
+                action_available: false,
+                action_button_text: None,
+                action_type: None,
+                details: None,
+            }],
+            next_required_action: Some("Loading subnet status...".to_string()),
             all_complete: false,
         }
     }

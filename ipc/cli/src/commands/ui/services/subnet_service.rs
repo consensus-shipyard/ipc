@@ -634,7 +634,9 @@ impl SubnetService {
             });
 
         // Generate setup checklist based on subnet status
+        log::info!("Generating setup checklist for subnet: {}", subnet_id);
         status.setup_checklist = self.generate_setup_checklist(&subnet, &status, provider).await;
+        log::info!("Generated setup checklist with {} steps", status.setup_checklist.steps.len());
 
         log::info!("=== COMPREHENSIVE STATUS COMPLETE: {} = {} (is_active: {}, block_height: {}) ===",
                    subnet_id, status.lifecycle_state, status.is_active, status.block_height);
@@ -813,7 +815,8 @@ impl SubnetService {
                     "deployment_time": status_info.deployment_time,
                     "last_block_time": status_info.last_block_time,
                     "error_message": status_info.error_message,
-                    "next_action_required": status_info.next_action_required
+                    "next_action_required": status_info.next_action_required,
+                    "setup_checklist": serde_json::to_value(&status_info.setup_checklist).unwrap_or_default()
                 },
                 "validators": validators,
                 "config": {
@@ -870,11 +873,32 @@ impl SubnetService {
                     }
                 };
 
-                // Get validators from the blockchain
-                let validators = self.get_validators_for_subnet(subnet_id).await.unwrap_or_else(|e| {
-                    log::warn!("Failed to fetch validators for subnet {}: {}", subnet_id, e);
+                // Get comprehensive status information with setup checklist
+                let status_info = match self.get_comprehensive_subnet_status(subnet_id).await {
+                    Ok(status) => {
+                        log::info!("✓ Comprehensive status for {}: {} (genesis: {}, validators: {}/{})",
+                            subnet_id, status.lifecycle_state, status.genesis_available,
+                            status.active_validators, status.validator_count);
+                        status
+                    }
+                    Err(e) => {
+                        log::error!("✗ Failed to get comprehensive status for {}: {}", subnet_id, e);
+                        let mut status = SubnetStatusInfo::default();
+                        status.lifecycle_state = SubnetLifecycleState::Failed;
+                        status.error_message = Some(format!("Status check failed: {}", e));
+                        status
+                    }
+                };
+
+                // Get validators from the blockchain (only if needed for display)
+                let validators = if status_info.validator_count > 0 {
+                    self.get_validators_for_subnet(subnet_id).await.unwrap_or_else(|e| {
+                        log::warn!("Failed to fetch detailed validator info for subnet {}: {}", subnet_id, e);
+                        Vec::new()
+                    })
+                } else {
                     Vec::new()
-                });
+                };
 
                 // Get the actual permission mode from the subnet contract
                 let permission_mode = match self.get_permission_mode(subnet_id).await {
@@ -888,16 +912,28 @@ impl SubnetService {
                     }
                 };
 
+                // Create enhanced response with comprehensive status including setup_checklist
                 let instance = serde_json::json!({
                     "id": subnet_id,
-                    "name": format!("Subnet {}", subnet_id),
-                    "status": "Active",
+                    "name": format!("Subnet {}", subnet_id.split('/').last().unwrap_or(subnet_id)),
+                    "status": status_info.lifecycle_state.to_string(),
+                    "status_info": {
+                        "lifecycle_state": status_info.lifecycle_state.to_string(),
+                        "genesis_available": status_info.genesis_available,
+                        "validator_count": status_info.validator_count,
+                        "active_validators": status_info.active_validators,
+                        "permission_mode": status_info.permission_mode,
+                        "deployment_time": status_info.deployment_time,
+                        "last_block_time": status_info.last_block_time,
+                        "error_message": status_info.error_message,
+                        "next_action_required": status_info.next_action_required,
+                        "setup_checklist": serde_json::to_value(&status_info.setup_checklist).unwrap_or_default()
+                    },
                     "parent": parent,
                     "type": "subnet",
                     "created_at": chrono::Utc::now().to_rfc3339(),
                     "last_updated": chrono::Utc::now().to_rfc3339(),
-                    "validator_count": validators.len(),
-                    "is_active": true,
+                    "is_active": status_info.is_active,
                     "chain_id": subnet_config.id.chain_id(),
                     "validators": validators,
                     "config": {
@@ -910,9 +946,9 @@ impl SubnetService {
                         }
                     },
                     "stats": {
-                        "block_height": 1000,
+                        "block_height": status_info.block_height,
                         "transaction_count": 50,
-                        "validator_count": validators.len(),
+                        "validator_count": status_info.validator_count,
                         "last_checkpoint": chrono::Utc::now().to_rfc3339()
                     }
                 });
