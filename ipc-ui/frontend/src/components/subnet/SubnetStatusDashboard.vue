@@ -1,8 +1,21 @@
 <template>
   <div class="bg-white rounded-lg border border-gray-200 p-6">
     <div class="flex items-center justify-between mb-6">
-      <div>
-        <h3 class="text-lg font-semibold text-gray-900">Subnet Setup Status</h3>
+      <div class="flex-1">
+        <div class="flex items-center">
+          <h3 class="text-lg font-semibold text-gray-900">Subnet Setup Status</h3>
+          <!-- Expand/Collapse button -->
+          <button
+            v-if="checklist?.steps?.length > 0"
+            @click="toggleExpanded"
+            class="ml-3 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+            :title="isExpanded ? 'Collapse steps' : 'Expand steps'"
+          >
+            <svg class="w-5 h-5 transform transition-transform" :class="{ 'rotate-180': isExpanded }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+        </div>
         <p class="text-sm text-gray-600 mt-1">
           Track configuration steps and complete missing requirements
         </p>
@@ -45,59 +58,58 @@
       </div>
     </div>
 
-    <!-- Setup steps checklist -->
-    <div class="space-y-4">
-      <div v-for="(step, index) in checklist?.steps"
-           :key="step.id"
-           class="flex items-start space-x-4 p-4 rounded-lg border transition-colors"
-           :class="getStepBorderClass(step.status)">
+    <!-- Setup steps checklist (collapsible) -->
+    <div v-if="checklist?.steps?.length > 0" class="transition-all duration-300">
+      <div v-show="isExpanded" class="space-y-2">
+        <div v-for="(step, index) in checklist.steps"
+             :key="step.id"
+             class="flex items-center space-x-3 p-3 rounded-md border transition-colors"
+             :class="getStepBorderClass(step.status)">
 
-        <!-- Step number and status icon -->
-        <div class="flex-shrink-0">
-          <div class="flex items-center justify-center w-8 h-8 rounded-full"
-               :class="getStepIconClass(step.status)">
-            <!-- Completed -->
-            <svg v-if="step.status === 'completed'" class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
-            </svg>
-            <!-- In Progress -->
-            <svg v-else-if="step.status === 'in_progress'" class="w-5 h-5 text-white animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <!-- Pending or Failed -->
-            <span v-else class="text-sm font-semibold">{{ index + 1 }}</span>
-          </div>
-        </div>
-
-        <!-- Step content -->
-        <div class="flex-1 min-w-0">
-          <div class="flex items-start justify-between">
-            <div class="flex-1">
-              <h4 class="text-sm font-semibold text-gray-900">{{ step.title }}</h4>
-              <p class="text-sm text-gray-600 mt-1">{{ step.description }}</p>
-
-              <!-- Status badge -->
-              <div class="mt-2">
-                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium"
-                      :class="getStatusBadgeClass(step.status)">
-                  {{ formatStepStatus(step.status) }}
-                  <span v-if="step.required" class="ml-1 text-red-500">*</span>
-                </span>
-              </div>
+          <!-- Step status icon -->
+          <div class="flex-shrink-0">
+            <div class="flex items-center justify-center w-6 h-6 rounded-full"
+                 :class="getStepIconClass(step.status)">
+              <!-- Completed -->
+              <svg v-if="step.status === 'completed'" class="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+              </svg>
+              <!-- In Progress -->
+              <svg v-else-if="step.status === 'in_progress'" class="w-3 h-3 text-white animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <!-- Pending or Failed -->
+              <span v-else class="text-xs font-semibold">{{ index + 1 }}</span>
             </div>
+          </div>
 
-            <!-- Action button -->
-            <div v-if="step.action_available && step.action_button_text" class="flex-shrink-0 ml-4">
-              <button @click="handleStepAction(step)"
-                      :disabled="actionInProgress === step.id"
-                      class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
-                <svg v-if="actionInProgress === step.id" class="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                {{ actionInProgress === step.id ? 'Processing...' : step.action_button_text }}
-              </button>
+          <!-- Step content -->
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center">
+                  <h4 class="text-sm font-medium text-gray-900 truncate">{{ step.title }}</h4>
+                  <span class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium"
+                        :class="getStatusBadgeClass(step.status)">
+                    {{ formatStepStatus(step.status) }}
+                  </span>
+                </div>
+                <p class="text-xs text-gray-600 mt-0.5 line-clamp-1">{{ step.description }}</p>
+              </div>
+
+              <!-- Action button -->
+              <div v-if="step.action_available && step.action_button_text" class="flex-shrink-0 ml-3">
+                <button @click="handleStepAction(step)"
+                        :disabled="actionInProgress === step.id"
+                        class="inline-flex items-center px-2 py-1 border border-transparent text-xs font-medium rounded text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                  <svg v-if="actionInProgress === step.id" class="w-3 h-3 mr-1 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  {{ actionInProgress === step.id ? 'Processing...' : step.action_button_text }}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -140,7 +152,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import ApproveSubnetModal from './modals/ApproveSubnetModal.vue'
 import SetFederatedPowerModal from './modals/SetFederatedPowerModal.vue'
 
@@ -179,6 +191,34 @@ const showFederatedPowerModal = ref(false)
 const showApproveModal = ref(false)
 const modalInitialData = ref<any>(null)
 const actionInProgress = ref<string | null>(null)
+
+// Collapsible state
+const isExpanded = ref(false)
+
+// Compute default expanded state: expand if any steps failed or are in progress
+const shouldBeExpanded = computed(() => {
+  if (!props.checklist?.steps?.length) return false
+
+  // Always expand if there are failed or in-progress steps
+  const hasFailuresOrProgress = props.checklist.steps.some(step =>
+    step.status === 'failed' || step.status === 'in_progress'
+  )
+
+  if (hasFailuresOrProgress) return true
+
+  // Collapse by default if all steps are completed
+  return !props.checklist.all_complete
+})
+
+// Watch for changes in checklist and update expanded state
+watch(shouldBeExpanded, (newValue) => {
+  isExpanded.value = newValue
+}, { immediate: true })
+
+// Toggle function
+const toggleExpanded = () => {
+  isExpanded.value = !isExpanded.value
+}
 
 // Handle step action button clicks
 const handleStepAction = (step: SetupStep) => {
