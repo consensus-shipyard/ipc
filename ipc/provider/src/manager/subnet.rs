@@ -7,9 +7,10 @@ use anyhow::Result;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
+use ipc_actors_abis::checkpointing_facet::StateCommitmentBreakDown;
 use ipc_actors_abis::subnet_actor_activity_facet::ValidatorClaim;
-use ipc_actors_abis::subnet_actor_checkpointing_facet::{Inclusion};
-use ipc_actors_abis::subnet_actor_checkpoint_facet::{LastCommitmentHeights};
+use ipc_actors_abis::subnet_actor_checkpoint_facet::LastCommitmentHeights;
+use ipc_actors_abis::subnet_actor_checkpointing_facet::Inclusion;
 use ipc_actors_abis::subnet_actor_getter_facet::ListPendingCommitmentsEntry;
 use ipc_api::checkpoint::{
     consensus::ValidatorData, BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent,
@@ -21,7 +22,6 @@ use ipc_api::subnet::{Asset, ConstructParams, PermissionMode};
 use ipc_api::subnet_id::SubnetID;
 use ipc_api::validator::Validator;
 use std::collections::{BTreeMap, HashMap};
-use ipc_actors_abis::checkpointing_facet::{StateCommitmentBreakDown};
 
 /// Trait to interact with a subnet and handle its lifecycle.
 #[async_trait]
@@ -277,20 +277,23 @@ pub trait SignedHeaderRelayer: Send + Sync {
         header: SignedHeader,
     ) -> Result<ChainEpoch>;
 
-    async fn query_commitment(&self, height: ChainEpoch) -> Result<Option<StateCommitmentBreakDown>>;
+    async fn query_commitment(
+        &self,
+        height: ChainEpoch,
+    ) -> Result<Option<StateCommitmentBreakDown>>;
 
     async fn get_last_commitment_heights(
         &self,
         subnet_id: &SubnetID,
     ) -> Result<LastCommitmentHeights>;
-    
+
     async fn confirm_validator_change(
         &self,
         height: ChainEpoch,
         submitter: &Address,
         subnet_id: &SubnetID,
-        commitment: StateCommitmentBreakDown
-    ) -> Result<()>;
+        commitment: StateCommitmentBreakDown,
+    ) -> Result<ChainEpoch>;
 
     async fn last_submission_height(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
 

@@ -21,58 +21,58 @@ pub struct SignedHeader {
 pub struct LightHeader {
     pub version: Consensus,
     pub chain_id: String,
-    pub height: i64,  // int64 in Solidity
+    pub height: i64, // int64 in Solidity
     pub time: Timestamp,
     pub last_block_id: BlockId,
-    pub last_commit_hash: Bytes,  // bytes in Solidity (dynamic)
-    pub data_hash: Bytes,          // bytes in Solidity (dynamic)
-    pub validators_hash: Bytes,    // bytes in Solidity (dynamic)
+    pub last_commit_hash: Bytes,     // bytes in Solidity (dynamic)
+    pub data_hash: Bytes,            // bytes in Solidity (dynamic)
+    pub validators_hash: Bytes,      // bytes in Solidity (dynamic)
     pub next_validators_hash: Bytes, // bytes in Solidity (dynamic)
-    pub consensus_hash: Bytes,     // bytes in Solidity (dynamic)
-    pub app_hash: Bytes,           // bytes in Solidity (dynamic)
-    pub last_results_hash: Bytes,  // bytes in Solidity (dynamic)
-    pub evidence_hash: Bytes,      // bytes in Solidity (dynamic)
-    pub proposer_address: Bytes,   // bytes in Solidity (dynamic)
+    pub consensus_hash: Bytes,       // bytes in Solidity (dynamic)
+    pub app_hash: Bytes,             // bytes in Solidity (dynamic)
+    pub last_results_hash: Bytes,    // bytes in Solidity (dynamic)
+    pub evidence_hash: Bytes,        // bytes in Solidity (dynamic)
+    pub proposer_address: Bytes,     // bytes in Solidity (dynamic)
 }
 
 #[derive(Debug, Clone, EthAbiType, EthAbiCodec)]
 pub struct Consensus {
-    pub block: u64,  // uint64 in Solidity
-    pub app: u64,    // uint64 in Solidity
+    pub block: u64, // uint64 in Solidity
+    pub app: u64,   // uint64 in Solidity
 }
 
 #[derive(Debug, Clone, EthAbiType, EthAbiCodec)]
 pub struct Timestamp {
-    pub seconds: i64,  // int64 in Solidity (not uint64!)
-    pub nanos: i32,    // int32 in Solidity (not uint32!)
+    pub seconds: i64, // int64 in Solidity (not uint64!)
+    pub nanos: i32,   // int32 in Solidity (not uint32!)
 }
 
 #[derive(Debug, Clone, EthAbiType, EthAbiCodec)]
 pub struct BlockId {
-    pub hash: Bytes,  // bytes in Solidity (dynamic, not bytes32!)
+    pub hash: Bytes, // bytes in Solidity (dynamic, not bytes32!)
     pub part_set_header: PartSetHeader,
 }
 
 #[derive(Debug, Clone, EthAbiType, EthAbiCodec)]
 pub struct PartSetHeader {
-    pub total: u32,   // uint32 in Solidity
-    pub hash: Bytes,  // bytes in Solidity (dynamic, not bytes32!)
+    pub total: u32,  // uint32 in Solidity
+    pub hash: Bytes, // bytes in Solidity (dynamic, not bytes32!)
 }
 
 #[derive(Debug, Clone, EthAbiType, EthAbiCodec)]
 pub struct Commit {
-    pub height: i64,  // int64 in Solidity
-    pub round: i32,   // int32 in Solidity
+    pub height: i64, // int64 in Solidity
+    pub round: i32,  // int32 in Solidity
     pub block_id: BlockId,
     pub signatures: Vec<CommitSig>,
 }
 
 #[derive(Debug, Clone, EthAbiType, EthAbiCodec)]
 pub struct CommitSig {
-    pub block_id_flag: u8,  // BlockIDFlag enum in Solidity (uint32)
-    pub validator_address: Bytes,  // bytes in Solidity
+    pub block_id_flag: u8,        // BlockIDFlag enum in Solidity (uint32)
+    pub validator_address: Bytes, // bytes in Solidity
     pub timestamp: Timestamp,
-    pub signature: Bytes,  // bytes in Solidity
+    pub signature: Bytes, // bytes in Solidity
 }
 
 impl From<TendermintSignedHeader> for SignedHeader {
@@ -105,13 +105,7 @@ impl From<tendermint::block::Header> for LightHeader {
                     .as_bytes()
                     .to_vec(),
             ),
-            data_hash: Bytes::from(
-                tm_header
-                    .data_hash
-                    .unwrap_or_default()
-                    .as_bytes()
-                    .to_vec(),
-            ),
+            data_hash: Bytes::from(tm_header.data_hash.unwrap_or_default().as_bytes().to_vec()),
             validators_hash: Bytes::from(tm_header.validators_hash.as_bytes().to_vec()),
             next_validators_hash: Bytes::from(tm_header.next_validators_hash.as_bytes().to_vec()),
             consensus_hash: Bytes::from(tm_header.consensus_hash.as_bytes().to_vec()),
@@ -232,8 +226,8 @@ impl From<TendermintTime> for Timestamp {
         // IMPORTANT: Solidity expects int64 seconds and int32 nanos
         let nanos_total = time.unix_timestamp_nanos();
         Timestamp {
-            seconds: (nanos_total / 1_000_000_000) as i64,  // int64
-            nanos: (nanos_total % 1_000_000_000) as i32,    // int32
+            seconds: (nanos_total / 1_000_000_000) as i64, // int64
+            nanos: (nanos_total % 1_000_000_000) as i32,   // int32
         }
     }
 }

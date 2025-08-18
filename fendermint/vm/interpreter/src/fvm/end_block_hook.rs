@@ -5,6 +5,7 @@ use super::state::ipc::tokens_to_burn;
 use super::state::{ipc::GatewayCaller, FvmExecState};
 
 use crate::fvm::activity::ValidatorActivityTracker;
+use crate::types::BlockEndEvents;
 use anyhow::Context;
 use ethers::abi::{AbiEncode, Tokenizable};
 use fendermint_vm_genesis::{Power, Validator};
@@ -18,7 +19,6 @@ use ipc_api::staking::ConfigurationNumber;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tendermint::block::Height;
-use crate::types::BlockEndEvents;
 
 /// Validator voting power snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -156,10 +156,7 @@ where
     };
 
     let ret = gateway
-        .record_light_client_commitments(
-            state,
-            &commitments
-        )
+        .record_light_client_commitments(state, &commitments)
         .context("failed to store checkpoint")?;
 
     end_block_events.push((ret.apply_ret.events, ret.emitters));

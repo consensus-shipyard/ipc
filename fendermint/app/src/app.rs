@@ -41,7 +41,6 @@ use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_snapshot::{SnapshotClient, SnapshotError};
 use fvm::engine::MultiEngine;
 use fvm_ipld_blockstore::Blockstore;
-use fvm_shared::chainid::ChainID;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
@@ -109,7 +108,7 @@ impl AppState {
     pub fn state_root(&self) -> Cid {
         self.state_params.state_root
     }
-    
+
     pub fn app_hash(&self) -> tendermint::hash::AppHash {
         to_app_hash(&self.state_params)
     }
@@ -891,7 +890,7 @@ where
             power_updates,
             gas_market,
             light_client_commitments,
-            end_block_events
+            end_block_events,
         } = response;
 
         let mut c = self.light_client_commitments.lock().await;

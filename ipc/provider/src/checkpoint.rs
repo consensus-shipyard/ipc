@@ -117,32 +117,56 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
         loop {
             let height = match self.submit_next_signed_header(submitter).await {
                 Ok(Some(h)) => h,
-                Ok(None) => { continue; }
+                Ok(None) => {
+                    continue;
+                }
                 Err(e) => {
-                    tracing::error!("cannot submit checkpoint for submitter: {submitter} due to {e}");
+                    tracing::error!(
+                        "cannot submit checkpoint for submitter: {submitter} due to {e}"
+                    );
                     continue;
                 }
             };
 
             if let Err(e) = self.commit_next_validator_changes(submitter, height).await {
-                tracing::error!("cannot commit next validator changes for submitter: {submitter} due to {e}");
+                tracing::error!(
+                    "cannot commit next validator changes for submitter: {submitter} due to {e}"
+                );
             }
 
             tokio::time::sleep(submission_interval).await;
         }
     }
 
-    async fn commit_next_validator_changes(&self, submitter: Address, end_height: ChainEpoch) -> Result<()> {
-        let heights = self.child_handler.get_last_commitment_heights(&self.metadata.target.id).await?;
+    async fn commit_next_validator_changes(
+        &self,
+        submitter: Address,
+        end_height: ChainEpoch,
+    ) -> Result<()> {
+        let heights = self
+            .child_handler
+            .get_last_commitment_heights(&self.metadata.target.id)
+            .await?;
 
         let mut next_height = heights.config_number;
         while next_height <= end_height as u64 {
             next_height += self.metadata.period as u64;
-            let Some(commitment) = self.child_handler.query_commitment(next_height as ChainEpoch).await? else {
+            let Some(commitment) = self
+                .child_handler
+                .query_commitment(next_height as ChainEpoch)
+                .await?
+            else {
                 continue;
             };
 
-            self.parent_handler.confirm_validator_change(next_height as ChainEpoch, &submitter, &self.metadata.target.id, commitment).await?;
+            self.parent_handler
+                .confirm_validator_change(
+                    next_height as ChainEpoch,
+                    &submitter,
+                    &self.metadata.target.id,
+                    commitment,
+                )
+                .await?;
         }
 
         Ok(())

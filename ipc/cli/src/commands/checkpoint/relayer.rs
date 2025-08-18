@@ -12,6 +12,7 @@ use fvm_shared::clock::ChainEpoch;
 use ipc_api::subnet_id::SubnetID;
 use ipc_provider::checkpoint::BottomUpCheckpointManager;
 use ipc_provider::config::Config;
+use ipc_provider::manager::cometbft::CometbftClient;
 use ipc_provider::new_evm_keystore_from_config;
 use ipc_provider::observe::register_metrics as register_checkpoint_metrics;
 use ipc_wallet::EvmKeyStore;
@@ -19,7 +20,6 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-use ipc_provider::manager::cometbft::CometbftClient;
 
 const DEFAULT_POLLING_INTERVAL: u64 = 15;
 

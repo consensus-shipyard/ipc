@@ -20,6 +20,12 @@ use fendermint_vm_message::conv::{from_eth, from_fvm};
 use fendermint_vm_message::signed::sign_secp256k1;
 use fendermint_vm_topdown::IPCParentFinality;
 
+use super::{
+    fevm::{ContractCaller, MockProvider, NoRevert},
+    FvmExecState,
+};
+use crate::fvm::end_block_hook::LightClientCommitments;
+use crate::types::AppliedMessage;
 use ipc_actors_abis::checkpointing_facet::CheckpointingFacet;
 use ipc_actors_abis::gateway_getter_facet::GatewayGetterFacet;
 use ipc_actors_abis::gateway_getter_facet::{self as getter, gateway_getter_facet};
@@ -29,12 +35,6 @@ use ipc_actors_abis::xnet_messaging_facet::XnetMessagingFacet;
 use ipc_actors_abis::{checkpointing_facet, top_down_finality_facet, xnet_messaging_facet};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::{ConfigurationNumber, PowerChangeRequest};
-use crate::fvm::end_block_hook::LightClientCommitments;
-use super::{
-    fevm::{ContractCaller, MockProvider, NoRevert},
-    FvmExecState,
-};
-use crate::types::AppliedMessage;
 
 #[derive(Clone)]
 pub struct GatewayCaller<DB> {
@@ -116,7 +116,7 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         &self,
         state: &mut FvmExecState<DB>,
         commitment: &LightClientCommitments,
-    ) -> anyhow::Result<AppliedMessage>  {
+    ) -> anyhow::Result<AppliedMessage> {
         let commitment = checkpointing_facet::StateCommitmentBreakDown {
             state_root: Default::default(),
             msg_batch_commitment: checkpointing_facet::Commitment {
@@ -124,11 +124,11 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
                 msgs_root: commitment.msg_batch_commitment.msgs_root,
             },
             validator_next_configuration_number: commitment.validator_next_configuration_number,
-            activity_commitment: commitment.activity_commitment.clone(),
+            activity_commitment: commitment.activity_commitment,
         };
-        Ok(self.checkpointing.call_with_return(state, |c| {
-            c.record_light_client_commitments(commitment)
-        })?
+        Ok(self
+            .checkpointing
+            .call_with_return(state, |c| c.record_light_client_commitments(commitment))?
             .into_return())
     }
 
