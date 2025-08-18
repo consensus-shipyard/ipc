@@ -134,6 +134,9 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
                 );
             }
 
+            if let Err(e) = self.execute_pending_batch_commitments(submitter).await {
+                tracing::error!("cannot execute pending batch commitments for submitter: {submitter} due to {e}");
+            }
             tokio::time::sleep(submission_interval).await;
         }
     }
@@ -218,5 +221,43 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
             .await?;
 
         Ok(Some(height))
+    }
+
+    /// Checks if there are any pending bottom up batch commitments, if so execute them.
+    async fn execute_pending_batch_commitments(&self, submitter: Address) -> Result<()> {
+        let pending_commitments = self
+            .parent_handler
+            .list_pending_bottom_up_batch_commitments(&self.metadata.target.id)
+            .await
+            .map_err(|e| {
+                anyhow!(
+                    "cannot obtain the list of pending bottom up batch commitments due to: {e:}"
+                )
+            })?;
+        tracing::info!("total pending commitments: {}", pending_commitments.len());
+
+        for commitment in pending_commitments {
+            let inclusions = self
+                .child_handler
+                .make_next_bottom_up_batch_inclusions(&commitment)
+                .await?;
+
+            let height = commitment.height as i64;
+            self.parent_handler.execute_bottom_up_batch(
+                &submitter,
+                &self.metadata.target.id,
+                height,
+                inclusions,
+            )
+                .await
+                .inspect_err(|err| {
+                    tracing::error!("Fail to execute bottom up batch at height {height}: {err}");
+                })?;
+
+        }
+
+        tracing::debug!("Waiting for all execution tasks to finish");
+
+        Ok(())
     }
 }

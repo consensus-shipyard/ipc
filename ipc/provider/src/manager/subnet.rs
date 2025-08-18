@@ -12,10 +12,7 @@ use ipc_actors_abis::subnet_actor_activity_facet::ValidatorClaim;
 use ipc_actors_abis::subnet_actor_checkpoint_facet::LastCommitmentHeights;
 use ipc_actors_abis::subnet_actor_checkpointing_facet::Inclusion;
 use ipc_actors_abis::subnet_actor_getter_facet::ListPendingCommitmentsEntry;
-use ipc_api::checkpoint::{
-    consensus::ValidatorData, BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent,
-    Signature,
-};
+use ipc_api::checkpoint::consensus::ValidatorData;
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::{PowerChangeRequest, ValidatorInfo};
 use ipc_api::subnet::{Asset, ConstructParams, PermissionMode};
@@ -26,7 +23,7 @@ use std::collections::{BTreeMap, HashMap};
 /// Trait to interact with a subnet and handle its lifecycle.
 #[async_trait]
 pub trait SubnetManager:
-    Send + Sync + TopDownFinalityQuery + BottomUpCheckpointRelayer + ValidatorRewarder
+    Send + Sync + TopDownFinalityQuery + SignedHeaderRelayer + ValidatorRewarder
 {
     /// Deploys a new subnet actor on the `parent` subnet and with the
     /// configuration passed in `ConstructParams`.
@@ -305,40 +302,13 @@ pub trait SignedHeaderRelayer: Send + Sync {
         &self,
         subnet: &SubnetID,
     ) -> Result<Vec<(Address, ValidatorInfo)>>;
-}
 
-/// The bottom up checkpoint manager that handles the bottom up relaying from child subnet to the parent
-/// subnet.
-#[async_trait]
-pub trait BottomUpCheckpointRelayer: Send + Sync {
-    /// Submit a checkpoint for execution.
-    /// It triggers the commitment of the checkpoint and the execution of related cross-net messages.
-    /// Returns the epoch that the execution is successful
-    async fn submit_checkpoint(
-        &self,
-        submitter: &Address,
-        checkpoint: BottomUpCheckpoint,
-        signatures: Vec<Signature>,
-        signatories: Vec<Address>,
-    ) -> Result<ChainEpoch>;
-    /// The last confirmed/submitted checkpoint height.
-    async fn last_bottom_up_checkpoint_height(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
-    /// Get the checkpoint period, i.e the number of blocks to submit bottom up checkpoints.
-    async fn checkpoint_period(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
-    /// Get the checkpoint bundle at a specific height. If it does not exist, it will through error.
-    async fn checkpoint_bundle_at(
-        &self,
-        height: ChainEpoch,
-    ) -> Result<Option<BottomUpCheckpointBundle>>;
-    /// Queries the signature quorum reached events at target height.
-    async fn quorum_reached_events(&self, height: ChainEpoch) -> Result<Vec<QuorumReachedEvent>>;
-    /// Get the current epoch in the current subnet
-    async fn current_epoch(&self) -> Result<ChainEpoch>;
     /// Lists the pending bottom-up batch commitments for the given subnet.
     async fn list_pending_bottom_up_batch_commitments(
         &self,
         subnet_id: &SubnetID,
     ) -> Result<Vec<ListPendingCommitmentsEntry>>;
+
     /// Prepares the next messages and their inclusion proof
     /// that should be executed based on the current pending commitment.
     async fn make_next_bottom_up_batch_inclusions(

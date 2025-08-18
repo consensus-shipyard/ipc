@@ -10,7 +10,6 @@ use fvm_shared::{
     address::Address, clock::ChainEpoch, crypto::signature::SignatureType, econ::TokenAmount,
 };
 use ipc_api::checkpoint::consensus::ValidatorData;
-use ipc_api::checkpoint::{BottomUpCheckpointBundle, QuorumReachedEvent};
 use ipc_api::evm::payload_to_evm_address;
 use ipc_api::staking::{PowerChangeRequest, ValidatorInfo};
 use ipc_api::subnet::{Asset, PermissionMode};
@@ -692,42 +691,7 @@ impl IpcProvider {
 
         conn.manager().chain_head_height().await
     }
-
-    pub async fn get_bottom_up_bundle(
-        &self,
-        subnet: &SubnetID,
-        height: ChainEpoch,
-    ) -> anyhow::Result<Option<BottomUpCheckpointBundle>> {
-        let conn = match self.connection(subnet) {
-            None => return Err(anyhow!("target subnet not found")),
-            Some(conn) => conn,
-        };
-
-        conn.manager().checkpoint_bundle_at(height).await
-    }
-
-    pub async fn last_bottom_up_checkpoint_height(
-        &self,
-        subnet: &SubnetID,
-    ) -> anyhow::Result<ChainEpoch> {
-        let parent = subnet.parent().ok_or_else(|| anyhow!("no parent found"))?;
-        let conn = self.get_connection(&parent)?;
-
-        conn.manager()
-            .last_bottom_up_checkpoint_height(subnet)
-            .await
-    }
-
-    pub async fn quorum_reached_events(
-        &self,
-        subnet: &SubnetID,
-        height: ChainEpoch,
-    ) -> anyhow::Result<Vec<QuorumReachedEvent>> {
-        let conn = self.get_connection(subnet)?;
-
-        conn.manager().quorum_reached_events(height).await
-    }
-
+    
     /// Advertises the endpoint of a bootstrap node for the subnet.
     pub async fn add_bootstrap(
         &mut self,
