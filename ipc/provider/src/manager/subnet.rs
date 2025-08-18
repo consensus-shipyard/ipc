@@ -9,8 +9,7 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_actors_abis::checkpointing_facet::StateCommitmentBreakDown;
 use ipc_actors_abis::subnet_actor_activity_facet::ValidatorClaim;
-use ipc_actors_abis::subnet_actor_checkpoint_facet::LastCommitmentHeights;
-use ipc_actors_abis::subnet_actor_checkpointing_facet::Inclusion;
+use ipc_actors_abis::subnet_actor_checkpoint_facet::{Inclusion, LastCommitmentHeights};
 use ipc_actors_abis::subnet_actor_getter_facet::ListPendingCommitmentsEntry;
 use ipc_api::checkpoint::consensus::ValidatorData;
 use ipc_api::cross::IpcEnvelope;
@@ -322,6 +321,7 @@ pub trait SignedHeaderRelayer: Send + Sync {
         subnet_id: &SubnetID,
         height: ChainEpoch,
         inclusions: Vec<Inclusion>,
+        commitment: StateCommitmentBreakDown,
     ) -> Result<ChainEpoch>;
 }
 

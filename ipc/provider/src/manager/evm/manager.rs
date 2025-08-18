@@ -50,11 +50,11 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_actors_abis::checkpointing_facet::StateCommitmentBreakDown;
 use ipc_actors_abis::subnet_actor_activity_facet::ValidatorClaim;
-use ipc_actors_abis::subnet_actor_checkpoint_facet::LastCommitmentHeights;
-use ipc_actors_abis::subnet_actor_checkpointing_facet::Inclusion;
+use ipc_actors_abis::subnet_actor_checkpoint_facet::{Inclusion, LastCommitmentHeights};
 use ipc_actors_abis::subnet_actor_getter_facet::ListPendingCommitmentsEntry;
 use ipc_api::checkpoint::{
-    abi_encode_envelope, abi_encode_envelope_fields, consensus::ValidatorData, VALIDATOR_REWARD_FIELDS,
+    abi_encode_envelope, abi_encode_envelope_fields, consensus::ValidatorData,
+    VALIDATOR_REWARD_FIELDS,
 };
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::merkle::MerkleGen;
@@ -1444,7 +1444,8 @@ impl SignedHeaderRelayer for EthSubnetManager {
                 continue;
             }
             let proof = merkle.get_proof(msg)?;
-            let msg = convert_msg(msg.clone());
+            let msg =
+                subnet_actor_checkpoint_facet::IpcEnvelope::from_tokens(msg.clone().into_tokens())?;
             inclusions.push(Inclusion {
                 msg,
                 proof: proof.into_iter().map(|v| v.into()).collect(),
@@ -1459,6 +1460,7 @@ impl SignedHeaderRelayer for EthSubnetManager {
         subnet_id: &SubnetID,
         height: ChainEpoch,
         inclusions: Vec<Inclusion>,
+        commitment: StateCommitmentBreakDown,
     ) -> Result<ChainEpoch> {
         let address = contract_address_from_subnet(subnet_id)?;
         tracing::debug!(
@@ -1466,11 +1468,12 @@ impl SignedHeaderRelayer for EthSubnetManager {
         );
 
         let signer = Arc::new(self.get_signer_with_fee_estimator(submitter)?);
-        let contract = subnet_actor_checkpointing_facet::SubnetActorCheckpointingFacet::new(
-            address,
-            signer.clone(),
-        );
-        let call = contract.exec_bottom_up_msg_batch(height.into(), inclusions);
+        let contract =
+            subnet_actor_checkpoint_facet::SubnetActorCheckpointFacet::new(address, signer.clone());
+
+        let tokens = commitment.into_tokens();
+        let t = subnet_actor_checkpoint_facet::StateCommitmentBreakDown::from_tokens(tokens)?;
+        let call = contract.exec_bottom_up_msg_batch(height as u64, t, inclusions);
         let call = extend_call_with_pending_block(call).await?;
 
         if let Some(calldata) = call.calldata() {
@@ -1795,38 +1798,6 @@ impl TryFrom<gateway_getter_facet::Subnet> for SubnetInfo {
             circ_supply: eth_to_fil_amount(&value.circ_supply)?,
             genesis_epoch: value.genesis_epoch.as_u64() as ChainEpoch,
         })
-    }
-}
-
-fn convert_msg(
-    msg: checkpointing_facet::IpcEnvelope,
-) -> subnet_actor_checkpointing_facet::IpcEnvelope {
-    subnet_actor_checkpointing_facet::IpcEnvelope {
-        kind: msg.kind,
-        local_nonce: msg.local_nonce,
-        from: subnet_actor_checkpointing_facet::Ipcaddress {
-            subnet_id: subnet_actor_checkpointing_facet::SubnetID {
-                root: msg.from.subnet_id.root,
-                route: msg.from.subnet_id.route,
-            },
-            raw_address: subnet_actor_checkpointing_facet::FvmAddress {
-                addr_type: msg.from.raw_address.addr_type,
-                payload: msg.from.raw_address.payload,
-            },
-        },
-        to: subnet_actor_checkpointing_facet::Ipcaddress {
-            subnet_id: subnet_actor_checkpointing_facet::SubnetID {
-                root: msg.to.subnet_id.root,
-                route: msg.to.subnet_id.route,
-            },
-            raw_address: subnet_actor_checkpointing_facet::FvmAddress {
-                addr_type: msg.to.raw_address.addr_type,
-                payload: msg.to.raw_address.payload,
-            },
-        },
-        value: msg.value,
-        original_nonce: msg.original_nonce,
-        message: msg.message,
     }
 }
 

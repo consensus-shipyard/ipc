@@ -691,7 +691,7 @@ impl IpcProvider {
 
         conn.manager().chain_head_height().await
     }
-    
+
     /// Advertises the endpoint of a bootstrap node for the subnet.
     pub async fn add_bootstrap(
         &mut self,

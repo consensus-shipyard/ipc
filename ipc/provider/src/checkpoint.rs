@@ -243,17 +243,24 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
                 .await?;
 
             let height = commitment.height as i64;
-            self.parent_handler.execute_bottom_up_batch(
-                &submitter,
-                &self.metadata.target.id,
-                height,
-                inclusions,
-            )
+            let commitment = self
+                .child_handler
+                .query_commitment(height)
+                .await?
+                .ok_or_else(|| anyhow!("no commitment found for {height}"))?;
+
+            self.parent_handler
+                .execute_bottom_up_batch(
+                    &submitter,
+                    &self.metadata.target.id,
+                    height,
+                    inclusions,
+                    commitment,
+                )
                 .await
                 .inspect_err(|err| {
                     tracing::error!("Fail to execute bottom up batch at height {height}: {err}");
                 })?;
-
         }
 
         tracing::debug!("Waiting for all execution tasks to finish");
