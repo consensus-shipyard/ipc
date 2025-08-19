@@ -24,20 +24,6 @@ const error = computed(() => subnetsStore.error)
 // Track when we've successfully loaded subnets at least once
 const isInitialLoad = computed(() => loading.value && !hasEverLoadedSubnets.value && subnets.value.length === 0)
 
-// Watch for successful subnet loads
-watch(subnets, (newSubnets: SubnetInstance[]) => {
-  if (newSubnets && newSubnets.length > 0) {
-    hasEverLoadedSubnets.value = true
-
-    // Load gateway owners for all subnets that don't have them cached
-    newSubnets.forEach(subnet => {
-      if (!gatewayOwnerCache[subnet.id]) {
-        loadGatewayOwner(subnet)
-      }
-    })
-  }
-}, { immediate: true })
-
 // Methods
 const fetchSubnets = () => subnetsStore.loadSubnets()
 
@@ -103,6 +89,20 @@ const loadGatewayOwner = async (subnet: SubnetInstance): Promise<void> => {
     value: fallbackAddress
   }
 }
+
+// Watch for successful subnet loads
+watch(subnets, (newSubnets: SubnetInstance[]) => {
+  if (newSubnets && newSubnets.length > 0) {
+    hasEverLoadedSubnets.value = true
+
+    // Load gateway owners for all subnets that don't have them cached
+    newSubnets.forEach(subnet => {
+      if (!gatewayOwnerCache[subnet.id]) {
+        loadGatewayOwner(subnet)
+      }
+    })
+  }
+}, { immediate: true })
 
 const approveSubnet = async (subnet: SubnetInstance) => {
   try {
