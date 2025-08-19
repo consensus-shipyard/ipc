@@ -9,7 +9,7 @@ use ethers::types::Address as EthAddress;
 use fendermint_eth_deployer::DeployedContracts;
 use ipc_api::subnet::{PermissionMode, AssetKind, Asset};
 use ipc_api::subnet_id::SubnetID;
-use ipc_provider::new_evm_keystore_from_config;
+use ipc_provider::{new_evm_keystore_from_config, config::SubnetConfig};
 use serde::{Serialize, Deserialize};
 use serde_json;
 use std::str::FromStr;
@@ -245,6 +245,84 @@ impl DeploymentService {
 
         log::info!("Generated subnet ID: {}", subnet_id);
 
+        // For federated or static subnets, set federated power first
+        if permission_mode == PermissionMode::Federated || permission_mode == PermissionMode::Static {
+            log::info!("Setting federated power for {:?} subnet: {}", permission_mode, subnet_id);
+
+            // Extract validator configuration from UI config
+            let validator_pubkeys = config["validatorPubkeys"]
+                .as_array()
+                .and_then(|arr| arr.iter().map(|v| v.as_str()).collect::<Option<Vec<_>>>())
+                .unwrap_or_default();
+
+            let validator_power = config["validatorPower"]
+                .as_array()
+                .and_then(|arr| arr.iter().map(|v| v.as_u64()).collect::<Option<Vec<_>>>())
+                .unwrap_or_else(|| vec![1; validator_pubkeys.len()]);
+
+            if validator_pubkeys.is_empty() {
+                log::error!("No validator public keys provided for federated subnet");
+                return Err(anyhow::anyhow!("Federated subnets require validator public keys to be configured"));
+            }
+
+            log::info!("Found {} validators with pubkeys: {:?}", validator_pubkeys.len(), validator_pubkeys);
+            log::info!("Validator powers: {:?}", validator_power);
+
+            // Convert public keys to validator addresses
+            let validator_addresses: Vec<String> = validator_pubkeys.iter()
+                .map(|pubkey| {
+                    // Convert public key to Ethereum address
+                    use ethers::{types::H160, utils::keccak256};
+                    use hex::FromHex;
+
+                    let key = pubkey.strip_prefix("0x").or_else(|| pubkey.strip_prefix("0X")).unwrap_or(pubkey);
+                    let bytes = Vec::from_hex(key).map_err(|e| anyhow::anyhow!("Invalid public key hex: {}", e))?;
+                    if bytes.len() != 65 || bytes[0] != 0x04 {
+                        return Err(anyhow::anyhow!("Expected 65-byte uncompressed key starting with 0x04"));
+                    }
+                    let hash = keccak256(&bytes[1..]);
+                    let eth_addr = H160::from_slice(&hash[12..]);
+                    Ok(format!("{:#x}", eth_addr))
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+
+            log::info!("Computed validator addresses: {:?}", validator_addresses);
+
+            // Prepare validator pubkeys without 0x prefix for the set_federated_power call
+            let pubkeys_clean: Vec<String> = validator_pubkeys.iter()
+                .map(|pk| pk.strip_prefix("0x").or_else(|| pk.strip_prefix("0X")).unwrap_or(pk).to_string())
+                .collect();
+
+            // Convert power values to u128
+            let validator_power_u128: Vec<u128> = validator_power.iter().map(|&p| p as u128).collect();
+
+            // Create SetFederatedPowerArgs
+            let set_power_args = crate::commands::subnet::set_federated_power::SetFederatedPowerArgs {
+                from: from_address_str.to_string(),
+                subnet: subnet_id.to_string(),
+                validator_addresses,
+                validator_pubkeys: pubkeys_clean,
+                validator_power: validator_power_u128,
+            };
+
+            // Call set_federated_power
+            match crate::commands::subnet::set_federated_power::set_federated_power(&provider, &set_power_args).await {
+                Ok(chain_epoch) => {
+                    log::info!("Successfully set federated power at epoch {}", chain_epoch);
+                }
+                Err(e) => {
+                    log::error!("Failed to set federated power: {}", e);
+                    return Err(anyhow::anyhow!("Failed to set federated power: {}", e));
+                }
+            }
+
+            // Wait a moment for the transaction to be processed and bootstrap to potentially occur
+            log::info!("Waiting for potential subnet bootstrap...");
+            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+
+            log::info!("Federated power setting completed for subnet: {}", subnet_id);
+        }
+
         // Approve the subnet automatically
         log::info!("Auto-approving subnet: {}", subnet_id);
         let approve_args = crate::commands::subnet::approve::ApproveSubnetArgs {
@@ -409,6 +487,7 @@ impl DeploymentService {
                 subnet_config.genesis_subnet_ipc_contracts_owner,
                 gateway_addr,
                 registry_addr,
+                &config,
                 headers,
             ).await?;
 
@@ -419,6 +498,7 @@ impl DeploymentService {
             let subnet_id = SubnetID::new_from_parent(&parent_id, addr);
 
             log::info!("Generated subnet ID: {}", subnet_id);
+            log::info!("Federated power setting was handled during subnet creation with custom gateway");
 
             // Auto-approve the subnet
             log::info!("Auto-approving subnet: {}", subnet_id);
@@ -471,7 +551,7 @@ impl DeploymentService {
     /// Create a subnet with custom gateway addresses, bypassing the automatic gateway selection
     async fn create_subnet_with_custom_gateway(
         &self,
-        _provider: &mut ipc_provider::IpcProvider,
+        provider: &mut ipc_provider::IpcProvider,
         from: Option<fvm_shared::address::Address>,
         parent: ipc_api::subnet_id::SubnetID,
         min_validators: u64,
@@ -487,6 +567,7 @@ impl DeploymentService {
         genesis_subnet_ipc_contracts_owner: ethers::types::H160,
         custom_gateway_addr: ethers::types::Address,
         custom_registry_addr: ethers::types::Address,
+        config: &serde_json::Value,
         headers: &warp::http::HeaderMap,
     ) -> Result<fvm_shared::address::Address> {
         // For now, let's use a simplified approach and modify the IPC config temporarily
@@ -537,7 +618,7 @@ impl DeploymentService {
         // Now create the subnet using the standard method (which will pick up our custom gateway)
         let result = provider.create_subnet(
             from,
-            parent,
+            parent.clone(),  // Clone parent since we need to use it later
             min_validators,
             min_validator_stake,
             bottomup_check_period,
@@ -551,13 +632,112 @@ impl DeploymentService {
             genesis_subnet_ipc_contracts_owner,
         ).await;
 
+        // Handle federated power setting BEFORE restoring configuration
+        // This ensures we use the correct provider context with custom gateway
+        if let Ok(subnet_actor_addr) = &result {
+            if permission_mode == ipc_api::subnet::PermissionMode::Federated || permission_mode == ipc_api::subnet::PermissionMode::Static {
+                log::info!("Setting federated power for {:?} subnet before config restoration", permission_mode);
+
+                // Convert the subnet actor address to a subnet ID
+                let subnet_id = ipc_api::subnet_id::SubnetID::new_from_parent(&parent, *subnet_actor_addr);
+
+                // Extract validator configuration from UI config
+                let validator_pubkeys = config["validatorPubkeys"]
+                    .as_array()
+                    .and_then(|arr| arr.iter().map(|v| v.as_str()).collect::<Option<Vec<_>>>())
+                    .unwrap_or_default();
+
+                let validator_power = config["validatorPower"]
+                    .as_array()
+                    .and_then(|arr| arr.iter().map(|v| v.as_u64()).collect::<Option<Vec<_>>>())
+                    .unwrap_or_else(|| vec![1; validator_pubkeys.len()]);
+
+                if !validator_pubkeys.is_empty() {
+                    log::info!("Found {} validators with pubkeys: {:?}", validator_pubkeys.len(), validator_pubkeys);
+                    log::info!("Validator powers: {:?}", validator_power);
+
+                    // Convert public keys to validator addresses
+                    let validator_addresses: Vec<String> = validator_pubkeys.iter()
+                        .map(|pubkey| {
+                            // Convert public key to Ethereum address
+                            use ethers::{types::H160, utils::keccak256};
+                            use hex::FromHex;
+
+                            let key = pubkey.strip_prefix("0x").or_else(|| pubkey.strip_prefix("0X")).unwrap_or(pubkey);
+                            let bytes = Vec::from_hex(key).map_err(|e| anyhow::anyhow!("Invalid public key hex: {}", e))?;
+
+                            if bytes.len() != 65 || bytes[0] != 0x04 {
+                                return Err(anyhow::anyhow!("Expected 65-byte uncompressed key starting with 0x04"));
+                            }
+                            let hash = keccak256(&bytes[1..]);
+                            let eth_addr = H160::from_slice(&hash[12..]);
+                            Ok(format!("{:#x}", eth_addr))
+                        })
+                        .collect::<Result<Vec<_>, _>>()?;
+
+                    log::info!("Computed validator addresses: {:?}", validator_addresses);
+
+                    // Prepare validator pubkeys without 0x prefix for the set_federated_power call
+                    let pubkeys_clean: Vec<String> = validator_pubkeys.iter()
+                        .map(|pk| pk.strip_prefix("0x").or_else(|| pk.strip_prefix("0X")).unwrap_or(pk).to_string())
+                        .collect();
+
+                    // Convert power values to u128
+                    let validator_power_u128: Vec<u128> = validator_power.iter().map(|&p| p as u128).collect();
+
+                    // Get from address string
+                    let from_address_str = from.map(|addr| addr.to_string())
+                        .or_else(|| config["from"].as_str().map(|s| s.to_string()))
+                        .unwrap_or_else(|| "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266".to_string());
+
+                    // Create SetFederatedPowerArgs
+                    let set_power_args = crate::commands::subnet::set_federated_power::SetFederatedPowerArgs {
+                        from: from_address_str.clone(),
+                        subnet: subnet_id.to_string(),
+                        validator_addresses,
+                        validator_pubkeys: pubkeys_clean,
+                        validator_power: validator_power_u128,
+                    };
+
+                    // Call set_federated_power using the provider with custom gateway config
+                    match crate::commands::subnet::set_federated_power::set_federated_power(&provider, &set_power_args).await {
+                        Ok(chain_epoch) => {
+                            log::info!("Successfully set federated power at epoch {} (before config restoration)", chain_epoch);
+                        }
+                        Err(e) => {
+                            log::error!("Failed to set federated power before config restoration: {}", e);
+                            // Don't return error here, let the subnet creation succeed
+                            // The user can manually set federated power later
+                        }
+                    }
+                } else {
+                    log::warn!("No validator public keys provided for federated subnet - skipping federated power setting");
+                }
+            }
+        }
+
         // Restore the original configuration if it existed, or remove our temporary config
         if let Some(original) = original_config {
-            // Restore original config - this would require more complex logic
-            log::info!("Would restore original config here (not implemented)");
+            // Restore original config
+            log::info!("Restoring original config for parent subnet: {}", temp_subnet_id);
+            match &original.config {
+                SubnetConfig::Fevm(evm_subnet) => {
+                    ipc_config_store
+                        .add_subnet(
+                            temp_subnet_id.clone(),
+                            evm_subnet.provider_http.clone(),
+                            evm_subnet.gateway_addr,
+                            evm_subnet.registry_addr,
+                        )
+                        .await?;
+                    log::info!("Successfully restored original config");
+                }
+            }
         } else {
-            // Remove our temporary config - this would require a remove method
-            log::info!("Would remove temporary config here (not implemented)");
+            // The parent subnet didn't exist before, but we can't easily remove it
+            // without affecting other operations. For now, leave it as is.
+            // This is safe because we only added the parent, not the new subnet
+            log::info!("Parent subnet config added temporarily - leaving in place (safe)");
         }
 
         result

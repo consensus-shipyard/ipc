@@ -1,7 +1,7 @@
 /**
  * Composable for managing chain statistics
  */
-import { ref, type Ref, onUnmounted } from 'vue'
+import { ref, type Ref, onUnmounted, watch } from 'vue'
 import type { ChainStats, SubnetStatus } from '@/types/subnet'
 import { StatsService } from '@/services/subnet/stats.service'
 
@@ -11,6 +11,7 @@ export function useChainStats(subnetId: Ref<string | undefined>) {
   const loading = ref(false)
   const error = ref<string | null>(null)
   const refreshInterval = ref<number | null>(null)
+  const hasInitialData = ref(false)
 
   const fetch = async () => {
     if (!subnetId.value) {
@@ -19,13 +20,17 @@ export function useChainStats(subnetId: Ref<string | undefined>) {
     }
 
     try {
-      loading.value = true
+      // Only show loading spinner if we don't have initial data yet
+      if (!hasInitialData.value) {
+        loading.value = true
+      }
       error.value = null
 
       const stats = await StatsService.getAllStats(subnetId.value)
 
       chainStats.value = stats.chainStats
       subnetStatus.value = stats.subnetStatus
+      hasInitialData.value = true
     } catch (err) {
       console.error('Error fetching chain stats:', err)
       error.value = err instanceof Error ? err.message : 'Failed to load chain statistics'
@@ -53,6 +58,16 @@ export function useChainStats(subnetId: Ref<string | undefined>) {
       refreshInterval.value = null
     }
   }
+
+  // Reset initial data flag when subnet ID changes
+  watch(subnetId, (newId, oldId) => {
+    if (newId !== oldId) {
+      hasInitialData.value = false
+      chainStats.value = null
+      subnetStatus.value = null
+      error.value = null
+    }
+  })
 
   // Cleanup on unmount
   onUnmounted(() => {
