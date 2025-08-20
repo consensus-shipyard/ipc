@@ -296,9 +296,17 @@ impl DeploymentService {
             // Convert power values to u128
             let validator_power_u128: Vec<u128> = validator_power.iter().map(|&p| p as u128).collect();
 
+            // CRITICAL FIX: Use the subnet owner's address for set_federated_power
+            // The setFederatedPower function can only be called by the subnet owner
+
+            // Need to use the subnet creator address, not the from address?????????
+            let owner_address = subnet_config.genesis_subnet_ipc_contracts_owner;
+            let owner_address_str = format!("0x{:x}", owner_address);
+            log::info!("🔍 Using subnet owner address for set_federated_power: {}", owner_address_str);
+
             // Create SetFederatedPowerArgs
             let set_power_args = crate::commands::subnet::set_federated_power::SetFederatedPowerArgs {
-                from: from_address_str.to_string(),
+                from: owner_address_str,  // Use owner, not from! // No maybe use FROM!?!?!?! Is this a problem?
                 subnet: subnet_id.to_string(),
                 validator_addresses,
                 validator_pubkeys: pubkeys_clean,
@@ -469,6 +477,11 @@ impl DeploymentService {
                 .unwrap_or(crate::commands::subnet::ZERO_ADDRESS.to_string());
             let validator_rewarder = require_fil_addr_from_str(&raw_addr)?;
 
+            // Auto-approve the subnet
+            // log::info!("Auto-approving subnet: {}", subnet_id);
+            // provider.approve_subnet(subnet_id.clone(), from).await?;
+            // log::info!("Successfully auto-approved subnet: {}", subnet_id);
+
             // Create custom subnet with the specified gateway addresses
             let addr = self.create_subnet_with_custom_gateway(
                 &mut provider,
@@ -499,11 +512,6 @@ impl DeploymentService {
 
             log::info!("Generated subnet ID: {}", subnet_id);
             log::info!("Federated power setting was handled during subnet creation with custom gateway");
-
-            // Auto-approve the subnet
-            log::info!("Auto-approving subnet: {}", subnet_id);
-            provider.approve_subnet(subnet_id.clone(), from).await?;
-            log::info!("Successfully auto-approved subnet: {}", subnet_id);
 
             // Add subnet to IPC config
             let rpc_url = headers
@@ -582,9 +590,7 @@ impl DeploymentService {
 
         log::info!("Custom gateway Filecoin address: {}", custom_gateway_fil);
         log::info!("Custom registry Filecoin address: {}", custom_registry_fil);
-
-        // Get a fresh provider instance
-        let mut provider = get_ipc_provider(&self.global)?;
+        log::info!("From address: {:?}", from);
 
         // Temporarily modify the subnet configuration to use our custom gateway
         let ipc_config_store = self.get_config_store().await?;
@@ -615,6 +621,10 @@ impl DeploymentService {
 
         log::info!("Temporarily added custom gateway config for subnet creation");
 
+        // Get a fresh provider instance AFTER config modification
+        // This ensures the provider has the correct custom gateway context
+        let mut provider = get_ipc_provider(&self.global)?;
+
         // Now create the subnet using the standard method (which will pick up our custom gateway)
         let result = provider.create_subnet(
             from,
@@ -635,11 +645,25 @@ impl DeploymentService {
         // Handle federated power setting BEFORE restoring configuration
         // This ensures we use the correct provider context with custom gateway
         if let Ok(subnet_actor_addr) = &result {
+            // Convert the subnet actor address to a subnet ID
+            let subnet_id = ipc_api::subnet_id::SubnetID::new_from_parent(&parent, *subnet_actor_addr);
+
+            log::info!("Auto-approving subnet: {}", subnet_id);
+            provider.approve_subnet(subnet_id.clone(), from.clone()).await?;
+            log::info!("Successfully auto-approved subnet: {}", subnet_id);
+
             if permission_mode == ipc_api::subnet::PermissionMode::Federated || permission_mode == ipc_api::subnet::PermissionMode::Static {
                 log::info!("Setting federated power for {:?} subnet before config restoration", permission_mode);
 
-                // Convert the subnet actor address to a subnet ID
-                let subnet_id = ipc_api::subnet_id::SubnetID::new_from_parent(&parent, *subnet_actor_addr);
+
+                log::info!("🔍 Subnet actor address: {}", subnet_actor_addr);
+                log::info!("🔍 Subnet ID: {}", subnet_id);
+                log::info!("🔍 Parent subnet: {}", parent);
+
+                // Log provider configuration
+                log::info!("🔍 Provider configuration before set_federated_power:");
+                log::info!("  - Custom gateway address: 0x{:x}", custom_gateway_addr);
+                log::info!("  - Custom registry address: 0x{:x}", custom_registry_addr);
 
                 // Extract validator configuration from UI config
                 let validator_pubkeys = config["validatorPubkeys"]
@@ -690,24 +714,62 @@ impl DeploymentService {
                         .or_else(|| config["from"].as_str().map(|s| s.to_string()))
                         .unwrap_or_else(|| "0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266".to_string());
 
+                    log::info!("🔍 From address configuration:");
+                    log::info!("  - from parameter: {:?}", from);
+                    log::info!("  - config['from']: {:?}", config["from"]);
+                    log::info!("  - Final from_address_str: {}", from_address_str);
+
+                    // The critical issue: WHO is the owner of the subnet contract?
+                    log::info!("🔍 Subnet ownership check:");
+                    log::info!("  - genesis_subnet_ipc_contracts_owner: 0x{:x}", genesis_subnet_ipc_contracts_owner);
+                    log::info!("  - from address (calling set_federated_power): {}", from_address_str);
+                    log::warn!("⚠️  IMPORTANT: Only the subnet owner can call setFederatedPower!");
+
+                    // Check if they match
+                    if from_address_str.to_lowercase() != format!("0x{:x}", genesis_subnet_ipc_contracts_owner).to_lowercase() {
+                        log::error!("❌ OWNERSHIP MISMATCH: The 'from' address {} does not match the subnet owner 0x{:x}",
+                                   from_address_str, genesis_subnet_ipc_contracts_owner);
+                        log::error!("This will cause NotAuthorized error when calling setFederatedPower!");
+                    } else {
+                        log::info!("✅ Ownership match: from address is the subnet owner");
+                    }
+
+                    // Log validator count before creating the args
+                    log::info!("Calling set_federated_power with {} validators", validator_addresses.len());
+
+                    // CRITICAL FIX: Use the subnet owner's address, not the from address
+                    // The setFederatedPower function can only be called by the subnet owner
+                    let owner_address_str = format!("0x{:x}", genesis_subnet_ipc_contracts_owner);
+                    log::info!("🔍 Using subnet owner address for set_federated_power: {}", owner_address_str);
+
                     // Create SetFederatedPowerArgs
                     let set_power_args = crate::commands::subnet::set_federated_power::SetFederatedPowerArgs {
                         from: from_address_str.clone(),
                         subnet: subnet_id.to_string(),
-                        validator_addresses,
-                        validator_pubkeys: pubkeys_clean,
-                        validator_power: validator_power_u128,
+                        validator_addresses: validator_addresses.clone(),
+                        validator_pubkeys: pubkeys_clean.clone(),
+                        validator_power: validator_power_u128.clone(),
                     };
 
+                    log::info!("🔍 SetFederatedPowerArgs:");
+                    log::info!("  - from: {}", set_power_args.from);
+                    log::info!("  - subnet: {}", set_power_args.subnet);
+                    log::info!("  - validator_addresses: {:?}", set_power_args.validator_addresses);
+                    log::info!("  - validator_pubkeys: {:?}", set_power_args.validator_pubkeys);
+                    log::info!("  - validator_power: {:?}", set_power_args.validator_power);
+
                     // Call set_federated_power using the provider with custom gateway config
+                    log::info!("🔍 Calling set_federated_power function...");
                     match crate::commands::subnet::set_federated_power::set_federated_power(&provider, &set_power_args).await {
                         Ok(chain_epoch) => {
-                            log::info!("Successfully set federated power at epoch {} (before config restoration)", chain_epoch);
+                            log::info!("✅ Successfully set federated power at epoch {} (before config restoration)", chain_epoch);
                         }
                         Err(e) => {
-                            log::error!("Failed to set federated power before config restoration: {}", e);
-                            // Don't return error here, let the subnet creation succeed
-                            // The user can manually set federated power later
+                            log::error!("❌ CRITICAL: Failed to set federated power: {}", e);
+                            log::error!("This means the subnet was created but validators were NOT configured!");
+                            log::error!("The subnet will need manual intervention to set federated power.");
+                            // Return the error so the user knows deployment failed
+                            return Err(anyhow::anyhow!("Failed to set federated power: {}. Subnet created but not fully configured.", e));
                         }
                     }
                 } else {

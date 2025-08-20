@@ -421,22 +421,9 @@ async fn run_async_deployment(
         Some(deployed_contracts.registry)
     ).await?;
 
-    // Add progress updates for the steps that happen inside deploy_subnet_with_gateway
-    // These are currently missing from the UI
-
-    // Update for validators step (this happens when set_federated_power is called)
-    broadcast_progress(state, deployment_id, "validators", 80, "in_progress",
-        Some("Initializing validators...".to_string())).await;
-    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-
-    // Update for activate step (this happens when subnet is approved)
-    broadcast_progress(state, deployment_id, "activate", 90, "in_progress",
-        Some("Activating subnet...".to_string())).await;
-    tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-
-    // Final verification step
-    broadcast_progress(state, deployment_id, "verification", 100, "completed",
-        Some("Running verification...".to_string())).await;
+        // NOTE: Progress updates for validators, activate, and verification steps
+    // should be broadcast from within deploy_subnet_with_gateway as they happen,
+    // not here after the fact. These broadcasts were misleading.
 
     Ok(subnet_result)
 }

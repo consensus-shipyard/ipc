@@ -398,14 +398,14 @@ impl SubnetService {
         let mut status = SubnetStatusInfo::default();
 
         // Step 1: Parse subnet ID and basic validation
-        log::info!("Step 1: Parsing subnet ID '{}'...", subnet_id);
+        log::debug!("Parsing subnet ID '{}'...", subnet_id);
         let subnet = match SubnetID::from_str(subnet_id) {
             Ok(subnet) => {
-                log::info!("Step 1: ✓ Successfully parsed subnet ID: {:?}", subnet);
+                log::debug!("Successfully parsed subnet ID: {:?}", subnet);
                 subnet
             }
             Err(e) => {
-                log::error!("Step 1: ✗ Failed to parse subnet ID '{}': {}", subnet_id, e);
+                log::error!("Failed to parse subnet ID '{}': {}", subnet_id, e);
                 status.lifecycle_state = SubnetLifecycleState::Failed;
                 status.error_message = Some(format!("Invalid subnet ID: {}", e));
                 return Ok(status);
@@ -414,22 +414,22 @@ impl SubnetService {
 
         // Step 2: Check if this is a root subnet
         if subnet.is_root() {
-            log::info!("Step 2: ✓ Subnet {} is a root subnet", subnet_id);
+            log::debug!("Subnet {} is a root subnet", subnet_id);
             status.lifecycle_state = SubnetLifecycleState::Healthy; // Root networks are always "healthy"
             status.genesis_available = true; // Root has implicit genesis
             return Ok(status);
         }
-        log::info!("Step 2: ✓ Subnet is not a root subnet");
+        log::debug!("Subnet is not a root subnet");
 
         // Step 3: Get IPC provider
-        log::info!("Step 3: Getting IPC provider...");
+        log::debug!("Getting IPC provider...");
         let provider = match crate::get_ipc_provider(&self.global) {
             Ok(provider) => {
-                log::info!("Step 3: ✓ Successfully got IPC provider");
+                log::debug!("Successfully got IPC provider");
                 provider
             }
             Err(e) => {
-                log::error!("Step 3: ✗ Failed to get IPC provider: {}", e);
+                log::error!("Failed to get IPC provider: {}", e);
                 status.lifecycle_state = SubnetLifecycleState::Failed;
                 status.error_message = Some(format!("Failed to get IPC provider: {}", e));
                 return Ok(status);
@@ -437,10 +437,10 @@ impl SubnetService {
         };
 
         // Step 4: Try to get genesis info (this is the critical detection point)
-        log::info!("Step 4: Attempting to get genesis info (single attempt - no retries)...");
+        log::debug!("Attempting to get genesis info (single attempt - no retries)...");
         match provider.get_genesis_info(&subnet).await {
             Ok(genesis_info) => {
-                log::info!("Step 4: ✓ Genesis info available - subnet is initialized");
+                log::info!("✓ Genesis info available - subnet is initialized");
                 status.genesis_available = true;
                 status.permission_mode = Some(match genesis_info.permission_mode {
                     ipc_api::subnet::PermissionMode::Collateral => "collateral".to_string(),
@@ -452,7 +452,7 @@ impl SubnetService {
             Err(e) => {
                 let error_msg = e.to_string();
                 if error_msg.contains("does not exist") || error_msg.contains("does not exists") {
-                    log::info!("Step 4: ✓ Subnet contracts exist but genesis not available - waiting for validators");
+                    log::debug!("Subnet contracts exist but genesis not available - waiting for validators");
                     status.genesis_available = false;
                     status.lifecycle_state = SubnetLifecycleState::WaitingForValidators;
                     status.next_action_required = Some("Start validators to activate subnet".to_string());
@@ -466,7 +466,7 @@ impl SubnetService {
         }
 
         // Step 5: Get validator information to refine the state
-        log::info!("Step 5: Getting validator information...");
+        log::debug!("Getting validator information...");
         match provider.list_validators(&subnet).await {
             Ok(validators) => {
                 status.validator_count = validators.len();
@@ -478,7 +478,7 @@ impl SubnetService {
                     })
                     .count();
 
-                log::info!("Step 5: ✓ Found {} validators ({} active)",
+                log::debug!("Found {} validators ({} active)",
                     status.validator_count, status.active_validators);
 
                 // Refine state based on validator information
@@ -528,10 +528,10 @@ impl SubnetService {
         }
 
         // Step 6: Check blockchain activity to determine if subnet is truly running
-        log::info!("Step 6: Checking blockchain activity...");
+        log::debug!("Checking blockchain activity...");
         match provider.get_chain_head_height(&subnet).await {
             Ok(height) => {
-                log::info!("Step 6: ✓ Blockchain is active with block height: {}", height);
+                log::debug!("Blockchain is active with block height: {}", height);
                 status.block_height = height as u64;
 
                 // If we can get block height, the subnet blockchain is definitely running
@@ -555,7 +555,7 @@ impl SubnetService {
                 // Try direct RPC connection as fallback
                 match self.get_block_height_via_rpc().await {
                     Ok(height) => {
-                        log::info!("Step 6: ✓ Got blockchain height via direct RPC: {}", height);
+                        log::debug!("Got blockchain height via direct RPC: {}", height);
                         status.block_height = height;
 
                         // If we can get block height via RPC, the subnet blockchain is running
@@ -588,7 +588,7 @@ impl SubnetService {
         }
 
         // Step 7: Final status determination based on all checks
-        log::info!("Step 7: Final status determination...");
+        log::debug!("Final status determination...");
 
         // Set is_active flag based on final lifecycle state
         status.is_active = matches!(status.lifecycle_state,
@@ -658,38 +658,38 @@ impl SubnetService {
     async fn get_permission_mode(&self, subnet_id: &str) -> Result<String> {
         log::info!("=== GETTING PERMISSION MODE FOR SUBNET: {} ===", subnet_id);
 
-        log::info!("Step 1: Getting IPC provider...");
+        log::debug!("Getting IPC provider...");
         let provider = crate::get_ipc_provider(&self.global).map_err(|e| {
             log::error!("Failed to get IPC provider for permission mode: {}", e);
             e
         })?;
-        log::info!("Step 1: ✓ Successfully got IPC provider");
+        log::debug!("Successfully got IPC provider");
 
-        log::info!("Step 2: Parsing subnet ID '{}'...", subnet_id);
+        log::debug!("Parsing subnet ID '{}'...", subnet_id);
         let subnet = SubnetID::from_str(subnet_id).map_err(|e| {
             log::error!("Failed to parse subnet ID '{}': {}", subnet_id, e);
             e
         })?;
-        log::info!("Step 2: ✓ Successfully parsed subnet ID: {:?}", subnet);
+        log::debug!("Successfully parsed subnet ID: {:?}", subnet);
 
         // Check if this is a root subnet (no parent)
         if subnet.is_root() {
-            log::warn!("Step 3: Subnet {} is a root subnet - root subnets don't have permission modes", subnet_id);
-            log::info!("=== PERMISSION MODE RETRIEVAL SKIPPED FOR ROOT SUBNET ===");
+            log::debug!("Subnet {} is a root subnet - root subnets don't have permission modes", subnet_id);
+            log::debug!("=== PERMISSION MODE RETRIEVAL SKIPPED FOR ROOT SUBNET ===");
             return Ok("root".to_string()); // Return "root" instead of error
         }
-        log::info!("Step 3: ✓ Subnet is not a root subnet");
+        log::debug!("Subnet is not a root subnet");
 
         // Log parent information
         if let Some(parent) = subnet.parent() {
-            log::info!("Step 4: Subnet parent is: {}", parent);
+            log::debug!("Subnet parent is: {}", parent);
         } else {
             log::error!("Step 4: ✗ Subnet has no parent but is not root - this is unexpected");
             return Ok("unknown".to_string()); // Return "unknown" instead of error
         }
 
         // Get genesis info with retry logic for newly deployed subnets
-        log::info!("Step 5: Getting genesis info from provider with retry logic...");
+        log::debug!("Getting genesis info from provider with retry logic...");
         let max_retries = 3; // Reduced from 5 to avoid long waits
         let mut retry_count = 0;
         let mut delay_ms = 1000; // Start with 1 second
@@ -697,7 +697,7 @@ impl SubnetService {
         loop {
             match provider.get_genesis_info(&subnet).await {
                 Ok(genesis_info) => {
-                    log::info!("Step 5: ✓ Successfully got genesis info (attempt {})", retry_count + 1);
+                    log::debug!("Successfully got genesis info (attempt {})", retry_count + 1);
                     log::info!("Genesis info: permission_mode={:?}", genesis_info.permission_mode);
 
                     let permission_mode = match genesis_info.permission_mode {
@@ -705,7 +705,7 @@ impl SubnetService {
                         ipc_api::subnet::PermissionMode::Federated => "federated",
                         ipc_api::subnet::PermissionMode::Static => "static",
                     };
-                    log::info!("Step 6: ✓ Mapped permission mode to string: '{}'", permission_mode);
+                    log::debug!("Mapped permission mode to string: '{}'", permission_mode);
                     log::info!("=== PERMISSION MODE RETRIEVAL SUCCESSFUL: {} ===", permission_mode);
                     return Ok(permission_mode.to_string());
                 }
@@ -715,10 +715,10 @@ impl SubnetService {
                         log::error!("Step 5: ✗ Failed to get genesis info for subnet {} after {} attempts: {}", subnet_id, max_retries, e);
 
                         // Try direct subnet actor contract query as fallback
-                        log::info!("Step 6: Attempting direct subnet actor contract query as fallback...");
+                        log::debug!("Attempting direct subnet actor contract query as fallback...");
                         match self.get_permission_mode_from_contract(&subnet).await {
                             Ok(mode) => {
-                                log::info!("Step 6: ✓ Successfully retrieved permission mode from contract: {}", mode);
+                                log::debug!("Successfully retrieved permission mode from contract: {}", mode);
                                 log::info!("=== PERMISSION MODE RETRIEVAL SUCCESSFUL (FALLBACK): {} ===", mode);
                                 return Ok(mode);
                             }
@@ -1249,10 +1249,10 @@ impl SubnetService {
         }
         log::info!("Step 3: ✓ Subnet is not a root subnet");
 
-        log::info!("Step 4: Getting parent subnet...");
+        log::debug!("Getting parent subnet...");
         let parent = subnet.parent();
         match &parent {
-            Some(p) => log::info!("Step 4: ✓ Parent subnet: {}", p),
+            Some(p) => log::debug!("Parent subnet: {}", p),
             None => {
                 log::error!("Step 4: ✗ No parent found for non-root subnet {}", subnet_id);
                 return Err(anyhow::anyhow!("No parent found for non-root subnet {}", subnet_id));
@@ -1260,7 +1260,7 @@ impl SubnetService {
         }
 
         // Get validators with retry logic for newly deployed subnets
-        log::info!("Step 5: Getting validators from provider with retry logic...");
+        log::debug!("Getting validators from provider with retry logic...");
         let max_retries = 3; // Reduced from 5 to avoid long waits
         let mut retry_count = 0;
         let mut delay_ms = 2000; // Start with 2 seconds for validators
@@ -1268,7 +1268,7 @@ impl SubnetService {
         loop {
             match provider.list_validators(&subnet).await {
                 Ok(validators) => {
-                    log::info!("Step 5: ✓ Successfully fetched {} validators for subnet {} (attempt {})", validators.len(), subnet_id, retry_count + 1);
+                    log::info!("Successfully fetched {} validators for subnet {}", validators.len(), subnet_id);
 
                     let mut validator_list = Vec::new();
                     for (i, (address, validator_info)) in validators.iter().enumerate() {

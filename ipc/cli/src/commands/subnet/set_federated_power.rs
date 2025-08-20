@@ -33,21 +33,43 @@ pub(crate) async fn set_federated_power(
     provider: &ipc_provider::IpcProvider,
     args: &SetFederatedPowerArgs,
 ) -> anyhow::Result<i64> {
+    log::info!("🔍 set_federated_power called with args:");
+    log::info!("  - from: {}", args.from);
+    log::info!("  - subnet: {}", args.subnet);
+    log::info!("  - validator_addresses: {:?}", args.validator_addresses);
+
     let subnet = SubnetID::from_str(&args.subnet)?;
+    log::info!("🔍 Parsed subnet ID: {}", subnet);
 
     let addresses: Vec<Address> = args
         .validator_addresses
         .iter()
-        .map(|address| require_fil_addr_from_str(address).unwrap())
+        .map(|address| {
+            let fil_addr = require_fil_addr_from_str(address).unwrap();
+            log::info!("🔍 Converted validator address '{}' to Filecoin address: {}", address, fil_addr);
+            fil_addr
+        })
         .collect();
 
     let public_keys: Vec<Vec<u8>> = args
         .validator_pubkeys
         .iter()
-        .map(|key| hex::decode(key).unwrap())
+        .map(|key| {
+            let decoded = hex::decode(key).unwrap();
+            log::info!("🔍 Decoded public key: {} -> {} bytes", key, decoded.len());
+            decoded
+        })
         .collect();
 
     let from_address = require_fil_addr_from_str(&args.from).unwrap();
+    log::info!("🔍 Converted from address '{}' to Filecoin address: {}", args.from, from_address);
+
+    log::info!("🔍 Calling provider.set_federated_power with:");
+    log::info!("  - from_address: {}", from_address);
+    log::info!("  - subnet: {}", subnet);
+    log::info!("  - addresses: {:?}", addresses);
+    log::info!("  - public_keys lengths: {:?}", public_keys.iter().map(|k| k.len()).collect::<Vec<_>>());
+    log::info!("  - validator_power: {:?}", args.validator_power);
 
     let chain_epoch = provider
         .set_federated_power(

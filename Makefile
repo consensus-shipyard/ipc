@@ -11,7 +11,6 @@ build-ui:
 	cd ipc && make build-ui
 
 build-with-ui:
-	cd contracts && make gen
 	cd ipc && make build-with-ui
 	./target/release/ipc-cli --version
 	./target/release/fendermint --version
