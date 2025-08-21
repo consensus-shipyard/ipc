@@ -19,7 +19,6 @@ struct LastCommitmentHeights {
         uint256 genesisCircSupply;
         /// @notice The height of the last committed bottom-up checkpoint.
         uint256 lastBottomUpCheckpointHeight;
-        uint256 last;
         /// @notice Minimal activation collateral
         uint256 minActivationCollateral;
         /// @notice number of blocks in a bottom-up epoch

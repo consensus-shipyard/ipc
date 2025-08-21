@@ -23,9 +23,6 @@ interface IGateway {
     /// hierarchy.
     function kill() external;
 
-    /// @notice commitCheckpoint propagates the commitment of a checkpoint from a child
-    function commitCheckpoint(BottomUpCheckpoint calldata bottomUpCheckpoint) external;
-
     /// @notice submit a verified batch of committed cross-net messages for execution.
     function execBottomUpMsgBatch(IpcEnvelope[] calldata msgs) external;
 
