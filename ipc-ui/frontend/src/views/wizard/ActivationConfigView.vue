@@ -442,7 +442,7 @@ const validateField = (fieldName: string) => {
                     class="mt-2 p-2 bg-gray-50 rounded text-xs"
                   >
                     <span class="font-medium text-gray-700">Public Key:</span>
-                    <code class="ml-2 text-gray-600">{{ federatedData.validatorPubkeys[index] }}</code>
+                    <code class="ml-2 text-gray-600 break-all word-break overflow-wrap-anywhere">{{ federatedData.validatorPubkeys[index] }}</code>
                   </div>
                 </div>
 

@@ -136,7 +136,7 @@
                   <div v-if="address.balance || (address.pubkey && showPubkey)" class="text-xs text-gray-400 mt-1">
                     <span v-if="address.balance">Balance: {{ address.balance }}</span>
                     <span v-if="address.balance && address.pubkey && showPubkey"> • </span>
-                    <span v-if="address.pubkey && showPubkey">PubKey: {{ formatAddress(address.pubkey) }}</span>
+                    <span v-if="address.pubkey && showPubkey" class="break-all">PubKey: {{ formatAddress(address.pubkey) }}</span>
                   </div>
                 </div>
               </div>

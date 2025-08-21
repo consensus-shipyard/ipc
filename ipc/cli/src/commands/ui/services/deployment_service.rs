@@ -394,6 +394,8 @@ impl DeploymentService {
         headers: &warp::http::HeaderMap,
         custom_gateway_addr: Option<ethers::types::Address>,
         custom_registry_addr: Option<ethers::types::Address>,
+        state: &super::super::AppState,
+        deployment_id: &str,
     ) -> Result<SubnetDeploymentResult> {
         log::info!("Starting subnet deployment with custom gateway addresses");
         if let (Some(gateway), Some(registry)) = (custom_gateway_addr, custom_registry_addr) {
@@ -456,6 +458,10 @@ impl DeploymentService {
         if let (Some(gateway_addr), Some(registry_addr)) = (custom_gateway_addr, custom_registry_addr) {
             log::info!("Creating subnet with custom gateway addresses");
 
+            // Broadcast validators step for custom gateway path
+            super::super::api::deployment::broadcast_progress(state, deployment_id, "validators", 85, "in_progress",
+                Some("Initializing validators...".to_string())).await;
+
             let parent = SubnetID::from_str(&subnet_config.parent)?;
             let from = match &subnet_config.from {
                 Some(address) => Some(require_fil_addr_from_str(address)?),
@@ -513,6 +519,10 @@ impl DeploymentService {
             log::info!("Generated subnet ID: {}", subnet_id);
             log::info!("Federated power setting was handled during subnet creation with custom gateway");
 
+            // Broadcast activation step for custom gateway path
+            super::super::api::deployment::broadcast_progress(state, deployment_id, "activation", 95, "in_progress",
+                Some("Activating subnet...".to_string())).await;
+
             // Add subnet to IPC config
             let rpc_url = headers
                 .get("x-network-rpc-url")
@@ -552,7 +562,17 @@ impl DeploymentService {
             Ok(result)
         } else {
             // Fall back to the original method if no custom gateway addresses are provided
-            self.deploy_subnet(config, headers).await
+            // Broadcast validators step before subnet creation
+            super::super::api::deployment::broadcast_progress(state, deployment_id, "validators", 85, "in_progress",
+                Some("Initializing validators...".to_string())).await;
+
+            let result = self.deploy_subnet(config, headers).await?;
+
+            // Broadcast activation step after subnet creation
+            super::super::api::deployment::broadcast_progress(state, deployment_id, "activation", 95, "in_progress",
+                Some("Activating subnet...".to_string())).await;
+
+            Ok(result)
         }
     }
 

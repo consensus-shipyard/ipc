@@ -195,7 +195,7 @@ async fn run_async_deployment(
     let deployed_contracts = match gateway_mode {
         "deployed" => {
             // Use existing deployed gateway - get gateway info and skip contract deployment
-            broadcast_progress(state, deployment_id, "contracts", 50, "in_progress",
+            broadcast_progress(state, deployment_id, "contracts", 30, "in_progress",
                 Some("Using existing deployed gateway...".to_string())).await;
 
             let selected_gateway_id = config.get("selectedDeployedGateway")
@@ -243,7 +243,7 @@ async fn run_async_deployment(
         },
         "l1-gateway" => {
             // Use L1 gateway selected from the top menu
-            broadcast_progress(state, deployment_id, "contracts", 50, "in_progress",
+            broadcast_progress(state, deployment_id, "contracts", 30, "in_progress",
                 Some("Using selected L1 gateway...".to_string())).await;
 
             let selected_gateway_id = config.get("selectedL1Gateway")
@@ -290,7 +290,7 @@ async fn run_async_deployment(
         },
         "custom" => {
             // Use custom gateway addresses provided by user
-            broadcast_progress(state, deployment_id, "contracts", 50, "in_progress",
+            broadcast_progress(state, deployment_id, "contracts", 30, "in_progress",
                 Some("Using custom gateway addresses...".to_string())).await;
 
             let gateway_address = config.get("customGatewayAddress")
@@ -342,7 +342,7 @@ async fn run_async_deployment(
                         &deployment_id,
                         "contracts",
                         progress_percent as u8,
-                        if current_step + 1 == total_steps { "completed" } else { "in_progress" },
+                        if current_step + 1 == total_steps { "in_progress" } else { "in_progress" }, // Never mark as completed here
                         Some(format!("Deploying {} ({}/{})", contract_name, current_step + 1, total_steps)),
                         Some(contract_progress),
                     ).await;
@@ -409,27 +409,32 @@ async fn run_async_deployment(
         log::info!("Skipping contract registration - using existing gateway (mode: {})", gateway_mode);
     }
 
+    // Mark contracts step as completed before moving to genesis
+    broadcast_progress(state, deployment_id, "contracts", 70, "completed",
+        Some("Smart contracts deployment completed".to_string())).await;
+
     // Continue with the rest of the deployment
-    broadcast_progress(state, deployment_id, "genesis", 70, "in_progress",
+    broadcast_progress(state, deployment_id, "genesis", 75, "in_progress",
         Some("Creating genesis block...".to_string())).await;
 
-    // Now continue with the subnet creation part, passing the selected gateway addresses
+        // Now continue with the subnet creation part, passing the selected gateway addresses
+    // Progress updates for validators, activate, and verification steps
+    // should be broadcast from within deploy_subnet_with_gateway as they happen,
+    // not here after the fact.
     let subnet_result = service.deploy_subnet_with_gateway(
         config.clone(),
         headers,
         Some(deployed_contracts.gateway),
-        Some(deployed_contracts.registry)
+        Some(deployed_contracts.registry),
+        state,
+        deployment_id
     ).await?;
-
-        // NOTE: Progress updates for validators, activate, and verification steps
-    // should be broadcast from within deploy_subnet_with_gateway as they happen,
-    // not here after the fact. These broadcasts were misleading.
 
     Ok(subnet_result)
 }
 
 /// Broadcast deployment progress to WebSocket clients
-async fn broadcast_progress(
+pub async fn broadcast_progress(
     state: &AppState,
     deployment_id: &str,
     step: &str,
