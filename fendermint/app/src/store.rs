@@ -26,7 +26,7 @@ impl<T> Encode<T> for AppStore
 where
     T: Serialize,
 {
-    fn to_repr(value: &T) -> KVResult<Cow<Self::Repr>> {
+    fn to_repr(value: &T) -> KVResult<Cow<'_, Self::Repr>> {
         fvm_ipld_encoding::to_vec(value)
             .map_err(|e| KVError::Codec(Box::new(e)))
             .map(Cow::Owned)
