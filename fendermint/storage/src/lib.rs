@@ -45,7 +45,7 @@ pub trait Encode<T>
 where
     Self: KVStore,
 {
-    fn to_repr(value: &T) -> KVResult<Cow<Self::Repr>>;
+    fn to_repr(value: &T) -> KVResult<Cow<'_, Self::Repr>>;
 }
 
 /// Decode data from binary with a serialization scheme.

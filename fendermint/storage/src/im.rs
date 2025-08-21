@@ -74,7 +74,7 @@ where
 
     /// Take a fresh snapshot, to isolate the effects of any further writes
     /// to the datastore from this read transaction.
-    fn read(&self) -> Transaction<S, Read> {
+    fn read(&self) -> Self::Tx<'_> {
         Transaction {
             backend: self,
             data: self.data.lock().unwrap().clone(),
@@ -95,7 +95,7 @@ where
 
     /// Take a snapshot to accumulate writes until they are committed.
     /// Take a write-lock on the data if necessary, but beware it doesn't work well with STM.
-    fn write(&self) -> Transaction<S, Write> {
+    fn write(&self) -> Self::Tx<'_> {
         // Take this lock first, otherwise we might be blocking `data` from anyone being able to commit.
         let token = if self.lock_writes {
             Some(self.write_token.lock().unwrap())
