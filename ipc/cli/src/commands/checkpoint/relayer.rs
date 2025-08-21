@@ -81,7 +81,12 @@ impl CommandLineHandler for BottomUpRelayer {
             parent.clone(),
             child.clone(),
             Arc::new(RwLock::new(keystore)),
-            CometbftClient::new_from_url("http://127.0.0.1:26657"),
+            CometbftClient::new_from_url(
+                arguments
+                    .cometbft_url
+                    .as_deref()
+                    .unwrap_or("http://127.0.0.1:26657"),
+            ),
         )
         .await?;
 
@@ -121,6 +126,9 @@ pub(crate) struct BottomUpRelayerArgs {
         help = "The max parallelism for submitting checkpoints"
     )]
     pub max_parallelism: usize,
+
+    #[arg(long, help = "The cometbft rpc endpoint to query commit data")]
+    pub cometbft_url: Option<String>,
 
     #[arg(
         long,
