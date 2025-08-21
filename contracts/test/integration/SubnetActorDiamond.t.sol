@@ -27,7 +27,7 @@ import {SubnetActorManagerFacet} from "../../contracts/subnet/SubnetActorManager
 import {OwnershipFacet} from "../../contracts/OwnershipFacet.sol";
 import {SubnetActorGetterFacet} from "../../contracts/subnet/SubnetActorGetterFacet.sol";
 import {SubnetActorPauseFacet} from "../../contracts/subnet/SubnetActorPauseFacet.sol";
-import {SubnetActorCheckpointingFacet} from "../../contracts/subnet/SubnetActorCheckpointingFacet.sol";
+import {SubnetActorCheckpointFacetMock} from "../mocks/SubnetActorCheckpointFacetMock.sol";
 import {SubnetActorRewardFacet} from "../../contracts/subnet/SubnetActorRewardFacet.sol";
 import {DiamondCutFacet} from "../../contracts/diamond/DiamondCutFacet.sol";
 import {FilAddress} from "fevmate/contracts/utils/FilAddress.sol";
@@ -91,7 +91,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     }
 
     function testSubnetActorDiamondReal_LoupeFunction() public view {
-        require(saDiamond.diamondLouper().facets().length == 10, "unexpected length");
+        require(saDiamond.diamondLouper().facets().length == 9, "unexpected length");
         require(
             saDiamond.diamondLouper().supportsInterface(type(IERC165).interfaceId) == true,
             "IERC165 not supported"
@@ -367,7 +367,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         SubnetActorGetterFacet saDupGetterFaucet = new SubnetActorGetterFacet();
         SubnetActorPauseFacet saDupPauserFaucet = new SubnetActorPauseFacet();
         SubnetActorRewardFacet saDupRewardFaucet = new SubnetActorRewardFacet();
-        SubnetActorCheckpointingFacet saDupCheckpointerFaucet = new SubnetActorCheckpointingFacet();
+        SubnetActorCheckpointFacetMock saDupCheckpointerFaucet = new SubnetActorCheckpointFacetMock();
         OwnershipFacet saOwnershipFacet = new OwnershipFacet();
 
         Asset memory native = AssetHelper.native();
@@ -556,289 +556,6 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         require(saDiamond.getter().crossMsgsHash(msgs) == keccak256(abi.encode(msgs)));
     }
 
-    function testSubnetActorDiamond_validateActiveQuorumSignatures() public {
-        (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
-
-        bytes[] memory pubKeys = new bytes[](3);
-        bytes[] memory signatures = new bytes[](3);
-
-        bytes32 hash = keccak256(abi.encodePacked("test"));
-
-        for (uint256 i = 0; i < 3; i++) {
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(keys[i], hash);
-            signatures[i] = abi.encodePacked(r, s, v);
-            pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
-            vm.deal(validators[i], 10 gwei);
-            vm.prank(validators[i]);
-            saDiamond.manager().join{value: 10}(pubKeys[i], 10);
-        }
-
-        saDiamond.checkpointer().validateActiveQuorumSignatures(validators, hash, signatures);
-    }
-
-    function testSubnetActorDiamond_validateActiveQuorumSignatures_InvalidWeightSum() public {
-        (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
-
-        bytes[] memory pubKeys = new bytes[](3);
-        bytes[] memory signatures = new bytes[](1);
-        address[] memory subValidators = new address[](1);
-
-        bytes32 hash = keccak256(abi.encodePacked("test"));
-
-        for (uint256 i = 0; i < 3; i++) {
-            pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
-            vm.deal(validators[i], 10 gwei);
-            vm.prank(validators[i]);
-            saDiamond.manager().join{value: 10}(pubKeys[i], 10);
-        }
-
-        // this should trigger `WeightsSumLessThanThreshold` error since the signature weight will be just 100.
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(keys[0], hash);
-        signatures[0] = abi.encodePacked(r, s, v);
-        subValidators[0] = validators[0];
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                InvalidSignatureErr.selector,
-                MultisignatureChecker.Error.WeightsSumLessThanThreshold
-            )
-        );
-        saDiamond.checkpointer().validateActiveQuorumSignatures(subValidators, hash, signatures);
-    }
-
-    function testSubnetActorDiamond_validateActiveQuorumSignatures_InvalidSignature() public {
-        (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
-        bytes[] memory pubKeys = new bytes[](3);
-        bytes[] memory signatures = new bytes[](3);
-
-        bytes32 hash = keccak256(abi.encodePacked("test"));
-
-        uint8 vv = 255;
-
-        for (uint256 i = 0; i < 3; i++) {
-            (, bytes32 r, bytes32 s) = vm.sign(keys[i], hash);
-
-            // create incorrect signature using `vv` to trigger `InvalidSignature` error.
-            signatures[i] = abi.encodePacked(r, s, vv);
-
-            pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
-            vm.deal(validators[i], 10 gwei);
-            vm.prank(validators[i]);
-            saDiamond.manager().join{value: 10}(pubKeys[i], 10);
-        }
-
-        vm.expectRevert(
-            abi.encodeWithSelector(InvalidSignatureErr.selector, MultisignatureChecker.Error.InvalidSignature)
-        );
-        saDiamond.checkpointer().validateActiveQuorumSignatures(validators, hash, signatures);
-    }
-
-    function testSubnetActorDiamond_validateActiveQuorumSignatures_EmptySignatures() public {
-        (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
-        bytes[] memory pubKeys = new bytes[](3);
-        bytes[] memory signatures = new bytes[](0);
-
-        bytes32 hash = keccak256(abi.encodePacked("test"));
-
-        for (uint256 i = 0; i < 3; i++) {
-            pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
-            vm.deal(validators[i], 10 gwei);
-            vm.prank(validators[i]);
-            saDiamond.manager().join{value: 10}(pubKeys[i], 10);
-        }
-
-        require(signatures.length == 0, "signatures are not empty");
-        vm.expectRevert(
-            abi.encodeWithSelector(InvalidSignatureErr.selector, MultisignatureChecker.Error.EmptySignatures)
-        );
-        saDiamond.checkpointer().validateActiveQuorumSignatures(validators, hash, signatures);
-    }
-
-    function testSubnetActorDiamond_validateActiveQuorumSignatures_InvalidArrayLength() public {
-        (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
-        bytes[] memory pubKeys = new bytes[](3);
-        bytes[] memory signatures = new bytes[](1);
-
-        bytes32 hash = keccak256(abi.encodePacked("test"));
-
-        for (uint256 i = 0; i < 3; i++) {
-            pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
-            vm.deal(validators[i], 10 gwei);
-            vm.prank(validators[i]);
-            saDiamond.manager().join{value: 10}(pubKeys[i], 10);
-        }
-
-        require(signatures.length == 1, "signatures are not empty");
-        vm.expectRevert(
-            abi.encodeWithSelector(InvalidSignatureErr.selector, MultisignatureChecker.Error.InvalidArrayLength)
-        );
-        saDiamond.checkpointer().validateActiveQuorumSignatures(validators, hash, signatures);
-    }
-
-    function testSubnetActorDiamond_validateActiveQuorumSignatures_DuplicatedValidators() public {
-        (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
-        bytes[] memory pubKeys = new bytes[](3);
-        bytes[] memory signatures = new bytes[](3);
-
-        bytes32 hash = keccak256(abi.encodePacked("test"));
-        bytes32 hash0 = keccak256(abi.encodePacked("test1"));
-
-        for (uint256 i = 0; i < 3; i++) {
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(keys[i], hash);
-
-            // create incorrect signature using `vv`
-            signatures[i] = abi.encodePacked(r, s, v);
-
-            pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
-            vm.deal(validators[i], 10 gwei);
-            vm.prank(validators[i]);
-            saDiamond.manager().join{value: 10}(pubKeys[i], 10);
-        }
-
-        signatures[0] = signatures[1];
-        validators[0] = validators[1];
-
-        vm.expectRevert(abi.encodeWithSelector(DuplicateValidatorSignaturesFound.selector));
-        saDiamond.checkpointer().validateActiveQuorumSignatures(validators, hash0, signatures);
-    }
-
-    function testSubnetActorDiamond_validateActiveQuorumSignatures_InvalidSignatory() public {
-        (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
-        bytes[] memory pubKeys = new bytes[](3);
-        bytes[] memory signatures = new bytes[](3);
-
-        bytes32 hash = keccak256(abi.encodePacked("test"));
-        bytes32 hash0 = keccak256(abi.encodePacked("test1"));
-
-        for (uint256 i = 0; i < 3; i++) {
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(keys[i], hash);
-
-            // create incorrect signature using `vv`
-            signatures[i] = abi.encodePacked(r, s, v);
-
-            pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
-            vm.deal(validators[i], 10 gwei);
-            vm.prank(validators[i]);
-            saDiamond.manager().join{value: 10}(pubKeys[i], 10);
-        }
-
-        // use validator 1's signature for validator 0 to trigger `InvalidSignatory` error;
-        signatures[0] = signatures[1];
-
-        vm.expectRevert(
-            abi.encodeWithSelector(InvalidSignatureErr.selector, MultisignatureChecker.Error.InvalidSignatory)
-        );
-        saDiamond.checkpointer().validateActiveQuorumSignatures(validators, hash0, signatures);
-    }
-
-    function testSubnetActorDiamond_submitCheckpoint_basic() public {
-        (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
-        bytes[] memory pubKeys = new bytes[](3);
-        bytes[] memory signatures = new bytes[](3);
-
-        for (uint256 i = 0; i < 3; i++) {
-            vm.deal(validators[i], 10 gwei);
-            pubKeys[i] = TestUtils.deriveValidatorPubKeyBytes(keys[i]);
-            vm.prank(validators[i]);
-            saDiamond.manager().join{value: 10}(pubKeys[i], 10);
-        }
-
-        SubnetID memory localSubnetID = saDiamond.getter().getParent().createSubnetId(address(saDiamond));
-
-        IpcEnvelope memory crossMsg = TestUtils.newXnetCallMsg(
-            IPCAddress({subnetId: localSubnetID, rawAddress: FvmAddressHelper.from(address(saDiamond))}),
-            IPCAddress({
-                subnetId: saDiamond.getter().getParent(),
-                rawAddress: FvmAddressHelper.from(address(saDiamond))
-            }),
-            DEFAULT_CROSS_MSG_FEE + 1,
-            0
-        );
-        IpcEnvelope[] memory msgs = new IpcEnvelope[](1);
-        msgs[0] = crossMsg;
-
-        BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-            subnetID: localSubnetID,
-            blockHeight: saDiamond.getter().bottomUpCheckPeriod(),
-            blockHash: keccak256("block1"),
-            nextConfigurationNumber: 0,
-            msgs: BottomUpBatchHelper.makeCommitment(msgs),
-            activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
-        });
-
-        BottomUpCheckpoint memory checkpointWithIncorrectHeight = BottomUpCheckpoint({
-            subnetID: saDiamond.getter().getParent(),
-            blockHeight: 1,
-            blockHash: keccak256("block1"),
-            nextConfigurationNumber: 0,
-            msgs: BottomUpBatchHelper.makeCommitment(msgs),
-            activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
-        });
-
-        vm.deal(address(saDiamond), 100 ether);
-        vm.prank(address(saDiamond));
-        gatewayDiamond.manager().register{value: DEFAULT_MIN_VALIDATOR_STAKE + 3 * DEFAULT_CROSS_MSG_FEE}(
-            3 * DEFAULT_CROSS_MSG_FEE,
-            DEFAULT_MIN_VALIDATOR_STAKE
-        );
-
-        bytes32 hash = keccak256(abi.encode(checkpoint));
-
-        for (uint256 i = 0; i < 3; i++) {
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(keys[i], hash);
-            signatures[i] = abi.encodePacked(r, s, v);
-        }
-
-        vm.expectRevert(InvalidCheckpointEpoch.selector);
-        vm.prank(validators[0]);
-        saDiamond.checkpointer().submitCheckpoint(checkpointWithIncorrectHeight, validators, signatures);
-
-        // skip the current checkpoint, should fail
-        checkpointWithIncorrectHeight.blockHeight = saDiamond.getter().bottomUpCheckPeriod() + 1;
-        vm.expectRevert(InvalidCheckpointEpoch.selector);
-        vm.prank(validators[0]);
-        saDiamond.checkpointer().submitCheckpoint(checkpointWithIncorrectHeight, validators, signatures);
-
-        // skip the curent checkpoint but submit at the next bottom up checkpoint, should fail
-        checkpointWithIncorrectHeight.blockHeight = saDiamond.getter().bottomUpCheckPeriod() * 2;
-        vm.expectRevert(InvalidCheckpointEpoch.selector);
-        vm.prank(validators[0]);
-        saDiamond.checkpointer().submitCheckpoint(checkpointWithIncorrectHeight, validators, signatures);
-
-        vm.expectCall(gatewayAddress, abi.encodeCall(IGateway.commitCheckpoint, (checkpoint)), 1);
-        vm.prank(validators[0]);
-        saDiamond.checkpointer().submitCheckpoint(checkpoint, validators, signatures);
-
-        require(
-            saDiamond.getter().lastBottomUpCheckpointHeight() == saDiamond.getter().bottomUpCheckPeriod(),
-            " checkpoint height correct"
-        );
-
-        vm.expectRevert(BottomUpCheckpointAlreadySubmitted.selector);
-        vm.prank(validators[0]);
-        saDiamond.checkpointer().submitCheckpoint(checkpoint, validators, signatures);
-        require(
-            saDiamond.getter().lastBottomUpCheckpointHeight() == saDiamond.getter().bottomUpCheckPeriod(),
-            " checkpoint height correct"
-        );
-
-        (bool exists, BottomUpCheckpoint memory recvCheckpoint) = saDiamond.getter().bottomUpCheckpointAtEpoch(
-            saDiamond.getter().bottomUpCheckPeriod()
-        );
-        require(exists, "checkpoint does not exist");
-        require(hash == keccak256(abi.encode(recvCheckpoint)), "checkpoint hashes are not the same");
-
-        bytes32 recvHash;
-        (exists, recvHash) = saDiamond.getter().bottomUpCheckpointHashAtEpoch(saDiamond.getter().bottomUpCheckPeriod());
-        require(exists, "checkpoint does not exist");
-        require(hash == recvHash, "hashes are not the same");
-
-        saDiamond.pauser().pause();
-        vm.prank(validators[0]);
-        vm.expectRevert(Pausable.EnforcedPause.selector);
-        saDiamond.checkpointer().submitCheckpoint(checkpoint, validators, signatures);
-    }
-
     function testSubnetActorDiamond_submitCheckpointWithReward() public {
         (uint256[] memory keys, address[] memory validators, ) = TestUtils.getThreeValidators(vm);
         bytes[] memory pubKeys = new bytes[](3);
@@ -889,9 +606,14 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             signatures[i] = abi.encodePacked(r, s, v);
         }
 
-        vm.expectCall(gatewayAddress, abi.encodeCall(IGateway.commitCheckpoint, (checkpoint)), 1);
         vm.prank(validators[0]);
-        saDiamond.checkpointer().submitCheckpoint(checkpoint, validators, signatures);
+        saDiamond.checkpointer().commitSideEffects(
+            checkpoint.blockHeight,
+            checkpoint.subnetID,
+            checkpoint.activity,
+            checkpoint.msgs,
+            checkpoint.nextConfigurationNumber
+        );
 
         require(
             saDiamond.getter().lastBottomUpCheckpointHeight() == saDiamond.getter().bottomUpCheckPeriod(),
@@ -927,16 +649,19 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         }
 
         vm.prank(validators[0]);
-        saDiamond.checkpointer().submitCheckpoint(checkpoint, validators, signatures);
+        saDiamond.checkpointer().commitSideEffects(
+            checkpoint.blockHeight,
+            checkpoint.subnetID,
+            checkpoint.activity,
+            checkpoint.msgs,
+            checkpoint.nextConfigurationNumber
+        );
     }
 
     function testSubnetActorDiamond_submitSignedHeader() public {
         SignedHeader.Data memory header = SignedHeader.Data({
             header: LightHeader.Data({
-                version: ConsensusData.Data({
-                    block: 11,
-                    app: 0
-                }),
+                version: ConsensusData.Data({block: 11, app: 0}),
                 chain_id: "1671263715227509",
                 height: 10,
                 time: Timestamp.Data({Seconds: 1754924475, nanos: 753738680}),
@@ -985,8 +710,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.deal(validator, 11 ether);
         vm.prank(validator);
         saDiamond.manager().join{value: 10 ether}(pubkey, 10 ether);
-
-        saDiamond.checkpoint().submitSignedHeader(abi.encode(header));
+        saDiamond.checkpointer().submitSignedHeader(abi.encode(header));
     }
 
     function testSubnetActorDiamond_DiamondCut() public {
@@ -2622,10 +2346,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         blocksMined[0] = 1;
         blocksMined[1] = 2;
 
-        (bytes32 activityRoot, bytes32[][] memory proofs) = MerkleTreeHelper.createMerkleProofsForConsensusActivity(
-            addrs,
-            blocksMined
-        );
+        (bytes32 activityRoot, ) = MerkleTreeHelper.createMerkleProofsForConsensusActivity(addrs, blocksMined);
 
         SubnetID memory localSubnetID = saDiamond.getter().getParent().createSubnetId(address(saDiamond));
 
@@ -2651,15 +2372,18 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         BottomUpBatch.Commitment memory commitment = BottomUpBatchHelper.makeCommitment(msgs);
         BottomUpBatch.Inclusion[] memory inclusions = BottomUpBatchHelper.makeInclusions(msgs);
 
-        confirmChange(addrs, privKeys, commitment, ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot));
-        uint256 h = saDiamond.getter().lastBottomUpCheckpointHeight();
-        (, BottomUpCheckpoint memory checkpoint) = saDiamond.getter().bottomUpCheckpointAtEpoch(h);
-        SubnetActorCheckpointingFacet checkpointer = saDiamond.checkpointer();
+        uint256 h = confirmChange(
+            addrs,
+            privKeys,
+            commitment,
+            ActivityHelper.newCompressedActivityRollup(2, 3, activityRoot)
+        );
+        SubnetActorCheckpointFacetMock checkpointer = saDiamond.checkpointer();
         BottomUpBatch.Inclusion[] memory inclusionsOne = new BottomUpBatch.Inclusion[](1);
 
         // attempt to execute with invalid checkpoint height.
         // expect revert.
-        uint256 invalidHeight = checkpoint.blockHeight + 1;
+        uint256 invalidHeight = h + 1;
         vm.expectRevert(MissingBatchCommitment.selector);
         checkpointer.execBottomUpMsgBatch(invalidHeight, inclusions);
 
@@ -2668,25 +2392,25 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         inclusionsOne[0].msg = inclusions[0].msg;
         inclusionsOne[0].proof = inclusions[1].proof;
         vm.expectRevert(InvalidInclusionProof.selector);
-        checkpointer.execBottomUpMsgBatch(checkpoint.blockHeight, inclusionsOne);
+        checkpointer.execBottomUpMsgBatch(h, inclusionsOne);
 
         // execute with a valid proof (1/2).
         inclusionsOne[0] = inclusions[0];
-        checkpointer.execBottomUpMsgBatch(checkpoint.blockHeight, inclusionsOne);
+        checkpointer.execBottomUpMsgBatch(h, inclusionsOne);
 
         // attempt to re-execute the same msg.
         // expect revert.
         vm.expectRevert(BatchMsgAlreadyExecuted.selector);
-        checkpointer.execBottomUpMsgBatch(checkpoint.blockHeight, inclusionsOne);
+        checkpointer.execBottomUpMsgBatch(h, inclusionsOne);
 
         // execute with a valid proof (2/2).
         inclusionsOne[0] = inclusions[1];
-        checkpointer.execBottomUpMsgBatch(checkpoint.blockHeight, inclusionsOne);
+        checkpointer.execBottomUpMsgBatch(h, inclusionsOne);
 
         // attempt to re-execute the same msg.
         // expect revert.
         vm.expectRevert(MissingBatchCommitment.selector);
-        checkpointer.execBottomUpMsgBatch(checkpoint.blockHeight, inclusionsOne);
+        checkpointer.execBottomUpMsgBatch(h, inclusionsOne);
     }
 
     // -----------------------------------------------------------------------------------------------------------------
@@ -2810,16 +2534,16 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
 
     function submitCheckpointInternal(
         BottomUpCheckpoint memory checkpoint,
-        address[] memory validators,
-        bytes[] memory signatures,
-        uint256[] memory keys
+        address[] memory,
+        bytes[] memory,
+        uint256[] memory
     ) internal {
-        bytes32 hash = keccak256(abi.encode(checkpoint));
-        for (uint256 i = 0; i < 3; i++) {
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(keys[i], hash);
-            signatures[i] = abi.encodePacked(r, s, v);
-        }
-
-        saDiamond.checkpointer().submitCheckpoint(checkpoint, validators, signatures);
+        saDiamond.checkpointer().commitSideEffects(
+            checkpoint.blockHeight,
+            checkpoint.subnetID,
+            checkpoint.activity,
+            checkpoint.msgs,
+            checkpoint.nextConfigurationNumber
+        );
     }
 }

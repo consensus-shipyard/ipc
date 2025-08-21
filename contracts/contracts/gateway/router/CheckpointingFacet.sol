@@ -92,9 +92,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
         emit ActivityRollupRecorded(uint64(checkpoint.blockHeight), activity);
     }
 
-    function recordLightClientCommitments(
-        StateCommitmentBreakDown calldata commitment
-    ) external systemActorOnly {
+    function recordLightClientCommitments(StateCommitmentBreakDown calldata commitment) external systemActorOnly {
         emit StateCommitmentCreated(uint64(block.number), commitment);
     }
 

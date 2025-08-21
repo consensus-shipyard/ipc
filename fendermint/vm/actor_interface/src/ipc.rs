@@ -135,10 +135,6 @@ lazy_static! {
                             name: "SubnetGetterFacet",
                             abi: ia::subnet_getter_facet::SUBNETGETTERFACET_ABI.to_owned(),
                         },
-                        EthFacet {
-                            name: "SubnetActorCheckpointFacet",
-                            abi: ia::subnet_actor_checkpoint_facet::SUBNETACTORCHECKPOINTFACET_ABI.to_owned(),
-                        },
                     ],
                 },
             ),
@@ -192,10 +188,6 @@ lazy_static! {
                         EthFacet {
                             name: "OwnershipFacet",
                             abi: ia::ownership_facet::OWNERSHIPFACET_ABI.to_owned(),
-                        },
-                        EthFacet {
-                            name: "SubnetActorCheckpointFacet",
-                            abi: ia::subnet_actor_checkpoint_facet::SUBNETACTORCHECKPOINTFACET_ABI.to_owned(),
                         },
                     ],
                 },
@@ -325,8 +317,6 @@ macro_rules! abi_hash {
     };
 }
 
-abi_hash!(struct ipc_actors_abis::checkpointing_facet::BottomUpCheckpoint);
-abi_hash!(struct ipc_actors_abis::subnet_actor_checkpointing_facet::BottomUpCheckpoint);
 abi_hash!(Vec<ipc_actors_abis::gateway_getter_facet::IpcEnvelope>);
 abi_hash!(Vec<ipc_actors_abis::subnet_actor_checkpointing_facet::IpcEnvelope>);
 abi_hash!(Vec<ipc_actors_abis::subnet_actor_getter_facet::IpcEnvelope>);
@@ -485,7 +475,6 @@ pub mod registry {
         pub diamond_loupe_facet: Address,
         pub ownership_facet: Address,
         pub activity_facet: Address,
-        pub checkpoint_facet: Address,
         pub subnet_getter_selectors: Vec<FunctionSelector>,
         pub subnet_manager_selectors: Vec<FunctionSelector>,
         pub subnet_rewarder_selectors: Vec<FunctionSelector>,
@@ -495,7 +484,6 @@ pub mod registry {
         pub subnet_actor_diamond_loupe_selectors: Vec<FunctionSelector>,
         pub subnet_actor_ownership_selectors: Vec<FunctionSelector>,
         pub subnet_actor_activity_selectors: Vec<FunctionSelector>,
-        pub subnet_checkpoint_selectors: Vec<FunctionSelector>,
         pub creation_privileges: u8, // 0 = Unrestricted, 1 = Owner.
     }
 }
@@ -522,54 +510,6 @@ pub mod subnet {
             GatewayManagerFacetErrors,
             CheckpointingFacetErrors,
             TopDownFinalityFacetErrors
-        }
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use ethers::abi::{AbiType, Tokenize};
-        use ethers::core::types::Bytes;
-        use ipc_actors_abis::subnet_actor_checkpointing_facet::{BottomUpCheckpoint, SubnetID};
-
-        #[test]
-        fn checkpoint_abi() {
-            // Some random checkpoint printed in a test that failed because the Rust ABI was different then the Solidity ABI.
-            let checkpoint = BottomUpCheckpoint {
-                subnet_id: SubnetID {
-                    root: 12378393254986206693,
-                    route: vec![
-                        "0x7b11cf9ca8ccee13bb3d003c97af5c18434067a9",
-                        "0x3d9019b8bf3bfd5e979ddc3b2761be54af867c47",
-                    ]
-                    .into_iter()
-                    .map(|h| h.parse().unwrap())
-                    .collect(),
-                },
-                block_height: ethers::types::U256::from(21),
-                block_hash: [
-                    107, 115, 111, 52, 42, 179, 77, 154, 254, 66, 52, 169, 43, 219, 25, 12, 53,
-                    178, 232, 216, 34, 217, 96, 27, 0, 185, 215, 8, 155, 25, 15, 1,
-                ],
-                next_configuration_number: 1,
-                msgs: Default::default(),
-                activity: Default::default(),
-            };
-
-            let param_type = BottomUpCheckpoint::param_type();
-
-            // Captured value of `abi.encode` in Solidity.
-            let expected_abi: Bytes = "0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000012000000000000000000000000000000000000000000000000000000000000000156b736f342ab34d9afe4234a92bdb190c35b2e8d822d9601b00b9d7089b190f01000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000abc8e314f58b4de5000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000020000000000000000000000007b11cf9ca8ccee13bb3d003c97af5c18434067a90000000000000000000000003d9019b8bf3bfd5e979ddc3b2761be54af867c47".parse().unwrap();
-
-            // XXX: It doesn't work with `decode_whole`.
-            let expected_tokens =
-                ethers::abi::decode(&[param_type], &expected_abi).expect("invalid Solidity ABI");
-
-            // The data needs to be wrapped into a tuple.
-            let observed_tokens = (checkpoint,).into_tokens();
-            let observed_abi: Bytes = ethers::abi::encode(&observed_tokens).into();
-
-            assert_eq!(observed_tokens, expected_tokens);
-            assert_eq!(observed_abi, expected_abi);
         }
     }
 }

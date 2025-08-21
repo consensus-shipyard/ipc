@@ -84,7 +84,6 @@ fn main() -> color_eyre::Result<()> {
         "GatewayMessengerFacet",
         "SubnetActorActivityFacet",
         "SubnetActorCheckpointingFacet",
-        "SubnetActorCheckpointFacet",
         "SubnetActorDiamond",
         "SubnetActorGetterFacet",
         "SubnetActorManagerFacet",

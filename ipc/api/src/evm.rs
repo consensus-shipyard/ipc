@@ -5,9 +5,7 @@
 
 use crate::address::IPCAddress;
 use crate::checkpoint::BottomUpMsgBatch;
-use crate::checkpoint::{
-    consensus, BottomUpBatchCommitment, BottomUpCheckpoint, CompressedActivityRollup,
-};
+use crate::checkpoint::{consensus, BottomUpBatchCommitment, CompressedActivityRollup};
 use crate::cross::{IpcEnvelope, IpcMsgKind};
 use crate::staking::PowerChange;
 use crate::staking::PowerChangeRequest;
@@ -17,7 +15,6 @@ use crate::{eth_to_fil_amount, ethers_address_to_fil_address};
 use anyhow::anyhow;
 use ethers::types::U256;
 use fvm_shared::address::{Address, Payload};
-use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use ipc_actors_abis::{
     checkpointing_facet, gateway_getter_facet, gateway_manager_facet, gateway_messenger_facet,
@@ -177,36 +174,6 @@ macro_rules! bottom_up_checkpoint_conversion {
                         .data_root_commitment
                         .try_into()
                         .map_err(|_| anyhow!("cannot convert bytes32"))?,
-                })
-            }
-        }
-
-        impl TryFrom<BottomUpCheckpoint> for $module::BottomUpCheckpoint {
-            type Error = anyhow::Error;
-
-            fn try_from(checkpoint: BottomUpCheckpoint) -> Result<Self, Self::Error> {
-                Ok($module::BottomUpCheckpoint {
-                    subnet_id: $module::SubnetID::try_from(&checkpoint.subnet_id)?,
-                    block_height: ethers::core::types::U256::from(checkpoint.block_height),
-                    block_hash: vec_to_bytes32(checkpoint.block_hash)?,
-                    next_configuration_number: checkpoint.next_configuration_number,
-                    msgs: checkpoint.msgs.try_into()?,
-                    activity: checkpoint.activity_rollup.try_into()?,
-                })
-            }
-        }
-
-        impl TryFrom<$module::BottomUpCheckpoint> for BottomUpCheckpoint {
-            type Error = anyhow::Error;
-
-            fn try_from(value: $module::BottomUpCheckpoint) -> Result<Self, Self::Error> {
-                Ok(BottomUpCheckpoint {
-                    subnet_id: SubnetID::try_from(value.subnet_id)?,
-                    block_height: value.block_height.as_u128() as ChainEpoch,
-                    block_hash: value.block_hash.to_vec(),
-                    next_configuration_number: value.next_configuration_number,
-                    msgs: value.msgs.into(),
-                    activity_rollup: value.activity.into(),
                 })
             }
         }

@@ -14,7 +14,7 @@ import {CrossMsgHelper} from "../../contracts/lib/CrossMsgHelper.sol";
 import {GatewayDiamond} from "../../contracts/GatewayDiamond.sol";
 import {SubnetActorDiamond} from "../../contracts/SubnetActorDiamond.sol";
 import {SubnetActorManagerFacet} from "../../contracts/subnet/SubnetActorManagerFacet.sol";
-import {SubnetActorCheckpointingFacet} from "../../contracts/subnet/SubnetActorCheckpointingFacet.sol";
+import {SubnetActorCheckpointFacetMock} from "../mocks/SubnetActorCheckpointFacetMock.sol";
 import {GatewayGetterFacet} from "../../contracts/gateway/GatewayGetterFacet.sol";
 import {LibGateway} from "../../contracts/lib/LibGateway.sol";
 import {TopDownFinalityFacet} from "../../contracts/gateway/router/TopDownFinalityFacet.sol";
@@ -259,11 +259,18 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase, IIpcHandler {
             sa
         );
 
-        SubnetActorCheckpointingFacet checkpointer = sa.checkpointer();
+        SubnetActorCheckpointFacetMock checkpointer = sa.checkpointer();
 
         vm.deal(address(1), 1 ether);
         vm.prank(address(1));
-        checkpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
+
+        checkpointer.commitSideEffects(
+            checkpoint.blockHeight,
+            checkpoint.subnetID,
+            checkpoint.activity,
+            checkpoint.msgs,
+            checkpoint.nextConfigurationNumber
+        );
     }
 
     function getNextEpoch(uint256 blockNumber, uint256 checkPeriod) internal pure returns (uint256) {
@@ -622,7 +629,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase, IIpcHandler {
     ) internal {
         BottomUpBatch.Inclusion[] memory inclusions = BottomUpBatchHelper.makeInclusions(msgs);
 
-        SubnetActorCheckpointingFacet checkpointer = sa.checkpointer();
+        SubnetActorCheckpointFacetMock checkpointer = sa.checkpointer();
         vm.startPrank(address(sa));
 
         checkpointer.execBottomUpMsgBatch(checkpoint.blockHeight, inclusions);

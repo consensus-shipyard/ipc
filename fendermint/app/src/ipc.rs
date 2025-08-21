@@ -14,7 +14,7 @@ use fendermint_vm_interpreter::MessagesInterpreter;
 use fendermint_vm_topdown::sync::ParentFinalityStateQuery;
 use fendermint_vm_topdown::IPCParentFinality;
 use fvm_ipld_blockstore::Blockstore;
-use ipc_actors_abis::subnet_actor_checkpoint_facet::{Commitment, StateCommitmentBreakDown};
+use ipc_actors_abis::subnet_actor_checkpointing_facet::{Commitment, StateCommitmentBreakDown};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 

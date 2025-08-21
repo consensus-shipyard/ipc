@@ -28,7 +28,7 @@ contract RegisterSubnetFacet is ReentrancyGuard {
 
         ensurePrivileges();
 
-        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](10);
+        IDiamond.FacetCut[] memory diamondCut = new IDiamond.FacetCut[](9);
 
         // set the diamond cut for subnet getter
         diamondCut[0] = IDiamond.FacetCut({
@@ -84,12 +84,6 @@ contract RegisterSubnetFacet is ReentrancyGuard {
             facetAddress: s.VALIDATOR_REWARD_FACET,
             action: IDiamond.FacetCutAction.Add,
             functionSelectors: s.subnetActorActivitySelectors
-        });
-
-        diamondCut[9] = IDiamond.FacetCut({
-            facetAddress: s.SUBNET_ACTOR_CHECKPOINT_FACET,
-            action: IDiamond.FacetCutAction.Add,
-            functionSelectors: s.subnetActorCheckpointSelectors
         });
 
         // slither-disable-next-line reentrancy-benign

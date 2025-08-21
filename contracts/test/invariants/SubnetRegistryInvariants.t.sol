@@ -10,8 +10,7 @@ import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
 import {SubnetActorGetterFacet} from "../../contracts/subnet/SubnetActorGetterFacet.sol";
 import {SubnetActorManagerFacet} from "../../contracts/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorPauseFacet} from "../../contracts/subnet/SubnetActorPauseFacet.sol";
-import {SubnetActorCheckpointingFacet} from "../../contracts/subnet/SubnetActorCheckpointingFacet.sol";
-import {SubnetActorCheckpointFacet} from "../../contracts/subnet/SubnetActorCheckpointFacet.sol";
+import {SubnetActorCheckpointFacetMock} from "../mocks/SubnetActorCheckpointFacetMock.sol";
 import {SubnetActorRewardFacet} from "../../contracts/subnet/SubnetActorRewardFacet.sol";
 import {SubnetID} from "../../contracts/structs/Subnet.sol";
 import {RegisterSubnetFacet} from "../../contracts/subnetregistry/RegisterSubnetFacet.sol";
@@ -48,24 +47,22 @@ contract SubnetRegistryInvariants is StdInvariant, Test, TestRegistry, Integrati
         params.getterFacet = address(new SubnetActorGetterFacet());
         params.managerFacet = address(new SubnetActorManagerFacet());
         params.rewarderFacet = address(new SubnetActorRewardFacet());
-        params.checkpointerFacet = address(new SubnetActorCheckpointingFacet());
+        params.checkpointerFacet = address(new SubnetActorCheckpointFacetMock());
         params.pauserFacet = address(new SubnetActorPauseFacet());
         params.diamondCutFacet = address(new DiamondCutFacet());
         params.diamondLoupeFacet = address(new DiamondLoupeFacet());
         params.ownershipFacet = address(new OwnershipFacet());
         params.activityFacet = address(new SubnetActorActivityFacet());
-        params.checkpointFacet = address(new SubnetActorCheckpointFacet());
 
         params.subnetActorGetterSelectors = mockedSelectors;
         params.subnetActorManagerSelectors = mockedSelectors2;
         params.subnetActorRewarderSelectors = mockedSelectors3;
-        params.subnetActorCheckpointerSelectors = mockedSelectors4;
+        params.subnetActorCheckpointerSelectors = SelectorLibrary.resolveSelectors("SubnetActorCheckpointFacetMock");
         params.subnetActorPauserSelectors = mockedSelectors5;
         params.subnetActorDiamondCutSelectors = SelectorLibrary.resolveSelectors("DiamondCutFacet");
         params.subnetActorDiamondLoupeSelectors = SelectorLibrary.resolveSelectors("DiamondLoupeFacet");
         params.subnetActorOwnershipSelectors = SelectorLibrary.resolveSelectors("OwnershipFacet");
         params.subnetActorActivitySelectors = SelectorLibrary.resolveSelectors("SubnetActorActivityFacet");
-        params.subnetActorCheckpointSelectors = SelectorLibrary.resolveSelectors("SubnetActorCheckpointFacet");
 
         registryDiamond = createSubnetRegistry(params);
         registryHandler = new SubnetRegistryHandler(registryDiamond);

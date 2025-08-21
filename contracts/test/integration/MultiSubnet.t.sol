@@ -15,7 +15,7 @@ import {GatewayDiamond, FEATURE_MULTILEVEL_CROSSMSG} from "../../contracts/Gatew
 import {SubnetActorDiamond} from "../../contracts/SubnetActorDiamond.sol";
 import {SubnetActorGetterFacet} from "../../contracts/subnet/SubnetActorGetterFacet.sol";
 import {SubnetActorManagerFacet} from "../../contracts/subnet/SubnetActorManagerFacet.sol";
-import {SubnetActorCheckpointingFacet} from "../../contracts/subnet/SubnetActorCheckpointingFacet.sol";
+import {SubnetActorCheckpointFacetMock} from "../mocks/SubnetActorCheckpointFacetMock.sol";
 import {GatewayGetterFacet} from "../../contracts/gateway/GatewayGetterFacet.sol";
 import {GatewayManagerFacet} from "../../contracts/gateway/GatewayManagerFacet.sol";
 import {LibGateway} from "../../contracts/lib/LibGateway.sol";
@@ -460,7 +460,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
     ) internal {
         BottomUpBatch.Inclusion[] memory inclusions = BottomUpBatchHelper.makeInclusions(msgs);
 
-        SubnetActorCheckpointingFacet checkpointer = sa.checkpointer();
+        SubnetActorCheckpointFacetMock checkpointer = sa.checkpointer();
         vm.startPrank(address(sa));
 
         checkpointer.execBottomUpMsgBatch(checkpoint.blockHeight, inclusions);
@@ -1473,10 +1473,16 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             parentSignatures[i] = abi.encodePacked(r, s, v);
         }
 
-        SubnetActorCheckpointingFacet checkpointer = sa.checkpointer();
+        SubnetActorCheckpointFacetMock checkpointer = sa.checkpointer();
 
         vm.startPrank(address(sa));
-        checkpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
+        checkpointer.commitSideEffects(
+            checkpoint.blockHeight,
+            checkpoint.subnetID,
+            checkpoint.activity,
+            checkpoint.msgs,
+            checkpoint.nextConfigurationNumber
+        );
         vm.stopPrank();
     }
 

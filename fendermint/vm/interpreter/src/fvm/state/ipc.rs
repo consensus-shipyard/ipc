@@ -1,23 +1,22 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 use ethers::types as et;
 
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::ActorID;
 
-use fendermint_crypto::{PublicKey, SecretKey};
+use fendermint_crypto::PublicKey;
 use fendermint_vm_actor_interface::ipc;
 use fendermint_vm_actor_interface::{
     eam::EthAddress,
     init::builtin_actor_eth_addr,
-    ipc::{AbiHash, ValidatorMerkleTree, GATEWAY_ACTOR_ID},
+    ipc::{ValidatorMerkleTree, GATEWAY_ACTOR_ID},
 };
 use fendermint_vm_genesis::{Collateral, Power, PowerScale, Validator, ValidatorKey};
-use fendermint_vm_message::conv::{from_eth, from_fvm};
-use fendermint_vm_message::signed::sign_secp256k1;
+use fendermint_vm_message::conv::from_eth;
 use fendermint_vm_topdown::IPCParentFinality;
 
 use super::{
@@ -208,52 +207,6 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         let power_table = membership_to_power_table(&membership, state.power_scale());
 
         Ok((membership.configuration_number, power_table))
-    }
-
-    /// Construct the input parameters for adding a signature to the checkpoint.
-    ///
-    /// This will need to be broadcasted as a transaction.
-    pub fn add_checkpoint_signature_calldata(
-        &self,
-        checkpoint: checkpointing_facet::BottomUpCheckpoint,
-        power_table: &[Validator<Power>],
-        validator: &Validator<Power>,
-        secret_key: &SecretKey,
-    ) -> anyhow::Result<et::Bytes> {
-        debug_assert_eq!(validator.public_key.0, secret_key.public_key());
-
-        let height = checkpoint.block_height;
-        let weight = et::U256::from(validator.power.0);
-
-        let hash = checkpoint.abi_hash();
-
-        let signature = sign_secp256k1(secret_key, &hash);
-        let signature =
-            from_fvm::to_eth_signature(&signature, false).context("invalid signature")?;
-        let signature = et::Bytes::from(signature.to_vec());
-
-        let tree =
-            ValidatorMerkleTree::new(power_table).context("failed to construct Merkle tree")?;
-
-        let membership_proof = tree
-            .prove(validator)
-            .context("failed to construct Merkle proof")?
-            .into_iter()
-            .map(|p| p.into())
-            .collect();
-
-        let call = self.checkpointing.contract().add_checkpoint_signature(
-            height,
-            membership_proof,
-            weight,
-            signature,
-        );
-
-        let calldata = call
-            .calldata()
-            .ok_or_else(|| anyhow!("no calldata for adding signature"))?;
-
-        Ok(calldata)
     }
 
     /// Commit the parent finality to the gateway and returns the previously committed finality.

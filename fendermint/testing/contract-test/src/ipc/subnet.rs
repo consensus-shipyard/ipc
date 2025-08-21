@@ -10,12 +10,7 @@ use fendermint_vm_interpreter::fvm::state::fevm::{
 use fendermint_vm_interpreter::fvm::state::FvmExecState;
 use fendermint_vm_message::conv::{from_eth, from_fvm};
 use fvm_ipld_blockstore::Blockstore;
-use fvm_shared::crypto::signature::SECP_SIG_LEN;
 use fvm_shared::econ::TokenAmount;
-use ipc_actors_abis::gateway_getter_facet::IpcEnvelope;
-use ipc_actors_abis::subnet_actor_checkpointing_facet::{
-    self as checkpointer, SubnetActorCheckpointingFacet,
-};
 use ipc_actors_abis::subnet_actor_getter_facet::{self as getter, SubnetActorGetterFacet};
 use ipc_actors_abis::subnet_actor_manager_facet::SubnetActorManagerFacet;
 
@@ -28,8 +23,6 @@ pub struct SubnetCaller<DB> {
     getter: ContractCaller<DB, SubnetActorGetterFacet<MockProvider>, NoRevert>,
     manager: ContractCaller<DB, SubnetActorManagerFacet<MockProvider>, SubnetActorErrors>,
     rewarder: ContractCaller<DB, SubnetActorRewardFacet<MockProvider>, SubnetActorErrors>,
-    checkpointer:
-        ContractCaller<DB, SubnetActorCheckpointingFacet<MockProvider>, SubnetActorErrors>,
 }
 
 impl<DB> SubnetCaller<DB> {
@@ -39,7 +32,6 @@ impl<DB> SubnetCaller<DB> {
             getter: ContractCaller::new(addr, SubnetActorGetterFacet::new),
             manager: ContractCaller::new(addr, SubnetActorManagerFacet::new),
             rewarder: ContractCaller::new(addr, SubnetActorRewardFacet::new),
-            checkpointer: ContractCaller::new(addr, SubnetActorCheckpointingFacet::new),
         }
     }
 
@@ -113,24 +105,6 @@ impl<DB: Blockstore + Clone> SubnetCaller<DB> {
     /// Claim any refunds.
     pub fn try_claim(&self, state: &mut FvmExecState<DB>, addr: &EthAddress) -> TryCallResult<()> {
         self.rewarder.try_call(state, |c| c.claim().from(addr))
-    }
-
-    /// Submit a bottom-up checkpoint.
-    pub fn try_submit_checkpoint(
-        &self,
-        state: &mut FvmExecState<DB>,
-        checkpoint: checkpointer::BottomUpCheckpoint,
-        _messages: Vec<IpcEnvelope>,
-        signatures: Vec<(EthAddress, [u8; SECP_SIG_LEN])>,
-    ) -> TryCallResult<()> {
-        let mut addrs = Vec::new();
-        let mut sigs = Vec::new();
-        for (addr, sig) in signatures {
-            addrs.push(ethers::types::Address::from(addr));
-            sigs.push(sig.into());
-        }
-        self.checkpointer
-            .try_call(state, |c| c.submit_checkpoint(checkpoint, addrs, sigs))
     }
 
     /// Get information about the validator's current and total collateral.

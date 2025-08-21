@@ -176,27 +176,6 @@ contract SubnetActorGetterFacet {
         return LibPower.isWaitingValidator(validator);
     }
 
-    /// @notice returns the committed bottom-up checkpoint at specific epoch.
-    /// @param epoch - the epoch to check.
-    /// @return exists - whether the checkpoint exists.
-    /// @return checkpoint - the checkpoint struct.
-    function bottomUpCheckpointAtEpoch(
-        uint256 epoch
-    ) public view returns (bool exists, BottomUpCheckpoint memory checkpoint) {
-        checkpoint = s.committedCheckpoints[epoch];
-        exists = !checkpoint.subnetID.isEmpty();
-        return (exists, checkpoint);
-    }
-
-    /// @notice returns the historical committed bottom-up checkpoint hash.
-    /// @param epoch - the epoch to check
-    /// @return exists - whether the checkpoint exists
-    /// @return hash - the hash of the checkpoint
-    function bottomUpCheckpointHashAtEpoch(uint256 epoch) external view returns (bool, bytes32) {
-        (bool exists, BottomUpCheckpoint memory checkpoint) = bottomUpCheckpointAtEpoch(epoch);
-        return (exists, keccak256(abi.encode(checkpoint)));
-    }
-
     /// @notice Returns the power scale in number of decimals from whole FIL.
     function powerScale() external view returns (int8) {
         return s.powerScale;

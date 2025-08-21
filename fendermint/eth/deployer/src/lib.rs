@@ -239,7 +239,6 @@ impl EthContractDeployer {
         let diamond_cut_facet = facets.remove(0);
         let ownership_facet = facets.remove(0);
         let activity_facet = facets.remove(0);
-        let checkpoint_facet = facets.remove(0);
 
         if facets.len() != 2 {
             return Err(anyhow!(
@@ -259,7 +258,6 @@ impl EthContractDeployer {
             diamond_loupe_facet: diamond_loupe_facet.facet_address,
             ownership_facet: ownership_facet.facet_address,
             activity_facet: activity_facet.facet_address,
-            checkpoint_facet: checkpoint_facet.facet_address,
             subnet_getter_selectors: getter_facet.function_selectors,
             subnet_manager_selectors: manager_facet.function_selectors,
             subnet_rewarder_selectors: rewarder_facet.function_selectors,
@@ -269,7 +267,6 @@ impl EthContractDeployer {
             subnet_actor_diamond_loupe_selectors: diamond_loupe_facet.function_selectors,
             subnet_actor_ownership_selectors: ownership_facet.function_selectors,
             subnet_actor_activity_selectors: activity_facet.function_selectors,
-            subnet_checkpoint_selectors: checkpoint_facet.function_selectors,
             creation_privileges: subnet_creation_privilege as u8,
         };
 

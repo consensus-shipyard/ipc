@@ -16,7 +16,7 @@ import {CrossMsgHelper} from "../../contracts/lib/CrossMsgHelper.sol";
 import {GatewayDiamond} from "../../contracts/GatewayDiamond.sol";
 import {SubnetActorDiamond} from "../../contracts/SubnetActorDiamond.sol";
 import {SubnetActorManagerFacet} from "../../contracts/subnet/SubnetActorManagerFacet.sol";
-import {SubnetActorCheckpointingFacet} from "../../contracts/subnet/SubnetActorCheckpointingFacet.sol";
+import {SubnetActorCheckpointFacetMock} from "../mocks/SubnetActorCheckpointFacetMock.sol";
 import {GatewayGetterFacet} from "../../contracts/gateway/GatewayGetterFacet.sol";
 import {LibGateway} from "../../contracts/lib/LibGateway.sol";
 import {TopDownFinalityFacet} from "../../contracts/gateway/router/TopDownFinalityFacet.sol";
@@ -896,7 +896,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
     ) internal {
         BottomUpBatch.Inclusion[] memory inclusions = BottomUpBatchHelper.makeInclusions(msgs);
 
-        SubnetActorCheckpointingFacet checkpointer = sa.checkpointer();
+        SubnetActorCheckpointFacetMock checkpointer = sa.checkpointer();
         vm.startPrank(address(sa));
 
         checkpointer.execBottomUpMsgBatch(checkpoint.blockHeight, inclusions);
@@ -905,15 +905,16 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
     }
 
     function submitBottomUpCheckpoint(BottomUpCheckpoint memory checkpoint, SubnetActorDiamond sa) internal {
-        (address[] memory parentValidators, bytes[] memory parentSignatures) = prepareValidatorsSignatures(
-            checkpoint,
-            sa
-        );
-
-        SubnetActorCheckpointingFacet checkpointer = sa.checkpointer();
+        SubnetActorCheckpointFacetMock checkpointer = sa.checkpointer();
 
         vm.startPrank(address(sa));
-        checkpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
+        checkpointer.commitSideEffects(
+            checkpoint.blockHeight,
+            checkpoint.subnetID,
+            checkpoint.activity,
+            checkpoint.msgs,
+            checkpoint.nextConfigurationNumber
+        );
         vm.stopPrank();
     }
 
@@ -930,10 +931,17 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             subnetActor
         );
 
-        SubnetActorCheckpointingFacet checkpointer = subnetActor.checkpointer();
+        SubnetActorCheckpointFacetMock checkpointer = subnetActor.checkpointer();
 
         vm.startPrank(address(subnetActor));
-        checkpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
+        checkpointer.commitSideEffects(
+            checkpoint.blockHeight,
+            checkpoint.subnetID,
+            checkpoint.activity,
+            checkpoint.msgs,
+            checkpoint.nextConfigurationNumber
+        );
+
         vm.expectEmit(true, true, true, true, expectedGatewayAddr);
         emit LibGateway.NewTopDownMessage({
             subnet: expectedSubnetAddr,
@@ -958,7 +966,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             subnetActor
         );
 
-        SubnetActorCheckpointingFacet checkpointer = subnetActor.checkpointer();
+        SubnetActorCheckpointFacetMock checkpointer = subnetActor.checkpointer();
 
         vm.startPrank(address(subnetActor));
         vm.expectEmit(true, true, true, true, expectedGatewayAddr);
@@ -967,7 +975,13 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             message: expectedMessage,
             id: expectedMessage.toTracingId()
         });
-        checkpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
+        checkpointer.commitSideEffects(
+            checkpoint.blockHeight,
+            checkpoint.subnetID,
+            checkpoint.activity,
+            checkpoint.msgs,
+            checkpoint.nextConfigurationNumber
+        );
         vm.stopPrank();
     }
 
