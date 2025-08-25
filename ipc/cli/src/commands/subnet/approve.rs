@@ -33,18 +33,12 @@ pub(crate) async fn approve_subnet(
             let addr = require_fil_addr_from_str(address)?;
             Some(addr)
         }
-        None => {
-            None
-        }
+        None => None,
     };
 
     match provider.approve_subnet(subnet.clone(), from).await {
-        Ok(()) => {
-            Ok(())
-        }
-        Err(e) => {
-            Err(e)
-        }
+        Ok(()) => Ok(()),
+        Err(e) => Err(e),
     }
 }
 

@@ -6,18 +6,15 @@ use super::super::AppState;
 use super::types::{IncomingMessage, OutgoingMessage};
 use anyhow::Result;
 use futures_util::{SinkExt, StreamExt};
-use tokio::sync::Mutex;
-use warp::ws::{Message};
 use std::sync::Arc;
+use tokio::sync::Mutex;
+use warp::ws::Message;
 
 /// Type alias for WebSocket clients
 pub type Clients = Arc<Mutex<Vec<super::super::WebSocketClient>>>;
 
 /// Handle new WebSocket connection (simplified)
-pub async fn handle_websocket(
-    websocket: warp::ws::WebSocket,
-    clients: Clients,
-) {
+pub async fn handle_websocket(websocket: warp::ws::WebSocket, clients: Clients) {
     let (tx, mut rx) = websocket.split();
     let tx = Arc::new(Mutex::new(tx));
 
@@ -71,7 +68,9 @@ pub async fn broadcast_deployment_progress(
 ) {
     log::info!(
         "Broadcasting deployment progress: {} - {} ({}%)",
-        deployment_id, step, progress
+        deployment_id,
+        step,
+        progress
     );
 
     // In a real implementation, we would send this to WebSocket clients

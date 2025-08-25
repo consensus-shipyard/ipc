@@ -2,19 +2,19 @@
 // SPDX-License-Identifier: MIT
 //! Subnet API endpoints
 
-use super::types::{ApiResponse, InvalidRequest, ServerError};
-use super::super::AppState;
 use super::super::services::SubnetService;
+use super::super::AppState;
+use super::types::{ApiResponse, InvalidRequest, ServerError};
 use crate::GlobalArguments;
 use anyhow::Result;
 use serde_json;
 use std::collections::HashMap;
 use std::convert::Infallible;
-use warp::{Filter, Reply};
-use warp::reply;
-use warp::hyper::HeaderMap;
-use warp::Rejection;
 use std::sync::Arc;
+use warp::hyper::HeaderMap;
+use warp::reply;
+use warp::Rejection;
+use warp::{Filter, Reply};
 
 /// Create subnet API routes
 pub fn subnet_routes(
@@ -103,9 +103,7 @@ pub fn subnet_routes(
 }
 
 /// Helper to pass state to handlers
-fn with_state(
-    state: AppState,
-) -> impl Filter<Extract = (AppState,), Error = Infallible> + Clone {
+fn with_state(state: AppState) -> impl Filter<Extract = (AppState,), Error = Infallible> + Clone {
     warp::any().map(move || state.clone())
 }
 
@@ -128,25 +126,29 @@ async fn handle_approve_subnet(
     let service = SubnetService::new(global);
 
     // URL decode the subnet ID
-    let decoded_subnet_id = urlencoding::decode(&subnet_id)
-        .map_err(|e| {
-            log::error!("Failed to decode subnet ID: {}", e);
-            warp::reject::custom(InvalidRequest(format!("Invalid subnet ID encoding: {}", e)))
-        })?;
+    let decoded_subnet_id = urlencoding::decode(&subnet_id).map_err(|e| {
+        log::error!("Failed to decode subnet ID: {}", e);
+        warp::reject::custom(InvalidRequest(format!("Invalid subnet ID encoding: {}", e)))
+    })?;
 
     log::info!("Decoded subnet ID: {}", decoded_subnet_id);
 
-    let from_address = approval_data.get("from")
-        .and_then(|v| v.as_str());
+    let from_address = approval_data.get("from").and_then(|v| v.as_str());
 
     log::info!("From address: {:?}", from_address);
     log::info!("Calling service.approve_subnet...");
 
-    match service.approve_subnet(&decoded_subnet_id, from_address).await {
+    match service
+        .approve_subnet(&decoded_subnet_id, from_address)
+        .await
+    {
         Ok(msg) => {
             log::info!("✓ APPROVAL SUCCESS: {}", msg);
             log::info!("=== END SUBNET APPROVAL (SUCCESS) ===");
-            Ok(warp::reply::json(&ApiResponse::success(format!("Subnet {} approved successfully", decoded_subnet_id))))
+            Ok(warp::reply::json(&ApiResponse::success(format!(
+                "Subnet {} approved successfully",
+                decoded_subnet_id
+            ))))
         }
         Err(e) => {
             log::error!("✗ APPROVAL FAILED: {}", e);
@@ -252,7 +254,10 @@ async fn handle_update_validator_stake(
 
     let service = SubnetService::new(global);
 
-    match service.update_validator_stake(&subnet_id, &stake_data).await {
+    match service
+        .update_validator_stake(&subnet_id, &stake_data)
+        .await
+    {
         Ok(message) => Ok(warp::reply::json(&ApiResponse::success(message))),
         Err(e) => {
             log::error!("Update validator stake failed: {}", e);
@@ -291,7 +296,9 @@ async fn handle_subnet_stats(
 ) -> Result<impl Reply, warp::Rejection> {
     // URL decode the subnet_id parameter
     let decoded_subnet_id = urlencoding::decode(&subnet_id)
-        .map_err(|e| warp::reject::custom(ServerError(format!("Invalid subnet ID encoding: {}", e))))?
+        .map_err(|e| {
+            warp::reject::custom(ServerError(format!("Invalid subnet ID encoding: {}", e)))
+        })?
         .to_string();
 
     let global = GlobalArguments {
@@ -318,7 +325,9 @@ async fn handle_subnet_status(
 ) -> Result<impl Reply, warp::Rejection> {
     // URL decode the subnet_id parameter
     let decoded_subnet_id = urlencoding::decode(&subnet_id)
-        .map_err(|e| warp::reject::custom(ServerError(format!("Invalid subnet ID encoding: {}", e))))?
+        .map_err(|e| {
+            warp::reject::custom(ServerError(format!("Invalid subnet ID encoding: {}", e)))
+        })?
         .to_string();
 
     let global = GlobalArguments {
@@ -339,9 +348,7 @@ async fn handle_subnet_status(
 }
 
 /// Handle get instances request
-async fn handle_get_instances(
-    state: AppState,
-) -> Result<impl Reply, warp::Rejection> {
+async fn handle_get_instances(state: AppState) -> Result<impl Reply, warp::Rejection> {
     log::info!("Received get instances request");
 
     let global = GlobalArguments {
@@ -373,7 +380,9 @@ async fn handle_get_instance(
     let instance_id = match query_params.get("id") {
         Some(id) => id,
         None => {
-            return Err(warp::reject::custom(InvalidRequest("Missing 'id' parameter".to_string())));
+            return Err(warp::reject::custom(InvalidRequest(
+                "Missing 'id' parameter".to_string(),
+            )));
         }
     };
 
@@ -409,7 +418,10 @@ pub async fn approve_subnet(
 ) -> Result<impl Reply, Rejection> {
     log::info!("Approving subnet: {}", subnet_id);
 
-    match subnet_service.approve_subnet(&subnet_id, from_address.as_deref()).await {
+    match subnet_service
+        .approve_subnet(&subnet_id, from_address.as_deref())
+        .await
+    {
         Ok(_) => {
             log::info!("Successfully approved subnet: {}", subnet_id);
             Ok(reply::json(&serde_json::json!({
@@ -435,7 +447,10 @@ pub async fn list_pending_approvals(
 ) -> Result<impl Reply, Rejection> {
     log::info!("Listing pending approvals for gateway: {}", gateway_address);
 
-    match subnet_service.list_pending_approvals(&gateway_address).await {
+    match subnet_service
+        .list_pending_approvals(&gateway_address)
+        .await
+    {
         Ok(pending_subnets) => {
             log::info!("Found {} pending approvals", pending_subnets.len());
             Ok(reply::json(&serde_json::json!({
@@ -461,12 +476,18 @@ async fn handle_generate_node_config(
 ) -> Result<impl Reply, warp::Rejection> {
     // URL decode the subnet_id parameter
     let decoded_subnet_id = urlencoding::decode(&subnet_id)
-        .map_err(|e| warp::reject::custom(ServerError(format!("Invalid subnet ID encoding: {}", e))))?
+        .map_err(|e| {
+            warp::reject::custom(ServerError(format!("Invalid subnet ID encoding: {}", e)))
+        })?
         .to_string();
 
     let validator_address = query_params.get("validator_address");
 
-    log::info!("Generating node config for subnet: {}, validator: {:?}", decoded_subnet_id, validator_address);
+    log::info!(
+        "Generating node config for subnet: {}, validator: {:?}",
+        decoded_subnet_id,
+        validator_address
+    );
 
     let global = GlobalArguments {
         config_path: Some(state.config_path.clone()),
@@ -476,17 +497,29 @@ async fn handle_generate_node_config(
 
     let service = SubnetService::new(global);
 
-    match service.generate_node_config(&decoded_subnet_id, validator_address.map(|s| s.as_str())).await {
+    match service
+        .generate_node_config(&decoded_subnet_id, validator_address.map(|s| s.as_str()))
+        .await
+    {
         Ok(config_yaml) => {
-            log::info!("Successfully generated node config for subnet: {}", decoded_subnet_id);
-            Ok(warp::reply::json(&ApiResponse::success(serde_json::json!({
-                "subnet_id": decoded_subnet_id,
-                "config_yaml": config_yaml,
-                "filename": format!("node_{}.yaml", decoded_subnet_id.replace('/', "_").replace(":", "_"))
-            }))))
+            log::info!(
+                "Successfully generated node config for subnet: {}",
+                decoded_subnet_id
+            );
+            Ok(warp::reply::json(&ApiResponse::success(
+                serde_json::json!({
+                    "subnet_id": decoded_subnet_id,
+                    "config_yaml": config_yaml,
+                    "filename": format!("node_{}.yaml", decoded_subnet_id.replace('/', "_").replace(":", "_"))
+                }),
+            )))
         }
         Err(e) => {
-            log::error!("Failed to generate node config for subnet {}: {}", decoded_subnet_id, e);
+            log::error!(
+                "Failed to generate node config for subnet {}: {}",
+                decoded_subnet_id,
+                e
+            );
             Err(warp::reject::custom(ServerError(e.to_string())))
         }
     }
@@ -500,12 +533,18 @@ async fn handle_generate_node_commands(
 ) -> Result<impl Reply, warp::Rejection> {
     // URL decode the subnet_id parameter
     let decoded_subnet_id = urlencoding::decode(&subnet_id)
-        .map_err(|e| warp::reject::custom(ServerError(format!("Invalid subnet ID encoding: {}", e))))?
+        .map_err(|e| {
+            warp::reject::custom(ServerError(format!("Invalid subnet ID encoding: {}", e)))
+        })?
         .to_string();
 
     let validator_address = query_params.get("validator_address");
 
-    log::info!("Generating node commands for subnet: {}, validator: {:?}", decoded_subnet_id, validator_address);
+    log::info!(
+        "Generating node commands for subnet: {}, validator: {:?}",
+        decoded_subnet_id,
+        validator_address
+    );
 
     let global = GlobalArguments {
         config_path: Some(state.config_path.clone()),
@@ -515,13 +554,23 @@ async fn handle_generate_node_commands(
 
     let service = SubnetService::new(global);
 
-    match service.generate_node_commands(&decoded_subnet_id, validator_address.map(|s| s.as_str())).await {
+    match service
+        .generate_node_commands(&decoded_subnet_id, validator_address.map(|s| s.as_str()))
+        .await
+    {
         Ok(commands_info) => {
-            log::info!("Successfully generated node commands for subnet: {}", decoded_subnet_id);
+            log::info!(
+                "Successfully generated node commands for subnet: {}",
+                decoded_subnet_id
+            );
             Ok(warp::reply::json(&ApiResponse::success(commands_info)))
         }
         Err(e) => {
-            log::error!("Failed to generate node commands for subnet {}: {}", decoded_subnet_id, e);
+            log::error!(
+                "Failed to generate node commands for subnet {}: {}",
+                decoded_subnet_id,
+                e
+            );
             Err(warp::reject::custom(ServerError(e.to_string())))
         }
     }

@@ -81,7 +81,11 @@ impl EthContractDeployer {
         &mut self,
         subnet_creation_privilege: SubnetCreationPrivilege,
     ) -> Result<DeployedContracts> {
-        self.deploy_all_with_progress(subnet_creation_privilege, None::<fn(&str, &str, usize, usize)>).await
+        self.deploy_all_with_progress(
+            subnet_creation_privilege,
+            None::<fn(&str, &str, usize, usize)>,
+        )
+        .await
     }
 
     /// Deploys all contracts with progress reporting:

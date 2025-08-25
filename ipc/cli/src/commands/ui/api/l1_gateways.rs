@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MIT
 //! L1 Gateway configuration API endpoints
 
-use super::types::{ApiResponse};
-use super::super::AppState;
 use super::super::services::gateway_service::GatewayService;
+use super::super::AppState;
+use super::types::ApiResponse;
 use crate::GlobalArguments;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -50,9 +50,7 @@ impl Default for L1GatewayConfigFile {
 }
 
 /// Get L1 gateway configuration
-pub async fn get_l1_gateway_config(
-    state: AppState,
-) -> Result<impl Reply, warp::Rejection> {
+pub async fn get_l1_gateway_config(state: AppState) -> Result<impl Reply, warp::Rejection> {
     log::info!("Getting L1 gateway configuration from discovered gateways");
 
     // Get discovered gateways and convert them to L1Gateway format
@@ -66,29 +64,42 @@ pub async fn get_l1_gateway_config(
 
     match gateway_service.discover_gateways(None).await {
         Ok(discovered_gateways) => {
-            log::info!("Discovered {} gateways for L1 configuration", discovered_gateways.len());
+            log::info!(
+                "Discovered {} gateways for L1 configuration",
+                discovered_gateways.len()
+            );
 
             // Convert discovered gateways to L1GatewayConfig format
-            let l1_gateways: Vec<L1GatewayConfig> = discovered_gateways.iter()
+            let l1_gateways: Vec<L1GatewayConfig> = discovered_gateways
+                .iter()
                 .filter(|gw| {
                     // Only include L1 gateways (root network gateways)
-                    gw.parent_network.starts_with("/r") &&
-                    gw.parent_network.matches('/').count() == 1 // e.g., "/r31337"
+                    gw.parent_network.starts_with("/r")
+                        && gw.parent_network.matches('/').count() == 1 // e.g., "/r31337"
                 })
                 .enumerate()
                 .map(|(index, gw)| {
                     L1GatewayConfig {
                         id: gw.id.clone(),
-                        name: gw.name.clone().unwrap_or_else(|| format!("Gateway {}", index + 1)),
+                        name: gw
+                            .name
+                            .clone()
+                            .unwrap_or_else(|| format!("Gateway {}", index + 1)),
                         address: gw.address.clone(),
                         registry_address: gw.registry_address.clone(),
                         network_id: gw.parent_network.clone(),
-                        network_name: format!("Local Anvil {}", gw.parent_network.replace("/r", "")),
+                        network_name: format!(
+                            "Local Anvil {}",
+                            gw.parent_network.replace("/r", "")
+                        ),
                         chain_id: 31337, // Default for local anvil, could be parsed from network_id
                         deployed_at: gw.deployed_at.to_rfc3339(),
                         deployer_address: "unknown".to_string(), // Not available in GatewayInfo
-                        is_default: index == 0, // Make first gateway default
-                        description: Some(format!("Gateway contract serving network {}", gw.parent_network)),
+                        is_default: index == 0,                  // Make first gateway default
+                        description: Some(format!(
+                            "Gateway contract serving network {}",
+                            gw.parent_network
+                        )),
                     }
                 })
                 .collect();
@@ -99,7 +110,10 @@ pub async fn get_l1_gateway_config(
                 last_updated: chrono::Utc::now().to_rfc3339(),
             };
 
-            log::info!("Returning {} L1 gateways in configuration", config.gateways.len());
+            log::info!(
+                "Returning {} L1 gateways in configuration",
+                config.gateways.len()
+            );
 
             let response = ApiResponse {
                 success: true,
@@ -151,7 +165,11 @@ pub async fn add_l1_gateway(
     gateway: L1GatewayConfig,
     _state: AppState,
 ) -> Result<impl Reply, warp::Rejection> {
-    log::info!("Adding new L1 gateway: {} ({})", gateway.name, gateway.address);
+    log::info!(
+        "Adding new L1 gateway: {} ({})",
+        gateway.name,
+        gateway.address
+    );
 
     // For now, just acknowledge the addition
     // In a real implementation, this would add to the config file
@@ -186,9 +204,7 @@ pub async fn remove_l1_gateway(
 }
 
 /// Helper to pass state to handlers
-fn with_state(
-    state: AppState,
-) -> impl Filter<Extract = (AppState,), Error = Infallible> + Clone {
+fn with_state(state: AppState) -> impl Filter<Extract = (AppState,), Error = Infallible> + Clone {
     warp::any().map(move || state.clone())
 }
 
@@ -225,9 +241,7 @@ pub fn l1_gateway_routes(
 }
 
 /// Handle get L1 gateway configuration request
-async fn handle_get_l1_gateway_config(
-    state: AppState,
-) -> Result<impl Reply, warp::Rejection> {
+async fn handle_get_l1_gateway_config(state: AppState) -> Result<impl Reply, warp::Rejection> {
     get_l1_gateway_config(state).await
 }
 

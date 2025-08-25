@@ -4,19 +4,21 @@
 //!
 //! This service wraps existing CLI handlers for subnet operations.
 
-use super::super::api::types::{ApiResponse, ChainStats, SubnetLifecycleState, SubnetStatusInfo, SubnetInstanceResponse};
+use super::super::api::types::{
+    ApiResponse, ChainStats, SubnetInstanceResponse, SubnetLifecycleState, SubnetStatusInfo,
+};
 use crate::commands::subnet::{
     approve::{approve_subnet, ApproveSubnetArgs},
     join::{join_subnet, JoinSubnetArgs},
-    leave::{LeaveSubnetArgs},
+    leave::LeaveSubnetArgs,
     // Note: list_subnets is not available as a function export
 };
-use crate::{GlobalArguments, get_ipc_provider};
-use anyhow::{Result, Context};
+use crate::{get_ipc_provider, GlobalArguments};
+use anyhow::{Context, Result};
 use fvm_shared::address::Address;
 use ipc_api::subnet_id::SubnetID;
-use std::str::FromStr;
 use num_traits::ToPrimitive;
+use std::str::FromStr;
 
 /// Subnet information for UI display
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -62,7 +64,11 @@ impl SubnetService {
     }
 
     /// Approve a subnet to join
-    pub async fn approve_subnet(&self, subnet_id: &str, from_address: Option<&str>) -> Result<String> {
+    pub async fn approve_subnet(
+        &self,
+        subnet_id: &str,
+        from_address: Option<&str>,
+    ) -> Result<String> {
         log::info!("SubnetService::approve_subnet called");
         log::info!("  Subnet ID: {}", subnet_id);
         log::info!("  From address: {:?}", from_address);
@@ -102,7 +108,10 @@ impl SubnetService {
     ) -> Result<String> {
         // TODO: Implement validator addition using the provider
         // For now, return a placeholder response
-        Ok(format!("Validator added to subnet {} (placeholder)", subnet_id))
+        Ok(format!(
+            "Validator added to subnet {} (placeholder)",
+            subnet_id
+        ))
     }
 
     /// Remove a validator from a subnet
@@ -113,7 +122,10 @@ impl SubnetService {
     ) -> Result<String> {
         // TODO: Implement validator removal using the provider
         // For now, return a placeholder response
-        Ok(format!("Validator removed from subnet {} (placeholder)", subnet_id))
+        Ok(format!(
+            "Validator removed from subnet {} (placeholder)",
+            subnet_id
+        ))
     }
 
     /// Update validator stake in a subnet
@@ -124,7 +136,10 @@ impl SubnetService {
     ) -> Result<String> {
         // TODO: Implement stake update using the provider
         // For now, return a placeholder response
-        Ok(format!("Validator stake updated in subnet {} (placeholder)", subnet_id))
+        Ok(format!(
+            "Validator stake updated in subnet {} (placeholder)",
+            subnet_id
+        ))
     }
 
     /// Set federated power for a subnet
@@ -135,7 +150,10 @@ impl SubnetService {
     ) -> Result<String> {
         // TODO: Implement federated power setting
         // The set_federated_power function signature needs to be checked
-        Ok(format!("Federated power set for subnet {} (placeholder)", subnet_id))
+        Ok(format!(
+            "Federated power set for subnet {} (placeholder)",
+            subnet_id
+        ))
     }
 
     /// Get subnet status
@@ -149,7 +167,10 @@ impl SubnetService {
         let subnet = SubnetID::from_str(subnet_id)?;
         let provider = get_ipc_provider(&self.global)?;
 
-        log::info!("=== Fetching blockchain statistics for subnet: {} ===", subnet_id);
+        log::info!(
+            "=== Fetching blockchain statistics for subnet: {} ===",
+            subnet_id
+        );
         log::info!("Parsed subnet: {:?}", subnet);
 
         // Initialize default stats in case some calls fail
@@ -171,13 +192,20 @@ impl SubnetService {
         log::info!("Attempting direct RPC connection first...");
         match self.get_block_height_via_rpc().await {
             Ok(rpc_height) => {
-                log::info!("SUCCESS: Direct RPC returned block height {} for running subnet node", rpc_height);
+                log::info!(
+                    "SUCCESS: Direct RPC returned block height {} for running subnet node",
+                    rpc_height
+                );
                 stats.block_height = rpc_height;
 
                 // Also try IPC provider to compare
                 match provider.get_chain_head_height(&subnet).await {
                     Ok(ipc_height) => {
-                        log::info!("INFO: IPC provider reports block height {} (RPC has {})", ipc_height, rpc_height);
+                        log::info!(
+                            "INFO: IPC provider reports block height {} (RPC has {})",
+                            ipc_height,
+                            rpc_height
+                        );
                         if (rpc_height as i64 - ipc_height as i64).abs() > 10 {
                             log::warn!("WARNING: Large discrepancy between RPC ({}) and IPC provider ({}) block heights", rpc_height, ipc_height);
                         }
@@ -188,12 +216,19 @@ impl SubnetService {
                 }
             }
             Err(rpc_error) => {
-                log::warn!("FAILED: Direct RPC connection failed: {}. Trying IPC provider...", rpc_error);
+                log::warn!(
+                    "FAILED: Direct RPC connection failed: {}. Trying IPC provider...",
+                    rpc_error
+                );
 
                 // Fall back to IPC provider
                 match provider.get_chain_head_height(&subnet).await {
                     Ok(height) => {
-                        log::info!("SUCCESS: IPC provider returned block height {} for subnet {}", height, subnet_id);
+                        log::info!(
+                            "SUCCESS: IPC provider returned block height {} for subnet {}",
+                            height,
+                            subnet_id
+                        );
                         stats.block_height = height as u64;
                     }
                     Err(e) => {
@@ -206,7 +241,11 @@ impl SubnetService {
         // Try to get validator count from IPC provider first
         match provider.list_validators(&subnet).await {
             Ok(validators) => {
-                log::info!("Successfully fetched {} validators from IPC provider for subnet {}", validators.len(), subnet_id);
+                log::info!(
+                    "Successfully fetched {} validators from IPC provider for subnet {}",
+                    validators.len(),
+                    subnet_id
+                );
                 stats.validator_count = validators.len() as u32;
             }
             Err(e) => {
@@ -214,7 +253,11 @@ impl SubnetService {
 
                 // Try direct RPC connection to get validator info
                 if let Ok(validator_count) = self.get_validator_count_via_rpc().await {
-                    log::info!("Successfully fetched validator count via direct RPC for subnet {}: {}", subnet_id, validator_count);
+                    log::info!(
+                        "Successfully fetched validator count via direct RPC for subnet {}: {}",
+                        subnet_id,
+                        validator_count
+                    );
                     stats.validator_count = validator_count;
                 } else {
                     log::warn!("Failed to get validator count via direct RPC as well. Using default value.");
@@ -259,7 +302,7 @@ impl SubnetService {
     async fn get_block_height_via_rpc(&self) -> Result<u64> {
         // Try common subnet node RPC endpoints
         let rpc_endpoints = vec![
-            "http://127.0.0.1:26657",  // Default CometBFT RPC port
+            "http://127.0.0.1:26657", // Default CometBFT RPC port
             "http://localhost:26657",
         ];
 
@@ -268,7 +311,11 @@ impl SubnetService {
 
             match self.fetch_status_from_rpc(endpoint).await {
                 Ok(height) => {
-                    log::info!("Successfully got block height {} from RPC endpoint {}", height, endpoint);
+                    log::info!(
+                        "Successfully got block height {} from RPC endpoint {}",
+                        height,
+                        endpoint
+                    );
                     return Ok(height);
                 }
                 Err(e) => {
@@ -284,20 +331,31 @@ impl SubnetService {
     async fn get_validator_count_via_rpc(&self) -> Result<u32> {
         // Try common subnet node RPC endpoints
         let rpc_endpoints = vec![
-            "http://127.0.0.1:26657",  // Default CometBFT RPC port
+            "http://127.0.0.1:26657", // Default CometBFT RPC port
             "http://localhost:26657",
         ];
 
         for endpoint in rpc_endpoints {
-            log::info!("Trying to get validator info from subnet RPC endpoint: {}", endpoint);
+            log::info!(
+                "Trying to get validator info from subnet RPC endpoint: {}",
+                endpoint
+            );
 
             match self.fetch_validator_info_from_rpc(endpoint).await {
                 Ok(count) => {
-                    log::info!("Successfully got validator count {} from RPC endpoint {}", count, endpoint);
+                    log::info!(
+                        "Successfully got validator count {} from RPC endpoint {}",
+                        count,
+                        endpoint
+                    );
                     return Ok(count);
                 }
                 Err(e) => {
-                    log::warn!("Failed to get validator info from RPC endpoint {}: {}", endpoint, e);
+                    log::warn!(
+                        "Failed to get validator info from RPC endpoint {}: {}",
+                        endpoint,
+                        e
+                    );
                 }
             }
         }
@@ -393,7 +451,10 @@ impl SubnetService {
 
     /// Get comprehensive subnet status information with enhanced state detection
     async fn get_comprehensive_subnet_status(&self, subnet_id: &str) -> Result<SubnetStatusInfo> {
-        log::info!("=== GETTING COMPREHENSIVE STATUS FOR SUBNET: {} ===", subnet_id);
+        log::info!(
+            "=== GETTING COMPREHENSIVE STATUS FOR SUBNET: {} ===",
+            subnet_id
+        );
 
         let mut status = SubnetStatusInfo::default();
 
@@ -452,10 +513,13 @@ impl SubnetService {
             Err(e) => {
                 let error_msg = e.to_string();
                 if error_msg.contains("does not exist") || error_msg.contains("does not exists") {
-                    log::debug!("Subnet contracts exist but genesis not available - waiting for validators");
+                    log::debug!(
+                        "Subnet contracts exist but genesis not available - waiting for validators"
+                    );
                     status.genesis_available = false;
                     status.lifecycle_state = SubnetLifecycleState::WaitingForValidators;
-                    status.next_action_required = Some("Start validators to activate subnet".to_string());
+                    status.next_action_required =
+                        Some("Start validators to activate subnet".to_string());
                 } else {
                     log::error!("Step 4: ✗ Unexpected error getting genesis info: {}", e);
                     status.lifecycle_state = SubnetLifecycleState::Failed;
@@ -470,7 +534,8 @@ impl SubnetService {
         match provider.list_validators(&subnet).await {
             Ok(validators) => {
                 status.validator_count = validators.len();
-                status.active_validators = validators.iter()
+                status.active_validators = validators
+                    .iter()
                     .filter(|v| {
                         // Check if validator is active by examining the validator info structure
                         // ValidatorInfo doesn't have is_active(), we'll use a simple heuristic
@@ -478,33 +543,45 @@ impl SubnetService {
                     })
                     .count();
 
-                log::debug!("Found {} validators ({} active)",
-                    status.validator_count, status.active_validators);
+                log::debug!(
+                    "Found {} validators ({} active)",
+                    status.validator_count,
+                    status.active_validators
+                );
 
                 // Refine state based on validator information
                 match status.lifecycle_state {
                     SubnetLifecycleState::WaitingForValidators => {
                         if status.validator_count == 0 {
                             // Confirmed: no validators registered yet
-                            status.next_action_required = Some("Register and start validators to activate subnet".to_string());
+                            status.next_action_required = Some(
+                                "Register and start validators to activate subnet".to_string(),
+                            );
                         } else {
                             // Validators exist but genesis isn't available - likely initialization issue
                             status.lifecycle_state = SubnetLifecycleState::Initializing;
-                            status.next_action_required = Some("Validators registered but subnet not fully initialized".to_string());
+                            status.next_action_required = Some(
+                                "Validators registered but subnet not fully initialized"
+                                    .to_string(),
+                            );
                         }
                     }
                     SubnetLifecycleState::Active => {
                         // Refine active state based on validator health
                         if status.validator_count == 0 {
                             status.lifecycle_state = SubnetLifecycleState::Offline;
-                            status.next_action_required = Some("No validators found - subnet is offline".to_string());
+                            status.next_action_required =
+                                Some("No validators found - subnet is offline".to_string());
                         } else if status.active_validators == 0 {
                             status.lifecycle_state = SubnetLifecycleState::Offline;
-                            status.next_action_required = Some("All validators are offline".to_string());
+                            status.next_action_required =
+                                Some("All validators are offline".to_string());
                         } else if status.active_validators < status.validator_count {
                             status.lifecycle_state = SubnetLifecycleState::Degraded;
-                            status.next_action_required = Some(format!("Only {}/{} validators are active",
-                                status.active_validators, status.validator_count));
+                            status.next_action_required = Some(format!(
+                                "Only {}/{} validators are active",
+                                status.active_validators, status.validator_count
+                            ));
                         } else {
                             status.lifecycle_state = SubnetLifecycleState::Healthy;
                         }
@@ -535,8 +612,9 @@ impl SubnetService {
                 status.block_height = height as u64;
 
                 // If we can get block height, the subnet blockchain is definitely running
-                if status.lifecycle_state == SubnetLifecycleState::WaitingForValidators ||
-                   status.lifecycle_state == SubnetLifecycleState::Initializing {
+                if status.lifecycle_state == SubnetLifecycleState::WaitingForValidators
+                    || status.lifecycle_state == SubnetLifecycleState::Initializing
+                {
                     // Upgrade status to Active since blockchain is running
                     status.lifecycle_state = SubnetLifecycleState::Active;
                     status.next_action_required = None;
@@ -559,8 +637,9 @@ impl SubnetService {
                         status.block_height = height;
 
                         // If we can get block height via RPC, the subnet blockchain is running
-                        if status.lifecycle_state == SubnetLifecycleState::WaitingForValidators ||
-                           status.lifecycle_state == SubnetLifecycleState::Initializing {
+                        if status.lifecycle_state == SubnetLifecycleState::WaitingForValidators
+                            || status.lifecycle_state == SubnetLifecycleState::Initializing
+                        {
                             status.lifecycle_state = SubnetLifecycleState::Active;
                             status.next_action_required = None;
                         }
@@ -572,13 +651,21 @@ impl SubnetService {
                         };
                     }
                     Err(rpc_e) => {
-                        log::warn!("Step 6: ⚠ Cannot get blockchain height via RPC either: {}", rpc_e);
+                        log::warn!(
+                            "Step 6: ⚠ Cannot get blockchain height via RPC either: {}",
+                            rpc_e
+                        );
                         status.block_height = 0;
 
                         // If we can't get block height but have validators, subnet might be starting
-                        if status.validator_count > 0 && status.lifecycle_state == SubnetLifecycleState::Active {
+                        if status.validator_count > 0
+                            && status.lifecycle_state == SubnetLifecycleState::Active
+                        {
                             status.lifecycle_state = SubnetLifecycleState::Initializing;
-                            status.next_action_required = Some("Subnet validators are configured but blockchain is not responding".to_string());
+                            status.next_action_required = Some(
+                                "Subnet validators are configured but blockchain is not responding"
+                                    .to_string(),
+                            );
                         }
 
                         status.consensus_status = "offline".to_string();
@@ -591,11 +678,12 @@ impl SubnetService {
         log::debug!("Final status determination...");
 
         // Set is_active flag based on final lifecycle state
-        status.is_active = matches!(status.lifecycle_state,
-            SubnetLifecycleState::Healthy |
-            SubnetLifecycleState::Active |
-            SubnetLifecycleState::Syncing |
-            SubnetLifecycleState::Degraded
+        status.is_active = matches!(
+            status.lifecycle_state,
+            SubnetLifecycleState::Healthy
+                | SubnetLifecycleState::Active
+                | SubnetLifecycleState::Syncing
+                | SubnetLifecycleState::Degraded
         );
 
         // Set validators_online count (for now, same as active_validators)
@@ -616,41 +704,74 @@ impl SubnetService {
             SubnetLifecycleState::Unknown => "Unknown".to_string(),
         };
 
-        status.message = status.next_action_required.clone()
-            .unwrap_or_else(|| {
-                match status.lifecycle_state {
+        status.message =
+            status
+                .next_action_required
+                .clone()
+                .unwrap_or_else(|| match status.lifecycle_state {
                     SubnetLifecycleState::Healthy => "Subnet is running normally".to_string(),
-                    SubnetLifecycleState::Active => "Subnet is active and processing blocks".to_string(),
-                    SubnetLifecycleState::Syncing => "Subnet is synchronizing with the network".to_string(),
-                    SubnetLifecycleState::Degraded => "Subnet is running but some validators are offline".to_string(),
+                    SubnetLifecycleState::Active => {
+                        "Subnet is active and processing blocks".to_string()
+                    }
+                    SubnetLifecycleState::Syncing => {
+                        "Subnet is synchronizing with the network".to_string()
+                    }
+                    SubnetLifecycleState::Degraded => {
+                        "Subnet is running but some validators are offline".to_string()
+                    }
                     SubnetLifecycleState::Offline => "Subnet is not responding".to_string(),
                     SubnetLifecycleState::Deploying => "Subnet is being deployed".to_string(),
                     SubnetLifecycleState::Deployed => "Subnet has been deployed".to_string(),
                     SubnetLifecycleState::Initializing => "Subnet is initializing".to_string(),
-                    SubnetLifecycleState::WaitingForValidators => "Waiting for validators to join".to_string(),
-                    SubnetLifecycleState::Failed => "Subnet deployment or operation failed".to_string(),
+                    SubnetLifecycleState::WaitingForValidators => {
+                        "Waiting for validators to join".to_string()
+                    }
+                    SubnetLifecycleState::Failed => {
+                        "Subnet deployment or operation failed".to_string()
+                    }
                     SubnetLifecycleState::Unknown => "Subnet status is unknown".to_string(),
-                }
-            });
+                });
 
         // Get the actual permission mode before generating checklist
-        log::info!("Getting permission mode for checklist generation: {}", subnet_id);
-        let actual_permission_mode = self.get_permission_mode(&subnet_id).await.unwrap_or_else(|e| {
-            log::warn!("Failed to get permission mode for checklist, using unknown: {}", e);
-            "unknown".to_string()
-        });
-        log::info!("Using permission mode for checklist: {}", actual_permission_mode);
+        log::info!(
+            "Getting permission mode for checklist generation: {}",
+            subnet_id
+        );
+        let actual_permission_mode =
+            self.get_permission_mode(&subnet_id)
+                .await
+                .unwrap_or_else(|e| {
+                    log::warn!(
+                        "Failed to get permission mode for checklist, using unknown: {}",
+                        e
+                    );
+                    "unknown".to_string()
+                });
+        log::info!(
+            "Using permission mode for checklist: {}",
+            actual_permission_mode
+        );
 
         // Update the status with the correct permission mode
         status.permission_mode = Some(actual_permission_mode.clone());
 
         // Generate setup checklist based on subnet status with correct permission mode
         log::info!("Generating setup checklist for subnet: {}", subnet_id);
-        status.setup_checklist = self.generate_setup_checklist(&subnet, &status, provider).await;
-        log::info!("Generated setup checklist with {} steps", status.setup_checklist.steps.len());
+        status.setup_checklist = self
+            .generate_setup_checklist(&subnet, &status, provider)
+            .await;
+        log::info!(
+            "Generated setup checklist with {} steps",
+            status.setup_checklist.steps.len()
+        );
 
-        log::info!("=== COMPREHENSIVE STATUS COMPLETE: {} = {} (is_active: {}, block_height: {}) ===",
-                   subnet_id, status.lifecycle_state, status.is_active, status.block_height);
+        log::info!(
+            "=== COMPREHENSIVE STATUS COMPLETE: {} = {} (is_active: {}, block_height: {}) ===",
+            subnet_id,
+            status.lifecycle_state,
+            status.is_active,
+            status.block_height
+        );
         Ok(status)
     }
 
@@ -674,7 +795,10 @@ impl SubnetService {
 
         // Check if this is a root subnet (no parent)
         if subnet.is_root() {
-            log::debug!("Subnet {} is a root subnet - root subnets don't have permission modes", subnet_id);
+            log::debug!(
+                "Subnet {} is a root subnet - root subnets don't have permission modes",
+                subnet_id
+            );
             log::debug!("=== PERMISSION MODE RETRIEVAL SKIPPED FOR ROOT SUBNET ===");
             return Ok("root".to_string()); // Return "root" instead of error
         }
@@ -697,8 +821,14 @@ impl SubnetService {
         loop {
             match provider.get_genesis_info(&subnet).await {
                 Ok(genesis_info) => {
-                    log::debug!("Successfully got genesis info (attempt {})", retry_count + 1);
-                    log::info!("Genesis info: permission_mode={:?}", genesis_info.permission_mode);
+                    log::debug!(
+                        "Successfully got genesis info (attempt {})",
+                        retry_count + 1
+                    );
+                    log::info!(
+                        "Genesis info: permission_mode={:?}",
+                        genesis_info.permission_mode
+                    );
 
                     let permission_mode = match genesis_info.permission_mode {
                         ipc_api::subnet::PermissionMode::Collateral => "collateral",
@@ -706,7 +836,10 @@ impl SubnetService {
                         ipc_api::subnet::PermissionMode::Static => "static",
                     };
                     log::debug!("Mapped permission mode to string: '{}'", permission_mode);
-                    log::info!("=== PERMISSION MODE RETRIEVAL SUCCESSFUL: {} ===", permission_mode);
+                    log::info!(
+                        "=== PERMISSION MODE RETRIEVAL SUCCESSFUL: {} ===",
+                        permission_mode
+                    );
                     return Ok(permission_mode.to_string());
                 }
                 Err(e) => {
@@ -718,12 +851,21 @@ impl SubnetService {
                         log::debug!("Attempting direct subnet actor contract query as fallback...");
                         match self.get_permission_mode_from_contract(&subnet).await {
                             Ok(mode) => {
-                                log::debug!("Successfully retrieved permission mode from contract: {}", mode);
-                                log::info!("=== PERMISSION MODE RETRIEVAL SUCCESSFUL (FALLBACK): {} ===", mode);
+                                log::debug!(
+                                    "Successfully retrieved permission mode from contract: {}",
+                                    mode
+                                );
+                                log::info!(
+                                    "=== PERMISSION MODE RETRIEVAL SUCCESSFUL (FALLBACK): {} ===",
+                                    mode
+                                );
                                 return Ok(mode);
                             }
                             Err(fallback_err) => {
-                                log::warn!("Step 6: ⚠ Fallback contract query also failed: {}", fallback_err);
+                                log::warn!(
+                                    "Step 6: ⚠ Fallback contract query also failed: {}",
+                                    fallback_err
+                                );
 
                                 // Instead of returning an error, return "unknown" with detailed logging
                                 // This allows the UI to show the subnet info even if permission mode can't be determined
@@ -752,24 +894,34 @@ impl SubnetService {
         log::info!("=== GATEWAY LOOKUP FOR PERMISSION MODE ===");
 
         // Get parent and gateway info from configuration
-        let config_store = crate::ipc_config_store::IpcConfigStore::load_or_init(&self.global).await?;
+        let config_store =
+            crate::ipc_config_store::IpcConfigStore::load_or_init(&self.global).await?;
         let config = config_store.snapshot().await;
 
-        let parent = subnet.parent().ok_or_else(|| anyhow::anyhow!("Subnet has no parent"))?;
-        let parent_config = config.subnets.get(&parent)
+        let parent = subnet
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("Subnet has no parent"))?;
+        let parent_config = config
+            .subnets
+            .get(&parent)
             .ok_or_else(|| anyhow::anyhow!("Parent subnet not found in config"))?;
 
         let (gateway_addr, rpc_url) = match &parent_config.config {
-            ipc_provider::config::SubnetConfig::Fevm(evm_subnet) => {
-                (evm_subnet.gateway_addr.to_string(), &evm_subnet.provider_http)
-            }
+            ipc_provider::config::SubnetConfig::Fevm(evm_subnet) => (
+                evm_subnet.gateway_addr.to_string(),
+                &evm_subnet.provider_http,
+            ),
         };
 
         // Convert f410 gateway address to Ethereum format if needed
-        let eth_gateway_addr = if gateway_addr.starts_with("t410") || gateway_addr.starts_with("f410") {
+        let eth_gateway_addr = if gateway_addr.starts_with("t410")
+            || gateway_addr.starts_with("f410")
+        {
             // Known gateway address mappings - in production this would use proper f410 conversion
             match gateway_addr.as_str() {
-                "t410f7fj3hitj3ahd5mhssr3dbwuxnoewvdc3vld75hy" => "0xf953b3a269d80e3eb0f2947630da976b896a8c5b",
+                "t410f7fj3hitj3ahd5mhssr3dbwuxnoewvdc3vld75hy" => {
+                    "0xf953b3a269d80e3eb0f2947630da976b896a8c5b"
+                }
                 _ => {
                     anyhow::bail!("Unknown f410 gateway address: {} - need to add mapping or implement f410 conversion", gateway_addr);
                 }
@@ -778,7 +930,12 @@ impl SubnetService {
             &gateway_addr
         };
 
-        log::info!("Using gateway: {} (converted to {}) on RPC: {}", gateway_addr, eth_gateway_addr, rpc_url);
+        log::info!(
+            "Using gateway: {} (converted to {}) on RPC: {}",
+            gateway_addr,
+            eth_gateway_addr,
+            rpc_url
+        );
 
         // Call the gateway's listSubnets() method to get all registered subnets
         log::info!("Calling gateway.listSubnets() to find deployed contract address...");
@@ -787,7 +944,8 @@ impl SubnetService {
                 "call",
                 eth_gateway_addr,
                 "listSubnets()",
-                "--rpc-url", rpc_url.as_str()
+                "--rpc-url",
+                rpc_url.as_str(),
             ])
             .output()
             .await?;
@@ -801,7 +959,9 @@ impl SubnetService {
         log::info!("Gateway listSubnets() raw response: {}", hex_result);
 
         if hex_result.is_empty() || hex_result == "0x" {
-            anyhow::bail!("Gateway returned empty result - no subnets registered or method not found");
+            anyhow::bail!(
+                "Gateway returned empty result - no subnets registered or method not found"
+            );
         }
 
         // The result is ABI-encoded array of Subnet structs
@@ -823,22 +983,33 @@ impl SubnetService {
             log::info!("Found potential deployed address: {}", deployed_addr);
 
             // Now query the permission mode from this contract
-            return self.query_contract_permission_mode(deployed_addr, rpc_url.as_str()).await;
+            return self
+                .query_contract_permission_mode(deployed_addr, rpc_url.as_str())
+                .await;
         }
 
         // Also check for the working subnet address
         if hex_result.contains("388e19c927d53550fb45c71313a434977335f021") {
             let deployed_addr = "0x388e19c927d53550fb45c71313a434977335f021";
             log::info!("Found potential deployed address: {}", deployed_addr);
-            return self.query_contract_permission_mode(deployed_addr, rpc_url.as_str()).await;
+            return self
+                .query_contract_permission_mode(deployed_addr, rpc_url.as_str())
+                .await;
         }
 
         // If we can't find a specific mapping, return an error
-        anyhow::bail!("Could not find deployed contract address for subnet {} in gateway response", subnet_str)
+        anyhow::bail!(
+            "Could not find deployed contract address for subnet {} in gateway response",
+            subnet_str
+        )
     }
 
     /// Query a specific contract address for its permission mode
-    async fn query_contract_permission_mode(&self, contract_addr: &str, rpc_url: &str) -> Result<String> {
+    async fn query_contract_permission_mode(
+        &self,
+        contract_addr: &str,
+        rpc_url: &str,
+    ) -> Result<String> {
         log::info!("Querying permission mode from contract: {}", contract_addr);
 
         let output = tokio::process::Command::new("cast")
@@ -846,7 +1017,8 @@ impl SubnetService {
                 "call",
                 contract_addr,
                 "permissionMode()",
-                "--rpc-url", rpc_url
+                "--rpc-url",
+                rpc_url,
             ])
             .output()
             .await?;
@@ -860,7 +1032,9 @@ impl SubnetService {
         log::info!("Contract permissionMode() response: {}", hex_result);
 
         if hex_result.is_empty() || hex_result == "0x" {
-            anyhow::bail!("Contract returned empty result - method not found or contract doesn't exist");
+            anyhow::bail!(
+                "Contract returned empty result - method not found or contract doesn't exist"
+            );
         }
 
         // Convert hex to decimal
@@ -873,7 +1047,9 @@ impl SubnetService {
             anyhow::bail!("Failed to convert hex result to decimal");
         }
 
-        let mode_num = String::from_utf8_lossy(&decimal_output.stdout).trim().parse::<u8>()?;
+        let mode_num = String::from_utf8_lossy(&decimal_output.stdout)
+            .trim()
+            .parse::<u8>()?;
 
         let permission_mode = match mode_num {
             0 => "collateral",
@@ -885,7 +1061,11 @@ impl SubnetService {
             }
         };
 
-        log::info!("Successfully got permission mode from contract: {} ({})", permission_mode, mode_num);
+        log::info!(
+            "Successfully got permission mode from contract: {} ({})",
+            permission_mode,
+            mode_num
+        );
         Ok(permission_mode.to_string())
     }
 
@@ -914,7 +1094,9 @@ impl SubnetService {
 
         // Check if this is an f410 address that needs conversion
         if subnet_actor_addr.starts_with("t410") || subnet_actor_addr.starts_with("f410") {
-            log::info!("F410 address detected - using gateway lookup to find actual deployed contract");
+            log::info!(
+                "F410 address detected - using gateway lookup to find actual deployed contract"
+            );
             return self.get_permission_mode_via_gateway_lookup(subnet).await;
         }
 
@@ -923,12 +1105,17 @@ impl SubnetService {
         log::info!("Querying contract at address: {}", eth_addr);
 
         // Get parent chain RPC URL from configuration
-        let config_store = crate::ipc_config_store::IpcConfigStore::load_or_init(&self.global).await?;
+        let config_store =
+            crate::ipc_config_store::IpcConfigStore::load_or_init(&self.global).await?;
         let config = config_store.snapshot().await;
 
         // Find the parent subnet config to get the RPC URL
-        let parent = subnet.parent().ok_or_else(|| anyhow::anyhow!("Subnet has no parent"))?;
-        let parent_config = config.subnets.get(&parent)
+        let parent = subnet
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("Subnet has no parent"))?;
+        let parent_config = config
+            .subnets
+            .get(&parent)
             .ok_or_else(|| anyhow::anyhow!("Parent subnet not found in config"))?;
 
         let rpc_url = match &parent_config.config {
@@ -943,7 +1130,8 @@ impl SubnetService {
                 "call",
                 eth_addr,
                 "permissionMode()",
-                "--rpc-url", rpc_url.as_str()
+                "--rpc-url",
+                rpc_url.as_str(),
             ])
             .output()
             .await?;
@@ -957,7 +1145,9 @@ impl SubnetService {
         log::info!("Raw contract response: {}", hex_result);
 
         if hex_result.is_empty() || hex_result == "0x" {
-            anyhow::bail!("Contract returned empty result - contract may not exist or method not found");
+            anyhow::bail!(
+                "Contract returned empty result - contract may not exist or method not found"
+            );
         }
 
         // Convert hex to decimal
@@ -970,7 +1160,9 @@ impl SubnetService {
             anyhow::bail!("Failed to convert hex result to decimal");
         }
 
-        let mode_num = String::from_utf8_lossy(&decimal_output.stdout).trim().parse::<u8>()?;
+        let mode_num = String::from_utf8_lossy(&decimal_output.stdout)
+            .trim()
+            .parse::<u8>()?;
 
         let permission_mode = match mode_num {
             0 => "collateral",
@@ -982,13 +1174,18 @@ impl SubnetService {
             }
         };
 
-        log::info!("Successfully parsed permission mode: {} ({})", permission_mode, mode_num);
+        log::info!(
+            "Successfully parsed permission mode: {} ({})",
+            permission_mode,
+            mode_num
+        );
         Ok(permission_mode.to_string())
     }
 
     /// List all subnets/instances with enhanced status information
     pub async fn list_subnets(&self) -> Result<Vec<serde_json::Value>> {
-        let config_store = crate::ipc_config_store::IpcConfigStore::load_or_init(&self.global).await?;
+        let config_store =
+            crate::ipc_config_store::IpcConfigStore::load_or_init(&self.global).await?;
         let config = config_store.snapshot().await;
 
         log::info!("Loading subnet configurations from config store");
@@ -997,14 +1194,17 @@ impl SubnetService {
         // Log all found subnets with their details
         for (subnet_id, subnet_config) in &config.subnets {
             let subnet_id_str = subnet_id.to_string();
-            log::info!("Raw subnet found: ID='{}', is_root={}, gateway={:?}, registry={:?}",
+            log::info!(
+                "Raw subnet found: ID='{}', is_root={}, gateway={:?}, registry={:?}",
                 subnet_id_str,
                 subnet_id.is_root(),
                 match &subnet_config.config {
-                    ipc_provider::config::SubnetConfig::Fevm(evm_subnet) => evm_subnet.gateway_addr.to_string(),
+                    ipc_provider::config::SubnetConfig::Fevm(evm_subnet) =>
+                        evm_subnet.gateway_addr.to_string(),
                 },
                 match &subnet_config.config {
-                    ipc_provider::config::SubnetConfig::Fevm(evm_subnet) => evm_subnet.registry_addr.to_string(),
+                    ipc_provider::config::SubnetConfig::Fevm(evm_subnet) =>
+                        evm_subnet.registry_addr.to_string(),
                 }
             );
         }
@@ -1028,13 +1228,22 @@ impl SubnetService {
             // Get comprehensive status information
             let status_info = match self.get_comprehensive_subnet_status(&subnet_id_str).await {
                 Ok(status) => {
-                    log::info!("✓ Comprehensive status for {}: {} (genesis: {}, validators: {}/{})",
-                        subnet_id_str, status.lifecycle_state, status.genesis_available,
-                        status.active_validators, status.validator_count);
+                    log::info!(
+                        "✓ Comprehensive status for {}: {} (genesis: {}, validators: {}/{})",
+                        subnet_id_str,
+                        status.lifecycle_state,
+                        status.genesis_available,
+                        status.active_validators,
+                        status.validator_count
+                    );
                     status
                 }
                 Err(e) => {
-                    log::error!("✗ Failed to get comprehensive status for {}: {}", subnet_id_str, e);
+                    log::error!(
+                        "✗ Failed to get comprehensive status for {}: {}",
+                        subnet_id_str,
+                        e
+                    );
                     let mut status = SubnetStatusInfo::default();
                     status.lifecycle_state = SubnetLifecycleState::Failed;
                     status.error_message = Some(format!("Status check failed: {}", e));
@@ -1044,10 +1253,16 @@ impl SubnetService {
 
             // Get validators for detailed info (only if needed for display)
             let validators = if status_info.validator_count > 0 {
-                self.get_validators_for_subnet(&subnet_id_str).await.unwrap_or_else(|e| {
-                    log::warn!("Failed to fetch detailed validator info for subnet {}: {}", subnet_id_str, e);
-                    Vec::new()
-                })
+                self.get_validators_for_subnet(&subnet_id_str)
+                    .await
+                    .unwrap_or_else(|e| {
+                        log::warn!(
+                            "Failed to fetch detailed validator info for subnet {}: {}",
+                            subnet_id_str,
+                            e
+                        );
+                        Vec::new()
+                    })
             } else {
                 Vec::new()
             };
@@ -1055,11 +1270,19 @@ impl SubnetService {
             // Get the actual permission mode from the subnet contract
             let permission_mode = match self.get_permission_mode(&subnet_id_str).await {
                 Ok(mode) => {
-                    log::info!("Successfully retrieved permission mode for subnet {}: {}", subnet_id_str, mode);
+                    log::info!(
+                        "Successfully retrieved permission mode for subnet {}: {}",
+                        subnet_id_str,
+                        mode
+                    );
                     mode
                 }
                 Err(e) => {
-                    log::error!("Failed to get permission mode for subnet {}: {}", subnet_id_str, e);
+                    log::error!(
+                        "Failed to get permission mode for subnet {}: {}",
+                        subnet_id_str,
+                        e
+                    );
                     "unknown".to_string()
                 }
             };
@@ -1100,17 +1323,25 @@ impl SubnetService {
             instances.push(instance);
         }
 
-        log::info!("Returning {} subnet instances (after filtering out {} root networks)", instances.len(), root_networks_filtered);
+        log::info!(
+            "Returning {} subnet instances (after filtering out {} root networks)",
+            instances.len(),
+            root_networks_filtered
+        );
         Ok(instances)
     }
 
     /// Get specific subnet info
     pub async fn get_subnet_info(&self, subnet_id: &str) -> Result<serde_json::Value> {
-        let config_store = crate::ipc_config_store::IpcConfigStore::load_or_init(&self.global).await?;
+        let config_store =
+            crate::ipc_config_store::IpcConfigStore::load_or_init(&self.global).await?;
         let config = config_store.snapshot().await;
 
         log::info!("Looking for subnet with ID: {}", subnet_id);
-        log::info!("Available subnets in config: {:?}", config.subnets.keys().collect::<Vec<_>>());
+        log::info!(
+            "Available subnets in config: {:?}",
+            config.subnets.keys().collect::<Vec<_>>()
+        );
 
         // Try to find the subnet in configuration by iterating through subnets
         for (config_subnet_id, subnet_config) in &config.subnets {
@@ -1139,13 +1370,22 @@ impl SubnetService {
                 // Get comprehensive status information with setup checklist
                 let status_info = match self.get_comprehensive_subnet_status(subnet_id).await {
                     Ok(status) => {
-                        log::info!("✓ Comprehensive status for {}: {} (genesis: {}, validators: {}/{})",
-                            subnet_id, status.lifecycle_state, status.genesis_available,
-                            status.active_validators, status.validator_count);
+                        log::info!(
+                            "✓ Comprehensive status for {}: {} (genesis: {}, validators: {}/{})",
+                            subnet_id,
+                            status.lifecycle_state,
+                            status.genesis_available,
+                            status.active_validators,
+                            status.validator_count
+                        );
                         status
                     }
                     Err(e) => {
-                        log::error!("✗ Failed to get comprehensive status for {}: {}", subnet_id, e);
+                        log::error!(
+                            "✗ Failed to get comprehensive status for {}: {}",
+                            subnet_id,
+                            e
+                        );
                         let mut status = SubnetStatusInfo::default();
                         status.lifecycle_state = SubnetLifecycleState::Failed;
                         status.error_message = Some(format!("Status check failed: {}", e));
@@ -1155,10 +1395,16 @@ impl SubnetService {
 
                 // Get validators from the blockchain (only if needed for display)
                 let validators = if status_info.validator_count > 0 {
-                    self.get_validators_for_subnet(subnet_id).await.unwrap_or_else(|e| {
-                        log::warn!("Failed to fetch detailed validator info for subnet {}: {}", subnet_id, e);
-                        Vec::new()
-                    })
+                    self.get_validators_for_subnet(subnet_id)
+                        .await
+                        .unwrap_or_else(|e| {
+                            log::warn!(
+                                "Failed to fetch detailed validator info for subnet {}: {}",
+                                subnet_id,
+                                e
+                            );
+                            Vec::new()
+                        })
                 } else {
                     Vec::new()
                 };
@@ -1166,11 +1412,19 @@ impl SubnetService {
                 // Get the actual permission mode from the subnet contract
                 let permission_mode = match self.get_permission_mode(subnet_id).await {
                     Ok(mode) => {
-                        log::info!("Successfully retrieved permission mode for subnet {}: {}", subnet_id, mode);
+                        log::info!(
+                            "Successfully retrieved permission mode for subnet {}: {}",
+                            subnet_id,
+                            mode
+                        );
                         mode
                     }
                     Err(e) => {
-                        log::error!("Failed to get permission mode for subnet {}: {}", subnet_id, e);
+                        log::error!(
+                            "Failed to get permission mode for subnet {}: {}",
+                            subnet_id,
+                            e
+                        );
                         "unknown".to_string()
                     }
                 };
@@ -1223,7 +1477,7 @@ impl SubnetService {
         anyhow::bail!("Subnet with ID '{}' not found in configuration", subnet_id)
     }
 
-        /// Helper method to get validators for a subnet
+    /// Helper method to get validators for a subnet
     async fn get_validators_for_subnet(&self, subnet_id: &str) -> Result<Vec<serde_json::Value>> {
         log::info!("=== FETCHING VALIDATORS FOR SUBNET: {} ===", subnet_id);
 
@@ -1243,7 +1497,10 @@ impl SubnetService {
 
         // Check if this is a root subnet (no parent)
         if subnet.is_root() {
-            log::info!("Step 3: Subnet {} is a root subnet, no validators to fetch from parent", subnet_id);
+            log::info!(
+                "Step 3: Subnet {} is a root subnet, no validators to fetch from parent",
+                subnet_id
+            );
             log::info!("=== VALIDATOR FETCHING SKIPPED FOR ROOT SUBNET ===");
             return Ok(vec![]);
         }
@@ -1254,8 +1511,14 @@ impl SubnetService {
         match &parent {
             Some(p) => log::debug!("Parent subnet: {}", p),
             None => {
-                log::error!("Step 4: ✗ No parent found for non-root subnet {}", subnet_id);
-                return Err(anyhow::anyhow!("No parent found for non-root subnet {}", subnet_id));
+                log::error!(
+                    "Step 4: ✗ No parent found for non-root subnet {}",
+                    subnet_id
+                );
+                return Err(anyhow::anyhow!(
+                    "No parent found for non-root subnet {}",
+                    subnet_id
+                ));
             }
         }
 
@@ -1268,15 +1531,29 @@ impl SubnetService {
         loop {
             match provider.list_validators(&subnet).await {
                 Ok(validators) => {
-                    log::info!("Successfully fetched {} validators for subnet {}", validators.len(), subnet_id);
+                    log::info!(
+                        "Successfully fetched {} validators for subnet {}",
+                        validators.len(),
+                        subnet_id
+                    );
 
                     let mut validator_list = Vec::new();
                     for (i, (address, validator_info)) in validators.iter().enumerate() {
-                        log::info!("Step 6.{}: Processing validator {}: {}", i+1, i+1, address);
+                        log::info!(
+                            "Step 6.{}: Processing validator {}: {}",
+                            i + 1,
+                            i + 1,
+                            address
+                        );
 
                         // Convert TokenAmount to string for stake/power
                         let stake = validator_info.staking.current_power().to_string();
-                        let power = validator_info.staking.next_power().atto().to_u64().unwrap_or(0);
+                        let power = validator_info
+                            .staking
+                            .next_power()
+                            .atto()
+                            .to_u64()
+                            .unwrap_or(0);
 
                         // Determine status based on validator state
                         let status = if validator_info.is_active {
@@ -1298,12 +1575,21 @@ impl SubnetService {
                             "next_power": validator_info.staking.next_power().to_string()
                         });
 
-                        log::info!("Step 6.{}: ✓ Validator {} - status: {}, stake: {}, power: {}",
-                            i+1, address, status, stake, power);
+                        log::info!(
+                            "Step 6.{}: ✓ Validator {} - status: {}, stake: {}, power: {}",
+                            i + 1,
+                            address,
+                            status,
+                            stake,
+                            power
+                        );
                         validator_list.push(validator_json);
                     }
 
-                    log::info!("=== VALIDATOR FETCHING SUCCESSFUL: {} validators ===", validator_list.len());
+                    log::info!(
+                        "=== VALIDATOR FETCHING SUCCESSFUL: {} validators ===",
+                        validator_list.len()
+                    );
                     return Ok(validator_list);
                 }
                 Err(e) => {
@@ -1331,19 +1617,22 @@ impl SubnetService {
         }
     }
 
-
-        /// Generate detailed setup checklist for a subnet based on its current status
+    /// Generate detailed setup checklist for a subnet based on its current status
     async fn generate_setup_checklist(
         &self,
         subnet: &ipc_api::subnet_id::SubnetID,
         status_info: &crate::commands::ui::api::types::SubnetStatusInfo,
         mut provider: ipc_provider::IpcProvider,
     ) -> crate::commands::ui::api::types::SubnetSetupChecklist {
-        use crate::commands::ui::api::types::{SubnetSetupChecklist, SetupStep, StepStatus};
+        use crate::commands::ui::api::types::{SetupStep, StepStatus, SubnetSetupChecklist};
 
         log::info!("Generating setup checklist for subnet: {}", subnet);
 
-        let permission_mode = status_info.permission_mode.as_deref().unwrap_or("unknown").to_lowercase();
+        let permission_mode = status_info
+            .permission_mode
+            .as_deref()
+            .unwrap_or("unknown")
+            .to_lowercase();
         let mut steps = Vec::new();
         let mut all_complete = true;
         let mut next_action = None;
@@ -1353,16 +1642,30 @@ impl SubnetService {
                 log::info!("Generating federated subnet checklist");
 
                 // Step 1: Check if federated power is set (validators configured)
-                let federated_power_set = self.check_federated_power_status(subnet, &mut provider).await;
+                let federated_power_set = self
+                    .check_federated_power_status(subnet, &mut provider)
+                    .await;
                 steps.push(SetupStep {
                     id: "federated_power".to_string(),
                     title: "Configure Validators".to_string(),
                     description: "Set federated power for initial validators".to_string(),
-                    status: if federated_power_set { StepStatus::Completed } else { StepStatus::Pending },
+                    status: if federated_power_set {
+                        StepStatus::Completed
+                    } else {
+                        StepStatus::Pending
+                    },
                     required: true,
                     action_available: !federated_power_set,
-                    action_button_text: if federated_power_set { None } else { Some("Set Federated Power".to_string()) },
-                    action_type: if federated_power_set { None } else { Some("set_federated_power".to_string()) },
+                    action_button_text: if federated_power_set {
+                        None
+                    } else {
+                        Some("Set Federated Power".to_string())
+                    },
+                    action_type: if federated_power_set {
+                        None
+                    } else {
+                        Some("set_federated_power".to_string())
+                    },
                     details: Some(serde_json::json!({
                         "subnet_id": subnet.to_string(),
                         "min_validators": 1, // This could be fetched from subnet config
@@ -1372,7 +1675,10 @@ impl SubnetService {
                 if !federated_power_set {
                     all_complete = false;
                     if next_action.is_none() {
-                        next_action = Some("Set federated power for validators to bootstrap the subnet".to_string());
+                        next_action = Some(
+                            "Set federated power for validators to bootstrap the subnet"
+                                .to_string(),
+                        );
                     }
                 }
 
@@ -1382,7 +1688,13 @@ impl SubnetService {
                     id: "bootstrap".to_string(),
                     title: "Subnet Bootstrapped".to_string(),
                     description: "Subnet has been bootstrapped with initial validators".to_string(),
-                    status: if is_bootstrapped { StepStatus::Completed } else if federated_power_set { StepStatus::InProgress } else { StepStatus::Pending },
+                    status: if is_bootstrapped {
+                        StepStatus::Completed
+                    } else if federated_power_set {
+                        StepStatus::InProgress
+                    } else {
+                        StepStatus::Pending
+                    },
                     required: true,
                     action_available: false, // Bootstrap happens automatically after federated power is set
                     action_button_text: None,
@@ -1403,11 +1715,27 @@ impl SubnetService {
                     id: "gateway_approval".to_string(),
                     title: "Gateway Approval".to_string(),
                     description: "Subnet is approved and registered in the gateway".to_string(),
-                    status: if is_approved { StepStatus::Completed } else { StepStatus::Pending },
+                    status: if is_approved {
+                        StepStatus::Completed
+                    } else {
+                        StepStatus::Pending
+                    },
                     required: true,
                     action_available: is_bootstrapped && !is_approved,
-                    action_button_text: if is_approved { None } else if is_bootstrapped { Some("Approve Subnet".to_string()) } else { None },
-                    action_type: if is_approved { None } else if is_bootstrapped { Some("approve_subnet".to_string()) } else { None },
+                    action_button_text: if is_approved {
+                        None
+                    } else if is_bootstrapped {
+                        Some("Approve Subnet".to_string())
+                    } else {
+                        None
+                    },
+                    action_type: if is_approved {
+                        None
+                    } else if is_bootstrapped {
+                        Some("approve_subnet".to_string())
+                    } else {
+                        None
+                    },
                     details: Some(serde_json::json!({
                         "subnet_id": subnet.to_string(),
                     })),
@@ -1416,7 +1744,8 @@ impl SubnetService {
                 if !is_approved {
                     all_complete = false;
                     if next_action.is_none() && is_bootstrapped {
-                        next_action = Some("Approve subnet in the gateway to complete setup".to_string());
+                        next_action =
+                            Some("Approve subnet in the gateway to complete setup".to_string());
                     }
                 }
             }
@@ -1425,16 +1754,30 @@ impl SubnetService {
                 log::info!("Generating collateral subnet checklist");
 
                 // Step 1: Check minimum collateral
-                let min_collateral_met = self.check_minimum_collateral_status(subnet, &mut provider).await;
+                let min_collateral_met = self
+                    .check_minimum_collateral_status(subnet, &mut provider)
+                    .await;
                 steps.push(SetupStep {
                     id: "minimum_collateral".to_string(),
                     title: "Minimum Collateral".to_string(),
                     description: "Subnet has reached minimum collateral threshold".to_string(),
-                    status: if min_collateral_met { StepStatus::Completed } else { StepStatus::Pending },
+                    status: if min_collateral_met {
+                        StepStatus::Completed
+                    } else {
+                        StepStatus::Pending
+                    },
                     required: true,
                     action_available: !min_collateral_met,
-                    action_button_text: if min_collateral_met { None } else { Some("Join as Validator".to_string()) },
-                    action_type: if min_collateral_met { None } else { Some("join_subnet".to_string()) },
+                    action_button_text: if min_collateral_met {
+                        None
+                    } else {
+                        Some("Join as Validator".to_string())
+                    },
+                    action_type: if min_collateral_met {
+                        None
+                    } else {
+                        Some("join_subnet".to_string())
+                    },
                     details: Some(serde_json::json!({
                         "subnet_id": subnet.to_string(),
                     })),
@@ -1443,7 +1786,9 @@ impl SubnetService {
                 if !min_collateral_met {
                     all_complete = false;
                     if next_action.is_none() {
-                        next_action = Some("Add validators with collateral to reach minimum threshold".to_string());
+                        next_action = Some(
+                            "Add validators with collateral to reach minimum threshold".to_string(),
+                        );
                     }
                 }
 
@@ -1471,11 +1816,27 @@ impl SubnetService {
                     id: "gateway_approval".to_string(),
                     title: "Gateway Approval".to_string(),
                     description: "Subnet is approved and registered in the gateway".to_string(),
-                    status: if is_approved { StepStatus::Completed } else { StepStatus::Pending },
+                    status: if is_approved {
+                        StepStatus::Completed
+                    } else {
+                        StepStatus::Pending
+                    },
                     required: true,
                     action_available: is_bootstrapped && !is_approved,
-                    action_button_text: if is_approved { None } else if is_bootstrapped { Some("Approve Subnet".to_string()) } else { None },
-                    action_type: if is_approved { None } else if is_bootstrapped { Some("approve_subnet".to_string()) } else { None },
+                    action_button_text: if is_approved {
+                        None
+                    } else if is_bootstrapped {
+                        Some("Approve Subnet".to_string())
+                    } else {
+                        None
+                    },
+                    action_type: if is_approved {
+                        None
+                    } else if is_bootstrapped {
+                        Some("approve_subnet".to_string())
+                    } else {
+                        None
+                    },
                     details: Some(serde_json::json!({
                         "subnet_id": subnet.to_string(),
                     })),
@@ -1484,7 +1845,8 @@ impl SubnetService {
                 if !is_approved {
                     all_complete = false;
                     if next_action.is_none() && is_bootstrapped {
-                        next_action = Some("Approve subnet in the gateway to complete setup".to_string());
+                        next_action =
+                            Some("Approve subnet in the gateway to complete setup".to_string());
                     }
                 }
             }
@@ -1515,13 +1877,20 @@ impl SubnetService {
     }
 
     /// Check if federated power has been set for a subnet
-    async fn check_federated_power_status(&self, subnet: &ipc_api::subnet_id::SubnetID, provider: &mut ipc_provider::IpcProvider) -> bool {
+    async fn check_federated_power_status(
+        &self,
+        subnet: &ipc_api::subnet_id::SubnetID,
+        provider: &mut ipc_provider::IpcProvider,
+    ) -> bool {
         log::debug!("Checking federated power status for subnet: {}", subnet);
 
         // Try to get genesis info to check if validators are configured
         match provider.get_genesis_info(subnet).await {
             Ok(genesis_info) => {
-                log::debug!("Genesis info found, validators configured: {}", !genesis_info.validators.is_empty());
+                log::debug!(
+                    "Genesis info found, validators configured: {}",
+                    !genesis_info.validators.is_empty()
+                );
                 !genesis_info.validators.is_empty()
             }
             Err(e) => {
@@ -1531,8 +1900,12 @@ impl SubnetService {
         }
     }
 
-        /// Check if subnet is bootstrapped
-    async fn check_bootstrap_status(&self, subnet: &ipc_api::subnet_id::SubnetID, provider: &mut ipc_provider::IpcProvider) -> bool {
+    /// Check if subnet is bootstrapped
+    async fn check_bootstrap_status(
+        &self,
+        subnet: &ipc_api::subnet_id::SubnetID,
+        provider: &mut ipc_provider::IpcProvider,
+    ) -> bool {
         log::debug!("Checking bootstrap status for subnet: {}", subnet);
 
         // Try to get genesis info - if it exists and has validators, it's bootstrapped
@@ -1549,7 +1922,11 @@ impl SubnetService {
     }
 
     /// Check if minimum collateral threshold is met for collateral subnets
-    async fn check_minimum_collateral_status(&self, subnet: &ipc_api::subnet_id::SubnetID, provider: &mut ipc_provider::IpcProvider) -> bool {
+    async fn check_minimum_collateral_status(
+        &self,
+        subnet: &ipc_api::subnet_id::SubnetID,
+        provider: &mut ipc_provider::IpcProvider,
+    ) -> bool {
         log::debug!("Checking minimum collateral status for subnet: {}", subnet);
 
         // This is a simplified check - in reality we'd need to query the subnet actor contract
@@ -1567,8 +1944,16 @@ impl SubnetService {
     }
 
     /// Check if a subnet is approved in the gateway contract
-    async fn check_subnet_approval_status(&self, subnet_id: &ipc_api::subnet_id::SubnetID, gateway_address: &str) -> bool {
-        log::debug!("Checking approval status for subnet {} in gateway {}", subnet_id, gateway_address);
+    async fn check_subnet_approval_status(
+        &self,
+        subnet_id: &ipc_api::subnet_id::SubnetID,
+        gateway_address: &str,
+    ) -> bool {
+        log::debug!(
+            "Checking approval status for subnet {} in gateway {}",
+            subnet_id,
+            gateway_address
+        );
 
         // Try to get the subnet info using IPC provider
         let mut provider = match crate::get_ipc_provider(&self.global) {
@@ -1602,11 +1987,15 @@ impl SubnetService {
         }
     }
 
-        /// List pending subnet approvals for a gateway
-    pub async fn list_pending_approvals(&self, gateway_address: &str) -> anyhow::Result<Vec<serde_json::Value>> {
+    /// List pending subnet approvals for a gateway
+    pub async fn list_pending_approvals(
+        &self,
+        gateway_address: &str,
+    ) -> anyhow::Result<Vec<serde_json::Value>> {
         log::info!("Listing pending approvals for gateway: {}", gateway_address);
 
-        let config_store = crate::ipc_config_store::IpcConfigStore::load_or_init(&self.global).await?;
+        let config_store =
+            crate::ipc_config_store::IpcConfigStore::load_or_init(&self.global).await?;
         let config = config_store.snapshot().await;
 
         let mut pending_subnets = Vec::new();
@@ -1619,20 +2008,33 @@ impl SubnetService {
                     let config_gateway_eth = evm_subnet.gateway_addr.to_string().to_lowercase();
                     let target_gateway_eth = gateway_address.to_lowercase();
 
-                    log::debug!("Comparing gateway addresses: config_eth={}, target_eth={}", config_gateway_eth, target_gateway_eth);
+                    log::debug!(
+                        "Comparing gateway addresses: config_eth={}, target_eth={}",
+                        config_gateway_eth,
+                        target_gateway_eth
+                    );
 
                     if config_gateway_eth == target_gateway_eth {
                         // Skip root networks - they don't need approval
                         if subnet_id.parent().is_none() {
-                            log::debug!("Skipping root network {} - doesn't need approval", subnet_id);
+                            log::debug!(
+                                "Skipping root network {} - doesn't need approval",
+                                subnet_id
+                            );
                             continue;
                         }
 
                         let parent_id = subnet_id.parent().unwrap();
-                        log::debug!("Checking subnet {} that uses gateway {}", subnet_id, gateway_address);
+                        log::debug!(
+                            "Checking subnet {} that uses gateway {}",
+                            subnet_id,
+                            gateway_address
+                        );
 
                         // NEW: Actually check if the subnet is approved by querying the gateway contract
-                        let is_approved = self.check_subnet_approval_status(subnet_id, gateway_address).await;
+                        let is_approved = self
+                            .check_subnet_approval_status(subnet_id, gateway_address)
+                            .await;
 
                         if !is_approved {
                             // Only include subnets that are NOT approved
@@ -1656,7 +2058,11 @@ impl SubnetService {
             }
         }
 
-        log::info!("Found {} truly pending subnets for gateway {}", pending_subnets.len(), gateway_address);
+        log::info!(
+            "Found {} truly pending subnets for gateway {}",
+            pending_subnets.len(),
+            gateway_address
+        );
         Ok(pending_subnets)
     }
 
@@ -1684,12 +2090,17 @@ impl SubnetService {
             Err(_) => None,
         };
 
-        let is_collateral = matches!(permission_mode, Some(ipc_api::subnet::PermissionMode::Collateral));
+        let is_collateral = matches!(
+            permission_mode,
+            Some(ipc_api::subnet::PermissionMode::Collateral)
+        );
 
         // Create join config if it's a collateral subnet
         let join_config = if is_collateral {
             Some(JoinConfig {
-                from: validator_address.unwrap_or("YOUR_VALIDATOR_ADDRESS").to_string(),
+                from: validator_address
+                    .unwrap_or("YOUR_VALIDATOR_ADDRESS")
+                    .to_string(),
                 collateral: 1.0,
                 initial_balance: Some(10.0),
             })
@@ -1742,7 +2153,10 @@ impl SubnetService {
         let yaml_content = serde_yaml::to_string(&node_config)
             .context("failed to serialize node config to YAML")?;
 
-        log::info!("Node configuration generated successfully for subnet: {}", subnet_id);
+        log::info!(
+            "Node configuration generated successfully for subnet: {}",
+            subnet_id
+        );
         Ok(yaml_content)
     }
 
@@ -1763,7 +2177,10 @@ impl SubnetService {
             Err(_) => None,
         };
 
-        let is_collateral = matches!(permission_mode, Some(ipc_api::subnet::PermissionMode::Collateral));
+        let is_collateral = matches!(
+            permission_mode,
+            Some(ipc_api::subnet::PermissionMode::Collateral)
+        );
         let safe_id = subnet_id.replace('/', "_").replace(":", "_");
 
         let mut commands = Vec::new();
@@ -1786,10 +2203,7 @@ impl SubnetService {
         }
 
         // Step 2: Initialize node
-        let init_command = format!(
-            "ipc-cli node init --config node_{}.yaml",
-            safe_id
-        );
+        let init_command = format!("ipc-cli node init --config node_{}.yaml", safe_id);
         commands.push(serde_json::json!({
             "step": is_collateral as u8 + 1,
             "title": "Initialize Node",
@@ -1835,7 +2249,10 @@ impl SubnetService {
             ]
         });
 
-        log::info!("Node startup commands generated successfully for subnet: {}", subnet_id);
+        log::info!(
+            "Node startup commands generated successfully for subnet: {}",
+            subnet_id
+        );
         Ok(result)
     }
 }

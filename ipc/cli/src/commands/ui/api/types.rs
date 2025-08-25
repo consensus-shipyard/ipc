@@ -264,11 +264,11 @@ pub struct TestTransactionResponse {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct WalletAddress {
     pub address: String,
-    pub wallet_type: String, // "evm" or "fvm"
-    pub pubkey: Option<String>, // For EVM addresses, used in validator selection
-    pub balance: Option<String>, // Balance in the current subnet context
+    pub wallet_type: String,          // "evm" or "fvm"
+    pub pubkey: Option<String>,       // For EVM addresses, used in validator selection
+    pub balance: Option<String>,      // Balance in the current subnet context
     pub custom_label: Option<String>, // User-defined name for the address
-    pub is_default: bool, // Whether this is the default address for this wallet type
+    pub is_default: bool,             // Whether this is the default address for this wallet type
 }
 
 /// Gateway information

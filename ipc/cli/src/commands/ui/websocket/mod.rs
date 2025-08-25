@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 //! WebSocket module for real-time communication
 
-pub mod types;
 pub mod handlers;
+pub mod types;
 
-pub use types::*;
 pub use handlers::*;
+pub use types::*;

@@ -807,7 +807,11 @@ impl SubnetManager for EthSubnetManager {
             1 => PermissionMode::Federated,
             2 => PermissionMode::Static,
             _ => {
-                tracing::warn!("Unknown permission mode value {} for subnet {}, defaulting to Collateral", permission_mode_u8, subnet);
+                tracing::warn!(
+                    "Unknown permission mode value {} for subnet {}, defaulting to Collateral",
+                    permission_mode_u8,
+                    subnet
+                );
                 PermissionMode::Collateral
             }
         };

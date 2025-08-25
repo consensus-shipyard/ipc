@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MIT
 //! Gateway API endpoints
 
-use super::types::{ApiResponse, InvalidRequest, ServerError};
-use super::super::AppState;
 use super::super::services::GatewayService;
+use super::super::AppState;
+use super::types::{ApiResponse, InvalidRequest, ServerError};
 use crate::GlobalArguments;
 use anyhow::Result;
 use serde_json;
@@ -45,9 +45,7 @@ pub fn gateway_routes(
 }
 
 /// Helper to pass state to handlers
-fn with_state(
-    state: AppState,
-) -> impl Filter<Extract = (AppState,), Error = Infallible> + Clone {
+fn with_state(state: AppState) -> impl Filter<Extract = (AppState,), Error = Infallible> + Clone {
     warp::any().map(move || state.clone())
 }
 
@@ -70,7 +68,7 @@ async fn handle_get_gateways(
         Ok(gateways) => {
             log::info!("Found {} gateways for selected network", gateways.len());
             Ok(warp::reply::json(&ApiResponse::success(gateways)))
-        },
+        }
         Err(e) => {
             log::error!("Get gateways failed: {}", e);
             Err(warp::reject::custom(ServerError(e.to_string())))
@@ -95,9 +93,12 @@ async fn handle_discover_gateways(
 
     match service.discover_gateways(Some(&headers)).await {
         Ok(gateways) => {
-            log::info!("Discovered {} gateways for selected network", gateways.len());
+            log::info!(
+                "Discovered {} gateways for selected network",
+                gateways.len()
+            );
             Ok(warp::reply::json(&ApiResponse::success(gateways)))
-        },
+        }
         Err(e) => {
             log::error!("Discover gateways failed: {}", e);
             Err(warp::reject::custom(ServerError(e.to_string())))
@@ -120,7 +121,9 @@ async fn handle_get_gateway_by_id(
 
     match service.get_gateway_info(&gateway_id).await {
         Ok(Some(gateway)) => Ok(warp::reply::json(&ApiResponse::success(gateway))),
-        Ok(None) => Err(warp::reject::custom(InvalidRequest("Gateway not found".to_string()))),
+        Ok(None) => Err(warp::reject::custom(InvalidRequest(
+            "Gateway not found".to_string(),
+        ))),
         Err(e) => {
             log::error!("Get gateway by ID failed: {}", e);
             Err(warp::reject::custom(ServerError(e.to_string())))

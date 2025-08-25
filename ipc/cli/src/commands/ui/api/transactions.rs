@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: MIT
 //! Transaction API endpoints
 
-use super::types::{ApiResponse, TestTransactionRequest, TestTransactionResponse, InvalidRequest, ServerError};
 use super::super::AppState;
-use crate::{GlobalArguments, get_ipc_provider};
+use super::types::{
+    ApiResponse, InvalidRequest, ServerError, TestTransactionRequest, TestTransactionResponse,
+};
+use crate::{get_ipc_provider, GlobalArguments};
 use anyhow::Result;
 use ipc_api::subnet_id::SubnetID;
 use serde_json;
@@ -26,9 +28,7 @@ pub fn transaction_routes(
 }
 
 /// Helper to pass state to handlers
-fn with_state(
-    state: AppState,
-) -> impl Filter<Extract = (AppState,), Error = Infallible> + Clone {
+fn with_state(state: AppState) -> impl Filter<Extract = (AppState,), Error = Infallible> + Clone {
     warp::any().map(move || state.clone())
 }
 
@@ -63,17 +63,23 @@ async fn send_test_transaction(
     let mut provider = get_ipc_provider(global)?;
 
     match test_tx_data.network.as_str() {
-        "subnet" => {
-            match test_tx_data.tx_type.as_str() {
-                "simple" => send_simple_subnet_transaction(&mut provider, &subnet).await,
-                "transfer" => send_transfer_subnet_transaction(&mut provider, &subnet, &test_tx_data).await,
-                _ => Err(anyhow::anyhow!("Unsupported transaction type for subnet: {}", test_tx_data.tx_type)),
+        "subnet" => match test_tx_data.tx_type.as_str() {
+            "simple" => send_simple_subnet_transaction(&mut provider, &subnet).await,
+            "transfer" => {
+                send_transfer_subnet_transaction(&mut provider, &subnet, &test_tx_data).await
             }
-        }
+            _ => Err(anyhow::anyhow!(
+                "Unsupported transaction type for subnet: {}",
+                test_tx_data.tx_type
+            )),
+        },
         "l1" => {
             send_l1_transaction(&mut provider, &subnet, &test_tx_data.tx_type, &test_tx_data).await
         }
-        _ => Err(anyhow::anyhow!("Unsupported network: {}", test_tx_data.network)),
+        _ => Err(anyhow::anyhow!(
+            "Unsupported network: {}",
+            test_tx_data.network
+        )),
     }
 }
 
@@ -109,19 +115,23 @@ async fn send_transfer_subnet_transaction(
     subnet: &SubnetID,
     test_tx_data: &TestTransactionRequest,
 ) -> anyhow::Result<TestTransactionResponse> {
-    let from_addr_str = test_tx_data.from.as_ref()
+    let from_addr_str = test_tx_data
+        .from
+        .as_ref()
         .ok_or_else(|| anyhow::anyhow!("From address required for transfer"))?;
-    let to_addr_str = test_tx_data.to.as_ref()
+    let to_addr_str = test_tx_data
+        .to
+        .as_ref()
         .ok_or_else(|| anyhow::anyhow!("To address required for transfer"))?;
-    let amount_str = test_tx_data.amount.as_ref()
+    let amount_str = test_tx_data
+        .amount
+        .as_ref()
         .ok_or_else(|| anyhow::anyhow!("Amount required for transfer"))?;
 
     // Parse addresses and amount
     let from_addr = fvm_shared::address::Address::from_str(from_addr_str)?;
     let to_addr = fvm_shared::address::Address::from_str(to_addr_str)?;
-    let amount = fvm_shared::econ::TokenAmount::from_whole(
-        amount_str.parse::<u64>().unwrap_or(1)
-    );
+    let amount = fvm_shared::econ::TokenAmount::from_whole(amount_str.parse::<u64>().unwrap_or(1));
 
     // This is a simplified example - in reality you'd need to properly construct and send the transaction
     let tx_hash = "0xabcdef1234567890".to_string(); // Mock transaction hash
@@ -176,7 +186,10 @@ async fn send_l1_transaction(
                 network: "l1".to_string(),
             })
         }
-        _ => Err(anyhow::anyhow!("Unsupported L1 transaction type: {}", tx_type)),
+        _ => Err(anyhow::anyhow!(
+            "Unsupported L1 transaction type: {}",
+            tx_type
+        )),
     }
 }
 

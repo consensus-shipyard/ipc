@@ -2,25 +2,27 @@
 // SPDX-License-Identifier: MIT
 //! Deployment API endpoints
 
-use super::super::services::deployment_service::{DeploymentService, SubnetDeploymentResult, ContractDeploymentProgress};
-use super::types::{ApiResponse, DeploymentRequest, DeploymentResponse};
+use super::super::services::deployment_service::{
+    ContractDeploymentProgress, DeploymentService, SubnetDeploymentResult,
+};
 use super::super::{AppState, DeploymentState};
-use anyhow::{Result, Context};
+use super::types::{ApiResponse, DeploymentRequest, DeploymentResponse};
+use crate::commands::deploy::{CliSubnetCreationPrivilege, DeployConfig};
+use anyhow::{Context, Result};
 use chrono;
+use ethers::types::Address;
 use futures_util::SinkExt;
+use fvm_shared::address::Address as FilecoinAddress;
+use ipc_types;
 use serde_json;
 use std::convert::Infallible;
+use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use warp::{self, Filter, Reply};
-use warp::ws::Message;
-use uuid::Uuid;
-use std::str::FromStr;
-use ethers::types::Address;
-use crate::commands::deploy::{DeployConfig, CliSubnetCreationPrivilege};
 use url;
-use ipc_types;
-use fvm_shared::address::Address as FilecoinAddress;
+use uuid::Uuid;
+use warp::ws::Message;
+use warp::{self, Filter, Reply};
 
 /// Create deployment API routes
 pub fn deployment_routes(
@@ -72,16 +74,19 @@ async fn handle_deploy_request(
     // Store initial deployment state
     {
         let mut deployments = state.deployments.lock().unwrap();
-        deployments.insert(deployment_id.clone(), super::super::DeploymentState {
-            id: deployment_id.clone(),
-            template: request.template.clone(),
-            status: "in_progress".to_string(),
-            created_at: chrono::Utc::now(),
-            config: request.config.clone(),
-            progress: 0,
-            step: "validate".to_string(),
-            updated_at: chrono::Utc::now(),
-        });
+        deployments.insert(
+            deployment_id.clone(),
+            super::super::DeploymentState {
+                id: deployment_id.clone(),
+                template: request.template.clone(),
+                status: "in_progress".to_string(),
+                created_at: chrono::Utc::now(),
+                config: request.config.clone(),
+                progress: 0,
+                step: "validate".to_string(),
+                updated_at: chrono::Utc::now(),
+            },
+        );
     }
 
     // Start async deployment task
@@ -92,16 +97,39 @@ async fn handle_deploy_request(
 
     tokio::spawn(async move {
         // Run the actual deployment in background and send progress updates
-        match run_async_deployment(&service, deployment_config, &deploy_headers, &deploy_state, &deploy_id).await {
+        match run_async_deployment(
+            &service,
+            deployment_config,
+            &deploy_headers,
+            &deploy_state,
+            &deploy_id,
+        )
+        .await
+        {
             Ok(result) => {
                 // Broadcast final success with subnet_id and contract addresses
-                broadcast_progress_with_deployment_result(&deploy_state, &deploy_id, "verification", 100, "completed",
-                    Some(format!("Subnet created successfully: {}", result.subnet_id)), &result).await;
+                broadcast_progress_with_deployment_result(
+                    &deploy_state,
+                    &deploy_id,
+                    "verification",
+                    100,
+                    "completed",
+                    Some(format!("Subnet created successfully: {}", result.subnet_id)),
+                    &result,
+                )
+                .await;
             }
             Err(e) => {
                 // Broadcast failure
-                broadcast_progress(&deploy_state, &deploy_id, "error", 0, "failed",
-                    Some(format!("Deployment failed: {}", e))).await;
+                broadcast_progress(
+                    &deploy_state,
+                    &deploy_id,
+                    "error",
+                    0,
+                    "failed",
+                    Some(format!("Deployment failed: {}", e)),
+                )
+                .await;
             }
         }
     });
@@ -115,15 +143,16 @@ async fn handle_deploy_request(
 
     log::info!("Deployment response created: {:?}", response);
     let api_response = ApiResponse::success(response);
-    log::info!("About to return successful API response with deployment_id: {}", deployment_id);
+    log::info!(
+        "About to return successful API response with deployment_id: {}",
+        deployment_id
+    );
 
     Ok(warp::reply::json(&api_response))
 }
 
 /// Handle get templates request
-async fn handle_get_templates(
-    state: AppState,
-) -> Result<impl warp::Reply, warp::Rejection> {
+async fn handle_get_templates(state: AppState) -> Result<impl warp::Reply, warp::Rejection> {
     log::info!("Received get templates request");
 
     let global = crate::GlobalArguments {
@@ -141,7 +170,10 @@ async fn handle_get_templates(
         }
         Err(e) => {
             log::error!("Failed to get templates: {}", e);
-            let response = ApiResponse::<Vec<serde_json::Value>>::error(format!("Failed to get templates: {}", e));
+            let response = ApiResponse::<Vec<serde_json::Value>>::error(format!(
+                "Failed to get templates: {}",
+                e
+            ));
             Ok(warp::reply::json(&response))
         }
     }
@@ -156,26 +188,50 @@ async fn run_async_deployment(
     deployment_id: &str,
 ) -> Result<SubnetDeploymentResult, anyhow::Error> {
     // Send progress updates for each step
-    broadcast_progress(state, deployment_id, "validate", 10, "in_progress",
-        Some("Validating configuration...".to_string())).await;
+    broadcast_progress(
+        state,
+        deployment_id,
+        "validate",
+        10,
+        "in_progress",
+        Some("Validating configuration...".to_string()),
+    )
+    .await;
 
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-    broadcast_progress(state, deployment_id, "prepare", 20, "in_progress",
-        Some("Preparing deployment files...".to_string())).await;
+    broadcast_progress(
+        state,
+        deployment_id,
+        "prepare",
+        20,
+        "in_progress",
+        Some("Preparing deployment files...".to_string()),
+    )
+    .await;
 
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
     // Check gateway mode to determine if we need to deploy contracts
     log::info!("=== GATEWAY MODE DEBUGGING ===");
-    log::info!("Full config received: {}", serde_json::to_string_pretty(&config).unwrap_or_else(|_| "Failed to serialize config".to_string()));
+    log::info!(
+        "Full config received: {}",
+        serde_json::to_string_pretty(&config)
+            .unwrap_or_else(|_| "Failed to serialize config".to_string())
+    );
 
-    let gateway_mode = config.get("gatewayMode").and_then(|v| v.as_str()).unwrap_or("deploy");
+    let gateway_mode = config
+        .get("gatewayMode")
+        .and_then(|v| v.as_str())
+        .unwrap_or("deploy");
     log::info!("Extracted gateway mode: '{}'", gateway_mode);
     log::info!("Gateway mode type: {:?}", config.get("gatewayMode"));
 
     if gateway_mode == "deployed" || gateway_mode == "l1-gateway" {
-        log::info!("SHOULD SKIP CONTRACT DEPLOYMENT - Using {} mode", gateway_mode);
+        log::info!(
+            "SHOULD SKIP CONTRACT DEPLOYMENT - Using {} mode",
+            gateway_mode
+        );
     } else {
         log::info!("WILL DEPLOY CONTRACTS - Gateway mode is '{}'", gateway_mode);
     }
@@ -195,111 +251,230 @@ async fn run_async_deployment(
     let deployed_contracts = match gateway_mode {
         "deployed" => {
             // Use existing deployed gateway - get gateway info and skip contract deployment
-            broadcast_progress(state, deployment_id, "contracts", 30, "in_progress",
-                Some("Using existing deployed gateway...".to_string())).await;
+            broadcast_progress(
+                state,
+                deployment_id,
+                "contracts",
+                30,
+                "in_progress",
+                Some("Using existing deployed gateway...".to_string()),
+            )
+            .await;
 
-            let selected_gateway_id = config.get("selectedDeployedGateway")
+            let selected_gateway_id = config
+                .get("selectedDeployedGateway")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| anyhow::anyhow!("Selected deployed gateway ID is required when using deployed gateway mode"))?;
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Selected deployed gateway ID is required when using deployed gateway mode"
+                    )
+                })?;
 
             log::info!("Using deployed gateway: {}", selected_gateway_id);
 
             // Get gateway information from the gateway service
-            let gateway_service = super::super::services::GatewayService::new(crate::GlobalArguments {
-                config_path: Some(state.config_path.clone()),
-                _network: fvm_shared::address::Network::Testnet,
-                __network: None,
-            });
+            let gateway_service =
+                super::super::services::GatewayService::new(crate::GlobalArguments {
+                    config_path: Some(state.config_path.clone()),
+                    _network: fvm_shared::address::Network::Testnet,
+                    __network: None,
+                });
 
-            let discovered_gateways = gateway_service.discover_gateways(Some(headers)).await
+            let discovered_gateways = gateway_service
+                .discover_gateways(Some(headers))
+                .await
                 .map_err(|e| anyhow::anyhow!("Failed to discover gateways: {}", e))?;
 
-            let selected_gateway = discovered_gateways.iter()
+            let selected_gateway = discovered_gateways
+                .iter()
                 .find(|g| g.id == selected_gateway_id)
-                .ok_or_else(|| anyhow::anyhow!("Selected gateway not found: {}", selected_gateway_id))?;
+                .ok_or_else(|| {
+                    anyhow::anyhow!("Selected gateway not found: {}", selected_gateway_id)
+                })?;
 
-            log::info!("Found selected gateway: {} at address {}", selected_gateway.id, selected_gateway.address);
+            log::info!(
+                "Found selected gateway: {} at address {}",
+                selected_gateway.id,
+                selected_gateway.address
+            );
 
             // Convert Filecoin addresses to Ethereum format
             // Parse the Filecoin addresses first
-            let gateway_fil_addr = FilecoinAddress::from_str(&selected_gateway.address)
-                .map_err(|e| anyhow::anyhow!("Invalid Filecoin gateway address '{}': {}", selected_gateway.address, e))?;
+            let gateway_fil_addr =
+                FilecoinAddress::from_str(&selected_gateway.address).map_err(|e| {
+                    anyhow::anyhow!(
+                        "Invalid Filecoin gateway address '{}': {}",
+                        selected_gateway.address,
+                        e
+                    )
+                })?;
             let registry_fil_addr = FilecoinAddress::from_str(&selected_gateway.registry_address)
-                .map_err(|e| anyhow::anyhow!("Invalid Filecoin registry address '{}': {}", selected_gateway.registry_address, e))?;
+                .map_err(|e| {
+                anyhow::anyhow!(
+                    "Invalid Filecoin registry address '{}': {}",
+                    selected_gateway.registry_address,
+                    e
+                )
+            })?;
 
             // Convert to Ethereum format
             let gateway_addr = ipc_api::evm::payload_to_evm_address(gateway_fil_addr.payload())
-                .map_err(|e| anyhow::anyhow!("Failed to convert gateway address to Ethereum format: {}", e))?;
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "Failed to convert gateway address to Ethereum format: {}",
+                        e
+                    )
+                })?;
             let registry_addr = ipc_api::evm::payload_to_evm_address(registry_fil_addr.payload())
-                .map_err(|e| anyhow::anyhow!("Failed to convert registry address to Ethereum format: {}", e))?;
+                .map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to convert registry address to Ethereum format: {}",
+                    e
+                )
+            })?;
 
-            log::info!("Converted gateway address from {} to 0x{:x}", selected_gateway.address, gateway_addr);
-            log::info!("Converted registry address from {} to 0x{:x}", selected_gateway.registry_address, registry_addr);
+            log::info!(
+                "Converted gateway address from {} to 0x{:x}",
+                selected_gateway.address,
+                gateway_addr
+            );
+            log::info!(
+                "Converted registry address from {} to 0x{:x}",
+                selected_gateway.registry_address,
+                registry_addr
+            );
 
             fendermint_eth_deployer::DeployedContracts {
                 gateway: gateway_addr,
                 registry: registry_addr,
             }
-        },
+        }
         "l1-gateway" => {
             // Use L1 gateway selected from the top menu
-            broadcast_progress(state, deployment_id, "contracts", 30, "in_progress",
-                Some("Using selected L1 gateway...".to_string())).await;
+            broadcast_progress(
+                state,
+                deployment_id,
+                "contracts",
+                30,
+                "in_progress",
+                Some("Using selected L1 gateway...".to_string()),
+            )
+            .await;
 
-            let selected_gateway_id = config.get("selectedL1Gateway")
+            let selected_gateway_id = config
+                .get("selectedL1Gateway")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| anyhow::anyhow!("Selected L1 gateway ID is required when using l1-gateway mode"))?;
+                .ok_or_else(|| {
+                    anyhow::anyhow!("Selected L1 gateway ID is required when using l1-gateway mode")
+                })?;
 
             log::info!("Using L1 gateway: {}", selected_gateway_id);
 
             // Get gateway information from the gateway service
-            let gateway_service = super::super::services::GatewayService::new(crate::GlobalArguments {
-                config_path: Some(state.config_path.clone()),
-                _network: fvm_shared::address::Network::Testnet,
-                __network: None,
-            });
+            let gateway_service =
+                super::super::services::GatewayService::new(crate::GlobalArguments {
+                    config_path: Some(state.config_path.clone()),
+                    _network: fvm_shared::address::Network::Testnet,
+                    __network: None,
+                });
 
-            let discovered_gateways = gateway_service.discover_gateways(Some(headers)).await
+            let discovered_gateways = gateway_service
+                .discover_gateways(Some(headers))
+                .await
                 .map_err(|e| anyhow::anyhow!("Failed to discover gateways: {}", e))?;
 
-            let selected_gateway = discovered_gateways.iter()
+            let selected_gateway = discovered_gateways
+                .iter()
                 .find(|g| g.id == selected_gateway_id)
-                .ok_or_else(|| anyhow::anyhow!("Selected L1 gateway not found: {}", selected_gateway_id))?;
+                .ok_or_else(|| {
+                    anyhow::anyhow!("Selected L1 gateway not found: {}", selected_gateway_id)
+                })?;
 
-            log::info!("Found selected L1 gateway: {} at address {}", selected_gateway.id, selected_gateway.address);
+            log::info!(
+                "Found selected L1 gateway: {} at address {}",
+                selected_gateway.id,
+                selected_gateway.address
+            );
 
             // Convert Filecoin addresses to Ethereum format
-            let gateway_fil_addr = FilecoinAddress::from_str(&selected_gateway.address)
-                .map_err(|e| anyhow::anyhow!("Invalid Filecoin gateway address '{}': {}", selected_gateway.address, e))?;
+            let gateway_fil_addr =
+                FilecoinAddress::from_str(&selected_gateway.address).map_err(|e| {
+                    anyhow::anyhow!(
+                        "Invalid Filecoin gateway address '{}': {}",
+                        selected_gateway.address,
+                        e
+                    )
+                })?;
             let registry_fil_addr = FilecoinAddress::from_str(&selected_gateway.registry_address)
-                .map_err(|e| anyhow::anyhow!("Invalid Filecoin registry address '{}': {}", selected_gateway.registry_address, e))?;
+                .map_err(|e| {
+                anyhow::anyhow!(
+                    "Invalid Filecoin registry address '{}': {}",
+                    selected_gateway.registry_address,
+                    e
+                )
+            })?;
 
             // Convert to Ethereum format
             let gateway_addr = ipc_api::evm::payload_to_evm_address(gateway_fil_addr.payload())
-                .map_err(|e| anyhow::anyhow!("Failed to convert gateway address to Ethereum format: {}", e))?;
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "Failed to convert gateway address to Ethereum format: {}",
+                        e
+                    )
+                })?;
             let registry_addr = ipc_api::evm::payload_to_evm_address(registry_fil_addr.payload())
-                .map_err(|e| anyhow::anyhow!("Failed to convert registry address to Ethereum format: {}", e))?;
+                .map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to convert registry address to Ethereum format: {}",
+                    e
+                )
+            })?;
 
-            log::info!("Converted gateway address from {} to 0x{:x}", selected_gateway.address, gateway_addr);
-            log::info!("Converted registry address from {} to 0x{:x}", selected_gateway.registry_address, registry_addr);
+            log::info!(
+                "Converted gateway address from {} to 0x{:x}",
+                selected_gateway.address,
+                gateway_addr
+            );
+            log::info!(
+                "Converted registry address from {} to 0x{:x}",
+                selected_gateway.registry_address,
+                registry_addr
+            );
 
             fendermint_eth_deployer::DeployedContracts {
                 gateway: gateway_addr,
                 registry: registry_addr,
             }
-        },
+        }
         "custom" => {
             // Use custom gateway addresses provided by user
-            broadcast_progress(state, deployment_id, "contracts", 30, "in_progress",
-                Some("Using custom gateway addresses...".to_string())).await;
+            broadcast_progress(
+                state,
+                deployment_id,
+                "contracts",
+                30,
+                "in_progress",
+                Some("Using custom gateway addresses...".to_string()),
+            )
+            .await;
 
-            let gateway_address = config.get("customGatewayAddress")
+            let gateway_address = config
+                .get("customGatewayAddress")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| anyhow::anyhow!("Custom gateway address is required when using custom gateway mode"))?;
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Custom gateway address is required when using custom gateway mode"
+                    )
+                })?;
 
-            let registry_address = config.get("customRegistryAddress")
+            let registry_address = config
+                .get("customRegistryAddress")
                 .and_then(|v| v.as_str())
-                .ok_or_else(|| anyhow::anyhow!("Custom registry address is required when using custom gateway mode"))?;
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "Custom registry address is required when using custom gateway mode"
+                    )
+                })?;
 
             let gateway_addr = ethers::types::Address::from_str(gateway_address)
                 .map_err(|e| anyhow::anyhow!("Invalid custom gateway address: {}", e))?;
@@ -310,25 +485,36 @@ async fn run_async_deployment(
                 gateway: gateway_addr,
                 registry: registry_addr,
             }
-        },
+        }
         _ => {
             // Deploy new gateway contracts (default behavior)
-            broadcast_progress(state, deployment_id, "contracts", 30, "in_progress",
-                Some("Deploying smart contracts...".to_string())).await;
+            broadcast_progress(
+                state,
+                deployment_id,
+                "contracts",
+                30,
+                "in_progress",
+                Some("Deploying smart contracts...".to_string()),
+            )
+            .await;
 
             // Use real contract deployment progress tracking
             let state_clone = state.clone();
             let deployment_id_clone = deployment_id.to_string();
 
             // Create a progress callback that converts real deployment progress to UI updates
-            let progress_callback = move |contract_name: &str, contract_type: &str, current_step: usize, total_steps: usize| {
+            let progress_callback = move |contract_name: &str,
+                                          contract_type: &str,
+                                          current_step: usize,
+                                          total_steps: usize| {
                 let state = state_clone.clone();
                 let deployment_id = deployment_id_clone.clone();
                 let contract_name = contract_name.to_string();
                 let contract_type = contract_type.to_string();
 
                 tokio::spawn(async move {
-                    let progress_percent = ((current_step + 1) as f32 / total_steps as f32 * 40.0) + 30.0; // Scale to 30-70%
+                    let progress_percent =
+                        ((current_step + 1) as f32 / total_steps as f32 * 40.0) + 30.0; // Scale to 30-70%
 
                     let contract_progress = ContractDeploymentProgress {
                         total_contracts: total_steps as u32,
@@ -342,16 +528,33 @@ async fn run_async_deployment(
                         &deployment_id,
                         "contracts",
                         progress_percent as u8,
-                        if current_step + 1 == total_steps { "in_progress" } else { "in_progress" }, // Never mark as completed here
-                        Some(format!("Deploying {} ({}/{})", contract_name, current_step + 1, total_steps)),
+                        if current_step + 1 == total_steps {
+                            "in_progress"
+                        } else {
+                            "in_progress"
+                        }, // Never mark as completed here
+                        Some(format!(
+                            "Deploying {} ({}/{})",
+                            contract_name,
+                            current_step + 1,
+                            total_steps
+                        )),
                         Some(contract_progress),
-                    ).await;
+                    )
+                    .await;
                 });
             };
 
             log::info!("=== DEBUGGING NETWORK CONFIGURATION ===");
-            log::info!("Available headers: {:?}", headers.keys().collect::<Vec<_>>());
-            log::info!("Config object: {}", serde_json::to_string_pretty(&config).unwrap_or_else(|_| "Failed to serialize config".to_string()));
+            log::info!(
+                "Available headers: {:?}",
+                headers.keys().collect::<Vec<_>>()
+            );
+            log::info!(
+                "Config object: {}",
+                serde_json::to_string_pretty(&config)
+                    .unwrap_or_else(|_| "Failed to serialize config".to_string())
+            );
 
             log::info!("Found RPC URL from header: {}", rpc_url);
             log::info!("Found Chain ID from header: {}", chain_id);
@@ -360,18 +563,25 @@ async fn run_async_deployment(
             let from_address_str = config["deployment"]["fromAddress"]
                 .as_str()
                 .or_else(|| config["from"].as_str())
-                .ok_or_else(|| anyhow::anyhow!("Missing required field: deployment.fromAddress or from"))?;
+                .ok_or_else(|| {
+                    anyhow::anyhow!("Missing required field: deployment.fromAddress or from")
+                })?;
 
-            let from_address = ethers::types::Address::from_str(from_address_str)
-                .map_err(|e| anyhow::anyhow!("Invalid fromAddress '{}': {}", from_address_str, e))?;
+            let from_address = ethers::types::Address::from_str(from_address_str).map_err(|e| {
+                anyhow::anyhow!("Invalid fromAddress '{}': {}", from_address_str, e)
+            })?;
 
             // Validate RPC URL format
             if rpc_url.is_empty() {
                 return Err(anyhow::anyhow!("RPC URL cannot be empty"));
             }
 
-            log::info!("Deploying contracts to RPC URL: {}, from address: {}, chain ID: {}",
-                       rpc_url, from_address, chain_id);
+            log::info!(
+                "Deploying contracts to RPC URL: {}, from address: {}, chain ID: {}",
+                rpc_url,
+                from_address,
+                chain_id
+            );
 
             let deploy_config = DeployConfig {
                 url: rpc_url.to_string(),
@@ -382,14 +592,19 @@ async fn run_async_deployment(
             };
 
             // Deploy contracts with real progress tracking directly (without spawn)
-            service.deploy_contracts_with_real_progress(&deploy_config, progress_callback).await?
+            service
+                .deploy_contracts_with_real_progress(&deploy_config, progress_callback)
+                .await?
         }
     };
 
     // Register the deployed contracts in the IPC configuration store (only for newly deployed contracts)
     if gateway_mode != "deployed" && gateway_mode != "custom" && gateway_mode != "l1-gateway" {
-        log::info!("Registering newly deployed contracts in IPC config: gateway={:?}, registry={:?}",
-                   deployed_contracts.gateway, deployed_contracts.registry);
+        log::info!(
+            "Registering newly deployed contracts in IPC config: gateway={:?}, registry={:?}",
+            deployed_contracts.gateway,
+            deployed_contracts.registry
+        );
 
         let ipc_config_store = service.get_config_store().await?;
         let subnet_id = ipc_api::subnet_id::SubnetID::new_root(chain_id);
@@ -406,29 +621,48 @@ async fn run_async_deployment(
 
         log::info!("Successfully registered subnet {} in IPC config", subnet_id);
     } else {
-        log::info!("Skipping contract registration - using existing gateway (mode: {})", gateway_mode);
+        log::info!(
+            "Skipping contract registration - using existing gateway (mode: {})",
+            gateway_mode
+        );
     }
 
     // Mark contracts step as completed before moving to genesis
-    broadcast_progress(state, deployment_id, "contracts", 70, "completed",
-        Some("Smart contracts deployment completed".to_string())).await;
+    broadcast_progress(
+        state,
+        deployment_id,
+        "contracts",
+        70,
+        "completed",
+        Some("Smart contracts deployment completed".to_string()),
+    )
+    .await;
 
     // Continue with the rest of the deployment
-    broadcast_progress(state, deployment_id, "genesis", 75, "in_progress",
-        Some("Creating genesis block...".to_string())).await;
+    broadcast_progress(
+        state,
+        deployment_id,
+        "genesis",
+        75,
+        "in_progress",
+        Some("Creating genesis block...".to_string()),
+    )
+    .await;
 
-        // Now continue with the subnet creation part, passing the selected gateway addresses
+    // Now continue with the subnet creation part, passing the selected gateway addresses
     // Progress updates for validators, activate, and verification steps
     // should be broadcast from within deploy_subnet_with_gateway as they happen,
     // not here after the fact.
-    let subnet_result = service.deploy_subnet_with_gateway(
-        config.clone(),
-        headers,
-        Some(deployed_contracts.gateway),
-        Some(deployed_contracts.registry),
-        state,
-        deployment_id
-    ).await?;
+    let subnet_result = service
+        .deploy_subnet_with_gateway(
+            config.clone(),
+            headers,
+            Some(deployed_contracts.gateway),
+            Some(deployed_contracts.registry),
+            state,
+            deployment_id,
+        )
+        .await?;
 
     Ok(subnet_result)
 }
@@ -470,8 +704,11 @@ pub async fn broadcast_progress(
     // Broadcast to all connected WebSocket clients
     let clients = {
         let clients_guard = state.websocket_clients.lock().unwrap();
-        log::info!("Broadcasting progress to {} WebSocket clients", clients_guard.len());
-        clients_guard.clone()  // Clone the Arc<Mutex<...>> handles
+        log::info!(
+            "Broadcasting progress to {} WebSocket clients",
+            clients_guard.len()
+        );
+        clients_guard.clone() // Clone the Arc<Mutex<...>> handles
     };
 
     for client in clients.iter() {
@@ -524,7 +761,8 @@ async fn broadcast_progress_with_subnet_id(
         if status == "completed" {
             if let Ok(parsed_subnet_id) = ipc_api::subnet_id::SubnetID::from_str(subnet_id_str) {
                 if let Some(parent_subnet) = parsed_subnet_id.parent() {
-                    progress_data["parent_id"] = serde_json::Value::String(parent_subnet.to_string());
+                    progress_data["parent_id"] =
+                        serde_json::Value::String(parent_subnet.to_string());
                 }
             }
         }
@@ -538,8 +776,11 @@ async fn broadcast_progress_with_subnet_id(
     // Broadcast to all connected WebSocket clients
     let clients = {
         let clients_guard = state.websocket_clients.lock().unwrap();
-        log::info!("Broadcasting progress with subnet_id to {} WebSocket clients", clients_guard.len());
-        clients_guard.clone()  // Clone the Arc<Mutex<...>> handles
+        log::info!(
+            "Broadcasting progress with subnet_id to {} WebSocket clients",
+            clients_guard.len()
+        );
+        clients_guard.clone() // Clone the Arc<Mutex<...>> handles
     };
 
     for client in clients.iter() {
@@ -551,7 +792,12 @@ async fn broadcast_progress_with_subnet_id(
         }
     }
 
-    log::info!("Progress with subnet_id: {} - {} ({}%)", deployment_id, step, progress);
+    log::info!(
+        "Progress with subnet_id: {} - {} ({}%)",
+        deployment_id,
+        step,
+        progress
+    );
 }
 
 /// Broadcast deployment progress with full deployment result to WebSocket clients
@@ -596,8 +842,11 @@ async fn broadcast_progress_with_deployment_result(
     // Broadcast to all connected WebSocket clients
     let clients = {
         let clients_guard = state.websocket_clients.lock().unwrap();
-        log::info!("Broadcasting progress with deployment result to {} WebSocket clients", clients_guard.len());
-        clients_guard.clone()  // Clone the Arc<Mutex<...>> handles
+        log::info!(
+            "Broadcasting progress with deployment result to {} WebSocket clients",
+            clients_guard.len()
+        );
+        clients_guard.clone() // Clone the Arc<Mutex<...>> handles
     };
 
     for client in clients.iter() {
@@ -609,7 +858,12 @@ async fn broadcast_progress_with_deployment_result(
         }
     }
 
-    log::info!("Progress with deployment result: {} - {} ({}%)", deployment_id, step, progress);
+    log::info!(
+        "Progress with deployment result: {} - {} ({}%)",
+        deployment_id,
+        step,
+        progress
+    );
 }
 
 /// Broadcast deployment progress with contract details to WebSocket clients
@@ -665,7 +919,10 @@ async fn broadcast_progress_with_contracts(
     // Broadcast to all connected WebSocket clients
     let clients = {
         let clients_guard = state.websocket_clients.lock().unwrap();
-        log::info!("Broadcasting progress with contracts to {} WebSocket clients", clients_guard.len());
+        log::info!(
+            "Broadcasting progress with contracts to {} WebSocket clients",
+            clients_guard.len()
+        );
         clients_guard.clone()
     };
 

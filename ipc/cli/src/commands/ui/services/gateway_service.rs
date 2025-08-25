@@ -6,12 +6,12 @@
 
 use super::super::api::types::{ApiResponse, InvalidRequest, ServerError};
 use crate::ipc_config_store::IpcConfigStore;
-use crate::{GlobalArguments, get_ipc_provider};
-use anyhow::{Result, Context};
-use serde::{Serialize, Deserialize};
+use crate::{get_ipc_provider, GlobalArguments};
+use anyhow::{Context, Result};
+use ipc_api::subnet_id::SubnetID;
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use warp::http::HeaderMap;
-use ipc_api::subnet_id::SubnetID;
 
 /// Gateway information
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,10 +45,10 @@ impl GatewayService {
                 if let Ok(chain_id) = chain_id_str.parse::<u64>() {
                     // Map common chain IDs to their subnet IDs
                     return match chain_id {
-                        31337 => "/r31337".to_string(),      // Local Anvil
-                        314159 => "/r314159".to_string(),    // Calibration Testnet
-                        1 => "/r1".to_string(),              // Ethereum Mainnet
-                        _ => format!("/r{}", chain_id),      // Generic mapping
+                        31337 => "/r31337".to_string(),   // Local Anvil
+                        314159 => "/r314159".to_string(), // Calibration Testnet
+                        1 => "/r1".to_string(),           // Ethereum Mainnet
+                        _ => format!("/r{}", chain_id),   // Generic mapping
                     };
                 }
             }
@@ -75,7 +75,8 @@ impl GatewayService {
         let config_store = IpcConfigStore::load_or_init(&self.global).await?;
         let config = config_store.snapshot().await;
 
-        let mut gateways_map: std::collections::HashMap<String, GatewayInfo> = std::collections::HashMap::new();
+        let mut gateways_map: std::collections::HashMap<String, GatewayInfo> =
+            std::collections::HashMap::new();
         let target_network = headers.map(|h| Self::get_parent_network_from_headers(h));
 
         log::info!("Discovering gateways, target network: {:?}", target_network);
@@ -122,32 +123,51 @@ impl GatewayService {
                     if let Some(existing_gateway) = gateways_map.get_mut(&gateway_key) {
                         // Gateway already exists, increment subnet count
                         existing_gateway.subnet_count += 1;
-                        log::info!("Found additional subnet {} for existing gateway {}", subnet_id_str, gateway_addr_str);
+                        log::info!(
+                            "Found additional subnet {} for existing gateway {}",
+                            subnet_id_str,
+                            gateway_addr_str
+                        );
                     } else {
                         // New gateway, create entry
-                        let parent_network = if let Ok(subnet_id) = SubnetID::from_str(&subnet_id_str.to_string()) {
-                            if subnet_id.is_root() {
-                                subnet_id_str.to_string()
+                        let parent_network =
+                            if let Ok(subnet_id) = SubnetID::from_str(&subnet_id_str.to_string()) {
+                                if subnet_id.is_root() {
+                                    subnet_id_str.to_string()
+                                } else {
+                                    subnet_id
+                                        .parent()
+                                        .map(|p| p.to_string())
+                                        .unwrap_or_else(|| subnet_id_str.to_string())
+                                }
                             } else {
-                                subnet_id.parent().map(|p| p.to_string()).unwrap_or_else(|| subnet_id_str.to_string())
-                            }
-                        } else {
-                            subnet_id_str.to_string()
-                        };
+                                subnet_id_str.to_string()
+                            };
 
                         let gateway_info = GatewayInfo {
-                            id: format!("gateway-{}", &gateway_addr_str[gateway_addr_str.len().saturating_sub(12)..]),
+                            id: format!(
+                                "gateway-{}",
+                                &gateway_addr_str[gateway_addr_str.len().saturating_sub(12)..]
+                            ),
                             address: gateway_addr_str.clone(),
                             registry_address: registry_addr_str,
                             deployer_address: "unknown".to_string(), // TODO: Track deployer
                             parent_network,
-                            name: Some(format!("Gateway {}", &gateway_addr_str[gateway_addr_str.len().saturating_sub(8)..])),
+                            name: Some(format!(
+                                "Gateway {}",
+                                &gateway_addr_str[gateway_addr_str.len().saturating_sub(8)..]
+                            )),
                             subnet_count: 1,
                             is_active: true, // Assume active if in config
                             deployed_at: chrono::Utc::now(), // TODO: Track actual deployment time
                         };
 
-                        log::info!("Found new gateway: {} with ID: {} serving subnet: {}", gateway_addr_str, gateway_info.id, subnet_id_str);
+                        log::info!(
+                            "Found new gateway: {} with ID: {} serving subnet: {}",
+                            gateway_addr_str,
+                            gateway_info.id,
+                            subnet_id_str
+                        );
                         gateways_map.insert(gateway_key, gateway_info);
                     }
                 }
@@ -160,7 +180,11 @@ impl GatewayService {
 
         // Convert HashMap to Vec
         let gateways: Vec<GatewayInfo> = gateways_map.into_values().collect();
-        log::info!("Discovered {} unique gateways for target network {:?}", gateways.len(), target_network);
+        log::info!(
+            "Discovered {} unique gateways for target network {:?}",
+            gateways.len(),
+            target_network
+        );
 
         Ok(gateways)
     }
@@ -206,11 +230,16 @@ impl GatewayService {
     }
 
     /// Update gateway information
-    pub async fn update_gateway(&self, gateway_id: &str, updates: &serde_json::Value) -> Result<GatewayInfo> {
+    pub async fn update_gateway(
+        &self,
+        gateway_id: &str,
+        updates: &serde_json::Value,
+    ) -> Result<GatewayInfo> {
         // For now, this is a placeholder implementation
         // In a real implementation, this would update the gateway configuration
 
-        let name = updates.get("name")
+        let name = updates
+            .get("name")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 

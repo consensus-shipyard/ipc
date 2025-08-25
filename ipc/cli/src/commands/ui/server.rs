@@ -3,12 +3,8 @@
 //! UI Server implementation - Simplified to focus on routing and server management
 
 use super::api::{
-    deployment::deployment_routes,
-    gateway::gateway_routes,
-    l1_gateways::l1_gateway_routes,
-    network::network_routes,
-    subnet::subnet_routes,
-    transactions::transaction_routes,
+    deployment::deployment_routes, gateway::gateway_routes, l1_gateways::l1_gateway_routes,
+    network::network_routes, subnet::subnet_routes, transactions::transaction_routes,
     wallet::wallet_routes,
 };
 use super::websocket::types::{IncomingMessage, OutgoingMessage};
@@ -20,7 +16,9 @@ use std::sync::{Arc, Mutex};
 use warp::Filter;
 
 /// Create WebSocket routes
-fn websocket_routes(state: AppState) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+fn websocket_routes(
+    state: AppState,
+) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::path("ws")
         .and(warp::ws())
         .map(move |ws: warp::ws::Ws| {
@@ -34,8 +32,8 @@ fn websocket_routes(state: AppState) -> impl Filter<Extract = impl warp::Reply, 
 /// Handle WebSocket connection
 async fn handle_websocket_connection(websocket: warp::ws::WebSocket, state: AppState) {
     use futures_util::{SinkExt, StreamExt};
-    use tokio::sync::Mutex;
     use std::sync::Arc;
+    use tokio::sync::Mutex;
 
     let (tx, mut rx) = websocket.split();
     let tx = Arc::new(Mutex::new(tx));
@@ -44,7 +42,10 @@ async fn handle_websocket_connection(websocket: warp::ws::WebSocket, state: AppS
     {
         let mut clients_guard = state.websocket_clients.lock().unwrap();
         clients_guard.push(tx.clone());
-        log::info!("WebSocket client connected. Total clients: {}", clients_guard.len());
+        log::info!(
+            "WebSocket client connected. Total clients: {}",
+            clients_guard.len()
+        );
     }
 
     // Handle incoming messages
@@ -63,14 +64,19 @@ async fn handle_websocket_connection(websocket: warp::ws::WebSocket, state: AppS
                                     let pong_response = OutgoingMessage::Pong;
                                     if let Ok(pong_json) = serde_json::to_string(&pong_response) {
                                         let mut sink = tx.lock().await;
-                                        if let Err(e) = sink.send(warp::ws::Message::text(pong_json)).await {
+                                        if let Err(e) =
+                                            sink.send(warp::ws::Message::text(pong_json)).await
+                                        {
                                             log::error!("Failed to send pong: {}", e);
                                             break;
                                         }
                                     }
                                 }
                                 IncomingMessage::SubscribeDeployment { deployment_id } => {
-                                    log::info!("Client subscribed to deployment: {}", deployment_id);
+                                    log::info!(
+                                        "Client subscribed to deployment: {}",
+                                        deployment_id
+                                    );
                                     // TODO: Handle deployment subscription
                                 }
                                 IncomingMessage::SubscribeInstance { instance_id } => {
@@ -85,7 +91,9 @@ async fn handle_websocket_connection(websocket: warp::ws::WebSocket, state: AppS
                                 let pong_response = OutgoingMessage::Pong;
                                 if let Ok(pong_json) = serde_json::to_string(&pong_response) {
                                     let mut sink = tx.lock().await;
-                                    if let Err(e) = sink.send(warp::ws::Message::text(pong_json)).await {
+                                    if let Err(e) =
+                                        sink.send(warp::ws::Message::text(pong_json)).await
+                                    {
                                         log::error!("Failed to send pong: {}", e);
                                         break;
                                     }
@@ -107,15 +115,16 @@ async fn handle_websocket_connection(websocket: warp::ws::WebSocket, state: AppS
         let mut clients_guard = state.websocket_clients.lock().unwrap();
         let initial_count = clients_guard.len();
         clients_guard.retain(|client| !Arc::ptr_eq(client, &tx));
-        log::info!("WebSocket client disconnected. Clients: {} -> {}", initial_count, clients_guard.len());
+        log::info!(
+            "WebSocket client disconnected. Clients: {} -> {}",
+            initial_count,
+            clients_guard.len()
+        );
     }
 }
 
 /// Start the UI server
-pub async fn start_ui_server(
-    config_path: String,
-    addr: SocketAddr,
-) -> Result<()> {
+pub async fn start_ui_server(config_path: String, addr: SocketAddr) -> Result<()> {
     log::info!("Starting IPC UI server on {}", addr);
 
     // Create shared state
@@ -130,16 +139,15 @@ pub async fn start_ui_server(
     };
 
     // Create API routes
-    let api_routes = warp::path("api")
-        .and(
-            wallet_routes(state.clone())
-                .or(subnet_routes(state.clone()))
-                .or(gateway_routes(state.clone()))
-                .or(l1_gateway_routes(state.clone()))
-                .or(deployment_routes(state.clone()))
-                .or(transaction_routes(state.clone()))
-                .or(network_routes(state.clone()))
-        );
+    let api_routes = warp::path("api").and(
+        wallet_routes(state.clone())
+            .or(subnet_routes(state.clone()))
+            .or(gateway_routes(state.clone()))
+            .or(l1_gateway_routes(state.clone()))
+            .or(deployment_routes(state.clone()))
+            .or(transaction_routes(state.clone()))
+            .or(network_routes(state.clone())),
+    );
 
     // Create WebSocket routes
     let ws_routes = websocket_routes(state.clone());
@@ -154,9 +162,7 @@ pub async fn start_ui_server(
         .with(warp::cors().allow_any_origin());
 
     // Start the server
-    warp::serve(routes)
-        .run(addr)
-        .await;
+    warp::serve(routes).run(addr).await;
 
     Ok(())
 }

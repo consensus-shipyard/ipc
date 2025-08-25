@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 //! Network API endpoints
 
-use super::types::{ApiResponse, InvalidRequest, ServerError};
 use super::super::AppState;
+use super::types::{ApiResponse, InvalidRequest, ServerError};
 use anyhow::Result;
 use reqwest;
 use serde::{Deserialize, Serialize};
@@ -52,9 +52,7 @@ pub fn network_routes(
 }
 
 /// Helper to pass state to handlers
-fn with_state(
-    state: AppState,
-) -> impl Filter<Extract = (AppState,), Error = Infallible> + Clone {
+fn with_state(state: AppState) -> impl Filter<Extract = (AppState,), Error = Infallible> + Clone {
     warp::any().map(move || state.clone())
 }
 
@@ -63,7 +61,11 @@ async fn handle_test_network_connection(
     request: NetworkConnectionTestRequest,
     _state: AppState,
 ) -> Result<impl Reply, warp::Rejection> {
-    log::info!("Testing connection to network: {} ({})", request.network_name, request.rpc_url);
+    log::info!(
+        "Testing connection to network: {} ({})",
+        request.network_name,
+        request.rpc_url
+    );
 
     let start_time = std::time::Instant::now();
     let mut status = NetworkConnectionStatus {
@@ -95,9 +97,7 @@ async fn handle_test_network_connection(
 }
 
 /// Handle health check request
-async fn handle_health_check(
-    _state: AppState,
-) -> Result<impl Reply, warp::Rejection> {
+async fn handle_health_check(_state: AppState) -> Result<impl Reply, warp::Rejection> {
     let health_status = json!({
         "status": "healthy",
         "timestamp": chrono::Utc::now().to_rfc3339(),

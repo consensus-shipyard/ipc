@@ -21,7 +21,9 @@ pub mod websocket;
 pub use server::start_ui_server;
 
 /// WebSocket client handle
-pub type WebSocketClient = std::sync::Arc<tokio::sync::Mutex<futures_util::stream::SplitSink<warp::ws::WebSocket, warp::ws::Message>>>;
+pub type WebSocketClient = std::sync::Arc<
+    tokio::sync::Mutex<futures_util::stream::SplitSink<warp::ws::WebSocket, warp::ws::Message>>,
+>;
 
 /// Deployment state tracking
 #[derive(Debug, Clone)]
@@ -72,17 +74,15 @@ pub struct UICommandArgs {
 }
 
 /// Run the UI command
-pub async fn run_ui_command(
-    global: crate::GlobalArguments,
-    args: UICommandArgs,
-) -> Result<()> {
-    let ip: IpAddr = args.address.parse()
+pub async fn run_ui_command(global: crate::GlobalArguments, args: UICommandArgs) -> Result<()> {
+    let ip: IpAddr = args
+        .address
+        .parse()
         .unwrap_or_else(|_| IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
     let addr = SocketAddr::new(ip, args.port);
 
     // Fix config path resolution - use global.config_path() which handles defaults properly
-    let config_path = args.config_path
-        .unwrap_or_else(|| global.config_path());
+    let config_path = args.config_path.unwrap_or_else(|| global.config_path());
 
     start_ui_server(config_path, addr).await
 }

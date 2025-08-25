@@ -155,9 +155,7 @@ pub async fn cli() -> anyhow::Result<()> {
                 Commands::Util(args) => args.handle(global).await,
                 Commands::Validator(args) => args.handle(global).await,
                 Commands::Deploy(args) => DeployCommand::handle(global, args).await,
-                Commands::Ui(args) => {
-                    run_ui_command(global.clone(), args.clone()).await
-                }
+                Commands::Ui(args) => run_ui_command(global.clone(), args.clone()).await,
                 Commands::Node(args) => args.handle(global).await,
             };
 
