@@ -1,3 +1,5 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: MIT
 //! Deployment service for subnet creation through the UI
 //!
 //! This service wraps existing CLI handlers for deployment operations.
