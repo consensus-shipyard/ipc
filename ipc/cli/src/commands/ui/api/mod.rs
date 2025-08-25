@@ -12,4 +12,3 @@ pub mod subnet;
 pub mod transactions;
 pub mod types;
 pub mod wallet;
-

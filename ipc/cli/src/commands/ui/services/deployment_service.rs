@@ -781,9 +781,7 @@ impl DeploymentService {
                 ipc_api::subnet_id::SubnetID::new_from_parent(&parent, *subnet_actor_addr);
 
             log::info!("Auto-approving subnet: {}", subnet_id);
-            provider
-                .approve_subnet(subnet_id.clone(), from)
-                .await?;
+            provider.approve_subnet(subnet_id.clone(), from).await?;
             log::info!("Successfully auto-approved subnet: {}", subnet_id);
 
             if permission_mode == ipc_api::subnet::PermissionMode::Federated

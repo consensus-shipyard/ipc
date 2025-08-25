@@ -61,8 +61,7 @@ pub struct ChainStats {
     pub pending_transactions: Option<u64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub enum SubnetLifecycleState {
     // Deployment states
     #[serde(rename = "deploying")]
@@ -95,7 +94,6 @@ pub enum SubnetLifecycleState {
     #[default]
     Unknown,
 }
-
 
 impl std::fmt::Display for SubnetLifecycleState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -4,9 +4,7 @@
 //!
 //! This service wraps existing CLI handlers for subnet operations.
 
-use super::super::api::types::{
-    ChainStats, SubnetLifecycleState, SubnetStatusInfo,
-};
+use super::super::api::types::{ChainStats, SubnetLifecycleState, SubnetStatusInfo};
 use crate::commands::subnet::approve::{approve_subnet, ApproveSubnetArgs};
 use crate::{get_ipc_provider, GlobalArguments};
 use anyhow::{Context, Result};

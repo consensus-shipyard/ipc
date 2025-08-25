@@ -3,9 +3,7 @@
 //! Transaction API endpoints
 
 use super::super::AppState;
-use super::types::{
-    ApiResponse, ServerError, TestTransactionRequest, TestTransactionResponse,
-};
+use super::types::{ApiResponse, ServerError, TestTransactionRequest, TestTransactionResponse};
 use crate::{get_ipc_provider, GlobalArguments};
 use anyhow::Result;
 use ipc_api::subnet_id::SubnetID;
@@ -17,8 +15,6 @@ use warp::{Filter, Reply};
 pub fn transaction_routes(
     state: AppState,
 ) -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
-    
-
     warp::path!("subnets" / String / "test-transaction")
         .and(warp::post())
         .and(warp::body::json())
