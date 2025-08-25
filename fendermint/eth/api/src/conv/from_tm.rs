@@ -389,15 +389,8 @@ where
 }
 
 fn app_hash_to_root(app_hash: &tendermint::AppHash) -> anyhow::Result<et::H256> {
-    // Out app hash is a CID. We only need the hash part.
-    // Actually it's not the state root of the actors, but it's still a CID.
-    let state_root = cid::Cid::try_from(app_hash.as_bytes()).context("app hash is not a CID")?;
-    // Just in case we returned `Cid::default()`
-    if state_root.hash().digest().is_empty() {
-        Ok(et::H256::default())
-    } else {
-        Ok(et::H256::from_slice(state_root.hash().digest()))
-    }
+    // The app hash is a keccak hash
+    Ok(et::H256::from_slice(app_hash.as_bytes()))
 }
 
 fn maybe_contract_address(deliver_tx: &DeliverTx) -> Option<EthAddress> {
