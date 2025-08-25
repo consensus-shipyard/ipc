@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::Context;
-use ethers::types as et;
 
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::econ::TokenAmount;
@@ -11,9 +10,7 @@ use fvm_shared::ActorID;
 use fendermint_crypto::PublicKey;
 use fendermint_vm_actor_interface::ipc;
 use fendermint_vm_actor_interface::{
-    eam::EthAddress,
-    init::builtin_actor_eth_addr,
-    ipc::{ValidatorMerkleTree, GATEWAY_ACTOR_ID},
+    eam::EthAddress, init::builtin_actor_eth_addr, ipc::GATEWAY_ACTOR_ID,
 };
 use fendermint_vm_genesis::{Collateral, Power, PowerScale, Validator, ValidatorKey};
 use fendermint_vm_message::conv::from_eth;
@@ -115,6 +112,8 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         &self,
         state: &mut FvmExecState<DB>,
         commitment: &LightClientCommitments,
+        msgs: Vec<checkpointing_facet::IpcEnvelope>,
+        activity: checkpointing_facet::FullActivityRollup,
     ) -> anyhow::Result<AppliedMessage> {
         let commitment = checkpointing_facet::StateCommitmentBreakDown {
             state_root: Default::default(),
@@ -127,48 +126,10 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         };
         Ok(self
             .checkpointing
-            .call_with_return(state, |c| c.record_light_client_commitments(commitment))?
-            .into_return())
-    }
-
-    /// Insert a new checkpoint at the period boundary.
-    pub fn create_bottom_up_checkpoint(
-        &self,
-        state: &mut FvmExecState<DB>,
-        checkpoint: checkpointing_facet::BottomUpCheckpoint,
-        power_table: &[Validator<Power>],
-        msgs: Vec<checkpointing_facet::IpcEnvelope>,
-        activity: checkpointing_facet::FullActivityRollup,
-    ) -> anyhow::Result<AppliedMessage> {
-        // Construct a Merkle tree from the power table, which we can use to validate validator set membership
-        // when the signatures are submitted in transactions for accumulation.
-        let tree =
-            ValidatorMerkleTree::new(power_table).context("failed to create validator tree")?;
-
-        let total_power = power_table.iter().fold(et::U256::zero(), |p, v| {
-            p.saturating_add(et::U256::from(v.power.0))
-        });
-
-        Ok(self
-            .checkpointing
             .call_with_return(state, |c| {
-                c.create_bottom_up_checkpoint(
-                    checkpoint,
-                    tree.root_hash().0,
-                    total_power,
-                    msgs,
-                    activity,
-                )
+                c.record_light_client_commitments(commitment, msgs, activity)
             })?
             .into_return())
-    }
-
-    /// Retrieve checkpoints which have not reached a quorum.
-    pub fn incomplete_checkpoints(
-        &self,
-        state: &mut FvmExecState<DB>,
-    ) -> anyhow::Result<Vec<getter::BottomUpCheckpoint>> {
-        self.getter.call(state, |c| c.get_incomplete_checkpoints())
     }
 
     /// Retrieve checkpoint info by block height.
@@ -285,21 +246,6 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
             .getter
             .call(state, |c| c.get_latest_parent_finality())?;
         Ok(IPCParentFinality::from(r))
-    }
-
-    /// Get the Ethereum adresses of validators who signed a checkpoint.
-    pub fn checkpoint_signatories(
-        &self,
-        state: &mut FvmExecState<DB>,
-        height: u64,
-    ) -> anyhow::Result<Vec<EthAddress>> {
-        let (_, _, addrs, _) = self.getter.call(state, |c| {
-            c.get_checkpoint_signature_bundle(ethers::types::U256::from(height))
-        })?;
-
-        let addrs = addrs.into_iter().map(|a| a.into()).collect();
-
-        Ok(addrs)
     }
 
     pub fn approve_subnet_joining_gateway(

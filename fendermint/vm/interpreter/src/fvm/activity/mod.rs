@@ -6,10 +6,14 @@
 
 pub mod actor;
 
+use ethers::abi::Detokenize;
+use ethers::abi::Tokenize;
 use fendermint_crypto::PublicKey;
 use ipc_actors_abis::checkpointing_facet::{
-    AggregatedStats, CompressedActivityRollup, CompressedSummary, FullActivityRollup, FullSummary,
-    ValidatorData,
+    AggregatedStats, FullActivityRollup, FullSummary, ValidatorData,
+};
+use ipc_actors_abis::subnet_actor_checkpointing_facet::{
+    CompressedActivityRollup, CompressedSummary,
 };
 use ipc_api::checkpoint::VALIDATOR_REWARD_FIELDS;
 use ipc_api::evm::payload_to_evm_address;
@@ -75,9 +79,13 @@ impl FullActivity {
             self.0.consensus.data.as_slice(),
             &VALIDATOR_REWARD_FIELDS,
         )?;
+        let tokens = self.0.consensus.stats.clone().into_tokens();
         Ok(CompressedActivityRollup {
             consensus: CompressedSummary {
-                stats: self.0.consensus.stats.clone(),
+                stats:
+                    ipc_actors_abis::subnet_actor_checkpointing_facet::AggregatedStats::from_tokens(
+                        tokens,
+                    )?,
                 data_root_commitment: gen.root().to_fixed_bytes(),
             },
         })

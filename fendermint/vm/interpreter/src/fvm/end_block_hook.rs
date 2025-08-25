@@ -135,7 +135,8 @@ where
         total_num_msgs: msgs_count as u64,
         msgs_root,
     };
-    let activity_commitment = state.activity_tracker().commit_activity()?.compressed()?;
+    let full_activity = state.activity_tracker().commit_activity()?;
+    let activity_commitment = full_activity.compressed()?;
 
     // Figure out the power updates if there was some change in the configuration.
     let power_updates = if next_configuration_number == 0 {
@@ -156,7 +157,7 @@ where
     };
 
     let ret = gateway
-        .record_light_client_commitments(state, &commitments)
+        .record_light_client_commitments(state, &commitments, msgs, full_activity.into_inner())
         .context("failed to store checkpoint")?;
 
     end_block_events.push((ret.apply_ret.events, ret.emitters));

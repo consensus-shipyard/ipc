@@ -13,7 +13,6 @@ use fendermint_vm_genesis::{Power, Validator};
 use fvm_shared::address::Error as AddressError;
 use fvm_shared::address::Payload;
 use ipc_actors_abis as ia;
-pub use ipc_actors_abis::checkpointing_facet::BottomUpCheckpoint;
 use ipc_api::subnet_id::SubnetID;
 use lazy_static::lazy_static;
 use merkle_tree_rs::{

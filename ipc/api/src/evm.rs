@@ -4,8 +4,7 @@
 //! Type conversion for IPC Agent struct with solidity contract struct
 
 use crate::address::IPCAddress;
-use crate::checkpoint::BottomUpMsgBatch;
-use crate::checkpoint::{consensus, BottomUpBatchCommitment, CompressedActivityRollup};
+use crate::checkpoint::BottomUpBatchCommitment;
 use crate::cross::{IpcEnvelope, IpcMsgKind};
 use crate::staking::PowerChange;
 use crate::staking::PowerChangeRequest;
@@ -123,61 +122,6 @@ macro_rules! cross_msg_types {
 /// The type conversion between different bottom up checkpoint definition in ethers and sdk
 macro_rules! bottom_up_checkpoint_conversion {
     ($module:ident) => {
-        impl TryFrom<consensus::AggregatedStats> for $module::AggregatedStats {
-            type Error = anyhow::Error;
-
-            fn try_from(c: consensus::AggregatedStats) -> Result<Self, Self::Error> {
-                Ok($module::AggregatedStats {
-                    total_active_validators: c.total_active_validators,
-                    total_num_blocks_committed: c.total_num_blocks_committed,
-                })
-            }
-        }
-
-        impl TryFrom<CompressedActivityRollup> for $module::CompressedActivityRollup {
-            type Error = anyhow::Error;
-
-            fn try_from(c: CompressedActivityRollup) -> Result<Self, Self::Error> {
-                Ok($module::CompressedActivityRollup {
-                    consensus: c.consensus.try_into()?,
-                })
-            }
-        }
-
-        impl From<$module::CompressedActivityRollup> for CompressedActivityRollup {
-            fn from(value: $module::CompressedActivityRollup) -> Self {
-                CompressedActivityRollup {
-                    consensus: consensus::CompressedSummary {
-                        stats: consensus::AggregatedStats {
-                            total_active_validators: value.consensus.stats.total_active_validators,
-                            total_num_blocks_committed: value
-                                .consensus
-                                .stats
-                                .total_num_blocks_committed,
-                        },
-                        data_root_commitment: value.consensus.data_root_commitment.to_vec(),
-                    },
-                }
-            }
-        }
-
-        impl TryFrom<consensus::CompressedSummary> for $module::CompressedSummary {
-            type Error = anyhow::Error;
-
-            fn try_from(c: consensus::CompressedSummary) -> Result<Self, Self::Error> {
-                Ok($module::CompressedSummary {
-                    stats: c
-                        .stats
-                        .try_into()
-                        .map_err(|_| anyhow!("cannot convert aggregated stats"))?,
-                    data_root_commitment: c
-                        .data_root_commitment
-                        .try_into()
-                        .map_err(|_| anyhow!("cannot convert bytes32"))?,
-                })
-            }
-        }
-
         impl TryFrom<BottomUpBatchCommitment> for $module::Commitment {
             type Error = anyhow::Error;
 
@@ -198,27 +142,6 @@ macro_rules! bottom_up_checkpoint_conversion {
                     total_num_msgs: value.total_num_msgs,
                     msgs_root: value.msgs_root.to_vec(),
                 }
-            }
-        }
-    };
-}
-
-/// The type conversion between different bottom up message batch definition in ethers and sdk
-macro_rules! bottom_up_msg_batch_conversion {
-    ($module:ident) => {
-        impl TryFrom<BottomUpMsgBatch> for $module::BottomUpMsgBatch {
-            type Error = anyhow::Error;
-
-            fn try_from(batch: BottomUpMsgBatch) -> Result<Self, Self::Error> {
-                Ok($module::BottomUpMsgBatch {
-                    subnet_id: $module::SubnetID::try_from(&batch.subnet_id)?,
-                    block_height: ethers::core::types::U256::from(batch.block_height),
-                    msgs: batch
-                        .msgs
-                        .into_iter()
-                        .map($module::IpcEnvelope::try_from)
-                        .collect::<Result<Vec<_>, _>>()?,
-                })
             }
         }
     };
@@ -281,9 +204,7 @@ cross_msg_types!(subnet_actor_checkpointing_facet);
 cross_msg_types!(checkpointing_facet);
 
 bottom_up_checkpoint_conversion!(checkpointing_facet);
-bottom_up_checkpoint_conversion!(gateway_getter_facet);
 bottom_up_checkpoint_conversion!(subnet_actor_checkpointing_facet);
-bottom_up_msg_batch_conversion!(gateway_getter_facet);
 
 asset_conversion!(subnet_actor_diamond);
 asset_conversion!(register_subnet_facet);
