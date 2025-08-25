@@ -10,6 +10,7 @@ fvm_ipld_blockstore = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 fvm_ipld_hamt = { workspace = true }
 fvm_shared = { workspace = true }
+fvm_sdk = { workspace = true }
 
 anyhow = { workspace = true }
 cid = { workspace = true, default-features = false, features = ["serde-codec"] }
@@ -23,6 +24,7 @@ num-traits = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 uint = { version = "0.9.3", default-features = false }
 thiserror = { workspace = true }
+ethers = { workspace = true }
 
 [features]
 fil-actor = []

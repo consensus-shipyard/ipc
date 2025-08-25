@@ -11,6 +11,7 @@ use tracing_appender::rolling::RollingFileAppender;
 use tracing_subscriber::{fmt, fmt::Subscriber, layer::SubscriberExt, EnvFilter, Layer, Registry};
 
 pub const TRACING_TARGET: &str = "tracing_event";
+pub const CONSENSUS_TARGET: &str = "consensus_event";
 
 // Creates a temporary subscriber that logs all traces to stderr. Useful when global tracing is not set yet.
 pub fn create_temporary_subscriber() -> Subscriber {
@@ -32,23 +33,30 @@ pub fn create_temporary_subscriber() -> Subscriber {
 // Returns a guard that can be used to drop the subscriber.
 pub fn set_global_tracing_subscriber(config: &TracingSettings) -> Vec<WorkerGuard> {
     let console_layer = {
-        let filter: EnvFilter = config
+        let mut filter: EnvFilter = config
             .console
             .as_ref()
             .and_then(|c| c.level.clone())
             .unwrap_or_default()
             .into();
 
+        // Exclude traces from console output (they should go to their dedicated file)
+        filter = filter.add_directive(
+            format!("{TRACING_TARGET}=off")
+                .parse()
+                .expect("invalid traces level"),
+        );
+
         // log all traces to stderr (reserving stdout for any actual output such as from the CLI commands)
         fmt::layer()
             .with_writer(std::io::stderr)
-            .with_target(false)
+            .with_target(true)
             .with_file(true)
             .with_line_number(true)
             .with_filter(filter)
     };
 
-    let (traces_layer, logs_layer, guards) = if let Some(file_settings) =
+    let (traces_layer, logs_layer, consensus_layer, guards) = if let Some(file_settings) =
         config.file.as_ref().filter(|s| s.enabled)
     {
         //
@@ -100,6 +108,12 @@ pub fn set_global_tracing_subscriber(config: &TracingSettings) -> Vec<WorkerGuar
                     .expect("invalid logs level"),
             );
 
+            filter = filter.add_directive(
+                format!("{CONSENSUS_TARGET}=off")
+                    .parse()
+                    .expect("invalid logs level"),
+            );
+
             let layer = fmt::layer()
                 .json()
                 .with_writer(appender)
@@ -111,20 +125,49 @@ pub fn set_global_tracing_subscriber(config: &TracingSettings) -> Vec<WorkerGuar
             (layer, guard)
         };
 
+        let (consensus_layer, consensus_guard) = {
+            let (appender, guard) =
+                non_blocking(create_file_appender(file_settings, "consensus.log"));
+
+            // We'll reuse the same file_settings.level or define a separate consensus-level if desired
+            let level = file_settings.level.clone().unwrap_or_default();
+
+            // We'll log everything for target=CONSENSUS_TARGET at the declared level
+            // e.g. "info", "debug", etc. If you want to always show them at "trace", do "consensus_event=trace"
+            let filter = EnvFilter::try_new(format!("{CONSENSUS_TARGET}={}", level))
+                .expect("invalid consensus level");
+
+            let layer = fmt::layer::<_>()
+                .json()
+                .with_writer(appender)
+                .with_target(false)
+                .with_file(true)
+                .with_line_number(true)
+                .with_filter(filter);
+
+            (layer, guard)
+        };
+
+        // gather all guards
+        let guards = vec![logs_guard, traces_guard, consensus_guard];
+
+        // combine into Option Some(...) so we can destructure below
         (
             Some(traces_layer),
             Some(logs_layer),
-            vec![logs_guard, traces_guard],
+            Some(consensus_layer),
+            guards,
         )
     } else {
-        (None, None, Vec::new())
+        (None, None, None, Vec::new())
     };
 
     // Start with the base registry
     let subscriber = Registry::default()
         .with(console_layer)
         .with(traces_layer)
-        .with(logs_layer);
+        .with(logs_layer)
+        .with(consensus_layer);
 
     // Set the global subscriber
     tracing::subscriber::set_global_default(subscriber)

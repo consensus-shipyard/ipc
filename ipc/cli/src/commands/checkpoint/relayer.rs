@@ -13,7 +13,7 @@ use ipc_api::subnet_id::SubnetID;
 use ipc_provider::checkpoint::BottomUpCheckpointManager;
 use ipc_provider::config::Config;
 use ipc_provider::manager::cometbft::CometbftClient;
-use ipc_provider::new_evm_keystore_from_config;
+use ipc_provider::new_evm_keystore_from_arc_config;
 use ipc_provider::observe::register_metrics as register_checkpoint_metrics;
 use ipc_wallet::EvmKeyStore;
 use std::net::SocketAddr;
@@ -57,7 +57,7 @@ impl CommandLineHandler for BottomUpRelayer {
 
         let config_path = global.config_path();
         let config = Arc::new(Config::from_file(&config_path)?);
-        let mut keystore = new_evm_keystore_from_config(config)?;
+        let mut keystore = new_evm_keystore_from_arc_config(config)?;
         let submitter = match (arguments.submitter.as_ref(), keystore.get_default()?) {
             (Some(submitter), _) => require_fil_addr_from_str(submitter)?,
             (None, Some(addr)) => {

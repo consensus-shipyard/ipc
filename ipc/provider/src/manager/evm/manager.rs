@@ -1178,9 +1178,9 @@ impl EthSubnetManager {
 
         let client = client.build()?;
 
-        let provider = Http::new_with_client(url, client).into();
-
-        let mut provider = Provider::new(provider);
+        let http_provider = Http::new_with_client(url, client);
+        let error_parser_provider = ErrorParserHttp::from(http_provider);
+        let mut provider = Provider::new(error_parser_provider);
         // set polling interval for provider to fit fast child subnets block times.
         // TODO: We may want to make it dynamic so it adjusts depending on the type of network
         // so we don't have a too slow or too fast polling for the underlying block times.

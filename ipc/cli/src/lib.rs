@@ -5,10 +5,14 @@ use async_trait::async_trait;
 use clap::Args;
 use fvm_shared::address::Network;
 use num_traits::cast::FromPrimitive;
+use std::path::{Path, PathBuf};
 
 mod commands;
 
 pub use commands::*;
+pub mod comet_runner;
+mod ipc_config_store;
+pub mod services;
 use ipc_provider::config::Config;
 
 /// The trait that represents the abstraction of a command line handler. To implement a new command
@@ -55,6 +59,10 @@ impl GlobalArguments {
             .unwrap_or_else(ipc_provider::default_config_path)
     }
 
+    pub fn config_dir(&self) -> PathBuf {
+        dir_of(&self.config_path())
+    }
+
     pub fn config(&self) -> Result<Config> {
         let config_path = self.config_path();
         Config::from_file(config_path)
@@ -79,5 +87,14 @@ fn parse_network(s: &str) -> Result<Network, String> {
 
             Ok(n)
         }
+    }
+}
+
+fn dir_of(path: &str) -> PathBuf {
+    let p = Path::new(path);
+    // `parent()` returns an `Option<&Path>`; if there’s no “parent” we fall back to “.”
+    match p.parent() {
+        Some(dir) if !dir.as_os_str().is_empty() => dir.to_path_buf(),
+        _ => PathBuf::from("."),
     }
 }

@@ -1,18 +1,121 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 
-use tracing_subscriber::prelude::*;
-use tracing_subscriber::{fmt, EnvFilter};
+pub mod comet_runner;
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::registry()
-        .with(fmt::layer())
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
-        .init();
-
     if let Err(e) = ipc_cli::cli().await {
-        log::error!("main process failed: {e:#}");
+        print_user_friendly_error(&e);
         std::process::exit(1);
+    }
+}
+
+fn print_user_friendly_error(error: &anyhow::Error) {
+    // Extract the most meaningful error message
+    let error_msg = extract_meaningful_error(error);
+
+    // Print a clean, user-friendly error message
+    eprintln!("\n❌ Error: {}", error_msg);
+
+    // Provide helpful suggestions based on the error type
+    if let Some(suggestion) = get_error_suggestion(&error_msg) {
+        eprintln!("\n💡 Suggestion: {}", suggestion);
+    }
+
+    // Check if this might be a contract-related error and suggest the documentation
+    if is_contract_related_error(&error_msg) {
+        eprintln!("\n📖 For detailed information about contract errors, see:");
+        eprintln!(
+            "   https://github.com/consensus-shipyard/ipc/blob/main/docs/ipc/contract-errors.md"
+        );
+        eprintln!("   or run: ipc-cli --help");
+    }
+
+    // For debugging, show the full error chain if RUST_BACKTRACE is set
+    if std::env::var("RUST_BACKTRACE").is_ok() {
+        eprintln!("\n🔍 Full error details:");
+        eprintln!("{}", error);
+    }
+
+    eprintln!(); // Add spacing for better readability
+}
+
+fn extract_meaningful_error(error: &anyhow::Error) -> String {
+    // Get the root cause of the error chain
+    let mut root_cause = error.to_string();
+
+    // Get the first source error if available
+    if let Some(source) = error.source() {
+        root_cause = source.to_string();
+    }
+
+    // Clean up common error patterns
+    let cleaned = root_cause
+        .replace("error processing command Some(", "")
+        .replace("main process failed: ", "")
+        .trim()
+        .to_string();
+
+    // Special handling for contract revert errors
+    if cleaned.contains("Contract call reverted with data:") {
+        // Provide a generic but helpful message
+        return "Contract operation failed. The transaction was reverted by the smart contract."
+            .to_string();
+    }
+
+    // If the cleaned message is significantly shorter, use it
+    if cleaned.len() < root_cause.len() * 2 / 3 {
+        cleaned
+    } else {
+        root_cause
+    }
+}
+
+fn is_contract_related_error(error_msg: &str) -> bool {
+    let error_lower = error_msg.to_lowercase();
+
+    // Check for common contract error patterns
+    error_lower.contains("contract")
+        || error_lower.contains("revert")
+        || error_lower.contains("not owner")
+        || error_lower.contains("not authorized")
+        || error_lower.contains("insufficient")
+        || error_lower.contains("invalid")
+        || error_lower.contains("already exists")
+        || error_lower.contains("not found")
+        || error_lower.contains("permission")
+        || error_lower.contains("unauthorized")
+        || error_lower.contains("subnet")
+        || error_lower.contains("validator")
+        || error_lower.contains("checkpoint")
+        || error_lower.contains("batch")
+        || error_lower.contains("signature")
+        || error_lower.contains("collateral")
+        || error_lower.contains("balance")
+        || error_lower.contains("funds")
+}
+
+fn get_error_suggestion(error_msg: &str) -> Option<&'static str> {
+    let error_lower = error_msg.to_lowercase();
+
+    if error_lower.contains("no default evm account") {
+        Some("Use the --from flag to specify an account address, or configure a default account in your wallet.")
+    } else if error_lower.contains("not owner of public key") {
+        Some("Make sure you're using the correct account that owns the validator public key.")
+    } else if error_lower.contains("insufficient funds") {
+        Some("Check your account balance and ensure you have enough tokens for the transaction.")
+    } else if error_lower.contains("invalid subnet") {
+        Some("Verify the subnet ID format and ensure the subnet exists.")
+    } else if error_lower.contains("connection") || error_lower.contains("timeout") {
+        Some("Check your network connection and ensure the RPC endpoint is accessible.")
+    } else if error_lower.contains("permission") || error_lower.contains("unauthorized") {
+        Some("Verify you have the necessary permissions for this operation.")
+    } else if error_lower.contains("contract operation failed") {
+        Some("The smart contract rejected the transaction. Check the contract requirements and your input parameters.")
+    } else if error_lower.contains("contract") && error_lower.contains("reverted") {
+        Some("The contract operation failed. Check the error details above for more information.")
+    } else {
+        None
     }
 }

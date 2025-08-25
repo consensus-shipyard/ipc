@@ -7,6 +7,7 @@ mod config;
 mod crossmsg;
 // mod daemon;
 mod deploy;
+mod node;
 mod subnet;
 mod util;
 mod validator;
@@ -22,6 +23,8 @@ use clap::{Command, CommandFactory, Parser, Subcommand};
 use clap_complete::{generate, Generator, Shell};
 use fvm_shared::econ::TokenAmount;
 use ipc_api::ethers_address_to_fil_address;
+use tracing_subscriber::prelude::*;
+use tracing_subscriber::{fmt, EnvFilter};
 
 use fvm_shared::address::set_current_network;
 use ipc_api::subnet_id::SubnetID;
@@ -33,6 +36,7 @@ use std::str::FromStr;
 
 use crate::commands::config::ConfigCommandsArgs;
 use crate::commands::deploy::{DeployCommand, DeployCommandArgs};
+use crate::commands::node::NodeCommandsArgs;
 use crate::commands::validator::ValidatorCommandsArgs;
 use crate::commands::wallet::WalletCommandsArgs;
 use crate::CommandLineHandler;
@@ -54,13 +58,15 @@ enum Commands {
     Util(UtilCommandsArgs),
     Validator(ValidatorCommandsArgs),
     Deploy(DeployCommandArgs),
+    Node(NodeCommandsArgs),
 }
 
 #[derive(Debug, Parser)]
 #[command(
     name = "ipc-agent",
-    about = "The IPC agent command line tool",
-    version = "v0.0.1"
+    about = "The IPC agent command line tool for managing subnets, validators, and cross-messages",
+    version = "v0.0.1",
+    after_help = "For detailed information about contract errors, see: https://github.com/consensus-shipyard/ipc/blob/main/docs/ipc/contract-errors.md"
 )]
 #[command(propagate_version = true, arg_required_else_help = true)]
 struct IPCAgentCliCommands {
@@ -132,6 +138,10 @@ pub async fn cli() -> anyhow::Result<()> {
     } else {
         let global = &args.global_params;
         if let Some(c) = &args.command {
+            if !matches!(c, Commands::Node(_)) {
+                default_subscriber();
+            }
+
             let r = match &c {
                 // Commands::Daemon(args) => LaunchDaemon::handle(global, args).await,
                 Commands::Config(args) => args.handle(global).await,
@@ -142,6 +152,7 @@ pub async fn cli() -> anyhow::Result<()> {
                 Commands::Util(args) => args.handle(global).await,
                 Commands::Validator(args) => args.handle(global).await,
                 Commands::Deploy(args) => DeployCommand::handle(global, args).await,
+                Commands::Node(args) => args.handle(global).await,
             };
 
             r.with_context(|| format!("error processing command {:?}", args.command))
@@ -149,6 +160,13 @@ pub async fn cli() -> anyhow::Result<()> {
             Ok(())
         }
     }
+}
+
+pub fn default_subscriber() {
+    tracing_subscriber::registry()
+        .with(fmt::layer())
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .init();
 }
 
 fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {

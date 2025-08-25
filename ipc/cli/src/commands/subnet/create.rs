@@ -7,7 +7,10 @@ use std::str::FromStr;
 
 use async_trait::async_trait;
 use clap::Args;
+use fvm_shared::address::Address as FvmAddress;
 use fvm_shared::clock::ChainEpoch;
+
+use ethers::types::Address as EthAddress;
 
 use ipc_api::subnet::{Asset, AssetKind, PermissionMode};
 use ipc_api::subnet_id::SubnetID;
@@ -15,6 +18,7 @@ use ipc_api::subnet_id::SubnetID;
 use crate::commands::get_ipc_provider;
 use crate::commands::subnet::ZERO_ADDRESS;
 use crate::{f64_to_token_amount, require_fil_addr_from_str, CommandLineHandler, GlobalArguments};
+use serde::{self, Deserialize};
 
 const DEFAULT_ACTIVE_VALIDATORS: u16 = 100;
 
@@ -24,73 +28,32 @@ pub struct CreateSubnet;
 impl CreateSubnet {
     pub async fn create(
         global: &GlobalArguments,
-        arguments: &CreateSubnetArgs,
+        args: &CreateSubnetArgs,
     ) -> anyhow::Result<String> {
-        let mut provider = get_ipc_provider(global)?;
-        let parent = SubnetID::from_str(&arguments.parent)?;
-
-        let from = match &arguments.from {
-            Some(address) => Some(require_fil_addr_from_str(address)?),
-            None => None,
-        };
-
-        let supply_source = parse_supply_source(arguments)?;
-        let collateral_source = parse_collateral_source(arguments)?;
-
-        let raw_addr = arguments
-            .validator_gater
-            .clone()
-            .unwrap_or(ZERO_ADDRESS.to_string());
-        let validator_gater = require_fil_addr_from_str(&raw_addr)?;
-
-        let raw_addr = arguments
-            .validator_rewarder
-            .clone()
-            .unwrap_or(ZERO_ADDRESS.to_string());
-        let validator_rewarder = require_fil_addr_from_str(&raw_addr)?;
-        let addr = provider
-            .create_subnet(
-                from,
-                parent,
-                arguments.min_validators,
-                f64_to_token_amount(arguments.min_validator_stake)?,
-                arguments.bottomup_check_period,
-                arguments
-                    .active_validators_limit
-                    .unwrap_or(DEFAULT_ACTIVE_VALIDATORS),
-                f64_to_token_amount(arguments.min_cross_msg_fee)?,
-                arguments.permission_mode,
-                supply_source,
-                collateral_source,
-                validator_gater,
-                validator_rewarder,
-                arguments.genesis_subnet_ipc_contracts_owner,
-                arguments.chain_id,
-            )
-            .await?;
-
-        Ok(addr.to_string())
+        let provider = get_ipc_provider(global)?;
+        let created_subnet_address = create_subnet(provider, &args.config).await?;
+        Ok(created_subnet_address.to_string())
     }
 }
 
-fn parse_supply_source(arguments: &CreateSubnetArgs) -> anyhow::Result<Asset> {
-    let token_address = if let Some(addr) = &arguments.supply_source_address {
+fn parse_supply_source(conf: &SubnetCreateConfig) -> anyhow::Result<Asset> {
+    let token_address = if let Some(addr) = &conf.supply_source_address {
         Some(require_fil_addr_from_str(addr)?)
     } else {
         None
     };
     Ok(Asset {
-        kind: arguments.supply_source_kind,
+        kind: conf.supply_source_kind,
         token_address,
     })
 }
 
-fn parse_collateral_source(arguments: &CreateSubnetArgs) -> anyhow::Result<Asset> {
-    let Some(ref kind) = arguments.collateral_source_kind else {
+fn parse_collateral_source(conf: &SubnetCreateConfig) -> anyhow::Result<Asset> {
+    let Some(ref kind) = conf.collateral_source_kind else {
         return Ok(Asset::default());
     };
 
-    let token_address = if let Some(addr) = &arguments.collateral_source_address {
+    let token_address = if let Some(addr) = &conf.collateral_source_address {
         Some(require_fil_addr_from_str(addr)?)
     } else {
         None
@@ -113,7 +76,7 @@ impl CommandLineHandler for CreateSubnet {
 
         log::info!(
             "created subnet actor with id: {}/{}",
-            arguments.parent,
+            arguments.config.parent,
             address
         );
 
@@ -121,84 +84,151 @@ impl CommandLineHandler for CreateSubnet {
     }
 }
 
-#[derive(Debug, Args)]
-#[command(name = "create", about = "Create a new subnet actor")]
-pub struct CreateSubnetArgs {
+pub(crate) async fn create_subnet(
+    mut provider: ipc_provider::IpcProvider,
+    arguments: &SubnetCreateConfig,
+) -> anyhow::Result<FvmAddress> {
+    let parent = SubnetID::from_str(&arguments.parent)?;
+
+    let from = match &arguments.from {
+        Some(address) => Some(require_fil_addr_from_str(address)?),
+        None => None,
+    };
+
+    let supply_source = parse_supply_source(arguments)?;
+    let collateral_source = parse_collateral_source(arguments)?;
+
+    let raw_addr = arguments
+        .validator_gater
+        .clone()
+        .unwrap_or(ZERO_ADDRESS.to_string());
+    let validator_gater = require_fil_addr_from_str(&raw_addr)?;
+
+    let raw_addr = arguments
+        .validator_rewarder
+        .clone()
+        .unwrap_or(ZERO_ADDRESS.to_string());
+    let validator_rewarder = require_fil_addr_from_str(&raw_addr)?;
+    let addr = provider
+        .create_subnet(
+            from,
+            parent,
+            arguments.min_validators,
+            f64_to_token_amount(arguments.min_validator_stake)?,
+            arguments.bottomup_check_period,
+            arguments
+                .active_validators_limit
+                .unwrap_or(DEFAULT_ACTIVE_VALIDATORS),
+            f64_to_token_amount(arguments.min_cross_msg_fee)?,
+            arguments.permission_mode,
+            supply_source,
+            collateral_source,
+            validator_gater,
+            validator_rewarder,
+            arguments.genesis_subnet_ipc_contracts_owner,
+            arguments.chain_id,
+        )
+        .await?;
+
+    Ok(addr)
+}
+
+/// Shared subnet‐create config for both CLI flags and YAML.
+///
+/// - Clap will pick up each `#[arg(long, help=...)]`
+/// - Serde will map kebab-case YAML keys to the same fields
+#[derive(Debug, Clone, Args, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) struct SubnetCreateConfig {
+    /// The address that creates the subnet (defaults to your global sender).
     #[arg(long, help = "The address that creates the subnet")]
     pub from: Option<String>,
+
+    /// The parent subnet namespace (e.g. `/r314159/...`).
     #[arg(long, help = "The parent subnet to create the new actor in")]
     pub parent: String,
+
+    /// The minimum FIL stake required per validator (in whole FIL).
     #[arg(
         long,
-        help = "The minimum number of collateral required for validators in (in whole FIL; the minimum is 1 nanoFIL)"
+        help = "Minimum collateral per validator (whole FIL; min 1 nanoFIL)"
     )]
     pub min_validator_stake: f64,
-    #[arg(
-        long,
-        help = "Minimum number of validators required to bootstrap the subnet"
-    )]
+
+    /// Minimum number of validators required to bootstrap the subnet.
+    #[arg(long, help = "Minimum number of validators to bootstrap the subnet")]
     pub min_validators: u64,
-    #[arg(long, help = "The bottom up checkpoint period in number of blocks")]
+
+    /// The bottom-up checkpoint period (in number of epochs).
+    #[arg(long, help = "Bottom-up checkpoint period in epoch count")]
     pub bottomup_check_period: ChainEpoch,
-    #[arg(long, help = "The max number of active validators in subnet")]
+
+    /// Maximum number of active validators in the subnet.
+    #[arg(long, help = "Max number of active validators in subnet")]
     pub active_validators_limit: Option<u16>,
+
+    /// Minimum fee for cross-network messages (FIL).
     #[arg(
         long,
         default_value = "0.000001",
-        help = "Minimum fee for cross-net messages in subnet (in whole FIL; the minimum is 1 nanoFIL)"
+        help = "Min fee for cross-net messages (whole FIL; min 1 nanoFIL)"
     )]
     pub min_cross_msg_fee: f64,
+
+    /// The permission mode: collateral, federated, or static.
     #[arg(
         long,
-        help = "The permission mode for the subnet: collateral, federated and static",
-        value_parser = PermissionMode::from_str,
+        value_enum,
+        help = "Permission mode for the subnet: collateral, federated, or static"
     )]
-    // TODO figure out a way to use a newtype + ValueEnum, or reference PermissionMode::VARIANTS to
-    //  enumerate all variants
     pub permission_mode: PermissionMode,
+
+    /// Source of new tokens: native or erc20.
     #[arg(
         long,
-        help = "The kind of supply source of a subnet on its parent subnet: native or erc20",
-        value_parser = AssetKind::from_str,
+        value_enum,
+        help = "Kind of supply source on parent: native or erc20"
     )]
-    // TODO figure out a way to use a newtype + ValueEnum, or reference AssetKind::VARIANTS to
-    //  enumerate all variants
     pub supply_source_kind: AssetKind,
-    #[arg(
-        long,
-        help = "The address of supply source of a subnet on its parent subnet. None if kind is native"
-    )]
+
+    /// ERC-20 contract address (if `supply-source-kind` == `erc20`).
+    #[arg(long, help = "Address of supply source on parent (omit if native)")]
     pub supply_source_address: Option<String>,
-    #[arg(
-        long,
-        help = "The address of validator gating contract. None if validator gating is disabled"
-    )]
+
+    /// Validator gating contract address (optional).
+    #[arg(long, help = "Validator gating contract address, if any")]
     pub validator_gater: Option<String>,
-    #[arg(long, help = "The address of validator rewarder contract.")]
+
+    /// Validator rewarder contract address.
+    #[arg(long, help = "Validator rewarder contract address")]
     pub validator_rewarder: Option<String>,
+
+    /// Collateral source kind: native or erc20.
     #[arg(
         long,
-        help = "The kind of collateral source of a subnet on its parent subnet: native or erc20",
-        value_parser = AssetKind::from_str,
+        value_enum,
+        help = "Kind of collateral source on parent: native or erc20"
     )]
     pub collateral_source_kind: Option<AssetKind>,
-    #[arg(
-        long,
-        help = "The address of collateral source of a subnet on its parent subnet. None if kind is native"
-    )]
+
+    /// ERC-20 collateral contract (if `collateral-source-kind` == `erc20`).
+    #[arg(long, help = "Collateral source address on parent (omit if native)")]
     pub collateral_source_address: Option<String>,
 
-    #[arg(
-        long,
-        help = "Genesis address assigned as the initial owner of all IPC diamond contracts on this subnet chain. \
-This address lives on the subnet network and controls contract-level administrative functions (e.g. pausing, upgrading, facet management) \
-for every IPC diamond contract within the subnet. Ownership can be transferred later via an on-chain transaction."
-    )]
-    pub genesis_subnet_ipc_contracts_owner: ethers::types::Address,
+    /// Owner for all IPC diamond contracts at genesis (subnet-local address).
+    #[arg(long, help = "Genesis owner for IPC diamond contracts on this subnet")]
+    pub genesis_subnet_ipc_contracts_owner: EthAddress,
 
     #[arg(
         long,
         help = "The chain id for the subnet, make sure it's unique across existing known chain ids"
     )]
     pub chain_id: u64,
+}
+
+#[derive(Debug, Args)]
+#[command(name = "create", about = "Create a new subnet actor")]
+pub struct CreateSubnetArgs {
+    #[command(flatten)]
+    pub config: SubnetCreateConfig,
 }

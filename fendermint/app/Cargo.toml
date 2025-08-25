@@ -36,6 +36,7 @@ tendermint-config = { workspace = true }
 tendermint-rpc = { workspace = true }
 tendermint-proto = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { workspace = true }
 tower = { workspace = true }
 tower-abci = { workspace = true }
 tracing = { workspace = true }
@@ -85,6 +86,7 @@ ipc-api = { path = "../../ipc/api" }
 ipc-provider = { path = "../../ipc/provider" }
 ipc_ipld_resolver = { path = "../../ipld/resolver" }
 ipc-observability = { path = "../../ipc/observability" }
+contracts-artifacts = { path = "../../contracts-artifacts" }
 
 [dev-dependencies]
 tempfile = { workspace = true }
