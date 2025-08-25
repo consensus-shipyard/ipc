@@ -4,7 +4,6 @@
 mod staking;
 
 use anyhow::{Context, Ok};
-use async_trait::async_trait;
 use ethers::types::U256;
 use fendermint_contract_test::Tester;
 use fendermint_rpc::response::decode_fevm_return_data;
@@ -18,7 +17,6 @@ use fvm_shared::address::Address;
 use fvm_shared::bigint::Zero;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
-use tendermint_rpc::Client;
 
 use fendermint_crypto::SecretKey;
 use fendermint_vm_actor_interface::eam;
@@ -258,18 +256,5 @@ async fn test_applying_upgrades() {
 
         // check that the app_version was upgraded to 1
         assert_eq!(tester.state_params().app_version, 1);
-    }
-}
-
-#[derive(Clone)]
-struct NeverCallClient;
-
-#[async_trait]
-impl Client for NeverCallClient {
-    async fn perform<R>(&self, _request: R) -> Result<R::Output, tendermint_rpc::Error>
-    where
-        R: tendermint_rpc::SimpleRequest,
-    {
-        todo!()
     }
 }

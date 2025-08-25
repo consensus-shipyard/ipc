@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use ethers::types::U256;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::subnet::SubnetActorErrors;
 use fendermint_vm_genesis::{Collateral, Validator};
@@ -15,13 +16,18 @@ use ipc_actors_abis::subnet_actor_getter_facet::{self as getter, SubnetActorGett
 use ipc_actors_abis::subnet_actor_manager_facet::SubnetActorManagerFacet;
 
 pub use ipc_actors_abis::register_subnet_facet::ConstructorParams as SubnetConstructorParams;
+use ipc_actors_abis::subnet_actor_checkpoint_facet_mock::SubnetActorCheckpointFacetMock;
 use ipc_actors_abis::subnet_actor_reward_facet::SubnetActorRewardFacet;
+use ipc_api::subnet_id::SubnetID;
 
 #[derive(Clone)]
 pub struct SubnetCaller<DB> {
     addr: EthAddress,
     getter: ContractCaller<DB, SubnetActorGetterFacet<MockProvider>, NoRevert>,
     manager: ContractCaller<DB, SubnetActorManagerFacet<MockProvider>, SubnetActorErrors>,
+    // use the SubnetActorCheckpointFacetMock instead of SubnetActorCheckpointingFacet to simulate
+    // subnet validator logic instead of focusing on cometbft app hash generation/validation
+    checkpoint: ContractCaller<DB, SubnetActorCheckpointFacetMock<MockProvider>, SubnetActorErrors>,
     rewarder: ContractCaller<DB, SubnetActorRewardFacet<MockProvider>, SubnetActorErrors>,
 }
 
@@ -31,6 +37,7 @@ impl<DB> SubnetCaller<DB> {
             addr,
             getter: ContractCaller::new(addr, SubnetActorGetterFacet::new),
             manager: ContractCaller::new(addr, SubnetActorManagerFacet::new),
+            checkpoint: ContractCaller::new(addr, SubnetActorCheckpointFacetMock::new),
             rewarder: ContractCaller::new(addr, SubnetActorRewardFacet::new),
         }
     }
@@ -179,5 +186,23 @@ impl<DB: Blockstore + Clone> SubnetCaller<DB> {
         cross_msgs: Vec<getter::IpcEnvelope>,
     ) -> anyhow::Result<[u8; 32]> {
         self.getter.call(state, |c| c.cross_msgs_hash(cross_msgs))
+    }
+
+    pub fn drive_validator_change(
+        &self,
+        state: &mut FvmExecState<DB>,
+        _: &SubnetID,
+        height: u64,
+        next_config_number: u64,
+    ) -> TryCallResult<()> {
+        self.checkpoint.try_call(state, |c| {
+            c.commit_side_effects(
+                U256::from(height),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                next_config_number,
+            )
+        })
     }
 }

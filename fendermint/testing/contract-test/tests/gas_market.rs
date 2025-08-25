@@ -5,7 +5,6 @@ mod staking;
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use fendermint_actor_gas_market_eip1559::Constants;
 use fendermint_contract_test::Tester;
 use fendermint_crypto::{PublicKey, SecretKey};
@@ -36,7 +35,6 @@ use fvm_shared::version::NetworkVersion;
 use lazy_static::lazy_static;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
-use tendermint_rpc::Client;
 
 lazy_static! {
     static ref SECRET: SecretKey = rand_secret_key();
@@ -364,18 +362,5 @@ fn custom_gas_limit(block_gas_limit: u64) -> Message {
         gas_limit: 10000000,
         gas_fee_cap: Default::default(),
         gas_premium: Default::default(),
-    }
-}
-
-#[derive(Clone)]
-struct NeverCallClient;
-
-#[async_trait]
-impl Client for NeverCallClient {
-    async fn perform<R>(&self, _request: R) -> Result<R::Output, tendermint_rpc::Error>
-    where
-        R: tendermint_rpc::SimpleRequest,
-    {
-        todo!()
     }
 }
