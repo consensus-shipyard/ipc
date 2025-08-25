@@ -241,11 +241,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase, IIpcHandler {
     }
 
     function submitBottomUpCheckpoint(BottomUpCheckpoint memory checkpoint, SubnetActorDiamond sa) internal {
-        (address[] memory parentValidators, bytes[] memory parentSignatures) = prepareValidatorsSignatures(
-            checkpoint,
-            sa
-        );
-
         SubnetActorCheckpointFacetMock checkpointer = sa.checkpointer();
 
         vm.deal(address(1), 1 ether);
@@ -394,8 +389,9 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase, IIpcHandler {
 
             address gateway = subnets.getSubnetGateway(from);
             // this would normally submitted by releayer. It call the subnet actor on the L2 network.
-            BottomUpCheckpoint memory checkpoint = createBottomUpCheckpoint(from, GatewayDiamond(payable(gateway)));
-            IpcEnvelope[] memory msgs = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
+
+            (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory msgs) = XnetUtil
+                .callCreateBottomUpCheckpointFromChildSubnet(from, GatewayDiamond(payable(gateway)));
             submitBottomUpCheckpoint(checkpoint, sa);
             execBottomUpMsgBatch(checkpoint, msgs, sa);
 

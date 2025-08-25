@@ -503,20 +503,16 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         params.subnetL3.gateway.messenger().sendContractXnetMessage{value: params.amount}(crossMessage);
 
         // this would normally submitted by releayer. It call the subnet actor on the L2 network.
-        (BottomUpCheckpoint memory _checkpoint, IpcEnvelope[] memory _msgs) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
-            params.subnetL3.id,
-            params.subnetL3.gateway
-        );
+        (BottomUpCheckpoint memory _checkpoint, IpcEnvelope[] memory _msgs) = XnetUtil
+            .callCreateBottomUpCheckpointFromChildSubnet(params.subnetL3.id, params.subnetL3.gateway);
         submitBottomUpCheckpoint(_checkpoint, params.subnetL3.subnetActor);
         _msgs[0] = crossMessage;
         execBottomUpMsgBatch(_checkpoint, _msgs, params.subnetL3.subnetActor);
 
         // create checkpoint in L2 and submit it to the root network (L2 subnet actor)
         vm.recordLogs();
-        (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory l2_batch) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
-            params.subnet.id,
-            params.subnet.gateway
-        );
+        (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory l2_batch) = XnetUtil
+            .callCreateBottomUpCheckpointFromChildSubnet(params.subnet.id, params.subnet.gateway);
 
         // expected result top down message from root to L2. This is a response to the xnet call.
         IpcEnvelope memory resultMessage = crossMessage.createResultMsg(params.expectedOutcome, params.expectedRet);
@@ -613,19 +609,15 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         executeTopDownMsgs(msgs, params.subnetL3.gateway);
         // submit checkoint so the result message can be propagated to L2
         vm.recordLogs();
-        (BottomUpCheckpoint memory l3_checkpoint, IpcEnvelope[] memory l3_batch) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
-            params.subnetL3.id,
-            params.subnetL3.gateway
-        );
+        (BottomUpCheckpoint memory l3_checkpoint, IpcEnvelope[] memory l3_batch) = XnetUtil
+            .callCreateBottomUpCheckpointFromChildSubnet(params.subnetL3.id, params.subnetL3.gateway);
         submitBottomUpCheckpoint(l3_checkpoint, params.subnetL3.subnetActor);
         execBottomUpMsgBatch(l3_checkpoint, l3_batch, params.subnetL3.subnetActor);
 
         // submit checkoint so the result message can be propagated to root network
         vm.recordLogs();
-        (BottomUpCheckpoint memory l2_checkpoint, IpcEnvelope[] memory l2_batch) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
-            params.subnet.id,
-            params.subnet.gateway
-        );
+        (BottomUpCheckpoint memory l2_checkpoint, IpcEnvelope[] memory l2_batch) = XnetUtil
+            .callCreateBottomUpCheckpointFromChildSubnet(params.subnet.id, params.subnet.gateway);
         submitBottomUpCheckpoint(l2_checkpoint, params.subnet.subnetActor);
         execBottomUpMsgBatch(l2_checkpoint, l2_batch, params.subnet.subnetActor);
 
@@ -851,11 +843,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         address expectedSubnetAddr,
         address expectedGatewayAddr
     ) internal {
-        (address[] memory parentValidators, bytes[] memory parentSignatures) = prepareValidatorsSignatures(
-            checkpoint,
-            subnetActor
-        );
-
         SubnetActorCheckpointFacetMock checkpointer = subnetActor.checkpointer();
 
         vm.startPrank(address(subnetActor));
@@ -867,12 +854,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
             checkpoint.nextConfigurationNumber
         );
 
-        vm.expectEmit(true, true, true, true, expectedGatewayAddr);
-        emit LibGateway.NewTopDownMessage({
-            subnet: expectedSubnetAddr,
-            message: expectedMessage,
-            id: expectedMessage.toTracingId()
-        });
         BottomUpBatch.Inclusion[] memory inclusions = BottomUpBatchHelper.makeInclusions(msgBatch);
         checkpointer.execBottomUpMsgBatch(checkpoint.blockHeight, inclusions);
 

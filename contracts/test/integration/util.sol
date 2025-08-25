@@ -14,7 +14,6 @@ import {GatewayGetterFacet} from "../../contracts/gateway/GatewayGetterFacet.sol
 import {ActivityHelper} from "../helpers/ActivityHelper.sol";
 import {BottomUpBatchHelper} from "../helpers/BottomUpBatchHelper.sol";
 
-
 /// @notice A bottom-up checkpoint type.
 struct BottomUpCheckpoint {
     /// @dev Child subnet ID, for replay protection from other subnets where the exact same validators operate.
@@ -39,7 +38,7 @@ library XnetUtil {
     uint64 constant DEFAULT_CHECKPOINT_PERIOD = 10;
 
     using GatewayFacetsHelper for GatewayDiamond;
-    
+
     function getNextEpoch(uint256 blockNumber, uint256 checkPeriod) internal pure returns (uint256) {
         return ((uint64(blockNumber) / checkPeriod) + 1) * checkPeriod;
     }
@@ -69,7 +68,7 @@ library XnetUtil {
 
     function callCreateBottomUpCheckpointFromChildSubnet(
         SubnetID memory subnet,
-        GatewayDiamond gw,
+        GatewayDiamond,
         IpcEnvelope[] memory msgs
     ) internal returns (BottomUpCheckpoint memory checkpoint) {
         uint256 e = getNextEpoch(block.number, DEFAULT_CHECKPOINT_PERIOD);

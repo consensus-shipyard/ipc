@@ -385,10 +385,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         manager.release{value: releaseAmount}(FvmAddressHelper.from(address(recipient)));
 
         vm.recordLogs();
-        (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory msgs) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
-            deflationaryTokenSubnet.id,
-            deflationaryTokenSubnet.gateway
-        );
+        (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory msgs) = XnetUtil
+            .callCreateBottomUpCheckpointFromChildSubnet(deflationaryTokenSubnet.id, deflationaryTokenSubnet.gateway);
         submitBottomUpCheckpoint(checkpoint, deflationaryTokenSubnet.subnetActor);
         execBottomUpMsgBatch(checkpoint, msgs, deflationaryTokenSubnet.subnetActor);
 
@@ -430,10 +428,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         manager.release{value: releaseAmount}(FvmAddressHelper.from(address(recipient)));
 
         vm.recordLogs();
-        (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory msgs) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
-            inflationaryTokenSubnet.id,
-            inflationaryTokenSubnet.gateway
-        );
+        (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory msgs) = XnetUtil
+            .callCreateBottomUpCheckpointFromChildSubnet(inflationaryTokenSubnet.id, inflationaryTokenSubnet.gateway);
         submitBottomUpCheckpoint(checkpoint, inflationaryTokenSubnet.subnetActor);
         execBottomUpMsgBatch(checkpoint, msgs, inflationaryTokenSubnet.subnetActor);
 
@@ -640,10 +636,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         manager.release{value: amount}(FvmAddressHelper.from(address(recipient)));
 
         vm.recordLogs();
-        (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory msgs) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
-            nativeSubnet.id,
-            nativeSubnet.gateway
-        );
+        (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory msgs) = XnetUtil
+            .callCreateBottomUpCheckpointFromChildSubnet(nativeSubnet.id, nativeSubnet.gateway);
         submitBottomUpCheckpoint(checkpoint, nativeSubnet.subnetActor);
         execBottomUpMsgBatch(checkpoint, msgs, nativeSubnet.subnetActor);
 
@@ -797,7 +791,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.prank(caller);
         manager.release{value: amount}(FvmAddressHelper.from(address(recipient)));
 
-        (BottomUpCheckpoint memory checkpoint,) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
+        (BottomUpCheckpoint memory checkpoint, ) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnet.id,
             nativeSubnet.gateway
         );
@@ -825,10 +819,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         manager.release{value: amount}(FvmAddressHelper.from(address(recipient)));
 
         vm.recordLogs();
-        (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory msgs) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
-            nativeSubnet.id,
-            nativeSubnet.gateway
-        );
+        (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory msgs) = XnetUtil
+            .callCreateBottomUpCheckpointFromChildSubnet(nativeSubnet.id, nativeSubnet.gateway);
         submitBottomUpCheckpoint(checkpoint, nativeSubnet.subnetActor);
         execBottomUpMsgBatch(checkpoint, msgs, nativeSubnet.subnetActor);
 
@@ -998,10 +990,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         manager.release{value: amount}(FvmAddressHelper.from(address(recipient)));
 
         vm.recordLogs();
-        (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory msgs) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
-            tokenSubnet.id,
-            tokenSubnet.gateway
-        );
+        (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory msgs) = XnetUtil
+            .callCreateBottomUpCheckpointFromChildSubnet(tokenSubnet.id, tokenSubnet.gateway);
         submitBottomUpCheckpoint(checkpoint, tokenSubnet.subnetActor);
         execBottomUpMsgBatch(checkpoint, msgs, tokenSubnet.subnetActor);
 
@@ -1031,10 +1021,8 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         manager.release{value: amount}(FvmAddressHelper.from(address(recipient)));
 
         vm.recordLogs();
-        (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory msgs) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
-            tokenSubnet.id,
-            tokenSubnet.gateway
-        );
+        (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory msgs) = XnetUtil
+            .callCreateBottomUpCheckpointFromChildSubnet(tokenSubnet.id, tokenSubnet.gateway);
         submitBottomUpCheckpoint(checkpoint, tokenSubnet.subnetActor);
         execBottomUpMsgBatch(checkpoint, msgs, tokenSubnet.subnetActor);
 
@@ -1130,7 +1118,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             )
         );
 
-        (BottomUpCheckpoint memory checkpoint,) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
+        (BottomUpCheckpoint memory checkpoint, ) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnet.id,
             nativeSubnet.gateway
         );
@@ -1275,7 +1263,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.prank(address(caller));
         messenger.sendContractXnetMessage{value: amount}(envelope);
 
-        (BottomUpCheckpoint memory checkpoint,) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
+        (BottomUpCheckpoint memory checkpoint, ) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             tokenSubnet.id,
             tokenSubnet.gateway
         );

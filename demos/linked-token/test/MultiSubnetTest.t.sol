@@ -31,11 +31,10 @@ import {TopDownFinalityFacet} from "@ipc/contracts/gateway/router/TopDownFinalit
 import {XnetMessagingFacet} from "@ipc/contracts/gateway/router/XnetMessagingFacet.sol";
 import {SubnetActorManagerFacet} from "@ipc/contracts/subnet/SubnetActorManagerFacet.sol";
 import {GatewayGetterFacet} from "@ipc/contracts/gateway/GatewayGetterFacet.sol";
-import {SubnetActorCheckpointingFacet} from "@ipc/contracts/subnet/SubnetActorCheckpointingFacet.sol";
 import {CheckpointingFacet} from "@ipc/contracts/gateway/router/CheckpointingFacet.sol";
 import {FvmAddressHelper} from "@ipc/contracts/lib/FvmAddressHelper.sol";
 import {Consensus, CompressedActivityRollup} from "@ipc/contracts/structs/Activity.sol";
-import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind, ResultMsg, CallMsg} from "@ipc/contracts/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpMsgBatch, ParentFinality, IpcMsgKind, ResultMsg, CallMsg} from "@ipc/contracts/structs/CrossNet.sol";
 import {SubnetIDHelper} from "@ipc/contracts/lib/SubnetIDHelper.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {CrossMsgHelper} from "@ipc/contracts/lib/CrossMsgHelper.sol";
@@ -46,6 +45,26 @@ import {BottomUpBatchRecorded, BottomUpBatch} from "@ipc/contracts/structs/Botto
 string constant REPLICA_TOKEN_NAME = "USDCTestReplica";
 string constant REPLICA_TOKEN_SYMBOL = "USDCtR";
 uint8 constant REPLICA_TOKEN_DECIMALS = 6;
+
+/// @notice A bottom-up checkpoint type.
+struct BottomUpCheckpoint {
+    /// @dev Child subnet ID, for replay protection from other subnets where the exact same validators operate.
+    /// Alternatively it can be appended to the hash before signing, similar to how we use the chain ID.
+    SubnetID subnetID;
+    /// @dev The height of the child subnet at which this checkpoint was cut.
+    /// Has to follow the previous checkpoint by checkpoint period.
+    uint256 blockHeight;
+    /// @dev The hash of the block.
+    bytes32 blockHash;
+    /// @dev The number of the membership (validator set) which is going to sign the next checkpoint.
+    /// This one expected to be signed by the validators from the membership reported in the previous checkpoint.
+    /// 0 could mean "no change".
+    uint64 nextConfigurationNumber;
+    /// @dev Batch of messages to execute.
+    BottomUpBatch.Commitment msgs;
+    /// @dev The activity rollup from child subnet to parent subnet.
+    CompressedActivityRollup activity;
+}
 
 contract MultiSubnetTest is IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
@@ -326,11 +345,10 @@ contract MultiSubnetTest is IntegrationTestBase {
         console.log("Begin bottom up checkpoint");
 
         vm.recordLogs();
-        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+        (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory msgs) = callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnetName,
             nativeSubnetGateway
         );
-        IpcEnvelope[] memory msgs = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
         submitBottomUpCheckpoint(checkpoint, rootNativeSubnetActor);
         execBottomUpMsgBatch(checkpoint, msgs, rootNativeSubnetActor);
 
@@ -372,17 +390,11 @@ contract MultiSubnetTest is IntegrationTestBase {
     function callCreateBottomUpCheckpointFromChildSubnet(
         SubnetID memory subnet,
         GatewayDiamond gw
-    ) internal returns (BottomUpCheckpoint memory checkpoint) {
+    ) internal returns (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory) {
         uint256 e = getNextEpoch(block.number, DEFAULT_CHECKPOINT_PERIOD);
 
         GatewayGetterFacet getter = gw.getter();
-        CheckpointingFacet checkpointer = gw.checkpointer();
-
         BottomUpMsgBatch memory batch = getter.bottomUpMsgBatch(e);
-
-        (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
-
-        (bytes32 membershipRoot, ) = MerkleTreeHelper.createMerkleProofsForValidators(addrs, weights);
 
         checkpoint = BottomUpCheckpoint({
             subnetID: subnet,
@@ -398,23 +410,12 @@ contract MultiSubnetTest is IntegrationTestBase {
             })
         });
 
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        checkpointer.createBottomUpCheckpoint(
-            checkpoint,
-            membershipRoot,
-            weights[0] + weights[1] + weights[2],
-            batch.msgs,
-            ActivityHelper.dummyActivityRollup()
-        );
-        vm.stopPrank();
-
-        return checkpoint;
+        return (checkpoint, batch.msgs);
     }
 
     function submitBottomUpCheckpoint(BottomUpCheckpoint memory checkpoint, SubnetActorDiamond sa) internal {
         (uint256[] memory parentKeys, address[] memory parentValidators, ) = TestUtils.getThreeValidators(vm);
         bytes[] memory parentPubKeys = new bytes[](3);
-        bytes[] memory parentSignatures = new bytes[](3);
 
         SubnetActorManagerFacet manager = sa.manager();
 
@@ -425,17 +426,8 @@ contract MultiSubnetTest is IntegrationTestBase {
             manager.join{value: 10}(parentPubKeys[i], 10);
         }
 
-        bytes32 hash = keccak256(abi.encode(checkpoint));
-
-        for (uint256 i = 0; i < 3; i++) {
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(parentKeys[i], hash);
-            parentSignatures[i] = abi.encodePacked(r, s, v);
-        }
-
-        SubnetActorCheckpointingFacet checkpointer = sa.checkpointer();
-
         vm.startPrank(address(sa));
-        checkpointer.submitCheckpoint(checkpoint, parentValidators, parentSignatures);
+        sa.checkpointer().commitSideEffects(checkpoint.blockHeight, checkpoint.subnetID, checkpoint.activity, checkpoint.msgs, checkpoint.nextConfigurationNumber);
         vm.stopPrank();
     }
 
@@ -461,11 +453,8 @@ contract MultiSubnetTest is IntegrationTestBase {
     ) internal {
         BottomUpBatch.Inclusion[] memory inclusions = BottomUpBatchHelper.makeInclusions(msgs);
 
-        SubnetActorCheckpointingFacet checkpointer = sa.checkpointer();
         vm.startPrank(address(sa));
-
-        checkpointer.execBottomUpMsgBatch(checkpoint.blockHeight, inclusions);
-
+        sa.checkpointer().execBottomUpMsgBatch(checkpoint.blockHeight, inclusions);
         vm.stopPrank();
     }
 }
