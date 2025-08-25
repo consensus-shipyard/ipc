@@ -505,7 +505,7 @@ async fn run_async_deployment(
                 let state = state_clone.clone();
                 let deployment_id = deployment_id_clone.clone();
                 let contract_name = contract_name.to_string();
-                let contract_type = contract_type.to_string();
+                let _contract_type = contract_type.to_string();
 
                 tokio::spawn(async move {
                     let progress_percent =
@@ -523,11 +523,7 @@ async fn run_async_deployment(
                         &deployment_id,
                         "contracts",
                         progress_percent as u8,
-                        if current_step + 1 == total_steps {
-                            "in_progress"
-                        } else {
-                            "in_progress"
-                        }, // Never mark as completed here
+                        "in_progress", // Never mark as completed here
                         Some(format!(
                             "Deploying {} ({}/{})",
                             contract_name,
@@ -719,6 +715,7 @@ pub async fn broadcast_progress(
 }
 
 /// Broadcast deployment progress with subnet_id to WebSocket clients
+#[allow(dead_code)]
 async fn broadcast_progress_with_subnet_id(
     state: &AppState,
     deployment_id: &str,

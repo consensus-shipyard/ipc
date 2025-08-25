@@ -26,6 +26,7 @@ pub type WebSocketClient = std::sync::Arc<
 
 /// Deployment state tracking
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct DeploymentState {
     pub id: String,
     pub template: String,
@@ -39,6 +40,7 @@ pub struct DeploymentState {
 
 /// Shared application state
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct AppState {
     pub config_path: String,
     pub mode: DeploymentMode,
@@ -51,6 +53,7 @@ pub struct AppState {
 
 /// Deployment mode for the UI
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum DeploymentMode {
     Development,
     Production,

@@ -410,8 +410,9 @@ async fn handle_get_instance(
 }
 
 /// Approve a subnet
+#[allow(dead_code)]
 pub async fn approve_subnet(
-    headers: Option<&HeaderMap>,
+    _headers: Option<&HeaderMap>,
     subnet_service: Arc<SubnetService>,
     subnet_id: String,
     from_address: Option<String>,
@@ -440,8 +441,9 @@ pub async fn approve_subnet(
 }
 
 /// List pending subnet approvals for a gateway
+#[allow(dead_code)]
 pub async fn list_pending_approvals(
-    headers: Option<&HeaderMap>,
+    _headers: Option<&HeaderMap>,
     subnet_service: Arc<SubnetService>,
     gateway_address: String,
 ) -> Result<impl Reply, Rejection> {

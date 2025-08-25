@@ -26,6 +26,7 @@ pub struct NetworkConnectionStatus {
 
 /// Network connection test request
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct NetworkConnectionTestRequest {
     pub network_id: String,
     pub network_name: String,

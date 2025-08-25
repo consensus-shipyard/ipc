@@ -96,7 +96,7 @@ impl SubnetService {
     pub async fn add_validator(
         &self,
         subnet_id: &str,
-        validator_data: &serde_json::Value,
+        _validator_data: &serde_json::Value,
     ) -> Result<String> {
         // TODO: Implement validator addition using the provider
         // For now, return a placeholder response
@@ -110,7 +110,7 @@ impl SubnetService {
     pub async fn remove_validator(
         &self,
         subnet_id: &str,
-        validator_data: &serde_json::Value,
+        _validator_data: &serde_json::Value,
     ) -> Result<String> {
         // TODO: Implement validator removal using the provider
         // For now, return a placeholder response
@@ -124,7 +124,7 @@ impl SubnetService {
     pub async fn update_validator_stake(
         &self,
         subnet_id: &str,
-        stake_data: &serde_json::Value,
+        _stake_data: &serde_json::Value,
     ) -> Result<String> {
         // TODO: Implement stake update using the provider
         // For now, return a placeholder response
@@ -138,7 +138,7 @@ impl SubnetService {
     pub async fn set_federated_power(
         &self,
         subnet_id: &str,
-        power_data: &serde_json::Value,
+        _power_data: &serde_json::Value,
     ) -> Result<String> {
         // TODO: Implement federated power setting
         // The set_federated_power function signature needs to be checked
@@ -528,7 +528,7 @@ impl SubnetService {
                 status.validator_count = validators.len();
                 status.active_validators = validators
                     .iter()
-                    .filter(|v| {
+                    .filter(|_v| {
                         // Check if validator is active by examining the validator info structure
                         // ValidatorInfo doesn't have is_active(), we'll use a simple heuristic
                         true // For now, consider all validators as active since we can't determine this easily
@@ -1236,10 +1236,11 @@ impl SubnetService {
                         subnet_id_str,
                         e
                     );
-                    let mut status = SubnetStatusInfo::default();
-                    status.lifecycle_state = SubnetLifecycleState::Failed;
-                    status.error_message = Some(format!("Status check failed: {}", e));
-                    status
+                    SubnetStatusInfo {
+                        lifecycle_state: SubnetLifecycleState::Failed,
+                        error_message: Some(format!("Status check failed: {}", e)),
+                        ..SubnetStatusInfo::default()
+                    }
                 }
             };
 
@@ -1378,10 +1379,11 @@ impl SubnetService {
                             subnet_id,
                             e
                         );
-                        let mut status = SubnetStatusInfo::default();
-                        status.lifecycle_state = SubnetLifecycleState::Failed;
-                        status.error_message = Some(format!("Status check failed: {}", e));
-                        status
+                        SubnetStatusInfo {
+                            lifecycle_state: SubnetLifecycleState::Failed,
+                            error_message: Some(format!("Status check failed: {}", e)),
+                            ..SubnetStatusInfo::default()
+                        }
                     }
                 };
 
@@ -1924,7 +1926,7 @@ impl SubnetService {
         // This is a simplified check - in reality we'd need to query the subnet actor contract
         // to check current collateral vs minimum required collateral
         match provider.get_genesis_info(subnet).await {
-            Ok(genesis_info) => {
+            Ok(_genesis_info) => {
                 log::debug!("Genesis info found, assuming minimum collateral met");
                 true
             }

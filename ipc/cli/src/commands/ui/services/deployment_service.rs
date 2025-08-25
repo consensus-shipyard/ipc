@@ -58,6 +58,7 @@ impl DeploymentService {
     }
 
     /// Validate that the deployment address has sufficient balance
+    #[allow(dead_code)]
     async fn validate_deployment_balance(
         &self,
         rpc_url: &str,
@@ -88,6 +89,7 @@ impl DeploymentService {
     }
 
     /// Get the parent network from network headers or default
+    #[allow(dead_code)]
     fn get_parent_network_from_headers(headers: &HeaderMap) -> String {
         // Extract chain ID from network headers
         if let Some(chain_id_header) = headers.get("x-network-chain-id") {
@@ -675,9 +677,10 @@ impl DeploymentService {
     }
 
     /// Create a subnet with custom gateway addresses, bypassing the automatic gateway selection
+    #[allow(clippy::too_many_arguments)]
     async fn create_subnet_with_custom_gateway(
         &self,
-        provider: &mut ipc_provider::IpcProvider,
+        _provider: &mut ipc_provider::IpcProvider,
         from: Option<fvm_shared::address::Address>,
         parent: ipc_api::subnet_id::SubnetID,
         min_validators: u64,

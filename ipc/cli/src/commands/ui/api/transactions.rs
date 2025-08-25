@@ -84,10 +84,10 @@ async fn send_simple_subnet_transaction(
     subnet: &SubnetID,
 ) -> anyhow::Result<TestTransactionResponse> {
     // Get test addresses
-    let (from_addr, to_addr) = get_test_addresses(provider, subnet).await?;
+    let (_from_addr, _to_addr) = get_test_addresses(provider, subnet).await?;
 
     // Send a simple transfer transaction
-    let amount = fvm_shared::econ::TokenAmount::from_atto(1000u64);
+    let _amount = fvm_shared::econ::TokenAmount::from_atto(1000u64);
 
     // This is a simplified example - in reality you'd need to properly construct and send the transaction
     let tx_hash = "0x1234567890abcdef".to_string(); // Mock transaction hash
@@ -106,8 +106,8 @@ async fn send_simple_subnet_transaction(
 
 /// Send a transfer subnet transaction
 async fn send_transfer_subnet_transaction(
-    provider: &mut ipc_provider::IpcProvider,
-    subnet: &SubnetID,
+    _provider: &mut ipc_provider::IpcProvider,
+    _subnet: &SubnetID,
     test_tx_data: &TestTransactionRequest,
 ) -> anyhow::Result<TestTransactionResponse> {
     let from_addr_str = test_tx_data
@@ -124,9 +124,9 @@ async fn send_transfer_subnet_transaction(
         .ok_or_else(|| anyhow::anyhow!("Amount required for transfer"))?;
 
     // Parse addresses and amount
-    let from_addr = fvm_shared::address::Address::from_str(from_addr_str)?;
-    let to_addr = fvm_shared::address::Address::from_str(to_addr_str)?;
-    let amount = fvm_shared::econ::TokenAmount::from_whole(amount_str.parse::<u64>().unwrap_or(1));
+    let _from_addr = fvm_shared::address::Address::from_str(from_addr_str)?;
+    let _to_addr = fvm_shared::address::Address::from_str(to_addr_str)?;
+    let _amount = fvm_shared::econ::TokenAmount::from_whole(amount_str.parse::<u64>().unwrap_or(1));
 
     // This is a simplified example - in reality you'd need to properly construct and send the transaction
     let tx_hash = "0xabcdef1234567890".to_string(); // Mock transaction hash
@@ -145,10 +145,10 @@ async fn send_transfer_subnet_transaction(
 
 /// Send an L1 transaction
 async fn send_l1_transaction(
-    provider: &mut ipc_provider::IpcProvider,
-    subnet: &SubnetID,
+    _provider: &mut ipc_provider::IpcProvider,
+    _subnet: &SubnetID,
     tx_type: &str,
-    test_tx_data: &TestTransactionRequest,
+    _test_tx_data: &TestTransactionRequest,
 ) -> anyhow::Result<TestTransactionResponse> {
     match tx_type {
         "join" => {
@@ -190,8 +190,8 @@ async fn send_l1_transaction(
 
 /// Get test addresses for transactions
 async fn get_test_addresses(
-    provider: &ipc_provider::IpcProvider,
-    subnet: &SubnetID,
+    _provider: &ipc_provider::IpcProvider,
+    _subnet: &SubnetID,
 ) -> anyhow::Result<(fvm_shared::address::Address, fvm_shared::address::Address)> {
     // Get available addresses from wallet
     // This is a simplified implementation

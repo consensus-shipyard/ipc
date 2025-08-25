@@ -234,6 +234,7 @@ pub struct SubnetInstanceResponse {
 
 /// Test transaction request
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct TestTransactionRequest {
     pub tx_type: String, // "simple", "transfer", "contract_call"
     pub network: String, // "subnet", "l1"
@@ -291,11 +292,13 @@ pub struct SubnetMetadata {
 
 /// Error types for better error handling
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct InvalidRequest(pub String);
 
 impl warp::reject::Reject for InvalidRequest {}
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct ServerError(pub String);
 
 impl warp::reject::Reject for ServerError {}

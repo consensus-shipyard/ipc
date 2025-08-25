@@ -19,6 +19,7 @@ pub enum IncomingMessage {
 /// WebSocket message types from backend to frontend
 #[derive(Debug, Serialize)]
 #[serde(tag = "type")]
+#[allow(dead_code)]
 pub enum OutgoingMessage {
     /// Deployment progress update
     DeploymentProgress {
@@ -42,12 +43,14 @@ pub enum OutgoingMessage {
 
 /// WebSocket connection state
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct ConnectionState {
     pub client_id: String,
     pub subscriptions: Vec<String>,
 }
 
 impl ConnectionState {
+    #[allow(dead_code)]
     pub fn new(client_id: String) -> Self {
         Self {
             client_id,
@@ -55,12 +58,14 @@ impl ConnectionState {
         }
     }
 
+    #[allow(dead_code)]
     pub fn subscribe(&mut self, subscription: String) {
         if !self.subscriptions.contains(&subscription) {
             self.subscriptions.push(subscription);
         }
     }
 
+    #[allow(dead_code)]
     pub fn unsubscribe(&mut self, subscription: &str) {
         self.subscriptions.retain(|s| s != subscription);
     }

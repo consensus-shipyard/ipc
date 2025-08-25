@@ -170,10 +170,6 @@ impl GatewayService {
                         gateways_map.insert(gateway_key, gateway_info);
                     }
                 }
-                _ => {
-                    // Skip non-EVM subnets for now
-                    continue;
-                }
             }
         }
 
@@ -189,6 +185,7 @@ impl GatewayService {
     }
 
     /// List deployed contracts for gateways
+    #[allow(dead_code)]
     pub async fn list_deployed_contracts(&self) -> Result<Vec<serde_json::Value>> {
         let gateways = self.discover_gateways(None).await?; // No headers for this call
         let mut contracts = Vec::new();
@@ -259,6 +256,7 @@ impl GatewayService {
     }
 
     /// Track a newly deployed gateway
+    #[allow(dead_code)]
     pub async fn track_deployed_gateway(
         &self,
         gateway_address: String,
@@ -285,7 +283,8 @@ impl GatewayService {
     }
 
     /// Get gateway statistics
-    pub async fn get_gateway_stats(&self, gateway_id: &str) -> Result<serde_json::Value> {
+    #[allow(dead_code)]
+    pub async fn get_gateway_stats(&self, _gateway_id: &str) -> Result<serde_json::Value> {
         // TODO: Get actual gateway statistics from the provider
         Ok(serde_json::json!({
             "total_transactions": 0,
@@ -299,8 +298,9 @@ impl GatewayService {
     }
 
     /// Validate gateway configuration
+    #[allow(dead_code)]
     pub async fn validate_gateway(&self, gateway_address: &str) -> Result<bool> {
-        let provider = get_ipc_provider(&self.global)?;
+        let _provider = get_ipc_provider(&self.global)?;
 
         // Try to connect to the gateway and validate it's working
         // This is a simplified check - in reality, you'd want to perform
@@ -319,6 +319,7 @@ impl GatewayService {
     }
 
     /// Get all contracts associated with gateways
+    #[allow(dead_code)]
     pub async fn get_gateway_contracts(&self) -> Result<Vec<serde_json::Value>> {
         let gateways = self.discover_gateways(None).await?; // No headers for this call
 
@@ -354,6 +355,7 @@ impl GatewayService {
     }
 
     /// Inspect a gateway contract
+    #[allow(dead_code)]
     pub async fn inspect_gateway_contract(&self, address: &str) -> Result<serde_json::Value> {
         // TODO: Use the provider to inspect the actual contract
         Ok(serde_json::json!({

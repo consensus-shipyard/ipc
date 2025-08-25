@@ -9,9 +9,11 @@ use tokio::sync::Mutex;
 use warp::ws::Message;
 
 /// Type alias for WebSocket clients
+#[allow(dead_code)]
 pub type Clients = Arc<Mutex<Vec<super::super::WebSocketClient>>>;
 
 /// Handle new WebSocket connection (simplified)
+#[allow(dead_code)]
 pub async fn handle_websocket(websocket: warp::ws::WebSocket, clients: Clients) {
     let (tx, mut rx) = websocket.split();
     let tx = Arc::new(Mutex::new(tx));
@@ -56,12 +58,13 @@ pub async fn handle_websocket(websocket: warp::ws::WebSocket, clients: Clients) 
 }
 
 /// Broadcast deployment progress to all clients (placeholder)
+#[allow(dead_code)]
 pub async fn broadcast_deployment_progress(
-    state: &AppState,
+    _state: &AppState,
     deployment_id: &str,
     step: &str,
     progress: u8,
-    status: &str,
+    _status: &str,
     _message: Option<String>,
 ) {
     log::info!(
@@ -76,8 +79,9 @@ pub async fn broadcast_deployment_progress(
 }
 
 /// Broadcast subnet status update to all clients (placeholder)
+#[allow(dead_code)]
 pub async fn broadcast_subnet_status(
-    state: &AppState,
+    _state: &AppState,
     subnet_id: &str,
     status: &str,
     _message: Option<String>,
