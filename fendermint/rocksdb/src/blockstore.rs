@@ -61,7 +61,7 @@ impl NamespaceBlockstore {
 
     // Unfortunately there doesn't seem to be a way to avoid having to
     // clone another instance for each operation :(
-    fn cf(&self) -> anyhow::Result<Arc<BoundColumnFamily>> {
+    fn cf(&self) -> anyhow::Result<Arc<BoundColumnFamily<'_>>> {
         self.db
             .cf_handle(&self.ns)
             .ok_or_else(|| anyhow!("namespace {} does not exist!", self.ns))

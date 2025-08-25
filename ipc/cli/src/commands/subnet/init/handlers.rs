@@ -255,9 +255,29 @@ pub async fn generate_node_config(
     // Determine genesis source based on activation status
     let genesis_source = if activation_info.is_some() {
         // Subnet is activated - use existing genesis file
+        // genesis_path actually contains the sealed genesis path, so we need to derive the genesis path
+        let sealed_path = genesis_path.to_path_buf();
+
+        // Derive the genesis path from the sealed path by replacing "genesis_sealed_" with "genesis_"
+        let genesis_path = if let Some(file_name) = sealed_path.file_name() {
+            if let Some(file_str) = file_name.to_str() {
+                if file_str.starts_with("genesis_sealed_") {
+                    let genesis_name = file_str.replace("genesis_sealed_", "genesis_");
+                    sealed_path.with_file_name(genesis_name)
+                } else {
+                    // Fallback: assume the sealed path is correct
+                    sealed_path.clone()
+                }
+            } else {
+                sealed_path.clone()
+            }
+        } else {
+            sealed_path.clone()
+        };
+
         GenesisSource::Path(crate::commands::subnet::create_genesis::CreatedGenesis {
-            genesis: genesis_path.to_path_buf(),
-            sealed: genesis_path.to_path_buf(),
+            genesis: genesis_path,
+            sealed: sealed_path,
         })
     } else {
         // Subnet is NOT activated - create new genesis
