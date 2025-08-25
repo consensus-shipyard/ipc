@@ -31,6 +31,7 @@ library CometbftLightClient {
     error InvalidLength(string what, uint256 expected, uint256 actual);
     error NotSameChain();
     error NoQuorumFormed();
+    error NoValidatorInQuoum();
     error CometbftSignerNotValidator(bytes20 expected, bytes20 incoming);
     error InvalidCommitHash(bytes32 expected, bytes32 actual);
     error InvalidSignature(bytes32 message, bytes signature, address validator, ECDSA.RecoverError err);
@@ -40,7 +41,11 @@ library CometbftLightClient {
     function verifyValidatorsQuorum(SignedHeader.Data memory header) internal view {
         checkCommitHash(header);
 
-        uint256 totalPower = 0;
+        uint256 totalPower = LibPower.getTotalCurrentPower();
+        if (totalPower == 0) {
+            revert NoValidatorInQuoum();
+        }
+
         uint256 powerSoFar = 0;
 
         CommitSig.Data memory commitSig;

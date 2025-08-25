@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import "forge-std/Test.sol";
 import "../../contracts/errors/IPCErrors.sol";
 import {EMPTY_BYTES} from "../../contracts/constants/Constants.sol";
-import {IpcEnvelope, BottomUpCheckpoint, BottomUpMsgBatch, ParentFinality, IpcMsgKind, OutcomeType} from "../../contracts/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpMsgBatch, ParentFinality, IpcMsgKind, OutcomeType} from "../../contracts/structs/CrossNet.sol";
 import {BottomUpBatch} from "../../contracts/structs/BottomUpBatch.sol";
 import {SubnetID, Subnet, IPCAddress, Validator} from "../../contracts/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
@@ -38,6 +38,8 @@ import {ActivityHelper} from "../helpers/ActivityHelper.sol";
 import {BottomUpBatchHelper} from "../helpers/BottomUpBatchHelper.sol";
 
 import "forge-std/console.sol";
+
+import {BottomUpCheckpoint, XnetUtil} from "./util.sol";
 
 contract L2PlusSubnetTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
@@ -501,22 +503,20 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         params.subnetL3.gateway.messenger().sendContractXnetMessage{value: params.amount}(crossMessage);
 
         // this would normally submitted by releayer. It call the subnet actor on the L2 network.
-        BottomUpCheckpoint memory _checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+        (BottomUpCheckpoint memory _checkpoint, IpcEnvelope[] memory _msgs) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             params.subnetL3.id,
             params.subnetL3.gateway
         );
         submitBottomUpCheckpoint(_checkpoint, params.subnetL3.subnetActor);
-        IpcEnvelope[] memory _msgs = new IpcEnvelope[](1);
         _msgs[0] = crossMessage;
         execBottomUpMsgBatch(_checkpoint, _msgs, params.subnetL3.subnetActor);
 
         // create checkpoint in L2 and submit it to the root network (L2 subnet actor)
         vm.recordLogs();
-        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+        (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory l2_batch) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             params.subnet.id,
             params.subnet.gateway
         );
-        IpcEnvelope[] memory l2_batch = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
 
         // expected result top down message from root to L2. This is a response to the xnet call.
         IpcEnvelope memory resultMessage = crossMessage.createResultMsg(params.expectedOutcome, params.expectedRet);
@@ -613,21 +613,19 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         executeTopDownMsgs(msgs, params.subnetL3.gateway);
         // submit checkoint so the result message can be propagated to L2
         vm.recordLogs();
-        BottomUpCheckpoint memory l3_checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+        (BottomUpCheckpoint memory l3_checkpoint, IpcEnvelope[] memory l3_batch) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             params.subnetL3.id,
             params.subnetL3.gateway
         );
-        IpcEnvelope[] memory l3_batch = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
         submitBottomUpCheckpoint(l3_checkpoint, params.subnetL3.subnetActor);
         execBottomUpMsgBatch(l3_checkpoint, l3_batch, params.subnetL3.subnetActor);
 
         // submit checkoint so the result message can be propagated to root network
         vm.recordLogs();
-        BottomUpCheckpoint memory l2_checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+        (BottomUpCheckpoint memory l2_checkpoint, IpcEnvelope[] memory l2_batch) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             params.subnet.id,
             params.subnet.gateway
         );
-        IpcEnvelope[] memory l2_batch = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
         submitBottomUpCheckpoint(l2_checkpoint, params.subnet.subnetActor);
         execBottomUpMsgBatch(l2_checkpoint, l2_batch, params.subnet.subnetActor);
 
@@ -674,7 +672,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
         // submit the checkpoint from L3-0 to L2
         vm.recordLogs();
-        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+        (BottomUpCheckpoint memory checkpoint, ) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             subnetL3s[0].id,
             subnetL3s[0].gateway
         );
@@ -697,7 +695,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
 
         // submit the checkpoint from L3-1 to L2 for result propagation
         vm.recordLogs();
-        checkpoint = callCreateBottomUpCheckpointFromChildSubnet(subnetL3s[1].id, subnetL3s[1].gateway);
+        (checkpoint, ) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(subnetL3s[1].id, subnetL3s[1].gateway);
 
         // expected result top down message from L2 to L3. This is a response to the xnet call.
         IpcEnvelope memory resultMessage = crossMessage.createResultMsg(OutcomeType.Ok, abi.encode(EMPTY_BYTES));
@@ -787,79 +785,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase {
         });
         XnetMessagingFacet xnetMessenger = gw.xnetMessenger();
         xnetMessenger.applyCrossMessages(msgs);
-    }
-
-    function callCreateBottomUpCheckpointFromChildSubnet(
-        SubnetID memory subnet,
-        GatewayDiamond gw
-    ) internal returns (BottomUpCheckpoint memory checkpoint) {
-        uint256 e = getNextEpoch(block.number, DEFAULT_CHECKPOINT_PERIOD);
-
-        GatewayGetterFacet getter = gw.getter();
-        CheckpointingFacet checkpointer = gw.checkpointer();
-
-        BottomUpMsgBatch memory batch = getter.bottomUpMsgBatch(e);
-        require(batch.msgs.length == 1, "batch length incorrect");
-
-        (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
-
-        (bytes32 membershipRoot, ) = MerkleTreeHelper.createMerkleProofsForValidators(addrs, weights);
-
-        checkpoint = BottomUpCheckpoint({
-            subnetID: subnet,
-            blockHeight: batch.blockHeight,
-            blockHash: keccak256("block1"),
-            nextConfigurationNumber: 0,
-            msgs: BottomUpBatchHelper.makeCommitment(batch.msgs),
-            activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
-        });
-
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        checkpointer.createBottomUpCheckpoint(
-            checkpoint,
-            membershipRoot,
-            weights[0] + weights[1] + weights[2],
-            batch.msgs,
-            ActivityHelper.dummyActivityRollup()
-        );
-        vm.stopPrank();
-
-        return checkpoint;
-    }
-
-    function callCreateBottomUpCheckpointFromChildSubnet(
-        SubnetID memory subnet,
-        GatewayDiamond gw,
-        IpcEnvelope[] memory msgs
-    ) internal returns (BottomUpCheckpoint memory checkpoint) {
-        uint256 e = getNextEpoch(block.number, DEFAULT_CHECKPOINT_PERIOD);
-
-        CheckpointingFacet checkpointer = gw.checkpointer();
-
-        (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
-
-        (bytes32 membershipRoot, ) = MerkleTreeHelper.createMerkleProofsForValidators(addrs, weights);
-
-        checkpoint = BottomUpCheckpoint({
-            subnetID: subnet,
-            blockHeight: e,
-            blockHash: keccak256("block1"),
-            nextConfigurationNumber: 0,
-            msgs: BottomUpBatchHelper.makeCommitment(msgs),
-            activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
-        });
-
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        checkpointer.createBottomUpCheckpoint(
-            checkpoint,
-            membershipRoot,
-            weights[0] + weights[1] + weights[2],
-            BottomUpBatchHelper.makeEmptyBatch(),
-            ActivityHelper.dummyActivityRollup()
-        );
-        vm.stopPrank();
-
-        return checkpoint;
     }
 
     function prepareValidatorsSignatures(

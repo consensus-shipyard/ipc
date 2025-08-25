@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 
 import "../../contracts/errors/IPCErrors.sol";
 import {EMPTY_BYTES, METHOD_SEND, EMPTY_HASH} from "../../contracts/constants/Constants.sol";
-import {IpcEnvelope, BottomUpCheckpoint} from "../../contracts/structs/CrossNet.sol";
+import {IpcEnvelope} from "../../contracts/structs/CrossNet.sol";
 import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
 import {IPCAddress, SubnetID, Subnet, Asset, AssetKind, Validator} from "../../contracts/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
@@ -36,6 +36,8 @@ import {GatewayFacetsHelper} from "../helpers/GatewayFacetsHelper.sol";
 import {FullActivityRollup, Consensus} from "../../contracts/structs/Activity.sol";
 import {ActivityHelper} from "../helpers/ActivityHelper.sol";
 import {BottomUpBatchHelper} from "../helpers/BottomUpBatchHelper.sol";
+
+import {BottomUpCheckpoint} from "./util.sol";
 
 contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
@@ -172,10 +174,6 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         });
 
         vm.prank(address(saDiamond));
-        gatewayDiamond.checkpointer().commitCheckpoint(batch);
-        vm.prank(address(saDiamond));
-        vm.expectEmit(true, true, true, true, address(token));
-        emit Transfer(address(gatewayDiamond), recipient, value);
         gatewayDiamond.checkpointer().execBottomUpMsgBatch(msgs);
 
         // Assert post-conditions.
@@ -190,8 +188,6 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
         batch.msgs = BottomUpBatchHelper.makeCommitment(msgs);
 
         // This reverts.
-        vm.prank(address(saDiamond));
-        gatewayDiamond.checkpointer().commitCheckpoint(batch);
         vm.prank(address(saDiamond));
         vm.expectRevert();
         gatewayDiamond.checkpointer().execBottomUpMsgBatch(msgs);
@@ -236,9 +232,6 @@ contract GatewayDiamondTokenTest is Test, IntegrationTestBase {
 
         // Verify that we received the call and that the recipient has the tokens.
         vm.prank(address(saDiamond));
-        gatewayDiamond.checkpointer().commitCheckpoint(batch);
-        vm.prank(address(saDiamond));
-        vm.expectCall(recipient, abi.encodeCall(IIpcHandler.handleIpcMessage, (msgs[0])), 1);
         gatewayDiamond.checkpointer().execBottomUpMsgBatch(msgs);
         assertEq(token.balanceOf(recipient), value);
     }

@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import {NotSystemActor, NotEnoughFunds} from "../errors/IPCErrors.sol";
 import {QuorumMap} from "../structs/Quorum.sol";
-import {BottomUpCheckpoint, BottomUpMsgBatch, IpcEnvelope, ParentFinality} from "../structs/CrossNet.sol";
+import {BottomUpMsgBatch, IpcEnvelope, ParentFinality} from "../structs/CrossNet.sol";
 import {SubnetID, Subnet, ParentValidatorsTracker} from "../structs/Subnet.sol";
 import {Membership} from "../structs/Subnet.sol";
 import {AccountHelper} from "../lib/AccountHelper.sol";
@@ -65,9 +65,6 @@ struct GatewayActorStorage {
     mapping(bytes32 => IpcEnvelope) postbox;
     /// @notice Keys of the envelopes in the postbox. Useful to iterate through them
     EnumerableSet.Bytes32Set postboxKeys;
-    /// @notice A mapping of block numbers to bottom-up checkpoints
-    // slither-disable-next-line uninitialized-state
-    mapping(uint256 => BottomUpCheckpoint) bottomUpCheckpoints;
     /// @notice A mapping of block numbers to bottom-up cross-messages
     // slither-disable-next-line uninitialized-state
     mapping(uint256 => BottomUpMsgBatch) bottomUpMsgBatches;

@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import "forge-std/Test.sol";
 import "../../contracts/errors/IPCErrors.sol";
 import {EMPTY_BYTES, METHOD_SEND} from "../../contracts/constants/Constants.sol";
-import {IpcEnvelope, BottomUpMsgBatch, BottomUpCheckpoint, ParentFinality, IpcMsgKind, OutcomeType} from "../../contracts/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpMsgBatch, ParentFinality, IpcMsgKind, OutcomeType} from "../../contracts/structs/CrossNet.sol";
 import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress, Validator} from "../../contracts/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
@@ -49,6 +49,8 @@ import "forge-std/console.sol";
 import {FullActivityRollup, Consensus} from "../../contracts/structs/Activity.sol";
 import {ActivityHelper} from "../helpers/ActivityHelper.sol";
 import {BottomUpBatchHelper} from "../helpers/BottomUpBatchHelper.sol";
+
+import {BottomUpCheckpoint, XnetUtil} from "./util.sol";
 
 contract MultiSubnetTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
@@ -383,11 +385,10 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         manager.release{value: releaseAmount}(FvmAddressHelper.from(address(recipient)));
 
         vm.recordLogs();
-        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+        (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory msgs) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             deflationaryTokenSubnet.id,
             deflationaryTokenSubnet.gateway
         );
-        IpcEnvelope[] memory msgs = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
         submitBottomUpCheckpoint(checkpoint, deflationaryTokenSubnet.subnetActor);
         execBottomUpMsgBatch(checkpoint, msgs, deflationaryTokenSubnet.subnetActor);
 
@@ -429,11 +430,10 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         manager.release{value: releaseAmount}(FvmAddressHelper.from(address(recipient)));
 
         vm.recordLogs();
-        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+        (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory msgs) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             inflationaryTokenSubnet.id,
             inflationaryTokenSubnet.gateway
         );
-        IpcEnvelope[] memory msgs = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
         submitBottomUpCheckpoint(checkpoint, inflationaryTokenSubnet.subnetActor);
         execBottomUpMsgBatch(checkpoint, msgs, inflationaryTokenSubnet.subnetActor);
 
@@ -640,11 +640,10 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         manager.release{value: amount}(FvmAddressHelper.from(address(recipient)));
 
         vm.recordLogs();
-        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+        (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory msgs) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnet.id,
             nativeSubnet.gateway
         );
-        IpcEnvelope[] memory msgs = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
         submitBottomUpCheckpoint(checkpoint, nativeSubnet.subnetActor);
         execBottomUpMsgBatch(checkpoint, msgs, nativeSubnet.subnetActor);
 
@@ -677,7 +676,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         GatewayManagerFacet manager = GatewayManagerFacet(nativeSubnet.gatewayAddr);
 
-        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+        BottomUpCheckpoint memory checkpoint = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnet.id,
             nativeSubnet.gateway,
             crossMsgs
@@ -720,7 +719,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         GatewayManagerFacet manager = GatewayManagerFacet(nativeSubnet.gatewayAddr);
 
-        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+        BottomUpCheckpoint memory checkpoint = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnet.id,
             nativeSubnet.gateway,
             crossMsgs
@@ -768,7 +767,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
 
         GatewayManagerFacet manager = GatewayManagerFacet(nativeSubnet.gatewayAddr);
 
-        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+        BottomUpCheckpoint memory checkpoint = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnet.id,
             nativeSubnet.gateway,
             crossMsgs
@@ -798,7 +797,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.prank(caller);
         manager.release{value: amount}(FvmAddressHelper.from(address(recipient)));
 
-        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+        (BottomUpCheckpoint memory checkpoint,) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnet.id,
             nativeSubnet.gateway
         );
@@ -826,11 +825,10 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         manager.release{value: amount}(FvmAddressHelper.from(address(recipient)));
 
         vm.recordLogs();
-        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+        (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory msgs) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnet.id,
             nativeSubnet.gateway
         );
-        IpcEnvelope[] memory msgs = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
         submitBottomUpCheckpoint(checkpoint, nativeSubnet.subnetActor);
         execBottomUpMsgBatch(checkpoint, msgs, nativeSubnet.subnetActor);
 
@@ -871,7 +869,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         IpcEnvelope[] memory crossMsgs = new IpcEnvelope[](1);
         crossMsgs[0] = resultMsg;
 
-        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+        BottomUpCheckpoint memory checkpoint = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             tokenSubnet.id,
             tokenSubnet.gateway,
             crossMsgs
@@ -917,7 +915,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         IpcEnvelope[] memory crossMsgs = new IpcEnvelope[](1);
         crossMsgs[0] = resultMsg;
 
-        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+        BottomUpCheckpoint memory checkpoint = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             tokenSubnet.id,
             tokenSubnet.gateway,
             crossMsgs
@@ -964,7 +962,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         IpcEnvelope[] memory crossMsgs = new IpcEnvelope[](1);
         crossMsgs[0] = resultMsg;
 
-        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+        BottomUpCheckpoint memory checkpoint = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             tokenSubnet.id,
             tokenSubnet.gateway,
             crossMsgs
@@ -1000,11 +998,10 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         manager.release{value: amount}(FvmAddressHelper.from(address(recipient)));
 
         vm.recordLogs();
-        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+        (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory msgs) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             tokenSubnet.id,
             tokenSubnet.gateway
         );
-        IpcEnvelope[] memory msgs = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
         submitBottomUpCheckpoint(checkpoint, tokenSubnet.subnetActor);
         execBottomUpMsgBatch(checkpoint, msgs, tokenSubnet.subnetActor);
 
@@ -1034,11 +1031,10 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         manager.release{value: amount}(FvmAddressHelper.from(address(recipient)));
 
         vm.recordLogs();
-        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+        (BottomUpCheckpoint memory checkpoint, IpcEnvelope[] memory msgs) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             tokenSubnet.id,
             tokenSubnet.gateway
         );
-        IpcEnvelope[] memory msgs = getBottomUpBatchRecordedFromLogs(vm.getRecordedLogs());
         submitBottomUpCheckpoint(checkpoint, tokenSubnet.subnetActor);
         execBottomUpMsgBatch(checkpoint, msgs, tokenSubnet.subnetActor);
 
@@ -1088,7 +1084,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         IpcEnvelope[] memory crossMsgs = new IpcEnvelope[](1);
         crossMsgs[0] = resultMsg;
 
-        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+        BottomUpCheckpoint memory checkpoint = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnet.id,
             nativeSubnet.gateway,
             crossMsgs
@@ -1134,7 +1130,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
             )
         );
 
-        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+        (BottomUpCheckpoint memory checkpoint,) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             nativeSubnet.id,
             nativeSubnet.gateway
         );
@@ -1228,7 +1224,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         IpcEnvelope[] memory crossMsgs = new IpcEnvelope[](1);
         crossMsgs[0] = resultMsg;
 
-        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+        BottomUpCheckpoint memory checkpoint = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             tokenSubnet.id,
             tokenSubnet.gateway,
             crossMsgs
@@ -1279,7 +1275,7 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
         vm.prank(address(caller));
         messenger.sendContractXnetMessage{value: amount}(envelope);
 
-        BottomUpCheckpoint memory checkpoint = callCreateBottomUpCheckpointFromChildSubnet(
+        (BottomUpCheckpoint memory checkpoint,) = XnetUtil.callCreateBottomUpCheckpointFromChildSubnet(
             tokenSubnet.id,
             tokenSubnet.gateway
         );
@@ -1376,80 +1372,6 @@ contract MultiSubnetTest is Test, IntegrationTestBase {
     function executeTopDownMsgsRevert(IpcEnvelope[] memory msgs, SubnetID memory subnet, GatewayDiamond gw) internal {
         vm.expectRevert();
         executeTopDownMsgs(msgs, subnet, gw);
-    }
-
-    function callCreateBottomUpCheckpointFromChildSubnet(
-        SubnetID memory subnet,
-        GatewayDiamond gw
-    ) internal returns (BottomUpCheckpoint memory checkpoint) {
-        uint256 e = getNextEpoch(block.number, DEFAULT_CHECKPOINT_PERIOD);
-
-        GatewayGetterFacet getter = gw.getter();
-        CheckpointingFacet checkpointer = gw.checkpointer();
-
-        BottomUpMsgBatch memory batch = getter.bottomUpMsgBatch(e);
-        require(batch.msgs.length == 1, "batch length incorrect");
-
-        (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
-
-        (bytes32 membershipRoot, ) = MerkleTreeHelper.createMerkleProofsForValidators(addrs, weights);
-
-        checkpoint = BottomUpCheckpoint({
-            subnetID: subnet,
-            blockHeight: batch.blockHeight,
-            blockHash: keccak256("block1"),
-            nextConfigurationNumber: 0,
-            msgs: BottomUpBatchHelper.makeCommitment(batch.msgs),
-            activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
-        });
-
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        checkpointer.createBottomUpCheckpoint(
-            checkpoint,
-            membershipRoot,
-            weights[0] + weights[1] + weights[2],
-            batch.msgs,
-            ActivityHelper.dummyActivityRollup()
-        );
-        vm.stopPrank();
-
-        return checkpoint;
-    }
-
-    function callCreateBottomUpCheckpointFromChildSubnet(
-        SubnetID memory subnet,
-        GatewayDiamond gw,
-        IpcEnvelope[] memory msgs
-    ) internal returns (BottomUpCheckpoint memory checkpoint) {
-        uint256 e = getNextEpoch(block.number, DEFAULT_CHECKPOINT_PERIOD);
-
-        GatewayGetterFacet getter = gw.getter();
-        CheckpointingFacet checkpointer = gw.checkpointer();
-
-        (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
-
-        (bytes32 membershipRoot, ) = MerkleTreeHelper.createMerkleProofsForValidators(addrs, weights);
-
-        checkpoint = BottomUpCheckpoint({
-            subnetID: subnet,
-            blockHeight: e,
-            blockHash: keccak256("block1"),
-            nextConfigurationNumber: 0,
-            msgs: BottomUpBatchHelper.makeCommitment(msgs),
-            activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
-        });
-
-        vm.startPrank(FilAddress.SYSTEM_ACTOR);
-        checkpointer.createBottomUpCheckpoint(
-            checkpoint,
-            membershipRoot,
-            weights[0] + weights[1] + weights[2],
-            BottomUpBatchHelper.makeEmptyBatch(),
-            ActivityHelper.dummyActivityRollup()
-        );
-        vm.stopPrank();
-
-        return checkpoint;
     }
 
     function submitBottomUpCheckpoint(BottomUpCheckpoint memory checkpoint, SubnetActorDiamond sa) internal {

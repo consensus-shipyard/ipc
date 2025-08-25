@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import {ConsensusType} from "../enums/ConsensusType.sol";
 import {NotGateway, SubnetAlreadyKilled} from "../errors/IPCErrors.sol";
-import {BottomUpCheckpoint, StateCommitment} from "../structs/CrossNet.sol";
+import {StateCommitment} from "../structs/CrossNet.sol";
 import {SubnetID, ValidatorSet, PowerChangeLog, StakingReleaseQueue, Asset, Validator, PermissionMode} from "../structs/Subnet.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
@@ -64,8 +64,6 @@ struct LastCommitmentHeights {
         mapping(address => string) bootstrapNodes;
         /// @notice the list ov validators that announces bootstrap nodes
         EnumerableSet.AddressSet bootstrapOwners;
-        /// @notice contains all committed bottom-up checkpoint at specific epoch
-        mapping(uint256 => BottomUpCheckpoint) committedCheckpoints;
         /// @notice contains all committed subnet state hash and block header
         mapping(uint64 => StateCommitment) stateCommitments;
         LastCommitmentHeights commitmentHeights;

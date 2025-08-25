@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {ConsensusType} from "../enums/ConsensusType.sol";
-import {BottomUpCheckpoint, IpcEnvelope} from "../structs/CrossNet.sol";
+import {IpcEnvelope} from "../structs/CrossNet.sol";
 import {SubnetID, Asset} from "../structs/Subnet.sol";
 import {SubnetID, ValidatorInfo, Validator, PermissionMode} from "../structs/Subnet.sol";
 import {SubnetActorStorage} from "../lib/LibSubnetActorStorage.sol";

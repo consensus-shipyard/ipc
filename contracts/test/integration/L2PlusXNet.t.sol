@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import "forge-std/Test.sol";
 import "../../contracts/errors/IPCErrors.sol";
-import {IpcEnvelope, BottomUpCheckpoint, BottomUpMsgBatch, ParentFinality, IpcMsgKind, ResultMsg} from "../../contracts/structs/CrossNet.sol";
+import {IpcEnvelope, BottomUpMsgBatch, ParentFinality, IpcMsgKind, ResultMsg} from "../../contracts/structs/CrossNet.sol";
 import {BottomUpBatchRecorded, BottomUpBatch} from "../../contracts/structs/BottomUpBatch.sol";
 import {SubnetID, Subnet, IPCAddress, Validator, FvmAddress} from "../../contracts/structs/Subnet.sol";
 import {SubnetIDHelper} from "../../contracts/lib/SubnetIDHelper.sol";
@@ -40,6 +40,8 @@ import {IIpcHandler} from "../../sdk/interfaces/IIpcHandler.sol";
 import {IGateway} from "../../contracts/interfaces/IGateway.sol";
 
 import "forge-std/console.sol";
+
+import {BottomUpCheckpoint, XnetUtil} from "./util.sol";
 
 struct SubnetsHierarchy {
     /// @dev The lookup key to l1 SubnetNode
@@ -197,13 +199,7 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase, IIpcHandler {
         uint256 e = getNextEpoch(block.number, DEFAULT_CHECKPOINT_PERIOD);
 
         GatewayGetterFacet getter = gw.getter();
-        CheckpointingFacet checkpointer = gw.checkpointer();
-
         BottomUpMsgBatch memory batch = getter.bottomUpMsgBatch(e);
-
-        (, address[] memory addrs, uint256[] memory weights) = TestUtils.getFourValidators(vm);
-
-        (bytes32 membershipRoot, ) = MerkleTreeHelper.createMerkleProofsForValidators(addrs, weights);
 
         checkpoint = BottomUpCheckpoint({
             subnetID: subnet,
@@ -213,15 +209,6 @@ contract L2PlusSubnetTest is Test, IntegrationTestBase, IIpcHandler {
             msgs: BottomUpBatchHelper.makeCommitment(batch.msgs),
             activity: ActivityHelper.newCompressedActivityRollup(1, 3, bytes32(uint256(0)))
         });
-
-        vm.prank(FilAddress.SYSTEM_ACTOR);
-        checkpointer.createBottomUpCheckpoint(
-            checkpoint,
-            membershipRoot,
-            weights[0] + weights[1] + weights[2],
-            batch.msgs,
-            ActivityHelper.dummyActivityRollup()
-        );
 
         return checkpoint;
     }

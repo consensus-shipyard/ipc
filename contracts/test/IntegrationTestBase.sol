@@ -7,7 +7,7 @@ import "../contracts/errors/IPCErrors.sol";
 import {EMPTY_BYTES, METHOD_SEND} from "../contracts/constants/Constants.sol";
 import {ConsensusType} from "../contracts/enums/ConsensusType.sol";
 import {IDiamond} from "../contracts/interfaces/IDiamond.sol";
-import {IpcEnvelope, BottomUpCheckpoint, IpcMsgKind, ParentFinality, CallMsg} from "../contracts/structs/CrossNet.sol";
+import {IpcEnvelope, IpcMsgKind, ParentFinality, CallMsg} from "../contracts/structs/CrossNet.sol";
 import {FvmAddress} from "../contracts/structs/FvmAddress.sol";
 import {SubnetID, AssetKind, PermissionMode, PermissionMode, Subnet, Asset, IPCAddress, Validator} from "../contracts/structs/Subnet.sol";
 import {SubnetIDHelper} from "../contracts/lib/SubnetIDHelper.sol";
@@ -51,6 +51,8 @@ import {BottomUpBatch} from "../contracts/structs/BottomUpBatch.sol";
 import {ValidatorRewarderMap} from "../contracts/examples/ValidatorRewarderMap.sol";
 import {SubnetActorActivityFacet} from "../contracts/subnet/SubnetActorActivityFacet.sol";
 import {BottomUpBatchHelper} from "./helpers/BottomUpBatchHelper.sol";
+
+import {BottomUpCheckpoint} from "./integration/util.sol";
 
 struct TestSubnetDefinition {
     GatewayDiamond gateway;
