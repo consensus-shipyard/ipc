@@ -60,7 +60,7 @@ deploy:
   enabled: true
   url: http://localhost:8545
   from: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
-  chain-id: 31337
+  chain-id: 314159
 
 create:
   parent: /r314159
@@ -70,6 +70,7 @@ create:
   bottomup-check-period: 50
   permission-mode: federated
   supply-source-kind: native
+  min-cross-msg-fee: 0.000001
   genesis-subnet-ipc-contracts-owner: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 
 activate:
@@ -114,6 +115,7 @@ ipc-cli subnet create \
   --bottomup-check-period 50 \
   --permission-mode federated \
   --supply-source-kind native \
+  --min-cross-msg-fee 0.000001 \
   --genesis-subnet-ipc-contracts-owner 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 
 # 3. Set federated power (activates the subnet)
@@ -147,6 +149,7 @@ ipc-cli subnet create \
   --bottomup-check-period 50 \
   --permission-mode collateral \
   --supply-source-kind native \
+  --min-cross-msg-fee 0.000001 \
   --genesis-subnet-ipc-contracts-owner 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
 
 # 3. Validators join individually (activates when enough join with sufficient collateral)

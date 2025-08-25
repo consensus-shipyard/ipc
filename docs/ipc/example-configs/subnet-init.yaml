@@ -1,0 +1,33 @@
+import-wallets:
+  - wallet-type: evm
+    private-key: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+
+deploy:
+  enabled: true
+  url: http://localhost:8545
+  from: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+  chain-id: 31337
+
+create:
+  parent: /r31337
+  from: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+  min-validator-stake: 1.0
+  min-validators: 2
+  bottomup-check-period: 50
+  permission-mode: federated
+  supply-source-kind: native
+  min-cross-msg-fee: 0.000001
+  genesis-subnet-ipc-contracts-owner: 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+
+activate:
+  mode: federated
+  validator-pubkeys:
+    - 0x048318535b54105d4a7aae60c08fc45f9687181b4fdfc625bd1a753fa7397fed753547f11ca8696646f2f3acb08e31016afac23e630c5d11f59f61fef57b0d2aa5
+    - 0x04425dc3d478fe2713fc74ead3f3b16083b0059a35672c0a7ddfd054cbdd7cdb28e5ec0e933c3329f9b79a3d77dcba6ce0d995244776fdf735199df21a8892ef40
+  validator-power:
+    - 1
+    - 1
+
+genesis:
+  base-fee: 1000
+  power-scale: 0
