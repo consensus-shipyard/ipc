@@ -40,7 +40,11 @@ contract CheckpointingFacet is GatewayActorModifiers {
         _execBottomUpMsgBatch(msgs, subnet);
     }
 
-    function recordLightClientCommitments(StateCommitmentBreakDown calldata commitment, IpcEnvelope[] calldata msgs, FullActivityRollup calldata activity) external systemActorOnly {
+    function recordLightClientCommitments(
+        StateCommitmentBreakDown calldata commitment,
+        IpcEnvelope[] calldata msgs,
+        FullActivityRollup calldata activity
+    ) external systemActorOnly {
         emit StateCommitmentCreated(uint64(block.number), commitment);
         emit BottomUpBatchRecorded(uint64(block.number), msgs);
         emit ActivityRollupRecorded(uint64(block.number), activity);
