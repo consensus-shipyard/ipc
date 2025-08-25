@@ -2,13 +2,10 @@
 // SPDX-License-Identifier: MIT
 //! L1 Gateway configuration API endpoints
 
-use super::super::services::gateway_service::GatewayService;
 use super::super::AppState;
 use super::types::ApiResponse;
-use crate::GlobalArguments;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::convert::Infallible;
 use warp::{Filter, Reply};
 

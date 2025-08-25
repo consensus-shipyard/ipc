@@ -4,7 +4,6 @@
 //!
 //! This service provides methods for discovering and managing IPC gateway contracts.
 
-use super::super::api::types::{ApiResponse, InvalidRequest, ServerError};
 use crate::ipc_config_store::IpcConfigStore;
 use crate::{get_ipc_provider, GlobalArguments};
 use anyhow::{Context, Result};
@@ -77,7 +76,7 @@ impl GatewayService {
 
         let mut gateways_map: std::collections::HashMap<String, GatewayInfo> =
             std::collections::HashMap::new();
-        let target_network = headers.map(|h| Self::get_parent_network_from_headers(h));
+        let target_network = headers.map(Self::get_parent_network_from_headers);
 
         log::info!("Discovering gateways, target network: {:?}", target_network);
 
@@ -106,7 +105,7 @@ impl GatewayService {
                         }
                     }
                 } else {
-                    log::warn!("Failed to parse subnet ID: {}", subnet_id_str.to_string());
+                    log::warn!("Failed to parse subnet ID: {}", subnet_id_str);
                     continue;
                 }
             }
@@ -301,7 +300,7 @@ impl GatewayService {
 
     /// Validate gateway configuration
     pub async fn validate_gateway(&self, gateway_address: &str) -> Result<bool> {
-        let mut provider = get_ipc_provider(&self.global)?;
+        let provider = get_ipc_provider(&self.global)?;
 
         // Try to connect to the gateway and validate it's working
         // This is a simplified check - in reality, you'd want to perform

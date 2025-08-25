@@ -4,12 +4,11 @@
 
 use super::super::AppState;
 use super::types::{
-    ApiResponse, InvalidRequest, ServerError, TestTransactionRequest, TestTransactionResponse,
+    ApiResponse, ServerError, TestTransactionRequest, TestTransactionResponse,
 };
 use crate::{get_ipc_provider, GlobalArguments};
 use anyhow::Result;
 use ipc_api::subnet_id::SubnetID;
-use serde_json;
 use std::convert::Infallible;
 use std::str::FromStr;
 use warp::{Filter, Reply};
@@ -18,13 +17,13 @@ use warp::{Filter, Reply};
 pub fn transaction_routes(
     state: AppState,
 ) -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
-    let send_test_tx_route = warp::path!("subnets" / String / "test-transaction")
+    
+
+    warp::path!("subnets" / String / "test-transaction")
         .and(warp::post())
         .and(warp::body::json())
         .and(with_state(state.clone()))
-        .and_then(handle_send_test_transaction);
-
-    send_test_tx_route
+        .and_then(handle_send_test_transaction)
 }
 
 /// Helper to pass state to handlers

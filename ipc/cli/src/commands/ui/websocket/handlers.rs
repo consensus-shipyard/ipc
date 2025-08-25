@@ -3,8 +3,6 @@
 //! WebSocket handlers for real-time communication
 
 use super::super::AppState;
-use super::types::{IncomingMessage, OutgoingMessage};
-use anyhow::Result;
 use futures_util::{SinkExt, StreamExt};
 use std::sync::Arc;
 use tokio::sync::Mutex;

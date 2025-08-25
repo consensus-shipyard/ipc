@@ -62,6 +62,7 @@ pub struct ChainStats {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Default)]
 pub enum SubnetLifecycleState {
     // Deployment states
     #[serde(rename = "deploying")]
@@ -91,14 +92,10 @@ pub enum SubnetLifecycleState {
     #[serde(rename = "failed")]
     Failed,
     #[serde(rename = "unknown")]
+    #[default]
     Unknown,
 }
 
-impl Default for SubnetLifecycleState {
-    fn default() -> Self {
-        SubnetLifecycleState::Unknown
-    }
-}
 
 impl std::fmt::Display for SubnetLifecycleState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

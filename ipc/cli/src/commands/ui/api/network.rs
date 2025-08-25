@@ -3,7 +3,7 @@
 //! Network API endpoints
 
 use super::super::AppState;
-use super::types::{ApiResponse, InvalidRequest, ServerError};
+use super::types::ApiResponse;
 use anyhow::Result;
 use reqwest;
 use serde::{Deserialize, Serialize};

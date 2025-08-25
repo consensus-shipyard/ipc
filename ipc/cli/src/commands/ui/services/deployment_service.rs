@@ -191,11 +191,11 @@ impl DeploymentService {
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing required field: from"))?;
 
-        let min_validators = config["minValidators"].as_u64().unwrap_or(1) as u64;
+        let min_validators = config["minValidators"].as_u64().unwrap_or(1);
 
         let min_validator_stake = config["minValidatorStake"].as_f64().unwrap_or(1.0);
 
-        let bottomup_check_period = config["bottomupCheckPeriod"].as_i64().unwrap_or(100) as i64;
+        let bottomup_check_period = config["bottomupCheckPeriod"].as_i64().unwrap_or(100);
 
         let permission_mode = match config["permissionMode"].as_str().unwrap_or("collateral") {
             "federated" => PermissionMode::Federated,
@@ -219,7 +219,7 @@ impl DeploymentService {
             collateral_source_address: None,
             validator_gater: None,
             validator_rewarder: None,
-            genesis_subnet_ipc_contracts_owner: EthAddress::from_str(&from_address_str)?,
+            genesis_subnet_ipc_contracts_owner: EthAddress::from_str(from_address_str)?,
         };
 
         log::info!("Created subnet config: {:?}", subnet_config);
@@ -475,11 +475,11 @@ impl DeploymentService {
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing required field: from"))?;
 
-        let min_validators = config["minValidators"].as_u64().unwrap_or(1) as u64;
+        let min_validators = config["minValidators"].as_u64().unwrap_or(1);
 
         let min_validator_stake = config["minValidatorStake"].as_f64().unwrap_or(1.0);
 
-        let bottomup_check_period = config["bottomupCheckPeriod"].as_i64().unwrap_or(100) as i64;
+        let bottomup_check_period = config["bottomupCheckPeriod"].as_i64().unwrap_or(100);
 
         let permission_mode = match config["permissionMode"].as_str().unwrap_or("collateral") {
             "federated" => PermissionMode::Federated,
@@ -503,7 +503,7 @@ impl DeploymentService {
             collateral_source_address: None,
             validator_gater: None,
             validator_rewarder: None,
-            genesis_subnet_ipc_contracts_owner: EthAddress::from_str(&from_address_str)?,
+            genesis_subnet_ipc_contracts_owner: EthAddress::from_str(from_address_str)?,
         };
 
         log::info!("Created subnet config: {:?}", subnet_config);
@@ -743,8 +743,8 @@ impl DeploymentService {
             .add_subnet(
                 temp_subnet_id.clone(),
                 rpc_url_parsed,
-                custom_gateway_fil.clone(),
-                custom_registry_fil.clone(),
+                custom_gateway_fil,
+                custom_registry_fil,
             )
             .await?;
 
@@ -782,7 +782,7 @@ impl DeploymentService {
 
             log::info!("Auto-approving subnet: {}", subnet_id);
             provider
-                .approve_subnet(subnet_id.clone(), from.clone())
+                .approve_subnet(subnet_id.clone(), from)
                 .await?;
             log::info!("Successfully auto-approved subnet: {}", subnet_id);
 

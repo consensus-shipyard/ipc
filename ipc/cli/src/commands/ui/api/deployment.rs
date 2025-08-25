@@ -5,24 +5,19 @@
 use super::super::services::deployment_service::{
     ContractDeploymentProgress, DeploymentService, SubnetDeploymentResult,
 };
-use super::super::{AppState, DeploymentState};
+use super::super::AppState;
 use super::types::{ApiResponse, DeploymentRequest, DeploymentResponse};
 use crate::commands::deploy::{CliSubnetCreationPrivilege, DeployConfig};
 use anyhow::{Context, Result};
 use chrono;
-use ethers::types::Address;
 use futures_util::SinkExt;
 use fvm_shared::address::Address as FilecoinAddress;
 use ipc_types;
 use serde_json;
-use std::convert::Infallible;
 use std::str::FromStr;
-use std::sync::Arc;
-use tokio::sync::Mutex;
 use url;
-use uuid::Uuid;
 use warp::ws::Message;
-use warp::{self, Filter, Reply};
+use warp::{self, Filter};
 
 /// Create deployment API routes
 pub fn deployment_routes(
@@ -822,7 +817,7 @@ async fn broadcast_progress_with_deployment_result(
     }
 
     // Create message in format frontend expects: { type: "deployment_progress", data: {...} }
-    let mut progress_data = serde_json::json!({
+    let progress_data = serde_json::json!({
         "deployment_id": deployment_id,
         "step": step,
         "progress": progress,

@@ -5,17 +5,11 @@
 //! This service wraps existing CLI handlers for subnet operations.
 
 use super::super::api::types::{
-    ApiResponse, ChainStats, SubnetInstanceResponse, SubnetLifecycleState, SubnetStatusInfo,
+    ChainStats, SubnetLifecycleState, SubnetStatusInfo,
 };
-use crate::commands::subnet::{
-    approve::{approve_subnet, ApproveSubnetArgs},
-    join::{join_subnet, JoinSubnetArgs},
-    leave::LeaveSubnetArgs,
-    // Note: list_subnets is not available as a function export
-};
+use crate::commands::subnet::approve::{approve_subnet, ApproveSubnetArgs};
 use crate::{get_ipc_provider, GlobalArguments};
 use anyhow::{Context, Result};
-use fvm_shared::address::Address;
 use ipc_api::subnet_id::SubnetID;
 use num_traits::ToPrimitive;
 use std::str::FromStr;
@@ -206,7 +200,7 @@ impl SubnetService {
                             ipc_height,
                             rpc_height
                         );
-                        if (rpc_height as i64 - ipc_height as i64).abs() > 10 {
+                        if (rpc_height as i64 - ipc_height).abs() > 10 {
                             log::warn!("WARNING: Large discrepancy between RPC ({}) and IPC provider ({}) block heights", rpc_height, ipc_height);
                         }
                     }
@@ -738,7 +732,7 @@ impl SubnetService {
             subnet_id
         );
         let actual_permission_mode =
-            self.get_permission_mode(&subnet_id)
+            self.get_permission_mode(subnet_id)
                 .await
                 .unwrap_or_else(|e| {
                     log::warn!(
@@ -940,7 +934,7 @@ impl SubnetService {
         // Call the gateway's listSubnets() method to get all registered subnets
         log::info!("Calling gateway.listSubnets() to find deployed contract address...");
         let output = tokio::process::Command::new("cast")
-            .args(&[
+            .args([
                 "call",
                 eth_gateway_addr,
                 "listSubnets()",
@@ -1013,7 +1007,7 @@ impl SubnetService {
         log::info!("Querying permission mode from contract: {}", contract_addr);
 
         let output = tokio::process::Command::new("cast")
-            .args(&[
+            .args([
                 "call",
                 contract_addr,
                 "permissionMode()",
@@ -1039,7 +1033,7 @@ impl SubnetService {
 
         // Convert hex to decimal
         let decimal_output = tokio::process::Command::new("cast")
-            .args(&["--to-dec", &hex_result])
+            .args(["--to-dec", &hex_result])
             .output()
             .await?;
 
@@ -1126,7 +1120,7 @@ impl SubnetService {
 
         // Use tokio to run the cast command
         let output = tokio::process::Command::new("cast")
-            .args(&[
+            .args([
                 "call",
                 eth_addr,
                 "permissionMode()",
@@ -1152,7 +1146,7 @@ impl SubnetService {
 
         // Convert hex to decimal
         let decimal_output = tokio::process::Command::new("cast")
-            .args(&["--to-dec", &hex_result])
+            .args(["--to-dec", &hex_result])
             .output()
             .await?;
 
@@ -1956,7 +1950,7 @@ impl SubnetService {
         );
 
         // Try to get the subnet info using IPC provider
-        let mut provider = match crate::get_ipc_provider(&self.global) {
+        let provider = match crate::get_ipc_provider(&self.global) {
             Ok(provider) => provider,
             Err(e) => {
                 log::warn!("Failed to get IPC provider for approval check: {}", e);
@@ -2082,7 +2076,7 @@ impl SubnetService {
 
         let subnet = ipc_api::subnet_id::SubnetID::from_str(subnet_id)?;
         let parent_id = subnet.parent().unwrap_or_else(|| subnet.clone());
-        let mut provider = crate::get_ipc_provider(&self.global)?;
+        let provider = crate::get_ipc_provider(&self.global)?;
 
         // Determine if this is a collateral-based subnet
         let permission_mode = match provider.get_genesis_info(&subnet).await {
@@ -2169,7 +2163,7 @@ impl SubnetService {
         log::info!("Generating node startup commands for subnet: {}", subnet_id);
 
         let subnet = ipc_api::subnet_id::SubnetID::from_str(subnet_id)?;
-        let mut provider = crate::get_ipc_provider(&self.global)?;
+        let provider = crate::get_ipc_provider(&self.global)?;
 
         // Determine if this is a collateral-based subnet
         let permission_mode = match provider.get_genesis_info(&subnet).await {

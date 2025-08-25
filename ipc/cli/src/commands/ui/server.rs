@@ -56,7 +56,7 @@ async fn handle_websocket_connection(websocket: warp::ws::WebSocket, state: AppS
                     log::debug!("Received WebSocket message: {}", text);
 
                     // Try to parse as structured message first
-                    match serde_json::from_str::<IncomingMessage>(&text) {
+                    match serde_json::from_str::<IncomingMessage>(text) {
                         Ok(incoming_msg) => {
                             match incoming_msg {
                                 IncomingMessage::Ping => {
