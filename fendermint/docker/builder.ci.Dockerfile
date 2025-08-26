@@ -64,6 +64,15 @@ RUN if [ "${TARGETARCH}" = "arm64" ]; then \
 # Copy the stripped source code.
 COPY --from=stripper /app /app
 
+# install npm, foundry to build contract artifacts
+ENV PATH="/root/.foundry/bin:$PATH"
+
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+ && apt-get update && apt-get install -y git nodejs \
+ && rm -rf /var/lib/apt/lists/* \
+ && curl -L https://foundry.paradigm.xyz | bash \
+ && /root/.foundry/bin/foundryup
+ 
 # Build the dependencies.
 RUN \
   --mount=type=cache,target=/root/.cargo/registry,sharing=locked \
