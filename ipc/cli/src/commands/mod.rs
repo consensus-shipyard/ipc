@@ -9,12 +9,14 @@ mod crossmsg;
 mod deploy;
 mod node;
 mod subnet;
+mod ui;
 mod util;
 mod validator;
 mod wallet;
 
 use crate::commands::checkpoint::CheckpointCommandsArgs;
 use crate::commands::crossmsg::CrossMsgsCommandsArgs;
+use crate::commands::ui::{run_ui_command, UICommandArgs};
 use crate::commands::util::UtilCommandsArgs;
 use crate::GlobalArguments;
 use anyhow::{anyhow, Context, Result};
@@ -58,6 +60,7 @@ enum Commands {
     Util(UtilCommandsArgs),
     Validator(ValidatorCommandsArgs),
     Deploy(DeployCommandArgs),
+    Ui(UICommandArgs),
     Node(NodeCommandsArgs),
 }
 
@@ -152,6 +155,7 @@ pub async fn cli() -> anyhow::Result<()> {
                 Commands::Util(args) => args.handle(global).await,
                 Commands::Validator(args) => args.handle(global).await,
                 Commands::Deploy(args) => DeployCommand::handle(global, args).await,
+                Commands::Ui(args) => run_ui_command(global.clone(), args.clone()).await,
                 Commands::Node(args) => args.handle(global).await,
             };
 
