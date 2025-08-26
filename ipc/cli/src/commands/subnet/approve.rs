@@ -17,8 +17,6 @@ impl CommandLineHandler for ApproveSubnet {
     type Arguments = ApproveSubnetArgs;
 
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
-        log::debug!("approve subnet with args: {:?}", arguments);
-
         let mut provider = get_ipc_provider(global)?;
         approve_subnet(&mut provider, arguments).await
     }
@@ -29,11 +27,19 @@ pub(crate) async fn approve_subnet(
     args: &ApproveSubnetArgs,
 ) -> anyhow::Result<()> {
     let subnet = SubnetID::from_str(&args.subnet)?;
+
     let from = match &args.from {
-        Some(address) => Some(require_fil_addr_from_str(address)?),
+        Some(address) => {
+            let addr = require_fil_addr_from_str(address)?;
+            Some(addr)
+        }
         None => None,
     };
-    provider.approve_subnet(subnet, from).await
+
+    match provider.approve_subnet(subnet.clone(), from).await {
+        Ok(()) => Ok(()),
+        Err(e) => Err(e),
+    }
 }
 
 #[derive(Debug, Args)]

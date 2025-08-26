@@ -19,11 +19,8 @@ impl CommandLineHandler for crate::commands::subnet::SetFederatedPower {
     type Arguments = crate::commands::subnet::SetFederatedPowerArgs;
 
     async fn handle(global: &GlobalArguments, arguments: &Self::Arguments) -> anyhow::Result<()> {
-        log::debug!("set federated power with args: {:?}", arguments);
-
         let provider = get_ipc_provider(global)?;
-        let chain_epoch = set_federated_power(&provider, arguments).await?;
-        println!("New federated power is set at epoch {chain_epoch}");
+        set_federated_power(&provider, arguments).await?;
 
         Ok(())
     }

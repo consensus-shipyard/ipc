@@ -7,6 +7,14 @@ default:
 	./target/release/ipc-cli --version
 	./target/release/fendermint --version
 
+build-ui:
+	cd ipc && make build-ui
+
+build-with-ui:
+	cd ipc && make build-with-ui
+	./target/release/ipc-cli --version
+	./target/release/fendermint --version
+
 SUBTREES_RUST := fendermint ipc ipld/resolver
 SUBTREES_CONTRACTS := contracts
 SUBTREES_ALL := $(SUBTREES_RUST) $(SUBTREES_CONTRACTS)

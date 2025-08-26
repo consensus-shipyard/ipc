@@ -1,0 +1,599 @@
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import { apiService } from '../services/api'
+import { wsService, type WebSocketCallbacks } from '../services/websocket'
+import type { DeploymentProgress } from '../config/api'
+import { useL1GatewaysStore } from './l1-gateways'
+
+export interface SubnetConfig {
+  // Template selection
+  selectedTemplate?: string
+  questionnaire?: Record<string, string>
+  questionnaireSkipped?: boolean
+
+  // Basic configuration (mandatory)
+  parent?: string
+  from?: string
+  minValidatorStake?: number
+  minValidators?: number
+  bottomupCheckPeriod?: number
+  permissionMode?: 'collateral' | 'federated' | 'static'
+  supplySourceKind?: 'native' | 'erc20'
+  supplySourceAddress?: string
+  minCrossMsgFee?: number
+  genesisSubnetIpcContractsOwner?: string
+
+  // Advanced configuration (optional)
+  activeValidatorsLimit?: number
+  validatorGater?: string
+  validatorRewarder?: string
+  collateralSourceKind?: 'native' | 'erc20'
+  collateralSourceAddress?: string
+
+  // Genesis configuration
+  networkVersion?: number
+  baseFee?: number
+  powerScale?: number
+
+  // Activation configuration
+  activationMode?: 'federated' | 'static' | 'collateral'
+  validatorPubkeys?: string[]
+  validatorPower?: number[]
+  validators?: Array<{
+    from: string
+    collateral: number
+    initialBalance?: number
+  }>
+
+  // Gateway configuration
+  gatewayMode?: 'deploy' | 'l1-gateway' | 'subnet-gateway' | 'custom'
+  customGatewayAddress?: string
+  customRegistryAddress?: string
+  selectedDeployedGateway?: string
+  selectedL1Gateway?: string
+
+  // Deployment settings
+  deployConfig?: {
+    enabled?: boolean
+    url?: string
+    chainId?: number
+    artifactsPath?: string
+    subnetCreationPrivilege?: 'Unrestricted' | 'Whitelisted' | 'Restricted'
+  }
+
+  // Wallet import (for later phases)
+  walletImports?: Array<{
+    walletType: string
+    path?: string
+    privateKey?: string
+  }>
+}
+
+export interface ValidationError {
+  field: string
+  message: string
+}
+
+export const useWizardStore = defineStore('wizard', () => {
+  // State
+  const config = ref<SubnetConfig>({})
+  const currentStep = ref(1)
+  const validationErrors = ref<ValidationError[]>([])
+  const isValidating = ref(false)
+  const isDirty = ref(false)
+
+  // Deployment state
+  const isDeploying = ref(false)
+  const deploymentId = ref<string | null>(null)
+  const subnetId = ref<string | null>(null) // Actual subnet ID from deployment result
+  const deploymentProgress = ref<DeploymentProgress | null>(null)
+  const deploymentError = ref<string | null>(null)
+  const deploymentLogs = ref<string[]>([])
+  const gatewayAddress = ref<string | null>(null)
+  const registryAddress = ref<string | null>(null)
+  const parentId = ref<string | null>(null)
+
+  // WebSocket connection state
+  const isConnected = ref(false)
+
+  // Computed
+  const configValidationErrors = computed(() => {
+    const errors: ValidationError[] = []
+
+    // Check all mandatory fields
+    const required: { field: keyof SubnetConfig; label: string }[] = [
+      { field: 'parent', label: 'Parent Network' },
+      { field: 'minValidatorStake', label: 'Minimum Validator Stake' },
+      { field: 'minValidators', label: 'Minimum Validators' },
+      { field: 'bottomupCheckPeriod', label: 'Bottom-up Check Period' },
+      { field: 'permissionMode', label: 'Permission Mode' },
+      { field: 'supplySourceKind', label: 'Supply Source Kind' },
+      { field: 'genesisSubnetIpcContractsOwner', label: 'Genesis Owner Address' },
+      { field: 'gatewayMode', label: 'Gateway Mode' }
+    ]
+
+    required.forEach(({ field, label }) => {
+      const value = config.value[field]
+      if (value === undefined || value === null || value === '') {
+        errors.push({ field, message: `${label} is required` })
+      }
+    })
+
+    // Check gateway mode specific requirements
+    if (config.value.gatewayMode === 'custom') {
+      if (!config.value.customGatewayAddress) {
+        errors.push({ field: 'customGatewayAddress', message: 'Custom Gateway Address is required' })
+      }
+      if (!config.value.customRegistryAddress) {
+        errors.push({ field: 'customRegistryAddress', message: 'Custom Registry Address is required' })
+      }
+    } else if (config.value.gatewayMode === 'subnet-gateway') {
+      if (!config.value.selectedDeployedGateway) {
+        errors.push({ field: 'selectedDeployedGateway', message: 'Please select a deployed gateway' })
+      }
+        } else if (config.value.gatewayMode === 'l1-gateway') {
+      const l1GatewaysStore = useL1GatewaysStore()
+      const hasL1GatewaySelected = config.value.selectedL1Gateway || l1GatewaysStore.selectedGateway
+
+      if (!hasL1GatewaySelected) {
+        // Debug information for troubleshooting
+        const debugInfo = {
+          configSelected: config.value.selectedL1Gateway,
+          storeSelected: l1GatewaysStore.selectedGateway,
+          storeSelectedId: l1GatewaysStore.selectedGatewayId,
+          availableGateways: l1GatewaysStore.l1Gateways?.length || 0
+        }
+        console.log('[Wizard Validation] L1 Gateway validation failed. Debug info:', debugInfo)
+
+                errors.push({
+          field: 'selectedL1Gateway',
+          message: 'Please select an L1 gateway from the top menu'
+        })
+      }
+    }
+
+    return errors
+  })
+
+  const isConfigComplete = computed(() => {
+    return configValidationErrors.value.length === 0
+  })
+
+  const hasErrors = computed(() => validationErrors.value.length > 0)
+
+  const currentStepConfig = computed(() => {
+    switch (currentStep.value) {
+      case 1: // Template selection
+        return {
+          selectedTemplate: config.value.selectedTemplate,
+          questionnaire: config.value.questionnaire,
+          questionnaireSkipped: config.value.questionnaireSkipped
+        }
+      case 2: // Basic config
+        return {
+          parent: config.value.parent,
+          from: config.value.from,
+          minValidatorStake: config.value.minValidatorStake,
+          minValidators: config.value.minValidators,
+          bottomupCheckPeriod: config.value.bottomupCheckPeriod,
+          permissionMode: config.value.permissionMode,
+          supplySourceKind: config.value.supplySourceKind,
+          supplySourceAddress: config.value.supplySourceAddress,
+          minCrossMsgFee: config.value.minCrossMsgFee,
+          genesisSubnetIpcContractsOwner: config.value.genesisSubnetIpcContractsOwner
+        }
+      case 3: // Advanced config
+        return {
+          activeValidatorsLimit: config.value.activeValidatorsLimit,
+          validatorGater: config.value.validatorGater,
+          validatorRewarder: config.value.validatorRewarder,
+          collateralSourceKind: config.value.collateralSourceKind,
+          collateralSourceAddress: config.value.collateralSourceAddress,
+          networkVersion: config.value.networkVersion,
+          baseFee: config.value.baseFee,
+          powerScale: config.value.powerScale
+        }
+      case 4: // Activation config
+        return {
+          activationMode: config.value.activationMode,
+          validatorPubkeys: config.value.validatorPubkeys,
+          validatorPower: config.value.validatorPower,
+          validators: config.value.validators
+        }
+      default:
+        return {}
+    }
+  })
+
+  // Actions
+  const updateConfig = (updates: Partial<SubnetConfig>) => {
+    config.value = { ...config.value, ...updates }
+    isDirty.value = true
+  }
+
+  const setCurrentStep = (step: number) => {
+    currentStep.value = step
+  }
+
+  const validateField = (field: string, value: any): string | null => {
+    // Basic validation rules
+    switch (field) {
+      case 'parent':
+        if (!value) return 'Parent network is required'
+        if (typeof value === 'string' && !value.startsWith('/')) {
+          return 'Parent network should start with /'
+        }
+        break
+
+      case 'minValidatorStake':
+        if (value === undefined || value === null) return 'Minimum validator stake is required'
+        if (typeof value === 'number' && value <= 0) return 'Stake must be greater than 0'
+        break
+
+      case 'minValidators':
+        if (value === undefined || value === null) return 'Minimum validators count is required'
+        if (typeof value === 'number' && value < 1) return 'At least 1 validator is required'
+        break
+
+      case 'bottomupCheckPeriod':
+        if (value === undefined || value === null) return 'Bottom-up checkpoint period is required'
+        if (typeof value === 'number' && value < 1) return 'Period must be at least 1 epoch'
+        break
+
+      case 'genesisSubnetIpcContractsOwner':
+        if (!value) return 'Genesis contracts owner is required'
+        if (typeof value === 'string' && !/^0x[a-fA-F0-9]{40}$/.test(value)) {
+          return 'Must be a valid Ethereum address'
+        }
+        break
+
+      case 'supplySourceAddress':
+        if (config.value.supplySourceKind === 'erc20' && !value) {
+          return 'ERC20 address is required when using ERC20 supply source'
+        }
+        if (value && typeof value === 'string' && !/^0x[a-fA-F0-9]{40}$/.test(value)) {
+          return 'Must be a valid Ethereum address'
+        }
+        break
+
+      case 'collateralSourceAddress':
+        if (config.value.collateralSourceKind === 'erc20' && !value) {
+          return 'ERC20 address is required when using ERC20 collateral source'
+        }
+        if (value && typeof value === 'string' && !/^0x[a-fA-F0-9]{40}$/.test(value)) {
+          return 'Must be a valid Ethereum address'
+        }
+        break
+    }
+
+    return null
+  }
+
+  const validateStep = (step: number): ValidationError[] => {
+    const errors: ValidationError[] = []
+
+    if (step === 2) { // Basic config validation
+      const fields = ['parent', 'minValidatorStake', 'minValidators', 'bottomupCheckPeriod', 'permissionMode', 'supplySourceKind', 'genesisSubnetIpcContractsOwner']
+
+      fields.forEach(field => {
+        const value = config.value[field as keyof SubnetConfig]
+        const error = validateField(field, value)
+        if (error) {
+          errors.push({ field, message: error })
+        }
+      })
+
+      // Additional conditional validations
+      if (config.value.supplySourceKind === 'erc20') {
+        const error = validateField('supplySourceAddress', config.value.supplySourceAddress)
+        if (error) {
+          errors.push({ field: 'supplySourceAddress', message: error })
+        }
+      }
+    }
+
+    return errors
+  }
+
+  const setValidationErrors = (errors: ValidationError[]) => {
+    validationErrors.value = errors
+  }
+
+  const clearValidationErrors = () => {
+    validationErrors.value = []
+  }
+
+  const resetWizard = () => {
+    config.value = {}
+    currentStep.value = 1
+    validationErrors.value = []
+    isDirty.value = false
+  }
+
+  const exportConfig = () => {
+    // Export as subnet-init.yaml format (for future phases)
+    return config.value
+  }
+
+  // Helper function to determine if gateways should be refreshed
+  const shouldRefreshGateways = (): boolean => {
+    const gatewayMode = config.value.gatewayMode
+    // Only refresh if we deployed a new gateway (not using existing ones)
+    // The 'deploy' mode creates a brand new gateway that should be added to the config
+    return gatewayMode === 'deploy' || gatewayMode === undefined
+  }
+
+  // WebSocket integration
+  const initializeWebSocket = async () => {
+    const callbacks: WebSocketCallbacks = {
+      onOpen: () => {
+        console.log('WebSocket connected')
+        isConnected.value = true
+      },
+      onClose: () => {
+        console.log('WebSocket disconnected')
+        isConnected.value = false
+      },
+      onError: (error) => {
+        console.error('WebSocket error:', error)
+        isConnected.value = false
+      },
+      onDeploymentProgress: async (progress: DeploymentProgress) => {
+        console.log('Deployment progress:', progress)
+        deploymentProgress.value = progress
+
+        // Add to logs
+        if (progress.message) {
+          deploymentLogs.value.push(`[${progress.step}] ${progress.message}`)
+        }
+
+        // Handle completion or failure
+        if (progress.status === 'completed') {
+          isDeploying.value = false
+          // Extract deployment result data from deployment progress
+          if (progress.subnet_id) {
+            subnetId.value = progress.subnet_id
+            console.log('Deployment completed successfully, subnet ID:', progress.subnet_id)
+          }
+          if (progress.gateway_address) {
+            gatewayAddress.value = progress.gateway_address
+            console.log('Gateway address:', progress.gateway_address)
+          }
+          if (progress.registry_address) {
+            registryAddress.value = progress.registry_address
+            console.log('Registry address:', progress.registry_address)
+          }
+          if (progress.parent_id) {
+            parentId.value = progress.parent_id
+            console.log('Parent ID:', progress.parent_id)
+          }
+          if (!progress.subnet_id) {
+            console.log('Deployment completed successfully')
+          }
+
+          // Auto-refresh data stores if deployment was successful
+          try {
+            console.log('Deployment completed, refreshing all data stores...')
+
+            // Import app store to trigger full refresh
+            const { useAppStore } = await import('./app')
+            const appStore = useAppStore()
+            await appStore.refreshAllData()
+
+            console.log('All data stores refreshed successfully after deployment')
+          } catch (error) {
+            console.error('Failed to refresh data stores after deployment:', error)
+            // Don't fail the deployment over refresh issues
+          }
+        } else if (progress.status === 'failed') {
+          isDeploying.value = false
+          // Try both error and message fields for compatibility
+          const errorMessage = progress.error || progress.message || 'Deployment failed'
+          deploymentError.value = errorMessage
+          console.error('Deployment failed:', errorMessage)
+          console.log('Full progress object:', progress)
+        }
+      }
+    }
+
+    // Initialize WebSocket service with callbacks
+    Object.assign(wsService.callbacks, callbacks)
+
+    try {
+      await wsService.connect()
+    } catch (error) {
+      console.error('Failed to connect to WebSocket:', error)
+    }
+  }
+
+  // Deployment functions
+  const startDeployment = async () => {
+    if (!isConfigComplete.value) {
+      throw new Error('Configuration is incomplete')
+    }
+
+    isDeploying.value = true
+    deploymentError.value = null
+    deploymentLogs.value = []
+    deploymentProgress.value = null
+
+    try {
+      // Debug: Log the full config being sent to deployment
+      console.log('Starting deployment with config:', config.value)
+      console.log('Gateway Mode:', config.value.gatewayMode)
+      console.log('Selected L1 Gateway:', config.value.selectedL1Gateway)
+
+      // Additional debugging for L1 gateway setup
+      if (config.value.gatewayMode === 'l1-gateway') {
+        const l1GatewaysStore = useL1GatewaysStore()
+        console.log('L1 Gateway Store State:', {
+          selectedGatewayId: l1GatewaysStore.selectedGatewayId,
+          selectedGateway: l1GatewaysStore.selectedGateway,
+          availableGateways: l1GatewaysStore.l1Gateways?.length
+        })
+      }
+
+      // Ensure WebSocket is connected for progress updates
+      console.log('Checking WebSocket connection, isConnected:', isConnected.value)
+      if (!isConnected.value) {
+        console.log('WebSocket not connected, initializing...')
+        await initializeWebSocket()
+        console.log('WebSocket initialization completed, isConnected:', isConnected.value)
+      } else {
+        console.log('WebSocket already connected')
+      }
+
+      // Send deployment request to backend
+      const response = await apiService.deploy({
+        template: config.value.selectedTemplate || 'default',
+        config: config.value
+      })
+
+      console.log('Deployment API response:', response)
+      console.log('Response data structure:', JSON.stringify(response.data, null, 2))
+
+      // Handle ApiResponse wrapper structure: { success: true, data: { deployment_id, status, message }, error: null }
+      const deploymentResponse = response.data?.data || response.data
+      console.log('Deployment response data:', deploymentResponse)
+      console.log('Deployment ID from response:', deploymentResponse?.deployment_id)
+
+      if (deploymentResponse && deploymentResponse.deployment_id) {
+        deploymentId.value = deploymentResponse.deployment_id
+        console.log('Deployment started:', deploymentId.value)
+
+        // Subscribe to deployment progress updates
+        if (deploymentId.value) {
+          wsService.subscribeToDeployment(deploymentId.value)
+        }
+
+        return deploymentId.value
+      } else {
+        console.error('Missing deployment_id in response:', deploymentResponse)
+        console.error('Full response structure:', response)
+        throw new Error('Invalid response from deployment API - missing deployment_id')
+      }
+    } catch (error) {
+      isDeploying.value = false
+      deploymentError.value = error instanceof Error ? error.message : 'Deployment failed'
+      console.error('Deployment error:', error)
+      throw error
+    }
+  }
+
+  const cancelDeployment = () => {
+    if (deploymentId.value) {
+      // TODO: Implement cancel deployment API call
+      console.log('Canceling deployment:', deploymentId.value)
+    }
+
+    isDeploying.value = false
+    deploymentId.value = null
+    subnetId.value = null
+    deploymentProgress.value = null
+  }
+
+  const resetDeployment = () => {
+    isDeploying.value = false
+    deploymentId.value = null
+    subnetId.value = null
+    deploymentProgress.value = null
+    deploymentError.value = null
+    deploymentLogs.value = []
+  }
+
+  const retryDeployment = async () => {
+    if (!isConfigComplete.value) {
+      throw new Error('Configuration is incomplete')
+    }
+
+    console.log('Retrying deployment with current config')
+
+    // Reset deployment state but keep the config
+    deploymentError.value = null
+    deploymentLogs.value = []
+    deploymentProgress.value = null
+
+    // Start a new deployment
+    return await startDeployment()
+  }
+
+  // Configuration persistence
+  const saveConfiguration = async (name: string) => {
+    try {
+      const configData = {
+        name,
+        config: config.value,
+        timestamp: new Date().toISOString()
+      }
+
+      await apiService.saveConfig(configData)
+      console.log('Configuration saved:', name)
+    } catch (error) {
+      console.error('Failed to save configuration:', error)
+      throw error
+    }
+  }
+
+  const loadConfiguration = async (name: string) => {
+    try {
+      const response = await apiService.loadConfig(name)
+
+      if (response.data && response.data.config) {
+        config.value = response.data.config
+        isDirty.value = false
+        console.log('Configuration loaded:', name)
+      }
+    } catch (error) {
+      console.error('Failed to load configuration:', error)
+      throw error
+    }
+  }
+
+  return {
+    // State
+    config,
+    currentStep,
+    validationErrors,
+    isValidating,
+    isDirty,
+
+    // Deployment state
+    isDeploying: computed(() => isDeploying.value),
+    deploymentId: computed(() => deploymentId.value),
+    subnetId: computed(() => subnetId.value),
+    deploymentProgress: computed(() => deploymentProgress.value),
+    deploymentError: computed(() => deploymentError.value),
+    deploymentLogs: computed(() => deploymentLogs.value),
+    isConnected: computed(() => isConnected.value),
+    gatewayAddress: computed(() => gatewayAddress.value),
+    registryAddress: computed(() => registryAddress.value),
+    parentId: computed(() => parentId.value),
+
+    // Computed
+    isConfigComplete,
+    configValidationErrors,
+    hasErrors,
+    currentStepConfig,
+
+    // Actions
+    updateConfig,
+    setCurrentStep,
+    validateField,
+    validateStep,
+    setValidationErrors,
+    clearValidationErrors,
+    resetWizard,
+    exportConfig,
+
+    // Deployment actions
+    initializeWebSocket,
+    startDeployment,
+    cancelDeployment,
+    resetDeployment,
+    retryDeployment,
+
+    // Configuration management
+    saveConfiguration,
+    loadConfiguration
+  }
+})

@@ -81,17 +81,56 @@ impl EthContractDeployer {
         &mut self,
         subnet_creation_privilege: SubnetCreationPrivilege,
     ) -> Result<DeployedContracts> {
-        // Deploy all required libraries.
+        self.deploy_all_with_progress(
+            subnet_creation_privilege,
+            None::<fn(&str, &str, usize, usize)>,
+        )
+        .await
+    }
+
+    /// Deploys all contracts with progress reporting:
+    /// first libraries, then the gateway and registry contracts.
+    ///
+    /// The progress callback receives:
+    /// - contract_name: Name of the contract being deployed
+    /// - contract_type: Type of contract ("library", "gateway", "registry")
+    /// - current_step: Current step number (0-based)
+    /// - total_steps: Total number of deployment steps
+    pub async fn deploy_all_with_progress<F>(
+        &mut self,
+        subnet_creation_privilege: SubnetCreationPrivilege,
+        progress_callback: Option<F>,
+    ) -> Result<DeployedContracts>
+    where
+        F: Fn(&str, &str, usize, usize) + Send + Sync,
+    {
+        let total_steps = self.ipc_contracts.len() + 2; // libraries + gateway + registry
+        let mut current_step = 0;
+
+        // Deploy all required libraries with progress reporting.
         for (lib_src, lib_name) in self.ipc_contracts.clone() {
+            if let Some(ref callback) = progress_callback {
+                callback(&lib_name, "library", current_step, total_steps);
+            }
+
             self.deploy_library(&lib_src, &lib_name)
                 .await
                 .with_context(|| format!("failed to deploy library {lib_name}"))?;
+
+            current_step += 1;
         }
 
-        // Deploy the IPC Gateway contract.
+        // Deploy the IPC Gateway contract with progress reporting.
+        if let Some(ref callback) = progress_callback {
+            callback("Gateway", "gateway", current_step, total_steps);
+        }
         let gateway_addr = self.deploy_gateway().await?;
+        current_step += 1;
 
-        // Deploy the IPC SubnetRegistry contract.
+        // Deploy the IPC SubnetRegistry contract with progress reporting.
+        if let Some(ref callback) = progress_callback {
+            callback("Registry", "registry", current_step, total_steps);
+        }
         let registry_addr = self
             .deploy_registry(gateway_addr, subnet_creation_privilege)
             .await?;

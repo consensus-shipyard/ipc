@@ -42,7 +42,7 @@ pub mod list_validators;
 pub mod reject_approved;
 pub mod rpc;
 pub mod send_value;
-mod set_federated_power;
+pub mod set_federated_power;
 pub mod show_gateway_contract_commit_sha;
 mod validator;
 
