@@ -8,6 +8,9 @@ env_files = [
   { path = "../scripts/ci.env", profile = "ci" },
 ]
 
+[env]
+PROFILE = { value = "dev", condition = { env_not_set = ["PROFILE"] } }
+
 [tasks.test-data-env]
 script = """
 cat << EOF > ${TEST_DATA_DIR}/.env
