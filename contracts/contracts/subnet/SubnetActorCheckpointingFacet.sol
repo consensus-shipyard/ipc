@@ -56,6 +56,8 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         ensureValidHeight(checkpointHeight, s.commitmentHeights.activity);
 
         LibActivity.recordActivityRollup(subnet, checkpointHeight, activity);
+
+        s.commitmentHeights.activity = checkpointHeight;
     }
 
     function confirmValidatorChange(
@@ -66,6 +68,8 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         ensureValidHeight(checkpointHeight, s.commitmentHeights.configNumber);
 
         LibPower.confirmChange(breakdown.validatorNextConfigurationNumber);
+
+        s.commitmentHeights.configNumber = checkpointHeight;
     }
 
     /// @notice Executes bottom-up messages that have been committed to in a checkpoint.
