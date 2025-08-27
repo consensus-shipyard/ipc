@@ -811,6 +811,22 @@ impl SubnetManager for EthSubnetManager {
             chain_id
         ))?;
 
+        // Get the actual permission mode from the subnet contract
+        let permission_mode_u8 = contract.permission_mode().call().await?;
+        let permission_mode = match permission_mode_u8 {
+            0 => PermissionMode::Collateral,
+            1 => PermissionMode::Federated,
+            2 => PermissionMode::Static,
+            _ => {
+                tracing::warn!(
+                    "Unknown permission mode value {} for subnet {}, defaulting to Collateral",
+                    permission_mode_u8,
+                    subnet
+                );
+                PermissionMode::Collateral
+            }
+        };
+
         Ok(SubnetGenesisInfo {
             chain_id,
             // Active validators limit set for the child subnet.
@@ -826,8 +842,8 @@ impl SubnetManager for EthSubnetManager {
             // Custom message fee that the child subnet wants to set for cross-net messages
             validators: from_contract_validators(contract.genesis_validators().call().await?)?,
             genesis_balances: into_genesis_balance_map(genesis_balances.0, genesis_balances.1)?,
-            // TODO: fixme https://github.com/consensus-shipyard/ipc-monorepo/issues/496
-            permission_mode: PermissionMode::Collateral,
+            // Get the actual permission mode from the contract instead of hardcoded value
+            permission_mode,
             supply_source: Asset {
                 kind: AssetKind::Native,
                 token_address: None,

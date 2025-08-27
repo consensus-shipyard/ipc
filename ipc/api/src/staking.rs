@@ -60,6 +60,23 @@ pub struct ValidatorStakingInfo {
     pub metadata: Vec<u8>,
 }
 
+impl ValidatorStakingInfo {
+    /// Get the current power of the validator
+    pub fn current_power(&self) -> &TokenAmount {
+        &self.current_power
+    }
+
+    /// Get the next power of the validator
+    pub fn next_power(&self) -> &TokenAmount {
+        &self.next_power
+    }
+
+    /// Get the metadata of the validator
+    pub fn metadata(&self) -> &[u8] {
+        &self.metadata
+    }
+}
+
 impl Display for ValidatorStakingInfo {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(

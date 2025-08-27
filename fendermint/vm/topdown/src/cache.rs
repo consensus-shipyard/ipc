@@ -88,7 +88,7 @@ impl<K: PrimInt + Debug, V> SequentialKeyCache<K, V> {
         self.data.get(index).map(|entry| &entry.1)
     }
 
-    pub fn values_from(&self, start: K) -> ValueIter<K, V> {
+    pub fn values_from(&self, start: K) -> ValueIter<'_, K, V> {
         if self.is_empty() {
             return ValueIter {
                 i: self.data.iter(),
@@ -106,7 +106,7 @@ impl<K: PrimInt + Debug, V> SequentialKeyCache<K, V> {
         }
     }
 
-    pub fn values_within(&self, start: K, end: K) -> ValueIter<K, V> {
+    pub fn values_within(&self, start: K, end: K) -> ValueIter<'_, K, V> {
         if self.is_empty() {
             return ValueIter {
                 i: self.data.iter(),
@@ -128,7 +128,7 @@ impl<K: PrimInt + Debug, V> SequentialKeyCache<K, V> {
         }
     }
 
-    pub fn values(&self) -> ValueIter<K, V> {
+    pub fn values(&self) -> ValueIter<'_, K, V> {
         ValueIter {
             i: self.data.iter(),
         }

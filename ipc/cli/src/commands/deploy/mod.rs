@@ -68,6 +68,17 @@ pub(crate) async fn deploy_contracts(
     key_store: PersistentKeyStore<EthKeyAddress>,
     config: &DeployConfig,
 ) -> anyhow::Result<DeployedContracts> {
+    deploy_contracts_with_progress(key_store, config, None::<fn(&str, &str, usize, usize)>).await
+}
+
+pub(crate) async fn deploy_contracts_with_progress<F>(
+    key_store: PersistentKeyStore<EthKeyAddress>,
+    config: &DeployConfig,
+    progress_callback: Option<F>,
+) -> anyhow::Result<DeployedContracts>
+where
+    F: Fn(&str, &str, usize, usize) + Send + Sync,
+{
     // Retrieve the key info for the provided "from" address.
     let key_info: ipc_wallet::EvmKeyInfo =
         key_store.get(&config.from.into())?.ok_or_else(|| {
@@ -95,7 +106,7 @@ pub(crate) async fn deploy_contracts(
     )?;
 
     let deployed_contracts = deployer
-        .deploy_all(config.subnet_creation_privilege.into())
+        .deploy_all_with_progress(config.subnet_creation_privilege.into(), progress_callback)
         .await?;
 
     Ok(deployed_contracts)

@@ -190,7 +190,7 @@ where
     }
 
     /// Where can we send transactions and queries on a subnet.
-    pub fn submit_config(&self, subnet_name: &SubnetName) -> anyhow::Result<SubmitConfig<M>> {
+    pub fn submit_config(&self, subnet_name: &SubnetName) -> anyhow::Result<SubmitConfig<'_, M>> {
         let deployment = self.deployment(subnet_name)?;
         let subnet = self.subnet(subnet_name)?;
 

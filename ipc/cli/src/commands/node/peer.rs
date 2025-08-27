@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: MIT
 
+use crate::comet_runner::binary::init_comet_binary;
 use crate::commands::node::config::{
     CometBftOverrides, CometBftPeerInfo, ConnectionOverrideConfig, DiscoveryOverrideConfig,
     FendermintOverrides, FendermintPeerInfo, NodeInfo, P2pCometConfig, P2pConfig, PeerInfo,
@@ -338,11 +339,13 @@ pub async fn generate_peer_info(
 
 /// Get CometBFT node ID using the cometbft command
 async fn get_cometbft_node_id(cometbft_home: &Path) -> Result<String> {
-    let output = tokio::process::Command::new("cometbft")
+    let binary_path = init_comet_binary().context("failed to initialize CometBFT binary")?;
+
+    let output = tokio::process::Command::new(&binary_path)
         .args(["show-node-id", "--home", &cometbft_home.to_string_lossy()])
         .output()
         .await
-        .context("Couldn't run cometbft show-node-id—is CometBFT installed and in your PATH?")?;
+        .context("Couldn't run cometbft show-node-id—failed to execute bundled CometBFT binary")?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);

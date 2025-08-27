@@ -13,5 +13,17 @@ package-lock.json
 # no idea which forge package creates this
 .wake
 
+# Generated genesis and validator files
+genesis-sealed.json
+genesis_tendermint.json
+validator-nodes/
+
+# Vim swap files
+*.swp
+
 # Runtime data files
 data/
+
+# Frontend build artifacts and embedded UI assets
+ipc/cli/static/
+ipc-ui/frontend/dist/
