@@ -9,6 +9,8 @@ use std::{
 };
 use url::Url;
 
+use crate::docker::container_name;
+use crate::materials::WithNodeName;
 use crate::{
     manifest::{
         BalanceMap, CollateralMap, EnvMap, Manifest, Node, NodeMode, ParentNode, Rootnet, Subnet,
@@ -18,8 +20,8 @@ use crate::{
         TargetConfig,
     },
     materials::{IpcContractsOwner, Materials},
-    AccountId, NodeId, NodeName, RelayerName, ResourceHash, ResourceId, SubnetId, SubnetName,
-    TestnetName,
+    AccountId, NodeId, NodeName, RelayerName, ResourceHash, ResourceId, SubnetId,
+    SubnetName, TestnetName,
 };
 
 /// The `Testnet` parses a [Manifest] and is able to derive the steps
@@ -595,6 +597,7 @@ where
 
             // Create relayers for bottom-up checkpointing.
             let mut relayers = Vec::<(RelayerName, M::Relayer)>::new();
+
             for (id, relayer) in &subnet.relayers {
                 let submitter = self
                     .account(&relayer.submitter)
@@ -615,6 +618,12 @@ where
                     ),
                 };
 
+                let cometbft_url = format!(
+                    "http://{}:{}",
+                    container_name(follow_node.node_name(), "cometbft"),
+                    "26657"
+                );
+
                 let relayer_name = subnet_name.relayer(id);
                 let relayer = m
                     .create_relayer(
@@ -632,6 +641,7 @@ where
                             submitter,
                             env: &subnet.env,
                         },
+                        cometbft_url,
                     )
                     .await
                     .with_context(|| format!("failed to create relayer {id}"))?;

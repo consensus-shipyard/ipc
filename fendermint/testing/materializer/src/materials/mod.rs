@@ -5,7 +5,7 @@ use std::{os::unix::fs::PermissionsExt, path::Path};
 
 mod defaults;
 
-use crate::ResourceId;
+use crate::{NodeName, ResourceId};
 use anyhow::Context;
 pub use defaults::*;
 use fs_err as fs;
@@ -15,6 +15,10 @@ use serde::{de::DeserializeOwned, Serialize};
 pub trait IpcContractsOwner {
     /// return the address of the gateway/registry contract on this subnet
     fn ipc_contracts_owner(&self) -> ResourceId;
+}
+
+pub trait WithNodeName {
+    fn node_name(&self) -> &NodeName;
 }
 
 /// Type family of all the things a [Materializer] can create.
@@ -37,7 +41,7 @@ pub trait Materials {
     /// The address of a dynamically created subnet.
     type Subnet: Sync + Send + IpcContractsOwner;
     /// The handle to a node; could be a (set of) docker container(s) or remote addresses.
-    type Node: Sync + Send;
+    type Node: Sync + Send + WithNodeName;
     /// The handle to a relayer process.
     type Relayer: Sync + Send;
 }

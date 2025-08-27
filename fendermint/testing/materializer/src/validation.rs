@@ -372,6 +372,7 @@ impl Materializer<ValidationMaterials> for ValidatingMaterializer {
         parent_submit_config: &SubmitConfig<'a, ValidationMaterials>,
         relayer_name: &RelayerName,
         relayer_config: RelayerConfig<'a, ValidationMaterials>,
+        _cometbft_url: String,
     ) -> anyhow::Result<VRelayer>
     where
         's: 'a,

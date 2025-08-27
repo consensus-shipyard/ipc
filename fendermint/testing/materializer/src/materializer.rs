@@ -210,6 +210,7 @@ pub trait Materializer<M: Materials> {
         parent_submit_config: &SubmitConfig<'a, M>,
         relayer_name: &RelayerName,
         relayer_config: RelayerConfig<'a, M>,
+        cometbft_url: String,
     ) -> anyhow::Result<M::Relayer>
     where
         's: 'a;
