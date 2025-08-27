@@ -17,8 +17,6 @@ struct LastCommitmentHeights {
         /// @notice initial circulating supply provided by genesis validators to use when bootstrapping
         /// the network.
         uint256 genesisCircSupply;
-        /// @notice The height of the last committed bottom-up checkpoint.
-        uint256 lastBottomUpCheckpointHeight;
         /// @notice Minimal activation collateral
         uint256 minActivationCollateral;
         /// @notice number of blocks in a bottom-up epoch

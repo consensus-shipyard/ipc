@@ -20,7 +20,9 @@ contract SubnetActorCheckpointFacetMock is SubnetActorCheckpointingFacet {
         BottomUpBatch.Commitment calldata msgs,
         uint64 nextConfigurationNumber
     ) external {
-        s.lastBottomUpCheckpointHeight = h;
+        s.commitmentHeights.signedHeader = uint64(h);
+        s.commitmentHeights.activity = uint64(h);
+        s.commitmentHeights.configNumber = uint64(h);
 
         if (msgs.totalNumMsgs > 0) {
             LibBottomUpBatch.recordBottomUpBatchCommitment(uint64(h), msgs);
