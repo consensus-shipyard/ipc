@@ -66,8 +66,6 @@ fn block_zero() -> tendermint::Block {
         signatures: Vec::new(),
     };
 
-    let empty_cid = fendermint_vm_message::cid(&[0u8; 0]).unwrap();
-
     let header = tendermint::block::Header {
         version: tendermint::block::header::Version { block: 0, app: 0 },
         chain_id: tendermint::chain::Id::try_from("UNSPECIFIED").expect("invalid chainid"),
@@ -79,7 +77,7 @@ fn block_zero() -> tendermint::Block {
         validators_hash: tendermint::Hash::None,
         next_validators_hash: tendermint::Hash::None,
         consensus_hash: tendermint::Hash::None,
-        app_hash: tendermint::AppHash::try_from(empty_cid.to_bytes()).unwrap(),
+        app_hash: tendermint::AppHash::try_from(vec![0; 32]).unwrap(),
         last_results_hash: None,
         evidence_hash: None,
         proposer_address: tendermint::account::Id::new([0u8; 20]),
