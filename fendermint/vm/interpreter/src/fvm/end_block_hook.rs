@@ -28,13 +28,13 @@ pub struct PowerTable(pub Vec<Validator<Power>>);
 #[derive(Debug, Clone, Default)]
 pub struct PowerUpdates(pub Vec<Validator<Power>>);
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct MessageBatchCommitment {
     pub total_num_msgs: u64,
     pub msgs_root: [u8; 32],
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct LightClientCommitments {
     pub msg_batch_commitment: MessageBatchCommitment,
     pub validator_next_configuration_number: u64,

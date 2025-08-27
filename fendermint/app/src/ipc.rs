@@ -17,9 +17,10 @@ use fvm_ipld_blockstore::Blockstore;
 use ipc_actors_abis::subnet_actor_checkpointing_facet::{Commitment, StateCommitmentBreakDown};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use fendermint_vm_interpreter::fvm::end_block_hook::LightClientCommitments;
 
-pub fn derive_subnet_app_hash(state: &SubnetAppState) -> tendermint::hash::AppHash {
-    let state_params_cid = fendermint_vm_message::cid(state.state_params())
+pub fn derive_subnet_app_hash_from_components(state: &FvmStateParams, maybe_light: Option<&LightClientCommitments>) -> tendermint::hash::AppHash {
+    let state_params_cid = fendermint_vm_message::cid(state)
         .expect("state params have a CID")
         .to_bytes();
 
@@ -30,7 +31,7 @@ pub fn derive_subnet_app_hash(state: &SubnetAppState) -> tendermint::hash::AppHa
         activity_commitment: [0; 32],
     };
 
-    if let Some(commitment) = state.light_client_commitments() {
+    if let Some(commitment) = maybe_light {
         submission.activity_commitment = commitment.activity_commitment;
         submission.msg_batch_commitment = Commitment {
             total_num_msgs: commitment.msg_batch_commitment.total_num_msgs,
@@ -42,6 +43,10 @@ pub fn derive_subnet_app_hash(state: &SubnetAppState) -> tendermint::hash::AppHa
 
     let app_hash_bytes = ethers::utils::keccak256(submission.encode());
     tendermint::hash::AppHash::try_from(app_hash_bytes.to_vec()).expect("hash can be wrapped")
+}
+
+pub fn derive_subnet_app_hash(state: &SubnetAppState) -> tendermint::hash::AppHash {
+    derive_subnet_app_hash_from_components(state.state_params(), state.light_client_commitments())
 }
 
 /// All the things that can be voted on in a subnet.

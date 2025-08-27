@@ -16,6 +16,7 @@ const MANIFEST_FILE_NAME: &str = "manifest.json";
 /// Name of the subdirectory where `{idx}.part` files are stored within a snapshot.
 const PARTS_DIR_NAME: &str = "parts";
 
+use serde::{Deserialize, Serialize};
 pub use client::SnapshotClient;
 pub use error::SnapshotError;
 pub use manager::{SnapshotManager, SnapshotParams};

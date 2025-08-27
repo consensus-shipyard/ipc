@@ -9,12 +9,8 @@ use fendermint_vm_interpreter::fvm::state::{
     FvmStateParams,
 };
 use fs_err as fs;
-
-use crate::{
-    manifest,
-    state::{SnapshotDownload, SnapshotState},
-    SnapshotError, SnapshotItem, SnapshotManifest, MANIFEST_FILE_NAME,
-};
+use fendermint_vm_interpreter::fvm::state::snapshot::SnapshotPayload;
+use crate::{manifest, state::{SnapshotDownload, SnapshotState}, SnapshotError, SnapshotItem, SnapshotManifest, MANIFEST_FILE_NAME};
 
 /// Interface to snapshot state for the application.
 #[derive(Clone)]
@@ -41,11 +37,11 @@ impl SnapshotClient {
     ///
     /// Call this with the block height where the `app_hash` in the block reflects the
     /// state in the parameters, that is, the in the *next* block.
-    pub fn notify(&self, block_height: BlockHeight, state_params: FvmStateParams) -> Stm<()> {
+    pub fn notify(&self, block_height: BlockHeight, payload: SnapshotPayload) -> Stm<()> {
         if block_height % self.snapshot_interval == 0 {
             self.state
                 .latest_params
-                .write(Some((state_params, block_height)))?;
+                .write(Some((payload, block_height)))?;
         }
         Ok(())
     }

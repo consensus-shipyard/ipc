@@ -299,11 +299,10 @@ mod tests {
     }
 
     // These are all the libraries based on the `scripts/deploy-libraries.ts` in `ipc-solidity-actors`.
-    const IPC_DEPS: [&str; 4] = [
+    const IPC_DEPS: [&str; 3] = [
         "AccountHelper",
         "SubnetIDHelper",
         "CrossMsgHelper",
-        "LibQuorum",
     ];
 
     #[test]

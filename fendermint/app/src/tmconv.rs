@@ -4,7 +4,7 @@
 use anyhow::{anyhow, bail, Context};
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Power, Validator};
-use fendermint_vm_interpreter::fvm::state::{BlockHash, FvmStateParams};
+use fendermint_vm_interpreter::fvm::state::{BlockHash};
 use fendermint_vm_interpreter::types::{AppliedMessage, CheckResponse, QueryResponse};
 use fendermint_vm_message::signed::DomainHash;
 use fendermint_vm_snapshot::{SnapshotItem, SnapshotManifest};
@@ -13,13 +13,14 @@ use prost::Message;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, num::NonZeroU32};
 use tendermint::abci::{response, Code, Event, EventAttribute};
-
+use fendermint_vm_interpreter::fvm::state::snapshot::SnapshotPayload;
 use crate::{app::AppError, BlockHeight};
+use crate::ipc::{derive_subnet_app_hash_from_components};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct SnapshotMetadata {
     size: u64,
-    state_params: FvmStateParams,
+    state_params: SnapshotPayload,
 }
 
 /// IPLD encoding of data types we know we must be able to encode.
@@ -399,7 +400,7 @@ pub fn from_snapshot(
     let metadata = fvm_ipld_encoding::from_slice::<SnapshotMetadata>(&offer.snapshot.metadata)
         .context("failed to parse snapshot metadata")?;
 
-    let app_hash = fvm_state_hash(&metadata.state_params);
+    let app_hash = derive_subnet_app_hash_from_components(&metadata.state_params.state, metadata.state_params.light_client_commitments.as_ref());
 
     if app_hash != offer.app_hash {
         bail!(
@@ -424,39 +425,15 @@ pub fn from_snapshot(
     Ok(manifest)
 }
 
-/// Produce an appliction hash that is a commitment to all data replicated by consensus,
-/// that is, all nodes participating in the network must agree on this otherwise we have
-/// a consensus failure.
-///
-/// Notably it contains the actor state root _as well as_ some of the metadata maintained
-/// outside the FVM, such as the timestamp and the circulating supply.
-pub fn fvm_state_hash(state_params: &FvmStateParams) -> tendermint::hash::AppHash {
-    // Create an artifical CID from the FVM state params, which include everything that
-    // deterministically changes under consensus.
-    let state_params_cid =
-        fendermint_vm_message::cid(state_params).expect("state params have a CID");
-
-    // We could reduce it to a hash to ephasize that this is not something that we can return at the moment,
-    // but we could just as easily store the record in the Blockstore to make it retrievable.
-    // It is generally not a goal to serve the entire state over the IPLD Resolver or ABCI queries, though;
-    // for that we should rely on the CometBFT snapshot mechanism.
-    // But to keep our options open, we can return the hash as a CID that nobody can retrieve, and change our mind later.
-
-    // let state_params_hash = state_params_cid.hash();
-    let state_params_hash = state_params_cid.to_bytes();
-
-    tendermint::hash::AppHash::try_from(state_params_hash).expect("hash can be wrapped")
-}
-
 #[cfg(test)]
 mod tests {
     use fendermint_vm_snapshot::SnapshotItem;
     use fvm_shared::error::ExitCode;
     use tendermint::abci::request;
-
+    use crate::ipc::derive_subnet_app_hash_from_components;
     use crate::tmconv::to_error_msg;
 
-    use super::{from_snapshot, fvm_state_hash, to_snapshot};
+    use super::{from_snapshot, to_snapshot};
 
     #[test]
     fn code_error_message() {
@@ -472,7 +449,7 @@ mod tests {
         let abci_snapshot = to_snapshot(snapshot.clone()).unwrap();
         let abci_offer = request::OfferSnapshot {
             snapshot: abci_snapshot,
-            app_hash: fvm_state_hash(&snapshot.manifest.state_params),
+            app_hash: derive_subnet_app_hash_from_components(&snapshot.manifest.state_params.state, snapshot.manifest.state_params.light_client_commitments.as_ref()),
         };
         let manifest = from_snapshot(abci_offer).unwrap();
         assert_eq!(manifest, snapshot.manifest)

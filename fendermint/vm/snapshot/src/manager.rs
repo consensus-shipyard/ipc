@@ -9,7 +9,7 @@ use crate::state::SnapshotState;
 use crate::{car, SnapshotClient, SnapshotItem, PARTS_DIR_NAME, SNAPSHOT_FILE_NAME};
 use anyhow::Context;
 use async_stm::{atomically, retry, TVar};
-use fendermint_vm_interpreter::fvm::state::snapshot::{BlockHeight, Snapshot};
+use fendermint_vm_interpreter::fvm::state::snapshot::{BlockHeight, Snapshot, SnapshotPayload};
 use fendermint_vm_interpreter::fvm::state::FvmStateParams;
 use fvm_ipld_blockstore::Blockstore;
 use tendermint_rpc::Client;
@@ -103,7 +103,7 @@ where
 
         let mut last_params = None;
         loop {
-            let (state_params, block_height) = atomically(|| {
+            let (snapshot_payload, block_height) = atomically(|| {
                 // Check the current sync status. We could just query the API, but then we wouldn't
                 // be notified when we finally reach the end, and we'd only snapshot the next height,
                 // not the last one as soon as the chain is caught up.
@@ -120,7 +120,7 @@ where
             .await;
 
             match self
-                .create_snapshot(block_height, state_params.clone())
+                .create_snapshot(block_height, snapshot_payload.clone())
                 .await
             {
                 Ok(item) => {
@@ -147,7 +147,7 @@ where
             // Delete old snapshots.
             self.prune_history().await;
 
-            last_params = Some((state_params, block_height));
+            last_params = Some((snapshot_payload, block_height));
         }
     }
 
@@ -194,9 +194,9 @@ where
     async fn create_snapshot(
         &self,
         block_height: BlockHeight,
-        state_params: FvmStateParams,
+        snapshot_payload: SnapshotPayload,
     ) -> anyhow::Result<SnapshotItem> {
-        let snapshot = Snapshot::new(self.store.clone(), state_params.clone(), block_height)
+        let snapshot = Snapshot::new(self.store.clone(), snapshot_payload.clone(), block_height)
             .context("failed to create snapshot")?;
 
         let snapshot_version = snapshot.version();
@@ -254,7 +254,7 @@ where
             size: snapshot_size as u64,
             chunks: chunks_count as u32,
             checksum: checksum_bytes,
-            state_params,
+            state_params: snapshot_payload,
             version: snapshot_version,
         };
         let _ = write_manifest(temp_dir.path(), &manifest).context("failed to export manifest")?;
@@ -324,7 +324,7 @@ mod tests {
     };
     use fendermint_vm_interpreter::genesis::create_test_genesis_state;
     use quickcheck::Arbitrary;
-
+    use fendermint_vm_interpreter::fvm::state::snapshot::SnapshotPayload;
     use crate::{manager::SnapshotParams, manifest, PARTS_DIR_NAME};
 
     use super::SnapshotManager;
@@ -441,7 +441,7 @@ mod tests {
         assert!(!snapshots.is_empty(), "loads manifests on start");
     }
 
-    async fn init_genesis() -> (FvmStateParams, MemoryBlockstore) {
+    async fn init_genesis() -> (SnapshotPayload, MemoryBlockstore) {
         let mut g = quickcheck::Gen::new(5);
         let genesis = Genesis::arbitrary(&mut g);
 
@@ -461,7 +461,7 @@ mod tests {
             .unwrap_or_else(|_| panic!("cannot create exec state"));
         let (state_root, _, _) = state.commit().expect("failed to commit");
 
-        let state_params = FvmStateParams {
+        let state = FvmStateParams {
             state_root,
             timestamp: out.timestamp,
             network_version: out.network_version,
@@ -473,7 +473,11 @@ mod tests {
             consensus_params: None,
         };
 
-        (state_params, store)
+        let payload = SnapshotPayload {
+            state, light_client_commitments: None,
+        };
+
+        (payload, store)
     }
 
     fn mock_client() -> tendermint_rpc::MockClient<tendermint_rpc::MockRequestMethodMatcher> {
