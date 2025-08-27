@@ -13,3 +13,6 @@
 [submodule "contracts/lib/ExcessivelySafeCall"]
 	path = contracts/lib/ExcessivelySafeCall
 	url = https://github.com/nomad-xyz/ExcessivelySafeCall
+[submodule "contracts/lib/tendermint-sol"]
+	path = contracts/lib/tendermint-sol
+	url = https://github.com/ChorusOne/tendermint-sol

@@ -55,9 +55,9 @@ impl TryFrom<lib_power_change_log::NewPowerChangeRequestFilter> for PowerChangeR
 /// The staking validator information
 #[derive(Clone, Debug)]
 pub struct ValidatorStakingInfo {
-    current_power: TokenAmount,
-    next_power: TokenAmount,
-    metadata: Vec<u8>,
+    pub current_power: TokenAmount,
+    pub next_power: TokenAmount,
+    pub metadata: Vec<u8>,
 }
 
 impl ValidatorStakingInfo {

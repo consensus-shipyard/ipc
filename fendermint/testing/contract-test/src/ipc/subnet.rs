@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use ethers::types::U256;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::ipc::subnet::SubnetActorErrors;
 use fendermint_vm_genesis::{Collateral, Validator};
@@ -10,26 +11,24 @@ use fendermint_vm_interpreter::fvm::state::fevm::{
 use fendermint_vm_interpreter::fvm::state::FvmExecState;
 use fendermint_vm_message::conv::{from_eth, from_fvm};
 use fvm_ipld_blockstore::Blockstore;
-use fvm_shared::crypto::signature::SECP_SIG_LEN;
 use fvm_shared::econ::TokenAmount;
-use ipc_actors_abis::gateway_getter_facet::IpcEnvelope;
-use ipc_actors_abis::subnet_actor_checkpointing_facet::{
-    self as checkpointer, SubnetActorCheckpointingFacet,
-};
 use ipc_actors_abis::subnet_actor_getter_facet::{self as getter, SubnetActorGetterFacet};
 use ipc_actors_abis::subnet_actor_manager_facet::SubnetActorManagerFacet;
 
 pub use ipc_actors_abis::register_subnet_facet::ConstructorParams as SubnetConstructorParams;
+use ipc_actors_abis::subnet_actor_checkpoint_facet_mock::SubnetActorCheckpointFacetMock;
 use ipc_actors_abis::subnet_actor_reward_facet::SubnetActorRewardFacet;
+use ipc_api::subnet_id::SubnetID;
 
 #[derive(Clone)]
 pub struct SubnetCaller<DB> {
     addr: EthAddress,
     getter: ContractCaller<DB, SubnetActorGetterFacet<MockProvider>, NoRevert>,
     manager: ContractCaller<DB, SubnetActorManagerFacet<MockProvider>, SubnetActorErrors>,
+    // use the SubnetActorCheckpointFacetMock instead of SubnetActorCheckpointingFacet to simulate
+    // subnet validator logic instead of focusing on cometbft app hash generation/validation
+    checkpoint: ContractCaller<DB, SubnetActorCheckpointFacetMock<MockProvider>, SubnetActorErrors>,
     rewarder: ContractCaller<DB, SubnetActorRewardFacet<MockProvider>, SubnetActorErrors>,
-    checkpointer:
-        ContractCaller<DB, SubnetActorCheckpointingFacet<MockProvider>, SubnetActorErrors>,
 }
 
 impl<DB> SubnetCaller<DB> {
@@ -38,8 +37,8 @@ impl<DB> SubnetCaller<DB> {
             addr,
             getter: ContractCaller::new(addr, SubnetActorGetterFacet::new),
             manager: ContractCaller::new(addr, SubnetActorManagerFacet::new),
+            checkpoint: ContractCaller::new(addr, SubnetActorCheckpointFacetMock::new),
             rewarder: ContractCaller::new(addr, SubnetActorRewardFacet::new),
-            checkpointer: ContractCaller::new(addr, SubnetActorCheckpointingFacet::new),
         }
     }
 
@@ -115,24 +114,6 @@ impl<DB: Blockstore + Clone> SubnetCaller<DB> {
         self.rewarder.try_call(state, |c| c.claim().from(addr))
     }
 
-    /// Submit a bottom-up checkpoint.
-    pub fn try_submit_checkpoint(
-        &self,
-        state: &mut FvmExecState<DB>,
-        checkpoint: checkpointer::BottomUpCheckpoint,
-        _messages: Vec<IpcEnvelope>,
-        signatures: Vec<(EthAddress, [u8; SECP_SIG_LEN])>,
-    ) -> TryCallResult<()> {
-        let mut addrs = Vec::new();
-        let mut sigs = Vec::new();
-        for (addr, sig) in signatures {
-            addrs.push(ethers::types::Address::from(addr));
-            sigs.push(sig.into());
-        }
-        self.checkpointer
-            .try_call(state, |c| c.submit_checkpoint(checkpoint, addrs, sigs))
-    }
-
     /// Get information about the validator's current and total collateral.
     pub fn get_validator(
         &self,
@@ -205,5 +186,23 @@ impl<DB: Blockstore + Clone> SubnetCaller<DB> {
         cross_msgs: Vec<getter::IpcEnvelope>,
     ) -> anyhow::Result<[u8; 32]> {
         self.getter.call(state, |c| c.cross_msgs_hash(cross_msgs))
+    }
+
+    pub fn drive_validator_change(
+        &self,
+        state: &mut FvmExecState<DB>,
+        _: &SubnetID,
+        height: u64,
+        next_config_number: u64,
+    ) -> TryCallResult<()> {
+        self.checkpoint.try_call(state, |c| {
+            c.commit_side_effects(
+                U256::from(height),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                next_config_number,
+            )
+        })
     }
 }

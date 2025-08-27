@@ -3,16 +3,13 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::{SnapshotItem, MANIFEST_FILE_NAME};
 use anyhow::Context;
-use fendermint_vm_interpreter::fvm::state::{
-    snapshot::{BlockHeight, SnapshotVersion},
-    FvmStateParams,
-};
+use fendermint_vm_interpreter::fvm::state::snapshot::SnapshotPayload;
+use fendermint_vm_interpreter::fvm::state::snapshot::{BlockHeight, SnapshotVersion};
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-
-use crate::{SnapshotItem, MANIFEST_FILE_NAME};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct SnapshotManifest {
@@ -29,7 +26,7 @@ pub struct SnapshotManifest {
     /// The FVM parameters at the time of the snapshot,
     /// which are also in the CAR file, but it might be
     /// useful to see. It is annotated for human readability.
-    pub state_params: FvmStateParams,
+    pub state_params: SnapshotPayload,
     /// Snapshot format version
     pub version: SnapshotVersion,
 }
@@ -167,6 +164,7 @@ mod arb {
     use quickcheck::Arbitrary;
 
     use super::SnapshotManifest;
+    use fendermint_vm_interpreter::fvm::state::snapshot::SnapshotPayload;
 
     impl quickcheck::Arbitrary for SnapshotManifest {
         fn arbitrary(g: &mut quickcheck::Gen) -> Self {
@@ -181,18 +179,21 @@ mod arb {
                     &checksum,
                 )
                 .unwrap(),
-                state_params: FvmStateParams {
-                    state_root: ArbCid::arbitrary(g).0,
-                    timestamp: Timestamp(Arbitrary::arbitrary(g)),
-                    network_version: NetworkVersion::MAX,
-                    base_fee: ArbTokenAmount::arbitrary(g).0,
-                    circ_supply: ArbTokenAmount::arbitrary(g).0,
-                    chain_id: chainid::from_str_hashed(String::arbitrary(g).as_str())
-                        .unwrap()
-                        .into(),
-                    power_scale: *g.choose(&[-1, 0, 3]).unwrap(),
-                    app_version: 0,
-                    consensus_params: None,
+                state_params: SnapshotPayload {
+                    state: FvmStateParams {
+                        state_root: ArbCid::arbitrary(g).0,
+                        timestamp: Timestamp(Arbitrary::arbitrary(g)),
+                        network_version: NetworkVersion::MAX,
+                        base_fee: ArbTokenAmount::arbitrary(g).0,
+                        circ_supply: ArbTokenAmount::arbitrary(g).0,
+                        chain_id: chainid::from_str_hashed(String::arbitrary(g).as_str())
+                            .unwrap()
+                            .into(),
+                        power_scale: *g.choose(&[-1, 0, 3]).unwrap(),
+                        app_version: 0,
+                        consensus_params: None,
+                    },
+                    light_client_commitments: None,
                 },
                 version: Arbitrary::arbitrary(g),
             }

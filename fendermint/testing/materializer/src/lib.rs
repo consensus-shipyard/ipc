@@ -1,7 +1,7 @@
 use ethers::providers::{Http, Provider};
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-use crate::materials::IpcContractsOwner;
+use crate::materials::{IpcContractsOwner, WithNodeName};
 use multihash::MultihashDigest;
 use serde::{Deserialize, Serialize};
 use std::fmt::Formatter;
@@ -231,6 +231,12 @@ resource_name!(SubnetName: Testnet);
 resource_name!(NodeName: Testnet);
 resource_name!(RelayerName: Testnet);
 resource_name!(CliName: Testnet);
+
+impl WithNodeName for NodeName {
+    fn node_name(&self) -> &NodeName {
+        self
+    }
+}
 
 impl TestnetName {
     pub fn new<T: Into<TestnetId>>(id: T) -> Self {

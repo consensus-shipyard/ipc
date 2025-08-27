@@ -86,25 +86,25 @@ impl CommandLineHandler for CreateSubnet {
 
 pub(crate) async fn create_subnet(
     mut provider: ipc_provider::IpcProvider,
-    config: &SubnetCreateConfig,
+    arguments: &SubnetCreateConfig,
 ) -> anyhow::Result<FvmAddress> {
-    let parent = SubnetID::from_str(&config.parent)?;
+    let parent = SubnetID::from_str(&arguments.parent)?;
 
-    let from = match &config.from {
+    let from = match &arguments.from {
         Some(address) => Some(require_fil_addr_from_str(address)?),
         None => None,
     };
 
-    let supply_source = parse_supply_source(config)?;
-    let collateral_source = parse_collateral_source(config)?;
+    let supply_source = parse_supply_source(arguments)?;
+    let collateral_source = parse_collateral_source(arguments)?;
 
-    let raw_addr = config
+    let raw_addr = arguments
         .validator_gater
         .clone()
         .unwrap_or(ZERO_ADDRESS.to_string());
     let validator_gater = require_fil_addr_from_str(&raw_addr)?;
 
-    let raw_addr = config
+    let raw_addr = arguments
         .validator_rewarder
         .clone()
         .unwrap_or(ZERO_ADDRESS.to_string());
@@ -113,19 +113,20 @@ pub(crate) async fn create_subnet(
         .create_subnet(
             from,
             parent,
-            config.min_validators,
-            f64_to_token_amount(config.min_validator_stake)?,
-            config.bottomup_check_period,
-            config
+            arguments.min_validators,
+            f64_to_token_amount(arguments.min_validator_stake)?,
+            arguments.bottomup_check_period,
+            arguments
                 .active_validators_limit
                 .unwrap_or(DEFAULT_ACTIVE_VALIDATORS),
-            f64_to_token_amount(config.min_cross_msg_fee)?,
-            config.permission_mode,
+            f64_to_token_amount(arguments.min_cross_msg_fee)?,
+            arguments.permission_mode,
             supply_source,
             collateral_source,
             validator_gater,
             validator_rewarder,
-            config.genesis_subnet_ipc_contracts_owner,
+            arguments.genesis_subnet_ipc_contracts_owner,
+            arguments.chain_id,
         )
         .await?;
 
@@ -217,6 +218,12 @@ pub(crate) struct SubnetCreateConfig {
     /// Owner for all IPC diamond contracts at genesis (subnet-local address).
     #[arg(long, help = "Genesis owner for IPC diamond contracts on this subnet")]
     pub genesis_subnet_ipc_contracts_owner: EthAddress,
+
+    #[arg(
+        long,
+        help = "The chain id for the subnet, make sure it's unique across existing known chain ids"
+    )]
+    pub chain_id: u64,
 }
 
 #[derive(Debug, Args)]

@@ -4,31 +4,27 @@ use std::{cell::RefCell, collections::HashSet};
 
 use arbitrary::{Arbitrary, Unstructured};
 use fendermint_contract_test::ipc::{registry::RegistryCaller, subnet::SubnetCaller};
-use fendermint_crypto::{PublicKey, SecretKey};
+use fendermint_crypto::PublicKey;
 use fendermint_testing::smt::StateMachine;
 use fendermint_vm_actor_interface::{
     eam::EthAddress,
-    ipc::{subnet::SubnetActorErrors, subnet_id_to_eth, AbiHash},
+    ipc::{subnet::SubnetActorErrors, subnet_id_to_eth},
 };
 use fendermint_vm_genesis::{Collateral, Validator, ValidatorKey};
 use fendermint_vm_interpreter::fvm::{
     state::{fevm::ContractResult, ipc::GatewayCaller, FvmExecState},
     store::memory::MemoryBlockstore,
 };
-use fendermint_vm_message::{
-    conv::from_fvm::{self, to_eth_tokens},
-    signed::sign_secp256k1,
-};
+use fendermint_vm_message::conv::from_fvm::to_eth_tokens;
 use fvm_ipld_blockstore::Blockstore;
-use fvm_shared::bigint::Integer;
+use fvm_shared::address::Address;
 use fvm_shared::econ::TokenAmount;
-use fvm_shared::{address::Address, bigint::BigInt};
-use ipc_actors_abis::subnet_actor_checkpointing_facet as checkpointer;
 use ipc_api::subnet_id::SubnetID;
 
 use super::{
     choose_amount,
     state::{StakingAccount, StakingState},
+    DEFAULT_CHAIN_ID,
 };
 use fendermint_contract_test::ipc::registry::SubnetConstructorParams;
 
@@ -47,9 +43,7 @@ pub enum StakingCommand {
     /// Bottom-up checkpoint; confirms all staking operations up to the configuration number.
     Checkpoint {
         block_height: u64,
-        block_hash: [u8; 32],
         next_configuration_number: u64,
-        signatories: Vec<(EthAddress, SecretKey)>,
     },
     /// Join by as a new validator.
     Join(EthAddress, TokenAmount, PublicKey),
@@ -126,6 +120,7 @@ impl StateMachine for StakingMachine {
             validator_gater: EthAddress::from(ethers::types::Address::zero()).into(),
             validator_rewarder: Default::default(),
             genesis_subnet_ipc_contracts_owner: genesis_subnet_ipc_contracts_owner.into(),
+            chain_id: DEFAULT_CHAIN_ID,
         };
 
         eprintln!("\n> PARENT IPC: {parent_ipc:?}");
@@ -214,33 +209,10 @@ impl StateMachine for StakingMachine {
                 let block_height =
                     state.last_checkpoint_height + ipc_params.gateway.bottom_up_check_period;
 
-                let block_hash = <[u8; 32]>::arbitrary(u)?;
-
-                let majority_percentage = ipc_params.gateway.majority_percentage;
-                let collateral = state.active_collateral();
-                let collateral = collateral.atto();
-                let quorum_threshold =
-                    (collateral * majority_percentage).div_ceil(&BigInt::from(100));
-
-                let mut signatories = Vec::new();
-                let mut sign_power = BigInt::from(0);
-
-                for (collateral, addr) in state.active_validators() {
-                    let a = state.account(addr);
-                    signatories.push((*addr, a.secret_key.clone()));
-                    sign_power += collateral.0.atto();
-
-                    if sign_power >= quorum_threshold {
-                        break;
-                    }
-                }
-
                 // Technically we cannot build a proper checkpoint here because we don't know the subnet address.
                 StakingCommand::Checkpoint {
                     block_height,
-                    block_hash,
                     next_configuration_number,
-                    signatories,
                 }
             }
             &"join" => {
@@ -282,46 +254,20 @@ impl StateMachine for StakingMachine {
         match cmd {
             StakingCommand::Checkpoint {
                 block_height,
-                block_hash,
                 next_configuration_number,
-                signatories,
             } => {
                 eprintln!(
                     "\n> CMD: CHECKPOINT h={} cn={}",
                     block_height, next_configuration_number
                 );
 
-                // Build the checkpoint payload.
-
-                let (root, route) = subnet_id_to_eth(&system.subnet_id).unwrap();
-
-                let checkpoint = checkpointer::BottomUpCheckpoint {
-                    subnet_id: checkpointer::SubnetID { root, route },
-                    block_height: ethers::types::U256::from(*block_height),
-                    block_hash: *block_hash,
-                    next_configuration_number: *next_configuration_number,
-                    msgs: Default::default(),
-                    activity: Default::default(),
-                };
-                let checkpoint_hash = checkpoint.clone().abi_hash();
-
-                let mut signatures = Vec::new();
-
-                for (addr, secret_key) in signatories {
-                    let signature = sign_secp256k1(secret_key, &checkpoint_hash);
-                    let signature = from_fvm::to_eth_signature(&signature, false).unwrap();
-                    signatures.push((*addr, signature.into()));
-                }
-
-                signatures.sort_by_key(|(addr, _)| *addr);
-
                 system
                     .subnet
-                    .try_submit_checkpoint(
+                    .drive_validator_change(
                         &mut exec_state,
-                        checkpoint.clone(),
-                        Vec::new(),
-                        signatures.clone(),
+                        &system.subnet_id,
+                        *block_height,
+                        *next_configuration_number,
                     )
                     .expect("failed to call: submit_checkpoint")
             }

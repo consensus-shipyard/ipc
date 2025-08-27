@@ -4,7 +4,6 @@
 mod staking;
 
 use anyhow::{Context, Ok};
-use async_trait::async_trait;
 use ethers::types::U256;
 use fendermint_contract_test::Tester;
 use fendermint_rpc::response::decode_fevm_return_data;
@@ -18,14 +17,13 @@ use fvm_shared::address::Address;
 use fvm_shared::bigint::Zero;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
-use tendermint_rpc::Client;
 
 use fendermint_crypto::SecretKey;
 use fendermint_vm_actor_interface::eam;
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Account, Actor, ActorMeta, Genesis, PermissionMode, SignerAddr};
-use fendermint_vm_interpreter::fvm::bottomup::BottomUpManager;
+use fendermint_vm_interpreter::fvm::end_block_hook::EndBlockManager;
 use fendermint_vm_interpreter::fvm::store::memory::MemoryBlockstore;
 use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeScheduler};
@@ -200,13 +198,13 @@ async fn test_applying_upgrades() {
         )
         .unwrap();
 
-    let bottom_up_manager = BottomUpManager::new(NeverCallClient, None);
+    let end_block_manager = EndBlockManager::default();
     let finality_provider = Arc::new(Toggle::disabled());
     let vote_tally = VoteTally::empty();
     let top_down_manager = TopDownManager::new(finality_provider, vote_tally);
 
-    let interpreter: FvmMessagesInterpreter<MemoryBlockstore, _> = FvmMessagesInterpreter::new(
-        bottom_up_manager,
+    let interpreter: FvmMessagesInterpreter<MemoryBlockstore> = FvmMessagesInterpreter::new(
+        end_block_manager,
         top_down_manager,
         upgrade_scheduler,
         false,
@@ -258,18 +256,5 @@ async fn test_applying_upgrades() {
 
         // check that the app_version was upgraded to 1
         assert_eq!(tester.state_params().app_version, 1);
-    }
-}
-
-#[derive(Clone)]
-struct NeverCallClient;
-
-#[async_trait]
-impl Client for NeverCallClient {
-    async fn perform<R>(&self, _request: R) -> Result<R::Output, tendermint_rpc::Error>
-    where
-        R: tendermint_rpc::SimpleRequest,
-    {
-        todo!()
     }
 }

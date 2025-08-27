@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import {SubnetActorManagerFacet} from "../../contracts/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorPauseFacet} from "../../contracts/subnet/SubnetActorPauseFacet.sol";
-import {SubnetActorCheckpointingFacet} from "../../contracts/subnet/SubnetActorCheckpointingFacet.sol";
+import {SubnetActorCheckpointFacetMock} from "../../test/mocks/SubnetActorCheckpointFacetMock.sol";
 import {SubnetActorActivityFacet} from "../../contracts/subnet/SubnetActorActivityFacet.sol";
 import {SubnetActorRewardFacet} from "../../contracts/subnet/SubnetActorRewardFacet.sol";
 import {SubnetActorGetterFacet} from "../../contracts/subnet/SubnetActorGetterFacet.sol";
@@ -22,8 +22,8 @@ library SubnetActorFacetsHelper {
         return facet;
     }
 
-    function checkpointer(address sa) internal pure returns (SubnetActorCheckpointingFacet) {
-        SubnetActorCheckpointingFacet facet = SubnetActorCheckpointingFacet(sa);
+    function checkpointer(address sa) internal pure returns (SubnetActorCheckpointFacetMock) {
+        SubnetActorCheckpointFacetMock facet = SubnetActorCheckpointFacetMock(sa);
         return facet;
     }
 
@@ -62,8 +62,8 @@ library SubnetActorFacetsHelper {
         return facet;
     }
 
-    function checkpointer(SubnetActorDiamond sa) internal pure returns (SubnetActorCheckpointingFacet) {
-        SubnetActorCheckpointingFacet facet = SubnetActorCheckpointingFacet(address(sa));
+    function checkpointer(SubnetActorDiamond sa) internal pure returns (SubnetActorCheckpointFacetMock) {
+        SubnetActorCheckpointFacetMock facet = SubnetActorCheckpointFacetMock(address(sa));
         return facet;
     }
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {BottomUpCheckpoint, BottomUpMsgBatch, IpcEnvelope, ParentFinality} from "../structs/CrossNet.sol";
+import {BottomUpMsgBatch, IpcEnvelope, ParentFinality} from "../structs/CrossNet.sol";
 import {QuorumInfo} from "../structs/Quorum.sol";
 import {SubnetID, Subnet} from "../structs/Subnet.sol";
 import {Membership} from "../structs/Subnet.sol";
@@ -50,12 +50,6 @@ contract GatewayGetterFacet {
     /// @notice Returns the subnet identifier of the network.
     function getNetworkName() external view returns (SubnetID memory) {
         return s.networkName;
-    }
-
-    /// @notice Returns a specific bottom-up checkpoint based on an epoch number.
-    /// @param e The epoch number of the checkpoint.
-    function bottomUpCheckpoint(uint256 e) external view returns (BottomUpCheckpoint memory) {
-        return s.bottomUpCheckpoints[e];
     }
 
     /// @notice Returns a specific bottom-up message batch based on an index.
@@ -200,21 +194,6 @@ contract GatewayGetterFacet {
         return s.checkpointQuorumMap.incompleteQuorums.values();
     }
 
-    /// @notice Returns the incomplete checkpoints.
-    function getIncompleteCheckpoints() external view returns (BottomUpCheckpoint[] memory) {
-        uint256[] memory heights = s.checkpointQuorumMap.incompleteQuorums.values();
-        uint256 size = heights.length;
-
-        BottomUpCheckpoint[] memory checkpoints = new BottomUpCheckpoint[](size);
-        for (uint64 i; i < size; ) {
-            checkpoints[i] = s.bottomUpCheckpoints[heights[i]];
-            unchecked {
-                ++i;
-            }
-        }
-        return checkpoints;
-    }
-
     /// @notice Returns the bottom-up checkpoint retention index.
     function getCheckpointRetentionHeight() external view returns (uint256) {
         return s.checkpointQuorumMap.retentionHeight;
@@ -226,41 +205,5 @@ contract GatewayGetterFacet {
     /// @return The quorum threshold derived from the total weight and majority percentage.
     function getQuorumThreshold(uint256 totalWeight) external view returns (uint256) {
         return LibQuorum.weightNeeded(totalWeight, s.majorityPercentage);
-    }
-
-    /// @notice Retrieves a bundle of information and signatures for a specified bottom-up checkpoint.
-    /// @param h The height of the checkpoint for which information is requested.
-    /// @return ch The checkpoint information at the specified height.
-    /// @return info Quorum information related to the checkpoint.
-    /// @return signatories An array of addresses of signatories who have signed the checkpoint.
-    function getCheckpointSignatureBundle(
-        uint256 h
-    )
-        external
-        view
-        returns (
-            BottomUpCheckpoint memory ch,
-            QuorumInfo memory info,
-            address[] memory signatories,
-            bytes[] memory signatures
-        )
-    {
-        ch = s.bottomUpCheckpoints[h];
-        (info, signatories, signatures) = LibQuorum.getSignatureBundle(s.checkpointQuorumMap, h);
-
-        return (ch, info, signatories, signatures);
-    }
-
-    /// @notice Returns the current bottom-up checkpoint.
-    /// @return exists - whether the checkpoint exists
-    /// @return epoch - the epoch of the checkpoint
-    /// @return checkpoint - the checkpoint struct
-    function getCurrentBottomUpCheckpoint()
-        external
-        view
-        returns (bool exists, uint256 epoch, BottomUpCheckpoint memory checkpoint)
-    {
-        (exists, epoch, checkpoint) = LibGateway.getCurrentBottomUpCheckpoint();
-        return (exists, epoch, checkpoint);
     }
 }

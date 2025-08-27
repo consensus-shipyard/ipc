@@ -69,7 +69,6 @@ contract SubnetRegistryDiamond {
         if (params.activityFacet == address(0)) {
             revert FacetCannotBeZero();
         }
-
         LibDiamond.setContractOwner(msg.sender);
         LibDiamond.diamondCut({_diamondCut: _diamondCut, _init: address(0), _calldata: new bytes(0)});
 

@@ -6,7 +6,7 @@
 
 use crate::commands::subnet::init::config::{DeployConfig, SubnetCreateConfig};
 use crate::{f64_to_token_amount, get_ipc_provider, require_fil_addr_from_str, GlobalArguments};
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use ethers::types::Address as EthAddress;
 use fendermint_eth_deployer::DeployedContracts;
 use ipc_api::subnet::{Asset, AssetKind, PermissionMode};
@@ -205,6 +205,10 @@ impl DeploymentService {
             _ => PermissionMode::Collateral,
         };
 
+        let subnet_chain_id = config["chainId"]
+            .as_u64()
+            .ok_or_else(|| anyhow!("missing subnet chain id configuration"))?;
+
         // Create subnet creation config
         let subnet_config = SubnetCreateConfig {
             parent: parent_network.to_string(),
@@ -222,6 +226,7 @@ impl DeploymentService {
             validator_gater: None,
             validator_rewarder: None,
             genesis_subnet_ipc_contracts_owner: EthAddress::from_str(from_address_str)?,
+            chain_id: subnet_chain_id,
         };
 
         log::info!("Created subnet config: {:?}", subnet_config);
@@ -489,6 +494,10 @@ impl DeploymentService {
             _ => PermissionMode::Collateral,
         };
 
+        let subnet_chain_id = config["chainId"]
+            .as_u64()
+            .ok_or_else(|| anyhow!("missing subnet chain id configuration"))?;
+
         // Create subnet creation config
         let subnet_config = SubnetCreateConfig {
             parent: parent_network.to_string(),
@@ -506,6 +515,7 @@ impl DeploymentService {
             validator_gater: None,
             validator_rewarder: None,
             genesis_subnet_ipc_contracts_owner: EthAddress::from_str(from_address_str)?,
+            chain_id: subnet_chain_id,
         };
 
         log::info!("Created subnet config: {:?}", subnet_config);
@@ -576,6 +586,7 @@ impl DeploymentService {
                     validator_gater,
                     validator_rewarder,
                     subnet_config.genesis_subnet_ipc_contracts_owner,
+                    subnet_config.chain_id,
                     gateway_addr,
                     registry_addr,
                     &config,
@@ -694,6 +705,7 @@ impl DeploymentService {
         validator_gater: fvm_shared::address::Address,
         validator_rewarder: fvm_shared::address::Address,
         genesis_subnet_ipc_contracts_owner: ethers::types::H160,
+        subnet_chain_id: u64,
         custom_gateway_addr: ethers::types::Address,
         custom_registry_addr: ethers::types::Address,
         config: &serde_json::Value,
@@ -773,6 +785,7 @@ impl DeploymentService {
                 validator_gater,
                 validator_rewarder,
                 genesis_subnet_ipc_contracts_owner,
+                subnet_chain_id,
             )
             .await;
 
