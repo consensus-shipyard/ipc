@@ -399,7 +399,7 @@ pub fn from_snapshot(
     let metadata = fvm_ipld_encoding::from_slice::<SnapshotMetadata>(&offer.snapshot.metadata)
         .context("failed to parse snapshot metadata")?;
 
-    let app_hash = to_app_hash(&metadata.state_params);
+    let app_hash = fvm_state_hash(&metadata.state_params);
 
     if app_hash != offer.app_hash {
         bail!(
@@ -430,7 +430,7 @@ pub fn from_snapshot(
 ///
 /// Notably it contains the actor state root _as well as_ some of the metadata maintained
 /// outside the FVM, such as the timestamp and the circulating supply.
-pub fn to_app_hash(state_params: &FvmStateParams) -> tendermint::hash::AppHash {
+pub fn fvm_state_hash(state_params: &FvmStateParams) -> tendermint::hash::AppHash {
     // Create an artifical CID from the FVM state params, which include everything that
     // deterministically changes under consensus.
     let state_params_cid =
@@ -456,7 +456,7 @@ mod tests {
 
     use crate::tmconv::to_error_msg;
 
-    use super::{from_snapshot, to_app_hash, to_snapshot};
+    use super::{from_snapshot, fvm_state_hash, to_snapshot};
 
     #[test]
     fn code_error_message() {
@@ -472,7 +472,7 @@ mod tests {
         let abci_snapshot = to_snapshot(snapshot.clone()).unwrap();
         let abci_offer = request::OfferSnapshot {
             snapshot: abci_snapshot,
-            app_hash: to_app_hash(&snapshot.manifest.state_params),
+            app_hash: fvm_state_hash(&snapshot.manifest.state_params),
         };
         let manifest = from_snapshot(abci_offer).unwrap();
         assert_eq!(manifest, snapshot.manifest)
