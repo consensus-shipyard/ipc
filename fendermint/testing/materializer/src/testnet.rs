@@ -20,8 +20,8 @@ use crate::{
         TargetConfig,
     },
     materials::{IpcContractsOwner, Materials},
-    AccountId, NodeId, NodeName, RelayerName, ResourceHash, ResourceId, SubnetId,
-    SubnetName, TestnetName,
+    AccountId, NodeId, NodeName, RelayerName, ResourceHash, ResourceId, SubnetId, SubnetName,
+    TestnetName,
 };
 
 /// The `Testnet` parses a [Manifest] and is able to derive the steps
