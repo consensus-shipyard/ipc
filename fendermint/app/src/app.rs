@@ -568,8 +568,8 @@ where
             height,
             state_root = subnet_state.app_state.state_root().to_string(),
             app_hash = subnet_state.app_hash().to_string(),
-            timestamp = app_state.state_params.timestamp.0,
-            chain_id = app_state.state_params.chain_id,
+            timestamp = subnet_state.app_state.state_params.timestamp.0,
+            chain_id = subnet_state.app_state.state_params.chain_id,
             "init chain"
         );
 
