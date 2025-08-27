@@ -35,11 +35,17 @@ FROM --platform=$BUILDPLATFORM ubuntu:jammy as builder
 
 RUN apt-get update && \
   apt-get install -y build-essential clang cmake protobuf-compiler curl \
-  openssl libssl-dev pkg-config
+  openssl libssl-dev pkg-config && \
+  # Install Node.js 20.x
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+  apt-get install -y nodejs && \
+  # Install Foundry
+  curl -L https://foundry.paradigm.xyz | bash && \
+  /root/.foundry/bin/foundryup
 
 # Get Rust
 RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable -y
-ENV PATH="/root/.cargo/bin:${PATH}"
+ENV PATH="/root/.cargo/bin:/root/.foundry/bin:${PATH}"
 
 ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
   CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
