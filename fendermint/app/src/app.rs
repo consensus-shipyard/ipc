@@ -109,10 +109,6 @@ impl AppState {
         self.state_params.state_root
     }
 
-    pub fn app_hash(&self) -> tendermint::hash::AppHash {
-        to_app_hash(&self.state_params)
-    }
-
     /// The state is effective at the *next* block, that is, the effects of block N are visible in the header of block N+1,
     /// so the height of the state itself as a "post-state" is one higher than the block which we executed to create it.
     pub fn state_height(&self) -> BlockHeight {
@@ -556,27 +552,28 @@ where
             oldest_state_height: height,
             state_params,
         };
+        let subnet_state = SubnetAppState {
+            app_state,
+            // there is no light client commitment at the genesis
+            light_client_commitments: None,
+        };
 
         let response = response::InitChain {
             consensus_params: None, // not updating the proposed consensus params
             validators,
-            app_hash: app_state.app_hash(),
+            app_hash: subnet_state.app_hash(),
         };
 
         tracing::info!(
             height,
-            state_root = app_state.state_root().to_string(),
-            app_hash = app_state.app_hash().to_string(),
+            state_root = subnet_state.app_state.state_root().to_string(),
+            app_hash = subnet_state.app_hash().to_string(),
             timestamp = app_state.state_params.timestamp.0,
             chain_id = app_state.state_params.chain_id,
             "init chain"
         );
 
-        let state = SubnetAppState {
-            app_state,
-            light_client_commitments: None,
-        };
-        self.set_committed_state(state)?;
+        self.set_committed_state(subnet_state)?;
 
         Ok(response)
     }
