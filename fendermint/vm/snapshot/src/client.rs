@@ -3,14 +3,15 @@
 
 use std::{path::PathBuf, sync::Arc, time::SystemTime};
 
-use async_stm::{abort, Stm, StmResult, TVar};
-use fendermint_vm_interpreter::fvm::state::{
-    snapshot::{BlockHeight, SnapshotVersion},
-    FvmStateParams,
+use crate::{
+    manifest,
+    state::{SnapshotDownload, SnapshotState},
+    SnapshotError, SnapshotItem, SnapshotManifest, MANIFEST_FILE_NAME,
 };
-use fs_err as fs;
+use async_stm::{abort, Stm, StmResult, TVar};
 use fendermint_vm_interpreter::fvm::state::snapshot::SnapshotPayload;
-use crate::{manifest, state::{SnapshotDownload, SnapshotState}, SnapshotError, SnapshotItem, SnapshotManifest, MANIFEST_FILE_NAME};
+use fendermint_vm_interpreter::fvm::state::snapshot::{BlockHeight, SnapshotVersion};
+use fs_err as fs;
 
 /// Interface to snapshot state for the application.
 #[derive(Clone)]

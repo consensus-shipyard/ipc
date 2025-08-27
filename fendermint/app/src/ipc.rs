@@ -7,6 +7,7 @@ use crate::{App, BlockHeight};
 use ethers::abi::AbiEncode;
 use fendermint_storage::{Codec, Encode, KVReadable, KVStore, KVWritable};
 use fendermint_vm_genesis::{Power, Validator};
+use fendermint_vm_interpreter::fvm::end_block_hook::LightClientCommitments;
 use fendermint_vm_interpreter::fvm::state::ipc::GatewayCaller;
 use fendermint_vm_interpreter::fvm::state::{FvmExecState, FvmStateParams};
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
@@ -17,9 +18,11 @@ use fvm_ipld_blockstore::Blockstore;
 use ipc_actors_abis::subnet_actor_checkpointing_facet::{Commitment, StateCommitmentBreakDown};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use fendermint_vm_interpreter::fvm::end_block_hook::LightClientCommitments;
 
-pub fn derive_subnet_app_hash_from_components(state: &FvmStateParams, maybe_light: Option<&LightClientCommitments>) -> tendermint::hash::AppHash {
+pub fn derive_subnet_app_hash_from_components(
+    state: &FvmStateParams,
+    maybe_light: Option<&LightClientCommitments>,
+) -> tendermint::hash::AppHash {
     let state_params_cid = fendermint_vm_message::cid(state)
         .expect("state params have a CID")
         .to_bytes();

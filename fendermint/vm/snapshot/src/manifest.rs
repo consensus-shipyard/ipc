@@ -3,16 +3,13 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::{SnapshotItem, MANIFEST_FILE_NAME};
 use anyhow::Context;
-use fendermint_vm_interpreter::fvm::state::{
-    snapshot::{BlockHeight, SnapshotVersion},
-    FvmStateParams,
-};
+use fendermint_vm_interpreter::fvm::state::snapshot::SnapshotPayload;
+use fendermint_vm_interpreter::fvm::state::snapshot::{BlockHeight, SnapshotVersion};
 use fs_err as fs;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use fendermint_vm_interpreter::fvm::state::snapshot::SnapshotPayload;
-use crate::{SnapshotItem, MANIFEST_FILE_NAME};
 
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct SnapshotManifest {
@@ -196,7 +193,7 @@ mod arb {
                         app_version: 0,
                         consensus_params: None,
                     },
-                    light_client_commitments: None
+                    light_client_commitments: None,
                 },
                 version: Arbitrary::arbitrary(g),
             }

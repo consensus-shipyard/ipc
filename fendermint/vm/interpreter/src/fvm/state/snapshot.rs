@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use crate::fvm::end_block_hook::LightClientCommitments;
 use crate::fvm::state::FvmStateParams;
 use crate::fvm::store::ReadOnlyBlockstore;
 use anyhow::anyhow;
@@ -19,7 +20,6 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio_stream::StreamExt;
 use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
-use crate::fvm::end_block_hook::LightClientCommitments;
 
 pub type BlockHeight = u64;
 pub type SnapshotVersion = u32;
@@ -148,7 +148,6 @@ pub struct V1Snapshot<BS> {
     block_height: BlockHeight,
 }
 
-
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct SnapshotPayload {
     pub state: FvmStateParams,
@@ -185,7 +184,7 @@ where
                     ReadOnlyBlockstore::new(store),
                     &state_tree_root,
                 )?,
-                payload: payload,
+                payload,
                 block_height,
             })
         } else {

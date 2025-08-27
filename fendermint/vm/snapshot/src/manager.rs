@@ -10,7 +10,6 @@ use crate::{car, SnapshotClient, SnapshotItem, PARTS_DIR_NAME, SNAPSHOT_FILE_NAM
 use anyhow::Context;
 use async_stm::{atomically, retry, TVar};
 use fendermint_vm_interpreter::fvm::state::snapshot::{BlockHeight, Snapshot, SnapshotPayload};
-use fendermint_vm_interpreter::fvm::state::FvmStateParams;
 use fvm_ipld_blockstore::Blockstore;
 use tendermint_rpc::Client;
 
@@ -315,8 +314,10 @@ mod tests {
     use super::fs;
     use std::time::Duration;
 
+    use crate::{manager::SnapshotParams, manifest, PARTS_DIR_NAME};
     use async_stm::{atomically, retry};
     use fendermint_vm_genesis::Genesis;
+    use fendermint_vm_interpreter::fvm::state::snapshot::SnapshotPayload;
     use fendermint_vm_interpreter::fvm::{
         bundle::contracts_path,
         state::{snapshot::Snapshot, FvmStateParams},
@@ -324,8 +325,6 @@ mod tests {
     };
     use fendermint_vm_interpreter::genesis::create_test_genesis_state;
     use quickcheck::Arbitrary;
-    use fendermint_vm_interpreter::fvm::state::snapshot::SnapshotPayload;
-    use crate::{manager::SnapshotParams, manifest, PARTS_DIR_NAME};
 
     use super::SnapshotManager;
 
@@ -474,7 +473,8 @@ mod tests {
         };
 
         let payload = SnapshotPayload {
-            state, light_client_commitments: None,
+            state,
+            light_client_commitments: None,
         };
 
         (payload, store)

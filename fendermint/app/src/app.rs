@@ -37,6 +37,7 @@ use fendermint_vm_interpreter::MessagesInterpreter;
 
 use crate::ipc::derive_subnet_app_hash;
 use fendermint_vm_interpreter::fvm::end_block_hook::LightClientCommitments;
+use fendermint_vm_interpreter::fvm::state::snapshot::SnapshotPayload;
 use fendermint_vm_message::query::FvmQueryHeight;
 use fendermint_vm_snapshot::{SnapshotClient, SnapshotError};
 use fvm::engine::MultiEngine;
@@ -51,7 +52,6 @@ use tendermint::abci::request::CheckTxKind;
 use tendermint::abci::{request, response};
 use tendermint::consensus::params::Params as TendermintConsensusParams;
 use tracing::instrument;
-use fendermint_vm_interpreter::fvm::state::snapshot::SnapshotPayload;
 
 #[derive(Serialize)]
 #[repr(u8)]
@@ -998,9 +998,11 @@ where
         //    CometBFT is going to offer it with the `app_hash` of 901, but in this case that's good, because
         //    that hash reflects the changes made by block 900, which this state param is the result of.
         if let Some(ref snapshots) = self.snapshots {
-            let payload = SnapshotPayload { state: state.app_state.state_params.clone(), light_client_commitments: state.light_client_commitments.clone() };
-            atomically(|| snapshots.notify(block_height, payload.clone()))
-                .await;
+            let payload = SnapshotPayload {
+                state: state.app_state.state_params.clone(),
+                light_client_commitments: state.light_client_commitments.clone(),
+            };
+            atomically(|| snapshots.notify(block_height, payload.clone())).await;
         }
 
         // Commit app state to the datastore.
@@ -1148,7 +1150,8 @@ where
                         // The height reflects that it was produced in `commit`.
                         state.app_state.block_height = snapshot.manifest.block_height;
                         state.app_state.state_params = snapshot.manifest.state_params.state;
-                        state.light_client_commitments= snapshot.manifest.state_params.light_client_commitments;
+                        state.light_client_commitments =
+                            snapshot.manifest.state_params.light_client_commitments;
                         self.set_committed_state(state)?;
 
                         // TODO: We can remove the `current_download` from the STM

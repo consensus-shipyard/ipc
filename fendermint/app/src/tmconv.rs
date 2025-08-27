@@ -1,10 +1,13 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! Conversions to Tendermint data types.
+use crate::ipc::derive_subnet_app_hash_from_components;
+use crate::{app::AppError, BlockHeight};
 use anyhow::{anyhow, bail, Context};
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Power, Validator};
-use fendermint_vm_interpreter::fvm::state::{BlockHash};
+use fendermint_vm_interpreter::fvm::state::snapshot::SnapshotPayload;
+use fendermint_vm_interpreter::fvm::state::BlockHash;
 use fendermint_vm_interpreter::types::{AppliedMessage, CheckResponse, QueryResponse};
 use fendermint_vm_message::signed::DomainHash;
 use fendermint_vm_snapshot::{SnapshotItem, SnapshotManifest};
@@ -13,9 +16,6 @@ use prost::Message;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, num::NonZeroU32};
 use tendermint::abci::{response, Code, Event, EventAttribute};
-use fendermint_vm_interpreter::fvm::state::snapshot::SnapshotPayload;
-use crate::{app::AppError, BlockHeight};
-use crate::ipc::{derive_subnet_app_hash_from_components};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct SnapshotMetadata {
@@ -400,7 +400,10 @@ pub fn from_snapshot(
     let metadata = fvm_ipld_encoding::from_slice::<SnapshotMetadata>(&offer.snapshot.metadata)
         .context("failed to parse snapshot metadata")?;
 
-    let app_hash = derive_subnet_app_hash_from_components(&metadata.state_params.state, metadata.state_params.light_client_commitments.as_ref());
+    let app_hash = derive_subnet_app_hash_from_components(
+        &metadata.state_params.state,
+        metadata.state_params.light_client_commitments.as_ref(),
+    );
 
     if app_hash != offer.app_hash {
         bail!(
@@ -427,11 +430,11 @@ pub fn from_snapshot(
 
 #[cfg(test)]
 mod tests {
+    use crate::ipc::derive_subnet_app_hash_from_components;
+    use crate::tmconv::to_error_msg;
     use fendermint_vm_snapshot::SnapshotItem;
     use fvm_shared::error::ExitCode;
     use tendermint::abci::request;
-    use crate::ipc::derive_subnet_app_hash_from_components;
-    use crate::tmconv::to_error_msg;
 
     use super::{from_snapshot, to_snapshot};
 
@@ -449,7 +452,14 @@ mod tests {
         let abci_snapshot = to_snapshot(snapshot.clone()).unwrap();
         let abci_offer = request::OfferSnapshot {
             snapshot: abci_snapshot,
-            app_hash: derive_subnet_app_hash_from_components(&snapshot.manifest.state_params.state, snapshot.manifest.state_params.light_client_commitments.as_ref()),
+            app_hash: derive_subnet_app_hash_from_components(
+                &snapshot.manifest.state_params.state,
+                snapshot
+                    .manifest
+                    .state_params
+                    .light_client_commitments
+                    .as_ref(),
+            ),
         };
         let manifest = from_snapshot(abci_offer).unwrap();
         assert_eq!(manifest, snapshot.manifest)
