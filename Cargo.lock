@@ -3448,6 +3448,7 @@ dependencies = [
  "fvm_ipld_encoding",
  "fvm_shared",
  "hex",
+ "ipc-provider",
  "jsonrpc-v2",
  "lazy_static",
  "lru_time_cache",

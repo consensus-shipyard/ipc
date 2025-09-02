@@ -33,7 +33,7 @@ use crate::manager::subnet::{
 use crate::manager::{EthManager, SignedHeaderRelayer, SubnetManager};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
-use ethers::abi::Tokenize;
+use ethers::abi::{AbiDecode, Tokenize};
 use ethers::abi::{Detokenize, Tokenizable};
 use ethers::contract::abigen;
 use ethers::prelude::k256::ecdsa::SigningKey;
@@ -1216,6 +1216,15 @@ impl EthSubnetManager {
 
 #[async_trait]
 impl SignedHeaderRelayer for EthSubnetManager {
+    async fn get_signed_header(&self, height: u64) -> Result<SignedHeader> {
+        let raw_bytes = self
+            .ipc_contract_info
+            .provider
+            .request::<_, Bytes>("eth_get_commit_signed_header", [height])
+            .await?;
+        Ok(SignedHeader::decode(raw_bytes.as_ref())?)
+    }
+
     async fn submit_signed_header(
         &self,
         submitter: &Address,

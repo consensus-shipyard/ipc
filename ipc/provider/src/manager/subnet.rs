@@ -266,6 +266,8 @@ pub trait TopDownFinalityQuery: Send + Sync {
 
 #[async_trait]
 pub trait SignedHeaderRelayer: Send + Sync {
+    async fn get_signed_header(&self, height: u64) -> Result<SignedHeader>;
+
     async fn submit_signed_header(
         &self,
         submitter: &Address,

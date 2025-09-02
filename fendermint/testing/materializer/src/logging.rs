@@ -227,19 +227,13 @@ where
         parent_submit_config: &SubmitConfig<'a, M>,
         relayer_name: &RelayerName,
         relayer_config: RelayerConfig<'a, M>,
-        cometbft_url: String,
     ) -> anyhow::Result<M::Relayer>
     where
         's: 'a,
     {
         tracing::info!(%relayer_name, ctx=self.ctx, "create_relayer");
         self.inner
-            .create_relayer(
-                parent_submit_config,
-                relayer_name,
-                relayer_config,
-                cometbft_url,
-            )
+            .create_relayer(parent_submit_config, relayer_name, relayer_config)
             .await
     }
 }

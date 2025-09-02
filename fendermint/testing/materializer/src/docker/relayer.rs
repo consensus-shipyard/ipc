@@ -45,7 +45,6 @@ impl DockerRelayer {
         submitter: &DefaultAccount,
         network_name: Option<NetworkName>,
         env: &EnvMap,
-        cometbft_url: String,
     ) -> anyhow::Result<Self> {
         let container_name = container_name(relayer_name);
 
@@ -90,8 +89,7 @@ impl DockerRelayer {
                 --config-path /fendermint/.ipc/config.toml \
                 checkpoint relayer \
                     --subnet {} \
-                    --submitter {:?} \
-                    --cometbft-url {cometbft_url} \
+                    --submitter {:?}
             ",
             subnet.subnet_id,
             submitter.eth_addr()

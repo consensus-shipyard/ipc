@@ -9,8 +9,6 @@ use std::{
 };
 use url::Url;
 
-use crate::docker::container_name;
-use crate::materials::WithNodeName;
 use crate::{
     manifest::{
         BalanceMap, CollateralMap, EnvMap, Manifest, Node, NodeMode, ParentNode, Rootnet, Subnet,
@@ -618,12 +616,6 @@ where
                     ),
                 };
 
-                let cometbft_url = format!(
-                    "http://{}:{}",
-                    container_name(follow_node.node_name(), "cometbft"),
-                    "26657"
-                );
-
                 let relayer_name = subnet_name.relayer(id);
                 let relayer = m
                     .create_relayer(
@@ -641,7 +633,6 @@ where
                             submitter,
                             env: &subnet.env,
                         },
-                        cometbft_url,
                     )
                     .await
                     .with_context(|| format!("failed to create relayer {id}"))?;

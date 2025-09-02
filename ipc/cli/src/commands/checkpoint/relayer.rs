@@ -12,7 +12,6 @@ use fvm_shared::clock::ChainEpoch;
 use ipc_api::subnet_id::SubnetID;
 use ipc_provider::checkpoint::BottomUpCheckpointManager;
 use ipc_provider::config::Config;
-use ipc_provider::manager::cometbft::CometbftClient;
 use ipc_provider::new_evm_keystore_from_arc_config;
 use ipc_provider::observe::register_metrics as register_checkpoint_metrics;
 use ipc_wallet::EvmKeyStore;
@@ -81,12 +80,6 @@ impl CommandLineHandler for BottomUpRelayer {
             parent.clone(),
             child.clone(),
             Arc::new(RwLock::new(keystore)),
-            CometbftClient::new_from_url(
-                arguments
-                    .cometbft_url
-                    .as_deref()
-                    .unwrap_or("http://127.0.0.1:26657"),
-            ),
         )
         .await?;
 
@@ -126,9 +119,6 @@ pub(crate) struct BottomUpRelayerArgs {
         help = "The max parallelism for submitting checkpoints"
     )]
     pub max_parallelism: usize,
-
-    #[arg(long, help = "The cometbft rpc endpoint to query commit data")]
-    pub cometbft_url: Option<String>,
 
     #[arg(
         long,

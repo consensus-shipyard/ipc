@@ -3,7 +3,6 @@
 //! Bottom up checkpoint manager
 
 use crate::config::Subnet;
-use crate::manager::cometbft::CometbftClient;
 use crate::manager::{EthSubnetManager, SignedHeaderRelayer};
 use anyhow::{anyhow, Result};
 use fvm_shared::address::Address;
@@ -25,7 +24,6 @@ pub struct CheckpointConfig {
 pub struct BottomUpCheckpointManager<T> {
     metadata: CheckpointConfig,
     parent_handler: Arc<T>,
-    cometbft_client: CometbftClient,
     child_handler: T,
     /// The number of blocks away from the chain head that is considered final
     finalization_blocks: ChainEpoch,
@@ -35,7 +33,6 @@ impl<T: SignedHeaderRelayer> BottomUpCheckpointManager<T> {
     pub async fn new(
         parent: Subnet,
         child: Subnet,
-        cometbft_client: CometbftClient,
         parent_handler: T,
         child_handler: T,
     ) -> Result<Self> {
@@ -52,7 +49,6 @@ impl<T: SignedHeaderRelayer> BottomUpCheckpointManager<T> {
             parent_handler: Arc::new(parent_handler),
             child_handler,
             finalization_blocks: 0,
-            cometbft_client,
         })
     }
 
@@ -67,20 +63,12 @@ impl BottomUpCheckpointManager<EthSubnetManager> {
         parent: Subnet,
         child: Subnet,
         keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
-        cometbft_client: CometbftClient,
     ) -> Result<Self> {
         let parent_handler =
             EthSubnetManager::from_subnet_with_wallet_store(&parent, Some(keystore.clone()))?;
         let child_handler =
             EthSubnetManager::from_subnet_with_wallet_store(&child, Some(keystore))?;
-        Self::new(
-            parent,
-            child,
-            cometbft_client,
-            parent_handler,
-            child_handler,
-        )
-        .await
+        Self::new(parent, child, parent_handler, child_handler).await
     }
 }
 
@@ -210,8 +198,8 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
             .map(|(_, info)| info.staking.metadata.as_slice());
 
         let mut header = self
-            .cometbft_client
-            .fetch_signed_header(next_checkpoint_epoch)
+            .child_handler
+            .get_signed_header(next_checkpoint_epoch as u64)
             .await?;
         header.order_commit_against(pubkeys)?;
         let height = header.header.height;

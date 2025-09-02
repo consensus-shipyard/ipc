@@ -1020,7 +1020,6 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
         parent_submit_config: &SubmitConfig<'a, DockerMaterials>,
         relayer_name: &RelayerName,
         relayer_config: RelayerConfig<'a, DockerMaterials>,
-        cometbft_url: String,
     ) -> anyhow::Result<DockerRelayer>
     where
         's: 'a,
@@ -1053,7 +1052,6 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             relayer_config.submitter,
             network_name,
             relayer_config.env,
-            cometbft_url,
         )
         .await?;
 
