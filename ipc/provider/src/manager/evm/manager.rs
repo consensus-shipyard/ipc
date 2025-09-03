@@ -1220,7 +1220,7 @@ impl SignedHeaderRelayer for EthSubnetManager {
         let raw_bytes = self
             .ipc_contract_info
             .provider
-            .request::<_, Bytes>("eth_getCommitSignedHeader", [height])
+            .request::<_, Bytes>("eth_getCommitSignedHeader", [height.to_string()])
             .await?;
         Ok(SignedHeader::decode(raw_bytes.as_ref())?)
     }
