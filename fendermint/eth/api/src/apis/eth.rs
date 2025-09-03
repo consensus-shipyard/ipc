@@ -1197,7 +1197,7 @@ where
 /// Obtain the precommit signed header from cometbft
 pub async fn get_commit_signed_header<C>(
     data: JsonRpcData<C>,
-    Params(block_number): Params<et::BlockNumber>,
+    Params((block_number,)): Params<(et::BlockNumber,)>,
 ) -> JsonRpcResult<et::Bytes>
 where
     C: Client + Sync + Send,
