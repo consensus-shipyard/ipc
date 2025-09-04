@@ -4,8 +4,16 @@
 FROM rust:1.83.0-bookworm as builder
 
 RUN apt-get update && \
-  apt-get install -y build-essential clang cmake protobuf-compiler && \
+  apt-get install -y build-essential clang cmake protobuf-compiler curl && \
+  # Install Node.js 20.x
+  curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+  apt-get install -y nodejs && \
+  # Install Foundry
+  curl -L https://foundry.paradigm.xyz | bash && \
+  /root/.foundry/bin/foundryup && \
   rm -rf /var/lib/apt/lists/*
+
+ENV PATH="/root/.foundry/bin:${PATH}"
 
 WORKDIR /app
 
