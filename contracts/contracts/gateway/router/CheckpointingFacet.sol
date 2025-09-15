@@ -5,9 +5,7 @@ import {GatewayActorModifiers} from "../../lib/LibGatewayActorStorage.sol";
 import {IpcEnvelope} from "../../structs/CrossNet.sol";
 import {BottomUpBatchRecorded} from "../../structs/BottomUpBatch.sol";
 import {LibGateway} from "../../lib/LibGateway.sol";
-import {LibQuorum} from "../../lib/LibQuorum.sol";
 import {Subnet} from "../../structs/Subnet.sol";
-import {QuorumObjKind} from "../../structs/Quorum.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
 import {InvalidBatchSource, NotEnoughBalance, InvalidCheckpointSource, CheckpointAlreadyExists} from "../../errors/IPCErrors.sol";
@@ -21,12 +19,16 @@ import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
 import {ActivityRollupRecorded, FullActivityRollup} from "../../structs/Activity.sol";
 import {StateCommitmentBreakDown} from "../../lib/cometbft/CometbftLightClient.sol";
 
+struct BottomUpCheckpoint {
+    StateCommitmentBreakDown commitment;
+    IpcEnvelope[] msgs;
+    FullActivityRollup activity;
+}
+
 contract CheckpointingFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
 
-    /// @dev Emitted when a checkpoint is committed to gateway.
-    event CheckpointCommitted(address indexed subnet, uint256 subnetHeight);
     event StateCommitmentCreated(uint64 checkpointHeight, StateCommitmentBreakDown breakdown);
 
     /// @notice submit a verified batch of committed cross-net messages for execution.
@@ -40,14 +42,14 @@ contract CheckpointingFacet is GatewayActorModifiers {
         _execBottomUpMsgBatch(msgs, subnet);
     }
 
-    function recordLightClientCommitments(
-        StateCommitmentBreakDown calldata commitment,
-        IpcEnvelope[] calldata msgs,
-        FullActivityRollup calldata activity
-    ) external systemActorOnly {
-        emit StateCommitmentCreated(uint64(block.number), commitment);
-        emit BottomUpBatchRecorded(uint64(block.number), msgs);
-        emit ActivityRollupRecorded(uint64(block.number), activity);
+    /// @notice submit a verified checkpoint in the gateway to trigger side-effects.
+    /// @dev this method is called by the corresponding subnet actor.
+    ///     Called from a subnet actor if the checkpoint is cryptographically valid.
+    /// @param checkpoint The bottom-up checkpoint to be committed.
+    function commitCheckpoint(BottomUpCheckpoint calldata checkpoint) external systemActorOnly {
+        emit StateCommitmentCreated(uint64(block.number), checkpoint.commitment);
+        emit BottomUpBatchRecorded(uint64(block.number), checkpoint.msgs);
+        emit ActivityRollupRecorded(uint64(block.number), checkpoint.activity);
     }
 
     function _execBottomUpMsgBatch(IpcEnvelope[] calldata msgs, Subnet storage subnet) internal {

@@ -618,7 +618,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         );
 
         require(
-            saDiamond.getter().lastBottomUpCheckpointHeight() == saDiamond.getter().bottomUpCheckPeriod(),
+            saDiamond.checkpointer().lastBottomUpCheckpointHeight() == saDiamond.getter().bottomUpCheckPeriod(),
             " checkpoint height correct"
         );
 
@@ -712,7 +712,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.deal(validator, 11 ether);
         vm.prank(validator);
         saDiamond.manager().join{value: 10 ether}(pubkey, 10 ether);
-        saDiamond.checkpointer().submitSignedHeader(abi.encode(header));
+        saDiamond.checkpointer().submitBottomUpCheckpoint(abi.encode(header));
     }
 
     function testSubnetActorDiamond_DiamondCut() public {

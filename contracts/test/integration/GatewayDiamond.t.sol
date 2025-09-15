@@ -11,7 +11,6 @@ import {IERC165} from "../../contracts/interfaces/IERC165.sol";
 import {IDiamond} from "../../contracts/interfaces/IDiamond.sol";
 import {IDiamondLoupe} from "../../contracts/interfaces/IDiamondLoupe.sol";
 import {IDiamondCut} from "../../contracts/interfaces/IDiamondCut.sol";
-import {QuorumInfo} from "../../contracts/structs/Quorum.sol";
 import {IpcEnvelope, ParentFinality} from "../../contracts/structs/CrossNet.sol";
 import {FvmAddress} from "../../contracts/structs/FvmAddress.sol";
 import {SubnetID, Subnet, IPCAddress, Validator, PowerChange, PowerChangeRequest, Asset, PowerOperation} from "../../contracts/structs/Subnet.sol";

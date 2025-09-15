@@ -3,13 +3,13 @@ pragma solidity ^0.8.23;
 
 import {SignedHeader} from "tendermint-sol/proto/TendermintLight.sol";
 
-import {InvalidBatchEpoch, InvalidSignatureErr, DuplicateValidatorSignaturesFound, SignatureAddressesNotSorted, BottomUpCheckpointAlreadySubmitted, InvalidCheckpointEpoch} from "../errors/IPCErrors.sol";
+import {BottomUpCheckpointAlreadySubmitted, InvalidCheckpointEpoch} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 import {BottomUpMsgBatch, BottomUpMsgBatchInfo} from "../structs/CrossNet.sol";
 import {Validator, ValidatorSet, SubnetID} from "../structs/Subnet.sol";
-import {MultisignatureChecker} from "../lib/LibMultisignatureChecker.sol";
+import {ISubnetActorCheckpointing} from "../interfaces/ISubnetActor.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
-import {SubnetActorModifiers, LastCommitmentHeights} from "../lib/LibSubnetActorStorage.sol";
+import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
 import {LibValidatorSet, LibPower} from "../lib/LibPower.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {LibSubnetActor} from "../lib/LibSubnetActor.sol";
@@ -22,28 +22,59 @@ import {IpcEnvelope, StateCommitment} from "../structs/CrossNet.sol";
 import {CompressedActivityRollup} from "../structs/Activity.sol";
 import {CometbftLightClient, StateCommitmentBreakDown} from "../lib/cometbft/CometbftLightClient.sol";
 
-contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard, Pausable {
+/// @notice Tracks the latest checkpoint heights for different commitment types
+/// @dev Used to ensure sequential processing and prevent replay of checkpoints
+struct LastCommitmentHeights {
+    /// The height of the last submitted and verified CometBFT signed header
+    uint64 signedHeader;
+    /// The height of the last processed validator configuration change
+    uint64 configNumber;
+    /// The height of the last recorded activity rollup
+    uint64 activity;
+}
+
+/// @title Subnet Actor Checkpointing Facet
+/// @notice Handles bottom-up checkpoint submission and verification for IPC subnets
+/// @dev The current implementation is based on CometBFT light client verification and manages state commitments
+///
+/// This facet is responsible for:
+/// - Verifying and storing CometBFT signed headers with BFT consensus validation
+/// - Recording activity rollups from subnet validators
+/// - Confirming validator set changes
+/// - Executing bottom-up message batches with Merkle proof verification
+/// - Ensuring sequential checkpoint submission at correct intervals
+contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, SubnetActorModifiers, ReentrancyGuard, Pausable {
     using EnumerableSet for EnumerableSet.AddressSet;
     using LibValidatorSet for ValidatorSet;
 
     error AppHashNotEqual();
 
-    // TODO: The parameter should be SignedHeader.Data, but ethers-rust failed to generate the bindings
-    function submitSignedHeader(bytes calldata rawData) external whenNotPaused {
+    /// @inheritdoc ISubnetActorCheckpointing
+    function lastBottomUpCheckpointHeight() external view returns (uint256) {
+        return uint256(LibCheckpointingStorage.getStorage().commitmentHeights.signedHeader);
+    }
+
+    /// @inheritdoc ISubnetActorCheckpointing
+    function submitBottomUpCheckpoint(bytes calldata rawData) external whenNotPaused {
+        SubnetActorCheckpointingStorage storage checkpointStorage = LibCheckpointingStorage.getStorage();
+
         SignedHeader.Data memory header = abi.decode(rawData, (SignedHeader.Data));
 
         uint64 height = uint64(header.commit.height);
         // Enforcing a sequential submission
-        ensureValidHeight(height, s.commitmentHeights.signedHeader);
+        ensureValidHeight(height, checkpointStorage.commitmentHeights.signedHeader);
 
         CometbftLightClient.verifyValidatorsQuorum(header);
 
-        s.stateCommitments[height] = StateCommitment({blockHeight: height, commitment: header.header.app_hash});
-        s.commitmentHeights.signedHeader = height;
+        checkpointStorage.stateCommitments[height] = StateCommitment({
+            blockHeight: height,
+            commitment: header.header.app_hash
+        });
+        checkpointStorage.commitmentHeights.signedHeader = height;
     }
 
     function getLastCommitmentHeights() external view returns (LastCommitmentHeights memory) {
-        return s.commitmentHeights;
+        return LibCheckpointingStorage.getStorage().commitmentHeights;
     }
 
     function recordActivityRollup(
@@ -52,24 +83,28 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         CompressedActivityRollup calldata activity,
         StateCommitmentBreakDown calldata breakdown
     ) external whenNotPaused {
+        SubnetActorCheckpointingStorage storage checkpointStorage = LibCheckpointingStorage.getStorage();
+
         validateAppHash(checkpointHeight, breakdown);
-        ensureValidHeight(checkpointHeight, s.commitmentHeights.activity);
+        ensureValidHeight(checkpointHeight, checkpointStorage.commitmentHeights.activity);
 
         LibActivity.recordActivityRollup(subnet, checkpointHeight, activity);
 
-        s.commitmentHeights.activity = checkpointHeight;
+        checkpointStorage.commitmentHeights.activity = checkpointHeight;
     }
 
     function confirmValidatorChange(
         uint64 checkpointHeight,
         StateCommitmentBreakDown calldata breakdown
     ) external whenNotPaused {
+        SubnetActorCheckpointingStorage storage checkpointStorage = LibCheckpointingStorage.getStorage();
+
         validateAppHash(checkpointHeight, breakdown);
-        ensureValidHeight(checkpointHeight, s.commitmentHeights.configNumber);
+        ensureValidHeight(checkpointHeight, checkpointStorage.commitmentHeights.configNumber);
 
         LibPower.confirmChange(breakdown.validatorNextConfigurationNumber);
 
-        s.commitmentHeights.configNumber = checkpointHeight;
+        checkpointStorage.commitmentHeights.configNumber = checkpointHeight;
     }
 
     /// @notice Executes bottom-up messages that have been committed to in a checkpoint.
@@ -134,9 +169,31 @@ contract SubnetActorCheckpointingFacet is SubnetActorModifiers, ReentrancyGuard,
         uint64 checkpointHeight,
         StateCommitmentBreakDown calldata breakdown
     ) internal view whenNotPaused {
-        bytes memory expectedAppHash = s.stateCommitments[checkpointHeight].commitment;
+        SubnetActorCheckpointingStorage storage checkpointStorage = LibCheckpointingStorage.getStorage();
+
+        bytes memory expectedAppHash = checkpointStorage.stateCommitments[checkpointHeight].commitment;
         bytes memory actual = deriveAppHash(breakdown);
 
         if (keccak256(expectedAppHash) != keccak256(actual)) revert AppHashNotEqual();
+    }
+}
+
+// ================ INTERNAL UTIL ===================
+
+struct SubnetActorCheckpointingStorage {
+    /// @notice contains all committed subnet state hash and block header
+    mapping(uint64 => StateCommitment) stateCommitments;
+    LastCommitmentHeights commitmentHeights;
+}
+
+library LibCheckpointingStorage {
+    bytes32 private constant NAMESPACE = keccak256("SubnetActorCheckpointingFacet.storage");
+
+    function getStorage() internal pure returns (SubnetActorCheckpointingStorage storage ds) {
+        bytes32 position = NAMESPACE;
+        assembly {
+            ds.slot := position
+        }
+        return ds;
     }
 }

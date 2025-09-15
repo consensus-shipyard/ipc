@@ -37,7 +37,26 @@ library CometbftLightClient {
     error InvalidSignature(bytes32 message, bytes signature, address validator, ECDSA.RecoverError err);
     error NotSigner(bytes32 message, bytes signature, address recovered, address expected);
 
-    /// This method validates the quorum certificate of cometbft pre-commit votes.
+    /// @notice Validates the quorum certificate of CometBFT pre-commit votes
+    /// @dev Verifies that signatures meet BFT consensus requirements (>2/3 voting power)
+    ///
+    /// @param header The signed header containing the block header and commit with signatures
+    ///
+    /// CRITICAL: Validator signatures in the commit MUST be ordered exactly as validators
+    /// are arranged in LibPower's active validator set. The signature at index i must
+    /// correspond to the validator at index i in LibPower.getActiveValidatorAddressByIndex(i).
+    /// Misaligned ordering will cause validation to fail.
+    ///
+    /// Process:
+    /// 1. Validates commit hash matches the header
+    /// 2. Gets total voting power from current validator set
+    /// 3. Iterates through commit signatures by index:
+    ///    - Skips absent/nil votes (only processes BLOCK_ID_FLAG_COMMIT)
+    ///    - Validates signer at index i matches validator at index i in LibPower
+    ///    - Constructs vote sign bytes for the specific validator
+    ///    - Verifies ECDSA signature validity
+    ///    - Accumulates voting power of valid signatures
+    /// 4. Ensures accumulated power >= 2/3 of total power
     function verifyValidatorsQuorum(SignedHeader.Data memory header) internal view {
         checkCommitHash(header);
 
@@ -67,11 +86,21 @@ library CometbftLightClient {
             powerSoFar += power;
         }
 
-        if(powerSoFar < (totalPower * 2 / 3)) {
+        if(powerSoFar <= (totalPower * 2 / 3)) {
             revert NoQuorumFormed();
         }
     }
 
+    /// @notice Verifies that the commit references the correct block
+    /// @dev Ensures the block ID in the commit matches the header's hash
+    ///
+    /// @param header The signed header containing both the block header and commit
+    ///
+    /// This function validates that:
+    /// - The commit is for the same block as the header
+    /// - Prevents commits from being used with wrong blocks
+    /// - The block_id.hash in the commit equals the computed header hash
+    /// - This also makes sure the AppHash is not fabricated
     function checkCommitHash(SignedHeader.Data memory header) internal pure {
         bytes32 expected = header.hash();
         bytes32 actual = toBytes32(header.commit.block_id.hash);
@@ -98,6 +127,21 @@ library CometbftLightClient {
         }
     }
 
+    /// @notice Validates that a commit signature comes from an expected validator
+    /// @dev Ensures the CometBFT validator address matches the expected validator at the given index
+    ///
+    /// @param i The index of the validator in the active validator set
+    /// @param incomingValidator The CometBFT validator address from the commit signature (20 bytes)
+    ///
+    /// @return power The voting power of the validated validator
+    /// @return validator The Ethereum address of the validator
+    ///
+    /// Process:
+    /// 1. Retrieves the validator at index i from the active validator set
+    /// 2. Gets the validator's metadata containing their public key
+    /// 3. Derives the expected CometBFT address from the public key
+    /// 4. Compares the incoming validator address with the expected one
+    /// 5. Returns the validator's power and address if valid
     function ensureValidatorSubmission(uint256 i, bytes memory incomingValidator) internal view returns (uint256 power, address validator) {
         validator = LibPower.getActiveValidatorAddressByIndex(uint16(i));
         ValidatorInfo memory info = LibPower.getActiveValidatorInfo(validator);
@@ -111,6 +155,7 @@ library CometbftLightClient {
             incoming := mload(add(incomingValidator, 32))
         }
 
+        // cometbft account id is different than ethreum address, make sure the format matches
         if (incoming != expectedCometbftAccountId) {
             revert CometbftSignerNotValidator(expectedCometbftAccountId, incoming);
         }

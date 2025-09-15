@@ -127,20 +127,13 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         Ok(self
             .checkpointing
             .call_with_return(state, |c| {
-                c.record_light_client_commitments(commitment, msgs, activity)
+                c.commit_checkpoint(checkpointing_facet::BottomUpCheckpoint {
+                    commitment,
+                    msgs,
+                    activity,
+                })
             })?
             .into_return())
-    }
-
-    /// Retrieve checkpoint info by block height.
-    pub fn checkpoint_info(
-        &self,
-        state: &mut FvmExecState<DB>,
-        height: i64,
-    ) -> anyhow::Result<getter::QuorumInfo> {
-        self.getter.call(state, |c| {
-            c.get_checkpoint_info(ethers::types::U256::from(height))
-        })
     }
 
     /// Apply all pending validator changes, returning the newly adopted configuration number, or 0 if there were no changes.

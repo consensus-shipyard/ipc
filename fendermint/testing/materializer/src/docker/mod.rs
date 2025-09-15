@@ -676,7 +676,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             // TODO: Some of these hardcoded values can go into the manifest.
             let genesis = Genesis {
                 chain_name,
-                chain_id: None,
+                chain_id: DEFAULT_TEST_CHAIN_ID,
                 timestamp: Timestamp::current(),
                 network_version: NetworkVersion::V21,
                 base_fee: TokenAmount::zero(),

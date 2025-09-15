@@ -24,6 +24,7 @@ use fendermint_vm_topdown::voting::VoteTally;
 use fendermint_vm_topdown::Toggle;
 use fvm_shared::chainid::ChainID;
 
+use crate::staking::DEFAULT_CHAIN_ID;
 use fendermint_vm_interpreter::fvm::end_block_hook::EndBlockManager;
 use fvm::executor::{ApplyKind, Executor};
 use fvm_ipld_encoding::RawBytes;
@@ -88,7 +89,7 @@ async fn tester_with_upgrader(
 
     let genesis = Genesis {
         chain_name: CHAIN_NAME.to_string(),
-        chain_id: None,
+        chain_id: DEFAULT_CHAIN_ID,
         timestamp: Timestamp(0),
         network_version: NetworkVersion::V21,
         base_fee: TokenAmount::zero(),

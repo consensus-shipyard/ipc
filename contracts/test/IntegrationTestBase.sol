@@ -942,7 +942,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     function confirmChange(address[] memory validators, uint256[] memory) internal {
         (uint64 nextConfigNum, ) = saDiamond.getter().getConfigurationNumbers();
 
-        uint256 h = saDiamond.getter().lastBottomUpCheckpointHeight() + saDiamond.getter().bottomUpCheckPeriod();
+        uint256 h = saDiamond.checkpointer().lastBottomUpCheckpointHeight() + saDiamond.getter().bottomUpCheckPeriod();
 
         BottomUpBatch.Commitment memory msgs = BottomUpBatchHelper.makeCommitment(BottomUpBatchHelper.makeEmptyBatch());
         CompressedActivityRollup memory activity = CompressedActivityRollup({
@@ -973,7 +973,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
     ) internal returns (uint256 h) {
         (uint64 nextConfigNum, ) = saDiamond.getter().getConfigurationNumbers();
 
-        h = saDiamond.getter().lastBottomUpCheckpointHeight() + saDiamond.getter().bottomUpCheckPeriod();
+        h = saDiamond.checkpointer().lastBottomUpCheckpointHeight() + saDiamond.getter().bottomUpCheckPeriod();
 
         vm.prank(validators[0]);
         saDiamond.checkpointer().commitSideEffects(

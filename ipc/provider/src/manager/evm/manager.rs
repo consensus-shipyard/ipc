@@ -1241,7 +1241,7 @@ impl SignedHeaderRelayer for EthSubnetManager {
             address,
             signer.clone(),
         );
-        let call = contract.submit_signed_header(Bytes::from(bytes));
+        let call = contract.submit_bottom_up_checkpoint(Bytes::from(bytes));
         let call = extend_call_with_pending_block(call).await?;
 
         let pending_tx = call.send().await?;
@@ -1328,7 +1328,7 @@ impl SignedHeaderRelayer for EthSubnetManager {
 
     async fn last_submission_height(&self, subnet_id: &SubnetID) -> Result<ChainEpoch> {
         let address = contract_address_from_subnet(subnet_id)?;
-        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+        let contract = SubnetActorCheckpointingFacet::new(
             address,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );

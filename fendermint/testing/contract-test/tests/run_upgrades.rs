@@ -18,6 +18,7 @@ use fvm_shared::bigint::Zero;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::version::NetworkVersion;
 
+use crate::staking::DEFAULT_CHAIN_ID;
 use fendermint_crypto::SecretKey;
 use fendermint_vm_actor_interface::eam;
 use fendermint_vm_actor_interface::eam::EthAddress;
@@ -224,7 +225,7 @@ async fn test_applying_upgrades() {
 
     let genesis = Genesis {
         chain_name: CHAIN_NAME.to_string(),
-        chain_id: None,
+        chain_id: DEFAULT_CHAIN_ID,
         timestamp: Timestamp(0),
         network_version: NetworkVersion::V21,
         base_fee: TokenAmount::zero(),

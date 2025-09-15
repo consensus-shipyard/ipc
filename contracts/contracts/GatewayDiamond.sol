@@ -58,7 +58,6 @@ contract GatewayDiamond {
         s.networkName = params.networkName;
         s.bottomUpCheckPeriod = params.bottomUpCheckPeriod;
         s.majorityPercentage = params.majorityPercentage;
-        s.checkpointQuorumMap.retentionHeight = 1;
         s.commitSha = params.commitSha;
 
         s.validatorsTracker.validators.activeLimit = params.activeValidatorsLimit;

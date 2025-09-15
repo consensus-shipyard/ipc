@@ -2,7 +2,6 @@
 pragma solidity ^0.8.23;
 
 import {NotSystemActor, NotEnoughFunds} from "../errors/IPCErrors.sol";
-import {QuorumMap} from "../structs/Quorum.sol";
 import {BottomUpMsgBatch, IpcEnvelope, ParentFinality} from "../structs/CrossNet.sol";
 import {SubnetID, Subnet, ParentValidatorsTracker} from "../structs/Subnet.sol";
 import {Membership} from "../structs/Subnet.sol";
@@ -15,8 +14,6 @@ struct GatewayActorStorage {
     uint256 latestParentHeight;
     /// @notice bottom-up period in number of epochs for the subnet
     uint256 bottomUpCheckPeriod;
-    /// @notice bottom-up message batch period in number of epochs for the subnet
-    uint256 bottomUpMsgBatchPeriod;
     /// @notice nonce for bottom-up messages
     uint64 bottomUpNonce;
     /// @notice AppliedNonces keep track of the next nonce of the message to be applied.
@@ -45,8 +42,6 @@ struct GatewayActorStorage {
     Membership currentMembership;
     /// @notice The last membership received from the parent and adopted
     Membership lastMembership;
-    /// @notice Quorum information for checkpoints
-    QuorumMap checkpointQuorumMap;
     /// @notice path to the current network
     SubnetID networkName;
     /// Tracking validator changes from parent in child subnet

@@ -92,11 +92,6 @@ contract SubnetActorGetterFacet {
         return s.bottomUpCheckPeriod;
     }
 
-    /// @notice Returns the block height of the last bottom-up checkpoint.
-    function lastBottomUpCheckpointHeight() external view returns (uint256) {
-        return uint256(s.commitmentHeights.signedHeader);
-    }
-
     /// @notice Returns the consensus protocol type used in the subnet.
     function consensus() external view returns (ConsensusType) {
         return s.consensus;

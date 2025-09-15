@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import {SignedHeader} from "tendermint-sol/proto/TendermintLight.sol";
 
-import {SubnetActorCheckpointingFacet} from "../../contracts/subnet/SubnetActorCheckpointingFacet.sol";
+import {SubnetActorCheckpointingFacet, LibCheckpointingStorage, SubnetActorCheckpointingStorage} from "../../contracts/subnet/SubnetActorCheckpointingFacet.sol";
 import {BottomUpBatch} from "../../contracts/structs/BottomUpBatch.sol";
 import {CompressedActivityRollup} from "../../contracts/structs/Activity.sol";
 import {SubnetID} from "../../contracts/structs/Subnet.sol";
@@ -20,9 +20,11 @@ contract SubnetActorCheckpointFacetMock is SubnetActorCheckpointingFacet {
         BottomUpBatch.Commitment calldata msgs,
         uint64 nextConfigurationNumber
     ) external {
-        s.commitmentHeights.signedHeader = uint64(h);
-        s.commitmentHeights.activity = uint64(h);
-        s.commitmentHeights.configNumber = uint64(h);
+        SubnetActorCheckpointingStorage storage checkpointStorage = LibCheckpointingStorage.getStorage();
+
+        checkpointStorage.commitmentHeights.signedHeader = uint64(h);
+        checkpointStorage.commitmentHeights.activity = uint64(h);
+        checkpointStorage.commitmentHeights.configNumber = uint64(h);
 
         if (msgs.totalNumMsgs > 0) {
             LibBottomUpBatch.recordBottomUpBatchCommitment(uint64(h), msgs);
