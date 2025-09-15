@@ -96,7 +96,6 @@ fn main() -> color_eyre::Result<()> {
         "LibPower",
         "LibPowerChangeLog",
         "LibGateway",
-        "LibQuorum",
     ];
 
     for contract_name in all_contracts {

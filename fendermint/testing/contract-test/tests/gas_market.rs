@@ -291,8 +291,11 @@ async fn test_gas_market_upgrade() {
 
     // Attach an upgrade at epoch 2 that changes the gas limit to 200.
     upgrader
-        .add(
-            Upgrade::new(CHAIN_NAME, 2, Some(1), move |state| {
+        .add(Upgrade::new_by_id(
+            DEFAULT_CHAIN_ID.into(),
+            2,
+            Some(1),
+            move |state| {
                 println!(
                     "[Upgrade at height {}] Update gas market params",
                     state.block_height()
@@ -303,9 +306,8 @@ async fn test_gas_market_upgrade() {
                     executor.execute_message(msg, ApplyKind::Implicit, 0)?;
                     Ok(())
                 })
-            })
-            .unwrap(),
-        )
+            },
+        ))
         .unwrap();
 
     // Create a new tester with the upgrader attached.

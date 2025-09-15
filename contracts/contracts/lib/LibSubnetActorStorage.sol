@@ -62,9 +62,6 @@ struct LastCommitmentHeights {
         mapping(address => string) bootstrapNodes;
         /// @notice the list ov validators that announces bootstrap nodes
         EnumerableSet.AddressSet bootstrapOwners;
-        // /// @notice contains all committed subnet state hash and block header
-        // mapping(uint64 => StateCommitment) stateCommitments;
-        // LastCommitmentHeights commitmentHeights;
         string chainID;
         /// @notice initial set of validators joining in genesis
         Validator[] genesisValidators;

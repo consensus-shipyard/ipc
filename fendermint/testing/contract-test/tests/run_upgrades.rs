@@ -67,8 +67,11 @@ async fn test_applying_upgrades() {
 
     let mut upgrade_scheduler = UpgradeScheduler::new();
     upgrade_scheduler
-        .add(
-            Upgrade::new(CHAIN_NAME, 1, Some(1), |state| {
+        .add(Upgrade::new_by_id(
+            DEFAULT_CHAIN_ID.into(),
+            1,
+            Some(1),
+            |state| {
                 println!(
                     "[Upgrade at height {}] Deploy simple contract",
                     state.block_height()
@@ -108,14 +111,16 @@ async fn test_applying_upgrades() {
                 );
 
                 Ok(())
-            })
-            .unwrap(),
-        )
+            },
+        ))
         .unwrap();
 
     upgrade_scheduler
-        .add(
-            Upgrade::new(CHAIN_NAME, 2, None, |state| {
+        .add(Upgrade::new_by_id(
+            DEFAULT_CHAIN_ID.into(),
+            2,
+            None,
+            |state| {
                 println!(
                     "[Upgrade at height {}] Sends a balance",
                     state.block_height()
@@ -151,14 +156,16 @@ async fn test_applying_upgrades() {
                 );
 
                 Ok(())
-            })
-            .unwrap(),
-        )
+            },
+        ))
         .unwrap();
 
     upgrade_scheduler
-        .add(
-            Upgrade::new(CHAIN_NAME, 3, None, |state| {
+        .add(Upgrade::new_by_id(
+            DEFAULT_CHAIN_ID.into(),
+            3,
+            None,
+            |state| {
                 println!(
                     "[Upgrade at height {}] Returns a balance",
                     state.block_height()
@@ -194,9 +201,8 @@ async fn test_applying_upgrades() {
                 assert_eq!(balance, U256::from(SEND_BALANCE_AMOUNT));
 
                 Ok(())
-            })
-            .unwrap(),
-        )
+            },
+        ))
         .unwrap();
 
     let end_block_manager = EndBlockManager::default();
