@@ -9,7 +9,7 @@ import {BottomUpMsgBatch, BottomUpMsgBatchInfo} from "../structs/CrossNet.sol";
 import {Validator, ValidatorSet, SubnetID} from "../structs/Subnet.sol";
 import {ISubnetActorCheckpointing} from "../interfaces/ISubnetActor.sol";
 import {ReentrancyGuard} from "../lib/LibReentrancyGuard.sol";
-import {SubnetActorModifiers} from "../lib/LibSubnetActorStorage.sol";
+import {LibSubnetActorStorage} from "../lib/LibSubnetActorStorage.sol";
 import {LibValidatorSet, LibPower} from "../lib/LibPower.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {LibSubnetActor} from "../lib/LibSubnetActor.sol";
@@ -43,7 +43,7 @@ struct LastCommitmentHeights {
 /// - Confirming validator set changes
 /// - Executing bottom-up message batches with Merkle proof verification
 /// - Ensuring sequential checkpoint submission at correct intervals
-contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, SubnetActorModifiers, ReentrancyGuard, Pausable {
+contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, ReentrancyGuard, Pausable {
     using EnumerableSet for EnumerableSet.AddressSet;
     using LibValidatorSet for ValidatorSet;
 
@@ -135,14 +135,14 @@ contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, SubnetActor
             }
         }
 
-        IGateway(s.ipcGatewayAddr).execBottomUpMsgBatch(msgs);
+        IGateway(LibSubnetActorStorage.appStorage().ipcGatewayAddr).execBottomUpMsgBatch(msgs);
 
         // Propagate cross messages from checkpoint to other subnets
-        IGateway(s.ipcGatewayAddr).propagateAll();
+        IGateway(LibSubnetActorStorage.appStorage().ipcGatewayAddr).propagateAll();
     }
 
     function ensureValidHeight(uint64 blockHeight, uint64 lastHeight) internal view {
-        uint256 bottomUpCheckPeriod = s.bottomUpCheckPeriod;
+        uint256 bottomUpCheckPeriod = LibSubnetActorStorage.appStorage().bottomUpCheckPeriod;
 
         // cannot submit past bottom up checkpoint
         if (blockHeight <= lastHeight) {
