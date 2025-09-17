@@ -1204,10 +1204,15 @@ impl EthSubnetManager {
         let gateway_address = payload_to_evm_address(config.gateway_addr.payload())?;
         let registry_address = payload_to_evm_address(config.registry_addr.payload())?;
 
+        let chain_id = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async { provider.get_chainid().await })
+        })?
+        .as_u64();
+
         Ok(Self::new(
             gateway_address,
             registry_address,
-            subnet.id.chain_id(),
+            chain_id,
             provider,
             keystore,
         ))

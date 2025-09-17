@@ -104,8 +104,6 @@ struct ResultMsg {
 struct StateCommitment {
     /// @dev The height of the block
     uint64 blockHeight;
-    // /// @dev The hash of the block
-    // bytes blockHash;  NOTE: currently this is not stored as it's not used anywhere.
     /// @dev The state commitment, it could be the app_hash for cometbft based subnet
     bytes commitment;
 }
