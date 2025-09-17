@@ -78,7 +78,7 @@ library CometbftLightClient {
 
             (uint256 power, address validator) = ensureValidatorSubmission(i, commitSig.validator_address);
 
-            bytes memory message = voteSignBytesDelim(header.commit, LibSubnetActorStorage.appStorage().chainID, i);
+            bytes memory message = generateSignePayload(header.commit, LibSubnetActorStorage.appStorage().chainID, i);
             bytes32 messageHash = sha256(message);
 
             ensureValidSignature(messageHash, commitSig.signature, validator);
@@ -163,7 +163,8 @@ library CometbftLightClient {
         power = info.currentPower;
     }
 
-    function voteSignBytesDelim(
+    /// Generate the signed message payload to be validated
+    function generateSignePayload(
         Commit.Data memory commit,
         string memory _chainID,
         uint256 idx
