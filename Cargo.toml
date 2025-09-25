@@ -43,6 +43,7 @@ members = [
   "fendermint/actors/chainmetadata",
   "fendermint/actors/activity-tracker",
   "fendermint/actors/eam",
+  "fendermint/actors/f3-cert-manager",
   "fendermint/actors/f3-light-client",
   "fendermint/actors/gas_market/eip1559",
 
@@ -248,6 +249,9 @@ tendermint-rpc = { version = "0.31", features = [
   "websocket-client",
 ] }
 tendermint-proto = { version = "0.31" }
+
+rust-f3 = { git = "https://github.com/ChainSafe/rust-f3.git", branch = "main" }
+filecoin-proofs = { git = "https://github.com/consensus-shipyard/ipc-filecoin-proofs.git", branch = "main" }
 
 [patch.crates-io]
 # Using latest FVM to match builtin-actors v17.0.0 requirements

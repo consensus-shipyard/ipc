@@ -39,6 +39,7 @@ merkle-tree-rs = { path = "../../../ext/merkle-tree-rs" }
 
 fendermint_vm_genesis = { path = "../genesis" }
 fendermint_crypto = { path = "../../crypto" }
+fendermint_actor_f3_cert_manager = { path = "../../actors/f3-cert-manager" }
 fendermint_actor_f3_light_client = { path = "../../actors/f3-light-client" }
 
 [dev-dependencies]

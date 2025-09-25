@@ -18,8 +18,8 @@ use fendermint_eth_hardhat::{ContractSourceAndName, Hardhat, FQN};
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::{
-    account, activity, burntfunds, chainmetadata, cron, eam, f3_light_client, gas_market, init,
-    ipc, reward, system, EMPTY_ARR,
+    account, activity, burntfunds, chainmetadata, cron, eam, f3_cert_manager, f3_light_client,
+    gas_market, init, ipc, reward, system, EMPTY_ARR,
 };
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{ActorMeta, Collateral, Genesis, Power, PowerScale, Validator};
@@ -467,6 +467,46 @@ impl<'a> GenesisBuilder<'a> {
                 )
                 .context("failed to create F3 light client actor")?;
         };
+
+        // F3 Certificate Manager actor - manages F3 certificates for proof-based parent finality
+        let f3_cert_state = if let Some(_ipc_params) = genesis.ipc.as_ref() {
+            // For IPC subnets, initialize with basic parameters
+            // TODO: In the future, we can fetch the actual F3 certificate from the parent chain
+            let constructor_params = fendermint_actor_f3_cert_manager::types::ConstructorParams {
+                genesis_instance_id: 0, // Default F3 instance ID - will be updated when first certificate is received
+                genesis_power_table: vec![], // Empty for now - will be populated from first certificate
+                genesis_certificate: None, // No certificate at genesis - will be set by first ParentFinality message
+            };
+            fendermint_actor_f3_cert_manager::state::State::new(
+                state.store(),
+                constructor_params.genesis_instance_id,
+                constructor_params.genesis_power_table,
+                constructor_params.genesis_certificate,
+            )?
+        } else {
+            // For root chains or non-IPC subnets, create with default empty state
+            let constructor_params = fendermint_actor_f3_cert_manager::types::ConstructorParams {
+                genesis_instance_id: 0,
+                genesis_power_table: vec![],
+                genesis_certificate: None,
+            };
+            fendermint_actor_f3_cert_manager::state::State::new(
+                state.store(),
+                constructor_params.genesis_instance_id,
+                constructor_params.genesis_power_table,
+                constructor_params.genesis_certificate,
+            )?
+        };
+
+        state
+            .create_custom_actor(
+                fendermint_actor_f3_cert_manager::F3_CERT_MANAGER_ACTOR_NAME,
+                f3_cert_manager::F3_CERT_MANAGER_ACTOR_ID,
+                &f3_cert_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to create F3 certificate manager actor")?;
 
         // STAGE 2: Create non-builtin accounts which do not have a fixed ID.
 
