@@ -51,6 +51,7 @@ pub mod diamond;
 pub mod eam;
 pub mod ethaccount;
 pub mod evm;
+pub mod f3_cert_manager;
 pub mod gas_market;
 pub mod init;
 pub mod ipc;

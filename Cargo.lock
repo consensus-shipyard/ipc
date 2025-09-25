@@ -60,6 +60,7 @@ dependencies = [
  "fendermint_actor_activity_tracker",
  "fendermint_actor_chainmetadata",
  "fendermint_actor_eam",
+ "fendermint_actor_f3_cert_manager",
  "fendermint_actor_gas_market_eip1559",
  "fil_actor_bundler",
  "fil_actors_runtime",
@@ -80,6 +81,7 @@ dependencies = [
  "fendermint_actor_activity_tracker",
  "fendermint_actor_chainmetadata",
  "fendermint_actor_eam",
+ "fendermint_actor_f3_cert_manager",
  "fendermint_actor_gas_market_eip1559",
 ]
 
@@ -3252,6 +3254,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_actor_f3_cert_manager"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cid 0.10.1",
+ "fil_actors_evm_shared",
+ "fil_actors_runtime",
+ "frc42_dispatch 8.0.0",
+ "fvm_ipld_blockstore",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "hex-literal 0.4.1",
+ "log",
+ "multihash 0.18.1",
+ "num-derive 0.4.2",
+ "num-traits",
+ "serde",
+ "serde_tuple",
+]
+
+[[package]]
 name = "fendermint_actor_gas_market_eip1559"
 version = "0.1.0"
 dependencies = [
@@ -3695,6 +3718,7 @@ dependencies = [
  "cid 0.11.1",
  "ethers",
  "ethers-core",
+ "fendermint_actor_f3_cert_manager",
  "fendermint_crypto",
  "fendermint_vm_genesis",
  "fil_actors_evm_shared",
@@ -3800,6 +3824,7 @@ dependencies = [
  "fendermint_actor_activity_tracker",
  "fendermint_actor_chainmetadata",
  "fendermint_actor_eam",
+ "fendermint_actor_f3_cert_manager",
  "fendermint_actor_gas_market_eip1559",
  "fendermint_crypto",
  "fendermint_eth_deployer",
