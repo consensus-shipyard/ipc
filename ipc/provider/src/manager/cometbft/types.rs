@@ -248,7 +248,15 @@ impl SignedHeader {
             .map(|(index, id)| (id.into(), index))
             .collect::<HashMap<Vec<u8>, usize>>();
 
-        let f = |a: &[u8]| account_to_index.get(a).cloned().unwrap_or(usize::MAX);
+        // check the validators are included in the public keys
+        if let Some(v) = self.commit.signatures
+            .iter()
+            .find(|s| !account_to_index.contains_key(s.validator_address.as_ref())) {
+            return Err(anyhow!("validator address not found in the public keys: {:}", hex::encode(v.validator_address.as_ref())));
+        }
+
+        // safe to unwrap as validator must be found
+        let f = |a: &[u8]| account_to_index.get(a).cloned().unwrap();
 
         self.commit.signatures.sort_by(|a, b| {
             let a_index = f(a.validator_address.as_ref());

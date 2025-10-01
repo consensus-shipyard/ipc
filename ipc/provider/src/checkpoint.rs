@@ -201,6 +201,9 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
             .child_handler
             .get_signed_header(next_checkpoint_epoch as u64)
             .await?;
+
+        // order validators against the public keys ordered on chain. This is required as contract
+        // requires the exact public keys ordering onchain.
         header.order_commit_against(pubkeys)?;
         let height = header.header.height;
 

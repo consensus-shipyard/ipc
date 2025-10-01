@@ -71,14 +71,14 @@ library CometbftLightClient {
         
         for (uint256 i = 0; i < header.commit.signatures.length; i++) {
             commitSig = header.commit.signatures[i];
-            // no need to verify absent or nil votes.
+            // no need to verify absent or nil votes. Sanity check.
             if (commitSig.block_id_flag != TENDERMINTLIGHT_PROTO_GLOBAL_ENUMS.BlockIDFlag.BLOCK_ID_FLAG_COMMIT) {
                 continue;
             }
 
-            (uint256 power, address validator) = ensureValidatorSubmission(i, commitSig.validator_address);
+            (uint256 power, address validator) = getValidatorInfo(i);
 
-            bytes memory message = generateSignePayload(header.commit, LibSubnetActorStorage.appStorage().chainID, i);
+            bytes memory message = generateSignedPayload(header.commit, LibSubnetActorStorage.appStorage().chainID, i);
             bytes32 messageHash = sha256(message);
 
             ensureValidSignature(messageHash, commitSig.signature, validator);
@@ -127,44 +127,20 @@ library CometbftLightClient {
         }
     }
 
-    /// @notice Validates that a commit signature comes from an expected validator
-    /// @dev Ensures the CometBFT validator address matches the expected validator at the given index
+    /// @notice Get the validator address and power at position index i
     ///
     /// @param i The index of the validator in the active validator set
-    /// @param incomingValidator The CometBFT validator address from the commit signature (20 bytes)
     ///
     /// @return power The voting power of the validated validator
     /// @return validator The Ethereum address of the validator
-    ///
-    /// Process:
-    /// 1. Retrieves the validator at index i from the active validator set
-    /// 2. Gets the validator's metadata containing their public key
-    /// 3. Derives the expected CometBFT address from the public key
-    /// 4. Compares the incoming validator address with the expected one
-    /// 5. Returns the validator's power and address if valid
-    function ensureValidatorSubmission(uint256 i, bytes memory incomingValidator) internal view returns (uint256 power, address validator) {
+    function getValidatorInfo(uint256 i) internal view returns (uint256 power, address validator) {
         validator = LibPower.getActiveValidatorAddressByIndex(uint16(i));
-        ValidatorInfo memory info = LibPower.getActiveValidatorInfo(validator);
-
-        bytes20 expectedCometbftAccountId = toCometBFTAddress(info.metadata);
-
-        bytes20 incoming;
-        assembly {
-            // mload(add(b, 32)) loads the first 32 bytes of the actual data (after skipping the 32-byte length prefix).
-            // first 12 bytes discarded due to bytes20.
-            incoming := mload(add(incomingValidator, 32))
-        }
-
-        // cometbft account id is different than ethreum address, make sure the format matches
-        if (incoming != expectedCometbftAccountId) {
-            revert CometbftSignerNotValidator(expectedCometbftAccountId, incoming);
-        }
-
-        power = info.currentPower;
+        power = LibPower.getCurrentPower(validator);
     }
 
-    /// Generate the signed message payload to be validated
-    function generateSignePayload(
+    /// Generate the signed message payload to be validated onchain.
+    /// If data conversion is done offchain, extra calldata has to be attached and extra decoding into memory as well. This makes the overall implementation easier. 
+    function generateSignedPayload(
         Commit.Data memory commit,
         string memory _chainID,
         uint256 idx
@@ -220,27 +196,5 @@ library CometbftLightClient {
         } else {
             return (address(0), ECDSA.RecoverError.InvalidSignatureLength);
         }
-    }
-
-    function toCompressedPubkey(bytes memory uncompressed) public pure returns (bytes memory) {
-        if (uncompressed.length != 65) {
-            revert InvalidLength("pubkey", 65, uncompressed.length);
-        }
-
-        // ignore prefix
-        bytes memory compressed = new bytes(33);
-        bytes1 prefix = uint8(uncompressed[64]) % 2 == 0 ? bytes1(0x02) : bytes1(0x03); // Y even?
-        compressed[0] = prefix;
-
-        for (uint256 i = 0; i < 32; i++) {
-            compressed[i + 1] = uncompressed[i + 1]; // Copy X bytes
-        }
-
-        return compressed;
-    }
-
-    function toCometBFTAddress(bytes memory uncompressedPubkey) public pure returns (bytes20) {
-        bytes memory compressed = toCompressedPubkey(uncompressedPubkey);
-        return ripemd160(abi.encodePacked(sha256(compressed)));
     }
 }
