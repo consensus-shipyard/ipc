@@ -7,42 +7,64 @@ use serde::{Deserialize, Serialize};
 
 use crate::lotus::message::CIDMap;
 
-/// Response from F3.GetCertificate RPC call
+/// Response from F3.GetLatestCertificate RPC call
+/// This matches the actual Lotus API structure (gpbft.FinalityCertificate)
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct F3CertificateResponse {
-    /// F3 instance ID
-    pub instance_id: u64,
-    /// Epoch/height this certificate finalizes
-    pub epoch: ChainEpoch,
-    /// CID of the power table used for this certificate
-    pub power_table_cid: CIDMap,
-    /// Aggregated signature from F3 participants
-    pub signature: Vec<u8>,
-    /// Raw certificate data for verification
-    pub certificate_data: Vec<u8>,
+    /// GPBFT instance number
+    #[serde(rename = "GPBFTInstance")]
+    pub gpbft_instance: u64,
+    /// EC chain - array of tipsets
+    #[serde(rename = "ECChain")]
+    pub ec_chain: Vec<ECChainEntry>,
+    /// Supplemental data
+    pub supplemental_data: SupplementalData,
+    /// Signers bitmap
+    pub signers: Vec<u64>,
+    /// Aggregated signature (base64 encoded string)
+    pub signature: String,
 }
 
-/// Response from F3.GetPowerTable RPC call
+/// EC Chain entry in the finality certificate
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "PascalCase")]
-pub struct F3PowerTableResponse {
-    /// List of power entries
-    pub entries: Vec<F3PowerEntry>,
+pub struct ECChainEntry {
+    /// Tipset keys
+    pub key: Vec<CIDMap>,
+    /// Epoch/height
+    pub epoch: ChainEpoch,
+    /// Power table CID
+    pub power_table: CIDMap,
+    /// Commitments
+    pub commitments: String,
 }
+
+/// Supplemental data in the certificate
+#[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(rename_all = "PascalCase")]
+pub struct SupplementalData {
+    /// Commitments
+    pub commitments: String,
+    /// Power table CID
+    pub power_table: CIDMap,
+}
+
+/// Response from F3.GetPowerTableByInstance RPC call
+/// This is returned as a direct array of power entries (gpbft.PowerEntries)
+pub type F3PowerTableResponse = Vec<F3PowerEntry>;
 
 /// Power table entry for F3 consensus
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "PascalCase")]
 pub struct F3PowerEntry {
-    /// Public key of the validator (base64 encoded)
-    pub public_key: String,
-    /// Voting power of the validator
-    pub power: u64,
-}
-
-/// Response from F3.GetInstanceID RPC call
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct F3InstanceIDResponse {
-    pub instance_id: u64,
+    /// Validator ID
+    #[serde(rename = "ID")]
+    pub id: u64,
+    /// Power/weight of this validator (string in API response)
+    #[serde(rename = "Power")]
+    pub power: String,
+    /// Public key (base64 encoded)
+    #[serde(rename = "PubKey")]
+    pub pub_key: String,
 }

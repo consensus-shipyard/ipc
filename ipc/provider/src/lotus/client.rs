@@ -52,9 +52,8 @@ mod methods {
     pub const CHAIN_HEAD: &str = "Filecoin.ChainHead";
     pub const GET_TIPSET_BY_HEIGHT: &str = "Filecoin.ChainGetTipSetByHeight";
     pub const ESTIMATE_MESSAGE_GAS: &str = "Filecoin.GasEstimateMessageGas";
-    pub const F3_GET_CERTIFICATE: &str = "Filecoin.F3GetCertificate";
-    pub const F3_GET_POWER_TABLE: &str = "Filecoin.F3GetPowerTable";
-    pub const F3_GET_INSTANCE_ID: &str = "Filecoin.F3GetInstanceID";
+    pub const F3_GET_LATEST_CERTIFICATE: &str = "Filecoin.F3GetLatestCertificate";
+    pub const F3_GET_POWER_TABLE_BY_INSTANCE: &str = "Filecoin.F3GetPowerTableByInstance";
 }
 
 /// The default state wait confidence value
@@ -354,33 +353,38 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
     }
 
     async fn f3_get_certificate(&self) -> Result<Option<F3CertificateResponse>> {
-        // refer to: Filecoin.F3GetCertificate
+        // refer to: Filecoin.F3GetLatestCertificate
         let r = self
             .client
-            .request::<Option<F3CertificateResponse>>(methods::F3_GET_CERTIFICATE, NO_PARAMS)
+            .request::<Option<F3CertificateResponse>>(methods::F3_GET_LATEST_CERTIFICATE, NO_PARAMS)
             .await?;
-        tracing::debug!("received f3_get_certificate response: {r:?}");
+        tracing::debug!("received f3_get_latest_certificate response: {r:?}");
         Ok(r)
     }
 
     async fn f3_get_power_table(&self, instance_id: u64) -> Result<F3PowerTableResponse> {
-        // refer to: Filecoin.F3GetPowerTable
+        // refer to: Filecoin.F3GetPowerTableByInstance
         let r = self
             .client
-            .request::<F3PowerTableResponse>(methods::F3_GET_POWER_TABLE, json!([instance_id]))
+            .request::<F3PowerTableResponse>(
+                methods::F3_GET_POWER_TABLE_BY_INSTANCE,
+                json!([instance_id]),
+            )
             .await?;
-        tracing::debug!("received f3_get_power_table response: {r:?}");
+        tracing::debug!("received f3_get_power_table_by_instance response: {r:?}");
         Ok(r)
     }
 
     async fn f3_get_instance_id(&self) -> Result<u64> {
-        // refer to: Filecoin.F3GetInstanceID
-        let r = self
-            .client
-            .request::<u64>(methods::F3_GET_INSTANCE_ID, NO_PARAMS)
-            .await?;
-        tracing::debug!("received f3_get_instance_id response: {r:?}");
-        Ok(r)
+        // Get the latest certificate which contains the instance ID
+        // There's no direct F3GetInstanceID method in Lotus
+        let cert = self.f3_get_certificate().await?;
+        match cert {
+            Some(cert_response) => Ok(cert_response.gpbft_instance),
+            None => Err(anyhow!(
+                "No F3 certificate available - F3 might not be running on this chain"
+            )),
+        }
     }
 }
 
