@@ -395,4 +395,118 @@ mod tests {
 
         // Test passed if we get here without error
     }
+
+    #[test]
+    fn test_instance_id_progression_next_instance() {
+        let genesis_cert = create_test_certificate(100, 50);
+        let rt = construct_and_verify(100, vec![], Some(genesis_cert));
+
+        rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
+        rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
+
+        // Update to next instance (100 -> 101) should succeed
+        let next_instance_cert = create_test_certificate(101, 10); // Epoch can be any value
+        let update_params = UpdateCertificateParams {
+            certificate: next_instance_cert,
+        };
+
+        let result = rt.call::<F3CertManagerActor>(
+            Method::UpdateCertificate as u64,
+            IpldBlock::serialize_cbor(&update_params).unwrap(),
+        );
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_instance_id_skip_rejected() {
+        let genesis_cert = create_test_certificate(100, 50);
+        let rt = construct_and_verify(100, vec![], Some(genesis_cert));
+
+        rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
+        rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
+
+        // Try to skip instance (100 -> 102) should fail
+        let skipped_cert = create_test_certificate(102, 100);
+        let update_params = UpdateCertificateParams {
+            certificate: skipped_cert,
+        };
+
+        let result = rt.call::<F3CertManagerActor>(
+            Method::UpdateCertificate as u64,
+            IpldBlock::serialize_cbor(&update_params).unwrap(),
+        );
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.exit_code(), ExitCode::USR_ILLEGAL_ARGUMENT);
+    }
+
+    #[test]
+    fn test_instance_id_backward_rejected() {
+        let genesis_cert = create_test_certificate(100, 50);
+        let rt = construct_and_verify(100, vec![], Some(genesis_cert));
+
+        rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
+        rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
+
+        // Try to go backward (100 -> 99) should fail
+        let backward_cert = create_test_certificate(99, 100);
+        let update_params = UpdateCertificateParams {
+            certificate: backward_cert,
+        };
+
+        let result = rt.call::<F3CertManagerActor>(
+            Method::UpdateCertificate as u64,
+            IpldBlock::serialize_cbor(&update_params).unwrap(),
+        );
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.exit_code(), ExitCode::USR_ILLEGAL_ARGUMENT);
+    }
+
+    #[test]
+    fn test_instance_id_matches_genesis_when_no_certificate() {
+        // Start with no certificate, genesis_instance_id = 50
+        let rt = construct_and_verify(50, vec![], None);
+
+        rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
+        rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
+
+        // First certificate must match genesis_instance_id (50) or be next (51)
+        let matching_cert = create_test_certificate(50, 100);
+        let update_params = UpdateCertificateParams {
+            certificate: matching_cert,
+        };
+
+        let result = rt.call::<F3CertManagerActor>(
+            Method::UpdateCertificate as u64,
+            IpldBlock::serialize_cbor(&update_params).unwrap(),
+        );
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_instance_id_genesis_plus_one_when_no_certificate() {
+        // Start with no certificate, genesis_instance_id = 50
+        let rt = construct_and_verify(50, vec![], None);
+
+        rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
+        rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
+
+        // First certificate can also be genesis + 1 (51)
+        let next_instance_cert = create_test_certificate(51, 100);
+        let update_params = UpdateCertificateParams {
+            certificate: next_instance_cert,
+        };
+
+        let result = rt.call::<F3CertManagerActor>(
+            Method::UpdateCertificate as u64,
+            IpldBlock::serialize_cbor(&update_params).unwrap(),
+        );
+
+        assert!(result.is_ok());
+    }
 }

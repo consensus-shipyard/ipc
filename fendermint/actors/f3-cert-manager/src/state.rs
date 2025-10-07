@@ -47,11 +47,29 @@ impl State {
         _rt: &impl Runtime,
         certificate: F3Certificate,
     ) -> Result<(), ActorError> {
-        // Validate that the certificate advances the finalized height
-        if certificate.epoch <= self.latest_finalized_height {
+        // Determine current instance ID from latest certificate or genesis
+        let current_instance_id = self
+            .latest_certificate
+            .as_ref()
+            .map(|cert| cert.instance_id)
+            .unwrap_or(self.genesis_instance_id);
+
+        // Validate instance progression
+        if certificate.instance_id == current_instance_id {
+            // Same instance: epoch must advance
+            if certificate.epoch <= self.latest_finalized_height {
+                return Err(ActorError::illegal_argument(format!(
+                    "Certificate epoch {} must be greater than current finalized height {}",
+                    certificate.epoch, self.latest_finalized_height
+                )));
+            }
+        } else if certificate.instance_id == current_instance_id + 1 {
+            // Next instance: allowed (F3 protocol upgrade)
+        } else {
+            // Invalid progression (backward or skipping)
             return Err(ActorError::illegal_argument(format!(
-                "Certificate epoch {} is not greater than current finalized height {}",
-                certificate.epoch, self.latest_finalized_height
+                "Invalid instance progression: {} to {} (must increment by 0 or 1)",
+                current_instance_id, certificate.instance_id
             )));
         }
 

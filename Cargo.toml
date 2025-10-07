@@ -245,10 +245,6 @@ tendermint-rpc = { version = "0.31", features = [
 ] }
 tendermint-proto = { version = "0.31" }
 
-# Temporarily disabled due to bls-signatures@0.15.0 compatibility issues
-# filecoin-f3-lightclient = { git = "https://github.com/ChainSafe/rust-f3.git", tag = "filecoin-f3-lightclient-v0.1.0" }
-filecoin-proofs = { git = "https://github.com/consensus-shipyard/ipc-filecoin-proofs.git", branch = "main" }
-
 [patch.crates-io]
 fvm = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
 fvm_shared = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }

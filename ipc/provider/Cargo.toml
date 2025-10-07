@@ -64,8 +64,6 @@ fendermint_vm_genesis = { path = "../../fendermint/vm/genesis" }
 
 fendermint_actor_f3_cert_manager = { path = "../../fendermint/actors/f3-cert-manager" }
 fendermint_vm_genesis = { path = "../../fendermint/vm/genesis" }
-# Temporarily disabled due to bls-signatures@0.15.0 compatibility issues
-# filecoin-f3-lightclient = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
