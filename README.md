@@ -53,6 +53,41 @@ make ( or make build-with-ui )
 make test
 ```
 
+## Using the IPC UI
+
+IPC includes a web-based user interface for easier interaction with subnets and IPC operations.
+
+### Building with UI Support
+
+To build the `ipc-cli` binary with the UI embedded:
+
+```sh
+make build-with-ui
+```
+
+This will:
+1. Build the frontend Vue.js application in `ipc-ui/frontend`
+2. Embed the compiled UI assets into the `ipc-cli` binary
+3. Generate the release binary at `./target/release/ipc-cli`
+
+### Starting the UI
+
+Once built with UI support, start the UI server:
+
+```sh
+./target/release/ipc-cli ui
+```
+
+By default, the UI will be accessible at `http://localhost:3030`. The command will output the exact URL where the UI is running.
+
+### Accessing the UI
+
+Open your web browser and navigate to the URL shown in the terminal (typically `http://localhost:3030`). The UI provides a graphical interface for:
+- Managing subnets
+- Viewing subnet information
+- Interacting with IPC operations
+- Monitoring subnet status
+
 ## Code organization
 
 - `ipc/cli`: A Rust binary crate for our client `ipc-cli` application that provides a simple and easy-to-use interface to interact with IPC as a user and run all the processes required for the operation of a subnet.
