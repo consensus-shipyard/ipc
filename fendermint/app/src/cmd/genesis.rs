@@ -382,17 +382,18 @@ async fn fetch_f3_params_from_parent(
 
             // Convert power entries
             let power_table: anyhow::Result<Vec<_>> = power_table_response
-                .entries
                 .iter()
                 .map(|entry| {
                     // Decode base64 public key
                     let public_key_bytes = base64::Engine::decode(
                         &base64::engine::general_purpose::STANDARD,
-                        &entry.public_key,
+                        &entry.pub_key,
                     )?;
+                    // Parse the power string to u64
+                    let power = entry.power.parse::<u64>()?;
                     Ok(types::PowerEntry {
                         public_key: public_key_bytes,
-                        power: entry.power,
+                        power,
                     })
                 })
                 .collect();
@@ -401,12 +402,35 @@ async fn fetch_f3_params_from_parent(
             // Get latest certificate (optional)
             let certificate = lotus_client.f3_get_certificate().await?;
             let certificate = if let Some(cert_response) = certificate {
+                // Decode the base64 signature
+                let signature_bytes = base64::Engine::decode(
+                    &base64::engine::general_purpose::STANDARD,
+                    &cert_response.signature,
+                )?;
+
+                // Get the last epoch from EC chain (the finalized height)
+                let finalized_epoch = cert_response
+                    .ec_chain
+                    .last()
+                    .map(|entry| entry.epoch)
+                    .ok_or_else(|| anyhow::anyhow!("F3 certificate has empty EC chain"))?;
+
+                // Get the power table CID from the last EC chain entry
+                let power_table_cid = cert_response
+                    .ec_chain
+                    .last()
+                    .map(|entry| &entry.power_table)
+                    .ok_or_else(|| anyhow::anyhow!("F3 certificate has empty EC chain"))?;
+
+                // Serialize the entire certificate as the raw certificate data
+                let certificate_data = serde_json::to_vec(&cert_response)?;
+
                 Some(types::F3Certificate {
-                    instance_id: cert_response.instance_id,
-                    epoch: cert_response.epoch,
-                    power_table_cid: cid::Cid::try_from(&cert_response.power_table_cid)?,
-                    signature: cert_response.signature,
-                    certificate_data: cert_response.certificate_data,
+                    instance_id: cert_response.gpbft_instance,
+                    epoch: finalized_epoch,
+                    power_table_cid: cid::Cid::try_from(power_table_cid)?,
+                    signature: signature_bytes,
+                    certificate_data,
                 })
             } else {
                 None
@@ -420,14 +444,15 @@ async fn fetch_f3_params_from_parent(
             }))
         }
         Err(e) => {
-            // F3 might not be available on all chains (e.g., local testnets, some subnets)
-            // Log a warning but don't fail - F3 is optional
-            tracing::warn!(
-                "Failed to fetch F3 certificate data from parent chain: {}. \
-                 This is expected if the parent chain doesn't support F3 (e.g., local testnet or subnet).",
-                e
-            );
-            Ok(None)
+            // // F3 might not be available on all chains (e.g., local testnets, some subnets)
+            // // Log a warning but don't fail - F3 is optional
+            // tracing::warn!(
+            //     "Failed to fetch F3 certificate data from parent chain: {}. \
+            //      This is expected if the parent chain doesn't support F3 (e.g., local testnet or subnet).",
+            //     e
+            // );
+            // Ok(None)
+            Err(e)
         }
     }
 }
@@ -436,6 +461,7 @@ pub async fn new_genesis_from_parent(
     genesis_file: &PathBuf,
     args: &GenesisFromParentArgs,
 ) -> anyhow::Result<()> {
+    println!("Creating genesis from parent");
     // provider with the parent.
     let parent_provider = IpcProvider::new_with_subnet(
         None,
@@ -463,6 +489,8 @@ pub async fn new_genesis_from_parent(
         args.parent_filecoin_auth_token.as_ref(),
     )
     .await?;
+
+    tracing::debug!("F3 params: {:?}", f3_params);
 
     // get gateway genesis
     let ipc_params = ipc::IpcParams {
