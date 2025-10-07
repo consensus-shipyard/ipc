@@ -134,7 +134,7 @@ contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, ReentrancyG
     }
 
     /// Execute the bottom up message batch after the commitment is registered
-    function execBottomUpMsgBatch(
+    function execBottomUpMsgBatchOnly(
         uint64 checkpointHeight,
         BottomUpBatch.Inclusion[] calldata inclusions
     ) external whenNotPaused {
