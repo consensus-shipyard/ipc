@@ -4,8 +4,10 @@ pragma solidity ^0.8.23;
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
-import {CanonicalVote, CanonicalBlockID, Timestamp, CanonicalPartSetHeader, Vote, CommitSig, Commit, SignedHeader, TENDERMINTLIGHT_PROTO_GLOBAL_ENUMS} from "tendermint-sol/proto/TendermintLight.sol";
+import {CanonicalVote, CanonicalBlockID, Timestamp, Consensus, BlockID, CanonicalPartSetHeader, Vote, CommitSig, Commit, LightHeader, SignedHeader, TENDERMINTLIGHT_PROTO_GLOBAL_ENUMS} from "tendermint-sol/proto/TendermintLight.sol";
 import {Encoder} from "tendermint-sol/proto/Encoder.sol";
+import {MerkleTree} from "tendermint-sol/utils/crypto/MerkleTree.sol";
+
 import {TendermintHelper} from "tendermint-sol/proto/TendermintHelper.sol";
 import {Bytes} from "tendermint-sol/utils/Bytes.sol";
 

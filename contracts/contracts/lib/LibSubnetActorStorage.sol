@@ -3,7 +3,6 @@ pragma solidity ^0.8.23;
 
 import {ConsensusType} from "../enums/ConsensusType.sol";
 import {NotGateway, SubnetAlreadyKilled} from "../errors/IPCErrors.sol";
-import {StateCommitment} from "../structs/CrossNet.sol";
 import {SubnetID, ValidatorSet, PowerChangeLog, StakingReleaseQueue, Asset, Validator, PermissionMode} from "../structs/Subnet.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 

@@ -249,10 +249,16 @@ impl SignedHeader {
             .collect::<HashMap<Vec<u8>, usize>>();
 
         // check the validators are included in the public keys
-        if let Some(v) = self.commit.signatures
+        if let Some(v) = self
+            .commit
+            .signatures
             .iter()
-            .find(|s| !account_to_index.contains_key(s.validator_address.as_ref())) {
-            return Err(anyhow!("validator address not found in the public keys: {:}", hex::encode(v.validator_address.as_ref())));
+            .find(|s| !account_to_index.contains_key(s.validator_address.as_ref()))
+        {
+            return Err(anyhow!(
+                "validator address not found in the public keys: {:}",
+                hex::encode(v.validator_address.as_ref())
+            ));
         }
 
         // safe to unwrap as validator must be found

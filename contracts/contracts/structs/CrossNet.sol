@@ -99,11 +99,3 @@ struct ResultMsg {
     //
     // NOTE: In the future we may include events and other result information.
 }
-
-/// @notice The state commitment of a particular subnet
-struct StateCommitment {
-    /// @dev The height of the block
-    uint64 blockHeight;
-    /// @dev The state commitment, it could be the app_hash for cometbft based subnet
-    bytes commitment;
-}
