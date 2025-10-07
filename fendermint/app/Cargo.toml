@@ -87,8 +87,6 @@ ipc-provider = { path = "../../ipc/provider" }
 ipc_ipld_resolver = { path = "../../ipld/resolver" }
 ipc-observability = { path = "../../ipc/observability" }
 contracts-artifacts = { path = "../../contracts-artifacts" }
-# Temporarily disabled due to bls-signatures@0.15.0 compatibility issues
-# filecoin-f3-lightclient = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
