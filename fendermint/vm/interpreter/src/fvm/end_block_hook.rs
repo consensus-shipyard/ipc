@@ -7,13 +7,15 @@ use super::state::{ipc::GatewayCaller, FvmExecState};
 use crate::fvm::activity::ValidatorActivityTracker;
 use crate::types::BlockEndEvents;
 use anyhow::Context;
-use ethers::abi::{AbiEncode, Tokenizable};
+use ethers::abi::Tokenizable;
 use fendermint_vm_genesis::{Power, Validator};
 use fvm_ipld_blockstore::Blockstore;
 use ipc_actors_abis::checkpointing_facet as checkpoint;
 use ipc_actors_abis::checkpointing_facet::{FvmAddress, Ipcaddress, SubnetID};
 use ipc_actors_abis::gateway_getter_facet::gateway_getter_facet;
-use ipc_api::checkpoint::{abi_encode_envelope, abi_encode_envelope_fields};
+use ipc_api::checkpoint::{
+    abi_encode_envelope, abi_encode_envelope_fields, CompressedActivityRollup,
+};
 use ipc_api::merkle::MerkleGen;
 use ipc_api::staking::ConfigurationNumber;
 use serde::{Deserialize, Serialize};
@@ -38,7 +40,7 @@ pub struct MessageBatchCommitment {
 pub struct LightClientCommitments {
     pub msg_batch_commitment: MessageBatchCommitment,
     pub validator_next_configuration_number: u64,
-    pub activity_commitment: [u8; 32],
+    pub activity_commitment: CompressedActivityRollup,
 }
 
 pub struct EndBlockOutcome {
@@ -153,7 +155,7 @@ where
     let commitments = LightClientCommitments {
         msg_batch_commitment: cross_msg_commitment,
         validator_next_configuration_number: next_configuration_number,
-        activity_commitment: ethers::utils::keccak256(activity_commitment.encode()),
+        activity_commitment: activity_commitment.into(),
     };
 
     let ret = gateway

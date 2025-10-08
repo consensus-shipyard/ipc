@@ -7,9 +7,9 @@ use anyhow::Result;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
-use ipc_actors_abis::checkpointing_facet::StateCommitmentBreakDown;
+use ipc_actors_abis::checkpointing_facet::AppHashBreakdown;
 use ipc_actors_abis::subnet_actor_activity_facet::ValidatorClaim;
-use ipc_actors_abis::subnet_actor_checkpointing_facet::{Inclusion, LastCommitmentHeights};
+use ipc_actors_abis::subnet_actor_checkpointing_facet::Inclusion;
 use ipc_actors_abis::subnet_actor_getter_facet::ListPendingCommitmentsEntry;
 use ipc_api::checkpoint::consensus::ValidatorData;
 use ipc_api::cross::IpcEnvelope;
@@ -275,25 +275,20 @@ pub trait SignedHeaderRelayer: Send + Sync {
         header: SignedHeader,
     ) -> Result<ChainEpoch>;
 
-    async fn query_commitment(
+    async fn query_app_hash_breakdown(
         &self,
         height: ChainEpoch,
-    ) -> Result<Option<StateCommitmentBreakDown>>;
+    ) -> Result<Option<AppHashBreakdown>>;
 
-    async fn get_last_commitment_heights(
-        &self,
-        subnet_id: &SubnetID,
-    ) -> Result<LastCommitmentHeights>;
+    async fn get_last_bottom_up_checkpoint_height(&self, subnet_id: &SubnetID) -> Result<u64>;
 
-    async fn confirm_validator_change(
+    async fn record_app_hash_breakdown(
         &self,
         height: ChainEpoch,
         submitter: &Address,
         subnet_id: &SubnetID,
-        commitment: StateCommitmentBreakDown,
+        breakdown: AppHashBreakdown,
     ) -> Result<ChainEpoch>;
-
-    async fn last_submission_height(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
 
     async fn submission_period(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
 
@@ -316,6 +311,7 @@ pub trait SignedHeaderRelayer: Send + Sync {
         &self,
         current: &ListPendingCommitmentsEntry,
     ) -> Result<Vec<Inclusion>>;
+
     /// Executes a batch of committed bottom-up messages.
     async fn execute_bottom_up_batch(
         &self,
@@ -323,7 +319,6 @@ pub trait SignedHeaderRelayer: Send + Sync {
         subnet_id: &SubnetID,
         height: ChainEpoch,
         inclusions: Vec<Inclusion>,
-        commitment: StateCommitmentBreakDown,
     ) -> Result<ChainEpoch>;
 }
 

@@ -17,13 +17,14 @@ import {BottomUpBatch} from "../../structs/BottomUpBatch.sol";
 import {LibPower} from "../LibPower.sol";
 import {LibSubnetActorStorage, SubnetActorStorage} from "../LibSubnetActorStorage.sol";
 import {DuplicateValidatorSignaturesFound, SignatureAddressesNotSorted} from "../../errors/IPCErrors.sol";
+import {CompressedActivityRollup} from "../../structs/Activity.sol";
 
-/// Breakdown how the app hash is generated
-struct StateCommitmentBreakDown {
+/// Breakdown how the app hash is generated, it's keccak(abi.encode(AppHashBreakdown))
+struct AppHashBreakdown {
     bytes stateRoot; // fvm state root
     BottomUpBatch.Commitment msgBatchCommitment;
     uint64 validatorNextConfigurationNumber;
-    bytes32 activityCommitment;
+    CompressedActivityRollup activityCommitment;
 }
 
 library CometbftLightClient {

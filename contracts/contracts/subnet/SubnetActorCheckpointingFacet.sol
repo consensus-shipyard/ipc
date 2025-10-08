@@ -20,18 +20,7 @@ import {LibBottomUpBatch} from "../lib/LibBottomUpBatch.sol";
 import {BottomUpBatch} from "../structs/BottomUpBatch.sol";
 import {IpcEnvelope} from "../structs/CrossNet.sol";
 import {CompressedActivityRollup} from "../structs/Activity.sol";
-import {CometbftLightClient, StateCommitmentBreakDown} from "../lib/cometbft/CometbftLightClient.sol";
-
-/// @notice Tracks the latest checkpoint heights for different commitment types
-/// @dev Used to ensure sequential processing and prevent replay of checkpoints
-struct LastCommitmentHeights {
-    /// The height of the last submitted and verified CometBFT signed header
-    uint64 signedHeader;
-    /// The height of the last processed validator configuration change
-    uint64 configNumber;
-    /// The height of the last recorded activity rollup
-    uint64 activity;
-}
+import {CometbftLightClient, AppHashBreakdown} from "../lib/cometbft/CometbftLightClient.sol";
 
 /// @title Subnet Actor Checkpointing Facet
 /// @notice Handles bottom-up checkpoint submission and verification for IPC subnets
@@ -48,11 +37,10 @@ contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, ReentrancyG
     using LibValidatorSet for ValidatorSet;
 
     error AppHashNotEqual();
-    error InvalidActivityCommiment();
 
     /// @inheritdoc ISubnetActorCheckpointing
     function lastBottomUpCheckpointHeight() external view returns (uint256) {
-        return uint256(LibCheckpointingStorage.getStorage().commitmentHeights.signedHeader);
+        return uint256(LibCheckpointingStorage.getStorage().lastSubmissionHeight);
     }
 
     /// @inheritdoc ISubnetActorCheckpointing
@@ -63,78 +51,32 @@ contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, ReentrancyG
 
         uint64 height = uint64(header.commit.height);
         // Enforcing a sequential submission
-        ensureValidHeight(height, checkpointStorage.commitmentHeights.signedHeader);
+        ensureValidHeight(height, checkpointStorage.lastSubmissionHeight);
 
+        /// Performs protobuf encoding against the header, can be gas intensive
         CometbftLightClient.verifyValidatorsQuorum(header);
 
-        checkpointStorage.stateCommitments[height] = header.header.app_hash;
-        checkpointStorage.commitmentHeights.signedHeader = height;
+        checkpointStorage.appHash[height] = header.header.app_hash;
+        checkpointStorage.lastSubmissionHeight = height;
     }
 
-    function getLastCommitmentHeights() external view returns (LastCommitmentHeights memory) {
-        return LibCheckpointingStorage.getStorage().commitmentHeights;
-    }
-
-    function recordActivityRollup(
+    /// @dev Once the checkpoint is submitted, it is just the signed cometbft app hash. The app hash is the hash of AppHashBreakdown.
+    /// The app hash break down is the aggregate of commitments for configuration number or message batch root.
+    /// It's not submitted together with `submitBottomUpCheckpoint` for gas considerations.
+    function recordAppHashBreakdown(
         uint64 checkpointHeight,
         SubnetID calldata subnet,
-        CompressedActivityRollup calldata activity,
-        StateCommitmentBreakDown calldata breakdown
+        AppHashBreakdown calldata breakdown
     ) external whenNotPaused {
-        SubnetActorCheckpointingStorage storage checkpointStorage = LibCheckpointingStorage.getStorage();
-
-        if (breakdown.activityCommitment != keccak256(abi.encode(activity))) revert InvalidActivityCommiment();
-
         validateAppHash(checkpointHeight, breakdown);
-        ensureValidHeight(checkpointHeight, checkpointStorage.commitmentHeights.activity);
-
-        LibActivity.recordActivityRollup(subnet, checkpointHeight, activity);
-
-        checkpointStorage.commitmentHeights.activity = checkpointHeight;
-    }
-
-    function confirmValidatorChange(
-        uint64 checkpointHeight,
-        StateCommitmentBreakDown calldata breakdown
-    ) external whenNotPaused {
-        SubnetActorCheckpointingStorage storage checkpointStorage = LibCheckpointingStorage.getStorage();
-
-        validateAppHash(checkpointHeight, breakdown);
-        ensureValidHeight(checkpointHeight, checkpointStorage.commitmentHeights.configNumber);
 
         LibPower.confirmChange(breakdown.validatorNextConfigurationNumber);
-
-        checkpointStorage.commitmentHeights.configNumber = checkpointHeight;
+        LibBottomUpBatch.recordBottomUpBatchCommitment(checkpointHeight, breakdown.msgBatchCommitment);
+        LibActivity.recordActivityRollup(subnet, checkpointHeight, breakdown.activityCommitment);
     }
 
-    /// @notice Executes the whole batch of bottom-up messages that have been committed to in a checkpoint.
-    /// @dev Each message in the batch must include a valid Merkle proof of inclusion.
-    ///      This function verifies each proof, processes the message, and submits it to the gateway for execution.
-    ///      It also triggers propagation of cross-subnet messages after successful execution.
-    /// @param checkpointHeight The height of the checkpoint containing the committed messages.
-    /// @param inclusions An array of inclusion proofs and messages to be executed.
+    /// @dev Execute the bottom up message batch after the commitment is registered
     function execBottomUpMsgBatch(
-        uint64 checkpointHeight,
-        StateCommitmentBreakDown calldata breakdown,
-        BottomUpBatch.Inclusion[] calldata inclusions
-    ) external whenNotPaused {
-        validateAppHash(checkpointHeight, breakdown);
-
-        LibBottomUpBatch.recordBottomUpBatchCommitment(checkpointHeight, breakdown.msgBatchCommitment);
-        _execBottomUpMsgBatch(checkpointHeight, inclusions);
-    }
-
-    /// Record the bottom up msg batch commitment so that bottom up batch can be executed one by one
-    function recordBottomUpMsgBatch(
-        uint64 checkpointHeight,
-        StateCommitmentBreakDown calldata breakdown
-    ) external whenNotPaused {
-        validateAppHash(checkpointHeight, breakdown);
-        LibBottomUpBatch.recordBottomUpBatchCommitment(checkpointHeight, breakdown.msgBatchCommitment);
-    }
-
-    /// Execute the bottom up message batch after the commitment is registered
-    function execBottomUpMsgBatchOnly(
         uint64 checkpointHeight,
         BottomUpBatch.Inclusion[] calldata inclusions
     ) external whenNotPaused {
@@ -172,7 +114,7 @@ contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, ReentrancyG
         }
     }
 
-    function deriveAppHash(StateCommitmentBreakDown calldata breakdown) internal pure returns (bytes memory appHash) {
+    function deriveAppHash(AppHashBreakdown calldata breakdown) internal pure returns (bytes memory appHash) {
         bytes32 derived = keccak256(abi.encode(breakdown));
 
         appHash = new bytes(32);
@@ -182,13 +124,10 @@ contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, ReentrancyG
         return appHash;
     }
 
-    function validateAppHash(
-        uint64 checkpointHeight,
-        StateCommitmentBreakDown calldata breakdown
-    ) internal view whenNotPaused {
+    function validateAppHash(uint64 checkpointHeight, AppHashBreakdown calldata breakdown) internal view whenNotPaused {
         SubnetActorCheckpointingStorage storage checkpointStorage = LibCheckpointingStorage.getStorage();
 
-        bytes memory expectedAppHash = checkpointStorage.stateCommitments[checkpointHeight];
+        bytes memory expectedAppHash = checkpointStorage.appHash[checkpointHeight];
         bytes memory actual = deriveAppHash(breakdown);
 
         if (keccak256(expectedAppHash) != keccak256(actual)) revert AppHashNotEqual();
@@ -198,9 +137,9 @@ contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, ReentrancyG
 // ================ INTERNAL UTIL ===================
 
 struct SubnetActorCheckpointingStorage {
-    /// @notice contains all committed subnet state hash and block header
-    mapping(uint64 => bytes) stateCommitments;
-    LastCommitmentHeights commitmentHeights;
+    /// @notice contains all committed subnet app hash against each checkpoint height
+    mapping(uint64 => bytes) appHash;
+    uint64 lastSubmissionHeight;
 }
 
 library LibCheckpointingStorage {

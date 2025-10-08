@@ -115,14 +115,14 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         msgs: Vec<checkpointing_facet::IpcEnvelope>,
         activity: checkpointing_facet::FullActivityRollup,
     ) -> anyhow::Result<AppliedMessage> {
-        let commitment = checkpointing_facet::StateCommitmentBreakDown {
+        let commitment = checkpointing_facet::AppHashBreakdown {
             state_root: Default::default(),
             msg_batch_commitment: checkpointing_facet::Commitment {
                 total_num_msgs: commitment.msg_batch_commitment.total_num_msgs,
                 msgs_root: commitment.msg_batch_commitment.msgs_root,
             },
             validator_next_configuration_number: commitment.validator_next_configuration_number,
-            activity_commitment: commitment.activity_commitment,
+            activity_commitment: commitment.activity_commitment.clone().try_into()?,
         };
         Ok(self
             .checkpointing

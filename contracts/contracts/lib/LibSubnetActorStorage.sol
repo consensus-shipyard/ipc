@@ -6,12 +6,6 @@ import {NotGateway, SubnetAlreadyKilled} from "../errors/IPCErrors.sol";
 import {SubnetID, ValidatorSet, PowerChangeLog, StakingReleaseQueue, Asset, Validator, PermissionMode} from "../structs/Subnet.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-struct LastCommitmentHeights {
-    uint64 signedHeader;
-    uint64 configNumber;
-    uint64 activity;
-}
-
     struct SubnetActorStorage {
         /// @notice initial circulating supply provided by genesis validators to use when bootstrapping
         /// the network.

@@ -17,10 +17,10 @@ import {IpcEnvelope, SubnetID, IpcMsgKind} from "../../structs/CrossNet.sol";
 import {SubnetIDHelper} from "../../lib/SubnetIDHelper.sol";
 
 import {ActivityRollupRecorded, FullActivityRollup} from "../../structs/Activity.sol";
-import {StateCommitmentBreakDown} from "../../lib/cometbft/CometbftLightClient.sol";
+import {AppHashBreakdown} from "../../lib/cometbft/CometbftLightClient.sol";
 
 struct BottomUpCheckpoint {
-    StateCommitmentBreakDown commitment;
+    AppHashBreakdown commitment;
     IpcEnvelope[] msgs;
     FullActivityRollup activity;
 }
@@ -29,7 +29,7 @@ contract CheckpointingFacet is GatewayActorModifiers {
     using SubnetIDHelper for SubnetID;
     using CrossMsgHelper for IpcEnvelope;
 
-    event StateCommitmentCreated(uint64 checkpointHeight, StateCommitmentBreakDown breakdown);
+    event StateCommitmentCreated(uint64 checkpointHeight, AppHashBreakdown breakdown);
 
     /// @notice submit a verified batch of committed cross-net messages for execution.
     /// @param msgs The batch of messages to be executed.

@@ -15,7 +15,9 @@ use fendermint_vm_interpreter::MessagesInterpreter;
 use fendermint_vm_topdown::sync::ParentFinalityStateQuery;
 use fendermint_vm_topdown::IPCParentFinality;
 use fvm_ipld_blockstore::Blockstore;
-use ipc_actors_abis::subnet_actor_checkpointing_facet::{Commitment, StateCommitmentBreakDown};
+use ipc_actors_abis::subnet_actor_checkpointing_facet::{
+    AppHashBreakdown, Commitment, CompressedActivityRollup,
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -27,15 +29,16 @@ pub fn derive_subnet_app_hash_from_components(
         .expect("state params have a CID")
         .to_bytes();
 
-    let mut submission = StateCommitmentBreakDown {
+    let mut submission = AppHashBreakdown {
         state_root: state_params_cid.into(),
         msg_batch_commitment: Commitment::default(),
         validator_next_configuration_number: 0,
-        activity_commitment: [0; 32],
+        activity_commitment: CompressedActivityRollup::default(),
     };
 
     if let Some(commitment) = maybe_light {
-        submission.activity_commitment = commitment.activity_commitment;
+        // safe to unwrap as it's internal conversion
+        submission.activity_commitment = commitment.activity_commitment.clone().try_into().unwrap();
         submission.msg_batch_commitment = Commitment {
             total_num_msgs: commitment.msg_batch_commitment.total_num_msgs,
             msgs_root: commitment.msg_batch_commitment.msgs_root,

@@ -116,7 +116,10 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
                 }
             };
 
-            if let Err(e) = self.commit_next_validator_changes(submitter, height).await {
+            if let Err(e) = self
+                .submit_missing_app_hash_breakdowns(submitter, height)
+                .await
+            {
                 tracing::error!(
                     "cannot commit next validator changes for submitter: {submitter} due to {e}"
                 );
@@ -129,29 +132,31 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
         }
     }
 
-    async fn commit_next_validator_changes(
+    /// The bottom up checkpoint submits only the app hash. The breakdown of the app hash, i.e.
+    /// configuration number or bottom up message batch merkle root have to be submitted separately.
+    /// This method does not handle rollup activity as it's not required in ro
+    async fn submit_missing_app_hash_breakdowns(
         &self,
         submitter: Address,
         end_height: ChainEpoch,
     ) -> Result<()> {
-        let heights = self
+        let mut next_height = self
             .child_handler
-            .get_last_commitment_heights(&self.metadata.target.id)
+            .get_last_bottom_up_checkpoint_height(&self.metadata.target.id)
             .await?;
 
-        let mut next_height = heights.config_number;
         while next_height <= end_height as u64 {
             next_height += self.metadata.period as u64;
             let Some(commitment) = self
                 .child_handler
-                .query_commitment(next_height as ChainEpoch)
+                .query_app_hash_breakdown(next_height as ChainEpoch)
                 .await?
             else {
                 continue;
             };
 
             self.parent_handler
-                .confirm_validator_change(
+                .record_app_hash_breakdown(
                     next_height as ChainEpoch,
                     &submitter,
                     &self.metadata.target.id,
@@ -166,13 +171,13 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
     async fn submit_next_signed_header(&self, submitter: Address) -> Result<Option<ChainEpoch>> {
         let last_checkpoint_epoch = self
             .parent_handler
-            .last_submission_height(&self.metadata.source.id)
+            .get_last_bottom_up_checkpoint_height(&self.metadata.source.id)
             .await
             .map_err(|e| {
                 anyhow!("cannot obtain the last bottom up checkpoint height due to: {e:}")
             })?;
 
-        let next_checkpoint_epoch = last_checkpoint_epoch + self.metadata.period;
+        let next_checkpoint_epoch = last_checkpoint_epoch as ChainEpoch + self.metadata.period;
 
         tracing::info!(
             last_checkpoint_epoch,
@@ -234,20 +239,8 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
                 .await?;
 
             let height = commitment.height as i64;
-            let commitment = self
-                .child_handler
-                .query_commitment(height)
-                .await?
-                .ok_or_else(|| anyhow!("no commitment found for {height}"))?;
-
             self.parent_handler
-                .execute_bottom_up_batch(
-                    &submitter,
-                    &self.metadata.target.id,
-                    height,
-                    inclusions,
-                    commitment,
-                )
+                .execute_bottom_up_batch(&submitter, &self.metadata.target.id, height, inclusions)
                 .await
                 .inspect_err(|err| {
                     tracing::error!("Fail to execute bottom up batch at height {height}: {err}");
