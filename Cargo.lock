@@ -6748,8 +6748,10 @@ dependencies = [
  "hyper 1.8.1",
  "hyper-util",
  "log",
- "rustls 0.23.36",
+ "rustls 0.23.34",
  "rustls-pki-types",
+ "tokio",
+ "tokio-rustls 0.26.4",
  "tower-service",
  "webpki-roots 1.0.5",
 ]
@@ -13795,10 +13797,13 @@ checksum = "3c879d448e9d986b661742763247d3693ed13609438cf3d006f51f5368a5ba6b"
 dependencies = [
  "bitflags 2.10.0",
  "core-foundation 0.9.4",
- "core-foundation",
  "system-configuration-sys 0.6.0",
 ]
+
 [[package]]
+name = "system-configuration-sys"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a75fb188eb626b924683e3b95e3a48e63551fcfb51949de2f06a9d91dbee93c9"
 dependencies = [
  "core-foundation-sys",
