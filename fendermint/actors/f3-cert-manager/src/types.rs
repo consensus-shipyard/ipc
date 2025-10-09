@@ -10,13 +10,14 @@ use fvm_shared::clock::ChainEpoch;
 pub struct F3Certificate {
     /// F3 instance ID
     pub instance_id: u64,
-    /// Epoch/height this certificate finalizes
-    pub epoch: ChainEpoch,
+    /// All epochs finalized by this certificate (from ECChain)
+    /// Must contain at least one epoch
+    pub finalized_epochs: Vec<ChainEpoch>,
     /// CID of the power table used for this certificate
     pub power_table_cid: Cid,
     /// Aggregated signature from F3 participants
     pub signature: Vec<u8>,
-    /// Raw certificate data for verification
+    /// Raw certificate data for verification (full Lotus cert with ECChain)
     pub certificate_data: Vec<u8>,
 }
 

@@ -29,7 +29,7 @@ impl State {
     ) -> Result<State, ActorError> {
         let latest_finalized_height = genesis_certificate
             .as_ref()
-            .map(|cert| cert.epoch)
+            .and_then(|cert| cert.finalized_epochs.iter().max().copied())
             .unwrap_or(0);
 
         let state = State {
@@ -47,6 +47,13 @@ impl State {
         _rt: &impl Runtime,
         certificate: F3Certificate,
     ) -> Result<(), ActorError> {
+        // Validate finalized_epochs is not empty
+        if certificate.finalized_epochs.is_empty() {
+            return Err(ActorError::illegal_argument(
+                "Certificate must have at least one finalized epoch".to_string(),
+            ));
+        }
+
         // Determine current instance ID from latest certificate or genesis
         let current_instance_id = self
             .latest_certificate
@@ -56,11 +63,16 @@ impl State {
 
         // Validate instance progression
         if certificate.instance_id == current_instance_id {
-            // Same instance: epoch must advance
-            if certificate.epoch <= self.latest_finalized_height {
+            // Same instance: highest epoch must advance
+            let new_highest = certificate
+                .finalized_epochs
+                .iter()
+                .max()
+                .expect("finalized_epochs validated as non-empty");
+            if *new_highest <= self.latest_finalized_height {
                 return Err(ActorError::illegal_argument(format!(
-                    "Certificate epoch {} must be greater than current finalized height {}",
-                    certificate.epoch, self.latest_finalized_height
+                    "Certificate highest epoch {} must be greater than current finalized height {}",
+                    new_highest, self.latest_finalized_height
                 )));
             }
         } else if certificate.instance_id == current_instance_id + 1 {
@@ -73,8 +85,12 @@ impl State {
             )));
         }
 
-        // Update state - the transaction will handle persisting this
-        self.latest_finalized_height = certificate.epoch;
+        // Update state - set latest_finalized_height to the highest epoch
+        self.latest_finalized_height = *certificate
+            .finalized_epochs
+            .iter()
+            .max()
+            .expect("finalized_epochs validated as non-empty");
         self.latest_certificate = Some(certificate);
 
         Ok(())
@@ -98,5 +114,14 @@ impl State {
     /// Get the latest finalized height
     pub fn get_latest_finalized_height(&self) -> ChainEpoch {
         self.latest_finalized_height
+    }
+
+    /// Check if a specific parent epoch has been finalized
+    pub fn is_epoch_finalized(&self, epoch: ChainEpoch) -> bool {
+        if let Some(cert) = &self.latest_certificate {
+            cert.finalized_epochs.contains(&epoch)
+        } else {
+            false
+        }
     }
 }

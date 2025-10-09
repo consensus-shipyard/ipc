@@ -153,13 +153,13 @@ mod tests {
     use multihash::{Code, MultihashDigest};
 
     /// Helper function to create a mock F3 certificate
-    fn create_test_certificate(instance_id: u64, epoch: i64) -> F3Certificate {
+    fn create_test_certificate(instance_id: u64, finalized_epochs: Vec<i64>) -> F3Certificate {
         // Create a dummy CID for power table
         let power_table_cid = Cid::new_v1(0x55, Code::Blake2b256.digest(b"test_power_table"));
 
         F3Certificate {
             instance_id,
-            epoch,
+            finalized_epochs,
             power_table_cid,
             signature: vec![1, 2, 3, 4],        // Dummy signature
             certificate_data: vec![5, 6, 7, 8], // Dummy certificate data
@@ -224,7 +224,7 @@ mod tests {
     #[test]
     fn test_constructor_with_genesis_data() {
         let power_entries = create_test_power_entries();
-        let genesis_cert = create_test_certificate(1, 100);
+        let genesis_cert = create_test_certificate(1, vec![100, 101, 102]);
 
         let _rt = construct_and_verify(1, power_entries, Some(genesis_cert));
         // Constructor test passed if we get here without panicking
@@ -238,7 +238,7 @@ mod tests {
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
 
-        let new_cert = create_test_certificate(1, 200);
+        let new_cert = create_test_certificate(1, vec![200, 201, 202]);
         let update_params = UpdateCertificateParams {
             certificate: new_cert.clone(),
         };
@@ -258,14 +258,14 @@ mod tests {
 
     #[test]
     fn test_update_certificate_non_advancing_height() {
-        let genesis_cert = create_test_certificate(1, 100);
+        let genesis_cert = create_test_certificate(1, vec![100, 101, 102]);
         let rt = construct_and_verify(1, vec![], Some(genesis_cert));
 
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
 
-        // Try to update with same or lower height
-        let same_height_cert = create_test_certificate(1, 100); // Same height
+        // Try to update with same or lower height (highest epoch is 102, try with 102 or lower)
+        let same_height_cert = create_test_certificate(1, vec![100, 101, 102]); // Same highest
         let update_params = UpdateCertificateParams {
             certificate: same_height_cert,
         };
@@ -290,7 +290,7 @@ mod tests {
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, unauthorized_caller);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
 
-        let new_cert = create_test_certificate(1, 200);
+        let new_cert = create_test_certificate(1, vec![200, 201, 202]);
         let update_params = UpdateCertificateParams {
             certificate: new_cert,
         };
@@ -325,7 +325,7 @@ mod tests {
 
     #[test]
     fn test_get_certificate_with_data() {
-        let genesis_cert = create_test_certificate(1, 100);
+        let genesis_cert = create_test_certificate(1, vec![100, 101, 102]);
         let rt = construct_and_verify(1, vec![], Some(genesis_cert.clone()));
 
         rt.expect_validate_caller_any();
@@ -337,7 +337,7 @@ mod tests {
 
         let response = result.deserialize::<GetCertificateResponse>().unwrap();
         assert_eq!(response.certificate, Some(genesis_cert));
-        assert_eq!(response.latest_finalized_height, 100);
+        assert_eq!(response.latest_finalized_height, 102); // Highest epoch
     }
 
     #[test]
@@ -366,7 +366,7 @@ mod tests {
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
 
-        let cert1 = create_test_certificate(1, 100);
+        let cert1 = create_test_certificate(1, vec![100, 101, 102]);
         let update_params1 = UpdateCertificateParams {
             certificate: cert1.clone(),
         };
@@ -382,7 +382,7 @@ mod tests {
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
 
-        let cert2 = create_test_certificate(1, 200);
+        let cert2 = create_test_certificate(1, vec![200, 201, 202]);
         let update_params2 = UpdateCertificateParams {
             certificate: cert2.clone(),
         };
@@ -398,14 +398,14 @@ mod tests {
 
     #[test]
     fn test_instance_id_progression_next_instance() {
-        let genesis_cert = create_test_certificate(100, 50);
+        let genesis_cert = create_test_certificate(100, vec![50, 51, 52]);
         let rt = construct_and_verify(100, vec![], Some(genesis_cert));
 
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
 
         // Update to next instance (100 -> 101) should succeed
-        let next_instance_cert = create_test_certificate(101, 10); // Epoch can be any value
+        let next_instance_cert = create_test_certificate(101, vec![10, 11, 12]); // Epoch can be any value
         let update_params = UpdateCertificateParams {
             certificate: next_instance_cert,
         };
@@ -420,14 +420,14 @@ mod tests {
 
     #[test]
     fn test_instance_id_skip_rejected() {
-        let genesis_cert = create_test_certificate(100, 50);
+        let genesis_cert = create_test_certificate(100, vec![50, 51, 52]);
         let rt = construct_and_verify(100, vec![], Some(genesis_cert));
 
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
 
         // Try to skip instance (100 -> 102) should fail
-        let skipped_cert = create_test_certificate(102, 100);
+        let skipped_cert = create_test_certificate(102, vec![100, 101, 102]);
         let update_params = UpdateCertificateParams {
             certificate: skipped_cert,
         };
@@ -444,14 +444,14 @@ mod tests {
 
     #[test]
     fn test_instance_id_backward_rejected() {
-        let genesis_cert = create_test_certificate(100, 50);
+        let genesis_cert = create_test_certificate(100, vec![50, 51, 52]);
         let rt = construct_and_verify(100, vec![], Some(genesis_cert));
 
         rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
 
         // Try to go backward (100 -> 99) should fail
-        let backward_cert = create_test_certificate(99, 100);
+        let backward_cert = create_test_certificate(99, vec![100, 101, 102]);
         let update_params = UpdateCertificateParams {
             certificate: backward_cert,
         };
@@ -475,7 +475,7 @@ mod tests {
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
 
         // First certificate must match genesis_instance_id (50) or be next (51)
-        let matching_cert = create_test_certificate(50, 100);
+        let matching_cert = create_test_certificate(50, vec![100, 101, 102]);
         let update_params = UpdateCertificateParams {
             certificate: matching_cert,
         };
@@ -497,9 +497,88 @@ mod tests {
         rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
 
         // First certificate can also be genesis + 1 (51)
-        let next_instance_cert = create_test_certificate(51, 100);
+        let next_instance_cert = create_test_certificate(51, vec![100, 101, 102]);
         let update_params = UpdateCertificateParams {
             certificate: next_instance_cert,
+        };
+
+        let result = rt.call::<F3CertManagerActor>(
+            Method::UpdateCertificate as u64,
+            IpldBlock::serialize_cbor(&update_params).unwrap(),
+        );
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_certificate_with_multiple_epochs() {
+        let rt = construct_and_verify(1, vec![], None);
+
+        rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
+        rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
+
+        // Certificate covering epochs 100-110
+        let multi_epoch_cert = create_test_certificate(
+            1,
+            vec![100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110],
+        );
+        let update_params = UpdateCertificateParams {
+            certificate: multi_epoch_cert,
+        };
+
+        let result = rt.call::<F3CertManagerActor>(
+            Method::UpdateCertificate as u64,
+            IpldBlock::serialize_cbor(&update_params).unwrap(),
+        );
+
+        assert!(result.is_ok());
+        rt.reset();
+
+        // Query to verify latest_finalized_height is the highest epoch
+        rt.expect_validate_caller_any();
+        let result = rt
+            .call::<F3CertManagerActor>(Method::GetCertificate as u64, None)
+            .unwrap()
+            .unwrap();
+
+        let response = result.deserialize::<GetCertificateResponse>().unwrap();
+        assert_eq!(response.latest_finalized_height, 110); // Highest epoch
+    }
+
+    #[test]
+    fn test_certificate_empty_epochs_rejected() {
+        let rt = construct_and_verify(1, vec![], None);
+
+        rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
+        rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
+
+        // Try to update with empty finalized_epochs
+        let invalid_cert = create_test_certificate(1, vec![]);
+        let update_params = UpdateCertificateParams {
+            certificate: invalid_cert,
+        };
+
+        let result = rt.call::<F3CertManagerActor>(
+            Method::UpdateCertificate as u64,
+            IpldBlock::serialize_cbor(&update_params).unwrap(),
+        );
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.exit_code(), ExitCode::USR_ILLEGAL_ARGUMENT);
+    }
+
+    #[test]
+    fn test_certificate_single_epoch() {
+        let rt = construct_and_verify(1, vec![], None);
+
+        rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
+        rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
+
+        // Certificate with only one epoch should work
+        let single_epoch_cert = create_test_certificate(1, vec![100]);
+        let update_params = UpdateCertificateParams {
+            certificate: single_epoch_cert,
         };
 
         let result = rt.call::<F3CertManagerActor>(
