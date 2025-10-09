@@ -92,6 +92,13 @@ pub trait LotusClient {
     /// See: Filecoin.F3GetLatestCertificate
     async fn f3_get_certificate(&self) -> Result<Option<F3CertificateResponse>>;
 
+    /// Get F3 certificate for a specific instance ID
+    /// See: Filecoin.F3GetCert
+    async fn f3_get_cert_by_instance(
+        &self,
+        instance_id: u64,
+    ) -> Result<Option<F3CertificateResponse>>;
+
     /// Get the F3 power table for a given instance
     /// See: Filecoin.F3GetPowerTableByInstance
     async fn f3_get_power_table(&self, instance_id: u64) -> Result<F3PowerTableResponse>;

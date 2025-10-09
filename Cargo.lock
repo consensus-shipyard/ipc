@@ -4024,6 +4024,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_vm_topdown_proof_service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.21.7",
+ "cid 0.10.1",
+ "fendermint_actor_f3_cert_manager",
+ "fendermint_vm_genesis",
+ "fvm_ipld_encoding",
+ "fvm_shared",
+ "humantime-serde",
+ "ipc-api",
+ "ipc-provider",
+ "multihash 0.18.1",
+ "parking_lot",
+ "serde",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "url",
+]
+
+[[package]]
 name = "ff"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5379,6 +5403,16 @@ name = "humantime"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "135b12329e5e3ce057a9f972339ea52bc954fe1e9358ef27f95e89716fbc5424"
+
+[[package]]
+name = "humantime-serde"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57a3db5ea5923d99402c94e9feb261dc5ee9b4efa158b0315f788cf549cc200c"
+dependencies = [
+ "humantime 2.3.0",
+ "serde",
+]
 
 [[package]]
 name = "hyper"
