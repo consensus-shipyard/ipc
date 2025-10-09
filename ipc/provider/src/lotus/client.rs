@@ -53,6 +53,7 @@ mod methods {
     pub const GET_TIPSET_BY_HEIGHT: &str = "Filecoin.ChainGetTipSetByHeight";
     pub const ESTIMATE_MESSAGE_GAS: &str = "Filecoin.GasEstimateMessageGas";
     pub const F3_GET_LATEST_CERTIFICATE: &str = "Filecoin.F3GetLatestCertificate";
+    pub const F3_GET_CERT: &str = "Filecoin.F3GetCert";
     pub const F3_GET_POWER_TABLE_BY_INSTANCE: &str = "Filecoin.F3GetPowerTableByInstance";
 }
 
@@ -359,6 +360,22 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
             .request::<Option<F3CertificateResponse>>(methods::F3_GET_LATEST_CERTIFICATE, NO_PARAMS)
             .await?;
         tracing::debug!("received f3_get_latest_certificate response: {r:?}");
+        Ok(r)
+    }
+
+    async fn f3_get_cert_by_instance(
+        &self,
+        instance_id: u64,
+    ) -> Result<Option<F3CertificateResponse>> {
+        // refer to: Filecoin.F3GetCert
+        let r = self
+            .client
+            .request::<Option<F3CertificateResponse>>(methods::F3_GET_CERT, json!([instance_id]))
+            .await?;
+        tracing::debug!(
+            "received f3_get_cert response for instance {}: {r:?}",
+            instance_id
+        );
         Ok(r)
     }
 
