@@ -82,6 +82,8 @@ library CometbftLightClient {
     function verifyValidatorsQuorum(LightHeader.Data memory header, ValidatorSignPayload[] memory signatures, CanonicalVote.Data memory voteTemplate) internal view {
         prepareParams(header, voteTemplate);
 
+        // make sure the vote template block hash matchees the header, so that 
+        // the validators are signing the same light client header hash.
         checkCommitHash(header, toBytes32(voteTemplate.block_id.hash));
 
         uint256 totalPower = LibPower.getTotalCurrentPower();
