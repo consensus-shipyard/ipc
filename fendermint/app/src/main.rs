@@ -75,9 +75,8 @@ mod tests {
         };
         let db = open_db();
 
-        let cids = load_car_unchecked(&db, bundle_car)
-            .await
-            .expect("error loading bundle CAR");
+        // In FVM 4.7, load_car_unchecked is synchronous
+        let cids = load_car_unchecked(&db, bundle_car).expect("error loading bundle CAR");
 
         let bundle_root = cids.first().expect("there should be 1 CID");
 

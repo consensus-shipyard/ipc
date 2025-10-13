@@ -41,6 +41,7 @@ cid = { workspace = true }
 env_logger = { workspace = true }
 fvm_ipld_hamt = { workspace = true }
 multihash = { workspace = true }
+multihash-codetable = { version = "0.1.4", features = ["sha2"] }
 quickcheck_macros = { workspace = true }
 
 ipc_ipld_resolver = { path = ".", features = ["arb"] }

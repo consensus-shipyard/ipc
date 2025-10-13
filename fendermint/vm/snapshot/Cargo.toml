@@ -25,7 +25,9 @@ tracing = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
+tokio-stream = { workspace = true }
 unsigned-varint = "0.7"
+multihash-codetable = { version = "0.1.4", features = ["sha2"] }
 
 arbitrary = { workspace = true, optional = true }
 quickcheck = { workspace = true, optional = true }

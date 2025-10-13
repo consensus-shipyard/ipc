@@ -213,12 +213,12 @@ impl ContractErrorParser {
 #[cfg(test)]
 mod tests {
     use crate::error_parser::{ContractErrorParser, ParseContractError};
-    use const_hex::hex;
+    use const_hex;
 
     #[test]
     fn test_parse_error_ok() {
         // selector for "BottomUpCheckpointAlreadySubmitted" error
-        let err_bytes = hex::decode("d6bb62dd").unwrap();
+        let err_bytes = const_hex::decode("d6bb62dd").unwrap();
 
         let result = ContractErrorParser::parse_from_bytes(err_bytes.as_ref()).unwrap();
         assert_eq!(result.name, "BottomUpCheckpointAlreadySubmitted");
@@ -248,9 +248,10 @@ mod tests {
     #[test]
     fn test_parse_panic() {
         // Panic with code 0x11 (arithmetic overflow)
-        let panic_bytes =
-            hex::decode("4e487b710000000000000000000000000000000000000000000000000000000000000011")
-                .unwrap();
+        let panic_bytes = const_hex::decode(
+            "4e487b710000000000000000000000000000000000000000000000000000000000000011",
+        )
+        .unwrap();
 
         let result = ContractErrorParser::parse_from_bytes(panic_bytes.as_ref()).unwrap();
         assert_eq!(result.name, "Panic");
@@ -267,13 +268,13 @@ mod tests {
 
     #[test]
     fn test_parse_error_not_found() {
-        // a random error selector
-        let err_bytes = hex::decode("a6bb62dd").unwrap();
+        // a random error selector that definitely doesn't exist
+        let err_bytes = const_hex::decode("ffffffff").unwrap();
 
         let result = ContractErrorParser::parse_from_bytes(err_bytes.as_ref());
         assert!(result.is_err());
         if let Err(ParseContractError::ErrorNotFound { selector }) = result {
-            assert_eq!(selector, "a6bb62dd");
+            assert_eq!(selector, "ffffffff");
         } else {
             panic!("Expected ErrorNotFound error");
         }

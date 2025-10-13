@@ -9,7 +9,7 @@ use futures::{future, StreamExt};
 use std::io::Cursor;
 use std::path::Path;
 
-use fvm_ipld_car::{CarHeader, CarReader, Block};
+use fvm_ipld_car::{CarHeader, CarReader};
 
 use self::{chunker::ChunkWriter, streamer::BlockStreamer};
 
@@ -37,8 +37,7 @@ where
 
     // In FVM 4.7, CarReader is synchronous
     let input_car = Cursor::new(input_car);
-    let reader: CarReader<_> = CarReader::new(input_car)
-        .context("failed to open CAR reader")?;
+    let reader: CarReader<_> = CarReader::new(input_car).context("failed to open CAR reader")?;
 
     // Create a Writer that opens new files when the maximum is reached.
     let mut writer = ChunkWriter::new(output_dir, max_size, file_name);
@@ -58,26 +57,34 @@ where
     // In FVM 4.7, need to manually write CAR format to the async writer
     use futures::io::AsyncWriteExt;
     use fvm_ipld_encoding::to_vec;
-    
+
     // Write header with length prefix
     let header_bytes = to_vec(&header).context("failed to encode header")?;
-    let mut header_frame = Vec::new();
-    header_frame.extend(unsigned_varint::encode::u64(header_bytes.len() as u64, &mut unsigned_varint::encode::u64_buffer()));
-    header_frame.extend(&header_bytes);
-    writer.write_all(&header_frame).await?;
+    let mut len_buf = unsigned_varint::encode::u64_buffer();
+    let len_encoded = unsigned_varint::encode::u64(header_bytes.len() as u64, &mut len_buf);
+
+    writer.write_all(len_encoded).await?;
+    writer.write_all(&header_bytes).await?;
+    // Flush after header to trigger file closing (ChunkWriter closes after first chunk)
+    writer.flush().await?;
 
     // Write all blocks with length prefix
     while let Some((cid, data)) = block_streamer.next().await {
         let cid_bytes = cid.to_bytes();
         let total_len = cid_bytes.len() + data.len();
-        
-        let mut block_frame = Vec::new();
-        block_frame.extend(unsigned_varint::encode::u64(total_len as u64, &mut unsigned_varint::encode::u64_buffer()));
-        block_frame.extend(&cid_bytes);
-        block_frame.extend(&data);
-        
-        writer.write_all(&block_frame).await?;
+
+        let mut len_buf = unsigned_varint::encode::u64_buffer();
+        let len_encoded = unsigned_varint::encode::u64(total_len as u64, &mut len_buf);
+
+        writer.write_all(len_encoded).await?;
+        writer.write_all(&cid_bytes).await?;
+        writer.write_all(&data).await?;
+        // Flush after each block to allow ChunkWriter to chunk properly
+        writer.flush().await?;
     }
+
+    // Final flush and close
+    writer.close().await?;
 
     Ok(writer.chunk_created())
 }

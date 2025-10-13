@@ -6,6 +6,7 @@ use std::{
 };
 
 use anyhow::Result;
+use cid::Cid as FvmCid;
 use fvm_ipld_blockstore::Blockstore;
 use ipc_ipld_resolver::missing_blocks::missing_blocks;
 use libipld::Cid;
@@ -17,16 +18,28 @@ pub struct TestBlockstore {
 }
 
 impl Blockstore for TestBlockstore {
-    fn has(&self, k: &Cid) -> Result<bool> {
-        Ok(self.blocks.read().unwrap().contains_key(k))
+    fn has(&self, k: &FvmCid) -> Result<bool> {
+        // Convert FvmCid (cid 0.11) to libipld::Cid (cid 0.10)
+        let cid_bytes = k.to_bytes();
+        let libipld_cid = Cid::try_from(cid_bytes.as_slice())?;
+        Ok(self.blocks.read().unwrap().contains_key(&libipld_cid))
     }
 
-    fn get(&self, k: &Cid) -> Result<Option<Vec<u8>>> {
-        Ok(self.blocks.read().unwrap().get(k).cloned())
+    fn get(&self, k: &FvmCid) -> Result<Option<Vec<u8>>> {
+        // Convert FvmCid (cid 0.11) to libipld::Cid (cid 0.10)
+        let cid_bytes = k.to_bytes();
+        let libipld_cid = Cid::try_from(cid_bytes.as_slice())?;
+        Ok(self.blocks.read().unwrap().get(&libipld_cid).cloned())
     }
 
-    fn put_keyed(&self, k: &Cid, block: &[u8]) -> Result<()> {
-        self.blocks.write().unwrap().insert(*k, block.into());
+    fn put_keyed(&self, k: &FvmCid, block: &[u8]) -> Result<()> {
+        // Convert FvmCid (cid 0.11) to libipld::Cid (cid 0.10)
+        let cid_bytes = k.to_bytes();
+        let libipld_cid = Cid::try_from(cid_bytes.as_slice())?;
+        self.blocks
+            .write()
+            .unwrap()
+            .insert(libipld_cid, block.into());
         Ok(())
     }
 }
@@ -37,15 +50,22 @@ impl BitswapStore for TestBlockstore {
     type Params = TestStoreParams;
 
     fn contains(&mut self, cid: &Cid) -> Result<bool> {
-        Blockstore::has(self, cid)
+        // BitswapStore uses libipld::Cid directly, check HashMap directly to avoid double conversion
+        Ok(self.blocks.read().unwrap().contains_key(cid))
     }
 
     fn get(&mut self, cid: &Cid) -> Result<Option<Vec<u8>>> {
-        Blockstore::get(self, cid)
+        // BitswapStore uses libipld::Cid directly, check HashMap directly
+        Ok(self.blocks.read().unwrap().get(cid).cloned())
     }
 
     fn insert(&mut self, block: &libipld::Block<Self::Params>) -> Result<()> {
-        Blockstore::put_keyed(self, block.cid(), block.data())
+        // BitswapStore uses libipld::Cid directly, insert into HashMap directly
+        self.blocks
+            .write()
+            .unwrap()
+            .insert(*block.cid(), block.data().to_vec());
+        Ok(())
     }
 
     fn missing_blocks(&mut self, cid: &Cid) -> Result<Vec<Cid>> {
