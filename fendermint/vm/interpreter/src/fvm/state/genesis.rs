@@ -5,7 +5,8 @@ use std::sync::Arc;
 
 use actors_custom_car::Manifest as CustomActorManifest;
 use anyhow::{anyhow, bail, Context};
-use cid::{multihash::Code, Cid};
+use cid::Cid;
+use multihash_codetable::Code;
 use ethers::{abi::Tokenize, core::abi::Abi};
 use fendermint_vm_actor_interface::{
     account::{self, ACCOUNT_ACTOR_CODE_ID},
@@ -33,8 +34,11 @@ use fvm_shared::{
     message::Message,
     state::StateTreeVersion,
     version::NetworkVersion,
-    ActorID, BLOCK_GAS_LIMIT, METHOD_CONSTRUCTOR,
+    ActorID, METHOD_CONSTRUCTOR,
 };
+
+// BLOCK_GAS_LIMIT was removed in FVM 4.7, define locally for IPC
+const BLOCK_GAS_LIMIT: u64 = 10_000_000_000;
 use num_traits::Zero;
 use serde::{de, Serialize};
 
@@ -68,7 +72,8 @@ where
 }
 
 async fn parse_bundle<DB: Blockstore>(store: &DB, bundle: &[u8]) -> anyhow::Result<(u32, Cid)> {
-    let bundle_roots = load_car_unchecked(&store, bundle).await?;
+    // In FVM 4.7, load_car_unchecked is no longer async
+    let bundle_roots = load_car_unchecked(&store, bundle)?;
     let bundle_root = match bundle_roots.as_slice() {
         [root] => root,
         roots => {

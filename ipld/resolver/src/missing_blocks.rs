@@ -6,6 +6,7 @@
 use fvm_ipld_blockstore::Blockstore;
 use libipld::Cid;
 use libipld::{prelude::*, store::StoreParams, Ipld};
+use cid::Cid as FvmCid;
 
 /// Recursively find all [`Cid`] fields in the [`Block`] structures stored in the
 /// [`Blockstore`] and return all CIDs which could *not* be retrieved from the store.
@@ -22,7 +23,11 @@ where
     let mut stack = vec![*cid];
     let mut missing = vec![];
     while let Some(cid) = stack.pop() {
-        if let Some(data) = bs.get(&cid)? {
+        // Convert libipld::Cid (cid 0.10) to fvm Cid (cid 0.11) for blockstore
+        let cid_bytes = cid.to_bytes();
+        let fvm_cid = FvmCid::try_from(cid_bytes.as_slice())?;
+        
+        if let Some(data) = bs.get(&fvm_cid)? {
             let block = libipld::Block::<P>::new_unchecked(cid, data);
             block.references(&mut stack)?;
         } else {

@@ -1,4 +1,5 @@
-use cid::Cid;
+use cid::Cid as FvmCid;
+use libipld::Cid;
 use ipc_ipld_resolver::missing_blocks::missing_blocks;
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
@@ -99,15 +100,24 @@ impl BitswapStore for BitswapBlockstore {
     type Params = libipld::DefaultParams;
 
     fn contains(&mut self, cid: &Cid) -> anyhow::Result<bool> {
-        Blockstore::has(self, cid)
+        // Convert libipld::Cid (cid 0.10) to FvmCid (cid 0.11)
+        let cid_bytes = cid.to_bytes();
+        let fvm_cid = FvmCid::try_from(cid_bytes.as_slice())?;
+        Blockstore::has(self, &fvm_cid)
     }
 
     fn get(&mut self, cid: &Cid) -> anyhow::Result<Option<Vec<u8>>> {
-        Blockstore::get(self, cid)
+        // Convert libipld::Cid (cid 0.10) to FvmCid (cid 0.11)
+        let cid_bytes = cid.to_bytes();
+        let fvm_cid = FvmCid::try_from(cid_bytes.as_slice())?;
+        Blockstore::get(self, &fvm_cid)
     }
 
     fn insert(&mut self, block: &libipld::Block<Self::Params>) -> anyhow::Result<()> {
-        Blockstore::put_keyed(self, block.cid(), block.data())
+        // Convert libipld::Cid (cid 0.10) to FvmCid (cid 0.11)
+        let cid_bytes = block.cid().to_bytes();
+        let fvm_cid = FvmCid::try_from(cid_bytes.as_slice())?;
+        Blockstore::put_keyed(self, &fvm_cid, block.data())
     }
 
     fn missing_blocks(&mut self, cid: &Cid) -> anyhow::Result<Vec<Cid>> {

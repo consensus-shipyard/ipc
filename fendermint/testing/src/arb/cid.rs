@@ -7,10 +7,8 @@
 //!
 //! TODO: Remove this module when the `cid` dependency is updated.
 //! NOTE: A simpler alternative is https://github.com/ChainSafe/forest/blob/v0.6.0/blockchain/blocks/src/lib.rs
-use cid::{
-    multihash::{Code, MultihashDigest, MultihashGeneric},
-    CidGeneric, Version,
-};
+use cid::{multihash::MultihashGeneric, CidGeneric, Version};
+use multihash_codetable::{Code, MultihashDigest};
 use rand::{distributions::WeightedIndex, prelude::Distribution, Rng, RngCore, SeedableRng};
 
 use quickcheck::{Arbitrary, Gen};

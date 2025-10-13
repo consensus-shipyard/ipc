@@ -24,6 +24,9 @@ use fvm_ipld_encoding::{from_slice, CborStore, RawBytes};
 use fvm_shared::{address::Address, chainid::ChainID, clock::ChainEpoch, ActorID};
 use num_traits::Zero;
 
+// BLOCK_GAS_LIMIT was removed in FVM 4.7, define locally for IPC
+const BLOCK_GAS_LIMIT: u64 = 10_000_000_000;
+
 /// The state over which we run queries. These can interrogate the IPLD block store or the state tree.
 pub struct FvmQueryState<DB>
 where
@@ -188,7 +191,7 @@ where
             // gas limit not set error. It is possible, in the future, to estimate the gas limit
             // based on the account balance and base fee + premium for higher accuracy.
             if msg.gas_limit == 0 {
-                msg.gas_limit = fvm_shared::BLOCK_GAS_LIMIT;
+                msg.gas_limit = BLOCK_GAS_LIMIT;
             }
 
             let to = msg.to;

@@ -1,10 +1,8 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use anyhow::anyhow;
-use cid::{
-    multihash::{Code, MultihashDigest},
-    Cid,
-};
+use cid::Cid;
+use multihash_codetable::{Code, MultihashDigest};
 use fendermint_vm_actor_interface::chainmetadata::CHAINMETADATA_ACTOR_ID;
 use fvm::{
     externs::{Chain, Consensus, Externs, Rand},

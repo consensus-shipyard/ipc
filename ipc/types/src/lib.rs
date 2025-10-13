@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use std::{fmt::Display, marker::PhantomData};
 
-use cid::{multihash::Code, Cid};
+use cid::Cid;
+use multihash_codetable::{Code, MultihashDigest};
 
 pub use self::actor_error::*;
 
@@ -203,6 +204,7 @@ macro_rules! tcid_ops {
 
 pub mod codes {
     use super::CodeType;
+    use multihash_codetable::Code;
 
     /// Define a unit struct for a `Code` element that
     /// can be used as a generic parameter.
@@ -213,8 +215,8 @@ pub mod codes {
             pub struct $typ;
 
             impl CodeType for $typ {
-                fn code() -> cid::multihash::Code {
-                    cid::multihash::Code::$code
+                fn code() -> Code {
+                    Code::$code
                 }
             }
             )*

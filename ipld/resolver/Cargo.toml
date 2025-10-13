@@ -35,9 +35,9 @@ fvm_ipld_blockstore = { workspace = true, optional = true }
 ipc-api = { path = "../../ipc/api", default-features = false }
 ipc-observability = { path = "../../ipc/observability" }
 gcra = { workspace = true }
+cid = { workspace = true }
 
 [dev-dependencies]
-cid = { workspace = true }
 env_logger = { workspace = true }
 fvm_ipld_hamt = { workspace = true }
 multihash = { workspace = true }

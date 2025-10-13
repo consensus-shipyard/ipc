@@ -43,7 +43,7 @@ pub fn extend_errors(
     for (_, v) in contract_errors.iter() {
         for e in v {
             // solidity selector is only the first 4 bytes of the signature
-            let selector = const_hex::hex::encode(&e.signature().0[0..SOLIDITY_SELECTOR_BYTE_SIZE]);
+            let selector = const_hex::encode(&e.signature().0[0..SOLIDITY_SELECTOR_BYTE_SIZE]);
             map.insert(selector, e.clone());
         }
     }
@@ -83,7 +83,7 @@ impl ContractErrorParser {
             return Err(ParseContractError::ErrorBytesTooShort);
         }
 
-        let selector = const_hex::hex::encode(&bytes[0..4]);
+        let selector = const_hex::encode(&bytes[0..4]);
 
         // Check for standard Solidity errors first
         match selector.as_str() {
@@ -194,7 +194,7 @@ impl ContractErrorParser {
     }
 
     pub fn parse_from_hex_str(err: &str) -> Result<ParsedError, ParseContractError> {
-        let bytes = const_hex::hex::decode(err)
+        let bytes = const_hex::decode(err)
             .map_err(|e| ParseContractError::ErrorNotHexStr(e.to_string()))?;
         Self::parse_from_bytes(bytes.as_slice())
     }

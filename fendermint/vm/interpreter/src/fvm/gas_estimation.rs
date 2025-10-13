@@ -11,8 +11,11 @@ use fendermint_vm_message::query::GasEstimate;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{self, RawBytes};
 use fvm_shared::{
-    bigint::BigInt, econ::TokenAmount, error::ExitCode, message::Message, BLOCK_GAS_LIMIT,
+    bigint::BigInt, econ::TokenAmount, error::ExitCode, message::Message,
 };
+
+// BLOCK_GAS_LIMIT was removed in FVM 4.7, define locally for IPC
+const BLOCK_GAS_LIMIT: u64 = 10_000_000_000;
 use ipc_observability::emit;
 use num_traits::Zero;
 use std::time::Instant;

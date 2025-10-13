@@ -28,6 +28,9 @@ use fvm_shared::bigint::BigInt;
 use fvm_shared::crypto::signature::Signature;
 use fvm_shared::{chainid::ChainID, error::ExitCode};
 use jsonrpc_v2::Params;
+
+// BLOCK_GAS_LIMIT was removed in FVM 4.7, define locally for IPC
+const BLOCK_GAS_LIMIT: u64 = 10_000_000_000;
 use rand::Rng;
 use tendermint::block::Height;
 use tendermint_rpc::endpoint::{self, status};
@@ -106,7 +109,7 @@ where
     let mut block_gas_limit = consensus_params.consensus_params.block.max_gas;
     if block_gas_limit <= 0 {
         block_gas_limit =
-            i64::try_from(fvm_shared::BLOCK_GAS_LIMIT).expect("FVM block gas limit not i64")
+            i64::try_from(BLOCK_GAS_LIMIT).expect("FVM block gas limit not i64")
     };
 
     let mut premiums = Vec::new();
@@ -237,7 +240,7 @@ where
         let mut block_gas_limit = consensus_params.consensus_params.block.max_gas;
         if block_gas_limit <= 0 {
             block_gas_limit =
-                i64::try_from(fvm_shared::BLOCK_GAS_LIMIT).expect("FVM block gas limit not i64")
+                i64::try_from(BLOCK_GAS_LIMIT).expect("FVM block gas limit not i64")
         };
 
         // The latest block might not have results yet.
@@ -786,10 +789,12 @@ where
     C: Client + Sync + Send,
 {
     let encode = |data: Option<uints::U256>| {
-        let mut bz = [0u8; 32];
-        if let Some(data) = data {
-            data.to_big_endian(&mut bz);
-        }
+        let bz = if let Some(data) = data {
+            // In FVM 4.7, to_big_endian() returns the array instead of taking a mutable reference
+            data.to_big_endian()
+        } else {
+            [0u8; 32]
+        };
         // The client library expects hex encoded string. The JS client might want a prefix too.
         Ok(format!("0x{}", hex::encode(bz)))
     };

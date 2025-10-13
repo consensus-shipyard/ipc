@@ -53,6 +53,7 @@ prometheus = { workspace = true }
 strum = { workspace = true }
 
 cid = { workspace = true }
+multihash-codetable = { version = "0.1.4", features = ["blake2b"] }
 fvm = { workspace = true }
 fvm_shared = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use std::collections::{BTreeSet, HashMap};
-use std::io::{Read, Write};
+use std::io::{Cursor, Read, Write};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
@@ -24,7 +24,6 @@ use fendermint_vm_actor_interface::{
 };
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{ActorMeta, Collateral, Genesis, Power, PowerScale, Validator};
-use futures_util::io::Cursor;
 use fvm::engine::MultiEngine;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_car::{load_car, CarHeader};
@@ -132,7 +131,8 @@ pub async fn read_genesis_car<DB: Blockstore + 'static + Send + Sync>(
     bytes: Vec<u8>,
     store: &DB,
 ) -> anyhow::Result<(Vec<Validator<Power>>, FvmStateParams)> {
-    let roots = load_car(store, Cursor::new(&bytes)).await?;
+    // In FVM 4.7, load_car is synchronous
+    let roots = load_car(store, Cursor::new(&bytes))?;
 
     let metadata_cid = roots
         .first()
@@ -214,12 +214,27 @@ impl<'a> GenesisBuilder<'a> {
         // create the target car header with the metadata cid as the only root
         let car = CarHeader::new(vec![metadata_cid], 1);
 
-        // create the stream to stream all the data into the car file
+        // In FVM 4.7, CAR API is synchronous, collect stream first
         let mut streamer = tokio_stream::iter(vec![(metadata_cid, metadata_bytes)]).merge(streamer);
 
-        let mut write = file.compat_write();
-        car.write_stream_async(&mut Pin::new(&mut write), &mut streamer)
-            .await?;
+        use tokio_stream::StreamExt;
+        let mut blocks = Vec::new();
+        while let Some((cid, data)) = streamer.next().await {
+            blocks.push((cid, data));
+        }
+
+        // Write synchronously in a blocking task
+        let out_path_clone = out_path.clone();
+        tokio::task::spawn_blocking(move || {
+            use fvm_ipld_car::{Block, CarWriter};
+            let file_std = std::fs::File::create(out_path_clone)?;
+            let mut writer = CarWriter::new(car, file_std)?;
+            for (cid, data) in blocks {
+                writer.write(Block { cid, data })?;
+            }
+            Ok::<_, anyhow::Error>(())
+        })
+        .await??;
 
         tracing::info!("written sealed genesis state to file");
 

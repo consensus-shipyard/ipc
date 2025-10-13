@@ -8,7 +8,10 @@ use ethers::types as et;
 use fendermint_rpc::response::decode_fevm_return_data;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::error::ExitCode;
-use fvm_shared::{address::Address, chainid::ChainID, econ::TokenAmount, BLOCK_GAS_LIMIT};
+use fvm_shared::{address::Address, chainid::ChainID, econ::TokenAmount};
+
+// BLOCK_GAS_LIMIT was removed in FVM 4.7, define locally for IPC
+const BLOCK_GAS_LIMIT: u64 = 10_000_000_000;
 use num_traits::Zero;
 use tendermint_rpc::Client;
 

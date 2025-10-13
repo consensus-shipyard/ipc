@@ -2,7 +2,7 @@ use ethers::providers::{Http, Provider};
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use crate::materials::IpcContractsOwner;
-use multihash::MultihashDigest;
+use multihash_codetable::{Code, MultihashDigest};
 use serde::{Deserialize, Serialize};
 use std::fmt::Formatter;
 use std::{
@@ -350,7 +350,7 @@ pub struct ResourceHash([u8; 32]);
 impl ResourceHash {
     /// Digest some general unique but unwieldy label for a more compact form.
     pub fn digest<T: AsRef<[u8]>>(value: T) -> Self {
-        let d = multihash::Code::Blake2b256.digest(value.as_ref());
+        let d = Code::Blake2b256.digest(value.as_ref());
         let mut bz = [0u8; 32];
         bz.copy_from_slice(d.digest());
         Self(bz)

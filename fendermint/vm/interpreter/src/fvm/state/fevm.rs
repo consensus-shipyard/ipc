@@ -18,6 +18,9 @@ use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{BytesDe, BytesSer, RawBytes};
 use fvm_shared::{address::Address, econ::TokenAmount, error::ExitCode, message::Message};
 
+// BLOCK_GAS_LIMIT was removed in FVM 4.7, define locally for IPC
+const BLOCK_GAS_LIMIT: u64 = 10_000_000_000;
+
 use super::FvmExecState;
 
 pub type MockProvider = ep::Provider<ep::MockProvider>;
@@ -267,7 +270,7 @@ where
             value,
             method_num: evm::Method::InvokeContract as u64,
             params: calldata,
-            gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
+            gas_limit: BLOCK_GAS_LIMIT,
             gas_fee_cap: TokenAmount::from_atto(0),
             gas_premium: TokenAmount::from_atto(0),
         };
@@ -305,7 +308,7 @@ where
                 from,
                 to: self.addr,
                 method_num: evm::Method::InvokeContract as u64,
-                gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
+                gas_limit: BLOCK_GAS_LIMIT,
                 emitters,
             };
             Ok(Ok(ContractCallerReturn { call, ret }))

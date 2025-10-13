@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::Context;
-use cid::multihash::MultihashDigest;
+use multihash_codetable::{Code, MultihashDigest};
 use jsonrpc_v2::Params;
 use tendermint::abci;
 use tendermint_rpc::Client;
@@ -37,7 +37,7 @@ where
 {
     let input = input.strip_prefix("0x").unwrap_or(&input);
     let input = hex::decode(input).context("failed to decode input as hex")?;
-    let output = cid::multihash::Code::Keccak256.digest(&input);
+    let output = Code::Keccak256.digest(&input);
     let output = hex::encode(output.digest());
     Ok(output)
 }
