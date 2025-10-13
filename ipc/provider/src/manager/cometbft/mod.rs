@@ -3,4 +3,4 @@
 
 mod types;
 
-pub use crate::manager::cometbft::types::SignedHeader;
+pub use crate::manager::cometbft::types::*;

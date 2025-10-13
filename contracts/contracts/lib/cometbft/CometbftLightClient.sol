@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
-import {CanonicalVote, CanonicalBlockID, Timestamp, Consensus, BlockID, CanonicalPartSetHeader, Vote, CommitSig, Commit, LightHeader, SignedHeader, TENDERMINTLIGHT_PROTO_GLOBAL_ENUMS} from "tendermint-sol/proto/TendermintLight.sol";
+import {CanonicalVote, Timestamp, Consensus, BlockID, Vote, LightHeader} from "tendermint-sol/proto/TendermintLight.sol";
 import {Encoder} from "tendermint-sol/proto/Encoder.sol";
 import {MerkleTree} from "tendermint-sol/utils/crypto/MerkleTree.sol";
 
@@ -27,23 +27,42 @@ struct AppHashBreakdown {
     CompressedActivityRollup activityCommitment;
 }
 
+struct ValidatorSignPayload {
+    Timestamp.Data timestamp;
+    bytes signature;
+}
+
 library CometbftLightClient {
-    using TendermintHelper for SignedHeader.Data;
     using TendermintHelper for Vote.Data;
 
     error InvalidLength(string what, uint256 expected, uint256 actual);
-    error NotSameChain();
+    error NotSameHeight();
     error NoQuorumFormed();
     error NoValidatorInQuoum();
     error CometbftSignerNotValidator(bytes20 expected, bytes20 incoming);
     error InvalidCommitHash(bytes32 expected, bytes32 actual);
     error InvalidSignature(bytes32 message, bytes signature, address validator, ECDSA.RecoverError err);
     error NotSigner(bytes32 message, bytes signature, address recovered, address expected);
+    error ValidatorsHashCannotBeEmpty();
+
+    // Some preparation for the parameters, ensures the chaid ids are expected and heights are the same
+    function prepareParams(LightHeader.Data memory header, CanonicalVote.Data memory voteTemplate) internal view {
+        string memory _chainID = LibSubnetActorStorage.appStorage().chainID;
+
+        header.chain_id = _chainID;
+        voteTemplate.chain_id = _chainID;
+
+        if (header.height != voteTemplate.height) revert NotSameHeight();
+    }
 
     /// @notice Validates the quorum certificate of CometBFT pre-commit votes
     /// @dev Verifies that signatures meet BFT consensus requirements (>2/3 voting power)
     ///
-    /// @param header The signed header containing the block header and commit with signatures
+    /// @param header The light client header containing the block header
+    /// @param voteTemplate The canonical vote tempalted filled except for the timestamp and chain id. The chain id will be 
+    /// assigned in the contract while timestamp is take from the signatures. The rest of the fields in voteTemplate should be 
+    /// the same for all validators.
+    /// @param signatures The validator signatures with their signature timestamp
     ///
     /// CRITICAL: Validator signatures in the commit MUST be ordered exactly as validators
     /// are arranged in LibPower's active validator set. The signature at index i must
@@ -60,31 +79,23 @@ library CometbftLightClient {
     ///    - Verifies ECDSA signature validity
     ///    - Accumulates voting power of valid signatures
     /// 4. Ensures accumulated power >= 2/3 of total power
-    function verifyValidatorsQuorum(SignedHeader.Data memory header) internal view {
-        checkCommitHash(header);
+    function verifyValidatorsQuorum(LightHeader.Data memory header, ValidatorSignPayload[] memory signatures, CanonicalVote.Data memory voteTemplate) internal view {
+        prepareParams(header, voteTemplate);
+
+        checkCommitHash(header, toBytes32(voteTemplate.block_id.hash));
 
         uint256 totalPower = LibPower.getTotalCurrentPower();
-        if (totalPower == 0) {
-            revert NoValidatorInQuoum();
-        }
+        if (totalPower == 0) revert NoValidatorInQuoum();
 
         uint256 powerSoFar = 0;
 
-        CommitSig.Data memory commitSig;
-        
-        for (uint256 i = 0; i < header.commit.signatures.length; i++) {
-            commitSig = header.commit.signatures[i];
-            // no need to verify absent or nil votes. Sanity check.
-            if (commitSig.block_id_flag != TENDERMINTLIGHT_PROTO_GLOBAL_ENUMS.BlockIDFlag.BLOCK_ID_FLAG_COMMIT) {
-                continue;
-            }
-
+        for (uint256 i = 0; i < signatures.length; i++) {
             (uint256 power, address validator) = getValidatorInfo(i);
 
-            bytes memory message = generateSignedPayload(header.commit, LibSubnetActorStorage.appStorage().chainID, i);
-            bytes32 messageHash = sha256(message);
+            voteTemplate.timestamp = signatures[i].timestamp;
 
-            ensureValidSignature(messageHash, commitSig.signature, validator);
+            bytes32 messageHash = sha256(generateSignedPayload(voteTemplate));
+            ensureValidSignature(messageHash, signatures[i].signature, validator);
 
             powerSoFar += power;
         }
@@ -104,9 +115,8 @@ library CometbftLightClient {
     /// - Prevents commits from being used with wrong blocks
     /// - The block_id.hash in the commit equals the computed header hash
     /// - This also makes sure the AppHash is not fabricated
-    function checkCommitHash(SignedHeader.Data memory header) internal pure {
-        bytes32 expected = header.hash();
-        bytes32 actual = toBytes32(header.commit.block_id.hash);
+    function checkCommitHash(LightHeader.Data memory header, bytes32 actual) internal pure {
+        bytes32 expected = hashLightHeader(header);
         if (actual != expected) revert InvalidCommitHash(expected, actual);
     }
 
@@ -141,22 +151,10 @@ library CometbftLightClient {
         power = LibPower.getCurrentPower(validator);
     }
 
-    /// Generate the signed message payload to be validated onchain.
-    /// If data conversion is done offchain, extra calldata has to be attached and extra decoding into memory as well. This makes the overall implementation easier. 
+    /// Converts the CanonicalVote.Data into protobuf encoded data required by conmetbft signature verification.
     function generateSignedPayload(
-        Commit.Data memory commit,
-        string memory _chainID,
-        uint256 idx
+        CanonicalVote.Data memory vote
     ) internal pure returns (bytes memory) {
-        CanonicalVote.Data memory vote = CanonicalVote.Data({
-            Type: TENDERMINTLIGHT_PROTO_GLOBAL_ENUMS.SignedMsgType.SIGNED_MSG_TYPE_PRECOMMIT,
-            height: commit.height,
-            round: int64(commit.round),
-            block_id: TendermintHelper.toCanonicalBlockID(commit.block_id),
-            timestamp: commit.signatures[idx].timestamp,
-            chain_id: _chainID
-        });
-
         return Encoder.encodeDelim(CanonicalVote.encode(vote));
     }
 
@@ -200,4 +198,32 @@ library CometbftLightClient {
             return (address(0), ECDSA.RecoverError.InvalidSignatureLength);
         }
     }
+
+    function hashLightHeader(LightHeader.Data memory h) internal pure returns (bytes32) {
+        if(h.validators_hash.length == 0) revert ValidatorsHashCannotBeEmpty();
+
+        bytes memory hbz = Consensus.encode(h.version);
+        bytes memory pbt = Timestamp.encode(h.time);
+        bytes memory bzbi = BlockID.encode(h.last_block_id);
+
+        bytes[14] memory all = [
+            hbz,
+            Encoder.cdcEncode(h.chain_id),
+            Encoder.cdcEncode(h.height),
+            pbt,
+            bzbi,
+            Encoder.cdcEncode(h.last_commit_hash),
+            Encoder.cdcEncode(h.data_hash),
+            Encoder.cdcEncode(h.validators_hash),
+            Encoder.cdcEncode(h.next_validators_hash),
+            Encoder.cdcEncode(h.consensus_hash),
+            Encoder.cdcEncode(h.app_hash),
+            Encoder.cdcEncode(h.last_results_hash),
+            Encoder.cdcEncode(h.evidence_hash),
+            Encoder.cdcEncode(h.proposer_address)
+        ];
+
+        return MerkleTree.merkleRootHash(all, 0, all.length);
+    }
+
 }

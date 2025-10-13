@@ -51,9 +51,10 @@ import {MerkleTreeHelper} from "../helpers/MerkleTreeHelper.sol";
 import {ActivityHelper} from "../helpers/ActivityHelper.sol";
 import {BottomUpBatchHelper} from "../helpers/BottomUpBatchHelper.sol";
 
-import {Timestamp, SignedHeader, BlockID, Commit, PartSetHeader, CommitSig, LightHeader, Consensus as ConsensusData, TENDERMINTLIGHT_PROTO_GLOBAL_ENUMS} from "tendermint-sol/proto/TendermintLight.sol";
+import {Timestamp, CanonicalBlockID, CanonicalPartSetHeader, SignedHeader, CanonicalVote, BlockID, Commit, PartSetHeader, CommitSig, LightHeader, Consensus as ConsensusData, TENDERMINTLIGHT_PROTO_GLOBAL_ENUMS} from "tendermint-sol/proto/TendermintLight.sol";
 
 import {BottomUpCheckpoint} from "./util.sol";
+import {ValidatorSignPayload} from "../../contracts/lib/cometbft/CometbftLightClient.sol";
 
 contract SubnetActorDiamondTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
@@ -698,9 +699,22 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
             })
         });
 
-        header.commit.signatures[0] = CommitSig.Data({
-            block_id_flag: TENDERMINTLIGHT_PROTO_GLOBAL_ENUMS.BlockIDFlag.BLOCK_ID_FLAG_COMMIT,
-            validator_address: hex"905b1c0098887ea9033946de1eab5427c97a82ad",
+        LightHeader.Data memory lightHeader = header.header;
+        CanonicalVote.Data memory voteTemplate;
+
+        voteTemplate.Type = TENDERMINTLIGHT_PROTO_GLOBAL_ENUMS.SignedMsgType.SIGNED_MSG_TYPE_PRECOMMIT;
+        voteTemplate.height = header.commit.height;
+        voteTemplate.round = int64(header.commit.round);
+        voteTemplate.block_id = CanonicalBlockID.Data({
+            hash: header.commit.block_id.hash,
+            part_set_header: CanonicalPartSetHeader.Data({
+                total: header.commit.block_id.part_set_header.total,
+                hash: header.commit.block_id.part_set_header.hash
+            })
+        });
+        ValidatorSignPayload[] memory signatures = new ValidatorSignPayload[](1);
+
+        signatures[0] = ValidatorSignPayload({
             timestamp: Timestamp.Data({Seconds: 1754924476, nanos: 811159237}),
             signature: hex"284f7f673bf73a515a8829dd29edc8671094e62d94db5cfa869bb62b4e8b6eff51c44f2662fb6fef1e37239d9a7d14707971feeddd1e9ba87c2ca5bafc1b6d9e"
         });
@@ -712,7 +726,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         vm.deal(validator, 11 ether);
         vm.prank(validator);
         saDiamond.manager().join{value: 10 ether}(pubkey, 10 ether);
-        saDiamond.checkpointer().submitBottomUpCheckpoint(abi.encode(header));
+        saDiamond.checkpointer().submitBottomUpCheckpoint(abi.encode(lightHeader, signatures, voteTemplate));
     }
 
     function testSubnetActorDiamond_DiamondCut() public {

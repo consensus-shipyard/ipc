@@ -43,7 +43,7 @@ use ethers::signers::{LocalWallet, Wallet};
 use ethers::types::{Bytes, Eip1559TransactionRequest, ValueOrArray, H256, U256};
 
 use super::gas_estimator_middleware::Eip1559GasEstimatorMiddleware;
-use crate::manager::cometbft::SignedHeader;
+use crate::manager::cometbft::{CanonicalVoteData, SignedHeader, Timestamp, ValidatorSignPayload};
 use crate::manager::evm::error_parsing::ErrorParserHttp;
 use ethers::middleware::Middleware;
 use fvm_shared::clock::ChainEpoch;
@@ -1233,8 +1233,7 @@ impl SignedHeaderRelayer for EthSubnetManager {
         subnet_id: &SubnetID,
         header: SignedHeader,
     ) -> Result<ChainEpoch> {
-        let tokens = vec![header.into_token()];
-        let bytes = ethers::abi::encode(&tokens);
+        let bytes = convert_signed_header(header);
 
         let address = contract_address_from_subnet(subnet_id)?;
 
@@ -1774,6 +1773,44 @@ impl TryFrom<gateway_getter_facet::Subnet> for SubnetInfo {
             genesis_epoch: value.genesis_epoch.as_u64() as ChainEpoch,
         })
     }
+}
+
+const SIGNED_MSG_TYPE_PRECOMMIT: u8 = 2;
+
+fn convert_signed_header(signed_header: SignedHeader) -> ethers::abi::Bytes {
+    let light_header = signed_header.header;
+
+    let vote_template = CanonicalVoteData {
+        vote_type: SIGNED_MSG_TYPE_PRECOMMIT,
+        height: signed_header.commit.height,
+        round: signed_header.commit.round as i64,
+        block_id: signed_header.commit.block_id,
+        // leave it blank, it should be populated on chain
+        timestamp: Timestamp {
+            seconds: 0,
+            nanos: 0,
+        },
+        // leave it blank, it should be populated on chain
+        chain_id: "".to_string(),
+    };
+
+    let signatures = signed_header
+        .commit
+        .signatures
+        .into_iter()
+        .map(|v| ValidatorSignPayload {
+            timestamp: v.timestamp,
+            signature: v.signature,
+        })
+        .collect::<Vec<ValidatorSignPayload>>();
+
+    let tokens = vec![
+        light_header.clone().into_token(),
+        signatures.to_vec().into_token(),
+        vote_template.clone().into_token(),
+    ];
+
+    ethers::abi::encode(&tokens)
 }
 
 #[cfg(test)]

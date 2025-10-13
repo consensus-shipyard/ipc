@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 
-import {SignedHeader} from "tendermint-sol/proto/TendermintLight.sol";
+import {LightHeader, CanonicalVote} from "tendermint-sol/proto/TendermintLight.sol";
 
 import {BottomUpCheckpointAlreadySubmitted, InvalidCheckpointEpoch} from "../errors/IPCErrors.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
@@ -20,7 +20,7 @@ import {LibBottomUpBatch} from "../lib/LibBottomUpBatch.sol";
 import {BottomUpBatch} from "../structs/BottomUpBatch.sol";
 import {IpcEnvelope} from "../structs/CrossNet.sol";
 import {CompressedActivityRollup} from "../structs/Activity.sol";
-import {CometbftLightClient, AppHashBreakdown} from "../lib/cometbft/CometbftLightClient.sol";
+import {CometbftLightClient, ValidatorSignPayload, AppHashBreakdown} from "../lib/cometbft/CometbftLightClient.sol";
 
 /// @title Subnet Actor Checkpointing Facet
 /// @notice Handles bottom-up checkpoint submission and verification for IPC subnets
@@ -47,16 +47,20 @@ contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, ReentrancyG
     function submitBottomUpCheckpoint(bytes calldata rawData) external whenNotPaused {
         SubnetActorCheckpointingStorage storage checkpointStorage = LibCheckpointingStorage.getStorage();
 
-        SignedHeader.Data memory header = abi.decode(rawData, (SignedHeader.Data));
+        (
+            LightHeader.Data memory header,
+            ValidatorSignPayload[] memory signatures,
+            CanonicalVote.Data memory voteTemplate
+        ) = abi.decode(rawData, (LightHeader.Data, ValidatorSignPayload[], CanonicalVote.Data));
 
-        uint64 height = uint64(header.commit.height);
+        uint64 height = uint64(header.height);
         // Enforcing a sequential submission
         ensureValidHeight(height, checkpointStorage.lastSubmissionHeight);
 
         /// Performs protobuf encoding against the header, can be gas intensive
-        CometbftLightClient.verifyValidatorsQuorum(header);
+        CometbftLightClient.verifyValidatorsQuorum(header, signatures, voteTemplate);
 
-        checkpointStorage.appHash[height] = header.header.app_hash;
+        checkpointStorage.appHash[height] = header.app_hash;
         checkpointStorage.lastSubmissionHeight = height;
     }
 

@@ -11,6 +11,24 @@ use tendermint::block::signed_header::SignedHeader as TendermintSignedHeader;
 use tendermint::time::Time as TendermintTime;
 use tendermint::PublicKey;
 
+// Main Data struct (appears to be CanonicalVote.Data based on fields)
+#[derive(Debug, Clone, EthAbiType, EthAbiCodec)]
+pub struct CanonicalVoteData {
+    pub vote_type: u8,
+    pub height: i64,
+    pub round: i64,
+    pub block_id: BlockId,
+    pub timestamp: Timestamp,
+    pub chain_id: String,
+}
+
+// ValidatorSignPayload struct matching Solidity
+#[derive(Debug, Clone, EthAbiType, EthAbiCodec)]
+pub struct ValidatorSignPayload {
+    pub timestamp: Timestamp, // Nested struct
+    pub signature: Bytes,     // bytes in Solidity (dynamic)
+}
+
 #[derive(Debug, Clone, EthAbiType, EthAbiCodec)]
 pub struct SignedHeader {
     pub header: LightHeader,
