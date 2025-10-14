@@ -108,8 +108,7 @@ where
         .context("failed to get consensus params")?;
     let mut block_gas_limit = consensus_params.consensus_params.block.max_gas;
     if block_gas_limit <= 0 {
-        block_gas_limit =
-            i64::try_from(BLOCK_GAS_LIMIT).expect("FVM block gas limit not i64")
+        block_gas_limit = i64::try_from(BLOCK_GAS_LIMIT).expect("FVM block gas limit not i64")
     };
 
     let mut premiums = Vec::new();
@@ -239,8 +238,7 @@ where
 
         let mut block_gas_limit = consensus_params.consensus_params.block.max_gas;
         if block_gas_limit <= 0 {
-            block_gas_limit =
-                i64::try_from(BLOCK_GAS_LIMIT).expect("FVM block gas limit not i64")
+            block_gas_limit = i64::try_from(BLOCK_GAS_LIMIT).expect("FVM block gas limit not i64")
         };
 
         // The latest block might not have results yet.

@@ -3,7 +3,6 @@
 
 use std::fmt::{Debug, Display};
 
-use multihash_codetable::{Code, MultihashDigest};
 use fendermint_crypto::PublicKey;
 use fvm_ipld_encoding::{
     strict_bytes,
@@ -13,6 +12,7 @@ use fvm_shared::{
     address::{Address, Error, SECP_PUB_LEN},
     ActorID, METHOD_CONSTRUCTOR,
 };
+use multihash_codetable::{Code, MultihashDigest};
 
 define_singleton!(EAM {
     id: 10,

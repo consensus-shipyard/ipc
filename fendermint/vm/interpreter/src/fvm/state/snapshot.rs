@@ -9,8 +9,7 @@ use futures_core::Stream;
 use fvm::state_tree::StateTree;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_car::{load_car, load_car_unchecked, CarHeader};
-use fvm_ipld_encoding::{from_slice, CborStore, DAG_CBOR};
-use libipld::Cid as LibipldCid;
+use fvm_ipld_encoding::{CborStore, DAG_CBOR};
 use libipld::Ipld;
 use multihash_codetable::{Code, MultihashDigest};
 use serde::{Deserialize, Serialize};
@@ -19,7 +18,6 @@ use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio_stream::StreamExt;
-use tokio_util::compat::{TokioAsyncReadCompatExt, TokioAsyncWriteCompatExt};
 
 pub type BlockHeight = u64;
 pub type SnapshotVersion = u32;
@@ -264,7 +262,7 @@ impl<BS: Blockstore> Stream for StateTreeStreamer<BS> {
                     if cid.codec() == DAG_CBOR {
                         // libipld has its own codec, use that instead of fvm_ipld_encoding
                         use libipld::cbor::DagCborCodec;
-                        use libipld::codec::{Codec, Decode};
+                        use libipld::codec::Codec;
 
                         let codec = DagCborCodec;
                         if let Ok(ipld) = codec.decode::<Ipld>(&bytes) {

@@ -3,7 +3,7 @@
 use std::{fmt::Display, marker::PhantomData};
 
 use cid::Cid;
-use multihash_codetable::{Code, MultihashDigest};
+use multihash_codetable::Code;
 
 pub use self::actor_error::*;
 

@@ -7,7 +7,7 @@
 //!
 //! TODO: Remove this module when the `cid` dependency is updated.
 //! NOTE: A simpler alternative is https://github.com/ChainSafe/forest/blob/v0.6.0/blockchain/blocks/src/lib.rs
-use cid::{multihash::MultihashGeneric, CidGeneric, Version};
+use cid::{multihash::Multihash, CidGeneric, Version};
 use multihash_codetable::{Code, MultihashDigest};
 use rand::{distributions::WeightedIndex, prelude::Distribution, Rng, RngCore, SeedableRng};
 
@@ -62,7 +62,7 @@ impl<const S: usize> Arbitrary for ArbCid<S> {
 }
 
 #[derive(Clone)]
-pub struct ArbMultihash<const S: usize>(pub MultihashGeneric<S>);
+pub struct ArbMultihash<const S: usize>(pub Multihash<S>);
 
 impl<const S: usize> Arbitrary for ArbMultihash<S> {
     /// Generates a random valid multihash.
@@ -90,6 +90,6 @@ impl<const S: usize> Arbitrary for ArbMultihash<S> {
         let size = rng.gen_range(0..S);
         let mut data = [0; S];
         rng.fill_bytes(&mut data);
-        Self(MultihashGeneric::wrap(code, &data[..size]).unwrap())
+        Self(Multihash::wrap(code, &data[..size]).unwrap())
     }
 }

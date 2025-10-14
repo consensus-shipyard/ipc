@@ -1,8 +1,8 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 use cid::Cid;
-use multihash_codetable::{Code, MultihashDigest};
 use fvm_ipld_encoding::{to_vec, Error as IpldError, DAG_CBOR};
+use multihash_codetable::{Code, MultihashDigest};
 use serde::Serialize;
 
 pub mod chain;

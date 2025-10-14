@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::Context;
-use multihash_codetable::{Code, MultihashDigest};
 use jsonrpc_v2::Params;
+use multihash_codetable::{Code, MultihashDigest};
 use tendermint::abci;
 use tendermint_rpc::Client;
 

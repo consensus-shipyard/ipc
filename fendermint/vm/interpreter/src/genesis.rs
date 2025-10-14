@@ -5,7 +5,6 @@ use std::collections::{BTreeSet, HashMap};
 use std::io::{Cursor, Read, Write};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
-use std::pin::Pin;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Context};
@@ -40,8 +39,6 @@ use crate::fvm::store::memory::MemoryBlockstore;
 use fendermint_vm_genesis::ipc::{GatewayParams, IpcParams};
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use tokio_stream::StreamExt;
-use tokio_util::compat::TokioAsyncWriteCompatExt;
 
 /// The sealed genesis state metadata
 #[serde_as]
@@ -201,8 +198,6 @@ impl<'a> GenesisBuilder<'a> {
         out_path: PathBuf,
         store: MemoryBlockstore,
     ) -> anyhow::Result<()> {
-        let file = tokio::fs::File::create(&out_path).await?;
-
         tracing::info!(state_root = state_root.to_string(), "state root");
 
         let metadata = GenesisMetadata::new(state_root, genesis_state);

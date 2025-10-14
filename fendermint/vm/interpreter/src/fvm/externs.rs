@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 use anyhow::anyhow;
 use cid::Cid;
-use multihash_codetable::{Code, MultihashDigest};
 use fendermint_vm_actor_interface::chainmetadata::CHAINMETADATA_ACTOR_ID;
 use fvm::{
     externs::{Chain, Consensus, Externs, Rand},
@@ -11,6 +10,7 @@ use fvm::{
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{CborStore, DAG_CBOR};
 use fvm_shared::clock::ChainEpoch;
+use multihash_codetable::{Code, MultihashDigest};
 
 use super::store::ReadOnlyBlockstore;
 

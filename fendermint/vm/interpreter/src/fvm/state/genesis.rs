@@ -6,7 +6,6 @@ use std::sync::Arc;
 use actors_custom_car::Manifest as CustomActorManifest;
 use anyhow::{anyhow, bail, Context};
 use cid::Cid;
-use multihash_codetable::Code;
 use ethers::{abi::Tokenize, core::abi::Abi};
 use fendermint_vm_actor_interface::{
     account::{self, ACCOUNT_ACTOR_CODE_ID},
@@ -36,6 +35,7 @@ use fvm_shared::{
     version::NetworkVersion,
     ActorID, METHOD_CONSTRUCTOR,
 };
+use multihash_codetable::Code;
 
 // BLOCK_GAS_LIMIT was removed in FVM 4.7, define locally for IPC
 const BLOCK_GAS_LIMIT: u64 = 10_000_000_000;

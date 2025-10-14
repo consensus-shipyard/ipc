@@ -435,7 +435,7 @@ fn recover_secp256k1(signature: &Signature, data: &[u8]) -> Result<PublicKey, St
     let rec_key_bytes =
         recover_secp_public_key(hash.as_bytes().try_into().expect("fixed array size"), &sig)
             .map_err(|e| e.to_string())?;
-    
+
     // In FVM 4.7, recover_secp_public_key returns [u8; 65], convert to PublicKey
     let rec_key = PublicKey::parse_slice(&rec_key_bytes, None)
         .map_err(|e| format!("Failed to parse recovered public key: {}", e))?;

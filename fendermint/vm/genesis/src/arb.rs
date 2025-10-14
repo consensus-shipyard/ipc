@@ -4,11 +4,11 @@ use crate::{
     ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, PermissionMode, Power,
     SignerAddr, Validator, ValidatorKey,
 };
-use multihash_codetable::{Code, MultihashDigest};
 use fendermint_crypto::SecretKey;
 use fendermint_testing::arb::{ArbSubnetID, ArbTokenAmount};
 use fendermint_vm_core::Timestamp;
 use fvm_shared::{address::Address, version::NetworkVersion};
+use multihash_codetable::{Code, MultihashDigest};
 use quickcheck::{Arbitrary, Gen};
 use rand::{rngs::StdRng, SeedableRng};
 
