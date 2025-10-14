@@ -50,7 +50,7 @@ fn file_digest(reader: impl Read) -> Result<Checksum> {
         Ok(())
     })?;
     let digest = sha.finalize();
-    Checksum::try_from(digest.as_slice())
+    Checksum::try_from(&*digest)
 }
 
 /// Convert a slice to an array
@@ -113,7 +113,7 @@ async fn download_builtin_actors_bundle(
         std::io::copy(&mut reader, &mut tmp.as_file_mut())?;
     }
     let digest = sha.finalize();
-    let digest = Checksum::try_from(digest.as_slice())?;
+    let digest = Checksum::try_from(&*digest)?;
     Ok((tmp, digest))
 }
 
