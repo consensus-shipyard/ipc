@@ -1,3 +1,4 @@
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 // SPDX-License-Identifier: MIT OR Apache-2.0
 pragma solidity ^0.8.23;
 

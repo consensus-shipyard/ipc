@@ -242,9 +242,13 @@ Users and subnet deployers need IPCT on L1s (Filecoin, Ethereum) to pay for subn
 
 **Step 2: Automatic Assignment**
 - Root IPC assigns you to a sharding subnet
-- Sharding subnet assigns you to execution subnets
+- Sharding subnet assigns you to 1-2 execution subnets simultaneously
 - You can validate subnets with ANY L1 parent (Filecoin, Ethereum, or subnet)
-- Assignments rotate weekly (prevents collusion)
+- **Multi-subnet validation:** Run multiple subnet clients in parallel, earn rewards from each
+- **Weekly rotation:** Every week, ~1/3 of validators rotate to different execution subnets
+  - Prevents long-term collusion
+  - Exposure to different L1 ecosystems
+  - Can switch from Filecoin-parent subnet to Ethereum-parent subnet seamlessly
 
 **Step 3: Earn Rewards**
 - Base rewards in IPCT (10-100 IPCT per day depending on assignments)
@@ -283,6 +287,105 @@ Validators earn reputation scores (0.0-2.0) based on:
 - Double signing: -100 IPCT (1% of stake)
 - Invalid state transition: -500 IPCT (5% of stake)
 - Coordinated attack: -10,000 IPCT (100% of stake) + ban
+
+---
+
+## Data Availability & Storage
+
+### How Subnet Data is Stored and Secured
+
+When execution subnets process transactions, that data must be available for verification and potential reconstruction. IPC uses a **distributed erasure coding system** managed at the sharding subnet level—ensuring data remains available even if some validators go offline.
+
+### Erasure Coding Process
+
+Every execution subnet creates periodic **checkpoints** (default: every 100 seconds or ~100 blocks):
+
+**Step 1: Checkpoint Creation**
+- Execution subnet validators finalize a batch of blocks
+- Create checkpoint containing:
+  - State root (merkle root of current state)
+  - Transaction merkle root
+  - Block range (e.g., blocks 1000-1100)
+  - Validator signatures (2/3+ threshold)
+  - Parent checkpoint hash
+
+**Step 2: Erasure Encoding**
+- Checkpoint + block data is serialized
+- Erasure coded into **N chunks** (N = number of validators in parent shard)
+- **Redundancy factor: 2x** — Only need 50% of chunks to reconstruct full data
+- Example: 200 validators in shard = 200 chunks, need any 100 to rebuild
+
+**Step 3: Distributed Storage**
+- Each chunk sent to different validator in parent sharding subnet
+- Validators store chunks locally (SSD storage)
+- Validators sign attestation: "I have chunk X of checkpoint Y"
+- Checkpoint considered "available" when 66%+ of validators confirm
+
+**Step 4: Checkpoint Routing**
+- Sharding subnet routes checkpoint commitment to appropriate destination:
+  - Filecoin-parent subnet → Filecoin Gateway Contract
+  - Ethereum-parent subnet → Ethereum Gateway Contract
+  - Subnet-parent → Parent subnet validators
+- Aggregate checkpoint also sent to Root IPC Chain
+
+### Storage Tiers: Hot vs Cold
+
+**Hot Storage (Recent Data):**
+- Last ~1,000 checkpoints (~27 hours of data)
+- Maintained via erasure coding across shard validators
+- Fast retrieval for recent queries and state verification
+- Required for data availability challenges
+- Applies to subnets with any L1 parent
+
+**Cold Storage (Historical Data):**
+- Data older than finality window (beyond hot storage)
+- **Archived to Filecoin** regardless of subnet's parent L1
+- Why Filecoin for all archival:
+  - Filecoin is purpose-built for decentralized long-term storage
+  - Even Ethereum-parent subnets benefit from cheap Filecoin archival
+  - Single archival layer simplifies architecture
+  - Creates natural cross-ecosystem integration
+
+**Archival Process:**
+1. Sharding subnet identifies checkpoints beyond hot storage window
+2. Validators reconstruct full data from erasure coded chunks
+3. Compress and batch multiple checkpoints
+4. Create Filecoin storage deal via smart contract
+5. Upload to Filecoin storage providers
+6. Record Filecoin deal ID on Root IPC Chain
+7. Validators prune local chunks, keep only commitment hash
+
+### Data Availability Challenges
+
+To ensure validators actually store the data they claim to:
+
+**Random Sampling Protocol:**
+- Root IPC Chain randomly selects checkpoints each epoch
+- Challenges validators to provide specific erasure coded chunks
+- Validators must respond within 30 seconds
+- **Success:** Validator earns +1 IPCT bonus
+- **Failure:** Validator slashed -10 IPCT
+
+This keeps validators honest and ensures data remains retrievable.
+
+### Benefits of This Model
+
+**For Subnet Deployers:**
+- Data automatically distributed and backed up
+- No manual storage management
+- Can retrieve any historical state from Filecoin
+- Same storage model regardless of L1 parent
+
+**For the Network:**
+- No single point of failure (distributed across 100+ validators)
+- 50% of shard validators can go offline and data remains available
+- Efficient storage (erasure coding is space-efficient)
+- Long-term archival handled by Filecoin (specialized storage network)
+
+**Cross-L1 Benefit:**
+- Ethereum-parent subnets get cheap permanent storage via Filecoin
+- Filecoin-parent subnets naturally integrate with native storage
+- Unified retrieval mechanism for all historical data
 
 ---
 
