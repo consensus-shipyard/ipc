@@ -1,6 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use actors_custom_car::Manifest as CustomActorManifest;
@@ -61,7 +62,10 @@ where
 {
     pub manifest_data_cid: Cid,
     pub manifest: Manifest,
+    /// IPC specific actor manifest
     pub custom_actor_manifest: CustomActorManifest,
+    /// other dynamically loaded actor manifest
+    user_actor_manifest: Option<UserActorManifest>,
     store: DB,
     multi_engine: Arc<MultiEngine>,
     stage: Stage<DB>,
@@ -101,6 +105,7 @@ where
         multi_engine: Arc<MultiEngine>,
         bundle: &[u8],
         custom_actor_bundle: &[u8],
+        user_actor_bundle: Option<&[u8]>,
     ) -> anyhow::Result<Self> {
         // Load the builtin actor bundle.
         let (manifest_version, manifest_data_cid): (u32, Cid) =
@@ -113,12 +118,21 @@ where
         let custom_actor_manifest =
             CustomActorManifest::load(&store, &custom_manifest_data_cid, custom_manifest_version)?;
 
-        let state_tree = empty_state_tree(store.clone())?;
+        let user_actor_manifest = match user_actor_bundle {
+            None => None,
+            Some(bundle) => {
+                let (version, data_cid): (u32, Cid) = parse_bundle(&store, bundle).await?;
+                let manifest = UserActorManifest::load(&store, &data_cid, version)?;
+                Some(manifest)
+            }
+        };
 
+        let state_tree = empty_state_tree(store.clone())?;
         let state = Self {
             manifest_data_cid,
             manifest,
             custom_actor_manifest,
+            user_actor_manifest,
             store,
             multi_engine,
             stage: Stage::Tree(Box::new(state_tree)),
@@ -280,6 +294,20 @@ where
         self.create_actor_internal(code_cid, id, state, balance, delegated_address)
     }
 
+    pub fn load_user_actor(&mut self, mut next_actor_id: ActorID) -> anyhow::Result<()> {
+        let Some(name_to_actor) = self.user_actor_manifest.take() else {
+            return Ok(());
+        };
+
+        for (_, info) in name_to_actor.actor_to_data.into_iter() {
+            self.create_actor_with_state_cid(next_actor_id, info.code, info.init_state)?;
+
+            next_actor_id += 1;
+        }
+
+        Ok(())
+    }
+
     pub fn construct_custom_actor(
         &mut self,
         name: &str,
@@ -314,6 +342,37 @@ where
             sequence: 0,
             balance,
             delegated_address,
+        };
+
+        self.with_state_tree(
+            |s| s.set_actor(id, actor_state.clone()),
+            |s| s.set_actor(id, actor_state.clone()),
+        );
+
+        {
+            let cid = self.with_state_tree(|s| s.flush(), |s| s.flush())?;
+            tracing::debug!(
+                state_root = cid.to_string(),
+                actor_id = id,
+                "interim state root after actor creation"
+            );
+        }
+
+        Ok(())
+    }
+
+    fn create_actor_with_state_cid(
+        &mut self,
+        id: ActorID,
+        code_cid: Cid,
+        state_cid: Cid,
+    ) -> anyhow::Result<()> {
+        let actor_state = ActorState {
+            code: code_cid,
+            state: state_cid,
+            sequence: 0,
+            balance: TokenAmount::zero(),
+            delegated_address: None,
         };
 
         self.with_state_tree(
@@ -566,5 +625,63 @@ where
             .get_cbor(&actor_state_cid)
             .context("failed to get actor state by state cid")?
             .ok_or_else(|| anyhow!("actor state by {actor_state_cid} not found"))
+    }
+}
+
+struct UserActorStatePair {
+    init_state: Cid,
+    code: Cid,
+}
+
+struct UserActorManifest {
+    actor_to_data: HashMap<String, UserActorStatePair>,
+}
+
+impl UserActorManifest {
+    pub fn load<B: Blockstore>(bs: &B, root_cid: &Cid, ver: u32) -> anyhow::Result<Self> {
+        if ver != 1 {
+            return Err(anyhow!("unsupported manifest version {}", ver));
+        }
+
+        let vec: Vec<(String, Cid)> = match bs.get_cbor(root_cid)? {
+            Some(vec) => vec,
+            None => {
+                return Err(anyhow!(
+                    "cannot find user actor manifest root cid {}",
+                    root_cid
+                ));
+            }
+        };
+
+        UserActorManifest::new(vec)
+    }
+
+    /// Construct a new manifest from actor name/cid tuples.
+    fn new(data: Vec<(String, Cid)>) -> anyhow::Result<Self> {
+        if data.len() % 2 != 0 {
+            return Err(anyhow!("total number of cids should be multiples of 2"));
+        }
+
+        let mut actor_to_data = HashMap::new();
+
+        for chunk in data.chunks(2) {
+            match chunk {
+                [(actor_name, code_cid), (state_name, state_cid)] => {
+                    let expected_state_name = format!("{actor_name}-state");
+                    if *state_name != expected_state_name {
+                        return Err(anyhow!("state and actor name not matching, invalid bundle"));
+                    }
+
+                    let entry = UserActorStatePair {
+                        init_state: *state_cid,
+                        code: *code_cid,
+                    };
+                    actor_to_data.insert(actor_name.clone(), entry);
+                }
+                _ => unreachable!(),
+            }
+        }
+
+        Ok(Self { actor_to_data })
     }
 }
