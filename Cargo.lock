@@ -6107,6 +6107,7 @@ dependencies = [
  "ethers",
  "fs-err",
  "fvm_shared",
+ "generic-array 1.3.3",
  "hex",
  "ipc-types",
  "libc",

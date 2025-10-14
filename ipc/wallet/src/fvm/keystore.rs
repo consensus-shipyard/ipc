@@ -21,6 +21,9 @@ use log::{debug, error};
 use rand::{rngs::OsRng, RngCore};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+// Allow deprecated GenericArray from xsalsa20poly1305's old generic-array dependency
+// TODO: Migrate to crypto_secretbox when ready (xsalsa20poly1305 is deprecated)
+#[allow(deprecated)]
 use xsalsa20poly1305::{
     aead::{generic_array::GenericArray, Aead},
     KeyInit, XSalsa20Poly1305, NONCE_SIZE,
@@ -468,6 +471,7 @@ impl EncryptedKeyStore {
         }
     }
 
+    #[allow(deprecated)]
     fn encrypt(encryption_key: &[u8], msg: &[u8]) -> anyhow::Result<Vec<u8>> {
         let mut nonce = [0; NONCE_SIZE];
         OsRng.fill_bytes(&mut nonce);
@@ -479,6 +483,7 @@ impl EncryptedKeyStore {
         Ok(ciphertext)
     }
 
+    #[allow(deprecated)]
     fn decrypt(encryption_key: &[u8], msg: &[u8]) -> anyhow::Result<Vec<u8>> {
         let cyphertext_len = msg.len() - NONCE_SIZE;
         let ciphertext = &msg[..cyphertext_len];
