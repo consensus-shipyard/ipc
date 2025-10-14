@@ -57,12 +57,12 @@ where
     // In FVM 4.7, need to manually write CAR format to the async writer
     use futures::io::AsyncWriteExt;
     use fvm_ipld_encoding::to_vec;
-    
+
     // Write header with length prefix (only once for chunk 0)
     let header_bytes = to_vec(&header).context("failed to encode header")?;
     let mut len_buf = unsigned_varint::encode::u64_buffer();
     let len_encoded = unsigned_varint::encode::u64(header_bytes.len() as u64, &mut len_buf);
-    
+
     writer.write_all(len_encoded).await?;
     writer.write_all(&header_bytes).await?;
     // Flush after header to trigger file closing (ChunkWriter closes after first chunk)
@@ -72,10 +72,10 @@ where
     while let Some((cid, data)) = block_streamer.next().await {
         let cid_bytes = cid.to_bytes();
         let total_len = cid_bytes.len() + data.len();
-        
+
         let mut len_buf = unsigned_varint::encode::u64_buffer();
         let len_encoded = unsigned_varint::encode::u64(total_len as u64, &mut len_buf);
-        
+
         writer.write_all(len_encoded).await?;
         writer.write_all(&cid_bytes).await?;
         writer.write_all(&data).await?;
