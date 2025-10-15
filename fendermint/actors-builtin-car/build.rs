@@ -12,9 +12,9 @@ use std::io::{Read, Write};
 use std::path::Path;
 use tempfile::NamedTempFile;
 
-const BUILTIN_ACTORS_TAG: &str = "v15.0.0";
+const BUILTIN_ACTORS_TAG: &str = "v17.0.0";
 const BUILTIN_ACTORS_SHA256SUM: &str =
-    "fd7e442bb52ee2e0079053eaf4f75670257f2084b6315826e084c2b483deee4a";
+    "58dc4465750cc05ee61289a7e24ee5397531d9fdd601a5f0de63b9dabc7a99c1";
 
 const FORCE_RERUN: &str = "IPC_BUILTIN_ACTORS_FORCE_FETCH";
 

@@ -255,6 +255,16 @@ fvm_ipld_hamt = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
 fvm_ipld_amt = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
 yamux = { git = "https://github.com/paritytech/yamux", tag = "yamux-v0.13.4" }
 
+# Patch builtin-actors git dependencies to use the same FVM version
+[patch."https://github.com/filecoin-project/builtin-actors"]
+fvm = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_shared = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_sdk = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_ipld_blockstore = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_ipld_encoding = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_ipld_hamt = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_ipld_amt = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+
 [profile.wasm]
 inherits = "release"
 panic = "abort"
