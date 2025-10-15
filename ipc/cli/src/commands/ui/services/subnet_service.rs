@@ -12,32 +12,6 @@ use ipc_api::subnet_id::SubnetID;
 use num_traits::ToPrimitive;
 use std::str::FromStr;
 
-/// Subnet information for UI display
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct SubnetInfo {
-    pub id: String,
-    pub parent_id: String,
-    pub name: Option<String>,
-    pub permission_mode: String,
-    pub min_validators: u64,
-    pub validators: Vec<ValidatorInfo>,
-    pub total_collateral: String,
-    pub circulating_supply: String,
-    pub is_active: bool,
-    pub block_height: u64,
-    pub checkpoint_period: u64,
-}
-
-/// Validator information for UI display
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ValidatorInfo {
-    pub address: String,
-    pub stake: String,
-    pub is_active: bool,
-    pub federated_power: Option<u64>,
-    pub metadata: Option<ValidatorMetadata>,
-}
-
 /// Validator metadata
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ValidatorMetadata {
