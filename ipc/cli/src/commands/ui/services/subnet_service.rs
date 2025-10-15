@@ -12,13 +12,6 @@ use ipc_api::subnet_id::SubnetID;
 use num_traits::ToPrimitive;
 use std::str::FromStr;
 
-/// Validator metadata
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ValidatorMetadata {
-    pub network_address: Option<String>,
-    pub public_key: Option<String>,
-}
-
 /// Service for subnet management operations
 pub struct SubnetService {
     global: GlobalArguments,
