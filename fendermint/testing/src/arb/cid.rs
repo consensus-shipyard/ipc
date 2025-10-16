@@ -31,11 +31,11 @@ impl<const S: usize> Arbitrary for ArbCid<S> {
     fn arbitrary(g: &mut Gen) -> Self {
         let cid = if S >= 32 && ArbVersion::arbitrary(g).0 == Version::V0 {
             let data: Vec<u8> = Vec::arbitrary(g);
-            let hash = Code::Blake2b256
+            let hash = Code::Sha2_256
                 .digest(&data)
                 .resize()
                 .expect("digest too large");
-            CidGeneric::new_v0(hash).expect("blake2b256 is a valid hash for cid v0")
+            CidGeneric::new_v0(hash).expect("sha2_256 is a valid hash for cid v0")
         } else {
             // In real world lower IPLD Codec codes more likely to happen, hence distribute them
             // with bias towards smaller values.

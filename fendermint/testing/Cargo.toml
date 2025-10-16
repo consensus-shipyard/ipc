@@ -23,6 +23,7 @@ arbtest = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 cid = { workspace = true, optional = true }
 multihash-codetable = { version = "0.1.4", features = [
+  "sha2",
   "sha3",
 ], optional = true }
 fvm_ipld_encoding = { workspace = true, optional = true }
