@@ -626,7 +626,7 @@ mod tests {
     async fn test_resolver_port_config_listen_ip_defaults_to_zero() {
         let (_temp, paths) = create_test_paths();
 
-        let mut p2p_config = P2pConfig {
+        let p2p_config = P2pConfig {
             external_ip: Some("192.168.1.100".to_string()),
             listen_ip: None, // Explicitly not set
             ports: Some(P2pPortsConfig {

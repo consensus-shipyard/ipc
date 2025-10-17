@@ -302,6 +302,7 @@ pub async fn generate_node_config(
         join: join_config,
         p2p: Some(crate::commands::node::config::P2pConfig {
             external_ip: Some("127.0.0.1".to_string()), // Default external IP for user to modify
+            listen_ip: Some("0.0.0.0".to_string()),     // Default listen IP (binds to all interfaces)
             ports: None,                                // Let user configure ports
             peers: None,                                // Let user configure peers
         }),
