@@ -12,6 +12,12 @@ subnet:
   # Parent chain ID
   parent_chain_id: "/r314159"
 
+  # Parent registry contract address
+  parent_registry: "0xd7a98e6e49eee73e8637bf52c0f048e20eb66e5f"
+
+  # Parent gateway contract address
+  parent_gateway: "0xaba9fb31574d5158f125e20f368835e00b082538"
+
 # Validator Nodes
 validators:
   - name: "validator-1"
@@ -19,18 +25,21 @@ validators:
     ssh_user: "philip"
     ipc_user: "ipc"
     role: "primary"  # First node initialized
+    private_key: "0x867c766fa9ea9fab8929a6ec6a4fe32ccf33969035d3d7f2262f6eb8021b56d8"
 
   - name: "validator-2"
     ip: "35.237.175.224"
     ssh_user: "philip"
     ipc_user: "ipc"
     role: "secondary"
+    private_key: "0x40aa709b5d6765411f2afbdb0b4ae00e45a06425b37a386334c80482b203d04d"
 
   - name: "validator-3"
     ip: "34.75.205.89"
     ssh_user: "philip"
     ipc_user: "ipc"
     role: "secondary"
+    private_key: "0xc1099a062e296366a2ac3b26ac80a409833e6a74edbf677a0bd14580d2c68ea2"
 
 # Network Configuration
 network:
@@ -49,6 +58,12 @@ paths:
   # Node init config path
   node_init_config: "/home/ipc/node-init.yml"
 
+  # IPC CLI config directory
+  ipc_config_dir: "/home/ipc/.ipc"
+
+  # IPC CLI config file
+  ipc_config_file: "/home/ipc/.ipc/config.toml"
+
 # Initialization Settings
 init:
   # Supply source (native or ERC20)
@@ -59,6 +74,56 @@ init:
 
   # Validator power (for federated mode)
   validator_power: 1
+
+  # Genesis configuration
+  genesis:
+    base_fee: "1000"
+    power_scale: 3
+    network_version: 21
+
+  # IPC configuration
+  ipc:
+    vote_interval: 1
+    vote_timeout: 60
+
+  # Top-down finality configuration
+  topdown:
+    chain_head_delay: 10
+    proposal_delay: 10
+    max_proposal_range: 100
+    polling_interval: 10
+    exponential_back_off: 5
+    exponential_retry_limit: 5
+    parent_http_timeout: 60
+
+  # CometBFT overrides
+  cometbft:
+    timeout_commit: "5s"
+    rpc_laddr: "tcp://0.0.0.0:26657"
+
+# IPC CLI Configuration (for ~/.ipc/config.toml)
+ipc_cli:
+  # Keystore path
+  keystore_path: "~/.ipc"
+
+  # Parent subnet configuration
+  parent:
+    id: "/r314159"
+    network_type: "fevm"
+    provider_http: "https://api.calibration.node.glif.io/rpc/v1"
+    registry_addr: "0xd7a98e6e49eee73e8637bf52c0f048e20eb66e5f"
+    gateway_addr: "0xaba9fb31574d5158f125e20f368835e00b082538"
+
+  # Child subnet configuration (this subnet)
+  child:
+    # Uses subnet.id from above
+    network_type: "fevm"
+    # Provider HTTP - can be different from parent
+    # For local node, use http://localhost:8545
+    # For remote, use the parent's RPC or a dedicated endpoint
+    provider_http: "http://localhost:8545"
+    # Child subnet uses parent's registry and gateway
+    use_parent_contracts: true
 
 # Environment Variable Overrides:
 # - IPC_SUBNET_ID

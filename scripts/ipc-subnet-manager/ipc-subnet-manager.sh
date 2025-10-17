@@ -41,13 +41,16 @@ Commands:
     update-config     Update existing node configs without wiping data
     check             Comprehensive health check on all nodes
     restart           Graceful restart of all nodes
+    info              Show subnet information (chain ID, validators, status)
+    block-time        Measure block production time (default: 10s sample)
     logs [validator]  Tail logs from specific validator
     deploy            Deploy/update binaries (STUB - not implemented)
 
 Options:
-    --config FILE     Path to config file (default: ./ipc-subnet-config.yml)
-    --dry-run         Preview actions without executing
-    --yes             Skip confirmation prompts
+    --config FILE        Path to config file (default: ./ipc-subnet-config.yml)
+    --dry-run            Preview actions without executing
+    --yes                Skip confirmation prompts
+    --duration SECONDS   For block-time: sample duration (default: 10)
     --help            Show this help message
 
 Environment Variables:
@@ -158,7 +161,7 @@ cmd_init() {
     log_section "Initializing Secondary Nodes"
     initialize_secondary_nodes "$primary_peer_info"
 
-    # Extract all peer info
+    # Collect peer information (peer-info.json created during init)
     log_section "Collecting Peer Information"
     collect_all_peer_info
 
@@ -166,11 +169,15 @@ cmd_init() {
     log_section "Updating Node Configurations"
     update_all_configs
 
+    # Update IPC CLI configs
+    log_section "Updating IPC CLI Configuration"
+    update_ipc_cli_configs
+
     # Set federated power
     log_section "Setting Validator Power"
     set_federated_power
 
-    # Start all nodes
+    # Start all nodes with complete configuration
     log_section "Starting All Nodes"
     start_all_nodes
 
@@ -191,8 +198,11 @@ cmd_update_config() {
     log_info "Collecting current peer information..."
     collect_all_peer_info
 
-    log_info "Updating configurations..."
+    log_info "Updating node configurations..."
     update_all_configs
+
+    log_info "Updating IPC CLI configurations..."
+    update_ipc_cli_configs
 
     log_info "Restarting nodes..."
     cmd_restart --yes
@@ -249,6 +259,28 @@ cmd_restart() {
     start_all_nodes
 
     log_success "✓ All nodes restarted"
+}
+
+# Measure block time
+cmd_block_time() {
+    local sample_duration=10
+
+    for arg in "$@"; do
+        case $arg in
+            --duration=*) sample_duration="${arg#*=}" ;;
+            --duration) shift; sample_duration="$1" ;;
+        esac
+    done
+
+    load_config
+
+    measure_all_block_times "$sample_duration"
+}
+
+# Show subnet information
+cmd_info() {
+    load_config
+    show_subnet_info
 }
 
 # View logs
@@ -340,6 +372,12 @@ main() {
             ;;
         restart)
             cmd_restart "$@"
+            ;;
+        info)
+            cmd_info "$@"
+            ;;
+        block-time)
+            cmd_block_time "$@"
             ;;
         logs)
             cmd_logs "$@"
