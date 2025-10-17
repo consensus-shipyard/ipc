@@ -165,6 +165,10 @@ cmd_init() {
     log_section "Collecting Peer Information"
     collect_all_peer_info
 
+    # Fix listen addresses to bind to 0.0.0.0 instead of public IP
+    log_section "Fixing Listen Addresses"
+    fix_listen_addresses
+
     # Update all configs with full mesh
     log_section "Updating Node Configurations"
     update_all_configs
@@ -197,6 +201,9 @@ cmd_update_config() {
 
     log_info "Collecting current peer information..."
     collect_all_peer_info
+
+    log_info "Fixing listen addresses..."
+    fix_listen_addresses
 
     log_info "Updating node configurations..."
     update_all_configs

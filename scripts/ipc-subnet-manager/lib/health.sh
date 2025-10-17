@@ -475,12 +475,169 @@ show_subnet_info() {
     local listening=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
         "curl -s http://localhost:26657/net_info 2>/dev/null | jq -r '.result.listening // false' 2>/dev/null")
 
-    log_info "  Connected Peers: $n_peers"
-    log_info "  Listening: $listening"
+    log_info "  CometBFT Peers: $n_peers"
+    log_info "  CometBFT Listening: $listening"
     echo
 
-    # Check parent finality and top-down status (critical for cross-msg fund)
-    log_info "Parent Finality Status (for cross-msg fund):"
+    # Check critical infrastructure for parent finality voting
+    log_info "Libp2p Infrastructure (required for voting):"
+    local libp2p_port=$(get_config_value "network.libp2p_port")
+
+    # Check if libp2p port is listening and on correct address
+    local libp2p_listening=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        "ss -tulpn 2>/dev/null | grep ':$libp2p_port ' | head -1" 2>/dev/null)
+
+    if [ -n "$libp2p_listening" ]; then
+        if echo "$libp2p_listening" | grep -q "0.0.0.0:$libp2p_port"; then
+            log_info "  ✓ Libp2p port $libp2p_port listening on 0.0.0.0 (can accept connections)"
+        elif echo "$libp2p_listening" | grep -q "127.0.0.1:$libp2p_port"; then
+            log_warn "  ✗ Libp2p port $libp2p_port bound to 127.0.0.1 (cannot accept external connections!)"
+            log_warn "    Run: ./ipc-manager update-config to fix"
+        else
+            log_info "  ⚠ Libp2p port $libp2p_port listening: $(echo $libp2p_listening | awk '{print $5}')"
+        fi
+    else
+        log_warn "  ✗ Libp2p port $libp2p_port not listening!"
+    fi
+
+    # Check if resolver is enabled in config
+    local resolver_enabled=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+        "sudo su - $ipc_user -c 'grep -A3 \"\\[resolver\\]\" ~/.ipc-node/fendermint/config/default.toml | grep enabled | grep -o \"true\\|false\"'" 2>/dev/null | head -1 | tr -d '\n\r ')
+
+    if [ "$resolver_enabled" = "true" ]; then
+        log_info "  ✓ Resolver enabled in config"
+
+        # Check if resolver service started
+        local resolver_started=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+            "sudo su - $ipc_user -c 'grep \"starting the IPLD Resolver Service\" ~/.ipc-node/logs/*.log 2>/dev/null | wc -l'" 2>/dev/null | tr -d ' \n\r')
+
+        if [ -n "$resolver_started" ] && [ "$resolver_started" -gt 0 ] 2>/dev/null; then
+            log_info "  ✓ Resolver service started ($resolver_started times)"
+
+            # Check if vote gossip loop started
+            local vote_loop=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+                "sudo su - $ipc_user -c 'grep \"parent finality vote gossip loop\" ~/.ipc-node/logs/*.log 2>/dev/null | wc -l'" 2>/dev/null | tr -d ' \n\r')
+
+            if [ -n "$vote_loop" ] && [ "$vote_loop" -gt 0 ] 2>/dev/null; then
+                log_info "  ✓ Vote gossip loop active"
+            else
+                log_warn "  ✗ Vote gossip loop not started"
+            fi
+        else
+            log_warn "  ✗ Resolver service did not start"
+        fi
+    else
+        log_warn "  ✗ Resolver not enabled in config (found: '$resolver_enabled')!"
+    fi
+
+    # Check listen_addr configuration
+    local listen_addr=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        "grep 'listen_addr' ~/.ipc-node/fendermint/config/default.toml 2>/dev/null | head -1" 2>/dev/null)
+
+    if echo "$listen_addr" | grep -q "0.0.0.0"; then
+        log_info "  ✓ Listen address configured correctly (0.0.0.0)"
+    elif echo "$listen_addr" | grep -q "127.0.0.1"; then
+        log_warn "  ✗ Listen address misconfigured (127.0.0.1 - run update-config)"
+    fi
+    echo
+
+    # Check external_addresses and static_addresses for all validators
+    log_info "Libp2p Peer Configuration:"
+    for idx in "${!VALIDATORS[@]}"; do
+        local v_name="${VALIDATORS[$idx]}"
+        local v_ip=$(get_config_value "validators[$idx].ip")
+        local v_ssh_user=$(get_config_value "validators[$idx].ssh_user")
+        local v_ipc_user=$(get_config_value "validators[$idx].ipc_user")
+        local v_node_home=$(get_config_value "paths.node_home")
+
+        log_info "  $v_name ($v_ip):"
+
+        # Get external_addresses
+        local ext_addrs=$(ssh -o StrictHostKeyChecking=no "$v_ssh_user@$v_ip" \
+            "sudo su - $v_ipc_user -c 'grep external_addresses $v_node_home/fendermint/config/default.toml 2>/dev/null'" 2>/dev/null)
+
+        if [ -n "$ext_addrs" ] && echo "$ext_addrs" | grep -q "/ip4/$v_ip/tcp/$libp2p_port"; then
+            log_info "    ✓ external_addresses: Contains own IP ($v_ip)"
+        elif [ -n "$ext_addrs" ]; then
+            log_warn "    ✗ external_addresses: $(echo "$ext_addrs" | cut -c1-80)"
+            log_warn "      Expected to contain: /ip4/$v_ip/tcp/$libp2p_port"
+        else
+            log_warn "    ✗ external_addresses: Not set or empty"
+        fi
+
+        # Get static_addresses
+        local static_addrs=$(ssh -o StrictHostKeyChecking=no "$v_ssh_user@$v_ip" \
+            "sudo su - $v_ipc_user -c 'grep static_addresses $v_node_home/fendermint/config/default.toml 2>/dev/null'" 2>/dev/null)
+
+        if [ -n "$static_addrs" ]; then
+            # Count how many peer IPs are in static_addresses
+            local peer_count=0
+            for peer_idx in "${!VALIDATORS[@]}"; do
+                if [ "$peer_idx" != "$idx" ]; then
+                    local peer_ip=$(get_config_value "validators[$peer_idx].ip")
+                    if echo "$static_addrs" | grep -q "/ip4/$peer_ip/tcp/$libp2p_port"; then
+                        peer_count=$((peer_count + 1))
+                    fi
+                fi
+            done
+
+            local expected_peers=$((${#VALIDATORS[@]} - 1))
+            if [ "$peer_count" -eq "$expected_peers" ]; then
+                log_info "    ✓ static_addresses: Contains all $expected_peers peer IPs"
+            else
+                log_warn "    ✗ static_addresses: Only $peer_count of $expected_peers peer IPs found"
+                log_warn "      Check: $(echo "$static_addrs" | cut -c1-100)"
+            fi
+        else
+            log_warn "    ✗ static_addresses: Not set or empty"
+            log_warn "      Run: ./ipc-manager update-config to fix"
+        fi
+
+        # Check if libp2p connections are actually established
+        local libp2p_connections=$(ssh -o StrictHostKeyChecking=no "$v_ssh_user@$v_ip" \
+            "sudo su - $v_ipc_user -c 'ss -tn | grep :$libp2p_port | grep ESTAB | wc -l'" 2>/dev/null | tr -d ' \n\r')
+
+        if [ -n "$libp2p_connections" ] && [ "$libp2p_connections" -gt 0 ] 2>/dev/null; then
+            log_info "    ✓ Active libp2p connections: $libp2p_connections"
+        else
+            log_warn "    ✗ No active libp2p connections (firewall blocking port $libp2p_port?)"
+        fi
+    done
+    echo
+
+    # Check parent chain connectivity
+    log_info "Parent Chain Connectivity:"
+
+    # Check if parent RPC is reachable
+    local parent_rpc_errors=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+        "sudo su - $ipc_user -c 'grep -i \"failed to get.*parent\\|parent.*connection.*failed\\|parent.*RPC.*error\" ~/.ipc-node/logs/*.log 2>/dev/null | wc -l'" 2>/dev/null | tr -d ' \n\r')
+
+    if [ -n "$parent_rpc_errors" ] && [ "$parent_rpc_errors" -gt 0 ] 2>/dev/null; then
+        log_warn "  ✗ Parent RPC errors detected ($parent_rpc_errors occurrences)"
+        # Show a sample error
+        local sample_error=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+            "sudo su - $ipc_user -c 'grep -i \"failed to get.*parent\\|parent.*connection.*failed\" ~/.ipc-node/logs/*.log 2>/dev/null | tail -1'" 2>/dev/null)
+        if [ -n "$sample_error" ]; then
+            log_warn "    Sample: $(echo "$sample_error" | tail -c 120)"
+        fi
+    else
+        log_info "  ✓ No parent RPC connection errors detected"
+    fi
+
+    # Check if parent blocks are being fetched
+    local parent_blocks_fetched=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+        "sudo su - $ipc_user -c 'grep -i \"parent.*block.*height\\|fetched.*parent\" ~/.ipc-node/logs/*.log 2>/dev/null | tail -1'" 2>/dev/null)
+
+    if [ -n "$parent_blocks_fetched" ]; then
+        log_info "  ✓ Parent block data being fetched"
+        log_info "    Recent: $(echo "$parent_blocks_fetched" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' | head -1)"
+    else
+        log_warn "  ✗ No evidence of parent block fetching"
+    fi
+    echo
+
+    # Check parent finality and top-down status
+    log_info "Parent Finality Status:"
 
     # Check recent logs for parent finality activity using separate greps
     local parent_finality_count=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
@@ -509,13 +666,52 @@ show_subnet_info() {
             log_info "  ✓ Top-down message activity: $topdown_count entries"
         fi
     else
-        log_warn "  No parent finality commits found"
+        log_warn "  ✗ No parent finality commits found"
         log_info "    This is required for cross-msg fund to work!"
+        echo ""
+
+        # Diagnose why parent finality isn't working (simplified for speed)
+        log_info "  Diagnosing parent finality issues..."
+
+        # Check for vote-related activity (use simple grep, faster)
+        local vote_sent=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+            "sudo su - $ipc_user -c 'grep -i PeerVoteReceived ~/.ipc-node/logs/*.log 2>/dev/null | wc -l'" 2>/dev/null | tr -d ' \n\r')
+        if [ -n "$vote_sent" ] && [ "$vote_sent" -gt 0 ] 2>/dev/null; then
+            log_info "    ✓ Found $vote_sent vote messages"
+        else
+            log_warn "    ✗ No votes being sent or received"
+        fi
+
+        # Check for resolver errors (common issue)
+        local resolver_errors=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+            "sudo su - $ipc_user -c 'grep -i \"IPLD Resolver.*failed\\|Cannot assign requested address\" ~/.ipc-node/logs/*.log 2>/dev/null | wc -l'" 2>/dev/null | tr -d ' \n\r')
+        if [ -n "$resolver_errors" ] && [ "$resolver_errors" -gt 0 ] 2>/dev/null; then
+            log_warn "    ✗ Resolver binding errors detected ($resolver_errors occurrences)"
+            log_warn "      This means libp2p cannot accept connections"
+        fi
     fi
     echo
 
-    # Show validator status summary
-    log_info "Validator Health Summary:"
+    # Show validator status summary with voting power
+    log_info "Validator Status & Voting Power:"
+
+    # Get validator set from CometBFT (from first validator)
+    local validators_json=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        "curl -s http://localhost:26657/validators 2>/dev/null" 2>/dev/null)
+
+    local total_voting_power=0
+    local validator_count=0
+    if [ -n "$validators_json" ]; then
+        # Calculate total voting power by summing individual powers
+        total_voting_power=$(echo "$validators_json" | jq -r '[.result.validators[].voting_power | tonumber] | add' 2>/dev/null)
+        validator_count=$(echo "$validators_json" | jq -r '.result.count // "0"' 2>/dev/null)
+
+        # Fallback if calculation fails
+        if [ -z "$total_voting_power" ] || [ "$total_voting_power" = "null" ]; then
+            total_voting_power="0"
+        fi
+    fi
+
     for idx in "${!VALIDATORS[@]}"; do
         local val_name="${VALIDATORS[$idx]}"
         local val_ip=$(get_config_value "validators[$idx].ip")
@@ -530,12 +726,49 @@ show_subnet_info() {
         local val_peers=$(ssh_exec "$val_ip" "$val_ssh_user" "$val_ipc_user" \
             "curl -s http://localhost:26657/net_info 2>/dev/null | jq -r '.result.n_peers // 0' 2>/dev/null")
 
+        # Get validator's voting power
+        local val_power="?"
+        local power_pct="?"
         if [ "$is_running" = "running" ]; then
-            log_info "  ✓ $val_name: Running | Height: $val_height | Peers: $val_peers"
+            local val_info=$(ssh_exec "$val_ip" "$val_ssh_user" "$val_ipc_user" \
+                "curl -s http://localhost:26657/status 2>/dev/null | jq -r '.result.validator_info.voting_power // \"0\"' 2>/dev/null")
+
+            if [ -n "$val_info" ] && [ "$val_info" != "0" ] && [ "$val_info" != "" ]; then
+                val_power="$val_info"
+                if [ "$total_voting_power" != "0" ]; then
+                    power_pct=$(echo "scale=2; ($val_power * 100) / $total_voting_power" | bc 2>/dev/null)
+                fi
+            fi
+        fi
+
+        if [ "$is_running" = "running" ]; then
+            log_info "  ✓ $val_name: Running | Height: $val_height | Peers: $val_peers | Power: $val_power ($power_pct%)"
         else
-            log_warn "  ✗ $val_name: Not running"
+            log_warn "  ✗ $val_name: Not running | Power: $val_power"
         fi
     done
+
+    if [ "$total_voting_power" != "0" ]; then
+        log_info ""
+        log_info "  Total Voting Power: $total_voting_power (across $validator_count validators)"
+        local quorum_needed=$(echo "scale=0; ($total_voting_power * 67) / 100 + 1" | bc 2>/dev/null)
+        log_info "  Quorum Required: >67% (>= $quorum_needed power)"
+
+        # Check if quorum is possible
+        if [ "$validator_count" -ge 3 ]; then
+            log_info "  ✓ Quorum is reachable with current validator set"
+
+            # Check if voting power is too low (warning if < 10 per validator on average)
+            local avg_power=$(echo "scale=0; $total_voting_power / $validator_count" | bc 2>/dev/null)
+            if [ "$avg_power" -lt 10 ]; then
+                log_warn "  ⚠ WARNING: Voting power is very low (avg: $avg_power per validator)"
+                log_warn "    With this setup, if ANY validator goes offline, quorum cannot be reached!"
+                log_warn "    Consider increasing power using: ipc-cli subnet set-federated-power"
+            fi
+        else
+            log_warn "  ⚠ Only $validator_count validators - may not reach quorum!"
+        fi
+    fi
     echo
 
     # Check for recent cross-msg related activity in logs

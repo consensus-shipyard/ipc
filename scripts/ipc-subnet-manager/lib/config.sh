@@ -279,6 +279,9 @@ cometbft-overrides: |
 
 # Optional: Fendermint configuration overrides
 fendermint-overrides: |
+  [resolver]
+  enabled = true
+
   [ipc]
   subnet_id = "$subnet_id"
   vote_interval = $vote_interval
@@ -310,6 +313,15 @@ fendermint-overrides: |
 
   [resolver.network]
   local_key = "validator.sk"
+
+  [resolver.network.parent_finality]
+  enabled = true
+
+  [resolver.network.parent_finality.vote_tally]
+  # Tally configuration
+
+  [resolver.network.parent_finality.vote_tally.gossip]
+  # Use gossip for vote tallying (required for voting)
 
   [eth.listen]
   host = "0.0.0.0"
@@ -367,14 +379,16 @@ collect_all_peer_info() {
             log_warn "Could not get CometBFT peer string for $name"
         fi
 
-        # Parse libp2p multiaddr locally
-        local libp2p_multiaddr=$(echo "$peer_json" | jq -r '.fendermint.multiaddr // empty' 2>/dev/null)
+        # Parse libp2p peer ID locally (we'll reconstruct the multiaddr with correct IP)
+        local libp2p_peer_id=$(echo "$peer_json" | jq -r '.fendermint.peer_id // empty' 2>/dev/null)
 
-        if [ -n "$libp2p_multiaddr" ]; then
-            LIBP2P_PEERS[$idx]="$libp2p_multiaddr"
+        if [ -n "$libp2p_peer_id" ] && [ "$libp2p_peer_id" != "null" ]; then
+            # Reconstruct multiaddr using the ACTUAL public IP from config (not from peer-info.json)
+            # This ensures we advertise the correct external IP even if peer-info.json has 127.0.0.1
+            LIBP2P_PEERS[$idx]="/ip4/$ip/tcp/$libp2p_port/p2p/$libp2p_peer_id"
             log_info "$name libp2p: ${LIBP2P_PEERS[$idx]}"
         else
-            log_warn "Could not get libp2p multiaddr for $name"
+            log_warn "Could not get libp2p peer ID for $name"
         fi
 
         # Get validator public key from validator.pk file
@@ -386,6 +400,38 @@ collect_all_peer_info() {
         else
             VALIDATOR_PUBKEYS[$idx]="$pubkey"
             log_info "$name pubkey: ${pubkey:0:20}..."
+        fi
+    done
+}
+
+# Fix listen_addr to bind to 0.0.0.0 (ipc-cli sets it to external-ip)
+fix_listen_addresses() {
+    log_info "Fixing resolver listen addresses to bind to 0.0.0.0..."
+
+    local libp2p_port=$(get_config_value "network.libp2p_port")
+
+    for idx in "${!VALIDATORS[@]}"; do
+        local name="${VALIDATORS[$idx]}"
+        local ip=$(get_config_value "validators[$idx].ip")
+        local ssh_user=$(get_config_value "validators[$idx].ssh_user")
+        local ipc_user=$(get_config_value "validators[$idx].ipc_user")
+        local node_home=$(get_config_value "paths.node_home")
+
+        log_info "Fixing listen_addr for $name..."
+
+        # Change listen_addr from public IP to 0.0.0.0
+        # Use direct SSH to avoid quote escaping issues
+        ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+            "sudo su - $ipc_user -c 'sed -i.bak \"s|listen_addr = .*/tcp/$libp2p_port\\\"|listen_addr = \\\"/ip4/0.0.0.0/tcp/$libp2p_port\\\"|\" $node_home/fendermint/config/default.toml'" 2>/dev/null
+
+        # Verify the change
+        local listen_addr=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+            "sudo su - $ipc_user -c 'grep listen_addr $node_home/fendermint/config/default.toml | head -1'" 2>/dev/null)
+
+        if echo "$listen_addr" | grep -q "0.0.0.0"; then
+            log_info "  ✓ $name now listening on 0.0.0.0:$libp2p_port"
+        else
+            log_warn "  ✗ Failed to update listen_addr for $name"
         fi
     done
 }

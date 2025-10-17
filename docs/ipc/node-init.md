@@ -132,19 +132,57 @@ P2P networking configuration for peer discovery and communication.
 | `ports`       | `object` | No        | Port configuration for different P2P services |
 | `peers`       | `object` | No        | Peer configuration sources                    |
 
-**Example:**
+#### Understanding Network Configuration
+
+The `external-ip` field serves a specific purpose in P2P networking:
+
+- **External IP** (`external-ip`): The public IP address that OTHER nodes use to connect to you. This is what you advertise to peers.
+- **Listen Address**: Where YOUR node binds/listens for incoming connections. This is automatically set to `0.0.0.0` (all interfaces) for maximum compatibility.
+
+**Cloud Deployment (GCP, AWS, Azure):**
+
+When deploying on cloud providers, use your VM's **public IP** for `external-ip`:
+
+```yaml
+p2p:
+  external-ip: "34.73.187.192"  # Your VM's public IP
+  ports:
+    cometbft: 26656
+    resolver: 26655
+```
+
+This configuration will:
+- Bind services to `0.0.0.0` (listens on all network interfaces)
+- Advertise your public IP to peers for incoming connections
+- Work correctly with cloud networking where public IPs are not directly bound to interfaces
+
+**Local Development:**
+
+For local testing, use localhost:
+
+```yaml
+p2p:
+  external-ip: "127.0.0.1"  # Localhost (default)
+  ports:
+    cometbft: 26656
+    resolver: 26655
+```
+
+**With Peer Discovery:**
 
 ```yaml
 p2p:
   external-ip: "192.168.1.100"
   ports:
     cometbft: 26656
-    resolver: 26657
+    resolver: 26655
   peers:
     peer-files:
       - "/path/to/peer1.json"
       - "/path/to/peer2.json"
 ```
+
+> **Note:** The node automatically handles the distinction between listen addresses (what to bind to) and external addresses (what to advertise). You only need to specify the public-facing IP in `external-ip`.
 
 ---
 

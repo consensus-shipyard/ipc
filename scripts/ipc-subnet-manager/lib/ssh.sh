@@ -111,16 +111,16 @@ ssh_kill_process() {
     local ssh_user="$2"
     local ipc_user="$3"
     local process_name="$4"
-    
+
     # First, try graceful termination (SIGTERM)
     ssh_exec "$ip" "$ssh_user" "$ipc_user" "pkill -f '$process_name' 2>/dev/null || true" || true
-    
+
     # Wait a moment
     sleep 1
-    
+
     # Check if any processes remain and force kill them (SIGKILL)
     ssh_exec "$ip" "$ssh_user" "$ipc_user" "pkill -9 -f '$process_name' 2>/dev/null || true" || true
-    
+
     # Always return success so script doesn't exit
     return 0
 }

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### 🐛 Bug Fixes
+
+- *(cli)* Fix libp2p binding issue on cloud VMs (GCP, AWS, Azure) - `ipc-cli node init` now correctly uses `0.0.0.0` for `listen_addr` and the public IP for `external_addresses`. This fixes parent finality voting and top-down message execution on cloud-deployed subnets where public IPs are not directly bound to network interfaces. Existing deployments can reinitialize or manually update `~/.ipc-node/fendermint/config/default.toml` to set `listen_addr = "/ip4/0.0.0.0/tcp/26655"` and add `external_addresses = ["/ip4/<PUBLIC_IP>/tcp/26655"]`.
+
 ## [axon-r08] - 2024-12-31
 
 ### 🚀 Features
