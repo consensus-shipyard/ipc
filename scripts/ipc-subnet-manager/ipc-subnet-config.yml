@@ -98,7 +98,7 @@ init:
 
   # CometBFT overrides
   cometbft:
-    timeout_commit: "5s"
+    timeout_commit: "100ms"  # Extreme-speed block production (~0.2-0.4s blocks, 5-10 blocks/sec)
     rpc_laddr: "tcp://0.0.0.0:26657"
 
 # IPC CLI Configuration (for ~/.ipc/config.toml)

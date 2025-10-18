@@ -44,6 +44,7 @@ Commands:
     info              Show subnet information (chain ID, validators, status)
     block-time        Measure block production time (default: 10s sample)
     watch-finality    Monitor parent finality progress in real-time
+    watch-blocks      Monitor block production in real-time
     logs [validator]  Tail logs from specific validator
     deploy            Deploy/update binaries (STUB - not implemented)
 
@@ -65,6 +66,8 @@ Examples:
     $0 check                                   # Run health checks
     $0 watch-finality                          # Monitor parent finality progress
     $0 watch-finality --target-epoch=3115719   # Watch until specific epoch
+    $0 watch-blocks                            # Monitor block production
+    $0 watch-blocks --target-height=1000       # Watch until block 1000
     $0 logs validator-1                        # View logs from validator-1
     $0 restart --yes                           # Restart without confirmation
 
@@ -306,6 +309,25 @@ cmd_watch_finality() {
     watch_parent_finality "$target_epoch" "$refresh_interval"
 }
 
+# Watch block production
+cmd_watch_blocks() {
+    local refresh_interval=2
+    local target_height=""
+
+    for arg in "$@"; do
+        case $arg in
+            --target-height=*) target_height="${arg#*=}" ;;
+            --target-height) shift; target_height="$1" ;;
+            --interval=*) refresh_interval="${arg#*=}" ;;
+            --interval) shift; refresh_interval="$1" ;;
+        esac
+    done
+
+    load_config
+
+    watch_block_production "$target_height" "$refresh_interval"
+}
+
 # Show subnet information
 cmd_info() {
     load_config
@@ -410,6 +432,9 @@ main() {
             ;;
         watch-finality)
             cmd_watch_finality "$@"
+            ;;
+        watch-blocks)
+            cmd_watch_blocks "$@"
             ;;
         logs)
             cmd_logs "$@"

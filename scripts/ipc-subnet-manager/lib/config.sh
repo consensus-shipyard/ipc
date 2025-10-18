@@ -13,6 +13,12 @@ load_config() {
         exit 1
     fi
 
+    # Clear validators array (in case of shell reuse)
+    VALIDATORS=()
+    COMETBFT_PEERS=()
+    LIBP2P_PEERS=()
+    VALIDATOR_PUBKEYS=()
+
     # Parse validators
     local validator_count=$(yq eval '.validators | length' "$CONFIG_FILE")
     for ((i=0; i<validator_count; i++)); do

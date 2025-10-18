@@ -904,3 +904,140 @@ watch_parent_finality() {
     fi
 }
 
+# Watch block production in real-time
+watch_block_production() {
+    local target_height="${1:-}"
+    local refresh_interval="${2:-2}"
+
+    # Use first validator for monitoring
+    local ip=$(get_config_value "validators[0].ip")
+    local ssh_user=$(get_config_value "validators[0].ssh_user")
+    local ipc_user=$(get_config_value "validators[0].ipc_user")
+    local name="${VALIDATORS[0]}"
+
+    echo ""
+    log_section "Block Production Monitor"
+    echo ""
+
+    if [ -n "$target_height" ]; then
+        log_info "Monitoring until block height: $target_height"
+    else
+        log_info "Monitoring block production (Ctrl+C to stop)"
+    fi
+    log_info "Refresh interval: ${refresh_interval}s"
+    log_info "Source: $name"
+    echo ""
+    echo "Time      | Iter | Height  | Δ Blocks | Block Time | Blocks/s | Avg Time | Status"
+    echo "----------|------|---------|----------|------------|----------|----------|--------"
+
+    local iteration=0
+    local start_time=$(date +%s)
+    local prev_height=0
+    local prev_time=0
+    local total_blocks=0
+    local cumulative_time=0
+
+    # Get initial height
+    prev_height=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        "curl -s http://localhost:26657/status 2>/dev/null | jq -r '.result.sync_info.latest_block_height // 0' 2>/dev/null" || echo "0")
+    prev_time=$(date +%s)
+
+    while true; do
+        sleep "$refresh_interval"
+
+        iteration=$((iteration + 1))
+        local current_time=$(date +%s)
+        local elapsed=$((current_time - start_time))
+
+        # Get current block height
+        local current_height=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+            "curl -s http://localhost:26657/status 2>/dev/null | jq -r '.result.sync_info.latest_block_height // 0' 2>/dev/null" || echo "0")
+
+        # Calculate metrics
+        local delta_blocks=$((current_height - prev_height))
+        local delta_time=$((current_time - prev_time))
+
+        # Avoid division by zero
+        if [ "$delta_time" -eq 0 ]; then
+            delta_time=1
+        fi
+
+        # Calculate block time and blocks per second
+        local block_time="N/A"
+        local blocks_per_sec="0.00"
+        if [ "$delta_blocks" -gt 0 ]; then
+            block_time=$(echo "scale=2; $delta_time / $delta_blocks" | bc 2>/dev/null || echo "N/A")
+            blocks_per_sec=$(echo "scale=2; $delta_blocks / $delta_time" | bc 2>/dev/null || echo "0.00")
+
+            # Update cumulative stats
+            total_blocks=$((total_blocks + delta_blocks))
+            cumulative_time=$((cumulative_time + delta_time))
+        fi
+
+        # Calculate average block time
+        local avg_block_time="N/A"
+        if [ "$total_blocks" -gt 0 ] && [ "$cumulative_time" -gt 0 ]; then
+            avg_block_time=$(echo "scale=2; $cumulative_time / $total_blocks" | bc 2>/dev/null || echo "N/A")
+        fi
+
+        # Calculate progress if target is set
+        local status_msg=""
+        if [ -n "$target_height" ] && [ "$current_height" -gt 0 ]; then
+            local remaining=$((target_height - current_height))
+            if [ "$remaining" -gt 0 ]; then
+                status_msg="$remaining left"
+            elif [ "$remaining" -eq 0 ]; then
+                status_msg="✓ REACHED"
+            else
+                status_msg="✓ PAST"
+            fi
+        else
+            if [ "$delta_blocks" -eq 0 ]; then
+                status_msg="stalled"
+            elif [ "$delta_blocks" -lt 0 ]; then
+                status_msg="reorg?"
+            else
+                status_msg="producing"
+            fi
+        fi
+
+        # Display current status on new line
+        printf "%s | %-4d | %-7d | %-8d | %-10s | %-8s | %-8s | %s\n" \
+            "$(date +%H:%M:%S)" \
+            "$iteration" \
+            "$current_height" \
+            "$delta_blocks" \
+            "${block_time}s" \
+            "$blocks_per_sec" \
+            "${avg_block_time}s" \
+            "$status_msg"
+
+        # Check if target reached
+        if [ -n "$target_height" ] && [ "$current_height" -ge "$target_height" ]; then
+            echo ""
+            log_success "✓ Target height $target_height reached!"
+            log_info "  Current height: $current_height"
+            log_info "  Total blocks produced: $total_blocks"
+            log_info "  Average block time: ${avg_block_time}s"
+            log_info "  Total elapsed time: ${elapsed}s"
+            echo ""
+            break
+        fi
+
+        # Update previous values for next iteration
+        prev_height=$current_height
+        prev_time=$current_time
+    done
+
+    if [ -z "$target_height" ]; then
+        echo ""
+        log_info "Monitoring stopped after $iteration iterations (${elapsed}s elapsed)"
+        log_info "  Total blocks observed: $total_blocks"
+        if [ "$total_blocks" -gt 0 ]; then
+            log_info "  Average block time: ${avg_block_time}s"
+            local overall_blocks_per_sec=$(echo "scale=2; $total_blocks / $elapsed" | bc 2>/dev/null || echo "0.00")
+            log_info "  Overall blocks/second: $overall_blocks_per_sec"
+        fi
+    fi
+}
+
