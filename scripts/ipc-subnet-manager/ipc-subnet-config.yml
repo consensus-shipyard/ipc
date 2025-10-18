@@ -4,7 +4,7 @@
 # Subnet Configuration
 subnet:
   # Subnet ID - get this from your subnet creation
-  id: "/r314159/t410f4hiopvhpdytxzsffl5brjf4yc7elfmuquqy7a3y"
+  id: "/r314159/t410fa46dmtr5hj5snn7ijakzpejnn5l2cwcnpn3tbua"
 
   # Parent chain RPC endpoint
   parent_rpc: "https://api.calibration.node.glif.io/rpc/v1"
@@ -73,7 +73,7 @@ init:
   permission_mode: "federated"
 
   # Validator power (for federated mode)
-  validator_power: 1
+  validator_power: 3
 
   # Genesis configuration
   genesis:
