@@ -792,3 +792,115 @@ show_subnet_info() {
     echo
 }
 
+# Watch parent finality progress in real-time
+watch_parent_finality() {
+    local target_epoch="${1:-}"
+    local refresh_interval="${2:-5}"
+
+    # Use first validator for monitoring
+    local ip=$(get_config_value "validators[0].ip")
+    local ssh_user=$(get_config_value "validators[0].ssh_user")
+    local ipc_user=$(get_config_value "validators[0].ipc_user")
+    local name="${VALIDATORS[0]}"
+
+    # Get parent RPC endpoint for querying actual parent chain height
+    local parent_rpc=$(get_config_value "subnet.parent_rpc")
+
+    echo ""
+    log_section "Parent Finality Monitor"
+    echo ""
+
+    if [ -n "$target_epoch" ]; then
+        log_info "Monitoring until parent epoch: $target_epoch"
+    else
+        log_info "Monitoring parent finality progress (Ctrl+C to stop)"
+    fi
+    log_info "Refresh interval: ${refresh_interval}s"
+    log_info "Source: $name"
+    log_info "Parent RPC: $parent_rpc"
+    echo ""
+    echo "Time      | Iter | Subnet Finality | Parent Chain | Lag   | Subnet Height | Status"
+    echo "----------|------|-----------------|--------------|-------|---------------|--------"
+
+    local iteration=0
+    local start_time=$(date +%s)
+
+    while true; do
+        iteration=$((iteration + 1))
+        local current_time=$(date +%s)
+        local elapsed=$((current_time - start_time))
+
+        # Get subnet's parent finality height (what parent height the subnet has committed)
+        local subnet_parent_finality=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+            "grep 'ParentFinalityCommitted' ~/.ipc-node/logs/*.log 2>/dev/null | tail -1" 2>/dev/null | \
+            grep -oE 'parent_height: [0-9]+' | grep -oE '[0-9]+' || echo "0")
+
+        # Get current parent chain block height
+        local parent_chain_height=$(curl -s -X POST -H "Content-Type: application/json" \
+            --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
+            "$parent_rpc" 2>/dev/null | jq -r '.result // "0x0"' 2>/dev/null)
+
+        # Convert hex to decimal
+        if [[ "$parent_chain_height" == 0x* ]]; then
+            parent_chain_height=$((16#${parent_chain_height#0x}))
+        else
+            parent_chain_height=0
+        fi
+
+        # Calculate lag between parent chain and subnet finality
+        local lag=0
+        if [ "$subnet_parent_finality" -gt 0 ] && [ "$parent_chain_height" -gt 0 ]; then
+            lag=$((parent_chain_height - subnet_parent_finality))
+        fi
+
+        # Get current subnet block height
+        local subnet_height=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+            "curl -s http://localhost:26657/status 2>/dev/null | jq -r '.result.sync_info.latest_block_height // 0' 2>/dev/null" || echo "0")
+
+        # Calculate progress if target is set
+        local status_msg=""
+        if [ -n "$target_epoch" ] && [ "$subnet_parent_finality" -gt 0 ]; then
+            local remaining=$((target_epoch - subnet_parent_finality))
+            if [ "$remaining" -gt 0 ]; then
+                status_msg="$remaining left"
+            elif [ "$remaining" -eq 0 ]; then
+                status_msg="✓ REACHED"
+            else
+                status_msg="✓ PAST"
+            fi
+        else
+            status_msg="tracking"
+        fi
+
+        # Display current status on new line
+        printf "%s | %-4d | %-15d | %-12d | %-5d | %-13d | %s\n" \
+            "$(date +%H:%M:%S)" \
+            "$iteration" \
+            "$subnet_parent_finality" \
+            "$parent_chain_height" \
+            "$lag" \
+            "$subnet_height" \
+            "$status_msg"
+
+        # Check if target reached
+        if [ -n "$target_epoch" ] && [ "$subnet_parent_finality" -ge "$target_epoch" ]; then
+            echo ""
+            log_success "✓ Target epoch $target_epoch reached!"
+            log_info "  Subnet parent finality: $subnet_parent_finality"
+            log_info "  Parent chain height: $parent_chain_height"
+            log_info "  Lag: $lag epochs"
+            log_info "  Subnet block height: $subnet_height"
+            log_info "  Total elapsed time: ${elapsed}s"
+            echo ""
+            break
+        fi
+
+        sleep "$refresh_interval"
+    done
+
+    if [ -z "$target_epoch" ]; then
+        echo ""
+        log_info "Monitoring stopped after $iteration iterations (${elapsed}s elapsed)"
+    fi
+}
+

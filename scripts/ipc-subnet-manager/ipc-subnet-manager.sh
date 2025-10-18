@@ -43,6 +43,7 @@ Commands:
     restart           Graceful restart of all nodes
     info              Show subnet information (chain ID, validators, status)
     block-time        Measure block production time (default: 10s sample)
+    watch-finality    Monitor parent finality progress in real-time
     logs [validator]  Tail logs from specific validator
     deploy            Deploy/update binaries (STUB - not implemented)
 
@@ -60,10 +61,12 @@ Environment Variables:
     IPC_PARENT_RPC           Override parent RPC endpoint
 
 Examples:
-    $0 init                  # Initialize subnet from scratch
-    $0 check                 # Run health checks
-    $0 logs validator-1      # View logs from validator-1
-    $0 restart --yes         # Restart without confirmation
+    $0 init                                    # Initialize subnet from scratch
+    $0 check                                   # Run health checks
+    $0 watch-finality                          # Monitor parent finality progress
+    $0 watch-finality --target-epoch=3115719   # Watch until specific epoch
+    $0 logs validator-1                        # View logs from validator-1
+    $0 restart --yes                           # Restart without confirmation
 
 EOF
     exit 0
@@ -284,6 +287,25 @@ cmd_block_time() {
     measure_all_block_times "$sample_duration"
 }
 
+# Watch parent finality progress
+cmd_watch_finality() {
+    local target_epoch=""
+    local refresh_interval=5
+
+    for arg in "$@"; do
+        case $arg in
+            --target-epoch=*) target_epoch="${arg#*=}" ;;
+            --target-epoch) shift; target_epoch="$1" ;;
+            --interval=*) refresh_interval="${arg#*=}" ;;
+            --interval) shift; refresh_interval="$1" ;;
+        esac
+    done
+
+    load_config
+
+    watch_parent_finality "$target_epoch" "$refresh_interval"
+}
+
 # Show subnet information
 cmd_info() {
     load_config
@@ -385,6 +407,9 @@ main() {
             ;;
         block-time)
             cmd_block_time "$@"
+            ;;
+        watch-finality)
+            cmd_watch_finality "$@"
             ;;
         logs)
             cmd_logs "$@"
