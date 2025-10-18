@@ -368,12 +368,19 @@ fendermint-overrides: |
   [resolver.network.parent_finality.vote_tally.gossip]
   # Use gossip for vote tallying (required for voting)
 
+  # Disable bottom-up checkpointing for federated subnets
+  # (Bottom-up checkpointing posts state commitments to parent chain)
+  [ipc.bottomup]
+  enabled = false
+
   [eth.listen]
   host = "0.0.0.0"
 
   [validator_key]
   path = "validator.sk"
-  kind = "regular"
+  # Use "ethereum" for EVM-based subnets (federated/collateral with EVM addresses)
+  # Use "regular" only for native Filecoin address subnets
+  kind = "ethereum"
 EOF
 }
 
