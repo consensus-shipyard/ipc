@@ -81,24 +81,44 @@ init:
     power_scale: 3
     network_version: 21
 
-  # IPC configuration
+  # IPC configuration (optimized for fast parent finality)
   ipc:
-    vote_interval: 1
-    vote_timeout: 60
+    vote_interval: 1          # Vote every block
+    vote_timeout: 30          # Reduced from 60s for faster timeout
 
-  # Top-down finality configuration
+  # Top-down finality configuration (optimized for speed)
   topdown:
-    chain_head_delay: 10
-    proposal_delay: 10
-    max_proposal_range: 100
-    polling_interval: 10
-    exponential_back_off: 5
-    exponential_retry_limit: 5
-    parent_http_timeout: 60
+    chain_head_delay: 5       # Reduced from 10 for faster parent block processing
+    proposal_delay: 5         # Reduced from 10 for faster proposals
+    max_proposal_range: 50    # Reduced from 100 for smaller batches
+    polling_interval: 5       # Poll parent every 5s instead of 10s
+    exponential_back_off: 3   # Reduced from 5 for faster retries
+    exponential_retry_limit: 3 # Reduced from 5
+    parent_http_timeout: 30   # Reduced from 60s for faster timeout
 
-  # CometBFT overrides
+  # CometBFT overrides (optimal performance profile - validated through testing)
   cometbft:
-    timeout_commit: "100ms"  # Extreme-speed block production (~0.2-0.4s blocks, 5-10 blocks/sec)
+    # Core consensus timeouts
+    timeout_commit: "100ms"         # Time between blocks
+    timeout_propose: "400ms"        # Time to wait for proposal (OPTIMAL: tested 300/400/500ms) ⭐
+    timeout_prevote: "200ms"        # Time to wait for prevotes (default: 1s)
+    timeout_precommit: "200ms"      # Time to wait for precommits (default: 1s)
+
+    # Timeout deltas (increases per round if consensus fails)
+    timeout_propose_delta: "100ms"  # (default: 500ms)
+    timeout_prevote_delta: "50ms"   # (default: 500ms)
+    timeout_precommit_delta: "50ms" # (default: 500ms)
+
+    # Empty blocks
+    create_empty_blocks: true
+    create_empty_blocks_interval: "0s"  # Create immediately when timeout_commit expires
+
+    # P2P performance
+    send_rate: 20971520         # 20MB/s (default: 5MB/s)
+    recv_rate: 20971520         # 20MB/s (default: 5MB/s)
+    max_packet_msg_payload_size: 10240  # 10KB packets (default: 1KB)
+
+    # RPC
     rpc_laddr: "tcp://0.0.0.0:26657"
 
 # IPC CLI Configuration (for ~/.ipc/config.toml)

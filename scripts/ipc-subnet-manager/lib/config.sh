@@ -222,8 +222,27 @@ generate_node_init_yml() {
     local exponential_retry_limit=$(get_config_value "init.topdown.exponential_retry_limit")
     local parent_http_timeout=$(get_config_value "init.topdown.parent_http_timeout")
 
-    # CometBFT config
+    # CometBFT config - core timeouts
     local timeout_commit=$(get_config_value "init.cometbft.timeout_commit")
+    local timeout_propose=$(get_config_value "init.cometbft.timeout_propose")
+    local timeout_prevote=$(get_config_value "init.cometbft.timeout_prevote")
+    local timeout_precommit=$(get_config_value "init.cometbft.timeout_precommit")
+
+    # CometBFT config - timeout deltas
+    local timeout_propose_delta=$(get_config_value "init.cometbft.timeout_propose_delta")
+    local timeout_prevote_delta=$(get_config_value "init.cometbft.timeout_prevote_delta")
+    local timeout_precommit_delta=$(get_config_value "init.cometbft.timeout_precommit_delta")
+
+    # CometBFT config - empty blocks
+    local create_empty_blocks=$(get_config_value "init.cometbft.create_empty_blocks")
+    local create_empty_blocks_interval=$(get_config_value "init.cometbft.create_empty_blocks_interval")
+
+    # CometBFT config - P2P
+    local send_rate=$(get_config_value "init.cometbft.send_rate")
+    local recv_rate=$(get_config_value "init.cometbft.recv_rate")
+    local max_packet_msg_payload_size=$(get_config_value "init.cometbft.max_packet_msg_payload_size")
+
+    # CometBFT config - RPC
     local rpc_laddr=$(get_config_value "init.cometbft.rpc_laddr")
 
     cat > "$output_file" << EOF
@@ -279,7 +298,27 @@ genesis: !create
 # Optional: CometBFT configuration overrides
 cometbft-overrides: |
   [consensus]
+  # Core consensus timeouts
   timeout_commit = "$timeout_commit"
+  timeout_propose = "$timeout_propose"
+  timeout_prevote = "$timeout_prevote"
+  timeout_precommit = "$timeout_precommit"
+
+  # Timeout deltas (increase per round on failure)
+  timeout_propose_delta = "$timeout_propose_delta"
+  timeout_prevote_delta = "$timeout_prevote_delta"
+  timeout_precommit_delta = "$timeout_precommit_delta"
+
+  # Empty block control
+  create_empty_blocks = $create_empty_blocks
+  create_empty_blocks_interval = "$create_empty_blocks_interval"
+
+  [p2p]
+  # P2P performance tuning
+  send_rate = $send_rate
+  recv_rate = $recv_rate
+  max_packet_msg_payload_size = $max_packet_msg_payload_size
+
   [rpc]
   laddr = "$rpc_laddr"
 
