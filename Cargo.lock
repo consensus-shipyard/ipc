@@ -3268,6 +3268,7 @@ dependencies = [
  "hex-literal 0.4.1",
  "log",
  "multihash 0.18.1",
+ "multihash-codetable",
  "num-derive 0.4.2",
  "num-traits",
  "serde",

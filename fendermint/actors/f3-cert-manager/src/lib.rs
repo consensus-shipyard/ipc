@@ -150,7 +150,7 @@ mod tests {
     use fvm_ipld_encoding::ipld_block::IpldBlock;
     use fvm_shared::address::Address;
     use fvm_shared::error::ExitCode;
-    use multihash::{Code, MultihashDigest};
+    use multihash_codetable::{Code, MultihashDigest};
 
     /// Helper function to create a mock F3 certificate
     fn create_test_certificate(instance_id: u64, epoch: i64) -> F3Certificate {
