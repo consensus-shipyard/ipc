@@ -4030,15 +4030,16 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64 0.21.7",
- "cid 0.10.1",
+ "cid 0.11.1",
  "fendermint_actor_f3_cert_manager",
  "fendermint_vm_genesis",
- "fvm_ipld_encoding",
+ "fvm_ipld_encoding 0.5.3",
  "fvm_shared",
  "humantime-serde",
  "ipc-api",
  "ipc-provider",
  "multihash 0.18.1",
+ "multihash-codetable",
  "parking_lot",
  "serde",
  "thiserror 1.0.69",
@@ -5410,7 +5411,7 @@ version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57a3db5ea5923d99402c94e9feb261dc5ee9b4efa158b0315f788cf549cc200c"
 dependencies = [
- "humantime 2.3.0",
+ "humantime",
  "serde",
 ]
 

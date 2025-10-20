@@ -37,3 +37,4 @@ fvm_ipld_encoding = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "rt-multi-thread"] }
+multihash-codetable = { version = "0.1.4", features = ["blake2b"] }
