@@ -48,7 +48,7 @@ url = { workspace = true }
 
 fendermint_abci = { path = "../abci" }
 actors-custom-api = { path = "../actors/api" }
-fendermint_actor_f3_light_client = { path = "../actors/f3-light-client" }
+fendermint_actor_f3_cert_manager = { path = "../actors/f3-cert-manager" }
 fendermint_app_options = { path = "./options" }
 fendermint_app_settings = { path = "./settings" }
 fendermint_crypto = { path = "../crypto" }
@@ -71,10 +71,6 @@ fendermint_vm_message = { path = "../vm/message" }
 fendermint_vm_resolver = { path = "../vm/resolver" }
 fendermint_vm_snapshot = { path = "../vm/snapshot" }
 fendermint_vm_topdown = { path = "../vm/topdown" }
-fendermint_vm_topdown_proof_service = { path = "../vm/topdown/proof-service" }
-
-ipc_actors_abis = { path = "../../contract-bindings" }
-ethers = {workspace =  true}
 
 # .car file wrapped in a crate
 actors-builtin-car = { path = "../actors-builtin-car" }
@@ -91,6 +87,8 @@ ipc-provider = { path = "../../ipc/provider" }
 ipc_ipld_resolver = { path = "../../ipld/resolver" }
 ipc-observability = { path = "../../ipc/observability" }
 contracts-artifacts = { path = "../../contracts-artifacts" }
+# Temporarily disabled due to bls-signatures@0.15.0 compatibility issues
+# filecoin-f3-lightclient = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

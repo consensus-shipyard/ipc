@@ -227,9 +227,9 @@ pub struct GenesisFromParentArgs {
 
     /// Filecoin/Lotus RPC endpoint for fetching F3 certificate data (parent finality proofs).
     /// This is separate from parent_endpoint which is the EVM/Ethereum API.
-    /// Optional - if not provided, F3 data will not be fetched (e.g., when parent is not Filecoin).
+    /// Required for proof-based parent finality.
     #[arg(long)]
-    pub parent_filecoin_rpc: Option<url::Url>,
+    pub parent_filecoin_rpc: url::Url,
 
     /// Auth token for the Filecoin RPC endpoint.
     #[arg(long)]
