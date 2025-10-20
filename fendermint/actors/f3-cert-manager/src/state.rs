@@ -2,13 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use crate::types::{F3Certificate, PowerEntry};
-use cid::Cid;
 use fil_actors_runtime::runtime::Runtime;
 use fil_actors_runtime::ActorError;
-use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::CborStore;
 use fvm_shared::clock::ChainEpoch;
-use multihash_codetable::Code;
 use serde::{Deserialize, Serialize};
 
 /// State of the F3 certificate manager actor
@@ -16,18 +12,17 @@ use serde::{Deserialize, Serialize};
 pub struct State {
     /// Genesis F3 instance ID
     pub genesis_instance_id: u64,
-    /// Genesis power table for F3 consensus (stored in blockstore)
-    pub genesis_power_table: Cid,
-    /// Latest F3 certificate (stored in blockstore)
-    pub latest_certificate: Option<Cid>,
+    /// Genesis power table for F3 consensus
+    pub genesis_power_table: Vec<PowerEntry>,
+    /// Latest F3 certificate
+    pub latest_certificate: Option<F3Certificate>,
     /// Latest finalized height
     pub latest_finalized_height: ChainEpoch,
 }
 
 impl State {
     /// Create a new F3 certificate manager state
-    pub fn new<BS: Blockstore>(
-        store: &BS,
+    pub fn new(
         genesis_instance_id: u64,
         genesis_power_table: Vec<PowerEntry>,
         genesis_certificate: Option<F3Certificate>,
@@ -37,26 +32,10 @@ impl State {
             .map(|cert| cert.epoch)
             .unwrap_or(0);
 
-        // Store genesis power table in blockstore
-        let genesis_power_table_cid = store
-            .put_cbor(&genesis_power_table, Code::Blake2b256)
-            .map_err(|e| {
-                ActorError::illegal_state(format!("Failed to store genesis power table: {}", e))
-            })?;
-
-        // Store genesis certificate in blockstore if provided
-        let latest_certificate_cid = if let Some(cert) = &genesis_certificate {
-            Some(store.put_cbor(cert, Code::Blake2b256).map_err(|e| {
-                ActorError::illegal_state(format!("Failed to store genesis certificate: {}", e))
-            })?)
-        } else {
-            None
-        };
-
         let state = State {
             genesis_instance_id,
-            genesis_power_table: genesis_power_table_cid,
-            latest_certificate: latest_certificate_cid,
+            genesis_power_table,
+            latest_certificate: genesis_certificate,
             latest_finalized_height,
         };
         Ok(state)
@@ -65,7 +44,7 @@ impl State {
     /// Update the latest F3 certificate
     pub fn update_certificate(
         &mut self,
-        rt: &impl Runtime,
+        _rt: &impl Runtime,
         certificate: F3Certificate,
     ) -> Result<(), ActorError> {
         // Validate that the certificate advances the finalized height
@@ -76,40 +55,16 @@ impl State {
             )));
         }
 
-        // Store certificate in blockstore
-        let certificate_cid = rt
-            .store()
-            .put_cbor(&certificate, Code::Blake2b256)
-            .map_err(|e| {
-                ActorError::illegal_state(format!("Failed to store certificate: {}", e))
-            })?;
-
-        // Update state
+        // Update state - the transaction will handle persisting this
         self.latest_finalized_height = certificate.epoch;
-        self.latest_certificate = Some(certificate_cid);
+        self.latest_certificate = Some(certificate);
 
         Ok(())
     }
 
     /// Get the latest certificate
-    pub fn get_latest_certificate(
-        &self,
-        rt: &impl Runtime,
-    ) -> Result<Option<F3Certificate>, ActorError> {
-        if let Some(cid) = &self.latest_certificate {
-            let cert = rt
-                .store()
-                .get_cbor(cid)
-                .map_err(|e| {
-                    ActorError::illegal_state(format!("Failed to load certificate: {}", e))
-                })?
-                .ok_or_else(|| {
-                    ActorError::illegal_state("Certificate not found in blockstore".to_string())
-                })?;
-            Ok(Some(cert))
-        } else {
-            Ok(None)
-        }
+    pub fn get_latest_certificate(&self) -> Option<&F3Certificate> {
+        self.latest_certificate.as_ref()
     }
 
     /// Get the genesis F3 instance ID
@@ -118,20 +73,8 @@ impl State {
     }
 
     /// Get the genesis power table
-    pub fn get_genesis_power_table(
-        &self,
-        rt: &impl Runtime,
-    ) -> Result<Vec<PowerEntry>, ActorError> {
-        let power_table = rt
-            .store()
-            .get_cbor(&self.genesis_power_table)
-            .map_err(|e| {
-                ActorError::illegal_state(format!("Failed to load genesis power table: {}", e))
-            })?
-            .ok_or_else(|| {
-                ActorError::illegal_state("Genesis power table not found in blockstore".to_string())
-            })?;
-        Ok(power_table)
+    pub fn get_genesis_power_table(&self) -> &[PowerEntry] {
+        &self.genesis_power_table
     }
 
     /// Get the latest finalized height

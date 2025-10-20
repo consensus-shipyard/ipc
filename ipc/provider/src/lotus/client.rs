@@ -52,8 +52,9 @@ mod methods {
     pub const CHAIN_HEAD: &str = "Filecoin.ChainHead";
     pub const GET_TIPSET_BY_HEIGHT: &str = "Filecoin.ChainGetTipSetByHeight";
     pub const ESTIMATE_MESSAGE_GAS: &str = "Filecoin.GasEstimateMessageGas";
-    pub const F3_GET_LATEST_CERTIFICATE: &str = "Filecoin.F3GetLatestCertificate";
-    pub const F3_GET_POWER_TABLE_BY_INSTANCE: &str = "Filecoin.F3GetPowerTableByInstance";
+    pub const F3_GET_CERTIFICATE: &str = "Filecoin.F3GetCertificate";
+    pub const F3_GET_POWER_TABLE: &str = "Filecoin.F3GetPowerTable";
+    pub const F3_GET_INSTANCE_ID: &str = "Filecoin.F3GetInstanceID";
 }
 
 /// The default state wait confidence value
@@ -353,25 +354,32 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
     }
 
     async fn f3_get_certificate(&self) -> Result<Option<F3CertificateResponse>> {
-        // refer to: Filecoin.F3GetLatestCertificate
+        // refer to: Filecoin.F3GetCertificate
         let r = self
             .client
-            .request::<Option<F3CertificateResponse>>(methods::F3_GET_LATEST_CERTIFICATE, NO_PARAMS)
+            .request::<Option<F3CertificateResponse>>(methods::F3_GET_CERTIFICATE, NO_PARAMS)
             .await?;
-        tracing::debug!("received f3_get_latest_certificate response: {r:?}");
+        tracing::debug!("received f3_get_certificate response: {r:?}");
         Ok(r)
     }
 
     async fn f3_get_power_table(&self, instance_id: u64) -> Result<F3PowerTableResponse> {
-        // refer to: Filecoin.F3GetPowerTableByInstance
+        // refer to: Filecoin.F3GetPowerTable
         let r = self
             .client
-            .request::<F3PowerTableResponse>(
-                methods::F3_GET_POWER_TABLE_BY_INSTANCE,
-                json!([instance_id]),
-            )
+            .request::<F3PowerTableResponse>(methods::F3_GET_POWER_TABLE, json!([instance_id]))
             .await?;
-        tracing::debug!("received f3_get_power_table_by_instance response: {r:?}");
+        tracing::debug!("received f3_get_power_table response: {r:?}");
+        Ok(r)
+    }
+
+    async fn f3_get_instance_id(&self) -> Result<u64> {
+        // refer to: Filecoin.F3GetInstanceID
+        let r = self
+            .client
+            .request::<u64>(methods::F3_GET_INSTANCE_ID, NO_PARAMS)
+            .await?;
+        tracing::debug!("received f3_get_instance_id response: {r:?}");
         Ok(r)
     }
 }
