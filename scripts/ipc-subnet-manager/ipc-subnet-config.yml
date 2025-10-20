@@ -4,7 +4,7 @@
 # Subnet Configuration
 subnet:
   # Subnet ID - get this from your subnet creation
-  id: "/r314159/t410fa46dmtr5hj5snn7ijakzpejnn5l2cwcnpn3tbua"
+  id: "/r314159/t410f4vg4nhhuiorfffwjs3fjotkyiq3enivrnhdez2q"
 
   # Parent chain RPC endpoint
   parent_rpc: "https://api.calibration.node.glif.io/rpc/v1"

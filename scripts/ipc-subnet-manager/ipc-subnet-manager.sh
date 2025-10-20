@@ -24,6 +24,7 @@ source "${SCRIPT_DIR}/lib/colors.sh"
 source "${SCRIPT_DIR}/lib/ssh.sh"
 source "${SCRIPT_DIR}/lib/config.sh"
 source "${SCRIPT_DIR}/lib/health.sh"
+source "${SCRIPT_DIR}/lib/dashboard.sh"
 
 # Global variables
 VALIDATORS=()
@@ -42,6 +43,7 @@ Commands:
     check             Comprehensive health check on all nodes
     restart           Graceful restart of all nodes
     info              Show subnet information (chain ID, validators, status)
+    dashboard         Live monitoring dashboard with metrics and errors
     block-time        Measure block production time (default: 10s sample)
     watch-finality    Monitor parent finality progress in real-time
     watch-blocks      Monitor block production in real-time
@@ -334,6 +336,32 @@ cmd_info() {
     show_subnet_info
 }
 
+# Live dashboard monitoring
+cmd_dashboard() {
+    local validator_idx=0
+    local refresh_interval=3
+
+    for arg in "$@"; do
+        case $arg in
+            --validator=*)
+                local name="${arg#*=}"
+                # Find validator index by name
+                for idx in "${!VALIDATORS[@]}"; do
+                    if [ "${VALIDATORS[$idx]}" = "$name" ]; then
+                        validator_idx=$idx
+                        break
+                    fi
+                done
+                ;;
+            --validator) shift; validator_idx="$1" ;;
+            --interval=*) refresh_interval="${arg#*=}" ;;
+            --interval) shift; refresh_interval="$1" ;;
+        esac
+    done
+
+    run_dashboard "$validator_idx" "$refresh_interval"
+}
+
 # View logs
 cmd_logs() {
     local validator_name="${1:-}"
@@ -426,6 +454,9 @@ main() {
             ;;
         info)
             cmd_info "$@"
+            ;;
+        dashboard|monitor)
+            cmd_dashboard "$@"
             ;;
         block-time)
             cmd_block_time "$@"
