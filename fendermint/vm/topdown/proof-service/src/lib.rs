@@ -20,12 +20,9 @@
 pub mod assembler;
 pub mod cache;
 pub mod config;
-pub mod f3_client;
-pub mod observe;
 pub mod persistence;
 pub mod service;
 pub mod types;
-pub mod verifier;
 
 // Re-export main types for convenience
 pub use cache::ProofCache;
@@ -53,11 +50,12 @@ use std::sync::Arc;
 /// * `initial_instance` - The last committed F3 instance (from F3CertManager actor)
 /// * `initial_power_table` - Initial power table (from F3CertManager actor)
 /// * `db_path` - Optional database path for persistence
+/// * `initial_committed_instance` - The last committed F3 instance (from actor)
 ///
 /// # Returns
 /// * `Arc<ProofCache>` - Shared cache that proposers can query
 /// * `tokio::task::JoinHandle` - Handle to the background service task
-pub async fn launch_service(
+pub fn launch_service(
     config: ProofServiceConfig,
     subnet_id: SubnetID,
     initial_committed_epoch: ChainEpoch,

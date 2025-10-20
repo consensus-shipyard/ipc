@@ -4992,17 +4992,11 @@ dependencies = [
  "tracing-subscriber 0.3.22",
  "url",
 ]
-
 [[package]]
 name = "ff"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d013fc25338cc558c5c2cfbad646908fb23591e2404481826742b651c9af7160"
-dependencies = [
- "bitvec",
- "rand_core 0.6.4",
- "subtle",
-]
 
 [[package]]
 name = "ff"
