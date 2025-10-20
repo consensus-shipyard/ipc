@@ -31,6 +31,7 @@ frc42_dispatch = { workspace = true }
 fil_actors_evm_shared = { workspace = true }
 fil_actors_runtime = { workspace = true, features = ["test_utils"] }
 multihash = { workspace = true }
+multihash-codetable = { version = "0.1.4", features = ["blake2b"] }
 
 [features]
 fil-actor = ["fil_actors_runtime/fil-actor"]
