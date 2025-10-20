@@ -1776,6 +1776,7 @@ impl TryFrom<gateway_getter_facet::Subnet> for SubnetInfo {
 }
 
 const SIGNED_MSG_TYPE_PRECOMMIT: u8 = 2;
+const BLOCK_ID_FLAG_COMMIT: u8 = 2;
 
 fn convert_signed_header(signed_header: SignedHeader) -> ethers::abi::Bytes {
     let light_header = signed_header.header;
@@ -1798,6 +1799,8 @@ fn convert_signed_header(signed_header: SignedHeader) -> ethers::abi::Bytes {
         .commit
         .signatures
         .into_iter()
+        // keep only precommit votes
+        .filter(|v| v.block_id_flag == BLOCK_ID_FLAG_COMMIT)
         .map(|v| ValidatorSignPayload {
             timestamp: v.timestamp,
             signature: v.signature,

@@ -38,14 +38,14 @@ library CometbftLightClient {
     error InvalidLength(string what, uint256 expected, uint256 actual);
     error NotSameHeight();
     error NoQuorumFormed();
-    error NoValidatorInQuoum();
+    error NoValidatorInQuorum();
     error CometbftSignerNotValidator(bytes20 expected, bytes20 incoming);
     error InvalidCommitHash(bytes32 expected, bytes32 actual);
     error InvalidSignature(bytes32 message, bytes signature, address validator, ECDSA.RecoverError err);
     error NotSigner(bytes32 message, bytes signature, address recovered, address expected);
     error ValidatorsHashCannotBeEmpty();
 
-    // Some preparation for the parameters, ensures the chaid ids are expected and heights are the same
+    // Some preparation for the parameters, ensures the chain ids are expected and heights are the same
     function prepareParams(LightHeader.Data memory header, CanonicalVote.Data memory voteTemplate) internal view {
         string memory _chainID = LibSubnetActorStorage.appStorage().chainID;
 
@@ -82,12 +82,12 @@ library CometbftLightClient {
     function verifyValidatorsQuorum(LightHeader.Data memory header, ValidatorSignPayload[] memory signatures, CanonicalVote.Data memory voteTemplate) internal view {
         prepareParams(header, voteTemplate);
 
-        // make sure the vote template block hash matchees the header, so that 
+        // make sure the vote template block hash matches the header, so that 
         // the validators are signing the same light client header hash.
         checkCommitHash(header, toBytes32(voteTemplate.block_id.hash));
 
         uint256 totalPower = LibPower.getTotalCurrentPower();
-        if (totalPower == 0) revert NoValidatorInQuoum();
+        if (totalPower == 0) revert NoValidatorInQuorum();
 
         uint256 powerSoFar = 0;
 
