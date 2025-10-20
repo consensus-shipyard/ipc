@@ -265,8 +265,16 @@ impl<BS: Blockstore> Stream for StateTreeStreamer<BS> {
                         use libipld::codec::Codec;
 
                         let codec = DagCborCodec;
-                        if let Ok(ipld) = codec.decode::<Ipld>(&bytes) {
-                            walk_ipld_cids(ipld, &mut this.dfs);
+                        match codec.decode::<Ipld>(&bytes) {
+                            Ok(ipld) => {
+                                walk_ipld_cids(ipld, &mut this.dfs);
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    "Failed to decode DAG-CBOR at {}: {}. This may result in incomplete snapshot traversal.",
+                                    cid, e
+                                );
+                            }
                         }
                     }
                     return Poll::Ready(Some((cid, bytes)));
@@ -300,8 +308,15 @@ fn walk_ipld_cids(ipld: Ipld, dfs: &mut VecDeque<Cid>) {
         Ipld::Link(libipld_cid) => {
             // Convert libipld::Cid (cid 0.10) to Cid (cid 0.11)
             let bytes = libipld_cid.to_bytes();
-            if let Ok(fvm_cid) = Cid::try_from(bytes.as_slice()) {
-                dfs.push_back(fvm_cid);
+            match Cid::try_from(bytes.as_slice()) {
+                Ok(fvm_cid) => dfs.push_back(fvm_cid),
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to convert libipld CID to FVM CID during traversal: {}. CID: {}",
+                        e,
+                        libipld_cid
+                    );
+                }
             }
         }
         _ => {}

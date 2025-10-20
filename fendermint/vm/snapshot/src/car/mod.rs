@@ -61,6 +61,7 @@ where
     // Write header with length prefix (only once for chunk 0)
     let header_bytes = to_vec(&header).context("failed to encode header")?;
     let mut len_buf = unsigned_varint::encode::u64_buffer();
+    // unsigned_varint::encode::u64 returns a slice of the buffer containing the encoded bytes
     let len_encoded = unsigned_varint::encode::u64(header_bytes.len() as u64, &mut len_buf);
 
     writer.write_all(len_encoded).await?;
@@ -74,6 +75,7 @@ where
         let total_len = cid_bytes.len() + data.len();
 
         let mut len_buf = unsigned_varint::encode::u64_buffer();
+        // unsigned_varint::encode::u64 returns a slice of the buffer containing the encoded bytes
         let len_encoded = unsigned_varint::encode::u64(total_len as u64, &mut len_buf);
 
         writer.write_all(len_encoded).await?;

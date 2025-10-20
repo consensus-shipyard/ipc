@@ -29,8 +29,6 @@ use fvm_shared::crypto::signature::Signature;
 use fvm_shared::{chainid::ChainID, error::ExitCode};
 use jsonrpc_v2::Params;
 
-// BLOCK_GAS_LIMIT was removed in FVM 4.7, define locally for IPC
-const BLOCK_GAS_LIMIT: u64 = 10_000_000_000;
 use rand::Rng;
 use tendermint::block::Height;
 use tendermint_rpc::endpoint::{self, status};
@@ -52,6 +50,9 @@ use crate::{
     },
     error, JsonRpcData, JsonRpcResult,
 };
+
+// BLOCK_GAS_LIMIT was removed in FVM 4.7, define locally for IPC
+const BLOCK_GAS_LIMIT: u64 = 10_000_000_000;
 
 /// Returns a list of addresses owned by client.
 ///

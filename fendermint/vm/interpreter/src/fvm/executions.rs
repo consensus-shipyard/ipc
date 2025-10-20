@@ -15,8 +15,7 @@ use crate::fvm::observe::{MsgExec, MsgExecPurpose};
 
 use crate::fvm::FvmMessage;
 
-// BLOCK_GAS_LIMIT was removed in FVM 4.7, define locally for IPC
-const BLOCK_GAS_LIMIT: u64 = 10_000_000_000;
+use super::constants::BLOCK_GAS_LIMIT;
 const GAS_LIMIT: u64 = BLOCK_GAS_LIMIT * 10000;
 
 /// Helper to build and execute an implicit system message.

@@ -1,11 +1,13 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+// We use two different CID types due to version mismatch:
+// - FvmCid: from cid crate v0.11, used by FVM 4.7
+// - libipld::Cid: from cid crate v0.10, used by libipld and libp2p-bitswap
+// This is a temporary situation until all dependencies align on the same CID version.
 use cid::Cid as FvmCid;
 use ipc_ipld_resolver::missing_blocks::missing_blocks;
 use libipld::Cid;
-// Copyright 2022-2024 Protocol Labs
-// SPDX-License-Identifier: Apache-2.0, MIT
 use libp2p_bitswap::BitswapStore;
 use std::borrow::Cow;
 

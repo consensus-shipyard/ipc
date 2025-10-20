@@ -76,8 +76,19 @@ fn start_resolve<C>(
     tokio::spawn(async move {
         // Convert cid 0.11 to libipld cid 0.10
         let cid_bytes = task.cid().to_bytes();
-        let libipld_cid =
-            LibipldCid::try_from(cid_bytes.as_slice()).expect("CID conversion should work");
+        let libipld_cid = match LibipldCid::try_from(cid_bytes.as_slice()) {
+            Ok(cid) => cid,
+            Err(e) => {
+                tracing::error!(
+                    error = e.to_string(),
+                    cid = ?task.cid(),
+                    "Failed to convert FVM CID to libipld CID"
+                );
+                // Requeue the task for retry
+                schedule_retry(task, queue, retry_delay);
+                return;
+            }
+        };
 
         let from_theirs = client.resolve(libipld_cid, task.subnet_id());
         let from_own = own_subnet_id.map(|subnet_id| client.resolve(libipld_cid, subnet_id));

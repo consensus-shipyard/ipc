@@ -37,8 +37,7 @@ use fvm_shared::{
 };
 use multihash_codetable::Code;
 
-// BLOCK_GAS_LIMIT was removed in FVM 4.7, define locally for IPC
-const BLOCK_GAS_LIMIT: u64 = 10_000_000_000;
+use crate::fvm::constants::BLOCK_GAS_LIMIT;
 use num_traits::Zero;
 use serde::{de, Serialize};
 

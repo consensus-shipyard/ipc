@@ -18,8 +18,7 @@ use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{BytesDe, BytesSer, RawBytes};
 use fvm_shared::{address::Address, econ::TokenAmount, error::ExitCode, message::Message};
 
-// BLOCK_GAS_LIMIT was removed in FVM 4.7, define locally for IPC
-const BLOCK_GAS_LIMIT: u64 = 10_000_000_000;
+use crate::fvm::constants::BLOCK_GAS_LIMIT;
 
 use super::FvmExecState;
 
