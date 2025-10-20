@@ -59,7 +59,7 @@ impl CacheEntry {
 mod tests {
     use super::*;
     use cid::Cid;
-    use multihash::{Code, MultihashDigest};
+    use multihash_codetable::{Code, MultihashDigest};
 
     #[test]
     fn test_cache_entry_epoch_helpers() {
