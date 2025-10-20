@@ -9,9 +9,10 @@ authors.workspace = true
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-tokio = { workspace = true, features = ["sync", "time", "macros"] }
+tokio = { workspace = true, features = ["sync", "time", "macros", "fs"] }
 tracing = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 parking_lot = { workspace = true }
 url = { workspace = true }
@@ -19,6 +20,7 @@ base64 = { workspace = true }
 humantime-serde = { workspace = true }
 cid = { workspace = true }
 multihash = { workspace = true }
+rocksdb = { version = "0.21", features = ["multi-threaded-cf"] }
 
 # Fendermint
 fendermint_actor_f3_cert_manager = { path = "../../../actors/f3-cert-manager" }
@@ -32,8 +34,12 @@ ipc-api = { path = "../../../../ipc/api" }
 fvm_shared = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 
-# Proofs library (will be added from git)
-# proofs = { git = "https://github.com/consensus-shipyard/ipc-filecoin-proofs", branch = "proofs" }
+# Proofs library
+proofs = { git = "https://github.com/consensus-shipyard/ipc-filecoin-proofs", branch = "proofs" }
+
+# F3 certificate handling - TO BE INTEGRATED
+# TODO: Identify correct crate from rust-f3 repository
+# filecoin-f3-certs = { git = "https://github.com/ChainSafe/rust-f3" }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "rt-multi-thread"] }
