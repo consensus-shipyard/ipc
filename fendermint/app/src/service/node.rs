@@ -262,7 +262,8 @@ pub async fn run(
         None
     };
 
-    let bottom_up_manager = BottomUpManager::new(tendermint_client.clone(), validator_ctx);
+    let bottomup_enabled = settings.ipc.bottomup_enabled();
+    let bottom_up_manager = BottomUpManager::new(tendermint_client.clone(), validator_ctx, bottomup_enabled);
     let top_down_manager = TopDownManager::new(
         parent_finality_provider.clone(),
         parent_finality_votes.clone(),

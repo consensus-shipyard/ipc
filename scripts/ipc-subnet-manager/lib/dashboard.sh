@@ -298,9 +298,26 @@ draw_dashboard() {
     fi
     local mempool_status=$(get_status_indicator $mempool_pct 80 50 false)
     local mempool_bytes_fmt=$(format_bytes $mempool_bytes)
+    local mempool_size_fmt=$(format_number $mempool_size)
+    local mempool_max_fmt=$(format_number $mempool_max)
+
+    # Dynamic status text based on mempool state
+    local mempool_state="HEALTHY"
+    if [ $mempool_size -eq 0 ]; then
+        mempool_state="EMPTY"
+    elif [ $mempool_pct -ge 80 ]; then
+        mempool_state="${RED}CRITICAL${RESET}"
+    elif [ $mempool_pct -ge 50 ]; then
+        mempool_state="${YELLOW}WARNING${RESET}"
+    elif [ $mempool_size -gt 100 ]; then
+        mempool_state="${YELLOW}ACTIVE${RESET}"
+    else
+        mempool_state="${GREEN}HEALTHY${RESET}"
+    fi
 
     echo -e "${BOLD}┌─ MEMPOOL STATUS ──────────────────────────────────────────────────────┐${RESET}"
-    printf "│ Transactions: %d/%d (%d%%)  Size: %s/1GB    Status: %b HEALTHY   │\n" "$mempool_size" "$mempool_max" "$mempool_pct" "$mempool_bytes_fmt" "$mempool_status"
+    printf "│ Pending Transactions: %-8s (%-3d%% full)    Status: %b           │\n" "$mempool_size_fmt" "$mempool_pct" "$mempool_status"
+    printf "│ Max Capacity: %-8s    Size: %-6s    State: %-18s │\n" "$mempool_max_fmt" "$mempool_bytes_fmt" "$mempool_state"
     echo -e "${BOLD}└───────────────────────────────────────────────────────────────────────┘${RESET}"
     echo ""
 

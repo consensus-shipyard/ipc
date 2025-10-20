@@ -86,6 +86,10 @@ init:
     vote_interval: 1          # Vote every block
     vote_timeout: 30          # Reduced from 60s for faster timeout
 
+    # Bottom-up checkpointing (disabled due to nonce management bug)
+    bottomup:
+      enabled: false          # Disable bottom-up checkpointing to prevent mempool clogging
+
   # Top-down finality configuration (optimized for speed)
   topdown:
     chain_head_delay: 5       # Reduced from 10 for faster parent block processing
