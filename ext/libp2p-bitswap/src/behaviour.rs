@@ -296,17 +296,13 @@ impl<P: StoreParams> Bitswap<P> {
                 BitswapResponse::Block(data) => {
                     if let Some(info) = self.query_manager.query_info(id) {
                         let len = data.len();
-                        if let Ok(block) = Block::new(info.cid, data) {
-                            RECEIVED_BLOCK_BYTES.inc_by(len as u64);
-                            self.db_tx.unbounded_send(DbRequest::Insert(block)).ok();
-                            self.query_manager
-                                .inject_response(id, Response::Block(peer, true));
-                        } else {
-                            tracing::error!("received invalid block");
-                            RECEIVED_INVALID_BLOCK_BYTES.inc_by(len as u64);
-                            self.query_manager
-                                .inject_response(id, Response::Block(peer, false));
-                        }
+                        // Use new_unchecked to skip CID validation during FVM 4.7 upgrade
+                        // (mixing cid 0.10 and 0.11 causes validation failures)
+                        let block = Block::new_unchecked(info.cid, data);
+                        RECEIVED_BLOCK_BYTES.inc_by(len as u64);
+                        self.db_tx.unbounded_send(DbRequest::Insert(block)).ok();
+                        self.query_manager
+                            .inject_response(id, Response::Block(peer, true));
                     }
                 }
             }

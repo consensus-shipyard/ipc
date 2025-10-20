@@ -8,7 +8,6 @@ use std::sync::{Arc, RwLock};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use base64::Engine;
-use cid::multihash::MultihashDigest;
 use cid::Cid;
 use fvm_ipld_encoding::{to_vec, RawBytes};
 use fvm_shared::address::Address;
@@ -18,6 +17,7 @@ use fvm_shared::crypto::signature::Signature;
 use fvm_shared::econ::TokenAmount;
 use ipc_api::subnet_id::SubnetID;
 use ipc_wallet::Wallet;
+use multihash_codetable::{Code, MultihashDigest};
 use num_traits::cast::ToPrimitive;
 use serde::de::DeserializeOwned;
 use serde_json::json;
@@ -387,7 +387,7 @@ impl<T: JsonRpcClient + Send + Sync> LotusJsonRPCClient<T> {
                 .clone(),
         };
 
-        let hash = cid::multihash::Code::Blake2b256.digest(&to_vec(&message)?);
+        let hash = Code::Blake2b256.digest(&to_vec(&message)?);
         let msg_cid = Cid::new_v1(fvm_ipld_encoding::DAG_CBOR, hash).to_bytes();
 
         let mut wallet_store = self.wallet_store.as_ref().unwrap().write().unwrap();

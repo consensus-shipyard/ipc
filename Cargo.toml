@@ -194,18 +194,18 @@ openssl = { version = "0.10", features = ["vendored"] }
 # pull in crates as transitive dependencies that do not support Wasm architector. If this
 # happens, try removing "crypto" feature from fvm_shared dependency in contract-bindings/Cargo.toml
 # and run `cargo build`. Then add the "crypto" feature back and run `cargo build` again.
-fvm = { version = "4.4.0", features = [
+fvm = { version = "4.7.4", features = [
   "verify-signature",
 ], default-features = false } # no opencl feature or it fails on CI
-fvm_shared = { version = "4.4.0" }
-fvm_sdk = { version = "4.4.0" }
+fvm_shared = { version = "4.7.4" }
+fvm_sdk = { version = "4.7.4" }
 
 
-fvm_ipld_blockstore = "0.2.0"
-fvm_ipld_car = "0.7.1"
-fvm_ipld_encoding = "0.4.0"
-fvm_ipld_hamt = "0.9.0"
-fvm_ipld_amt = "0.6.2"
+fvm_ipld_blockstore = "0.3.1"
+fvm_ipld_car = "0.9.0"
+fvm_ipld_encoding = "0.5.3"
+fvm_ipld_hamt = "0.10.4"
+fvm_ipld_amt = "0.7.4"
 
 # Local FVM debugging
 # fvm = { path = "../ref-fvm/fvm", default-features = false }
@@ -219,12 +219,13 @@ fvm_ipld_amt = "0.6.2"
 # to cut down the time it takes to compile everything. However, some projects have a "shared" part,
 # and this copy-paste is clunky, so at least for those that have it, we should use it.
 # Keep the version here in sync with the Makefile!
-fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
-fil_actor_eam = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
-fil_actor_evm = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
-fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", tag = "v15.0.0" }
+# NOTE: Using master branch instead of v17.0.0 tag due to serde dependency fixes
+fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-actors", branch = "master" }
+fil_actor_eam = { git = "https://github.com/filecoin-project/builtin-actors", branch = "master" }
+fil_actor_evm = { git = "https://github.com/filecoin-project/builtin-actors", branch = "master" }
+fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", branch = "master" }
 
-cid = { version = "0.10.1", default-features = false, features = [
+cid = { version = "0.11", default-features = false, features = [
   "serde-codec",
   "std",
 ] }
@@ -253,6 +254,16 @@ fvm_ipld_encoding = { git = "https://github.com/consensus-shipyard/ref-fvm.git" 
 fvm_ipld_hamt = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
 fvm_ipld_amt = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
 yamux = { git = "https://github.com/paritytech/yamux", tag = "yamux-v0.13.4" }
+
+# Patch builtin-actors git dependencies to use the same FVM version
+[patch."https://github.com/filecoin-project/builtin-actors"]
+fvm = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_shared = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_sdk = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_ipld_blockstore = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_ipld_encoding = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_ipld_hamt = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+fvm_ipld_amt = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
 
 [profile.wasm]
 inherits = "release"

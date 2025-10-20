@@ -21,6 +21,7 @@ fvm_shared = { workspace = true }
 hex = { workspace = true }
 lazy_static = { workspace = true }
 multihash = { workspace = true }
+multihash-codetable = { version = "0.1.4", features = ["blake2b"] }
 regex = { workspace = true }
 serde = { workspace = true }
 serde_with = { workspace = true }

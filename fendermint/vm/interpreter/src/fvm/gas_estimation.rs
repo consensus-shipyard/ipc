@@ -10,9 +10,9 @@ use crate::fvm::{
 use fendermint_vm_message::query::GasEstimate;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{self, RawBytes};
-use fvm_shared::{
-    bigint::BigInt, econ::TokenAmount, error::ExitCode, message::Message, BLOCK_GAS_LIMIT,
-};
+use fvm_shared::{bigint::BigInt, econ::TokenAmount, error::ExitCode, message::Message};
+
+use super::constants::BLOCK_GAS_LIMIT;
 use ipc_observability::emit;
 use num_traits::Zero;
 use std::time::Instant;

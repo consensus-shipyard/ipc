@@ -8,7 +8,9 @@ use ethers::types as et;
 use fendermint_rpc::response::decode_fevm_return_data;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::error::ExitCode;
-use fvm_shared::{address::Address, chainid::ChainID, econ::TokenAmount, BLOCK_GAS_LIMIT};
+use fvm_shared::{address::Address, chainid::ChainID, econ::TokenAmount};
+
+use super::constants::BLOCK_GAS_LIMIT;
 use num_traits::Zero;
 use tendermint_rpc::Client;
 
