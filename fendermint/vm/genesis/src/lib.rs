@@ -47,13 +47,13 @@ pub struct Genesis {
     /// The custom eam permission mode that controls who can deploy contracts
     pub eam_permission_mode: PermissionMode,
     /// IPC related configuration, if enabled.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ipc: Option<ipc::IpcParams>,
     /// The owner of the IPC Solidity contracts within the subnet
     pub ipc_contracts_owner: ethers::types::Address,
     /// F3 (Fast Finality) consensus parameters, if enabled.
     /// Used for proof-based parent finality.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub f3: Option<ipc::F3Params>,
 }
 

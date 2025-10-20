@@ -443,41 +443,29 @@ impl<'a> GenesisBuilder<'a> {
             .context("failed to create activity tracker actor")?;
 
         // F3 Certificate Manager actor - manages F3 certificates for proof-based parent finality
-        let f3_cert_state = if let Some(f3_params) = &genesis.f3 {
+        if let Some(f3_params) = &genesis.f3 {
             // For subnets with F3 parameters, initialize with the provided F3 data
             let constructor_params = fendermint_actor_f3_cert_manager::types::ConstructorParams {
                 genesis_instance_id: f3_params.genesis_instance_id,
                 genesis_power_table: f3_params.genesis_power_table.clone(),
                 genesis_certificate: f3_params.genesis_certificate.clone(),
             };
-            fendermint_actor_f3_cert_manager::state::State::new(
+            let f3_cert_state = fendermint_actor_f3_cert_manager::state::State::new(
                 constructor_params.genesis_instance_id,
                 constructor_params.genesis_power_table,
                 constructor_params.genesis_certificate,
-            )?
-        } else {
-            // For root chains or non-IPC subnets, create with default empty state
-            let constructor_params = fendermint_actor_f3_cert_manager::types::ConstructorParams {
-                genesis_instance_id: 0,
-                genesis_power_table: vec![],
-                genesis_certificate: None,
-            };
-            fendermint_actor_f3_cert_manager::state::State::new(
-                constructor_params.genesis_instance_id,
-                constructor_params.genesis_power_table,
-                constructor_params.genesis_certificate,
-            )?
-        };
+            )?;
 
-        state
-            .create_custom_actor(
-                fendermint_actor_f3_cert_manager::F3_CERT_MANAGER_ACTOR_NAME,
-                f3_cert_manager::F3_CERT_MANAGER_ACTOR_ID,
-                &f3_cert_state,
-                TokenAmount::zero(),
-                None,
-            )
-            .context("failed to create F3 certificate manager actor")?;
+            state
+                .create_custom_actor(
+                    fendermint_actor_f3_cert_manager::F3_CERT_MANAGER_ACTOR_NAME,
+                    f3_cert_manager::F3_CERT_MANAGER_ACTOR_ID,
+                    &f3_cert_state,
+                    TokenAmount::zero(),
+                    None,
+                )
+                .context("failed to create F3 certificate manager actor")?;
+        };
 
         // STAGE 2: Create non-builtin accounts which do not have a fixed ID.
 
