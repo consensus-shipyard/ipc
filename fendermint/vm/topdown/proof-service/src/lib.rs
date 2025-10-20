@@ -11,6 +11,8 @@
 pub mod assembler;
 pub mod cache;
 pub mod config;
+pub mod persistence;
+pub mod provider_manager;
 pub mod service;
 pub mod types;
 pub mod watcher;

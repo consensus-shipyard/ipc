@@ -1,13 +1,17 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-//! In-memory cache for proof bundles
+//! In-memory cache for proof bundles with disk persistence
 
 use crate::config::CacheConfig;
+use crate::persistence::ProofCachePersistence;
 use crate::types::CacheEntry;
+use anyhow::{Context, Result};
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
+use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use tracing::{debug, info, warn};
 
 /// Thread-safe in-memory cache for proof bundles
 #[derive(Clone)]
