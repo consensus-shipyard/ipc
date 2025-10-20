@@ -225,6 +225,16 @@ pub struct GenesisFromParentArgs {
     #[arg(long)]
     pub parent_auth_token: Option<String>,
 
+    /// Filecoin/Lotus RPC endpoint for fetching F3 certificate data (parent finality proofs).
+    /// This is separate from parent_endpoint which is the EVM/Ethereum API.
+    /// Required for proof-based parent finality.
+    #[arg(long)]
+    pub parent_filecoin_rpc: url::Url,
+
+    /// Auth token for the Filecoin RPC endpoint.
+    #[arg(long)]
+    pub parent_filecoin_auth_token: Option<String>,
+
     /// IPC gateway of the parent; 20 byte Ethereum address in 0x prefixed hex format
     #[arg(long, value_parser = parse_eth_address, default_value = "0xff00000000000000000000000000000000000064")]
     pub parent_gateway: Address,

@@ -590,6 +590,7 @@ impl arbitrary::Arbitrary<'_> for StakingState {
             eam_permission_mode: PermissionMode::Unrestricted,
             ipc: Some(parent_ipc),
             ipc_contracts_owner: ipc_contracts_owner.into(),
+            f3: None,
         };
 
         let child_ipc = IpcParams {
@@ -613,6 +614,7 @@ impl arbitrary::Arbitrary<'_> for StakingState {
             eam_permission_mode: PermissionMode::Unrestricted,
             ipc: Some(child_ipc),
             ipc_contracts_owner: ipc_contracts_owner.into(),
+            f3: None,
         };
 
         Ok(StakingState::new(accounts, parent_genesis, child_genesis))

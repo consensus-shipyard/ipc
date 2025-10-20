@@ -58,7 +58,6 @@ impl F3CertManagerActor {
         rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
 
         let state = State::new(
-            rt.store(),
             params.genesis_instance_id,
             params.genesis_power_table,
             params.genesis_certificate,
@@ -90,7 +89,7 @@ impl F3CertManager for F3CertManagerActor {
 
         let state = rt.state::<State>()?;
         Ok(GetCertificateResponse {
-            certificate: state.get_latest_certificate(rt)?,
+            certificate: state.get_latest_certificate().cloned(),
             latest_finalized_height: state.get_latest_finalized_height(),
         })
     }
@@ -102,7 +101,7 @@ impl F3CertManager for F3CertManagerActor {
         let state = rt.state::<State>()?;
         Ok(GetInstanceInfoResponse {
             genesis_instance_id: state.get_genesis_instance_id(),
-            genesis_power_table: state.get_genesis_power_table(rt)?,
+            genesis_power_table: state.get_genesis_power_table().to_vec(),
             latest_finalized_height: state.get_latest_finalized_height(),
         })
     }
@@ -120,7 +119,7 @@ impl F3CertManager for F3CertManagerActor {
         rt.validate_immediate_caller_accept_any()?;
 
         let state = rt.state::<State>()?;
-        Ok(state.get_genesis_power_table(rt)?)
+        Ok(state.get_genesis_power_table().to_vec())
     }
 }
 

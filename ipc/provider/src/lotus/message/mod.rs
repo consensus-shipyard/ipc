@@ -13,6 +13,7 @@ mod tests;
 
 pub mod chain;
 pub mod deserialize;
+pub mod f3;
 pub mod ipc;
 pub mod mpool;
 pub mod serialize;

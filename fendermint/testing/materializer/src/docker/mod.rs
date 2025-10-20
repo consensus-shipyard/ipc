@@ -704,6 +704,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                     },
                 }),
                 ipc_contracts_owner,
+                f3: None, // No F3 parameters for root chains
             };
             Ok(genesis)
         })

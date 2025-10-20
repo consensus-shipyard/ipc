@@ -443,16 +443,14 @@ impl<'a> GenesisBuilder<'a> {
             .context("failed to create activity tracker actor")?;
 
         // F3 Certificate Manager actor - manages F3 certificates for proof-based parent finality
-        let f3_cert_state = if let Some(_ipc_params) = genesis.ipc.as_ref() {
-            // For IPC subnets, initialize with basic parameters
-            // TODO: In the future, we can fetch the actual F3 certificate from the parent chain
+        let f3_cert_state = if let Some(f3_params) = &genesis.f3 {
+            // For subnets with F3 parameters, initialize with the provided F3 data
             let constructor_params = fendermint_actor_f3_cert_manager::types::ConstructorParams {
-                genesis_instance_id: 0, // Default F3 instance ID - will be updated when first certificate is received
-                genesis_power_table: vec![], // Empty for now - will be populated from first certificate
-                genesis_certificate: None, // No certificate at genesis - will be set by first ParentFinality message
+                genesis_instance_id: f3_params.genesis_instance_id,
+                genesis_power_table: f3_params.genesis_power_table.clone(),
+                genesis_certificate: f3_params.genesis_certificate.clone(),
             };
             fendermint_actor_f3_cert_manager::state::State::new(
-                state.store(),
                 constructor_params.genesis_instance_id,
                 constructor_params.genesis_power_table,
                 constructor_params.genesis_certificate,
@@ -465,7 +463,6 @@ impl<'a> GenesisBuilder<'a> {
                 genesis_certificate: None,
             };
             fendermint_actor_f3_cert_manager::state::State::new(
-                state.store(),
                 constructor_params.genesis_instance_id,
                 constructor_params.genesis_power_table,
                 constructor_params.genesis_certificate,

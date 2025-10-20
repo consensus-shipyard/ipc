@@ -51,6 +51,10 @@ pub struct Genesis {
     pub ipc: Option<ipc::IpcParams>,
     /// The owner of the IPC Solidity contracts within the subnet
     pub ipc_contracts_owner: ethers::types::Address,
+    /// F3 (Fast Finality) consensus parameters, if enabled.
+    /// Used for proof-based parent finality.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub f3: Option<ipc::F3Params>,
 }
 
 impl Genesis {
@@ -278,6 +282,17 @@ pub mod ipc {
                 ..Default::default()
             }
         }
+    }
+
+    /// F3 certificate parameters for proof-based parent finality
+    #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+    pub struct F3Params {
+        /// Genesis F3 instance ID
+        pub genesis_instance_id: u64,
+        /// Genesis power table for F3 consensus
+        pub genesis_power_table: Vec<fendermint_actor_f3_cert_manager::types::PowerEntry>,
+        /// Genesis F3 certificate (if available)
+        pub genesis_certificate: Option<fendermint_actor_f3_cert_manager::types::F3Certificate>,
     }
 }
 

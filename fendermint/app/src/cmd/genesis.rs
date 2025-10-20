@@ -2,9 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::{anyhow, Context};
+use fendermint_actor_f3_cert_manager::types;
 use fendermint_crypto::PublicKey;
+// Temporarily disabled due to bls-signatures@0.15.0 compatibility issues
+// use filecoin_f3_lightclient::F3Client;
 use fvm_shared::address::Address;
+use ipc_api::subnet_id::SubnetID;
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
+use ipc_provider::jsonrpc::JsonRpcClientImpl;
+use ipc_provider::lotus::client::LotusJsonRPCClient;
+use ipc_provider::lotus::LotusClient;
 use ipc_provider::IpcProvider;
 use std::path::PathBuf;
 
@@ -54,6 +61,7 @@ cmd! {
       eam_permission_mode: PermissionMode::Unrestricted,
       ipc: None,
       ipc_contracts_owner: self.ipc_contracts_owner,
+      f3: None,
     };
 
     let json = serde_json::to_string_pretty(&genesis)?;
@@ -344,6 +352,86 @@ pub async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> any
     builder.write_to(args.output_path.clone()).await
 }
 
+/// Fetches F3 certificate data from the parent Filecoin chain
+async fn fetch_f3_params_from_parent(
+    parent_endpoint: &url::Url,
+    parent_auth_token: Option<&String>,
+) -> anyhow::Result<Option<ipc::F3Params>> {
+    use std::convert::TryFrom;
+
+    tracing::info!(
+        "Fetching F3 certificate data from parent chain at {}",
+        parent_endpoint
+    );
+
+    let jsonrpc_client = JsonRpcClientImpl::new(
+        parent_endpoint.clone(),
+        parent_auth_token.map(|s| s.as_str()),
+    );
+
+    // We use a dummy subnet ID here since F3 data is at the chain level, not subnet-specific
+    let lotus_client = LotusJsonRPCClient::new(jsonrpc_client, SubnetID::default());
+
+    // Fetch F3 data using the Lotus client
+    match lotus_client.f3_get_instance_id().await {
+        Ok(instance_id) => {
+            tracing::info!("Found F3 instance ID: {}", instance_id);
+
+            // Get power table for this instance
+            let power_table_response = lotus_client.f3_get_power_table(instance_id).await?;
+
+            // Convert power entries
+            let power_table: anyhow::Result<Vec<_>> = power_table_response
+                .entries
+                .iter()
+                .map(|entry| {
+                    // Decode base64 public key
+                    let public_key_bytes = base64::Engine::decode(
+                        &base64::engine::general_purpose::STANDARD,
+                        &entry.public_key,
+                    )?;
+                    Ok(types::PowerEntry {
+                        public_key: public_key_bytes,
+                        power: entry.power,
+                    })
+                })
+                .collect();
+            let power_table = power_table?;
+
+            // Get latest certificate (optional)
+            let certificate = lotus_client.f3_get_certificate().await?;
+            let certificate = if let Some(cert_response) = certificate {
+                Some(types::F3Certificate {
+                    instance_id: cert_response.instance_id,
+                    epoch: cert_response.epoch,
+                    power_table_cid: cid::Cid::try_from(&cert_response.power_table_cid)?,
+                    signature: cert_response.signature,
+                    certificate_data: cert_response.certificate_data,
+                })
+            } else {
+                None
+            };
+
+            tracing::info!("Successfully fetched F3 certificate data from parent chain");
+            Ok(Some(ipc::F3Params {
+                genesis_instance_id: instance_id,
+                genesis_power_table: power_table,
+                genesis_certificate: certificate,
+            }))
+        }
+        Err(e) => {
+            // F3 might not be available on all chains (e.g., local testnets, some subnets)
+            // Log a warning but don't fail - F3 is optional
+            tracing::warn!(
+                "Failed to fetch F3 certificate data from parent chain: {}. \
+                 This is expected if the parent chain doesn't support F3 (e.g., local testnet or subnet).",
+                e
+            );
+            Ok(None)
+        }
+    }
+}
+
 pub async fn new_genesis_from_parent(
     genesis_file: &PathBuf,
     args: &GenesisFromParentArgs,
@@ -367,6 +455,14 @@ pub async fn new_genesis_from_parent(
     )?;
 
     let genesis_info = parent_provider.get_genesis_info(&args.subnet_id).await?;
+
+    // Fetch F3 certificate data from parent chain using Lotus client directly
+    // This requires the Filecoin/Lotus RPC endpoint, not the EVM endpoint
+    let f3_params = fetch_f3_params_from_parent(
+        &args.parent_filecoin_rpc,
+        args.parent_filecoin_auth_token.as_ref(),
+    )
+    .await?;
 
     // get gateway genesis
     let ipc_params = ipc::IpcParams {
@@ -394,6 +490,7 @@ pub async fn new_genesis_from_parent(
         ipc: Some(ipc_params),
         chain_id: None,
         ipc_contracts_owner: genesis_info.genesis_subnet_ipc_contracts_owner,
+        f3: f3_params,
     };
 
     for v in genesis_info.validators {
