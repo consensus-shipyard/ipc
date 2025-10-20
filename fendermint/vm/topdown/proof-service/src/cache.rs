@@ -149,7 +149,7 @@ mod tests {
     use crate::types::ProofBundlePlaceholder;
     use cid::Cid;
     use fendermint_actor_f3_cert_manager::types::F3Certificate;
-    use multihash::{Code, MultihashDigest};
+    use multihash_codetable::{Code, MultihashDigest};
     use std::time::SystemTime;
 
     fn create_test_entry(instance_id: u64, epochs: Vec<i64>) -> CacheEntry {

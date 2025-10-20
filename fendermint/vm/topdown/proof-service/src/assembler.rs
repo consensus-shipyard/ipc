@@ -140,7 +140,7 @@ mod tests {
     use cid::Cid;
     use ipc_provider::lotus::message::f3::{ECChainEntry, F3CertificateResponse, SupplementalData};
     use ipc_provider::lotus::message::CIDMap;
-    use multihash::{Code, MultihashDigest};
+    use multihash_codetable::{Code, MultihashDigest};
 
     fn create_test_lotus_cert(instance: u64, epochs: Vec<i64>) -> F3CertificateResponse {
         let power_table_cid = Cid::new_v1(0x55, Code::Blake2b256.digest(b"test"));
