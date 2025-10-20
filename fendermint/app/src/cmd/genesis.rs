@@ -408,12 +408,16 @@ async fn fetch_f3_params_from_parent(
                     &cert_response.signature,
                 )?;
 
-                // Get the last epoch from EC chain (the finalized height)
-                let finalized_epoch = cert_response
+                // Collect all finalized epochs from the EC chain
+                let finalized_epochs: Vec<i64> = cert_response
                     .ec_chain
-                    .last()
+                    .iter()
                     .map(|entry| entry.epoch)
-                    .ok_or_else(|| anyhow::anyhow!("F3 certificate has empty EC chain"))?;
+                    .collect();
+
+                if finalized_epochs.is_empty() {
+                    return Err(anyhow::anyhow!("F3 certificate has empty EC chain"));
+                }
 
                 // Get the power table CID from the last EC chain entry
                 let power_table_cid = cert_response
@@ -427,7 +431,7 @@ async fn fetch_f3_params_from_parent(
 
                 Some(types::F3Certificate {
                     instance_id: cert_response.gpbft_instance,
-                    epoch: finalized_epoch,
+                    finalized_epochs,
                     power_table_cid: cid::Cid::try_from(power_table_cid)?,
                     signature: signature_bytes,
                     certificate_data,
@@ -443,17 +447,10 @@ async fn fetch_f3_params_from_parent(
                 genesis_certificate: certificate,
             }))
         }
-        Err(e) => {
-            // // F3 might not be available on all chains (e.g., local testnets, some subnets)
-            // // Log a warning but don't fail - F3 is optional
-            // tracing::warn!(
-            //     "Failed to fetch F3 certificate data from parent chain: {}. \
-            //      This is expected if the parent chain doesn't support F3 (e.g., local testnet or subnet).",
-            //     e
-            // );
-            // Ok(None)
-            Err(e)
-        }
+        Err(e) => Err(anyhow::anyhow!(
+            "Failed to fetch F3 certificate data from parent chain: {}",
+            e
+        )),
     }
 }
 
