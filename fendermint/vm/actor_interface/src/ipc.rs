@@ -350,12 +350,14 @@ pub mod gateway {
         pub majority_percentage: u8,
         pub network_name: GatewaySubnetID,
         pub validators: Vec<GatewayValidator>,
+        pub commit_sha: [u8; 32],
     }
 
     impl ConstructorParameters {
         pub fn new(
             params: GatewayParams,
             validators: Vec<Validator<Collateral>>,
+            commit_sha: [u8; 32],
         ) -> anyhow::Result<Self> {
             // Every validator has an Ethereum address.
             let validators = validators
@@ -380,6 +382,7 @@ pub mod gateway {
                 majority_percentage: params.majority_percentage,
                 network_name: GatewaySubnetID { root, route },
                 validators,
+                commit_sha,
             })
         }
     }
@@ -420,6 +423,7 @@ pub mod gateway {
                     metadata: Bytes::new(),
                 }],
                 active_validators_limit: 100,
+                commit_sha: [0u8; 32],
             };
 
             // It looks like if we pass just the record then it will be passed as 5 tokens,
