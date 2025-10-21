@@ -383,9 +383,8 @@ pub struct PersistenceStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::ProofBundlePlaceholder;
     use cid::Cid;
-    use fendermint_actor_f3_cert_manager::types::F3Certificate;
+    use fendermint_actor_f3_light_client::types::F3Certificate;
     use multihash_codetable::{Code, MultihashDigest};
     use std::time::SystemTime;
     use tempfile::tempdir;
@@ -396,10 +395,8 @@ mod tests {
         CacheEntry {
             instance_id,
             finalized_epochs: vec![100, 101, 102],
-            bundle: ProofBundlePlaceholder {
-                parent_height: 102,
-                data: vec![],
-            },
+            proof_bundle_bytes: vec![1, 2, 3], // Mock proof bundle bytes
+            f3_certificate_bytes: vec![4, 5, 6], // Mock F3 certificate bytes
             actor_certificate: F3Certificate {
                 instance_id,
                 finalized_epochs: vec![100, 101, 102],
