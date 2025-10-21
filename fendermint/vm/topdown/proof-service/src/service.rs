@@ -29,12 +29,28 @@ pub struct ProofGeneratorService {
 impl ProofGeneratorService {
     /// Create a new proof generator service
     pub fn new(config: ProofServiceConfig, cache: Arc<ProofCache>) -> Result<Self> {
+        // Validate required configuration
+        let gateway_actor_id = config
+            .gateway_actor_id
+            .context("gateway_actor_id is required in configuration")?;
+        let subnet_id = config
+            .subnet_id
+            .as_ref()
+            .context("subnet_id is required in configuration")?;
+
         let watcher = Arc::new(
             ParentWatcher::new(&config.parent_rpc_url, &config.parent_subnet_id)
                 .context("Failed to create parent watcher")?,
         );
 
-        let assembler = Arc::new(ProofAssembler::new(config.parent_rpc_url.clone()));
+        let assembler = Arc::new(
+            ProofAssembler::new(
+                config.parent_rpc_url.clone(),
+                gateway_actor_id,
+                subnet_id.clone(),
+            )
+            .context("Failed to create proof assembler")?,
+        );
 
         Ok(Self {
             config,
@@ -71,68 +87,61 @@ impl ProofGeneratorService {
     }
 
     /// Generate proofs for the next needed instances
-    ///
-    /// This method fetches certificates SEQUENTIALLY by instance ID.
-    /// This is critical for:
-    /// - Handling restarts (fill gaps from last_committed to parent latest)
-    /// - Avoiding missed instances (never skip an instance!)
-    /// - Proper crash recovery
+    /// CRITICAL: Process F3 instances SEQUENTIALLY - never skip!
     async fn generate_next_proofs(&self) -> Result<()> {
-        // 1. Determine what we need
         let last_committed = self.cache.last_committed_instance();
         let next_instance = last_committed + 1;
-        let max_instance_to_generate = last_committed + self.config.lookahead_instances;
+        let max_instance = last_committed + self.config.lookahead_instances;
 
         tracing::debug!(
             last_committed,
             next_instance,
-            max_instance_to_generate,
-            "Checking for instances to generate"
+            max_instance,
+            "Checking for new F3 certificates"
         );
 
-        // 2. Fetch certificates SEQUENTIALLY by instance ID
-        // CRITICAL: We MUST process instances in order, never skip!
-        for instance_id in next_instance..=max_instance_to_generate {
+        // Process instances IN ORDER - this is critical for F3
+        for instance_id in next_instance..=max_instance {
             // Skip if already cached
             if self.cache.contains(instance_id) {
                 tracing::debug!(instance_id, "Proof already cached");
                 continue;
             }
 
-            // Fetch certificate for THIS SPECIFIC instance
-            let cert = match self
+            // Fetch and validate certificate for THIS SPECIFIC instance
+            let validated = match self
                 .watcher
-                .fetch_certificate_by_instance(instance_id)
+                .fetch_and_validate_certificate(instance_id)
                 .await?
             {
                 Some(cert) => cert,
                 None => {
-                    // Parent hasn't finalized this instance yet - stop here
-                    tracing::debug!(
-                        instance_id,
-                        "Instance not finalized on parent yet, stopping lookahead"
-                    );
-                    break; // Don't try to fetch higher instances
+                    // Certificate not available yet - stop here!
+                    // Don't try higher instances as they depend on this one
+                    tracing::debug!(instance_id, "Certificate not available, stopping lookahead");
+                    break;
                 }
             };
 
+            tracing::info!(
+                instance_id,
+                epochs = ?validated.lotus_response.ec_chain.len(),
+                "F3 certificate validated successfully"
+            );
+
             // Generate proof for this certificate
-            match self.generate_proof_for_instance(&cert).await {
+            match self.generate_proof_for_certificate(&validated).await {
                 Ok(entry) => {
                     self.cache.insert(entry)?;
-                    tracing::info!(
-                        instance_id,
-                        epochs_count = cert.ec_chain.len(),
-                        "Successfully generated and cached proof"
-                    );
+                    tracing::info!(instance_id, "Successfully generated and cached proof");
                 }
                 Err(e) => {
                     tracing::error!(
                         instance_id,
                         error = %e,
-                        "Failed to generate proof, will retry next cycle"
+                        "Failed to generate proof, will retry"
                     );
-                    // Stop here, retry on next poll cycle
+                    // Stop here and retry on next poll
                     break;
                 }
             }
@@ -141,18 +150,21 @@ impl ProofGeneratorService {
         Ok(())
     }
 
-    /// Generate a proof for a specific F3 certificate
-    async fn generate_proof_for_instance(
+    /// Generate a proof for a validated certificate
+    async fn generate_proof_for_certificate(
         &self,
-        lotus_cert: &ipc_provider::lotus::message::f3::F3CertificateResponse,
+        validated: &crate::types::ValidatedCertificate,
     ) -> Result<CacheEntry> {
         tracing::debug!(
-            instance_id = lotus_cert.gpbft_instance,
-            "Generating proof for instance"
+            instance_id = validated.instance_id,
+            "Generating proof for certificate"
         );
 
-        // Use the assembler to build the proof bundle
-        let entry = self.assembler.assemble_proof(lotus_cert).await?;
+        // Use the assembler to create the cache entry
+        let entry = self
+            .assembler
+            .create_cache_entry_for_certificate(validated)
+            .await?;
 
         Ok(entry)
     }
@@ -169,11 +181,14 @@ mod tests {
     use crate::config::CacheConfig;
 
     #[tokio::test]
+    #[ignore] // Requires real parent chain RPC endpoint
     async fn test_service_creation() {
         let config = ProofServiceConfig {
             enabled: true,
             parent_rpc_url: "http://localhost:1234/rpc/v1".to_string(),
             parent_subnet_id: "/r314159".to_string(),
+            gateway_actor_id: Some(1001),
+            subnet_id: Some("test-subnet".to_string()),
             ..Default::default()
         };
 

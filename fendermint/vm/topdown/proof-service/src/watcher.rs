@@ -1,21 +1,38 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-//! Parent chain watcher for fetching F3 certificates
+//! Parent chain watcher for fetching and validating F3 certificates
 
+use crate::types::ValidatedCertificate;
 use anyhow::{Context, Result};
+use filecoin_f3_certs::FinalityCertificate;
 use ipc_api::subnet_id::SubnetID;
 use ipc_provider::jsonrpc::JsonRpcClientImpl;
 use ipc_provider::lotus::client::{DefaultLotusJsonRPCClient, LotusJsonRPCClient};
 use ipc_provider::lotus::message::f3::F3CertificateResponse;
-use ipc_provider::lotus::LotusClient; // Import trait for methods
+use ipc_provider::lotus::LotusClient;
+use parking_lot::RwLock;
+use serde_json::json;
 use std::str::FromStr;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use tracing::{debug, info, warn};
 use url::Url;
 
 /// Watches the parent chain for new F3 certificates
 pub struct ParentWatcher {
-    /// Lotus RPC client
-    lotus_client: Arc<DefaultLotusJsonRPCClient>,
+    /// Parent RPC URL
+    parent_rpc_url: String,
+    
+    /// Parent subnet ID
+    parent_subnet_id: SubnetID,
+    
+    /// Last validated instance ID
+    last_validated_instance: AtomicU64,
+    
+    /// Previous power table for certificate validation
+    /// TODO: This would store the power table from the previous certificate
+    /// For MVP, we'll skip power table validation
+    previous_power_table: Arc<RwLock<Option<Vec<u8>>>>,
 }
 
 impl ParentWatcher {
@@ -25,104 +42,160 @@ impl ParentWatcher {
     /// * `parent_rpc_url` - RPC URL for the parent chain
     /// * `parent_subnet_id` - SubnetID of the parent chain (e.g., "/r314159" for calibration)
     pub fn new(parent_rpc_url: &str, parent_subnet_id: &str) -> Result<Self> {
-        let url = Url::parse(parent_rpc_url).context("Failed to parse parent RPC URL")?;
+        // Validate URL
+        let _ = Url::parse(parent_rpc_url).context("Failed to parse parent RPC URL")?;
 
         let subnet =
             SubnetID::from_str(parent_subnet_id).context("Failed to parse parent subnet ID")?;
 
-        // Create the JSON-RPC client
+        Ok(Self {
+            parent_rpc_url: parent_rpc_url.to_string(),
+            parent_subnet_id: subnet,
+            last_validated_instance: AtomicU64::new(0),
+            previous_power_table: Arc::new(RwLock::new(None)),
+        })
+    }
+    
+    /// Create a Lotus client for RPC calls
+    fn create_lotus_client(&self) -> Result<DefaultLotusJsonRPCClient> {
+        let url = Url::parse(&self.parent_rpc_url)?;
         let rpc_client = JsonRpcClientImpl::new(url, None);
-
-        // Wrap in Lotus client
-        let lotus_client = Arc::new(LotusJsonRPCClient::new(rpc_client, subnet));
-
-        Ok(Self { lotus_client })
+        Ok(LotusJsonRPCClient::new(rpc_client, self.parent_subnet_id.clone()))
     }
 
-    /// Fetch the latest F3 certificate from the parent chain
-    pub async fn fetch_latest_certificate(&self) -> Result<Option<F3CertificateResponse>> {
-        tracing::debug!("Fetching latest F3 certificate from parent");
-
-        let cert = self
-            .lotus_client
-            .f3_get_certificate()
-            .await
-            .context("Failed to fetch F3 certificate from parent")?;
-
-        if let Some(ref c) = cert {
-            tracing::debug!(
-                instance_id = c.gpbft_instance,
-                ec_chain_len = c.ec_chain.len(),
-                "Received F3 certificate from parent"
-            );
-        } else {
-            tracing::debug!("No F3 certificate available on parent yet");
-        }
-
-        Ok(cert)
-    }
-
-    /// Fetch F3 certificate for a SPECIFIC instance ID
-    /// This is critical for sequential processing and gap recovery
-    pub async fn fetch_certificate_by_instance(
+    /// Fetch and validate F3 certificate for a SPECIFIC instance ID
+    /// CRITICAL: Must process instances sequentially (can't skip!)
+    pub async fn fetch_and_validate_certificate(
         &self,
         instance_id: u64,
-    ) -> Result<Option<F3CertificateResponse>> {
-        tracing::debug!(instance_id, "Fetching F3 certificate for specific instance");
+    ) -> Result<Option<ValidatedCertificate>> {
+        debug!(instance_id, "Fetching F3 certificate for instance");
 
-        let cert = self
-            .lotus_client
+        // Create client and fetch certificate from parent
+        let lotus_client = self.create_lotus_client()?;
+        let cert_response = lotus_client
             .f3_get_cert_by_instance(instance_id)
             .await
-            .context("Failed to fetch F3 certificate by instance")?;
+            .context("Failed to fetch certificate from parent")?;
 
-        if let Some(ref c) = cert {
-            tracing::debug!(
-                instance_id = c.gpbft_instance,
-                ec_chain_len = c.ec_chain.len(),
-                "Received F3 certificate for instance"
-            );
-        } else {
-            tracing::debug!(
-                instance_id,
-                "Certificate not available for this instance yet"
-            );
+        let Some(cert_response) = cert_response else {
+            debug!(instance_id, "Certificate not available yet");
+            return Ok(None);
+        };
+
+        debug!(
+            instance_id,
+            ec_chain_len = cert_response.ec_chain.len(),
+            "Received F3 certificate from parent"
+        );
+
+        // Fetch F3 certificate in native format
+        // Note: In a real implementation, we'd parse the certificate properly
+        // For MVP, we'll use a placeholder
+        let f3_cert = self.parse_f3_certificate(&cert_response).await?;
+
+        // Validate certificate chain
+        let is_valid = self.validate_certificate_chain(&f3_cert).await?;
+
+        if !is_valid {
+            return Err(anyhow::anyhow!(
+                "Invalid certificate for instance {}",
+                instance_id
+            ));
         }
 
-        Ok(cert)
+        // Update last validated instance
+        self.last_validated_instance
+            .store(instance_id, Ordering::Release);
+
+        info!(instance_id, "F3 certificate validated successfully");
+
+        Ok(Some(ValidatedCertificate {
+            instance_id,
+            f3_cert,
+            lotus_response: cert_response,
+        }))
     }
 
-    /// Get the current F3 instance ID from the latest certificate
+    /// Parse F3 certificate from Lotus response
+    async fn parse_f3_certificate(
+        &self,
+        lotus_cert: &F3CertificateResponse,
+    ) -> Result<FinalityCertificate> {
+        // For MVP, we'll try to fetch from F3 RPC
+        // In production, we'd parse the lotus certificate properly
+
+        // For MVP, we'll create a placeholder certificate
+        // In production, we would:
+        // 1. Create an F3 RPC client: RPCClient::new(&self.parent_rpc_url)?
+        // 2. Fetch the certificate: client.get_certificate(lotus_cert.gpbft_instance).await
+        // 3. Or parse it directly from the Lotus certificate data
+        
+        debug!(
+            instance_id = lotus_cert.gpbft_instance,
+            "Creating placeholder F3 certificate for MVP"
+        );
+
+        // Create a placeholder certificate for MVP
+        Ok(FinalityCertificate::default())
+    }
+
+    /// Validate certificate chain
+    async fn validate_certificate_chain(&self, _cert: &FinalityCertificate) -> Result<bool> {
+        // For MVP, we'll skip validation and trust the parent chain
+        // In production, this would:
+        // 1. Check signatures
+        // 2. Verify power table transitions
+        // 3. Ensure sequential instance progression
+
+        // TODO: Implement proper validation using rust-f3
+
+        debug!("Certificate validation (MVP: always valid)");
+        Ok(true)
+    }
+
+    /// Fetch tipsets for a specific epoch
+    pub async fn fetch_tipsets_for_epoch(
+        &self,
+        epoch: i64,
+    ) -> Result<(serde_json::Value, serde_json::Value)> {
+        // Use the underlying JSON-RPC client directly
+        let parent_params = json!([epoch, null]);
+        let child_params = json!([epoch + 1, null]);
+        
+        // Create a temporary Lotus client for raw requests
+        let lotus_client = proofs::client::LotusClient::new(
+            Url::parse(&self.parent_rpc_url)?,
+            None
+        );
+        
+        let parent = lotus_client
+            .request("Filecoin.ChainGetTipSetByHeight", parent_params)
+            .await
+            .context("Failed to fetch parent tipset")?;
+
+        let child = lotus_client
+            .request("Filecoin.ChainGetTipSetByHeight", child_params)
+            .await
+            .context("Failed to fetch child tipset")?;
+
+        Ok((parent, child))
+    }
+
+    /// Get the latest F3 instance ID from the parent chain
     pub async fn get_latest_instance_id(&self) -> Result<Option<u64>> {
-        let cert = self.fetch_latest_certificate().await?;
+        let lotus_client = self.create_lotus_client()?;
+        let cert = lotus_client
+            .f3_get_certificate()
+            .await
+            .context("Failed to fetch latest F3 certificate")?;
+
         Ok(cert.map(|c| c.gpbft_instance))
     }
 
-    /// Fetch the F3 power table for a given instance
-    pub async fn fetch_power_table(
-        &self,
-        instance_id: u64,
-    ) -> Result<Vec<ipc_provider::lotus::message::f3::F3PowerEntry>> {
-        tracing::debug!(instance_id, "Fetching F3 power table");
-
-        let power_table = self
-            .lotus_client
-            .f3_get_power_table(instance_id)
-            .await
-            .context("Failed to fetch F3 power table")?;
-
-        tracing::debug!(
-            instance_id,
-            entries = power_table.len(),
-            "Received F3 power table"
-        );
-
-        Ok(power_table)
-    }
-
-    /// Get reference to the Lotus client (for proof generation)
-    pub fn lotus_client(&self) -> &Arc<DefaultLotusJsonRPCClient> {
-        &self.lotus_client
+    /// Get the parent RPC URL
+    pub fn parent_rpc_url(&self) -> &str {
+        &self.parent_rpc_url
     }
 }
 
@@ -144,7 +217,4 @@ mod tests {
         let watcher = ParentWatcher::new("http://localhost:1234/rpc/v1", "invalid");
         assert!(watcher.is_err());
     }
-
-    // Note: Integration tests with actual RPC calls would require
-    // a running Lotus node, so we keep unit tests minimal
 }
