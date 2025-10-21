@@ -280,6 +280,14 @@ EOF
 EOF
     fi
 
+    # Get current parent chain height for genesis timestamp
+    local parent_rpc=$(get_config_value "subnet.parent_rpc")
+    local current_parent_height=$(curl -s -X POST -H "Content-Type: application/json" \
+        --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
+        "$parent_rpc" | jq -r '.result' | xargs printf "%d\n" 2>/dev/null || echo "0")
+
+    log_info "Current parent chain height: $current_parent_height (will be used as genesis timestamp)"
+
     cat >> "$output_file" << EOF
 
 # Genesis configuration - create from parent subnet data
@@ -287,6 +295,7 @@ genesis: !create
   base-fee: "$base_fee"
   power-scale: $power_scale
   network-version: $network_version
+  timestamp: $current_parent_height  # Use current parent height to avoid 16h lookback issue
 
 # Join subnet configuration (for newly deployed subnets)
 # Note: This will be skipped if the subnet is already bootstrapped

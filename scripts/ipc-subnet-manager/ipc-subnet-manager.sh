@@ -43,6 +43,8 @@ Commands:
     check             Comprehensive health check on all nodes
     restart           Graceful restart of all nodes
     info              Show subnet information (chain ID, validators, status)
+    consensus-status  Show consensus state across all validators (heights, hashes, rounds)
+    voting-status     Show detailed voting info for current consensus round
     dashboard         Live monitoring dashboard with metrics and errors
     block-time        Measure block production time (default: 10s sample)
     watch-finality    Monitor parent finality progress in real-time
@@ -336,6 +338,18 @@ cmd_info() {
     show_subnet_info
 }
 
+# Show consensus status across validators
+cmd_consensus_status() {
+    load_config
+    show_consensus_status
+}
+
+# Show detailed voting status
+cmd_voting_status() {
+    load_config
+    show_voting_status
+}
+
 # Live dashboard monitoring
 cmd_dashboard() {
     local validator_idx=0
@@ -454,6 +468,12 @@ main() {
             ;;
         info)
             cmd_info "$@"
+            ;;
+        consensus-status)
+            cmd_consensus_status "$@"
+            ;;
+        voting-status)
+            cmd_voting_status "$@"
             ;;
         dashboard|monitor)
             cmd_dashboard "$@"

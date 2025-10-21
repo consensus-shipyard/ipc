@@ -1041,3 +1041,204 @@ watch_block_production() {
     fi
 }
 
+# Show consensus status across all validators
+show_consensus_status() {
+    echo ""
+    log_section "Consensus Status"
+    echo ""
+
+    log_info "Checking consensus state across all validators..."
+    echo ""
+    echo "Validator      | Height | Block Hash                                                       | App Hash                                                         | Round | Step"
+    echo "---------------|--------|------------------------------------------------------------------|------------------------------------------------------------------|-------|-------------"
+
+    for idx in "${!VALIDATORS[@]}"; do
+        local name="${VALIDATORS[$idx]}"
+        local ip=$(get_config_value "validators[$idx].ip")
+        local ssh_user=$(get_config_value "validators[$idx].ssh_user")
+        local ipc_user=$(get_config_value "validators[$idx].ipc_user")
+
+        # Get status from CometBFT
+        local status=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+            "curl -s http://localhost:26657/status 2>/dev/null" || echo '{}')
+
+        local height=$(echo "$status" | jq -r '.result.sync_info.latest_block_height // "?"' 2>/dev/null || echo "?")
+        local block_hash=$(echo "$status" | jq -r '.result.sync_info.latest_block_hash // "?"' 2>/dev/null || echo "?")
+        local app_hash=$(echo "$status" | jq -r '.result.sync_info.latest_app_hash // "?"' 2>/dev/null || echo "?")
+
+        # Get consensus state
+        local consensus=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+            "curl -s http://localhost:26657/consensus_state 2>/dev/null" || echo '{}')
+
+        local round=$(echo "$consensus" | jq -r '.result.round_state.height_round_step // "?"' 2>/dev/null | cut -d'/' -f2 || echo "?")
+        local step=$(echo "$consensus" | jq -r '.result.round_state.height_round_step // "?"' 2>/dev/null | cut -d'/' -f3 || echo "?")
+
+        # Truncate hashes for display
+        local block_hash_short="${block_hash:0:64}"
+        local app_hash_short="${app_hash:0:64}"
+
+        printf "%-14s | %-6s | %-64s | %-64s | %-5s | %s\n" \
+            "$name" "$height" "$block_hash_short" "$app_hash_short" "$round" "$step"
+    done
+
+    echo ""
+
+    # Check for divergence
+    log_info "Checking for state divergence..."
+
+    # Get heights and hashes
+    declare -A heights
+    declare -A block_hashes
+    declare -A app_hashes
+
+    for idx in "${!VALIDATORS[@]}"; do
+        local name="${VALIDATORS[$idx]}"
+        local ip=$(get_config_value "validators[$idx].ip")
+        local ssh_user=$(get_config_value "validators[$idx].ssh_user")
+        local ipc_user=$(get_config_value "validators[$idx].ipc_user")
+
+        local status=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+            "curl -s http://localhost:26657/status 2>/dev/null" || echo '{}')
+
+        heights[$name]=$(echo "$status" | jq -r '.result.sync_info.latest_block_height // "0"' 2>/dev/null)
+        block_hashes[$name]=$(echo "$status" | jq -r '.result.sync_info.latest_block_hash // ""' 2>/dev/null)
+        app_hashes[$name]=$(echo "$status" | jq -r '.result.sync_info.latest_app_hash // ""' 2>/dev/null)
+    done
+
+    # Check height divergence
+    local min_height=999999999
+    local max_height=0
+    for height in "${heights[@]}"; do
+        if [ "$height" != "0" ] && [ "$height" -lt "$min_height" ]; then
+            min_height=$height
+        fi
+        if [ "$height" -gt "$max_height" ]; then
+            max_height=$height
+        fi
+    done
+
+    local height_diff=$((max_height - min_height))
+
+    if [ "$height_diff" -gt 10 ]; then
+        log_warn "⚠ Height divergence detected: $height_diff blocks apart"
+        log_warn "  Min: $min_height, Max: $max_height"
+    elif [ "$height_diff" -gt 0 ]; then
+        log_info "  Small height difference: $height_diff blocks (normal during sync)"
+    else
+        log_success "  ✓ All validators at same height: $max_height"
+    fi
+
+    # Check app hash divergence at same height
+    declare -A height_app_hashes
+    for name in "${!heights[@]}"; do
+        local h="${heights[$name]}"
+        local ah="${app_hashes[$name]}"
+        if [ -n "$ah" ] && [ "$ah" != "null" ]; then
+            if [ -z "${height_app_hashes[$h]:-}" ]; then
+                height_app_hashes[$h]="$ah"
+            elif [ "${height_app_hashes[$h]}" != "$ah" ]; then
+                log_error "✗ CRITICAL: App hash divergence at height $h!"
+                log_error "  This indicates state machine divergence between validators"
+                log_error "  One or more validators have corrupted state"
+                return 1
+            fi
+        fi
+    done
+
+    log_success "  ✓ No app hash divergence detected"
+    echo ""
+}
+
+# Show detailed voting status for current consensus round
+show_voting_status() {
+    echo ""
+    log_section "Voting Status"
+    echo ""
+
+    log_info "Checking current consensus round voting..."
+    echo ""
+
+    # Use first validator as reference
+    local ip=$(get_config_value "validators[0].ip")
+    local ssh_user=$(get_config_value "validators[0].ssh_user")
+    local ipc_user=$(get_config_value "validators[0].ipc_user")
+    local name="${VALIDATORS[0]}"
+
+    log_info "Source: $name"
+    echo ""
+
+    # Get consensus state
+    local consensus=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        "curl -s http://localhost:26657/consensus_state 2>/dev/null" || echo '{}')
+
+    local height_round_step=$(echo "$consensus" | jq -r '.result.round_state.height_round_step // "?"' 2>/dev/null)
+    local height=$(echo "$height_round_step" | cut -d'/' -f1)
+    local round=$(echo "$height_round_step" | cut -d'/' -f2)
+    local step=$(echo "$height_round_step" | cut -d'/' -f3)
+
+    log_info "Current consensus: Height $height, Round $round, Step $step"
+    echo ""
+
+    # Get validators
+    local validators=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        "curl -s http://localhost:26657/validators 2>/dev/null" || echo '{}')
+
+    local total_voting_power=$(echo "$validators" | jq -r '[.result.validators[].voting_power | tonumber] | add // 0' 2>/dev/null)
+
+    log_info "Total voting power: $total_voting_power"
+    log_info "Quorum required: $((total_voting_power * 2 / 3 + 1)) (>2/3)"
+    echo ""
+
+    # Get prevote and precommit info
+    local prevotes=$(echo "$consensus" | jq -r '.result.round_state.height_vote_set[0].prevotes_bit_array // "?"' 2>/dev/null)
+    local precommits=$(echo "$consensus" | jq -r '.result.round_state.height_vote_set[0].precommits_bit_array // "?"' 2>/dev/null)
+
+    log_info "Prevotes:   $prevotes"
+    log_info "Precommits: $precommits"
+    echo ""
+
+    # Parse vote participation
+    local prevote_sum=$(echo "$prevotes" | grep -oE '[0-9]+/' | cut -d'/' -f1 || echo "0")
+    local prevote_total=$(echo "$prevotes" | grep -oE '/[0-9]+ =' | tr -d '/ =' || echo "0")
+    local precommit_sum=$(echo "$precommits" | grep -oE '[0-9]+/' | cut -d'/' -f1 || echo "0")
+    local precommit_total=$(echo "$precommits" | grep -oE '/[0-9]+ =' | tr -d '/ =' || echo "0")
+
+    if [ "$prevote_total" -gt 0 ]; then
+        local prevote_pct=$((prevote_sum * 100 / prevote_total))
+        log_info "Prevote participation: $prevote_sum/$prevote_total validators ($prevote_pct%)"
+    fi
+
+    if [ "$precommit_total" -gt 0 ]; then
+        local precommit_pct=$((precommit_sum * 100 / precommit_total))
+        log_info "Precommit participation: $precommit_sum/$precommit_total validators ($precommit_pct%)"
+    fi
+
+    echo ""
+
+    # Check if consensus is stuck
+    if [ "$step" = "RoundStepPrevote" ] || [ "$step" = "RoundStepPrecommit" ]; then
+        log_warn "⚠ Consensus is in voting phase"
+        if [ "$prevote_sum" -lt "$((prevote_total * 2 / 3))" ]; then
+            log_warn "  Not enough prevotes for quorum (need $((prevote_total * 2 / 3 + 1)))"
+        fi
+        if [ "$precommit_sum" -lt "$((precommit_total * 2 / 3))" ]; then
+            log_warn "  Not enough precommits for quorum (need $((precommit_total * 2 / 3 + 1)))"
+        fi
+    elif [ "$step" = "RoundStepNewHeight" ] || [ "$step" = "RoundStepPropose" ]; then
+        log_success "  ✓ Consensus progressing normally"
+    else
+        log_info "  Step: $step"
+    fi
+
+    echo ""
+
+    # Check recent consensus logs for issues
+    log_info "Recent consensus activity (last 20 lines):"
+    echo ""
+
+    ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        "tail -20 ~/.ipc-node/logs/2025-10-20.consensus.log 2>/dev/null | grep -v 'received complete proposal' | tail -10" || true
+
+    echo ""
+}
+
