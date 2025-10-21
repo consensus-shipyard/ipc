@@ -742,13 +742,14 @@ fn circ_supply(g: &Genesis) -> TokenAmount {
 pub async fn create_test_genesis_state(
     builtin_actors_bundle: &[u8],
     custom_actors_bundle: &[u8],
+    user_actors_bundle: Option<&[u8]>,
     ipc_path: PathBuf,
     genesis_params: Genesis,
 ) -> anyhow::Result<(FvmGenesisState<MemoryBlockstore>, GenesisOutput)> {
     let builder = GenesisBuilder::new(
         builtin_actors_bundle,
         custom_actors_bundle,
-        None,
+        user_actors_bundle,
         ipc_path,
         genesis_params,
     );
