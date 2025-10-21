@@ -18,6 +18,7 @@ serde = { workspace = true }
 serde_tuple = { workspace = true }
 tracing = { workspace = true }
 multihash = { workspace = true }
+multihash-codetable = { version = "0.1.4", features = ["sha3"] }
 
 cid = { workspace = true }
 fvm_shared = { workspace = true }

@@ -17,6 +17,7 @@ bls-signatures = { version = "0.13.0", default-features = false, features = ["bl
 ethers = { workspace = true, optional = true }
 fs-err = { workspace = true }
 fvm_shared = { workspace = true, features = ["crypto"] }
+generic-array = "1.1"
 hex = { workspace = true }
 libc = "0.2"
 libsecp256k1 = { workspace = true }

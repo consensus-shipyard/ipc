@@ -204,7 +204,7 @@ mod arb {
 mod tests {
     use std::io::Write;
 
-    use cid::multihash::MultihashDigest;
+    use multihash_codetable::{Code, MultihashDigest};
     use tempfile::NamedTempFile;
 
     use crate::manifest::file_checksum;
@@ -218,7 +218,7 @@ mod tests {
         let file_path = file.into_temp_path();
         let file_digest = file_checksum(file_path).expect("checksum");
 
-        let content_digest = cid::multihash::Code::Sha2_256.digest(content);
+        let content_digest = Code::Sha2_256.digest(content);
         let content_digest = content_digest.digest();
 
         assert_eq!(file_digest.as_bytes(), content_digest)

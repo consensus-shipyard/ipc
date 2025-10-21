@@ -32,6 +32,7 @@ use ipc_ipld_resolver::{
     Client, Config, ConnectionConfig, ContentConfig, DiscoveryConfig, Event, MembershipConfig,
     NetworkConfig, Resolver, Service, VoteRecord,
 };
+use libipld::Cid as LibipldCid;
 use libp2p::{
     core::{
         muxing::StreamMuxerBox,
@@ -41,7 +42,7 @@ use libp2p::{
     multiaddr::Protocol,
     plaintext, yamux, Multiaddr, PeerId, Transport,
 };
-use multihash::{Code, MultihashDigest};
+use multihash_codetable::{Code, MultihashDigest};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 mod store;
@@ -184,11 +185,15 @@ async fn single_bootstrap_single_provider_resolve_one() {
     tokio::time::sleep(Duration::from_secs(3)).await;
 
     // Ask for the CID to be resolved from another peer.
+    // Convert cid 0.11 to libipld cid 0.10 for the resolver
+    let cid_bytes = cid.to_bytes();
+    let libipld_cid = LibipldCid::try_from(cid_bytes.as_slice()).expect("CID conversion");
+
     tokio::time::timeout(
         Duration::from_secs(3),
         cluster.agents[resolver_idx]
             .client
-            .resolve(cid, subnet_id.clone()),
+            .resolve(libipld_cid, subnet_id.clone()),
     )
     .await
     .expect("timeout resolving content")
@@ -196,6 +201,7 @@ async fn single_bootstrap_single_provider_resolve_one() {
     .expect("failed to resolve content");
 
     // Check that the CID is deposited into the store of the requestor.
+    // Note: The store uses FvmCid (0.11) internally
     check_test_data(&mut cluster.agents[resolver_idx], &cid).expect("failed to resolve from store");
 }
 

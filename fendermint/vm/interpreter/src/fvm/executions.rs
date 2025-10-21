@@ -9,13 +9,13 @@ use fendermint_vm_message::signed::SignedMessage;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
-use fvm_shared::BLOCK_GAS_LIMIT;
 use ipc_observability::{emit, measure_time};
 
 use crate::fvm::observe::{MsgExec, MsgExecPurpose};
 
 use crate::fvm::FvmMessage;
 
+use super::constants::BLOCK_GAS_LIMIT;
 const GAS_LIMIT: u64 = BLOCK_GAS_LIMIT * 10000;
 
 /// Helper to build and execute an implicit system message.
