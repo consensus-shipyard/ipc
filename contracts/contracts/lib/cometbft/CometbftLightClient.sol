@@ -27,6 +27,10 @@ struct AppHashBreakdown {
     CompressedActivityRollup activityCommitment;
 }
 
+/// Validator sigature payload from cometbft pre-commit quorum certificate.
+/// @dev This struct is used together with vote template for light client verification,
+/// see contracts/contracts/subnet/SubnetActorCheckpointingFacet.sol#submitBottomUpCheckpoint method
+/// for its usage.
 struct ValidatorSignPayload {
     Timestamp.Data timestamp;
     bytes signature;
@@ -201,6 +205,10 @@ library CometbftLightClient {
         }
     }
 
+    /// @dev This method hash LightHeader.Data into a bytes32 hash that is exactly how cometbft go client 
+    /// does it. This code is taken from tendermint-sol/contracts/proto/TendermintHelper.sol#hash method.
+    /// The original method takes SignedHeader.Data as parameter, while this contract requires LightHeader.Data,
+    /// immplementations are the same.
     function hashLightHeader(LightHeader.Data memory h) internal pure returns (bytes32) {
         if(h.validators_hash.length == 0) revert ValidatorsHashCannotBeEmpty();
 

@@ -63,6 +63,8 @@ struct GatewayActorStorage {
     /// @notice A mapping of block numbers to bottom-up cross-messages
     // slither-disable-next-line uninitialized-state
     mapping(uint256 => BottomUpMsgBatch) bottomUpMsgBatches;
+    /// @notice This tracks the latest bottom up checkpoint height created
+    uint64 lastestBottomUpCheckpointHeight;
     /// @notice Keys of the registered subnets. Useful to iterate through them
     EnumerableSet.Bytes32Set subnetKeys;
     /// @notice List of approved subnet that can join the network

@@ -47,6 +47,13 @@ contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, ReentrancyG
     function submitBottomUpCheckpoint(bytes calldata rawData) external whenNotPaused {
         SubnetActorCheckpointingStorage storage checkpointStorage = LibCheckpointingStorage.getStorage();
 
+        // In the original cometbft SignedHeader, which is used for pre-commit quorum certificate, the validator signatures
+        // and the light client header they are signing are all contained in SignedHeader struct. However, for light client
+        // verification, protobuf encoding is required. This means type conversion for SignedHeader needs to be done on chain.
+        // This process could be gas costly.
+        // To be more gas efficient, the voteTemplate contains the common fields that valiators are using to sign the pre-commit
+        // quorum payload. Their signatures are grouped into `ValidatorSignPayload[] signatures` to reduce as much on chain
+        // data conversion as possible.
         (
             LightHeader.Data memory header,
             ValidatorSignPayload[] memory signatures,

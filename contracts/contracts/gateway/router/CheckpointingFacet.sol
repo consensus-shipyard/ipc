@@ -47,9 +47,14 @@ contract CheckpointingFacet is GatewayActorModifiers {
     ///     Called from a subnet actor if the checkpoint is cryptographically valid.
     /// @param checkpoint The bottom-up checkpoint to be committed.
     function commitCheckpoint(BottomUpCheckpoint calldata checkpoint) external systemActorOnly {
+        if (block.number <= s.lastestBottomUpCheckpointHeight) {
+            revert CheckpointAlreadyExists();
+        }
         emit StateCommitmentCreated(uint64(block.number), checkpoint.commitment);
         emit BottomUpBatchRecorded(uint64(block.number), checkpoint.msgs);
         emit ActivityRollupRecorded(uint64(block.number), checkpoint.activity);
+
+        s.lastestBottomUpCheckpointHeight = uint64(block.number);
     }
 
     function _execBottomUpMsgBatch(IpcEnvelope[] calldata msgs, Subnet storage subnet) internal {
