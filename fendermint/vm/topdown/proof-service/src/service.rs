@@ -98,8 +98,8 @@ impl ProofGeneratorService {
         Ok(Self {
             config,
             cache,
-            f3_client,
             assembler,
+            f3_client,
         })
     }
 
@@ -115,6 +115,7 @@ impl ProofGeneratorService {
             "Starting proof generator service"
         );
 
+        // Validator is already initialized in new() with trusted power table
         let mut poll_interval = interval(self.config.polling_interval);
         poll_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 

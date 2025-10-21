@@ -3580,7 +3580,7 @@ dependencies = [
  "serde",
  "serde_json",
  "strum 0.26.3",
- "syn 2.0.114",
+"syn 2.0.114",
  "tempfile",
  "thiserror 1.0.69",
  "tiny-keccak",
@@ -5143,7 +5143,7 @@ dependencies = [
 [[package]]
 name = "filecoin-f3-blssig"
 version = "0.1.0"
-source = "git+https://github.com/moshababo/rust-f3?branch=cargo-git-compat#40af605984045a9f2b9ba5dcc9c04c984deb8d1f"
+source = "git+https://github.com/ChainSafe/rust-f3#4520e4cd42140118c9728a6caa051e0d59a5e4f3"
 dependencies = [
  "blake2 0.11.0-rc.2",
  "bls-signatures 0.15.0",
@@ -5159,7 +5159,7 @@ dependencies = [
 [[package]]
 name = "filecoin-f3-certs"
 version = "0.1.0"
-source = "git+https://github.com/moshababo/rust-f3?branch=cargo-git-compat#40af605984045a9f2b9ba5dcc9c04c984deb8d1f"
+source = "git+https://github.com/ChainSafe/rust-f3#4520e4cd42140118c9728a6caa051e0d59a5e4f3"
 dependencies = [
  "ahash 0.8.12",
  "filecoin-f3-gpbft",
@@ -5170,7 +5170,7 @@ dependencies = [
 [[package]]
 name = "filecoin-f3-gpbft"
 version = "0.1.0"
-source = "git+https://github.com/moshababo/rust-f3?branch=cargo-git-compat#40af605984045a9f2b9ba5dcc9c04c984deb8d1f"
+source = "git+https://github.com/ChainSafe/rust-f3#4520e4cd42140118c9728a6caa051e0d59a5e4f3"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
@@ -5193,7 +5193,7 @@ dependencies = [
 [[package]]
 name = "filecoin-f3-lightclient"
 version = "0.1.0"
-source = "git+https://github.com/moshababo/rust-f3?branch=cargo-git-compat#40af605984045a9f2b9ba5dcc9c04c984deb8d1f"
+source = "git+https://github.com/ChainSafe/rust-f3#4520e4cd42140118c9728a6caa051e0d59a5e4f3"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -5209,7 +5209,7 @@ dependencies = [
 [[package]]
 name = "filecoin-f3-merkle"
 version = "0.1.0"
-source = "git+https://github.com/moshababo/rust-f3?branch=cargo-git-compat#40af605984045a9f2b9ba5dcc9c04c984deb8d1f"
+source = "git+https://github.com/ChainSafe/rust-f3#4520e4cd42140118c9728a6caa051e0d59a5e4f3"
 dependencies = [
  "anyhow",
  "sha3",
@@ -5218,7 +5218,7 @@ dependencies = [
 [[package]]
 name = "filecoin-f3-rpc"
 version = "0.1.0"
-source = "git+https://github.com/moshababo/rust-f3?branch=cargo-git-compat#40af605984045a9f2b9ba5dcc9c04c984deb8d1f"
+source = "git+https://github.com/ChainSafe/rust-f3#4520e4cd42140118c9728a6caa051e0d59a5e4f3"
 dependencies = [
  "anyhow",
  "filecoin-f3-gpbft",
@@ -6759,7 +6759,7 @@ dependencies = [
  "hyper 1.8.1",
  "hyper-util",
  "log",
- "rustls 0.23.32",
+ "rustls 0.23.33",
  "rustls-pki-types",
  "tokio",
  "tokio-rustls 0.26.4",
@@ -8047,6 +8047,28 @@ name = "itoa"
 version = "1.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92ecc6618181def0457392ccd0ee51198e065e016d1d527a7ac1b6dc7c1f09d2"
+
+[[package]]
+name = "jni"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a87aa2bb7d2af34197c04845522473242e1aa17c12f4935d5856491a7fb8c97"
+dependencies = [
+ "cesu8",
+ "cfg-if",
+ "combine",
+ "jni-sys",
+ "log",
+ "thiserror 1.0.69",
+ "walkdir",
+ "windows-sys 0.45.0",
+]
+
+[[package]]
+name = "jni-sys"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8eaf4bc02d17cbdd7ff4c7438cafcdf7fb9a4613313ad11b4f8fefe7d3fa0130"
 
 [[package]]
 name = "jni"
@@ -13638,6 +13660,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "strum_macros"
+version = "0.27.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7695ce3845ea4b33927c055a39dc438a45b059f7c1b3d91d38d10355fb8cbca7"
+dependencies = [
+ "heck 0.5.0",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.107",
+]
+
+[[package]]
 name = "substrate-bn"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -15990,6 +16024,12 @@ checksum = "3949bd5b99cafdf1c7ca86b43ca564028dfe27d66958f2470940f73d86d75b37"
 dependencies = [
  "windows-link 0.2.1",
 ]
+
+[[package]]
+name = "windows_aarch64_gnullvm"
+version = "0.42.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "597a5118570b68bc08d8d59125332c54f1ba9d9adeedeef5b99b02ba2b0698f8"
 
 [[package]]
 name = "windows_aarch64_gnullvm"

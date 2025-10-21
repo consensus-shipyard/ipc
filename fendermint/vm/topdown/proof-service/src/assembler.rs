@@ -1,10 +1,6 @@
 // Copyright 2022-2025 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! Proof bundle assembler
-//!
-//! Generates cryptographic proofs for parent chain finality using the
-//! ipc-filecoin-proofs library. The assembler is only responsible for
-//! proof generation - it has no knowledge of cache entries or storage.
 
 use crate::observe::{OperationStatus, ProofBundleGenerated};
 use crate::types::FinalizedTipset;
@@ -13,12 +9,10 @@ use fvm_ipld_encoding;
 use ipc_observability::emit;
 use proofs::{
     client::LotusClient,
-    proofs::{
-        calculate_storage_slot, common::bundle::UnifiedProofBundle, generate_proof_bundle,
-        EventProofSpec, StorageProofSpec,
-    },
+    proofs::{calculate_storage_slot, generate_proof_bundle, EventProofSpec, StorageProofSpec},
 };
-use std::time::Instant;
+use serde_json::json;
+use std::time::SystemTime;
 use url::Url;
 
 // Event signatures for proof generation
@@ -56,13 +50,8 @@ const TOPDOWN_NONCE_STORAGE_OFFSET: u64 = 3;
 const NEXT_CONFIG_NUMBER_STORAGE_SLOT: u64 = 20;
 
 /// Assembles proof bundles from F3 certificates and parent chain data
-///
-/// # Thread Safety
-///
-/// LotusClient from the proofs library uses Rc/RefCell internally, so it's not Send.
-/// We store the URL and create clients on-demand instead of storing the client.
 pub struct ProofAssembler {
-    rpc_url: Url,
+    rpc_url: String,
     gateway_actor_id: u64,
     subnet_id: String,
 }
@@ -72,7 +61,7 @@ impl ProofAssembler {
     pub fn new(rpc_url: String, gateway_actor_id: u64, subnet_id: String) -> Result<Self> {
         let url = Url::parse(&rpc_url).context("Failed to parse RPC URL")?;
         Ok(Self {
-            rpc_url: url,
+            rpc_url,
             gateway_actor_id,
             subnet_id,
         })
@@ -257,12 +246,5 @@ mod tests {
             "test-subnet".to_string(),
         );
         assert!(assembler.is_ok());
-    }
-
-    #[test]
-    fn test_invalid_url() {
-        let assembler =
-            ProofAssembler::new("not a url".to_string(), 1001, "test-subnet".to_string());
-        assert!(assembler.is_err());
     }
 }

@@ -106,7 +106,17 @@ pub fn launch_service(
     let cache_clone = cache.clone();
     let power_table_clone = initial_power_table.clone();
 
-    // Spawn background task
+    // Use spawn_blocking to run the service in a blocking thread pool
+    // Then spawn an async task to handle it
+    let handle = tokio::task::spawn_blocking(move || {
+        // Create a new runtime for the blocking task
+        let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+        rt.block_on(async move {
+            service.run().await;
+        });
+    });
+
+    // Convert to a JoinHandle that looks like our original
     let handle = tokio::spawn(async move {
         match ProofGeneratorService::new(
             config_clone,
@@ -147,6 +157,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires real parent chain RPC endpoint
     async fn test_launch_service_enabled() {
         use crate::config::GatewayId;
         use filecoin_f3_gpbft::PowerEntries;
@@ -167,5 +178,9 @@ mod tests {
 
         let (_cache, handle) = result.unwrap().unwrap();
         handle.abort();
+
+        // Check cache state
+        assert_eq!(cache.last_committed_instance(), 100);
+        assert_eq!(cache.len(), 0);
     }
 }

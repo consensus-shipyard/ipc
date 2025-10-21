@@ -23,7 +23,6 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicI64, AtomicU64, Ordering};
 use std::sync::Arc;
-use tracing::{debug, info, warn};
 
 /// Thread-safe two-level cache for proof bundles
 #[derive(Clone)]

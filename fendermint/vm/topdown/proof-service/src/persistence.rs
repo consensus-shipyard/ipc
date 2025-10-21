@@ -27,7 +27,7 @@ use rocksdb::{BoundColumnFamily, Options, DB};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 /// Database schema version
 const SCHEMA_VERSION: u32 = 1;
@@ -182,14 +182,6 @@ impl ProofCachePersistence {
         self.clear_all()
     }
 
-    /// Load the last committed instance ID
-    ///
-    /// Note: This information is not persisted to disk, so this always returns None.
-    /// The last committed state is only stored in memory in the ProofCache.
-    pub fn load_last_committed(&self) -> Result<Option<u64>> {
-        Ok(None)
-    }
-
     /// Load all entries as combined cache entries
     ///
     /// This combines certificates with their associated epoch proofs for inspection.
@@ -237,166 +229,6 @@ impl ProofCachePersistence {
         }
         Ok(())
     }
-
-    /// Delete entries older than the given instance
-    pub fn cleanup_old_entries(&self, cutoff_instance: u64) -> Result<usize> {
-        let cf_bundles = self
-            .db
-            .cf_handle(CF_BUNDLES)
-            .context("Failed to get bundles column family")?;
-
-        let mut count = 0;
-        let cutoff_key = cutoff_instance.to_be_bytes();
-
-        // Collect keys to delete (can't delete while iterating)
-        let mut keys_to_delete = Vec::new();
-
-        let iter = self
-            .db
-            .iterator_cf(&cf_bundles, rocksdb::IteratorMode::Start);
-
-        for item in iter {
-            let (key, _) = item?;
-
-            // If key is less than cutoff, mark for deletion
-            if key.as_ref() < &cutoff_key[..] {
-                keys_to_delete.push(key.to_vec());
-            } else {
-                // Keys are ordered, so we can stop here
-                break;
-            }
-        }
-
-        // Delete collected keys
-        for key in keys_to_delete {
-            self.db.delete_cf(&cf_bundles, &key)?;
-            count += 1;
-        }
-
-        if count > 0 {
-            info!(count, cutoff_instance, "Cleaned up old entries from disk");
-        }
-
-        Ok(count)
-    }
-
-    /// Save certificate verification cache
-    pub fn save_verified_certificate(&self, cert_hash: &[u8], instance_id: u64) -> Result<()> {
-        let cf_certs = self
-            .db
-            .cf_handle(CF_CERTIFICATES)
-            .context("Failed to get certificates column family")?;
-
-        self.db
-            .put_cf(&cf_certs, cert_hash, instance_id.to_be_bytes())
-            .context("Failed to save verified certificate")?;
-
-        Ok(())
-    }
-
-    /// Check if a certificate has been verified before
-    pub fn is_certificate_verified(&self, cert_hash: &[u8]) -> Result<bool> {
-        let cf_certs = self
-            .db
-            .cf_handle(CF_CERTIFICATES)
-            .context("Failed to get certificates column family")?;
-
-        Ok(self.db.get_cf(&cf_certs, cert_hash)?.is_some())
-    }
-
-    /// Validate cache integrity on startup
-    pub fn validate_integrity(&self) -> Result<()> {
-        info!("Validating cache integrity");
-
-        let cf_bundles = self
-            .db
-            .cf_handle(CF_BUNDLES)
-            .context("Failed to get bundles column family")?;
-
-        let mut valid_count = 0;
-        let mut invalid_count = 0;
-
-        let iter = self
-            .db
-            .iterator_cf(&cf_bundles, rocksdb::IteratorMode::Start);
-
-        for item in iter {
-            let (key, value) = item?;
-
-            // Try to deserialize
-            match serde_json::from_slice::<CacheEntry>(&value) {
-                Ok(entry) => {
-                    // Verify key matches instance ID
-                    let expected_key = entry.instance_id.to_be_bytes();
-                    if key.as_ref() == &expected_key[..] {
-                        valid_count += 1;
-                    } else {
-                        warn!(
-                            instance_id = entry.instance_id,
-                            "Key mismatch in cache entry"
-                        );
-                        invalid_count += 1;
-                    }
-                }
-                Err(e) => {
-                    warn!(
-                        error = %e,
-                        "Failed to deserialize cache entry"
-                    );
-                    invalid_count += 1;
-                }
-            }
-        }
-
-        info!(
-            valid_count,
-            invalid_count, "Cache integrity validation complete"
-        );
-
-        if invalid_count > 0 {
-            warn!(
-                "Found {} invalid entries during integrity check",
-                invalid_count
-            );
-        }
-
-        Ok(())
-    }
-
-    /// Get database statistics
-    pub fn get_stats(&self) -> Result<PersistenceStats> {
-        let cf_bundles = self
-            .db
-            .cf_handle(CF_BUNDLES)
-            .context("Failed to get bundles column family")?;
-
-        let mut entry_count = 0;
-        let mut total_size = 0;
-
-        let iter = self
-            .db
-            .iterator_cf(&cf_bundles, rocksdb::IteratorMode::Start);
-
-        for item in iter {
-            let (_, value) = item?;
-            entry_count += 1;
-            total_size += value.len();
-        }
-
-        Ok(PersistenceStats {
-            entry_count,
-            total_size_bytes: total_size,
-            last_committed: self.load_last_committed()?,
-        })
-    }
-}
-
-/// Statistics about the persistent cache
-#[derive(Debug, Clone)]
-pub struct PersistenceStats {
-    pub entry_count: usize,
-    pub total_size_bytes: usize,
-    pub last_committed: Option<u64>,
 }
 
 #[cfg(test)]
@@ -494,7 +326,7 @@ mod tests {
     }
 
     #[test]
-    fn test_persistence_cleanup() {
+    fn test_persistence_delete() {
         let dir = tempdir().unwrap();
         let persistence = ProofCachePersistence::open(dir.path()).unwrap();
 
