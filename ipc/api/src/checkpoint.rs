@@ -5,8 +5,6 @@
 use crate::cross::IpcEnvelope;
 use crate::subnet_id::SubnetID;
 use crate::HumanReadable;
-use cid::multihash::Code;
-use cid::multihash::MultihashDigest;
 use cid::Cid;
 use ethers::abi::AbiEncode;
 use ethers::utils::hex;
@@ -15,6 +13,7 @@ use fvm_shared::clock::ChainEpoch;
 use fvm_shared::econ::TokenAmount;
 use ipc_actors_abis::checkpointing_facet;
 use lazy_static::lazy_static;
+use multihash_codetable::{Code, MultihashDigest};
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize, Serializer};
 use serde_with::serde_as;

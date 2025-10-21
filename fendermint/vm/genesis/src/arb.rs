@@ -4,11 +4,11 @@ use crate::{
     ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, PermissionMode, Power,
     SignerAddr, Validator, ValidatorKey,
 };
-use cid::multihash::MultihashDigest;
 use fendermint_crypto::SecretKey;
 use fendermint_testing::arb::{ArbSubnetID, ArbTokenAmount};
 use fendermint_vm_core::Timestamp;
 use fvm_shared::{address::Address, version::NetworkVersion};
+use multihash_codetable::{Code, MultihashDigest};
 use quickcheck::{Arbitrary, Gen};
 use rand::{rngs::StdRng, SeedableRng};
 
@@ -23,7 +23,7 @@ impl Arbitrary for ActorMeta {
             } else {
                 // NOTE: Not using `EthAddress` because it would be circular dependency.
                 let mut hash20 = [0u8; 20];
-                let hash32 = cid::multihash::Code::Keccak256.digest(&pk[1..]);
+                let hash32 = Code::Keccak256.digest(&pk[1..]);
                 hash20.copy_from_slice(&hash32.digest()[12..]);
                 Address::new_delegated(10, &hash20).unwrap()
             };

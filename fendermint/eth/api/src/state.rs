@@ -30,6 +30,9 @@ use tendermint_rpc::{Order, Subscription, SubscriptionClient};
 use tokio::sync::mpsc::{Sender, UnboundedSender};
 use tokio::sync::RwLock;
 
+// BLOCK_GAS_LIMIT was removed in FVM 4.7, define locally for IPC
+const BLOCK_GAS_LIMIT: u64 = 10_000_000_000;
+
 use crate::cache::{AddressCache, Cache};
 use crate::conv::from_tm;
 use crate::filters::{
@@ -422,7 +425,7 @@ where
             value: TokenAmount::from_atto(0),
             method_num,
             params,
-            gas_limit: fvm_shared::BLOCK_GAS_LIMIT,
+            gas_limit: BLOCK_GAS_LIMIT,
             gas_fee_cap: TokenAmount::from_atto(0),
             gas_premium: TokenAmount::from_atto(0),
         };

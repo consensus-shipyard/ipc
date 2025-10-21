@@ -22,7 +22,8 @@ quickcheck = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 
 cid = { workspace = true }
-fvm_shared = { workspace = true, features  = ["crypto"] }
+multihash-codetable = { version = "0.1.4", features = ["blake2b"] }
+fvm_shared = { workspace = true, features = ["crypto"] }
 fvm_ipld_encoding = { workspace = true }
 ipc-api = { path = "../../../ipc/api" }
 

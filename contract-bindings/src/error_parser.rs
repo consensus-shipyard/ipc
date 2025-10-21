@@ -43,7 +43,7 @@ pub fn extend_errors(
     for (_, v) in contract_errors.iter() {
         for e in v {
             // solidity selector is only the first 4 bytes of the signature
-            let selector = const_hex::hex::encode(&e.signature().0[0..SOLIDITY_SELECTOR_BYTE_SIZE]);
+            let selector = const_hex::encode(&e.signature().0[0..SOLIDITY_SELECTOR_BYTE_SIZE]);
             map.insert(selector, e.clone());
         }
     }
@@ -83,7 +83,7 @@ impl ContractErrorParser {
             return Err(ParseContractError::ErrorBytesTooShort);
         }
 
-        let selector = const_hex::hex::encode(&bytes[0..4]);
+        let selector = const_hex::encode(&bytes[0..4]);
 
         // Check for standard Solidity errors first
         match selector.as_str() {
@@ -194,7 +194,7 @@ impl ContractErrorParser {
     }
 
     pub fn parse_from_hex_str(err: &str) -> Result<ParsedError, ParseContractError> {
-        let bytes = const_hex::hex::decode(err)
+        let bytes = const_hex::decode(err)
             .map_err(|e| ParseContractError::ErrorNotHexStr(e.to_string()))?;
         Self::parse_from_bytes(bytes.as_slice())
     }
@@ -213,12 +213,12 @@ impl ContractErrorParser {
 #[cfg(test)]
 mod tests {
     use crate::error_parser::{ContractErrorParser, ParseContractError};
-    use const_hex::hex;
+    use const_hex;
 
     #[test]
     fn test_parse_error_ok() {
         // selector for "BottomUpCheckpointAlreadySubmitted" error
-        let err_bytes = hex::decode("d6bb62dd").unwrap();
+        let err_bytes = const_hex::decode("d6bb62dd").unwrap();
 
         let result = ContractErrorParser::parse_from_bytes(err_bytes.as_ref()).unwrap();
         assert_eq!(result.name, "BottomUpCheckpointAlreadySubmitted");
@@ -248,9 +248,10 @@ mod tests {
     #[test]
     fn test_parse_panic() {
         // Panic with code 0x11 (arithmetic overflow)
-        let panic_bytes =
-            hex::decode("4e487b710000000000000000000000000000000000000000000000000000000000000011")
-                .unwrap();
+        let panic_bytes = const_hex::decode(
+            "4e487b710000000000000000000000000000000000000000000000000000000000000011",
+        )
+        .unwrap();
 
         let result = ContractErrorParser::parse_from_bytes(panic_bytes.as_ref()).unwrap();
         assert_eq!(result.name, "Panic");
@@ -267,13 +268,13 @@ mod tests {
 
     #[test]
     fn test_parse_error_not_found() {
-        // a random error selector
-        let err_bytes = hex::decode("a6bb62dd").unwrap();
+        // a random error selector that definitely doesn't exist
+        let err_bytes = const_hex::decode("ffffffff").unwrap();
 
         let result = ContractErrorParser::parse_from_bytes(err_bytes.as_ref());
         assert!(result.is_err());
         if let Err(ParseContractError::ErrorNotFound { selector }) = result {
-            assert_eq!(selector, "a6bb62dd");
+            assert_eq!(selector, "ffffffff");
         } else {
             panic!("Expected ErrorNotFound error");
         }
