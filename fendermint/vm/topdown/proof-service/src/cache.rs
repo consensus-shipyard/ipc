@@ -3,15 +3,11 @@
 //! In-memory cache for proof bundles with disk persistence
 
 use crate::config::CacheConfig;
-use crate::persistence::ProofCachePersistence;
 use crate::types::CacheEntry;
-use anyhow::{Context, Result};
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
-use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use tracing::{debug, info, warn};
 
 /// Thread-safe in-memory cache for proof bundles
 #[derive(Clone)]
@@ -150,26 +146,21 @@ impl ProofCache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::ProofBundlePlaceholder;
-    use cid::Cid;
-    use fendermint_actor_f3_cert_manager::types::F3Certificate;
-    use multihash_codetable::{Code, MultihashDigest};
     use std::time::SystemTime;
 
     fn create_test_entry(instance_id: u64, epochs: Vec<i64>) -> CacheEntry {
-        let power_table_cid = Cid::new_v1(0x55, Code::Blake2b256.digest(b"test"));
-
         CacheEntry {
             instance_id,
             finalized_epochs: epochs.clone(),
-            bundle: ProofBundlePlaceholder {
-                parent_height: *epochs.iter().max().unwrap_or(&0) as u64,
-                data: vec![],
-            },
-            actor_certificate: F3Certificate {
+            proof_bundle_bytes: vec![1, 2, 3, 4], // Test proof bundle bytes
+            f3_certificate_bytes: vec![5, 6, 7, 8], // Test F3 certificate bytes
+            actor_certificate: fendermint_actor_f3_cert_manager::types::F3Certificate {
                 instance_id,
                 finalized_epochs: epochs,
-                power_table_cid,
+                power_table_cid: {
+                    use multihash_codetable::{Code, MultihashDigest};
+                    cid::Cid::new_v1(0x55, Code::Blake2b256.digest(b"test"))
+                },
                 signature: vec![],
                 certificate_data: vec![],
             },

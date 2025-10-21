@@ -37,10 +37,24 @@ fvm_ipld_encoding = { workspace = true }
 # Proofs library
 proofs = { git = "https://github.com/consensus-shipyard/ipc-filecoin-proofs", branch = "proofs" }
 
-# F3 certificate handling - TO BE INTEGRATED
-# TODO: Identify correct crate from rust-f3 repository
-# filecoin-f3-certs = { git = "https://github.com/ChainSafe/rust-f3" }
+# F3 certificate handling
+filecoin-f3-certs = { git = "https://github.com/ChainSafe/rust-f3" }
+filecoin-f3-rpc = { git = "https://github.com/ChainSafe/rust-f3" }
+
+# Binary dependencies (required for proof-cache-test binary)
+clap = { workspace = true, optional = true }
+tracing-subscriber = { workspace = true, optional = true }
+chrono = { version = "0.4", optional = true }
+
+[features]
+cli = ["clap", "tracing-subscriber", "chrono"]
+
+[[bin]]
+name = "proof-cache-test"
+path = "src/bin/proof-cache-test.rs"
+required-features = ["cli"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "rt-multi-thread"] }
 multihash-codetable = { version = "0.1.4", features = ["blake2b"] }
+tempfile = "3.8"

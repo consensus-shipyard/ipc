@@ -460,3 +460,5 @@ mod tests {
         assert_eq!(manager.current_provider_url(), "http://primary:1234");
     }
 }
+
+
