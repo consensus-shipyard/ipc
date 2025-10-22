@@ -96,9 +96,7 @@ library CometbftLightClient {
         for (uint8 bitCount = 0; bitCount < totalValidators; bitCount++) {
             if (!certificate.bitmap.isBitSet(bitCount)) continue;
 
-            // The certificate.signatures must be ordered accordingly to the LibPower active validators
-            // priority queue ordering. Otherwise the signatures might have a mismatch.
-            (uint256 power, address validator) = getValidatorInfo(bitCount);
+            (uint256 power, address validator) = getValidatorInfo(validatorIndex);
 
             voteTemplate.timestamp = certificate.signatures[validatorIndex].timestamp;
 
