@@ -3,13 +3,14 @@
 
 use anyhow::anyhow;
 use ethers::prelude::*;
-use std::collections::HashMap;
 
 use tendermint::account::Id;
 use tendermint::block::commit_sig::CommitSig as TendermintCommitSig;
 use tendermint::block::signed_header::SignedHeader as TendermintSignedHeader;
 use tendermint::time::Time as TendermintTime;
 use tendermint::PublicKey;
+
+const BLOCK_ID_FLAG_COMMIT: u8 = 2;
 
 // Main Data struct (appears to be CanonicalVote.Data based on fields)
 #[derive(Debug, Clone, EthAbiType, EthAbiCodec)]
@@ -27,6 +28,13 @@ pub struct CanonicalVoteData {
 pub struct ValidatorSignPayload {
     pub timestamp: Timestamp, // Nested struct
     pub signature: Bytes,     // bytes in Solidity (dynamic)
+}
+
+/// The quorum signature certificate
+#[derive(Debug, Clone, EthAbiType, EthAbiCodec)]
+pub struct ValidatorCertificate {
+    pub bitmap: U256,
+    pub signatures: Vec<ValidatorSignPayload>,
 }
 
 #[derive(Debug, Clone, EthAbiType, EthAbiCodec)]
@@ -253,42 +261,54 @@ impl From<TendermintTime> for Timestamp {
 impl SignedHeader {
     /// Order the commitment payload against the public keys, i.e. using public key to cometbft account
     /// id to order the validators in pre commit cert.
-    pub fn order_commit_against<'a, I: Iterator<Item = &'a [u8]>>(
+    pub fn generate_validator_cert<'a, I: Iterator<Item = &'a [u8]>>(
         &mut self,
         pubkeys: I,
-    ) -> anyhow::Result<()> {
-        let account_to_index = pubkeys
-            .into_iter()
-            .map(pubkey_to_account_id)
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .enumerate()
-            .map(|(index, id)| (id.into(), index))
-            .collect::<HashMap<Vec<u8>, usize>>();
+    ) -> anyhow::Result<ValidatorCertificate> {
+        let mut bitmap = U256::zero();
+        let mut signatures = Vec::new();
 
-        // check the validators are included in the public keys
-        if let Some(v) = self
-            .commit
-            .signatures
-            .iter()
-            .find(|s| !account_to_index.contains_key(s.validator_address.as_ref()))
-        {
-            return Err(anyhow!(
-                "validator address not found in the public keys: {:}",
-                hex::encode(v.validator_address.as_ref())
-            ));
+        for (index, pubkey) in pubkeys.into_iter().enumerate() {
+            let cometbft_account_id = pubkey_to_account_id(pubkey)?;
+
+            let maybe_sig = self
+                .commit
+                .signatures
+                .iter()
+                .find(|s| s.validator_address.as_ref() == cometbft_account_id.as_ref());
+
+            let Some(sig) = maybe_sig else {
+                tracing::info!(
+                    height = self.header.height,
+                    account_id = hex::encode(cometbft_account_id.as_bytes()),
+                    "validator does not have signature for signed header"
+                );
+                continue;
+            };
+
+            if sig.block_id_flag != BLOCK_ID_FLAG_COMMIT {
+                tracing::info!(
+                    height = self.header.height,
+                    account_id = hex::encode(cometbft_account_id.as_bytes()),
+                    "validator signature not commit vote for signed header"
+                );
+                continue;
+            };
+
+            set_bit(&mut bitmap, index);
+            signatures.push(ValidatorSignPayload {
+                timestamp: sig.timestamp.clone(),
+                signature: sig.signature.clone(),
+            });
+
+            tracing::info!(
+                height = self.header.height,
+                account_id = hex::encode(cometbft_account_id.as_bytes()),
+                "validator signature included in bottom up certificate"
+            );
         }
 
-        // safe to unwrap as validator must be found
-        let f = |a: &[u8]| account_to_index.get(a).cloned().unwrap();
-
-        self.commit.signatures.sort_by(|a, b| {
-            let a_index = f(a.validator_address.as_ref());
-            let b_index = f(b.validator_address.as_ref());
-            a_index.cmp(&b_index)
-        });
-
-        Ok(())
+        Ok(ValidatorCertificate { bitmap, signatures })
     }
 }
 
@@ -310,6 +330,12 @@ fn uncompressed_to_compressed(uncompressed: &[u8]) -> anyhow::Result<Vec<u8>> {
     compressed.extend_from_slice(&uncompressed[1..33]); // x coordinate
 
     Ok(compressed)
+}
+
+fn set_bit(bitmap: &mut U256, index: usize) {
+    assert!(index < 256, "Index out of bounds for Bitmap256");
+    let one = U256::one();
+    *bitmap |= one << index;
 }
 
 #[cfg(test)]
