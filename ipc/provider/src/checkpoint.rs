@@ -198,18 +198,24 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
             .parent_handler
             .list_active_validators(&self.metadata.source.id)
             .await?;
+        tracing::info!("obtained list of active validators: {active_validators}");
+
         let pubkeys = active_validators
             .iter()
             .map(|(_, info)| info.staking.metadata.as_slice());
+        tracing::info!("obtained list of active validators public keys");
 
         let mut header = self
             .child_handler
             .get_signed_header(next_checkpoint_epoch as u64)
             .await?;
+        tracing::info!("obtained signed header: {header:?}");
 
         // order validators against the public keys ordered on chain. This is required as contract
         // requires the exact public keys ordering onchain.
         let cert = header.generate_validator_cert(pubkeys)?;
+        tracing::info!("obtained certificate: {cert:?}");
+
         let height = header.header.height;
 
         self.parent_handler
