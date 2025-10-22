@@ -156,6 +156,5 @@ contract SubnetBottomUpCheckpointTest is Test, IntegrationTestBase {
         require(LibBitMap.isBitSet(bitmap, 7), "7");
     }
 
-    function callback() public view {
-    }
+    function callback() public view {}
 }
