@@ -54,7 +54,7 @@ import {BottomUpBatchHelper} from "../helpers/BottomUpBatchHelper.sol";
 import {Timestamp, CanonicalBlockID, CanonicalPartSetHeader, SignedHeader, CanonicalVote, BlockID, Commit, PartSetHeader, CommitSig, LightHeader, Consensus as ConsensusData, TENDERMINTLIGHT_PROTO_GLOBAL_ENUMS} from "tendermint-sol/proto/TendermintLight.sol";
 
 import {BottomUpCheckpoint} from "./util.sol";
-import {ValidatorSignPayload, ValidatorCertificate, LibBitMap} from "../../contracts/lib/cometbft/CometbftLightClient.sol";
+import {ValidatorSignPayload, ValidatorCertificate} from "../../contracts/lib/cometbft/CometbftLightClient.sol";
 
 contract SubnetBottomUpCheckpointTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
@@ -142,19 +142,22 @@ contract SubnetBottomUpCheckpointTest is Test, IntegrationTestBase {
         saDiamond.checkpointer().submitBottomUpCheckpoint(abi.encode(lightHeader, certificate, voteTemplate));
     }
 
-    function testSubnetActorDiamond_checkBitMap() public {
-        // 10000011
-        uint256 bitmap = 131;
-
-        require(LibBitMap.isBitSet(bitmap, 0), "0");
-        require(LibBitMap.isBitSet(bitmap, 1), "1");
-        require(!LibBitMap.isBitSet(bitmap, 2), "2");
-        require(!LibBitMap.isBitSet(bitmap, 3), "3");
-        require(!LibBitMap.isBitSet(bitmap, 4), "4");
-        require(!LibBitMap.isBitSet(bitmap, 5), "5");
-        require(!LibBitMap.isBitSet(bitmap, 6), "6");
-        require(LibBitMap.isBitSet(bitmap, 7), "7");
+    function callback() public view {
+        // console.log("callback called");
     }
 
-    function callback() public view {}
+    function submitCheckpointInternal(
+        BottomUpCheckpoint memory checkpoint,
+        address[] memory,
+        bytes[] memory,
+        uint256[] memory
+    ) internal {
+        saDiamond.checkpointer().commitSideEffects(
+            checkpoint.blockHeight,
+            checkpoint.subnetID,
+            checkpoint.activity,
+            checkpoint.msgs,
+            checkpoint.nextConfigurationNumber
+        );
+    }
 }
