@@ -98,17 +98,54 @@ initialize_primary_node() {
     local temp_config="/tmp/node-init-${name}.yml"
     generate_node_init_yml "$validator_idx" "$temp_config" ""
 
+    # Show generated config for debugging
+    log_info "Generated node-init.yml for $name:"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    cat "$temp_config"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
     # Copy to remote
     scp_to_host "$ip" "$ssh_user" "$ipc_user" "$temp_config" "$node_init_config"
     rm -f "$temp_config"
 
-    # Run init
+    # Test parent chain connectivity from the remote node
+    log_info "Testing parent chain connectivity from $name..."
+    local parent_rpc=$(get_config_value "subnet.parent_rpc")
+    local parent_test=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        "curl -s -X POST -H 'Content-Type: application/json' --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}' '$parent_rpc' 2>&1")
+
+    if echo "$parent_test" | grep -q "error\|failed\|refused"; then
+        log_error "Cannot reach parent chain RPC at $parent_rpc from $name"
+        echo "$parent_test"
+        log_info "Please verify:"
+        log_info "  1. Parent RPC URL is correct: $parent_rpc"
+        log_info "  2. Parent chain is running and accessible from the validator node"
+        log_info "  3. No firewall blocking the connection"
+        exit 1
+    else
+        log_success "Parent chain connectivity OK"
+    fi
+
+    # Run init with verbose logging
+    log_info "Running ipc-cli node init with verbose logging..."
     local init_output=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-        "$ipc_binary node init --config $node_init_config 2>&1")
+        "RUST_LOG=debug,ipc_cli=trace $ipc_binary node init --config $node_init_config 2>&1")
 
     if echo "$init_output" | grep -q "Error\|error\|failed"; then
         log_error "Initialization failed for $name"
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━ DETAILED ERROR OUTPUT ━━━━━━━━━━━━━━━━━━━━━━━"
         echo "$init_output"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        log_info "Troubleshooting tips:"
+        log_info "  1. Check if parent_registry and parent_gateway addresses are correct"
+        log_info "  2. Verify subnet already exists on parent chain: $parent_rpc"
+        log_info "  3. Check if the subnet ID is correct: $(get_config_value 'subnet.id')"
+        log_info "  4. Try querying parent chain manually:"
+        log_info "     curl -X POST -H 'Content-Type: application/json' \\"
+        log_info "          --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}' \\"
+        log_info "          '$parent_rpc'"
         exit 1
     fi
 
@@ -155,17 +192,32 @@ initialize_secondary_node() {
     fi
     generate_node_init_yml "$validator_idx" "$temp_config" "$peer_file_path"
 
+    # Show generated config for debugging
+    log_info "Generated node-init.yml for $name:"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    cat "$temp_config"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
     # Copy to remote
     scp_to_host "$ip" "$ssh_user" "$ipc_user" "$temp_config" "$node_init_config"
     rm -f "$temp_config"
 
-    # Run init
+    # Run init with verbose logging
+    log_info "Running ipc-cli node init with verbose logging..."
     local init_output=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-        "$ipc_binary node init --config $node_init_config 2>&1")
+        "RUST_LOG=debug,ipc_cli=trace $ipc_binary node init --config $node_init_config 2>&1")
 
     if echo "$init_output" | grep -q "Error\|error\|failed"; then
         log_error "Initialization failed for $name"
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━ DETAILED ERROR OUTPUT ━━━━━━━━━━━━━━━━━━━━━━━"
         echo "$init_output"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        log_info "Troubleshooting tips:"
+        log_info "  1. Check if parent_registry and parent_gateway addresses are correct"
+        log_info "  2. Verify subnet already exists on parent chain"
+        log_info "  3. Check if the subnet ID is correct: $(get_config_value 'subnet.id')"
         exit 1
     fi
 
