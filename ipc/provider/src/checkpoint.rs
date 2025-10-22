@@ -209,11 +209,11 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
 
         // order validators against the public keys ordered on chain. This is required as contract
         // requires the exact public keys ordering onchain.
-        header.order_commit_against(pubkeys)?;
+        let cert = header.generate_validator_cert(pubkeys)?;
         let height = header.header.height;
 
         self.parent_handler
-            .submit_signed_header(&submitter, &self.source_subnet().id, header)
+            .submit_signed_header(&submitter, &self.source_subnet().id, header, cert)
             .await?;
 
         Ok(Some(height))

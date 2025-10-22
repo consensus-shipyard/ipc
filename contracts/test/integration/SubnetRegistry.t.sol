@@ -248,6 +248,8 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
             path[i] = vm.addr(300 + i);
         }
 
+        if (_activeValidatorsLimit > uint16(type(uint8).max)) _activeValidatorsLimit = uint16(type(uint8).max);
+
         SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
             parentId: SubnetID({root: ROOTNET_CHAINID, route: path}),
             ipcGatewayAddr: DEFAULT_IPC_GATEWAY_ADDR,

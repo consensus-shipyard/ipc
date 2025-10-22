@@ -20,7 +20,7 @@ import {LibBottomUpBatch} from "../lib/LibBottomUpBatch.sol";
 import {BottomUpBatch} from "../structs/BottomUpBatch.sol";
 import {IpcEnvelope} from "../structs/CrossNet.sol";
 import {CompressedActivityRollup} from "../structs/Activity.sol";
-import {CometbftLightClient, ValidatorSignPayload, AppHashBreakdown} from "../lib/cometbft/CometbftLightClient.sol";
+import {CometbftLightClient, ValidatorSignPayload, ValidatorCertificate, AppHashBreakdown} from "../lib/cometbft/CometbftLightClient.sol";
 
 /// @title Subnet Actor Checkpointing Facet
 /// @notice Handles bottom-up checkpoint submission and verification for IPC subnets
@@ -56,16 +56,16 @@ contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, ReentrancyG
         // data conversion as possible.
         (
             LightHeader.Data memory header,
-            ValidatorSignPayload[] memory signatures,
+            ValidatorCertificate memory certificate,
             CanonicalVote.Data memory voteTemplate
-        ) = abi.decode(rawData, (LightHeader.Data, ValidatorSignPayload[], CanonicalVote.Data));
+        ) = abi.decode(rawData, (LightHeader.Data, ValidatorCertificate, CanonicalVote.Data));
 
         uint64 height = uint64(header.height);
         // Enforcing a sequential submission
         ensureValidHeight(height, checkpointStorage.lastSubmissionHeight);
 
         /// Performs protobuf encoding against the header, can be gas intensive
-        CometbftLightClient.verifyValidatorsQuorum(header, signatures, voteTemplate);
+        CometbftLightClient.verifyValidatorsQuorum(header, certificate, voteTemplate);
 
         checkpointStorage.appHash[height] = header.app_hash;
         checkpointStorage.lastSubmissionHeight = height;
