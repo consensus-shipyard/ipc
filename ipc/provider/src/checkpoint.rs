@@ -124,6 +124,7 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
                     tracing::error!(
                         "cannot submit checkpoint for submitter: {submitter} due to {e}"
                     );
+                    tokio::time::sleep(submission_interval).await;
                     continue;
                 }
             };
@@ -169,7 +170,8 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
 
             let state_params = self
                 .child_fendermint_client
-                .state_params(next_height.into())
+                // the state root from fendermint client is actually in the next block height
+                .state_params((next_height + 1).into())
                 .await?;
             let state_root = state_params.value.state_root;
 
@@ -236,7 +238,8 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
 
         let mut header = self
             .child_handler
-            .get_signed_header(next_checkpoint_epoch as u64)
+            // we need to query signed header of the next block for the app hash in the checkpoint epoch
+            .get_signed_header(next_checkpoint_epoch as u64 + 1)
             .await?;
         tracing::info!("obtained signed header: {header:?}");
 

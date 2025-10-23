@@ -66,7 +66,22 @@ contract SubnetBottomUpCheckpointTest is Test, IntegrationTestBase {
     address gatewayAddress;
 
     function setUp() public override {
-        super.setUp();
+        address[] memory path = new address[](1);
+        path[0] = ROOTNET_ADDRESS;
+
+        // create the root gateway actor.
+        GatewayDiamond.ConstructorParams memory gwConstructorParams = defaultGatewayParams();
+        gwConstructorParams.bottomUpCheckPeriod = 9;
+        gatewayDiamond = createGatewayDiamond(gwConstructorParams);
+
+        // create a subnet actor in the root network.
+        SubnetActorDiamond.ConstructorParams memory saConstructorParams = defaultSubnetActorParamsWith(
+            address(gatewayDiamond)
+        );
+        saConstructorParams.bottomUpCheckPeriod = 9;
+
+        saDiamond = createSubnetActor(saConstructorParams);
+        gatewayDiamond.manager().approveSubnet(address(saDiamond));
 
         gatewayAddress = address(gatewayDiamond);
     }
@@ -171,7 +186,7 @@ contract SubnetBottomUpCheckpointTest is Test, IntegrationTestBase {
 
         // Create the AppHashBreakdown from the provided data
         AppHashBreakdown memory breakdown = AppHashBreakdown({
-            stateRoot: hex"0171a0e40220d324f2815da59e84482e6103a5eb1b6a7674918c55ebad378685ec908fac2e39",
+            stateRoot: hex"0171a0e40220f304de25b08331144c6ac702b10bc47005f05ed6aa139315ecc57a3d273af7d2",
             msgBatchCommitment: BottomUpBatch.Commitment({
                 totalNumMsgs: 0,
                 msgsRoot: BottomUpBatch.MerkleHash.wrap(bytes32(0))
@@ -186,9 +201,9 @@ contract SubnetBottomUpCheckpointTest is Test, IntegrationTestBase {
                 })
             })
         });
-        
+
         bytes memory derived = saDiamond.checkpointer().deriveAppHash(breakdown);
-        bytes memory expected = hex"8d26ca04a9eb3b9140457445abd7ab774c98b6b6a1a4ee187fb8dc8ee99f9f55";
+        bytes memory expected = hex"46152b7c703d6f89b250fcde823a5ea1f0925bcbdcabd69e5c954ac2d9ab742e";
         require(keccak256(derived) == keccak256(expected));
     }
 

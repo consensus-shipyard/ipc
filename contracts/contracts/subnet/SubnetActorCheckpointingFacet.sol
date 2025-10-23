@@ -64,7 +64,13 @@ contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, ReentrancyG
             CanonicalVote.Data memory voteTemplate
         ) = abi.decode(rawData, (LightHeader.Data, ValidatorCertificate, CanonicalVote.Data));
 
-        uint64 height = uint64(header.height);
+        // In CometBFT/Tendermint, a block header’s AppHash is the application state after the previous height finished committing. So:
+        // The proposer for block 10 includes AppHash = S₉ in block 10’s header.
+        // Nodes verify the proposal by checking that this AppHash matches their own local post-block-9 state.
+        // Then they execute block 10; its ABCI Commit returns S₁₀, which will appear as AppHash in block 11.
+        // The actual checkpoint height is header height - 1
+        uint64 height = uint64(header.height) - 1;
+
         // Enforcing a sequential submission
         ensureValidHeight(height, checkpointStorage.lastBottomUpCheckpointHeight);
 
@@ -128,9 +134,9 @@ contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, ReentrancyG
             revert BottomUpCheckpointAlreadySubmitted();
         }
 
-        uint256 nextCheckpointHeight = LibGateway.getNextEpoch(uint256(lastHeight), bottomUpCheckPeriod);
-        if (blockHeight != uint64(nextCheckpointHeight)) {
-            revert InvalidCheckpointEpoch();
+        uint64 nextCheckpointHeight = uint64(LibGateway.getNextEpoch(uint256(lastHeight), bottomUpCheckPeriod));
+        if (blockHeight != nextCheckpointHeight) {
+            revert InvalidCheckpointEpoch(nextCheckpointHeight, blockHeight);
         }
     }
 
