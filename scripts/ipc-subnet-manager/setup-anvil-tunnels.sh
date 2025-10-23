@@ -57,7 +57,7 @@ get_validator_info() {
 # Local Anvil port
 LOCAL_ANVIL_PORT=8545
 # Remote port on VMs (can be the same or different)
-REMOTE_ANVIL_PORT=8545
+REMOTE_ANVIL_PORT=8555
 
 echo -e "${GREEN}Setting up SSH tunnels to remote validators...${NC}"
 echo -e "Local Anvil: localhost:${LOCAL_ANVIL_PORT}"
@@ -97,12 +97,14 @@ for i in $(seq 0 $((VALIDATOR_COUNT - 1))); do
     # -R: Reverse port forwarding (remote:local)
     # -o ServerAliveInterval=60: Keep connection alive
     # -o ExitOnForwardFailure=yes: Exit if tunnel can't be established
+    # -o LogLevel=ERROR: Suppress setsockopt warnings
     ssh -N \
         -R ${REMOTE_ANVIL_PORT}:localhost:${LOCAL_ANVIL_PORT} \
         -o ServerAliveInterval=60 \
         -o ServerAliveCountMax=3 \
         -o ExitOnForwardFailure=yes \
-        ${VALIDATOR_USER}@${VALIDATOR_IP} &
+        -o LogLevel=ERROR \
+        ${VALIDATOR_USER}@${VALIDATOR_IP} 2>/dev/null &
 
     TUNNEL_PID=$!
     TUNNEL_PIDS+=("$TUNNEL_PID")

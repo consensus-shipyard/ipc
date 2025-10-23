@@ -1,0 +1,39 @@
+[Unit]
+Description=IPC Checkpoint Relayer
+After=network.target ipc-node.service
+Wants=network-online.target
+Requires=ipc-node.service
+
+[Service]
+Type=simple
+User=__IPC_USER__
+WorkingDirectory=__NODE_HOME__
+Environment="RUST_LOG=info"
+Environment="RUST_BACKTRACE=1"
+
+ExecStart=__IPC_BINARY__ checkpoint relayer \
+    --subnet __SUBNET_ID__ \
+    --checkpoint-interval-sec __CHECKPOINT_INTERVAL__ \
+    --max-parallelism __MAX_PARALLELISM__ \
+    --submitter __SUBMITTER_ADDRESS__
+
+# Restart policy
+Restart=on-failure
+RestartSec=10s
+StartLimitInterval=300
+StartLimitBurst=5
+
+# Resource limits
+LimitNOFILE=65536
+
+# Logging
+StandardOutput=append:__NODE_HOME__/logs/relayer.log
+StandardError=append:__NODE_HOME__/logs/relayer.log
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+

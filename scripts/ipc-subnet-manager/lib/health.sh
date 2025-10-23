@@ -33,6 +33,178 @@ wipe_all_nodes() {
     done
 }
 
+# Generate systemd service file for node
+generate_node_systemd_service() {
+    local validator_idx="$1"
+    local output_file="$2"
+
+    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
+    local ipc_binary=$(get_config_value "paths.ipc_binary")
+    local node_home=$(get_config_value "paths.node_home")
+
+    sed -e "s|__IPC_USER__|$ipc_user|g" \
+        -e "s|__IPC_BINARY__|$ipc_binary|g" \
+        -e "s|__NODE_HOME__|$node_home|g" \
+        "${SCRIPT_DIR}/templates/ipc-node.service.template" > "$output_file"
+}
+
+# Generate systemd service file for relayer
+generate_relayer_systemd_service() {
+    local validator_idx="$1"
+    local output_file="$2"
+
+    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
+    local ipc_binary=$(get_config_value "paths.ipc_binary")
+    local node_home=$(get_config_value "paths.node_home")
+    local subnet_id=$(get_config_value "subnet.id")
+    local checkpoint_interval=$(get_config_value "relayer.checkpoint_interval")
+    local max_parallelism=$(get_config_value "relayer.max_parallelism")
+
+    # Get submitter address
+    local submitter=$(get_validator_address_from_keystore "$validator_idx")
+
+    if [ -z "$submitter" ]; then
+        log_error "Failed to get submitter address for systemd service"
+        return 1
+    fi
+
+    sed -e "s|__IPC_USER__|$ipc_user|g" \
+        -e "s|__IPC_BINARY__|$ipc_binary|g" \
+        -e "s|__NODE_HOME__|$node_home|g" \
+        -e "s|__SUBNET_ID__|$subnet_id|g" \
+        -e "s|__CHECKPOINT_INTERVAL__|$checkpoint_interval|g" \
+        -e "s|__MAX_PARALLELISM__|$max_parallelism|g" \
+        -e "s|__SUBMITTER_ADDRESS__|$submitter|g" \
+        "${SCRIPT_DIR}/templates/ipc-relayer.service.template" > "$output_file"
+}
+
+# Check if systemd is available
+check_systemd_available() {
+    local ip="$1"
+    local ssh_user="$2"
+
+    # Check if systemd is available (just check the system one)
+    local result=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+        "systemctl --version >/dev/null 2>&1 && echo 'yes' || echo 'no'" 2>/dev/null)
+
+    echo "$result"
+}
+
+# Install systemd services on a validator
+install_systemd_services() {
+    local validator_idx="$1"
+
+    local name="${VALIDATORS[$validator_idx]}"
+    local ip=$(get_config_value "validators[$validator_idx].ip")
+    local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
+    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
+    local node_home=$(get_config_value "paths.node_home")
+
+    log_info "Checking systemd availability on $name..."
+
+    # Check if systemd is available
+    local systemd_available=$(check_systemd_available "$ip" "$ssh_user")
+
+    if [ "$systemd_available" != "yes" ]; then
+        log_warn "✗ Systemd not available on $name"
+        log_info "  You can still manage processes manually without systemd"
+        return 1
+    fi
+
+    log_info "Installing systemd service on $name..."
+
+    # Generate node service file
+    local node_service_file="/tmp/ipc-node-${name}.service"
+    generate_node_systemd_service "$validator_idx" "$node_service_file"
+
+    # Ensure logs directory exists
+    ssh_exec "$ip" "$ssh_user" "$ipc_user" "mkdir -p $node_home/logs" || true
+
+    # Copy service file to /etc/systemd/system/ (requires sudo)
+    scp -o StrictHostKeyChecking=no "$node_service_file" "$ssh_user@$ip:/tmp/ipc-node.service" >/dev/null 2>&1
+    ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+        "sudo mv /tmp/ipc-node.service /etc/systemd/system/ipc-node.service && sudo chmod 644 /etc/systemd/system/ipc-node.service" >/dev/null 2>&1
+
+    # Reload systemd
+    if ! ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+        "sudo systemctl daemon-reload" >/dev/null 2>&1; then
+        log_error "Failed to reload systemd on $name"
+        rm -f "$node_service_file"
+        return 1
+    fi
+
+    # Enable node service
+    if ! ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+        "sudo systemctl enable ipc-node.service" >/dev/null 2>&1; then
+        log_error "Failed to enable service on $name"
+        rm -f "$node_service_file"
+        return 1
+    fi
+
+    log_success "✓ Node service installed on $name"
+
+    # Cleanup
+    rm -f "$node_service_file"
+    return 0
+}
+
+# Install relayer systemd service on primary validator
+install_relayer_systemd_service() {
+    local validator_idx="$1"
+
+    local name="${VALIDATORS[$validator_idx]}"
+    local ip=$(get_config_value "validators[$validator_idx].ip")
+    local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
+    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
+
+    # Check if systemd is available
+    local systemd_available=$(check_systemd_available "$ip" "$ssh_user")
+
+    if [ "$systemd_available" != "yes" ]; then
+        log_warn "✗ Systemd not available on $name"
+        log_info "  Relayer will need to be managed manually"
+        return 1
+    fi
+
+    log_info "Installing relayer systemd service on $name..."
+
+    # Generate relayer service file
+    local relayer_service_file="/tmp/ipc-relayer-${name}.service"
+    generate_relayer_systemd_service "$validator_idx" "$relayer_service_file"
+
+    if [ ! -f "$relayer_service_file" ]; then
+        log_error "Failed to generate relayer service file"
+        return 1
+    fi
+
+    # Copy service file to /etc/systemd/system/ (requires sudo)
+    scp -o StrictHostKeyChecking=no "$relayer_service_file" "$ssh_user@$ip:/tmp/ipc-relayer.service" >/dev/null 2>&1
+    ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+        "sudo mv /tmp/ipc-relayer.service /etc/systemd/system/ipc-relayer.service && sudo chmod 644 /etc/systemd/system/ipc-relayer.service" >/dev/null 2>&1
+
+    # Reload systemd
+    if ! ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+        "sudo systemctl daemon-reload" >/dev/null 2>&1; then
+        log_error "Failed to reload systemd on $name"
+        rm -f "$relayer_service_file"
+        return 1
+    fi
+
+    # Enable relayer service
+    if ! ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+        "sudo systemctl enable ipc-relayer.service" >/dev/null 2>&1; then
+        log_error "Failed to enable relayer service on $name"
+        rm -f "$relayer_service_file"
+        return 1
+    fi
+
+    log_success "✓ Relayer service installed on $name"
+
+    # Cleanup
+    rm -f "$relayer_service_file"
+    return 0
+}
+
 stop_all_nodes() {
     for idx in "${!VALIDATORS[@]}"; do
         local name="${VALIDATORS[$idx]}"
@@ -41,9 +213,17 @@ stop_all_nodes() {
         local ipc_user=$(get_config_value "validators[$idx].ipc_user")
 
         log_info "Stopping $name..."
-        ssh_kill_process "$ip" "$ssh_user" "$ipc_user" "ipc-cli node start"
 
-        # Wait a moment for graceful shutdown
+        # Try systemd first, fall back to manual kill
+        local has_systemd=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+            "systemctl is-active ipc-node 2>/dev/null | grep -q active && echo yes || echo no" 2>/dev/null)
+
+        if [ "$has_systemd" = "yes" ]; then
+            ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" "sudo systemctl stop ipc-node" >/dev/null 2>&1 || true
+        else
+            ssh_kill_process "$ip" "$ssh_user" "$ipc_user" "ipc-cli node start"
+        fi
+
         sleep 2
     done
 }
@@ -77,9 +257,17 @@ start_validator_node() {
 
     log_info "Starting $name..."
 
-    # Start node in background
-    ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-        "nohup $ipc_binary node start --home $node_home > $node_home/node.log 2>&1 &"
+    # Try systemd first, fall back to nohup
+    local has_systemd=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+        "systemctl list-unit-files ipc-node.service 2>/dev/null | grep -q ipc-node && echo yes || echo no" 2>/dev/null)
+
+    if [ "$has_systemd" = "yes" ]; then
+        ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" "sudo systemctl start ipc-node" >/dev/null 2>&1 || true
+    else
+        # Fall back to nohup
+        ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+            "nohup $ipc_binary node start --home $node_home > $node_home/logs/node.stdout.log 2>&1 &"
+    fi
 }
 
 initialize_primary_node() {
@@ -842,6 +1030,25 @@ show_subnet_info() {
         log_info "  No recent topdown activity found in logs"
     fi
     echo
+
+    # Get contract commitSHA values
+    log_info "Contract Versions (commitSHA):"
+
+    local parent_rpc=$(get_config_value "subnet.parent_rpc")
+    local child_rpc=$(get_config_value "ipc_cli.child.provider_http")
+    local parent_gateway_addr=$(get_config_value "subnet.parent_gateway")
+    local parent_registry_addr=$(get_config_value "subnet.parent_registry")
+    local child_gateway_addr=$(get_config_value "ipc_cli.child.gateway_addr")
+    local child_registry_addr=$(get_config_value "ipc_cli.child.registry_addr")
+
+    log_info "  Parent Contracts (RPC: $parent_rpc):"
+    log_info "    Gateway ($parent_gateway_addr): $(get_contract_commit_sha "$parent_rpc" "$parent_gateway_addr")"
+    log_info "    Registry ($parent_registry_addr): $(get_contract_commit_sha "$parent_rpc" "$parent_registry_addr")"
+
+    log_info "  Child Contracts (RPC: $child_rpc):"
+    log_info "    Gateway ($child_gateway_addr): $(get_contract_commit_sha "$child_rpc" "$child_gateway_addr")"
+    log_info "    Registry ($child_registry_addr): $(get_contract_commit_sha "$child_rpc" "$child_registry_addr")"
+    echo
 }
 
 # Watch parent finality progress in real-time
@@ -1292,5 +1499,269 @@ show_voting_status() {
         "tail -20 ~/.ipc-node/logs/2025-10-20.consensus.log 2>/dev/null | grep -v 'received complete proposal' | tail -10" || true
 
     echo ""
+}
+
+# Get address from keystore for a validator
+get_validator_address_from_keystore() {
+    local validator_idx="$1"
+
+    local ip=$(get_config_value "validators[$validator_idx].ip")
+    local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
+    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
+    local ipc_config_dir=$(get_config_value "paths.ipc_config_dir")
+
+    # Try to get address from evm_keystore.json
+    # First check if it's an array or object
+    local keystore_content=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        "cat $ipc_config_dir/evm_keystore.json 2>/dev/null" 2>/dev/null)
+
+    if [ -z "$keystore_content" ]; then
+        log_warn "Could not read keystore file"
+        return 1
+    fi
+
+    # Try as array first (most common), then as object
+    local address=$(echo "$keystore_content" | jq -r '
+        if type == "array" then
+            .[0].address // .[0].Address // empty
+        else
+            .address // .Address // empty
+        end
+    ' 2>/dev/null)
+
+    if [ -n "$address" ] && [ "$address" != "null" ]; then
+        # Add 0x prefix if not present
+        if [[ ! "$address" =~ ^0x ]]; then
+            address="0x${address}"
+        fi
+        echo "$address"
+        return 0
+    fi
+
+    log_warn "Could not extract address from keystore"
+    return 1
+}
+
+# Start checkpoint relayer on primary validator
+start_relayer() {
+    log_header "Starting Checkpoint Relayer"
+
+    # Get primary validator
+    local primary_idx=$(get_primary_validator)
+    local name="${VALIDATORS[$primary_idx]}"
+
+    log_info "Starting relayer on $name (primary validator)..."
+
+    local ip=$(get_config_value "validators[$primary_idx].ip")
+    local ssh_user=$(get_config_value "validators[$primary_idx].ssh_user")
+    local ipc_user=$(get_config_value "validators[$primary_idx].ipc_user")
+    local node_home=$(get_config_value "paths.node_home")
+    local subnet_id=$(get_config_value "subnet.id")
+    local checkpoint_interval=$(get_config_value "relayer.checkpoint_interval")
+    local max_parallelism=$(get_config_value "relayer.max_parallelism")
+
+    log_info "  Subnet: $subnet_id"
+    log_info "  Checkpoint interval: ${checkpoint_interval}s"
+    log_info "  Max parallelism: $max_parallelism"
+
+    # Try systemd first, fall back to nohup
+    local has_systemd=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+        "systemctl list-unit-files ipc-relayer.service 2>/dev/null | grep -q ipc-relayer && echo yes || echo no" 2>/dev/null)
+
+    if [ "$has_systemd" = "yes" ]; then
+        log_info "Using systemd to start relayer..."
+        ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" "sudo systemctl start ipc-relayer" >/dev/null 2>&1 || true
+        sleep 2
+
+        # Check status
+        local is_active=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+            "systemctl is-active ipc-relayer 2>/dev/null" | tr -d ' \n\r')
+
+        if [ "$is_active" = "active" ]; then
+            log_success "✓ Relayer started successfully via systemd"
+            log_info "View logs: sudo journalctl -u ipc-relayer -f"
+            log_info "Or: tail -f $node_home/logs/relayer.log"
+            return 0
+        else
+            log_error "✗ Failed to start relayer via systemd"
+            log_info "Check status: sudo systemctl status ipc-relayer"
+            return 1
+        fi
+    else
+        # Fall back to nohup
+        log_info "Systemd service not found, using nohup..."
+
+        # Get submitter address from keystore
+        log_info "Extracting submitter address from keystore..."
+        local submitter=$(get_validator_address_from_keystore "$primary_idx")
+
+        if [ -z "$submitter" ]; then
+            log_error "Failed to get submitter address from keystore"
+            return 1
+        fi
+
+        log_info "Submitter address: $submitter"
+
+        local ipc_binary=$(get_config_value "paths.ipc_binary")
+        local relayer_log="$node_home/logs/relayer.log"
+
+        # Ensure logs directory exists
+        ssh_exec "$ip" "$ssh_user" "$ipc_user" "mkdir -p $node_home/logs" || true
+
+        ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+            "nohup $ipc_binary checkpoint relayer \
+            --subnet $subnet_id \
+            --checkpoint-interval-sec $checkpoint_interval \
+            --max-parallelism $max_parallelism \
+            --submitter $submitter \
+            > $relayer_log 2>&1 &"
+
+        sleep 2
+
+        # Verify it started
+        local relayer_pid=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+            "ps aux | grep '[i]pc-cli checkpoint relayer' | grep -v grep | awk '{print \$2}' | head -1" 2>/dev/null | tr -d ' \n\r')
+
+        if [ -n "$relayer_pid" ]; then
+            log_success "✓ Relayer started successfully (PID: $relayer_pid)"
+            log_info "Log file: $relayer_log"
+            return 0
+        else
+            log_error "✗ Failed to start relayer"
+            return 1
+        fi
+    fi
+}
+
+# Stop checkpoint relayer
+stop_relayer() {
+    log_header "Stopping Checkpoint Relayer"
+
+    local primary_idx=$(get_primary_validator)
+    local name="${VALIDATORS[$primary_idx]}"
+
+    log_info "Stopping relayer on $name..."
+
+    local ip=$(get_config_value "validators[$primary_idx].ip")
+    local ssh_user=$(get_config_value "validators[$primary_idx].ssh_user")
+    local ipc_user=$(get_config_value "validators[$primary_idx].ipc_user")
+
+    # Try systemd first, fall back to manual kill
+    local has_systemd=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+        "systemctl list-unit-files ipc-relayer.service 2>/dev/null | grep -q ipc-relayer && echo yes || echo no" 2>/dev/null)
+
+    if [ "$has_systemd" = "yes" ]; then
+        log_info "Using systemd to stop relayer..."
+        ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" "sudo systemctl stop ipc-relayer" >/dev/null 2>&1 || true
+    else
+        # Find and kill the relayer process by PID
+        local pids=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+            "ps aux | grep '[i]pc-cli checkpoint relayer' | grep -v grep | awk '{print \$2}'" 2>/dev/null | tr '\n' ' ')
+
+        if [ -n "$pids" ]; then
+            log_info "Killing relayer process(es): $pids"
+            ssh_exec "$ip" "$ssh_user" "$ipc_user" "kill $pids 2>/dev/null || true" || true
+            sleep 1
+            # Force kill if still running
+            ssh_exec "$ip" "$ssh_user" "$ipc_user" "kill -9 $pids 2>/dev/null || true" || true
+        else
+            log_info "No relayer processes found"
+        fi
+    fi
+
+    log_success "✓ Relayer stopped"
+}
+
+# Check relayer status
+check_relayer_status() {
+    log_header "Checkpoint Relayer Status"
+
+    local primary_idx=$(get_primary_validator)
+    local name="${VALIDATORS[$primary_idx]}"
+
+    local ip=$(get_config_value "validators[$primary_idx].ip")
+    local ssh_user=$(get_config_value "validators[$primary_idx].ssh_user")
+    local ipc_user=$(get_config_value "validators[$primary_idx].ipc_user")
+
+    log_info "Checking relayer on $name..."
+
+    local node_home=$(get_config_value "paths.node_home")
+    local relayer_log="$node_home/logs/relayer.log"
+
+    # Check systemd first
+    local has_systemd=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+        "systemctl list-unit-files ipc-relayer.service 2>/dev/null | grep -q ipc-relayer && echo yes || echo no" 2>/dev/null)
+
+    if [ "$has_systemd" = "yes" ]; then
+        local is_active=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+            "systemctl is-active ipc-relayer 2>/dev/null" | tr -d ' \n\r')
+
+        if [ "$is_active" = "active" ]; then
+            log_success "✓ Relayer is running (systemd)"
+            log_info "Check status: sudo systemctl status ipc-relayer"
+            log_info "View logs: sudo journalctl -u ipc-relayer -f"
+        else
+            log_warn "✗ Relayer is not running (systemd service exists but inactive)"
+            log_info "Status: $is_active"
+            log_info "Check with: sudo systemctl status ipc-relayer"
+        fi
+
+        # Show recent journal logs
+        log_info "Recent relayer activity (from journal):"
+        ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+            "sudo journalctl -u ipc-relayer -n 20 --no-pager 2>/dev/null || echo 'No journal logs found'"
+    else
+        # Check for relayer process using ps
+        local relayer_pid=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+            "ps aux | grep '[i]pc-cli checkpoint relayer' | grep -v grep | awk '{print \$2}' | head -1" 2>/dev/null | tr -d ' \n\r')
+
+        if [ -n "$relayer_pid" ]; then
+            log_success "✓ Relayer is running (PID: $relayer_pid)"
+            log_info "Log file: $relayer_log"
+
+            # Show recent log lines
+            log_info "Recent relayer activity:"
+            ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+                "tail -20 $relayer_log 2>/dev/null || echo 'No logs found'"
+        else
+            log_warn "✗ Relayer is not running"
+
+            # Check if log file exists with any content
+            local log_exists=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+                "test -f $relayer_log && echo 'yes' || echo 'no'" 2>/dev/null)
+
+            if [ "$log_exists" = "yes" ]; then
+                log_info "Last relayer output from $relayer_log:"
+                ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+                    "tail -20 $relayer_log 2>/dev/null || echo 'Could not read log'"
+            fi
+        fi
+    fi
+}
+
+# Get commitSHA from contract
+get_contract_commit_sha() {
+    local rpc_url="$1"
+    local contract_address="$2"
+
+    # Call the commitSHA() function (selector: 0x66a9f38a)
+    local result=$(curl -s -X POST -H "Content-Type: application/json" \
+        --data "{\"jsonrpc\":\"2.0\",\"method\":\"eth_call\",\"params\":[{\"to\":\"$contract_address\",\"data\":\"0x66a9f38a\"},\"latest\"],\"id\":1}" \
+        "$rpc_url" 2>/dev/null | jq -r '.result // empty')
+
+    if [ -n "$result" ] && [ "$result" != "null" ] && [ "$result" != "0x" ]; then
+        # Decode the bytes32 result to a string
+        # Remove 0x prefix and trailing zeros
+        result="${result#0x}"
+        # Convert hex to ASCII
+        local decoded=$(echo "$result" | xxd -r -p 2>/dev/null | tr -d '\0' | strings)
+        if [ -n "$decoded" ]; then
+            echo "$decoded"
+        else
+            echo "$result"
+        fi
+    else
+        echo "N/A"
+    fi
 }
 

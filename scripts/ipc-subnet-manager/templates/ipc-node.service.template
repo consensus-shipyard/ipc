@@ -1,0 +1,35 @@
+[Unit]
+Description=IPC Validator Node
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__IPC_USER__
+WorkingDirectory=__NODE_HOME__
+Environment="RUST_LOG=info"
+Environment="RUST_BACKTRACE=1"
+
+ExecStart=__IPC_BINARY__ node start --home __NODE_HOME__
+
+# Restart policy
+Restart=on-failure
+RestartSec=5s
+StartLimitInterval=300
+StartLimitBurst=5
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=32768
+
+# Logging
+StandardOutput=append:__NODE_HOME__/logs/node.stdout.log
+StandardError=append:__NODE_HOME__/logs/node.stderr.log
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+

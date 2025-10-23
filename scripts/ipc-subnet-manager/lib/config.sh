@@ -602,11 +602,8 @@ generate_ipc_cli_config() {
     local child_id=$(get_config_value "subnet.id")
     local child_network_type=$(get_config_value "ipc_cli.child.network_type")
     local child_provider_http=$(get_config_value "ipc_cli.child.provider_http")
-    local use_parent_contracts=$(get_config_value "ipc_cli.child.use_parent_contracts")
-
-    # For child subnet, use parent's contracts if configured
-    local child_registry="$parent_registry"
-    local child_gateway="$parent_gateway"
+    local child_gateway=$(get_config_value "ipc_cli.child.gateway_addr")
+    local child_registry=$(get_config_value "ipc_cli.child.registry_addr")
 
     cat > "$output_file" << EOF
 keystore_path = "$keystore_path"

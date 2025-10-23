@@ -4,20 +4,20 @@
 # Subnet Configuration
 subnet:
   # Subnet ID - get this from your subnet creation
-  id: "/r31337/t410f64rg5wfkj3kmbia633bjb4gqcxo7ifhs2e6zuwq"
+  id: "/r314159/t410fgxd7f5t3up6ho5l6po7bfthuiaxib2olfoxeafq"
 
   # Parent chain RPC endpoint
-  #parent_rpc: "https://api.calibration.node.glif.io/rpc/v1"
-  parent_rpc: "http://localhost:8545"
+  parent_rpc: "https://api.calibration.node.glif.io/rpc/v1"
+  #parent_rpc: "http://localhost:8555"
 
   # Parent chain ID
-  parent_chain_id: "/r31337"
+  parent_chain_id: "/r314159"
 
   # Parent registry contract address
-  parent_registry: "0x5efd9aadab93db9f09c2f4c3759f627eb015ddba"
+  parent_registry: "0x51b66fb4f4b26c9cff772f3492ff6c2b205d1d46"
 
   # Parent gateway contract address
-  parent_gateway: "0x0cdd23b138f20e4744568f61c474ffe35c0bc1fb"
+  parent_gateway: "0x9a6740a1e23de7b9ebdf160b744546d2affc9e6e"
 
 # Validator Nodes
 validators:
@@ -133,12 +133,12 @@ ipc_cli:
 
   # Parent subnet configuration
   parent:
-    id: "/r31337"
+    id: "/r314159"
     network_type: "fevm"
-    #provider_http: "https://api.calibration.node.glif.io/rpc/v1"
-    provider_http: "http://localhost:8545"
-    registry_addr: "0x5efd9aadab93db9f09c2f4c3759f627eb015ddba"
-    gateway_addr: "0x0cdd23b138f20e4744568f61c474ffe35c0bc1fb"
+    provider_http: "https://api.calibration.node.glif.io/rpc/v1"
+    #provider_http: "http://localhost:8555"
+    registry_addr: "0x51b66fb4f4b26c9cff772f3492ff6c2b205d1d46"
+    gateway_addr: "0x9a6740a1e23de7b9ebdf160b744546d2affc9e6e"
 
   # Child subnet configuration (this subnet)
   child:
@@ -148,8 +148,16 @@ ipc_cli:
     # For local node, use http://localhost:8545
     # For remote, use the parent's RPC or a dedicated endpoint
     provider_http: "http://localhost:8545"
-    # Child subnet uses parent's registry and gateway
-    use_parent_contracts: true
+    # Child subnet's own gateway and registry contracts
+    gateway_addr: "0x77aa40b105843728088c0132e43fc44348881da8"
+    registry_addr: "0x74539671a1d2f1c8f200826baba665179f53a1b7"
+
+# Relayer Configuration
+relayer:
+  # Checkpoint interval in seconds
+  checkpoint_interval: 10
+  # Maximum parallel checkpoint submissions
+  max_parallelism: 1
 
 # Environment Variable Overrides:
 # - IPC_SUBNET_ID

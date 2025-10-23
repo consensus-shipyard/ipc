@@ -50,6 +50,10 @@ Commands:
     watch-finality    Monitor parent finality progress in real-time
     watch-blocks      Monitor block production in real-time
     logs [validator]  Tail logs from specific validator
+    install-systemd   Install systemd services on all validators
+    start-relayer     Start checkpoint relayer on primary validator
+    stop-relayer      Stop checkpoint relayer
+    relayer-status    Check relayer status and view logs
     deploy            Deploy/update binaries (STUB - not implemented)
 
 Options:
@@ -73,6 +77,8 @@ Examples:
     $0 watch-blocks                            # Monitor block production
     $0 watch-blocks --target-height=1000       # Watch until block 1000
     $0 logs validator-1                        # View logs from validator-1
+    $0 start-relayer                           # Start checkpoint relayer on primary
+    $0 relayer-status                          # Check relayer status
     $0 restart --yes                           # Restart without confirmation
 
 EOF
@@ -158,6 +164,11 @@ cmd_init() {
     log_section "Wiping Node Data"
     wipe_all_nodes
 
+    # Update IPC CLI configs (must be done BEFORE node init)
+    log_section "Deploying IPC CLI Configuration"
+    log_info "Creating ~/.ipc/config.toml with parent subnet configuration..."
+    update_ipc_cli_configs
+
     # Initialize primary node
     log_section "Initializing Primary Node"
     local primary_validator=$(get_primary_validator)
@@ -182,10 +193,6 @@ cmd_init() {
     # Update all configs with full mesh
     log_section "Updating Node Configurations"
     update_all_configs
-
-    # Update IPC CLI configs
-    log_section "Updating IPC CLI Configuration"
-    update_ipc_cli_configs
 
     # Set federated power
     log_section "Setting Validator Power"
@@ -411,6 +418,83 @@ cmd_deploy() {
     exit 1
 }
 
+# Install systemd services
+cmd_install_systemd() {
+    local skip_confirm=false
+    local install_relayer=false
+
+    for arg in "$@"; do
+        case $arg in
+            --yes) skip_confirm=true ;;
+            --with-relayer) install_relayer=true ;;
+        esac
+    done
+
+    log_header "Installing Systemd Services"
+
+    confirm "This will install systemd services for node management" "$skip_confirm"
+
+    load_config
+
+    # Install node services on all validators
+    log_section "Installing Node Services"
+    local success_count=0
+    local fail_count=0
+
+    for idx in "${!VALIDATORS[@]}"; do
+        if install_systemd_services "$idx"; then
+            ((success_count++))
+        else
+            ((fail_count++))
+        fi
+    done
+
+    # Install relayer service on primary validator
+    if [ "$install_relayer" = true ]; then
+        log_section "Installing Relayer Service"
+        local primary_idx=$(get_primary_validator)
+        if ! install_relayer_systemd_service "$primary_idx"; then
+            log_warn "Relayer systemd service installation failed"
+            ((fail_count++))
+        else
+            ((success_count++))
+        fi
+    fi
+
+    echo ""
+    log_info "Installation Summary:"
+    log_info "  ✓ Successful: $success_count"
+    if [ $fail_count -gt 0 ]; then
+        log_warn "  ✗ Failed: $fail_count"
+        log_info ""
+        log_info "Failed installations will fall back to manual process management (nohup/kill)"
+        log_info "The system will continue to work, but without systemd benefits"
+    fi
+
+    if [ $success_count -gt 0 ]; then
+            log_info ""
+            log_success "✓ Systemd services installed on $success_count node(s)!"
+            log_info ""
+            log_info "Services installed to /etc/systemd/system/"
+            log_info "You can now manage services with:"
+            log_info "  - sudo systemctl start ipc-node"
+            log_info "  - sudo systemctl stop ipc-node"
+            log_info "  - sudo systemctl status ipc-node"
+
+            if [ "$install_relayer" = true ]; then
+                log_info "  - sudo systemctl start ipc-relayer"
+                log_info "  - sudo systemctl stop ipc-relayer"
+                log_info "  - sudo systemctl status ipc-relayer"
+            fi
+
+            log_info ""
+            log_info "Or use the manager commands (they auto-detect systemd):"
+            log_info "  - ./ipc-manager restart"
+            log_info "  - ./ipc-manager start-relayer"
+            log_info "  - ./ipc-manager stop-relayer"
+        fi
+}
+
 # Main execution
 main() {
     if [ $# -eq 0 ]; then
@@ -489,6 +573,22 @@ main() {
             ;;
         logs)
             cmd_logs "$@"
+            ;;
+        install-systemd)
+            load_config
+            cmd_install_systemd "$@"
+            ;;
+        start-relayer)
+            load_config
+            start_relayer
+            ;;
+        stop-relayer)
+            load_config
+            stop_relayer
+            ;;
+        relayer-status)
+            load_config
+            check_relayer_status
             ;;
         deploy)
             cmd_deploy "$@"
