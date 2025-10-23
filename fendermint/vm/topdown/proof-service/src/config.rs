@@ -27,6 +27,9 @@ pub struct ProofServiceConfig {
     /// Parent subnet ID (e.g., "/r314159" for calibration)
     pub parent_subnet_id: String,
 
+    /// F3 network name (e.g., "calibrationnet", "mainnet")
+    pub f3_network_name: String,
+
     /// Optional: Additional RPC URLs for failover (future enhancement)
     #[serde(default)]
     pub fallback_rpc_urls: Vec<String>,
@@ -55,6 +58,7 @@ impl Default for ProofServiceConfig {
             retention_instances: 2,
             parent_rpc_url: String::new(),
             parent_subnet_id: String::new(),
+            f3_network_name: "calibrationnet".to_string(),
             fallback_rpc_urls: Vec::new(),
             max_cache_size_bytes: 0,
             gateway_actor_id: None,
