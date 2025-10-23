@@ -171,7 +171,7 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
                 .child_fendermint_client
                 .state_params(next_height.into())
                 .await?;
-            let state_root = state_params.value.state_root.to_bytes();
+            let state_root = state_params.value.state_root;
 
             tracing::info!(
                 height = next_height,

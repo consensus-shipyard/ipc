@@ -128,7 +128,7 @@ pub struct GasEstimate {
 pub struct StateParams {
     /// The state root
     #[serde_as(as = "IsHumanReadable")]
-    pub state_root: Cid,
+    pub state_root: Vec<u8>,
     /// Base fee.
     ///
     /// Its evolution can depend on the size of blocks, contention, etc.
