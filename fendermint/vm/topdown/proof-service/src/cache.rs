@@ -1,11 +1,14 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-//! In-memory cache for proof bundles with disk persistence
+//! In-memory cache for proof bundles with optional disk persistence
 
 use crate::config::CacheConfig;
+use crate::persistence::ProofCachePersistence;
 use crate::types::CacheEntry;
+use anyhow::Result;
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
+use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -21,16 +24,50 @@ pub struct ProofCache {
 
     /// Configuration
     config: CacheConfig,
+
+    /// Optional disk persistence
+    persistence: Option<Arc<ProofCachePersistence>>,
 }
 
 impl ProofCache {
-    /// Create a new proof cache with the given initial instance and config
+    /// Create a new proof cache (in-memory only)
     pub fn new(last_committed_instance: u64, config: CacheConfig) -> Self {
         Self {
             entries: Arc::new(RwLock::new(BTreeMap::new())),
             last_committed_instance: Arc::new(AtomicU64::new(last_committed_instance)),
             config,
+            persistence: None,
         }
+    }
+
+    /// Create a new proof cache with disk persistence
+    ///
+    /// Loads existing entries from disk on startup.
+    pub fn new_with_persistence(config: CacheConfig, db_path: &Path) -> Result<Self> {
+        let persistence = ProofCachePersistence::open(db_path)?;
+
+        // Load last committed from disk
+        let last_committed = persistence.load_last_committed()?.unwrap_or(0);
+
+        // Load all entries from disk into memory
+        let entries_vec = persistence.load_all_entries()?;
+        let entries: BTreeMap<u64, CacheEntry> = entries_vec
+            .into_iter()
+            .map(|e| (e.instance_id, e))
+            .collect();
+
+        tracing::info!(
+            last_committed,
+            entry_count = entries.len(),
+            "Loaded cache from disk"
+        );
+
+        Ok(Self {
+            entries: Arc::new(RwLock::new(entries)),
+            last_committed_instance: Arc::new(AtomicU64::new(last_committed)),
+            config,
+            persistence: Some(Arc::new(persistence)),
+        })
     }
 
     /// Get the next uncommitted proof (in sequential order)
@@ -69,7 +106,13 @@ impl ProofCache {
             );
         }
 
-        self.entries.write().insert(instance_id, entry);
+        // Insert to memory
+        self.entries.write().insert(instance_id, entry.clone());
+
+        // Persist to disk if enabled
+        if let Some(persistence) = &self.persistence {
+            persistence.save_entry(&entry)?;
+        }
 
         tracing::debug!(
             instance_id,
@@ -85,6 +128,11 @@ impl ProofCache {
         let old_value = self
             .last_committed_instance
             .swap(instance_id, Ordering::Release);
+
+        // Save to disk if enabled
+        if let Some(persistence) = &self.persistence {
+            let _ = persistence.save_last_committed(instance_id);
+        }
 
         tracing::info!(
             old_instance = old_value,
@@ -120,18 +168,35 @@ impl ProofCache {
     fn cleanup_old_instances(&self, current_instance: u64) {
         let retention_cutoff = current_instance.saturating_sub(self.config.retention_instances);
 
-        let mut entries = self.entries.write();
-        let old_size = entries.len();
+        // Collect IDs to remove
+        let to_remove: Vec<u64> = {
+            let entries = self.entries.read();
+            entries
+                .keys()
+                .filter(|&&id| id < retention_cutoff)
+                .copied()
+                .collect()
+        };
 
-        // Remove all entries below the cutoff
-        entries.retain(|&instance_id, _| instance_id >= retention_cutoff);
+        if !to_remove.is_empty() {
+            // Remove from memory
+            {
+                let mut entries = self.entries.write();
+                for id in &to_remove {
+                    entries.remove(id);
+                }
+            }
 
-        let removed = old_size - entries.len();
-        if removed > 0 {
+            // Remove from disk if enabled
+            if let Some(persistence) = &self.persistence {
+                for id in &to_remove {
+                    let _ = persistence.delete_entry(*id);
+                }
+            }
+
             tracing::debug!(
-                removed,
+                removed = to_remove.len(),
                 retention_cutoff,
-                remaining = entries.len(),
                 "Cleaned up old cache entries"
             );
         }
@@ -146,23 +211,28 @@ impl ProofCache {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::SerializableF3Certificate;
+    use proofs::proofs::common::bundle::UnifiedProofBundle;
     use std::time::SystemTime;
 
     fn create_test_entry(instance_id: u64, epochs: Vec<i64>) -> CacheEntry {
         CacheEntry {
             instance_id,
             finalized_epochs: epochs.clone(),
-            proof_bundle_bytes: vec![1, 2, 3, 4], // Test proof bundle bytes
-            f3_certificate_bytes: vec![5, 6, 7, 8], // Test F3 certificate bytes
-            actor_certificate: fendermint_actor_f3_cert_manager::types::F3Certificate {
+            proof_bundle: UnifiedProofBundle {
+                storage_proofs: vec![],
+                event_proofs: vec![],
+                blocks: vec![],
+            },
+            certificate: SerializableF3Certificate {
                 instance_id,
                 finalized_epochs: epochs,
                 power_table_cid: {
                     use multihash_codetable::{Code, MultihashDigest};
-                    cid::Cid::new_v1(0x55, Code::Blake2b256.digest(b"test"))
+                    cid::Cid::new_v1(0x55, Code::Blake2b256.digest(b"test")).to_string()
                 },
                 signature: vec![],
-                certificate_data: vec![],
+                signers: vec![],
             },
             generated_at: SystemTime::now(),
             source_rpc: "test".to_string(),

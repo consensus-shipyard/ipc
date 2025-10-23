@@ -1,22 +1,30 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! Proof bundle assembler
+//!
+//! Generates cryptographic proofs for parent chain finality using the
+//! ipc-filecoin-proofs library. The assembler is only responsible for
+//! proof generation - it has no knowledge of cache entries or storage.
 
-use crate::types::{CacheEntry, ValidatedCertificate};
 use anyhow::{Context, Result};
-use fendermint_actor_f3_cert_manager::types::F3Certificate;
-use fvm_shared::clock::ChainEpoch;
+use filecoin_f3_certs::FinalityCertificate;
 use proofs::{
     client::LotusClient,
-    proofs::{calculate_storage_slot, generate_proof_bundle, EventProofSpec, StorageProofSpec},
+    proofs::{
+        calculate_storage_slot, common::bundle::UnifiedProofBundle, generate_proof_bundle,
+        EventProofSpec, StorageProofSpec,
+    },
 };
-use serde_json::json;
-use std::time::SystemTime;
 use url::Url;
 
 /// Assembles proof bundles from F3 certificates and parent chain data
+///
+/// # Thread Safety
+///
+/// LotusClient from the proofs library uses Rc/RefCell internally, so it's not Send.
+/// We store the URL and create clients on-demand instead of storing the client.
 pub struct ProofAssembler {
-    rpc_url: String,
+    rpc_url: Url,
     gateway_actor_id: u64,
     subnet_id: String,
 }
@@ -24,37 +32,60 @@ pub struct ProofAssembler {
 impl ProofAssembler {
     /// Create a new proof assembler
     pub fn new(rpc_url: String, gateway_actor_id: u64, subnet_id: String) -> Result<Self> {
-        // Validate URL
-        let _ = Url::parse(&rpc_url)?;
+        let url = Url::parse(&rpc_url).context("Failed to parse RPC URL")?;
+
         Ok(Self {
-            rpc_url,
+            rpc_url: url,
             gateway_actor_id,
             subnet_id,
         })
     }
-    
-    /// Create a Lotus client for requests
-    fn create_client(&self) -> Result<LotusClient> {
-        Ok(LotusClient::new(Url::parse(&self.rpc_url)?, None))
+
+    /// Create a LotusClient for making requests
+    ///
+    /// LotusClient is not Send, so we create it on-demand in each async function
+    /// rather than storing it as a field.
+    fn create_client(&self) -> LotusClient {
+        LotusClient::new(self.rpc_url.clone(), None)
     }
 
-    /// Generate proof for a specific epoch
-    pub async fn generate_proof_for_epoch(&self, epoch: i64) -> Result<Vec<u8>> {
-        tracing::debug!(epoch, "Generating proof for epoch");
-        
-        // Create client for this request
-        let lotus_client = self.create_client()?;
+    /// Generate proof bundle for a certificate
+    ///
+    /// Takes a certificate and tipsets, generates storage and event proofs.
+    ///
+    /// # Arguments
+    /// * `certificate` - Cryptographically validated F3 certificate
+    /// * `parent_tipset` - Parent tipset JSON
+    /// * `child_tipset` - Child tipset JSON
+    ///
+    /// # Returns
+    /// Typed unified proof bundle (storage + event proofs + witness blocks)
+    pub async fn generate_proof_bundle(
+        &self,
+        certificate: &FinalityCertificate,
+        parent_tipset: &serde_json::Value,
+        child_tipset: &serde_json::Value,
+    ) -> Result<UnifiedProofBundle> {
+        let highest_epoch = certificate
+            .ec_chain
+            .suffix()
+            .last()
+            .map(|ts| ts.epoch)
+            .context("No epochs in certificate")?;
 
-        // Fetch tipsets
-        let parent = lotus_client
-            .request("Filecoin.ChainGetTipSetByHeight", json!([epoch, null]))
-            .await
-            .context("Failed to fetch parent tipset")?;
+        tracing::debug!(
+            instance_id = certificate.gpbft_instance,
+            highest_epoch,
+            "Generating proof bundle"
+        );
 
-        let child = lotus_client
-            .request("Filecoin.ChainGetTipSetByHeight", json!([epoch + 1, null]))
-            .await
-            .context("Failed to fetch child tipset")?;
+        // Deserialize tipsets from JSON
+        let parent_api: proofs::client::types::ApiTipset =
+            serde_json::from_value(parent_tipset.clone())
+                .context("Failed to deserialize parent tipset")?;
+        let child_api: proofs::client::types::ApiTipset =
+            serde_json::from_value(child_tipset.clone())
+                .context("Failed to deserialize child tipset")?;
 
         // Configure proof specs
         let storage_specs = vec![StorageProofSpec {
@@ -69,138 +100,41 @@ impl ProofAssembler {
         }];
 
         tracing::debug!(
-            epoch,
+            highest_epoch,
             storage_specs_count = storage_specs.len(),
             event_specs_count = event_specs.len(),
             "Configured proof specs"
         );
 
-        // Generate proof bundle
-        let bundle = generate_proof_bundle(
-            &lotus_client,
-            &parent,
-            &child,
-            storage_specs,
-            event_specs,
-        )
+        // Create LotusClient for this request (not stored due to Rc/RefCell)
+        let lotus_client = self.create_client();
+
+        // Generate proof bundle in blocking task (proofs library uses non-Send types)
+        let bundle = tokio::task::spawn_blocking(move || {
+            // Create a new tokio runtime for the blocking task
+            let rt = tokio::runtime::Handle::current();
+            rt.block_on(generate_proof_bundle(
+                &lotus_client,
+                &parent_api,
+                &child_api,
+                storage_specs,
+                event_specs,
+            ))
+        })
         .await
+        .context("Proof generation task panicked")?
         .context("Failed to generate proof bundle")?;
 
-        // Serialize the bundle to bytes
-        let bundle_bytes =
-            fvm_ipld_encoding::to_vec(&bundle).context("Failed to serialize proof bundle")?;
-
         tracing::info!(
-            epoch,
-            bundle_size = bundle_bytes.len(),
+            instance_id = certificate.gpbft_instance,
+            highest_epoch,
+            storage_proofs = bundle.storage_proofs.len(),
+            event_proofs = bundle.event_proofs.len(),
+            witness_blocks = bundle.blocks.len(),
             "Generated proof bundle"
         );
 
-        Ok(bundle_bytes)
-    }
-
-    /// Create a cache entry from a validated certificate
-    pub async fn create_cache_entry_for_certificate(
-        &self,
-        validated: &ValidatedCertificate,
-    ) -> Result<CacheEntry> {
-        // Extract epochs from certificate
-        let finalized_epochs: Vec<ChainEpoch> = validated
-            .lotus_response
-            .ec_chain
-            .iter()
-            .map(|entry| entry.epoch)
-            .collect();
-
-        if finalized_epochs.is_empty() {
-            anyhow::bail!("Certificate has empty ECChain");
-        }
-
-        let highest_epoch = *finalized_epochs
-            .iter()
-            .max()
-            .context("No epochs in certificate")?;
-
-        tracing::debug!(
-            instance_id = validated.instance_id,
-            highest_epoch,
-            epochs_count = finalized_epochs.len(),
-            "Processing certificate for proof generation"
-        );
-
-        // Generate proof bundle for the highest epoch
-        let proof_bundle_bytes = self
-            .generate_proof_for_epoch(highest_epoch)
-            .await
-            .context("Failed to generate proof for epoch")?;
-
-        // For MVP, we'll store empty bytes since F3Certificate doesn't implement Serialize
-        // In production, we'd store the raw certificate data
-        let f3_certificate_bytes = vec![];
-
-        // Convert to actor certificate format
-        let actor_cert = self.convert_to_actor_cert(&validated.lotus_response)?;
-
-        Ok(CacheEntry {
-            instance_id: validated.instance_id,
-            finalized_epochs,
-            proof_bundle_bytes,
-            f3_certificate_bytes,
-            actor_certificate: actor_cert,
-            generated_at: SystemTime::now(),
-            source_rpc: self.rpc_url.clone(),
-        })
-    }
-
-    /// Convert Lotus F3 certificate to actor certificate format
-    fn convert_to_actor_cert(
-        &self,
-        lotus_cert: &ipc_provider::lotus::message::f3::F3CertificateResponse,
-    ) -> Result<F3Certificate> {
-        use cid::Cid;
-        use std::str::FromStr;
-
-        // Extract all epochs from ECChain
-        let finalized_epochs: Vec<ChainEpoch> = lotus_cert
-            .ec_chain
-            .iter()
-            .map(|entry| entry.epoch)
-            .collect();
-
-        if finalized_epochs.is_empty() {
-            anyhow::bail!("Empty ECChain in certificate");
-        }
-
-        // Power table CID from last entry in ECChain
-        let power_table_cid_str = lotus_cert
-            .ec_chain
-            .last()
-            .context("Empty ECChain")?
-            .power_table
-            .cid
-            .as_ref()
-            .context("PowerTable CID is None")?;
-
-        let power_table_cid =
-            Cid::from_str(power_table_cid_str).context("Failed to parse power table CID")?;
-
-        // Decode signature from base64
-        use base64::Engine;
-        let signature = base64::engine::general_purpose::STANDARD
-            .decode(&lotus_cert.signature)
-            .context("Failed to decode certificate signature")?;
-
-        // Encode full Lotus certificate as CBOR
-        let certificate_data =
-            fvm_ipld_encoding::to_vec(lotus_cert).context("Failed to encode certificate data")?;
-
-        Ok(F3Certificate {
-            instance_id: lotus_cert.gpbft_instance,
-            finalized_epochs,
-            power_table_cid,
-            signature,
-            certificate_data,
-        })
+        Ok(bundle)
     }
 }
 
@@ -216,5 +150,12 @@ mod tests {
             "test-subnet".to_string(),
         );
         assert!(assembler.is_ok());
+    }
+
+    #[test]
+    fn test_invalid_url() {
+        let assembler =
+            ProofAssembler::new("not a url".to_string(), 1001, "test-subnet".to_string());
+        assert!(assembler.is_err());
     }
 }

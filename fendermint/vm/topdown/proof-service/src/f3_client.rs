@@ -7,15 +7,12 @@
 //! - Full cryptographic validation (BLS signatures, quorum, chain continuity)
 //! - Sequential state management for validated certificates
 
-use crate::observe::{F3CertificateFetched, F3CertificateValidated, OperationStatus};
 use crate::types::ValidatedCertificate;
 use anyhow::{Context, Result};
 use filecoin_f3_lightclient::{LightClient, LightClientState};
-use ipc_observability::emit;
 use std::sync::Arc;
-use std::time::Instant;
 use tokio::sync::Mutex;
-use tracing::{debug, error, info};
+use tracing::{debug, info};
 
 /// F3 client for fetching and validating certificates
 ///
@@ -112,116 +109,55 @@ impl F3Client {
     /// Fetch and validate an F3 certificate
     ///
     /// This performs full cryptographic validation including:
-    /// - BLS signature correctness
-    /// - Quorum requirements (>2/3 power)
-    /// - Chain continuity (sequential instances)
-    /// - Power table validity
+    /// - ✅ BLS signature correctness
+    /// - ✅ Quorum requirements (>2/3 power)
+    /// - ✅ Chain continuity (sequential instances)
+    /// - ✅ Power table validity
     ///
     /// # Returns
     /// `ValidatedCertificate` containing the cryptographically verified certificate
     pub async fn fetch_and_validate(&self, instance: u64) -> Result<ValidatedCertificate> {
-        debug!(instance, "Starting F3 certificate fetch and validation");
+        debug!(instance, "Fetching and validating F3 certificate");
 
         // STEP 1: FETCH certificate from F3 RPC
-        let fetch_start = Instant::now();
-        let f3_cert = match self
+        let f3_cert = self
             .light_client
             .lock()
             .await
             .get_certificate(instance)
             .await
-        {
-            Ok(cert) => {
-                let latency = fetch_start.elapsed().as_secs_f64();
-                emit(F3CertificateFetched {
-                    instance,
-                    ec_chain_len: cert.ec_chain.suffix().len(),
-                    status: OperationStatus::Success,
-                    latency,
-                });
-                debug!(
-                    instance,
-                    ec_chain_len = cert.ec_chain.suffix().len(),
-                    "Fetched certificate from F3 RPC"
-                );
-                cert
-            }
-            Err(e) => {
-                let latency = fetch_start.elapsed().as_secs_f64();
-                emit(F3CertificateFetched {
-                    instance,
-                    ec_chain_len: 0,
-                    status: OperationStatus::Failure,
-                    latency,
-                });
-                error!(
-                    instance,
-                    error = %e,
-                    "Failed to fetch certificate from F3 RPC"
-                );
-                return Err(e).context("Failed to fetch certificate from F3 RPC");
-            }
-        };
+            .context("Failed to fetch certificate from F3 RPC")?;
+
+        debug!(
+            instance,
+            ec_chain_len = f3_cert.ec_chain.suffix().len(),
+            "Fetched certificate from F3 RPC"
+        );
 
         // STEP 2: CRYPTOGRAPHIC VALIDATION
-        debug!(instance, "Validating certificate cryptography");
-        let validation_start = Instant::now();
+        // The light client performs full validation: BLS signatures, quorum, continuity
         let new_state = {
             let mut client = self.light_client.lock().await;
             let state = self.state.lock().await.clone();
-
-            debug!(
-                instance,
-                current_instance = state.instance,
-                power_table_entries = state.power_table.len(),
-                "Current F3 validator state"
-            );
-
-            match client.validate_certificates(&state, &[f3_cert.clone()]) {
-                Ok(new_state) => {
-                    let latency = validation_start.elapsed().as_secs_f64();
-                    emit(F3CertificateValidated {
-                        instance,
-                        new_instance: new_state.instance,
-                        power_table_size: new_state.power_table.len(),
-                        status: OperationStatus::Success,
-                        latency,
-                    });
-                    info!(
-                        instance,
-                        new_instance = new_state.instance,
-                        power_table_size = new_state.power_table.len(),
-                        "Certificate validated (BLS signatures, quorum, continuity)"
-                    );
-                    new_state
-                }
-                Err(e) => {
-                    let latency = validation_start.elapsed().as_secs_f64();
-                    let state_instance = state.instance;
-                    let power_table_len = state.power_table.len();
-                    emit(F3CertificateValidated {
-                        instance,
-                        new_instance: state_instance,
-                        power_table_size: power_table_len,
-                        status: OperationStatus::Failure,
-                        latency,
-                    });
-                    error!(
-                        instance,
-                        error = %e,
-                        current_instance = state_instance,
-                        power_table_entries = power_table_len,
-                        "Certificate validation failed"
-                    );
-                    return Err(e).context("Certificate cryptographic validation failed");
-                }
-            }
+            client
+                .validate_certificates(&state, &[f3_cert.clone()])
+                .context("Certificate cryptographic validation failed")?
         };
+
+        debug!(
+            instance,
+            new_instance = new_state.instance,
+            power_table_size = new_state.power_table.len(),
+            "Certificate cryptographically validated (BLS, quorum, continuity verified)"
+        );
 
         // STEP 3: UPDATE validated state
         *self.state.lock().await = new_state;
 
-        debug!(instance, "Certificate validation complete");
+        info!(
+            instance,
+            "Certificate validated with full cryptographic verification"
+        );
 
         Ok(ValidatedCertificate {
             instance_id: instance,
