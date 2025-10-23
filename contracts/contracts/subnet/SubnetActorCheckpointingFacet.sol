@@ -134,7 +134,7 @@ contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, ReentrancyG
         }
     }
 
-    function deriveAppHash(AppHashBreakdown calldata breakdown) internal pure returns (bytes memory appHash) {
+    function deriveAppHash(AppHashBreakdown calldata breakdown) public pure returns (bytes memory appHash) {
         bytes32 derived = keccak256(abi.encode(breakdown));
 
         appHash = new bytes(32);
@@ -144,7 +144,7 @@ contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, ReentrancyG
         return appHash;
     }
 
-    function validateAppHash(uint64 checkpointHeight, AppHashBreakdown calldata breakdown) internal view whenNotPaused {
+    function validateAppHash(uint64 checkpointHeight, AppHashBreakdown calldata breakdown) public view {
         SubnetActorCheckpointingStorage storage checkpointStorage = LibCheckpointingStorage.getStorage();
 
         bytes memory expectedAppHash = checkpointStorage.appHash[checkpointHeight];

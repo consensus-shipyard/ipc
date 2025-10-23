@@ -54,7 +54,7 @@ import {BottomUpBatchHelper} from "../helpers/BottomUpBatchHelper.sol";
 import {Timestamp, CanonicalBlockID, CanonicalPartSetHeader, SignedHeader, CanonicalVote, BlockID, Commit, PartSetHeader, CommitSig, LightHeader, Consensus as ConsensusData, TENDERMINTLIGHT_PROTO_GLOBAL_ENUMS} from "tendermint-sol/proto/TendermintLight.sol";
 
 import {BottomUpCheckpoint} from "./util.sol";
-import {ValidatorSignPayload, ValidatorCertificate, LibBitMap} from "../../contracts/lib/cometbft/CometbftLightClient.sol";
+import {ValidatorSignPayload, ValidatorCertificate, AppHashBreakdown, CompressedActivityRollup, LibBitMap} from "../../contracts/lib/cometbft/CometbftLightClient.sol";
 
 contract SubnetBottomUpCheckpointTest is Test, IntegrationTestBase {
     using SubnetIDHelper for SubnetID;
@@ -154,6 +154,42 @@ contract SubnetBottomUpCheckpointTest is Test, IntegrationTestBase {
         require(!LibBitMap.isBitSet(bitmap, 5), "5");
         require(!LibBitMap.isBitSet(bitmap, 6), "6");
         require(LibBitMap.isBitSet(bitmap, 7), "7");
+    }
+
+    function testSubnetActorDiamond_deriveAppHash() public {
+        // Setup: Join validator first
+        address validator = address(0x1A79385eAd0e873FE0C441C034636D3Edf7014cC);
+        bytes
+            memory pubkey = hex"047efe505fb55f56756514db73ff1e3a8d7fc08f7c5bbc3cbf10d646be71c2593766d6a8785f468ed6701c427d9b2a6a8d8a7d7146bc77a7e7a94c49bbcbd39f7f";
+
+        vm.deal(validator, 11 ether);
+        vm.prank(validator);
+        saDiamond.manager().join{value: 10 ether}(pubkey, 10 ether);
+
+        // Now test recordAppHashBreakdown with the provided data
+        uint64 checkpointHeight = 10;
+
+        // Create the AppHashBreakdown from the provided data
+        AppHashBreakdown memory breakdown = AppHashBreakdown({
+            stateRoot: hex"0171a0e40220d324f2815da59e84482e6103a5eb1b6a7674918c55ebad378685ec908fac2e39",
+            msgBatchCommitment: BottomUpBatch.Commitment({
+                totalNumMsgs: 0,
+                msgsRoot: BottomUpBatch.MerkleHash.wrap(bytes32(0))
+            }),
+            validatorNextConfigurationNumber: 0,
+            activityCommitment: CompressedActivityRollup({
+                consensus: Consensus.CompressedSummary({
+                    stats: Consensus.AggregatedStats({totalActiveValidators: 1, totalNumBlocksCommitted: 10}),
+                    dataRootCommitment: Consensus.MerkleHash.wrap(
+                        hex"c43833517ebdaddf412148dcc6fbf8674464ba826ff4cfa80707966444c5f235"
+                    )
+                })
+            })
+        });
+        
+        bytes memory derived = saDiamond.checkpointer().deriveAppHash(breakdown);
+        bytes memory expected = hex"8d26ca04a9eb3b9140457445abd7ab774c98b6b6a1a4ee187fb8dc8ee99f9f55";
+        require(keccak256(derived) == keccak256(expected));
     }
 
     function callback() public view {}
