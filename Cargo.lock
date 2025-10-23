@@ -121,7 +121,7 @@ version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d122413f284cf2d62fb1b7db97e02edb8cda96d769b16e443a4f6195e35662b0"
 dependencies = [
- "crypto-common",
+ "crypto-common 0.1.6",
  "generic-array 0.14.9",
 ]
 
@@ -321,7 +321,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c3610892ee6e0cbce8ae2700349fcf8f98adb0dbfbee85aec3c9179d29cc072"
 dependencies = [
  "base64ct",
- "blake2",
+ "blake2 0.10.6",
  "cpufeatures",
  "password-hash 0.5.0",
 ]
@@ -925,7 +925,7 @@ dependencies = [
  "bellpepper-core",
  "bincode",
  "blake2s_simd 1.0.3",
- "blstrs 0.7.1",
+ "blstrs",
  "byteorder",
  "crossbeam-channel",
  "digest 0.10.7",
@@ -935,7 +935,7 @@ dependencies = [
  "group 0.13.0",
  "log",
  "memmap2",
- "pairing 0.23.0",
+ "pairing",
  "rand 0.8.5",
  "rand_core 0.6.4",
  "rayon",
@@ -1060,6 +1060,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "blake2"
+version = "0.11.0-rc.2"
+source = "git+https://github.com/huitseeker/hashes.git?rev=4d3debf264a45da9e33d52645eb6ee9963336f66#4d3debf264a45da9e33d52645eb6ee9963336f66"
+dependencies = [
+ "digest 0.11.0-rc.3",
+]
+
+[[package]]
 name = "blake2b_simd"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1124,6 +1132,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "block-buffer"
+version = "0.11.0-rc.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e9ef36a6fcdb072aa548f3da057640ec10859eb4e91ddf526ee648d50c76a949"
+dependencies = [
+ "hybrid-array",
+]
+
+[[package]]
 name = "block-padding"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1156,34 +1173,36 @@ dependencies = [
 
 [[package]]
 name = "bls-signatures"
-version = "0.13.1"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1659e487883b92123806f16ff3568dd57563991231d187d29b23eea5d910e800"
+checksum = "ecc7fce0356b52c2483bb6188cc8bdc11add526bce75d1a44e5e5d889a6ab008"
 dependencies = [
+ "bls12_381",
  "blst",
- "blstrs 0.6.2",
- "ff 0.12.1",
- "group 0.12.1",
- "pairing 0.22.0",
+ "blstrs",
+ "ff 0.13.1",
+ "group 0.13.0",
+ "hkdf 0.11.0",
+ "pairing",
  "rand_core 0.6.4",
+ "rayon",
+ "sha2 0.9.9",
  "subtle",
  "thiserror 1.0.69",
 ]
 
 [[package]]
-name = "bls-signatures"
-version = "0.15.0"
+name = "bls12_381"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ecc7fce0356b52c2483bb6188cc8bdc11add526bce75d1a44e5e5d889a6ab008"
+checksum = "d7bc6d6292be3a19e6379786dac800f551e5865a5bb51ebbe3064ab80433f403"
 dependencies = [
- "blst",
- "blstrs 0.7.1",
+ "digest 0.9.0",
  "ff 0.13.1",
  "group 0.13.0",
- "pairing 0.23.0",
+ "pairing",
  "rand_core 0.6.4",
  "subtle",
- "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -1200,22 +1219,6 @@ dependencies = [
 
 [[package]]
 name = "blstrs"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ff3694b352ece02eb664a09ffb948ee69b35afa2e6ac444a6b8cb9d515deebd"
-dependencies = [
- "blst",
- "byte-slice-cast",
- "ff 0.12.1",
- "group 0.12.1",
- "pairing 0.22.0",
- "rand_core 0.6.4",
- "serde",
- "subtle",
-]
-
-[[package]]
-name = "blstrs"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a8a8ed6fefbeef4a8c7b460e4110e12c5e22a5b7cf32621aae6ad650c4dcf29"
@@ -1225,7 +1228,7 @@ dependencies = [
  "ec-gpu",
  "ff 0.13.1",
  "group 0.13.0",
- "pairing 0.23.0",
+ "pairing",
  "rand_core 0.6.4",
  "serde",
  "subtle",
@@ -1554,7 +1557,7 @@ version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "773f3b9af64447d2ce9850330c473515014aa235e6a783b02db81ff39e4a3dad"
 dependencies = [
- "crypto-common",
+ "crypto-common 0.1.6",
  "inout",
  "zeroize",
 ]
@@ -2156,10 +2159,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "crypto-common"
+version = "0.2.0-rc.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a8235645834fbc6832939736ce2f2d08192652269e11010a6240f61b908a1c6"
+dependencies = [
+ "hybrid-array",
+]
+
+[[package]]
 name = "crypto-mac"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b584a330336237c1eecd3e94266efb216c56ed91225d634cb2991c5f3fd1aeab"
+dependencies = [
+ "generic-array 0.14.9",
+ "subtle",
+]
+
+[[package]]
+name = "crypto-mac"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25fab6889090c8133f3deb8f73ba3c65a7f456f66436fc012a1b1e272b1e103e"
 dependencies = [
  "generic-array 0.14.9",
  "subtle",
@@ -2436,7 +2458,18 @@ checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
 dependencies = [
  "block-buffer 0.10.4",
  "const-oid",
- "crypto-common",
+ "crypto-common 0.1.6",
+ "subtle",
+]
+
+[[package]]
+name = "digest"
+version = "0.11.0-rc.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dac89f8a64533a9b0eaa73a68e424db0fb1fd6271c74cc0125336a05f090568d"
+dependencies = [
+ "block-buffer 0.11.0-rc.5",
+ "crypto-common 0.2.0-rc.4",
  "subtle",
 ]
 
@@ -4068,6 +4101,8 @@ dependencies = [
  "fendermint_actor_f3_light_client",
  "fendermint_vm_genesis",
  "filecoin-f3-certs",
+ "filecoin-f3-gpbft",
+ "filecoin-f3-lightclient",
  "filecoin-f3-rpc",
  "fvm_ipld_encoding 0.5.3",
  "fvm_shared",
@@ -4095,7 +4130,6 @@ version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d013fc25338cc558c5c2cfbad646908fb23591e2404481826742b651c9af7160"
 dependencies = [
- "bitvec",
  "rand_core 0.6.4",
  "subtle",
 ]
@@ -4236,9 +4270,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "filecoin-f3-blssig"
+version = "0.1.0"
+dependencies = [
+ "blake2 0.11.0-rc.2",
+ "bls-signatures",
+ "bls12_381",
+ "filecoin-f3-gpbft",
+ "hashlink",
+ "parking_lot",
+ "rayon",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "filecoin-f3-certs"
 version = "0.1.0"
-source = "git+https://github.com/ChainSafe/rust-f3#4520e4cd42140118c9728a6caa051e0d59a5e4f3"
 dependencies = [
  "ahash 0.8.12",
  "filecoin-f3-gpbft",
@@ -4249,7 +4296,6 @@ dependencies = [
 [[package]]
 name = "filecoin-f3-gpbft"
 version = "0.1.0"
-source = "git+https://github.com/ChainSafe/rust-f3#4520e4cd42140118c9728a6caa051e0d59a5e4f3"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
@@ -4270,9 +4316,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "filecoin-f3-lightclient"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "filecoin-f3-blssig",
+ "filecoin-f3-certs",
+ "filecoin-f3-gpbft",
+ "filecoin-f3-rpc",
+ "hex",
+ "keccak-hash",
+ "tokio",
+]
+
+[[package]]
 name = "filecoin-f3-merkle"
 version = "0.1.0"
-source = "git+https://github.com/ChainSafe/rust-f3#4520e4cd42140118c9728a6caa051e0d59a5e4f3"
 dependencies = [
  "anyhow",
  "sha3",
@@ -4281,7 +4341,6 @@ dependencies = [
 [[package]]
 name = "filecoin-f3-rpc"
 version = "0.1.0"
-source = "git+https://github.com/ChainSafe/rust-f3#4520e4cd42140118c9728a6caa051e0d59a5e4f3"
 dependencies = [
  "anyhow",
  "filecoin-f3-gpbft",
@@ -4298,7 +4357,7 @@ checksum = "9081144cced0c2b7dc6e7337c2c8c7f4c6ff7ef0bb9c0b75b7f1aaeb1428ebd7"
 dependencies = [
  "anyhow",
  "bellperson",
- "blstrs 0.7.1",
+ "blstrs",
  "ff 0.13.1",
  "generic-array 0.14.9",
  "hex",
@@ -4320,7 +4379,7 @@ dependencies = [
  "bellperson",
  "bincode",
  "blake2b_simd",
- "blstrs 0.7.1",
+ "blstrs",
  "ff 0.13.1",
  "filecoin-hashers",
  "fr32",
@@ -4352,7 +4411,7 @@ checksum = "d50610f79df0975b54461fd65820183b99326fda4f24223d507c1b75cb303b14"
 dependencies = [
  "anyhow",
  "bincode",
- "blstrs 0.7.1",
+ "blstrs",
  "filecoin-proofs",
  "fr32",
  "lazy_static",
@@ -4478,7 +4537,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf1de08b59372f0316e8c7e304aaec13f180ccb33d55ebe02c10034a0826a2bd"
 dependencies = [
  "anyhow",
- "blstrs 0.7.1",
+ "blstrs",
  "byte-slice-cast",
  "byteorder",
  "ff 0.13.1",
@@ -4969,7 +5028,7 @@ dependencies = [
  "arbitrary",
  "bitflags 2.10.0",
  "blake2b_simd",
- "bls-signatures 0.15.0",
+ "bls-signatures",
  "cid 0.11.1",
  "data-encoding",
  "data-encoding-macro",
@@ -5131,9 +5190,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5dfbfb3a6cfbd390d5c9564ab283a0349b9b9fcd46a706c1eb10e0db70bfbac7"
 dependencies = [
  "ff 0.12.1",
- "rand 0.8.5",
  "rand_core 0.6.4",
- "rand_xorshift 0.3.0",
  "subtle",
 ]
 
@@ -5234,6 +5291,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2bca93b15ea5a746f220e56587f71e73c6165eab783df9e26590069953e3c30"
 dependencies = [
  "fxhash",
+]
+
+[[package]]
+name = "hashlink"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7382cf6263419f2d8df38c55d7da83da5c18aef87fc7a7fc1fb1e344edfe14c1"
+dependencies = [
+ "hashbrown 0.15.5",
 ]
 
 [[package]]
@@ -5381,6 +5447,16 @@ dependencies = [
 
 [[package]]
 name = "hkdf"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "01706d578d5c281058480e673ae4086a9f4710d8df1ad80a5b03e39ece5f886b"
+dependencies = [
+ "digest 0.9.0",
+ "hmac 0.11.0",
+]
+
+[[package]]
+name = "hkdf"
 version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b5f8eb2ad728638ea2c7d47a21db23b7b58a72ed6a38256b8a1849f15fbbdf7"
@@ -5394,7 +5470,17 @@ version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "126888268dcc288495a26bf004b38c5fdbb31682f992c84ceb046a1f0fe38840"
 dependencies = [
- "crypto-mac",
+ "crypto-mac 0.8.0",
+ "digest 0.9.0",
+]
+
+[[package]]
+name = "hmac"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a2a2320eb7ec0ebe8da8f744d7812d9fc4cb4d09344ac01898dbcb6a20ae69b"
+dependencies = [
+ "crypto-mac 0.11.0",
  "digest 0.9.0",
 ]
 
@@ -5515,6 +5601,15 @@ checksum = "57a3db5ea5923d99402c94e9feb261dc5ee9b4efa158b0315f788cf549cc200c"
 dependencies = [
  "humantime",
  "serde",
+]
+
+[[package]]
+name = "hybrid-array"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f471e0a81b2f90ffc0cb2f951ae04da57de8baa46fa99112b062a5173a5088d0"
+dependencies = [
+ "typenum",
 ]
 
 [[package]]
@@ -6278,7 +6373,7 @@ dependencies = [
  "argon2",
  "base64 0.21.7",
  "blake2b_simd",
- "bls-signatures 0.13.1",
+ "bls-signatures",
  "ethers",
  "fs-err",
  "fvm_shared",
@@ -7059,7 +7154,7 @@ dependencies = [
  "asn1_der",
  "bs58",
  "ed25519-dalek",
- "hkdf",
+ "hkdf 0.12.4",
  "k256 0.13.4",
  "multihash 0.19.3",
  "quick-protobuf",
@@ -7925,7 +8020,7 @@ dependencies = [
  "bellpepper",
  "bellpepper-core",
  "blake2s_simd 0.5.11",
- "blstrs 0.7.1",
+ "blstrs",
  "byteorder",
  "ff 0.13.1",
  "generic-array 0.14.9",
@@ -8336,15 +8431,6 @@ name = "owo-colors"
 version = "4.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c6901729fa79e91a0913333229e9ca5dc725089d1c363b2f4b4760709dc4a52"
-
-[[package]]
-name = "pairing"
-version = "0.22.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "135590d8bdba2b31346f9cd1fb2a912329f5135e832a4f422942eb6ead8b6b3b"
-dependencies = [
- "group 0.12.1",
-]
 
 [[package]]
 name = "pairing"
@@ -10792,7 +10878,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "850948bee068e713b8ab860fe1adc4d109676ab4c3b621fd8147f06b261f2f85"
 dependencies = [
  "aes-gcm",
- "blake2",
+ "blake2 0.10.6",
  "chacha20poly1305",
  "curve25519-dalek",
  "rand_core 0.6.4",
@@ -10936,7 +11022,7 @@ dependencies = [
  "anyhow",
  "bellperson",
  "blake2b_simd",
- "blstrs 0.7.1",
+ "blstrs",
  "byteorder",
  "cbc",
  "config 0.14.1",
@@ -10971,7 +11057,7 @@ dependencies = [
  "bellperson",
  "bincode",
  "blake2b_simd",
- "blstrs 0.7.1",
+ "blstrs",
  "byte-slice-cast",
  "byteorder",
  "chacha20",
@@ -11011,7 +11097,7 @@ checksum = "b040787160b2381f1f86ac08f8789283da753e97df25e6be4ea3cc8615d5497c"
 dependencies = [
  "anyhow",
  "bellperson",
- "blstrs 0.7.1",
+ "blstrs",
  "byteorder",
  "ff 0.13.1",
  "filecoin-hashers",
@@ -11031,7 +11117,7 @@ checksum = "1118e3f9dff7c93a68d06a17ae89bf051321278be810e4c3c24a1a88bbc0c3e7"
 dependencies = [
  "anyhow",
  "bellperson",
- "blstrs 0.7.1",
+ "blstrs",
  "ff 0.13.1",
  "filecoin-hashers",
  "fr32",
@@ -12367,7 +12453,7 @@ version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc1de2c688dc15305988b563c3854064043356019f97a4b46276fe734c4f07ea"
 dependencies = [
- "crypto-common",
+ "crypto-common 0.1.6",
  "subtle",
 ]
 
