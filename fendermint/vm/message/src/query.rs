@@ -126,6 +126,9 @@ pub struct GasEstimate {
 #[serde_as]
 #[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 pub struct StateParams {
+    /// The state root
+    #[serde_as(as = "IsHumanReadable")]
+    pub state_root: Cid,
     /// Base fee.
     ///
     /// Its evolution can depend on the size of blocks, contention, etc.

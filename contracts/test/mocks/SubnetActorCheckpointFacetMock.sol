@@ -22,7 +22,7 @@ contract SubnetActorCheckpointFacetMock is SubnetActorCheckpointingFacet {
     ) external {
         SubnetActorCheckpointingStorage storage checkpointStorage = LibCheckpointingStorage.getStorage();
 
-        checkpointStorage.lastSubmissionHeight = uint64(h);
+        checkpointStorage.lastBottomUpCheckpointHeight = uint64(h);
 
         if (msgs.totalNumMsgs > 0) {
             LibBottomUpBatch.recordBottomUpBatchCommitment(uint64(h), msgs);

@@ -554,6 +554,7 @@ where
             FvmQuery::StateParams => {
                 let state_params = state.state_params();
                 let state_params = StateParams {
+                    state_root: state_params.state_root,
                     base_fee: state_params.base_fee.clone(),
                     circ_supply: state_params.circ_supply.clone(),
                     chain_id: state_params.chain_id,

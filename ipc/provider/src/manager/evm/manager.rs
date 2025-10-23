@@ -1288,6 +1288,15 @@ impl SignedHeaderRelayer for EthSubnetManager {
         Ok(None)
     }
 
+    async fn get_last_app_commitment_height(&self, subnet_id: &SubnetID) -> Result<u64> {
+        let address = contract_address_from_subnet(subnet_id)?;
+        let contract = subnet_actor_checkpointing_facet::SubnetActorCheckpointingFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        Ok(contract.last_commitment_height().call().await?.as_u64())
+    }
+
     async fn get_last_bottom_up_checkpoint_height(&self, subnet_id: &SubnetID) -> Result<u64> {
         let address = contract_address_from_subnet(subnet_id)?;
         let contract = subnet_actor_checkpointing_facet::SubnetActorCheckpointingFacet::new(
