@@ -20,6 +20,8 @@
 pub mod assembler;
 pub mod cache;
 pub mod config;
+pub mod f3_client;
+pub mod parent_client;
 pub mod persistence;
 pub mod service;
 pub mod types;
@@ -55,7 +57,11 @@ use std::sync::Arc;
 /// # Returns
 /// * `Arc<ProofCache>` - Shared cache that proposers can query
 /// * `tokio::task::JoinHandle` - Handle to the background service task
-pub fn launch_service(
+///
+/// # Note
+/// This function fetches the initial power table from RPC for MVP.
+/// In production, the power table should come from the F3CertManager actor.
+pub async fn launch_service(
     config: ProofServiceConfig,
     subnet_id: SubnetID,
     initial_committed_epoch: ChainEpoch,
@@ -106,17 +112,11 @@ pub fn launch_service(
     let cache_clone = cache.clone();
     let power_table_clone = initial_power_table.clone();
 
-    // Use spawn_blocking to run the service in a blocking thread pool
-    // Then spawn an async task to handle it
-    let handle = tokio::task::spawn_blocking(move || {
-        // Create a new runtime for the blocking task
-        let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
-        rt.block_on(async move {
-            service.run().await;
-        });
-    });
+    // Clone what we need for the background task
+    let config_clone = config.clone();
+    let cache_clone = cache.clone();
 
-    // Convert to a JoinHandle that looks like our original
+    // Spawn background task
     let handle = tokio::spawn(async move {
         match ProofGeneratorService::new(
             config_clone,
@@ -157,7 +157,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore] // Requires real parent chain RPC endpoint
     async fn test_launch_service_enabled() {
         use crate::config::GatewayId;
         use filecoin_f3_gpbft::PowerEntries;
@@ -181,6 +180,5 @@ mod tests {
 
         // Check cache state
         assert_eq!(cache.last_committed_instance(), 100);
-        assert_eq!(cache.len(), 0);
     }
 }

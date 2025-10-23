@@ -51,7 +51,6 @@ impl ProofCachePersistence {
         let path = path.as_ref();
         info!(?path, "Opening proof cache database");
 
-        // Configure RocksDB
         let mut opts = Options::default();
         opts.create_if_missing(true);
         opts.create_missing_column_families(true);
@@ -239,8 +238,8 @@ mod tests {
         SerializablePowerEntries, SerializablePowerEntry, SerializableSupplementalData,
     };
     use cid::Cid;
-    use fendermint_actor_f3_cert_manager::types::F3Certificate;
     use multihash_codetable::{Code, MultihashDigest};
+    use proofs::proofs::common::bundle::UnifiedProofBundle;
     use std::time::SystemTime;
     use tempfile::tempdir;
 

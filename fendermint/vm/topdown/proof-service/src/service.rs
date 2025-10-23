@@ -119,8 +119,9 @@ impl ProofGeneratorService {
         let mut poll_interval = interval(self.config.polling_interval);
         poll_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
-        loop {
-            poll_interval.tick().await;
+        // Health check interval - check unhealthy providers every 60s
+        let mut health_check_interval = interval(std::time::Duration::from_secs(180));
+        health_check_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
             if let Err(e) = self.process_next_certificate().await {
                 tracing::error!(

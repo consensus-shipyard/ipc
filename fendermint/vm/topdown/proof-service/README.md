@@ -17,8 +17,8 @@ This service provides production-ready proof generation for IPC subnets using F3
 
 - BLS signature verification using F3 light client
 - Quorum checks (>2/3 power)
-- Chain continuity validation (sequential instances)
-- Power table verification and tracking
+- Chain continuity validation
+- Power table verification
 
 ### High Performance
 
@@ -57,14 +57,13 @@ The service generates proofs for the following on-chain data:
 
 ```
 ┌──────────────┐
-│ Parent Chain │
-│   F3 RPC     │
+│ F3 RPC       │ (Parent chain F3 endpoint)
 └──────┬───────┘
-       │ Fetch certificates
-       ↓
+       │
+       ↓ Fetch certificates
 ┌──────────────────────────────────┐
 │ F3 Light Client                  │
-│ - Fetch from F3 RPC              │
+│ - Cryptographic validation       │
 │ - BLS signature verification     │
 │ - Quorum validation (>2/3 power) │
 │ - Chain continuity checks        │
@@ -89,7 +88,7 @@ The service generates proofs for the following on-chain data:
 │ - Retention policy               │
 └──────┬───────────────────────────┘
        │
-       ↓ Query by proposers
+       ↓ Validated certificates
 ┌──────────────────────────────────┐
 │ Block Proposer                   │
 │ - Get proof for epoch            │
@@ -248,28 +247,17 @@ ipc-cli proof-cache get --db-path /var/lib/fendermint/proof-cache --instance-id 
 # Build the test binary
 cargo build --package fendermint_vm_topdown_proof_service --features cli --bin proof-cache-test
 
-# Get current F3 instance
-LATEST=$(curl -s -X POST -H "Content-Type: application/json" \
-  --data '{"jsonrpc":"2.0","method":"Filecoin.F3GetLatestCertificate","params":[],"id":1}' \
-  http://api.calibration.node.glif.io/rpc/v1 | jq -r '.result.GPBFTInstance')
-
-# Start from recent instance (within RPC lookback limit of ~16.7 hours)
-START=$((LATEST - 5))
-
 # Run against Calibration testnet
-./target/debug/proof-cache-test run \
-    --rpc-url "http://api.calibration.node.glif.io/rpc/v1" \
-    --initial-instance $START \
-    --gateway-actor-id 176609 \
-    --subnet-id "calib-subnet-1" \
-    --poll-interval 10 \
-    --lookahead 3 \
-    --db-path /tmp/proof-cache-test.db
+./target/debug/proof-cache-test \
+    --rpc https://api.calibration.node.glif.io/rpc/v1 \
+    --subnet-id /r314159 \
+    --gateway-id 1001 \
+    --start-instance 0
 ```
 
 ## Configuration
 
-All configuration options in `ProofServiceConfig`:
+See `src/config.rs` for all options:
 
 | Field                  | Type           | Required | Description                                      |
 | ---------------------- | -------------- | -------- | ------------------------------------------------ |
@@ -285,9 +273,9 @@ All configuration options in `ProofServiceConfig`:
 | `max_cache_size_bytes` | usize          | No       | Maximum cache size (0 = unlimited)               |
 | `fallback_rpc_urls`    | Vec<String>    | No       | Backup RPC endpoints for failover                |
 
-## Observability
+## Certificate Validation
 
-### Prometheus Metrics
+The service performs **full cryptographic validation** via the F3 light client:
 
 **F3 Certificate Operations:**
 
@@ -411,9 +399,9 @@ Older issue with reqwest library on macOS (now fixed in upstream).
 
 ### Unit Tests
 
-```bash
-cargo test --package fendermint_vm_topdown_proof_service --lib
-```
+````bash
+# Unit tests
+cargo test --package fendermint_vm_topdown_proof_service
 
 **Test Coverage:**
 
@@ -428,7 +416,7 @@ cargo test --package fendermint_vm_topdown_proof_service --lib
 ```bash
 # Requires live Calibration network
 cargo test --package fendermint_vm_topdown_proof_service --test integration -- --ignored
-```
+````
 
 ### End-to-End Testing
 
@@ -471,7 +459,6 @@ forge create --rpc-url http://api.calibration.node.glif.io/rpc/v1 \
 - `filecoin-f3-gpbft` - GPBFT consensus types (power tables)
 - `proofs` - IPC proof generation library (`ipc-filecoin-proofs`)
 - `rocksdb` - Optional persistence layer
-- `ipc-observability` - Metrics and tracing
 
 ### Repository Links
 
@@ -623,11 +610,6 @@ See Cursor plan "Custom RPC Client Integration" for:
 
 ## Related Code
 
-- **F3CertManager Actor**: `fendermint/actors/f3-cert-manager` - On-chain certificate storage
-- **Gateway Contract**: `contracts/contracts/gateway` - Parent chain gateway
-- **IPC Provider**: `ipc/provider` - Lotus RPC client
-- **Fendermint App**: Integrates this service for topdown finality
-
-## License
-
-MIT OR Apache-2.0 - Protocol Labs
+- IPC Provider: `ipc/provider/src/lotus/message/f3.rs` - Lotus F3 types
+- F3CertManager Actor: `fendermint/actors/f3-cert-manager` - On-chain certificate storage
+- Fendermint App: Uses this service for topdown finality proofs
