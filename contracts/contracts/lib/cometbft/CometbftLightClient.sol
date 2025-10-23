@@ -43,6 +43,7 @@ struct ValidatorCertificate {
 
 library CometbftLightClient {
     using TendermintHelper for Vote.Data;
+    using LibBitMap for uint256;
 
     error InvalidLength(string what, uint256 expected, uint256 actual);
     error NotSameHeight();
