@@ -443,9 +443,9 @@ cmd_install_systemd() {
 
     for idx in "${!VALIDATORS[@]}"; do
         if install_systemd_services "$idx"; then
-            ((success_count++))
+            success_count=$((success_count + 1))
         else
-            ((fail_count++))
+            fail_count=$((fail_count + 1))
         fi
     done
 
@@ -455,9 +455,9 @@ cmd_install_systemd() {
         local primary_idx=$(get_primary_validator)
         if ! install_relayer_systemd_service "$primary_idx"; then
             log_warn "Relayer systemd service installation failed"
-            ((fail_count++))
+            fail_count=$((fail_count + 1))
         else
-            ((success_count++))
+            success_count=$((success_count + 1))
         fi
     fi
 

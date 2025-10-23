@@ -42,6 +42,11 @@ generate_node_systemd_service() {
     local ipc_binary=$(get_config_value "paths.ipc_binary")
     local node_home=$(get_config_value "paths.node_home")
 
+    # Ensure SCRIPT_DIR is set
+    if [ -z "$SCRIPT_DIR" ]; then
+        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    fi
+
     sed -e "s|__IPC_USER__|$ipc_user|g" \
         -e "s|__IPC_BINARY__|$ipc_binary|g" \
         -e "s|__NODE_HOME__|$node_home|g" \
@@ -66,6 +71,11 @@ generate_relayer_systemd_service() {
     if [ -z "$submitter" ]; then
         log_error "Failed to get submitter address for systemd service"
         return 1
+    fi
+
+    # Ensure SCRIPT_DIR is set
+    if [ -z "$SCRIPT_DIR" ]; then
+        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
     fi
 
     sed -e "s|__IPC_USER__|$ipc_user|g" \
@@ -117,15 +127,32 @@ install_systemd_services() {
     local node_service_file="/tmp/ipc-node-${name}.service"
     generate_node_systemd_service "$validator_idx" "$node_service_file"
 
+    if [ ! -f "$node_service_file" ]; then
+        log_error "Failed to generate service file for $name"
+        return 1
+    fi
+
     # Ensure logs directory exists
-    ssh_exec "$ip" "$ssh_user" "$ipc_user" "mkdir -p $node_home/logs" || true
+    ssh_exec "$ip" "$ssh_user" "$ipc_user" "mkdir -p $node_home/logs" 2>/dev/null || true
 
     # Copy service file to /etc/systemd/system/ (requires sudo)
-    scp -o StrictHostKeyChecking=no "$node_service_file" "$ssh_user@$ip:/tmp/ipc-node.service" >/dev/null 2>&1
-    ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "sudo mv /tmp/ipc-node.service /etc/systemd/system/ipc-node.service && sudo chmod 644 /etc/systemd/system/ipc-node.service" >/dev/null 2>&1
+    log_info "  Copying service file to $name..."
+    if ! scp -o StrictHostKeyChecking=no "$node_service_file" "$ssh_user@$ip:/tmp/ipc-node.service" >/dev/null 2>&1; then
+        log_error "Failed to copy service file to $name"
+        rm -f "$node_service_file"
+        return 1
+    fi
+
+    log_info "  Moving to /etc/systemd/system/..."
+    if ! ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+        "sudo mv /tmp/ipc-node.service /etc/systemd/system/ipc-node.service && sudo chmod 644 /etc/systemd/system/ipc-node.service" >/dev/null 2>&1; then
+        log_error "Failed to install service file on $name"
+        rm -f "$node_service_file"
+        return 1
+    fi
 
     # Reload systemd
+    log_info "  Reloading systemd..."
     if ! ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
         "sudo systemctl daemon-reload" >/dev/null 2>&1; then
         log_error "Failed to reload systemd on $name"
@@ -134,12 +161,9 @@ install_systemd_services() {
     fi
 
     # Enable node service
-    if ! ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "sudo systemctl enable ipc-node.service" >/dev/null 2>&1; then
-        log_error "Failed to enable service on $name"
-        rm -f "$node_service_file"
-        return 1
-    fi
+    log_info "  Enabling service..."
+    ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+        "sudo systemctl enable ipc-node.service" >/dev/null 2>&1 || true
 
     log_success "✓ Node service installed on $name"
 
@@ -178,11 +202,23 @@ install_relayer_systemd_service() {
     fi
 
     # Copy service file to /etc/systemd/system/ (requires sudo)
-    scp -o StrictHostKeyChecking=no "$relayer_service_file" "$ssh_user@$ip:/tmp/ipc-relayer.service" >/dev/null 2>&1
-    ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "sudo mv /tmp/ipc-relayer.service /etc/systemd/system/ipc-relayer.service && sudo chmod 644 /etc/systemd/system/ipc-relayer.service" >/dev/null 2>&1
+    log_info "  Copying relayer service file to $name..."
+    if ! scp -o StrictHostKeyChecking=no "$relayer_service_file" "$ssh_user@$ip:/tmp/ipc-relayer.service" >/dev/null 2>&1; then
+        log_error "Failed to copy relayer service file to $name"
+        rm -f "$relayer_service_file"
+        return 1
+    fi
+
+    log_info "  Moving to /etc/systemd/system/..."
+    if ! ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+        "sudo mv /tmp/ipc-relayer.service /etc/systemd/system/ipc-relayer.service && sudo chmod 644 /etc/systemd/system/ipc-relayer.service" >/dev/null 2>&1; then
+        log_error "Failed to install relayer service file on $name"
+        rm -f "$relayer_service_file"
+        return 1
+    fi
 
     # Reload systemd
+    log_info "  Reloading systemd..."
     if ! ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
         "sudo systemctl daemon-reload" >/dev/null 2>&1; then
         log_error "Failed to reload systemd on $name"
@@ -191,12 +227,9 @@ install_relayer_systemd_service() {
     fi
 
     # Enable relayer service
-    if ! ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "sudo systemctl enable ipc-relayer.service" >/dev/null 2>&1; then
-        log_error "Failed to enable relayer service on $name"
-        rm -f "$relayer_service_file"
-        return 1
-    fi
+    log_info "  Enabling relayer service..."
+    ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+        "sudo systemctl enable ipc-relayer.service" >/dev/null 2>&1 || true
 
     log_success "✓ Relayer service installed on $name"
 

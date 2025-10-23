@@ -26,9 +26,13 @@ StartLimitBurst=5
 # Resource limits
 LimitNOFILE=65536
 
-# Logging
-StandardOutput=append:__NODE_HOME__/logs/relayer.log
-StandardError=append:__NODE_HOME__/logs/relayer.log
+# Logging (both to journal and files)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ipc-relayer
+
+# Also ensure logs directory exists
+ExecStartPre=/bin/sh -c 'mkdir -p __NODE_HOME__/logs'
 
 # Security
 NoNewPrivileges=true

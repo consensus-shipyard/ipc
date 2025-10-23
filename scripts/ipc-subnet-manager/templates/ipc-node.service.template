@@ -22,9 +22,13 @@ StartLimitBurst=5
 LimitNOFILE=65536
 LimitNPROC=32768
 
-# Logging
-StandardOutput=append:__NODE_HOME__/logs/node.stdout.log
-StandardError=append:__NODE_HOME__/logs/node.stderr.log
+# Logging (both to journal and files)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ipc-node
+
+# Also tee to files for direct access
+ExecStartPre=/bin/sh -c 'mkdir -p __NODE_HOME__/logs'
 
 # Security
 NoNewPrivileges=true
