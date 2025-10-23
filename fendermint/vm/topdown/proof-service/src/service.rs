@@ -34,14 +34,15 @@ impl ProofGeneratorService {
     /// * `config` - Service configuration
     /// * `cache` - Proof cache
     /// * `initial_instance` - F3 instance to bootstrap from (from F3CertManager actor)
+    /// * `power_table` - Initial power table (from F3CertManager actor)
     ///
-    /// The `initial_instance` should come from the F3CertManager actor on-chain,
-    /// which holds the last committed certificate. The power table is fetched from
-    /// the F3 RPC endpoint during initialization.
+    /// Both `initial_instance` and `power_table` should come from the F3CertManager
+    /// actor on-chain, which holds the last committed certificate and its power table.
     pub async fn new(
         config: ProofServiceConfig,
         cache: Arc<ProofCache>,
         initial_instance: u64,
+        power_table: filecoin_f3_gpbft::PowerEntries,
     ) -> Result<Self> {
         // Validate required configuration
         let gateway_actor_id = config
@@ -64,11 +65,15 @@ impl ProofGeneratorService {
         );
 
         // Create F3 client for certificate fetching + validation
-        // This fetches the initial power table from the F3 RPC endpoint
+        // Uses provided power table from F3CertManager actor
         let f3_client = Arc::new(
-            F3Client::new_from_rpc(&config.parent_rpc_url, "calibrationnet", initial_instance)
-                .await
-                .context("Failed to create F3 client")?,
+            F3Client::new(
+                &config.parent_rpc_url,
+                &config.f3_network_name,
+                initial_instance,
+                power_table,
+            )
+            .context("Failed to create F3 client")?,
         );
 
         // Create proof assembler
@@ -264,10 +269,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_service_creation() {
+        use filecoin_f3_gpbft::PowerEntries;
+
         let config = ProofServiceConfig {
             enabled: true,
             parent_rpc_url: "http://localhost:1234/rpc/v1".to_string(),
             parent_subnet_id: "/r314159".to_string(),
+            f3_network_name: "calibrationnet".to_string(),
             gateway_actor_id: Some(1001),
             subnet_id: Some("test-subnet".to_string()),
             ..Default::default()
@@ -275,11 +283,11 @@ mod tests {
 
         let cache_config = CacheConfig::from(&config);
         let cache = Arc::new(ProofCache::new(0, cache_config));
+        let power_table = PowerEntries(vec![]);
 
-        // Note: This will fail without a real F3 RPC endpoint
-        // For unit tests, we'd need to mock the RPC client
-        let result = ProofGeneratorService::new(config, cache, 0).await;
-        // Expect failure since localhost:1234 is not a real F3 endpoint
-        assert!(result.is_err());
+        // Note: Service creation succeeds with F3Client::new() even with a fake RPC endpoint
+        // The actual RPC calls will fail later when the service tries to fetch certificates
+        let result = ProofGeneratorService::new(config, cache, 0, power_table).await;
+        assert!(result.is_ok());
     }
 }

@@ -143,6 +143,7 @@ async fn run_service(
         enabled: true,
         parent_rpc_url: rpc_url,
         parent_subnet_id: "/r314159".to_string(),
+        f3_network_name: "calibrationnet".to_string(), // TODO: make this a CLI argument
         subnet_id: Some(subnet_id),
         gateway_actor_id: Some(gateway_actor_id),
         lookahead_instances: lookahead,
@@ -153,7 +154,10 @@ async fn run_service(
     };
 
     println!("Starting proof cache service...");
-    let (cache, _handle) = launch_service(config, initial_instance)?;
+
+    // For testing, use an empty power table - in production this should come from F3CertManager
+    let power_table = filecoin_f3_gpbft::PowerEntries(vec![]);
+    let (cache, _handle) = launch_service(config, initial_instance, power_table).await?;
     println!("Service started successfully!");
     println!("Monitoring parent chain for F3 certificates...");
     println!();
@@ -267,7 +271,7 @@ fn inspect_cache(db_path: &PathBuf) -> anyhow::Result<()> {
         let proof_bundle_size = fvm_ipld_encoding::to_vec(&entry.proof_bundle)
             .map(|v| v.len())
             .unwrap_or(0);
-        
+
         println!(
             "{:<12} {:<20} {:<15} {:<15}",
             entry.instance_id,
@@ -305,7 +309,11 @@ fn show_stats(db_path: &PathBuf) -> anyhow::Result<()> {
         let max_instance = entries.iter().map(|e| e.instance_id).max().unwrap();
         let total_proof_size: usize = entries
             .iter()
-            .map(|e| fvm_ipld_encoding::to_vec(&e.proof_bundle).map(|v| v.len()).unwrap_or(0))
+            .map(|e| {
+                fvm_ipld_encoding::to_vec(&e.proof_bundle)
+                    .map(|v| v.len())
+                    .unwrap_or(0)
+            })
             .sum();
         let avg_proof_size = total_proof_size / entries.len();
 
@@ -326,7 +334,9 @@ fn show_stats(db_path: &PathBuf) -> anyhow::Result<()> {
             "  Min Size: {} bytes",
             entries
                 .iter()
-                .map(|e| fvm_ipld_encoding::to_vec(&e.proof_bundle).map(|v| v.len()).unwrap_or(0))
+                .map(|e| fvm_ipld_encoding::to_vec(&e.proof_bundle)
+                    .map(|v| v.len())
+                    .unwrap_or(0))
                 .min()
                 .unwrap()
         );
@@ -334,7 +344,9 @@ fn show_stats(db_path: &PathBuf) -> anyhow::Result<()> {
             "  Max Size: {} bytes",
             entries
                 .iter()
-                .map(|e| fvm_ipld_encoding::to_vec(&e.proof_bundle).map(|v| v.len()).unwrap_or(0))
+                .map(|e| fvm_ipld_encoding::to_vec(&e.proof_bundle)
+                    .map(|v| v.len())
+                    .unwrap_or(0))
                 .max()
                 .unwrap()
         );
@@ -384,11 +396,11 @@ fn get_proof(db_path: &PathBuf, instance_id: u64) -> anyhow::Result<()> {
                 "    - Storage Proofs: {}",
                 entry.proof_bundle.storage_proofs.len()
             );
-            println!("    - Event Proofs: {}", entry.proof_bundle.event_proofs.len());
             println!(
-                "    - Witness Blocks: {}",
-                entry.proof_bundle.blocks.len()
+                "    - Event Proofs: {}",
+                entry.proof_bundle.event_proofs.len()
             );
+            println!("    - Witness Blocks: {}", entry.proof_bundle.blocks.len());
             println!("  Generated At: {:?}", entry.generated_at);
             println!("  Source RPC: {}", entry.source_rpc);
             println!();
