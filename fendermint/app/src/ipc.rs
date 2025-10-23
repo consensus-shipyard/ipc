@@ -25,10 +25,7 @@ pub fn derive_subnet_app_hash_from_components(
     state: &FvmStateParams,
     maybe_light: Option<&LightClientCommitments>,
 ) -> tendermint::hash::AppHash {
-    let state_params_cid = fendermint_vm_message::cid(state)
-        .expect("state params have a CID")
-        .to_bytes();
-
+    let state_params_cid = state.state_root.to_bytes();
     let mut submission = AppHashBreakdown {
         state_root: state_params_cid.into(),
         msg_batch_commitment: Commitment::default(),
