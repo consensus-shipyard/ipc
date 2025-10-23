@@ -37,9 +37,11 @@ fvm_ipld_encoding = { workspace = true }
 # Proofs library
 proofs = { git = "https://github.com/consensus-shipyard/ipc-filecoin-proofs", branch = "proofs" }
 
-# F3 certificate handling
-filecoin-f3-certs = { git = "https://github.com/ChainSafe/rust-f3" }
-filecoin-f3-rpc = { git = "https://github.com/ChainSafe/rust-f3" }
+# F3 certificate handling - using LOCAL fixed version for testing
+filecoin-f3-certs = { path = "/Users/karlem/work/rust-f3-fork/certs" }
+filecoin-f3-rpc = { path = "/Users/karlem/work/rust-f3-fork/rpc" }
+filecoin-f3-lightclient = { path = "/Users/karlem/work/rust-f3-fork/lightclient" }
+filecoin-f3-gpbft = { path = "/Users/karlem/work/rust-f3-fork/gpbft" }
 
 # Binary dependencies (required for proof-cache-test binary)
 clap = { workspace = true, optional = true }
@@ -56,5 +58,6 @@ required-features = ["cli"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "rt-multi-thread"] }
+tracing-subscriber = { workspace = true }
 multihash-codetable = { version = "0.1.4", features = ["blake2b"] }
 tempfile = "3.8"
