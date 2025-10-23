@@ -62,11 +62,11 @@ impl CacheEntry {
 mod tests {
 
     // Helper function to create test entries
-    // For now, we'll skip this test since it requires complex setup with ProofBundle
+    // Skipped since it requires complex setup with real ProofBundle from integration tests
     #[ignore]
     #[test]
     fn test_cache_entry_epoch_helpers() {
-        // TODO: Re-enable once we have proper test utilities for ProofBundle
+        // Note: Re-enable with real ProofBundle from integration test data
         /*
         let entry = CacheEntry {
             instance_id: 1,
