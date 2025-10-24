@@ -12,7 +12,6 @@ use crate::assembler::ProofAssembler;
 use crate::cache::ProofCache;
 use crate::config::ProofServiceConfig;
 use crate::f3_client::F3Client;
-use crate::parent_client::ParentClient;
 use crate::types::CacheEntry;
 use anyhow::{Context, Result};
 use std::sync::Arc;
@@ -22,7 +21,6 @@ use tokio::time::{interval, MissedTickBehavior};
 pub struct ProofGeneratorService {
     config: ProofServiceConfig,
     cache: Arc<ProofCache>,
-    parent_client: Arc<ParentClient>,
     f3_client: Arc<F3Client>,
     assembler: Arc<ProofAssembler>,
 }
@@ -52,17 +50,6 @@ impl ProofGeneratorService {
             .as_ref()
             .context("subnet_id is required in configuration")?;
 
-        // Create parent client with multi-provider support
-        let parent_client_config = crate::parent_client::ParentClientConfig {
-            primary_url: config.parent_rpc_url.clone(),
-            fallback_urls: config.fallback_rpc_urls.clone(),
-            parent_subnet_id: config.parent_subnet_id.clone(),
-            ..Default::default()
-        };
-        let parent_client = Arc::new(
-            ParentClient::new(parent_client_config).context("Failed to create parent client")?,
-        );
-
         // Create F3 client for certificate fetching + validation
         // This fetches the initial power table from the F3 RPC endpoint
         let f3_client = Arc::new(
@@ -84,7 +71,6 @@ impl ProofGeneratorService {
         Ok(Self {
             config,
             cache,
-            parent_client,
             f3_client,
             assembler,
         })
@@ -93,7 +79,6 @@ impl ProofGeneratorService {
     /// Main service loop - runs continuously and polls parent chain periodically
     ///
     /// Maintains a ticker that triggers proof generation at regular intervals.
-    /// Also runs periodic health checks on unhealthy providers for recovery.
     /// Errors are logged but don't stop the service - it will retry on next tick.
     pub async fn run(self) {
         tracing::info!(
@@ -106,25 +91,15 @@ impl ProofGeneratorService {
         let mut poll_interval = interval(self.config.polling_interval);
         poll_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
-        // Health check interval - check unhealthy providers every 60s
-        let mut health_check_interval = interval(std::time::Duration::from_secs(180));
-        health_check_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
-
         loop {
-            tokio::select! {
-                _ = poll_interval.tick() => {
-                    if let Err(e) = self.generate_next_proofs().await {
-                        tracing::error!(
-                            error = %e,
-                            "Failed to generate proofs, will retry on next tick"
-                        );
-                    }
-                }
-
-                _ = health_check_interval.tick() => {
-                    // Probe unhealthy providers to allow recovery
-                    self.parent_client.health_check_unhealthy().await;
-                }
+            poll_interval.tick().await;
+            
+            tracing::debug!("Poll interval tick");
+            if let Err(e) = self.generate_next_proofs().await {
+                tracing::error!(
+                    error = %e,
+                    "Failed to generate proofs, will retry on next tick"
+                );
             }
         }
     }
@@ -137,7 +112,8 @@ impl ProofGeneratorService {
     /// CRITICAL: Processes F3 instances SEQUENTIALLY - never skips!
     async fn generate_next_proofs(&self) -> Result<()> {
         let last_committed = self.cache.last_committed_instance();
-        let next_instance = last_committed + 1;
+        // Start FROM last_committed (not +1) because F3 state needs to validate that instance first
+        let next_instance = last_committed;
         let max_instance = last_committed + self.config.lookahead_instances;
 
         tracing::debug!(
@@ -148,10 +124,22 @@ impl ProofGeneratorService {
         );
 
         // Process instances IN ORDER - this is critical for F3
+        // Start from last_committed itself to validate it first
         for instance_id in next_instance..=max_instance {
             // Skip if already cached
             if self.cache.contains(instance_id) {
                 tracing::debug!(instance_id, "Proof already cached");
+                continue;
+            }
+
+            // Skip if F3 state is already past this instance (already validated)
+            let f3_current = self.f3_client.current_instance().await;
+            if f3_current > instance_id {
+                tracing::debug!(
+                    instance_id,
+                    f3_current,
+                    "F3 state already past this instance (validated but proof pending) - skipping to avoid re-validation"
+                );
                 continue;
             }
 
@@ -234,17 +222,10 @@ impl ProofGeneratorService {
             "Generating proof for certificate"
         );
 
-        // Fetch tipsets for that epoch
-        let (parent, child) = self
-            .parent_client
-            .fetch_tipsets(highest_epoch)
-            .await
-            .context("Failed to fetch tipsets")?;
-
-        // Generate proof
+        // Generate proof (assembler fetches its own tipsets)
         let bundle = self
             .assembler
-            .generate_proof_bundle(f3_cert, &parent, &child)
+            .generate_proof_bundle(f3_cert)
             .await
             .context("Failed to generate proof bundle")?;
 

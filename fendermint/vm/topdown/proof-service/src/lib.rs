@@ -12,7 +12,6 @@ pub mod assembler;
 pub mod cache;
 pub mod config;
 pub mod f3_client;
-pub mod parent_client;
 pub mod persistence;
 pub mod service;
 pub mod types;
@@ -36,17 +35,17 @@ use std::sync::Arc;
 /// # Arguments
 /// * `config` - Service configuration
 /// * `initial_committed_instance` - The last committed F3 instance (from F3CertManager actor)
+/// * `power_table` - Initial power table (from F3CertManager actor)
+/// * `db_path` - Optional database path for persistence
 ///
 /// # Returns
 /// * `Arc<ProofCache>` - Shared cache that proposers can query
 /// * `tokio::task::JoinHandle` - Handle to the background service task
-///
-/// # Note
-/// This function fetches the initial power table from RPC for MVP.
-/// In production, the power table should come from the F3CertManager actor.
 pub async fn launch_service(
     config: ProofServiceConfig,
     initial_committed_instance: u64,
+    power_table: filecoin_f3_gpbft::PowerEntries,
+    db_path: Option<std::path::PathBuf>,
 ) -> Result<(Arc<ProofCache>, tokio::task::JoinHandle<()>)> {
     if !config.enabled {
         anyhow::bail!("Proof service is disabled in configuration");
@@ -58,21 +57,34 @@ pub async fn launch_service(
         "Launching proof generator service"
     );
 
-    // Create cache
+    // Create cache (with optional persistence)
     let cache_config = CacheConfig::from(&config);
-    let cache = Arc::new(ProofCache::new(initial_committed_instance, cache_config));
-
-    // TODO: When BLS deps resolved, fetch power table from F3CertManager actor
-    // For MVP, power table not needed (structural validation only)
+    let cache = if let Some(path) = db_path {
+        tracing::info!(path = %path.display(), "Creating cache with persistence");
+        Arc::new(ProofCache::new_with_persistence(
+            cache_config,
+            &path,
+            initial_committed_instance,
+        )?)
+    } else {
+        tracing::info!("Creating in-memory cache (no persistence)");
+        Arc::new(ProofCache::new(initial_committed_instance, cache_config))
+    };
 
     // Clone what we need for the background task
     let config_clone = config.clone();
     let cache_clone = cache.clone();
+    let power_table_clone = power_table.clone();
 
     // Spawn background task
     let handle = tokio::spawn(async move {
-        match ProofGeneratorService::new(config_clone, cache_clone, initial_committed_instance)
-            .await
+        match ProofGeneratorService::new(
+            config_clone,
+            cache_clone,
+            initial_committed_instance,
+            power_table_clone,
+        )
+        .await
         {
             Ok(service) => service.run().await,
             Err(e) => {
@@ -90,28 +102,35 @@ mod tests {
 
     #[tokio::test]
     async fn test_launch_service_disabled() {
+        use filecoin_f3_gpbft::PowerEntries;
+
         let config = ProofServiceConfig {
             enabled: false,
             ..Default::default()
         };
 
-        let result = launch_service(config, 0).await;
+        let power_table = PowerEntries(vec![]);
+        let result = launch_service(config, 0, power_table, None).await;
         assert!(result.is_err());
     }
 
     #[tokio::test]
     async fn test_launch_service_enabled() {
+        use filecoin_f3_gpbft::PowerEntries;
+
         let config = ProofServiceConfig {
             enabled: true,
             parent_rpc_url: "http://localhost:1234/rpc/v1".to_string(),
             parent_subnet_id: "/r314159".to_string(),
+            f3_network_name: "calibrationnet".to_string(),
             gateway_actor_id: Some(1001),
             subnet_id: Some("test-subnet".to_string()),
             polling_interval: std::time::Duration::from_secs(60),
             ..Default::default()
         };
 
-        let result = launch_service(config, 100).await;
+        let power_table = PowerEntries(vec![]);
+        let result = launch_service(config, 100, power_table, None).await;
         assert!(result.is_ok());
 
         let (cache, handle) = result.unwrap();

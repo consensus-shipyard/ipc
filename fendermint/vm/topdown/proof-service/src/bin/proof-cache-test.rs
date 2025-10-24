@@ -4,6 +4,7 @@
 
 use clap::{Parser, Subcommand};
 use fendermint_vm_topdown_proof_service::{launch_service, ProofCache, ProofServiceConfig};
+use fvm_ipld_encoding;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -139,10 +140,36 @@ async fn run_service(
     }
     println!();
 
+    println!("Starting proof cache service...");
+    println!();
+    println!(
+        "Fetching initial power table from F3 RPC (instance {})...",
+        initial_instance
+    );
+
+    let temp_client = fendermint_vm_topdown_proof_service::f3_client::F3Client::new_from_rpc(
+        &rpc_url,
+        "calibrationnet",
+        initial_instance,
+    )
+    .await?;
+
+    // Get the power table
+    // NOTE: The light client state is initialized at 'initial_instance' and ready to validate from there
+    let current_state = temp_client.get_state().await;
+    let power_table = current_state.power_table;
+
+    println!("Power table fetched: {} entries", power_table.0.len());
+    println!(
+        "F3 state initialized at instance {} (ready to validate {} onwards)",
+        initial_instance, initial_instance
+    );
+
     let config = ProofServiceConfig {
         enabled: true,
         parent_rpc_url: rpc_url,
         parent_subnet_id: "/r314159".to_string(),
+        f3_network_name: "calibrationnet".to_string(), // TODO: make this a CLI argument
         subnet_id: Some(subnet_id),
         gateway_actor_id: Some(gateway_actor_id),
         lookahead_instances: lookahead,
@@ -152,8 +179,9 @@ async fn run_service(
         fallback_rpc_urls: vec![],
     };
 
-    println!("Starting proof cache service...");
-    let (cache, _handle) = launch_service(config, initial_instance)?;
+    // Use the VALIDATED instance (742410), not the advanced state (742411)
+    // The service will start generating proofs for 742411+
+    let (cache, _handle) = launch_service(config, initial_instance, power_table, db_path).await?;
     println!("Service started successfully!");
     println!("Monitoring parent chain for F3 certificates...");
     println!();
@@ -186,7 +214,7 @@ async fn run_service(
         println!();
 
         if size > last_size {
-            println!("✅ New proofs generated! ({} new)", size - last_size);
+            println!("New proofs generated: {}", size - last_size);
             last_size = size;
         }
 
@@ -267,7 +295,7 @@ fn inspect_cache(db_path: &PathBuf) -> anyhow::Result<()> {
         let proof_bundle_size = fvm_ipld_encoding::to_vec(&entry.proof_bundle)
             .map(|v| v.len())
             .unwrap_or(0);
-        
+
         println!(
             "{:<12} {:<20} {:<15} {:<15}",
             entry.instance_id,
@@ -305,7 +333,11 @@ fn show_stats(db_path: &PathBuf) -> anyhow::Result<()> {
         let max_instance = entries.iter().map(|e| e.instance_id).max().unwrap();
         let total_proof_size: usize = entries
             .iter()
-            .map(|e| fvm_ipld_encoding::to_vec(&e.proof_bundle).map(|v| v.len()).unwrap_or(0))
+            .map(|e| {
+                fvm_ipld_encoding::to_vec(&e.proof_bundle)
+                    .map(|v| v.len())
+                    .unwrap_or(0)
+            })
             .sum();
         let avg_proof_size = total_proof_size / entries.len();
 
@@ -326,7 +358,9 @@ fn show_stats(db_path: &PathBuf) -> anyhow::Result<()> {
             "  Min Size: {} bytes",
             entries
                 .iter()
-                .map(|e| fvm_ipld_encoding::to_vec(&e.proof_bundle).map(|v| v.len()).unwrap_or(0))
+                .map(|e| fvm_ipld_encoding::to_vec(&e.proof_bundle)
+                    .map(|v| v.len())
+                    .unwrap_or(0))
                 .min()
                 .unwrap()
         );
@@ -334,7 +368,9 @@ fn show_stats(db_path: &PathBuf) -> anyhow::Result<()> {
             "  Max Size: {} bytes",
             entries
                 .iter()
-                .map(|e| fvm_ipld_encoding::to_vec(&e.proof_bundle).map(|v| v.len()).unwrap_or(0))
+                .map(|e| fvm_ipld_encoding::to_vec(&e.proof_bundle)
+                    .map(|v| v.len())
+                    .unwrap_or(0))
                 .max()
                 .unwrap()
         );
@@ -367,32 +403,15 @@ fn get_proof(db_path: &PathBuf, instance_id: u64) -> anyhow::Result<()> {
         max_size_bytes: 0,
     };
 
-    let cache = ProofCache::new_with_persistence(cache_config, db_path)?;
+    let cache = ProofCache::new_with_persistence(cache_config, db_path, 0)?;
 
     match cache.get(instance_id) {
         Some(entry) => {
-            println!("✅ Found proof for instance {}", instance_id);
+            println!("Found proof for instance {}", instance_id);
             println!();
-            println!("Details:");
-            println!("  Instance ID: {}", entry.instance_id);
-            println!("  Finalized Epochs: {:?}", entry.finalized_epochs);
-            let proof_bundle_size = fvm_ipld_encoding::to_vec(&entry.proof_bundle)
-                .map(|v| v.len())
-                .unwrap_or(0);
-            println!("  Proof Bundle Size: {} bytes", proof_bundle_size);
-            println!(
-                "    - Storage Proofs: {}",
-                entry.proof_bundle.storage_proofs.len()
-            );
-            println!("    - Event Proofs: {}", entry.proof_bundle.event_proofs.len());
-            println!(
-                "    - Witness Blocks: {}",
-                entry.proof_bundle.blocks.len()
-            );
-            println!("  Generated At: {:?}", entry.generated_at);
-            println!("  Source RPC: {}", entry.source_rpc);
-            println!();
-            println!("Certificate:");
+
+            // Certificate Details
+            println!("═══ F3 Certificate ═══");
             println!("  Instance ID: {}", entry.certificate.instance_id);
             println!(
                 "  Finalized Epochs: {:?}",
@@ -400,13 +419,75 @@ fn get_proof(db_path: &PathBuf, instance_id: u64) -> anyhow::Result<()> {
             );
             println!("  Power Table CID: {}", entry.certificate.power_table_cid);
             println!(
-                "  Signature Size: {} bytes",
+                "  BLS Signature: {} bytes",
                 entry.certificate.signature.len()
             );
-            println!("  Signers: {}", entry.certificate.signers.len());
+            println!("  Signers: {} validators", entry.certificate.signers.len());
+            println!();
+
+            // Proof Bundle Summary
+            println!("═══ Proof Bundle Summary ═══");
+            let proof_bundle_size = fvm_ipld_encoding::to_vec(&entry.proof_bundle)
+                .map(|v| v.len())
+                .unwrap_or(0);
+            println!(
+                "  Total Size: {} bytes ({:.2} KB)",
+                proof_bundle_size,
+                proof_bundle_size as f64 / 1024.0
+            );
+            println!(
+                "  Storage Proofs: {}",
+                entry.proof_bundle.storage_proofs.len()
+            );
+            println!("  Event Proofs: {}", entry.proof_bundle.event_proofs.len());
+            println!("  Witness Blocks: {}", entry.proof_bundle.blocks.len());
+            println!();
+
+            // Proof Bundle Details - show structure
+            println!("═══ Detailed Proof Structure ═══");
+            println!(
+                "Storage Proofs ({}):",
+                entry.proof_bundle.storage_proofs.len()
+            );
+            for (i, sp) in entry.proof_bundle.storage_proofs.iter().enumerate() {
+                println!("  [{}] {:?}", i, sp);
+            }
+            println!();
+
+            println!("Event Proofs ({}):", entry.proof_bundle.event_proofs.len());
+            for (i, ep) in entry.proof_bundle.event_proofs.iter().enumerate() {
+                println!("  [{}] {:?}", i, ep);
+            }
+            println!();
+
+            println!("Witness Blocks ({}):", entry.proof_bundle.blocks.len());
+            println!("  (First and last blocks shown)");
+            for (i, block) in entry.proof_bundle.blocks.iter().enumerate() {
+                if i < 2 || i >= entry.proof_bundle.blocks.len() - 2 {
+                    println!("  [{}] {:?}", i, block);
+                } else if i == 2 {
+                    println!(
+                        "  ... ({} more blocks)",
+                        entry.proof_bundle.blocks.len() - 4
+                    );
+                }
+            }
+            println!();
+
+            // Metadata
+            println!("═══ Metadata ═══");
+            println!("  Generated At: {:?}", entry.generated_at);
+            println!("  Source RPC: {}", entry.source_rpc);
+            println!();
+
+            // Full JSON dump
+            println!("═══ Full Proof Bundle (JSON) ═══");
+            if let Ok(json) = serde_json::to_string_pretty(&entry.proof_bundle) {
+                println!("{}", json);
+            }
         }
         None => {
-            println!("❌ No proof found for instance {}", instance_id);
+            println!("No proof found for instance {}", instance_id);
             println!();
             println!("Available instances: {:?}", cache.cached_instances());
         }

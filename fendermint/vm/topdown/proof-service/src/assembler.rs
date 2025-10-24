@@ -51,20 +51,16 @@ impl ProofAssembler {
 
     /// Generate proof bundle for a certificate
     ///
-    /// Takes a certificate and tipsets, generates storage and event proofs.
+    /// Fetches tipsets and generates storage and event proofs.
     ///
     /// # Arguments
     /// * `certificate` - Cryptographically validated F3 certificate
-    /// * `parent_tipset` - Parent tipset JSON
-    /// * `child_tipset` - Child tipset JSON
     ///
     /// # Returns
     /// Typed unified proof bundle (storage + event proofs + witness blocks)
     pub async fn generate_proof_bundle(
         &self,
         certificate: &FinalityCertificate,
-        parent_tipset: &serde_json::Value,
-        child_tipset: &serde_json::Value,
     ) -> Result<UnifiedProofBundle> {
         let highest_epoch = certificate
             .ec_chain
@@ -76,16 +72,39 @@ impl ProofAssembler {
         tracing::debug!(
             instance_id = certificate.gpbft_instance,
             highest_epoch,
-            "Generating proof bundle"
+            "Generating proof bundle - fetching tipsets"
+        );
+
+        // Fetch tipsets from Lotus using proofs library client
+        let client = self.create_client();
+
+        let parent_tipset = client
+            .request(
+                "Filecoin.ChainGetTipSetByHeight",
+                serde_json::json!([highest_epoch, null]),
+            )
+            .await
+            .context("Failed to fetch parent tipset")?;
+
+        let child_tipset = client
+            .request(
+                "Filecoin.ChainGetTipSetByHeight",
+                serde_json::json!([highest_epoch + 1, null]),
+            )
+            .await
+            .context("Failed to fetch child tipset")?;
+
+        tracing::debug!(
+            instance_id = certificate.gpbft_instance,
+            highest_epoch,
+            "Fetched tipsets successfully"
         );
 
         // Deserialize tipsets from JSON
         let parent_api: proofs::client::types::ApiTipset =
-            serde_json::from_value(parent_tipset.clone())
-                .context("Failed to deserialize parent tipset")?;
+            serde_json::from_value(parent_tipset).context("Failed to deserialize parent tipset")?;
         let child_api: proofs::client::types::ApiTipset =
-            serde_json::from_value(child_tipset.clone())
-                .context("Failed to deserialize child tipset")?;
+            serde_json::from_value(child_tipset).context("Failed to deserialize child tipset")?;
 
         // Configure proof specs
         let storage_specs = vec![StorageProofSpec {
