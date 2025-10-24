@@ -18,8 +18,9 @@ async fn test_proof_generation_from_calibration() {
     // Use calibration testnet
     let config = ProofServiceConfig {
         enabled: true,
-        parent_rpc_url: "https://api.calibration.node.glif.io/rpc/v1".to_string(),
+        parent_rpc_url: "http://api.calibration.node.glif.io/rpc/v1".to_string(),
         parent_subnet_id: "/r314159".to_string(),
+        f3_network_name: "calibrationnet".to_string(),
         subnet_id: Some("test-subnet".to_string()),
         gateway_actor_id: Some(1001),
         lookahead_instances: 2,
@@ -30,14 +31,18 @@ async fn test_proof_generation_from_calibration() {
     };
 
     // Get current F3 instance from chain to start from valid point
-    // For MVP, we'll start from instance 0
     let initial_instance = 0;
 
     println!(
         "Starting proof service from instance {}...",
         initial_instance
     );
-    let (cache, handle) = launch_service(config, initial_instance)
+
+    // Fetch power table for testing
+    use filecoin_f3_gpbft::PowerEntries;
+    let power_table = PowerEntries(vec![]);
+
+    let (cache, handle) = launch_service(config, initial_instance, power_table, None)
         .await
         .expect("Failed to launch service");
 
@@ -51,7 +56,7 @@ async fn test_proof_generation_from_calibration() {
         println!("[{}s] Cache has {} entries", i * 5, cache_size);
 
         if cache_size > 0 {
-            println!("✓ Successfully generated some proofs!");
+            println!("Successfully generated some proofs!");
             break;
         }
     }
@@ -65,13 +70,19 @@ async fn test_proof_generation_from_calibration() {
 
     // Verify cache structure
     if let Some(entry) = cache.get_next_uncommitted() {
-        println!("✓ Got proof for instance {}", entry.instance_id);
-        println!("✓ Epochs: {:?}", entry.finalized_epochs);
-        println!("✓ Storage proofs: {}", entry.proof_bundle.storage_proofs.len());
-        println!("✓ Event proofs: {}", entry.proof_bundle.event_proofs.len());
-        println!("✓ Witness blocks: {}", entry.proof_bundle.blocks.len());
+        println!("Got proof for instance {}", entry.instance_id);
+        println!("Epochs: {:?}", entry.finalized_epochs);
+        println!(
+            "Storage proofs: {}",
+            entry.proof_bundle.storage_proofs.len()
+        );
+        println!("Event proofs: {}", entry.proof_bundle.event_proofs.len());
+        println!("Witness blocks: {}", entry.proof_bundle.blocks.len());
         assert!(!entry.finalized_epochs.is_empty(), "Should have epochs");
-        assert!(!entry.certificate.signature.is_empty(), "Should have certificate");
+        assert!(
+            !entry.certificate.signature.is_empty(),
+            "Should have certificate"
+        );
     } else {
         println!("Note: No uncommitted proofs yet");
     }
@@ -101,5 +112,5 @@ async fn test_cache_operations() {
     // Note: We can't easily test insertion without creating proper CacheEntry objects
     // which requires the full service setup. This is mostly a placeholder test.
 
-    println!("✓ Basic cache operations work");
+    println!("Basic cache operations work");
 }

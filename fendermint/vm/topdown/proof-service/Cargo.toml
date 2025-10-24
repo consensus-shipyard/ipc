@@ -34,8 +34,8 @@ ipc-api = { path = "../../../../ipc/api" }
 fvm_shared = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 
-# Proofs library
-proofs = { git = "https://github.com/consensus-shipyard/ipc-filecoin-proofs", branch = "proofs" }
+# Proofs library - using local path for macOS fix
+proofs = { path = "/Users/karlem/work/proofs" }
 
 # F3 certificate handling - using LOCAL fixed version for testing
 filecoin-f3-certs = { path = "/Users/karlem/work/rust-f3-fork/certs" }
