@@ -157,9 +157,10 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
             .parent_handler
             .get_last_app_commitment_height(&self.metadata.child.id)
             .await?;
+        
+        next_height += self.metadata.period as u64;
 
-        while next_height <= end_height as u64 {
-            next_height += self.metadata.period as u64;
+        while next_height < end_height as u64 {
             let Some(mut commitment) = self
                 .child_handler
                 .query_app_hash_breakdown(next_height as ChainEpoch)
@@ -191,6 +192,8 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
                     commitment,
                 )
                 .await?;
+
+            next_height += self.metadata.period as u64;
         }
 
         Ok(())

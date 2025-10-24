@@ -95,7 +95,11 @@ contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, ReentrancyG
         validateAppHash(checkpointHeight, breakdown);
 
         LibPower.confirmChange(breakdown.validatorNextConfigurationNumber);
-        LibBottomUpBatch.recordBottomUpBatchCommitment(checkpointHeight, breakdown.msgBatchCommitment);
+
+        if (breakdown.msgBatchCommitment.totalNumMsgs > 0) {
+            LibBottomUpBatch.recordBottomUpBatchCommitment(checkpointHeight, breakdown.msgBatchCommitment);
+        }
+
         LibActivity.recordActivityRollup(subnet, checkpointHeight, breakdown.activityCommitment);
 
         checkpointStorage.lastCommitmentHeight = checkpointHeight;
