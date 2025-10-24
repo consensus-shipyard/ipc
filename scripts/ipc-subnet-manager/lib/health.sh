@@ -506,7 +506,7 @@ set_federated_power() {
 
     # Collect all validator public keys (without 0x prefix)
     local pubkeys=""
-    for idx in "${!VALIDATORS[@]}"; do
+    for idx in "${!VALIDATOR_PUBKEYS[@]}"; do
         if [ -n "${VALIDATOR_PUBKEYS[$idx]:-}" ]; then
             local clean_pubkey="${VALIDATOR_PUBKEYS[$idx]#0x}"
             pubkeys+="${clean_pubkey},"
@@ -532,6 +532,117 @@ set_federated_power() {
         echo "$output"
     else
         log_success "Federated power configured"
+    fi
+}
+
+# Update binaries on a single validator
+update_validator_binaries() {
+    local validator_idx="$1"
+    local branch="$2"
+
+    local name="${VALIDATORS[$validator_idx]}"
+    local ip=$(get_config_value "validators[$validator_idx].ip")
+    local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
+    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
+    local ipc_repo=$(get_config_value "paths.ipc_repo")
+
+    log_info "[$name] Updating binaries from branch '$branch'..."
+
+    # Build update commands
+    local update_cmd="cd $ipc_repo && \
+        git fetch origin && \
+        git checkout $branch && \
+        git pull origin $branch && \
+        make"
+
+    # Execute build
+    log_info "[$name] Pulling latest changes and building..."
+    local build_output=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" "$update_cmd 2>&1")
+    local build_exit=$?
+
+    if [ $build_exit -ne 0 ]; then
+        log_error "[$name] Build failed"
+        echo "$build_output" | tail -20
+        return 1
+    fi
+
+    log_success "[$name] Build completed successfully"
+
+    # Copy binaries to /usr/local/bin (requires sudo)
+    log_info "[$name] Installing binaries to /usr/local/bin..."
+    ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+        "sudo cp $ipc_repo/target/release/ipc-cli /usr/local/bin/ipc-cli && \
+         sudo cp $ipc_repo/target/release/fendermint /usr/local/bin/fendermint && \
+         sudo chmod +x /usr/local/bin/ipc-cli /usr/local/bin/fendermint" >/dev/null 2>&1
+
+    if [ $? -ne 0 ]; then
+        log_error "[$name] Failed to install binaries"
+        return 1
+    fi
+
+    log_success "[$name] Binaries installed successfully"
+
+    # Verify installation
+    local ipc_version=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
+        "/usr/local/bin/ipc-cli --version 2>&1 | head -1")
+    log_info "[$name] ipc-cli version: $ipc_version"
+
+    return 0
+}
+
+# Update binaries on all validators
+update_all_binaries() {
+    local branch="${1:-main}"
+
+    log_header "Updating IPC Binaries"
+    log_info "Branch: $branch"
+    log_info "Validators: ${#VALIDATORS[@]}"
+    echo ""
+
+    # Array to track background jobs
+    local pids=()
+    local results=()
+
+    # Start updates in parallel
+    for idx in "${!VALIDATORS[@]}"; do
+        update_validator_binaries "$idx" "$branch" &
+        pids[$idx]=$!
+    done
+
+    # Wait for all jobs to complete
+    log_info "Waiting for all builds to complete..."
+    local all_success=true
+
+    for idx in "${!VALIDATORS[@]}"; do
+        wait ${pids[$idx]}
+        results[$idx]=$?
+        if [ ${results[$idx]} -ne 0 ]; then
+            all_success=false
+        fi
+    done
+
+    echo ""
+    log_section "Update Summary"
+
+    for idx in "${!VALIDATORS[@]}"; do
+        local name="${VALIDATORS[$idx]}"
+        if [ ${results[$idx]} -eq 0 ]; then
+            log_success "✓ $name: Update successful"
+        else
+            log_error "✗ $name: Update failed"
+        fi
+    done
+
+    if [ "$all_success" = true ]; then
+        echo ""
+        log_success "✓ All validators updated successfully"
+        log_info "You may need to restart nodes for changes to take effect:"
+        log_info "  $0 restart"
+        return 0
+    else
+        echo ""
+        log_error "✗ Some validators failed to update"
+        return 1
     fi
 }
 
@@ -747,7 +858,21 @@ show_subnet_info() {
     for idx in "${!VALIDATORS[@]}"; do
         local name="${VALIDATORS[$idx]}"
         local ip=$(get_config_value "validators[$idx].ip")
-        log_info "    - $name ($ip)"
+        local ssh_user=$(get_config_value "validators[$idx].ssh_user")
+        local ipc_user=$(get_config_value "validators[$idx].ipc_user")
+        local node_home=$(get_config_value "paths.node_home")
+
+        # Get validator public key
+        local pubkey=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+            "cat $node_home/fendermint/validator.pk 2>/dev/null || echo ''")
+
+        if [ -n "$pubkey" ]; then
+            log_info "    - $name ($ip)"
+            log_info "      Public Key: $pubkey"
+        else
+            log_info "    - $name ($ip)"
+            log_warn "      Public Key: Not found"
+        fi
     done
     echo
 

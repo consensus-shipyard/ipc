@@ -41,6 +41,7 @@ Usage: $0 <command> [options]
 Commands:
     init              Nuclear option - wipe and reinitialize all nodes
     update-config     Update existing node configs without wiping data
+    update-binaries   Pull latest code, build, and install binaries on all validators
     check             Comprehensive health check on all nodes
     restart           Graceful restart of all nodes
     info              Show subnet information (chain ID, validators, status)
@@ -55,15 +56,15 @@ Commands:
     start-relayer     Start checkpoint relayer on primary validator
     stop-relayer      Stop checkpoint relayer
     relayer-status    Check relayer status and view logs
-    deploy            Deploy/update binaries (STUB - not implemented)
 
 Options:
     --config FILE        Path to config file (default: ./ipc-subnet-config.yml)
     --dry-run            Preview actions without executing
     --yes                Skip confirmation prompts
     --debug              Show verbose debug output
+    --branch NAME        For update-binaries: git branch to pull from (default: main)
     --duration SECONDS   For block-time: sample duration (default: 10)
-    --help            Show this help message
+    --help               Show this help message
 
 Environment Variables:
     IPC_CONFIG_FILE          Override config file path
@@ -75,6 +76,8 @@ Examples:
     $0 init                                    # Initialize subnet from scratch
     $0 init --debug                            # Initialize with verbose debug output
     $0 check                                   # Run health checks
+    $0 update-binaries --branch main           # Update binaries from main branch
+    $0 update-binaries --branch dev            # Update binaries from dev branch
     $0 watch-finality                          # Monitor parent finality progress
     $0 watch-finality --target-epoch=3115719   # Watch until specific epoch
     $0 watch-blocks                            # Monitor block production
@@ -228,6 +231,55 @@ cmd_init() {
     cmd_check
 
     log_success "✓ Subnet initialization complete!"
+}
+
+# Update binaries on all validators
+cmd_update_binaries() {
+    local branch="main"
+
+    # Parse options
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --branch)
+                branch="$2"
+                shift 2
+                ;;
+            --help|-h)
+                cat << EOF
+Update IPC binaries on all validators
+
+Usage: $0 update-binaries [options]
+
+Options:
+    --branch NAME    Git branch to pull from (default: main)
+    --help           Show this help message
+
+This command will:
+  1. SSH to each validator (in parallel)
+  2. Pull latest changes from the specified branch
+  3. Build binaries using 'make' in the repo root
+  4. Copy ipc-cli and fendermint binaries to /usr/local/bin
+
+Examples:
+    $0 update-binaries --branch main
+    $0 update-binaries --branch dev
+    $0 update-binaries --branch feature-xyz
+EOF
+                exit 0
+                ;;
+            *)
+                log_error "Unknown option: $1"
+                echo "Usage: $0 update-binaries --branch <branch-name>"
+                exit 1
+                ;;
+        esac
+    done
+
+    # Load configuration
+    load_config
+
+    # Update binaries
+    update_all_binaries "$branch"
 }
 
 # Update existing node configs
@@ -555,7 +607,7 @@ main() {
 
     # Acquire lock for destructive operations
     case $command in
-        init|restart|deploy)
+        init|restart|update-binaries)
             acquire_lock
             ;;
     esac
@@ -567,6 +619,9 @@ main() {
             ;;
         update-config)
             cmd_update_config "$@"
+            ;;
+        update-binaries)
+            cmd_update_binaries "$@"
             ;;
         check)
             cmd_check "$@"
@@ -613,9 +668,6 @@ main() {
         relayer-status)
             load_config
             check_relayer_status
-            ;;
-        deploy)
-            cmd_deploy "$@"
             ;;
         *)
             log_error "Unknown command: $command"
