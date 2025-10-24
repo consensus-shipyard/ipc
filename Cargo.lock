@@ -9101,7 +9101,6 @@ dependencies = [
 [[package]]
 name = "proofs"
 version = "0.1.0"
-source = "git+https://github.com/consensus-shipyard/ipc-filecoin-proofs?branch=proofs#287aa5d052bb32d191ec0103e6bbb8373f0b3bd3"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
