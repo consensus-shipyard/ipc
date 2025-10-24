@@ -16,7 +16,7 @@ error EmptyAddress();
 error FailedAddSignatory();
 error GatewayCannotBeZero();
 error InvalidActorAddress();
-error InvalidCheckpointEpoch();
+error InvalidCheckpointEpoch(uint64 expected, uint64 actual);
 error BatchMsgAlreadyExecuted();
 error MissingBatchCommitment();
 error InvalidInclusionProof();

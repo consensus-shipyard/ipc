@@ -264,7 +264,8 @@ pub async fn run(
         AppConfig {
             app_namespace: ns.app,
             state_hist_namespace: ns.state_hist,
-            state_hist_size: settings.db.state_hist_size,
+            // keep all state history for light client validation
+            state_hist_size: 0,
             halt_height: settings.halt_height,
         },
         db,

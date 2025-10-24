@@ -40,7 +40,11 @@ contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, ReentrancyG
 
     /// @inheritdoc ISubnetActorCheckpointing
     function lastBottomUpCheckpointHeight() external view returns (uint256) {
-        return uint256(LibCheckpointingStorage.getStorage().lastSubmissionHeight);
+        return uint256(LibCheckpointingStorage.getStorage().lastBottomUpCheckpointHeight);
+    }
+
+    function lastCommitmentHeight() external view returns (uint256) {
+        return uint256(LibCheckpointingStorage.getStorage().lastCommitmentHeight);
     }
 
     /// @inheritdoc ISubnetActorCheckpointing
@@ -60,18 +64,24 @@ contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, ReentrancyG
             CanonicalVote.Data memory voteTemplate
         ) = abi.decode(rawData, (LightHeader.Data, ValidatorCertificate, CanonicalVote.Data));
 
-        uint64 height = uint64(header.height);
+        // In CometBFT/Tendermint, a block header’s AppHash is the application state after the previous height finished committing. So:
+        // The proposer for block 10 includes AppHash = S₉ in block 10’s header.
+        // Nodes verify the proposal by checking that this AppHash matches their own local post-block-9 state.
+        // Then they execute block 10; its ABCI Commit returns S₁₀, which will appear as AppHash in block 11.
+        // The actual checkpoint height is header height - 1
+        uint64 height = uint64(header.height) - 1;
+
         // Enforcing a sequential submission
-        ensureValidHeight(height, checkpointStorage.lastSubmissionHeight);
+        ensureValidHeight(height, checkpointStorage.lastBottomUpCheckpointHeight);
 
         /// Performs protobuf encoding against the header, can be gas intensive
         CometbftLightClient.verifyValidatorsQuorum(header, certificate, voteTemplate);
 
         checkpointStorage.appHash[height] = header.app_hash;
-        checkpointStorage.lastSubmissionHeight = height;
+        checkpointStorage.lastBottomUpCheckpointHeight = height;
     }
 
-    /// @dev Once the checkpoint is submitted, it is just the signed cometbft app hash. The app hash is the hash of AppHashBreakdown.
+    /// @dev The app hash is the hash of AppHashBreakdown.
     /// The app hash break down is the aggregate of commitments for configuration number or message batch root.
     /// It's not submitted together with `submitBottomUpCheckpoint` for gas considerations.
     function recordAppHashBreakdown(
@@ -79,11 +89,20 @@ contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, ReentrancyG
         SubnetID calldata subnet,
         AppHashBreakdown calldata breakdown
     ) external whenNotPaused {
+        SubnetActorCheckpointingStorage storage checkpointStorage = LibCheckpointingStorage.getStorage();
+
+        ensureValidHeight(checkpointHeight, checkpointStorage.lastCommitmentHeight);
         validateAppHash(checkpointHeight, breakdown);
 
         LibPower.confirmChange(breakdown.validatorNextConfigurationNumber);
-        LibBottomUpBatch.recordBottomUpBatchCommitment(checkpointHeight, breakdown.msgBatchCommitment);
+
+        if (breakdown.msgBatchCommitment.totalNumMsgs > 0) {
+            LibBottomUpBatch.recordBottomUpBatchCommitment(checkpointHeight, breakdown.msgBatchCommitment);
+        }
+
         LibActivity.recordActivityRollup(subnet, checkpointHeight, breakdown.activityCommitment);
+
+        checkpointStorage.lastCommitmentHeight = checkpointHeight;
     }
 
     /// @dev Execute the bottom up message batch after the commitment is registered
@@ -119,13 +138,13 @@ contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, ReentrancyG
             revert BottomUpCheckpointAlreadySubmitted();
         }
 
-        uint256 nextCheckpointHeight = LibGateway.getNextEpoch(uint256(lastHeight), bottomUpCheckPeriod);
-        if (blockHeight != uint64(nextCheckpointHeight)) {
-            revert InvalidCheckpointEpoch();
+        uint64 nextCheckpointHeight = uint64(LibGateway.getNextEpoch(uint256(lastHeight), bottomUpCheckPeriod));
+        if (blockHeight != nextCheckpointHeight) {
+            revert InvalidCheckpointEpoch(nextCheckpointHeight, blockHeight);
         }
     }
 
-    function deriveAppHash(AppHashBreakdown calldata breakdown) internal pure returns (bytes memory appHash) {
+    function deriveAppHash(AppHashBreakdown calldata breakdown) public pure returns (bytes memory appHash) {
         bytes32 derived = keccak256(abi.encode(breakdown));
 
         appHash = new bytes(32);
@@ -135,7 +154,7 @@ contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, ReentrancyG
         return appHash;
     }
 
-    function validateAppHash(uint64 checkpointHeight, AppHashBreakdown calldata breakdown) internal view whenNotPaused {
+    function validateAppHash(uint64 checkpointHeight, AppHashBreakdown calldata breakdown) public view {
         SubnetActorCheckpointingStorage storage checkpointStorage = LibCheckpointingStorage.getStorage();
 
         bytes memory expectedAppHash = checkpointStorage.appHash[checkpointHeight];
@@ -150,7 +169,8 @@ contract SubnetActorCheckpointingFacet is ISubnetActorCheckpointing, ReentrancyG
 struct SubnetActorCheckpointingStorage {
     /// @notice contains all committed subnet app hash against each checkpoint height
     mapping(uint64 => bytes) appHash;
-    uint64 lastSubmissionHeight;
+    uint64 lastBottomUpCheckpointHeight;
+    uint64 lastCommitmentHeight;
 }
 
 library LibCheckpointingStorage {

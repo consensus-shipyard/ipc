@@ -56,6 +56,7 @@ ipc-observability = { path = "../../ipc/observability" }
 prometheus = { workspace = true }
 tendermint-rpc  = { workspace = true }
 tendermint  = { workspace = true }
+fendermint_rpc = { path = "../../fendermint/rpc" }
 
 [dev-dependencies]
 tempfile = { workspace = true }
