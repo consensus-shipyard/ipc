@@ -43,11 +43,12 @@ impl ProofCache {
     /// Create a new proof cache with disk persistence
     ///
     /// Loads existing entries from disk on startup.
-    pub fn new_with_persistence(config: CacheConfig, db_path: &Path) -> Result<Self> {
+    /// If DB is fresh, uses `initial_instance` as the starting point.
+    pub fn new_with_persistence(config: CacheConfig, db_path: &Path, initial_instance: u64) -> Result<Self> {
         let persistence = ProofCachePersistence::open(db_path)?;
 
-        // Load last committed from disk
-        let last_committed = persistence.load_last_committed()?.unwrap_or(0);
+        // Load last committed from disk, or use initial_instance if DB is fresh
+        let last_committed = persistence.load_last_committed()?.unwrap_or(initial_instance);
 
         // Load all entries from disk into memory
         let entries_vec = persistence.load_all_entries()?;
