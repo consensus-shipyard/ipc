@@ -21,7 +21,6 @@ pub mod assembler;
 pub mod cache;
 pub mod config;
 pub mod f3_client;
-pub mod parent_client;
 pub mod persistence;
 pub mod service;
 pub mod types;
@@ -57,10 +56,6 @@ use std::sync::Arc;
 /// # Returns
 /// * `Arc<ProofCache>` - Shared cache that proposers can query
 /// * `tokio::task::JoinHandle` - Handle to the background service task
-///
-/// # Note
-/// This function fetches the initial power table from RPC for MVP.
-/// In production, the power table should come from the F3CertManager actor.
 pub async fn launch_service(
     config: ProofServiceConfig,
     subnet_id: SubnetID,
@@ -115,6 +110,7 @@ pub async fn launch_service(
     // Clone what we need for the background task
     let config_clone = config.clone();
     let cache_clone = cache.clone();
+    let power_table_clone = power_table.clone();
 
     // Spawn background task
     let handle = tokio::spawn(async move {
@@ -144,6 +140,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_launch_service_disabled() {
+        use filecoin_f3_gpbft::PowerEntries;
+
         let config = ProofServiceConfig {
             enabled: false,
             ..Default::default()

@@ -119,10 +119,10 @@ impl F3Client {
     /// Fetch and validate an F3 certificate
     ///
     /// This performs full cryptographic validation including:
-    /// - ✅ BLS signature correctness
-    /// - ✅ Quorum requirements (>2/3 power)
-    /// - ✅ Chain continuity (sequential instances)
-    /// - ✅ Power table validity
+    /// - BLS signature correctness
+    /// - Quorum requirements (>2/3 power)
+    /// - Chain continuity (sequential instances)
+    /// - Power table validity
     ///
     /// # Returns
     /// `FinalityCertificate` that has been cryptographically verified
