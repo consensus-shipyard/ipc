@@ -53,15 +53,15 @@ members = [
   "ipc-storage/ipc-decentralized-storage",
 
   # actors
-  "fendermint/actors/adm_types",         # fil_actor_adm - ADM types
-  "fendermint/actors/adm",               # ADM actor
-  "fendermint/actors/machine",           # Machine base trait
+  "fendermint/actors/adm_types",                 # fil_actor_adm - ADM types
+  "fendermint/actors/adm",                       # ADM actor
+  "fendermint/actors/machine",                   # Machine base trait
   "fendermint/actors/blobs",
   "fendermint/actors/blobs/shared",
   "fendermint/actors/blobs/testing",
   "fendermint/actors/blob_reader",
-  "fendermint/actors/bucket",            # S3-like object storage
-  "fendermint/actors/timehub",           # Timestamping service
+  "fendermint/actors/bucket",                    # S3-like object storage
+  "fendermint/actors/timehub",                   # Timestamping service
   "fendermint/actors/ipc_storage_config",
   "fendermint/actors/ipc_storage_config/shared",
 
