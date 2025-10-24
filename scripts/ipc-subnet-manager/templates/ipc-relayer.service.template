@@ -13,6 +13,7 @@ Environment="RUST_BACKTRACE=1"
 
 ExecStart=__IPC_BINARY__ checkpoint relayer \
     --subnet __SUBNET_ID__ \
+    --fendermint-rpc-url __FENDERMINT_RPC_URL__ \
     --checkpoint-interval-sec __CHECKPOINT_INTERVAL__ \
     --max-parallelism __MAX_PARALLELISM__ \
     --submitter __SUBMITTER_ADDRESS__

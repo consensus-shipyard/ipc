@@ -7,12 +7,19 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+GRAY='\033[0;90m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
 # Logging functions
 log_error() {
     echo -e "${RED}[ERROR]${NC} $*" >&2
+}
+
+log_debug() {
+    if [ "${DEBUG:-false}" = true ]; then
+        echo -e "${GRAY}[DEBUG]${NC} $*"
+    fi
 }
 
 log_success() {

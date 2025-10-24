@@ -64,6 +64,10 @@ generate_relayer_systemd_service() {
     local subnet_id=$(get_config_value "subnet.id")
     local checkpoint_interval=$(get_config_value "relayer.checkpoint_interval")
     local max_parallelism=$(get_config_value "relayer.max_parallelism")
+    local eth_api_port=$(get_config_value "network.eth_api_port")
+
+    # Fendermint RPC URL is the local ETH API endpoint
+    local fendermint_rpc_url="http://localhost:${eth_api_port}"
 
     # Get submitter address
     local submitter=$(get_validator_address_from_keystore "$validator_idx")
@@ -82,6 +86,7 @@ generate_relayer_systemd_service() {
         -e "s|__IPC_BINARY__|$ipc_binary|g" \
         -e "s|__NODE_HOME__|$node_home|g" \
         -e "s|__SUBNET_ID__|$subnet_id|g" \
+        -e "s|__FENDERMINT_RPC_URL__|$fendermint_rpc_url|g" \
         -e "s|__CHECKPOINT_INTERVAL__|$checkpoint_interval|g" \
         -e "s|__MAX_PARALLELISM__|$max_parallelism|g" \
         -e "s|__SUBMITTER_ADDRESS__|$submitter|g" \
@@ -320,10 +325,14 @@ initialize_primary_node() {
     generate_node_init_yml "$validator_idx" "$temp_config" ""
 
     # Show generated config for debugging
-    log_info "Generated node-init.yml for $name:"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    cat "$temp_config"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    if [ "${DEBUG:-false}" = true ]; then
+        log_debug "Generated node-init.yml for $name:"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        cat "$temp_config"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    else
+        log_info "Generated node-init.yml for $name (use --debug to view full config)"
+    fi
 
     # Copy to remote
     scp_to_host "$ip" "$ssh_user" "$ipc_user" "$temp_config" "$node_init_config"
@@ -347,17 +356,35 @@ initialize_primary_node() {
         log_success "Parent chain connectivity OK"
     fi
 
-    # Run init with verbose logging
-    log_info "Running ipc-cli node init with verbose logging..."
-    local init_output=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-        "RUST_LOG=debug,ipc_cli=trace $ipc_binary node init --config $node_init_config 2>&1")
+    # Run init with verbose logging if debug mode
+    if [ "${DEBUG:-false}" = true ]; then
+        log_info "Running ipc-cli node init with verbose logging..."
+        local init_output=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+            "RUST_LOG=debug,ipc_cli=trace $ipc_binary node init --config $node_init_config 2>&1")
+    else
+        log_info "Running ipc-cli node init..."
+        local init_output=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+            "$ipc_binary node init --config $node_init_config 2>&1")
+    fi
 
     if echo "$init_output" | grep -q "Error\|error\|failed"; then
         log_error "Initialization failed for $name"
-        echo ""
-        echo "━━━━━━━━━━━━━━━━━━━━━━━ DETAILED ERROR OUTPUT ━━━━━━━━━━━━━━━━━━━━━━━"
-        echo "$init_output"
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+        if [ "${DEBUG:-false}" = true ]; then
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━ DETAILED ERROR OUTPUT ━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "$init_output"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo ""
+        else
+            # Show just the error line(s)
+            echo ""
+            echo "Error summary:"
+            echo "$init_output" | grep -i "error" | head -5
+            echo ""
+            log_info "Run with --debug flag to see full output"
+        fi
+
         echo ""
         log_info "Troubleshooting tips:"
         log_info "  1. Check if parent_registry and parent_gateway addresses are correct"
@@ -414,26 +441,48 @@ initialize_secondary_node() {
     generate_node_init_yml "$validator_idx" "$temp_config" "$peer_file_path"
 
     # Show generated config for debugging
-    log_info "Generated node-init.yml for $name:"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    cat "$temp_config"
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    if [ "${DEBUG:-false}" = true ]; then
+        log_debug "Generated node-init.yml for $name:"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        cat "$temp_config"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    else
+        log_info "Generated node-init.yml for $name (use --debug to view full config)"
+    fi
 
     # Copy to remote
     scp_to_host "$ip" "$ssh_user" "$ipc_user" "$temp_config" "$node_init_config"
     rm -f "$temp_config"
 
-    # Run init with verbose logging
-    log_info "Running ipc-cli node init with verbose logging..."
-    local init_output=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-        "RUST_LOG=debug,ipc_cli=trace $ipc_binary node init --config $node_init_config 2>&1")
+    # Run init with verbose logging if debug mode
+    if [ "${DEBUG:-false}" = true ]; then
+        log_info "Running ipc-cli node init with verbose logging..."
+        local init_output=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+            "RUST_LOG=debug,ipc_cli=trace $ipc_binary node init --config $node_init_config 2>&1")
+    else
+        log_info "Running ipc-cli node init..."
+        local init_output=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+            "$ipc_binary node init --config $node_init_config 2>&1")
+    fi
 
     if echo "$init_output" | grep -q "Error\|error\|failed"; then
         log_error "Initialization failed for $name"
-        echo ""
-        echo "━━━━━━━━━━━━━━━━━━━━━━━ DETAILED ERROR OUTPUT ━━━━━━━━━━━━━━━━━━━━━━━"
-        echo "$init_output"
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+        if [ "${DEBUG:-false}" = true ]; then
+            echo ""
+            echo "━━━━━━━━━━━━━━━━━━━━━━━ DETAILED ERROR OUTPUT ━━━━━━━━━━━━━━━━━━━━━━━"
+            echo "$init_output"
+            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+            echo ""
+        else
+            # Show just the error line(s)
+            echo ""
+            echo "Error summary:"
+            echo "$init_output" | grep -i "error" | head -5
+            echo ""
+            log_info "Run with --debug flag to see full output"
+        fi
+
         echo ""
         log_info "Troubleshooting tips:"
         log_info "  1. Check if parent_registry and parent_gateway addresses are correct"

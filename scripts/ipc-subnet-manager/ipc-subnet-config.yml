@@ -4,7 +4,7 @@
 # Subnet Configuration
 subnet:
   # Subnet ID - get this from your subnet creation
-  id: "/r314159/t410fgxd7f5t3up6ho5l6po7bfthuiaxib2olfoxeafq"
+  id: "/r314159/t410fxilg4kypvjqxk4csq4a2otimkovgdtj56abk6za"
 
   # Parent chain RPC endpoint
   parent_rpc: "https://api.calibration.node.glif.io/rpc/v1"
@@ -14,10 +14,10 @@ subnet:
   parent_chain_id: "/r314159"
 
   # Parent registry contract address
-  parent_registry: "0x51b66fb4f4b26c9cff772f3492ff6c2b205d1d46"
+  parent_registry: "0x940f8cf09902b527e91105b6cfbaad7383216f4d"
 
   # Parent gateway contract address
-  parent_gateway: "0x9a6740a1e23de7b9ebdf160b744546d2affc9e6e"
+  parent_gateway: "0xd2d93eb6636b5268d9fbb8f71c4403c3415c139d"
 
 # Validator Nodes
 validators:
@@ -137,8 +137,8 @@ ipc_cli:
     network_type: "fevm"
     provider_http: "https://api.calibration.node.glif.io/rpc/v1"
     #provider_http: "http://localhost:8555"
-    registry_addr: "0x51b66fb4f4b26c9cff772f3492ff6c2b205d1d46"
-    gateway_addr: "0x9a6740a1e23de7b9ebdf160b744546d2affc9e6e"
+    registry_addr: "0x940f8cf09902b527e91105b6cfbaad7383216f4d"
+    gateway_addr: "0xd2d93eb6636b5268d9fbb8f71c4403c3415c139d"
 
   # Child subnet configuration (this subnet)
   child:

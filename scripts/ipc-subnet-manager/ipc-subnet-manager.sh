@@ -29,6 +29,7 @@ source "${SCRIPT_DIR}/lib/dashboard.sh"
 # Global variables
 VALIDATORS=()
 DRY_RUN=false
+DEBUG=false
 
 # Usage information
 usage() {
@@ -60,6 +61,7 @@ Options:
     --config FILE        Path to config file (default: ./ipc-subnet-config.yml)
     --dry-run            Preview actions without executing
     --yes                Skip confirmation prompts
+    --debug              Show verbose debug output
     --duration SECONDS   For block-time: sample duration (default: 10)
     --help            Show this help message
 
@@ -71,6 +73,7 @@ Environment Variables:
 
 Examples:
     $0 init                                    # Initialize subnet from scratch
+    $0 init --debug                            # Initialize with verbose debug output
     $0 check                                   # Run health checks
     $0 watch-finality                          # Monitor parent finality progress
     $0 watch-finality --target-epoch=3115719   # Watch until specific epoch
@@ -182,9 +185,26 @@ cmd_init() {
     log_section "Initializing Secondary Nodes"
     initialize_secondary_nodes "$primary_peer_info"
 
-    # Collect peer information (peer-info.json created during init)
+    # Collect peer information from peer-info.json (for libp2p and validator keys)
     log_section "Collecting Peer Information"
     collect_all_peer_info
+
+    # Start nodes temporarily to collect CometBFT node IDs
+    log_section "Starting Nodes Temporarily"
+    log_info "Starting nodes to collect CometBFT peer IDs..."
+    start_all_nodes
+
+    log_info "Waiting for CometBFT to start (15 seconds)..."
+    sleep 15
+
+    # Collect CometBFT peer IDs from running nodes
+    log_section "Collecting CometBFT Peer IDs"
+    collect_peer_ids_from_running_nodes
+
+    # Stop nodes to update configurations
+    log_info "Stopping nodes to update peer configurations..."
+    stop_all_nodes
+    sleep 5
 
     # Fix listen addresses to bind to 0.0.0.0 instead of public IP
     log_section "Fixing Listen Addresses"
@@ -515,6 +535,10 @@ main() {
                 ;;
             --dry-run)
                 DRY_RUN=true
+                shift
+                ;;
+            --debug)
+                DEBUG=true
                 shift
                 ;;
             --help|-h)
