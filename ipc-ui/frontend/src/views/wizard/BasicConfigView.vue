@@ -26,6 +26,7 @@ const formData = ref({
   supplySourceAddress: wizardStore.config.supplySourceAddress || '',
   minCrossMsgFee: wizardStore.config.minCrossMsgFee || 0.000001,
   genesisSubnetIpcContractsOwner: wizardStore.config.genesisSubnetIpcContractsOwner || '',
+  chainId: wizardStore.config.chainId || Math.floor(100000 + Math.random() * 900000),
   gatewayMode: wizardStore.config.gatewayMode || 'deploy',
   customGatewayAddress: wizardStore.config.customGatewayAddress || '',
   customRegistryAddress: wizardStore.config.customRegistryAddress || '',
@@ -115,7 +116,7 @@ const validateForm = () => {
   fieldErrors.value = {}
 
   // Validate all required fields
-  const requiredFields = ['parent', 'minValidatorStake', 'minValidators', 'bottomupCheckPeriod', 'permissionMode', 'supplySourceKind', 'genesisSubnetIpcContractsOwner', 'gatewayMode']
+  const requiredFields = ['parent', 'minValidatorStake', 'minValidators', 'bottomupCheckPeriod', 'chainId', 'permissionMode', 'supplySourceKind', 'genesisSubnetIpcContractsOwner', 'gatewayMode']
 
   requiredFields.forEach(field => {
     validateField(field)
@@ -554,6 +555,19 @@ const selectGateway = (gatewayId: string) => {
               :error="fieldErrors.minCrossMsgFee"
               help-text="Minimum fee for cross-network messages"
               @blur="handleFieldBlur('minCrossMsgFee')"
+            />
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <FormInput
+              v-model="formData.chainId"
+              type="number"
+              label="Subnet Chain ID"
+              placeholder="123456"
+              required
+              :error="fieldErrors.chainId"
+              help-text="Unique chain ID for this subnet (must be globally unique)"
+              @blur="handleFieldBlur('chainId')"
             />
           </div>
 
