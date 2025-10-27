@@ -363,22 +363,6 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
         Ok(r)
     }
 
-    async fn f3_get_cert_by_instance(
-        &self,
-        instance_id: u64,
-    ) -> Result<Option<F3CertificateResponse>> {
-        // refer to: Filecoin.F3GetCert
-        let r = self
-            .client
-            .request::<Option<F3CertificateResponse>>(methods::F3_GET_CERT, json!([instance_id]))
-            .await?;
-        tracing::debug!(
-            "received f3_get_cert response for instance {}: {r:?}",
-            instance_id
-        );
-        Ok(r)
-    }
-
     async fn f3_get_power_table(&self, instance_id: u64) -> Result<F3PowerTableResponse> {
         // refer to: Filecoin.F3GetPowerTableByInstance
         let r = self
