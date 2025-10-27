@@ -14,8 +14,8 @@ pub struct State {
     pub genesis_instance_id: u64,
     /// Genesis power table for F3 consensus
     pub genesis_power_table: Vec<PowerEntry>,
-    /// Latest F3 certificate
-    pub latest_certificate: Option<F3Certificate>,
+    /// Current F3 instance ID (updated via certificates)
+    pub current_instance_id: u64,
     /// Latest finalized height
     pub latest_finalized_height: ChainEpoch,
 }
@@ -25,64 +25,67 @@ impl State {
     pub fn new(
         genesis_instance_id: u64,
         genesis_power_table: Vec<PowerEntry>,
-        genesis_certificate: Option<F3Certificate>,
     ) -> Result<State, ActorError> {
-        let latest_finalized_height = genesis_certificate
-            .as_ref()
-            .map(|cert| cert.epoch)
-            .unwrap_or(0);
-
         let state = State {
             genesis_instance_id,
             genesis_power_table,
-            latest_certificate: genesis_certificate,
-            latest_finalized_height,
+            current_instance_id: genesis_instance_id,
+            latest_finalized_height: 0,
         };
         Ok(state)
     }
 
-    /// Update the latest F3 certificate
+    /// Update state from F3 certificate (without storing the certificate)
     pub fn update_certificate(
         &mut self,
         _rt: &impl Runtime,
         certificate: F3Certificate,
     ) -> Result<(), ActorError> {
-        // Determine current instance ID from latest certificate or genesis
-        let current_instance_id = self
-            .latest_certificate
-            .as_ref()
-            .map(|cert| cert.instance_id)
-            .unwrap_or(self.genesis_instance_id);
+        // Validate finalized_epochs is not empty
+        if certificate.finalized_epochs.is_empty() {
+            return Err(ActorError::illegal_argument(
+                "Certificate must have at least one finalized epoch".to_string(),
+            ));
+        }
 
         // Validate instance progression
-        if certificate.instance_id == current_instance_id {
-            // Same instance: epoch must advance
-            if certificate.epoch <= self.latest_finalized_height {
+        if certificate.instance_id == self.current_instance_id {
+            // Same instance: highest epoch must advance
+            let new_highest = certificate
+                .finalized_epochs
+                .iter()
+                .max()
+                .expect("finalized_epochs validated as non-empty");
+            if *new_highest <= self.latest_finalized_height {
                 return Err(ActorError::illegal_argument(format!(
-                    "Certificate epoch {} must be greater than current finalized height {}",
-                    certificate.epoch, self.latest_finalized_height
+                    "Certificate highest epoch {} must be greater than current finalized height {}",
+                    new_highest, self.latest_finalized_height
                 )));
             }
-        } else if certificate.instance_id == current_instance_id + 1 {
+        } else if certificate.instance_id == self.current_instance_id + 1 {
             // Next instance: allowed (F3 protocol upgrade)
+            self.current_instance_id = certificate.instance_id;
         } else {
             // Invalid progression (backward or skipping)
             return Err(ActorError::illegal_argument(format!(
                 "Invalid instance progression: {} to {} (must increment by 0 or 1)",
-                current_instance_id, certificate.instance_id
+                self.current_instance_id, certificate.instance_id
             )));
         }
 
-        // Update state - the transaction will handle persisting this
-        self.latest_finalized_height = certificate.epoch;
-        self.latest_certificate = Some(certificate);
+        // Update state - set latest_finalized_height to the highest epoch
+        self.latest_finalized_height = *certificate
+            .finalized_epochs
+            .iter()
+            .max()
+            .expect("finalized_epochs validated as non-empty");
 
         Ok(())
     }
 
-    /// Get the latest certificate
-    pub fn get_latest_certificate(&self) -> Option<&F3Certificate> {
-        self.latest_certificate.as_ref()
+    /// Get the current F3 instance ID
+    pub fn get_current_instance_id(&self) -> u64 {
+        self.current_instance_id
     }
 
     /// Get the genesis F3 instance ID
