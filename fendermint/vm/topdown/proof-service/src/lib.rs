@@ -12,6 +12,7 @@ pub mod assembler;
 pub mod cache;
 pub mod config;
 pub mod f3_client;
+pub mod observe;
 pub mod persistence;
 pub mod service;
 pub mod types;
@@ -24,7 +25,7 @@ pub use service::ProofGeneratorService;
 pub use types::{CacheEntry, SerializableF3Certificate, ValidatedCertificate};
 pub use verifier::verify_proof_bundle;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::sync::Arc;
 
 /// Initialize and launch the proof generator service
@@ -47,14 +48,37 @@ pub async fn launch_service(
     power_table: filecoin_f3_gpbft::PowerEntries,
     db_path: Option<std::path::PathBuf>,
 ) -> Result<(Arc<ProofCache>, tokio::task::JoinHandle<()>)> {
+    // Validate configuration
     if !config.enabled {
         anyhow::bail!("Proof service is disabled in configuration");
     }
 
+    if config.parent_rpc_url.is_empty() {
+        anyhow::bail!("parent_rpc_url is required");
+    }
+
+    if config.f3_network_name.is_empty() {
+        anyhow::bail!("f3_network_name is required (e.g., 'calibrationnet', 'mainnet')");
+    }
+
+    if config.lookahead_instances == 0 {
+        anyhow::bail!("lookahead_instances must be > 0");
+    }
+
+    if config.retention_instances == 0 {
+        anyhow::bail!("retention_instances must be > 0");
+    }
+
+    // Validate URL format
+    url::Url::parse(&config.parent_rpc_url)
+        .with_context(|| format!("Invalid parent_rpc_url: {}", config.parent_rpc_url))?;
+
     tracing::info!(
         initial_instance = initial_committed_instance,
         parent_rpc = config.parent_rpc_url,
-        "Launching proof generator service"
+        f3_network = config.f3_network_name,
+        lookahead = config.lookahead_instances,
+        "Launching proof generator service with validated configuration"
     );
 
     // Create cache (with optional persistence)
