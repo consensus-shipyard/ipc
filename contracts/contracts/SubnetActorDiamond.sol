@@ -7,7 +7,7 @@ import {IDiamond} from "./interfaces/IDiamond.sol";
 import {IDiamondCut} from "./interfaces/IDiamondCut.sol";
 import {IDiamondLoupe} from "./interfaces/IDiamondLoupe.sol";
 import {IERC165} from "./interfaces/IERC165.sol";
-import {GatewayCannotBeZero, NotGateway, InvalidSubmissionPeriod, InvalidCollateral, InvalidMajorityPercentage, InvalidPowerScale, MissingGenesisSubnetIpcContractsOwner} from "./errors/IPCErrors.sol";
+import {GatewayCannotBeZero, NotGateway, InvalidSubmissionPeriod, InvalidCollateral, InvalidMajorityPercentage, InvalidPowerScale, TooManyValidators, MissingGenesisSubnetIpcContractsOwner} from "./errors/IPCErrors.sol";
 import {LibDiamond} from "./lib/LibDiamond.sol";
 import {PermissionMode, SubnetID, AssetKind, Asset} from "./structs/Subnet.sol";
 import {SubnetIDHelper} from "./lib/SubnetIDHelper.sol";
@@ -98,7 +98,9 @@ contract SubnetActorDiamond {
         s.validatorSet.permissionMode = params.permissionMode;
         s.genesisSubnetIpcContractsOwner = params.genesisSubnetIpcContractsOwner;
 
+        if (params.activeValidatorsLimit > uint16(type(uint8).max)) revert TooManyValidators();
         s.validatorSet.activeLimit = params.activeValidatorsLimit;
+
         // Start the next configuration number from 1, 0 is reserved for no change and the genesis membership
         s.changeSet.nextConfigurationNumber = LibPower.INITIAL_CONFIGURATION_NUMBER;
         // The startConfiguration number is also 1 to match with nextConfigurationNumber, indicating we have

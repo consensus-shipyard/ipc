@@ -113,9 +113,10 @@ pub(crate) struct BottomUpRelayerArgs {
     pub finalization_blocks: Option<u64>,
     #[arg(long, help = "The hex encoded address of the submitter")]
     pub submitter: Option<String>,
+
     #[arg(
         long,
-        default_value = "4",
+        default_value = "1",
         help = "The max parallelism for submitting checkpoints"
     )]
     pub max_parallelism: usize,

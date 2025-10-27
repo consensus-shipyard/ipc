@@ -16,8 +16,8 @@ use std::time::Duration;
 /// Tracks the config required for bottom up checkpoint submissions
 /// parent/child subnet and checkpoint period.
 pub struct CheckpointConfig {
-    target: Subnet,
-    source: Subnet,
+    parent: Subnet,
+    child: Subnet,
     period: ChainEpoch,
 }
 
@@ -42,8 +42,8 @@ impl<T: SignedHeaderRelayer> BottomUpCheckpointManager<T> {
             .map_err(|e| anyhow!("cannot get bottom up checkpoint period: {e}"))?;
         Ok(Self {
             metadata: CheckpointConfig {
-                target: parent,
-                source: child,
+                parent,
+                child,
                 period,
             },
             parent_handler: Arc::new(parent_handler),
@@ -77,20 +77,20 @@ impl<T: SignedHeaderRelayer> Display for BottomUpCheckpointManager<T> {
         write!(
             f,
             "light client relayer, target: {:}, source: {:}",
-            self.metadata.target.id, self.metadata.source.id
+            self.metadata.parent.id, self.metadata.child.id
         )
     }
 }
 
 impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T> {
     /// Getter for the parent subnet this checkpoint manager is handling
-    pub fn target_subnet(&self) -> &Subnet {
-        &self.metadata.target
+    pub fn parent_subnet(&self) -> &Subnet {
+        &self.metadata.parent
     }
 
     /// Getter for the target subnet this checkpoint manager is handling
-    pub fn source_subnet(&self) -> &Subnet {
-        &self.metadata.source
+    pub fn child_subnet(&self) -> &Subnet {
+        &self.metadata.child
     }
 
     /// The submission period that the current manager is submitting upon
@@ -112,6 +112,7 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
                     tracing::error!(
                         "cannot submit checkpoint for submitter: {submitter} due to {e}"
                     );
+                    tokio::time::sleep(submission_interval).await;
                     continue;
                 }
             };
@@ -141,13 +142,14 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
         end_height: ChainEpoch,
     ) -> Result<()> {
         let mut next_height = self
-            .child_handler
-            .get_last_bottom_up_checkpoint_height(&self.metadata.target.id)
+            .parent_handler
+            .get_last_app_commitment_height(&self.metadata.child.id)
             .await?;
 
-        while next_height <= end_height as u64 {
-            next_height += self.metadata.period as u64;
-            let Some(commitment) = self
+        next_height += self.metadata.period as u64;
+
+        while next_height < end_height as u64 {
+            let Some(mut commitment) = self
                 .child_handler
                 .query_app_hash_breakdown(next_height as ChainEpoch)
                 .await?
@@ -155,14 +157,30 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
                 continue;
             };
 
+            let state_root = self
+                .child_handler
+                // the state root from fendermint client is actually in the next block height
+                .get_state_root((next_height + 1) as ChainEpoch)
+                .await?;
+
+            tracing::info!(
+                height = next_height,
+                state_root = hex::encode(state_root.as_slice()),
+                "obtains state root at height"
+            );
+
+            commitment.state_root = ethers::types::Bytes::from(state_root);
+
             self.parent_handler
                 .record_app_hash_breakdown(
                     next_height as ChainEpoch,
                     &submitter,
-                    &self.metadata.target.id,
+                    &self.metadata.child.id,
                     commitment,
                 )
                 .await?;
+
+            next_height += self.metadata.period as u64;
         }
 
         Ok(())
@@ -171,7 +189,7 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
     async fn submit_next_signed_header(&self, submitter: Address) -> Result<Option<ChainEpoch>> {
         let last_checkpoint_epoch = self
             .parent_handler
-            .get_last_bottom_up_checkpoint_height(&self.metadata.source.id)
+            .get_last_bottom_up_checkpoint_height(&self.metadata.child.id)
             .await
             .map_err(|e| {
                 anyhow!("cannot obtain the last bottom up checkpoint height due to: {e:}")
@@ -196,24 +214,34 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
 
         let active_validators = self
             .parent_handler
-            .list_active_validators(&self.metadata.source.id)
+            .list_active_validators(&self.metadata.child.id)
             .await?;
+        tracing::info!(
+            length = active_validators.len(),
+            "obtained list of active validators"
+        );
+
         let pubkeys = active_validators
             .iter()
             .map(|(_, info)| info.staking.metadata.as_slice());
+        tracing::info!("obtained list of active validators public keys");
 
         let mut header = self
             .child_handler
-            .get_signed_header(next_checkpoint_epoch as u64)
+            // we need to query signed header of the next block for the app hash in the checkpoint epoch
+            .get_signed_header(next_checkpoint_epoch as u64 + 1)
             .await?;
+        tracing::info!("obtained signed header: {header:?}");
 
         // order validators against the public keys ordered on chain. This is required as contract
         // requires the exact public keys ordering onchain.
-        header.order_commit_against(pubkeys)?;
+        let cert = header.generate_validator_cert(pubkeys)?;
+        tracing::info!(cert = ?cert, "obtained certificate");
+
         let height = header.header.height;
 
         self.parent_handler
-            .submit_signed_header(&submitter, &self.source_subnet().id, header)
+            .submit_signed_header(&submitter, &self.child_subnet().id, header, cert)
             .await?;
 
         Ok(Some(height))
@@ -223,7 +251,7 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
     async fn execute_pending_batch_commitments(&self, submitter: Address) -> Result<()> {
         let pending_commitments = self
             .parent_handler
-            .list_pending_bottom_up_batch_commitments(&self.metadata.target.id)
+            .list_pending_bottom_up_batch_commitments(&self.metadata.child.id)
             .await
             .map_err(|e| {
                 anyhow!(
@@ -240,7 +268,7 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
 
             let height = commitment.height as i64;
             self.parent_handler
-                .execute_bottom_up_batch(&submitter, &self.metadata.target.id, height, inclusions)
+                .execute_bottom_up_batch(&submitter, &self.metadata.child.id, height, inclusions)
                 .await
                 .inspect_err(|err| {
                     tracing::error!("Fail to execute bottom up batch at height {height}: {err}");

@@ -43,7 +43,7 @@ use ethers::signers::{LocalWallet, Wallet};
 use ethers::types::{Bytes, Eip1559TransactionRequest, ValueOrArray, H256, U256};
 
 use super::gas_estimator_middleware::Eip1559GasEstimatorMiddleware;
-use crate::manager::cometbft::{CanonicalVoteData, SignedHeader, Timestamp, ValidatorSignPayload};
+use crate::manager::cometbft::{CanonicalVoteData, SignedHeader, Timestamp, ValidatorCertificate};
 use crate::manager::evm::error_parsing::ErrorParserHttp;
 use ethers::middleware::Middleware;
 use fvm_shared::clock::ChainEpoch;
@@ -1227,13 +1227,23 @@ impl SignedHeaderRelayer for EthSubnetManager {
         Ok(SignedHeader::decode(raw_bytes.as_ref())?)
     }
 
+    async fn get_state_root(&self, height: ChainEpoch) -> Result<Vec<u8>> {
+        let raw_bytes = self
+            .ipc_contract_info
+            .provider
+            .request::<_, Bytes>("eth_getStateRoot", [height.to_string()])
+            .await?;
+        Ok(raw_bytes.to_vec())
+    }
+
     async fn submit_signed_header(
         &self,
         submitter: &Address,
         subnet_id: &SubnetID,
         header: SignedHeader,
+        cert: ValidatorCertificate,
     ) -> Result<ChainEpoch> {
-        let bytes = convert_signed_header(header);
+        let bytes = generate_bottom_up_checkpoint_bytes(header, cert);
 
         let address = contract_address_from_subnet(subnet_id)?;
 
@@ -1285,6 +1295,15 @@ impl SignedHeaderRelayer for EthSubnetManager {
         }
 
         Ok(None)
+    }
+
+    async fn get_last_app_commitment_height(&self, subnet_id: &SubnetID) -> Result<u64> {
+        let address = contract_address_from_subnet(subnet_id)?;
+        let contract = subnet_actor_checkpointing_facet::SubnetActorCheckpointingFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        Ok(contract.last_commitment_height().call().await?.as_u64())
     }
 
     async fn get_last_bottom_up_checkpoint_height(&self, subnet_id: &SubnetID) -> Result<u64> {
@@ -1776,9 +1795,11 @@ impl TryFrom<gateway_getter_facet::Subnet> for SubnetInfo {
 }
 
 const SIGNED_MSG_TYPE_PRECOMMIT: u8 = 2;
-const BLOCK_ID_FLAG_COMMIT: u8 = 2;
 
-fn convert_signed_header(signed_header: SignedHeader) -> ethers::abi::Bytes {
+fn generate_bottom_up_checkpoint_bytes(
+    signed_header: SignedHeader,
+    cert: ValidatorCertificate,
+) -> ethers::abi::Bytes {
     let light_header = signed_header.header;
 
     let vote_template = CanonicalVoteData {
@@ -1795,21 +1816,9 @@ fn convert_signed_header(signed_header: SignedHeader) -> ethers::abi::Bytes {
         chain_id: "".to_string(),
     };
 
-    let signatures = signed_header
-        .commit
-        .signatures
-        .into_iter()
-        // keep only precommit votes
-        .filter(|v| v.block_id_flag == BLOCK_ID_FLAG_COMMIT)
-        .map(|v| ValidatorSignPayload {
-            timestamp: v.timestamp,
-            signature: v.signature,
-        })
-        .collect::<Vec<ValidatorSignPayload>>();
-
     let tokens = vec![
         light_header.clone().into_token(),
-        signatures.to_vec().into_token(),
+        cert.into_token(),
         vote_template.clone().into_token(),
     ];
 

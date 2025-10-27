@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 use crate::lotus::message::ipc::SubnetInfo;
-use crate::manager::cometbft::SignedHeader;
+use crate::manager::cometbft::{SignedHeader, ValidatorCertificate};
 use anyhow::Result;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
@@ -273,6 +273,7 @@ pub trait SignedHeaderRelayer: Send + Sync {
         submitter: &Address,
         subnet_id: &SubnetID,
         header: SignedHeader,
+        cert: ValidatorCertificate,
     ) -> Result<ChainEpoch>;
 
     async fn query_app_hash_breakdown(
@@ -280,7 +281,11 @@ pub trait SignedHeaderRelayer: Send + Sync {
         height: ChainEpoch,
     ) -> Result<Option<AppHashBreakdown>>;
 
+    async fn get_state_root(&self, height: ChainEpoch) -> Result<Vec<u8>>;
+
     async fn get_last_bottom_up_checkpoint_height(&self, subnet_id: &SubnetID) -> Result<u64>;
+
+    async fn get_last_app_commitment_height(&self, subnet_id: &SubnetID) -> Result<u64>;
 
     async fn record_app_hash_breakdown(
         &self,

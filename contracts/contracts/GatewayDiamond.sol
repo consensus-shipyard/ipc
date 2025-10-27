@@ -7,7 +7,7 @@ import {IDiamondCut} from "./interfaces/IDiamondCut.sol";
 import {IDiamondLoupe} from "./interfaces/IDiamondLoupe.sol";
 import {IERC165} from "./interfaces/IERC165.sol";
 import {Validator, Membership} from "./structs/Subnet.sol";
-import {InvalidCollateral, InvalidSubmissionPeriod, InvalidMajorityPercentage} from "./errors/IPCErrors.sol";
+import {InvalidCollateral, InvalidSubmissionPeriod, InvalidMajorityPercentage, TooManyValidators} from "./errors/IPCErrors.sol";
 import {LibDiamond} from "./lib/LibDiamond.sol";
 import {LibGateway} from "./lib/LibGateway.sol";
 import {SubnetID} from "./structs/Subnet.sol";
@@ -60,7 +60,9 @@ contract GatewayDiamond {
         s.majorityPercentage = params.majorityPercentage;
         s.commitSha = params.commitSha;
 
+        if (params.activeValidatorsLimit > uint16(type(uint8).max)) revert TooManyValidators();
         s.validatorsTracker.validators.activeLimit = params.activeValidatorsLimit;
+
         // Start the next configuration number from 1, 0 is reserved for no change and the genesis membership
         s.validatorsTracker.changes.nextConfigurationNumber = LibPower.INITIAL_CONFIGURATION_NUMBER;
         // The startConfiguration number is also 1 to match with nextConfigurationNumber, indicating we have

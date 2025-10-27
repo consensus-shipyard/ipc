@@ -1216,6 +1216,21 @@ where
     Ok(et::Bytes::from(header.encode()))
 }
 
+pub async fn get_state_root<C>(
+    data: JsonRpcData<C>,
+    Params((block_number,)): Params<(et::BlockNumber,)>,
+) -> JsonRpcResult<et::Bytes>
+where
+    C: Client + Sync + Send,
+{
+    let h = block_number
+        .as_number()
+        .ok_or_else(|| anyhow!("invalid block #{}", block_number))?
+        .as_u64();
+    let query_response = data.client.state_params(FvmQueryHeight::Height(h)).await?;
+    Ok(et::Bytes::from(query_response.value.state_root))
+}
+
 /// Unsubscribe from the filter registered by this websocket.
 pub async fn unsubscribe<C>(
     data: JsonRpcData<C>,

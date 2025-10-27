@@ -36,8 +36,14 @@ struct ValidatorSignPayload {
     bytes signature;
 }
 
+struct ValidatorCertificate {
+    uint256 bitmap;
+    ValidatorSignPayload[] signatures;
+}
+
 library CometbftLightClient {
     using TendermintHelper for Vote.Data;
+    using LibBitMap for uint256;
 
     error InvalidLength(string what, uint256 expected, uint256 actual);
     error NotSameHeight();
@@ -49,24 +55,14 @@ library CometbftLightClient {
     error NotSigner(bytes32 message, bytes signature, address recovered, address expected);
     error ValidatorsHashCannotBeEmpty();
 
-    // Some preparation for the parameters, ensures the chain ids are expected and heights are the same
-    function prepareParams(LightHeader.Data memory header, CanonicalVote.Data memory voteTemplate) internal view {
-        string memory _chainID = LibSubnetActorStorage.appStorage().chainID;
-
-        header.chain_id = _chainID;
-        voteTemplate.chain_id = _chainID;
-
-        if (header.height != voteTemplate.height) revert NotSameHeight();
-    }
-
     /// @notice Validates the quorum certificate of CometBFT pre-commit votes
     /// @dev Verifies that signatures meet BFT consensus requirements (>2/3 voting power)
     ///
     /// @param header The light client header containing the block header
-    /// @param voteTemplate The canonical vote tempalted filled except for the timestamp and chain id. The chain id will be 
-    /// assigned in the contract while timestamp is take from the signatures. The rest of the fields in voteTemplate should be 
+    /// @param voteTemplate The canonical vote tempalted filled except for the timestamp and chain id. The chain id will be
+    /// assigned in the contract while timestamp is take from the signatures. The rest of the fields in voteTemplate should be
     /// the same for all validators.
-    /// @param signatures The validator signatures with their signature timestamp
+    /// @param certificate The validator certificate with each signature and signing timestamp
     ///
     /// CRITICAL: Validator signatures in the commit MUST be ordered exactly as validators
     /// are arranged in LibPower's active validator set. The signature at index i must
@@ -83,32 +79,50 @@ library CometbftLightClient {
     ///    - Verifies ECDSA signature validity
     ///    - Accumulates voting power of valid signatures
     /// 4. Ensures accumulated power >= 2/3 of total power
-    function verifyValidatorsQuorum(LightHeader.Data memory header, ValidatorSignPayload[] memory signatures, CanonicalVote.Data memory voteTemplate) internal view {
+    function verifyValidatorsQuorum(LightHeader.Data memory header, ValidatorCertificate memory certificate, CanonicalVote.Data memory voteTemplate) internal view {
         prepareParams(header, voteTemplate);
 
-        // make sure the vote template block hash matches the header, so that 
+        // make sure the vote template block hash matches the header, so that
         // the validators are signing the same light client header hash.
         checkCommitHash(header, toBytes32(voteTemplate.block_id.hash));
 
         uint256 totalPower = LibPower.getTotalCurrentPower();
         if (totalPower == 0) revert NoValidatorInQuorum();
 
+        uint256 validatorIndex = 0;
         uint256 powerSoFar = 0;
+        uint8 totalValidators = uint8(LibPower.totalActiveValidators());
 
-        for (uint256 i = 0; i < signatures.length; i++) {
-            (uint256 power, address validator) = getValidatorInfo(i);
+        for (uint8 bitCount = 0; bitCount < totalValidators; bitCount++) {
+            if (!certificate.bitmap.isBitSet(bitCount)) continue;
 
-            voteTemplate.timestamp = signatures[i].timestamp;
+            // The certificate.signatures must be ordered accordingly to the LibPower active validators
+            // priority queue ordering. Otherwise the signatures might have a mismatch.
+            (uint256 power, address validator) = getValidatorInfo(bitCount);
+
+            voteTemplate.timestamp = certificate.signatures[validatorIndex].timestamp;
 
             bytes32 messageHash = sha256(generateSignedPayload(voteTemplate));
-            ensureValidSignature(messageHash, signatures[i].signature, validator);
+            ensureValidSignature(messageHash, certificate.signatures[validatorIndex].signature, validator);
 
             powerSoFar += power;
+            validatorIndex += 1;
         }
 
         if(powerSoFar <= (totalPower * 2 / 3)) {
             revert NoQuorumFormed();
         }
+    }
+
+    // Some preparation for the parameters, ensures the chain ids are expected and heights are the same
+    function prepareParams(LightHeader.Data memory header, CanonicalVote.Data memory voteTemplate) internal view {
+        string memory _chainID = LibSubnetActorStorage.appStorage().chainID;
+
+        // slightly more gas efficient than string compare
+        header.chain_id = _chainID;
+        voteTemplate.chain_id = _chainID;
+
+        if (header.height != voteTemplate.height) revert NotSameHeight();
     }
 
     /// @notice Verifies that the commit references the correct block
@@ -205,7 +219,7 @@ library CometbftLightClient {
         }
     }
 
-    /// @dev This method hash LightHeader.Data into a bytes32 hash that is exactly how cometbft go client 
+    /// @dev This method hash LightHeader.Data into a bytes32 hash that is exactly how cometbft go client
     /// does it. This code is taken from tendermint-sol/contracts/proto/TendermintHelper.sol#hash method.
     /// The original method takes SignedHeader.Data as parameter, while this contract requires LightHeader.Data,
     /// immplementations are the same.
@@ -236,4 +250,11 @@ library CometbftLightClient {
         return MerkleTree.merkleRootHash(all, 0, all.length);
     }
 
+}
+
+library LibBitMap {
+    function isBitSet(uint256 bitmap, uint8 index) internal pure returns (bool) {
+        // Shift 1 left by index positions and AND with bitmap
+        return (bitmap & (uint256(1) << index)) != 0;
+    }
 }
