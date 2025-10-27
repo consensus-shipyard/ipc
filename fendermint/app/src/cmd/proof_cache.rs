@@ -5,7 +5,7 @@ use crate::cmd;
 use crate::options::proof_cache::{ProofCacheArgs, ProofCacheCommands};
 use fendermint_vm_topdown_proof_service::persistence::ProofCachePersistence;
 use fendermint_vm_topdown_proof_service::{CacheConfig, ProofCache};
-use std::path::Path;
+use std::path::PathBuf;
 
 cmd! {
     ProofCacheArgs(self) {
@@ -24,7 +24,7 @@ fn handle_proof_cache_command(args: &ProofCacheArgs) -> anyhow::Result<()> {
     }
 }
 
-fn inspect_cache(db_path: &Path) -> anyhow::Result<()> {
+fn inspect_cache(db_path: &PathBuf) -> anyhow::Result<()> {
     println!("=== Proof Cache Inspection ===");
     println!("Database: {}", db_path.display());
     println!();
@@ -67,7 +67,7 @@ fn inspect_cache(db_path: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn show_stats(db_path: &Path) -> anyhow::Result<()> {
+fn show_stats(db_path: &PathBuf) -> anyhow::Result<()> {
     println!("=== Proof Cache Statistics ===");
     println!("Database: {}", db_path.display());
     println!();
@@ -116,7 +116,7 @@ fn show_stats(db_path: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn get_proof(db_path: &Path, instance_id: u64) -> anyhow::Result<()> {
+fn get_proof(db_path: &PathBuf, instance_id: u64) -> anyhow::Result<()> {
     println!("=== Get Proof for Instance {} ===", instance_id);
     println!("Database: {}", db_path.display());
     println!();

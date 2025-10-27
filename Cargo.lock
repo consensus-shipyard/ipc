@@ -975,7 +975,7 @@ dependencies = [
  "bitflags 2.10.0",
  "cexpr",
  "clang-sys",
- "itertools 0.13.0",
+ "itertools 0.10.5",
  "proc-macro2",
  "quote",
  "regex",
@@ -2771,7 +2771,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3369,6 +3369,7 @@ dependencies = [
  "fendermint_vm_resolver",
  "fendermint_vm_snapshot",
  "fendermint_vm_topdown",
+ "fendermint_vm_topdown_proof_service",
  "fs-err",
  "fvm",
  "fvm_ipld_blockstore 0.3.1",
@@ -4067,10 +4068,12 @@ dependencies = [
  "fvm_shared",
  "humantime-serde",
  "ipc-api",
+ "ipc-observability",
  "ipc-provider",
  "multihash 0.18.1",
  "multihash-codetable",
  "parking_lot",
+ "prometheus",
  "proofs",
  "rocksdb",
  "serde",
@@ -4231,6 +4234,7 @@ dependencies = [
 [[package]]
 name = "filecoin-f3-blssig"
 version = "0.1.0"
+source = "git+https://github.com/moshababo/rust-f3?branch=bdn_agg#5df78a7cb20cec7f7be45c0a2735a0ffb0a9c03a"
 dependencies = [
  "blake2 0.11.0-rc.2",
  "bls-signatures",
@@ -4245,6 +4249,7 @@ dependencies = [
 [[package]]
 name = "filecoin-f3-certs"
 version = "0.1.0"
+source = "git+https://github.com/moshababo/rust-f3?branch=bdn_agg#5df78a7cb20cec7f7be45c0a2735a0ffb0a9c03a"
 dependencies = [
  "ahash 0.8.12",
  "filecoin-f3-gpbft",
@@ -4255,6 +4260,7 @@ dependencies = [
 [[package]]
 name = "filecoin-f3-gpbft"
 version = "0.1.0"
+source = "git+https://github.com/moshababo/rust-f3?branch=bdn_agg#5df78a7cb20cec7f7be45c0a2735a0ffb0a9c03a"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
@@ -4277,6 +4283,7 @@ dependencies = [
 [[package]]
 name = "filecoin-f3-lightclient"
 version = "0.1.0"
+source = "git+https://github.com/moshababo/rust-f3?branch=bdn_agg#5df78a7cb20cec7f7be45c0a2735a0ffb0a9c03a"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4292,6 +4299,7 @@ dependencies = [
 [[package]]
 name = "filecoin-f3-merkle"
 version = "0.1.0"
+source = "git+https://github.com/moshababo/rust-f3?branch=bdn_agg#5df78a7cb20cec7f7be45c0a2735a0ffb0a9c03a"
 dependencies = [
  "anyhow",
  "sha3",
@@ -4300,6 +4308,7 @@ dependencies = [
 [[package]]
 name = "filecoin-f3-rpc"
 version = "0.1.0"
+source = "git+https://github.com/moshababo/rust-f3?branch=bdn_agg#5df78a7cb20cec7f7be45c0a2735a0ffb0a9c03a"
 dependencies = [
  "anyhow",
  "filecoin-f3-gpbft",
@@ -5568,7 +5577,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.4.10",
  "tokio",
  "tower-service",
  "tracing",
@@ -5664,6 +5673,19 @@ dependencies = [
  "tokio-rustls 0.26.4",
  "tower-service",
  "webpki-roots 1.0.3",
+]
+
+[[package]]
+name = "hyper-tls"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6183ddfa99b85da61a140bea0efc93fdf56ceaa041b37d553518030827f9905"
+dependencies = [
+ "bytes",
+ "hyper 0.14.32",
+ "native-tls",
+ "tokio",
+ "tokio-native-tls",
 ]
 
 [[package]]
@@ -8061,7 +8083,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -8197,7 +8219,7 @@ version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff32365de1b6743cb203b710788263c44a03de03802daf96092f2da4fe6ba4d7"
 dependencies = [
- "proc-macro-crate 3.4.0",
+ "proc-macro-crate 1.1.3",
  "proc-macro2",
  "quote",
  "syn 2.0.108",
@@ -9027,6 +9049,7 @@ dependencies = [
 [[package]]
 name = "proofs"
 version = "0.1.0"
+source = "git+https://github.com/consensus-shipyard/ipc-filecoin-proofs?branch=proofs#287aa5d052bb32d191ec0103e6bbb8373f0b3bd3"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
@@ -9305,7 +9328,7 @@ dependencies = [
  "once_cell",
  "socket2 0.6.1",
  "tracing",
- "windows-sys 0.60.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -9579,10 +9602,12 @@ dependencies = [
  "http-body 0.4.6",
  "hyper 0.14.32",
  "hyper-rustls 0.24.2",
+ "hyper-tls 0.5.0",
  "ipnet",
  "js-sys",
  "log",
  "mime",
+ "native-tls",
  "once_cell",
  "percent-encoding",
  "pin-project-lite",
@@ -9594,6 +9619,7 @@ dependencies = [
  "sync_wrapper 0.1.2",
  "system-configuration 0.5.1",
  "tokio",
+ "tokio-native-tls",
  "tokio-rustls 0.24.1",
  "tower-service",
  "url",
@@ -9621,7 +9647,7 @@ dependencies = [
  "http-body-util",
  "hyper 1.7.0",
  "hyper-rustls 0.27.7",
- "hyper-tls",
+ "hyper-tls 0.6.0",
  "hyper-util",
  "js-sys",
  "log",
@@ -9911,7 +9937,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.11.0",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -11354,7 +11380,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.2",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -13053,7 +13079,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

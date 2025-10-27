@@ -115,29 +115,3 @@ impl CacheEntry {
         self.finalized_epochs.contains(&epoch)
     }
 }
-
-#[cfg(test)]
-mod tests {
-
-    // Helper function to create test entries
-    // For now, we'll skip this test since it requires complex setup with ProofBundle
-    #[ignore]
-    #[test]
-    fn test_cache_entry_epoch_helpers() {
-        // TODO: Re-enable once we have proper test utilities for ProofBundle
-        /*
-        let entry = CacheEntry {
-            instance_id: 1,
-            finalized_epochs: vec![100, 101, 102, 103],
-            // Would need real ProofBundle here
-            ...
-        };
-
-        assert_eq!(entry.highest_epoch(), Some(103));
-        assert_eq!(entry.lowest_epoch(), Some(100));
-        assert!(entry.covers_epoch(101));
-        assert!(!entry.covers_epoch(99));
-        assert!(!entry.covers_epoch(104));
-        */
-    }
-}

@@ -148,7 +148,7 @@ rand = "0.8"
 rand_chacha = "0.3"
 regex = "1"
 statrs = "0.18.0"
-reqwest = { version = "0.11.13", default-features = false, features = ["json", "rustls-tls", "blocking"] }
+reqwest = { version = "0.11.13", features = ["json"] }
 sha2 = "0.10"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_bytes = "0.11"
