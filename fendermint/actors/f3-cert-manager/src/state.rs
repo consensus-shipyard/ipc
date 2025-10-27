@@ -14,8 +14,8 @@ pub struct State {
     pub genesis_instance_id: u64,
     /// Genesis power table for F3 consensus
     pub genesis_power_table: Vec<PowerEntry>,
-    /// Latest F3 certificate
-    pub latest_certificate: Option<F3Certificate>,
+    /// Current F3 instance ID (updated via certificates)
+    pub current_instance_id: u64,
     /// Latest finalized height
     pub latest_finalized_height: ChainEpoch,
 }
@@ -25,23 +25,17 @@ impl State {
     pub fn new(
         genesis_instance_id: u64,
         genesis_power_table: Vec<PowerEntry>,
-        genesis_certificate: Option<F3Certificate>,
     ) -> Result<State, ActorError> {
-        let latest_finalized_height = genesis_certificate
-            .as_ref()
-            .and_then(|cert| cert.finalized_epochs.iter().max().copied())
-            .unwrap_or(0);
-
         let state = State {
             genesis_instance_id,
             genesis_power_table,
-            latest_certificate: genesis_certificate,
-            latest_finalized_height,
+            current_instance_id: genesis_instance_id,
+            latest_finalized_height: 0,
         };
         Ok(state)
     }
 
-    /// Update the latest F3 certificate
+    /// Update state from F3 certificate (without storing the certificate)
     pub fn update_certificate(
         &mut self,
         _rt: &impl Runtime,
@@ -54,15 +48,8 @@ impl State {
             ));
         }
 
-        // Determine current instance ID from latest certificate or genesis
-        let current_instance_id = self
-            .latest_certificate
-            .as_ref()
-            .map(|cert| cert.instance_id)
-            .unwrap_or(self.genesis_instance_id);
-
         // Validate instance progression
-        if certificate.instance_id == current_instance_id {
+        if certificate.instance_id == self.current_instance_id {
             // Same instance: highest epoch must advance
             let new_highest = certificate
                 .finalized_epochs
@@ -75,13 +62,14 @@ impl State {
                     new_highest, self.latest_finalized_height
                 )));
             }
-        } else if certificate.instance_id == current_instance_id + 1 {
+        } else if certificate.instance_id == self.current_instance_id + 1 {
             // Next instance: allowed (F3 protocol upgrade)
+            self.current_instance_id = certificate.instance_id;
         } else {
             // Invalid progression (backward or skipping)
             return Err(ActorError::illegal_argument(format!(
                 "Invalid instance progression: {} to {} (must increment by 0 or 1)",
-                current_instance_id, certificate.instance_id
+                self.current_instance_id, certificate.instance_id
             )));
         }
 
@@ -91,14 +79,13 @@ impl State {
             .iter()
             .max()
             .expect("finalized_epochs validated as non-empty");
-        self.latest_certificate = Some(certificate);
 
         Ok(())
     }
 
-    /// Get the latest certificate
-    pub fn get_latest_certificate(&self) -> Option<&F3Certificate> {
-        self.latest_certificate.as_ref()
+    /// Get the current F3 instance ID
+    pub fn get_current_instance_id(&self) -> u64 {
+        self.current_instance_id
     }
 
     /// Get the genesis F3 instance ID
@@ -114,14 +101,5 @@ impl State {
     /// Get the latest finalized height
     pub fn get_latest_finalized_height(&self) -> ChainEpoch {
         self.latest_finalized_height
-    }
-
-    /// Check if a specific parent epoch has been finalized
-    pub fn is_epoch_finalized(&self, epoch: ChainEpoch) -> bool {
-        if let Some(cert) = &self.latest_certificate {
-            cert.finalized_epochs.contains(&epoch)
-        } else {
-            false
-        }
     }
 }
