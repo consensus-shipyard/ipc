@@ -30,7 +30,7 @@ pub struct ProofServiceConfig {
     /// F3 network name (e.g., "calibrationnet", "mainnet")
     pub f3_network_name: String,
 
-    /// Optional: Additional RPC URLs for failover (future enhancement)
+    /// Optional: Additional RPC URLs for failover (not yet implemented - future enhancement)
     #[serde(default)]
     pub fallback_rpc_urls: Vec<String>,
 
@@ -38,10 +38,21 @@ pub struct ProofServiceConfig {
     #[serde(default)]
     pub max_cache_size_bytes: usize,
 
-    /// Gateway actor ID on parent chain (for proof generation)
-    /// Will be configured from subnet genesis info
+    /// Gateway actor on parent chain (for proof generation).
+    ///
+    /// Can be either:
+    /// - Actor ID: 176609
+    /// - Ethereum address: 0xE4c61299c16323C4B58376b60A77F68Aa59afC8b (will be resolved to actor ID)
+    ///
+    /// Will be configured from subnet genesis info.
     #[serde(default)]
     pub gateway_actor_id: Option<u64>,
+
+    /// Gateway ethereum address (alternative to gateway_actor_id).
+    ///
+    /// If provided, will be resolved to actor ID on service startup.
+    #[serde(default)]
+    pub gateway_eth_address: Option<String>,
 
     /// Subnet ID (for event filtering)
     /// Will be derived from genesis
@@ -62,6 +73,7 @@ impl Default for ProofServiceConfig {
             fallback_rpc_urls: Vec::new(),
             max_cache_size_bytes: 0,
             gateway_actor_id: None,
+            gateway_eth_address: None,
             subnet_id: None,
         }
     }

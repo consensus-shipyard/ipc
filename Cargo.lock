@@ -3407,6 +3407,7 @@ dependencies = [
  "fendermint_vm_resolver",
  "fendermint_vm_snapshot",
  "fendermint_vm_topdown",
+ "fendermint_vm_topdown_proof_service",
  "fs-err",
  "fvm",
  "fvm_ipld_blockstore 0.3.1",
@@ -4108,10 +4109,12 @@ dependencies = [
  "fvm_shared",
  "humantime-serde",
  "ipc-api",
+ "ipc-observability",
  "ipc-provider",
  "multihash 0.18.1",
  "multihash-codetable",
  "parking_lot",
+ "prometheus",
  "proofs",
  "rocksdb",
  "serde",
@@ -4272,6 +4275,7 @@ dependencies = [
 [[package]]
 name = "filecoin-f3-blssig"
 version = "0.1.0"
+source = "git+https://github.com/moshababo/rust-f3?branch=bdn_agg#0abe7e457ab88370f6ea19d726a79e0031d0138e"
 dependencies = [
  "blake2 0.11.0-rc.2",
  "bls-signatures",
@@ -4286,6 +4290,7 @@ dependencies = [
 [[package]]
 name = "filecoin-f3-certs"
 version = "0.1.0"
+source = "git+https://github.com/moshababo/rust-f3?branch=bdn_agg#0abe7e457ab88370f6ea19d726a79e0031d0138e"
 dependencies = [
  "ahash 0.8.12",
  "filecoin-f3-gpbft",
@@ -4296,6 +4301,7 @@ dependencies = [
 [[package]]
 name = "filecoin-f3-gpbft"
 version = "0.1.0"
+source = "git+https://github.com/moshababo/rust-f3?branch=bdn_agg#0abe7e457ab88370f6ea19d726a79e0031d0138e"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
@@ -4318,6 +4324,7 @@ dependencies = [
 [[package]]
 name = "filecoin-f3-lightclient"
 version = "0.1.0"
+source = "git+https://github.com/moshababo/rust-f3?branch=bdn_agg#0abe7e457ab88370f6ea19d726a79e0031d0138e"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4333,6 +4340,7 @@ dependencies = [
 [[package]]
 name = "filecoin-f3-merkle"
 version = "0.1.0"
+source = "git+https://github.com/moshababo/rust-f3?branch=bdn_agg#0abe7e457ab88370f6ea19d726a79e0031d0138e"
 dependencies = [
  "anyhow",
  "sha3",
@@ -4341,6 +4349,7 @@ dependencies = [
 [[package]]
 name = "filecoin-f3-rpc"
 version = "0.1.0"
+source = "git+https://github.com/moshababo/rust-f3?branch=bdn_agg#0abe7e457ab88370f6ea19d726a79e0031d0138e"
 dependencies = [
  "anyhow",
  "filecoin-f3-gpbft",
@@ -9101,6 +9110,7 @@ dependencies = [
 [[package]]
 name = "proofs"
 version = "0.1.0"
+source = "git+https://github.com/consensus-shipyard/ipc-filecoin-proofs?branch=proofs#287aa5d052bb32d191ec0103e6bbb8373f0b3bd3"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
