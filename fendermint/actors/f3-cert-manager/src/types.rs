@@ -37,8 +37,6 @@ pub struct ConstructorParams {
     pub genesis_instance_id: u64,
     /// Genesis power table
     pub genesis_power_table: Vec<PowerEntry>,
-    /// Genesis F3 certificate (if available)
-    pub genesis_certificate: Option<F3Certificate>,
 }
 
 /// Parameters for updating the F3 certificate
@@ -48,11 +46,11 @@ pub struct UpdateCertificateParams {
     pub certificate: F3Certificate,
 }
 
-/// Response containing the latest F3 certificate
+/// Response containing the latest F3 state
 #[derive(Deserialize_tuple, Serialize_tuple, Debug, Clone, PartialEq, Eq)]
 pub struct GetCertificateResponse {
-    /// Current F3 certificate
-    pub certificate: Option<F3Certificate>,
+    /// Current F3 instance ID
+    pub current_instance_id: u64,
     /// Latest finalized height
     pub latest_finalized_height: ChainEpoch,
 }
