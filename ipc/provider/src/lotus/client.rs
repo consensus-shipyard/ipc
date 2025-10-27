@@ -53,7 +53,6 @@ mod methods {
     pub const GET_TIPSET_BY_HEIGHT: &str = "Filecoin.ChainGetTipSetByHeight";
     pub const ESTIMATE_MESSAGE_GAS: &str = "Filecoin.GasEstimateMessageGas";
     pub const F3_GET_LATEST_CERTIFICATE: &str = "Filecoin.F3GetLatestCertificate";
-    pub const F3_GET_CERT: &str = "Filecoin.F3GetCert";
     pub const F3_GET_POWER_TABLE_BY_INSTANCE: &str = "Filecoin.F3GetPowerTableByInstance";
 }
 
