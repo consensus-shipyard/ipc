@@ -76,15 +76,10 @@ impl CommandLineHandler for BottomUpRelayer {
         let child = get_subnet_config(&config_path, &subnet)?;
         let parent = get_subnet_config(&config_path, &parent)?;
 
-        let fendermint_client = fendermint_rpc::FendermintClient::new_http(
-            tendermint_rpc::Url::from_str(arguments.fendermint_rpc_url.as_str())?,
-            None,
-        )?;
         let mut manager = BottomUpCheckpointManager::new_evm_manager(
             parent.clone(),
             child.clone(),
             Arc::new(RwLock::new(keystore)),
-            fendermint_client,
         )
         .await?;
 
@@ -118,9 +113,6 @@ pub(crate) struct BottomUpRelayerArgs {
     pub finalization_blocks: Option<u64>,
     #[arg(long, help = "The hex encoded address of the submitter")]
     pub submitter: Option<String>,
-
-    #[arg(long, help = "The fendermint rpc url for the child subnet")]
-    pub fendermint_rpc_url: String,
 
     #[arg(
         long,

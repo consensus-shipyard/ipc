@@ -281,6 +281,8 @@ pub trait SignedHeaderRelayer: Send + Sync {
         height: ChainEpoch,
     ) -> Result<Option<AppHashBreakdown>>;
 
+    async fn get_state_root(&self, height: ChainEpoch) -> Result<Vec<u8>>;
+
     async fn get_last_bottom_up_checkpoint_height(&self, subnet_id: &SubnetID) -> Result<u64>;
 
     async fn get_last_app_commitment_height(&self, subnet_id: &SubnetID) -> Result<u64>;

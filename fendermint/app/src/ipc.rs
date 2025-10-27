@@ -181,7 +181,6 @@ mod tests {
     use ipc_actors_abis::subnet_actor_checkpointing_facet::{
         AggregatedStats, AppHashBreakdown, Commitment, CompressedActivityRollup, CompressedSummary,
     };
-    use k256::pkcs8::der::Encode;
 
     #[test]
     fn test_app_hash() {
@@ -216,7 +215,7 @@ mod tests {
 
         let bytes = abi_encode_tuple_manual_hash(&breakdown);
         assert_eq!(
-            hex::encode(&bytes),
+            hex::encode(bytes),
             "5904603f8b5b1844a80498361e2a2c92938529bd09be6ba7eefcd9b679d5a0e3"
         );
 
@@ -251,7 +250,7 @@ mod tests {
 
         let bytes = abi_encode_tuple_manual_hash(&another);
         assert_eq!(
-            hex::encode(&bytes),
+            hex::encode(bytes),
             "8d26ca04a9eb3b9140457445abd7ab774c98b6b6a1a4ee187fb8dc8ee99f9f55"
         );
     }

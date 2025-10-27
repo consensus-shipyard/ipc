@@ -124,6 +124,7 @@ pub fn register_methods(server: ServerBuilder<MapRouter>) -> ServerBuilder<MapRo
         subscribe,
         syncing,
         getCommitSignedHeader,
+        getStateRoot,
         uninstallFilter,
         unsubscribe
     });

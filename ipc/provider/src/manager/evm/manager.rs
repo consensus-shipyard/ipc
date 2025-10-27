@@ -1227,6 +1227,15 @@ impl SignedHeaderRelayer for EthSubnetManager {
         Ok(SignedHeader::decode(raw_bytes.as_ref())?)
     }
 
+    async fn get_state_root(&self, height: ChainEpoch) -> Result<Vec<u8>> {
+        let raw_bytes = self
+            .ipc_contract_info
+            .provider
+            .request::<_, Bytes>("eth_getStateRoot", [height.to_string()])
+            .await?;
+        Ok(raw_bytes.to_vec())
+    }
+
     async fn submit_signed_header(
         &self,
         submitter: &Address,

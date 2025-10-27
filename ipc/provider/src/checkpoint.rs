@@ -5,7 +5,6 @@
 use crate::config::Subnet;
 use crate::manager::{EthSubnetManager, SignedHeaderRelayer};
 use anyhow::{anyhow, Result};
-use fendermint_rpc::{FendermintClient, QueryClient};
 use fvm_shared::address::Address;
 use fvm_shared::clock::ChainEpoch;
 use ipc_wallet::{EthKeyAddress, PersistentKeyStore};
@@ -26,7 +25,6 @@ pub struct BottomUpCheckpointManager<T> {
     metadata: CheckpointConfig,
     parent_handler: Arc<T>,
     child_handler: T,
-    child_fendermint_client: FendermintClient,
     /// The number of blocks away from the chain head that is considered final
     finalization_blocks: ChainEpoch,
 }
@@ -37,7 +35,6 @@ impl<T: SignedHeaderRelayer> BottomUpCheckpointManager<T> {
         child: Subnet,
         parent_handler: T,
         child_handler: T,
-        child_fendermint_client: FendermintClient,
     ) -> Result<Self> {
         let period = parent_handler
             .submission_period(&child.id)
@@ -52,7 +49,6 @@ impl<T: SignedHeaderRelayer> BottomUpCheckpointManager<T> {
             parent_handler: Arc::new(parent_handler),
             child_handler,
             finalization_blocks: 0,
-            child_fendermint_client,
         })
     }
 
@@ -67,20 +63,12 @@ impl BottomUpCheckpointManager<EthSubnetManager> {
         parent: Subnet,
         child: Subnet,
         keystore: Arc<RwLock<PersistentKeyStore<EthKeyAddress>>>,
-        child_fendermint_client: FendermintClient,
     ) -> Result<Self> {
         let parent_handler =
             EthSubnetManager::from_subnet_with_wallet_store(&parent, Some(keystore.clone()))?;
         let child_handler =
             EthSubnetManager::from_subnet_with_wallet_store(&child, Some(keystore))?;
-        Self::new(
-            parent,
-            child,
-            parent_handler,
-            child_handler,
-            child_fendermint_client,
-        )
-        .await
+        Self::new(parent, child, parent_handler, child_handler).await
     }
 }
 
@@ -157,7 +145,7 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
             .parent_handler
             .get_last_app_commitment_height(&self.metadata.child.id)
             .await?;
-        
+
         next_height += self.metadata.period as u64;
 
         while next_height < end_height as u64 {
@@ -169,12 +157,11 @@ impl<T: SignedHeaderRelayer + Send + Sync + 'static> BottomUpCheckpointManager<T
                 continue;
             };
 
-            let state_params = self
-                .child_fendermint_client
+            let state_root = self
+                .child_handler
                 // the state root from fendermint client is actually in the next block height
-                .state_params((next_height + 1).into())
+                .get_state_root((next_height + 1) as ChainEpoch)
                 .await?;
-            let state_root = state_params.value.state_root;
 
             tracing::info!(
                 height = next_height,
