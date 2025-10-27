@@ -131,8 +131,8 @@ impl ProofGeneratorService {
     /// CRITICAL: Processes F3 instances SEQUENTIALLY - never skips!
     async fn generate_next_proofs(&self) -> Result<()> {
         let last_committed = self.cache.last_committed_instance();
-        // Start FROM last_committed (not +1) because F3 state needs to validate that instance first
-        let next_instance = last_committed;
+        // Lookahead window starts AFTER last_committed (which was already processed)
+        let next_instance = last_committed + 1;
         let max_instance = last_committed + self.config.lookahead_instances;
 
         tracing::debug!(
@@ -143,7 +143,6 @@ impl ProofGeneratorService {
         );
 
         // Process instances IN ORDER - this is critical for F3
-        // Start from last_committed itself to validate it first
         for instance_id in next_instance..=max_instance {
             // Skip if already cached
             if self.cache.contains(instance_id) {
