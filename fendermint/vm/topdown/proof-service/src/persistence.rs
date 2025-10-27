@@ -89,22 +89,11 @@ impl ProofCachePersistence {
                 info!(version = SCHEMA_VERSION, "Verified schema version");
             }
             None => {
-<<<<<<< HEAD
                 self.db.put_cf(
                     &cf,
                     KEY_SCHEMA_VERSION,
                     serde_json::to_vec(&SCHEMA_VERSION)?,
                 )?;
-=======
-                // Initialize new schema
-                self.db
-                    .put_cf(
-                        &cf_meta,
-                        KEY_SCHEMA_VERSION,
-                        serde_json::to_vec(&SCHEMA_VERSION)?,
-                    )
-                    .context("Failed to write schema version")?;
->>>>>>> 5798704e (feat: debug issues + make functional)
                 info!(version = SCHEMA_VERSION, "Initialized new schema");
             }
         }
@@ -126,7 +115,6 @@ impl ProofCachePersistence {
         Ok(())
     }
 
-<<<<<<< HEAD
     pub fn load_all_certificates(&self) -> Result<Vec<CertificateEntry>> {
         let cf = self.get_cf(CF_CERTIFICATES)?;
         let mut entries = Vec::new();
@@ -148,33 +136,6 @@ impl ProofCachePersistence {
         debug!(instance_id, "Deleted certificate from disk");
         Ok(())
     }
-=======
-    /// Load a cache entry from disk
-    pub fn load_entry(&self, instance_id: u64) -> Result<Option<CacheEntry>> {
-        let cf_bundles = self
-            .db
-            .cf_handle(CF_BUNDLES)
-            .context("Failed to get bundles column family")?;
-
-        let key = instance_id.to_be_bytes();
-
-        match self.db.get_cf(&cf_bundles, key)? {
-            Some(data) => {
-                let entry =
-                    serde_json::from_slice(&data).context("Failed to deserialize cache entry")?;
-                Ok(Some(entry))
-            }
-            None => Ok(None),
-        }
-    }
-
-    /// Load all entries within a range
-    pub fn load_range(&self, start: u64, end: u64) -> Result<Vec<CacheEntry>> {
-        let cf_bundles = self
-            .db
-            .cf_handle(CF_BUNDLES)
-            .context("Failed to get bundles column family")?;
->>>>>>> 5798704e (feat: debug issues + make functional)
 
     pub fn save_epoch_proof(&self, entry: &EpochProofEntry) -> Result<()> {
         let cf = self.get_cf(CF_EPOCH_PROOFS)?;
@@ -192,15 +153,9 @@ impl ProofCachePersistence {
 
         for item in self.db.iterator_cf(&cf, rocksdb::IteratorMode::Start) {
             let (_, value) = item?;
-<<<<<<< HEAD
             let entry: EpochProofEntry = serde_json::from_slice(&value)
                 .context("Failed to deserialize epoch proof entry")?;
             entries.push(entry);
-=======
-            let entry: SerializableCacheEntry =
-                serde_json::from_slice(&value).context("Failed to deserialize cache entry")?;
-            entries.push(CacheEntry::try_from(entry)?);
->>>>>>> 5798704e (feat: debug issues + make functional)
         }
 
         info!(count = entries.len(), "Loaded epoch proofs from disk");

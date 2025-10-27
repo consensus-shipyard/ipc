@@ -18,6 +18,7 @@ use proofs::{
         EventProofSpec, StorageProofSpec,
     },
 };
+use std::time::Instant;
 use url::Url;
 
 // Event signatures for proof generation

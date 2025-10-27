@@ -8,6 +8,7 @@ mod crossmsg;
 // mod daemon;
 mod deploy;
 mod node;
+mod proof_cache;
 mod subnet;
 mod ui;
 mod util;
@@ -16,6 +17,7 @@ mod wallet;
 
 use crate::commands::checkpoint::CheckpointCommandsArgs;
 use crate::commands::crossmsg::CrossMsgsCommandsArgs;
+use crate::commands::proof_cache::ProofCacheArgs;
 use crate::commands::ui::{run_ui_command, UICommandArgs};
 use crate::commands::util::UtilCommandsArgs;
 use crate::GlobalArguments;
@@ -62,6 +64,7 @@ enum Commands {
     Deploy(DeployCommandArgs),
     Ui(UICommandArgs),
     Node(NodeCommandsArgs),
+    ProofCache(ProofCacheArgs),
 }
 
 #[derive(Debug, Parser)]

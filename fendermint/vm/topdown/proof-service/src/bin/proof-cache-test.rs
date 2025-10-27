@@ -1,6 +1,9 @@
 // Copyright 2022-2025 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-//! Test CLI for the proof cache service with multiple subcommands
+//! Development/testing binary for the proof cache service
+//!
+//! NOTE: For production use, use `fendermint proof-cache` commands instead.
+//! This binary is for development and CI testing only.
 
 use clap::{Parser, Subcommand};
 use fendermint_vm_topdown_proof_service::config::{CacheConfig, GatewayId, ProofServiceConfig};
@@ -14,7 +17,7 @@ use std::str::FromStr;
 use std::time::Duration;
 
 #[derive(Parser)]
-#[command(author, version, about = "Proof cache service test CLI")]
+#[command(author, version, about = "Proof cache service - DEVELOPMENT TOOL")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -22,26 +25,26 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Run the proof generation service
+    /// Run the proof generation service (development/testing)
     Run {
-        /// Parent chain RPC URL
+        /// Parent RPC URL
         #[arg(long)]
         rpc_url: String,
 
-        /// Subnet ID (e.g., "mysubnet")
+        /// Subnet ID
         #[arg(long)]
         subnet_id: String,
 
-        /// Gateway actor ID on parent chain
+        /// Gateway address (Ethereum address like 0xE4c61299c16323C4B58376b60A77F68Aa59afC8b)
         #[arg(long)]
-        gateway_actor_id: u64,
+        gateway_address: String,
 
-        /// Number of instances to look ahead
-        #[arg(long, default_value = "5")]
+        /// Lookahead window
+        #[arg(long, default_value = "3")]
         lookahead: u64,
 
-        /// Initial F3 instance ID to start from
-        #[arg(long, default_value = "0")]
+        /// Initial F3 instance to start from
+        #[arg(long)]
         initial_instance: u64,
 
         /// Initial committed epoch
@@ -55,31 +58,6 @@ enum Commands {
         /// Optional database path for persistence
         #[arg(long)]
         db_path: Option<PathBuf>,
-    },
-
-    /// Inspect cache contents
-    Inspect {
-        /// Database path
-        #[arg(long)]
-        db_path: PathBuf,
-    },
-
-    /// Show cache statistics
-    Stats {
-        /// Database path
-        #[arg(long)]
-        db_path: PathBuf,
-    },
-
-    /// Get specific proof by instance ID
-    Get {
-        /// Database path
-        #[arg(long)]
-        db_path: PathBuf,
-
-        /// Instance ID to fetch
-        #[arg(long)]
-        instance_id: u64,
     },
 }
 
@@ -99,7 +77,7 @@ async fn main() -> anyhow::Result<()> {
         Commands::Run {
             rpc_url,
             subnet_id,
-            gateway_actor_id,
+            gateway_address,
             lookahead,
             initial_instance,
             initial_committed_epoch,
@@ -109,7 +87,7 @@ async fn main() -> anyhow::Result<()> {
             run_service(
                 rpc_url,
                 subnet_id,
-                gateway_actor_id,
+                gateway_address,
                 lookahead,
                 initial_committed_epoch,
                 initial_instance,
@@ -118,30 +96,24 @@ async fn main() -> anyhow::Result<()> {
             )
             .await
         }
-        Commands::Inspect { db_path } => inspect_cache(&db_path),
-        Commands::Stats { db_path } => show_stats(&db_path),
-        Commands::Get {
-            db_path,
-            instance_id,
-        } => get_proof(&db_path, instance_id),
     }
 }
 
 async fn run_service(
     rpc_url: String,
     subnet_id: String,
-    gateway_actor_id: u64,
+    gateway_address: String,
     lookahead: u64,
     initial_committed_epoch: u64,
     initial_instance: u64,
     poll_interval: u64,
     db_path: Option<PathBuf>,
 ) -> anyhow::Result<()> {
-    println!("=== Proof Cache Service ===");
+    println!("=== Proof Cache Service (DEVELOPMENT) ===");
     println!("Configuration:");
     println!("  RPC URL: {}", rpc_url);
     println!("  Subnet ID: {}", subnet_id);
-    println!("  Gateway Actor ID: {}", gateway_actor_id);
+    println!("  Gateway Address: {}", gateway_address);
     println!("  Lookahead: {} instances", lookahead);
     println!("  Initial Instance: {}", initial_instance);
     println!("  Poll Interval: {} seconds", poll_interval);
@@ -213,9 +185,7 @@ async fn run_service(
         let highest = cache.highest_cached_instance();
         let instances = cache.cached_certificate_instances();
 
-        // Clear screen for clean display
-        print!("\x1B[2J\x1B[1;1H");
-
+        print!("\x1B[2J\x1B[1;1H"); // Clear screen
         println!("=== Proof Cache Status ===");
         println!(
             "Timestamp: {}",
@@ -251,10 +221,8 @@ async fn run_service(
             println!("No proofs cached yet...");
             println!();
         }
-        println!();
 
-        let instances = cache.cached_instances();
-        if !instances.is_empty() {
+        if size > 0 {
             println!("Cached Instances:");
             print!("  ");
             for instance in instances {
