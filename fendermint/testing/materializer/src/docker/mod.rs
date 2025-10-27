@@ -975,6 +975,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                 ipc from-parent \
                     --subnet-id {} \
                     --parent-endpoint {} \
+                    --parent-filecoin-rpc {} \
                     --parent-gateway {:?} \
                     --parent-registry {:?} \
                     --base-fee {} \
@@ -982,6 +983,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                 ",
             subnet.subnet_id,
             parent_url,
+            parent_url, // Use same endpoint as parent_endpoint for test environment
             parent_submit_config.deployment.gateway,
             parent_submit_config.deployment.registry,
             TokenAmount::zero().atto(),
