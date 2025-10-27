@@ -3,9 +3,11 @@
 //! In-memory cache for proof bundles with optional disk persistence
 
 use crate::config::CacheConfig;
+use crate::observe::ProofCached;
 use crate::persistence::ProofCachePersistence;
 use crate::types::CacheEntry;
 use anyhow::Result;
+use ipc_observability::emit;
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -44,11 +46,17 @@ impl ProofCache {
     ///
     /// Loads existing entries from disk on startup.
     /// If DB is fresh, uses `initial_instance` as the starting point.
-    pub fn new_with_persistence(config: CacheConfig, db_path: &Path, initial_instance: u64) -> Result<Self> {
+    pub fn new_with_persistence(
+        config: CacheConfig,
+        db_path: &Path,
+        initial_instance: u64,
+    ) -> Result<Self> {
         let persistence = ProofCachePersistence::open(db_path)?;
 
         // Load last committed from disk, or use initial_instance if DB is fresh
-        let last_committed = persistence.load_last_committed()?.unwrap_or(initial_instance);
+        let last_committed = persistence
+            .load_last_committed()?
+            .unwrap_or(initial_instance);
 
         // Load all entries from disk into memory
         let entries_vec = persistence.load_all_entries()?;
@@ -87,7 +95,15 @@ impl ProofCache {
 
     /// Check if an instance is already cached
     pub fn contains(&self, instance_id: u64) -> bool {
-        self.entries.read().contains_key(&instance_id)
+        let result = self.entries.read().contains_key(&instance_id);
+
+        // Record cache hit/miss
+        use crate::observe::CACHE_HIT_TOTAL;
+        CACHE_HIT_TOTAL
+            .with_label_values(&[if result { "hit" } else { "miss" }])
+            .inc();
+
+        result
     }
 
     /// Insert a proof into the cache
@@ -115,11 +131,23 @@ impl ProofCache {
             persistence.save_entry(&entry)?;
         }
 
-        tracing::debug!(
-            instance_id,
-            cache_size = self.entries.read().len(),
-            "Inserted proof into cache"
-        );
+        // Emit metrics
+        let cache_size = self.entries.read().len();
+        let highest = self.highest_cached_instance();
+
+        if let Some(highest_cached) = highest {
+            emit(ProofCached {
+                instance: instance_id,
+                cache_size,
+                highest_cached,
+            });
+        }
+
+        // Update cache size metric
+        use crate::observe::CACHE_SIZE;
+        CACHE_SIZE.set(cache_size as i64);
+
+        tracing::debug!(instance_id, cache_size, "Inserted proof into cache");
 
         Ok(())
     }

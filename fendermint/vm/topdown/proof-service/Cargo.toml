@@ -29,32 +29,36 @@ fendermint_vm_genesis = { path = "../../genesis" }
 # IPC
 ipc-provider = { path = "../../../../ipc/provider" }
 ipc-api = { path = "../../../../ipc/api" }
+ipc-observability = { path = "../../../../ipc/observability" }
+
+# Metrics
+prometheus = { workspace = true }
 
 # FVM
 fvm_shared = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
 
-# Proofs library - using local path for macOS fix
-proofs = { path = "/Users/karlem/work/proofs" }
+proofs = { git = "https://github.com/consensus-shipyard/ipc-filecoin-proofs", branch = "proofs" }
 
-# F3 certificate handling - using LOCAL fixed version for testing
-filecoin-f3-certs = { path = "/Users/karlem/work/rust-f3-fork/certs" }
-filecoin-f3-rpc = { path = "/Users/karlem/work/rust-f3-fork/rpc" }
-filecoin-f3-lightclient = { path = "/Users/karlem/work/rust-f3-fork/lightclient" }
-filecoin-f3-gpbft = { path = "/Users/karlem/work/rust-f3-fork/gpbft" }
+# F3 certificate handling
+filecoin-f3-certs = { git = "https://github.com/moshababo/rust-f3", branch = "bdn_agg" }
+filecoin-f3-rpc = { git = "https://github.com/moshababo/rust-f3", branch = "bdn_agg" }
+filecoin-f3-lightclient = { git = "https://github.com/moshababo/rust-f3", branch = "bdn_agg" }
+filecoin-f3-gpbft = { git = "https://github.com/moshababo/rust-f3", branch = "bdn_agg" }
 
-# Binary dependencies (required for proof-cache-test binary)
+# Development/testing binary dependencies
 clap = { workspace = true, optional = true }
 tracing-subscriber = { workspace = true, optional = true }
 chrono = { version = "0.4", optional = true }
 
 [features]
-cli = ["clap", "tracing-subscriber", "chrono"]
+# Feature for building the development/testing binary
+dev-tools = ["clap", "tracing-subscriber", "chrono"]
 
 [[bin]]
 name = "proof-cache-test"
 path = "src/bin/proof-cache-test.rs"
-required-features = ["cli"]
+required-features = ["dev-tools"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "rt-multi-thread"] }

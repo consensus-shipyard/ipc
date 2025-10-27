@@ -6,8 +6,11 @@
 //! ipc-filecoin-proofs library. The assembler is only responsible for
 //! proof generation - it has no knowledge of cache entries or storage.
 
+use crate::observe::{OperationStatus, ProofBundleGenerated};
 use anyhow::{Context, Result};
 use filecoin_f3_certs::FinalityCertificate;
+use fvm_ipld_encoding;
+use ipc_observability::emit;
 use proofs::{
     client::LotusClient,
     proofs::{
@@ -15,6 +18,7 @@ use proofs::{
         EventProofSpec, StorageProofSpec,
     },
 };
+use std::time::Instant;
 use url::Url;
 
 /// Assembles proof bundles from F3 certificates and parent chain data
@@ -62,6 +66,9 @@ impl ProofAssembler {
         &self,
         certificate: &FinalityCertificate,
     ) -> Result<UnifiedProofBundle> {
+        let generation_start = Instant::now();
+        let instance_id = certificate.gpbft_instance;
+
         let highest_epoch = certificate
             .ec_chain
             .suffix()
@@ -70,7 +77,7 @@ impl ProofAssembler {
             .context("No epochs in certificate")?;
 
         tracing::debug!(
-            instance_id = certificate.gpbft_instance,
+            instance_id,
             highest_epoch,
             "Generating proof bundle - fetching tipsets"
         );
@@ -84,7 +91,12 @@ impl ProofAssembler {
                 serde_json::json!([highest_epoch, null]),
             )
             .await
-            .context("Failed to fetch parent tipset")?;
+            .with_context(|| {
+                format!(
+                    "Failed to fetch parent tipset at epoch {} - RPC may not serve old tipsets (check lookback limit)",
+                    highest_epoch
+                )
+            })?;
 
         let child_tipset = client
             .request(
@@ -92,7 +104,12 @@ impl ProofAssembler {
                 serde_json::json!([highest_epoch + 1, null]),
             )
             .await
-            .context("Failed to fetch child tipset")?;
+            .with_context(|| {
+                format!(
+                    "Failed to fetch child tipset at epoch {} - RPC may not serve old tipsets (check lookback limit)",
+                    highest_epoch + 1
+                )
+            })?;
 
         tracing::debug!(
             instance_id = certificate.gpbft_instance,
@@ -106,14 +123,19 @@ impl ProofAssembler {
         let child_api: proofs::client::types::ApiTipset =
             serde_json::from_value(child_tipset).context("Failed to deserialize child tipset")?;
 
-        // Configure proof specs
+        // Configure proof specs for Gateway contract
+        // Storage: subnets[subnetKey].topDownNonce
+        // Event: NewTopDownMessage(address indexed subnet, IpcEnvelope message, bytes32 indexed id)
         let storage_specs = vec![StorageProofSpec {
             actor_id: self.gateway_actor_id,
-            slot: calculate_storage_slot(&self.subnet_id, 0),
+            // Calculate slot for subnets[subnetKey].topDownNonce
+            // Note: topDownNonce is at offset 3 in the Subnet struct
+            slot: calculate_storage_slot(&self.subnet_id, 3),
         }];
 
         let event_specs = vec![EventProofSpec {
-            event_signature: "NewTopDownMessage(bytes32,uint256)".to_string(),
+            event_signature: "NewTopDownMessage(address,IpcEnvelope,bytes32)".to_string(),
+            // topic_1 is the indexed subnet address
             topic_1: self.subnet_id.clone(),
             actor_id_filter: Some(self.gateway_actor_id),
         }];
@@ -144,8 +166,26 @@ impl ProofAssembler {
         .context("Proof generation task panicked")?
         .context("Failed to generate proof bundle")?;
 
+        // Calculate bundle size for metrics
+        let bundle_size_bytes = fvm_ipld_encoding::to_vec(&bundle)
+            .map(|v| v.len())
+            .unwrap_or(0);
+
+        let latency = generation_start.elapsed().as_secs_f64();
+
+        emit(ProofBundleGenerated {
+            instance: instance_id,
+            highest_epoch,
+            storage_proofs: bundle.storage_proofs.len(),
+            event_proofs: bundle.event_proofs.len(),
+            witness_blocks: bundle.blocks.len(),
+            bundle_size_bytes,
+            status: OperationStatus::Success,
+            latency,
+        });
+
         tracing::info!(
-            instance_id = certificate.gpbft_instance,
+            instance_id,
             highest_epoch,
             storage_proofs = bundle.storage_proofs.len(),
             event_proofs = bundle.event_proofs.len(),

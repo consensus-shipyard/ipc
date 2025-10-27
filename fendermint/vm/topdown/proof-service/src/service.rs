@@ -42,10 +42,24 @@ impl ProofGeneratorService {
         initial_instance: u64,
         power_table: filecoin_f3_gpbft::PowerEntries,
     ) -> Result<Self> {
-        // Validate required configuration
-        let gateway_actor_id = config
-            .gateway_actor_id
-            .context("gateway_actor_id is required in configuration")?;
+        // Resolve gateway actor ID (support both direct ID and Ethereum address)
+        let gateway_actor_id = if let Some(id) = config.gateway_actor_id {
+            id
+        } else if let Some(eth_addr) = &config.gateway_eth_address {
+            // Resolve Ethereum address to actor ID
+            tracing::info!(eth_address = %eth_addr, "Resolving gateway Ethereum address to actor ID");
+            let client =
+                proofs::client::LotusClient::new(url::Url::parse(&config.parent_rpc_url)?, None);
+            let actor_id = proofs::proofs::resolve_eth_address_to_actor_id(&client, eth_addr)
+                .await
+                .with_context(|| {
+                    format!("Failed to resolve gateway Ethereum address: {}", eth_addr)
+                })?;
+            tracing::info!(eth_address = %eth_addr, actor_id, "Resolved gateway address");
+            actor_id
+        } else {
+            anyhow::bail!("Either gateway_actor_id or gateway_eth_address must be configured");
+        };
         let subnet_id = config
             .subnet_id
             .as_ref()
@@ -98,7 +112,7 @@ impl ProofGeneratorService {
 
         loop {
             poll_interval.tick().await;
-            
+
             tracing::debug!("Poll interval tick");
             if let Err(e) = self.generate_next_proofs().await {
                 tracing::error!(
@@ -134,17 +148,6 @@ impl ProofGeneratorService {
             // Skip if already cached
             if self.cache.contains(instance_id) {
                 tracing::debug!(instance_id, "Proof already cached");
-                continue;
-            }
-
-            // Skip if F3 state is already past this instance (already validated)
-            let f3_current = self.f3_client.current_instance().await;
-            if f3_current > instance_id {
-                tracing::debug!(
-                    instance_id,
-                    f3_current,
-                    "F3 state already past this instance (validated but proof pending) - skipping to avoid re-validation"
-                );
                 continue;
             }
 
@@ -232,7 +235,12 @@ impl ProofGeneratorService {
             .assembler
             .generate_proof_bundle(f3_cert)
             .await
-            .context("Failed to generate proof bundle")?;
+            .with_context(|| {
+                format!(
+                    "Failed to generate proof bundle for instance {} - check RPC tipset availability and network connectivity",
+                    f3_cert.gpbft_instance
+                )
+            })?;
 
         Ok(bundle)
     }
