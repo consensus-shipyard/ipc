@@ -4784,7 +4784,11 @@ dependencies = [
  "fendermint_vm_message",
  "fendermint_vm_resolver",
  "fendermint_vm_topdown",
+<<<<<<< HEAD
  "fil_actor_adm",
+=======
+ "fendermint_vm_topdown_proof_service",
+>>>>>>> 9c2672466 (feat: init lifecycle)
  "fil_actor_eam",
  "fil_actor_evm",
  "futures-core",
@@ -4840,6 +4844,7 @@ dependencies = [
  "fendermint_vm_actor_interface",
  "fendermint_vm_encoding",
  "fendermint_vm_message",
+ "fendermint_vm_topdown_proof_service",
  "fvm_ipld_encoding 0.5.3",
  "fvm_shared",
  "hex",
@@ -4847,6 +4852,7 @@ dependencies = [
  "lazy_static",
  "multihash-codetable",
  "num-traits",
+ "proofs",
  "quickcheck",
  "quickcheck_macros",
  "rand 0.8.5",
@@ -11128,7 +11134,7 @@ dependencies = [
 [[package]]
 name = "proofs"
 version = "0.1.0"
-source = "git+https://github.com/consensus-shipyard/ipc-filecoin-proofs?branch=proofs#287aa5d052bb32d191ec0103e6bbb8373f0b3bd3"
+source = "git+https://github.com/consensus-shipyard/ipc-filecoin-proofs.git?branch=proofs#287aa5d052bb32d191ec0103e6bbb8373f0b3bd3"
 dependencies = [
  "anyhow",
  "base64 0.21.7",

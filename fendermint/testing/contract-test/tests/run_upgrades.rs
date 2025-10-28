@@ -208,7 +208,7 @@ async fn test_applying_upgrades() {
     let end_block_manager = EndBlockManager::default();
     let finality_provider = Arc::new(Toggle::disabled());
     let vote_tally = VoteTally::empty();
-    let top_down_manager = TopDownManager::new(finality_provider, vote_tally);
+    let top_down_manager = TopDownManager::new(finality_provider, vote_tally, None);
 
     let interpreter: FvmMessagesInterpreter<MemoryBlockstore> = FvmMessagesInterpreter::new(
         end_block_manager,
