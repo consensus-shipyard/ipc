@@ -21,6 +21,7 @@ humantime-serde = { workspace = true }
 cid = { workspace = true }
 multihash = { workspace = true }
 rocksdb = { version = "0.21", features = ["multi-threaded-cf"] }
+futures = { workspace = true }
 
 # Fendermint
 fendermint_actor_f3_light_client = { path = "../../../actors/f3-light-client" }
