@@ -152,9 +152,8 @@ impl ProofAssembler {
 
         // Generate proof bundle in blocking task (proofs library uses non-Send types)
         let bundle = tokio::task::spawn_blocking(move || {
-            // Create a new tokio runtime for the blocking task
-            let rt = tokio::runtime::Handle::current();
-            rt.block_on(generate_proof_bundle(
+            // Use futures::executor to run async code without blocking the parent runtime
+            futures::executor::block_on(generate_proof_bundle(
                 &lotus_client,
                 &parent_api,
                 &child_api,
