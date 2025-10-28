@@ -479,13 +479,20 @@ pub async fn new_genesis_from_parent(
 
     let genesis_info = parent_provider.get_genesis_info(&args.subnet_id).await?;
 
-    // Fetch F3 certificate data from parent chain using Lotus client directly
-    // This requires the Filecoin/Lotus RPC endpoint, not the EVM endpoint
-    let f3_params = fetch_f3_params_from_parent(
-        &args.parent_filecoin_rpc,
-        args.parent_filecoin_auth_token.as_ref(),
-    )
-    .await?;
+    // Fetch F3 certificate data from parent chain if Filecoin RPC endpoint is provided.
+    // If not provided, it means the parent is not Filecoin (e.g., a Fendermint subnet)
+    // and F3 data is not available.
+    let f3_params = if let Some(ref parent_filecoin_rpc) = args.parent_filecoin_rpc {
+        tracing::info!("Fetching F3 data from parent Filecoin chain");
+        fetch_f3_params_from_parent(
+            parent_filecoin_rpc,
+            args.parent_filecoin_auth_token.as_ref(),
+        )
+        .await?
+    } else {
+        tracing::info!("Skipping F3 data fetch - parent is not Filecoin");
+        None
+    };
 
     tracing::debug!("F3 params: {:?}", f3_params);
 
