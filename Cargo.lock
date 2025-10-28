@@ -4064,6 +4064,7 @@ dependencies = [
  "filecoin-f3-gpbft",
  "filecoin-f3-lightclient",
  "filecoin-f3-rpc",
+ "futures",
  "fvm_ipld_encoding 0.5.3",
  "fvm_shared",
  "humantime-serde",
