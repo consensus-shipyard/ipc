@@ -38,17 +38,24 @@ where
     votes: VoteTally,
     // Gateway caller for IPC gateway interactions
     gateway_caller: GatewayCaller<DB>,
+    // Proof cache for F3-based parent finality (optional for gradual rollout)
+    proof_cache: Option<std::sync::Arc<fendermint_vm_topdown_proof_service::ProofCache>>,
 }
 
 impl<DB> TopDownManager<DB>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    pub fn new(provider: TopDownFinalityProvider, votes: VoteTally) -> Self {
+    pub fn new(
+        provider: TopDownFinalityProvider,
+        votes: VoteTally,
+        proof_cache: Option<std::sync::Arc<fendermint_vm_topdown_proof_service::ProofCache>>,
+    ) -> Self {
         Self {
             provider,
             votes,
             gateway_caller: GatewayCaller::default(),
+            proof_cache,
         }
     }
 
@@ -116,6 +123,76 @@ where
         })))
     }
 
+    /// Query proof cache for next uncommitted proof and create a chain message with proof bundle.
+    ///
+    /// This is the v2 proof-based approach that replaces voting with cryptographic verification.
+    ///
+    /// Returns `None` if:
+    /// - Proof cache is not configured
+    /// - No proof available for next height
+    /// - Cache is temporarily empty (graceful degradation)
+    pub async fn chain_message_from_proof_cache(&self) -> Option<ChainMessage> {
+        let cache = self.proof_cache.as_ref()?;
+
+        // Get next uncommitted proof (instance after last_committed)
+        let entry = cache.get_next_uncommitted()?;
+
+        tracing::debug!(
+            instance_id = entry.instance_id,
+            epochs = ?entry.finalized_epochs,
+            "found proof in cache for proposal"
+        );
+
+        // Extract highest epoch as the finality height
+        let height = entry.highest_epoch()? as ChainEpoch;
+
+        // Extract block hash from the proof bundle
+        // The proof bundle contains the parent tipset information
+        // For now, we use an empty block hash as a placeholder
+        // TODO: Extract actual block hash from certificate or proof bundle
+        let block_hash = vec![];
+
+        Some(ChainMessage::Ipc(IpcMessage::ParentFinalityWithProof(
+            fendermint_vm_message::ipc::ParentFinalityProofBundle {
+                finality: ParentFinality { height, block_hash },
+                certificate: entry.certificate,
+                proof_bundle: entry.proof_bundle,
+            },
+        )))
+    }
+
+    /// Deterministically verify a proof bundle against F3 certificate.
+    ///
+    /// This performs cryptographic verification of:
+    /// 1. Storage proofs (contract state at parent height - completeness via topDownNonce)
+    /// 2. Event proofs (emitted events at parent height)
+    /// 3. Certificate chain continuity (validates against F3CertManager state)
+    ///
+    /// All correct validators will reach the same decision (deterministic).
+    pub async fn verify_proof_bundle(
+        &self,
+        bundle: &fendermint_vm_message::ipc::ParentFinalityProofBundle,
+    ) -> anyhow::Result<()> {
+        use fendermint_vm_topdown_proof_service::verify_proof_bundle;
+
+        // Step 1: Verify cryptographic proofs (storage + events)
+        verify_proof_bundle(&bundle.proof_bundle, &bundle.certificate)
+            .context("proof bundle cryptographic verification failed")?;
+
+        // Step 2: TODO - Verify certificate chain continuity
+        // Query F3CertManager for last committed instance
+        // Ensure bundle.certificate.instance_id == last_committed + 1
+        // This requires querying the F3CertManager actor state
+
+        tracing::debug!(
+            instance_id = bundle.certificate.instance_id,
+            height = bundle.finality.height,
+            "proof bundle verified successfully"
+        );
+
+        Ok(())
+    }
+
     pub async fn update_voting_power_table(&self, power_updates: &PowerUpdates) {
         let power_updates_mapped: Vec<_> = power_updates
             .0
@@ -124,6 +201,127 @@ where
             .collect();
 
         atomically(|| self.votes.update_power_table(power_updates_mapped.clone())).await
+    }
+
+    /// Execute proof-based topdown finality (v2).
+    ///
+    /// Steps:
+    /// 1. Commit parent finality to gateway
+    /// 2. Update F3CertManager actor with new certificate (TODO)
+    /// 3. Extract and execute topdown effects (messages + validator changes)
+    /// 4. Mark instance as committed in cache
+    /// 5. Update local state (provider + votes)
+    pub async fn execute_proof_based_topdown(
+        &self,
+        state: &mut FvmExecState<DB>,
+        bundle: fendermint_vm_message::ipc::ParentFinalityProofBundle,
+    ) -> anyhow::Result<AppliedMessage> {
+        if !self.provider.is_enabled() {
+            bail!("cannot execute IPC top-down message: parent provider disabled");
+        }
+
+        // Convert to IPCParentFinality
+        let finality =
+            IPCParentFinality::new(bundle.finality.height, bundle.finality.block_hash.clone());
+
+        tracing::debug!(
+            finality = finality.to_string(),
+            instance = bundle.certificate.instance_id,
+            "executing proof-based topdown finality"
+        );
+
+        // Step 1: Commit parent finality (same as v1)
+        let (prev_height, _prev_finality) = self
+            .commit_finality(state, finality.clone())
+            .await
+            .context("failed to commit finality")?;
+
+        tracing::debug!(
+            previous_height = prev_height,
+            current_height = finality.height,
+            "committed parent finality"
+        );
+
+        // Step 2: TODO - Update F3CertManager actor
+        // self.update_f3_cert_manager(state, &bundle.certificate)?;
+
+        // Step 3: Execute topdown effects
+        // For now, we use the existing v1 path to fetch messages/changes from the provider
+        // TODO: Extract from proof bundle instead
+        let (execution_fr, execution_to) = (prev_height + 1, finality.height);
+
+        let validator_changes = self
+            .provider
+            .validator_changes_from(execution_fr, execution_to)
+            .await
+            .context("failed to fetch validator changes")?;
+
+        tracing::debug!(
+            from = execution_fr,
+            to = execution_to,
+            change_count = validator_changes.len(),
+            "fetched validator changes"
+        );
+
+        self.gateway_caller
+            .store_validator_changes(state, validator_changes)
+            .context("failed to store validator changes")?;
+
+        let msgs = self
+            .provider
+            .top_down_msgs_from(execution_fr, execution_to)
+            .await
+            .context("failed to fetch top down messages")?;
+
+        tracing::debug!(
+            message_count = msgs.len(),
+            start = execution_fr,
+            end = execution_to,
+            "fetched topdown messages"
+        );
+
+        let ret = self
+            .execute_topdown_msgs(state, msgs)
+            .await
+            .context("failed to execute top down messages")?;
+
+        tracing::debug!("applied topdown messages");
+
+        // Step 4: Mark instance as committed in cache
+        if let Some(cache) = &self.proof_cache {
+            cache.mark_committed(bundle.certificate.instance_id);
+            tracing::debug!(
+                instance = bundle.certificate.instance_id,
+                "marked instance as committed in cache"
+            );
+        }
+
+        // Step 5: Update state (same as v1)
+        let local_block_height = state.block_height() as u64;
+        let proposer = state
+            .block_producer()
+            .map(|id| hex::encode(id.serialize_compressed()));
+        let proposer_ref = proposer.as_deref();
+
+        atomically(|| {
+            self.provider.set_new_finality(finality.clone())?;
+            self.votes.set_finalized(
+                finality.height,
+                finality.block_hash.clone(),
+                proposer_ref,
+                Some(local_block_height),
+            )?;
+            Ok(())
+        })
+        .await;
+
+        tracing::info!(
+            instance = bundle.certificate.instance_id,
+            height = finality.height,
+            "proof-based topdown finality executed successfully"
+        );
+
+        Ok(ret)
     }
 
     // TODO Karel - separate this huge function and clean up

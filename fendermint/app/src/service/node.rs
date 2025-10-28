@@ -248,6 +248,7 @@ pub async fn run(
     let top_down_manager = TopDownManager::new(
         parent_finality_provider.clone(),
         parent_finality_votes.clone(),
+        None, // TODO: Initialize proof cache when service is launched
     );
 
     let interpreter = FvmMessagesInterpreter::new(

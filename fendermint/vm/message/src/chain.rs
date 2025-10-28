@@ -12,7 +12,7 @@ use crate::{ipc::IpcMessage, signed::SignedMessage};
 /// signatures are stripped from the messages, to save space. Tendermint Core will
 /// not do this for us (perhaps with ABCI++ Vote Extensions we could do it), though.
 #[allow(clippy::large_enum_variant)]
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum ChainMessage {
     /// A message that can be passed on to the FVM as-is.
     Signed(SignedMessage),

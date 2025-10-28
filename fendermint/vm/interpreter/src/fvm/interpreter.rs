@@ -275,11 +275,21 @@ where
             .into_iter()
             .map(Into::into);
 
-        let top_down_iter = self
-            .top_down_manager
-            .chain_message_from_finality_or_quorum()
-            .await
-            .into_iter();
+        // Try proof-based finality first (v2)
+        let top_down_iter =
+            if let Some(proof_msg) = self.top_down_manager.chain_message_from_proof_cache().await {
+                tracing::info!("including proof-based parent finality in proposal");
+                vec![proof_msg].into_iter()
+            } else {
+                // Fallback to v1 voting-based approach
+                tracing::debug!("no proof available, trying v1 voting-based finality");
+                self.top_down_manager
+                    .chain_message_from_finality_or_quorum()
+                    .await
+                    .into_iter()
+                    .collect::<Vec<_>>()
+                    .into_iter()
+            };
 
         let mut all_msgs = top_down_iter
             .chain(signed_msgs_iter)
@@ -333,7 +343,28 @@ where
         for msg in msgs {
             match fvm_ipld_encoding::from_slice::<ChainMessage>(&msg) {
                 Ok(chain_msg) => match chain_msg {
+                    ChainMessage::Ipc(IpcMessage::ParentFinalityWithProof(bundle)) => {
+                        // DETERMINISTIC VERIFICATION - all validators reach same decision
+                        match self.top_down_manager.verify_proof_bundle(&bundle).await {
+                            Ok(()) => {
+                                tracing::debug!(
+                                    instance = bundle.certificate.instance_id,
+                                    height = bundle.finality.height,
+                                    "proof bundle verified - accepting"
+                                );
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    error = %e,
+                                    instance = bundle.certificate.instance_id,
+                                    "proof bundle verification failed - rejecting block"
+                                );
+                                return Ok(AttestMessagesResponse::Reject);
+                            }
+                        }
+                    }
                     ChainMessage::Ipc(IpcMessage::TopDownExec(finality)) => {
+                        // v1 voting-based finality (kept for backward compatibility)
                         if !self.top_down_manager.is_finality_valid(finality).await {
                             return Ok(AttestMessagesResponse::Reject);
                         }
@@ -459,7 +490,19 @@ where
                 })
             }
             ChainMessage::Ipc(ipc_msg) => match ipc_msg {
+                IpcMessage::ParentFinalityWithProof(bundle) => {
+                    // NEW: Execute proof-based topdown finality (v2)
+                    let applied_message = self
+                        .top_down_manager
+                        .execute_proof_based_topdown(state, bundle)
+                        .await?;
+                    Ok(ApplyMessageResponse {
+                        applied_message,
+                        domain_hash: None,
+                    })
+                }
                 IpcMessage::TopDownExec(p) => {
+                    // OLD: v1 voting-based execution (kept for backward compatibility)
                     let applied_message =
                         self.top_down_manager.execute_topdown_msg(state, p).await?;
                     Ok(ApplyMessageResponse {
