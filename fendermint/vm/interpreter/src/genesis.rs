@@ -448,12 +448,10 @@ impl<'a> GenesisBuilder<'a> {
             let constructor_params = fendermint_actor_f3_cert_manager::types::ConstructorParams {
                 genesis_instance_id: f3_params.genesis_instance_id,
                 genesis_power_table: f3_params.genesis_power_table.clone(),
-                genesis_certificate: f3_params.genesis_certificate.clone(),
             };
             let f3_cert_state = fendermint_actor_f3_cert_manager::state::State::new(
                 constructor_params.genesis_instance_id,
                 constructor_params.genesis_power_table,
-                constructor_params.genesis_certificate,
             )?;
 
             state
