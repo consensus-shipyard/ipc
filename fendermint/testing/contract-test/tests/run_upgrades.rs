@@ -203,7 +203,7 @@ async fn test_applying_upgrades() {
     let bottom_up_manager = BottomUpManager::new(NeverCallClient, None);
     let finality_provider = Arc::new(Toggle::disabled());
     let vote_tally = VoteTally::empty();
-    let top_down_manager = TopDownManager::new(finality_provider, vote_tally);
+    let top_down_manager = TopDownManager::new(finality_provider, vote_tally, None);
 
     let interpreter: FvmMessagesInterpreter<MemoryBlockstore, _> = FvmMessagesInterpreter::new(
         bottom_up_manager,

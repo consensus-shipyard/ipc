@@ -18,6 +18,7 @@ fendermint_vm_genesis = { path = "../genesis" }
 fendermint_vm_message = { path = "../message" }
 fendermint_vm_resolver = { path = "../resolver" }
 fendermint_vm_topdown = { path = "../topdown" }
+fendermint_vm_topdown_proof_service = { path = "../topdown/proof-service" }
 fendermint_crypto = { path = "../../crypto" }
 fendermint_eth_hardhat = { path = "../../eth/hardhat" }
 fendermint_eth_deployer = { path = "../../eth/deployer" }
