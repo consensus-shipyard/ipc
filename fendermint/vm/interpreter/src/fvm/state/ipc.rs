@@ -1,27 +1,27 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
+use ethers::types as et;
 
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::ActorID;
 
-use fendermint_crypto::PublicKey;
+use fendermint_crypto::{PublicKey, SecretKey};
 use fendermint_vm_actor_interface::ipc;
 use fendermint_vm_actor_interface::{
-    eam::EthAddress, init::builtin_actor_eth_addr, ipc::GATEWAY_ACTOR_ID,
+    eam::EthAddress,
+    f3_light_client,
+    init::builtin_actor_eth_addr,
+    ipc::{AbiHash, ValidatorMerkleTree, GATEWAY_ACTOR_ID},
 };
 use fendermint_vm_genesis::{Collateral, Power, PowerScale, Validator, ValidatorKey};
-use fendermint_vm_message::conv::from_eth;
+use fendermint_vm_message::conv::{from_eth, from_fvm};
+use fendermint_vm_message::signed::sign_secp256k1;
 use fendermint_vm_topdown::IPCParentFinality;
+use fvm_ipld_encoding::RawBytes;
 
-use super::{
-    fevm::{ContractCaller, MockProvider, NoRevert},
-    FvmExecState,
-};
-use crate::fvm::end_block_hook::LightClientCommitments;
-use crate::types::AppliedMessage;
 use ipc_actors_abis::checkpointing_facet::CheckpointingFacet;
 use ipc_actors_abis::gateway_getter_facet::GatewayGetterFacet;
 use ipc_actors_abis::gateway_getter_facet::{self as getter, gateway_getter_facet};
@@ -31,6 +31,12 @@ use ipc_actors_abis::xnet_messaging_facet::XnetMessagingFacet;
 use ipc_actors_abis::{checkpointing_facet, top_down_finality_facet, xnet_messaging_facet};
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::{ConfigurationNumber, PowerChangeRequest};
+
+use super::{
+    fevm::{ContractCaller, MockProvider, NoRevert},
+    FvmExecState,
+};
+use crate::types::AppliedMessage;
 
 #[derive(Clone)]
 pub struct GatewayCaller<DB> {
@@ -108,32 +114,55 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         Ok(batch)
     }
 
-    pub fn record_light_client_commitments(
+    /// Insert a new checkpoint at the period boundary.
+    pub fn create_bottom_up_checkpoint(
         &self,
         state: &mut FvmExecState<DB>,
-        commitment: &LightClientCommitments,
+        checkpoint: checkpointing_facet::BottomUpCheckpoint,
+        power_table: &[Validator<Power>],
         msgs: Vec<checkpointing_facet::IpcEnvelope>,
         activity: checkpointing_facet::FullActivityRollup,
     ) -> anyhow::Result<AppliedMessage> {
-        let commitment = checkpointing_facet::AppHashBreakdown {
-            state_root: Default::default(),
-            msg_batch_commitment: checkpointing_facet::Commitment {
-                total_num_msgs: commitment.msg_batch_commitment.total_num_msgs,
-                msgs_root: commitment.msg_batch_commitment.msgs_root,
-            },
-            validator_next_configuration_number: commitment.validator_next_configuration_number,
-            activity_commitment: commitment.activity_commitment.clone().try_into()?,
-        };
+        // Construct a Merkle tree from the power table, which we can use to validate validator set membership
+        // when the signatures are submitted in transactions for accumulation.
+        let tree =
+            ValidatorMerkleTree::new(power_table).context("failed to create validator tree")?;
+
+        let total_power = power_table.iter().fold(et::U256::zero(), |p, v| {
+            p.saturating_add(et::U256::from(v.power.0))
+        });
+
         Ok(self
             .checkpointing
             .call_with_return(state, |c| {
-                c.commit_checkpoint(checkpointing_facet::BottomUpCheckpoint {
-                    commitment,
+                c.create_bottom_up_checkpoint(
+                    checkpoint,
+                    tree.root_hash().0,
+                    total_power,
                     msgs,
                     activity,
-                })
+                )
             })?
             .into_return())
+    }
+
+    /// Retrieve checkpoints which have not reached a quorum.
+    pub fn incomplete_checkpoints(
+        &self,
+        state: &mut FvmExecState<DB>,
+    ) -> anyhow::Result<Vec<getter::BottomUpCheckpoint>> {
+        self.getter.call(state, |c| c.get_incomplete_checkpoints())
+    }
+
+    /// Retrieve checkpoint info by block height.
+    pub fn checkpoint_info(
+        &self,
+        state: &mut FvmExecState<DB>,
+        height: i64,
+    ) -> anyhow::Result<getter::QuorumInfo> {
+        self.getter.call(state, |c| {
+            c.get_checkpoint_info(ethers::types::U256::from(height))
+        })
     }
 
     /// Apply all pending validator changes, returning the newly adopted configuration number, or 0 if there were no changes.
@@ -161,6 +190,52 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         let power_table = membership_to_power_table(&membership, state.power_scale());
 
         Ok((membership.configuration_number, power_table))
+    }
+
+    /// Construct the input parameters for adding a signature to the checkpoint.
+    ///
+    /// This will need to be broadcasted as a transaction.
+    pub fn add_checkpoint_signature_calldata(
+        &self,
+        checkpoint: checkpointing_facet::BottomUpCheckpoint,
+        power_table: &[Validator<Power>],
+        validator: &Validator<Power>,
+        secret_key: &SecretKey,
+    ) -> anyhow::Result<et::Bytes> {
+        debug_assert_eq!(validator.public_key.0, secret_key.public_key());
+
+        let height = checkpoint.block_height;
+        let weight = et::U256::from(validator.power.0);
+
+        let hash = checkpoint.abi_hash();
+
+        let signature = sign_secp256k1(secret_key, &hash);
+        let signature =
+            from_fvm::to_eth_signature(&signature, false).context("invalid signature")?;
+        let signature = et::Bytes::from(signature.to_vec());
+
+        let tree =
+            ValidatorMerkleTree::new(power_table).context("failed to construct Merkle tree")?;
+
+        let membership_proof = tree
+            .prove(validator)
+            .context("failed to construct Merkle proof")?
+            .into_iter()
+            .map(|p| p.into())
+            .collect();
+
+        let call = self.checkpointing.contract().add_checkpoint_signature(
+            height,
+            membership_proof,
+            weight,
+            signature,
+        );
+
+        let calldata = call
+            .calldata()
+            .ok_or_else(|| anyhow!("no calldata for adding signature"))?;
+
+        Ok(calldata)
     }
 
     /// Commit the parent finality to the gateway and returns the previously committed finality.
@@ -241,6 +316,21 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         Ok(IPCParentFinality::from(r))
     }
 
+    /// Get the Ethereum adresses of validators who signed a checkpoint.
+    pub fn checkpoint_signatories(
+        &self,
+        state: &mut FvmExecState<DB>,
+        height: u64,
+    ) -> anyhow::Result<Vec<EthAddress>> {
+        let (_, _, addrs, _) = self.getter.call(state, |c| {
+            c.get_checkpoint_signature_bundle(ethers::types::U256::from(height))
+        })?;
+
+        let addrs = addrs.into_iter().map(|a| a.into()).collect();
+
+        Ok(addrs)
+    }
+
     pub fn approve_subnet_joining_gateway(
         &self,
         state: &mut FvmExecState<DB>,
@@ -296,4 +386,111 @@ fn membership_to_power_table(
     }
 
     pt
+}
+
+/// Caller for F3 Light Client actor operations.
+///
+/// The F3 Light Client actor maintains F3 light client state including:
+/// - Current F3 instance ID
+/// - Finalized epochs chain  
+/// - Validator power table
+#[derive(Clone)]
+pub struct F3LightClientCaller {
+    actor_id: ActorID,
+}
+
+impl Default for F3LightClientCaller {
+    fn default() -> Self {
+        Self::new(f3_light_client::F3_LIGHT_CLIENT_ACTOR_ID)
+    }
+}
+
+impl F3LightClientCaller {
+    pub fn new(actor_id: ActorID) -> Self {
+        Self { actor_id }
+    }
+}
+
+impl<DB: Blockstore + Clone> F3LightClientCaller {
+    /// Get the current F3 light client state.
+    ///
+    /// Returns the instance ID, finalized epochs, and power table.
+    pub fn get_state(
+        &self,
+        state: &mut FvmExecState<DB>,
+    ) -> anyhow::Result<f3_light_client::GetStateResponse> {
+        let method_num = f3_light_client::Method::GetState as u64;
+        let params = RawBytes::default(); // No params needed for GetState
+
+        let msg = fvm_shared::message::Message {
+            from: fvm_shared::address::Address::new_id(fvm_shared::SYSTEM_ACTOR_ID),
+            to: fvm_shared::address::Address::new_id(self.actor_id),
+            sequence: 0,
+            gas_limit: 10_000_000_000,
+            method_num,
+            params,
+            value: TokenAmount::zero(),
+            version: 0,
+            gas_fee_cap: TokenAmount::zero(),
+            gas_premium: TokenAmount::zero(),
+        };
+
+        let ret = state
+            .execute_implicit(msg)
+            .context("failed to call F3LightClientActor GetState")?;
+
+        if !ret.msg_receipt.exit_code.is_success() {
+            bail!(
+                "F3LightClientActor GetState returned exit code: {:?}",
+                ret.msg_receipt.exit_code
+            );
+        }
+
+        let response: f3_light_client::GetStateResponse =
+            fvm_ipld_encoding::from_slice(&ret.msg_receipt.return_data)
+                .context("failed to decode GetStateResponse")?;
+
+        Ok(response)
+    }
+
+    /// Update the F3 light client state with a new certificate.
+    ///
+    /// This should be called after successfully executing a proof-based topdown finality message.
+    pub fn update_state(
+        &self,
+        state: &mut FvmExecState<DB>,
+        new_state: f3_light_client::LightClientState,
+    ) -> anyhow::Result<()> {
+        let method_num = f3_light_client::Method::UpdateState as u64;
+
+        let params = f3_light_client::UpdateStateParams { state: new_state };
+        let params = fvm_ipld_encoding::RawBytes::serialize(params)
+            .context("failed to serialize UpdateStateParams")?;
+
+        let msg = fvm_shared::message::Message {
+            from: fvm_shared::address::Address::new_id(fvm_shared::SYSTEM_ACTOR_ID),
+            to: fvm_shared::address::Address::new_id(self.actor_id),
+            sequence: 0,
+            gas_limit: 10_000_000_000,
+            method_num,
+            params,
+            value: TokenAmount::zero(),
+            version: 0,
+            gas_fee_cap: TokenAmount::zero(),
+            gas_premium: TokenAmount::zero(),
+        };
+
+        let ret = state
+            .execute_implicit(msg)
+            .context("failed to call F3LightClientActor UpdateState")?;
+
+        if !ret.msg_receipt.exit_code.is_success() {
+            bail!(
+                "F3LightClientActor UpdateState returned exit code: {:?}",
+                ret.msg_receipt.exit_code
+            );
+        }
+
+        Ok(())
+    }
 }

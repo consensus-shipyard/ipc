@@ -343,13 +343,15 @@ where
         for msg in msgs {
             match fvm_ipld_encoding::from_slice::<ChainMessage>(&msg) {
                 Ok(chain_msg) => match chain_msg {
-                    ChainMessage::Ipc(IpcMessage::ParentFinalityWithProof(bundle)) => {
+                    ChainMessage::Ipc(IpcMessage::TopDownWithProof(bundle)) => {
                         // DETERMINISTIC VERIFICATION - all validators reach same decision
-                        match self.top_down_manager.verify_proof_bundle(&bundle).await {
+                        match self
+                            .top_down_manager
+                            .verify_proof_bundle_attestation(&bundle)
+                        {
                             Ok(()) => {
                                 tracing::debug!(
                                     instance = bundle.certificate.instance_id,
-                                    height = bundle.finality.height,
                                     "proof bundle verified - accepting"
                                 );
                             }
@@ -490,7 +492,7 @@ where
                 })
             }
             ChainMessage::Ipc(ipc_msg) => match ipc_msg {
-                IpcMessage::ParentFinalityWithProof(bundle) => {
+                IpcMessage::TopDownWithProof(bundle) => {
                     // NEW: Execute proof-based topdown finality (v2)
                     let applied_message = self
                         .top_down_manager
