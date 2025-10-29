@@ -47,6 +47,8 @@ contract SubnetActorDiamond {
         /// @notice F3 instance ID from parent chain (optional - only for Filecoin parent)
         /// @dev Set to 0 if parent doesn't have F3. CLI determines if parent is Filecoin.
         uint64 genesisF3InstanceId;
+        /// @notice Whether F3 instance ID was explicitly set (to distinguish from instance ID 0)
+        bool hasGenesisF3InstanceId;
     }
 
     constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params, address owner) {
@@ -98,7 +100,7 @@ contract SubnetActorDiamond {
         s.validatorSet.permissionMode = params.permissionMode;
         s.genesisSubnetIpcContractsOwner = params.genesisSubnetIpcContractsOwner;
         s.genesisF3InstanceId = params.genesisF3InstanceId;
-        s.hasGenesisF3InstanceId = params.genesisF3InstanceId > 0;
+        s.hasGenesisF3InstanceId = params.hasGenesisF3InstanceId;
 
         s.validatorSet.activeLimit = params.activeValidatorsLimit;
         // Start the next configuration number from 1, 0 is reserved for no change and the genesis membership

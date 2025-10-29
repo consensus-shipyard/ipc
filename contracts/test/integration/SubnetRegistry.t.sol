@@ -265,7 +265,8 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
             validatorGater: address(0),
             validatorRewarder: address(new ValidatorRewarderMap()),
             genesisSubnetIpcContractsOwner: address(1),
-                genesisF3InstanceId: 0
+            genesisF3InstanceId: 0,
+            hasGenesisF3InstanceId: false
         });
 
         registrySubnetFacet.newSubnetActor(params);

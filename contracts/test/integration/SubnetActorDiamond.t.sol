@@ -388,7 +388,8 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
                 validatorGater: address(0),
                 validatorRewarder: address(0),
                 genesisSubnetIpcContractsOwner: address(1),
-                genesisF3InstanceId: 0
+                genesisF3InstanceId: 0,
+                hasGenesisF3InstanceId: false
             }),
             address(saDupGetterFaucet),
             address(saDupMangerFaucet),
@@ -2780,6 +2781,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         // Test that F3 instance ID is set correctly when non-zero
         SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(address(gatewayDiamond));
         params.genesisF3InstanceId = 42;
+        params.hasGenesisF3InstanceId = true;
 
         SubnetActorDiamond sa = createSubnetActor(params);
 
@@ -2794,9 +2796,11 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         // fetch the same F3 instance ID from the subnet actor
         SubnetActorDiamond.ConstructorParams memory params1 = defaultSubnetActorParamsWith(address(gatewayDiamond));
         params1.genesisF3InstanceId = 100;
+        params1.hasGenesisF3InstanceId = true;
 
         SubnetActorDiamond.ConstructorParams memory params2 = defaultSubnetActorParamsWith(address(gatewayDiamond));
         params2.genesisF3InstanceId = 100;
+        params2.hasGenesisF3InstanceId = true;
 
         SubnetActorDiamond sa1 = createSubnetActor(params1);
         SubnetActorDiamond sa2 = createSubnetActor(params2);
@@ -2814,6 +2818,7 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         // Test with a realistic F3 instance ID value
         SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(address(gatewayDiamond));
         params.genesisF3InstanceId = type(uint64).max;
+        params.hasGenesisF3InstanceId = true;
 
         SubnetActorDiamond sa = createSubnetActor(params);
 

@@ -215,7 +215,8 @@ contract TestSubnetActor is Test, TestParams {
             validatorGater: address(0),
             validatorRewarder: address(0),
             genesisSubnetIpcContractsOwner: address(1),
-                genesisF3InstanceId: 0
+            genesisF3InstanceId: 0,
+            hasGenesisF3InstanceId: false
         });
         return params;
     }
@@ -242,7 +243,8 @@ contract TestSubnetActor is Test, TestParams {
             validatorGater: address(0),
             validatorRewarder: address(0),
             genesisSubnetIpcContractsOwner: address(1),
-                genesisF3InstanceId: 0
+            genesisF3InstanceId: 0,
+            hasGenesisF3InstanceId: false
         });
         return params;
     }
@@ -279,7 +281,8 @@ contract TestSubnetActor is Test, TestParams {
             validatorGater: address(0),
             validatorRewarder: address(0),
             genesisSubnetIpcContractsOwner: address(1),
-                genesisF3InstanceId: 0
+            genesisF3InstanceId: 0,
+            hasGenesisF3InstanceId: false
         });
         return params;
     }
@@ -637,7 +640,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             validatorGater: address(0),
             validatorRewarder: address(new ValidatorRewarderMap()),
             genesisSubnetIpcContractsOwner: address(1),
-                genesisF3InstanceId: 0
+            genesisF3InstanceId: 0,
+            hasGenesisF3InstanceId: false
         });
         saDiamond = createSubnetActor(params);
     }
@@ -671,7 +675,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             validatorGater: _validatorGater,
             validatorRewarder: address(new ValidatorRewarderMap()),
             genesisSubnetIpcContractsOwner: address(1),
-                genesisF3InstanceId: 0
+            genesisF3InstanceId: 0,
+            hasGenesisF3InstanceId: false
         });
         saDiamond = createSubnetActor(params);
     }
