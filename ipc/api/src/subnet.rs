@@ -148,6 +148,9 @@ pub struct ConstructParams {
     pub validator_gater: Address,
     pub validator_rewarder: Address,
     pub genesis_subnet_ipc_contracts_owner: ethers::types::Address,
+    /// F3 instance ID from parent chain (optional)
+    /// Only set when parent is Filecoin mainnet/calibration
+    pub genesis_f3_instance_id: Option<u64>,
 }
 
 /// Consensus types supported by hierarchical consensus

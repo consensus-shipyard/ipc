@@ -293,6 +293,7 @@ impl SubnetManager for EthSubnetManager {
             validator_gater: payload_to_evm_address(params.validator_gater.payload())?,
             validator_rewarder: payload_to_evm_address(params.validator_rewarder.payload())?,
             genesis_subnet_ipc_contracts_owner: params.genesis_subnet_ipc_contracts_owner,
+            genesis_f3_instance_id: params.genesis_f3_instance_id.unwrap_or(0),
         };
 
         tracing::info!("creating subnet on evm with params: {params:?}");
@@ -818,6 +819,20 @@ impl SubnetManager for EthSubnetManager {
             }
         };
 
+        // Fetch F3 instance ID from subnet actor if available
+        // The contract method genesisF3InstanceId() returns: (instanceId: u64, hasValue: bool)
+        // The hasValue flag distinguishes between:
+        //   - F3 instance ID explicitly set to 0 (hasValue=true, instanceId=0)  
+        //   - F3 not configured (hasValue=false, instanceId=0)
+        // This ensures deterministic genesis: all nodes fetch the same instance ID
+        // that was captured during subnet creation on the parent chain.
+        let (instance_id_value, has_f3_instance_id) = contract.genesis_f3_instance_id().call().await?;
+        let f3_instance_id = if has_f3_instance_id {
+            Some(instance_id_value)
+        } else {
+            None
+        };
+
         Ok(SubnetGenesisInfo {
             // Active validators limit set for the child subnet.
             active_validators_limit: contract.active_validators_limit().call().await?,
@@ -839,6 +854,7 @@ impl SubnetManager for EthSubnetManager {
                 token_address: None,
             },
             genesis_subnet_ipc_contracts_owner,
+            f3_instance_id,
         })
     }
 
