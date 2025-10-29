@@ -228,6 +228,25 @@ pub struct TopDownSettings {
     pub parent_gateway: Address,
 }
 
+/// Settings for bottom-up checkpointing (posting subnet state to parent chain).
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct BottomUpSettings {
+    /// Whether bottom-up checkpointing is enabled. If false, no checkpoints will be created
+    /// and no signatures will be broadcast.
+    #[serde(default = "default_bottomup_enabled")]
+    pub enabled: bool,
+}
+
+fn default_bottomup_enabled() -> bool {
+    true
+}
+
+impl Default for BottomUpSettings {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
+}
+
 #[serde_as]
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct IpcSettings {
@@ -242,6 +261,9 @@ pub struct IpcSettings {
     /// The config for top down checkpoint. It's None if subnet id is root or not activating
     /// any top down checkpoint related operations
     pub topdown: Option<TopDownSettings>,
+    /// The config for bottom up checkpoint. If None or disabled, no bottom-up checkpointing
+    /// will be performed (no checkpoint creation or signature broadcasting).
+    pub bottomup: Option<BottomUpSettings>,
 }
 
 impl Default for IpcSettings {
@@ -251,6 +273,7 @@ impl Default for IpcSettings {
             vote_interval: Duration::from_secs(1),
             vote_timeout: Duration::from_secs(60),
             topdown: None,
+            bottomup: None,
         }
     }
 }
@@ -267,6 +290,11 @@ impl IpcSettings {
         };
 
         Ok(ret)
+    }
+
+    /// Check if bottom-up checkpointing is enabled.
+    pub fn bottomup_enabled(&self) -> bool {
+        self.bottomup.as_ref().map_or(false, |config| config.enabled)
     }
 }
 

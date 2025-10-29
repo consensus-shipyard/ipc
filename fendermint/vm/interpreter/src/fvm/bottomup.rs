@@ -63,6 +63,9 @@ where
 
     // Gateway caller for IPC gateway interactions
     gateway_caller: GatewayCaller<DB>,
+
+    /// Whether bottom-up checkpointing is enabled
+    bottomup_enabled: bool,
 }
 
 impl<DB, C> BottomUpManager<DB, C>
@@ -70,11 +73,12 @@ where
     DB: Blockstore + Clone + 'static + Send + Sync,
     C: Client + Clone + Send + Sync + 'static,
 {
-    pub fn new(tendermint_client: C, validator_ctx: Option<ValidatorContext<C>>) -> Self {
+    pub fn new(tendermint_client: C, validator_ctx: Option<ValidatorContext<C>>, bottomup_enabled: bool) -> Self {
         Self {
             tendermint_client,
             validator_ctx,
             gateway_caller: GatewayCaller::default(),
+            bottomup_enabled,
         }
     }
 
@@ -82,6 +86,11 @@ where
         &self,
         state: &mut FvmExecState<DB>,
     ) -> anyhow::Result<Option<CheckpointOutcome>> {
+        // Exit early if bottom-up checkpointing is disabled
+        if !self.bottomup_enabled {
+            return Ok(None);
+        }
+
         let mut block_end_events = BlockEndEvents::default();
 
         // Emit trace; errors here are logged but not fatal.
@@ -114,6 +123,11 @@ where
         current_checkpoint: ipc_actors_abis::checkpointing_facet::BottomUpCheckpoint,
         state: &mut FvmExecState<DB>,
     ) -> anyhow::Result<()> {
+        // Exit early if bottom-up checkpointing is disabled
+        if !self.bottomup_enabled {
+            return Ok(());
+        }
+
         // Exit early if there's no validator context.
         let validator_ctx = match self.validator_ctx.as_ref() {
             Some(ctx) => ctx,

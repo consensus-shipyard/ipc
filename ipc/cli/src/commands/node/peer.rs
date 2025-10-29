@@ -96,13 +96,28 @@ async fn apply_port_configurations(paths: &NodePaths, p2p_config: &P2pConfig) ->
     if let Some(resolver_port) = ports.resolver {
         log::info!("Configuring Fendermint resolver port: {}", resolver_port);
 
+        // Use listen_ip (defaults to 0.0.0.0) for listen_addr to allow binding on any interface.
+        // This is essential for cloud VMs where public IPs are not directly bound to network interfaces.
+        // Users can override with a specific IP for more restrictive binding if needed.
+        let listen_ip = p2p_config.listen_ip.as_deref().unwrap_or("0.0.0.0");
+        let listen_addr = format!("/ip4/{}/tcp/{}", listen_ip, resolver_port);
+
+        // Use external_ip for external_addresses - this is what we advertise to peers
         let external_ip = p2p_config.external_ip.as_deref().unwrap_or("127.0.0.1");
-        let listen_addr = format!("/ip4/{}/tcp/{}", external_ip, resolver_port);
+        let external_addresses = vec![format!("/ip4/{}/tcp/{}", external_ip, resolver_port)];
+
+        log::debug!(
+            "Resolver configuration: listen_ip={}, listen_addr={}, external_addresses={:?}",
+            listen_ip,
+            listen_addr,
+            external_addresses
+        );
 
         let fendermint_config = FendermintOverrides {
             resolver: Some(ResolverOverrideConfig {
                 connection: Some(ConnectionOverrideConfig {
                     listen_addr: Some(listen_addr),
+                    external_addresses: Some(external_addresses),
                     extra: toml::Table::new(),
                 }),
                 discovery: None,
@@ -395,4 +410,244 @@ fn print_peer_info_to_console(peer_info: &PeerInfo) {
     println!("└─────────────────────────────────────────────────────────────┘");
     println!("📁 Peer info saved to: peer-info.json");
     println!();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::commands::node::config::P2pPortsConfig;
+    use tempfile::TempDir;
+
+    /// Helper function to create test node paths
+    fn create_test_paths() -> (TempDir, NodePaths) {
+        let temp_dir = TempDir::new().unwrap();
+        let home = temp_dir.path().to_path_buf();
+        let paths = NodePaths::new(home);
+
+        // Create necessary directories
+        std::fs::create_dir_all(&paths.fendermint.join("config")).unwrap();
+        std::fs::create_dir_all(&paths.comet_bft.join("config")).unwrap();
+
+        // Create minimal config files
+        std::fs::write(
+            paths.fendermint.join("config/default.toml"),
+            "[resolver.connection]\n",
+        )
+        .unwrap();
+        std::fs::write(paths.comet_bft.join("config/config.toml"), "[p2p]\n").unwrap();
+
+        (temp_dir, paths)
+    }
+
+    #[tokio::test]
+    async fn test_resolver_port_config_uses_zero_address_for_listening() {
+        let (_temp, paths) = create_test_paths();
+
+        let mut p2p_config = P2pConfig::default();
+        p2p_config.external_ip = Some("34.73.187.192".to_string());
+        p2p_config.ports = Some(P2pPortsConfig {
+            cometbft: Some(26656),
+            resolver: Some(26655),
+        });
+
+        apply_port_configurations(&paths, &p2p_config)
+            .await
+            .expect("should apply port configurations");
+
+        // Read the generated config
+        let config_content =
+            std::fs::read_to_string(paths.fendermint.join("config/default.toml")).unwrap();
+
+        // Verify listen_addr uses 0.0.0.0
+        assert!(
+            config_content.contains("listen_addr = \"/ip4/0.0.0.0/tcp/26655\""),
+            "listen_addr should use 0.0.0.0 for binding, got: {}",
+            config_content
+        );
+
+        // Verify external_addresses uses the external IP
+        assert!(
+            config_content.contains("external_addresses = [\"/ip4/34.73.187.192/tcp/26655\"]"),
+            "external_addresses should use external IP, got: {}",
+            config_content
+        );
+    }
+
+    #[tokio::test]
+    async fn test_resolver_port_config_with_default_localhost() {
+        let (_temp, paths) = create_test_paths();
+
+        let mut p2p_config = P2pConfig::default();
+        // Don't set external_ip, should default to 127.0.0.1
+        p2p_config.ports = Some(P2pPortsConfig {
+            cometbft: Some(26656),
+            resolver: Some(26655),
+        });
+
+        apply_port_configurations(&paths, &p2p_config)
+            .await
+            .expect("should apply port configurations");
+
+        let config_content =
+            std::fs::read_to_string(paths.fendermint.join("config/default.toml")).unwrap();
+
+        // Verify listen_addr still uses 0.0.0.0
+        assert!(
+            config_content.contains("listen_addr = \"/ip4/0.0.0.0/tcp/26655\""),
+            "listen_addr should use 0.0.0.0, got: {}",
+            config_content
+        );
+
+        // Verify external_addresses uses default localhost
+        assert!(
+            config_content.contains("external_addresses = [\"/ip4/127.0.0.1/tcp/26655\"]"),
+            "external_addresses should default to 127.0.0.1, got: {}",
+            config_content
+        );
+    }
+
+    #[tokio::test]
+    async fn test_resolver_port_config_with_custom_port() {
+        let (_temp, paths) = create_test_paths();
+
+        let mut p2p_config = P2pConfig::default();
+        p2p_config.external_ip = Some("10.0.0.5".to_string());
+        p2p_config.ports = Some(P2pPortsConfig {
+            cometbft: Some(26656),
+            resolver: Some(9999), // Custom port
+        });
+
+        apply_port_configurations(&paths, &p2p_config)
+            .await
+            .expect("should apply port configurations");
+
+        let config_content =
+            std::fs::read_to_string(paths.fendermint.join("config/default.toml")).unwrap();
+
+        assert!(
+            config_content.contains("listen_addr = \"/ip4/0.0.0.0/tcp/9999\""),
+            "listen_addr should use custom port, got: {}",
+            config_content
+        );
+
+        assert!(
+            config_content.contains("external_addresses = [\"/ip4/10.0.0.5/tcp/9999\"]"),
+            "external_addresses should use custom port, got: {}",
+            config_content
+        );
+    }
+
+    #[tokio::test]
+    async fn test_resolver_disabled_when_port_not_set() {
+        let (_temp, paths) = create_test_paths();
+
+        let mut p2p_config = P2pConfig::default();
+        p2p_config.external_ip = Some("34.73.187.192".to_string());
+        p2p_config.ports = Some(P2pPortsConfig {
+            cometbft: Some(26656),
+            resolver: None, // Resolver disabled
+        });
+
+        apply_port_configurations(&paths, &p2p_config)
+            .await
+            .expect("should apply port configurations");
+
+        let config_content =
+            std::fs::read_to_string(paths.fendermint.join("config/default.toml")).unwrap();
+
+        // Should not have added resolver configuration
+        assert!(
+            !config_content.contains("listen_addr"),
+            "should not configure resolver when port is None, got: {}",
+            config_content
+        );
+    }
+
+    #[tokio::test]
+    async fn test_cometbft_port_config_uses_zero_address() {
+        let (_temp, paths) = create_test_paths();
+
+        let mut p2p_config = P2pConfig::default();
+        p2p_config.ports = Some(P2pPortsConfig {
+            cometbft: Some(26656),
+            resolver: None,
+        });
+
+        apply_port_configurations(&paths, &p2p_config)
+            .await
+            .expect("should apply port configurations");
+
+        let config_content =
+            std::fs::read_to_string(paths.comet_bft.join("config/config.toml")).unwrap();
+
+        // CometBFT should also use 0.0.0.0 for listening
+        assert!(
+            config_content.contains("laddr = \"tcp://0.0.0.0:26656\""),
+            "CometBFT laddr should use 0.0.0.0, got: {}",
+            config_content
+        );
+    }
+
+    #[tokio::test]
+    async fn test_resolver_port_config_with_custom_listen_ip() {
+        let (_temp, paths) = create_test_paths();
+
+        let mut p2p_config = P2pConfig::default();
+        p2p_config.external_ip = Some("34.73.187.192".to_string());
+        p2p_config.listen_ip = Some("10.128.0.5".to_string()); // Custom private IP
+        p2p_config.ports = Some(P2pPortsConfig {
+            cometbft: Some(26656),
+            resolver: Some(26655),
+        });
+
+        apply_port_configurations(&paths, &p2p_config)
+            .await
+            .expect("should apply port configurations");
+
+        let config_content =
+            std::fs::read_to_string(paths.fendermint.join("config/default.toml")).unwrap();
+
+        // Verify listen_addr uses custom listen_ip
+        assert!(
+            config_content.contains("listen_addr = \"/ip4/10.128.0.5/tcp/26655\""),
+            "listen_addr should use custom listen_ip, got: {}",
+            config_content
+        );
+
+        // Verify external_addresses still uses external_ip
+        assert!(
+            config_content.contains("external_addresses = [\"/ip4/34.73.187.192/tcp/26655\"]"),
+            "external_addresses should use external_ip, got: {}",
+            config_content
+        );
+    }
+
+    #[tokio::test]
+    async fn test_resolver_port_config_listen_ip_defaults_to_zero() {
+        let (_temp, paths) = create_test_paths();
+
+        let p2p_config = P2pConfig {
+            external_ip: Some("192.168.1.100".to_string()),
+            listen_ip: None, // Explicitly not set
+            ports: Some(P2pPortsConfig {
+                cometbft: Some(26656),
+                resolver: Some(26655),
+            }),
+            peers: None,
+        };
+
+        apply_port_configurations(&paths, &p2p_config)
+            .await
+            .expect("should apply port configurations");
+
+        let config_content =
+            std::fs::read_to_string(paths.fendermint.join("config/default.toml")).unwrap();
+
+        // Should default to 0.0.0.0 when listen_ip is None
+        assert!(
+            config_content.contains("listen_addr = \"/ip4/0.0.0.0/tcp/26655\""),
+            "listen_addr should default to 0.0.0.0 when listen_ip is None, got: {}",
+            config_content
+        );
+    }
 }
