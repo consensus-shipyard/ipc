@@ -397,7 +397,7 @@ impl SubnetManager for EthSubnetManager {
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
-        block_number_from_receipt(receipt)
+        block_number_from_positive_receipt(receipt)
     }
 
     async fn pre_fund(&self, subnet: SubnetID, from: Address, balance: TokenAmount) -> Result<()> {
@@ -610,7 +610,7 @@ impl SubnetManager for EthSubnetManager {
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
-        block_number_from_receipt(receipt)
+        block_number_from_positive_receipt(receipt)
     }
 
     /// Approves the `from` address to use up to `amount` tokens from `token_address`.
@@ -644,7 +644,7 @@ impl SubnetManager for EthSubnetManager {
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
-        block_number_from_receipt(receipt)
+        block_number_from_positive_receipt(receipt)
     }
 
     async fn fund_with_token(
@@ -676,7 +676,7 @@ impl SubnetManager for EthSubnetManager {
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
-        block_number_from_receipt(receipt)
+        block_number_from_positive_receipt(receipt)
     }
 
     async fn release(
@@ -706,7 +706,7 @@ impl SubnetManager for EthSubnetManager {
 
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
-        block_number_from_receipt(receipt)
+        block_number_from_positive_receipt(receipt)
     }
 
     /// Send value between two addresses in a subnet
@@ -980,7 +980,7 @@ impl SubnetManager for EthSubnetManager {
         let txn = extend_call_with_pending_block(call).await?;
         let pending_tx = txn.send().await?;
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
-        block_number_from_receipt(receipt)
+        block_number_from_positive_receipt(receipt)
     }
 }
 
@@ -1264,7 +1264,7 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
 
         let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
 
-        block_number_from_receipt(receipt)
+        block_number_from_positive_receipt(receipt)
     }
 
     async fn last_bottom_up_checkpoint_height(
@@ -1675,15 +1675,23 @@ where
 }
 
 /// Get the block number from the transaction receipt
-fn block_number_from_receipt(
+fn block_number_from_positive_receipt(
     receipt: Option<ethers::types::TransactionReceipt>,
 ) -> Result<ChainEpoch> {
     match receipt {
-        Some(r) => {
-            let block_number = r
-                .block_number
-                .ok_or_else(|| anyhow!("cannot get block number"))?;
-            Ok(block_number.as_u64() as ChainEpoch)
+        Some(r) =>
+        // success only
+        {
+            if r.status.as_ref().map(|x| x.as_u64()) != Some(1) {
+                let block_number = r
+                    .block_number
+                    .ok_or_else(|| anyhow!("cannot get block number"))?;
+                Ok(block_number.as_u64() as ChainEpoch)
+            } else {
+                Err(anyhow!(
+                    "txn sent to network, but receipt was a revert receipt"
+                ))
+            }
         }
         None => Err(anyhow!(
             "txn sent to network, but receipt cannot be obtained, please check scanner"

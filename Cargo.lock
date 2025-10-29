@@ -67,6 +67,7 @@ dependencies = [
  "fvm_ipld_blockstore 0.3.1",
  "fvm_ipld_encoding 0.5.3",
  "ignore",
+ "indexmap 2.8.0",
  "num-traits",
  "toml 0.8.23",
  "tracing",

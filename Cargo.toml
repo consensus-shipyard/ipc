@@ -265,7 +265,7 @@ fvm_ipld_encoding = { git = "https://github.com/consensus-shipyard/ref-fvm.git" 
 fvm_ipld_hamt = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
 fvm_ipld_amt = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
 
-[profile.wasm]
+[profile.wasm-actor]
 inherits = "release"
 panic = "abort"
 overflow-checks = false
