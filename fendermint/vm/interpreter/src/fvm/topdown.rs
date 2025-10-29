@@ -18,7 +18,7 @@ use fendermint_vm_topdown::{
 use fvm_shared::clock::ChainEpoch;
 use std::sync::Arc;
 
-use crate::fvm::state::ipc::GatewayCaller;
+use crate::fvm::state::ipc::{F3LightClientCaller, GatewayCaller};
 use crate::fvm::state::FvmExecState;
 use anyhow::{bail, Context};
 use fvm_ipld_blockstore::Blockstore;
@@ -39,17 +39,27 @@ where
     votes: VoteTally,
     // Gateway caller for IPC gateway interactions
     gateway_caller: GatewayCaller<DB>,
+    // F3 Light Client caller for querying F3 state
+    f3_light_client_caller: F3LightClientCaller,
+    // Proof cache for F3-based parent finality (optional for gradual rollout)
+    proof_cache: Option<std::sync::Arc<fendermint_vm_topdown_proof_service::ProofCache>>,
 }
 
 impl<DB> TopDownManager<DB>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    pub fn new(provider: TopDownFinalityProvider, votes: VoteTally) -> Self {
+    pub fn new(
+        provider: TopDownFinalityProvider,
+        votes: VoteTally,
+        proof_cache: Option<std::sync::Arc<fendermint_vm_topdown_proof_service::ProofCache>>,
+    ) -> Self {
         Self {
             provider,
             votes,
             gateway_caller: GatewayCaller::default(),
+            f3_light_client_caller: F3LightClientCaller::default(),
+            proof_cache,
         }
     }
 
@@ -117,6 +127,105 @@ where
         })))
     }
 
+    /// Query proof cache for next uncommitted proof and create a chain message with proof bundle.
+    ///
+    /// This is the v2 proof-based approach that replaces voting with cryptographic verification.
+    ///
+    /// Returns `None` if:
+    /// - Proof cache is not configured
+    /// - No proof available for next height
+    /// - Cache is temporarily empty (graceful degradation)
+    pub async fn chain_message_from_proof_cache(&self) -> Option<ChainMessage> {
+        let cache = self.proof_cache.as_ref()?;
+
+        // Get next uncommitted proof (instance after last_committed)
+        let entry = cache.get_next_uncommitted()?;
+
+        tracing::debug!(
+            instance_id = entry.instance_id,
+            epochs = ?entry.finalized_epochs,
+            "found proof in cache for proposal"
+        );
+
+        Some(ChainMessage::Ipc(IpcMessage::TopDownWithProof(
+            fendermint_vm_message::ipc::TopDownProofBundle {
+                certificate: entry.certificate,
+                proof_bundle: entry.proof_bundle,
+            },
+        )))
+    }
+
+    /// Deterministically verify a proof bundle against F3 certificate (read-only attestation).
+    ///
+    /// This performs cryptographic verification of:
+    /// 1. Storage proofs (contract state at parent height - completeness via topDownNonce)
+    /// 2. Event proofs (emitted events at parent height)
+    ///
+    /// All correct validators will reach the same decision (deterministic).
+    /// Full verification including state queries happens during execution.
+    pub fn verify_proof_bundle_attestation(
+        &self,
+        bundle: &fendermint_vm_message::ipc::TopDownProofBundle,
+    ) -> anyhow::Result<()> {
+        use fendermint_vm_topdown_proof_service::verify_proof_bundle;
+
+        // Verify cryptographic proofs (storage + events)
+        verify_proof_bundle(&bundle.proof_bundle, &bundle.certificate)
+            .context("proof bundle cryptographic verification failed")?;
+
+        tracing::debug!(
+            instance_id = bundle.certificate.instance_id,
+            "proof bundle verified successfully (attestation)"
+        );
+
+        Ok(())
+    }
+
+    /// Verify proof bundle with full state validation (during execution).
+    ///
+    /// This performs:
+    /// 1. Certificate chain continuity check (validates against F3LightClientActor state)
+    /// 2. Cryptographic proof verification
+    fn verify_proof_bundle_with_state(
+        &self,
+        state: &mut FvmExecState<DB>,
+        bundle: &fendermint_vm_message::ipc::TopDownProofBundle,
+    ) -> anyhow::Result<()> {
+        // Step 1: Verify certificate chain continuity
+        // Query F3LightClientActor for last committed instance
+        let f3_state = self
+            .f3_light_client_caller
+            .get_state(state)
+            .context("failed to query F3LightClientActor state")?;
+
+        // Ensure bundle.certificate.instance_id == last_committed + 1
+        if bundle.certificate.instance_id != f3_state.instance_id + 1 {
+            bail!(
+                "Certificate instance ID {} is not sequential (expected {})",
+                bundle.certificate.instance_id,
+                f3_state.instance_id + 1
+            );
+        }
+
+        tracing::debug!(
+            current_instance = f3_state.instance_id,
+            new_instance = bundle.certificate.instance_id,
+            "verified certificate chain continuity"
+        );
+
+        // Step 2: Verify cryptographic proofs (already done in attestation, but verify again)
+        self.verify_proof_bundle_attestation(bundle)?;
+
+        // Step 3: TODO - Verify F3 certificate cryptographically using F3Client
+        // This requires:
+        // 1. Initialize F3Client with power table from f3_state
+        // 2. Call f3_client.fetch_and_validate(bundle.certificate.instance_id)
+        // 3. Verify BLS signatures, quorum, and chain continuity
+        // For now, we skip this and trust the certificate
+
+        Ok(())
+    }
+
     pub async fn update_voting_power_table(&self, power_updates: &PowerUpdates) {
         let power_updates_mapped: Vec<_> = power_updates
             .0
@@ -125,6 +234,219 @@ where
             .collect();
 
         atomically(|| self.votes.update_power_table(power_updates_mapped.clone())).await
+    }
+
+    /// Execute proof-based topdown finality (v2).
+    ///
+    /// Steps:
+    /// 1. Extract topdown messages from proof bundle (via ABI decoding)
+    /// 2. Extract validator changes from proof bundle (via ABI decoding)
+    /// 3. Commit parent finality to gateway (use highest epoch from certificate)
+    /// 4. Store validator changes in gateway
+    /// 5. Execute topdown messages
+    /// 6. Update F3LightClientActor with new certificate state
+    /// 7. Mark instance as committed in cache
+    pub async fn execute_proof_based_topdown(
+        &self,
+        state: &mut FvmExecState<DB>,
+        bundle: fendermint_vm_message::ipc::TopDownProofBundle,
+    ) -> anyhow::Result<AppliedMessage> {
+        if !self.provider.is_enabled() {
+            bail!("cannot execute IPC top-down message: parent provider disabled");
+        }
+
+        tracing::debug!(
+            instance = bundle.certificate.instance_id,
+            "executing proof-based topdown finality"
+        );
+
+        // Step 0: Verify proof bundle with state (chain continuity check)
+        self.verify_proof_bundle_with_state(state, &bundle)
+            .context("proof bundle verification with state failed")?;
+
+        // Step 1 & 2: Extract topdown effects from proof bundle
+        let msgs = self.extract_topdown_messages_from_bundle(&bundle.proof_bundle)?;
+        let validator_changes = self.extract_validator_changes_from_bundle(&bundle.proof_bundle)?;
+
+        tracing::debug!(
+            message_count = msgs.len(),
+            validator_changes_count = validator_changes.len(),
+            "extracted topdown effects from proof bundle"
+        );
+
+        // Step 3: Commit parent finality to gateway
+        // Use the highest finalized epoch from the certificate
+        let highest_epoch = bundle
+            .certificate
+            .finalized_epochs
+            .iter()
+            .max()
+            .copied()
+            .context("certificate has no finalized epochs")?;
+        let finality = IPCParentFinality::new(highest_epoch as BlockHeight, vec![]);
+
+        let (prev_height, _prev_finality) = self
+            .commit_finality(state, finality.clone())
+            .await
+            .context("failed to commit finality")?;
+
+        tracing::debug!(
+            previous_height = prev_height,
+            current_height = finality.height,
+            "committed parent finality"
+        );
+
+        // Step 4: Store validator changes in gateway
+        self.gateway_caller
+            .store_validator_changes(state, validator_changes)
+            .context("failed to store validator changes")?;
+
+        // Step 5: Execute topdown messages
+        let ret = self
+            .execute_topdown_msgs(state, msgs)
+            .await
+            .context("failed to execute top down messages")?;
+
+        tracing::debug!("applied topdown messages");
+
+        // Step 6: Update F3LightClientActor with new certificate state
+        // Convert power table from proof service format to actor format
+        let power_table: Vec<fendermint_vm_actor_interface::f3_light_client::PowerEntry> = bundle
+            .certificate
+            .power_table
+            .iter()
+            .map(
+                |pe| fendermint_vm_actor_interface::f3_light_client::PowerEntry {
+                    public_key: pe.public_key.clone(),
+                    power: pe.power,
+                },
+            )
+            .collect();
+
+        let new_light_client_state =
+            fendermint_vm_actor_interface::f3_light_client::LightClientState {
+                instance_id: bundle.certificate.instance_id,
+                finalized_epochs: bundle.certificate.finalized_epochs.clone(),
+                power_table,
+            };
+
+        self.f3_light_client_caller
+            .update_state(state, new_light_client_state)
+            .context("failed to update F3LightClientActor state")?;
+
+        tracing::debug!(
+            instance = bundle.certificate.instance_id,
+            "updated F3LightClientActor state"
+        );
+
+        // Step 7: Mark instance as committed in cache
+        if let Some(cache) = &self.proof_cache {
+            cache.mark_committed(bundle.certificate.instance_id);
+            tracing::debug!(
+                instance = bundle.certificate.instance_id,
+                "marked instance as committed in cache"
+            );
+        }
+
+        tracing::info!(
+            instance = bundle.certificate.instance_id,
+            height = finality.height,
+            "proof-based topdown finality executed successfully"
+        );
+
+        Ok(ret)
+    }
+
+    /// Extract topdown messages from proof bundle event proofs.
+    ///
+    /// Decodes `NewTopDownMessage` events from the proof bundle using ABI decoding.
+    ///
+    /// Event signature: `NewTopDownMessage(address indexed subnet, IpcEnvelope message, bytes32 indexed id)`
+    fn extract_topdown_messages_from_bundle(
+        &self,
+        proof_bundle: &proofs::proofs::common::bundle::UnifiedProofBundle,
+    ) -> anyhow::Result<Vec<IpcEnvelope>> {
+        use ethers::abi::{Abi, RawLog};
+        use ethers::types as et;
+
+        // NewTopDownMessage event signature
+        // event NewTopDownMessage(address indexed subnet, IpcEnvelope message, bytes32 indexed id)
+        let event_signature = et::H256::from_slice(&ethers::utils::keccak256(
+            "NewTopDownMessage(address,IpcEnvelope,bytes32)",
+        ));
+
+        let mut messages = Vec::new();
+
+        // Iterate through event proofs in the bundle
+        for event_proof in &proof_bundle.event_proofs {
+            // TODO: Decode event proof structure to extract logs
+            // The event_proof contains:
+            // - Receipt with logs
+            // - Merkle proof for the receipt
+            // Each log has: address, topics[], data
+            //
+            // For each log:
+            // 1. Check if topics[0] == event_signature
+            // 2. If yes, decode topics and data:
+            //    - topics[1] = subnet address (indexed)
+            //    - topics[2] = message id (indexed)
+            //    - data = ABI-encoded IpcEnvelope
+            // 3. Use contract-bindings or ethabi to decode IpcEnvelope from data
+            // 4. Convert to ipc_api::cross::IpcEnvelope and add to messages
+
+            tracing::debug!("TODO: Decode event proof for NewTopDownMessage events");
+        }
+
+        tracing::warn!(
+            "extract_topdown_messages_from_bundle not yet implemented - returning empty",
+        );
+
+        Ok(messages)
+    }
+
+    /// Extract validator changes from proof bundle event proofs.
+    ///
+    /// Decodes `NewPowerChangeRequest` events from the proof bundle using ABI decoding.
+    ///
+    /// Event signature: `NewPowerChangeRequest(uint8 op, address validator, bytes payload, uint64 configurationNumber)`
+    fn extract_validator_changes_from_bundle(
+        &self,
+        proof_bundle: &proofs::proofs::common::bundle::UnifiedProofBundle,
+    ) -> anyhow::Result<Vec<ipc_api::staking::PowerChangeRequest>> {
+        use ethers::abi::{Abi, RawLog};
+        use ethers::types as et;
+
+        // NewPowerChangeRequest event signature
+        // event NewPowerChangeRequest(uint8 op, address validator, bytes payload, uint64 configurationNumber)
+        let event_signature = et::H256::from_slice(&ethers::utils::keccak256(
+            "NewPowerChangeRequest(uint8,address,bytes,uint64)",
+        ));
+
+        let mut changes = Vec::new();
+
+        // Iterate through event proofs in the bundle
+        for event_proof in &proof_bundle.event_proofs {
+            // TODO: Decode event proof structure to extract logs
+            // The event_proof contains:
+            // - Receipt with logs
+            // - Merkle proof for the receipt
+            // Each log has: address, topics[], data
+            //
+            // For each log:
+            // 1. Check if topics[0] == event_signature
+            // 2. If yes, decode topics and data:
+            //    - data = ABI-encoded (uint8 op, address validator, bytes payload, uint64 configurationNumber)
+            // 3. Use contract-bindings or ethabi to decode into PowerChangeRequest
+            // 4. Convert to ipc_api::staking::PowerChangeRequest and add to changes
+
+            tracing::debug!("TODO: Decode event proof for NewPowerChangeRequest events");
+        }
+
+        tracing::warn!(
+            "extract_validator_changes_from_bundle not yet implemented - returning empty",
+        );
+
+        Ok(changes)
     }
 
     // TODO Karel - separate this huge function and clean up

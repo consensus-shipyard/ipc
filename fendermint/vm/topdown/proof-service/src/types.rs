@@ -22,10 +22,21 @@ pub struct SerializableF3Certificate {
     pub finalized_epochs: Vec<ChainEpoch>,
     /// Power table CID (as string for serialization)
     pub power_table_cid: String,
+    /// Actual power table entries (for F3 Light Client actor updates)
+    pub power_table: Vec<PowerEntry>,
     /// Validated BLS signature
     pub signature: Vec<u8>,
     /// Signer indices (bitfield as Vec for serialization)
     pub signers: Vec<u64>,
+}
+
+/// Power table entry matching F3 Light Client actor format
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PowerEntry {
+    /// Public key of the validator
+    pub public_key: Vec<u8>,
+    /// Voting power of the validator
+    pub power: u64,
 }
 
 /// Entry in the proof cache
@@ -58,10 +69,15 @@ pub struct ValidatedCertificate {
 impl SerializableF3Certificate {
     /// Create from a cryptographically validated F3 certificate
     pub fn from_validated(cert: &FinalityCertificate) -> Self {
+        // TODO: Extract actual power table entries from certificate
+        // For now, use empty power table as placeholder
+        let power_table = Vec::new();
+
         Self {
             instance_id: cert.gpbft_instance,
             finalized_epochs: cert.ec_chain.suffix().iter().map(|ts| ts.epoch).collect(),
             power_table_cid: cert.supplemental_data.power_table.to_string(),
+            power_table,
             signature: cert.signature.clone(),
             signers: cert.signers.iter().collect(),
         }

@@ -30,7 +30,9 @@ ipc-api = { path = "../../../ipc/api" }
 fendermint_crypto = { path = "../../crypto" }
 fendermint_vm_encoding = { path = "../encoding" }
 fendermint_vm_actor_interface = { path = "../actor_interface" }
+fendermint_vm_topdown_proof_service = { path = "../topdown/proof-service" }
 fendermint_testing = { path = "../../testing", optional = true }
+proofs = { git = "https://github.com/consensus-shipyard/ipc-filecoin-proofs.git", branch = "proofs" }
 
 [dev-dependencies]
 ethers = { workspace = true }
