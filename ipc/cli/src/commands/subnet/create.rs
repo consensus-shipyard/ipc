@@ -111,7 +111,7 @@ pub(crate) async fn create_subnet(
     let validator_rewarder = require_fil_addr_from_str(&raw_addr)?;
 
     // Fetch F3 instance ID if parent is Filecoin (for deterministic genesis)
-    // 
+    //
     // When --parent-filecoin-rpc is provided, we fetch the current F3 instance ID
     // and store it in the subnet actor. This ensures all nodes generate identical
     // genesis files by fetching F3 data for the SAME instance, not "latest".
@@ -119,13 +119,24 @@ pub(crate) async fn create_subnet(
     // Without this, nodes running genesis at different times would fetch different
     // F3 instances, resulting in different genesis files and consensus failure.
     let genesis_f3_instance_id = if let Some(ref parent_filecoin_rpc) = config.parent_filecoin_rpc {
-        match fetch_current_f3_instance(parent_filecoin_rpc, config.parent_filecoin_auth_token.as_ref()).await {
+        match fetch_current_f3_instance(
+            parent_filecoin_rpc,
+            config.parent_filecoin_auth_token.as_ref(),
+        )
+        .await
+        {
             Ok(instance_id) => {
-                log::info!("Captured F3 instance ID {} for deterministic genesis", instance_id);
+                log::info!(
+                    "Captured F3 instance ID {} for deterministic genesis",
+                    instance_id
+                );
                 Some(instance_id)
             }
             Err(e) => {
-                log::warn!("Failed to fetch F3 instance ID: {}. Subnet will be created without F3 data.", e);
+                log::warn!(
+                    "Failed to fetch F3 instance ID: {}. Subnet will be created without F3 data.",
+                    e
+                );
                 None
             }
         }
@@ -178,22 +189,22 @@ async fn fetch_current_f3_instance(
     use ipc_provider::lotus::client::LotusJsonRPCClient;
     use ipc_provider::lotus::LotusClient;
 
-    let jsonrpc_client = JsonRpcClientImpl::new(
-        parent_filecoin_rpc.clone(),
-        auth_token.map(|s| s.as_str()),
-    );
+    let jsonrpc_client =
+        JsonRpcClientImpl::new(parent_filecoin_rpc.clone(), auth_token.map(|s| s.as_str()));
 
     let lotus_client = LotusJsonRPCClient::new(jsonrpc_client, SubnetID::default());
-    
+
     // Fetch the latest F3 certificate which contains the current instance ID
     let cert = lotus_client.f3_get_certificate().await?;
-    
+
     match cert {
         Some(c) => {
             // Extract instance ID from the certificate (gpbft_instance field)
             Ok(c.gpbft_instance)
         }
-        None => Err(anyhow::anyhow!("No F3 certificate available on parent chain")),
+        None => Err(anyhow::anyhow!(
+            "No F3 certificate available on parent chain"
+        )),
     }
 }
 
@@ -285,7 +296,10 @@ pub(crate) struct SubnetCreateConfig {
 
     /// Parent Filecoin RPC endpoint (optional - only when parent is Filecoin)
     /// If provided, CLI will fetch F3 instance ID for deterministic genesis
-    #[arg(long, help = "Parent Filecoin RPC endpoint (for F3 instance ID capture)")]
+    #[arg(
+        long,
+        help = "Parent Filecoin RPC endpoint (for F3 instance ID capture)"
+    )]
     pub parent_filecoin_rpc: Option<url::Url>,
 
     /// Auth token for parent Filecoin RPC (optional)

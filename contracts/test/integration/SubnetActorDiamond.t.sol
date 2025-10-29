@@ -2768,9 +2768,9 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         // Test that F3 instance ID is not set when genesisF3InstanceId is 0
         SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(address(gatewayDiamond));
         params.genesisF3InstanceId = 0;
-        
+
         SubnetActorDiamond sa = createSubnetActor(params);
-        
+
         (uint64 f3InstanceId, bool hasF3) = sa.getter().genesisF3InstanceId();
         assertEq(f3InstanceId, 0, "F3 instance ID should be 0");
         assertFalse(hasF3, "hasF3 should be false");
@@ -2780,9 +2780,9 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         // Test that F3 instance ID is set correctly when non-zero
         SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(address(gatewayDiamond));
         params.genesisF3InstanceId = 42;
-        
+
         SubnetActorDiamond sa = createSubnetActor(params);
-        
+
         (uint64 f3InstanceId, bool hasF3) = sa.getter().genesisF3InstanceId();
         assertEq(f3InstanceId, 42, "F3 instance ID should be 42");
         assertTrue(hasF3, "hasF3 should be true");
@@ -2794,16 +2794,16 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         // fetch the same F3 instance ID from the subnet actor
         SubnetActorDiamond.ConstructorParams memory params1 = defaultSubnetActorParamsWith(address(gatewayDiamond));
         params1.genesisF3InstanceId = 100;
-        
+
         SubnetActorDiamond.ConstructorParams memory params2 = defaultSubnetActorParamsWith(address(gatewayDiamond));
         params2.genesisF3InstanceId = 100;
-        
+
         SubnetActorDiamond sa1 = createSubnetActor(params1);
         SubnetActorDiamond sa2 = createSubnetActor(params2);
-        
+
         (uint64 f3_1, bool has1) = sa1.getter().genesisF3InstanceId();
         (uint64 f3_2, bool has2) = sa2.getter().genesisF3InstanceId();
-        
+
         assertEq(f3_1, 100, "SA1 F3 instance ID should be 100");
         assertEq(f3_2, 100, "SA2 F3 instance ID should be 100");
         assertEq(f3_1, f3_2, "Both subnets should have same F3 instance ID");
@@ -2814,9 +2814,9 @@ contract SubnetActorDiamondTest is Test, IntegrationTestBase {
         // Test with a realistic F3 instance ID value
         SubnetActorDiamond.ConstructorParams memory params = defaultSubnetActorParamsWith(address(gatewayDiamond));
         params.genesisF3InstanceId = type(uint64).max;
-        
+
         SubnetActorDiamond sa = createSubnetActor(params);
-        
+
         (uint64 f3InstanceId, bool hasF3) = sa.getter().genesisF3InstanceId();
         assertEq(f3InstanceId, type(uint64).max, "F3 instance ID should be max uint64");
         assertTrue(hasF3, "hasF3 should be true");
