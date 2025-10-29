@@ -1,6 +1,6 @@
 [package]
-name = "fendermint_actor_f3_cert_manager"
-description = "Manages F3 certificates and provides light client functionality for proof-based parent finality"
+name = "fendermint_actor_f3_light_client"
+description = "Manages F3 light client state for proof-based parent finality"
 license.workspace = true
 edition.workspace = true
 authors.workspace = true

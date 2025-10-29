@@ -28,7 +28,7 @@ multihash-codetable = { version = "0.1.4", features = [
 fvm_shared = { workspace = true }
 ipc-api = { path = "../../../ipc/api" }
 fendermint_actor_eam = { path = "../../actors/eam" }
-fendermint_actor_f3_cert_manager = { path = "../../actors/f3-cert-manager" }
+fendermint_actor_f3_light_client = { path = "../../actors/f3-light-client" }
 
 fendermint_crypto = { path = "../../crypto" }
 fendermint_testing = { path = "../../testing", optional = true }

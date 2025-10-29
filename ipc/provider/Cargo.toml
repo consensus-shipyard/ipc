@@ -55,7 +55,7 @@ ipc_actors_abis = { path = "../../contract-bindings" }
 ipc-observability = { path = "../../ipc/observability" }
 prometheus = { workspace = true }
 
-fendermint_actor_f3_cert_manager = { path = "../../fendermint/actors/f3-cert-manager" }
+fendermint_actor_f3_light_client = { path = "../../fendermint/actors/f3-light-client" }
 fendermint_vm_genesis = { path = "../../fendermint/vm/genesis" }
 
 [dev-dependencies]

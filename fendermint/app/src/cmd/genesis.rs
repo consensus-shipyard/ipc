@@ -2,10 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::{anyhow, Context};
-use fendermint_actor_f3_cert_manager::types;
+use fendermint_actor_f3_light_client::types;
 use fendermint_crypto::PublicKey;
-// Temporarily disabled due to bls-signatures@0.15.0 compatibility issues
-// use filecoin_f3_lightclient::F3Client;
 use fvm_shared::address::Address;
 use ipc_api::subnet_id::SubnetID;
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
@@ -352,15 +350,13 @@ pub async fn seal_genesis(genesis_file: &PathBuf, args: &SealGenesisArgs) -> any
     builder.write_to(args.output_path.clone()).await
 }
 
-/// Fetches F3 certificate data from the parent Filecoin chain
+/// Fetches F3 parameters from the parent Filecoin chain
 async fn fetch_f3_params_from_parent(
     parent_endpoint: &url::Url,
     parent_auth_token: Option<&String>,
 ) -> anyhow::Result<Option<ipc::F3Params>> {
-    use std::convert::TryFrom;
-
     tracing::info!(
-        "Fetching F3 certificate data from parent chain at {}",
+        "Fetching F3 parameters from parent chain at {}",
         parent_endpoint
     );
 
@@ -372,10 +368,27 @@ async fn fetch_f3_params_from_parent(
     // We use a dummy subnet ID here since F3 data is at the chain level, not subnet-specific
     let lotus_client = LotusJsonRPCClient::new(jsonrpc_client, SubnetID::default());
 
-    // Fetch F3 data using the Lotus client
-    match lotus_client.f3_get_instance_id().await {
-        Ok(instance_id) => {
+    // Fetch F3 certificate which contains instance ID and finalized epochs
+    let certificate = lotus_client.f3_get_certificate().await?;
+
+    match certificate {
+        Some(cert) => {
+            let instance_id = cert.gpbft_instance;
             tracing::info!("Found F3 instance ID: {}", instance_id);
+
+            // Extract finalized epochs from the EC chain
+            let finalized_epochs: Vec<i64> =
+                cert.ec_chain.iter().map(|entry| entry.epoch).collect();
+
+            if finalized_epochs.is_empty() {
+                return Err(anyhow::anyhow!("F3 certificate has empty EC chain"));
+            }
+
+            tracing::info!(
+                "Found {} finalized epochs, latest: {}",
+                finalized_epochs.len(),
+                finalized_epochs.iter().max().unwrap_or(&0)
+            );
 
             // Get power table for this instance
             let power_table_response = lotus_client.f3_get_power_table(instance_id).await?;
@@ -399,57 +412,15 @@ async fn fetch_f3_params_from_parent(
                 .collect();
             let power_table = power_table?;
 
-            // Get latest certificate (optional)
-            let certificate = lotus_client.f3_get_certificate().await?;
-            let certificate = if let Some(cert_response) = certificate {
-                // Decode the base64 signature
-                let signature_bytes = base64::Engine::decode(
-                    &base64::engine::general_purpose::STANDARD,
-                    &cert_response.signature,
-                )?;
-
-                // Collect all finalized epochs from the EC chain
-                let finalized_epochs: Vec<i64> = cert_response
-                    .ec_chain
-                    .iter()
-                    .map(|entry| entry.epoch)
-                    .collect();
-
-                if finalized_epochs.is_empty() {
-                    return Err(anyhow::anyhow!("F3 certificate has empty EC chain"));
-                }
-
-                // Get the power table CID from the last EC chain entry
-                let power_table_cid = cert_response
-                    .ec_chain
-                    .last()
-                    .map(|entry| &entry.power_table)
-                    .ok_or_else(|| anyhow::anyhow!("F3 certificate has empty EC chain"))?;
-
-                // Serialize the entire certificate as the raw certificate data
-                let certificate_data = serde_json::to_vec(&cert_response)?;
-
-                Some(types::F3Certificate {
-                    instance_id: cert_response.gpbft_instance,
-                    finalized_epochs,
-                    power_table_cid: cid::Cid::try_from(power_table_cid)?,
-                    signature: signature_bytes,
-                    certificate_data,
-                })
-            } else {
-                None
-            };
-
-            tracing::info!("Successfully fetched F3 certificate data from parent chain");
+            tracing::info!("Successfully fetched F3 parameters from parent chain");
             Ok(Some(ipc::F3Params {
-                genesis_instance_id: instance_id,
-                genesis_power_table: power_table,
-                genesis_certificate: certificate,
+                instance_id,
+                power_table,
+                finalized_epochs,
             }))
         }
-        Err(e) => Err(anyhow::anyhow!(
-            "Failed to fetch F3 certificate data from parent chain: {}",
-            e
+        None => Err(anyhow::anyhow!(
+            "No F3 certificate available - F3 might not be running on the parent chain"
         )),
     }
 }
