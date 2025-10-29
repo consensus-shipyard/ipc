@@ -867,8 +867,22 @@ show_subnet_info() {
             "cat $node_home/fendermint/validator.pk 2>/dev/null || echo ''")
 
         if [ -n "$pubkey" ]; then
+            # Convert validator key to Ethereum address using fendermint
+            local eth_address=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+                "fendermint key into-eth --secret-key $node_home/fendermint/validator.sk --name temp --out-dir /tmp 2>/dev/null && cat /tmp/temp.addr 2>/dev/null && rm -f /tmp/temp.* || echo ''")
+
+            # Add 0x prefix if address was successfully converted
+            if [ -n "$eth_address" ] && [ "$eth_address" != "" ]; then
+                eth_address="0x${eth_address}"
+            fi
+
             log_info "    - $name ($ip)"
             log_info "      Public Key: $pubkey"
+            if [ -n "$eth_address" ]; then
+                log_info "      Address: $eth_address"
+            else
+                log_warn "      Address: Unable to convert"
+            fi
         else
             log_info "    - $name ($ip)"
             log_warn "      Public Key: Not found"
