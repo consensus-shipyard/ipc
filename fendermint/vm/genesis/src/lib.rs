@@ -280,15 +280,15 @@ pub mod ipc {
         }
     }
 
-    /// F3 certificate parameters for proof-based parent finality
+    /// F3 parameters for proof-based parent finality
     #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
     pub struct F3Params {
-        /// Genesis F3 instance ID
-        pub genesis_instance_id: u64,
-        /// Genesis power table for F3 consensus
-        pub genesis_power_table: Vec<fendermint_actor_f3_cert_manager::types::PowerEntry>,
-        /// Genesis F3 certificate (if available)
-        pub genesis_certificate: Option<fendermint_actor_f3_cert_manager::types::F3Certificate>,
+        /// F3 instance ID from parent chain
+        pub instance_id: u64,
+        /// Power table for F3 consensus from parent chain
+        pub power_table: Vec<fendermint_actor_f3_light_client::types::PowerEntry>,
+        /// Finalized epochs from the parent certificate
+        pub finalized_epochs: Vec<fvm_shared::clock::ChainEpoch>,
     }
 }
 

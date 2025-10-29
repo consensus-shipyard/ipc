@@ -42,7 +42,7 @@ members = [
   "fendermint/actors/chainmetadata",
   "fendermint/actors/activity-tracker",
   "fendermint/actors/eam",
-  "fendermint/actors/f3-cert-manager",
+  "fendermint/actors/f3-light-client",
   "fendermint/actors/gas_market/eip1559",
 
   "build-rs-utils",
