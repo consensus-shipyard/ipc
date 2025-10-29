@@ -26,7 +26,6 @@ fendermint_tracing = { path = "../../tracing" }
 actors-custom-car = { path = "../../actors-custom-car" }
 fendermint_actor_chainmetadata = { path = "../../actors/chainmetadata" }
 fendermint_actor_activity_tracker = { path = "../../actors/activity-tracker" }
-fendermint_actor_f3_cert_manager = { path = "../../actors/f3-cert-manager" }
 fendermint_actor_f3_light_client = { path = "../../actors/f3-light-client" }
 fendermint_actor_gas_market_eip1559 = { path = "../../actors/gas_market/eip1559" }
 fendermint_actor_eam = { path = "../../actors/eam" }

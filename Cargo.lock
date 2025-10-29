@@ -4065,7 +4065,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "fendermint_actor_f3_cert_manager"
+name = "fendermint_actor_f3_light_client"
 version = "0.1.0"
 dependencies = [
  "anyhow",

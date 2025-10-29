@@ -374,18 +374,6 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
         tracing::debug!("received f3_get_power_table_by_instance response: {r:?}");
         Ok(r)
     }
-
-    async fn f3_get_instance_id(&self) -> Result<u64> {
-        // Get the latest certificate which contains the instance ID
-        // There's no direct F3GetInstanceID method in Lotus
-        let cert = self.f3_get_certificate().await?;
-        match cert {
-            Some(cert_response) => Ok(cert_response.gpbft_instance),
-            None => Err(anyhow!(
-                "No F3 certificate available - F3 might not be running on this chain"
-            )),
-        }
-    }
 }
 
 impl<T: JsonRpcClient + Send + Sync> LotusJsonRPCClient<T> {
