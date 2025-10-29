@@ -12,6 +12,7 @@ use fendermint_crypto::{PublicKey, SecretKey};
 use fendermint_vm_actor_interface::ipc;
 use fendermint_vm_actor_interface::{
     eam::EthAddress,
+    f3_light_client,
     init::builtin_actor_eth_addr,
     ipc::{AbiHash, ValidatorMerkleTree, GATEWAY_ACTOR_ID},
 };
@@ -19,6 +20,7 @@ use fendermint_vm_genesis::{Collateral, Power, PowerScale, Validator, ValidatorK
 use fendermint_vm_message::conv::{from_eth, from_fvm};
 use fendermint_vm_message::signed::sign_secp256k1;
 use fendermint_vm_topdown::IPCParentFinality;
+use fvm_ipld_encoding::RawBytes;
 
 use ipc_actors_abis::checkpointing_facet::CheckpointingFacet;
 use ipc_actors_abis::gateway_getter_facet::GatewayGetterFacet;
@@ -384,4 +386,111 @@ fn membership_to_power_table(
     }
 
     pt
+}
+
+/// Caller for F3 Light Client actor operations.
+///
+/// The F3 Light Client actor maintains F3 light client state including:
+/// - Current F3 instance ID
+/// - Finalized epochs chain  
+/// - Validator power table
+#[derive(Clone)]
+pub struct F3LightClientCaller {
+    actor_id: ActorID,
+}
+
+impl Default for F3LightClientCaller {
+    fn default() -> Self {
+        Self::new(f3_light_client::F3_LIGHT_CLIENT_ACTOR_ID)
+    }
+}
+
+impl F3LightClientCaller {
+    pub fn new(actor_id: ActorID) -> Self {
+        Self { actor_id }
+    }
+}
+
+impl<DB: Blockstore + Clone> F3LightClientCaller {
+    /// Get the current F3 light client state.
+    ///
+    /// Returns the instance ID, finalized epochs, and power table.
+    pub fn get_state(
+        &self,
+        state: &mut FvmExecState<DB>,
+    ) -> anyhow::Result<f3_light_client::GetStateResponse> {
+        let method_num = f3_light_client::Method::GetState as u64;
+        let params = RawBytes::default(); // No params needed for GetState
+
+        let msg = fvm_shared::message::Message {
+            from: fvm_shared::address::Address::new_id(fvm_shared::SYSTEM_ACTOR_ID),
+            to: fvm_shared::address::Address::new_id(self.actor_id),
+            sequence: 0,
+            gas_limit: 10_000_000_000,
+            method_num,
+            params,
+            value: TokenAmount::zero(),
+            version: 0,
+            gas_fee_cap: TokenAmount::zero(),
+            gas_premium: TokenAmount::zero(),
+        };
+
+        let ret = state
+            .execute_implicit(msg)
+            .context("failed to call F3LightClientActor GetState")?;
+
+        if !ret.msg_receipt.exit_code.is_success() {
+            bail!(
+                "F3LightClientActor GetState returned exit code: {:?}",
+                ret.msg_receipt.exit_code
+            );
+        }
+
+        let response: f3_light_client::GetStateResponse =
+            fvm_ipld_encoding::from_slice(&ret.msg_receipt.return_data)
+                .context("failed to decode GetStateResponse")?;
+
+        Ok(response)
+    }
+
+    /// Update the F3 light client state with a new certificate.
+    ///
+    /// This should be called after successfully executing a proof-based topdown finality message.
+    pub fn update_state(
+        &self,
+        state: &mut FvmExecState<DB>,
+        new_state: f3_light_client::LightClientState,
+    ) -> anyhow::Result<()> {
+        let method_num = f3_light_client::Method::UpdateState as u64;
+
+        let params = f3_light_client::UpdateStateParams { state: new_state };
+        let params = fvm_ipld_encoding::RawBytes::serialize(params)
+            .context("failed to serialize UpdateStateParams")?;
+
+        let msg = fvm_shared::message::Message {
+            from: fvm_shared::address::Address::new_id(fvm_shared::SYSTEM_ACTOR_ID),
+            to: fvm_shared::address::Address::new_id(self.actor_id),
+            sequence: 0,
+            gas_limit: 10_000_000_000,
+            method_num,
+            params,
+            value: TokenAmount::zero(),
+            version: 0,
+            gas_fee_cap: TokenAmount::zero(),
+            gas_premium: TokenAmount::zero(),
+        };
+
+        let ret = state
+            .execute_implicit(msg)
+            .context("failed to call F3LightClientActor UpdateState")?;
+
+        if !ret.msg_receipt.exit_code.is_success() {
+            bail!(
+                "F3LightClientActor UpdateState returned exit code: {:?}",
+                ret.msg_receipt.exit_code
+            );
+        }
+
+        Ok(())
+    }
 }

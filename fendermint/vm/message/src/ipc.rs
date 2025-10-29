@@ -11,9 +11,10 @@ pub enum IpcMessage {
     /// A top-down checkpoint parent finality proposal. This proposal should contain the latest parent
     /// state that to be checked and voted by validators.
     TopDownExec(ParentFinality),
-    /// Proof-based parent finality with cryptographic F3 certificates and proof bundles.
+    /// Proof-based topdown finality with cryptographic F3 certificates and proof bundles.
     /// This is the v2 approach that replaces voting with deterministic verification.
-    ParentFinalityWithProof(ParentFinalityProofBundle),
+    /// The bundle can span multiple blocks as F3 certificates finalize chains of epochs.
+    TopDownWithProof(TopDownProofBundle),
 }
 
 /// A proposal of the parent view that validators will be voting on.
@@ -25,18 +26,16 @@ pub struct ParentFinality {
     pub block_hash: Vec<u8>,
 }
 
-/// Proof-based parent finality message with cryptographic verification.
+/// Proof-based topdown finality bundle with cryptographic verification.
 ///
 /// This contains:
-/// - The parent finality (height + block hash)
-/// - A validated F3 certificate with instance ID and finalized epochs
+/// - A validated F3 certificate with instance ID and finalized epochs (chain of blocks)
 /// - A proof bundle with storage proofs (completeness) and event proofs (topdown messages/validator changes)
 ///
 /// Validators verify this deterministically without requiring gossip-based voting.
+/// The certificate can finalize multiple blocks, so height/block_hash are not in the bundle itself.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ParentFinalityProofBundle {
-    /// Parent finality (height + block hash)
-    pub finality: ParentFinality,
+pub struct TopDownProofBundle {
     /// Validated F3 certificate (serializable for consensus)
     pub certificate: fendermint_vm_topdown_proof_service::types::SerializableF3Certificate,
     /// Cryptographic proof bundle (storage + event proofs + witness blocks)
