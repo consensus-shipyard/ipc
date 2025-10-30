@@ -72,6 +72,9 @@ fendermint_vm_resolver = { path = "../vm/resolver" }
 fendermint_vm_snapshot = { path = "../vm/snapshot" }
 fendermint_vm_topdown = { path = "../vm/topdown" }
 
+ipc_actors_abis = { path = "../../contract-bindings" }
+ethers = {workspace =  true}
+
 # .car file wrapped in a crate
 actors-builtin-car = { path = "../actors-builtin-car" }
 actors-custom-car = { path = "../actors-custom-car" }

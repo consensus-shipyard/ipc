@@ -53,6 +53,34 @@ make ( or make build-with-ui )
 make test
 ```
 
+## Local Development with Anvil
+
+For local development and testing, you can use Anvil (local Ethereum node) with your IPC keystore accounts:
+
+```sh
+# Quick start - setup Anvil with all IPC keystore accounts funded
+./scripts/setup-anvil-with-ipc-keys.sh
+
+# Stop Anvil
+/tmp/stop-anvil-ipc.sh
+
+# Save/load Anvil state for persistence across restarts
+./scripts/anvil-persistent-state.sh save
+./scripts/anvil-persistent-state.sh load
+```
+
+This automatically:
+- Starts Anvil on port 8545 with chain ID 31337
+- Funds all addresses from `~/.ipc/evm_keystore.json` with 10,000 ETH each
+- Uses deterministic accounts for consistent testing
+
+For detailed documentation, see [scripts/ANVIL_IPC_SETUP.md](./scripts/ANVIL_IPC_SETUP.md).
+
+**Optional**: Source convenience aliases:
+```sh
+source scripts/aliases.sh  # Adds anvil-start, anvil-stop, etc.
+```
+
 ## Code organization
 
 - `ipc/cli`: A Rust binary crate for our client `ipc-cli` application that provides a simple and easy-to-use interface to interact with IPC as a user and run all the processes required for the operation of a subnet.

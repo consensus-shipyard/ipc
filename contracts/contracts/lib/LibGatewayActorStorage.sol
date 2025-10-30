@@ -2,8 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {NotSystemActor, NotEnoughFunds} from "../errors/IPCErrors.sol";
-import {QuorumMap} from "../structs/Quorum.sol";
-import {BottomUpCheckpoint, BottomUpMsgBatch, IpcEnvelope, ParentFinality} from "../structs/CrossNet.sol";
+import {BottomUpMsgBatch, IpcEnvelope, ParentFinality} from "../structs/CrossNet.sol";
 import {SubnetID, Subnet, ParentValidatorsTracker} from "../structs/Subnet.sol";
 import {Membership} from "../structs/Subnet.sol";
 import {AccountHelper} from "../lib/AccountHelper.sol";
@@ -15,8 +14,6 @@ struct GatewayActorStorage {
     uint256 latestParentHeight;
     /// @notice bottom-up period in number of epochs for the subnet
     uint256 bottomUpCheckPeriod;
-    /// @notice bottom-up message batch period in number of epochs for the subnet
-    uint256 bottomUpMsgBatchPeriod;
     /// @notice nonce for bottom-up messages
     uint64 bottomUpNonce;
     /// @notice AppliedNonces keep track of the next nonce of the message to be applied.
@@ -45,8 +42,6 @@ struct GatewayActorStorage {
     Membership currentMembership;
     /// @notice The last membership received from the parent and adopted
     Membership lastMembership;
-    /// @notice Quorum information for checkpoints
-    QuorumMap checkpointQuorumMap;
     /// @notice path to the current network
     SubnetID networkName;
     /// Tracking validator changes from parent in child subnet
@@ -65,12 +60,11 @@ struct GatewayActorStorage {
     mapping(bytes32 => IpcEnvelope) postbox;
     /// @notice Keys of the envelopes in the postbox. Useful to iterate through them
     EnumerableSet.Bytes32Set postboxKeys;
-    /// @notice A mapping of block numbers to bottom-up checkpoints
-    // slither-disable-next-line uninitialized-state
-    mapping(uint256 => BottomUpCheckpoint) bottomUpCheckpoints;
     /// @notice A mapping of block numbers to bottom-up cross-messages
     // slither-disable-next-line uninitialized-state
     mapping(uint256 => BottomUpMsgBatch) bottomUpMsgBatches;
+    /// @notice This tracks the latest bottom up checkpoint height created
+    uint64 lastestBottomUpCheckpointHeight;
     /// @notice Keys of the registered subnets. Useful to iterate through them
     EnumerableSet.Bytes32Set subnetKeys;
     /// @notice List of approved subnet that can join the network

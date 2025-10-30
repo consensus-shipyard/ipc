@@ -5,7 +5,6 @@ mod staking;
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use fendermint_actor_gas_market_eip1559::Constants;
 use fendermint_contract_test::Tester;
 use fendermint_crypto::{PublicKey, SecretKey};
@@ -14,7 +13,6 @@ use fendermint_vm_actor_interface::gas_market::GAS_MARKET_ACTOR_ADDR;
 use fendermint_vm_actor_interface::system::SYSTEM_ACTOR_ADDR;
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{Account, Actor, ActorMeta, Genesis, PermissionMode, SignerAddr};
-use fendermint_vm_interpreter::fvm::bottomup::BottomUpManager;
 use fendermint_vm_interpreter::fvm::store::memory::MemoryBlockstore;
 use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::{Upgrade, UpgradeScheduler};
@@ -26,6 +24,8 @@ use fendermint_vm_topdown::voting::VoteTally;
 use fendermint_vm_topdown::Toggle;
 use fvm_shared::chainid::ChainID;
 
+use crate::staking::DEFAULT_CHAIN_ID;
+use fendermint_vm_interpreter::fvm::end_block_hook::EndBlockManager;
 use fvm::executor::{ApplyKind, Executor};
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
@@ -36,7 +36,6 @@ use fvm_shared::version::NetworkVersion;
 use lazy_static::lazy_static;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
-use tendermint_rpc::Client;
 
 lazy_static! {
     static ref SECRET: SecretKey = rand_secret_key();
@@ -46,7 +45,7 @@ lazy_static! {
 }
 
 const CHAIN_NAME: &str = "mychain";
-type I = FvmMessagesInterpreter<MemoryBlockstore, NeverCallClient>;
+type I = FvmMessagesInterpreter<MemoryBlockstore>;
 
 // returns a seeded secret key which is guaranteed to be the same every time
 fn rand_secret_key() -> SecretKey {
@@ -64,13 +63,13 @@ async fn tester_with_upgrader(
 ) -> (Tester<I>, PublicKey) {
     let validator = rand_secret_key().public_key();
 
-    let bottom_up_manager = BottomUpManager::new(NeverCallClient, None);
+    let end_block_manager = EndBlockManager::default();
     let finality_provider = Arc::new(Toggle::disabled());
     let vote_tally = VoteTally::empty();
     let top_down_manager = TopDownManager::new(finality_provider, vote_tally);
 
-    let interpreter: FvmMessagesInterpreter<MemoryBlockstore, _> = FvmMessagesInterpreter::new(
-        bottom_up_manager,
+    let interpreter: FvmMessagesInterpreter<MemoryBlockstore> = FvmMessagesInterpreter::new(
+        end_block_manager,
         top_down_manager,
         upgrade_scheduler,
         false,
@@ -90,7 +89,7 @@ async fn tester_with_upgrader(
 
     let genesis = Genesis {
         chain_name: CHAIN_NAME.to_string(),
-        chain_id: None,
+        chain_id: DEFAULT_CHAIN_ID,
         timestamp: Timestamp(0),
         network_version: NetworkVersion::V21,
         base_fee: TokenAmount::zero(),
@@ -293,8 +292,11 @@ async fn test_gas_market_upgrade() {
 
     // Attach an upgrade at epoch 2 that changes the gas limit to 200.
     upgrader
-        .add(
-            Upgrade::new(CHAIN_NAME, 2, Some(1), move |state| {
+        .add(Upgrade::new_by_id(
+            DEFAULT_CHAIN_ID.into(),
+            2,
+            Some(1),
+            move |state| {
                 println!(
                     "[Upgrade at height {}] Update gas market params",
                     state.block_height()
@@ -305,9 +307,8 @@ async fn test_gas_market_upgrade() {
                     executor.execute_message(msg, ApplyKind::Implicit, 0)?;
                     Ok(())
                 })
-            })
-            .unwrap(),
-        )
+            },
+        ))
         .unwrap();
 
     // Create a new tester with the upgrader attached.
@@ -365,18 +366,5 @@ fn custom_gas_limit(block_gas_limit: u64) -> Message {
         gas_limit: 10000000,
         gas_fee_cap: Default::default(),
         gas_premium: Default::default(),
-    }
-}
-
-#[derive(Clone)]
-struct NeverCallClient;
-
-#[async_trait]
-impl Client for NeverCallClient {
-    async fn perform<R>(&self, _request: R) -> Result<R::Output, tendermint_rpc::Error>
-    where
-        R: tendermint_rpc::SimpleRequest,
-    {
-        todo!()
     }
 }

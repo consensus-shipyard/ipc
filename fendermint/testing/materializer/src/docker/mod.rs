@@ -51,6 +51,8 @@ use crate::{
     TestnetName, TestnetResource,
 };
 
+pub use node::container_name;
+
 mod container;
 mod dropper;
 mod network;
@@ -76,6 +78,8 @@ const DOCKER_ENTRY_FILE_NAME: &str = "docker-entry.sh";
 
 const PORT_RANGE_START: u32 = 30000;
 const PORT_RANGE_SIZE: u32 = 100;
+
+const DEFAULT_TEST_CHAIN_ID: u64 = 10000;
 
 lazy_static! {
     static ref STARTUP_TIMEOUT: Duration = Duration::from_secs(30);
@@ -672,7 +676,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             // TODO: Some of these hardcoded values can go into the manifest.
             let genesis = Genesis {
                 chain_name,
-                chain_id: None,
+                chain_id: DEFAULT_TEST_CHAIN_ID,
                 timestamp: Timestamp::current(),
                 network_version: NetworkVersion::V21,
                 base_fee: TokenAmount::zero(),
@@ -822,7 +826,8 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                 --bottomup-check-period {} \
                 --permission-mode collateral \
                 --supply-source-kind native \
-                --genesis-subnet-ipc-contracts-owner {:?}
+                --genesis-subnet-ipc-contracts-owner {:?} \
+                --chain-id {}
                 ",
             parent_submit_config.subnet.subnet_id,
             subnet_config.creator.eth_addr(),
@@ -830,6 +835,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             TokenAmount::from_nano(1), // The minimum for native mode that the CLI parses
             subnet_config.bottom_up_checkpoint.period,
             subnet_config.creator.eth_addr(),
+            DEFAULT_TEST_CHAIN_ID,
         );
 
         // Now run the command and capture the output.

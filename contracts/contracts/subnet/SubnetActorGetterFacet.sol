@@ -2,7 +2,7 @@
 pragma solidity ^0.8.23;
 
 import {ConsensusType} from "../enums/ConsensusType.sol";
-import {BottomUpCheckpoint, IpcEnvelope} from "../structs/CrossNet.sol";
+import {IpcEnvelope} from "../structs/CrossNet.sol";
 import {SubnetID, Asset} from "../structs/Subnet.sol";
 import {SubnetID, ValidatorInfo, Validator, PermissionMode} from "../structs/Subnet.sol";
 import {SubnetActorStorage} from "../lib/LibSubnetActorStorage.sol";
@@ -83,14 +83,13 @@ contract SubnetActorGetterFacet {
         return (addresses, balances);
     }
 
+    function chainID() external view returns (string memory) {
+        return s.chainID;
+    }
+
     /// @notice Returns the period for bottom-up checkpointing operations.
     function bottomUpCheckPeriod() external view returns (uint256) {
         return s.bottomUpCheckPeriod;
-    }
-
-    /// @notice Returns the block height of the last bottom-up checkpoint.
-    function lastBottomUpCheckpointHeight() external view returns (uint256) {
-        return s.lastBottomUpCheckpointHeight;
     }
 
     /// @notice Returns the consensus protocol type used in the subnet.
@@ -111,6 +110,11 @@ contract SubnetActorGetterFacet {
     /// @notice Returns the minimum collateral required for subnet activation.
     function minActivationCollateral() external view returns (uint256) {
         return s.minActivationCollateral;
+    }
+
+    /// @notice Obtain the active validator address by its position index in the validator list array.
+    function getActiveValidatorAddressByIndex(uint16 index) external view returns (address) {
+        return LibPower.getActiveValidatorAddressByIndex(index);
     }
 
     /// @notice Returns detailed information about a specific validator.
@@ -165,27 +169,6 @@ contract SubnetActorGetterFacet {
     /// @param validator The address of the checked validator.
     function isWaitingValidator(address validator) external view returns (bool) {
         return LibPower.isWaitingValidator(validator);
-    }
-
-    /// @notice returns the committed bottom-up checkpoint at specific epoch.
-    /// @param epoch - the epoch to check.
-    /// @return exists - whether the checkpoint exists.
-    /// @return checkpoint - the checkpoint struct.
-    function bottomUpCheckpointAtEpoch(
-        uint256 epoch
-    ) public view returns (bool exists, BottomUpCheckpoint memory checkpoint) {
-        checkpoint = s.committedCheckpoints[epoch];
-        exists = !checkpoint.subnetID.isEmpty();
-        return (exists, checkpoint);
-    }
-
-    /// @notice returns the historical committed bottom-up checkpoint hash.
-    /// @param epoch - the epoch to check
-    /// @return exists - whether the checkpoint exists
-    /// @return hash - the hash of the checkpoint
-    function bottomUpCheckpointHashAtEpoch(uint256 epoch) external view returns (bool, bytes32) {
-        (bool exists, BottomUpCheckpoint memory checkpoint) = bottomUpCheckpointAtEpoch(epoch);
-        return (exists, keccak256(abi.encode(checkpoint)));
     }
 
     /// @notice Returns the power scale in number of decimals from whole FIL.

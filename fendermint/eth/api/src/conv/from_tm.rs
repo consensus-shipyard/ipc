@@ -66,8 +66,6 @@ fn block_zero() -> tendermint::Block {
         signatures: Vec::new(),
     };
 
-    let empty_cid = fendermint_vm_message::cid(&[0u8; 0]).unwrap();
-
     let header = tendermint::block::Header {
         version: tendermint::block::header::Version { block: 0, app: 0 },
         chain_id: tendermint::chain::Id::try_from("UNSPECIFIED").expect("invalid chainid"),
@@ -79,7 +77,7 @@ fn block_zero() -> tendermint::Block {
         validators_hash: tendermint::Hash::None,
         next_validators_hash: tendermint::Hash::None,
         consensus_hash: tendermint::Hash::None,
-        app_hash: tendermint::AppHash::try_from(empty_cid.to_bytes()).unwrap(),
+        app_hash: tendermint::AppHash::try_from(vec![0; 32]).unwrap(),
         last_results_hash: None,
         evidence_hash: None,
         proposer_address: tendermint::account::Id::new([0u8; 20]),
@@ -389,15 +387,8 @@ where
 }
 
 fn app_hash_to_root(app_hash: &tendermint::AppHash) -> anyhow::Result<et::H256> {
-    // Out app hash is a CID. We only need the hash part.
-    // Actually it's not the state root of the actors, but it's still a CID.
-    let state_root = cid::Cid::try_from(app_hash.as_bytes()).context("app hash is not a CID")?;
-    // Just in case we returned `Cid::default()`
-    if state_root.hash().digest().is_empty() {
-        Ok(et::H256::default())
-    } else {
-        Ok(et::H256::from_slice(state_root.hash().digest()))
-    }
+    // The app hash is a keccak hash
+    Ok(et::H256::from_slice(app_hash.as_bytes()))
 }
 
 fn maybe_contract_address(deliver_tx: &DeliverTx) -> Option<EthAddress> {

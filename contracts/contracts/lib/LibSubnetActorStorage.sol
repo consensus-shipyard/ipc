@@ -3,7 +3,6 @@ pragma solidity ^0.8.23;
 
 import {ConsensusType} from "../enums/ConsensusType.sol";
 import {NotGateway, SubnetAlreadyKilled} from "../errors/IPCErrors.sol";
-import {BottomUpCheckpoint, BottomUpMsgBatchInfo} from "../structs/CrossNet.sol";
 import {SubnetID, ValidatorSet, PowerChangeLog, StakingReleaseQueue, Asset, Validator, PermissionMode} from "../structs/Subnet.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
@@ -11,8 +10,6 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
         /// @notice initial circulating supply provided by genesis validators to use when bootstrapping
         /// the network.
         uint256 genesisCircSupply;
-        /// @notice The height of the last committed bottom-up checkpoint.
-        uint256 lastBottomUpCheckpointHeight;
         /// @notice Minimal activation collateral
         uint256 minActivationCollateral;
         /// @notice number of blocks in a bottom-up epoch
@@ -58,8 +55,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
         mapping(address => string) bootstrapNodes;
         /// @notice the list ov validators that announces bootstrap nodes
         EnumerableSet.AddressSet bootstrapOwners;
-        /// @notice contains all committed bottom-up checkpoint at specific epoch
-        mapping(uint256 => BottomUpCheckpoint) committedCheckpoints;
+        string chainID;
         /// @notice initial set of validators joining in genesis
         Validator[] genesisValidators;
         /// @notice genesis balance to be allocated to the subnet in genesis.

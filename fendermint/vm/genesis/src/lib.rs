@@ -14,7 +14,7 @@ use fvm_shared::version::NetworkVersion;
 use fvm_shared::{address::Address, econ::TokenAmount};
 
 use fendermint_crypto::{normalize_public_key, PublicKey};
-use fendermint_vm_core::{chainid, Timestamp};
+use fendermint_vm_core::Timestamp;
 use fendermint_vm_encoding::IsHumanReadable;
 
 #[cfg(feature = "arb")]
@@ -32,7 +32,7 @@ pub struct Genesis {
     /// It will be used to derive a chain ID as well as being
     /// the network name in the `InitActor`.
     pub chain_name: String,
-    pub chain_id: Option<u64>,
+    pub chain_id: u64,
     pub timestamp: Timestamp,
     pub network_version: NetworkVersion,
     #[serde_as(as = "IsHumanReadable")]
@@ -59,11 +59,7 @@ pub struct Genesis {
 
 impl Genesis {
     pub fn chain_id(&self) -> anyhow::Result<ChainID> {
-        let id = match self.chain_id {
-            None => chainid::from_str_hashed(&self.chain_name)?.into(),
-            Some(v) => v,
-        };
-        Ok(id.into())
+        Ok(self.chain_id.into())
     }
 }
 

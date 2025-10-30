@@ -2,17 +2,16 @@
 // SPDX-License-Identifier: MIT
 
 use crate::lotus::message::ipc::SubnetInfo;
+use crate::manager::cometbft::{SignedHeader, ValidatorCertificate};
 use anyhow::Result;
 use async_trait::async_trait;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
+use ipc_actors_abis::checkpointing_facet::AppHashBreakdown;
 use ipc_actors_abis::subnet_actor_activity_facet::ValidatorClaim;
 use ipc_actors_abis::subnet_actor_checkpointing_facet::Inclusion;
 use ipc_actors_abis::subnet_actor_getter_facet::ListPendingCommitmentsEntry;
-use ipc_api::checkpoint::{
-    consensus::ValidatorData, BottomUpCheckpoint, BottomUpCheckpointBundle, QuorumReachedEvent,
-    Signature,
-};
+use ipc_api::checkpoint::consensus::ValidatorData;
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::staking::{PowerChangeRequest, ValidatorInfo};
 use ipc_api::subnet::{Asset, ConstructParams, PermissionMode};
@@ -23,7 +22,7 @@ use std::collections::{BTreeMap, HashMap};
 /// Trait to interact with a subnet and handle its lifecycle.
 #[async_trait]
 pub trait SubnetManager:
-    Send + Sync + TopDownFinalityQuery + BottomUpCheckpointRelayer + ValidatorRewarder
+    Send + Sync + TopDownFinalityQuery + SignedHeaderRelayer + ValidatorRewarder
 {
     /// Deploys a new subnet actor on the `parent` subnet and with the
     /// configuration passed in `ConstructParams`.
@@ -191,6 +190,16 @@ pub trait SubnetManager:
     /// Lists all the validators
     async fn list_validators(&self, subnet: &SubnetID) -> Result<Vec<(Address, ValidatorInfo)>>;
 
+    async fn list_subnet_active_validators(
+        &self,
+        subnet: &SubnetID,
+    ) -> Result<Vec<(Address, ValidatorInfo)>>;
+
+    async fn list_waiting_validators(
+        &self,
+        subnet: &SubnetID,
+    ) -> Result<Vec<(Address, ValidatorInfo)>>;
+
     async fn set_federated_power(
         &self,
         from: &Address,
@@ -203,6 +212,7 @@ pub trait SubnetManager:
 
 #[derive(Debug)]
 pub struct SubnetGenesisInfo {
+    pub chain_id: u64,
     pub bottom_up_checkpoint_period: u64,
     pub majority_percentage: u8,
     pub active_validators_limit: u16,
@@ -254,44 +264,59 @@ pub trait TopDownFinalityQuery: Send + Sync {
     async fn latest_parent_finality(&self) -> Result<ChainEpoch>;
 }
 
-/// The bottom up checkpoint manager that handles the bottom up relaying from child subnet to the parent
-/// subnet.
 #[async_trait]
-pub trait BottomUpCheckpointRelayer: Send + Sync {
-    /// Submit a checkpoint for execution.
-    /// It triggers the commitment of the checkpoint and the execution of related cross-net messages.
-    /// Returns the epoch that the execution is successful
-    async fn submit_checkpoint(
+pub trait SignedHeaderRelayer: Send + Sync {
+    async fn get_signed_header(&self, height: u64) -> Result<SignedHeader>;
+
+    async fn submit_signed_header(
         &self,
         submitter: &Address,
-        checkpoint: BottomUpCheckpoint,
-        signatures: Vec<Signature>,
-        signatories: Vec<Address>,
+        subnet_id: &SubnetID,
+        header: SignedHeader,
+        cert: ValidatorCertificate,
     ) -> Result<ChainEpoch>;
-    /// The last confirmed/submitted checkpoint height.
-    async fn last_bottom_up_checkpoint_height(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
-    /// Get the checkpoint period, i.e the number of blocks to submit bottom up checkpoints.
-    async fn checkpoint_period(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
-    /// Get the checkpoint bundle at a specific height. If it does not exist, it will through error.
-    async fn checkpoint_bundle_at(
+
+    async fn query_app_hash_breakdown(
         &self,
         height: ChainEpoch,
-    ) -> Result<Option<BottomUpCheckpointBundle>>;
-    /// Queries the signature quorum reached events at target height.
-    async fn quorum_reached_events(&self, height: ChainEpoch) -> Result<Vec<QuorumReachedEvent>>;
-    /// Get the current epoch in the current subnet
+    ) -> Result<Option<AppHashBreakdown>>;
+
+    async fn get_state_root(&self, height: ChainEpoch) -> Result<Vec<u8>>;
+
+    async fn get_last_bottom_up_checkpoint_height(&self, subnet_id: &SubnetID) -> Result<u64>;
+
+    async fn get_last_app_commitment_height(&self, subnet_id: &SubnetID) -> Result<u64>;
+
+    async fn record_app_hash_breakdown(
+        &self,
+        height: ChainEpoch,
+        submitter: &Address,
+        subnet_id: &SubnetID,
+        breakdown: AppHashBreakdown,
+    ) -> Result<ChainEpoch>;
+
+    async fn submission_period(&self, subnet_id: &SubnetID) -> Result<ChainEpoch>;
+
     async fn current_epoch(&self) -> Result<ChainEpoch>;
+
+    async fn list_active_validators(
+        &self,
+        subnet: &SubnetID,
+    ) -> Result<Vec<(Address, ValidatorInfo)>>;
+
     /// Lists the pending bottom-up batch commitments for the given subnet.
     async fn list_pending_bottom_up_batch_commitments(
         &self,
         subnet_id: &SubnetID,
     ) -> Result<Vec<ListPendingCommitmentsEntry>>;
+
     /// Prepares the next messages and their inclusion proof
     /// that should be executed based on the current pending commitment.
     async fn make_next_bottom_up_batch_inclusions(
         &self,
         current: &ListPendingCommitmentsEntry,
     ) -> Result<Vec<Inclusion>>;
+
     /// Executes a batch of committed bottom-up messages.
     async fn execute_bottom_up_batch(
         &self,

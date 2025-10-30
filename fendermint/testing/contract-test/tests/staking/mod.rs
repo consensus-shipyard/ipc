@@ -8,6 +8,8 @@ use fvm_shared::{bigint::Integer, econ::TokenAmount};
 pub mod machine;
 pub mod state;
 
+pub(crate) const DEFAULT_CHAIN_ID: u64 = 101;
+
 fn choose_amount(u: &mut Unstructured<'_>, max: &TokenAmount) -> arbitrary::Result<TokenAmount> {
     if max.is_zero() {
         Ok(TokenAmount::from_atto(0))

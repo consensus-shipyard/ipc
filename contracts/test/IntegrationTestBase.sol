@@ -7,7 +7,7 @@ import "../contracts/errors/IPCErrors.sol";
 import {EMPTY_BYTES, METHOD_SEND} from "../contracts/constants/Constants.sol";
 import {ConsensusType} from "../contracts/enums/ConsensusType.sol";
 import {IDiamond} from "../contracts/interfaces/IDiamond.sol";
-import {IpcEnvelope, BottomUpCheckpoint, IpcMsgKind, ParentFinality, CallMsg} from "../contracts/structs/CrossNet.sol";
+import {IpcEnvelope, IpcMsgKind, ParentFinality, CallMsg} from "../contracts/structs/CrossNet.sol";
 import {FvmAddress} from "../contracts/structs/FvmAddress.sol";
 import {SubnetID, AssetKind, PermissionMode, PermissionMode, Subnet, Asset, IPCAddress, Validator} from "../contracts/structs/Subnet.sol";
 import {SubnetIDHelper} from "../contracts/lib/SubnetIDHelper.sol";
@@ -27,7 +27,8 @@ import {TopDownFinalityFacet} from "../contracts/gateway/router/TopDownFinalityF
 import {SubnetActorMock} from "./mocks/SubnetActorMock.sol";
 import {SubnetActorManagerFacet} from "../contracts/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorPauseFacet} from "../contracts/subnet/SubnetActorPauseFacet.sol";
-import {SubnetActorCheckpointingFacet} from "../contracts/subnet/SubnetActorCheckpointingFacet.sol";
+import {SubnetActorCheckpointFacetMock} from "./mocks/SubnetActorCheckpointFacetMock.sol";
+
 import {SubnetActorRewardFacet} from "../contracts/subnet/SubnetActorRewardFacet.sol";
 import {SubnetActorGetterFacet} from "../contracts/subnet/SubnetActorGetterFacet.sol";
 
@@ -50,6 +51,8 @@ import {BottomUpBatch} from "../contracts/structs/BottomUpBatch.sol";
 import {ValidatorRewarderMap} from "../contracts/examples/ValidatorRewarderMap.sol";
 import {SubnetActorActivityFacet} from "../contracts/subnet/SubnetActorActivityFacet.sol";
 import {BottomUpBatchHelper} from "./helpers/BottomUpBatchHelper.sol";
+
+import {BottomUpCheckpoint} from "./integration/util.sol";
 
 struct TestSubnetDefinition {
     GatewayDiamond gateway;
@@ -178,7 +181,7 @@ contract TestSubnetActor is Test, TestParams {
         saManagerSelectors = SelectorLibrary.resolveSelectors("SubnetActorManagerFacet");
         saPauserSelectors = SelectorLibrary.resolveSelectors("SubnetActorPauseFacet");
         saRewarderSelectors = SelectorLibrary.resolveSelectors("SubnetActorRewardFacet");
-        saCheckpointerSelectors = SelectorLibrary.resolveSelectors("SubnetActorCheckpointingFacet");
+        saCheckpointerSelectors = SelectorLibrary.resolveSelectors("SubnetActorCheckpointFacetMock");
         saManagerMockedSelectors = SelectorLibrary.resolveSelectors("SubnetActorMock");
         saCutterSelectors = SelectorLibrary.resolveSelectors("DiamondCutFacet");
         saLouperSelectors = SelectorLibrary.resolveSelectors("DiamondLoupeFacet");
@@ -214,7 +217,8 @@ contract TestSubnetActor is Test, TestParams {
             collateralSource: AssetHelper.native(),
             validatorGater: address(0),
             validatorRewarder: address(0),
-            genesisSubnetIpcContractsOwner: address(1)
+            genesisSubnetIpcContractsOwner: address(1),
+            chainID: uint64(1671263715227509)
         });
         return params;
     }
@@ -240,7 +244,8 @@ contract TestSubnetActor is Test, TestParams {
             collateralSource: collateral,
             validatorGater: address(0),
             validatorRewarder: address(0),
-            genesisSubnetIpcContractsOwner: address(1)
+            genesisSubnetIpcContractsOwner: address(1),
+            chainID: uint64(1671263715227509)
         });
         return params;
     }
@@ -276,7 +281,8 @@ contract TestSubnetActor is Test, TestParams {
             collateralSource: AssetHelper.native(),
             validatorGater: address(0),
             validatorRewarder: address(0),
-            genesisSubnetIpcContractsOwner: address(1)
+            genesisSubnetIpcContractsOwner: address(1),
+            chainID: uint64(1671263715227509)
         });
         return params;
     }
@@ -500,7 +506,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         SubnetActorGetterFacet getter = new SubnetActorGetterFacet();
         SubnetActorPauseFacet pauser = new SubnetActorPauseFacet();
         SubnetActorRewardFacet rewarder = new SubnetActorRewardFacet();
-        SubnetActorCheckpointingFacet checkpointer = new SubnetActorCheckpointingFacet();
+        SubnetActorCheckpointFacetMock checkpointer = new SubnetActorCheckpointFacetMock();
         DiamondLoupeFacet louper = new DiamondLoupeFacet();
         DiamondCutFacet cutter = new DiamondCutFacet();
         OwnershipFacet ownership = new OwnershipFacet();
@@ -579,6 +585,7 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
                 functionSelectors: saActivitySelectors
             })
         );
+
         SubnetActorDiamond diamond = new SubnetActorDiamond(diamondCut, params, address(this));
 
         approveSubnet(address(diamond), false);
@@ -633,7 +640,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             collateralSource: AssetHelper.native(),
             validatorGater: address(0),
             validatorRewarder: address(new ValidatorRewarderMap()),
-            genesisSubnetIpcContractsOwner: address(1)
+            genesisSubnetIpcContractsOwner: address(1),
+            chainID: uint64(1671263715227509)
         });
         saDiamond = createSubnetActor(params);
     }
@@ -666,7 +674,8 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
             collateralSource: AssetHelper.native(),
             validatorGater: _validatorGater,
             validatorRewarder: address(new ValidatorRewarderMap()),
-            genesisSubnetIpcContractsOwner: address(1)
+            genesisSubnetIpcContractsOwner: address(1),
+            chainID: uint64(1671263715227509)
         });
         saDiamond = createSubnetActor(params);
     }
@@ -930,79 +939,50 @@ contract IntegrationTestBase is Test, TestParams, TestRegistry, TestSubnetActor,
         confirmChange(validators, privKeys);
     }
 
-    function confirmChange(address[] memory validators, uint256[] memory privKeys) internal {
-        uint256 n = validators.length;
-
-        bytes[] memory signatures = new bytes[](n);
-
+    function confirmChange(address[] memory validators, uint256[] memory) internal {
         (uint64 nextConfigNum, ) = saDiamond.getter().getConfigurationNumbers();
 
-        uint256 h = saDiamond.getter().lastBottomUpCheckpointHeight() + saDiamond.getter().bottomUpCheckPeriod();
+        uint256 h = saDiamond.checkpointer().lastBottomUpCheckpointHeight() + saDiamond.getter().bottomUpCheckPeriod();
 
-        BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-            subnetID: saDiamond.getter().getParent().createSubnetId(address(saDiamond)),
-            blockHeight: h,
-            blockHash: keccak256(abi.encode(h)),
-            nextConfigurationNumber: nextConfigNum - 1,
-            msgs: BottomUpBatchHelper.makeCommitment(BottomUpBatchHelper.makeEmptyBatch()),
-            activity: CompressedActivityRollup({
-                consensus: Consensus.CompressedSummary({
-                    stats: Consensus.AggregatedStats({
-                        totalActiveValidators: uint64(validators.length),
-                        totalNumBlocksCommitted: 3
-                    }),
-                    dataRootCommitment: Consensus.MerkleHash.wrap(bytes32(uint256(nextConfigNum)))
-                })
+        BottomUpBatch.Commitment memory msgs = BottomUpBatchHelper.makeCommitment(BottomUpBatchHelper.makeEmptyBatch());
+        CompressedActivityRollup memory activity = CompressedActivityRollup({
+            consensus: Consensus.CompressedSummary({
+                stats: Consensus.AggregatedStats({
+                    totalActiveValidators: uint64(validators.length),
+                    totalNumBlocksCommitted: 3
+                }),
+                dataRootCommitment: Consensus.MerkleHash.wrap(bytes32(uint256(nextConfigNum)))
             })
         });
 
-        vm.deal(address(saDiamond), 100 ether);
-
-        bytes32 hash = keccak256(abi.encode(checkpoint));
-
-        for (uint256 i = 0; i < n; i++) {
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(privKeys[i], hash);
-            signatures[i] = abi.encodePacked(r, s, v);
-        }
-
         vm.prank(validators[0]);
-        saDiamond.checkpointer().submitCheckpoint(checkpoint, validators, signatures);
+        saDiamond.checkpointer().commitSideEffects(
+            h,
+            saDiamond.getter().getParent().createSubnetId(address(saDiamond)),
+            activity,
+            msgs,
+            nextConfigNum - 1
+        );
     }
 
     function confirmChange(
         address[] memory validators,
-        uint256[] memory privKeys,
+        uint256[] memory,
         BottomUpBatch.Commitment memory commitment,
         CompressedActivityRollup memory activities
-    ) internal {
-        uint256 n = validators.length;
-
-        bytes[] memory signatures = new bytes[](n);
-
+    ) internal returns (uint256 h) {
         (uint64 nextConfigNum, ) = saDiamond.getter().getConfigurationNumbers();
 
-        uint256 h = saDiamond.getter().lastBottomUpCheckpointHeight() + saDiamond.getter().bottomUpCheckPeriod();
-
-        BottomUpCheckpoint memory checkpoint = BottomUpCheckpoint({
-            subnetID: saDiamond.getter().getParent().createSubnetId(address(saDiamond)),
-            blockHeight: h,
-            blockHash: keccak256(abi.encode(h)),
-            nextConfigurationNumber: nextConfigNum - 1,
-            msgs: commitment,
-            activity: activities
-        });
-
-        vm.deal(address(saDiamond), 100 ether);
-
-        bytes32 hash = keccak256(abi.encode(checkpoint));
-
-        for (uint256 i = 0; i < n; i++) {
-            (uint8 v, bytes32 r, bytes32 s) = vm.sign(privKeys[i], hash);
-            signatures[i] = abi.encodePacked(r, s, v);
-        }
+        h = saDiamond.checkpointer().lastBottomUpCheckpointHeight() + saDiamond.getter().bottomUpCheckPeriod();
 
         vm.prank(validators[0]);
-        saDiamond.checkpointer().submitCheckpoint(checkpoint, validators, signatures);
+        saDiamond.checkpointer().commitSideEffects(
+            h,
+            saDiamond.getter().getParent().createSubnetId(address(saDiamond)),
+            activities,
+            commitment,
+            nextConfigNum - 1
+        );
     }
 
     function release(uint256 releaseAmount) public {
