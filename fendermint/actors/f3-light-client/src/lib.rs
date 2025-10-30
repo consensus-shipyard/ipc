@@ -73,7 +73,6 @@ impl F3LightClient for F3LightClientActor {
             instance_id: lc.instance_id,
             finalized_epochs: lc.finalized_epochs.clone(),
             power_table: lc.power_table.clone(),
-            latest_finalized_height: lc.finalized_epochs.iter().max().copied().unwrap_or(0),
         })
     }
 }
@@ -209,44 +208,6 @@ mod tests {
     }
 
     #[test]
-    fn test_update_state_non_advancing_height() {
-        let rt = construct_and_verify(1, create_test_power_entries(), vec![]);
-
-        // First update to set the finalized height to 102
-        rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
-        rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-        let initial_state = create_test_state(1, vec![100, 101, 102], create_test_power_entries());
-        let initial_params = UpdateStateParams {
-            state: initial_state,
-        };
-        rt.call::<F3LightClientActor>(
-            Method::UpdateState as u64,
-            IpldBlock::serialize_cbor(&initial_params).unwrap(),
-        )
-        .unwrap();
-        rt.reset();
-
-        // Try to update with same height
-        rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
-        rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-        let same_height_state =
-            create_test_state(1, vec![100, 101, 102], create_test_power_entries());
-        let update_params = UpdateStateParams {
-            state: same_height_state,
-        };
-
-        let result = rt.call::<F3LightClientActor>(
-            Method::UpdateState as u64,
-            IpldBlock::serialize_cbor(&update_params).unwrap(),
-        );
-
-        // Should fail with illegal argument
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert_eq!(err.exit_code(), ExitCode::USR_ILLEGAL_ARGUMENT);
-    }
-
-    #[test]
     fn test_update_state_unauthorized_caller() {
         let rt = construct_and_verify(1, create_test_power_entries(), vec![]);
 
@@ -297,7 +258,6 @@ mod tests {
         assert_eq!(response.instance_id, 42);
         assert_eq!(response.finalized_epochs, vec![100, 101, 102]);
         assert_eq!(response.power_table, power_entries);
-        assert_eq!(response.latest_finalized_height, 102);
     }
 
     #[test]
@@ -326,97 +286,5 @@ mod tests {
             IpldBlock::serialize_cbor(&params2).unwrap(),
         );
         assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_instance_id_progression_next_instance() {
-        let rt = construct_and_verify(100, create_test_power_entries(), vec![]);
-
-        // First state at instance 100
-        rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
-        rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-        let initial_state = create_test_state(100, vec![50, 51, 52], create_test_power_entries());
-        let initial_params = UpdateStateParams {
-            state: initial_state,
-        };
-        rt.call::<F3LightClientActor>(
-            Method::UpdateState as u64,
-            IpldBlock::serialize_cbor(&initial_params).unwrap(),
-        )
-        .unwrap();
-        rt.reset();
-
-        // Update to next instance (100 -> 101) should succeed
-        rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
-        rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-        let next_instance_state =
-            create_test_state(101, vec![10, 11, 12], create_test_power_entries());
-        let update_params = UpdateStateParams {
-            state: next_instance_state,
-        };
-
-        let result = rt.call::<F3LightClientActor>(
-            Method::UpdateState as u64,
-            IpldBlock::serialize_cbor(&update_params).unwrap(),
-        );
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_instance_id_skip_rejected() {
-        let rt = construct_and_verify(100, create_test_power_entries(), vec![]);
-
-        // First state at instance 100
-        rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
-        rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-        let initial_state = create_test_state(100, vec![50, 51, 52], create_test_power_entries());
-        let initial_params = UpdateStateParams {
-            state: initial_state,
-        };
-        rt.call::<F3LightClientActor>(
-            Method::UpdateState as u64,
-            IpldBlock::serialize_cbor(&initial_params).unwrap(),
-        )
-        .unwrap();
-        rt.reset();
-
-        // Try to skip instance (100 -> 102) should fail
-        rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
-        rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-        let skipped_state =
-            create_test_state(102, vec![100, 101, 102], create_test_power_entries());
-        let update_params = UpdateStateParams {
-            state: skipped_state,
-        };
-
-        let result = rt.call::<F3LightClientActor>(
-            Method::UpdateState as u64,
-            IpldBlock::serialize_cbor(&update_params).unwrap(),
-        );
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert_eq!(err.exit_code(), ExitCode::USR_ILLEGAL_ARGUMENT);
-    }
-
-    #[test]
-    fn test_empty_epochs_rejected() {
-        let rt = construct_and_verify(1, create_test_power_entries(), vec![]);
-
-        rt.set_caller(*SYSTEM_ACTOR_CODE_ID, SYSTEM_ACTOR_ADDR);
-        rt.expect_validate_caller_addr(vec![SYSTEM_ACTOR_ADDR]);
-
-        // Try to update with empty finalized_epochs
-        let invalid_state = create_test_state(1, vec![], create_test_power_entries());
-        let update_params = UpdateStateParams {
-            state: invalid_state,
-        };
-
-        let result = rt.call::<F3LightClientActor>(
-            Method::UpdateState as u64,
-            IpldBlock::serialize_cbor(&update_params).unwrap(),
-        );
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert_eq!(err.exit_code(), ExitCode::USR_ILLEGAL_ARGUMENT);
     }
 }

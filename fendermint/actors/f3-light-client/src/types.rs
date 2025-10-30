@@ -63,10 +63,8 @@ pub struct UpdateStateParams {
 pub struct GetStateResponse {
     /// Current F3 instance ID
     pub instance_id: u64,
-    /// Finalized chain - full list of finalized epochs
+    /// Finalized chain - full list of finalized epochs (ordered)
     pub finalized_epochs: Vec<ChainEpoch>,
     /// Current power table
     pub power_table: Vec<PowerEntry>,
-    /// Latest finalized height (convenience field - max of finalized_epochs)
-    pub latest_finalized_height: ChainEpoch,
 }

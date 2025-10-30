@@ -368,29 +368,18 @@ async fn fetch_f3_params_from_parent(
     // We use a dummy subnet ID here since F3 data is at the chain level, not subnet-specific
     let lotus_client = LotusJsonRPCClient::new(jsonrpc_client, SubnetID::default());
 
-    // Fetch F3 certificate which contains instance ID and finalized epochs
+    // Fetch F3 certificate which contains instance ID
     let certificate = lotus_client.f3_get_certificate().await?;
 
     match certificate {
         Some(cert) => {
-            let instance_id = cert.gpbft_instance;
-            tracing::info!("Found F3 instance ID: {}", instance_id);
+            // We use the next instance ID as the starting point since we don't
+            // process the power table delta here. The finalized chain starts empty
+            // and the next certificate to be fetched will be processed properly.
+            let instance_id = cert.gpbft_instance + 1;
+            tracing::info!("Starting F3 from next instance ID: {}", instance_id);
 
-            // Extract finalized epochs from the EC chain
-            let finalized_epochs: Vec<i64> =
-                cert.ec_chain.iter().map(|entry| entry.epoch).collect();
-
-            if finalized_epochs.is_empty() {
-                return Err(anyhow::anyhow!("F3 certificate has empty EC chain"));
-            }
-
-            tracing::info!(
-                "Found {} finalized epochs, latest: {}",
-                finalized_epochs.len(),
-                finalized_epochs.iter().max().unwrap_or(&0)
-            );
-
-            // Get power table for this instance
+            // Get power table for the next instance
             let power_table_response = lotus_client.f3_get_power_table(instance_id).await?;
 
             // Convert power entries
@@ -416,7 +405,7 @@ async fn fetch_f3_params_from_parent(
             Ok(Some(ipc::F3Params {
                 instance_id,
                 power_table,
-                finalized_epochs,
+                finalized_epochs: Vec::new(), // Start with empty finalized chain
             }))
         }
         None => Err(anyhow::anyhow!(
