@@ -261,6 +261,7 @@ impl IpcProvider {
         validator_gater: Address,
         validator_rewarder: Address,
         subnet_ipc_contracts_owner: ethers::types::Address,
+        genesis_f3_instance_id: Option<u64>,
     ) -> anyhow::Result<Address> {
         let conn = self.get_connection(&parent)?;
 
@@ -282,6 +283,7 @@ impl IpcProvider {
             validator_gater,
             validator_rewarder,
             genesis_subnet_ipc_contracts_owner: subnet_ipc_contracts_owner,
+            genesis_f3_instance_id,
         };
 
         conn.manager()

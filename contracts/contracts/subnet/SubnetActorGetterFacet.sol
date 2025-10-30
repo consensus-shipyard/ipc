@@ -113,6 +113,13 @@ contract SubnetActorGetterFacet {
         return s.minActivationCollateral;
     }
 
+    /// @notice Returns the genesis F3 instance ID if available
+    /// @return instanceId The F3 instance ID (0 if not set)
+    /// @return hasValue Whether the instance ID was explicitly set
+    function genesisF3InstanceId() external view returns (uint64 instanceId, bool hasValue) {
+        return (s.genesisF3InstanceId, s.hasGenesisF3InstanceId);
+    }
+
     /// @notice Returns detailed information about a specific validator.
     /// @param validatorAddress The address of the validator to query information for.
     function getValidator(address validatorAddress) external view returns (ValidatorInfo memory validator) {
