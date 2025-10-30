@@ -414,6 +414,59 @@ async fn fetch_f3_params_from_parent(
     }
 }
 
+/// Fetches F3 parameters for a specific instance ID from the parent Filecoin chain
+async fn fetch_f3_params_for_instance(
+    parent_endpoint: &url::Url,
+    parent_auth_token: Option<&String>,
+    instance_id: u64,
+) -> anyhow::Result<Option<ipc::F3Params>> {
+    tracing::info!(
+        "Fetching F3 parameters for instance {} from parent chain at {}",
+        instance_id,
+        parent_endpoint
+    );
+
+    let jsonrpc_client = JsonRpcClientImpl::new(
+        parent_endpoint.clone(),
+        parent_auth_token.map(|s| s.as_str()),
+    );
+
+    // We use a dummy subnet ID here since F3 data is at the chain level, not subnet-specific
+    let lotus_client = LotusJsonRPCClient::new(jsonrpc_client, SubnetID::default());
+
+    // Get power table for the specified instance
+    let power_table_response = lotus_client.f3_get_power_table(instance_id).await?;
+
+    // Convert power entries
+    let power_table: anyhow::Result<Vec<_>> = power_table_response
+        .iter()
+        .map(|entry| {
+            // Decode base64 public key
+            let public_key_bytes = base64::Engine::decode(
+                &base64::engine::general_purpose::STANDARD,
+                &entry.pub_key,
+            )?;
+            // Parse the power string to u64
+            let power = entry.power.parse::<u64>()?;
+            Ok(types::PowerEntry {
+                public_key: public_key_bytes,
+                power,
+            })
+        })
+        .collect();
+    let power_table = power_table?;
+
+    tracing::info!(
+        "Successfully fetched F3 parameters for instance {} from parent chain",
+        instance_id
+    );
+    Ok(Some(ipc::F3Params {
+        instance_id,
+        power_table,
+        finalized_epochs: Vec::new(), // Start with empty finalized chain
+    }))
+}
+
 pub async fn new_genesis_from_parent(
     genesis_file: &PathBuf,
     args: &GenesisFromParentArgs,
