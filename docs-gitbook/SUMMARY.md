@@ -20,6 +20,7 @@
 
 ## User guides
 
+- [Connecting to IPC Chain Testnet](user-guides/connect-to-testnet.md)
 - [Performing transactions in a subnet](user-guides/performing-transactions-in-a-subnet.md)
 
 ## Developer Guides
