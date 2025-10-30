@@ -9,7 +9,7 @@ use std::time::Duration;
 use ethers_contract::{ContractError, EthLogDecode, LogMeta};
 use ipc_actors_abis::{
     checkpointing_facet, gateway_getter_facet, gateway_manager_facet, lib_gateway,
-    lib_power_change_log, lib_quorum, register_subnet_facet, subnet_actor_activity_facet,
+    lib_power_change_log, register_subnet_facet, subnet_actor_activity_facet,
     subnet_actor_checkpointing_facet, subnet_actor_getter_facet, subnet_actor_manager_facet,
     subnet_actor_reward_facet,
 };
@@ -26,32 +26,34 @@ use crate::config::subnet::SubnetConfig;
 use crate::config::Subnet;
 use crate::lotus::message::ipc::SubnetInfo;
 use crate::manager::subnet::{
-    BottomUpCheckpointRelayer, GetBlockHashResult, SubnetGenesisInfo, TopDownFinalityQuery,
-    TopDownQueryPayload, ValidatorRewarder,
+    GetBlockHashResult, SubnetGenesisInfo, TopDownFinalityQuery, TopDownQueryPayload,
+    ValidatorRewarder,
 };
 
-use crate::manager::{EthManager, SubnetManager};
+use crate::manager::{EthManager, SignedHeaderRelayer, SubnetManager};
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
-use ethers::abi::Tokenizable;
+use ethers::abi::{AbiDecode, Tokenize};
+use ethers::abi::{Detokenize, Tokenizable};
 use ethers::contract::abigen;
 use ethers::prelude::k256::ecdsa::SigningKey;
 use ethers::prelude::{Signer, SignerMiddleware};
 use ethers::providers::{Authorization, Http, Provider};
 use ethers::signers::{LocalWallet, Wallet};
-use ethers::types::{Eip1559TransactionRequest, ValueOrArray, H256, U256};
+use ethers::types::{Bytes, Eip1559TransactionRequest, ValueOrArray, H256, U256};
 
 use super::gas_estimator_middleware::Eip1559GasEstimatorMiddleware;
+use crate::manager::cometbft::{CanonicalVoteData, SignedHeader, Timestamp, ValidatorCertificate};
 use crate::manager::evm::error_parsing::ErrorParserHttp;
 use ethers::middleware::Middleware;
 use fvm_shared::clock::ChainEpoch;
 use fvm_shared::{address::Address, econ::TokenAmount};
 use ipc_actors_abis::subnet_actor_activity_facet::ValidatorClaim;
-use ipc_actors_abis::subnet_actor_checkpointing_facet::Inclusion;
+use ipc_actors_abis::subnet_actor_checkpointing_facet::{Inclusion, SubnetActorCheckpointingFacet};
 use ipc_actors_abis::subnet_actor_getter_facet::ListPendingCommitmentsEntry;
 use ipc_api::checkpoint::{
-    abi_encode_envelope, abi_encode_envelope_fields, consensus::ValidatorData, BottomUpCheckpoint,
-    BottomUpCheckpointBundle, QuorumReachedEvent, Signature, VALIDATOR_REWARD_FIELDS,
+    abi_encode_envelope, abi_encode_envelope_fields, consensus::ValidatorData,
+    VALIDATOR_REWARD_FIELDS,
 };
 use ipc_api::cross::IpcEnvelope;
 use ipc_api::merkle::MerkleGen;
@@ -61,7 +63,6 @@ use ipc_api::subnet_id::SubnetID;
 use ipc_observability::lazy_static;
 use ipc_wallet::{EthKeyAddress, EvmKeyStore, PersistentKeyStore};
 use num_traits::ToPrimitive;
-use std::result;
 
 pub type SignerWithFeeEstimatorMiddleware =
     Eip1559GasEstimatorMiddleware<SignerMiddleware<Provider<ErrorParserHttp>, Wallet<SigningKey>>>;
@@ -291,6 +292,7 @@ impl SubnetManager for EthSubnetManager {
             validator_gater: payload_to_evm_address(params.validator_gater.payload())?,
             validator_rewarder: payload_to_evm_address(params.validator_rewarder.payload())?,
             genesis_subnet_ipc_contracts_owner: params.genesis_subnet_ipc_contracts_owner,
+            chain_id: params.chain_id,
         };
 
         tracing::info!("creating subnet on evm with params: {params:?}");
@@ -800,6 +802,12 @@ impl SubnetManager for EthSubnetManager {
         let genesis_subnet_ipc_contracts_owner =
             contract.genesis_subnet_ipc_contracts_owner().call().await?;
 
+        let chain_id = contract.chain_id().await?;
+        let chain_id = chain_id.parse::<u64>().context(format!(
+            "invalid chain id, expected u64, found {}",
+            chain_id
+        ))?;
+
         // Get the actual permission mode from the subnet contract
         let permission_mode_u8 = contract.permission_mode().call().await?;
         let permission_mode = match permission_mode_u8 {
@@ -817,6 +825,7 @@ impl SubnetManager for EthSubnetManager {
         };
 
         Ok(SubnetGenesisInfo {
+            chain_id,
             // Active validators limit set for the child subnet.
             active_validators_limit: contract.active_validators_limit().call().await?,
             // Bottom-up checkpoint period set in the subnet actor.
@@ -897,7 +906,42 @@ impl SubnetManager for EthSubnetManager {
         })
     }
 
-    async fn list_validators(&self, subnet: &SubnetID) -> Result<Vec<(Address, ValidatorInfo)>> {
+    async fn list_waiting_validators(
+        &self,
+        subnet: &SubnetID,
+    ) -> Result<Vec<(Address, ValidatorInfo)>> {
+        let address = contract_address_from_subnet(subnet)?;
+        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+
+        let mut addresses: Vec<Address> = vec![];
+        let mut validators: Vec<ValidatorInfo> = vec![];
+
+        let waiting = contract.get_waiting_validators().call().await?;
+        addresses.extend(
+            waiting
+                .iter()
+                .map(ethers_address_to_fil_address)
+                .collect::<Result<Vec<_>, _>>()?,
+        );
+        for addr in waiting {
+            let info = contract.get_validator(addr).call().await?;
+            validators.push(ValidatorInfo {
+                staking: ValidatorStakingInfo::try_from(info)?,
+                is_active: false,
+                is_waiting: true,
+            });
+        }
+
+        Ok(addresses.into_iter().zip(validators).collect())
+    }
+
+    async fn list_subnet_active_validators(
+        &self,
+        subnet: &SubnetID,
+    ) -> Result<Vec<(Address, ValidatorInfo)>> {
         let address = contract_address_from_subnet(subnet)?;
         let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
             address,
@@ -922,23 +966,17 @@ impl SubnetManager for EthSubnetManager {
                 is_waiting: false,
             });
         }
-        let waiting = contract.get_waiting_validators().call().await?;
-        addresses.extend(
-            waiting
-                .iter()
-                .map(ethers_address_to_fil_address)
-                .collect::<Result<Vec<_>, _>>()?,
-        );
-        for addr in waiting {
-            let info = contract.get_validator(addr).call().await?;
-            validators.push(ValidatorInfo {
-                staking: ValidatorStakingInfo::try_from(info)?,
-                is_active: false,
-                is_waiting: true,
-            });
-        }
 
         Ok(addresses.into_iter().zip(validators).collect())
+    }
+
+    async fn list_validators(&self, subnet: &SubnetID) -> Result<Vec<(Address, ValidatorInfo)>> {
+        let mut active = self.list_subnet_active_validators(subnet).await?;
+        let mut waiting = self.list_waiting_validators(subnet).await?;
+
+        active.append(&mut waiting);
+
+        Ok(active)
     }
 
     async fn set_federated_power(
@@ -996,24 +1034,6 @@ impl EthManager for EthSubnetManager {
         Ok(block_number as ChainEpoch)
     }
 
-    async fn bottom_up_checkpoint(
-        &self,
-        epoch: ChainEpoch,
-    ) -> Result<subnet_actor_checkpointing_facet::BottomUpCheckpoint> {
-        let gateway_contract = gateway_getter_facet::GatewayGetterFacet::new(
-            self.ipc_contract_info.gateway_addr,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
-        let checkpoint = gateway_contract
-            .bottom_up_checkpoint(ethers::types::U256::from(epoch as u64))
-            .call()
-            .await?;
-        tracing::debug!("raw bottom up checkpoint from gateway: {checkpoint:?}");
-        let token = checkpoint.into_token();
-        let c = subnet_actor_checkpointing_facet::BottomUpCheckpoint::from_token(token)?;
-        Ok(c)
-    }
-
     async fn get_applied_top_down_nonce(&self, subnet_id: &SubnetID) -> Result<u64> {
         let route = subnet_id_to_evm_addresses(subnet_id)?;
         tracing::debug!("getting applied top down nonce for route: {route:?}");
@@ -1049,30 +1069,6 @@ impl EthManager for EthSubnetManager {
         );
         let period = contract.bottom_up_check_period().call().await?.as_u64();
         Ok(period as ChainEpoch)
-    }
-
-    async fn prev_bottom_up_checkpoint_hash(
-        &self,
-        subnet_id: &SubnetID,
-        epoch: ChainEpoch,
-    ) -> Result<[u8; 32]> {
-        let address = contract_address_from_subnet(subnet_id)?;
-        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
-            address,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
-        let (exists, hash) = contract
-            .bottom_up_checkpoint_hash_at_epoch(U256::from(epoch as u64))
-            .await?;
-        if !exists {
-            return if epoch == 0 {
-                // first ever epoch, return empty bytes
-                return Ok([0u8; 32]);
-            } else {
-                Err(anyhow!("checkpoint does not exists: {epoch:}"))
-            };
-        }
-        Ok(hash)
     }
 
     async fn min_validators(&self, subnet_id: &SubnetID) -> Result<u64> {
@@ -1205,10 +1201,15 @@ impl EthSubnetManager {
         let gateway_address = payload_to_evm_address(config.gateway_addr.payload())?;
         let registry_address = payload_to_evm_address(config.registry_addr.payload())?;
 
+        let chain_id = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async { provider.get_chainid().await })
+        })?
+        .as_u64();
+
         Ok(Self::new(
             gateway_address,
             registry_address,
-            subnet.id.chain_id(),
+            chain_id,
             provider,
             keystore,
         ))
@@ -1216,45 +1217,43 @@ impl EthSubnetManager {
 }
 
 #[async_trait]
-impl BottomUpCheckpointRelayer for EthSubnetManager {
-    async fn submit_checkpoint(
+impl SignedHeaderRelayer for EthSubnetManager {
+    async fn get_signed_header(&self, height: u64) -> Result<SignedHeader> {
+        let raw_bytes = self
+            .ipc_contract_info
+            .provider
+            .request::<_, Bytes>("eth_getCommitSignedHeader", [height.to_string()])
+            .await?;
+        Ok(SignedHeader::decode(raw_bytes.as_ref())?)
+    }
+
+    async fn get_state_root(&self, height: ChainEpoch) -> Result<Vec<u8>> {
+        let raw_bytes = self
+            .ipc_contract_info
+            .provider
+            .request::<_, Bytes>("eth_getStateRoot", [height.to_string()])
+            .await?;
+        Ok(raw_bytes.to_vec())
+    }
+
+    async fn submit_signed_header(
         &self,
         submitter: &Address,
-        checkpoint: BottomUpCheckpoint,
-        signatures: Vec<Signature>,
-        signatories: Vec<Address>,
-    ) -> anyhow::Result<ChainEpoch> {
-        let address = contract_address_from_subnet(&checkpoint.subnet_id)?;
-        tracing::debug!(
-            "submit bottom up checkpoint: {checkpoint:?} in evm subnet contract: {address:}"
-        );
+        subnet_id: &SubnetID,
+        header: SignedHeader,
+        cert: ValidatorCertificate,
+    ) -> Result<ChainEpoch> {
+        let bytes = generate_bottom_up_checkpoint_bytes(header, cert);
 
-        let signatures = signatures
-            .into_iter()
-            .map(ethers::types::Bytes::from)
-            .collect::<Vec<_>>();
-        let signatories = signatories
-            .into_iter()
-            .map(|addr| payload_to_evm_address(addr.payload()))
-            .collect::<result::Result<Vec<_>, _>>()?;
-
-        let checkpoint =
-            subnet_actor_checkpointing_facet::BottomUpCheckpoint::try_from(checkpoint)?;
+        let address = contract_address_from_subnet(subnet_id)?;
 
         let signer = Arc::new(self.get_signer_with_fee_estimator(submitter)?);
         let contract = subnet_actor_checkpointing_facet::SubnetActorCheckpointingFacet::new(
             address,
             signer.clone(),
         );
-        let call = contract.submit_checkpoint(checkpoint, signatories, signatures);
+        let call = contract.submit_bottom_up_checkpoint(Bytes::from(bytes));
         let call = extend_call_with_pending_block(call).await?;
-
-        if let Some(calldata) = call.calldata() {
-            tracing::info!(
-                calldata = calldata.to_string(),
-                "submit checkpoint raw call data"
-            );
-        }
 
         let pending_tx = call.send().await?;
         tracing::info!(
@@ -1267,17 +1266,114 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
         block_number_from_receipt(receipt)
     }
 
-    async fn last_bottom_up_checkpoint_height(
+    async fn query_app_hash_breakdown(
         &self,
+        height: ChainEpoch,
+    ) -> Result<Option<checkpointing_facet::AppHashBreakdown>> {
+        let height = height as u64;
+
+        let contract = checkpointing_facet::CheckpointingFacet::new(
+            self.ipc_contract_info.gateway_addr,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        let ev = contract
+            .event::<checkpointing_facet::StateCommitmentCreatedFilter>()
+            .from_block(height)
+            .to_block(height)
+            .address(ValueOrArray::Value(contract.address()));
+
+        if let Some((event, meta)) = (query_with_meta(ev, contract.client()).await?)
+            .into_iter()
+            .next()
+        {
+            tracing::debug!(
+                "found state commitment published at height: {}",
+                meta.block_number
+            );
+
+            return Ok(Some(event.breakdown));
+        }
+
+        Ok(None)
+    }
+
+    async fn get_last_app_commitment_height(&self, subnet_id: &SubnetID) -> Result<u64> {
+        let address = contract_address_from_subnet(subnet_id)?;
+        let contract = subnet_actor_checkpointing_facet::SubnetActorCheckpointingFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        Ok(contract.last_commitment_height().call().await?.as_u64())
+    }
+
+    async fn get_last_bottom_up_checkpoint_height(&self, subnet_id: &SubnetID) -> Result<u64> {
+        let address = contract_address_from_subnet(subnet_id)?;
+        let contract = subnet_actor_checkpointing_facet::SubnetActorCheckpointingFacet::new(
+            address,
+            Arc::new(self.ipc_contract_info.provider.clone()),
+        );
+        Ok(contract
+            .last_bottom_up_checkpoint_height()
+            .call()
+            .await?
+            .as_u64())
+    }
+
+    async fn record_app_hash_breakdown(
+        &self,
+        height: ChainEpoch,
+        submitter: &Address,
         subnet_id: &SubnetID,
-    ) -> anyhow::Result<ChainEpoch> {
+        commitment: checkpointing_facet::AppHashBreakdown,
+    ) -> Result<ChainEpoch> {
+        let address = contract_address_from_subnet(subnet_id)?;
+
+        let signer = Arc::new(self.get_signer_with_fee_estimator(submitter)?);
+        let contract = SubnetActorCheckpointingFacet::new(address, signer.clone());
+
+        let evm_subnet_id = subnet_actor_checkpointing_facet::SubnetID::try_from(subnet_id)?;
+
+        let tokens = commitment.into_tokens();
+        let t = subnet_actor_checkpointing_facet::AppHashBreakdown::from_tokens(tokens)?;
+        let call = contract.record_app_hash_breakdown(height as u64, evm_subnet_id, t);
+        let call = extend_call_with_pending_block(call).await?;
+
+        let pending_tx = call.send().await?;
+        tracing::info!(
+            hash = hex::encode(pending_tx.tx_hash().as_bytes()),
+            "sent confirm validator changet with txn"
+        );
+
+        let receipt = pending_tx.retries(TRANSACTION_RECEIPT_RETRIES).await?;
+
+        block_number_from_receipt(receipt)
+    }
+
+    async fn submission_period(&self, subnet_id: &SubnetID) -> Result<ChainEpoch> {
         let address = contract_address_from_subnet(subnet_id)?;
         let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
             address,
             Arc::new(self.ipc_contract_info.provider.clone()),
         );
-        let epoch = contract.last_bottom_up_checkpoint_height().call().await?;
+        let epoch = contract.bottom_up_check_period().call().await?;
         Ok(epoch.as_u64() as ChainEpoch)
+    }
+
+    async fn current_epoch(&self) -> Result<ChainEpoch> {
+        let epoch = self
+            .ipc_contract_info
+            .provider
+            .get_block_number()
+            .await?
+            .as_u64();
+        Ok(epoch as ChainEpoch)
+    }
+
+    async fn list_active_validators(
+        &self,
+        subnet: &SubnetID,
+    ) -> Result<Vec<(Address, ValidatorInfo)>> {
+        self.list_subnet_active_validators(subnet).await
     }
 
     async fn list_pending_bottom_up_batch_commitments(
@@ -1294,85 +1390,6 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
             .call()
             .await?;
         Ok(entries)
-    }
-
-    async fn checkpoint_period(&self, subnet_id: &SubnetID) -> anyhow::Result<ChainEpoch> {
-        let address = contract_address_from_subnet(subnet_id)?;
-        let contract = subnet_actor_getter_facet::SubnetActorGetterFacet::new(
-            address,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
-        let epoch = contract.bottom_up_check_period().call().await?;
-        Ok(epoch.as_u64() as ChainEpoch)
-    }
-
-    async fn checkpoint_bundle_at(
-        &self,
-        height: ChainEpoch,
-    ) -> anyhow::Result<Option<BottomUpCheckpointBundle>> {
-        let contract = gateway_getter_facet::GatewayGetterFacet::new(
-            self.ipc_contract_info.gateway_addr,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
-
-        let (checkpoint, _, signatories, signatures) = contract
-            .get_checkpoint_signature_bundle(U256::from(height))
-            .call()
-            .await?;
-
-        if checkpoint.block_height.as_u64() == 0 {
-            return Ok(None);
-        }
-
-        let checkpoint = BottomUpCheckpoint::try_from(checkpoint)?;
-        let signatories = signatories
-            .into_iter()
-            .map(|s| ethers_address_to_fil_address(&s))
-            .collect::<Result<Vec<_>, _>>()?;
-        let signatures = signatures
-            .into_iter()
-            .map(|s| s.to_vec())
-            .collect::<Vec<_>>();
-
-        Ok(Some(BottomUpCheckpointBundle {
-            checkpoint,
-            signatures,
-            signatories,
-        }))
-    }
-
-    async fn quorum_reached_events(&self, height: ChainEpoch) -> Result<Vec<QuorumReachedEvent>> {
-        let contract = checkpointing_facet::CheckpointingFacet::new(
-            self.ipc_contract_info.gateway_addr,
-            Arc::new(self.ipc_contract_info.provider.clone()),
-        );
-
-        let ev = contract
-            .event::<lib_quorum::QuorumReachedFilter>()
-            .from_block(height as u64)
-            .to_block(height as u64)
-            .address(ValueOrArray::Value(contract.address()));
-
-        let mut events = vec![];
-        for (event, _meta) in query_with_meta(ev, contract.client()).await? {
-            events.push(QuorumReachedEvent {
-                obj_kind: event.obj_kind,
-                height: event.height.as_u64() as ChainEpoch,
-                obj_hash: event.obj_hash.to_vec(),
-                quorum_weight: eth_to_fil_amount(&event.quorum_weight)?,
-            });
-        }
-
-        Ok(events)
-    }
-    async fn current_epoch(&self) -> Result<ChainEpoch> {
-        let epoch = self
-            .ipc_contract_info
-            .provider
-            .get_block_number()
-            .await?
-            .as_u64();
-        Ok(epoch as ChainEpoch)
     }
 
     async fn make_next_bottom_up_batch_inclusions(
@@ -1423,7 +1440,9 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
                 continue;
             }
             let proof = merkle.get_proof(msg)?;
-            let msg = convert_msg(msg.clone());
+            let msg = subnet_actor_checkpointing_facet::IpcEnvelope::from_tokens(
+                msg.clone().into_tokens(),
+            )?;
             inclusions.push(Inclusion {
                 msg,
                 proof: proof.into_iter().map(|v| v.into()).collect(),
@@ -1445,11 +1464,9 @@ impl BottomUpCheckpointRelayer for EthSubnetManager {
         );
 
         let signer = Arc::new(self.get_signer_with_fee_estimator(submitter)?);
-        let contract = subnet_actor_checkpointing_facet::SubnetActorCheckpointingFacet::new(
-            address,
-            signer.clone(),
-        );
-        let call = contract.exec_bottom_up_msg_batch(height.into(), inclusions);
+        let contract = SubnetActorCheckpointingFacet::new(address, signer.clone());
+
+        let call = contract.exec_bottom_up_msg_batch(height as u64, inclusions);
         let call = extend_call_with_pending_block(call).await?;
 
         if let Some(calldata) = call.calldata() {
@@ -1777,36 +1794,35 @@ impl TryFrom<gateway_getter_facet::Subnet> for SubnetInfo {
     }
 }
 
-fn convert_msg(
-    msg: checkpointing_facet::IpcEnvelope,
-) -> subnet_actor_checkpointing_facet::IpcEnvelope {
-    subnet_actor_checkpointing_facet::IpcEnvelope {
-        kind: msg.kind,
-        local_nonce: msg.local_nonce,
-        from: subnet_actor_checkpointing_facet::Ipcaddress {
-            subnet_id: subnet_actor_checkpointing_facet::SubnetID {
-                root: msg.from.subnet_id.root,
-                route: msg.from.subnet_id.route,
-            },
-            raw_address: subnet_actor_checkpointing_facet::FvmAddress {
-                addr_type: msg.from.raw_address.addr_type,
-                payload: msg.from.raw_address.payload,
-            },
+const SIGNED_MSG_TYPE_PRECOMMIT: u8 = 2;
+
+fn generate_bottom_up_checkpoint_bytes(
+    signed_header: SignedHeader,
+    cert: ValidatorCertificate,
+) -> ethers::abi::Bytes {
+    let light_header = signed_header.header;
+
+    let vote_template = CanonicalVoteData {
+        vote_type: SIGNED_MSG_TYPE_PRECOMMIT,
+        height: signed_header.commit.height,
+        round: signed_header.commit.round as i64,
+        block_id: signed_header.commit.block_id,
+        // leave it blank, it should be populated on chain
+        timestamp: Timestamp {
+            seconds: 0,
+            nanos: 0,
         },
-        to: subnet_actor_checkpointing_facet::Ipcaddress {
-            subnet_id: subnet_actor_checkpointing_facet::SubnetID {
-                root: msg.to.subnet_id.root,
-                route: msg.to.subnet_id.route,
-            },
-            raw_address: subnet_actor_checkpointing_facet::FvmAddress {
-                addr_type: msg.to.raw_address.addr_type,
-                payload: msg.to.raw_address.payload,
-            },
-        },
-        value: msg.value,
-        original_nonce: msg.original_nonce,
-        message: msg.message,
-    }
+        // leave it blank, it should be populated on chain
+        chain_id: "".to_string(),
+    };
+
+    let tokens = vec![
+        light_header.clone().into_token(),
+        cert.into_token(),
+        vote_template.clone().into_token(),
+    ];
+
+    ethers::abi::encode(&tokens)
 }
 
 #[cfg(test)]

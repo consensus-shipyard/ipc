@@ -32,6 +32,7 @@ tendermint = { workspace = true }
 tendermint-rpc = { workspace = true }
 tokio = { workspace = true }
 tower-http = { workspace = true }
+ipc-provider = { path = "../../../ipc/provider" }
 
 fil_actors_evm_shared = { workspace = true }
 fvm_shared = { workspace = true, features = ["crypto"] }

@@ -9,7 +9,7 @@ use ipc_provider::IpcProvider;
 use std::path::PathBuf;
 
 use fendermint_vm_actor_interface::eam::EthAddress;
-use fendermint_vm_core::Timestamp;
+use fendermint_vm_core::{chainid, Timestamp};
 use fendermint_vm_genesis::{
     ipc, Account, Actor, ActorMeta, Collateral, Genesis, Multisig, PermissionMode, SignerAddr,
     Validator, ValidatorKey,
@@ -45,7 +45,7 @@ cmd! {
     let genesis = Genesis {
       timestamp: Timestamp(self.timestamp),
       chain_name: self.chain_name.clone(),
-      chain_id: None,
+      chain_id: chainid::from_str_hashed(&self.chain_name)?.into(),
       network_version: self.network_version,
       base_fee: self.base_fee.clone(),
       power_scale: self.power_scale,
@@ -113,7 +113,7 @@ cmd! {
 
 fn set_chain_id(genesis_file: &PathBuf, args: &GenesisSetChainIdArgs) -> anyhow::Result<()> {
     update_genesis(genesis_file, |mut genesis| {
-        genesis.chain_id = Some(args.chain_id);
+        genesis.chain_id = args.chain_id;
         Ok(genesis)
     })
 }
@@ -392,7 +392,7 @@ pub async fn new_genesis_from_parent(
         accounts: Vec::new(),
         eam_permission_mode: PermissionMode::Unrestricted,
         ipc: Some(ipc_params),
-        chain_id: None,
+        chain_id: genesis_info.chain_id,
         ipc_contracts_owner: genesis_info.genesis_subnet_ipc_contracts_owner,
     };
 

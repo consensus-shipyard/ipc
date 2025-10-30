@@ -8,18 +8,15 @@ error CannotConfirmFutureChanges();
 error CannotReleaseZero();
 error CheckpointAlreadyExists();
 error BatchAlreadyExists();
-error QuorumAlreadyProcessed();
 error CheckpointNotCreated();
 error BottomUpCheckpointAlreadySubmitted();
 error BatchNotCreated();
 error CollateralIsZero();
 error EmptyAddress();
-error FailedAddIncompleteQuorum();
 error FailedAddSignatory();
-error FailedRemoveIncompleteQuorum();
 error GatewayCannotBeZero();
 error InvalidActorAddress();
-error InvalidCheckpointEpoch();
+error InvalidCheckpointEpoch(uint64 expected, uint64 actual);
 error BatchMsgAlreadyExecuted();
 error MissingBatchCommitment();
 error InvalidInclusionProof();
@@ -33,10 +30,6 @@ error InvalidConfigurationNumber();
 error InvalidXnetMessage(InvalidXnetMessageReason reason);
 error InvalidMajorityPercentage();
 error InvalidPowerScale();
-error InvalidRetentionHeight();
-error InvalidSignature();
-error InvalidSignatureErr(uint8);
-error InvalidSignatureLength();
 error InvalidPublicKeyLength();
 error InvalidSubmissionPeriod();
 error InvalidSubnet();
@@ -88,6 +81,7 @@ error NotOwner();
 error SignatureAddressesNotSorted();
 error DuplicateValidatorSignaturesFound();
 error MissingGenesisSubnetIpcContractsOwner();
+error TooManyValidators();
 
 enum InvalidXnetMessageReason {
     Sender,

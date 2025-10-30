@@ -1,0 +1,233 @@
+Anvil + IPC Keystore Integration
+=================================
+
+File Structure:
+───────────────
+
+scripts/
+├── setup-anvil-with-ipc-keys.sh     ⭐ Main setup script
+│   ├── Starts Anvil with deterministic config
+│   ├── Reads ~/.ipc/evm_keystore.json
+│   ├── Funds all accounts with 10,000 ETH
+│   └── Creates stop script and saves PID
+│
+├── anvil-persistent-state.sh         💾 State management
+│   ├── save  - Save current blockchain state
+│   ├── load  - Restore saved state
+│   ├── info  - Show state information
+│   └── list  - Generate account list
+│
+├── quick-anvil.sh                    🚀 Quick launcher
+│   ├── Checks dependencies
+│   ├── Validates keystore
+│   └── Launches main setup script
+│
+├── aliases.sh                        🔧 Convenience aliases
+│   ├── anvil-start, anvil-stop
+│   ├── anvil-save, anvil-load
+│   ├── Helper functions
+│   └── Source with: source scripts/aliases.sh
+│
+├── ANVIL_IPC_SETUP.md               📖 Complete guide
+│   ├── Quick start
+│   ├── Configuration
+│   ├── Workflows
+│   ├── Troubleshooting
+│   └── Advanced usage
+│
+├── QUICK_REFERENCE.md               🎯 Cheat sheet
+│   ├── Common commands
+│   ├── Network details
+│   ├── Quick fixes
+│   └── File locations
+│
+├── IMPLEMENTATION_SUMMARY.md        📋 Technical docs
+│   ├── Architecture
+│   ├── How it works
+│   ├── Testing
+│   └── Security notes
+│
+└── .anvil-ipc-structure.txt         📊 This file
+
+
+Data Flow:
+──────────
+
+   ┌──────────────────┐
+   │  User runs       │
+   │  setup script    │
+   └────────┬─────────┘
+            │
+            ▼
+   ┌──────────────────┐
+   │ Read IPC         │──────► ~/.ipc/evm_keystore.json
+   │ Keystore         │        [
+   └────────┬─────────┘          {"address": "0x...", "private_key": "..."},
+            │                    {"address": "0x...", "private_key": "..."}
+            │                  ]
+            ▼
+   ┌──────────────────┐
+   │ Start Anvil      │──────► Port: 8545
+   │ (if needed)      │        Chain ID: 31337
+   └────────┬─────────┘        Mnemonic: test test test...
+            │
+            ▼
+   ┌──────────────────┐
+   │ Fund Accounts    │──────► eth_sendTransaction
+   │ (10,000 ETH)     │        from: 0xf39Fd... (funder)
+   └────────┬─────────┘        to: <IPC keystore addresses>
+            │
+            ▼
+   ┌──────────────────┐
+   │ Show Summary     │──────► ✅ 16 accounts funded
+   │                  │        📊 Balances: 10,000 ETH each
+   └────────┬─────────┘        🌐 RPC: http://localhost:8545
+            │
+            ▼
+   ┌──────────────────┐
+   │ Create           │──────► /tmp/stop-anvil-ipc.sh
+   │ Management       │        /tmp/anvil_ipc.pid
+   │ Scripts          │        /tmp/anvil_ipc_keys.log
+   └──────────────────┘
+
+
+Key Features:
+─────────────
+
+✅ Deterministic Setup      - Same keys every restart
+✅ Automatic Funding        - All keystore accounts funded
+✅ State Persistence        - Save/restore blockchain state
+✅ Idempotent              - Safe to run multiple times
+✅ Interactive Menu        - User-friendly prompts
+✅ Error Handling          - Clear error messages
+✅ Comprehensive Docs      - Multiple documentation files
+✅ Convenience Tools       - Aliases and helper scripts
+
+
+Quick Start Commands:
+─────────────────────
+
+# Start everything
+./scripts/setup-anvil-with-ipc-keys.sh
+
+# Stop Anvil
+/tmp/stop-anvil-ipc.sh
+
+# Save state
+./scripts/anvil-persistent-state.sh save
+
+# Load state
+./scripts/anvil-persistent-state.sh load
+
+# Use aliases
+source scripts/aliases.sh
+anvil-start
+
+
+Network Configuration:
+──────────────────────
+
+RPC URL:      http://localhost:8545
+Chain ID:     31337
+Block Time:   1 second
+Gas Limit:    30,000,000
+Accounts:     All from ~/.ipc/evm_keystore.json
+Funding:      10,000 ETH per account
+
+
+Files Created by Scripts:
+──────────────────────────
+
+Runtime:
+  /tmp/anvil_ipc_keys.log      - Anvil output logs
+  /tmp/anvil_ipc.pid           - Process ID
+  /tmp/stop-anvil-ipc.sh       - Stop script
+
+State:
+  ~/.ipc/anvil-state/          - State directory
+  ~/.ipc/anvil-state/state.json - Saved blockchain state
+  ~/.ipc/anvil-state/metadata.json - State metadata
+
+
+Workflow Example:
+─────────────────
+
+Day 1:
+  $ ./scripts/setup-anvil-with-ipc-keys.sh
+  ✅ Anvil started
+  ✅ 16 accounts funded with 10,000 ETH
+
+  $ # Deploy contracts, run tests
+
+  $ ./scripts/anvil-persistent-state.sh save
+  💾 State saved
+
+  $ /tmp/stop-anvil-ipc.sh
+  🛑 Anvil stopped
+
+Day 2:
+  $ ./scripts/setup-anvil-with-ipc-keys.sh
+  ✅ Anvil started
+
+  $ ./scripts/anvil-persistent-state.sh load
+  ✅ State restored
+
+  $ # Continue development with same state
+
+
+Customization:
+──────────────
+
+Edit scripts/setup-anvil-with-ipc-keys.sh:
+
+  ANVIL_PORT=8545              # Change port
+  ANVIL_CHAIN_ID=31337         # Change chain ID
+  INITIAL_BALANCE="10000"      # Change funding (ETH)
+  IPC_KEYSTORE="..."           # Change keystore path
+
+
+Documentation Files:
+────────────────────
+
+📖 ANVIL_IPC_SETUP.md         - Complete guide (15 sections)
+🎯 QUICK_REFERENCE.md          - Cheat sheet for daily use
+📋 IMPLEMENTATION_SUMMARY.md   - Technical documentation
+📊 .anvil-ipc-structure.txt    - This overview file
+
+
+Integration with IPC:
+─────────────────────
+
+# All IPC CLI commands work with funded accounts
+ipc-cli wallet list --keystore-path ~/.ipc
+ipc-cli subnet create --parent /r31337 --keystore-path ~/.ipc
+ipc-cli subnet join --subnet /r31337/t... --keystore-path ~/.ipc
+
+# Use local Anvil as parent network
+--subnet /r31337  # Chain ID 31337 = Anvil
+
+
+Security Notes:
+───────────────
+
+⚠️  FOR LOCAL DEVELOPMENT ONLY
+⚠️  Never use these keys on mainnet
+⚠️  Keystore is unencrypted
+⚠️  Private keys exposed in operations
+⚠️  Clear keystore between projects
+
+
+Support & Help:
+───────────────
+
+Documentation:  scripts/ANVIL_IPC_SETUP.md
+Quick Ref:      scripts/QUICK_REFERENCE.md
+Main README:    README.md
+Slack:          #ipc-help (Filecoin Slack)
+GitHub:         Open issue in IPC repository
+
+
+Version: 1.0
+Created: October 22, 2025
+License: MIT/Apache-2.0
+

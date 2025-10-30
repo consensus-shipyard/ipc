@@ -11,6 +11,8 @@ import {PermissionMode, StakingReleaseQueue, PowerChangeLog, PowerChange, PowerC
 import {PowerReductionMoreThanTotal, NotValidator, CannotConfirmFutureChanges, NoCollateralToWithdraw, AddressShouldBeValidator, InvalidConfigurationNumber} from "../errors/IPCErrors.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
+import {ValidatorInfo} from "../structs/Subnet.sol";
+
 library LibAddressStakingReleases {
     /// @notice Add new release to the storage. Caller makes sure the release.releasedAt is ordered
     /// @notice in ascending order. This method does not do checks on this.
@@ -356,6 +358,8 @@ library LibPower {
 
     uint64 internal constant INITIAL_CONFIGURATION_NUMBER = 1;
 
+    error NotActiveValidator();
+
     event ConfigurationNumberConfirmed(uint64 number);
     event CollateralClaimed(address validator, uint256 amount);
 
@@ -371,6 +375,20 @@ library LibPower {
     function isActiveValidator(address validator) internal view returns (bool) {
         SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
         return s.validatorSet.isActiveValidator(validator);
+    }
+
+    function getActiveValidatorInfo(address validator) internal view returns (ValidatorInfo memory) {
+        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
+        return s.validatorSet.validators[validator];
+    }
+
+    function getActiveValidatorAddressByIndex(uint16 index) internal view returns (address validator) {
+        SubnetActorStorage storage s = LibSubnetActorStorage.appStorage();
+        // need to increment by 1 due to position 0 is empty in the min PQ
+        validator = s.validatorSet.activeValidators.getAddress(index + 1);
+        if (validator == address(0)) {
+            revert NotActiveValidator();
+        }
     }
 
     /// @notice Checks if the validator is a waiting validator

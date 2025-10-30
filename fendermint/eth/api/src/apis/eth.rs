@@ -8,7 +8,8 @@
 
 use std::collections::HashSet;
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
+use ethers_core::abi::AbiEncode;
 use ethers_core::types::transaction::eip2718::TypedTransaction;
 use ethers_core::types::{self as et, BlockNumber};
 use ethers_core::utils::rlp;
@@ -1195,6 +1196,39 @@ where
             ),
         },
     }
+}
+
+/// Obtain the precommit signed header from cometbft
+pub async fn get_commit_signed_header<C>(
+    data: JsonRpcData<C>,
+    Params((block_number,)): Params<(et::BlockNumber,)>,
+) -> JsonRpcResult<et::Bytes>
+where
+    C: Client + Sync + Send,
+{
+    let h = block_number
+        .as_number()
+        .ok_or_else(|| anyhow!("invalid block #{}", block_number))?
+        .as_u32();
+    let query_response = data.tm().commit(tendermint::block::Height::from(h)).await?;
+
+    let header = ipc_provider::manager::cometbft::SignedHeader::from(query_response.signed_header);
+    Ok(et::Bytes::from(header.encode()))
+}
+
+pub async fn get_state_root<C>(
+    data: JsonRpcData<C>,
+    Params((block_number,)): Params<(et::BlockNumber,)>,
+) -> JsonRpcResult<et::Bytes>
+where
+    C: Client + Sync + Send,
+{
+    let h = block_number
+        .as_number()
+        .ok_or_else(|| anyhow!("invalid block #{}", block_number))?
+        .as_u64();
+    let query_response = data.client.state_params(FvmQueryHeight::Height(h)).await?;
+    Ok(et::Bytes::from(query_response.value.state_root))
 }
 
 /// Unsubscribe from the filter registered by this websocket.

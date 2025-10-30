@@ -45,7 +45,7 @@ async function deployFacets(hre: HardhatRuntimeEnvironment, deployer: string): P
     const facets = [
         {
             name: 'GatewayGetterFacet',
-            libraries: ['SubnetIDHelper', 'LibQuorum'],
+            libraries: ['SubnetIDHelper'],
         },
         { name: 'DiamondLoupeFacet' },
         { name: 'DiamondCutFacet' },

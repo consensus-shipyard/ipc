@@ -21,7 +21,7 @@ use ipc_api::subnet_id::SubnetID;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 
-use super::choose_amount;
+use super::{choose_amount, DEFAULT_CHAIN_ID};
 
 #[derive(Debug, Clone)]
 pub enum StakingOp {
@@ -40,7 +40,7 @@ pub struct StakingUpdate {
 #[derive(Debug, Clone)]
 pub struct StakingAccount {
     pub public_key: PublicKey,
-    pub secret_key: SecretKey,
+    // pub secret_key: SecretKey,
     pub addr: EthAddress,
     /// In this test the accounts should never gain more than their initial balance.
     pub initial_balance: TokenAmount,
@@ -341,13 +341,6 @@ impl StakingState {
         self.current_configuration.ranking.iter().take(n)
     }
 
-    /// Total collateral of the top N validators.
-    ///
-    /// This is what we have to achieve quorum over.
-    pub fn active_collateral(&self) -> TokenAmount {
-        self.active_validators().map(|(c, _)| c.0.clone()).sum()
-    }
-
     /// Get and increment the configuration number.
     fn next_configuration_number(&mut self) -> u64 {
         let n = self.next_configuration_number;
@@ -509,7 +502,6 @@ impl arbitrary::Arbitrary<'_> for StakingState {
 
             accounts.push(StakingAccount {
                 public_key: pk,
-                secret_key: sk,
                 addr,
                 initial_balance,
                 current_balance,
@@ -580,7 +572,7 @@ impl arbitrary::Arbitrary<'_> for StakingState {
 
         let parent_genesis = Genesis {
             chain_name: String::arbitrary(u)?,
-            chain_id: None,
+            chain_id: DEFAULT_CHAIN_ID,
             timestamp: Timestamp(u64::arbitrary(u)?),
             network_version: NetworkVersion::V21,
             base_fee: ArbTokenAmount::arbitrary(u)?.0,
@@ -603,7 +595,7 @@ impl arbitrary::Arbitrary<'_> for StakingState {
 
         let child_genesis = Genesis {
             chain_name: String::arbitrary(u)?,
-            chain_id: None,
+            chain_id: DEFAULT_CHAIN_ID,
             timestamp: Timestamp(u64::arbitrary(u)?),
             network_version: NetworkVersion::V21,
             base_fee: ArbTokenAmount::arbitrary(u)?.0,

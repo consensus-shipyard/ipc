@@ -15,7 +15,7 @@ import {LibDiamond} from "../../contracts/lib/LibDiamond.sol";
 import {SubnetActorGetterFacet} from "../../contracts/subnet/SubnetActorGetterFacet.sol";
 import {SubnetActorManagerFacet} from "../../contracts/subnet/SubnetActorManagerFacet.sol";
 import {SubnetActorPauseFacet} from "../../contracts/subnet/SubnetActorPauseFacet.sol";
-import {SubnetActorCheckpointingFacet} from "../../contracts/subnet/SubnetActorCheckpointingFacet.sol";
+import {SubnetActorCheckpointFacetMock} from "../mocks/SubnetActorCheckpointFacetMock.sol";
 import {SubnetActorRewardFacet} from "../../contracts/subnet/SubnetActorRewardFacet.sol";
 import {SubnetActorDiamond} from "../../contracts/SubnetActorDiamond.sol";
 import {SubnetActorActivityFacet} from "../../contracts/subnet/SubnetActorActivityFacet.sol";
@@ -63,7 +63,7 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         params.getterFacet = address(new SubnetActorGetterFacet());
         params.managerFacet = address(new SubnetActorManagerFacet());
         params.rewarderFacet = address(new SubnetActorRewardFacet());
-        params.checkpointerFacet = address(new SubnetActorCheckpointingFacet());
+        params.checkpointerFacet = address(new SubnetActorCheckpointFacetMock());
         params.pauserFacet = address(new SubnetActorPauseFacet());
         params.diamondCutFacet = address(new DiamondCutFacet());
         params.diamondLoupeFacet = address(new DiamondLoupeFacet());
@@ -73,13 +73,12 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
         params.subnetActorGetterSelectors = mockedSelectors;
         params.subnetActorManagerSelectors = mockedSelectors2;
         params.subnetActorRewarderSelectors = mockedSelectors3;
-        params.subnetActorCheckpointerSelectors = mockedSelectors4;
+        params.subnetActorCheckpointerSelectors = SelectorLibrary.resolveSelectors("SubnetActorCheckpointFacetMock");
         params.subnetActorPauserSelectors = mockedSelectors5;
         params.subnetActorDiamondCutSelectors = SelectorLibrary.resolveSelectors("DiamondCutFacet");
         params.subnetActorDiamondLoupeSelectors = SelectorLibrary.resolveSelectors("DiamondLoupeFacet");
         params.subnetActorOwnershipSelectors = SelectorLibrary.resolveSelectors("OwnershipFacet");
         params.subnetActorActivitySelectors = SelectorLibrary.resolveSelectors("SubnetActorActivityFacet");
-
         params.creationPrivileges = SubnetCreationPrivileges.Unrestricted;
 
         return params;
@@ -249,6 +248,8 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
             path[i] = vm.addr(300 + i);
         }
 
+        if (_activeValidatorsLimit > uint16(type(uint8).max)) _activeValidatorsLimit = uint16(type(uint8).max);
+
         SubnetActorDiamond.ConstructorParams memory params = SubnetActorDiamond.ConstructorParams({
             parentId: SubnetID({root: ROOTNET_CHAINID, route: path}),
             ipcGatewayAddr: DEFAULT_IPC_GATEWAY_ADDR,
@@ -264,7 +265,8 @@ contract SubnetRegistryTest is Test, TestRegistry, IntegrationTestBase {
             collateralSource: AssetHelper.native(),
             validatorGater: address(0),
             validatorRewarder: address(new ValidatorRewarderMap()),
-            genesisSubnetIpcContractsOwner: address(1)
+            genesisSubnetIpcContractsOwner: address(1),
+            chainID: uint64(1671263715227509)
         });
 
         registrySubnetFacet.newSubnetActor(params);

@@ -128,7 +128,8 @@ contract SubnetRegistryHandler is CommonBase, StdCheats, StdUtils {
             collateralSource: AssetHelper.native(),
             validatorGater: address(0),
             validatorRewarder: address(new ValidatorRewarderMap()),
-            genesisSubnetIpcContractsOwner: address(1)
+            genesisSubnetIpcContractsOwner: address(1),
+            chainID: uint64(1671263715227509)
         });
 
         address owner = getRandomOldAddressOrNewOne(seed);
