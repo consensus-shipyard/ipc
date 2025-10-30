@@ -18,6 +18,7 @@ error FunctionNotFound(bytes4 _functionSelector);
 bool constant FEATURE_MULTILEVEL_CROSSMSG = true;
 bool constant FEATURE_GENERAL_PUPRPOSE_CROSSMSG = true;
 uint8 constant FEATURE_SUBNET_DEPTH = 10;
+uint16 constant MAX_VALIDATORS_SIZE = 256;
 
 contract GatewayDiamond {
     GatewayActorStorage internal s;
@@ -60,7 +61,8 @@ contract GatewayDiamond {
         s.majorityPercentage = params.majorityPercentage;
         s.commitSha = params.commitSha;
 
-        if (params.activeValidatorsLimit > uint16(type(uint8).max)) revert TooManyValidators();
+        // the validator bitmap is a uint256, which is 256 bits, this allows only 256 validators
+        if (params.activeValidatorsLimit > MAX_VALIDATORS_SIZE) revert TooManyValidators();
         s.validatorsTracker.validators.activeLimit = params.activeValidatorsLimit;
 
         // Start the next configuration number from 1, 0 is reserved for no change and the genesis membership

@@ -78,7 +78,7 @@ pub enum AppError {
 pub struct SubnetAppState {
     app_state: AppState,
     /// Only certain block height will trigger light client commitment payload
-    light_client_commitments: Option<LightClientCommitments>,
+    state_commitments: Option<LightClientCommitments>,
 }
 
 /// The application state record we keep a history of in the database.
@@ -101,7 +101,7 @@ impl SubnetAppState {
     }
 
     pub fn light_client_commitments(&self) -> Option<&LightClientCommitments> {
-        self.light_client_commitments.as_ref()
+        self.state_commitments.as_ref()
     }
 }
 
@@ -258,7 +258,7 @@ where
             };
             let state = SubnetAppState {
                 app_state,
-                light_client_commitments: None,
+                state_commitments: None,
             };
             self.set_committed_state(state)?;
         }
@@ -556,7 +556,7 @@ where
         let subnet_state = SubnetAppState {
             app_state,
             // there is no light client commitment at the genesis
-            light_client_commitments: None,
+            state_commitments: None,
         };
 
         let response = response::InitChain {
@@ -948,7 +948,7 @@ where
 
         let mut c = self.light_client_commitments.lock().await;
         // because of the take, no need to *c = None
-        state.light_client_commitments = c.take();
+        state.state_commitments = c.take();
 
         let app_hash = state.app_hash();
         let block_height = state.app_state.block_height;
@@ -1000,7 +1000,7 @@ where
         if let Some(ref snapshots) = self.snapshots {
             let payload = SnapshotPayload {
                 state: state.app_state.state_params.clone(),
-                light_client_commitments: state.light_client_commitments.clone(),
+                light_client_commitments: state.state_commitments.clone(),
             };
             atomically(|| snapshots.notify(block_height, payload.clone())).await;
         }
@@ -1150,7 +1150,7 @@ where
                         // The height reflects that it was produced in `commit`.
                         state.app_state.block_height = snapshot.manifest.block_height;
                         state.app_state.state_params = snapshot.manifest.state_params.state;
-                        state.light_client_commitments =
+                        state.state_commitments =
                             snapshot.manifest.state_params.light_client_commitments;
                         self.set_committed_state(state)?;
 

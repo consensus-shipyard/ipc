@@ -19,6 +19,8 @@ import {LibActivity} from "./lib/LibActivity.sol";
 
 error FunctionNotFound(bytes4 _functionSelector);
 
+uint16 constant MAX_VALIDATORS_SIZE = 256;
+
 contract SubnetActorDiamond {
     SubnetActorStorage internal s;
 
@@ -98,7 +100,8 @@ contract SubnetActorDiamond {
         s.validatorSet.permissionMode = params.permissionMode;
         s.genesisSubnetIpcContractsOwner = params.genesisSubnetIpcContractsOwner;
 
-        if (params.activeValidatorsLimit > uint16(type(uint8).max)) revert TooManyValidators();
+        // the validator bitmap is a uint256, which is 256 bits, this allows only 256 validators
+        if (params.activeValidatorsLimit > MAX_VALIDATORS_SIZE) revert TooManyValidators();
         s.validatorSet.activeLimit = params.activeValidatorsLimit;
 
         // Start the next configuration number from 1, 0 is reserved for no change and the genesis membership
