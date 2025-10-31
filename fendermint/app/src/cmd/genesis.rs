@@ -373,13 +373,13 @@ async fn fetch_f3_params_from_parent(
 
     match certificate {
         Some(cert) => {
-            // We use the next instance ID as the starting point since we don't
-            // process the power table delta here. The finalized chain starts empty
-            // and the next certificate to be fetched will be processed properly.
-            let instance_id = cert.gpbft_instance + 1;
-            tracing::info!("Starting F3 from next instance ID: {}", instance_id);
+            // Use the fetched certificate's instance ID to get its base power table.
+            // The finalized chain starts empty and subsequent certificates will be
+            // fetched and processed properly.
+            let instance_id = cert.gpbft_instance;
+            tracing::info!("Starting F3 from instance ID: {}", instance_id);
 
-            // Get power table for the next instance
+            // Get base power table for this instance
             let power_table_response = lotus_client.f3_get_power_table(instance_id).await?;
 
             // Convert power entries
