@@ -96,6 +96,7 @@
             Processing...
           </span>
           <span v-else-if="!isCorrectNetwork && connectedAddress">Switch Network to Continue</span>
+          <span v-else-if="!faucetConfig.amount">Loading...</span>
           <span v-else>Request {{ faucetConfig.amount }} tFIL</span>
         </button>
 
@@ -124,7 +125,7 @@
         <div class="mt-6 p-4 bg-white/5 rounded-lg border border-white/10">
           <h3 class="text-white font-semibold mb-2">Faucet Information</h3>
           <ul class="text-sm text-gray-300 space-y-1">
-            <li>• Amount per request: {{ faucetConfig.amount }} tFIL</li>
+            <li>• Amount per request: <span v-if="faucetConfig.amount">{{ faucetConfig.amount }} tFIL</span><span v-else class="text-gray-400">Loading...</span></li>
             <li>• Rate limit: {{ faucetConfig.rateLimit }}</li>
             <li>• Network: {{ networkInfo.name }}</li>
           </ul>
@@ -166,8 +167,8 @@ const networkInfo = ref({
 
 // Faucet configuration (will be fetched from backend)
 const faucetConfig = ref({
-  amount: '1',
-  rateLimit: '1 request per 24 hours per address'
+  amount: '',
+  rateLimit: 'Loading...'
 })
 
 // Computed
