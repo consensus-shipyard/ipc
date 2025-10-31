@@ -60,3 +60,4 @@ gas_with_buffer = int(gas * 1.2)
 print(f"\nRecommended (with 20% buffer): {gas_with_buffer:,} gas")
 EOF
 
+
