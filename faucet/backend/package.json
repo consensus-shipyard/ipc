@@ -1,0 +1,18 @@
+{
+  "name": "ipc-faucet-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "build": "echo 'No build step required for backend'"
+  },
+  "dependencies": {
+    "express": "^4.18.3",
+    "express-rate-limit": "^7.1.5",
+    "cors": "^2.8.5",
+    "ethers": "^6.11.1",
+    "dotenv": "^16.4.5"
+  }
+}
+
