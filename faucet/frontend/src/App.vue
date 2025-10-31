@@ -207,7 +207,7 @@ async function connectWallet() {
       connectedAddress.value = accounts[0]
       recipientAddress.value = accounts[0]
       await checkNetwork()
-      
+
       if (isCorrectNetwork.value) {
         setStatus('Wallet connected successfully!', 'success')
       } else {
@@ -286,7 +286,7 @@ async function switchNetwork() {
 
     await checkNetwork()
     setStatus('Network switched successfully!', 'success')
-    
+
     // Clear success message after 3 seconds
     setTimeout(() => {
       statusMessage.value = ''
@@ -311,7 +311,7 @@ async function switchNetwork() {
         })
         await checkNetwork()
         setStatus('Network added and switched successfully!', 'success')
-        
+
         // Clear success message after 3 seconds
         setTimeout(() => {
           statusMessage.value = ''
