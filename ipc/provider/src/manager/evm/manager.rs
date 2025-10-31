@@ -7,6 +7,8 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use ethers_contract::{ContractError, EthLogDecode, LogMeta};
+// Temporarily disabled due to bls-signatures@0.15.0 compatibility issues
+// use filecoin_f3_lightclient::F3Client;
 use ipc_actors_abis::{
     checkpointing_facet, gateway_getter_facet, gateway_manager_facet, lib_gateway,
     lib_power_change_log, register_subnet_facet, subnet_actor_activity_facet,
@@ -1174,8 +1176,8 @@ impl EthSubnetManager {
 
         let mut client = Client::builder();
 
-        if let Some(auth_token) = auth_token {
-            let auth = Authorization::Bearer(auth_token);
+        if let Some(auth_token) = auth_token.as_deref() {
+            let auth = Authorization::Bearer(auth_token.to_string());
             let mut auth_value = HeaderValue::from_str(&auth.to_string())?;
             auth_value.set_sensitive(true);
 
@@ -1191,7 +1193,8 @@ impl EthSubnetManager {
 
         let client = client.build()?;
 
-        let http_provider = Http::new_with_client(url, client);
+        // Clone url before Http::new_with_client consumes it
+        let http_provider = Http::new_with_client(url.clone(), client);
         let error_parser_provider = ErrorParserHttp::from(http_provider);
         let mut provider = Provider::new(error_parser_provider);
         // set polling interval for provider to fit fast child subnets block times.

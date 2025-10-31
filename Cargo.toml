@@ -42,6 +42,7 @@ members = [
   "fendermint/actors/chainmetadata",
   "fendermint/actors/activity-tracker",
   "fendermint/actors/eam",
+  "fendermint/actors/f3-light-client",
   "fendermint/actors/gas_market/eip1559",
 
   "build-rs-utils",
@@ -220,6 +221,7 @@ fvm_ipld_amt = "0.7.4"
 # and this copy-paste is clunky, so at least for those that have it, we should use it.
 # Keep the version here in sync with the Makefile!
 # NOTE: Using master branch instead of v17.0.0 tag due to serde dependency fixes
+# Master is currently at commit 2f040c12 which fixes the serde::__private::PhantomData import issue
 fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-actors", branch = "master" }
 fil_actor_eam = { git = "https://github.com/filecoin-project/builtin-actors", branch = "master" }
 fil_actor_evm = { git = "https://github.com/filecoin-project/builtin-actors", branch = "master" }
@@ -245,25 +247,16 @@ tendermint-rpc = { version = "0.31", features = [
 tendermint-proto = { version = "0.31" }
 
 [patch.crates-io]
-fvm = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
-fvm_shared = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
-fvm_sdk = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
-fvm_ipld_blockstore = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
-fvm_ipld_car = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
-fvm_ipld_encoding = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
-fvm_ipld_hamt = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
-fvm_ipld_amt = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
+# Using latest FVM to match builtin-actors v17.0.0 requirements
+fvm = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "master" }
+fvm_shared = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "master" }
+fvm_sdk = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "master" }
+fvm_ipld_blockstore = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "master" }
+fvm_ipld_car = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "master" }
+fvm_ipld_encoding = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "master" }
+fvm_ipld_hamt = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "master" }
+fvm_ipld_amt = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "master" }
 yamux = { git = "https://github.com/paritytech/yamux", tag = "yamux-v0.13.4" }
-
-# Patch builtin-actors git dependencies to use the same FVM version
-[patch."https://github.com/filecoin-project/builtin-actors"]
-fvm = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
-fvm_shared = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
-fvm_sdk = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
-fvm_ipld_blockstore = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
-fvm_ipld_encoding = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
-fvm_ipld_hamt = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
-fvm_ipld_amt = { git = "https://github.com/consensus-shipyard/ref-fvm.git" }
 
 [profile.wasm]
 inherits = "release"

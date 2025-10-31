@@ -708,6 +708,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                     },
                 }),
                 ipc_contracts_owner,
+                f3: None, // No F3 parameters for root chains
             };
             Ok(genesis)
         })
@@ -972,9 +973,15 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             .find_node(|n| n.internal_ethapi_http_endpoint(), |u| Some(u.clone()))
             .ok_or_else(|| anyhow!("there has to be some nodes with eth API enabled"))?;
 
+        // Check if any parent node is external (Filecoin/Lotus) to determine if we need F3 data
+        let has_external_parent = parent_submit_config
+            .nodes
+            .iter()
+            .any(|tc| matches!(tc, TargetConfig::External(_)));
+
         // TODO: Move --base-fee to config
         // TODO: Move --power-scale to config
-        let cmd = format!(
+        let mut cmd = format!(
             "genesis \
                 --genesis-file /fendermint/subnet/genesis.json \
                 ipc from-parent \
@@ -983,8 +990,7 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
                     --parent-gateway {:?} \
                     --parent-registry {:?} \
                     --base-fee {} \
-                    --power-scale {} \
-                ",
+                    --power-scale {} ",
             subnet.subnet_id,
             parent_url,
             parent_submit_config.deployment.gateway,
@@ -992,6 +998,12 @@ impl Materializer<DockerMaterials> for DockerMaterializer {
             TokenAmount::zero().atto(),
             9, // to work with nanoFIL
         );
+
+        // Only provide --parent-filecoin-rpc for external (Filecoin) parents
+        // Internal (Fendermint) parents don't have F3 available
+        if has_external_parent {
+            cmd.push_str(&format!("--parent-filecoin-rpc {} ", parent_url));
+        }
 
         let runner = self.fendermint_cli_runner(&subnet.name, network_name.as_ref())?;
 

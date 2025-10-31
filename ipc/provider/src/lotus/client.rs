@@ -24,6 +24,7 @@ use serde_json::json;
 
 use crate::jsonrpc::{JsonRpcClient, JsonRpcClientImpl, NO_PARAMS};
 use crate::lotus::message::chain::{ChainHeadResponse, GetTipSetByHeightResponse};
+use crate::lotus::message::f3::{F3CertificateResponse, F3PowerTableResponse};
 use crate::lotus::message::mpool::{
     EstimateGasResponse, MpoolPushMessage, MpoolPushMessageResponse, MpoolPushMessageResponseInner,
 };
@@ -51,6 +52,8 @@ mod methods {
     pub const CHAIN_HEAD: &str = "Filecoin.ChainHead";
     pub const GET_TIPSET_BY_HEIGHT: &str = "Filecoin.ChainGetTipSetByHeight";
     pub const ESTIMATE_MESSAGE_GAS: &str = "Filecoin.GasEstimateMessageGas";
+    pub const F3_GET_LATEST_CERTIFICATE: &str = "Filecoin.F3GetLatestCertificate";
+    pub const F3_GET_POWER_TABLE_BY_INSTANCE: &str = "Filecoin.F3GetPowerTableByInstance";
 }
 
 /// The default state wait confidence value
@@ -346,6 +349,29 @@ impl<T: JsonRpcClient + Send + Sync> LotusClient for LotusJsonRPCClient<T> {
             )
             .await?;
         tracing::debug!("received get_tipset_by_height response: {r:?}");
+        Ok(r)
+    }
+
+    async fn f3_get_certificate(&self) -> Result<Option<F3CertificateResponse>> {
+        // refer to: Filecoin.F3GetLatestCertificate
+        let r = self
+            .client
+            .request::<Option<F3CertificateResponse>>(methods::F3_GET_LATEST_CERTIFICATE, NO_PARAMS)
+            .await?;
+        tracing::debug!("received f3_get_latest_certificate response: {r:?}");
+        Ok(r)
+    }
+
+    async fn f3_get_power_table(&self, instance_id: u64) -> Result<F3PowerTableResponse> {
+        // refer to: Filecoin.F3GetPowerTableByInstance
+        let r = self
+            .client
+            .request::<F3PowerTableResponse>(
+                methods::F3_GET_POWER_TABLE_BY_INSTANCE,
+                json!([instance_id]),
+            )
+            .await?;
+        tracing::debug!("received f3_get_power_table_by_instance response: {r:?}");
         Ok(r)
     }
 }

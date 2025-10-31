@@ -120,6 +120,7 @@ impl Arbitrary for Genesis {
                 None
             },
             ipc_contracts_owner,
+            f3: None, // For now, we don't generate arbitrary F3 params in tests
         }
     }
 }

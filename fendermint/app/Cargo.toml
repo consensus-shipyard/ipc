@@ -10,6 +10,7 @@ license.workspace = true
 anyhow = { workspace = true }
 async-stm = { workspace = true }
 async-trait = { workspace = true }
+base64 = { workspace = true }
 bytes = { workspace = true }
 cid = { workspace = true }
 hex = { workspace = true }
@@ -43,9 +44,11 @@ tracing = { workspace = true }
 tracing-appender = { workspace = true }
 tracing-subscriber = { workspace = true }
 literally = { workspace = true }
+url = { workspace = true }
 
 fendermint_abci = { path = "../abci" }
 actors-custom-api = { path = "../actors/api" }
+fendermint_actor_f3_light_client = { path = "../actors/f3-light-client" }
 fendermint_app_options = { path = "./options" }
 fendermint_app_settings = { path = "./settings" }
 fendermint_crypto = { path = "../crypto" }

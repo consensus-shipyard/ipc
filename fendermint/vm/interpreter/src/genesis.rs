@@ -18,8 +18,8 @@ use fendermint_eth_hardhat::{ContractSourceAndName, Hardhat, FQN};
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::{
-    account, activity, burntfunds, chainmetadata, cron, eam, gas_market, init, ipc, reward, system,
-    EMPTY_ARR,
+    account, activity, burntfunds, chainmetadata, cron, eam, f3_light_client, gas_market, init,
+    ipc, reward, system, EMPTY_ARR,
 };
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{ActorMeta, Collateral, Genesis, Power, PowerScale, Validator};
@@ -441,6 +441,31 @@ impl<'a> GenesisBuilder<'a> {
                 None,
             )
             .context("failed to create activity tracker actor")?;
+
+        // F3 Light Client actor - manages F3 light client state for proof-based parent finality
+        if let Some(f3_params) = &genesis.f3 {
+            // For subnets with F3 parameters, initialize with the provided F3 data
+            let constructor_params = fendermint_actor_f3_light_client::types::ConstructorParams {
+                instance_id: f3_params.instance_id,
+                power_table: f3_params.power_table.clone(),
+                finalized_epochs: f3_params.finalized_epochs.clone(),
+            };
+            let f3_state = fendermint_actor_f3_light_client::state::State::new(
+                constructor_params.instance_id,
+                constructor_params.power_table,
+                constructor_params.finalized_epochs,
+            )?;
+
+            state
+                .create_custom_actor(
+                    fendermint_actor_f3_light_client::F3_LIGHT_CLIENT_ACTOR_NAME,
+                    f3_light_client::F3_LIGHT_CLIENT_ACTOR_ID,
+                    &f3_state,
+                    TokenAmount::zero(),
+                    None,
+                )
+                .context("failed to create F3 light client actor")?;
+        };
 
         // STAGE 2: Create non-builtin accounts which do not have a fixed ID.
 

@@ -246,6 +246,7 @@ async fn test_applying_upgrades() {
         eam_permission_mode: PermissionMode::Unrestricted,
         ipc: None,
         ipc_contracts_owner,
+        f3: None,
     };
 
     let mut tester = Tester::new(interpreter, genesis).await.unwrap();

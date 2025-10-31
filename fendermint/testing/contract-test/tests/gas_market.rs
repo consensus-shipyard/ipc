@@ -112,6 +112,7 @@ async fn tester_with_upgrader(
         eam_permission_mode: PermissionMode::Unrestricted,
         ipc: None,
         ipc_contracts_owner,
+        f3: None,
     };
     (Tester::new(interpreter, genesis).await.unwrap(), validator)
 }

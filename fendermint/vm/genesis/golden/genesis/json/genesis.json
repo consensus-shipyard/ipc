@@ -1,24 +1,40 @@
 {
-  "chain_name": "(￸ 8",
+  "chain_name": "U",
   "chain_id": 101,
-  "timestamp": 13048132555683723717,
+  "timestamp": 12982167733895342124,
   "network_version": 21,
-  "base_fee": "204536838142628348769883122108200822385",
-  "power_scale": 0,
+  "base_fee": "20131727983098262839895554089832955311",
+  "power_scale": 3,
   "validators": [
     {
-      "public_key": "BCNrOdxbY1N1vLm8mstrCEcb2QJ1A2VC5xLmUN1qXesxn8EE8ik/78qUZkCVEXmwZs8AWUZphSEgjk6hnycFRLk=",
-      "power": "279578440063968243640330591965566708807"
+      "public_key": "BH4dgpBqtkh6sKhMXelu7LKYN2nb1UJSX6ZCYGPmtmsCM9y80iAUMj5wu4Yiu952Dv3Oq2Rrbt9h45EgRmHkFSc=",
+      "power": "40223257309125237738285695934834340379"
+    },
+    {
+      "public_key": "BBPbyO1PiFQ7AoLdOYNViHBJ+EF6FuhOYGAOTygqwuvdOt960J5TvCIjwX2UIm2vPm+9ILZarBWcTFXz8rQG9bQ=",
+      "power": "19706769749739782860581433033120308803"
+    },
+    {
+      "public_key": "BGB9f7R3VPpLiWszpGgbG+BLbtllYDg1YGq0RMqmv9xhBz7RG6WVOSCmUem+TAVQkIX2tPT7ZcZF+FLkCoNHhOc=",
+      "power": "260894447470586868017041531430614024483"
+    },
+    {
+      "public_key": "BA0y6qtkjqTG5IdQDRNT3yHZx4WI+6Ua+LFYuXdfczM/ocBhjNJQmQVpCjDvuwHoBPD0hzK4KxtdJe+lPa7a3hU=",
+      "power": "178349749897518691979494799247727256537"
+    },
+    {
+      "public_key": "BPhrBPJqcNmmxgGlHirO5Tt03wYXcUKlHJVYuqdWzNew6RQby1tcXpqwyFxSazNt6cOQ0UNjXBa2RAnw9CWJieY=",
+      "power": "135063245844052113159013998821298664415"
     }
   ],
   "accounts": [
     {
       "meta": {
         "Account": {
-          "owner": "f410fxq53ozlqu5odo4gurfz6iiaswijs62fsojiaeyi"
+          "owner": "f410fkutwqjirqgadmxm43p2myoi5m3gurnulc4uvrti"
         }
       },
-      "balance": "22110260739791640481241452065447093925"
+      "balance": "68216112094381133411177903949584186607"
     }
   ],
   "eam_permission_mode": {
@@ -26,11 +42,11 @@
   },
   "ipc": {
     "gateway": {
-      "subnet_id": "/r17343480625867571039",
-      "bottom_up_check_period": 6666232981404249077,
-      "majority_percentage": 87,
-      "active_validators_limit": 80
+      "subnet_id": "/r16315642738389104412",
+      "bottom_up_check_period": 11339269183869879227,
+      "majority_percentage": 73,
+      "active_validators_limit": 63
     }
   },
-  "ipc_contracts_owner": "0xb8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8b8"
+  "ipc_contracts_owner": "0x8989898989898989898989898989898989898989"
 }

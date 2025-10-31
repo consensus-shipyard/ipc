@@ -42,10 +42,22 @@ impl RotationKind {
 }
 
 #[serde_as]
-#[derive(Debug, Deserialize, Serialize, Clone, Default)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TracingSettings {
     pub console: Option<ConsoleLayerSettings>,
     pub file: Option<FileLayerSettings>,
+}
+
+impl Default for TracingSettings {
+    fn default() -> Self {
+        Self {
+            // Enable console logging with info level by default
+            console: Some(ConsoleLayerSettings {
+                level: Some("info".to_string()),
+            }),
+            file: None,
+        }
+    }
 }
 
 #[serde_as]
