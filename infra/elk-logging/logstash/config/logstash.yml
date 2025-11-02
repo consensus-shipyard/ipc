@@ -1,0 +1,20 @@
+# Logstash Configuration for IPC Log Processing
+
+http.host: "0.0.0.0"
+xpack.monitoring.enabled: true
+xpack.monitoring.elasticsearch.hosts: ["http://elasticsearch:9200"]
+xpack.monitoring.elasticsearch.username: "elastic"
+xpack.monitoring.elasticsearch.password: "${ELASTIC_PASSWORD}"
+
+# Pipeline settings
+pipeline.workers: 2
+pipeline.batch.size: 125
+pipeline.batch.delay: 50
+
+# Queue settings (for reliability)
+queue.type: persisted
+queue.max_bytes: 1gb
+
+# Dead letter queue
+dead_letter_queue.enable: true
+

@@ -1,0 +1,37 @@
+[Unit]
+Description=Filebeat Log Shipper for IPC Validator
+Documentation=https://www.elastic.co/beats/filebeat
+After=network.target
+Wants=network-online.target
+After=ipc-node.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+
+# Filebeat binary and config
+ExecStart=/usr/local/bin/filebeat -c /etc/filebeat/filebeat.yml -path.home /usr/share/filebeat -path.config /etc/filebeat -path.data /var/lib/filebeat -path.logs /var/log/filebeat
+
+# Restart policy
+Restart=always
+RestartSec=10s
+StartLimitInterval=300
+StartLimitBurst=5
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=8192
+
+# Security
+NoNewPrivileges=true
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_SYSLOG
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=filebeat
+
+[Install]
+WantedBy=multi-user.target
+

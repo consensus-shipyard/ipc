@@ -1,0 +1,137 @@
+{
+  "index_patterns": ["ipc-logs-*"],
+  "template": {
+    "settings": {
+      "index": {
+        "number_of_shards": 1,
+        "number_of_replicas": 0,
+        "refresh_interval": "5s",
+        "codec": "best_compression"
+      },
+      "index.lifecycle.name": "ipc-logs-policy",
+      "index.lifecycle.rollover_alias": "ipc-logs"
+    },
+    "mappings": {
+      "properties": {
+        "@timestamp": {
+          "type": "date"
+        },
+        "message": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "log_level": {
+          "type": "keyword"
+        },
+        "log_message": {
+          "type": "text"
+        },
+        "log_source": {
+          "type": "keyword"
+        },
+        "validator": {
+          "type": "keyword"
+        },
+        "validator_ip": {
+          "type": "ip"
+        },
+        "service": {
+          "type": "keyword"
+        },
+        "role": {
+          "type": "keyword"
+        },
+        "block_height": {
+          "type": "long"
+        },
+        "tx_count": {
+          "type": "integer"
+        },
+        "consensus_round": {
+          "type": "integer"
+        },
+        "checkpoint_height": {
+          "type": "long"
+        },
+        "checkpoint_hash": {
+          "type": "keyword"
+        },
+        "tx_hash": {
+          "type": "keyword"
+        },
+        "from_address": {
+          "type": "keyword"
+        },
+        "gas_used": {
+          "type": "long"
+        },
+        "error_detail": {
+          "type": "text"
+        },
+        "subnet": {
+          "properties": {
+            "id": {
+              "type": "keyword"
+            },
+            "parent_rpc": {
+              "type": "keyword"
+            },
+            "parent_chain_id": {
+              "type": "keyword"
+            }
+          }
+        },
+        "systemd": {
+          "properties": {
+            "unit": {
+              "type": "keyword"
+            },
+            "transport": {
+              "type": "keyword"
+            }
+          }
+        },
+        "host": {
+          "properties": {
+            "hostname": {
+              "type": "keyword"
+            },
+            "name": {
+              "type": "keyword"
+            },
+            "ip": {
+              "type": "ip"
+            },
+            "os": {
+              "properties": {
+                "family": {
+                  "type": "keyword"
+                },
+                "name": {
+                  "type": "keyword"
+                },
+                "version": {
+                  "type": "keyword"
+                }
+              }
+            }
+          }
+        },
+        "tags": {
+          "type": "keyword"
+        }
+      }
+    }
+  },
+  "priority": 100,
+  "version": 1,
+  "_meta": {
+    "description": "Index template for IPC validator logs"
+  }
+}
+

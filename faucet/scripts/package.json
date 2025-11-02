@@ -1,0 +1,11 @@
+{
+  "name": "ipc-faucet-scripts",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "ethers": "^6.11.1",
+    "dotenv": "^16.4.5"
+  }
+}
+
