@@ -64,6 +64,13 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
         address[] genesisBalanceKeys;
         /// @notice The validator gater, if address(0), no validator gating is performed
         address validatorGater;
+        /// @notice F3 instance ID from parent chain at subnet creation time
+        /// @dev Used for deterministic genesis creation. All nodes fetch F3 data for this instance.
+        /// Only set when parent is Filecoin mainnet/calibration (has F3 running).
+        /// Value of 0 with hasGenesisF3InstanceId=false means parent doesn't have F3.
+        uint64 genesisF3InstanceId;
+        /// @notice Whether F3 instance ID was explicitly set (to distinguish from instance ID 0)
+        bool hasGenesisF3InstanceId;
     }
 
 library LibSubnetActorStorage {

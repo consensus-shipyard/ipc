@@ -439,18 +439,30 @@ pub async fn new_genesis_from_parent(
 
     let genesis_info = parent_provider.get_genesis_info(&args.subnet_id).await?;
 
-    // Fetch F3 certificate data from parent chain if Filecoin RPC endpoint is provided.
-    // If not provided, it means the parent is not Filecoin (e.g., a Fendermint subnet)
-    // and F3 data is not available.
-    let f3_params = if let Some(ref parent_filecoin_rpc) = args.parent_filecoin_rpc {
-        tracing::info!("Fetching F3 data from parent Filecoin chain");
-        fetch_f3_params_from_parent(
-            parent_filecoin_rpc,
+    // Fetch F3 parameters using stored instance ID from subnet actor (deterministic!)
+    let f3_params = if let Some(f3_instance_id) = genesis_info.f3_instance_id {
+        // Parent is Filecoin and has F3 instance ID stored in subnet actor
+        tracing::info!(
+            "Subnet has F3 instance ID {} stored - fetching deterministic F3 data",
+            f3_instance_id
+        );
+
+        let parent_rpc = args.parent_filecoin_rpc.as_ref().ok_or_else(|| {
+            anyhow!(
+                "Parent Filecoin RPC required when subnet has F3 instance ID. \
+                 Use --parent-filecoin-rpc flag."
+            )
+        })?;
+
+        fetch_f3_params_for_instance(
+            parent_rpc,
             args.parent_filecoin_auth_token.as_ref(),
+            f3_instance_id,
         )
         .await?
     } else {
-        tracing::info!("Skipping F3 data fetch - parent is not Filecoin");
+        // Parent doesn't have F3 (either not Filecoin, or creation predates F3 support)
+        tracing::info!("No F3 instance ID in subnet actor - skipping F3 data");
         None
     };
 
