@@ -27,11 +27,11 @@ pub enum Error {
 
 fn create_socket() -> std::io::Result<tokio::net::UnixStream> {
     use std::os::fd::{FromRawFd, IntoRawFd};
-    
+
     // socket2 0.5+ compatibility: use raw socket type constant instead of Type::RAW
     let socket = socket2::Socket::new(libc::AF_ROUTE.into(), socket2::Type::from(libc::SOCK_RAW), None)?;
     socket.set_nonblocking(true)?;
-    
+
     // socket2 0.5+ compatibility: explicit conversion through raw file descriptor
     let fd = socket.into_raw_fd();
     let socket_std: std::os::unix::net::UnixStream = unsafe { std::os::unix::net::UnixStream::from_raw_fd(fd) };

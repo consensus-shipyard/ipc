@@ -10,9 +10,9 @@ use cid::Cid;
 use fendermint_actor_blobs_shared::{
     credit::{GasAllowance, GetGasAllowanceParams, UpdateGasAllowanceParams},
     method::Method::{GetGasAllowance, UpdateGasAllowance},
+    BLOBS_ACTOR_ADDR, BLOBS_ACTOR_ID,
 };
 use fendermint_vm_actor_interface::{
-    blobs::{BLOBS_ACTOR_ADDR, BLOBS_ACTOR_ID},
     eam::EAM_ACTOR_ID,
     system::SYSTEM_ACTOR_ADDR,
 };
@@ -169,7 +169,7 @@ where
                     None,
                     false,
                 )
-            });
+            }, false); // FVM 4.7: with_transaction now requires read_only bool parameter
 
             let (res, machine) = match cm.finish() {
                 (Ok(res), machine) => (res, machine),
