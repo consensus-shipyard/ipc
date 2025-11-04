@@ -73,7 +73,7 @@ pub fn to_id_and_delegated_address(
 }
 
 /// Returns the [`TokenAmount`] as a [`BigUint`].
-/// If the given amount is negative, the value returned will be zero.  
+/// If the given amount is negative, the value returned will be zero.
 pub fn token_to_biguint(amount: Option<TokenAmount>) -> BigUint {
     amount
         .unwrap_or_default()
@@ -92,7 +92,7 @@ pub enum Kind {
 }
 
 /// Checks if an address is a bucket actor.
-/// 
+///
 /// TODO: Re-enable full implementation once ADM actor is available (needs ADM_ACTOR_ADDR)
 /// For now, returns false since bucket actors are not yet enabled.
 #[allow(unused_variables)]

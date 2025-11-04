@@ -63,7 +63,7 @@ members = [
   "recall/iroh_manager",
   "recall/ipld",
   "recall/actor_sdk",
-  
+
   # recall contracts (vendored locally, FVM 4.7 upgrade)
   "recall-contracts/crates/facade",
 
