@@ -2,7 +2,7 @@
 
 ## ✅ **MAJOR MILESTONE ACHIEVED**
 
-**All core API compatibility issues have been resolved!**  
+**All core API compatibility issues have been resolved!**
 The Objects HTTP API and blob resolution infrastructure are now fully integrated and compiling.
 
 ---
@@ -19,7 +19,7 @@ The Objects HTTP API and blob resolution infrastructure are now fully integrated
 
 **Iroh Resolver Integration**
 - Updated IPLD resolver with full Iroh blob support
-  - `resolve_iroh()` - Download blobs from Iroh nodes  
+  - `resolve_iroh()` - Download blobs from Iroh nodes
   - `close_read_request()` - Read blob data
 - Made `Service::new()` async for Iroh initialization
 - Added `IrohConfig` to resolver configuration
@@ -29,7 +29,7 @@ The Objects HTTP API and blob resolution infrastructure are now fully integrated
 - Created complete `fendermint/vm/iroh_resolver/` module
 - Ported `iroh.rs` - Core blob resolution logic with vote submission
 - Ported `observe.rs` - Metrics and observability
-- Ported `pool.rs` - Connection pooling  
+- Ported `pool.rs` - Connection pooling
 - Integrated with vote tally and IPLD resolver
 
 ### 2. ✅ Objects HTTP API (COMPLETE)
@@ -40,7 +40,7 @@ The Objects HTTP API and blob resolution infrastructure are now fully integrated
   - Blob download with range support
   - Integration with Iroh node for storage
 - Ported CLI options (`objects.rs`)
-- Ported settings configuration (`objects.rs`)  
+- Ported settings configuration (`objects.rs`)
 - Integrated into `fendermint` binary
 
 **Dependencies Added**
@@ -145,7 +145,7 @@ The Objects HTTP API and blob resolution infrastructure are now fully integrated
 
 The interpreter blob handling (`recall_config.rs`) requires additional actor modules:
 - `fendermint_actor_blobs_shared` - Shared types for blobs actor
-- `fendermint_actor_recall_config_shared` - Recall configuration types  
+- `fendermint_actor_recall_config_shared` - Recall configuration types
 - `recall_config` module in `fendermint_vm_actor_interface`
 
 **Why This Matters:**
@@ -158,7 +158,7 @@ The interpreter blob handling (`recall_config.rs`) requires additional actor mod
 - They can be deployed and used for on-chain blob registration
 - The missing piece is the interpreter reading their configuration at runtime
 
-### Vote Tally Chain Integration  
+### Vote Tally Chain Integration
 
 **What's Needed:**
 - Wire up blob voting event loop in `node.rs`
@@ -225,7 +225,7 @@ curl http://localhost:8080/download/<blob_hash>
 ## 📈 Progress Metrics
 
 - **Core API Compat**: 100% ✅
-- **Objects HTTP API**: 100% ✅  
+- **Objects HTTP API**: 100% ✅
 - **Iroh Integration**: 100% ✅
 - **Vote Tally**: 100% ✅
 - **Interpreter Config**: 20% ⏳ (blocked on shared types)
@@ -273,7 +273,7 @@ curl http://localhost:8080/download/<blob_hash>
 
 3. **Manual Vote Testing**
    - Trigger blob downloads manually
-   - Verify vote submission  
+   - Verify vote submission
    - Check vote tally accumulation
 
 ---
@@ -299,7 +299,7 @@ curl http://localhost:8080/download/<blob_hash>
 - `ipld/resolver/Cargo.toml` - Iroh dependencies
 - `Cargo.toml` - Workspace dependencies
 
-**Total Files Modified**: 25  
+**Total Files Modified**: 25
 **Total Lines Added**: ~4,000
 
 ---
@@ -328,7 +328,7 @@ curl http://localhost:8080/download/<blob_hash>
 
 This migration brings the powerful Recall blob storage functionality from the `ipc-recall` branch into the latest IPC main branch, enabling:
 - Decentralized blob storage with BFT consensus
-- Erasure coding for fault tolerance  
+- Erasure coding for fault tolerance
 - P2P blob transfer via Iroh
 - HTTP API for easy integration
 
@@ -336,7 +336,7 @@ All core APIs are now compatible and the system is ready for testing and integra
 
 ---
 
-**Last Updated**: November 4, 2025  
-**Branch**: `recall-migration`  
+**Last Updated**: November 4, 2025
+**Branch**: `recall-migration`
 **Status**: ✅ **Ready for Testing**
 
