@@ -79,10 +79,13 @@ name = "actors-umbrella"
 version = "0.1.0"
 dependencies = [
  "fendermint_actor_activity_tracker",
+ "fendermint_actor_blob_reader",
+ "fendermint_actor_blobs",
  "fendermint_actor_chainmetadata",
  "fendermint_actor_eam",
  "fendermint_actor_f3_light_client",
  "fendermint_actor_gas_market_eip1559",
+ "fendermint_actor_recall_config",
 ]
 
 [[package]]

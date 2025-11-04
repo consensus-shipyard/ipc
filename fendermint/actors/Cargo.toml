@@ -17,3 +17,7 @@ fendermint_actor_chainmetadata = { path = "chainmetadata", features = ["fil-acto
 fendermint_actor_f3_light_client = { path = "f3-light-client", features = ["fil-actor"] }
 fendermint_actor_gas_market_eip1559 = { path = "gas_market/eip1559", features = ["fil-actor"] }
 fendermint_actor_eam = { path = "eam", features = ["fil-actor"] }
+# Recall actors
+fendermint_actor_blobs = { path = "blobs", features = ["fil-actor"] }
+fendermint_actor_blob_reader = { path = "blob_reader", features = ["fil-actor"] }
+fendermint_actor_recall_config = { path = "recall_config", features = ["fil-actor"] }
