@@ -40,9 +40,9 @@
 
 ## Branch Information
 
-**Branch Name:** `recall-migration`  
-**Based On:** `main` @ commit `984fc4a4` (feat: add f3 cert actor)  
-**Original Branch:** `ipc-recall` @ commit `567108af` (fix: non-determinism from actor debug flag)  
+**Branch Name:** `recall-migration`
+**Based On:** `main` @ commit `984fc4a4` (feat: add f3 cert actor)
+**Original Branch:** `ipc-recall` @ commit `567108af` (fix: non-determinism from actor debug flag)
 **Gap:** 959 commits behind, 77 commits ahead
 
 ## Components Ported So Far
@@ -114,7 +114,7 @@ Caused by:
 1. **FVM 4.3 → 4.7.4 upgrade**
    - **Risk:** API incompatibilities in kernel/executor
    - **Mitigation:** Incremental testing, FVM changelog review
-   
+
 2. **Iroh 0.35 compatibility**
    - **Risk:** P2P layer might not work
    - **Mitigation:** Test early, have fallback plan
@@ -126,7 +126,7 @@ Caused by:
 ### Medium Risk Items
 1. **Contract binding paths changed**
    - **Mitigation:** Straightforward find/replace
-   
+
 2. **Vote tally integration**
    - **Mitigation:** Existing code in topdown/voting.rs
 
@@ -153,7 +153,7 @@ Caused by:
 ```
 Modified:
   Cargo.toml                              (workspace configuration)
-  
+
 Added:
   recall/                                  (entire directory)
   docs/ipc/recall-vote-tally.md           (documentation)
@@ -170,7 +170,7 @@ git status
 # See what's in recall/ on ipc-recall
 git show ipc-recall:recall/
 
-# See what actors exist on ipc-recall  
+# See what actors exist on ipc-recall
 git show ipc-recall:fendermint/actors/
 
 # Test compilation
@@ -195,7 +195,7 @@ code docs/ipc/recall-migration-guide.md
 
 ---
 
-**Last Updated:** 2024-11-04  
-**Status:** Phase 1 in progress  
+**Last Updated:** 2024-11-04
+**Status:** Phase 1 in progress
 **Next Milestone:** Complete recall module compilation
 

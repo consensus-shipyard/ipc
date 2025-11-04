@@ -44,6 +44,16 @@ members = [
   "fendermint/actors/eam",
   "fendermint/actors/f3-light-client",
   "fendermint/actors/gas_market/eip1559",
+  # recall actors
+  "fendermint/actors/blobs",
+  "fendermint/actors/blobs/shared",
+  "fendermint/actors/blobs/testing",
+  "fendermint/actors/blob_reader",
+  "fendermint/actors/bucket",
+  "fendermint/actors/machine",
+  "fendermint/actors/timehub",
+  "fendermint/actors/recall_config",
+  "fendermint/actors/recall_config/shared",
 
   # recall storage
   "recall/kernel",
@@ -79,6 +89,7 @@ axum = { version = "0.6", features = ["ws"] }
 base64 = "0.21"
 bollard = "0.15"
 blake2b_simd = "1.0"
+blake3 = "1.5"
 bloom = "0.3"
 bytes = "1.4"
 clap = { version = "4.1", features = ["derive", "env", "string"] }
@@ -86,6 +97,7 @@ color-eyre = "0.5.11"
 byteorder = "1.5.0"
 config = "0.13"
 const-hex = "1.14.0"
+data-encoding = "2.3.3"
 dirs = "5.0"
 dircpy = "0.3.19"
 either = "1.10"
@@ -171,6 +183,8 @@ reqwest = { version = "0.11.13", features = ["json"] }
 # Recall entanglement library
 entangler = { package = "recall_entangler", git = "https://github.com/recallnet/entanglement.git", rev = "aee1c675ff05e5cde4771a2e2eb3ac4dab8476bc" }
 entangler_storage = { package = "recall_entangler_storage", git = "https://github.com/recallnet/entanglement.git", rev = "aee1c675ff05e5cde4771a2e2eb3ac4dab8476bc" }
+# Recall Solidity facades
+recall_sol_facade = { git = "https://github.com/recallnet/contracts", rev = "8dbfadfce7e306936a65fb955a83bc06b023007d" }
 sha2 = "0.10"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_bytes = "0.11"
