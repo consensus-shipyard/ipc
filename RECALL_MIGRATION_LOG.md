@@ -4,7 +4,8 @@
 
 ### Progress Summary
 
-**Branch:** `recall-migration` (based on main @ `984fc4a4`)
+**Branch:** `recall-migration` (based on main @ `984fc4a4`)  
+**Latest Commit:** `e986d08e` - "fix: temporarily disable sol_facade"
 
 #### ✅ Completed
 
@@ -39,9 +40,27 @@
      - `entangler_storage` (git dependency)
      - `recall_sol_facade` (git dependency)
 
-#### 🔄 Current Status
+#### 🔄 Current Status (Updated 10:47 AM)
 
-**Blocker:** `fil_actor_adm` dependency missing
+**✅ Phase 0: COMPLETE**  
+**🟡 Phase 1: PARTIAL** - 3/7 recall modules compiling
+
+**Successfully Compiling:**
+- ✅ `recall_ipld` - Custom IPLD data structures
+- ✅ `recall_kernel_ops` - Kernel operations interface
+- ✅ `recall_actor_sdk` - Actor SDK (with warnings, no sol_facade)
+
+**Blocked by netwatch (upstream issue):**
+- ⏸️ `recall_syscalls` - Blob operation syscalls
+- ⏸️ `recall_kernel` - Custom FVM kernel
+- ⏸️ `iroh_manager` - Iroh P2P node management
+
+**Disabled Temporarily:**
+- 🚫 `fendermint/actors/machine` - needs fil_actor_adm
+- 🚫 `fendermint/actors/bucket` - depends on machine
+- 🚫 `fendermint/actors/timehub` - depends on machine
+
+**Previous Blocker:** `fil_actor_adm` dependency missing - **RESOLVED** by temporarily disabling dependent actors
 
 The `fendermint_actor_machine` depends on `fil_actor_adm` which doesn't exist in the main branch's builtin-actors.
 
@@ -199,22 +218,65 @@ A  docs/ipc/recall-vote-tally.md
    - Then blobs actor (most complex)
    - Leave bucket for later if it needs machine
 
+### Issues Encountered & Resolved
+
+**1. FVM Version Conflict** (MAJOR BLOCKER - WORKAROUND APPLIED)
+- **Problem:** recall_sol_facade requires FVM 4.3.0, IPC main uses FVM 4.7.4
+- **Solution:** Temporarily commented out all sol_facade dependencies
+- **Impact:** EVM event emission disabled, basic functionality intact
+- **Status:** ✅ Workaround applied, TODO: upgrade sol_facade later
+
+**2. ADM Actor Missing** (BLOCKER - WORKAROUND APPLIED)  
+- **Problem:** machine/bucket/timehub actors need fil_actor_adm (not in main)
+- **Solution:** Temporarily disabled these actors
+- **Impact:** Bucket storage and timehub features unavailable
+- **Status:** ✅ Workaround applied, TODO: port ADM actor later
+
+**3. netwatch Compilation Error** (BLOCKING PROGRESS)
+- **Problem:** netwatch 0.5.0 incompatible with socket2 (upstream issue)
+- **Error:** `Type::RAW` not found, `From<Socket>` trait issue
+- **Affects:** recall_syscalls, recall_kernel, iroh_manager
+- **Status:** 🚨 **CURRENT BLOCKER** - need to fix or work around
+
+### Commits Made
+
+1. **c4262763** - "feat: initial recall migration setup"
+   - Created branch, copied recall modules
+   - Added workspace configuration and documentation
+
+2. **b1b8491f** - "feat: port recall actors and resolve dependencies"
+   - Copied all Recall actors from ipc-recall
+   - Added missing dependencies (blake3, data-encoding, etc.)
+   - Added recall_sol_facade dependency
+
+3. **4003012b** - "docs: document FVM version incompatibility blocker"
+   - Documented FVM 4.3 vs 4.7.4 conflict
+   - Outlined resolution options
+   - Temporarily disabled machine/bucket/timehub
+
+4. **e986d08e** - "fix: temporarily disable sol_facade to resolve FVM version conflict"
+   - Commented out sol_facade in all Cargo.toml files
+   - Disabled EVM event emission code
+   - Got 3 recall modules compiling successfully
+
 ### Time Invested
 
 - Setup & Documentation: ~2 hours
-- Dependency Resolution: ~1 hour
-- **Total:** ~3 hours
+- Dependency Resolution: ~2 hours
+- FVM Compatibility Fixes: ~1 hour
+- **Total:** ~5 hours
 
 ### Estimated Remaining
 
-- Phase 1 completion: 4-6 hours
+- Fix netwatch issue: 1-2 hours
+- Phase 1 completion: 2-4 hours
 - Phase 2-4: 20-30 hours
 - Testing & Integration: 10-15 hours
-- **Total Remaining:** 35-50 hours (1-1.5 weeks full-time)
+- **Total Remaining:** 33-51 hours (1-1.5 weeks full-time)
 
 ---
 
-**Status:** Paused at dependency resolution
-**Blocker:** fil_actor_adm not found
-**Next:** Investigate ADM source or remove machine actor
+**Status:** Blocked by netwatch compilation error  
+**Current Blocker:** netwatch 0.5.0 socket2 incompatibility  
+**Next:** Fix netwatch or work around dependency
 
