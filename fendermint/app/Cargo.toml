@@ -26,6 +26,18 @@ openssl = { workspace = true }
 paste = { workspace = true }
 prometheus = { workspace = true }
 prometheus_exporter = { workspace = true }
+# Objects/Recall HTTP API dependencies
+warp = { workspace = true }
+uuid = { workspace = true }
+mime_guess = { workspace = true }
+urlencoding = { workspace = true }
+entangler = { workspace = true }
+entangler_storage = { workspace = true }
+iroh_manager = { path = "../../recall/iroh_manager" }
+iroh = { workspace = true }
+iroh-blobs = { workspace = true }
+thiserror = { workspace = true }
+futures-util = { workspace = true }
 prost = { workspace = true }
 rand_chacha = { workspace = true }
 serde = { workspace = true }
@@ -71,6 +83,10 @@ fendermint_vm_message = { path = "../vm/message" }
 fendermint_vm_resolver = { path = "../vm/resolver" }
 fendermint_vm_snapshot = { path = "../vm/snapshot" }
 fendermint_vm_topdown = { path = "../vm/topdown" }
+fendermint_vm_iroh_resolver = { path = "../vm/iroh_resolver" }
+
+# Recall actors needed for objects command
+# fendermint_actor_bucket = { path = "../actors/bucket" } # TODO: depends on machine/ADM (not in main)
 
 ipc_actors_abis = { path = "../../contract-bindings" }
 ethers = {workspace =  true}

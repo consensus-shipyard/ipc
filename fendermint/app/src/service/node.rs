@@ -18,7 +18,7 @@ use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
 use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
 use fvm_shared::address::{current_network, Address, Network};
-use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
+use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord, IrohConfig};
 use ipc_observability::observe::register_metrics as register_default_metrics;
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
@@ -128,7 +128,7 @@ pub async fn run(
     // If enabled, start a resolver that communicates with the application through the resolve pool.
     if settings.resolver_enabled() {
         let mut service =
-            make_resolver_service(&settings, db.clone(), state_store.clone(), ns.bit_store)?;
+            make_resolver_service(&settings, db.clone(), state_store.clone(), ns.bit_store).await?;
 
         // Register all metrics from the IPLD resolver stack
         if let Some(ref registry) = metrics_registry {
@@ -370,7 +370,7 @@ fn open_db(settings: &Settings, ns: &Namespaces) -> anyhow::Result<RocksDb> {
     Ok(db)
 }
 
-fn make_resolver_service(
+async fn make_resolver_service(
     settings: &Settings,
     db: RocksDb,
     state_store: NamespaceBlockstore,
@@ -385,6 +385,7 @@ fn make_resolver_service(
     let config = to_resolver_config(settings).context("error creating resolver config")?;
 
     let service = ipc_ipld_resolver::Service::new(config, bitswap_store)
+        .await
         .context("error creating IPLD Resolver Service")?;
 
     Ok(service)
@@ -464,6 +465,12 @@ fn to_resolver_config(settings: &Settings) -> anyhow::Result<ipc_ipld_resolver::
         content: ContentConfig {
             rate_limit_bytes: r.content.rate_limit_bytes,
             rate_limit_period: r.content.rate_limit_period,
+        },
+        iroh: IrohConfig {
+            v4_addr: r.iroh_resolver_config.v4_addr,
+            v6_addr: r.iroh_resolver_config.v6_addr,
+            path: r.iroh_resolver_config.iroh_data_dir.clone(),
+            rpc_addr: r.iroh_resolver_config.rpc_addr,
         },
     };
 

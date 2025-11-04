@@ -6,7 +6,7 @@
 
 ### What's Working
 - ✅ All 7 Recall core modules compiling
-- ✅ All 3 Recall actors compiling  
+- ✅ All 3 Recall actors compiling
 - ✅ Single-node testnode running
 - ✅ Recall actors added to custom actor bundle
 - ✅ Genesis setup fixed for IPC main branch
@@ -76,7 +76,7 @@ The `ipc-recall` branch has a full HTTP API for blob upload/download in `fenderm
 ### 1. Port the Objects Command
 
 Copy from `ipc-recall` branch:
-- `fendermint/app/src/cmd/objects.rs` 
+- `fendermint/app/src/cmd/objects.rs`
 - `fendermint/app/options/src/objects.rs`
 - `fendermint/app/settings/src/objects.rs`
 
@@ -140,7 +140,7 @@ Call Recall actors directly via fendermint RPC:
 
 **Core Modules:**
 1. `recall/kernel` - Custom FVM kernel with blob syscalls
-2. `recall/syscalls` - Blob operation syscalls  
+2. `recall/syscalls` - Blob operation syscalls
 3. `recall/iroh_manager` - Iroh P2P node management
 4. `recall/executor` - Custom executor with gas allowances
 5. `recall/actor_sdk` - Actor SDK with EVM support
@@ -187,7 +187,7 @@ Call Recall actors directly via fendermint RPC:
 - [ ] Check blob status transitions
 - [ ] Download blob and verify content
 
-### Integration Testing  
+### Integration Testing
 - [ ] Multi-validator setup
 - [ ] Vote tally mechanism
 - [ ] Blob finalization
@@ -199,19 +199,19 @@ Call Recall actors directly via fendermint RPC:
 ## Troubleshooting
 
 ### Issue: Actors Not in Genesis
-**Cause:** Docker image using old bundle  
+**Cause:** Docker image using old bundle
 **Fix:** Rebuild Docker image (Option 1 above)
 
 ### Issue: Iroh Connection Failed
-**Cause:** UDP ports blocked or relay unavailable  
+**Cause:** UDP ports blocked or relay unavailable
 **Fix:** Check firewall, verify ports 11204/11205 open
 
 ### Issue: Blob Upload Timeout
-**Cause:** Validator not resolving blobs  
+**Cause:** Validator not resolving blobs
 **Fix:** Check validator Iroh node running, check logs
 
 ### Issue: Vote Tally Not Reaching Quorum
-**Cause:** Not enough validators voting  
+**Cause:** Not enough validators voting
 **Fix:** Check validator connectivity, Iroh resolution
 
 ---
@@ -255,7 +255,7 @@ curl "http://localhost:26657/abci_query?path=\"/actor/70\"" | jq
 # Stop testnode
 FM_PULL_SKIP=true cargo make --makefile ./infra/fendermint/Makefile.toml testnode-down
 
-# Start testnode  
+# Start testnode
 FM_PULL_SKIP=true cargo make --makefile ./infra/fendermint/Makefile.toml testnode
 
 # View logs
@@ -267,7 +267,7 @@ docker logs -f ipc-node-cometbft
 
 **Status:** Ready for Docker rebuild and full testing! 🚀
 
-**Branch:** `recall-migration`  
-**Commit:** `5e6ef3b1`  
+**Branch:** `recall-migration`
+**Commit:** `5e6ef3b1`
 **Date:** November 4, 2024
 

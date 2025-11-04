@@ -10,8 +10,8 @@ use fvm_shared::address::Network;
 use lazy_static::lazy_static;
 
 use self::{
-    eth::EthArgs, genesis::GenesisArgs, key::KeyArgs, materializer::MaterializerArgs, rpc::RpcArgs,
-    run::RunArgs,
+    eth::EthArgs, genesis::GenesisArgs, key::KeyArgs, materializer::MaterializerArgs,
+    objects::ObjectsArgs, rpc::RpcArgs, run::RunArgs,
 };
 
 pub mod config;
@@ -20,6 +20,7 @@ pub mod eth;
 pub mod genesis;
 pub mod key;
 pub mod materializer;
+pub mod objects;
 pub mod rpc;
 pub mod run;
 
@@ -150,6 +151,8 @@ pub enum Commands {
     /// Subcommands related to the Testnet Materializer.
     #[clap(aliases  = &["mat", "matr", "mate"])]
     Materializer(MaterializerArgs),
+    /// Subcommands related to the Objects/Blobs storage HTTP API.
+    Objects(ObjectsArgs),
 }
 
 #[cfg(test)]

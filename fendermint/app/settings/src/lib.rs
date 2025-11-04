@@ -23,12 +23,14 @@ use fendermint_vm_topdown::BlockHeight;
 
 use self::eth::EthSettings;
 use self::fvm::FvmSettings;
+use self::objects::ObjectsSettings;
 use self::resolver::ResolverSettings;
 use ipc_observability::config::TracingSettings;
 use ipc_provider::config::deserialize::deserialize_eth_address_from_str;
 
 pub mod eth;
 pub mod fvm;
+pub mod objects;
 pub mod resolver;
 pub mod testing;
 pub mod utils;
@@ -360,6 +362,7 @@ pub struct Settings {
     pub snapshots: SnapshotSettings,
     pub eth: EthSettings,
     pub fvm: FvmSettings,
+    pub objects: ObjectsSettings,
     pub resolver: ResolverSettings,
     pub broadcast: BroadcastSettings,
     pub ipc: IpcSettings,
@@ -394,6 +397,21 @@ impl Default for Settings {
             snapshots: Default::default(),
             eth: Default::default(),
             fvm: Default::default(),
+            objects: ObjectsSettings {
+                max_object_size: 1024 * 1024 * 100, // 100MB default
+                listen: SocketAddress {
+                    host: "127.0.0.1".into(),
+                    port: 8080,
+                },
+                tracing: TracingSettings::default(),
+                metrics: MetricsSettings {
+                    enabled: true,
+                    listen: SocketAddress {
+                        host: "127.0.0.1".into(),
+                        port: 9186,
+                    },
+                },
+            },
             resolver: Default::default(),
             broadcast: Default::default(),
             ipc: Default::default(),

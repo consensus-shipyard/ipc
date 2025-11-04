@@ -4077,11 +4077,13 @@ dependencies = [
  "fendermint_vm_event",
  "fendermint_vm_genesis",
  "fendermint_vm_interpreter",
+ "fendermint_vm_iroh_resolver",
  "fendermint_vm_message",
  "fendermint_vm_resolver",
  "fendermint_vm_snapshot",
  "fendermint_vm_topdown",
  "fs-err",
+ "futures-util",
  "fvm",
  "fvm_ipld_blockstore 0.3.1",
  "fvm_ipld_car 0.9.0",
@@ -4093,12 +4095,16 @@ dependencies = [
  "ipc-provider",
  "ipc_actors_abis",
  "ipc_ipld_resolver",
+ "iroh",
+ "iroh-blobs",
+ "iroh_manager",
  "k256 0.11.6",
  "lazy_static",
  "libipld",
  "libp2p",
  "libp2p-bitswap",
  "literally",
+ "mime_guess",
  "multiaddr",
  "num-traits",
  "openssl",
@@ -4109,6 +4115,8 @@ dependencies = [
  "quickcheck",
  "quickcheck_macros",
  "rand_chacha 0.3.1",
+ "recall_entangler",
+ "recall_entangler_storage",
  "serde",
  "serde_json",
  "serde_with 2.3.3",
@@ -4117,6 +4125,7 @@ dependencies = [
  "tendermint-config 0.33.2",
  "tendermint-proto 0.31.1",
  "tendermint-rpc",
+ "thiserror 1.0.69",
  "tokio",
  "tokio-util 0.7.16",
  "toml 0.8.23",
@@ -4126,6 +4135,9 @@ dependencies = [
  "tracing-appender",
  "tracing-subscriber 0.3.20",
  "url",
+ "urlencoding",
+ "uuid 1.18.1",
+ "warp",
 ]
 
 [[package]]
@@ -4633,6 +4645,28 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-util 0.7.16",
+ "tracing",
+]
+
+[[package]]
+name = "fendermint_vm_iroh_resolver"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-stm",
+ "fendermint_vm_topdown",
+ "hex",
+ "im",
+ "ipc-api",
+ "ipc-observability",
+ "ipc_ipld_resolver",
+ "iroh",
+ "iroh-blobs",
+ "libp2p",
+ "prometheus",
+ "rand 0.8.5",
+ "serde",
+ "tokio",
  "tracing",
 ]
 
@@ -7138,6 +7172,7 @@ dependencies = [
  "base64 0.21.7",
  "blake2b_simd",
  "bloom",
+ "bytes",
  "cid 0.11.1",
  "env_logger 0.10.2",
  "fvm_ipld_blockstore 0.3.1",
@@ -7148,6 +7183,9 @@ dependencies = [
  "ipc-api",
  "ipc-observability",
  "ipc_ipld_resolver",
+ "iroh",
+ "iroh-blobs",
+ "iroh_manager",
  "lazy_static",
  "libipld",
  "libp2p",
@@ -11000,6 +11038,46 @@ dependencies = [
  "num-traits",
  "recall_sol_facade",
  "serde",
+]
+
+[[package]]
+name = "recall_entangler"
+version = "0.1.0"
+source = "git+https://github.com/recallnet/entanglement.git?rev=aee1c675ff05e5cde4771a2e2eb3ac4dab8476bc#aee1c675ff05e5cde4771a2e2eb3ac4dab8476bc"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bytes",
+ "cid 0.10.1",
+ "futures",
+ "iroh",
+ "iroh-blobs",
+ "recall_entangler_storage",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
+name = "recall_entangler_storage"
+version = "0.1.0"
+source = "git+https://github.com/recallnet/entanglement.git?rev=aee1c675ff05e5cde4771a2e2eb3ac4dab8476bc#aee1c675ff05e5cde4771a2e2eb3ac4dab8476bc"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bytes",
+ "cid 0.10.1",
+ "futures",
+ "futures-lite 2.6.1",
+ "iroh",
+ "iroh-blobs",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "uuid 1.18.1",
 ]
 
 [[package]]

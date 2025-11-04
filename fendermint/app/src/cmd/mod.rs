@@ -23,6 +23,7 @@ pub mod eth;
 pub mod genesis;
 pub mod key;
 pub mod materializer;
+pub mod objects;
 pub mod rpc;
 pub mod run;
 
@@ -99,6 +100,11 @@ pub async fn exec(opts: Arc<Options>) -> anyhow::Result<()> {
         Commands::Materializer(args) => {
             let _trace_file_guard = set_global_tracing_subscriber(&TracingSettings::default());
             args.exec(()).await
+        }
+        Commands::Objects(args) => {
+            let settings = load_settings(opts.clone())?.objects;
+            let _trace_file_guard = set_global_tracing_subscriber(&settings.tracing);
+            args.exec(settings).await
         }
     }
 }
