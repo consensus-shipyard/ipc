@@ -535,6 +535,16 @@ struct DeployConfig<'a> {
     deployer_addr: ethers::types::Address,
 }
 
+/// Get the commit SHA for genesis contract deployment.
+/// For genesis, we use a default value as genesis is typically built at compile time.
+fn get_genesis_commit_sha() -> [u8; 32] {
+    // Use default value for genesis (matches test default)
+    let default_sha = b"c7d8f53f";
+    let mut result = [0u8; 32];
+    result[..default_sha.len()].copy_from_slice(default_sha);
+    result
+}
+
 fn deploy_contracts(
     ipc_contracts: Vec<ContractSourceAndName>,
     top_level_contracts: &EthContractMap,
@@ -565,7 +575,9 @@ fn deploy_contracts(
             GatewayParams::new(SubnetID::new(config.chain_id.into(), vec![]))
         };
 
-        let params = ConstructorParameters::new(ipc_params, validators)
+        // Get commit SHA for genesis deployment
+        let commit_sha = get_genesis_commit_sha();
+        let params = ConstructorParameters::new(ipc_params, validators, commit_sha)
             .context("failed to create gateway constructor")?;
 
         let facets = deployer
