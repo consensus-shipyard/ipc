@@ -445,10 +445,11 @@ impl<'a> GenesisBuilder<'a> {
         // F3 Light Client actor - manages F3 light client state for proof-based parent finality
         if let Some(f3_params) = &genesis.f3 {
             // For subnets with F3 parameters, initialize with the provided F3 data
+            // Note: finalized_epochs always starts empty at genesis
             let constructor_params = fendermint_actor_f3_light_client::types::ConstructorParams {
                 instance_id: f3_params.instance_id,
                 power_table: f3_params.power_table.clone(),
-                finalized_epochs: f3_params.finalized_epochs.clone(),
+                finalized_epochs: Vec::new(),
             };
             let f3_state = fendermint_actor_f3_light_client::state::State::new(
                 constructor_params.instance_id,
