@@ -55,12 +55,12 @@ members = [
   "fendermint/actors/recall_config",
   "fendermint/actors/recall_config/shared",
 
-  # recall storage
-  "recall/kernel",
+  # recall storage (iroh_manager, syscalls, kernel disabled due to netwatch macOS issue)
+  # "recall/kernel",           # TODO: blocked by netwatch socket2 compatibility
   "recall/kernel/ops",
-  "recall/syscalls",
+  # "recall/syscalls",          # TODO: blocked by netwatch socket2 compatibility
   "recall/executor",
-  "recall/iroh_manager",
+  # "recall/iroh_manager",      # TODO: blocked by netwatch socket2 compatibility
   "recall/ipld",
   "recall/actor_sdk",
 
@@ -285,6 +285,7 @@ tendermint-proto = { version = "0.31" }
 [patch.crates-io]
 # Using latest FVM to match builtin-actors v17.0.0 requirements
 fvm = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "master" }
+
 fvm_shared = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "master" }
 fvm_sdk = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "master" }
 fvm_ipld_blockstore = { git = "https://github.com/consensus-shipyard/ref-fvm.git", branch = "master" }

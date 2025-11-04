@@ -4,7 +4,7 @@
 
 ### Progress Summary
 
-**Branch:** `recall-migration` (based on main @ `984fc4a4`)  
+**Branch:** `recall-migration` (based on main @ `984fc4a4`)
 **Latest Commit:** `e986d08e` - "fix: temporarily disable sol_facade"
 
 #### ✅ Completed
@@ -42,7 +42,7 @@
 
 #### 🔄 Current Status (Updated 10:47 AM)
 
-**✅ Phase 0: COMPLETE**  
+**✅ Phase 0: COMPLETE**
 **🟡 Phase 1: PARTIAL** - 3/7 recall modules compiling
 
 **Successfully Compiling:**
@@ -226,7 +226,7 @@ A  docs/ipc/recall-vote-tally.md
 - **Impact:** EVM event emission disabled, basic functionality intact
 - **Status:** ✅ Workaround applied, TODO: upgrade sol_facade later
 
-**2. ADM Actor Missing** (BLOCKER - WORKAROUND APPLIED)  
+**2. ADM Actor Missing** (BLOCKER - WORKAROUND APPLIED)
 - **Problem:** machine/bucket/timehub actors need fil_actor_adm (not in main)
 - **Solution:** Temporarily disabled these actors
 - **Impact:** Bucket storage and timehub features unavailable
@@ -276,7 +276,7 @@ A  docs/ipc/recall-vote-tally.md
 
 ---
 
-**Status:** Blocked by netwatch compilation error  
-**Current Blocker:** netwatch 0.5.0 socket2 incompatibility  
+**Status:** Blocked by netwatch compilation error
+**Current Blocker:** netwatch 0.5.0 socket2 incompatibility
 **Next:** Fix netwatch or work around dependency
 

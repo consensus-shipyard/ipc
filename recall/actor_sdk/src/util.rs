@@ -74,7 +74,7 @@ pub fn to_id_and_delegated_address(
 }
 
 /// Returns the [`TokenAmount`] as a [`BigUint`].
-/// If the given amount is negative, the value returned will be zero.  
+/// If the given amount is negative, the value returned will be zero.
 pub fn token_to_biguint(amount: Option<TokenAmount>) -> BigUint {
     amount
         .unwrap_or_default()
