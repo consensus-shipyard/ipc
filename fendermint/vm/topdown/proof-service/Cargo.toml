@@ -42,10 +42,10 @@ fvm_ipld_encoding = { workspace = true }
 proofs = { git = "https://github.com/consensus-shipyard/ipc-filecoin-proofs", branch = "proofs" }
 
 # F3 certificate handling
-filecoin-f3-certs = { git = "https://github.com/moshababo/rust-f3", branch = "bdn_agg" }
-filecoin-f3-rpc = { git = "https://github.com/moshababo/rust-f3", branch = "bdn_agg" }
-filecoin-f3-lightclient = { git = "https://github.com/moshababo/rust-f3", branch = "bdn_agg" }
-filecoin-f3-gpbft = { git = "https://github.com/moshababo/rust-f3", branch = "bdn_agg" }
+filecoin-f3-certs = { git = "https://github.com/moshababo/rust-f3", branch = "cargo-git-compat" }
+filecoin-f3-rpc = { git = "https://github.com/moshababo/rust-f3", branch = "cargo-git-compat" }
+filecoin-f3-lightclient = { git = "https://github.com/moshababo/rust-f3", branch = "cargo-git-compat" }
+filecoin-f3-gpbft = { git = "https://github.com/moshababo/rust-f3", branch = "cargo-git-compat" }
 
 # Development/testing binary dependencies
 clap = { workspace = true, optional = true }
