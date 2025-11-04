@@ -470,7 +470,7 @@ external_addresses = ["/ip4/192.168.1.101/tcp/7001"]
 ### Validator 2 Config
 
 ```toml
-# validator2/config.toml  
+# validator2/config.toml
 [objects]
 listen = { host = "0.0.0.0", port = 8080 }
 max_object_size = 104857600
