@@ -45,6 +45,15 @@ members = [
   "fendermint/actors/f3-light-client",
   "fendermint/actors/gas_market/eip1559",
 
+  # recall storage
+  "recall/kernel",
+  "recall/kernel/ops",
+  "recall/syscalls",
+  "recall/executor",
+  "recall/iroh_manager",
+  "recall/ipld",
+  "recall/actor_sdk",
+
   "build-rs-utils",
   "contracts-artifacts",
 ]
@@ -96,6 +105,15 @@ hex-literal = "0.4.1"
 http = "0.2.12"
 im = "15.1.0"
 integer-encoding = { version = "3.0.3", default-features = false }
+# Recall/Iroh dependencies
+ambassador = "0.3.5"
+iroh = "0.35"
+iroh-base = "0.35"
+iroh-blobs = { version = "0.35", features = ["rpc"] }
+iroh-relay = "0.35"
+iroh-quinn = { version = "0.13" }
+n0-future = "0.1.2"
+quic-rpc = { version = "0.20", features = ["quinn-transport"] }
 jsonrpc-v2 = { version = "0.11", default-features = false, features = [
   "bytes-v10",
 ] }
@@ -147,8 +165,12 @@ quickcheck_macros = "1"
 rand = "0.8"
 rand_chacha = "0.3"
 regex = "1"
+replace_with = "0.1.7"
 statrs = "0.18.0"
 reqwest = { version = "0.11.13", features = ["json"] }
+# Recall entanglement library
+entangler = { package = "recall_entangler", git = "https://github.com/recallnet/entanglement.git", rev = "aee1c675ff05e5cde4771a2e2eb3ac4dab8476bc" }
+entangler_storage = { package = "recall_entangler_storage", git = "https://github.com/recallnet/entanglement.git", rev = "aee1c675ff05e5cde4771a2e2eb3ac4dab8476bc" }
 sha2 = "0.10"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_bytes = "0.11"
