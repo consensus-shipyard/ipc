@@ -227,6 +227,8 @@ impl DeploymentService {
             validator_rewarder: None,
             genesis_subnet_ipc_contracts_owner: EthAddress::from_str(from_address_str)?,
             chain_id: subnet_chain_id,
+            parent_filecoin_rpc: None,
+            parent_filecoin_auth_token: None,
         };
 
         log::info!("Created subnet config: {:?}", subnet_config);
@@ -516,6 +518,8 @@ impl DeploymentService {
             validator_rewarder: None,
             genesis_subnet_ipc_contracts_owner: EthAddress::from_str(from_address_str)?,
             chain_id: subnet_chain_id,
+            parent_filecoin_rpc: None,
+            parent_filecoin_auth_token: None,
         };
 
         log::info!("Created subnet config: {:?}", subnet_config);
@@ -786,6 +790,7 @@ impl DeploymentService {
                 validator_rewarder,
                 genesis_subnet_ipc_contracts_owner,
                 subnet_chain_id,
+                None, // genesis_f3_instance_id - not provided from UI
             )
             .await;
 
