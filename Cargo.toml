@@ -44,14 +44,14 @@ members = [
   "fendermint/actors/eam",
   "fendermint/actors/f3-light-client",
   "fendermint/actors/gas_market/eip1559",
-  # recall actors
+  # recall actors (machine/bucket/timehub temporarily disabled - need fil_actor_adm)
   "fendermint/actors/blobs",
   "fendermint/actors/blobs/shared",
   "fendermint/actors/blobs/testing",
   "fendermint/actors/blob_reader",
-  "fendermint/actors/bucket",
-  "fendermint/actors/machine",
-  "fendermint/actors/timehub",
+  # "fendermint/actors/bucket",        # TODO: depends on machine
+  # "fendermint/actors/machine",       # TODO: depends on fil_actor_adm (not in main)
+  # "fendermint/actors/timehub",       # TODO: re-enable when ADM is available
   "fendermint/actors/recall_config",
   "fendermint/actors/recall_config/shared",
 

@@ -51,6 +51,39 @@ The `fendermint_actor_machine` depends on `fil_actor_adm` which doesn't exist in
 - ADM (Autonomous Data Management) appears to be a Recall-specific actor
 - Need to determine source of ADM actor or remove machine actor dependency
 
+#### 🚨 Critical Blocker: FVM Version Incompatibility
+
+**Problem:** `recall_sol_facade` (from recallnet/contracts @ ad096f2) requires FVM ~4.3.0, but IPC main uses FVM 4.7.4.
+
+**Impact:**
+- All Recall actors depend on `recall_sol_facade` for Solidity event emission
+- Cargo cannot resolve the conflicting FVM versions
+- Cannot compile any Recall actors until resolved
+
+**Resolution Options:**
+
+**Option A: Upgrade recall_sol_facade (Recommended)**
+1. Fork recallnet/contracts
+2. Upgrade FVM dependency from 4.3.0 to 4.7.4
+3. Fix any API breaking changes
+4. Use forked version temporarily
+5. Submit PR to upstream recallnet/contracts
+
+**Option B: Remove sol_facade Temporarily**
+1. Comment out `recall_sol_facade` dependencies in actor Cargo.toml files
+2. Comment out Solidity event emission code
+3. Get basic actor functionality compiling
+4. Add back sol_facade support once upgraded
+
+**Option C: Downgrade IPC FVM (Not Recommended)**
+1. Would require downgrading entire IPC main branch
+2. Not feasible - FVM 4.7 has critical fixes
+3. Would break other components
+
+**Recommended Path Forward:** Option B for now, then Option A in parallel
+
+---
+
 #### ⏸️ Next Actions
 
 **Option 1: Find ADM Actor Source**
@@ -96,7 +129,7 @@ data-encoding = "2.3.3"
 
 # External Recall libraries
 entangler (github.com/recallnet/entanglement)
-entangler_storage (github.com/recallnet/entanglement)  
+entangler_storage (github.com/recallnet/entanglement)
 recall_sol_facade (github.com/recallnet/contracts)
 ```
 
@@ -152,7 +185,7 @@ A  docs/ipc/recall-vote-tally.md
      - recall_kernel
      - recall_iroh_manager
      - recall_syscalls
-   
+
 3. **Test Basic Components:**
    ```bash
    cargo check -p recall_ipld
@@ -169,7 +202,7 @@ A  docs/ipc/recall-vote-tally.md
 ### Time Invested
 
 - Setup & Documentation: ~2 hours
-- Dependency Resolution: ~1 hour  
+- Dependency Resolution: ~1 hour
 - **Total:** ~3 hours
 
 ### Estimated Remaining
@@ -181,7 +214,7 @@ A  docs/ipc/recall-vote-tally.md
 
 ---
 
-**Status:** Paused at dependency resolution  
-**Blocker:** fil_actor_adm not found  
+**Status:** Paused at dependency resolution
+**Blocker:** fil_actor_adm not found
 **Next:** Investigate ADM source or remove machine actor
 
