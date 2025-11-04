@@ -63,6 +63,9 @@ members = [
   "recall/iroh_manager",
   "recall/ipld",
   "recall/actor_sdk",
+  
+  # recall contracts (vendored locally, FVM 4.7 upgrade)
+  "recall-contracts/crates/facade",
 
   "build-rs-utils",
   "contracts-artifacts",
@@ -183,8 +186,8 @@ reqwest = { version = "0.11.13", features = ["json"] }
 # Recall entanglement library
 entangler = { package = "recall_entangler", git = "https://github.com/recallnet/entanglement.git", rev = "aee1c675ff05e5cde4771a2e2eb3ac4dab8476bc" }
 entangler_storage = { package = "recall_entangler_storage", git = "https://github.com/recallnet/entanglement.git", rev = "aee1c675ff05e5cde4771a2e2eb3ac4dab8476bc" }
-# Recall Solidity facades
-recall_sol_facade = { git = "https://github.com/recallnet/contracts", rev = "8dbfadfce7e306936a65fb955a83bc06b023007d" }
+# Recall Solidity facades (vendored locally, upgraded to FVM 4.7)
+recall_sol_facade = { path = "recall-contracts/crates/facade" }
 sha2 = "0.10"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_bytes = "0.11"

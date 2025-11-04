@@ -1,0 +1,45 @@
+[package]
+name = "recall_sol_facade"
+authors = ["Recall Contributors"]
+description = "Rust bindings for the Recall Solidity Facades"
+edition = "2021"
+homepage = "https://github.com/recallnet/contracts/"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/recallnet/contracts/"
+keywords = ["recall", "rust"]
+version = "0.1.2"
+
+[dependencies]
+anyhow = "1.0.95"
+alloy-primitives = { version = "~0.8.19", features = ["std"] }
+alloy-sol-types = { version = "~0.8.19", features = ["std"] }
+# Upgraded to FVM 4.7 for IPC main branch compatibility
+fvm_ipld_encoding = { workspace = true }
+fvm_shared = { workspace = true }
+
+[build-dependencies]
+alloy-primitives = { version = "0.8.19" }
+alloy-sol-macro-expander = { version = "0.8.19", features = ["json"] }
+alloy-sol-macro-input = { version = "0.8.19", features = ["json"] }
+alloy-sol-types = { version = "0.8.19", features = ["json"] }
+dunce = "1.0.5"
+eyre = "0.6.12"
+prettyplease = "0.2.29"
+proc-macro2 = "1.0.93"
+quote = "1.0.38"
+regex = "1.11.1"
+syn = "2.0.96"
+serde = "1.0.217"
+serde_json = "1.0.138"
+thiserror = "2.0.11"
+walkdir = "2.5.0"
+
+[features]
+blob-reader = []
+blobs = []
+bucket = []
+config = []
+credit = []
+gas = []
+machine = []
+timehub = []

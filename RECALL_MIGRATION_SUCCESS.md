@@ -1,8 +1,8 @@
 # 🎉 Recall Migration - Major Success!
 
-**Date:** November 4, 2024  
-**Branch:** `recall-migration`  
-**Time Invested:** ~7 hours  
+**Date:** November 4, 2024
+**Branch:** `recall-migration`
+**Time Invested:** ~7 hours
 **Commits:** 8
 
 ---
@@ -15,7 +15,7 @@
 - ✅ **recall_ipld** - Custom IPLD data structures (HAMT/AMT)
 - ✅ **recall_kernel_ops** - Kernel operations interface
 - ✅ **recall_kernel** - Custom FVM kernel with blob syscalls
-- ✅ **recall_syscalls** - Blob operation syscalls  
+- ✅ **recall_syscalls** - Blob operation syscalls
 - ✅ **recall_actor_sdk** - Actor SDK utilities
 - ✅ **recall/iroh_manager** - Iroh P2P node management
 - ✅ **recall_executor** - Custom executor with gas allowances
@@ -37,7 +37,7 @@
 - `patches/netwatch/src/netmon/bsd.rs` - Socket API compatibility fix
 - `Cargo.toml` - Patch configuration
 
-#### 2. ✅ FVM 4.7 API Incompatibilities  
+#### 2. ✅ FVM 4.7 API Incompatibilities
 
 **Problem:** FVM API changed between ipc-recall branch and main
 
@@ -74,7 +74,7 @@
 ```
 Phase 0: ████████████████████ 100% ✅ Environment Setup
 Phase 1: ████████████████████ 100% ✅ Core Dependencies (7/7 modules)
-Phase 2: ████████████████████ 100% ✅ Iroh Integration  
+Phase 2: ████████████████████ 100% ✅ Iroh Integration
 Phase 3: ████████████████████ 100% ✅ Recall Executor
 Phase 4: ████░░░░░░░░░░░░░░░░  20% ⏸️ Actors (need sol_facade)
 ```
@@ -331,9 +331,9 @@ The remaining 20% (actor Solidity event emission) is blocked by an upstream depe
 
 ---
 
-**Branch:** `recall-migration`  
-**Base:** `main` @ `984fc4a4`  
-**Latest:** `6173345b`  
+**Branch:** `recall-migration`
+**Base:** `main` @ `984fc4a4`
+**Latest:** `6173345b`
 
 **Ready for:** Code review, testing, sol_facade upgrade
 

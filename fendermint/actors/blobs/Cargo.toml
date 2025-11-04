@@ -19,7 +19,7 @@ fvm_ipld_encoding = { workspace = true }
 fvm_shared = { workspace = true }
 log = { workspace = true, features = ["std"] }
 num-traits = { workspace = true }
-# recall_sol_facade = { workspace = true, features = ["blobs", "credit", "gas"] } # TODO: upgrade to FVM 4.7
+recall_sol_facade = { workspace = true, features = ["blobs", "credit", "gas"] }
 serde = { workspace = true, features = ["derive"] }
 
 fendermint_actor_blobs_shared = { path = "./shared" }
