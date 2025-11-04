@@ -6,7 +6,8 @@ use fil_actors_runtime::{actor_error, runtime::Runtime, ActorError};
 use fvm_ipld_encoding::{strict_bytes, tuple::*};
 use fvm_shared::event::{ActorEvent, Entry, Flags};
 use fvm_shared::IPLD_RAW;
-use recall_sol_facade::primitives::IntoLogData;
+// TODO: upgrade sol_facade to FVM 4.7
+// use recall_sol_facade::primitives::IntoLogData;
 
 /// The event key prefix for the Ethereum log topics.
 const EVENT_TOPIC_KEY_PREFIX: &str = "t";
@@ -14,44 +15,45 @@ const EVENT_TOPIC_KEY_PREFIX: &str = "t";
 /// The event key for the Ethereum log data.
 const EVENT_DATA_KEY: &str = "d";
 
-pub trait TryIntoEVMEvent {
-    type Target: IntoLogData;
-    fn try_into_evm_event(self) -> Result<Self::Target, anyhow::Error>;
-}
+// TODO: Re-enable once sol_facade is upgraded to FVM 4.7
+// pub trait TryIntoEVMEvent {
+//     type Target: IntoLogData;
+//     fn try_into_evm_event(self) -> Result<Self::Target, anyhow::Error>;
+// }
 
-/// Returns an [`ActorEvent`] from an EVM event.
-pub fn to_actor_event<T: TryIntoEVMEvent>(event: T) -> Result<ActorEvent, ActorError> {
-    let event = event
-        .try_into_evm_event()
-        .map_err(|e| actor_error!(illegal_argument; "failed to build evm event: {}", e))?;
-    let log = event.to_log_data();
-    let num_entries = log.topics().len() + 1; // +1 for log data
+// /// Returns an [`ActorEvent`] from an EVM event.
+// pub fn to_actor_event<T: TryIntoEVMEvent>(event: T) -> Result<ActorEvent, ActorError> {
+//     let event = event
+//         .try_into_evm_event()
+//         .map_err(|e| actor_error!(illegal_argument; "failed to build evm event: {}", e))?;
+//     let log = event.to_log_data();
+//     let num_entries = log.topics().len() + 1; // +1 for log data
 
-    let mut entries: Vec<Entry> = Vec::with_capacity(num_entries);
-    for (i, topic) in log.topics().iter().enumerate() {
-        let key = format!("{}{}", EVENT_TOPIC_KEY_PREFIX, i + 1);
-        entries.push(Entry {
-            flags: Flags::FLAG_INDEXED_ALL,
-            key,
-            codec: IPLD_RAW,
-            value: topic.to_vec(),
-        });
-    }
-    entries.push(Entry {
-        flags: Flags::FLAG_INDEXED_ALL,
-        key: EVENT_DATA_KEY.to_owned(),
-        codec: IPLD_RAW,
-        value: log.data.to_vec(),
-    });
+//     let mut entries: Vec<Entry> = Vec::with_capacity(num_entries);
+//     for (i, topic) in log.topics().iter().enumerate() {
+//         let key = format!("{}{}", EVENT_TOPIC_KEY_PREFIX, i + 1);
+//         entries.push(Entry {
+//             flags: Flags::FLAG_INDEXED_ALL,
+//             key,
+//             codec: IPLD_RAW,
+//             value: topic.to_vec(),
+//         });
+//     }
+//     entries.push(Entry {
+//         flags: Flags::FLAG_INDEXED_ALL,
+//         key: EVENT_DATA_KEY.to_owned(),
+//         codec: IPLD_RAW,
+//         value: log.data.to_vec(),
+//     });
 
-    Ok(entries.into())
-}
+//     Ok(entries.into())
+// }
 
-/// Emits an [`ActorEvent`] from an EVM event.
-pub fn emit_evm_event<T: TryIntoEVMEvent>(rt: &impl Runtime, event: T) -> Result<(), ActorError> {
-    let actor_event = to_actor_event(event)?;
-    rt.emit_event(&actor_event)
-}
+// /// Emits an [`ActorEvent`] from an EVM event.
+// pub fn emit_evm_event<T: TryIntoEVMEvent>(rt: &impl Runtime, event: T) -> Result<(), ActorError> {
+//     let actor_event = to_actor_event(event)?;
+//     rt.emit_event(&actor_event)
+// }
 
 /// Params for invoking a contract.
 #[derive(Default, Serialize_tuple, Deserialize_tuple)]

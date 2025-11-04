@@ -6,7 +6,9 @@ use cid::Cid;
 use fil_actors_runtime::{
     deserialize_block, extract_send_result,
     runtime::{builtins::Type, Runtime},
-    ActorError, ADM_ACTOR_ADDR,
+    ActorError,
+    // TODO: ADM not available on main
+    // ADM_ACTOR_ADDR,
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::sys::SendFlags;
@@ -90,21 +92,22 @@ pub enum Kind {
     Timehub,
 }
 
-pub fn is_bucket_address(rt: &impl Runtime, address: Address) -> Result<bool, ActorError> {
-    let caller_code_cid = rt
-        .resolve_address(&address)
-        .and_then(|actor_id| rt.get_actor_code_cid(&actor_id));
-    if let Some(caller_code_cid) = caller_code_cid {
-        let bucket_code_cid = deserialize_block::<Cid>(extract_send_result(rt.send(
-            &ADM_ACTOR_ADDR,
-            2892692559 as MethodNum,
-            IpldBlock::serialize_cbor(&Kind::Bucket)?,
-            TokenAmount::zero(),
-            None,
-            SendFlags::READ_ONLY,
-        ))?)?;
-        Ok(caller_code_cid.eq(&bucket_code_cid))
-    } else {
-        Ok(false)
-    }
-}
+// TODO: Re-enable once ADM actor is available
+// pub fn is_bucket_address(rt: &impl Runtime, address: Address) -> Result<bool, ActorError> {
+//     let caller_code_cid = rt
+//         .resolve_address(&address)
+//         .and_then(|actor_id| rt.get_actor_code_cid(&actor_id));
+//     if let Some(caller_code_cid) = caller_code_cid {
+//         let bucket_code_cid = deserialize_block::<Cid>(extract_send_result(rt.send(
+//             &ADM_ACTOR_ADDR,
+//             2892692559 as MethodNum,
+//             IpldBlock::serialize_cbor(&Kind::Bucket)?,
+//             TokenAmount::zero(),
+//             None,
+//             SendFlags::READ_ONLY,
+//         ))?)?;
+//         Ok(caller_code_cid.eq(&bucket_code_cid))
+//     } else {
+//         Ok(false)
+//     }
+// }
