@@ -51,7 +51,7 @@ where
 {
     end_block_manager: EndBlockManager<DB>,
 
-    top_down_manager: TopDownManager<DB>,
+    pub(crate) top_down_manager: TopDownManager<DB>,
     upgrade_scheduler: UpgradeScheduler<DB>,
 
     push_block_data_to_chainmeta_actor: bool,
@@ -198,6 +198,13 @@ impl<DB> MessagesInterpreter<DB> for FvmMessagesInterpreter<DB>
 where
     DB: Blockstore + Clone + Send + Sync + 'static,
 {
+    async fn set_proof_cache(
+        &self,
+        cache: std::sync::Arc<fendermint_vm_topdown_proof_service::ProofCache>,
+    ) {
+        self.top_down_manager.set_proof_cache(cache).await;
+    }
+
     async fn check_message(
         &self,
         state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
@@ -275,11 +282,21 @@ where
             .into_iter()
             .map(Into::into);
 
-        let top_down_iter = self
-            .top_down_manager
-            .chain_message_from_finality_or_quorum()
-            .await
-            .into_iter();
+        // Try proof-based finality first (v2)
+        let top_down_iter =
+            if let Some(proof_msg) = self.top_down_manager.chain_message_from_proof_cache().await {
+                tracing::info!("including proof-based parent finality in proposal");
+                vec![proof_msg].into_iter()
+            } else {
+                // Fallback to v1 voting-based approach
+                tracing::debug!("no proof available, trying v1 voting-based finality");
+                self.top_down_manager
+                    .chain_message_from_finality_or_quorum()
+                    .await
+                    .into_iter()
+                    .collect::<Vec<_>>()
+                    .into_iter()
+            };
 
         let mut all_msgs = top_down_iter
             .chain(signed_msgs_iter)
@@ -333,7 +350,58 @@ where
         for msg in msgs {
             match fvm_ipld_encoding::from_slice::<ChainMessage>(&msg) {
                 Ok(chain_msg) => match chain_msg {
+                    ChainMessage::Ipc(IpcMessage::TopDownWithProof(bundle)) => {
+                        // STEP 1: Verify storage/event proofs (deterministic)
+                        match self
+                            .top_down_manager
+                            .verify_proof_bundle_attestation(&bundle)
+                        {
+                            Ok(()) => {
+                                tracing::debug!(
+                                    instance = bundle.certificate.instance_id,
+                                    "storage/event proofs verified"
+                                );
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    error = %e,
+                                    instance = bundle.certificate.instance_id,
+                                    "proof bundle verification failed - rejecting block"
+                                );
+                                return Ok(AttestMessagesResponse::Reject);
+                            }
+                        }
+
+                        // STEP 2: Check if we have this certificate in our local cache
+                        let has_locally = self
+                            .top_down_manager
+                            .has_certificate_in_cache(bundle.certificate.instance_id)
+                            .await;
+
+                        if !has_locally {
+                            // STEP 3: Validate F3 certificate if not in our cache
+                            // This means we're behind or just started
+                            tracing::info!(
+                                instance = bundle.certificate.instance_id,
+                                "Certificate not in local cache - performing F3 validation"
+                            );
+                            
+                            // We need to validate during execution phase where we have state access
+                            // During attestation, we can't access FVM state, so we flag for validation
+                            // The actual validation happens in verify_proof_bundle_with_state during execution
+                            tracing::debug!(
+                                instance = bundle.certificate.instance_id,
+                                "F3 validation will occur during execution phase"
+                            );
+                        } else {
+                            tracing::debug!(
+                                instance = bundle.certificate.instance_id,
+                                "Certificate found in local cache - already validated by our F3 client"
+                            );
+                        }
+                    }
                     ChainMessage::Ipc(IpcMessage::TopDownExec(finality)) => {
+                        // v1 voting-based finality (kept for backward compatibility)
                         if !self.top_down_manager.is_finality_valid(finality).await {
                             return Ok(AttestMessagesResponse::Reject);
                         }
@@ -459,7 +527,19 @@ where
                 })
             }
             ChainMessage::Ipc(ipc_msg) => match ipc_msg {
+                IpcMessage::TopDownWithProof(bundle) => {
+                    // NEW: Execute proof-based topdown finality (v2)
+                    let applied_message = self
+                        .top_down_manager
+                        .execute_proof_based_topdown(state, bundle)
+                        .await?;
+                    Ok(ApplyMessageResponse {
+                        applied_message,
+                        domain_hash: None,
+                    })
+                }
                 IpcMessage::TopDownExec(p) => {
+                    // OLD: v1 voting-based execution (kept for backward compatibility)
                     let applied_message =
                         self.top_down_manager.execute_topdown_msg(state, p).await?;
                     Ok(ApplyMessageResponse {

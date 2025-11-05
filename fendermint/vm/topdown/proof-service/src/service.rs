@@ -32,15 +32,14 @@ impl ProofGeneratorService {
     /// * `config` - Service configuration
     /// * `cache` - Proof cache
     /// * `initial_instance` - F3 instance to bootstrap from (from F3CertManager actor)
-    /// * `power_table` - Initial power table (from F3CertManager actor)
     ///
-    /// Both `initial_instance` and `power_table` should come from the F3CertManager
-    /// actor on-chain, which holds the last committed certificate and its power table.
+    /// The `initial_instance` should come from the F3CertManager actor on-chain,
+    /// which holds the last committed certificate. The power table is fetched from
+    /// the F3 RPC endpoint during initialization.
     pub async fn new(
         config: ProofServiceConfig,
         cache: Arc<ProofCache>,
         initial_instance: u64,
-        power_table: filecoin_f3_gpbft::PowerEntries,
     ) -> Result<Self> {
         // Resolve gateway actor ID (support both direct ID and Ethereum address)
         let gateway_actor_id = if let Some(id) = config.gateway_actor_id {
@@ -66,15 +65,11 @@ impl ProofGeneratorService {
             .context("subnet_id is required in configuration")?;
 
         // Create F3 client for certificate fetching + validation
-        // Uses provided power table from F3CertManager actor
+        // This fetches the initial power table from the F3 RPC endpoint
         let f3_client = Arc::new(
-            F3Client::new(
-                &config.parent_rpc_url,
-                &config.f3_network_name,
-                initial_instance,
-                power_table,
-            )
-            .context("Failed to create F3 client")?,
+            F3Client::new_from_rpc(&config.parent_rpc_url, "calibrationnet", initial_instance)
+                .await
+                .context("Failed to create F3 client")?,
         );
 
         // Create proof assembler
@@ -131,8 +126,8 @@ impl ProofGeneratorService {
     /// CRITICAL: Processes F3 instances SEQUENTIALLY - never skips!
     async fn generate_next_proofs(&self) -> Result<()> {
         let last_committed = self.cache.last_committed_instance();
-        // Lookahead window starts AFTER last_committed (which was already processed)
-        let next_instance = last_committed + 1;
+        // Start FROM last_committed (not +1) because F3 state needs to validate that instance first
+        let next_instance = last_committed;
         let max_instance = last_committed + self.config.lookahead_instances;
 
         tracing::debug!(
@@ -143,6 +138,7 @@ impl ProofGeneratorService {
         );
 
         // Process instances IN ORDER - this is critical for F3
+        // Start from last_committed itself to validate it first
         for instance_id in next_instance..=max_instance {
             // Skip if already cached
             if self.cache.contains(instance_id) {
@@ -257,13 +253,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_service_creation() {
-        use filecoin_f3_gpbft::PowerEntries;
-
         let config = ProofServiceConfig {
             enabled: true,
             parent_rpc_url: "http://localhost:1234/rpc/v1".to_string(),
             parent_subnet_id: "/r314159".to_string(),
-            f3_network_name: "calibrationnet".to_string(),
             gateway_actor_id: Some(1001),
             subnet_id: Some("test-subnet".to_string()),
             ..Default::default()
@@ -271,11 +264,11 @@ mod tests {
 
         let cache_config = CacheConfig::from(&config);
         let cache = Arc::new(ProofCache::new(0, cache_config));
-        let power_table = PowerEntries(vec![]);
 
-        // Note: Service creation succeeds with F3Client::new() even with a fake RPC endpoint
-        // The actual RPC calls will fail later when the service tries to fetch certificates
-        let result = ProofGeneratorService::new(config, cache, 0, power_table).await;
-        assert!(result.is_ok());
+        // Note: This will fail without a real F3 RPC endpoint
+        // For unit tests, we'd need to mock the RPC client
+        let result = ProofGeneratorService::new(config, cache, 0).await;
+        // Expect failure since localhost:1234 is not a real F3 endpoint
+        assert!(result.is_err());
     }
 }

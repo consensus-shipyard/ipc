@@ -287,6 +287,8 @@ pub mod ipc {
         pub instance_id: u64,
         /// Power table for F3 consensus from parent chain
         pub power_table: Vec<fendermint_actor_f3_light_client::types::PowerEntry>,
+        /// Finalized epochs from the parent certificate
+        pub finalized_epochs: Vec<fvm_shared::clock::ChainEpoch>,
     }
 }
 

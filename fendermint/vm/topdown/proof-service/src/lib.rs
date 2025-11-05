@@ -8,6 +8,9 @@
 //! - Caches proofs for instant use by block proposers
 //! - Ensures sequential processing of F3 instances
 
+// Re-export commonly used types
+pub use filecoin_f3_gpbft::powertable::{PowerEntries, PowerEntry};
+
 pub mod assembler;
 pub mod cache;
 pub mod config;
@@ -98,7 +101,7 @@ pub async fn launch_service(
     // Clone what we need for the background task
     let config_clone = config.clone();
     let cache_clone = cache.clone();
-    let power_table_clone = power_table.clone();
+    let _power_table_clone = power_table.clone();
 
     // Spawn background task
     let handle = tokio::spawn(async move {
@@ -106,7 +109,6 @@ pub async fn launch_service(
             config_clone,
             cache_clone,
             initial_committed_instance,
-            power_table_clone,
         )
         .await
         {

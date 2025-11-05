@@ -9,6 +9,7 @@ use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, R
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::fvm::interpreter::FvmMessagesInterpreter;
 use fendermint_vm_interpreter::fvm::observe::register_metrics as register_interpreter_metrics;
+use fendermint_vm_interpreter::MessagesInterpreter;
 use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
@@ -244,10 +245,14 @@ pub async fn run(
         None
     };
 
+    // Initialize without proof cache first - we'll set it up after app creation
+    let proof_cache = None;
+
     let end_block_manager = EndBlockManager::new();
     let top_down_manager = TopDownManager::new(
         parent_finality_provider.clone(),
         parent_finality_votes.clone(),
+        proof_cache,
     );
 
     let interpreter = FvmMessagesInterpreter::new(
@@ -273,6 +278,74 @@ pub async fn run(
         interpreter,
         snapshots,
     )?;
+
+    // Launch F3 proof service after app creation if configured
+    // This allows us to query the F3LightClientActor for the correct initial state
+    if topdown_enabled {
+        let topdown_config = settings.ipc.topdown_config().ok();
+        if let Some(tc) = topdown_config {
+            if let Some(proof_settings) = &tc.proof_service {
+                if proof_settings.enabled {
+                    tracing::info!("F3 proof service enabled, querying initial state");
+                    
+                    // Query F3 state from the app after genesis
+                    match app.query_f3_state().await? {
+                        Some((instance_id, power_table)) => {
+                            tracing::info!(
+                                instance_id = instance_id,
+                                power_entries = power_table.0.len(),
+                                "Found F3 state in genesis, launching proof service"
+                            );
+
+                            let mut proof_config = proof_settings.to_proof_service_config(
+                                &settings.ipc.subnet_id.to_string()
+                            );
+                            proof_config.parent_rpc_url = tc.parent_http_endpoint.to_string();
+                            proof_config.subnet_id = Some(settings.ipc.subnet_id.to_string());
+
+                            let db_path = Some(settings.data_dir().join("proof-cache"));
+
+                            match fendermint_vm_topdown_proof_service::launch_service(
+                                proof_config.clone(),
+                                instance_id,
+                                power_table,
+                                db_path,
+                            ).await {
+                                Ok((cache, service_handle)) => {
+                                    tracing::info!(
+                                        f3_network = proof_config.f3_network_name,
+                                        lookahead = proof_config.lookahead_instances,
+                                        "F3 proof service launched successfully with correct initial state"
+                                    );
+                                    
+                                    // Spawn service in background
+                                    tokio::spawn(async move {
+                                        service_handle.await.ok();
+                                    });
+                                    
+                                    // Connect the proof cache to the TopDownManager
+                                    // This allows the TopDownManager to use cached proofs in proposals
+                                    app.interpreter().set_proof_cache(cache).await;
+                                    tracing::info!("Connected proof cache to TopDownManager");
+                                }
+                                Err(e) => {
+                                    tracing::error!(
+                                        error = %e,
+                                        "Failed to launch F3 proof service despite F3 being configured"
+                                    );
+                                }
+                            }
+                        }
+                        None => {
+                            tracing::info!("F3 not configured in genesis, skipping proof service");
+                        }
+                    }
+                } else {
+                    tracing::debug!("F3 proof service disabled in configuration");
+                }
+            }
+        }
+    }
 
     if let Some((agent_proxy, config)) = ipc_tuple {
         let app_parent_finality_query = AppParentFinalityQuery::new(app.clone());

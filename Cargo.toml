@@ -35,7 +35,6 @@ members = [
   "fendermint/testing/*-test",
   "fendermint/tracing",
   "fendermint/vm/*",
-  "fendermint/vm/topdown/proof-service",
   "fendermint/actors",
   "fendermint/actors-custom-car",
   "fendermint/actors-builtin-car",
@@ -185,8 +184,6 @@ tracing-appender = "0.2.3"
 text-tables = "0.3.1"
 url = { version = "2.4.1", features = ["serde"] }
 zeroize = "1.6"
-parking_lot = "0.12"
-humantime-serde = "1.1"
 
 # Vendored for cross-compilation, see https://github.com/cross-rs/cross/wiki/Recipes#openssl
 # Make sure every top level build target actually imports this dependency, and don't end up

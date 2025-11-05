@@ -1,16 +1,21 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::Context;
+use anyhow::{bail, Context};
 
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::ActorID;
+use num_traits::Zero;
 
 use fendermint_crypto::PublicKey;
 use fendermint_vm_actor_interface::ipc;
 use fendermint_vm_actor_interface::{
-    eam::EthAddress, init::builtin_actor_eth_addr, ipc::GATEWAY_ACTOR_ID,
+    eam::EthAddress,
+    f3_light_client,
+    init::builtin_actor_eth_addr,
+    ipc::GATEWAY_ACTOR_ID,
+    system,
 };
 use fendermint_vm_genesis::{Collateral, Power, PowerScale, Validator, ValidatorKey};
 use fendermint_vm_message::conv::from_eth;
@@ -296,4 +301,107 @@ fn membership_to_power_table(
     }
 
     pt
+}
+
+/// Caller for the F3 Light Client actor
+///
+/// This actor is responsible for:
+/// - Storing finalized F3 instance state (instance ID, finalized epochs, validator power table)
+/// - Validator power table
+#[derive(Clone)]
+pub struct F3LightClientCaller {
+    actor_id: ActorID,
+}
+
+impl F3LightClientCaller {
+    pub fn new() -> Self {
+        Self {
+            actor_id: f3_light_client::F3_LIGHT_CLIENT_ACTOR_ID,
+        }
+    }
+
+    /// Update the F3 light client state after verifying a proof bundle.
+    ///
+    /// This should be called after successfully executing a proof-based topdown finality message.
+    pub fn update_state(
+        &self,
+        state: &mut FvmExecState<impl Blockstore + Clone>,
+        light_client_state: f3_light_client::LightClientState,
+    ) -> anyhow::Result<()> {
+        let method_num = f3_light_client::Method::UpdateState as u64;
+
+        let params = f3_light_client::UpdateStateParams {
+            state: light_client_state,
+        };
+
+        let params_bytes =
+            fvm_ipld_encoding::to_vec(&params).context("failed to serialize update params")?;
+
+        let msg = fvm_shared::message::Message {
+            version: Default::default(),
+            from: fvm_shared::address::Address::new_id(system::SYSTEM_ACTOR_ID),
+            to: fvm_shared::address::Address::new_id(self.actor_id),
+            sequence: 0,
+            value: TokenAmount::zero(),
+            method_num,
+            params: fvm_ipld_encoding::RawBytes::new(params_bytes),
+            gas_limit: 10_000_000_000,
+            gas_fee_cap: TokenAmount::zero(),
+            gas_premium: TokenAmount::zero(),
+        };
+
+        let (ret, _) = state
+            .execute_implicit(msg)
+            .context("failed to execute F3 light client update")?;
+
+        if let Some(err) = &ret.failure_info {
+            bail!(
+                "F3 light client update failed (exit code {}): {}",
+                ret.msg_receipt.exit_code.value(),
+                err
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Get the current F3 instance state from the light client actor.
+    pub fn get_state(
+        &self,
+        state: &mut FvmExecState<impl Blockstore + Clone>,
+    ) -> anyhow::Result<f3_light_client::GetStateResponse> {
+        let method_num = f3_light_client::Method::GetState as u64;
+
+        let msg = fvm_shared::message::Message {
+            version: Default::default(),
+            from: fvm_shared::address::Address::new_id(system::SYSTEM_ACTOR_ID),
+            to: fvm_shared::address::Address::new_id(self.actor_id),
+            sequence: 0,
+            value: TokenAmount::zero(),
+            method_num,
+            params: fvm_ipld_encoding::RawBytes::default(),
+            gas_limit: 10_000_000_000,
+            gas_fee_cap: TokenAmount::zero(),
+            gas_premium: TokenAmount::zero(),
+        };
+
+        let (ret, _) = state
+            .execute_implicit(msg)
+            .context("failed to execute F3 light client get_state")?;
+
+        if let Some(err) = &ret.failure_info {
+            bail!(
+                "F3 light client get_state failed (exit code {}): {}",
+                ret.msg_receipt.exit_code.value(),
+                err
+            );
+        }
+
+        let state_response: f3_light_client::GetStateResponse = fvm_ipld_encoding::from_slice(
+            &ret.msg_receipt.return_data.bytes(),
+        )
+        .context("failed to deserialize F3 light client state")?;
+
+        Ok(state_response)
+    }
 }

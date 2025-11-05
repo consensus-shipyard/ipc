@@ -17,6 +17,7 @@ pub mod bundle;
 
 pub mod activity;
 pub mod end_block_hook;
+pub mod event_extraction;
 pub(crate) mod gas;
 pub(crate) mod gas_estimation;
 
