@@ -32,6 +32,8 @@ fendermint_actor_eam = { path = "../../actors/eam" }
 fil_actor_evm = { workspace = true }
 fendermint_testing = { path = "../../testing", optional = true }
 ipc_actors_abis = { path = "../../../contract-bindings" }
+recall_executor = { path = "../../../recall/executor" }
+recall_kernel = { path = "../../../recall/kernel" }
 fil_actor_eam = { workspace = true }
 ipc-api = { path = "../../../ipc/api" }
 ipc-observability = { path = "../../../ipc/observability" }

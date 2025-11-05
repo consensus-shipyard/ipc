@@ -41,13 +41,10 @@ pub struct Object {
     pub metadata: ObjectMetadata,
 }
 use fendermint_app_settings::objects::ObjectsSettings;
-use fendermint_rpc::{client::FendermintClient, message::GasParams, QueryClient};
+use fendermint_rpc::{client::FendermintClient, QueryClient};
 use fendermint_vm_message::query::FvmQueryHeight;
 use futures_util::{StreamExt, TryStreamExt};
-use fvm_shared::{
-    address::{Address, Error as NetworkError, Network},
-    econ::TokenAmount,
-};
+use fvm_shared::address::{Address, Error as NetworkError, Network};
 use ipc_api::ethers_address_to_fil_address;
 use iroh::NodeAddr;
 use iroh_blobs::{hashseq::HashSeq, rpc::client::blobs::BlobStatus, util::SetTagOption, Hash};

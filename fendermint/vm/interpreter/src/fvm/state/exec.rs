@@ -18,11 +18,12 @@ use fendermint_vm_genesis::PowerScale;
 use fvm::{
     call_manager::DefaultCallManager,
     engine::MultiEngine,
-    executor::{ApplyFailure, ApplyKind, ApplyRet, DefaultExecutor, Executor},
+    executor::{ApplyFailure, ApplyKind, ApplyRet, Executor},
     machine::{DefaultMachine, Machine, Manifest, NetworkConfig},
     state_tree::StateTree,
-    DefaultKernel,
 };
+use recall_executor::RecallExecutor;
+use recall_kernel::RecallKernel;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{
@@ -133,8 +134,8 @@ where
     DB: Blockstore + Clone + 'static,
 {
     #[allow(clippy::type_complexity)]
-    executor: DefaultExecutor<
-        DefaultKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
+    executor: RecallExecutor<
+        RecallKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
     >,
     /// Hash of the block currently being executed. For queries and checks this is empty.
     ///
@@ -186,7 +187,7 @@ where
         let engine = multi_engine.get(&nc)?;
         let externs = FendermintExterns::new(blockstore.clone(), params.state_root);
         let machine = DefaultMachine::new(&mc, blockstore.clone(), externs)?;
-        let mut executor = DefaultExecutor::new(engine.clone(), machine)?;
+        let mut executor = RecallExecutor::new(engine.clone(), machine)?;
 
         let block_gas_tracker = BlockGasTracker::create(&mut executor)?;
         let base_fee = block_gas_tracker.base_fee().clone();
@@ -291,8 +292,8 @@ where
     pub fn execute_with_executor<F, R>(&mut self, exec_func: F) -> anyhow::Result<R>
     where
         F: FnOnce(
-            &mut DefaultExecutor<
-                DefaultKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
+            &mut RecallExecutor<
+                RecallKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
             >,
         ) -> anyhow::Result<R>,
     {

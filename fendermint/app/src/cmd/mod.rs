@@ -17,6 +17,7 @@ use ipc_observability::traces::create_temporary_subscriber;
 use ipc_observability::traces::set_global_tracing_subscriber;
 use tracing::subscriber;
 
+pub mod blob;
 pub mod config;
 pub mod debug;
 pub mod eth;
@@ -96,6 +97,10 @@ pub async fn exec(opts: Arc<Options>) -> anyhow::Result<()> {
             let settings = load_settings(opts.clone())?.eth;
             let _trace_file_guard = set_global_tracing_subscriber(&settings.tracing);
             args.exec(settings).await
+        }
+        Commands::Blob(args) => {
+            let _trace_file_guard = set_global_tracing_subscriber(&TracingSettings::default());
+            args.exec(()).await
         }
         Commands::Materializer(args) => {
             let _trace_file_guard = set_global_tracing_subscriber(&TracingSettings::default());

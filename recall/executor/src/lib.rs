@@ -80,6 +80,73 @@ where
         apply_kind: ApplyKind,
         raw_length: usize,
     ) -> Result<ApplyRet> {
+        self.execute_message_with_revert(msg, apply_kind, raw_length, false)
+    }
+
+    /// Flush the state-tree to the underlying blockstore.
+    fn flush(&mut self) -> Result<Cid> {
+        let k = (**self).flush()?;
+        Ok(k)
+    }
+}
+
+impl<K> RecallExecutor<K>
+where
+    K: Kernel,
+{
+    /// Create a new [`RecallExecutor`] for executing messages on the [`Machine`].
+    pub fn new(
+        engine_pool: EnginePool,
+        machine: <K::CallManager as CallManager>::Machine,
+    ) -> Result<Self> {
+        // Skip preloading all builtin actors when testing.
+        #[cfg(not(any(test, feature = "testing")))]
+        {
+            // Preload any uncached modules.
+            // This interface works for now because we know all actor CIDs
+            // ahead of time, but with user-supplied code, we won't have that
+            // guarantee.
+            engine_pool.acquire().preload_all(
+                machine.blockstore(),
+                machine.builtin_actors().builtin_actor_codes(),
+            )?;
+        }
+        Ok(Self {
+            engine_pool,
+            machine: Some(machine),
+        })
+    }
+
+    /// Consume consumes the executor and returns the Machine. If the Machine had
+    /// been poisoned during execution, the Option will be None.
+    pub fn into_machine(self) -> Option<<K::CallManager as CallManager>::Machine> {
+        self.machine
+    }
+
+    /// This is the entrypoint to execute a message that allows caller to revert the execution.
+    /// The revert is generally useful for read-only transactions.
+    pub fn execute_message_with_revert(
+        &mut self,
+        msg: Message,
+        apply_kind: ApplyKind,
+        raw_length: usize,
+        always_revert: bool,
+    ) -> Result<ApplyRet> {
+        self.execute_message_internal(msg, apply_kind, raw_length, always_revert)
+    }
+
+    fn execute_message_internal(
+        &mut self,
+        msg: Message,
+        mut apply_kind: ApplyKind,
+        raw_length: usize,
+        always_revert: bool,
+    ) -> Result<ApplyRet> {
+        if always_revert {
+            // The apply kind is always hard coded to implicit if the call is expected to revert.
+            // This will bypass some checks and gas deduction in `preflight_messages`.
+            apply_kind = ApplyKind::Implicit;
+        }
         // Validate if the message was correct, charge for it, and extract some preliminary data.
         let (sender_id, sponsor_id, gas_costs, inclusion_cost) =
             match self.preflight_message(&msg, apply_kind, raw_length)? {
@@ -169,7 +236,7 @@ where
                     None,
                     false,
                 )
-            }, false); // FVM 4.7: with_transaction now requires read_only bool parameter
+            }, always_revert); // FVM 4.7: with_transaction now requires read_only bool parameter
 
             let (res, machine) = match cm.finish() {
                 (Ok(res), machine) => (res, machine),
@@ -299,46 +366,6 @@ where
                 events,
             }),
         }
-    }
-
-    /// Flush the state-tree to the underlying blockstore.
-    fn flush(&mut self) -> Result<Cid> {
-        let k = (**self).flush()?;
-        Ok(k)
-    }
-}
-
-impl<K> RecallExecutor<K>
-where
-    K: Kernel,
-{
-    /// Create a new [`RecallExecutor`] for executing messages on the [`Machine`].
-    pub fn new(
-        engine_pool: EnginePool,
-        machine: <K::CallManager as CallManager>::Machine,
-    ) -> Result<Self> {
-        // Skip preloading all builtin actors when testing.
-        #[cfg(not(any(test, feature = "testing")))]
-        {
-            // Preload any uncached modules.
-            // This interface works for now because we know all actor CIDs
-            // ahead of time, but with user-supplied code, we won't have that
-            // guarantee.
-            engine_pool.acquire().preload_all(
-                machine.blockstore(),
-                machine.builtin_actors().builtin_actor_codes(),
-            )?;
-        }
-        Ok(Self {
-            engine_pool,
-            machine: Some(machine),
-        })
-    }
-
-    /// Consume consumes the executor and returns the Machine. If the Machine had
-    /// been poisoned during execution, the Option will be None.
-    pub fn into_machine(self) -> Option<<K::CallManager as CallManager>::Machine> {
-        self.machine
     }
 
     // TODO: The return type here is very strange because we have three cases:
