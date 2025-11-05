@@ -93,7 +93,7 @@ impl SubnetCommandsArgs {
 #[derive(Debug, Subcommand)]
 pub(crate) enum Commands {
     Init(InitSubnetArgs),
-    Create(CreateSubnetArgs),
+    Create(Box<CreateSubnetArgs>),
     Approve(ApproveSubnetArgs),
     RejectApproved(RejectApprovedSubnetArgs),
     List(ListSubnetsArgs),

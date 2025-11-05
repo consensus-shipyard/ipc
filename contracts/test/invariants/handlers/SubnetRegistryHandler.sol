@@ -129,7 +129,9 @@ contract SubnetRegistryHandler is CommonBase, StdCheats, StdUtils {
             validatorGater: address(0),
             validatorRewarder: address(new ValidatorRewarderMap()),
             genesisSubnetIpcContractsOwner: address(1),
-            chainID: uint64(1671263715227509)
+            chainID: uint64(1671263715227509),
+            genesisF3InstanceId: 0,
+            hasGenesisF3InstanceId: false
         });
 
         address owner = getRandomOldAddressOrNewOne(seed);

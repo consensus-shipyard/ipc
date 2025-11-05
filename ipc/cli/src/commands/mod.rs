@@ -53,7 +53,7 @@ const FIL_AMOUNT_NANO_DIGITS: u32 = 9;
 enum Commands {
     // Daemon(LaunchDaemonArgs),
     Config(ConfigCommandsArgs),
-    Subnet(SubnetCommandsArgs),
+    Subnet(Box<SubnetCommandsArgs>),
     Wallet(WalletCommandsArgs),
     CrossMsg(CrossMsgsCommandsArgs),
     Checkpoint(CheckpointCommandsArgs),
