@@ -108,7 +108,7 @@ where
     }
 
     /// If we know the query is over the state, cache the state tree.
-    async fn with_exec_state<T, F>(self, f: F) -> anyhow::Result<(Self, T)>
+    pub async fn with_exec_state<T, F>(self, f: F) -> anyhow::Result<(Self, T)>
     where
         F: FnOnce(&mut FvmExecState<ReadOnlyBlockstore<DB>>) -> anyhow::Result<T>,
     {

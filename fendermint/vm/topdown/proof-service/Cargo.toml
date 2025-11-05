@@ -14,21 +14,19 @@ tracing = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
-parking_lot = { workspace = true }
+parking_lot = "0.12"
 url = { workspace = true }
 base64 = { workspace = true }
-humantime-serde = { workspace = true }
+humantime-serde = "1.1"
 cid = { workspace = true }
 multihash = { workspace = true }
 rocksdb = { version = "0.21", features = ["multi-threaded-cf"] }
 futures = { workspace = true }
 
 # Fendermint
-fendermint_actor_f3_cert_manager = { path = "../../../actors/f3-cert-manager" }
 fendermint_vm_genesis = { path = "../../genesis" }
 
 # IPC
-ipc-provider = { path = "../../../../ipc/provider" }
 ipc-api = { path = "../../../../ipc/api" }
 ipc-observability = { path = "../../../../ipc/observability" }
 

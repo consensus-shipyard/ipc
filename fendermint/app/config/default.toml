@@ -273,6 +273,51 @@ vote_interval = 1
 # pausing the syncer, preventing new events to trigger votes.
 vote_timeout = 60
 
+# # Top-down checkpoint configuration (uncomment to enable parent syncing)
+# [ipc.topdown]
+# # Number of blocks to delay before considering a parent block final
+# chain_head_delay = 10
+# # Additional delay on top of chain_head_delay before proposing finality
+# proposal_delay = 5
+# # Maximum number of blocks to propose in a single checkpoint
+# max_proposal_range = 100
+# # Maximum number of blocks to cache (optional)
+# # max_cache_blocks = 1000
+# # Parent syncing cron period, in seconds
+# polling_interval = 30
+# # Exponential backoff retry base, in seconds
+# exponential_back_off = 5
+# # Maximum number of retries before giving up
+# exponential_retry_limit = 5
+# # Parent HTTP RPC endpoint
+# parent_http_endpoint = "http://api.calibration.node.glif.io/rpc/v1"
+# # Parent HTTP timeout (optional), in seconds
+# # parent_http_timeout = 60
+# # Bearer token for Authorization header (optional)
+# # parent_http_auth_token = "your-token-here"
+# # Parent registry address
+# parent_registry = "0x74539671a1d2f1c8f200826baba665179f53a1b7"
+# # Parent gateway address  
+# parent_gateway = "0x77aa40b105843728088c0132e43fc44348881da8"
+#
+# # F3 proof service configuration (optional - for proof-based parent finality)
+# # Requires genesis to have F3 parameters configured
+# [ipc.topdown.proof_service]
+# # Enable F3 proof-based parent finality (default: false)
+# enabled = false
+# # F3 network name - must match parent chain ("calibrationnet", "mainnet")
+# f3_network_name = "calibrationnet"
+# # How often to poll parent chain for new F3 certificates, in seconds
+# polling_interval = 30
+# # How many F3 instances ahead to pre-generate proofs (lookahead window)
+# lookahead_instances = 5
+# # How many old instances to keep after commitment (retention window)
+# retention_instances = 2
+# # Gateway actor ID on parent chain (optional - derived from genesis if not set)
+# # gateway_actor_id = 176609
+# # Or use Ethereum address (will be resolved to actor ID)
+# # gateway_eth_address = "0xE4c61299c16323C4B58376b60A77F68Aa59afC8b"
+
 # # Setting which are only allowed if the `--network` CLI parameter is `testnet`.
 # [testing]
 

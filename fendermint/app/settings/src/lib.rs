@@ -226,6 +226,59 @@ pub struct TopDownSettings {
     /// The parent gateway address
     #[serde(deserialize_with = "deserialize_eth_address_from_str")]
     pub parent_gateway: Address,
+    /// F3 proof service configuration (optional - for proof-based finality)
+    #[serde(default)]
+    pub proof_service: Option<ProofServiceSettings>,
+}
+
+/// F3 proof service settings for proof-based parent finality
+#[serde_as]
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ProofServiceSettings {
+    /// Enable F3 proof-based finality
+    pub enabled: bool,
+
+    /// F3 network name ("calibrationnet", "mainnet")
+    pub f3_network_name: String,
+
+    /// Polling interval for checking parent F3 certificates
+    #[serde_as(as = "DurationSeconds<u64>")]
+    pub polling_interval: Duration,
+
+    /// Instances to generate ahead (lookahead)
+    pub lookahead_instances: u64,
+
+    /// Instances to retain after commitment
+    pub retention_instances: u64,
+
+    /// Gateway actor ID on parent (optional - can derive from genesis)
+    pub gateway_actor_id: Option<u64>,
+
+    /// Gateway Ethereum address (alternative to actor ID)
+    pub gateway_eth_address: Option<String>,
+}
+
+impl ProofServiceSettings {
+    /// Convert to proof service crate's config type
+    pub fn to_proof_service_config(
+        &self,
+        parent_subnet_id: &str,
+    ) -> fendermint_vm_topdown_proof_service::ProofServiceConfig {
+        fendermint_vm_topdown_proof_service::ProofServiceConfig {
+            enabled: self.enabled,
+            polling_interval: self.polling_interval,
+            lookahead_instances: self.lookahead_instances,
+            retention_instances: self.retention_instances,
+            parent_rpc_url: String::new(), // Will be filled from topdown settings
+            parent_subnet_id: parent_subnet_id.to_string(),
+            f3_network_name: self.f3_network_name.clone(),
+            fallback_rpc_urls: vec![],
+            max_cache_size_bytes: 0,
+            gateway_actor_id: self.gateway_actor_id,
+            gateway_eth_address: self.gateway_eth_address.clone(),
+            subnet_id: None, // Will be filled from IPC settings
+        }
+    }
 }
 
 #[serde_as]

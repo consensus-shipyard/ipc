@@ -76,6 +76,7 @@ quickcheck = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 
 merkle-tree-rs = { path = "../../../ext/merkle-tree-rs" }
+proofs = { git = "https://github.com/consensus-shipyard/ipc-filecoin-proofs", branch = "proofs" }
 
 [dev-dependencies]
 quickcheck = { workspace = true }

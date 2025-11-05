@@ -54,13 +54,9 @@ ipc-api = { path = "../../ipc/api" }
 ipc_actors_abis = { path = "../../contract-bindings" }
 ipc-observability = { path = "../../ipc/observability" }
 prometheus = { workspace = true }
-tendermint-rpc  = { workspace = true }
-tendermint  = { workspace = true }
+tendermint-rpc = { workspace = true }
+tendermint = { workspace = true }
 fendermint_rpc = { path = "../../fendermint/rpc" }
-
-fendermint_actor_f3_light_client = { path = "../../fendermint/actors/f3-light-client" }
-fendermint_vm_genesis = { path = "../../fendermint/vm/genesis" }
-
 
 fendermint_actor_f3_light_client = { path = "../../fendermint/actors/f3-light-client" }
 fendermint_vm_genesis = { path = "../../fendermint/vm/genesis" }

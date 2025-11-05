@@ -32,3 +32,4 @@ ipc-observability = { path = "../../../ipc/observability" }
 
 fendermint_vm_encoding = { path = "../../vm/encoding" }
 fendermint_vm_topdown = { path = "../../vm/topdown" }
+fendermint_vm_topdown_proof_service = { path = "../../vm/topdown/proof-service" }
