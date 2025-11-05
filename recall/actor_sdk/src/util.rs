@@ -7,13 +7,15 @@ use fil_actors_runtime::{
     deserialize_block, extract_send_result,
     runtime::{builtins::Type, Runtime},
     ActorError,
-    // ADM_ACTOR_ADDR, // TODO: ADM not available on main
 };
 use fvm_ipld_encoding::ipld_block::IpldBlock;
 use fvm_shared::sys::SendFlags;
 use fvm_shared::{address::Address, bigint::BigUint, econ::TokenAmount, MethodNum};
 use num_traits::Zero;
 use serde::{Deserialize, Serialize};
+
+use crate::constants::ADM_ACTOR_ADDR;
+pub use fil_actor_adm::Kind;
 
 /// Resolves ID address of an actor.
 /// If `require_delegated` is `true`, the address must be of type
@@ -82,22 +84,23 @@ pub fn token_to_biguint(amount: Option<TokenAmount>) -> BigUint {
         .unwrap_or_default()
 }
 
-/// The kinds of machines available.
-#[derive(Debug, Serialize, Deserialize)]
-pub enum Kind {
-    /// A bucket with S3-like key semantics.
-    Bucket,
-    /// An MMR accumulator, used for timestamping data.
-    Timehub,
-}
-
-/// Checks if an address is a bucket actor.
-///
-/// TODO: Re-enable full implementation once ADM actor is available (needs ADM_ACTOR_ADDR)
-/// For now, returns false since bucket actors are not yet enabled.
-#[allow(unused_variables)]
+/// Checks if an address is a bucket actor by comparing its code CID
+/// with the bucket code CID registered in the ADM actor.
 pub fn is_bucket_address(rt: &impl Runtime, address: Address) -> Result<bool, ActorError> {
-    // Stub implementation until bucket actors are enabled
-    // Original implementation would check with ADM_ACTOR_ADDR
+    let caller_code_cid = rt
+        .resolve_address(&address)
+        .and_then(|actor_id| rt.get_actor_code_cid(&actor_id));
+    if let Some(caller_code_cid) = caller_code_cid {
+        let bucket_code_cid = deserialize_block::<Cid>(extract_send_result(rt.send(
+            &ADM_ACTOR_ADDR,
+            2892692559 as MethodNum,
+            IpldBlock::serialize_cbor(&Kind::Bucket)?,
+            TokenAmount::zero(),
+            None,
+            SendFlags::READ_ONLY,
+        ))?)?;
+        Ok(caller_code_cid.eq(&bucket_code_cid))
+    } else {
         Ok(false)
+    }
 }

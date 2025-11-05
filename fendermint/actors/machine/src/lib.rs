@@ -6,9 +6,10 @@ use std::collections::HashMap;
 
 pub use fil_actor_adm::Kind;
 use fil_actors_runtime::{
-    actor_error, runtime::Runtime, ActorError, ADM_ACTOR_ADDR, FIRST_EXPORTED_METHOD_NUMBER,
+    actor_error, runtime::Runtime, ActorError, FIRST_EXPORTED_METHOD_NUMBER,
     INIT_ACTOR_ADDR,
 };
+use recall_actor_sdk::constants::ADM_ACTOR_ADDR;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{ipld_block::IpldBlock, tuple::*};
 pub use fvm_shared::METHOD_CONSTRUCTOR;

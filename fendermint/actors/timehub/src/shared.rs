@@ -4,8 +4,8 @@
 
 use std::collections::HashMap;
 
-use cid::multihash::{Code, MultihashDigest};
 use cid::Cid;
+use multihash_codetable::{Code, MultihashDigest};
 use fendermint_actor_machine::{
     Kind, MachineAddress, MachineState, GET_ADDRESS_METHOD, GET_METADATA_METHOD, INIT_METHOD,
     METHOD_CONSTRUCTOR,

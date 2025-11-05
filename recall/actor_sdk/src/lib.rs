@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 pub mod caller;
+pub mod constants;
 pub mod evm;
 pub mod storage;
 pub mod util;

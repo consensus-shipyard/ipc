@@ -44,14 +44,16 @@ members = [
   "fendermint/actors/eam",
   "fendermint/actors/f3-light-client",
   "fendermint/actors/gas_market/eip1559",
-  # recall actors (machine/bucket/timehub temporarily disabled - need fil_actor_adm)
+  # recall actors
+  "fendermint/actors/adm_types",         # fil_actor_adm - ADM types
+  "fendermint/actors/adm",               # ADM actor
+  "fendermint/actors/machine",           # Machine base trait
   "fendermint/actors/blobs",
   "fendermint/actors/blobs/shared",
   "fendermint/actors/blobs/testing",
   "fendermint/actors/blob_reader",
-  # "fendermint/actors/bucket",        # TODO: depends on machine
-  # "fendermint/actors/machine",       # TODO: depends on fil_actor_adm (not in main)
-  # "fendermint/actors/timehub",       # TODO: re-enable when ADM is available
+  "fendermint/actors/bucket",            # S3-like object storage
+  "fendermint/actors/timehub",           # Timestamping service
   "fendermint/actors/recall_config",
   "fendermint/actors/recall_config/shared",
 
@@ -267,6 +269,7 @@ fvm_ipld_amt = "0.7.4"
 # NOTE: Using master branch instead of v17.0.0 tag due to serde dependency fixes
 # Master is currently at commit 2f040c12 which fixes the serde::__private::PhantomData import issue
 fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-actors", branch = "master" }
+fil_actor_adm = { path = "fendermint/actors/adm_types" }
 fil_actor_eam = { git = "https://github.com/filecoin-project/builtin-actors", branch = "master" }
 fil_actor_evm = { git = "https://github.com/filecoin-project/builtin-actors", branch = "master" }
 fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", branch = "master" }
@@ -275,6 +278,7 @@ cid = { version = "0.11", default-features = false, features = [
   "serde-codec",
   "std",
 ] }
+multihash-codetable = "0.1"
 
 frc42_dispatch = { path = "./ext/frc42_dispatch" }
 

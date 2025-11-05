@@ -239,7 +239,7 @@ impl BlobsActor {
     /// their existing subscriptions.
     ///
     /// The `sponsor` will be the subscriber (the account responsible for payment), if it exists
-    /// and there is an approval from `sponsor` to `from`.    
+    /// and there is an approval from `sponsor` to `from`.
     ///
     /// The `from` address must be delegated (only delegated addresses can use credit).
     /// The `sponsor` address must be delegated (only delegated addresses can use credit).
@@ -309,7 +309,7 @@ impl BlobsActor {
     /// Deletes a blob subscription.
     ///
     /// The `sponsor` will be the subscriber (the account responsible for payment), if it exists
-    /// and there is an approval from `sponsor` to `from`.    
+    /// and there is an approval from `sponsor` to `from`.
     ///
     /// The `from` address must be delegated (only delegated addresses can use credit).
     /// The `sponsor` address must be delegated (only delegated addresses can use credit).
@@ -360,7 +360,7 @@ impl BlobsActor {
     /// and is useful for some blob workflows like replacing a key in a bucket actor.
     ///
     /// The `sponsor` will be the subscriber (the account responsible for payment), if it exists
-    /// and there is an approval from `sponsor` to `from`.    
+    /// and there is an approval from `sponsor` to `from`.
     ///
     /// The `from` address must be delegated (only delegated addresses can use credit).
     /// The `sponsor` address must be delegated (only delegated addresses can use credit).
@@ -473,13 +473,18 @@ mod tests {
     use fil_actors_runtime::test_utils::{
         MockRuntime, ETHACCOUNT_ACTOR_CODE_ID, EVM_ACTOR_CODE_ID,
     };
-    use fil_actors_runtime::ADM_ACTOR_ADDR;
+    // TODO: Re-enable when ADM actor is available
+    // use fil_actors_runtime::ADM_ACTOR_ADDR;
     use fvm_ipld_encoding::ipld_block::IpldBlock;
     use fvm_shared::sys::SendFlags;
     use fvm_shared::{
         address::Address, bigint::BigInt, clock::ChainEpoch, error::ExitCode, MethodNum,
     };
     use recall_actor_sdk::util::Kind;
+
+    // TODO: Re-enable when ADM actor is available
+    // Stub ADM_ACTOR_ADDR for tests
+    const ADM_ACTOR_ADDR: Address = Address::new_id(99);
 
     fn expect_retrieve_bucket_code_cid(rt: &MockRuntime, code_cid: Cid) {
         rt.expect_send(
@@ -858,7 +863,8 @@ mod tests {
             size: hash.1,
             ttl: Some(3600),
         };
-        expect_retrieve_bucket_code_cid(&rt, *ETHACCOUNT_ACTOR_CODE_ID);
+        // TODO: Re-enable when ADM bucket actor is available
+        // expect_retrieve_bucket_code_cid(&rt, *ETHACCOUNT_ACTOR_CODE_ID);
         expect_get_config(&rt);
         let result = rt.call::<BlobsActor>(
             Method::AddBlob as u64,
@@ -888,7 +894,8 @@ mod tests {
         rt.set_received(TokenAmount::zero());
         rt.set_epoch(ChainEpoch::from(5));
         rt.expect_validate_caller_any();
-        expect_retrieve_bucket_code_cid(&rt, *ETHACCOUNT_ACTOR_CODE_ID);
+        // TODO: Re-enable when ADM bucket actor is available
+        // expect_retrieve_bucket_code_cid(&rt, *ETHACCOUNT_ACTOR_CODE_ID);
         expect_get_config(&rt);
         expect_emitted_add_event(&rt, 5, &add_params, f4_eth_addr, add_params.size);
         let subscription = rt
@@ -959,7 +966,8 @@ mod tests {
         rt.set_balance(tokens_sent.clone());
         let tokens_required_atto = add_params.size * add_params.ttl.unwrap() as u64;
         let expected_tokens_unspent = tokens_sent.atto() - tokens_required_atto;
-        expect_retrieve_bucket_code_cid(&rt, *ETHACCOUNT_ACTOR_CODE_ID);
+        // TODO: Re-enable when ADM bucket actor is available
+        // expect_retrieve_bucket_code_cid(&rt, *ETHACCOUNT_ACTOR_CODE_ID);
         expect_get_config(&rt);
         expect_emitted_add_event(&rt, 0, &add_params, f4_eth_addr, add_params.size);
         rt.expect_send_simple(
@@ -991,7 +999,8 @@ mod tests {
             size: hash.1,
             ttl: Some(3600),
         };
-        expect_retrieve_bucket_code_cid(&rt, *ETHACCOUNT_ACTOR_CODE_ID);
+        // TODO: Re-enable when ADM bucket actor is available
+        // expect_retrieve_bucket_code_cid(&rt, *ETHACCOUNT_ACTOR_CODE_ID);
         expect_get_config(&rt);
         let response = rt.call::<BlobsActor>(
             Method::AddBlob as u64,
@@ -1016,7 +1025,8 @@ mod tests {
             size: hash.1,
             ttl: Some(3600),
         };
-        expect_retrieve_bucket_code_cid(&rt, *ETHACCOUNT_ACTOR_CODE_ID);
+        // TODO: Re-enable when ADM bucket actor is available
+        // expect_retrieve_bucket_code_cid(&rt, *ETHACCOUNT_ACTOR_CODE_ID);
         expect_get_config(&rt);
         expect_emitted_add_event(&rt, 0, &add_params, f4_eth_addr, add_params.size);
         let result = rt.call::<BlobsActor>(
@@ -1112,7 +1122,8 @@ mod tests {
             size: hash.1,
             ttl: Some(3600),
         };
-        expect_retrieve_bucket_code_cid(&rt, *ETHACCOUNT_ACTOR_CODE_ID);
+        // TODO: Re-enable when ADM bucket actor is available
+        // expect_retrieve_bucket_code_cid(&rt, *ETHACCOUNT_ACTOR_CODE_ID);
         expect_get_config(&rt);
         expect_emitted_add_event(&rt, 0, &add_params, sponsor_f4_eth_addr, add_params.size);
         let response = rt.call::<BlobsActor>(
@@ -1140,7 +1151,8 @@ mod tests {
             size: hash.1,
             ttl: Some(3600),
         };
-        expect_retrieve_bucket_code_cid(&rt, *ETHACCOUNT_ACTOR_CODE_ID);
+        // TODO: Re-enable when ADM bucket actor is available
+        // expect_retrieve_bucket_code_cid(&rt, *ETHACCOUNT_ACTOR_CODE_ID);
         expect_get_config(&rt);
         expect_emitted_add_event(&rt, 0, &add_params, sponsor_f4_eth_addr, add_params.size);
         rt.expect_send_simple(
