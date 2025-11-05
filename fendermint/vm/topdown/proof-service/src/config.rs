@@ -58,6 +58,28 @@ pub struct ProofServiceConfig {
     /// Will be derived from genesis
     #[serde(default)]
     pub subnet_id: Option<String>,
+
+    /// Maximum epoch lag before considering a certificate too old to generate proofs for.
+    /// If a certificate's highest epoch is more than this many epochs behind the current
+    /// parent chain epoch, it will be skipped.
+    /// Default: 100 epochs (~50 minutes on Filecoin mainnet)
+    #[serde(default = "default_max_epoch_lag")]
+    pub max_epoch_lag: u64,
+
+    /// Maximum lookback window that the parent RPC supports.
+    /// Most Lotus nodes have a limited lookback window (e.g., 2000 epochs).
+    /// If we're further behind than this, we can't generate proofs.
+    /// Default: 2000 epochs
+    #[serde(default = "default_rpc_lookback_limit")]
+    pub rpc_lookback_limit: u64,
+}
+
+fn default_max_epoch_lag() -> u64 {
+    100
+}
+
+fn default_rpc_lookback_limit() -> u64 {
+    2000
 }
 
 impl Default for ProofServiceConfig {
@@ -75,6 +97,8 @@ impl Default for ProofServiceConfig {
             gateway_actor_id: None,
             gateway_eth_address: None,
             subnet_id: None,
+            max_epoch_lag: default_max_epoch_lag(),
+            rpc_lookback_limit: default_rpc_lookback_limit(),
         }
     }
 }

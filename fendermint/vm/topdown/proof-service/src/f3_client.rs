@@ -42,12 +42,12 @@ impl F3Client {
     /// * `rpc_endpoint` - F3 RPC endpoint
     /// * `network_name` - Network name (e.g., "calibrationnet", "mainnet")
     /// * `initial_instance` - F3 instance to bootstrap from (from F3CertManager actor)
-    /// * `power_table` - Initial trusted power table (from F3CertManager actor)
+    /// * `initial_power_table` - Initial trusted power table (from F3CertManager actor)
     pub fn new(
         rpc_endpoint: &str,
         network_name: &str,
         initial_instance: u64,
-        power_table: filecoin_f3_gpbft::PowerEntries,
+        initial_power_table: filecoin_f3_gpbft::PowerEntries,
     ) -> Result<Self> {
         let light_client = LightClient::new(rpc_endpoint, network_name)
             .context("Failed to create F3 light client")?;
@@ -56,7 +56,7 @@ impl F3Client {
         let state = LightClientState {
             instance: initial_instance,
             chain: None,
-            power_table,
+            power_table: initial_power_table,
         };
 
         info!(

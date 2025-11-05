@@ -36,7 +36,7 @@ use std::sync::Arc;
 /// # Arguments
 /// * `config` - Service configuration
 /// * `initial_committed_instance` - The last committed F3 instance (from F3CertManager actor)
-/// * `power_table` - Initial power table (from F3CertManager actor)
+/// * `initial_power_table` - Initial power table (from F3CertManager actor)
 /// * `db_path` - Optional database path for persistence
 ///
 /// # Returns
@@ -45,7 +45,7 @@ use std::sync::Arc;
 pub async fn launch_service(
     config: ProofServiceConfig,
     initial_committed_instance: u64,
-    power_table: filecoin_f3_gpbft::PowerEntries,
+    initial_power_table: filecoin_f3_gpbft::PowerEntries,
     db_path: Option<std::path::PathBuf>,
 ) -> Result<(Arc<ProofCache>, tokio::task::JoinHandle<()>)> {
     // Validate configuration
@@ -98,7 +98,7 @@ pub async fn launch_service(
     // Clone what we need for the background task
     let config_clone = config.clone();
     let cache_clone = cache.clone();
-    let power_table_clone = power_table.clone();
+    let power_table_clone = initial_power_table.clone();
 
     // Spawn background task
     let handle = tokio::spawn(async move {

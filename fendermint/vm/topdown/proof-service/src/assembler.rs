@@ -21,6 +21,34 @@ use proofs::{
 use std::time::Instant;
 use url::Url;
 
+// Event signatures for proof generation
+// These use Solidity's canonical format (type names, not ABI encoding)
+// For contract bindings, see: contract_bindings::lib_gateway::NewTopDownMessageFilter
+// and contract_bindings::lib_power_change_log::NewPowerChangeRequestFilter
+
+/// Event signature for NewTopDownMessage from LibGateway.sol
+/// Event: NewTopDownMessage(address indexed subnet, IpcEnvelope message, bytes32 indexed id)
+/// Bindings: contract_bindings::lib_gateway::NewTopDownMessageFilter
+const NEW_TOPDOWN_MESSAGE_SIGNATURE: &str = "NewTopDownMessage(address,IpcEnvelope,bytes32)";
+
+/// Event signature for NewPowerChangeRequest from LibPowerChangeLog.sol
+/// Event: NewPowerChangeRequest(PowerOperation op, address validator, bytes payload, uint64 configurationNumber)
+/// Bindings: contract_bindings::lib_power_change_log::NewPowerChangeRequestFilter
+/// This captures validator power changes that need to be reflected in the subnet
+const NEW_POWER_CHANGE_REQUEST_SIGNATURE: &str =
+    "NewPowerChangeRequest(PowerOperation,address,bytes,uint64)";
+
+/// Storage slot offset for topDownNonce in the Subnet struct
+/// In the Gateway actor's subnets mapping: mapping(SubnetID => Subnet)
+/// The Subnet struct field layout (see contracts/contracts/structs/Subnet.sol):
+///   - id (SubnetID): slot 0
+///   - stake (uint256): slot 1  
+///   - topDownNonce (uint64): slot 2
+///   - appliedBottomUpNonce (uint64): slot 2 (packed with topDownNonce)
+///   - genesisEpoch (bytes[]): slot 3+
+/// We need the nonce to verify top-down message ordering
+const TOPDOWN_NONCE_STORAGE_OFFSET: u64 = 2;
+
 /// Assembles proof bundles from F3 certificates and parent chain data
 ///
 /// # Thread Safety
@@ -83,6 +111,13 @@ impl ProofAssembler {
         );
 
         // Fetch tipsets from Lotus using proofs library client
+        // We need both parent and child tipsets to generate storage/event proofs:
+        // - Parent tipset (at highest_epoch): Contains the state root we're proving against
+        // - Child tipset (at highest_epoch + 1): Needed to prove state transitions and events
+        //   that occurred when moving from parent to child
+        //
+        // The F3 certificate contains only the tipset CID and epoch, not the full tipset data.
+        // We fetch the actual tipsets here to extract block headers, state roots, and receipts.
         let client = self.create_client();
 
         let parent_tipset = client
@@ -98,6 +133,8 @@ impl ProofAssembler {
                 )
             })?;
 
+        // Child tipset is needed for proof generation - it contains the receipts and
+        // state transitions from the parent tipset
         let child_tipset = client
             .request(
                 "Filecoin.ChainGetTipSetByHeight",
@@ -125,20 +162,32 @@ impl ProofAssembler {
 
         // Configure proof specs for Gateway contract
         // Storage: subnets[subnetKey].topDownNonce
-        // Event: NewTopDownMessage(address indexed subnet, IpcEnvelope message, bytes32 indexed id)
+        // Events:
+        //   - NewTopDownMessage: Captures topdown messages for this subnet
+        //   - NewPowerChangeRequest: Captures validator power changes
         let storage_specs = vec![StorageProofSpec {
             actor_id: self.gateway_actor_id,
-            // Calculate slot for subnets[subnetKey].topDownNonce
-            // Note: topDownNonce is at offset 3 in the Subnet struct
-            slot: calculate_storage_slot(&self.subnet_id, 3),
+            // Calculate slot for subnets[subnetKey].topDownNonce in the mapping
+            slot: calculate_storage_slot(&self.subnet_id, TOPDOWN_NONCE_STORAGE_OFFSET),
         }];
 
-        let event_specs = vec![EventProofSpec {
-            event_signature: "NewTopDownMessage(address,IpcEnvelope,bytes32)".to_string(),
-            // topic_1 is the indexed subnet address
-            topic_1: self.subnet_id.clone(),
-            actor_id_filter: Some(self.gateway_actor_id),
-        }];
+        let event_specs = vec![
+            // Capture topdown messages for this specific subnet
+            EventProofSpec {
+                event_signature: NEW_TOPDOWN_MESSAGE_SIGNATURE.to_string(),
+                // topic_1 is the indexed subnet address
+                topic_1: self.subnet_id.clone(),
+                actor_id_filter: Some(self.gateway_actor_id),
+            },
+            // Capture ALL power change requests from the gateway
+            // These affect validator sets and need to be processed
+            EventProofSpec {
+                event_signature: NEW_POWER_CHANGE_REQUEST_SIGNATURE.to_string(),
+                // No topic_1 filter - we want all power changes
+                topic_1: String::new(),
+                actor_id_filter: Some(self.gateway_actor_id),
+            },
+        ];
 
         tracing::debug!(
             highest_epoch,
@@ -150,7 +199,12 @@ impl ProofAssembler {
         // Create LotusClient for this request (not stored due to Rc/RefCell)
         let lotus_client = self.create_client();
 
-        // Generate proof bundle in blocking task (proofs library uses non-Send types)
+        // Generate proof bundle in blocking task
+        // CRITICAL: The proofs library uses Rc/RefCell internally making LotusClient and
+        // related types non-Send. We must use spawn_blocking to run the proof generation
+        // in a separate thread, then use futures::executor::block_on to bridge the
+        // async/sync worlds. This prevents blocking the main tokio runtime while
+        // handling non-Send types correctly.
         let bundle = tokio::task::spawn_blocking(move || {
             // Use futures::executor to run async code without blocking the parent runtime
             futures::executor::block_on(generate_proof_bundle(

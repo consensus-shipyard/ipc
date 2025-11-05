@@ -32,15 +32,15 @@ impl ProofGeneratorService {
     /// * `config` - Service configuration
     /// * `cache` - Proof cache
     /// * `initial_instance` - F3 instance to bootstrap from (from F3CertManager actor)
-    /// * `power_table` - Initial power table (from F3CertManager actor)
+    /// * `initial_power_table` - Initial power table (from F3CertManager actor)
     ///
-    /// Both `initial_instance` and `power_table` should come from the F3CertManager
+    /// Both `initial_instance` and `initial_power_table` should come from the F3CertManager
     /// actor on-chain, which holds the last committed certificate and its power table.
     pub async fn new(
         config: ProofServiceConfig,
         cache: Arc<ProofCache>,
         initial_instance: u64,
-        power_table: filecoin_f3_gpbft::PowerEntries,
+        initial_power_table: filecoin_f3_gpbft::PowerEntries,
     ) -> Result<Self> {
         // Resolve gateway actor ID (support both direct ID and Ethereum address)
         let gateway_actor_id = if let Some(id) = config.gateway_actor_id {
@@ -72,7 +72,7 @@ impl ProofGeneratorService {
                 &config.parent_rpc_url,
                 &config.f3_network_name,
                 initial_instance,
-                power_table,
+                initial_power_table,
             )
             .context("Failed to create F3 client")?,
         );
