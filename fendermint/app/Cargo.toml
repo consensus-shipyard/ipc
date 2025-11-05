@@ -45,8 +45,10 @@ tracing-appender = { workspace = true }
 tracing-subscriber = { workspace = true }
 literally = { workspace = true }
 url = { workspace = true }
+ethers = { workspace = true }
 
 fendermint_abci = { path = "../abci" }
+ipc_actors_abis = { path = "../../contract-bindings" }
 actors-custom-api = { path = "../actors/api" }
 fendermint_actor_f3_light_client = { path = "../actors/f3-light-client" }
 fendermint_app_options = { path = "./options" }

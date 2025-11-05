@@ -23,8 +23,8 @@ use fendermint_storage::{
 };
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_interpreter::fvm::state::{
-    empty_state_tree, CheckStateRef, FvmExecState, FvmQueryState, FvmStateParams,
-    FvmUpdatableParams,
+    empty_state_tree, ipc::F3LightClientCaller, CheckStateRef, FvmExecState, FvmQueryState,
+    FvmStateParams, FvmUpdatableParams,
 };
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
 use fendermint_vm_interpreter::genesis::{read_genesis_car, GenesisAppState};
@@ -36,6 +36,7 @@ use fendermint_vm_interpreter::types::{
 use fendermint_vm_interpreter::MessagesInterpreter;
 
 use crate::ipc::derive_subnet_app_hash;
+use fendermint_vm_actor_interface::f3_light_client;
 use fendermint_vm_interpreter::fvm::end_block_hook::LightClientCommitments;
 use fendermint_vm_interpreter::fvm::state::snapshot::SnapshotPayload;
 use fendermint_vm_message::query::FvmQueryHeight;
@@ -480,6 +481,61 @@ where
             .as_ref()
             .context("Validator cache is not available")?
             .get_validator(id)
+    }
+
+    /// Query the F3 Light Client Actor state after genesis
+    /// Returns (instance_id, power_table) if F3 is initialized, None otherwise
+    pub async fn query_f3_state(
+        &self,
+    ) -> Result<Option<(u64, fendermint_vm_topdown_proof_service::PowerEntries)>> {
+        // Get committed state to check if genesis has been initialized
+        let state = self.committed_state()?;
+
+        // Don't try to query if state hasn't been initialized by genesis
+        if !Self::can_query_state(state.app_state.block_height, &state.app_state.state_params) {
+            return Ok(None);
+        }
+
+        // Create a read-only view of the state
+        let mut query_state = FvmQueryState::new(
+            self.state_store_clone(),
+            self.multi_engine.clone(),
+            state.app_state.block_height.try_into()?,
+            state.app_state.state_params.clone(),
+            self.check_state.clone(),
+            false, // not pending
+        )
+        .context("error creating query state")?;
+
+        // Create a temporary exec state to query the actor
+        let (_, result) = query_state
+            .with_exec_state(|exec_state| {
+                let f3_caller = F3LightClientCaller::new();
+                match f3_caller.get_state(exec_state) {
+                    Ok(state) => {
+                        // For now, we just return the instance ID and an empty power table
+                        // The proof service will fetch the actual power table from the parent chain
+                        Ok(Some((
+                            state.instance_id,
+                            fendermint_vm_topdown_proof_service::PowerEntries(vec![]),
+                        )))
+                    }
+                    Err(e) => {
+                        // F3 actor might not be deployed (non-Filecoin parent)
+                        tracing::debug!("F3 Light Client Actor not found or not accessible: {}", e);
+                        Ok(None)
+                    }
+                }
+            })
+            .await?;
+
+        Ok(result)
+    }
+
+    /// Get access to the messages interpreter
+    /// Used to access the TopDownManager for updating the proof cache
+    pub fn interpreter(&self) -> &Arc<MI> {
+        &self.messages_interpreter
     }
 }
 

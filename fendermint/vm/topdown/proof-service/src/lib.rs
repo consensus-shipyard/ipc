@@ -17,6 +17,9 @@
 //! This avoids duplicating certificates when multiple epochs reference
 //! the same certificate.
 
+// Re-export commonly used types
+pub use filecoin_f3_gpbft::powertable::{PowerEntries, PowerEntry};
+
 pub mod assembler;
 pub mod cache;
 pub mod config;

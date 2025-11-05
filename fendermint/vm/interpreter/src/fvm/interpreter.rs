@@ -51,7 +51,7 @@ where
 {
     end_block_manager: EndBlockManager<DB>,
 
-    top_down_manager: TopDownManager<DB>,
+    pub(crate) top_down_manager: TopDownManager<DB>,
     upgrade_scheduler: UpgradeScheduler<DB>,
 
     push_block_data_to_chainmeta_actor: bool,
@@ -198,6 +198,13 @@ impl<DB> MessagesInterpreter<DB> for FvmMessagesInterpreter<DB>
 where
     DB: Blockstore + Clone + Send + Sync + 'static,
 {
+    async fn set_proof_cache(
+        &self,
+        cache: std::sync::Arc<fendermint_vm_topdown_proof_service::ProofCache>,
+    ) {
+        self.top_down_manager.set_proof_cache(cache).await;
+    }
+
     async fn check_message(
         &self,
         state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
@@ -344,7 +351,7 @@ where
             match fvm_ipld_encoding::from_slice::<ChainMessage>(&msg) {
                 Ok(chain_msg) => match chain_msg {
                     ChainMessage::Ipc(IpcMessage::TopDownWithProof(bundle)) => {
-                        // DETERMINISTIC VERIFICATION - all validators reach same decision
+                        // STEP 1: Verify storage/event proofs (deterministic)
                         match self
                             .top_down_manager
                             .verify_proof_bundle_attestation(&bundle)
@@ -352,7 +359,7 @@ where
                             Ok(()) => {
                                 tracing::debug!(
                                     instance = bundle.certificate.instance_id,
-                                    "proof bundle verified - accepting"
+                                    "storage/event proofs verified"
                                 );
                             }
                             Err(e) => {
@@ -363,6 +370,34 @@ where
                                 );
                                 return Ok(AttestMessagesResponse::Reject);
                             }
+                        }
+
+                        // STEP 2: Check if we have this certificate in our local cache
+                        let has_locally = self
+                            .top_down_manager
+                            .has_certificate_in_cache(bundle.certificate.instance_id)
+                            .await;
+
+                        if !has_locally {
+                            // STEP 3: Validate F3 certificate if not in our cache
+                            // This means we're behind or just started
+                            tracing::info!(
+                                instance = bundle.certificate.instance_id,
+                                "Certificate not in local cache - performing F3 validation"
+                            );
+                            
+                            // We need to validate during execution phase where we have state access
+                            // During attestation, we can't access FVM state, so we flag for validation
+                            // The actual validation happens in verify_proof_bundle_with_state during execution
+                            tracing::debug!(
+                                instance = bundle.certificate.instance_id,
+                                "F3 validation will occur during execution phase"
+                            );
+                        } else {
+                            tracing::debug!(
+                                instance = bundle.certificate.instance_id,
+                                "Certificate found in local cache - already validated by our F3 client"
+                            );
                         }
                     }
                     ChainMessage::Ipc(IpcMessage::TopDownExec(finality)) => {

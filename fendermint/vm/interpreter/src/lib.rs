@@ -30,6 +30,15 @@ where
         msg: Vec<u8>,
         is_recheck: bool,
     ) -> Result<CheckResponse, CheckMessageError>;
+    
+    /// Set the proof cache for F3 proof-based parent finality (if supported)
+    /// Default implementation does nothing for interpreters that don't support F3
+    async fn set_proof_cache(
+        &self, 
+        _cache: std::sync::Arc<fendermint_vm_topdown_proof_service::ProofCache>,
+    ) {
+        // Default: no-op for interpreters without F3 support
+    }
 
     async fn prepare_messages_for_block(
         &self,

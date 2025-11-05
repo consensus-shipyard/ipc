@@ -4338,6 +4338,7 @@ dependencies = [
  "dirs",
  "fendermint_vm_encoding",
  "fendermint_vm_topdown",
+ "fendermint_vm_topdown_proof_service",
  "fvm_ipld_encoding 0.5.3",
  "fvm_shared",
  "ipc-api",
@@ -4784,11 +4785,7 @@ dependencies = [
  "fendermint_vm_message",
  "fendermint_vm_resolver",
  "fendermint_vm_topdown",
-<<<<<<< HEAD
  "fil_actor_adm",
-=======
- "fendermint_vm_topdown_proof_service",
->>>>>>> 9c2672466 (feat: init lifecycle)
  "fil_actor_eam",
  "fil_actor_evm",
  "futures-core",
@@ -4811,6 +4808,7 @@ dependencies = [
  "num-traits",
  "pin-project",
  "prometheus",
+ "proofs",
  "quickcheck",
  "quickcheck_macros",
  "rand 0.8.5",
@@ -4980,7 +4978,6 @@ dependencies = [
  "humantime-serde",
  "ipc-api",
  "ipc-observability",
- "ipc-provider",
  "keccak-hash",
  "multihash 0.18.1",
  "multihash-codetable",
@@ -4998,11 +4995,16 @@ dependencies = [
  "tracing-subscriber 0.3.22",
  "url",
 ]
+
 [[package]]
 name = "ff"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d013fc25338cc558c5c2cfbad646908fb23591e2404481826742b651c9af7160"
+dependencies = [
+ "rand_core 0.6.4",
+ "subtle",
+]
 
 [[package]]
 name = "ff"
@@ -11134,7 +11136,7 @@ dependencies = [
 [[package]]
 name = "proofs"
 version = "0.1.0"
-source = "git+https://github.com/consensus-shipyard/ipc-filecoin-proofs.git?branch=proofs#287aa5d052bb32d191ec0103e6bbb8373f0b3bd3"
+source = "git+https://github.com/consensus-shipyard/ipc-filecoin-proofs?branch=proofs#287aa5d052bb32d191ec0103e6bbb8373f0b3bd3"
 dependencies = [
  "anyhow",
  "base64 0.21.7",
