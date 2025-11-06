@@ -15,13 +15,14 @@ use crate::f3_client::F3Client;
 use crate::types::CacheEntry;
 use anyhow::{Context, Result};
 use std::sync::Arc;
+use tokio::sync::Mutex;
 use tokio::time::{interval, MissedTickBehavior};
 
 /// Main proof generator service
 pub struct ProofGeneratorService {
     config: ProofServiceConfig,
     cache: Arc<ProofCache>,
-    f3_client: Arc<F3Client>,
+    f3_client: Arc<Mutex<F3Client>>,
     assembler: Arc<ProofAssembler>,
 }
 
@@ -67,7 +68,7 @@ impl ProofGeneratorService {
 
         // Create F3 client for certificate fetching + validation
         // Uses provided power table from F3CertManager actor
-        let f3_client = Arc::new(
+        let f3_client = Arc::new(Mutex::new(
             F3Client::new(
                 &config.parent_rpc_url,
                 &config.f3_network_name,
@@ -75,7 +76,7 @@ impl ProofGeneratorService {
                 initial_power_table,
             )
             .context("Failed to create F3 client")?,
-        );
+        ));
 
         // Create proof assembler
         let assembler = Arc::new(
@@ -131,8 +132,8 @@ impl ProofGeneratorService {
     /// CRITICAL: Processes F3 instances SEQUENTIALLY - never skips!
     async fn generate_next_proofs(&self) -> Result<()> {
         let last_committed = self.cache.last_committed_instance();
-        // Lookahead window starts AFTER last_committed (which was already processed)
-        let next_instance = last_committed + 1;
+        // Start FROM last_committed (not +1) - F3 client expects to validate from current state
+        let next_instance = last_committed;
         let max_instance = last_committed + self.config.lookahead_instances;
 
         tracing::debug!(
@@ -150,10 +151,24 @@ impl ProofGeneratorService {
                 continue;
             }
 
+            // Check if F3 client has already passed this instance
+            {
+                let f3_client = self.f3_client.lock().await;
+                let f3_current = f3_client.current_instance();
+                if f3_current > instance_id {
+                    tracing::debug!(
+                        instance_id,
+                        f3_current,
+                        "F3 client already past this instance, skipping"
+                    );
+                    continue;
+                }
+            }
+
             // ====================
             // STEP 1: FETCH + VALIDATE certificate (single operation!)
             // ====================
-            let validated = match self.f3_client.fetch_and_validate(instance_id).await {
+            let validated = match self.f3_client.lock().await.fetch_and_validate(instance_id).await {
                 Ok(cert) => cert,
                 Err(e)
                     if e.to_string().contains("not found")
@@ -174,19 +189,46 @@ impl ProofGeneratorService {
                 }
             };
 
+            // Skip certificates with empty suffix (no epochs to prove)
+            if validated.f3_cert.ec_chain.suffix().is_empty() {
+                tracing::warn!(
+                    instance_id,
+                    "Certificate has empty suffix, skipping proof generation"
+                );
+                continue;
+            }
+
+            // Log detailed certificate information for debugging
+            let suffix = &validated.f3_cert.ec_chain.suffix();
+            let base_epoch = validated.f3_cert.ec_chain.base().map(|b| b.epoch);
+            let suffix_epochs: Vec<i64> = suffix.iter().map(|ts| ts.epoch).collect();
+            
             tracing::info!(
                 instance_id,
-                ec_chain_len = validated.f3_cert.ec_chain.suffix().len(),
+                ec_chain_len = suffix.len(),
+                base_epoch = ?base_epoch,
+                suffix_epochs = ?suffix_epochs,
                 "Certificate fetched and validated successfully"
             );
 
             // ====================
             // STEP 2: GENERATE proof bundle
             // ====================
-            let proof_bundle = self
+            let proof_bundle = match self
                 .generate_proof_for_certificate(&validated.f3_cert)
                 .await
-                .context("Failed to generate proof bundle")?;
+            {
+                Ok(bundle) => bundle,
+                Err(e) => {
+                    tracing::error!(
+                        instance_id,
+                        error = %e,
+                        error_chain = ?e,
+                        "Failed to generate proof bundle - detailed error"
+                    );
+                    return Err(e).context("Failed to generate proof bundle");
+                }
+            };
 
             // ====================
             // STEP 3: CACHE the result

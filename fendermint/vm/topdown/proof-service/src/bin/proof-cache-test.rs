@@ -127,7 +127,7 @@ async fn run_service(
     .await?;
 
     // Get the power table
-    let current_state = temp_client.get_state().await;
+    let current_state = temp_client.get_state();
     let power_table = current_state.power_table;
 
     println!("Power table fetched: {} entries", power_table.0.len());
@@ -149,6 +149,8 @@ async fn run_service(
         retention_instances: 2,
         max_cache_size_bytes: 0,
         fallback_rpc_urls: vec![],
+        max_epoch_lag: 100,
+        rpc_lookback_limit: 900,
     };
 
     let (cache, _handle) = launch_service(config, initial_instance, power_table, db_path).await?;
