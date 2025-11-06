@@ -28,7 +28,7 @@ use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{
     address::Address, chainid::ChainID, clock::ChainEpoch, econ::TokenAmount, error::ExitCode,
-    message::Message, receipt::Receipt, version::NetworkVersion, ActorID,
+    message::Message, receipt::Receipt, version::NetworkVersion, ActorID, MethodNum,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -42,6 +42,33 @@ pub type ActorAddressMap = HashMap<ActorID, Address>;
 
 /// The result of the message application bundled with any delegated addresses of event emitters.
 pub type ExecResult = anyhow::Result<(ApplyRet, ActorAddressMap)>;
+
+/// The return value extended with some things from the message that
+/// might not be available to the caller, because of the message lookups
+/// and transformations that happen along the way, e.g. where we need
+/// a field, we might just have a CID.
+pub struct FvmApplyRet {
+    pub apply_ret: ApplyRet,
+    pub from: Address,
+    pub to: Address,
+    pub method_num: MethodNum,
+    pub gas_limit: u64,
+    /// Delegated addresses of event emitters, if they have one.
+    pub emitters: HashMap<ActorID, Address>,
+}
+
+impl From<FvmApplyRet> for crate::types::AppliedMessage {
+    fn from(ret: FvmApplyRet) -> Self {
+        Self {
+            apply_ret: ret.apply_ret,
+            from: ret.from,
+            to: ret.to,
+            method_num: ret.method_num,
+            gas_limit: ret.gas_limit,
+            emitters: ret.emitters,
+        }
+    }
+}
 
 /// Parts of the state which evolve during the lifetime of the chain.
 #[serde_as]

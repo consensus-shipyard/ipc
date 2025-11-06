@@ -19,20 +19,20 @@ pub enum IpcMessage {
     /// state that to be checked and voted by validators.
     TopDownExec(ParentFinality),
 
-    // /// Proposed by validators at the credit debit interval set at genesis.
-    // DebitCreditAccounts,
+    /// Proposed by validators at the credit debit interval set at genesis.
+    DebitCreditAccounts,
 
-    // /// List of blobs that needs to be enqueued for resolution.
-    // BlobPending(PendingBlob),
+    /// List of blobs that needs to be enqueued for resolution.
+    BlobPending(PendingBlob),
 
-    // /// Proposed by validators when a blob has been finalized and is ready to be executed.
-    // BlobFinalized(FinalizedBlob),
+    /// Proposed by validators when a blob has been finalized and is ready to be executed.
+    BlobFinalized(FinalizedBlob),
 
-    // /// Proposed by validators when a read request has been enqueued for resolution.
-    // ReadRequestPending(PendingReadRequest),
+    /// Proposed by validators when a read request has been enqueued for resolution.
+    ReadRequestPending(PendingReadRequest),
 
-    // /// Proposed by validators when a read request has been closed.
-    // ReadRequestClosed(ClosedReadRequest),
+    /// Proposed by validators when a read request has been closed.
+    ReadRequestClosed(ClosedReadRequest),
 }
 
 /// A proposal of the parent view that validators will be voting on.

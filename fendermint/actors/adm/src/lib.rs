@@ -18,7 +18,7 @@
 use std::collections::HashMap;
 
 use fil_actors_runtime::{
-    actor_dispatch, actor_error,
+    actor_dispatch, actor_error, deserialize_block, extract_send_result,
     runtime::{ActorCode, Runtime},
     ActorError, INIT_ACTOR_ADDR,
 };
@@ -93,16 +93,14 @@ impl Actor {
         };
 
         // Call Init.Exec4 to create the machine actor
-        let exec_result = rt.send(
+        let exec_return: Exec4Return = deserialize_block(extract_send_result(rt.send(
             &INIT_ACTOR_ADDR,
             EXEC4_METHOD,
-            Some(IpldBlock::serialize_cbor(&exec_params)?),
-            TokenAmount::zero(),
+            IpldBlock::serialize_cbor(&exec_params)?,
+            TokenAmount::from_atto(0),
             None, // gas limit
             fvm_shared::sys::SendFlags::empty(),
-        )?;
-
-        let exec_return: Exec4Return = exec_result.deserialize()?;
+        ))?)?;
 
         // Call machine.Init to initialize it with its ID address
         let init_params = fendermint_actor_machine::InitParams {
@@ -112,8 +110,8 @@ impl Actor {
         rt.send(
             &Address::new_id(exec_return.id_address),
             fendermint_actor_machine::INIT_METHOD,
-            Some(IpldBlock::serialize_cbor(&init_params)?),
-            TokenAmount::zero(),
+            IpldBlock::serialize_cbor(&init_params)?,
+            TokenAmount::from_atto(0),
             None, // gas limit
             fvm_shared::sys::SendFlags::empty(),
         )?;

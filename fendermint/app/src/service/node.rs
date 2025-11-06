@@ -9,8 +9,10 @@ use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, R
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::fvm::interpreter::FvmMessagesInterpreter;
 use fendermint_vm_interpreter::fvm::observe::register_metrics as register_interpreter_metrics;
+use fendermint_vm_interpreter::fvm::recall_env::{BlobPool, ReadRequestPool};
 use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
+use fendermint_vm_iroh_resolver::pool::ResolvePool;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::observe::register_metrics as register_topdown_metrics;
 use fendermint_vm_topdown::proxy::{IPCProviderProxy, IPCProviderProxyWithLatency};
@@ -250,6 +252,16 @@ pub async fn run(
         parent_finality_votes.clone(),
     );
 
+    // Create Recall blob and read request resolution pools
+    let blob_pool: BlobPool = ResolvePool::new();
+    let read_request_pool: ReadRequestPool = ResolvePool::new();
+
+    // Recall configuration - TODO: make these configurable via settings
+    let blob_concurrency = 10u32;
+    let read_request_concurrency = 10u32;
+    let blob_metrics_interval = 10i64;
+    let blob_queue_gas_limit = 10_000_000_000u64;
+
     let interpreter = FvmMessagesInterpreter::new(
         end_block_manager,
         top_down_manager,
@@ -258,6 +270,12 @@ pub async fn run(
         settings.abci.block_max_msgs,
         settings.fvm.gas_overestimation_rate,
         settings.fvm.gas_search_step,
+        blob_pool,
+        blob_concurrency,
+        read_request_pool,
+        read_request_concurrency,
+        blob_metrics_interval,
+        blob_queue_gas_limit,
     );
 
     let app: App<_, _, AppStore, _> = App::new(

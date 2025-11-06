@@ -3,22 +3,29 @@
 
 use anyhow::{Context, Result};
 use cid::Cid;
+use fendermint_actor_blobs_shared::blobs::{BlobStatus, FinalizeBlobParams, SetBlobPendingParams};
+use fendermint_actor_blobs_shared::bytes::B256;
+use fendermint_actor_blobs_shared::method::Method::{DebitAccounts, FinalizeBlob, SetBlobPending};
+use fendermint_actor_blobs_shared::BLOBS_ACTOR_ADDR;
+use fendermint_vm_actor_interface::system;
 use fendermint_vm_message::chain::ChainMessage;
 use fendermint_vm_message::ipc::IpcMessage;
 use fendermint_vm_message::query::{FvmQuery, StateParams};
 use fendermint_vm_message::signed::SignedMessage;
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::{self};
-use fvm_shared::{address::Address, error::ExitCode};
+use fvm_ipld_encoding::{self, RawBytes};
+use fvm_shared::{address::Address, error::ExitCode, clock::ChainEpoch};
 use std::sync::Arc;
 use std::time::Instant;
-
+use crate::fvm::state::FvmApplyRet;
 use crate::errors::*;
 use crate::fvm::end_block_hook::{EndBlockManager, PowerUpdates};
 use crate::fvm::executions::{
     execute_cron_message, execute_signed_message, push_block_to_chainmeta_actor_if_possible,
 };
 use crate::fvm::gas_estimation::{estimate_gassed_msg, gas_search};
+use crate::fvm::recall_env::{BlobPool, ReadRequestPool};
+use crate::fvm::recall_helpers::{close_read_request, create_implicit_message, read_request_callback, set_read_request_pending};
 use crate::fvm::topdown::TopDownManager;
 use crate::fvm::{
     activity::ValidatorActivityTracker,
@@ -59,6 +66,14 @@ where
 
     gas_overestimation_rate: f64,
     gas_search_step: f64,
+
+    // Recall blob and read request resolution
+    blob_pool: BlobPool,
+    blob_concurrency: u32,
+    read_request_pool: ReadRequestPool,
+    read_request_concurrency: u32,
+    blob_metrics_interval: ChainEpoch,
+    blob_queue_gas_limit: u64,
 }
 
 impl<DB> FvmMessagesInterpreter<DB>
@@ -73,6 +88,12 @@ where
         max_msgs_per_block: usize,
         gas_overestimation_rate: f64,
         gas_search_step: f64,
+        blob_pool: BlobPool,
+        blob_concurrency: u32,
+        read_request_pool: ReadRequestPool,
+        read_request_concurrency: u32,
+        blob_metrics_interval: ChainEpoch,
+        blob_queue_gas_limit: u64,
     ) -> Self {
         Self {
             end_block_manager,
@@ -82,6 +103,12 @@ where
             max_msgs_per_block,
             gas_overestimation_rate,
             gas_search_step,
+            blob_pool,
+            blob_concurrency,
+            read_request_pool,
+            read_request_concurrency,
+            blob_metrics_interval,
+            blob_queue_gas_limit,
         }
     }
 
@@ -338,6 +365,25 @@ where
                             return Ok(AttestMessagesResponse::Reject);
                         }
                     }
+                    ChainMessage::Ipc(IpcMessage::DebitCreditAccounts) => {
+                        // System message - no additional validation needed here
+                    }
+                    ChainMessage::Ipc(IpcMessage::BlobPending(_)) => {
+                        // Blob pending messages are validated in prepare_messages_for_block
+                        // Just accept them here
+                    }
+                    ChainMessage::Ipc(IpcMessage::BlobFinalized(_)) => {
+                        // Blob finalized messages are validated in prepare_messages_for_block
+                        // Just accept them here
+                    }
+                    ChainMessage::Ipc(IpcMessage::ReadRequestPending(_)) => {
+                        // Read request pending messages are validated in prepare_messages_for_block
+                        // Just accept them here
+                    }
+                    ChainMessage::Ipc(IpcMessage::ReadRequestClosed(_)) => {
+                        // Read request closed messages are validated in prepare_messages_for_block
+                        // Just accept them here
+                    }
                     ChainMessage::Signed(signed) => {
                         if signed.message.gas_fee_cap < *base_fee {
                             tracing::warn!(
@@ -464,6 +510,144 @@ where
                         self.top_down_manager.execute_topdown_msg(state, p).await?;
                     Ok(ApplyMessageResponse {
                         applied_message,
+                        domain_hash: None,
+                    })
+                }
+                IpcMessage::DebitCreditAccounts => {
+                    let from = system::SYSTEM_ACTOR_ADDR;
+                    let to = BLOBS_ACTOR_ADDR;
+                    let method_num = DebitAccounts as u64;
+                    let gas_limit = crate::fvm::constants::BLOCK_GAS_LIMIT;
+                    let msg = create_implicit_message(to, method_num, Default::default(), gas_limit);
+                    let (apply_ret, emitters) = state.execute_implicit(msg)?;
+                    let ret = FvmApplyRet {
+                        apply_ret,
+                        from,
+                        to,
+                        method_num,
+                        gas_limit,
+                        emitters,
+                    };
+                    Ok(ApplyMessageResponse {
+                        applied_message: ret.into(),
+                        domain_hash: None,
+                    })
+                }
+                IpcMessage::BlobPending(blob) => {
+                    let from = system::SYSTEM_ACTOR_ADDR;
+                    let to = BLOBS_ACTOR_ADDR;
+                    let method_num = SetBlobPending as u64;
+                    let gas_limit = self.blob_queue_gas_limit;
+                    let source = B256(*blob.source.as_bytes());
+                    let hash = B256(*blob.hash.as_bytes());
+                    let params = SetBlobPendingParams {
+                        source,
+                        subscriber: blob.subscriber,
+                        hash,
+                        size: blob.size,
+                        id: blob.id.clone(),
+                    };
+                    let params = RawBytes::serialize(params)
+                        .context("failed to serialize SetBlobPendingParams")?;
+                    let msg = create_implicit_message(to, method_num, params, gas_limit);
+                    let (apply_ret, emitters) = state.execute_implicit(msg)?;
+
+                    tracing::debug!(
+                        hash = %blob.hash,
+                        "chain interpreter has set blob to pending"
+                    );
+
+                    let ret = FvmApplyRet {
+                        apply_ret,
+                        from,
+                        to,
+                        method_num,
+                        gas_limit,
+                        emitters,
+                    };
+
+                    Ok(ApplyMessageResponse {
+                        applied_message: ret.into(),
+                        domain_hash: None,
+                    })
+                }
+                IpcMessage::BlobFinalized(blob) => {
+                    let from = system::SYSTEM_ACTOR_ADDR;
+                    let to = BLOBS_ACTOR_ADDR;
+                    let method_num = FinalizeBlob as u64;
+                    let gas_limit = self.blob_queue_gas_limit;
+                    let source = B256(*blob.source.as_bytes());
+                    let hash = B256(*blob.hash.as_bytes());
+                    let status = if blob.succeeded {
+                        BlobStatus::Resolved
+                    } else {
+                        BlobStatus::Failed
+                    };
+                    let params = FinalizeBlobParams {
+                        source,
+                        subscriber: blob.subscriber,
+                        hash,
+                        size: blob.size,
+                        id: blob.id,
+                        status,
+                    };
+                    let params = RawBytes::serialize(params)
+                        .context("failed to serialize FinalizeBlobParams")?;
+                    let msg = create_implicit_message(to, method_num, params, gas_limit);
+                    let (apply_ret, emitters) = state.execute_implicit(msg)?;
+
+                    tracing::debug!(
+                        hash = %blob.hash,
+                        "chain interpreter has finalized blob"
+                    );
+
+                    let ret = FvmApplyRet {
+                        apply_ret,
+                        from,
+                        to,
+                        method_num,
+                        gas_limit,
+                        emitters,
+                    };
+
+                    Ok(ApplyMessageResponse {
+                        applied_message: ret.into(),
+                        domain_hash: None,
+                    })
+                }
+                IpcMessage::ReadRequestPending(read_request) => {
+                    // Set the read request to "pending" state
+                    let ret = set_read_request_pending(state, read_request.id)?;
+
+                    tracing::debug!(
+                        request_id = %read_request.id,
+                        "chain interpreter has set read request to pending"
+                    );
+
+                    Ok(ApplyMessageResponse {
+                        applied_message: ret.into(),
+                        domain_hash: None,
+                    })
+                }
+                IpcMessage::ReadRequestClosed(read_request) => {
+                    // Send the data to the callback address.
+                    // If this fails (e.g., the callback address is not reachable),
+                    // we will still close the request.
+                    //
+                    // We MUST use a non-privileged actor (BLOB_READER_ACTOR_ADDR) to call the callback.
+                    // This is to prevent malicious user from accessing unauthorized APIs.
+                    read_request_callback(state, &read_request)?;
+
+                    // Set the status of the request to closed.
+                    let ret = close_read_request(state, read_request.id)?;
+
+                    tracing::debug!(
+                        hash = %read_request.id,
+                        "chain interpreter has closed read request"
+                    );
+
+                    Ok(ApplyMessageResponse {
+                        applied_message: ret.into(),
                         domain_hash: None,
                     })
                 }
