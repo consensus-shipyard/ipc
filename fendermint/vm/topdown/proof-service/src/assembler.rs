@@ -41,13 +41,18 @@ const NEW_POWER_CHANGE_REQUEST_SIGNATURE: &str =
 /// Storage slot offset for topDownNonce in the Subnet struct
 /// In the Gateway actor's subnets mapping: mapping(SubnetID => Subnet)
 /// The Subnet struct field layout (see contracts/contracts/structs/Subnet.sol):
-///   - id (SubnetID): slot 0
-///   - stake (uint256): slot 1  
-///   - topDownNonce (uint64): slot 2
-///   - appliedBottomUpNonce (uint64): slot 2 (packed with topDownNonce)
-///   - genesisEpoch (bytes[]): slot 3+
+///   - id (SubnetID): slot 0-1 (SubnetID has 2 fields)
+///   - stake (uint256): slot 2
+///   - topDownNonce (uint64): slot 3 
+///   - appliedBottomUpNonce (uint64): slot 3 (packed with topDownNonce)
+///   - genesisEpoch (uint256): slot 4
 /// We need the nonce to verify top-down message ordering
-const TOPDOWN_NONCE_STORAGE_OFFSET: u64 = 2;
+const TOPDOWN_NONCE_STORAGE_OFFSET: u64 = 3;
+
+/// Storage slot for nextConfigurationNumber in GatewayActorStorage
+/// This is used to track configuration changes for power updates
+/// Based on the storage layout, nextConfigurationNumber is at slot 20
+const NEXT_CONFIG_NUMBER_STORAGE_SLOT: u64 = 20;
 
 /// Assembles proof bundles from F3 certificates and parent chain data
 ///
@@ -97,12 +102,17 @@ impl ProofAssembler {
         let generation_start = Instant::now();
         let instance_id = certificate.gpbft_instance;
 
+        // Get the highest (most recent) epoch from the certificate
+        // F3 certificates contain finalized epochs. On testnets like Calibration,
+        // F3 may lag significantly behind the current chain head (sometimes days).
+        // This can cause issues with RPC lookback limits.
         let highest_epoch = certificate
             .ec_chain
             .suffix()
-            .last()
+            .last()  // Get the most recent epoch in the suffix
+            .or_else(|| certificate.ec_chain.base())  // Fallback to base if suffix is empty
             .map(|ts| ts.epoch)
-            .context("No epochs in certificate")?;
+            .context("Certificate has no epochs in suffix or base")?;
 
         tracing::debug!(
             instance_id,
@@ -161,15 +171,25 @@ impl ProofAssembler {
             serde_json::from_value(child_tipset).context("Failed to deserialize child tipset")?;
 
         // Configure proof specs for Gateway contract
-        // Storage: subnets[subnetKey].topDownNonce
+        // Storage:
+        //   - subnets[subnetKey].topDownNonce: For topdown message ordering
+        //   - nextConfigurationNumber: For power change tracking
         // Events:
         //   - NewTopDownMessage: Captures topdown messages for this subnet
         //   - NewPowerChangeRequest: Captures validator power changes
-        let storage_specs = vec![StorageProofSpec {
-            actor_id: self.gateway_actor_id,
-            // Calculate slot for subnets[subnetKey].topDownNonce in the mapping
-            slot: calculate_storage_slot(&self.subnet_id, TOPDOWN_NONCE_STORAGE_OFFSET),
-        }];
+        let storage_specs = vec![
+            StorageProofSpec {
+                actor_id: self.gateway_actor_id,
+                // Calculate slot for subnets[subnetKey].topDownNonce in the mapping
+                slot: calculate_storage_slot(&self.subnet_id, TOPDOWN_NONCE_STORAGE_OFFSET),
+            },
+            StorageProofSpec {
+                actor_id: self.gateway_actor_id,
+                // nextConfigurationNumber is a direct storage variable at slot 20
+                // Using an empty key with the slot offset to get the direct variable
+                slot: calculate_storage_slot("", NEXT_CONFIG_NUMBER_STORAGE_SLOT),
+            },
+        ];
 
         let event_specs = vec![
             // Capture topdown messages for this specific subnet
