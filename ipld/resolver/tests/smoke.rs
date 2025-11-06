@@ -342,8 +342,8 @@ fn make_config(rng: &mut StdRng, cluster_size: u32, bootstrap_addr: Option<Multi
         membership: MembershipConfig {
             static_subnets: vec![],
             max_subnets: 10,
-            publish_interval: Duration::from_secs(5),
-            min_time_between_publish: Duration::from_secs(1),
+            publish_interval: Duration::from_millis(500),
+            min_time_between_publish: Duration::from_millis(100),
             max_provider_age: Duration::from_secs(60),
         },
         content: ContentConfig {
