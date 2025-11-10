@@ -16,7 +16,7 @@ use num_traits::Zero;
 use serde_json::json;
 
 use crate::cmd;
-use crate::cmd::key::read_secret_key;
+use crate::cmd::key::parse_secret_key_hex;
 use crate::cmd::rpc::print_json;
 use crate::options::blob::{BlobArgs, BlobCommands};
 
@@ -49,15 +49,15 @@ cmd! {
 
 async fn finalize_blob(
     url: tendermint_rpc::Url,
-    secret_key_path: &std::path::Path,
+    secret_key_hex: &str,
     subscriber: Address,
     hash_str: &str,
     id: &str,
     status: u8,
     gas_limit: u64,
 ) -> anyhow::Result<()> {
-    // Read the secret key
-    let sk = read_secret_key(secret_key_path)?;
+    // Parse the secret key from hex string
+    let sk = parse_secret_key_hex(secret_key_hex)?;
 
     // Parse the hash (assume it's hex)
     let hash_bytes = if hash_str.starts_with("0x") {

@@ -3,6 +3,7 @@
 use anyhow::{anyhow, Context};
 use base64::Engine;
 use bytes::Bytes;
+use fendermint_actor_bucket::Object;
 use fendermint_vm_actor_interface::eam::{self, CreateReturn};
 use fvm_ipld_encoding::{BytesDe, RawBytes};
 use tendermint::abci::response::DeliverTx;
@@ -57,4 +58,11 @@ pub fn decode_fevm_return_data(data: RawBytes) -> anyhow::Result<Vec<u8>> {
     fvm_ipld_encoding::from_slice::<BytesDe>(&data)
         .map(|bz| bz.0)
         .map_err(|e| anyhow!("failed to deserialize bytes returned by FEVM method invocation: {e}"))
+}
+
+/// Decode the result of a bucket GetObject call.
+pub fn decode_os_get(deliver_tx: &DeliverTx) -> anyhow::Result<Option<Object>> {
+    let data = decode_data(&deliver_tx.data)?;
+    fvm_ipld_encoding::from_slice::<Option<Object>>(&data)
+        .map_err(|e| anyhow!("error parsing as Option<Object>: {e}"))
 }

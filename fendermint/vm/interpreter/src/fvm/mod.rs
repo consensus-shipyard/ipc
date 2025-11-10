@@ -14,9 +14,6 @@ pub mod topdown;
 pub mod upgrades;
 pub use interpreter::FvmMessagesInterpreter;
 
-use fendermint_vm_event::ParentFinalityMissingQuorum;
-use fvm_shared::event::StampedEvent;
-
 #[cfg(any(test, feature = "bundle"))]
 pub mod bundle;
 

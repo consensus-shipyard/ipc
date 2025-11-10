@@ -9,6 +9,7 @@ use bytes::Bytes;
 use fendermint_crypto::SecretKey;
 use fendermint_vm_actor_interface::{eam, evm};
 use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
+use fendermint_actor_bucket::{GetParams, Method::GetObject};
 use fvm_ipld_encoding::{BytesSer, RawBytes};
 use fvm_shared::{
     address::Address, chainid::ChainID, econ::TokenAmount, message::Message, MethodNum, METHOD_SEND,
@@ -115,6 +116,18 @@ impl MessageFactory {
         self.set_sequence(msg.sequence);
 
         Ok(msg)
+    }
+
+    /// Get an object from a bucket.
+    pub fn os_get(
+        &mut self,
+        address: Address,
+        params: GetParams,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<Message> {
+        let params = RawBytes::serialize(params)?;
+        Ok(self.transaction(address, GetObject as u64, params, value, gas_params))
     }
 }
 /// Wrapper for MessageFactory which generates signed messages

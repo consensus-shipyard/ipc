@@ -29,8 +29,13 @@ fendermint_actor_activity_tracker = { path = "../../actors/activity-tracker" }
 fendermint_actor_f3_light_client = { path = "../../actors/f3-light-client" }
 fendermint_actor_gas_market_eip1559 = { path = "../../actors/gas_market/eip1559" }
 fendermint_actor_eam = { path = "../../actors/eam" }
+fendermint_actor_adm = { path = "../../actors/adm" }
+fendermint_actor_blobs = { path = "../../actors/blobs" }
 fendermint_actor_blobs_shared = { path = "../../actors/blobs/shared" }
 fendermint_actor_blob_reader = { path = "../../actors/blob_reader" }
+fendermint_actor_recall_config = { path = "../../actors/recall_config" }
+fendermint_actor_recall_config_shared = { path = "../../actors/recall_config/shared" }
+fil_actor_adm = { workspace = true }
 fil_actor_evm = { workspace = true }
 fendermint_testing = { path = "../../testing", optional = true }
 ipc_actors_abis = { path = "../../../contract-bindings" }

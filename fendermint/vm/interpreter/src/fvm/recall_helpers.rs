@@ -28,9 +28,8 @@ use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{address::Address, message::Message, MethodNum};
 use iroh_blobs::Hash;
 use std::collections::HashSet;
-use std::sync::Arc;
 
-use super::state::{FvmExecState, FvmQueryState};
+use super::state::FvmExecState;
 use super::store::ReadOnlyBlockstore;
 use crate::fvm::state::FvmApplyRet;
 

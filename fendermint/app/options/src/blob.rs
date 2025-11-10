@@ -1,8 +1,6 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::path::PathBuf;
-
 use clap::{Args, Subcommand};
 use crate::parse::parse_address;
 use fvm_shared::address::Address;
@@ -21,9 +19,9 @@ pub enum BlobCommands {
         #[arg(long, short, default_value = "http://127.0.0.1:26657")]
         url: tendermint_rpc::Url,
 
-        /// Path to the secret key file
+        /// Secret key as hex string (with or without 0x prefix)
         #[arg(long, short)]
-        secret_key: PathBuf,
+        secret_key: String,
 
         /// Subscriber address (owner of the blob)
         #[arg(long, value_parser = parse_address)]

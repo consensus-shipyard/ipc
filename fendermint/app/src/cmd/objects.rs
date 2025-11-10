@@ -11,38 +11,11 @@ use anyhow::{anyhow, Context};
 use bytes::Buf;
 use entangler::{ChunkRange, Config, EntanglementResult, Entangler};
 use entangler_storage::iroh::IrohStorage as EntanglerIrohStorage;
-// use fendermint_actor_bucket::{GetParams, Object}; // TODO: bucket not available (depends on ADM)
-// Stub types for bucket actor (until ADM is available)
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct GetParams(pub Vec<u8>);
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct HashBytes(pub Vec<u8>);
-
-impl HashBytes {
-    fn as_array(&self) -> [u8; 32] {
-        let mut arr = [0u8; 32];
-        let len = self.0.len().min(32);
-        arr[..len].copy_from_slice(&self.0[..len]);
-        arr
-    }
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct ObjectMetadata {
-    pub name: String,
-    pub content_type: String,
-}
-
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-pub struct Object {
-    pub hash: HashBytes,
-    pub recovery_hash: HashBytes,
-    pub metadata: ObjectMetadata,
-}
+use fendermint_actor_bucket::{GetParams, Object};
 use fendermint_app_settings::objects::ObjectsSettings;
-use fendermint_rpc::{client::FendermintClient, QueryClient};
+use fendermint_rpc::{client::FendermintClient, message::GasParams, QueryClient};
 use fendermint_vm_message::query::FvmQueryHeight;
+use fvm_shared::econ::TokenAmount;
 use futures_util::{StreamExt, TryStreamExt};
 use fvm_shared::address::{Address, Error as NetworkError, Network};
 use ipc_api::ethers_address_to_fil_address;
@@ -635,7 +608,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
 
     match maybe_object {
         Some(object) => {
-            let seq_hash = Hash::from_bytes(object.hash.as_array());
+            let seq_hash = Hash::from_bytes(object.hash.0);
             let (hash, size) = get_blob_hash_and_size(&iroh, seq_hash).await.map_err(|e| {
                 Rejection::from(BadRequest {
                     message: e.to_string(),
@@ -647,7 +620,7 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
                     message: format!("failed to create entangler: {}", e),
                 })
             })?;
-            let recovery_hash = Hash::from_bytes(object.recovery_hash.as_array());
+            let recovery_hash = Hash::from_bytes(object.recovery_hash.0);
 
             let object_range = match range {
                 Some(range) => {
@@ -754,7 +727,9 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
 
             let content_type = object
                 .metadata
-                .content_type.clone();
+                .get("content-type")
+                .cloned()
+                .unwrap_or_else(|| "application/octet-stream".to_string());
             header_map.insert(
                 "Content-Type",
                 HeaderValue::from_str(&content_type).unwrap(),
@@ -842,16 +817,24 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
 
 // RPC methods
 
-// TODO: Re-enable when ADM bucket actor is available
-#[allow(unused)]
 async fn os_get<F: QueryClient + Send + Sync>(
-    _client: F,
-    _address: Address,
-    _params: GetParams,
-    _height: u64,
+    mut client: F,
+    address: Address,
+    params: GetParams,
+    height: u64,
 ) -> anyhow::Result<Option<Object>> {
-    // Temporarily disabled until ADM bucket actor is available
-    anyhow::bail!("ADM bucket actor not yet available in this branch")
+    let gas_params = GasParams {
+        gas_limit: Default::default(),
+        gas_fee_cap: Default::default(),
+        gas_premium: Default::default(),
+    };
+    let h = FvmQueryHeight::from(height);
+
+    let return_data = client
+        .os_get_call(address, params, TokenAmount::default(), gas_params, h)
+        .await?;
+
+    Ok(return_data)
 }
 
 fn get_filename_with_extension(filename: &str, content_type: &str) -> Option<String> {

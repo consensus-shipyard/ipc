@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::{Context, Result};
+use async_stm::atomically;
 use cid::Cid;
 use fendermint_actor_blobs_shared::blobs::{BlobStatus, FinalizeBlobParams, SetBlobPendingParams};
 use fendermint_actor_blobs_shared::bytes::B256;
@@ -9,12 +10,13 @@ use fendermint_actor_blobs_shared::method::Method::{DebitAccounts, FinalizeBlob,
 use fendermint_actor_blobs_shared::BLOBS_ACTOR_ADDR;
 use fendermint_vm_actor_interface::system;
 use fendermint_vm_message::chain::ChainMessage;
-use fendermint_vm_message::ipc::IpcMessage;
+use fendermint_vm_message::ipc::{FinalizedBlob, IpcMessage, PendingBlob};
 use fendermint_vm_message::query::{FvmQuery, StateParams};
 use fendermint_vm_message::signed::SignedMessage;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{self, RawBytes};
 use fvm_shared::{address::Address, error::ExitCode, clock::ChainEpoch};
+use num_traits::Zero;
 use std::sync::Arc;
 use std::time::Instant;
 use crate::fvm::state::FvmApplyRet;
@@ -24,8 +26,11 @@ use crate::fvm::executions::{
     execute_cron_message, execute_signed_message, push_block_to_chainmeta_actor_if_possible,
 };
 use crate::fvm::gas_estimation::{estimate_gassed_msg, gas_search};
-use crate::fvm::recall_env::{BlobPool, ReadRequestPool};
-use crate::fvm::recall_helpers::{close_read_request, create_implicit_message, read_request_callback, set_read_request_pending};
+use crate::fvm::recall_env::{BlobPool, BlobPoolItem, ReadRequestPool, ReadRequestPoolItem};
+use crate::fvm::recall_helpers::{
+    close_read_request, create_implicit_message, get_added_blobs, get_pending_blobs,
+    is_blob_finalized, read_request_callback, set_read_request_pending, with_state_transaction,
+};
 use crate::fvm::topdown::TopDownManager;
 use crate::fvm::{
     activity::ValidatorActivityTracker,
@@ -279,7 +284,7 @@ where
 
     async fn prepare_messages_for_block(
         &self,
-        state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
+        mut state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
         msgs: Vec<Vec<u8>>,
         max_transaction_bytes: u64,
     ) -> Result<PrepareMessagesResponse, PrepareMessagesError> {
@@ -308,8 +313,88 @@ where
             .await
             .into_iter();
 
-        let mut all_msgs = top_down_iter
+        let mut chain_msgs: Vec<ChainMessage> = top_down_iter
             .chain(signed_msgs_iter)
+            .collect();
+
+        // ---- RECALL DEBIT
+        // Maybe debit all credit accounts
+        let current_height = state.block_height();
+        // let debit_interval = state.recall_config_tracker().blob_credit_debit_interval;
+        // if current_height > 0 && debit_interval > 0 && current_height % debit_interval == 0 {
+            // chain_msgs.push(ChainMessage::Ipc(IpcMessage::DebitCreditAccounts));
+        // }
+
+        // ---- RECALL BLOBS
+        // Collect finalized blobs from the pool
+        let (local_blobs_count, local_finalized_blobs) = atomically(|| self.blob_pool.collect()).await;
+        let mut blobs: Vec<ChainMessage> = vec![];
+
+        // Process finalized blobs
+        if !local_finalized_blobs.is_empty() {
+            // Begin state transaction to check blob status
+            state.state_tree_mut().begin_transaction();
+
+            for item in local_finalized_blobs.iter() {
+                let (finalized, status) = is_blob_finalized(&mut state, item.subscriber, item.hash, item.id.clone())
+                    .map_err(|e| PrepareMessagesError::Other(e))?;
+
+                if finalized {
+                    tracing::debug!(hash = %item.hash, "blob already finalized on chain (status={:?}); removing from pool", status);
+                    atomically(|| self.blob_pool.remove_task(item)).await;
+                    atomically(|| self.blob_pool.remove_result(item)).await;
+                    continue;
+                }
+
+                // For POC, consider all local resolutions as having quorum
+                // In production, this would check actual validator votes via finality provider
+                tracing::debug!(hash = %item.hash, size = item.size, "blob resolved locally; adding tx to chain");
+                blobs.push(ChainMessage::Ipc(IpcMessage::BlobFinalized(FinalizedBlob {
+                    subscriber: item.subscriber,
+                    hash: item.hash,
+                    size: item.size,
+                    id: item.id.clone(),
+                    source: item.source,
+                    succeeded: true, // Assuming success for now
+                })));
+            }
+
+            state.state_tree_mut().end_transaction(true)
+                .expect("interpreter failed to end state transaction");
+
+            // Append finalized blobs
+            chain_msgs.extend(blobs);
+        }
+
+        // Get added blobs from the blob actor and create BlobPending messages
+        let local_resolving_blobs_count = local_blobs_count.saturating_sub(local_finalized_blobs.len());
+        let added_blobs_fetch_count = self.blob_concurrency.saturating_sub(local_resolving_blobs_count as u32);
+
+        if !added_blobs_fetch_count.is_zero() {
+            let added_blobs = with_state_transaction(&mut state, |state| {
+                get_added_blobs(state, added_blobs_fetch_count)
+            })
+            .map_err(|e| PrepareMessagesError::Other(e))?;
+
+            println!("added blobs: {added_blobs:?}");
+
+            // Create BlobPending messages to add blobs to the resolution pool
+            for (hash, size, sources) in added_blobs {
+                for (subscriber, id, source) in sources {
+                    chain_msgs.push(ChainMessage::Ipc(IpcMessage::BlobPending(PendingBlob {
+                        subscriber,
+                        hash,
+                        size,
+                        id: id.clone(),
+                        source,
+                    })));
+                }
+            }
+        }
+
+        // Encode all chain messages to IPLD
+        let mut all_msgs = chain_msgs
+            .into_iter()
             .map(|msg| fvm_ipld_encoding::to_vec(&msg).context("failed to encode message as IPLD"))
             .collect::<Result<Vec<Vec<u8>>>>()?;
 
@@ -556,6 +641,18 @@ where
                         hash = %blob.hash,
                         "chain interpreter has set blob to pending"
                     );
+
+                    // Add the blob to the resolution pool for Iroh to download
+                    atomically(|| {
+                        self.blob_pool.add(BlobPoolItem {
+                            subscriber: blob.subscriber,
+                            hash: blob.hash,
+                            size: blob.size,
+                            id: blob.id.clone(),
+                            source: blob.source,
+                        })
+                    })
+                    .await;
 
                     let ret = FvmApplyRet {
                         apply_ret,
