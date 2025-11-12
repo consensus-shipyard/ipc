@@ -94,9 +94,20 @@ cmd! {
                 .and(with_iroh_blobs(iroh_resolver_node.clone()))
                 .and_then(handle_object_download);
 
+                let blobs_download = warp::path!("v1" / "blobs" / String)
+                .and(
+                    warp::get().map(|| "GET".to_string()).or(warp::head().map(|| "HEAD".to_string())).unify()
+                )
+                .and(warp::header::optional::<String>("Range"))
+                .and(warp::query::<HeightQuery>())
+                .and(with_client(client.clone()))
+                .and(with_iroh_blobs(iroh_resolver_node.clone()))
+                .and_then(handle_blob_download);
+
                 let router = health
                     .or(node_addr)
                     .or(objects_upload)
+                    .or(blobs_download)
                     .or(objects_download)
                     .with(warp::cors().allow_any_origin()
                         .allow_headers(vec!["Content-Type"])
@@ -282,7 +293,8 @@ async fn handle_node_addr(iroh: IrohNode) -> Result<impl Reply, Rejection> {
 
 #[derive(Serialize)]
 struct UploadResponse {
-    hash: String,
+    hash: String,  // Hash sequence hash (for bucket storage)
+    orig_hash: String,  // Original blob content hash (for addBlob)
     metadata_hash: String,
 }
 
@@ -360,7 +372,7 @@ async fn handle_object_upload(
                 }));
             }
 
-            info!(
+            println!(
                 "downloaded blob {} in {:?} (size: {}; local_size: {}; downloaded_size: {})",
                 hash, outcome.stats.elapsed, size, outcome.local_size, outcome.downloaded_size,
             );
@@ -410,7 +422,7 @@ async fn handle_object_upload(
                 }));
             };
             COUNTER_BYTES_UPLOADED.inc_by(size);
-            info!("stored uploaded blob {} (size: {})", hash, size);
+            println!("stored uploaded blob {} (size: {})", hash, size);
 
             hash
         }
@@ -428,6 +440,8 @@ async fn handle_object_upload(
         }
     };
 
+    println!("DEBUG UPLOAD: Raw uploaded hash: {}", hash);
+
     let ent = new_entangler(iroh.blobs_client()).map_err(|e| {
         Rejection::from(BadRequest {
             message: format!("failed to create entangler: {}", e),
@@ -439,6 +453,11 @@ async fn handle_object_upload(
         })
     })?;
 
+    println!("DEBUG UPLOAD: Entanglement result:");
+    println!("  orig_hash: {}", ent_result.orig_hash);
+    println!("  metadata_hash: {}", ent_result.metadata_hash);
+    println!("  upload_results count: {}", ent_result.upload_results.len());
+
     let hash_seq_hash = tag_entangled_data(&iroh, &ent_result, upload_id)
         .await
         .map_err(|e| {
@@ -447,11 +466,14 @@ async fn handle_object_upload(
             })
         })?;
 
+    println!("DEBUG UPLOAD: hash_seq_hash: {}", hash_seq_hash);
+
     COUNTER_BLOBS_UPLOADED.inc();
     HISTOGRAM_UPLOAD_TIME.observe(start_time.elapsed().as_secs_f64());
 
     let response = UploadResponse {
         hash: hash_seq_hash.to_string(),
+        orig_hash: ent_result.orig_hash.clone(),
         metadata_hash: ent_result.metadata_hash,
     };
     Ok(warp::reply::json(&response))
@@ -757,6 +779,203 @@ async fn handle_object_download<F: QueryClient + Send + Sync>(
     }
 }
 
+/// Handle direct blob download by querying the blobs actor.
+async fn handle_blob_download<F: QueryClient + Send + Sync>(
+    blob_hash_str: String,
+    method: String,
+    range: Option<String>,
+    height_query: HeightQuery,
+    client: F,
+    iroh: BlobsClient,
+) -> Result<impl Reply, Rejection> {
+    // Strip 0x prefix if present
+    let blob_hash_hex = blob_hash_str.strip_prefix("0x").unwrap_or(&blob_hash_str);
+
+    let blob_hash_bytes = hex::decode(blob_hash_hex).map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("invalid blob hash {}: {}", blob_hash_str, e),
+        })
+    })?;
+
+    if blob_hash_bytes.len() != 32 {
+        return Err(Rejection::from(BadRequest {
+            message: format!("blob hash must be 32 bytes, got {}", blob_hash_bytes.len()),
+        }));
+    }
+
+    let mut hash_array = [0u8; 32];
+    hash_array.copy_from_slice(&blob_hash_bytes);
+    let blob_hash = fendermint_actor_blobs_shared::bytes::B256(hash_array);
+
+    let height = height_query
+        .height
+        .unwrap_or(FvmQueryHeight::Committed.into());
+
+    let start_time = Instant::now();
+
+    // Query the blobs actor to get blob info
+    let maybe_blob = blob_get(client, blob_hash, height)
+        .await
+        .map_err(|e| {
+            Rejection::from(BadRequest {
+                message: format!("blobs actor query error: {}", e),
+            })
+        })?;
+
+    match maybe_blob {
+        Some(blob) => {
+            // The blob hash from blobs actor is the hash sequence hash
+            // We need to parse it to get the original content hash
+            let hash_seq_hash = Hash::from_bytes(blob_hash.0);
+            let size = blob.size;
+
+            println!("DEBUG: Blob download request");
+            println!("DEBUG: hash_seq_hash from URL: {}", hex::encode(blob_hash.0));
+            println!("DEBUG: hash_seq as Hash: {}", hash_seq_hash);
+            println!("DEBUG: metadata_hash: {}", hex::encode(blob.metadata_hash.0));
+            println!("DEBUG: size from actor: {}", size);
+
+            // Read the hash sequence to get the original content hash
+            use iroh_blobs::hashseq::HashSeq;
+            let hash_seq_bytes = iroh
+                .read_to_bytes(hash_seq_hash)
+                .await
+                .map_err(|e| {
+                    Rejection::from(BadRequest {
+                        message: format!("failed to read hash sequence: {} {}", hash_seq_hash, e),
+                    })
+                })?;
+
+            let hash_seq = HashSeq::try_from(hash_seq_bytes).map_err(|e| {
+                Rejection::from(BadRequest {
+                    message: format!("failed to parse hash sequence: {}", e),
+                })
+            })?;
+
+            // First hash in the sequence is the original content
+            let orig_hash = hash_seq.iter().next().ok_or_else(|| {
+                Rejection::from(BadRequest {
+                    message: "hash sequence is empty".to_string(),
+                })
+            })?;
+
+            println!("DEBUG: Parsed orig_hash from hash sequence: {}", orig_hash);
+
+            let object_range = match range {
+                Some(range) => {
+                    let (first_byte, last_byte) = get_range_params(range, size).map_err(|e| {
+                        Rejection::from(BadRequest {
+                            message: e.to_string(),
+                        })
+                    })?;
+                    let len = (last_byte - first_byte) + 1;
+
+                    // Use read_at for range requests on the original content
+                    use iroh_blobs::rpc::client::blobs::ReadAtLen;
+                    let read_len = ReadAtLen::AtMost(len);
+                    let bytes = iroh
+                        .read_at_to_bytes(orig_hash, first_byte, read_len)
+                        .await
+                        .map_err(|e| {
+                            Rejection::from(BadRequest {
+                                message: format!("failed to read blob at range: {} {}", orig_hash, e),
+                            })
+                        })?;
+
+                    let body = Body::from(bytes);
+                    ObjectRange {
+                        start: first_byte,
+                        end: last_byte,
+                        len,
+                        size,
+                        body,
+                    }
+                }
+                None => {
+                    // Read the entire original content blob directly from Iroh
+                    println!("DEBUG: Reading original content with hash: {}", orig_hash);
+                    println!("DEBUG: Expected size: {}", size);
+
+                    let reader = iroh
+                        .read(orig_hash)
+                        .await
+                        .map_err(|e| {
+                            Rejection::from(BadRequest {
+                                message: format!("failed to read blob: {} {}", orig_hash, e),
+                            })
+                        })?;
+
+                    let mut chunk_count = 0;
+                    let bytes_stream = reader.map(move |chunk_result: Result<bytes::Bytes, _>| {
+                        match &chunk_result {
+                            Ok(bytes) => {
+                                chunk_count += 1;
+                                println!("DEBUG: Chunk {}: {} bytes", chunk_count, bytes.len());
+                                println!("DEBUG: Chunk {} hex: {}", chunk_count, hex::encode(&bytes[..bytes.len().min(64)]));
+                                println!("DEBUG: Chunk {} content: {:?}", chunk_count, String::from_utf8_lossy(&bytes[..bytes.len().min(64)]));
+                            }
+                            Err(e) => {
+                                println!("DEBUG: Error reading chunk: {}", e);
+                            }
+                        }
+                        chunk_result.map_err(|e: std::io::Error| anyhow::anyhow!(e))
+                    });
+
+                    let body = Body::wrap_stream(bytes_stream);
+                    ObjectRange {
+                        start: 0,
+                        end: size - 1,
+                        len: size,
+                        size,
+                        body,
+                    }
+                }
+            };
+
+            // If it is a HEAD request, we don't need to send the body
+            if method == "HEAD" {
+                let mut response = warp::reply::Response::new(Body::empty());
+                let mut header_map = HeaderMap::new();
+                header_map.insert("Content-Length", HeaderValue::from(object_range.len));
+                let headers = response.headers_mut();
+                headers.extend(header_map);
+                return Ok(response);
+            }
+
+            let mut response = warp::reply::Response::new(object_range.body);
+            let mut header_map = HeaderMap::new();
+            if object_range.len < object_range.size {
+                *response.status_mut() = StatusCode::PARTIAL_CONTENT;
+                header_map.insert(
+                    "Content-Range",
+                    HeaderValue::from_str(&format!(
+                        "bytes {}-{}/{}",
+                        object_range.start, object_range.end, object_range.size
+                    ))
+                    .unwrap(),
+                );
+            } else {
+                header_map.insert("Accept-Ranges", HeaderValue::from_str("bytes").unwrap());
+            }
+            header_map.insert("Content-Length", HeaderValue::from(object_range.len));
+            header_map.insert(
+                "Content-Type",
+                HeaderValue::from_str("application/octet-stream").unwrap(),
+            );
+
+            let headers = response.headers_mut();
+            headers.extend(header_map);
+
+            COUNTER_BLOBS_DOWNLOADED.inc();
+            COUNTER_BYTES_DOWNLOADED.inc_by(object_range.len);
+            HISTOGRAM_DOWNLOAD_TIME.observe(start_time.elapsed().as_secs_f64());
+
+            Ok(response)
+        }
+        None => Err(Rejection::from(NotFound)),
+    }
+}
+
 /// Parse an f/eth-address from string.
 pub fn parse_address(s: &str) -> anyhow::Result<Address> {
     let addr = Network::Mainnet
@@ -832,6 +1051,25 @@ async fn os_get<F: QueryClient + Send + Sync>(
 
     let return_data = client
         .os_get_call(address, params, TokenAmount::default(), gas_params, h)
+        .await?;
+
+    Ok(return_data)
+}
+
+async fn blob_get<F: QueryClient + Send + Sync>(
+    mut client: F,
+    blob_hash: fendermint_actor_blobs_shared::bytes::B256,
+    height: u64,
+) -> anyhow::Result<Option<fendermint_actor_blobs_shared::blobs::Blob>> {
+    let gas_params = GasParams {
+        gas_limit: Default::default(),
+        gas_fee_cap: Default::default(),
+        gas_premium: Default::default(),
+    };
+    let h = FvmQueryHeight::from(height);
+
+    let return_data = client
+        .blob_get_call(blob_hash, TokenAmount::default(), gas_params, h)
         .await?;
 
     Ok(return_data)

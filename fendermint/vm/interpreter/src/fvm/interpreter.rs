@@ -299,8 +299,8 @@ where
             })
             .collect::<Vec<_>>();
 
-        let signed_msgs =
-            select_messages_above_base_fee(signed_msgs, state.block_gas_tracker().base_fee());
+        // let signed_msgs =
+        //     select_messages_above_base_fee(signed_msgs, state.block_gas_tracker().base_fee());
 
         let total_gas_limit = state.block_gas_tracker().available();
         let signed_msgs_iter = select_messages_by_gas_limit(signed_msgs, total_gas_limit)
@@ -327,20 +327,51 @@ where
 
         // ---- RECALL BLOBS
         // Collect finalized blobs from the pool
-        let (local_blobs_count, local_finalized_blobs) = atomically(|| self.blob_pool.collect()).await;
-        let mut blobs: Vec<ChainMessage> = vec![];
+        let (mut local_blobs_count, local_finalized_blobs) = atomically(|| self.blob_pool.collect()).await;
+
+        // If the local blob pool is empty and there are pending blobs on-chain,
+        // we may have restarted the validator. We can hydrate the pool here.
+        if local_blobs_count == 0 {
+            let pending_blobs = with_state_transaction(&mut state, |state| {
+                get_pending_blobs(state, self.blob_concurrency)
+            })
+            .map_err(|e| PrepareMessagesError::Other(e))?;
+
+            println!("pending_blobs: {pending_blobs:?}");
+
+            // Add them to the resolution pool
+            for (hash, size, sources) in pending_blobs {
+                for (subscriber, id, source) in sources {
+                    atomically(|| {
+                        self.blob_pool.add(BlobPoolItem {
+                            subscriber,
+                            hash,
+                            size,
+                            id: id.clone(),
+                            source,
+                        })
+                    })
+                    .await;
+                    local_blobs_count += 1;
+                }
+            }
+        }
 
         // Process finalized blobs
         if !local_finalized_blobs.is_empty() {
+            let mut blobs: Vec<ChainMessage> = vec![];
             // Begin state transaction to check blob status
             state.state_tree_mut().begin_transaction();
 
+            println!("local_finalized_blobs: {}", local_finalized_blobs.len());
             for item in local_finalized_blobs.iter() {
+                println!("Checking blob finalization: hash={}, subscriber={}", item.hash, item.subscriber);
                 let (finalized, status) = is_blob_finalized(&mut state, item.subscriber, item.hash, item.id.clone())
                     .map_err(|e| PrepareMessagesError::Other(e))?;
 
+                println!("Blob status check: finalized={}, status={:?}", finalized, status);
                 if finalized {
-                    tracing::debug!(hash = %item.hash, "blob already finalized on chain (status={:?}); removing from pool", status);
+                    println!("Blob already finalized on chain, removing from pool");
                     atomically(|| self.blob_pool.remove_task(item)).await;
                     atomically(|| self.blob_pool.remove_result(item)).await;
                     continue;
@@ -348,7 +379,7 @@ where
 
                 // For POC, consider all local resolutions as having quorum
                 // In production, this would check actual validator votes via finality provider
-                tracing::debug!(hash = %item.hash, size = item.size, "blob resolved locally; adding tx to chain");
+                println!("Creating BlobFinalized message for hash={}, subscriber={}, size={}", item.hash, item.subscriber, item.size);
                 blobs.push(ChainMessage::Ipc(IpcMessage::BlobFinalized(FinalizedBlob {
                     subscriber: item.subscriber,
                     hash: item.hash,
@@ -381,6 +412,7 @@ where
             // Create BlobPending messages to add blobs to the resolution pool
             for (hash, size, sources) in added_blobs {
                 for (subscriber, id, source) in sources {
+                    println!("Creating BlobPending: subscriber={}, id={}, hash={}", subscriber, id, hash);
                     chain_msgs.push(ChainMessage::Ipc(IpcMessage::BlobPending(PendingBlob {
                         subscriber,
                         hash,
@@ -669,6 +701,7 @@ where
                     })
                 }
                 IpcMessage::BlobFinalized(blob) => {
+                    println!("EXECUTING BlobFinalized: hash={}, subscriber={}, succeeded={}", blob.hash, blob.subscriber, blob.succeeded);
                     let from = system::SYSTEM_ACTOR_ADDR;
                     let to = BLOBS_ACTOR_ADDR;
                     let method_num = FinalizeBlob as u64;
@@ -685,13 +718,17 @@ where
                         subscriber: blob.subscriber,
                         hash,
                         size: blob.size,
-                        id: blob.id,
+                        id: blob.id.clone(),
                         status,
                     };
+                    println!("FinalizeBlobParams: subscriber={}, size={}, hash={:?}, id={}",
+                        params.subscriber, params.size, params.hash, params.id);
                     let params = RawBytes::serialize(params)
                         .context("failed to serialize FinalizeBlobParams")?;
                     let msg = create_implicit_message(to, method_num, params, gas_limit);
+                    println!("Calling FinalizeBlob actor method...");
                     let (apply_ret, emitters) = state.execute_implicit(msg)?;
+                    println!("FinalizeBlob execution result: exit_code={:?}", apply_ret.msg_receipt.exit_code);
 
                     tracing::debug!(
                         hash = %blob.hash,

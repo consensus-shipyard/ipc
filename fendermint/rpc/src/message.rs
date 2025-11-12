@@ -129,6 +129,21 @@ impl MessageFactory {
         let params = RawBytes::serialize(params)?;
         Ok(self.transaction(address, GetObject as u64, params, value, gas_params))
     }
+
+    pub fn blob_get(
+        &mut self,
+        blob_hash: fendermint_actor_blobs_shared::bytes::B256,
+        value: TokenAmount,
+        gas_params: GasParams,
+    ) -> anyhow::Result<Message> {
+        use fendermint_actor_blobs_shared::blobs::GetBlobParams;
+        use fendermint_actor_blobs_shared::method::Method::GetBlob;
+        use fendermint_actor_blobs_shared::BLOBS_ACTOR_ADDR;
+
+        let params = GetBlobParams(blob_hash);
+        let params = RawBytes::serialize(params)?;
+        Ok(self.transaction(BLOBS_ACTOR_ADDR, GetBlob as u64, params, value, gas_params))
+    }
 }
 /// Wrapper for MessageFactory which generates signed messages
 ///

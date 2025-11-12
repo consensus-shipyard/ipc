@@ -2,14 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::Context;
-use bytes::Bytes;
 use fendermint_actor_blobs_shared::blobs::{BlobStatus, FinalizeBlobParams, SubscriptionId};
 use fendermint_actor_blobs_shared::bytes::B256;
 use fendermint_actor_blobs_shared::method::Method;
 use fendermint_actor_blobs_shared::BLOBS_ACTOR_ADDR;
 use fendermint_rpc::client::FendermintClient;
 use fendermint_rpc::message::SignedMessageFactory;
-use fendermint_rpc::tx::{BoundClient, TxClient};
 use fendermint_vm_core::chainid;
 use fvm_shared::address::Address;
 use num_traits::Zero;
@@ -95,8 +93,8 @@ async fn finalize_blob(
         status: blob_status.clone(),
     };
 
-    // Encode params
-    let params_bytes = fvm_ipld_encoding::to_vec(&params)
+    // Encode params as RawBytes for native FVM call
+    let params_bytes = fvm_ipld_encoding::RawBytes::serialize(&params)
         .context("Failed to encode finalize blob params")?;
 
     // Create client with message factory
@@ -107,10 +105,7 @@ async fn finalize_blob(
     let mf = SignedMessageFactory::new(sk, subscriber, 0, chain_id);
     let mut bound_client = client.bind(mf);
 
-    // Create calldata: method number (8 bytes) + params
     let method_num = Method::FinalizeBlob as u64;
-    let mut calldata = method_num.to_be_bytes().to_vec();
-    calldata.extend_from_slice(&params_bytes);
 
     let gas_params = fendermint_rpc::message::GasParams {
         gas_limit,
@@ -118,22 +113,15 @@ async fn finalize_blob(
         gas_premium: Zero::zero(),
     };
 
-    // Create the chain message using the message factory directly
-    let msg = bound_client
-        .message_factory_mut()
-        .fevm_invoke(
-            BLOBS_ACTOR_ADDR.into(),
-            Bytes::from(calldata),
-            Zero::zero(),
-            gas_params,
-        )?;
-
-    // Broadcast with commit mode
-    use fendermint_rpc::tx::TxCommit;
-    let response = TxClient::<TxCommit>::perform(
-        &bound_client,
-        msg,
-        |_| Ok(()),
+    // Use the async transaction method on TxClient trait with TxCommit mode
+    use fendermint_rpc::tx::{TxClient, TxCommit};
+    let response = TxClient::<TxCommit>::transaction(
+        &mut bound_client,
+        BLOBS_ACTOR_ADDR,
+        method_num,
+        params_bytes,
+        Zero::zero(),
+        gas_params,
     )
     .await?;
 
@@ -143,11 +131,17 @@ async fn finalize_blob(
     println!("   Gas used: {}", response.response.deliver_tx.gas_used);
     println!("   Blob status: {:?}", blob_status.clone());
 
+    // response.return_data contains Option<RawBytes> from the transaction
+    let return_data_hex = response.return_data
+        .map(|data| hex::encode(data.bytes()))
+        .unwrap_or_else(|| "none".to_string());
+
     let json = json!({
         "hash": hex::encode(response.response.hash),
         "height": response.response.height.value(),
         "gas_used": response.response.deliver_tx.gas_used,
         "status": format!("{:?}", blob_status),
+        "return_data": return_data_hex,
     });
 
     print_json(&json)

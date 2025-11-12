@@ -66,3 +66,9 @@ pub fn decode_os_get(deliver_tx: &DeliverTx) -> anyhow::Result<Option<Object>> {
     fvm_ipld_encoding::from_slice::<Option<Object>>(&data)
         .map_err(|e| anyhow!("error parsing as Option<Object>: {e}"))
 }
+
+pub fn decode_blob_get(deliver_tx: &DeliverTx) -> anyhow::Result<Option<fendermint_actor_blobs_shared::blobs::Blob>> {
+    let data = decode_data(&deliver_tx.data)?;
+    fvm_ipld_encoding::from_slice::<Option<fendermint_actor_blobs_shared::blobs::Blob>>(&data)
+        .map_err(|e| anyhow!("error parsing as Option<Blob>: {e}"))
+}

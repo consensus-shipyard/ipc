@@ -160,31 +160,12 @@ impl BlobsActor {
     /// This is the final protocol step to add a blob, which is controlled by validator consensus.
     /// The [`BlobStatus::Resolved`] state means that a quorum of validators was able to download the blob.
     /// The [`BlobStatus::Failed`] state means that a quorum of validators was not able to download the blob.
-    ///
-    /// The `subscriber` address must be delegated (only delegated addresses can use credit).
-    ///
     /// # POC Mode
     /// Currently allows any caller to finalize blobs for quick POC testing.
-    ///
-    /// # TODO: Production Security
-    /// For production, restore caller validation:
-    /// ```ignore
-    /// let immediate_caller = rt.message().caller();
-    /// if immediate_caller != SYSTEM_ACTOR_ADDR {
-    ///     // Verify caller owns the blob by checking subscribers
-    ///     let state: State = rt.state()?;
-    ///     let blob = state.get_blob(rt.store(), params.hash)?
-    ///         .ok_or_else(|| ActorError::not_found(...))?;
-    ///     if !blob.subscribers.contains_key(&params.id) {
-    ///         return Err(ActorError::forbidden(...));
-    ///     }
-    /// }
-    /// ```
     pub fn finalize_blob(rt: &impl Runtime, params: FinalizeBlobParams) -> Result<(), ActorError> {
-        // POC: Removed system actor validation to allow manual finalization
-        // rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
-
-        let caller = Caller::new_delegated(rt, params.subscriber, None, CallerOption::None)?;
+        rt.validate_immediate_caller_is(std::iter::once(&SYSTEM_ACTOR_ADDR))?;
+        
+        let caller = Caller::new(rt, params.subscriber, None, CallerOption::None)?;
         let event_resolved = matches!(params.status, BlobStatus::Resolved);
 
         rt.transaction(|st: &mut State, rt| {
