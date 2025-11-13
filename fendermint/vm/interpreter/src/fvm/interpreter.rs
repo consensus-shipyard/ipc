@@ -2,23 +2,35 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use anyhow::{Context, Result};
+use async_stm::atomically;
 use cid::Cid;
+use fendermint_actor_blobs_shared::blobs::{BlobStatus, FinalizeBlobParams, SetBlobPendingParams};
+use fendermint_actor_blobs_shared::bytes::B256;
+use fendermint_actor_blobs_shared::method::Method::{DebitAccounts, FinalizeBlob, SetBlobPending};
+use fendermint_actor_blobs_shared::BLOBS_ACTOR_ADDR;
+use fendermint_vm_actor_interface::system;
 use fendermint_vm_message::chain::ChainMessage;
-use fendermint_vm_message::ipc::IpcMessage;
+use fendermint_vm_message::ipc::{FinalizedBlob, IpcMessage, PendingBlob};
 use fendermint_vm_message::query::{FvmQuery, StateParams};
 use fendermint_vm_message::signed::SignedMessage;
 use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::{self};
-use fvm_shared::{address::Address, error::ExitCode};
+use fvm_ipld_encoding::{self, RawBytes};
+use fvm_shared::{address::Address, error::ExitCode, clock::ChainEpoch};
+use num_traits::Zero;
 use std::sync::Arc;
 use std::time::Instant;
-
+use crate::fvm::state::FvmApplyRet;
 use crate::errors::*;
 use crate::fvm::end_block_hook::{EndBlockManager, PowerUpdates};
 use crate::fvm::executions::{
     execute_cron_message, execute_signed_message, push_block_to_chainmeta_actor_if_possible,
 };
 use crate::fvm::gas_estimation::{estimate_gassed_msg, gas_search};
+use crate::fvm::recall_env::{BlobPool, BlobPoolItem, ReadRequestPool, ReadRequestPoolItem};
+use crate::fvm::recall_helpers::{
+    close_read_request, create_implicit_message, get_added_blobs, get_pending_blobs,
+    is_blob_finalized, read_request_callback, set_read_request_pending, with_state_transaction,
+};
 use crate::fvm::topdown::TopDownManager;
 use crate::fvm::{
     activity::ValidatorActivityTracker,
@@ -59,6 +71,14 @@ where
 
     gas_overestimation_rate: f64,
     gas_search_step: f64,
+
+    // Recall blob and read request resolution
+    blob_pool: BlobPool,
+    blob_concurrency: u32,
+    read_request_pool: ReadRequestPool,
+    read_request_concurrency: u32,
+    blob_metrics_interval: ChainEpoch,
+    blob_queue_gas_limit: u64,
 }
 
 impl<DB> FvmMessagesInterpreter<DB>
@@ -73,6 +93,12 @@ where
         max_msgs_per_block: usize,
         gas_overestimation_rate: f64,
         gas_search_step: f64,
+        blob_pool: BlobPool,
+        blob_concurrency: u32,
+        read_request_pool: ReadRequestPool,
+        read_request_concurrency: u32,
+        blob_metrics_interval: ChainEpoch,
+        blob_queue_gas_limit: u64,
     ) -> Self {
         Self {
             end_block_manager,
@@ -82,6 +108,12 @@ where
             max_msgs_per_block,
             gas_overestimation_rate,
             gas_search_step,
+            blob_pool,
+            blob_concurrency,
+            read_request_pool,
+            read_request_concurrency,
+            blob_metrics_interval,
+            blob_queue_gas_limit,
         }
     }
 
@@ -252,7 +284,7 @@ where
 
     async fn prepare_messages_for_block(
         &self,
-        state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
+        mut state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
         msgs: Vec<Vec<u8>>,
         max_transaction_bytes: u64,
     ) -> Result<PrepareMessagesResponse, PrepareMessagesError> {
@@ -267,8 +299,8 @@ where
             })
             .collect::<Vec<_>>();
 
-        let signed_msgs =
-            select_messages_above_base_fee(signed_msgs, state.block_gas_tracker().base_fee());
+        // let signed_msgs =
+        //     select_messages_above_base_fee(signed_msgs, state.block_gas_tracker().base_fee());
 
         let total_gas_limit = state.block_gas_tracker().available();
         let signed_msgs_iter = select_messages_by_gas_limit(signed_msgs, total_gas_limit)
@@ -281,8 +313,120 @@ where
             .await
             .into_iter();
 
-        let mut all_msgs = top_down_iter
+        let mut chain_msgs: Vec<ChainMessage> = top_down_iter
             .chain(signed_msgs_iter)
+            .collect();
+
+        // ---- RECALL DEBIT
+        // Maybe debit all credit accounts
+        let current_height = state.block_height();
+        // let debit_interval = state.recall_config_tracker().blob_credit_debit_interval;
+        // if current_height > 0 && debit_interval > 0 && current_height % debit_interval == 0 {
+            // chain_msgs.push(ChainMessage::Ipc(IpcMessage::DebitCreditAccounts));
+        // }
+
+        // ---- RECALL BLOBS
+        // Collect finalized blobs from the pool
+        let (mut local_blobs_count, local_finalized_blobs) = atomically(|| self.blob_pool.collect()).await;
+
+        // If the local blob pool is empty and there are pending blobs on-chain,
+        // we may have restarted the validator. We can hydrate the pool here.
+        if local_blobs_count == 0 {
+            let pending_blobs = with_state_transaction(&mut state, |state| {
+                get_pending_blobs(state, self.blob_concurrency)
+            })
+            .map_err(|e| PrepareMessagesError::Other(e))?;
+
+            println!("pending_blobs: {pending_blobs:?}");
+
+            // Add them to the resolution pool
+            for (hash, size, sources) in pending_blobs {
+                for (subscriber, id, source) in sources {
+                    atomically(|| {
+                        self.blob_pool.add(BlobPoolItem {
+                            subscriber,
+                            hash,
+                            size,
+                            id: id.clone(),
+                            source,
+                        })
+                    })
+                    .await;
+                    local_blobs_count += 1;
+                }
+            }
+        }
+
+        // Process finalized blobs
+        if !local_finalized_blobs.is_empty() {
+            let mut blobs: Vec<ChainMessage> = vec![];
+            // Begin state transaction to check blob status
+            state.state_tree_mut().begin_transaction();
+
+            println!("local_finalized_blobs: {}", local_finalized_blobs.len());
+            for item in local_finalized_blobs.iter() {
+                println!("Checking blob finalization: hash={}, subscriber={}", item.hash, item.subscriber);
+                let (finalized, status) = is_blob_finalized(&mut state, item.subscriber, item.hash, item.id.clone())
+                    .map_err(|e| PrepareMessagesError::Other(e))?;
+
+                println!("Blob status check: finalized={}, status={:?}", finalized, status);
+                if finalized {
+                    println!("Blob already finalized on chain, removing from pool");
+                    atomically(|| self.blob_pool.remove_task(item)).await;
+                    atomically(|| self.blob_pool.remove_result(item)).await;
+                    continue;
+                }
+
+                // For POC, consider all local resolutions as having quorum
+                // In production, this would check actual validator votes via finality provider
+                println!("Creating BlobFinalized message for hash={}, subscriber={}, size={}", item.hash, item.subscriber, item.size);
+                blobs.push(ChainMessage::Ipc(IpcMessage::BlobFinalized(FinalizedBlob {
+                    subscriber: item.subscriber,
+                    hash: item.hash,
+                    size: item.size,
+                    id: item.id.clone(),
+                    source: item.source,
+                    succeeded: true, // Assuming success for now
+                })));
+            }
+
+            state.state_tree_mut().end_transaction(true)
+                .expect("interpreter failed to end state transaction");
+
+            // Append finalized blobs
+            chain_msgs.extend(blobs);
+        }
+
+        // Get added blobs from the blob actor and create BlobPending messages
+        let local_resolving_blobs_count = local_blobs_count.saturating_sub(local_finalized_blobs.len());
+        let added_blobs_fetch_count = self.blob_concurrency.saturating_sub(local_resolving_blobs_count as u32);
+
+        if !added_blobs_fetch_count.is_zero() {
+            let added_blobs = with_state_transaction(&mut state, |state| {
+                get_added_blobs(state, added_blobs_fetch_count)
+            })
+            .map_err(|e| PrepareMessagesError::Other(e))?;
+
+            println!("added blobs: {added_blobs:?}");
+
+            // Create BlobPending messages to add blobs to the resolution pool
+            for (hash, size, sources) in added_blobs {
+                for (subscriber, id, source) in sources {
+                    println!("Creating BlobPending: subscriber={}, id={}, hash={}", subscriber, id, hash);
+                    chain_msgs.push(ChainMessage::Ipc(IpcMessage::BlobPending(PendingBlob {
+                        subscriber,
+                        hash,
+                        size,
+                        id: id.clone(),
+                        source,
+                    })));
+                }
+            }
+        }
+
+        // Encode all chain messages to IPLD
+        let mut all_msgs = chain_msgs
+            .into_iter()
             .map(|msg| fvm_ipld_encoding::to_vec(&msg).context("failed to encode message as IPLD"))
             .collect::<Result<Vec<Vec<u8>>>>()?;
 
@@ -337,6 +481,25 @@ where
                         if !self.top_down_manager.is_finality_valid(finality).await {
                             return Ok(AttestMessagesResponse::Reject);
                         }
+                    }
+                    ChainMessage::Ipc(IpcMessage::DebitCreditAccounts) => {
+                        // System message - no additional validation needed here
+                    }
+                    ChainMessage::Ipc(IpcMessage::BlobPending(_)) => {
+                        // Blob pending messages are validated in prepare_messages_for_block
+                        // Just accept them here
+                    }
+                    ChainMessage::Ipc(IpcMessage::BlobFinalized(_)) => {
+                        // Blob finalized messages are validated in prepare_messages_for_block
+                        // Just accept them here
+                    }
+                    ChainMessage::Ipc(IpcMessage::ReadRequestPending(_)) => {
+                        // Read request pending messages are validated in prepare_messages_for_block
+                        // Just accept them here
+                    }
+                    ChainMessage::Ipc(IpcMessage::ReadRequestClosed(_)) => {
+                        // Read request closed messages are validated in prepare_messages_for_block
+                        // Just accept them here
                     }
                     ChainMessage::Signed(signed) => {
                         if signed.message.gas_fee_cap < *base_fee {
@@ -464,6 +627,161 @@ where
                         self.top_down_manager.execute_topdown_msg(state, p).await?;
                     Ok(ApplyMessageResponse {
                         applied_message,
+                        domain_hash: None,
+                    })
+                }
+                IpcMessage::DebitCreditAccounts => {
+                    let from = system::SYSTEM_ACTOR_ADDR;
+                    let to = BLOBS_ACTOR_ADDR;
+                    let method_num = DebitAccounts as u64;
+                    let gas_limit = crate::fvm::constants::BLOCK_GAS_LIMIT;
+                    let msg = create_implicit_message(to, method_num, Default::default(), gas_limit);
+                    let (apply_ret, emitters) = state.execute_implicit(msg)?;
+                    let ret = FvmApplyRet {
+                        apply_ret,
+                        from,
+                        to,
+                        method_num,
+                        gas_limit,
+                        emitters,
+                    };
+                    Ok(ApplyMessageResponse {
+                        applied_message: ret.into(),
+                        domain_hash: None,
+                    })
+                }
+                IpcMessage::BlobPending(blob) => {
+                    let from = system::SYSTEM_ACTOR_ADDR;
+                    let to = BLOBS_ACTOR_ADDR;
+                    let method_num = SetBlobPending as u64;
+                    let gas_limit = self.blob_queue_gas_limit;
+                    let source = B256(*blob.source.as_bytes());
+                    let hash = B256(*blob.hash.as_bytes());
+                    let params = SetBlobPendingParams {
+                        source,
+                        subscriber: blob.subscriber,
+                        hash,
+                        size: blob.size,
+                        id: blob.id.clone(),
+                    };
+                    let params = RawBytes::serialize(params)
+                        .context("failed to serialize SetBlobPendingParams")?;
+                    let msg = create_implicit_message(to, method_num, params, gas_limit);
+                    let (apply_ret, emitters) = state.execute_implicit(msg)?;
+
+                    tracing::debug!(
+                        hash = %blob.hash,
+                        "chain interpreter has set blob to pending"
+                    );
+
+                    // Add the blob to the resolution pool for Iroh to download
+                    atomically(|| {
+                        self.blob_pool.add(BlobPoolItem {
+                            subscriber: blob.subscriber,
+                            hash: blob.hash,
+                            size: blob.size,
+                            id: blob.id.clone(),
+                            source: blob.source,
+                        })
+                    })
+                    .await;
+
+                    let ret = FvmApplyRet {
+                        apply_ret,
+                        from,
+                        to,
+                        method_num,
+                        gas_limit,
+                        emitters,
+                    };
+
+                    Ok(ApplyMessageResponse {
+                        applied_message: ret.into(),
+                        domain_hash: None,
+                    })
+                }
+                IpcMessage::BlobFinalized(blob) => {
+                    println!("EXECUTING BlobFinalized: hash={}, subscriber={}, succeeded={}", blob.hash, blob.subscriber, blob.succeeded);
+                    let from = system::SYSTEM_ACTOR_ADDR;
+                    let to = BLOBS_ACTOR_ADDR;
+                    let method_num = FinalizeBlob as u64;
+                    let gas_limit = self.blob_queue_gas_limit;
+                    let source = B256(*blob.source.as_bytes());
+                    let hash = B256(*blob.hash.as_bytes());
+                    let status = if blob.succeeded {
+                        BlobStatus::Resolved
+                    } else {
+                        BlobStatus::Failed
+                    };
+                    let params = FinalizeBlobParams {
+                        source,
+                        subscriber: blob.subscriber,
+                        hash,
+                        size: blob.size,
+                        id: blob.id.clone(),
+                        status,
+                    };
+                    println!("FinalizeBlobParams: subscriber={}, size={}, hash={:?}, id={}",
+                        params.subscriber, params.size, params.hash, params.id);
+                    let params = RawBytes::serialize(params)
+                        .context("failed to serialize FinalizeBlobParams")?;
+                    let msg = create_implicit_message(to, method_num, params, gas_limit);
+                    println!("Calling FinalizeBlob actor method...");
+                    let (apply_ret, emitters) = state.execute_implicit(msg)?;
+                    println!("FinalizeBlob execution result: exit_code={:?}", apply_ret.msg_receipt.exit_code);
+
+                    tracing::debug!(
+                        hash = %blob.hash,
+                        "chain interpreter has finalized blob"
+                    );
+
+                    let ret = FvmApplyRet {
+                        apply_ret,
+                        from,
+                        to,
+                        method_num,
+                        gas_limit,
+                        emitters,
+                    };
+
+                    Ok(ApplyMessageResponse {
+                        applied_message: ret.into(),
+                        domain_hash: None,
+                    })
+                }
+                IpcMessage::ReadRequestPending(read_request) => {
+                    // Set the read request to "pending" state
+                    let ret = set_read_request_pending(state, read_request.id)?;
+
+                    tracing::debug!(
+                        request_id = %read_request.id,
+                        "chain interpreter has set read request to pending"
+                    );
+
+                    Ok(ApplyMessageResponse {
+                        applied_message: ret.into(),
+                        domain_hash: None,
+                    })
+                }
+                IpcMessage::ReadRequestClosed(read_request) => {
+                    // Send the data to the callback address.
+                    // If this fails (e.g., the callback address is not reachable),
+                    // we will still close the request.
+                    //
+                    // We MUST use a non-privileged actor (BLOB_READER_ACTOR_ADDR) to call the callback.
+                    // This is to prevent malicious user from accessing unauthorized APIs.
+                    read_request_callback(state, &read_request)?;
+
+                    // Set the status of the request to closed.
+                    let ret = close_read_request(state, read_request.id)?;
+
+                    tracing::debug!(
+                        hash = %read_request.id,
+                        "chain interpreter has closed read request"
+                    );
+
+                    Ok(ApplyMessageResponse {
+                        applied_message: ret.into(),
                         domain_hash: None,
                     })
                 }

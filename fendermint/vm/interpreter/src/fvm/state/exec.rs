@@ -18,16 +18,17 @@ use fendermint_vm_genesis::PowerScale;
 use fvm::{
     call_manager::DefaultCallManager,
     engine::MultiEngine,
-    executor::{ApplyFailure, ApplyKind, ApplyRet, DefaultExecutor, Executor},
+    executor::{ApplyFailure, ApplyKind, ApplyRet, Executor},
     machine::{DefaultMachine, Machine, Manifest, NetworkConfig},
     state_tree::StateTree,
-    DefaultKernel,
 };
+use recall_executor::RecallExecutor;
+use recall_kernel::RecallKernel;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{
     address::Address, chainid::ChainID, clock::ChainEpoch, econ::TokenAmount, error::ExitCode,
-    message::Message, receipt::Receipt, version::NetworkVersion, ActorID,
+    message::Message, receipt::Receipt, version::NetworkVersion, ActorID, MethodNum,
 };
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
@@ -41,6 +42,33 @@ pub type ActorAddressMap = HashMap<ActorID, Address>;
 
 /// The result of the message application bundled with any delegated addresses of event emitters.
 pub type ExecResult = anyhow::Result<(ApplyRet, ActorAddressMap)>;
+
+/// The return value extended with some things from the message that
+/// might not be available to the caller, because of the message lookups
+/// and transformations that happen along the way, e.g. where we need
+/// a field, we might just have a CID.
+pub struct FvmApplyRet {
+    pub apply_ret: ApplyRet,
+    pub from: Address,
+    pub to: Address,
+    pub method_num: MethodNum,
+    pub gas_limit: u64,
+    /// Delegated addresses of event emitters, if they have one.
+    pub emitters: HashMap<ActorID, Address>,
+}
+
+impl From<FvmApplyRet> for crate::types::AppliedMessage {
+    fn from(ret: FvmApplyRet) -> Self {
+        Self {
+            apply_ret: ret.apply_ret,
+            from: ret.from,
+            to: ret.to,
+            method_num: ret.method_num,
+            gas_limit: ret.gas_limit,
+            emitters: ret.emitters,
+        }
+    }
+}
 
 /// Parts of the state which evolve during the lifetime of the chain.
 #[serde_as]
@@ -133,8 +161,8 @@ where
     DB: Blockstore + Clone + 'static,
 {
     #[allow(clippy::type_complexity)]
-    executor: DefaultExecutor<
-        DefaultKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
+    executor: RecallExecutor<
+        RecallKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
     >,
     /// Hash of the block currently being executed. For queries and checks this is empty.
     ///
@@ -186,7 +214,7 @@ where
         let engine = multi_engine.get(&nc)?;
         let externs = FendermintExterns::new(blockstore.clone(), params.state_root);
         let machine = DefaultMachine::new(&mc, blockstore.clone(), externs)?;
-        let mut executor = DefaultExecutor::new(engine.clone(), machine)?;
+        let mut executor = RecallExecutor::new(engine.clone(), machine)?;
 
         let block_gas_tracker = BlockGasTracker::create(&mut executor)?;
         let base_fee = block_gas_tracker.base_fee().clone();
@@ -291,8 +319,8 @@ where
     pub fn execute_with_executor<F, R>(&mut self, exec_func: F) -> anyhow::Result<R>
     where
         F: FnOnce(
-            &mut DefaultExecutor<
-                DefaultKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
+            &mut RecallExecutor<
+                RecallKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
             >,
         ) -> anyhow::Result<R>,
     {

@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use std::{path::PathBuf, time::Duration};
+use std::{net::{SocketAddr, SocketAddrV4, SocketAddrV6}, path::PathBuf, time::Duration};
 
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DurationSeconds};
@@ -22,6 +22,7 @@ pub struct ResolverSettings {
     pub membership: MembershipSettings,
     pub connection: ConnectionSettings,
     pub content: ContentSettings,
+    pub iroh_resolver_config: IrohResolverSettings,
 }
 
 impl Default for ResolverSettings {
@@ -33,6 +34,7 @@ impl Default for ResolverSettings {
             membership: Default::default(),
             connection: Default::default(),
             content: Default::default(),
+            iroh_resolver_config: Default::default(),
         }
     }
 }
@@ -171,6 +173,30 @@ impl Default for ContentSettings {
         Self {
             rate_limit_bytes: 0,
             rate_limit_period: Duration::from_secs(0),
+        }
+    }
+}
+
+/// Configuration for Iroh blob storage and transfer
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct IrohResolverSettings {
+    /// IPv4 address for Iroh node
+    pub v4_addr: Option<SocketAddrV4>,
+    /// IPv6 address for Iroh node
+    pub v6_addr: Option<SocketAddrV6>,
+    /// Data directory for Iroh
+    pub iroh_data_dir: PathBuf,
+    /// RPC address for Iroh
+    pub rpc_addr: SocketAddr,
+}
+
+impl Default for IrohResolverSettings {
+    fn default() -> Self {
+        Self {
+            v4_addr: None,
+            v6_addr: None,
+            iroh_data_dir: PathBuf::from("data/iroh_resolver"),
+            rpc_addr: "127.0.0.1:4444".parse().unwrap(),
         }
     }
 }

@@ -1,0 +1,30 @@
+[package]
+name = "fendermint_vm_iroh_resolver"
+description = "Resolve iroh content in messages"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+async-stm = { workspace = true }
+hex = { workspace = true }
+im = { workspace = true }
+iroh = { workspace = true }
+iroh-blobs = { workspace = true }
+libp2p = { workspace = true }
+prometheus = { workspace = true }
+serde = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+
+ipc-api = { path = "../../../ipc/api" }
+ipc_ipld_resolver = { path = "../../../ipld/resolver" }
+ipc-observability = { path = "../../../ipc/observability" }
+
+fendermint_vm_topdown = { path = "../topdown" }
+
+[dev-dependencies]
+rand = { workspace = true }
+tokio = { workspace = true }

@@ -31,6 +31,7 @@ pub use crate::toggle::Toggle;
 pub type BlockHeight = u64;
 pub type Bytes = Vec<u8>;
 pub type BlockHash = Bytes;
+pub type Blob = Bytes;
 
 /// The null round error message
 pub(crate) const NULL_ROUND_ERR_MSG: &str = "requested epoch was a null round";
@@ -133,6 +134,47 @@ impl Display for IPCParentFinality {
             self.height,
             hex::encode(&self.block_hash)
         )
+    }
+}
+
+/// The finality view for IPC blob resolution
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct IPCBlobFinality {
+    pub hash: iroh_blobs::Hash,
+    pub success: bool,
+}
+
+impl IPCBlobFinality {
+    pub fn new(hash: iroh_blobs::Hash, success: bool) -> Self {
+        Self { hash, success }
+    }
+}
+
+impl Display for IPCBlobFinality {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "IPCBlobFinality(hash: {}, success: {})",
+            self.hash, self.success
+        )
+    }
+}
+
+/// The finality view for IPC read request resolution
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct IPCReadRequestClosed {
+    pub hash: iroh_blobs::Hash,
+}
+
+impl IPCReadRequestClosed {
+    pub fn new(hash: iroh_blobs::Hash) -> Self {
+        Self { hash }
+    }
+}
+
+impl Display for IPCReadRequestClosed {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "IPCReadRequestClosed(hash: {})", self.hash)
     }
 }
 

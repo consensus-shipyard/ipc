@@ -68,7 +68,7 @@ impl Config {
         })?;
 
         let config: Config =
-            Config::from_toml_str(contents.as_str()).context("failed to parse config TOML")?;
+            Config::from_toml_str(contents.as_str())?;
 
         Ok(config)
     }

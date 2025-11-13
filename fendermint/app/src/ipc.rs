@@ -13,7 +13,7 @@ use fendermint_vm_interpreter::fvm::state::{FvmExecState, FvmStateParams};
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
 use fendermint_vm_interpreter::MessagesInterpreter;
 use fendermint_vm_topdown::sync::ParentFinalityStateQuery;
-use fendermint_vm_topdown::IPCParentFinality;
+use fendermint_vm_topdown::{IPCBlobFinality, IPCParentFinality, IPCReadRequestClosed};
 use fvm_ipld_blockstore::Blockstore;
 use ipc_actors_abis::subnet_actor_checkpointing_facet::{
     AppHashBreakdown, Commitment, CompressedActivityRollup,
@@ -57,6 +57,10 @@ pub fn derive_subnet_app_hash(state: &SubnetAppState) -> tendermint::hash::AppHa
 pub enum AppVote {
     /// The validator considers a certain block final on the parent chain.
     ParentFinality(IPCParentFinality),
+    /// The validator considers a certain blob final.
+    BlobFinality(IPCBlobFinality),
+    /// The validator considers a certain read request completed.
+    ReadRequestClosed(IPCReadRequestClosed),
 }
 
 /// Queries the LATEST COMMITTED parent finality from the storage

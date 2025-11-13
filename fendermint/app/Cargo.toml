@@ -26,6 +26,18 @@ openssl = { workspace = true }
 paste = { workspace = true }
 prometheus = { workspace = true }
 prometheus_exporter = { workspace = true }
+# Objects/Recall HTTP API dependencies
+warp = { workspace = true }
+uuid = { workspace = true }
+mime_guess = { workspace = true }
+urlencoding = { workspace = true }
+entangler = { workspace = true }
+entangler_storage = { workspace = true }
+iroh_manager = { path = "../../recall/iroh_manager" }
+iroh = { workspace = true }
+iroh-blobs = { workspace = true }
+thiserror = { workspace = true }
+futures-util = { workspace = true }
 prost = { workspace = true }
 rand_chacha = { workspace = true }
 serde = { workspace = true }
@@ -48,6 +60,7 @@ url = { workspace = true }
 
 fendermint_abci = { path = "../abci" }
 actors-custom-api = { path = "../actors/api" }
+fendermint_actor_bucket = { path = "../actors/bucket" }
 fendermint_actor_f3_light_client = { path = "../actors/f3-light-client" }
 fendermint_app_options = { path = "./options" }
 fendermint_app_settings = { path = "./settings" }
@@ -59,6 +72,7 @@ fendermint_rpc = { path = "../rpc" }
 fendermint_storage = { path = "../storage" }
 fendermint_tracing = { path = "../tracing" }
 fendermint_actor_gas_market_eip1559 = { path = "../actors/gas_market/eip1559" }
+fendermint_actor_blobs_shared = { path = "../actors/blobs/shared" }
 fendermint_vm_actor_interface = { path = "../vm/actor_interface" }
 fendermint_vm_core = { path = "../vm/core" }
 fendermint_vm_encoding = { path = "../vm/encoding" }
@@ -71,6 +85,10 @@ fendermint_vm_message = { path = "../vm/message" }
 fendermint_vm_resolver = { path = "../vm/resolver" }
 fendermint_vm_snapshot = { path = "../vm/snapshot" }
 fendermint_vm_topdown = { path = "../vm/topdown" }
+fendermint_vm_iroh_resolver = { path = "../vm/iroh_resolver" }
+
+# Recall actors needed for objects command
+# fendermint_actor_bucket = { path = "../actors/bucket" } # TODO: depends on machine/ADM (not in main)
 
 ipc_actors_abis = { path = "../../contract-bindings" }
 ethers = {workspace =  true}

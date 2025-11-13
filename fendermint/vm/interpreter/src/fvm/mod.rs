@@ -6,6 +6,8 @@ mod executions;
 mod externs;
 pub mod interpreter;
 pub mod observe;
+pub mod recall_env;
+pub mod recall_helpers;
 pub mod state;
 pub mod store;
 pub mod topdown;
