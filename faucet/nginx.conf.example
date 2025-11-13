@@ -1,0 +1,99 @@
+# Nginx Configuration for IPC Faucet with HTTPS
+#
+# This is an example configuration for serving the faucet behind
+# an Nginx reverse proxy with SSL/TLS support
+#
+# To use:
+# 1. Install nginx and certbot
+# 2. Copy this file to /etc/nginx/sites-available/ipc-faucet
+# 3. Update YOUR_DOMAIN with your actual domain
+# 4. Get SSL certificate: sudo certbot --nginx -d your-domain.com
+# 5. Enable: sudo ln -s /etc/nginx/sites-available/ipc-faucet /etc/nginx/sites-enabled/
+# 6. Test: sudo nginx -t
+# 7. Reload: sudo systemctl reload nginx
+
+# Redirect HTTP to HTTPS
+server {
+    listen 80;
+    listen [::]:80;
+    server_name YOUR_DOMAIN;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$server_name$request_uri;
+    }
+}
+
+# HTTPS server
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name YOUR_DOMAIN;
+
+    # SSL certificate paths (managed by certbot)
+    ssl_certificate /etc/letsencrypt/live/YOUR_DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/YOUR_DOMAIN/privkey.pem;
+
+    # SSL configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "no-referrer-when-downgrade" always;
+
+    # Logging
+    access_log /var/log/nginx/ipc-faucet-access.log;
+    error_log /var/log/nginx/ipc-faucet-error.log;
+
+    # Max body size for requests
+    client_max_body_size 1M;
+
+    # Proxy to faucet application
+    location / {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+
+        # Timeouts
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+
+    # API endpoints with specific rate limiting
+    location /api/ {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Additional rate limiting at nginx level (optional)
+        # limit_req zone=api_limit burst=5 nodelay;
+    }
+}
+
+# Optional: Rate limiting zone definition
+# Add this to /etc/nginx/nginx.conf in the http block:
+#
+# http {
+#     limit_req_zone $binary_remote_addr zone=api_limit:10m rate=10r/m;
+#     ...
+# }
+
