@@ -49,6 +49,11 @@ contract SubnetActorDiamond {
         address genesisSubnetIpcContractsOwner;
         /// The chain id for the subnet
         uint64 chainID;
+        /// @notice F3 instance ID from parent chain (optional - only for Filecoin parent)
+        /// @dev Set to 0 if parent doesn't have F3. CLI determines if parent is Filecoin.
+        uint64 genesisF3InstanceId;
+        /// @notice Whether F3 instance ID was explicitly set (to distinguish from instance ID 0)
+        bool hasGenesisF3InstanceId;
     }
 
     constructor(IDiamond.FacetCut[] memory _diamondCut, ConstructorParams memory params, address owner) {
@@ -99,6 +104,8 @@ contract SubnetActorDiamond {
         s.currentSubnetHash = s.parentId.createSubnetId(address(this)).toHash();
         s.validatorSet.permissionMode = params.permissionMode;
         s.genesisSubnetIpcContractsOwner = params.genesisSubnetIpcContractsOwner;
+        s.genesisF3InstanceId = params.genesisF3InstanceId;
+        s.hasGenesisF3InstanceId = params.hasGenesisF3InstanceId;
 
         // the validator bitmap is a uint256, which is 256 bits, this allows only 256 validators
         if (params.activeValidatorsLimit > MAX_VALIDATORS_SIZE) revert TooManyValidators();

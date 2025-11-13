@@ -121,6 +121,14 @@ impl StateMachine for StakingMachine {
             validator_rewarder: Default::default(),
             genesis_subnet_ipc_contracts_owner: genesis_subnet_ipc_contracts_owner.into(),
             chain_id: DEFAULT_CHAIN_ID,
+            // F3 (Filecoin Fast Finality) instance ID configuration.
+            // Setting genesis_f3_instance_id=0 with has_genesis_f3_instance_id=false indicates
+            // F3 is not configured for this test subnet. In production scenarios, this field
+            // would be set to the parent chain's current F3 instance ID at subnet creation time
+            // to ensure all subnet nodes start with the same deterministic genesis state.
+            // The boolean flag distinguishes between "F3 explicitly set to instance 0" vs "F3 not configured".
+            genesis_f3_instance_id: 0,
+            has_genesis_f3_instance_id: false,
         };
 
         eprintln!("\n> PARENT IPC: {parent_ipc:?}");
