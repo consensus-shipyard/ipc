@@ -6,6 +6,54 @@ declare -A COMETBFT_PEERS
 declare -A LIBP2P_PEERS
 declare -A VALIDATOR_PUBKEYS
 
+# Global deployment mode
+DEPLOYMENT_MODE=""
+
+# Get deployment mode (local or remote)
+get_deployment_mode() {
+    # Check CLI override first
+    if [ -n "${CLI_MODE:-}" ]; then
+        echo "$CLI_MODE"
+        return
+    fi
+
+    # Check config file
+    local mode=$(yq eval '.deployment.mode // "remote"' "$CONFIG_FILE" 2>/dev/null)
+    if [ -z "$mode" ] || [ "$mode" = "null" ]; then
+        mode="remote"
+    fi
+    echo "$mode"
+}
+
+# Check if running in local mode
+is_local_mode() {
+    [ "$DEPLOYMENT_MODE" = "local" ]
+}
+
+# Get validator port with fallback to default
+# Usage: get_validator_port <validator_idx> <port_type> <default_port>
+get_validator_port() {
+    local validator_idx="$1"
+    local port_type="$2"
+    local default_port="$3"
+
+    # Try to get validator-specific port override
+    local port=$(yq eval ".validators[$validator_idx].ports.$port_type // null" "$CONFIG_FILE" 2>/dev/null)
+
+    if [ "$port" != "null" ] && [ -n "$port" ]; then
+        echo "$port"
+    else
+        echo "$default_port"
+    fi
+}
+
+# Calculate port offset for a validator (for local mode)
+# Validator 0 gets offset 0, validator 1 gets offset 100, etc.
+get_validator_port_offset() {
+    local validator_idx="$1"
+    echo $((validator_idx * 100))
+}
+
 # Load and validate configuration
 load_config() {
     if [ ! -f "$CONFIG_FILE" ]; then
@@ -19,6 +67,9 @@ load_config() {
     LIBP2P_PEERS=()
     VALIDATOR_PUBKEYS=()
 
+    # Determine deployment mode
+    DEPLOYMENT_MODE=$(get_deployment_mode)
+
     # Parse validators
     local validator_count=$(yq eval '.validators | length' "$CONFIG_FILE")
     for ((i=0; i<validator_count; i++)); do
@@ -26,7 +77,7 @@ load_config() {
         VALIDATORS+=("$name")
     done
 
-    log_info "Loaded configuration for ${#VALIDATORS[@]} validators"
+    log_info "Loaded configuration for ${#VALIDATORS[@]} validators (mode: $DEPLOYMENT_MODE)"
 }
 
 # Get config value with environment variable override
@@ -126,7 +177,23 @@ check_requirements() {
         log_check "ok" "yq found"
     fi
 
-    # Check ssh
+    # Check mode-specific requirements
+    if is_local_mode; then
+        # Local mode: check for anvil and ipc-cli
+        if ! command -v anvil &> /dev/null; then
+            log_warn "anvil not found. Install Foundry for Anvil support"
+            log_info "  curl -L https://foundry.paradigm.xyz | bash && foundryup"
+        else
+            log_check "ok" "anvil found"
+        fi
+
+        if ! command -v ipc-cli &> /dev/null; then
+            log_warn "ipc-cli not in PATH. Will use path from config"
+        else
+            log_check "ok" "ipc-cli found"
+        fi
+    else
+        # Remote mode: check for ssh/scp
     if ! command -v ssh &> /dev/null; then
         log_error "ssh not found"
         ((missing++))
@@ -134,12 +201,12 @@ check_requirements() {
         log_check "ok" "ssh found"
     fi
 
-    # Check scp
     if ! command -v scp &> /dev/null; then
         log_error "scp not found"
         ((missing++))
     else
         log_check "ok" "scp found"
+        fi
     fi
 
     if [ $missing -gt 0 ]; then
@@ -150,6 +217,12 @@ check_requirements() {
 
 # Check SSH connectivity to all validators
 check_ssh_connectivity() {
+    # Skip SSH checks in local mode
+    if is_local_mode; then
+        log_info "SSH connectivity check skipped (local mode)"
+        return 0
+    fi
+
     if [ "$DRY_RUN" = true ]; then
         log_info "Checking SSH connectivity (skipped in dry-run mode)..."
         for idx in "${!VALIDATORS[@]}"; do
@@ -200,9 +273,40 @@ generate_node_init_yml() {
     local name="${VALIDATORS[$validator_idx]}"
     local ip=$(get_config_value "validators[$validator_idx].ip")
     local private_key=$(get_config_value "validators[$validator_idx].private_key")
-    local node_home=$(get_config_value "paths.node_home")
-    local cometbft_port=$(get_config_value "network.cometbft_p2p_port")
-    local libp2p_port=$(get_config_value "network.libp2p_port")
+
+    # Get node home (different for local vs remote mode)
+    local node_home
+    if is_local_mode; then
+        node_home=$(get_node_home "$validator_idx")
+    else
+        node_home=$(get_config_value "paths.node_home")
+    fi
+
+    # Get port offset for local mode
+    local port_offset=0
+    if is_local_mode; then
+        port_offset=$(get_validator_port_offset "$validator_idx")
+    fi
+
+    # Calculate ports with offset
+    local cometbft_p2p_port=$(($(get_config_value "network.cometbft_p2p_port") + port_offset))
+    local cometbft_rpc_port=$(($(get_config_value "network.cometbft_rpc_port" 2>/dev/null || echo "26657") + port_offset))
+    local cometbft_abci_port=$(($(get_config_value "network.cometbft_abci_port" 2>/dev/null || echo "26658") + port_offset))
+    local cometbft_prometheus_port=$(($(get_config_value "network.cometbft_prometheus_port" 2>/dev/null || echo "26660") + port_offset))
+    local libp2p_port=$(($(get_config_value "network.libp2p_port") + port_offset - 1))  # -1 to match pattern
+    local eth_api_port=$(($(get_config_value "network.eth_api_port") + port_offset))
+    local eth_metrics_port=$(($(get_config_value "network.eth_metrics_port" 2>/dev/null || echo "9184") + port_offset))
+    local fendermint_metrics_port=$(($(get_config_value "network.fendermint_metrics_port" 2>/dev/null || echo "9185") + port_offset))
+
+    # Override with validator-specific ports if provided
+    cometbft_p2p_port=$(get_validator_port "$validator_idx" "cometbft_p2p" "$cometbft_p2p_port")
+    cometbft_rpc_port=$(get_validator_port "$validator_idx" "cometbft_rpc" "$cometbft_rpc_port")
+    cometbft_abci_port=$(get_validator_port "$validator_idx" "cometbft_abci" "$cometbft_abci_port")
+    cometbft_prometheus_port=$(get_validator_port "$validator_idx" "cometbft_prometheus" "$cometbft_prometheus_port")
+    libp2p_port=$(get_validator_port "$validator_idx" "libp2p" "$libp2p_port")
+    eth_api_port=$(get_validator_port "$validator_idx" "eth_api" "$eth_api_port")
+    eth_metrics_port=$(get_validator_port "$validator_idx" "eth_metrics" "$eth_metrics_port")
+    fendermint_metrics_port=$(get_validator_port "$validator_idx" "fendermint_metrics" "$fendermint_metrics_port")
 
     # Genesis config
     local base_fee=$(get_config_value "init.genesis.base_fee")
@@ -267,7 +371,7 @@ key:
 p2p:
   external-ip: "$ip"
   ports:
-    cometbft: $cometbft_port
+    cometbft: $cometbft_p2p_port
     resolver: $libp2p_port
 EOF
 
@@ -306,6 +410,16 @@ genesis: !create
 
 # Optional: CometBFT configuration overrides
 cometbft-overrides: |
+EOF
+
+    # Add local mode port overrides
+    if is_local_mode; then
+        cat >> "$output_file" << EOF
+  proxy_app = "tcp://127.0.0.1:$cometbft_abci_port"
+EOF
+    fi
+
+    cat >> "$output_file" << EOF
   [consensus]
   # Core consensus timeouts
   timeout_commit = "$timeout_commit"
@@ -329,10 +443,50 @@ cometbft-overrides: |
   max_packet_msg_payload_size = $max_packet_msg_payload_size
 
   [rpc]
+EOF
+
+    # Set RPC laddr based on mode
+    if is_local_mode; then
+        cat >> "$output_file" << EOF
+  laddr = "tcp://0.0.0.0:$cometbft_rpc_port"
+
+  [instrumentation]
+  prometheus_listen_addr = ":$cometbft_prometheus_port"
+EOF
+    else
+        cat >> "$output_file" << EOF
   laddr = "$rpc_laddr"
+EOF
+    fi
+
+    cat >> "$output_file" << EOF
 
 # Optional: Fendermint configuration overrides
 fendermint-overrides: |
+EOF
+
+    # Add local mode port overrides for fendermint
+    if is_local_mode; then
+        cat >> "$output_file" << EOF
+  tendermint_rpc_url = "http://127.0.0.1:$cometbft_rpc_port"
+  tendermint_websocket_url = "ws://127.0.0.1:$cometbft_rpc_port/websocket"
+
+  [abci.listen]
+  port = $cometbft_abci_port
+
+  [eth.listen]
+  port = $eth_api_port
+
+  [eth.metrics.listen]
+  port = $eth_metrics_port
+
+  [metrics.listen]
+  port = $fendermint_metrics_port
+
+EOF
+    fi
+
+    cat >> "$output_file" << EOF
   [resolver]
   enabled = true
 
@@ -354,7 +508,20 @@ fendermint-overrides: |
   parent_gateway = "$parent_gateway"
 
   [resolver.connection]
+EOF
+
+    # Set resolver listen address based on mode
+    if is_local_mode; then
+        cat >> "$output_file" << EOF
+  listen_addr = "/ip4/127.0.0.1/tcp/$libp2p_port"
+EOF
+    else
+        cat >> "$output_file" << EOF
   listen_addr = "/ip4/0.0.0.0/tcp/$libp2p_port"
+EOF
+    fi
+
+    cat >> "$output_file" << EOF
 
   [resolver.network]
   local_key = "validator.sk"
@@ -636,11 +803,12 @@ update_ipc_cli_configs() {
 
     for idx in "${!VALIDATORS[@]}"; do
         local name="${VALIDATORS[$idx]}"
-        local ip=$(get_config_value "validators[$idx].ip")
-        local ssh_user=$(get_config_value "validators[$idx].ssh_user")
-        local ipc_user=$(get_config_value "validators[$idx].ipc_user")
         local ipc_config_dir=$(get_config_value "paths.ipc_config_dir")
         local ipc_config_file=$(get_config_value "paths.ipc_config_file")
+
+        # Expand tilde in paths for local mode
+        ipc_config_dir="${ipc_config_dir/#\~/$HOME}"
+        ipc_config_file="${ipc_config_file/#\~/$HOME}"
 
         log_info "Updating IPC CLI config for $name..."
 
@@ -649,11 +817,10 @@ update_ipc_cli_configs() {
         generate_ipc_cli_config "$temp_config"
 
         # Create directory if it doesn't exist
-        ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-            "mkdir -p $ipc_config_dir"
+        exec_on_host "$idx" "mkdir -p $ipc_config_dir"
 
-        # Copy to remote
-        scp_to_host "$ip" "$ssh_user" "$ipc_user" "$temp_config" "$ipc_config_file"
+        # Copy to target location
+        copy_to_host "$idx" "$temp_config" "$ipc_config_file"
         rm -f "$temp_config"
 
         log_success "IPC CLI config updated for $name"

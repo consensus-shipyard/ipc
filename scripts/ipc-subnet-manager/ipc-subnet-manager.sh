@@ -23,6 +23,8 @@ LOCK_FILE="/tmp/ipc-subnet-manager.lock"
 source "${SCRIPT_DIR}/lib/colors.sh"
 source "${SCRIPT_DIR}/lib/ssh.sh"
 source "${SCRIPT_DIR}/lib/config.sh"
+source "${SCRIPT_DIR}/lib/exec.sh"
+source "${SCRIPT_DIR}/lib/anvil.sh"
 source "${SCRIPT_DIR}/lib/health.sh"
 source "${SCRIPT_DIR}/lib/dashboard.sh"
 
@@ -30,6 +32,7 @@ source "${SCRIPT_DIR}/lib/dashboard.sh"
 VALIDATORS=()
 DRY_RUN=false
 DEBUG=false
+CLI_MODE=""  # Can be set to "local" or "remote" to override config
 
 # Usage information
 usage() {
@@ -59,6 +62,7 @@ Commands:
 
 Options:
     --config FILE        Path to config file (default: ./ipc-subnet-config.yml)
+    --mode MODE          Deployment mode: local or remote (overrides config)
     --dry-run            Preview actions without executing
     --yes                Skip confirmation prompts
     --debug              Show verbose debug output
@@ -73,18 +77,20 @@ Environment Variables:
     IPC_PARENT_RPC           Override parent RPC endpoint
 
 Examples:
+    # Local mode (single machine, multiple validators)
+    $0 init --mode local                       # Initialize local subnet
+    $0 check --mode local                      # Check local validators
+    $0 restart --mode local --yes              # Restart local subnet
+
+    # Remote mode (multiple machines via SSH)
     $0 init                                    # Initialize subnet from scratch
     $0 init --debug                            # Initialize with verbose debug output
     $0 check                                   # Run health checks
     $0 update-binaries --branch main           # Update binaries from main branch
-    $0 update-binaries --branch dev            # Update binaries from dev branch
     $0 watch-finality                          # Monitor parent finality progress
-    $0 watch-finality --target-epoch=3115719   # Watch until specific epoch
     $0 watch-blocks                            # Monitor block production
-    $0 watch-blocks --target-height=1000       # Watch until block 1000
     $0 logs validator-1                        # View logs from validator-1
     $0 start-relayer                           # Start checkpoint relayer on primary
-    $0 relayer-status                          # Check relayer status
     $0 restart --yes                           # Restart without confirmation
 
 EOF
@@ -151,6 +157,11 @@ cmd_init() {
     # Load configuration
     log_info "Loading configuration from: $CONFIG_FILE"
     load_config
+
+    # Start Anvil if in local mode
+    if is_local_mode; then
+        ensure_anvil_running
+    fi
 
     # Pre-flight checks
     log_section "Pre-flight Checks"
@@ -583,6 +594,10 @@ main() {
         case $1 in
             --config)
                 CONFIG_FILE="$2"
+                shift 2
+                ;;
+            --mode)
+                CLI_MODE="$2"
                 shift 2
                 ;;
             --dry-run)

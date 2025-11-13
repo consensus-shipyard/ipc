@@ -6,30 +6,23 @@
 backup_all_nodes() {
     for idx in "${!VALIDATORS[@]}"; do
         local name="${VALIDATORS[$idx]}"
-        local ip=$(get_config_value "validators[$idx].ip")
-        local ssh_user=$(get_config_value "validators[$idx].ssh_user")
-        local ipc_user=$(get_config_value "validators[$idx].ipc_user")
-        local node_home=$(get_config_value "paths.node_home")
+        local node_home=$(get_node_home "$idx")
 
         local timestamp=$(date +%Y%m%d%H%M%S)
         local backup_path="${node_home}.backup.${timestamp}"
 
         log_info "Creating backup for $name at $backup_path..."
-        ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-            "if [ -d $node_home ]; then cp -r $node_home $backup_path; fi"
+        exec_on_host "$idx" "if [ -d $node_home ]; then cp -r $node_home $backup_path; fi"
     done
 }
 
 wipe_all_nodes() {
     for idx in "${!VALIDATORS[@]}"; do
         local name="${VALIDATORS[$idx]}"
-        local ip=$(get_config_value "validators[$idx].ip")
-        local ssh_user=$(get_config_value "validators[$idx].ssh_user")
-        local ipc_user=$(get_config_value "validators[$idx].ipc_user")
-        local node_home=$(get_config_value "paths.node_home")
+        local node_home=$(get_node_home "$idx")
 
         log_info "Wiping $name..."
-        ssh_exec "$ip" "$ssh_user" "$ipc_user" "rm -rf $node_home"
+        exec_on_host "$idx" "rm -rf $node_home"
     done
 }
 
@@ -246,13 +239,18 @@ install_relayer_systemd_service() {
 stop_all_nodes() {
     for idx in "${!VALIDATORS[@]}"; do
         local name="${VALIDATORS[$idx]}"
+
+        log_info "Stopping $name..."
+
+        if is_local_mode; then
+            # Local mode: just kill the process
+            kill_process "$idx" "ipc-cli.*node start"
+        else
+            # Remote mode: try systemd first, fall back to manual kill
         local ip=$(get_config_value "validators[$idx].ip")
         local ssh_user=$(get_config_value "validators[$idx].ssh_user")
         local ipc_user=$(get_config_value "validators[$idx].ipc_user")
 
-        log_info "Stopping $name..."
-
-        # Try systemd first, fall back to manual kill
         local has_systemd=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
             "systemctl is-active ipc-node 2>/dev/null | grep -q active && echo yes || echo no" 2>/dev/null)
 
@@ -260,6 +258,7 @@ stop_all_nodes() {
             ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" "sudo systemctl stop ipc-node" >/dev/null 2>&1 || true
         else
             ssh_kill_process "$ip" "$ssh_user" "$ipc_user" "ipc-cli node start"
+            fi
         fi
 
         sleep 2
@@ -287,15 +286,30 @@ start_validator_node() {
     local validator_idx="$1"
 
     local name="${VALIDATORS[$validator_idx]}"
-    local ip=$(get_config_value "validators[$validator_idx].ip")
-    local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
-    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
     local ipc_binary=$(get_config_value "paths.ipc_binary")
-    local node_home=$(get_config_value "paths.node_home")
+    local node_home=$(get_node_home "$validator_idx")
 
     log_info "Starting $name..."
 
-    # Try systemd first, fall back to nohup
+    if is_local_mode; then
+        # Local mode: always use nohup (macOS doesn't have systemd)
+        # Expand tilde in paths
+        ipc_binary="${ipc_binary/#\~/$HOME}"
+        node_home="${node_home/#\~/$HOME}"
+
+        # Ensure logs directory exists
+        mkdir -p "$node_home/logs"
+
+        # Start with nohup
+        nohup "$ipc_binary" node start --home "$node_home" > "$node_home/logs/node.stdout.log" 2>&1 &
+
+        log_info "Started $name (PID: $!)"
+    else
+        # Remote mode: try systemd first, fall back to nohup
+        local ip=$(get_config_value "validators[$validator_idx].ip")
+        local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
+        local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
+
     local has_systemd=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
         "systemctl list-unit-files ipc-node.service 2>/dev/null | grep -q ipc-node && echo yes || echo no" 2>/dev/null)
 
@@ -305,6 +319,7 @@ start_validator_node() {
         # Fall back to nohup
         ssh_exec "$ip" "$ssh_user" "$ipc_user" \
             "nohup $ipc_binary node start --home $node_home > $node_home/logs/node.stdout.log 2>&1 &"
+        fi
     fi
 }
 
@@ -334,14 +349,16 @@ initialize_primary_node() {
         log_info "Generated node-init.yml for $name (use --debug to view full config)"
     fi
 
-    # Copy to remote
-    scp_to_host "$ip" "$ssh_user" "$ipc_user" "$temp_config" "$node_init_config"
+    # Copy to target location
+    if ! is_local_mode; then
+        copy_to_host "$validator_idx" "$temp_config" "$node_init_config"
     rm -f "$temp_config"
+    fi
 
-    # Test parent chain connectivity from the remote node
+    # Test parent chain connectivity
     log_info "Testing parent chain connectivity from $name..."
     local parent_rpc=$(get_config_value "subnet.parent_rpc")
-    local parent_test=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+    local parent_test=$(exec_on_host "$validator_idx" \
         "curl -s -X POST -H 'Content-Type: application/json' --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}' '$parent_rpc' 2>&1")
 
     if echo "$parent_test" | grep -q "error\|failed\|refused"; then
@@ -356,15 +373,19 @@ initialize_primary_node() {
         log_success "Parent chain connectivity OK"
     fi
 
+    # Expand paths for local mode
+    local ipc_binary_expanded="${ipc_binary/#\~/$HOME}"
+    local node_init_config_expanded="${node_init_config/#\~/$HOME}"
+
     # Run init with verbose logging if debug mode
     if [ "${DEBUG:-false}" = true ]; then
         log_info "Running ipc-cli node init with verbose logging..."
-        local init_output=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-            "RUST_LOG=debug,ipc_cli=trace $ipc_binary node init --config $node_init_config 2>&1")
+        local init_output=$(exec_on_host "$validator_idx" \
+            "RUST_LOG=debug,ipc_cli=trace $ipc_binary_expanded node init --config $node_init_config_expanded 2>&1")
     else
         log_info "Running ipc-cli node init..."
-        local init_output=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-            "$ipc_binary node init --config $node_init_config 2>&1")
+        local init_output=$(exec_on_host "$validator_idx" \
+            "$ipc_binary_expanded node init --config $node_init_config_expanded 2>&1")
     fi
 
     if echo "$init_output" | grep -q "Error\|error\|failed"; then
@@ -416,11 +437,22 @@ initialize_secondary_node() {
     local primary_peer_info="$2"
 
     local name="${VALIDATORS[$validator_idx]}"
-    local ip=$(get_config_value "validators[$validator_idx].ip")
-    local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
-    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
     local ipc_binary=$(get_config_value "paths.ipc_binary")
-    local node_init_config=$(get_config_value "paths.node_init_config")
+    local node_init_config
+    local peer_file_path=""
+
+    if is_local_mode; then
+        node_init_config="/tmp/node-init-${name}.yml"
+        if [ -n "$primary_peer_info" ]; then
+            peer_file_path="/tmp/peer1-${name}.json"
+        fi
+    else
+        local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
+        node_init_config=$(get_config_value "paths.node_init_config")
+        if [ -n "$primary_peer_info" ]; then
+            peer_file_path="/home/$ipc_user/peer1.json"
+        fi
+    fi
 
     log_info "Initializing $name..."
 
@@ -428,16 +460,14 @@ initialize_secondary_node() {
     if [ -n "$primary_peer_info" ]; then
         local temp_peer_file="/tmp/peer1-${name}.json"
         echo "$primary_peer_info" > "$temp_peer_file"
-        scp_to_host "$ip" "$ssh_user" "$ipc_user" "$temp_peer_file" "/home/$ipc_user/peer1.json"
+        copy_to_host "$validator_idx" "$temp_peer_file" "$peer_file_path"
+        if ! is_local_mode; then
         rm -f "$temp_peer_file"
+        fi
     fi
 
     # Generate node-init.yml with peer file reference
     local temp_config="/tmp/node-init-${name}.yml"
-    local peer_file_path=""
-    if [ -n "$primary_peer_info" ]; then
-        peer_file_path="/home/$ipc_user/peer1.json"
-    fi
     generate_node_init_yml "$validator_idx" "$temp_config" "$peer_file_path"
 
     # Show generated config for debugging
@@ -450,19 +480,25 @@ initialize_secondary_node() {
         log_info "Generated node-init.yml for $name (use --debug to view full config)"
     fi
 
-    # Copy to remote
-    scp_to_host "$ip" "$ssh_user" "$ipc_user" "$temp_config" "$node_init_config"
+    # Copy to target location
+    if ! is_local_mode; then
+        copy_to_host "$validator_idx" "$temp_config" "$node_init_config"
     rm -f "$temp_config"
+    fi
+
+    # Expand paths for local mode
+    local ipc_binary_expanded="${ipc_binary/#\~/$HOME}"
+    local node_init_config_expanded="${node_init_config/#\~/$HOME}"
 
     # Run init with verbose logging if debug mode
     if [ "${DEBUG:-false}" = true ]; then
         log_info "Running ipc-cli node init with verbose logging..."
-        local init_output=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-            "RUST_LOG=debug,ipc_cli=trace $ipc_binary node init --config $node_init_config 2>&1")
+        local init_output=$(exec_on_host "$validator_idx" \
+            "RUST_LOG=debug,ipc_cli=trace $ipc_binary_expanded node init --config $node_init_config_expanded 2>&1")
     else
         log_info "Running ipc-cli node init..."
-        local init_output=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-            "$ipc_binary node init --config $node_init_config 2>&1")
+        local init_output=$(exec_on_host "$validator_idx" \
+            "$ipc_binary_expanded node init --config $node_init_config_expanded 2>&1")
     fi
 
     if echo "$init_output" | grep -q "Error\|error\|failed"; then
