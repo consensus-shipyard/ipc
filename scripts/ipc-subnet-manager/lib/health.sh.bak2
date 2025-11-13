@@ -326,7 +326,7 @@ start_validator_node() {
 # Deploy subnet using ipc-cli subnet init
 deploy_subnet() {
     # All logs go to stderr, only subnet ID goes to stdout for capture
-    log_info "Deploying subnet with gateway contracts..." >&2
+    log_info " >&2; log_info "Deploying subnet with gateway contracts..." >&2
 
     local ipc_binary=$(get_config_value "paths.ipc_binary")
     local ipc_binary_expanded="${ipc_binary/#\~/$HOME}"
@@ -360,14 +360,14 @@ deploy_subnet() {
                 ;;
             *)
                 log_error "Cannot derive address from private key. Please add 'address' field to validator config."
-                return 1
+                exit 1
                 ;;
         esac
     fi
 
     # Collect validator public keys (we'll need to generate these from private keys)
     # For now, we'll use placeholder pubkeys that need to be generated
-    log_info "Generating subnet-init.yaml configuration..."
+    log_info " >&2; log_info "Generating subnet-init.yaml configuration..."
 
     # Get permission mode and supply source from config
     local permission_mode=$(get_config_value "init.permission_mode")
@@ -458,8 +458,8 @@ EOF
             local pubkey_raw=$(cast wallet pubkey --private-key "$val_private_key" 2>/dev/null)
 
             if [ -z "$pubkey_raw" ]; then
-                log_error "Failed to derive public key from private key for validator $idx"
-                return 1
+                log_error " >&2; log_error "Failed to derive public key from private key for validator $idx"
+                exit 1
             fi
 
             # Prepend 0x04 to make it a 65-byte uncompressed public key
@@ -491,20 +491,20 @@ EOF
 
     # Show generated config in debug mode
     if [ "${DEBUG:-false}" = true ]; then
-        log_debug "Generated subnet-init.yaml:"
+        log_debug " >&2; log_debug "Generated subnet-init.yaml:"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         cat "$subnet_init_config"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     fi
 
     # Run subnet init
-    log_info "Running ipc-cli subnet init..."
-    log_info "This will deploy gateway contracts, create the subnet, and generate genesis files..."
+    log_info " >&2; log_info "Running ipc-cli subnet init..."
+    log_info " >&2; log_info "This will deploy gateway contracts, create the subnet, and generate genesis files..."
 
     local init_output
     if [ "${DEBUG:-false}" = true ]; then
         # In debug mode, show output in real-time
-        log_info "Debug mode: showing real-time output..."
+        log_info " >&2; log_info "Debug mode: showing real-time output..."
         $ipc_binary_expanded subnet init --config "$subnet_init_config" 2>&1 | tee /tmp/subnet-init-output-$$.log
         exit_code=${PIPESTATUS[0]}
         init_output=$(cat /tmp/subnet-init-output-$$.log)
@@ -515,21 +515,21 @@ EOF
     fi
 
     if [ $exit_code -ne 0 ]; then
-        log_error "Subnet deployment failed"
+        log_error " >&2; log_error "Subnet deployment failed"
         echo ""
         echo "Error output:"
         echo "$init_output"
         echo ""
-        log_info "Troubleshooting tips:"
-        log_info "  1. Make sure Anvil is running: lsof -i :8545"
-        log_info "  2. Check that parent gateway and registry addresses are correct"
-        log_info "  3. Try running with --debug flag for more details"
+        log_info " >&2; log_info "Troubleshooting tips:"
+        log_info " >&2; log_info "  1. Make sure Anvil is running: lsof -i :8545"
+        log_info " >&2; log_info "  2. Check that parent gateway and registry addresses are correct"
+        log_info " >&2; log_info "  3. Try running with --debug flag for more details"
         rm -f "$subnet_init_config"
-        return 1
+        exit 1
     fi
 
     # Show output summary
-    log_info "Subnet init completed. Output summary:"
+    log_info " >&2; log_info "Subnet init completed. Output summary:"
     echo "$init_output" | grep -E "(Deployed|deployed|Created|created|Subnet|Gateway|Registry)" | head -20
 
     # Extract subnet ID from ~/.ipc/config.toml
@@ -542,11 +542,11 @@ EOF
     local subnet_id=$(grep '^id = ' "$ipc_config_file" | cut -d'"' -f2 | grep -E "^$parent_chain_id/t[a-z0-9]+" | head -1)
 
     if [ -z "$subnet_id" ]; then
-        log_error "Could not extract subnet ID from IPC config at $ipc_config_file"
-        log_info "Full CLI output:"
+        log_error " >&2; log_error "Could not extract subnet ID from IPC config at $ipc_config_file"
+        log_info " >&2; log_info "Full CLI output:"
         echo "$init_output"
         rm -f "$subnet_init_config"
-        return 1
+        exit 1
     fi
 
     log_success "Subnet deployed successfully: $subnet_id"
@@ -578,22 +578,22 @@ EOF
 # Create bootstrap genesis for non-activated subnets (Anvil/local development)
 create_bootstrap_genesis() {
     local subnet_id="$1"
-
+    
     log_info "Creating bootstrap genesis for non-activated subnet..."
-
+    
     local ipc_config_dir=$(get_config_value "paths.ipc_config_dir")
     ipc_config_dir="${ipc_config_dir/#\~/$HOME}"
-
+    
     # Get genesis parameters from config
     local base_fee=$(get_config_value "init.genesis.base_fee")
     local power_scale=$(get_config_value "init.genesis.power_scale")
     local network_version=$(get_config_value "init.genesis.network_version")
-
+    
     # Get primary validator for contracts owner
     local primary_validator_idx=$(get_primary_validator)
     local from_address=$(yq eval ".validators[$primary_validator_idx].address // null" "$CONFIG_FILE")
     local primary_private_key=$(get_config_value "validators[$primary_validator_idx].private_key")
-
+    
     # Derive address if not in config
     if [ "$from_address" = "null" ] || [ -z "$from_address" ]; then
         case "$primary_private_key" in
@@ -608,15 +608,15 @@ create_bootstrap_genesis() {
                 ;;
         esac
     fi
-
+    
     # Create genesis file
     local genesis_file="$ipc_config_dir/genesis_${subnet_id//\//_}.json"
     local sealed_file="$ipc_config_dir/genesis_sealed_${subnet_id//\//_}.car"
     local timestamp=$(date +%s)
     local chain_name="${subnet_id//\//_}"
-
+    
     log_info "Creating genesis file: $genesis_file"
-
+    
     # Create new genesis
     fendermint genesis --genesis-file "$genesis_file" new \
         --timestamp "$timestamp" \
@@ -624,78 +624,61 @@ create_bootstrap_genesis() {
         --network-version "$network_version" \
         --base-fee "$base_fee" \
         --power-scale "$power_scale" \
-        --ipc-contracts-owner "$from_address" 2>&1 | grep -v "^$" >&2 || true
-
-    if [ ! -f "$genesis_file" ]; then
+        --ipc-contracts-owner "$from_address" 2>&1 | grep -v "^$"
+    
+    if [ $? -ne 0 ]; then
         log_error "Failed to create genesis file"
         return 1
     fi
-
+    
     # Add validators to genesis
     for idx in "${!VALIDATORS[@]}"; do
         local val_private_key=$(yq eval ".validators[$idx].private_key" "$CONFIG_FILE")
         local val_address=$(yq eval ".validators[$idx].address // null" "$CONFIG_FILE")
-
+        
         # Derive address if needed
         if [ "$val_address" = "null" ] || [ -z "$val_address" ]; then
             val_address=$(cast wallet address --private-key "$val_private_key" 2>/dev/null)
         fi
-
-        # Derive public key and save to file in base64 format
+        
+        # Derive public key
         local pubkey_raw=$(cast wallet pubkey --private-key "$val_private_key" 2>/dev/null)
-        local pubkey_hex="04${pubkey_raw#0x}"
-
-        # Convert hex to base64 for fendermint (no newlines)
-        local pubkey_file="/tmp/validator_${idx}_pubkey_b64.txt"
-        echo -n "$pubkey_hex" | xxd -r -p | base64 | tr -d '\n' > "$pubkey_file"
-
+        local pubkey="04${pubkey_raw#0x}"
+        
         log_info "Adding validator ${VALIDATORS[$idx]} to genesis..."
-
+        
         fendermint genesis --genesis-file "$genesis_file" add-validator \
-            --public-key "$pubkey_file" \
-            --power 100 2>&1 | grep -v "^$" >&2 || true
-
-        # Cleanup temp file
-        rm -f "$pubkey_file" 2>/dev/null
+            --public-key "$pubkey" \
+            --power 100 2>&1 | grep -v "^$"
     done
-
+    
     # Add initial balance for validators
     for idx in "${!VALIDATORS[@]}"; do
         local val_private_key=$(yq eval ".validators[$idx].private_key" "$CONFIG_FILE")
-
-        # Derive public key and save to file in base64 format
-        local pubkey_raw=$(cast wallet pubkey --private-key "$val_private_key" 2>/dev/null)
-        local pubkey_hex="04${pubkey_raw#0x}"
-
-        # Convert hex to base64 for fendermint (no newlines)
-        local pubkey_file="/tmp/validator_${idx}_account_pubkey_b64.txt"
-        echo -n "$pubkey_hex" | xxd -r -p | base64 | tr -d '\n' > "$pubkey_file"
-
+        local val_address=$(cast wallet address --private-key "$val_private_key" 2>/dev/null)
+        
         log_info "Adding balance for ${VALIDATORS[$idx]}..."
-
+        
         fendermint genesis --genesis-file "$genesis_file" add-account \
-            --public-key "$pubkey_file" \
-            --balance "1000" \
-            --kind ethereum 2>&1 | grep -v "^$" >&2 || true  # 1000 FIL
-
-        # Cleanup temp file
-        rm -f "$pubkey_file" 2>/dev/null
+            --kind ethereum \
+            --address "$val_address" \
+            --balance "1000000000000000000000" 2>&1 | grep -v "^$"  # 1000 FIL
     done
-
+    
     # Convert to Tendermint format
     log_info "Converting genesis to Tendermint format..."
     fendermint genesis --genesis-file "$genesis_file" into-tendermint \
-        --out "$sealed_file" 2>&1 | grep -v "^$" >&2 || true
-
-    if [ ! -f "$sealed_file" ]; then
+        --out "$sealed_file" 2>&1 | grep -v "^$"
+    
+    if [ $? -ne 0 ]; then
         log_error "Failed to convert genesis to Tendermint format"
         return 1
     fi
-
+    
     log_success "Bootstrap genesis created successfully"
     log_info "   Genesis file: $genesis_file"
     log_info "   Sealed file: $sealed_file"
-
+    
     return 0
 }
 
@@ -744,7 +727,7 @@ initialize_primary_node() {
         log_info "  1. Parent RPC URL is correct: $parent_rpc"
         log_info "  2. Parent chain is running and accessible from the validator node"
         log_info "  3. No firewall blocking the connection"
-        return 1
+        exit 1
     else
         log_success "Parent chain connectivity OK"
     fi
@@ -791,7 +774,7 @@ initialize_primary_node() {
         log_info "     curl -X POST -H 'Content-Type: application/json' \\"
         log_info "          --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}' \\"
         log_info "          '$parent_rpc'"
-        return 1
+        exit 1
     fi
 
     log_success "$name initialized successfully"
@@ -900,7 +883,7 @@ initialize_secondary_node() {
         log_info "  1. Check if parent_registry and parent_gateway addresses are correct"
         log_info "  2. Verify subnet already exists on parent chain"
         log_info "  3. Check if the subnet ID is correct: $(get_config_value 'subnet.id')"
-        return 1
+        exit 1
     fi
 
     log_success "$name initialized successfully"

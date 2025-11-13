@@ -4,30 +4,24 @@
 
 # Deployment Configuration
 deployment:
-  mode: local  # "local" runs validators on this machine, "remote" uses SSH to remote machines
+  mode: local # "local" runs validators on this machine, "remote" uses SSH to remote machines
   anvil:
-    auto_start: true  # Automatically start Anvil if not running
+    auto_start: true # Automatically start Anvil if not running
     port: 8545
     chain_id: 31337
     mnemonic: "test test test test test test test test test test test junk"
-
 # Subnet Configuration
 subnet:
-  # Subnet ID - get this from your subnet creation or set after creation
-  id: "/r31337/t410fexamplesubnetid"
-
+  # Subnet ID - deployed via IPC UI
+  id: "/r31337/t410f64rg5wfkj3kmbia633bjb4gqcxo7ifhs2e6zuwq"
   # Parent chain RPC endpoint (local Anvil)
   parent_rpc: "http://localhost:8545"
-
   # Parent chain ID
   parent_chain_id: "/r31337"
-
-  # Parent registry contract address (deploy IPC contracts first)
-  parent_registry: "0x74539671a1d2f1c8f200826baba665179f53a1b7"
-
-  # Parent gateway contract address (deploy IPC contracts first)
-  parent_gateway: "0x77aa40b105843728088c0132e43fc44348881da8"
-
+  # Parent registry contract address (deployed via IPC UI)
+  parent_registry: "0x5efd9aadab93db9f09c2f4c3759f627eb015ddba"
+  # Parent gateway contract address (deployed via IPC UI)
+  parent_gateway: "0x0cdd23b138f20e4744568f61c474ffe35c0bc1fb"
 # Validator Nodes
 # In local mode, all validators run on 127.0.0.1 with different ports
 # Port allocation: validator-0 uses base ports, validator-1 uses base+100, validator-2 uses base+200, etc.
@@ -47,39 +41,30 @@ validators:
       eth_api: 8545
       eth_metrics: 9184
       fendermint_metrics: 9185
-
-  - name: "validator-1"
-    ip: "127.0.0.1"
-    role: "secondary"
-    # Use second Anvil test account
-    private_key: "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
-    # Ports for validator-1 (base + 100)
-    ports:
-      cometbft_p2p: 26756
-      cometbft_rpc: 26757
-      cometbft_abci: 26758
-      cometbft_prometheus: 26760
-      libp2p: 26755
-      eth_api: 8645
-      eth_metrics: 9284
-      fendermint_metrics: 9285
-
-  - name: "validator-2"
-    ip: "127.0.0.1"
-    role: "secondary"
-    # Use third Anvil test account
-    private_key: "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a"
-    # Ports for validator-2 (base + 200)
-    ports:
-      cometbft_p2p: 26856
-      cometbft_rpc: 26857
-      cometbft_abci: 26858
-      cometbft_prometheus: 26860
-      libp2p: 26855
-      eth_api: 8745
-      eth_metrics: 9384
-      fendermint_metrics: 9385
-
+#  - name: "validator-1"
+#    ip: "127.0.0.1"
+#    role: "secondary"
+#    # Use second Anvil test account
+#    private_key: "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d"
+#    # Ports for validator-1 (base + 100)
+#    ports:
+#      cometbft_p2p: 26756
+#      cometbft_rpc: 26757
+#      cometbft_abci: 26758
+#      cometbft_prometheus: 26760
+#      libp2p: 26755
+#      eth_api: 8645
+#      eth_metrics: 9284
+#      fendermint_metrics: 9285
+#  - name: "validator-2"
+#    ip: "127.0.0.1"
+#    role: "secondary"
+#    # Use third Anvil test account
+#    private_key: "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a"
+#    # Ports for validator-2 (base + 200)
+#    ports:
+#      cometbft_p2p: 26856
+#      cometbft_rpc: 26857
 # Network Configuration (default ports - can be overridden per validator above)
 network:
   cometbft_p2p_port: 26656
@@ -90,98 +75,88 @@ network:
   eth_api_port: 8545
   eth_metrics_port: 9184
   fendermint_metrics_port: 9185
-
 # Paths (local mode uses local directories)
 paths:
   # Path to IPC CLI binary (use your built binary or installed version)
-  ipc_binary: "~/github/ipc/target/release/ipc-cli"
-
+  ipc_binary: "/Users/philip/github/ipc/target/release/ipc-cli"
   # Base directory for node homes (each validator gets a subdirectory)
-  # validator-0 -> ~/.ipc-local/validator-0
-  # validator-1 -> ~/.ipc-local/validator-1
+  # validator-0 -> /Users/philip/.ipc-local/validator-0
+  # validator-1 -> /Users/philip/.ipc-local/validator-1
   # etc.
-  node_home_base: "~/.ipc-local"
-
+  node_home_base: "/Users/philip/.ipc-local"
   # IPC CLI config directory
-  ipc_config_dir: "~/.ipc"
-
+  ipc_config_dir: "/Users/philip/.ipc"
   # IPC CLI config file
-  ipc_config_file: "~/.ipc/config.toml"
-
+  ipc_config_file: "/Users/philip/.ipc/config.toml"
 # Initialization Settings
 init:
+  # Deploy subnet and gateway contracts automatically
+  # Set to true to run `ipc-cli subnet init` before node initialization
+  deploy_subnet: false
+  # Activate subnet during deployment (recall-migration branch may not require F3)
+  # For UI-deployed subnets: Set to false to create bootstrap genesis locally
+  # This creates a local genesis instead of fetching from parent (which may fail for certain setups)
+  activate_subnet: false
+  # Minimum number of validators required for subnet
+  min_validators: 1
   # Supply source (native or ERC20)
   subnet_supply_source_kind: "native"
-
   # Permission mode (collateral or federated)
   permission_mode: "federated"
-
   # Validator power (for federated mode)
   validator_power: 1
-
   # Genesis configuration
   genesis:
     base_fee: "1000"
     power_scale: 3
     network_version: 21
-
   # IPC configuration (fast settings for local development)
   ipc:
-    vote_interval: 1          # Vote every block
-    vote_timeout: 30          # 30 seconds timeout
-
+    vote_interval: 1 # Vote every block
+    vote_timeout: 30 # 30 seconds timeout
     # Bottom-up checkpointing (can be enabled for local testing)
     bottomup:
       enabled: false
-
   # Top-down finality configuration (fast settings for local dev)
   topdown:
-    chain_head_delay: 2        # Lower delay for local Anvil
+    chain_head_delay: 2 # Lower delay for local Anvil
     proposal_delay: 2
     max_proposal_range: 50
-    polling_interval: 2        # Poll every 2s for local
+    polling_interval: 2 # Poll every 2s for local
     exponential_back_off: 2
     exponential_retry_limit: 3
-    parent_http_timeout: 10    # Shorter timeout for local
-
+    parent_http_timeout: 10 # Shorter timeout for local
   # CometBFT overrides (fast block times for local development)
   cometbft:
     # Core consensus timeouts (fast for local)
-    timeout_commit: "500ms"         # Fast block time for local dev
+    timeout_commit: "500ms" # Fast block time for local dev
     timeout_propose: "500ms"
     timeout_prevote: "500ms"
     timeout_precommit: "500ms"
-
     # Timeout deltas
     timeout_propose_delta: "100ms"
     timeout_prevote_delta: "100ms"
     timeout_precommit_delta: "100ms"
-
     # Empty blocks
     create_empty_blocks: true
     create_empty_blocks_interval: "0s"
-
     # P2P performance
-    send_rate: 20971520         # 20MB/s
-    recv_rate: 20971520         # 20MB/s
+    send_rate: 20971520 # 20MB/s
+    recv_rate: 20971520 # 20MB/s
     max_packet_msg_payload_size: 10240
-
     # RPC (will be overridden per validator in local mode)
     rpc_laddr: "tcp://0.0.0.0:26657"
-
 # IPC CLI Configuration (for ~/.ipc/config.toml)
 ipc_cli:
   # Keystore path
   keystore_path: "~/.ipc"
-
   # Parent subnet configuration (local Anvil)
   parent:
     id: "/r31337"
     network_type: "fevm"
     provider_http: "http://localhost:8545"
-    registry_addr: "0x74539671a1d2f1c8f200826baba665179f53a1b7"
-    gateway_addr: "0x77aa40b105843728088c0132e43fc44348881da8"
-
+    registry_addr: "0x5efd9aadab93db9f09c2f4c3759f627eb015ddba"
+    gateway_addr: "0x0cdd23b138f20e4744568f61c474ffe35c0bc1fb"
   # Child subnet configuration (this subnet)
   child:
     # Uses subnet.id from above
@@ -189,16 +164,14 @@ ipc_cli:
     # For local, use the first validator's ETH API port
     provider_http: "http://localhost:8545"
     # Child subnet's own gateway and registry contracts (will be auto-generated)
-    gateway_addr: "0x77aa40b105843728088c0132e43fc44348881da8"
-    registry_addr: "0x74539671a1d2f1c8f200826baba665179f53a1b7"
-
+    gateway_addr: "0x0cdd23b138f20e4744568f61c474ffe35c0bc1fb"
+    registry_addr: "0x5efd9aadab93db9f09c2f4c3759f627eb015ddba"
 # Relayer Configuration (optional)
 relayer:
   # Checkpoint interval in seconds
   checkpoint_interval: 10
   # Maximum parallel checkpoint submissions
   max_parallelism: 1
-
 # Usage Instructions:
 #
 # 1. Start local deployment:
@@ -221,7 +194,6 @@ relayer:
 #    - Validator-0: http://localhost:8545 (ETH API), http://localhost:26657 (CometBFT RPC)
 #    - Validator-1: http://localhost:8645 (ETH API), http://localhost:26757 (CometBFT RPC)
 #    - Validator-2: http://localhost:8745 (ETH API), http://localhost:26857 (CometBFT RPC)
-
 # Notes:
 # - All validators run on localhost (127.0.0.1)
 # - Each validator uses a unique set of ports (base + 100*index)
@@ -229,4 +201,3 @@ relayer:
 # - No SSH configuration needed in local mode
 # - Process management uses nohup (no systemd on macOS)
 # - Validator data stored in ~/.ipc-local/validator-{0,1,2}
-

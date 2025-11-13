@@ -360,7 +360,7 @@ deploy_subnet() {
                 ;;
             *)
                 log_error "Cannot derive address from private key. Please add 'address' field to validator config."
-                return 1
+                exit 1
                 ;;
         esac
     fi
@@ -459,7 +459,7 @@ EOF
 
             if [ -z "$pubkey_raw" ]; then
                 log_error "Failed to derive public key from private key for validator $idx"
-                return 1
+                exit 1
             fi
 
             # Prepend 0x04 to make it a 65-byte uncompressed public key
@@ -525,7 +525,7 @@ EOF
         log_info "  2. Check that parent gateway and registry addresses are correct"
         log_info "  3. Try running with --debug flag for more details"
         rm -f "$subnet_init_config"
-        return 1
+        exit 1
     fi
 
     # Show output summary
@@ -546,7 +546,7 @@ EOF
         log_info "Full CLI output:"
         echo "$init_output"
         rm -f "$subnet_init_config"
-        return 1
+        exit 1
     fi
 
     log_success "Subnet deployed successfully: $subnet_id"
@@ -744,7 +744,7 @@ initialize_primary_node() {
         log_info "  1. Parent RPC URL is correct: $parent_rpc"
         log_info "  2. Parent chain is running and accessible from the validator node"
         log_info "  3. No firewall blocking the connection"
-        return 1
+        exit 1
     else
         log_success "Parent chain connectivity OK"
     fi
@@ -791,7 +791,7 @@ initialize_primary_node() {
         log_info "     curl -X POST -H 'Content-Type: application/json' \\"
         log_info "          --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}' \\"
         log_info "          '$parent_rpc'"
-        return 1
+        exit 1
     fi
 
     log_success "$name initialized successfully"
@@ -900,7 +900,7 @@ initialize_secondary_node() {
         log_info "  1. Check if parent_registry and parent_gateway addresses are correct"
         log_info "  2. Verify subnet already exists on parent chain"
         log_info "  3. Check if the subnet ID is correct: $(get_config_value 'subnet.id')"
-        return 1
+        exit 1
     fi
 
     log_success "$name initialized successfully"

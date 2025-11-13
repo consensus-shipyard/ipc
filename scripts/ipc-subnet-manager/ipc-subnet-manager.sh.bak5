@@ -190,23 +190,16 @@ cmd_init() {
     wipe_all_nodes
 
     # Clean IPC CLI config directory to avoid corrupted files
-    # Preserve the EVM keystore which contains validator keys
-    log_info "Cleaning IPC CLI config directory (preserving keystore)..."
+    log_info "Cleaning IPC CLI config directory..."
     if is_local_mode; then
-        # Preserve keystore, only remove config.toml
-        rm -f ~/.ipc/config.toml
+        rm -rf ~/.ipc
     else
         for idx in "${!VALIDATORS[@]}"; do
             local ipc_config_dir=$(get_config_value "paths.ipc_config_dir")
             ipc_config_dir="${ipc_config_dir/#\~/$HOME}"
-            # Preserve keystore, only remove config.toml
-            exec_on_host "$idx" "rm -f $ipc_config_dir/config.toml"
+            exec_on_host "$idx" "rm -rf $ipc_config_dir"
         done
     fi
-
-    # Ensure EVM keystore exists with validator keys
-    log_section "Preparing EVM Keystore"
-    ensure_evm_keystore
 
     # Update IPC CLI configs (must be done BEFORE subnet deployment)
     log_section "Deploying IPC CLI Configuration"

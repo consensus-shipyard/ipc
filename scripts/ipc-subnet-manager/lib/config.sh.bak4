@@ -396,16 +396,12 @@ p2p:
     resolver: $libp2p_port
 EOF
 
-    # Add peer files if provided, otherwise set peers to null
+    # Add peer files if provided
     if [ -n "$peer_files" ]; then
         cat >> "$output_file" << EOF
   peers:
     peer-files:
       - "$peer_files"
-EOF
-    else
-        cat >> "$output_file" << EOF
-  peers: null
 EOF
     fi
 
@@ -435,7 +431,10 @@ genesis: !path
 
 # Join subnet configuration (for newly deployed subnets)
 # Note: This will be skipped if the subnet is already bootstrapped
-join: null
+#join:
+#  from: "0x..."
+#  collateral: 1.0
+#  initial-balance: 10.0
 EOF
     else
         # Create genesis from parent subnet (requires activated subnet)
@@ -451,7 +450,10 @@ genesis: !create
 
 # Join subnet configuration (for newly deployed subnets)
 # Note: This will be skipped if the subnet is already bootstrapped
-join: null
+#join:
+#  from: "0x..."
+#  collateral: 1.0
+#  initial-balance: 10.0
 EOF
     fi
 
@@ -835,58 +837,6 @@ provider_http = "$parent_provider_http"
 registry_addr = "$parent_registry"
 gateway_addr = "$parent_gateway"
 EOF
-}
-
-# Ensure EVM keystore exists with validator keys from config
-ensure_evm_keystore() {
-    local ipc_config_dir=$(get_config_value "paths.ipc_config_dir")
-    ipc_config_dir="${ipc_config_dir/#\~/$HOME}"
-    local keystore_file="$ipc_config_dir/evm_keystore.json"
-
-    # Create IPC directory if it doesn't exist
-    mkdir -p "$ipc_config_dir"
-
-    # If keystore doesn't exist, create it with validator keys from config
-    if [ ! -f "$keystore_file" ]; then
-        log_info "Creating EVM keystore with validator keys..."
-
-        echo "[" > "$keystore_file"
-
-        # Add each validator's key
-        local first=true
-        for idx in "${!VALIDATORS[@]}"; do
-            local val_private_key=$(yq eval ".validators[$idx].private_key" "$CONFIG_FILE")
-            local val_address=$(yq eval ".validators[$idx].address // null" "$CONFIG_FILE")
-
-            # Derive address if not in config
-            if [ "$val_address" = "null" ] || [ -z "$val_address" ]; then
-                val_address=$(cast wallet address --private-key "$val_private_key" 2>/dev/null)
-            fi
-
-            # Remove 0x prefix from private key for storage
-            val_private_key="${val_private_key#0x}"
-
-            # Add comma if not first entry
-            if [ "$first" = false ]; then
-                echo "," >> "$keystore_file"
-            fi
-            first=false
-
-            # Add validator entry (note: address keeps 0x prefix)
-            cat >> "$keystore_file" << EOF_JSON
-  {
-    "address": "${val_address}",
-    "private_key": "${val_private_key}"
-  }
-EOF_JSON
-        done
-
-        echo "]" >> "$keystore_file"
-
-        log_success "EVM keystore created at $keystore_file"
-    else
-        log_info "EVM keystore already exists at $keystore_file"
-    fi
 }
 
 # Update IPC CLI config on all validators
