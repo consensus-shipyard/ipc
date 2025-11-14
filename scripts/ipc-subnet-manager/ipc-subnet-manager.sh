@@ -233,17 +233,15 @@ cmd_init() {
         # Reload configuration to pick up updated subnet ID
         load_config
 
-        # For non-activated subnets (Anvil/local), create bootstrap genesis
-        local activate_subnet=$(get_config_value "init.activate_subnet" 2>/dev/null || echo "true")
-        if [ "$activate_subnet" = "false" ]; then
-            log_section "Creating Bootstrap Genesis"
-            log_info "Subnet not activated - creating bootstrap genesis for local development..."
-            if create_bootstrap_genesis "$deployed_subnet_id"; then
-                log_success "Bootstrap genesis created"
-            else
-                log_error "Failed to create bootstrap genesis"
-                exit 1
-            fi
+        # Create genesis using ipc-cli subnet create-genesis
+        # This works for both activated and non-activated subnets
+        log_section "Creating Genesis"
+        log_info "Creating genesis files for subnet $deployed_subnet_id..."
+        if create_bootstrap_genesis "$deployed_subnet_id"; then
+            log_success "Genesis created"
+        else
+            log_error "Failed to create genesis"
+            exit 1
         fi
     else
         log_info "Subnet deployment disabled (deploy_subnet='$deploy_subnet_enabled')"

@@ -417,21 +417,23 @@ EOF
 
     log_info "Current parent chain height: $current_parent_height (will be used as genesis timestamp)"
 
-    # Check if genesis files exist (bootstrap genesis for non-activated subnets)
+    # Check if genesis files exist (created by ipc-cli subnet create-genesis)
     local ipc_config_dir=$(get_config_value "paths.ipc_config_dir")
     ipc_config_dir="${ipc_config_dir/#\~/$HOME}"
-    local genesis_json="$ipc_config_dir/genesis_${subnet_id//\//_}.json"
-    local genesis_car="$ipc_config_dir/genesis_sealed_${subnet_id//\//_}.car"
+    # ipc-cli subnet create-genesis creates files with format: genesis_r31337_... (removes leading /)
+    local subnet_id_no_slash="${subnet_id#/}"
+    local genesis_json="$ipc_config_dir/genesis_${subnet_id_no_slash//\//_}.json"
+    local genesis_sealed="$ipc_config_dir/genesis_sealed_${subnet_id_no_slash//\//_}.json"
 
-    if [ -f "$genesis_json" ] && [ -f "$genesis_car" ]; then
-        # Use existing genesis files (bootstrap genesis)
+    if [ -f "$genesis_json" ] && [ -f "$genesis_sealed" ]; then
+        # Use existing genesis files
         log_info "Found existing genesis files - using !path"
         cat >> "$output_file" << EOF
 
 # Genesis configuration - use existing genesis files
 genesis: !path
   genesis: "$genesis_json"
-  sealed: "$genesis_car"
+  sealed: "$genesis_sealed"
 
 # Join subnet configuration (for newly deployed subnets)
 # Note: This will be skipped if the subnet is already bootstrapped
@@ -576,15 +578,6 @@ EOF
   [resolver.network]
   local_key = "validator.sk"
 
-  [resolver.network.parent_finality]
-  enabled = true
-
-  [resolver.network.parent_finality.vote_tally]
-  # Tally configuration
-
-  [resolver.network.parent_finality.vote_tally.gossip]
-  # Use gossip for vote tallying (required for voting)
-
   # Disable bottom-up checkpointing for federated subnets
   # (Bottom-up checkpointing posts state commitments to parent chain)
   [ipc.bottomup]
@@ -601,14 +594,19 @@ EOF
 # Extract peer information from a validator
 extract_peer_info() {
     local validator_idx="$1"
+    local name="${VALIDATORS[$validator_idx]}"
 
-    local ip=$(get_config_value "validators[$validator_idx].ip")
-    local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
-    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
-    local node_home=$(get_config_value "paths.node_home")
+    # Get node home path (local or remote)
+    local node_home
+    if is_local_mode; then
+        local node_home_base=$(get_config_value "paths.node_home_base")
+        node_home="${node_home_base/#\~/$HOME}/$name"
+    else
+        node_home=$(get_config_value "paths.node_home")
+    fi
 
     # Get CometBFT peer info
-    local peer_info=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" "cat $node_home/peer-info.json 2>/dev/null || echo '{}'")
+    local peer_info=$(exec_on_host "$validator_idx" "cat $node_home/peer-info.json 2>/dev/null || echo '{}'")
 
     if [ -z "$peer_info" ] || [ "$peer_info" = "{}" ]; then
         log_error "Failed to extract peer info from validator $validator_idx"
@@ -648,13 +646,19 @@ collect_all_peer_info() {
     for idx in "${!VALIDATORS[@]}"; do
         local name="${VALIDATORS[$idx]}"
         local ip=$(get_config_value "validators[$idx].ip")
-        local ssh_user=$(get_config_value "validators[$idx].ssh_user")
-        local ipc_user=$(get_config_value "validators[$idx].ipc_user")
-        local node_home=$(get_config_value "paths.node_home")
         local libp2p_port=$(get_config_value "network.libp2p_port")
 
+        # Get node home path (local or remote)
+        local node_home
+        if is_local_mode; then
+            local node_home_base=$(get_config_value "paths.node_home_base")
+            node_home="${node_home_base/#\~/$HOME}/$name"
+        else
+            node_home=$(get_config_value "paths.node_home")
+        fi
+
         # Get peer info from peer-info.json file for libp2p peer ID
-        local peer_json=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" "cat $node_home/peer-info.json 2>/dev/null || echo '{}'")
+        local peer_json=$(exec_on_host "$idx" "cat $node_home/peer-info.json 2>/dev/null || echo '{}'")
 
         # Parse libp2p peer ID locally (we'll reconstruct the multiaddr with correct IP)
         local libp2p_peer_id=$(echo "$peer_json" | jq -r '.fendermint.peer_id // empty' 2>/dev/null)
@@ -669,7 +673,7 @@ collect_all_peer_info() {
         fi
 
         # Get validator public key from validator.pk file
-        local pubkey=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+        local pubkey=$(exec_on_host "$idx" \
             "cat $node_home/fendermint/validator.pk 2>/dev/null || echo ''")
 
         if [ -z "$pubkey" ]; then
@@ -689,21 +693,24 @@ fix_listen_addresses() {
 
     for idx in "${!VALIDATORS[@]}"; do
         local name="${VALIDATORS[$idx]}"
-        local ip=$(get_config_value "validators[$idx].ip")
-        local ssh_user=$(get_config_value "validators[$idx].ssh_user")
-        local ipc_user=$(get_config_value "validators[$idx].ipc_user")
-        local node_home=$(get_config_value "paths.node_home")
+
+        # Get node home path (local or remote)
+        local node_home
+        if is_local_mode; then
+            local node_home_base=$(get_config_value "paths.node_home_base")
+            node_home="${node_home_base/#\~/$HOME}/$name"
+        else
+            node_home=$(get_config_value "paths.node_home")
+        fi
 
         log_info "Fixing listen_addr for $name..."
 
         # Change listen_addr from public IP to 0.0.0.0
-        # Use direct SSH to avoid quote escaping issues
-        ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-            "sudo su - $ipc_user -c 'sed -i.bak \"s|listen_addr = .*/tcp/$libp2p_port\\\"|listen_addr = \\\"/ip4/0.0.0.0/tcp/$libp2p_port\\\"|\" $node_home/fendermint/config/default.toml'" 2>/dev/null
+        local config_file="$node_home/fendermint/config/default.toml"
+        exec_on_host "$idx" "sed -i.bak 's|listen_addr = .*/tcp/$libp2p_port\"|listen_addr = \"/ip4/0.0.0.0/tcp/$libp2p_port\"|' $config_file" >/dev/null 2>&1
 
         # Verify the change
-        local listen_addr=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-            "sudo su - $ipc_user -c 'grep listen_addr $node_home/fendermint/config/default.toml | head -1'" 2>/dev/null)
+        local listen_addr=$(exec_on_host "$idx" "grep 'listen_addr = ' $config_file | head -1" 2>/dev/null)
 
         if echo "$listen_addr" | grep -q "0.0.0.0"; then
             log_info "  ✓ $name now listening on 0.0.0.0:$libp2p_port"
@@ -743,11 +750,16 @@ update_validator_config() {
     local validator_idx="$1"
 
     local name="${VALIDATORS[$validator_idx]}"
-    local ip=$(get_config_value "validators[$validator_idx].ip")
-    local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
-    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
-    local node_home=$(get_config_value "paths.node_home")
     local libp2p_port=$(get_config_value "network.libp2p_port")
+
+    # Get node home path (local or remote)
+    local node_home
+    if is_local_mode; then
+        local node_home_base=$(get_config_value "paths.node_home_base")
+        node_home="${node_home_base/#\~/$HOME}/$name"
+    else
+        node_home=$(get_config_value "paths.node_home")
+    fi
 
     # Build peer lists (excluding self)
     local comet_peers=""
@@ -772,8 +784,8 @@ update_validator_config() {
     # Update CometBFT persistent_peers
     if [ -n "$comet_peers" ]; then
         log_info "Setting CometBFT persistent_peers for $name"
-        ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-            "sed -i.bak \"s|^persistent_peers = .*|persistent_peers = \\\"$comet_peers\\\"|\" $node_home/cometbft/config/config.toml"
+        exec_on_host "$validator_idx" \
+            "sed -i.bak 's|^persistent_peers = .*|persistent_peers = \"$comet_peers\"|' $node_home/cometbft/config/config.toml" >/dev/null 2>&1
     fi
 
     # Update Fendermint libp2p config - static_addresses (peers to connect to)
@@ -782,22 +794,20 @@ update_validator_config() {
         # Add quotes around each multiaddr by transforming "addr1, addr2" to "\"addr1\", \"addr2\""
         local quoted_addrs=$(echo "$libp2p_static_addrs" | sed 's|/ip4/|"/ip4/|g' | sed 's|, |", |g')
         quoted_addrs="${quoted_addrs}\""  # Add trailing quote
-        # Escape the quotes for passing through ssh_exec
-        local escaped_addrs="${quoted_addrs//\"/\\\"}"
-        ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-            "sed -i.bak \"/\\[resolver.discovery\\]/,/\\[.*\\]/ s|^static_addresses = .*|static_addresses = [$escaped_addrs]|\" $node_home/fendermint/config/default.toml" >/dev/null
+        exec_on_host "$validator_idx" \
+            "sed -i.bak '/\\[resolver.discovery\\]/,/\\[.*\\]/ s|^static_addresses = .*|static_addresses = [$quoted_addrs]|' $node_home/fendermint/config/default.toml" >/dev/null 2>&1
     fi
 
     # Update external_addresses (this node's advertised address)
     if [ -n "${LIBP2P_PEERS[$validator_idx]:-}" ]; then
         log_info "Setting libp2p external_addresses for $name"
-        ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-            "sed -i.bak \"/\\[resolver.connection\\]/,/\\[.*\\]/ s|^external_addresses = .*|external_addresses = [\\\"${LIBP2P_PEERS[$validator_idx]}\\\"]|\" $node_home/fendermint/config/default.toml" >/dev/null
+        exec_on_host "$validator_idx" \
+            "sed -i.bak '/\\[resolver.connection\\]/,/\\[.*\\]/ s|^external_addresses = .*|external_addresses = [\"${LIBP2P_PEERS[$validator_idx]}\"]|' $node_home/fendermint/config/default.toml" >/dev/null 2>&1
     fi
 
     # Ensure validator_key section exists
-    ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-        "grep -q \"\\[validator_key\\]\" $node_home/fendermint/config/default.toml || echo -e \"\\n[validator_key]\\npath = \\\"validator.sk\\\"\\nkind = \\\"regular\\\"\" >> $node_home/fendermint/config/default.toml"
+    exec_on_host "$validator_idx" \
+        "grep -q '\\[validator_key\\]' $node_home/fendermint/config/default.toml || echo -e '\\n[validator_key]\\npath = \"validator.sk\"\\nkind = \"regular\"' >> $node_home/fendermint/config/default.toml" >/dev/null 2>&1
 }
 
 # Generate IPC CLI config file (~/.ipc/config.toml)

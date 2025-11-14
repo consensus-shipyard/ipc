@@ -579,122 +579,54 @@ EOF
 create_bootstrap_genesis() {
     local subnet_id="$1"
 
-    log_info "Creating bootstrap genesis for non-activated subnet..."
+    log_info "Creating genesis using ipc-cli subnet create-genesis..."
 
     local ipc_config_dir=$(get_config_value "paths.ipc_config_dir")
     ipc_config_dir="${ipc_config_dir/#\~/$HOME}"
+    local ipc_binary=$(get_config_value "paths.ipc_binary")
+    ipc_binary="${ipc_binary/#\~/$HOME}"
 
     # Get genesis parameters from config
     local base_fee=$(get_config_value "init.genesis.base_fee")
     local power_scale=$(get_config_value "init.genesis.power_scale")
     local network_version=$(get_config_value "init.genesis.network_version")
 
-    # Get primary validator for contracts owner
-    local primary_validator_idx=$(get_primary_validator)
-    local from_address=$(yq eval ".validators[$primary_validator_idx].address // null" "$CONFIG_FILE")
-    local primary_private_key=$(get_config_value "validators[$primary_validator_idx].private_key")
+    log_info "Running: ipc-cli subnet create-genesis --subnet $subnet_id --out-dir $ipc_config_dir"
 
-    # Derive address if not in config
-    if [ "$from_address" = "null" ] || [ -z "$from_address" ]; then
-        case "$primary_private_key" in
-            "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
-                from_address="0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
-                ;;
-            "0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d")
-                from_address="0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
-                ;;
-            "0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a")
-                from_address="0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC"
-                ;;
-        esac
-    fi
-
-    # Create genesis file
-    local genesis_file="$ipc_config_dir/genesis_${subnet_id//\//_}.json"
-    local sealed_file="$ipc_config_dir/genesis_sealed_${subnet_id//\//_}.car"
-    local timestamp=$(date +%s)
-    local chain_name="${subnet_id//\//_}"
-
-    log_info "Creating genesis file: $genesis_file"
-
-    # Create new genesis
-    fendermint genesis --genesis-file "$genesis_file" new \
-        --timestamp "$timestamp" \
-        --chain-name "$chain_name" \
+    # Use ipc-cli to create genesis (this works for both activated and non-activated subnets)
+    local create_output=$($ipc_binary subnet create-genesis \
+        --subnet "$subnet_id" \
         --network-version "$network_version" \
         --base-fee "$base_fee" \
         --power-scale "$power_scale" \
-        --ipc-contracts-owner "$from_address" 2>&1 | grep -v "^$" >&2 || true
+        --out-dir "$ipc_config_dir" 2>&1)
 
-    if [ ! -f "$genesis_file" ]; then
-        log_error "Failed to create genesis file"
+    local exit_code=$?
+
+    if [ $exit_code -ne 0 ]; then
+        log_error "Failed to create genesis using ipc-cli" >&2
+        echo "$create_output" >&2
         return 1
     fi
 
-    # Add validators to genesis
-    for idx in "${!VALIDATORS[@]}"; do
-        local val_private_key=$(yq eval ".validators[$idx].private_key" "$CONFIG_FILE")
-        local val_address=$(yq eval ".validators[$idx].address // null" "$CONFIG_FILE")
+    log_info "$create_output" >&2
 
-        # Derive address if needed
-        if [ "$val_address" = "null" ] || [ -z "$val_address" ]; then
-            val_address=$(cast wallet address --private-key "$val_private_key" 2>/dev/null)
-        fi
+    # Check if genesis files were created
+    # ipc-cli subnet create-genesis creates files with format: genesis_r31337_... (single underscore)
+    local subnet_id_no_slash="${subnet_id#/}"  # Remove leading /
+    local genesis_file="$ipc_config_dir/genesis_${subnet_id_no_slash//\//_}.json"
+    local sealed_file="$ipc_config_dir/genesis_sealed_${subnet_id_no_slash//\//_}.json"
 
-        # Derive public key and save to file in base64 format
-        local pubkey_raw=$(cast wallet pubkey --private-key "$val_private_key" 2>/dev/null)
-        local pubkey_hex="04${pubkey_raw#0x}"
-
-        # Convert hex to base64 for fendermint (no newlines)
-        local pubkey_file="/tmp/validator_${idx}_pubkey_b64.txt"
-        echo -n "$pubkey_hex" | xxd -r -p | base64 | tr -d '\n' > "$pubkey_file"
-
-        log_info "Adding validator ${VALIDATORS[$idx]} to genesis..."
-
-        fendermint genesis --genesis-file "$genesis_file" add-validator \
-            --public-key "$pubkey_file" \
-            --power 100 2>&1 | grep -v "^$" >&2 || true
-
-        # Cleanup temp file
-        rm -f "$pubkey_file" 2>/dev/null
-    done
-
-    # Add initial balance for validators
-    for idx in "${!VALIDATORS[@]}"; do
-        local val_private_key=$(yq eval ".validators[$idx].private_key" "$CONFIG_FILE")
-
-        # Derive public key and save to file in base64 format
-        local pubkey_raw=$(cast wallet pubkey --private-key "$val_private_key" 2>/dev/null)
-        local pubkey_hex="04${pubkey_raw#0x}"
-
-        # Convert hex to base64 for fendermint (no newlines)
-        local pubkey_file="/tmp/validator_${idx}_account_pubkey_b64.txt"
-        echo -n "$pubkey_hex" | xxd -r -p | base64 | tr -d '\n' > "$pubkey_file"
-
-        log_info "Adding balance for ${VALIDATORS[$idx]}..."
-
-        fendermint genesis --genesis-file "$genesis_file" add-account \
-            --public-key "$pubkey_file" \
-            --balance "1000" \
-            --kind ethereum 2>&1 | grep -v "^$" >&2 || true  # 1000 FIL
-
-        # Cleanup temp file
-        rm -f "$pubkey_file" 2>/dev/null
-    done
-
-    # Convert to Tendermint format
-    log_info "Converting genesis to Tendermint format..."
-    fendermint genesis --genesis-file "$genesis_file" into-tendermint \
-        --out "$sealed_file" 2>&1 | grep -v "^$" >&2 || true
-
-    if [ ! -f "$sealed_file" ]; then
-        log_error "Failed to convert genesis to Tendermint format"
+    if [ ! -f "$genesis_file" ] || [ ! -f "$sealed_file" ]; then
+        log_error "Genesis files not found after creation" >&2
+        log_error "Expected: $genesis_file" >&2
+        log_error "Expected: $sealed_file" >&2
         return 1
     fi
 
-    log_success "Bootstrap genesis created successfully"
-    log_info "   Genesis file: $genesis_file"
-    log_info "   Sealed file: $sealed_file"
+    log_success "Genesis created successfully using ipc-cli"
+    log_info "    Genesis file: $genesis_file"
+    log_info "    Sealed file: $sealed_file"
 
     return 0
 }
@@ -725,10 +657,15 @@ initialize_primary_node() {
         log_info "Generated node-init.yml for $name (use --debug to view full config)"
     fi
 
-    # Copy to target location
+    # Copy to target location or use temp config in local mode
+    local actual_config
     if ! is_local_mode; then
         copy_to_host "$validator_idx" "$temp_config" "$node_init_config"
     rm -f "$temp_config"
+        actual_config="$node_init_config"
+    else
+        # In local mode, use the temp config directly
+        actual_config="$temp_config"
     fi
 
     # Test parent chain connectivity
@@ -751,20 +688,29 @@ initialize_primary_node() {
 
     # Expand paths for local mode
     local ipc_binary_expanded="${ipc_binary/#\~/$HOME}"
-    local node_init_config_expanded="${node_init_config/#\~/$HOME}"
+    local actual_config_expanded="${actual_config/#\~/$HOME}"
 
     # Run init with verbose logging if debug mode
     if [ "${DEBUG:-false}" = true ]; then
         log_info "Running ipc-cli node init with verbose logging..."
         local init_output=$(exec_on_host "$validator_idx" \
-            "RUST_LOG=debug,ipc_cli=trace $ipc_binary_expanded node init --config $node_init_config_expanded 2>&1")
+            "RUST_LOG=debug,ipc_cli=trace $ipc_binary_expanded node init --config $actual_config_expanded 2>&1")
     else
         log_info "Running ipc-cli node init..."
         local init_output=$(exec_on_host "$validator_idx" \
-            "$ipc_binary_expanded node init --config $node_init_config_expanded 2>&1")
+            "$ipc_binary_expanded node init --config $actual_config_expanded 2>&1")
     fi
 
-    if echo "$init_output" | grep -q "Error\|error\|failed"; then
+    # Check if initialization succeeded by looking for success message
+    if echo "$init_output" | grep -q "Node initialization completed successfully"; then
+        log_success "Node $name initialized successfully"
+        if [ "${DEBUG:-false}" = true ]; then
+            echo "$init_output" | tail -20
+        fi
+        return 0
+    fi
+
+    # If we get here, there was an error
         log_error "Initialization failed for $name"
 
         if [ "${DEBUG:-false}" = true ]; then
@@ -777,7 +723,7 @@ initialize_primary_node() {
             # Show just the error line(s)
             echo ""
             echo "Error summary:"
-            echo "$init_output" | grep -i "error" | head -5
+        echo "$init_output" | grep "❌" | head -5
             echo ""
             log_info "Run with --debug flag to see full output"
         fi
@@ -791,10 +737,7 @@ initialize_primary_node() {
         log_info "     curl -X POST -H 'Content-Type: application/json' \\"
         log_info "          --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_blockNumber\",\"params\":[],\"id\":1}' \\"
         log_info "          '$parent_rpc'"
-        return 1
-    fi
-
-    log_success "$name initialized successfully"
+    return 1
 }
 
 initialize_secondary_nodes() {
@@ -877,7 +820,16 @@ initialize_secondary_node() {
             "$ipc_binary_expanded node init --config $node_init_config_expanded 2>&1")
     fi
 
-    if echo "$init_output" | grep -q "Error\|error\|failed"; then
+    # Check if initialization succeeded by looking for success message
+    if echo "$init_output" | grep -q "Node initialization completed successfully"; then
+        log_success "Node $name initialized successfully"
+        if [ "${DEBUG:-false}" = true ]; then
+            echo "$init_output" | tail -20
+        fi
+        return 0
+    fi
+
+    # If we get here, there was an error
         log_error "Initialization failed for $name"
 
         if [ "${DEBUG:-false}" = true ]; then
@@ -890,7 +842,7 @@ initialize_secondary_node() {
             # Show just the error line(s)
             echo ""
             echo "Error summary:"
-            echo "$init_output" | grep -i "error" | head -5
+        echo "$init_output" | grep "❌" | head -5
             echo ""
             log_info "Run with --debug flag to see full output"
         fi
@@ -900,21 +852,18 @@ initialize_secondary_node() {
         log_info "  1. Check if parent_registry and parent_gateway addresses are correct"
         log_info "  2. Verify subnet already exists on parent chain"
         log_info "  3. Check if the subnet ID is correct: $(get_config_value 'subnet.id')"
-        return 1
-    fi
-
-    log_success "$name initialized successfully"
+    return 1
 }
 
 set_federated_power() {
     local primary_idx=$(get_primary_validator)
     local name="${VALIDATORS[$primary_idx]}"
-    local ip=$(get_config_value "validators[$primary_idx].ip")
-    local ssh_user=$(get_config_value "validators[$primary_idx].ssh_user")
-    local ipc_user=$(get_config_value "validators[$primary_idx].ipc_user")
     local ipc_binary=$(get_config_value "paths.ipc_binary")
     local subnet_id=$(get_config_value "subnet.id")
     local validator_power=$(get_config_value "init.validator_power")
+
+    # Expand ipc_binary path for local mode
+    ipc_binary="${ipc_binary/#\~/$HOME}"
 
     # Collect all validator public keys (without 0x prefix)
     local pubkeys=""
@@ -937,7 +886,7 @@ set_federated_power() {
     # Run set-federated-power from primary node
     local cmd="$ipc_binary subnet set-federated-power --subnet $subnet_id --validator-pubkeys $pubkeys --validator-power $validator_power --from t1d4gxuxytb6vg7cxzvxqk3cvbx4hv7vrtd6oa2mi"
 
-    local output=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" "$cmd 2>&1")
+    local output=$(exec_on_host "$primary_idx" "$cmd 2>&1")
 
     if echo "$output" | grep -q "Error\|error\|failed"; then
         log_error "Failed to set federated power"
@@ -1270,17 +1219,22 @@ show_subnet_info() {
     for idx in "${!VALIDATORS[@]}"; do
         local name="${VALIDATORS[$idx]}"
         local ip=$(get_config_value "validators[$idx].ip")
-        local ssh_user=$(get_config_value "validators[$idx].ssh_user")
-        local ipc_user=$(get_config_value "validators[$idx].ipc_user")
-        local node_home=$(get_config_value "paths.node_home")
+
+        # Get node home path (local or remote)
+        local node_home
+        if is_local_mode; then
+            local node_home_base=$(get_config_value "paths.node_home_base")
+            node_home="${node_home_base/#\~/$HOME}/$name"
+        else
+            node_home=$(get_config_value "paths.node_home")
+        fi
 
         # Get validator public key
-        local pubkey=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-            "cat $node_home/fendermint/validator.pk 2>/dev/null || echo ''")
+        local pubkey=$(exec_on_host "$idx" "cat $node_home/fendermint/validator.pk 2>/dev/null || echo ''")
 
         if [ -n "$pubkey" ]; then
             # Convert validator key to Ethereum address using fendermint
-            local eth_address=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+            local eth_address=$(exec_on_host "$idx" \
                 "fendermint key into-eth --secret-key $node_home/fendermint/validator.sk --name temp --out-dir /tmp 2>/dev/null && cat /tmp/temp.addr 2>/dev/null && rm -f /tmp/temp.* || echo ''")
 
             # Add 0x prefix if address was successfully converted
@@ -1321,18 +1275,15 @@ show_subnet_info() {
 
     # Get current block info from first validator
     log_info "Current Block Information (from ${VALIDATORS[0]}):"
-    local ip=$(get_config_value "validators[0].ip")
-    local ssh_user=$(get_config_value "validators[0].ssh_user")
-    local ipc_user=$(get_config_value "validators[0].ipc_user")
 
-    local block_height=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+    local block_height=$(exec_on_host "0" \
         "curl -s http://localhost:26657/status 2>/dev/null | jq -r '.result.sync_info.latest_block_height // \"\"' 2>/dev/null")
-    local block_time=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+    local block_time=$(exec_on_host "0" \
         "curl -s http://localhost:26657/status 2>/dev/null | jq -r '.result.sync_info.latest_block_time // \"\"' 2>/dev/null")
-    local catching_up=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+    local catching_up=$(exec_on_host "0" \
         "curl -s http://localhost:26657/status 2>/dev/null | jq -r '.result.sync_info.catching_up // \"\"' 2>/dev/null")
 
-    if [ -n "$block_height" ] && [ "$block_height" != "null" ]; then
+    if [ -n "$block_height" ] && [ "$block_height" != "null" ] && [ "$block_height" != "" ]; then
         log_info "  Latest Block Height: $block_height"
         log_info "  Latest Block Time: $block_time"
         log_info "  Catching Up: $catching_up"
@@ -1343,9 +1294,9 @@ show_subnet_info() {
 
     # Get network info
     log_info "Network Status:"
-    local n_peers=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+    local n_peers=$(exec_on_host "0" \
         "curl -s http://localhost:26657/net_info 2>/dev/null | jq -r '.result.n_peers // 0' 2>/dev/null")
-    local listening=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+    local listening=$(exec_on_host "0" \
         "curl -s http://localhost:26657/net_info 2>/dev/null | jq -r '.result.listening // false' 2>/dev/null")
 
     log_info "  CometBFT Peers: $n_peers"
@@ -1356,16 +1307,24 @@ show_subnet_info() {
     log_info "Libp2p Infrastructure (required for voting):"
     local libp2p_port=$(get_config_value "network.libp2p_port")
 
+    # Get node home for first validator (local or remote)
+    local node_home_0
+    if is_local_mode; then
+        local node_home_base=$(get_config_value "paths.node_home_base")
+        node_home_0="${node_home_base/#\~/$HOME}/${VALIDATORS[0]}"
+    else
+        node_home_0=$(get_config_value "paths.node_home")
+    fi
+
     # Check if libp2p port is listening and on correct address
-    local libp2p_listening=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-        "ss -tulpn 2>/dev/null | grep ':$libp2p_port ' | head -1" 2>/dev/null)
+    local libp2p_listening=$(exec_on_host "0" \
+        "ss -tulpn 2>/dev/null | grep ':$libp2p_port ' | head -1 || lsof -iTCP:$libp2p_port -sTCP:LISTEN 2>/dev/null | tail -1" 2>/dev/null)
 
     if [ -n "$libp2p_listening" ]; then
-        if echo "$libp2p_listening" | grep -q "0.0.0.0:$libp2p_port"; then
+        if echo "$libp2p_listening" | grep -q "0.0.0.0:$libp2p_port\|\\*:$libp2p_port"; then
             log_info "  ✓ Libp2p port $libp2p_port listening on 0.0.0.0 (can accept connections)"
         elif echo "$libp2p_listening" | grep -q "127.0.0.1:$libp2p_port"; then
-            log_warn "  ✗ Libp2p port $libp2p_port bound to 127.0.0.1 (cannot accept external connections!)"
-            log_warn "    Run: ./ipc-manager update-config to fix"
+            log_warn "  ⚠ Libp2p port $libp2p_port listening: 127.0.0.1"
         else
             log_info "  ⚠ Libp2p port $libp2p_port listening: $(echo $libp2p_listening | awk '{print $5}')"
         fi
@@ -1374,22 +1333,22 @@ show_subnet_info() {
     fi
 
     # Check if resolver is enabled in config
-    local resolver_enabled=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "sudo su - $ipc_user -c 'grep -A3 \"\\[resolver\\]\" ~/.ipc-node/fendermint/config/default.toml | grep enabled | grep -o \"true\\|false\"'" 2>/dev/null | head -1 | tr -d '\n\r ')
+    local resolver_enabled=$(exec_on_host "0" \
+        "grep -A3 '\\[resolver\\]' $node_home_0/fendermint/config/default.toml 2>/dev/null | grep enabled | grep -o 'true\\|false' | head -1" 2>/dev/null | tr -d '\n\r ')
 
     if [ "$resolver_enabled" = "true" ]; then
         log_info "  ✓ Resolver enabled in config"
 
         # Check if resolver service started
-        local resolver_started=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-            "sudo su - $ipc_user -c 'grep \"starting the IPLD Resolver Service\" ~/.ipc-node/logs/*.log 2>/dev/null | wc -l'" 2>/dev/null | tr -d ' \n\r')
+        local resolver_started=$(exec_on_host "0" \
+            "grep 'starting the IPLD Resolver Service' $node_home_0/logs/*.log 2>/dev/null | wc -l" 2>/dev/null | tr -d ' \n\r')
 
         if [ -n "$resolver_started" ] && [ "$resolver_started" -gt 0 ] 2>/dev/null; then
             log_info "  ✓ Resolver service started ($resolver_started times)"
 
             # Check if vote gossip loop started
-            local vote_loop=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-                "sudo su - $ipc_user -c 'grep \"parent finality vote gossip loop\" ~/.ipc-node/logs/*.log 2>/dev/null | wc -l'" 2>/dev/null | tr -d ' \n\r')
+            local vote_loop=$(exec_on_host "0" \
+                "grep 'parent finality vote gossip loop' $node_home_0/logs/*.log 2>/dev/null | wc -l" 2>/dev/null | tr -d ' \n\r')
 
             if [ -n "$vote_loop" ] && [ "$vote_loop" -gt 0 ] 2>/dev/null; then
                 log_info "  ✓ Vote gossip loop active"
@@ -1404,8 +1363,8 @@ show_subnet_info() {
     fi
 
     # Check listen_addr configuration
-    local listen_addr=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-        "grep 'listen_addr' ~/.ipc-node/fendermint/config/default.toml 2>/dev/null | head -1" 2>/dev/null)
+    local listen_addr=$(exec_on_host "0" \
+        "grep 'listen_addr' $node_home_0/fendermint/config/default.toml 2>/dev/null | head -1" 2>/dev/null)
 
     if echo "$listen_addr" | grep -q "0.0.0.0"; then
         log_info "  ✓ Listen address configured correctly (0.0.0.0)"
@@ -1419,15 +1378,21 @@ show_subnet_info() {
     for idx in "${!VALIDATORS[@]}"; do
         local v_name="${VALIDATORS[$idx]}"
         local v_ip=$(get_config_value "validators[$idx].ip")
-        local v_ssh_user=$(get_config_value "validators[$idx].ssh_user")
-        local v_ipc_user=$(get_config_value "validators[$idx].ipc_user")
-        local v_node_home=$(get_config_value "paths.node_home")
+
+        # Get node home path (local or remote)
+        local v_node_home
+        if is_local_mode; then
+            local node_home_base=$(get_config_value "paths.node_home_base")
+            v_node_home="${node_home_base/#\~/$HOME}/$v_name"
+        else
+            v_node_home=$(get_config_value "paths.node_home")
+        fi
 
         log_info "  $v_name ($v_ip):"
 
         # Get external_addresses
-        local ext_addrs=$(ssh -o StrictHostKeyChecking=no "$v_ssh_user@$v_ip" \
-            "sudo su - $v_ipc_user -c 'grep external_addresses $v_node_home/fendermint/config/default.toml 2>/dev/null'" 2>/dev/null)
+        local ext_addrs=$(exec_on_host "$idx" \
+            "grep external_addresses $v_node_home/fendermint/config/default.toml 2>/dev/null" 2>/dev/null)
 
         if [ -n "$ext_addrs" ] && echo "$ext_addrs" | grep -q "/ip4/$v_ip/tcp/$libp2p_port"; then
             log_info "    ✓ external_addresses: Contains own IP ($v_ip)"
@@ -1439,8 +1404,8 @@ show_subnet_info() {
         fi
 
         # Get static_addresses
-        local static_addrs=$(ssh -o StrictHostKeyChecking=no "$v_ssh_user@$v_ip" \
-            "sudo su - $v_ipc_user -c 'grep static_addresses $v_node_home/fendermint/config/default.toml 2>/dev/null'" 2>/dev/null)
+        local static_addrs=$(exec_on_host "$idx" \
+            "grep static_addresses $v_node_home/fendermint/config/default.toml 2>/dev/null" 2>/dev/null)
 
         if [ -n "$static_addrs" ]; then
             # Count how many peer IPs are in static_addresses
@@ -1467,8 +1432,8 @@ show_subnet_info() {
         fi
 
         # Check if libp2p connections are actually established
-        local libp2p_connections=$(ssh -o StrictHostKeyChecking=no "$v_ssh_user@$v_ip" \
-            "sudo su - $v_ipc_user -c 'ss -tn | grep :$libp2p_port | grep ESTAB | wc -l'" 2>/dev/null | tr -d ' \n\r')
+        local libp2p_connections=$(exec_on_host "$idx" \
+            "ss -tn 2>/dev/null | grep :$libp2p_port | grep ESTAB | wc -l || netstat -an 2>/dev/null | grep $libp2p_port | grep ESTABLISHED | wc -l" 2>/dev/null | tr -d ' \n\r')
 
         if [ -n "$libp2p_connections" ] && [ "$libp2p_connections" -gt 0 ] 2>/dev/null; then
             log_info "    ✓ Active libp2p connections: $libp2p_connections"
@@ -1482,14 +1447,14 @@ show_subnet_info() {
     log_info "Parent Chain Connectivity:"
 
     # Check if parent RPC is reachable
-    local parent_rpc_errors=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "sudo su - $ipc_user -c 'grep -i \"failed to get.*parent\\|parent.*connection.*failed\\|parent.*RPC.*error\" ~/.ipc-node/logs/*.log 2>/dev/null | wc -l'" 2>/dev/null | tr -d ' \n\r')
+    local parent_rpc_errors=$(exec_on_host "0" \
+        "grep -i 'failed to get.*parent\\|parent.*connection.*failed\\|parent.*RPC.*error' $node_home_0/logs/*.log 2>/dev/null | wc -l" 2>/dev/null | tr -d ' \n\r')
 
     if [ -n "$parent_rpc_errors" ] && [ "$parent_rpc_errors" -gt 0 ] 2>/dev/null; then
         log_warn "  ✗ Parent RPC errors detected ($parent_rpc_errors occurrences)"
         # Show a sample error
-        local sample_error=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-            "sudo su - $ipc_user -c 'grep -i \"failed to get.*parent\\|parent.*connection.*failed\" ~/.ipc-node/logs/*.log 2>/dev/null | tail -1'" 2>/dev/null)
+        local sample_error=$(exec_on_host "0" \
+            "grep -i 'failed to get.*parent\\|parent.*connection.*failed' $node_home_0/logs/*.log 2>/dev/null | tail -1" 2>/dev/null)
         if [ -n "$sample_error" ]; then
             log_warn "    Sample: $(echo "$sample_error" | tail -c 120)"
         fi
@@ -1498,8 +1463,8 @@ show_subnet_info() {
     fi
 
     # Check if parent blocks are being fetched
-    local parent_blocks_fetched=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "sudo su - $ipc_user -c 'grep -i \"parent.*block.*height\\|fetched.*parent\" ~/.ipc-node/logs/*.log 2>/dev/null | tail -1'" 2>/dev/null)
+    local parent_blocks_fetched=$(exec_on_host "0" \
+        "grep -i 'parent.*block.*height\\|fetched.*parent' $node_home_0/logs/*.log 2>/dev/null | tail -1" 2>/dev/null)
 
     if [ -n "$parent_blocks_fetched" ]; then
         log_info "  ✓ Parent block data being fetched"
@@ -1513,15 +1478,15 @@ show_subnet_info() {
     log_info "Parent Finality Status:"
 
     # Check recent logs for parent finality activity using separate greps
-    local parent_finality_count=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-        "grep -i 'ParentFinalityCommitted' ~/.ipc-node/logs/*.log 2>/dev/null | wc -l" 2>/dev/null | tr -d ' ')
+    local parent_finality_count=$(exec_on_host "0" \
+        "grep -i 'ParentFinalityCommitted' $node_home_0/logs/*.log 2>/dev/null | wc -l" 2>/dev/null | tr -d ' ')
 
     if [ -n "$parent_finality_count" ] && [ "$parent_finality_count" -gt 0 ] 2>/dev/null; then
         log_info "  ✓ Parent finality commits detected: $parent_finality_count total"
 
         # Get the most recent one
-        local last_finality=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-            "grep -i 'ParentFinalityCommitted' ~/.ipc-node/logs/*.log 2>/dev/null | tail -1" 2>/dev/null)
+        local last_finality=$(exec_on_host "0" \
+            "grep -i 'ParentFinalityCommitted' $node_home_0/logs/*.log 2>/dev/null | tail -1" 2>/dev/null)
 
         if [ -n "$last_finality" ]; then
             # Extract timestamp
@@ -1532,8 +1497,8 @@ show_subnet_info() {
         fi
 
         # Check for top-down message execution
-        local topdown_count=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-            "grep -i 'topdown' ~/.ipc-node/logs/*.log 2>/dev/null | grep -i 'exec\|apply\|message' | wc -l" 2>/dev/null | tr -d ' ')
+        local topdown_count=$(exec_on_host "0" \
+            "grep -i 'topdown' $node_home_0/logs/*.log 2>/dev/null | grep -i 'exec\|apply\|message' | wc -l" 2>/dev/null | tr -d ' ')
 
         if [ -n "$topdown_count" ] && [ "$topdown_count" -gt 0 ] 2>/dev/null; then
             log_info "  ✓ Top-down message activity: $topdown_count entries"
@@ -1569,7 +1534,7 @@ show_subnet_info() {
     log_info "Validator Status & Voting Power:"
 
     # Get validator set from CometBFT (from first validator)
-    local validators_json=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
+    local validators_json=$(exec_on_host "0" \
         "curl -s http://localhost:26657/validators 2>/dev/null" 2>/dev/null)
 
     local total_voting_power=0
@@ -1648,8 +1613,8 @@ show_subnet_info() {
     log_info "Recent Cross-Chain Activity (last 5 entries):"
 
     # Get recent topdown-related logs
-    local cross_msg_logs=$(ssh_exec "$ip" "$ssh_user" "$ipc_user" \
-        "grep -i 'topdown' ~/.ipc-node/logs/*.log 2>/dev/null | tail -5" 2>/dev/null)
+    local cross_msg_logs=$(exec_on_host "0" \
+        "grep -i 'topdown' $node_home_0/logs/*.log 2>/dev/null | tail -5" 2>/dev/null)
 
     if [ -n "$cross_msg_logs" ] && [ "$cross_msg_logs" != "" ]; then
         echo "$cross_msg_logs" | while IFS= read -r line; do

@@ -13,7 +13,7 @@ deployment:
 # Subnet Configuration
 subnet:
   # Subnet ID - deployed via IPC UI
-  id: "/r31337/t410f64rg5wfkj3kmbia633bjb4gqcxo7ifhs2e6zuwq"
+  id: "/r31337/t410finhhk5wcdncsa3lyvsiao3sckuiv2hds6qm45oi"
   # Parent chain RPC endpoint (local Anvil)
   parent_rpc: "http://localhost:8545"
   # Parent chain ID
@@ -72,7 +72,7 @@ network:
   cometbft_abci_port: 26658
   cometbft_prometheus_port: 26660
   libp2p_port: 26655
-  eth_api_port: 8545
+  eth_api_port: 8546 # Changed from 8545 to avoid conflict with Anvil
   eth_metrics_port: 9184
   fendermint_metrics_port: 9185
 # Paths (local mode uses local directories)
@@ -88,15 +88,17 @@ paths:
   ipc_config_dir: "/Users/philip/.ipc"
   # IPC CLI config file
   ipc_config_file: "/Users/philip/.ipc/config.toml"
+  # Node init config path (temp file used during initialization)
+  node_init_config: "/tmp/node-init-local.yml"
 # Initialization Settings
 init:
   # Deploy subnet and gateway contracts automatically
   # Set to true to run `ipc-cli subnet init` before node initialization
-  deploy_subnet: false
-  # Activate subnet during deployment (recall-migration branch may not require F3)
-  # For UI-deployed subnets: Set to false to create bootstrap genesis locally
-  # This creates a local genesis instead of fetching from parent (which may fail for certain setups)
-  activate_subnet: false
+  deploy_subnet: true
+  # Activate subnet during deployment
+  # Set to true to activate the subnet and create genesis from parent chain
+  # Set to false to create bootstrap genesis locally (for development/testing)
+  activate_subnet: true
   # Minimum number of validators required for subnet
   min_validators: 1
   # Supply source (native or ERC20)
@@ -161,8 +163,8 @@ ipc_cli:
   child:
     # Uses subnet.id from above
     network_type: "fevm"
-    # For local, use the first validator's ETH API port
-    provider_http: "http://localhost:8545"
+    # For local, use the first validator's ETH API port (8546 to avoid conflict with Anvil on 8545)
+    provider_http: "http://localhost:8546"
     # Child subnet's own gateway and registry contracts (will be auto-generated)
     gateway_addr: "0x0cdd23b138f20e4744568f61c474ffe35c0bc1fb"
     registry_addr: "0x5efd9aadab93db9f09c2f4c3759f627eb015ddba"
