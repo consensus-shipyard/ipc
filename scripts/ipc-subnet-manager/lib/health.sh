@@ -1180,15 +1180,11 @@ measure_all_block_times() {
 # Get chain ID from a validator
 get_chain_id() {
     local validator_idx="${1:-0}"
-
-    local ip=$(get_config_value "validators[$validator_idx].ip")
-    local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
-    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
     local eth_api_port=$(get_config_value "network.eth_api_port")
 
-    # Query eth_chainId via JSON-RPC - using simpler quoting
-    local response=$(ssh -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "sudo su - $ipc_user -c \"curl -s -X POST -H 'Content-Type: application/json' --data '{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"method\\\":\\\"eth_chainId\\\",\\\"params\\\":[],\\\"id\\\":1}' http://localhost:${eth_api_port}\"" 2>/dev/null)
+    # Query eth_chainId via JSON-RPC
+    local response=$(exec_on_host "$validator_idx" \
+        "curl -s -X POST -H 'Content-Type: application/json' --data '{\"jsonrpc\":\"2.0\",\"method\":\"eth_chainId\",\"params\":[],\"id\":1}' http://localhost:${eth_api_port}" 2>/dev/null)
 
     local chain_id=$(echo "$response" | jq -r '.result // ""' 2>/dev/null)
 
