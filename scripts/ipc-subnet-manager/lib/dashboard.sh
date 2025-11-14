@@ -105,27 +105,33 @@ categorize_error() {
 # Fetch current metrics from validator
 fetch_metrics() {
     local validator_idx="$1"
-    local ip=$(get_config_value "validators[$validator_idx].ip")
-    local ssh_user=$(get_config_value "validators[$validator_idx].ssh_user")
-    local ipc_user=$(get_config_value "validators[$validator_idx].ipc_user")
     local name="${VALIDATORS[$validator_idx]}"
 
-    # Fetch block height and info (with timeout)
-    local status=$(timeout 5 ssh -o ConnectTimeout=3 -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "curl -s --max-time 2 http://localhost:26657/status 2>/dev/null" 2>/dev/null || echo '{"result":{"sync_info":{}}}')
+    # Get node home path (local or remote)
+    local node_home
+    if is_local_mode; then
+        local node_home_base=$(get_config_value "paths.node_home_base")
+        node_home="${node_home_base/#\~/$HOME}/$name"
+    else
+        node_home=$(get_config_value "paths.node_home")
+    fi
+
+    # Fetch block height and info (curl has its own timeout via --max-time)
+    local status=$(exec_on_host "$validator_idx" \
+        "curl -s --max-time 3 http://localhost:26657/status 2>/dev/null" 2>/dev/null || echo '{"result":{"sync_info":{}}}')
 
     METRICS[height]=$(echo "$status" | jq -r '.result.sync_info.latest_block_height // 0' 2>/dev/null || echo "0")
     METRICS[block_time]=$(echo "$status" | jq -r '.result.sync_info.latest_block_time // ""' 2>/dev/null || echo "")
     METRICS[catching_up]=$(echo "$status" | jq -r '.result.sync_info.catching_up // true' 2>/dev/null || echo "true")
 
-    # Fetch network info (with timeout)
-    local net_info=$(timeout 5 ssh -o ConnectTimeout=3 -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "curl -s --max-time 2 http://localhost:26657/net_info 2>/dev/null" 2>/dev/null || echo '{"result":{}}')
+    # Fetch network info (curl has its own timeout via --max-time)
+    local net_info=$(exec_on_host "$validator_idx" \
+        "curl -s --max-time 3 http://localhost:26657/net_info 2>/dev/null" 2>/dev/null || echo '{"result":{}}')
     METRICS[peers]=$(echo "$net_info" | jq -r '.result.n_peers // 0' 2>/dev/null || echo "0")
 
-    # Fetch mempool status (with timeout)
-    local mempool=$(timeout 5 ssh -o ConnectTimeout=3 -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "curl -s --max-time 2 http://localhost:26657/num_unconfirmed_txs 2>/dev/null" 2>/dev/null || echo '{"result":{}}')
+    # Fetch mempool status (curl has its own timeout via --max-time)
+    local mempool=$(exec_on_host "$validator_idx" \
+        "curl -s --max-time 3 http://localhost:26657/num_unconfirmed_txs 2>/dev/null" 2>/dev/null || echo '{"result":{}}')
     METRICS[mempool_size]=$(echo "$mempool" | jq -r '.result.n_txs // 0' 2>/dev/null || echo "0")
     METRICS[mempool_bytes]=$(echo "$mempool" | jq -r '.result.total_bytes // 0' 2>/dev/null || echo "0")
 
@@ -144,12 +150,13 @@ fetch_metrics() {
         METRICS[blocks_per_min]=0
     fi
 
-    # Fetch parent finality from logs (recent, with timeout)
-    local finality=$(timeout 5 ssh -o ConnectTimeout=3 -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "sudo su - $ipc_user -c 'grep ParentFinalityCommitted ~/.ipc-node/logs/*.log 2>/dev/null | tail -1'" 2>/dev/null || echo "")
+    # Fetch parent finality from logs (recent)
+    # Note: For local/Anvil deployments, parent finality tracking works via null finality provider (no F3 required)
+    local finality=$(exec_on_host "$validator_idx" \
+        "grep ParentFinalityCommitted $node_home/logs/*.log 2>/dev/null | tail -1" 2>/dev/null || echo "")
 
     if [ -n "$finality" ]; then
-        METRICS[parent_height]=$(echo "$finality" | grep -oE 'parent_height: [0-9]+' | grep -oE '[0-9]+' || echo "0")
+        METRICS[parent_height]=$(echo "$finality" | grep -oE 'block_height=[0-9]+' | grep -oE '[0-9]+' | head -1 || echo "0")
         METRICS[finality_time]=$(echo "$finality" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}' || echo "")
     fi
 
@@ -167,9 +174,9 @@ fetch_metrics() {
         METRICS[finality_lag]=0
     fi
 
-    # Scan recent logs for errors (with timeout)
-    local errors=$(timeout 10 ssh -o ConnectTimeout=3 -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "sudo su - $ipc_user -c 'tail -500 ~/.ipc-node/logs/*.log 2>/dev/null | grep -E \"ERROR|WARN\" 2>/dev/null | tail -100'" 2>/dev/null || echo "")
+    # Scan recent logs for errors
+    local errors=$(exec_on_host "$validator_idx" \
+        "tail -500 $node_home/logs/*.log 2>/dev/null | grep -E 'ERROR|WARN' 2>/dev/null | tail -100" 2>/dev/null || echo "")
 
     # Process errors
     while IFS= read -r error_line; do
@@ -178,9 +185,9 @@ fetch_metrics() {
         fi
     done <<< "$errors"
 
-    # Count checkpoint signatures (with timeout)
-    local signatures=$(timeout 5 ssh -o ConnectTimeout=3 -o StrictHostKeyChecking=no "$ssh_user@$ip" \
-        "sudo su - $ipc_user -c 'tail -100 ~/.ipc-node/logs/*.log 2>/dev/null | grep -c \"broadcasted signature\" 2>/dev/null'" 2>/dev/null || echo "0")
+    # Count checkpoint signatures
+    local signatures=$(exec_on_host "$validator_idx" \
+        "tail -100 $node_home/logs/*.log 2>/dev/null | grep -c 'broadcasted signature' 2>/dev/null" 2>/dev/null || echo "0")
     METRICS[checkpoint_sigs]=$(echo "$signatures" | tr -d ' \n')
 }
 
@@ -272,9 +279,18 @@ draw_dashboard() {
     local lag=${METRICS[finality_lag]:-0}
     local finality_status=$(get_status_indicator $lag 30 100 false)
 
+    # Check if F3 is disabled (Anvil/local development)
+    local finality_note=""
+    if is_local_mode; then
+        finality_note=" ${YELLOW}(Null Finality - F3 disabled)${RESET}"
+    fi
+
     echo -e "${BOLD}┌─ PARENT FINALITY ─────────────────────────────────────────────────────┐${RESET}"
     printf "│ Subnet: %-8s  Parent Chain: %-8s  Lag: %-4d blocks           │\n" "$subnet_finality" "$parent_chain" "$lag"
     printf "│ Status: %b SYNCING               Last Commit: --                     │\n" "$finality_status"
+    if [ -n "$finality_note" ]; then
+        printf "│ %b%-69s │\n" "$finality_note" ""
+    fi
     echo -e "${BOLD}└───────────────────────────────────────────────────────────────────────┘${RESET}"
     echo ""
 
