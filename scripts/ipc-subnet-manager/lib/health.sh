@@ -380,6 +380,15 @@ deploy_subnet() {
     # Create subnet-init.yaml
     local subnet_init_config="/tmp/subnet-init-$$.yaml"
 
+    # Generate a unique chain ID for the subnet
+    # Use a hash-based approach: take the parent chain ID and add a unique offset
+    # For subnets, we'll use parent_chain_id + a large offset to ensure uniqueness
+    local parent_numeric_id=$(echo "$parent_chain_id" | sed 's/\/r//')
+    local subnet_chain_id=$((parent_numeric_id + 1000000))  # Add 1M to parent ID for subnet
+
+    log_info "Parent chain ID: $parent_numeric_id" >&2
+    log_info "Subnet chain ID: $subnet_chain_id" >&2
+
     cat > "$subnet_init_config" << EOF
 import-wallets:
   - wallet-type: evm
@@ -389,12 +398,12 @@ deploy:
   enabled: true
   url: $parent_rpc
   from: $from_address
-  chain-id: $(echo "$parent_chain_id" | sed 's/\/r//')
+  chain-id: $parent_numeric_id
 
 create:
   parent: $parent_chain_id
   from: $from_address
-  chain-id: $(echo "$parent_chain_id" | sed 's/\/r//')
+  chain-id: $subnet_chain_id
   min-validator-stake: 1.0
   min-validators: $min_validators
   bottomup-check-period: 50

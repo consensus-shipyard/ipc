@@ -929,3 +929,167 @@ update_ipc_cli_configs() {
     done
 }
 
+# Update child subnet provider_http in existing config.toml after subnet deployment
+# ipc-cli subnet init writes the child subnet with default port 8545, but we need to use the correct port
+update_child_subnet_provider() {
+    local subnet_id="$1"
+
+    log_info "Updating child subnet provider_http to use correct port..."
+
+    # Get the correct provider_http from config
+    local child_provider_http=$(get_config_value "ipc_cli.child.provider_http")
+
+    for idx in "${!VALIDATORS[@]}"; do
+        local name="${VALIDATORS[$idx]}"
+        local ipc_config_file=$(get_config_value "paths.ipc_config_file")
+        ipc_config_file="${ipc_config_file/#\~/$HOME}"
+
+        log_info "Updating provider_http for $name..."
+
+        # Use sed with line numbers for reliable inline editing
+        if is_local_mode; then
+            # For local mode, update the config file directly
+            if [ -f "$ipc_config_file" ]; then
+                # Find the line number of the subnet ID
+                local subnet_line=$(grep -n "id = \"$subnet_id\"" "$ipc_config_file" | cut -d: -f1 | head -1)
+
+                if [ -n "$subnet_line" ]; then
+                    # Find the provider_http line after the subnet ID (within next 10 lines)
+                    local provider_line=$(tail -n +$subnet_line "$ipc_config_file" | head -10 | grep -n "^provider_http = " | head -1 | cut -d: -f1)
+
+                    if [ -n "$provider_line" ]; then
+                        # Calculate absolute line number
+                        local abs_line=$((subnet_line + provider_line - 1))
+                        # Replace that specific line
+                        sed -i.bak "${abs_line}s|^provider_http = .*|provider_http = \"$child_provider_http\"|" "$ipc_config_file"
+                        log_success "Updated provider_http for $name (line $abs_line)"
+                    else
+                        log_warn "Could not find provider_http line after subnet ID"
+                    fi
+                else
+                    log_warn "Could not find subnet ID in config"
+                fi
+            fi
+        else
+            # For remote mode, use similar approach via exec_on_host
+            exec_on_host "$idx" "
+                subnet_line=\$(grep -n 'id = \"$subnet_id\"' $ipc_config_file | cut -d: -f1 | head -1)
+                if [ -n \"\$subnet_line\" ]; then
+                    provider_line=\$(tail -n +\$subnet_line $ipc_config_file | head -10 | grep -n '^provider_http = ' | head -1 | cut -d: -f1)
+                    if [ -n \"\$provider_line\" ]; then
+                        abs_line=\$((subnet_line + provider_line - 1))
+                        sed -i.bak \"\${abs_line}s|^provider_http = .*|provider_http = \\\"$child_provider_http\\\"|\" $ipc_config_file
+                    fi
+                fi
+            "
+
+            log_success "Updated provider_http for $name"
+        fi
+    done
+}
+
+# Update Fendermint topdown parent gateway and registry addresses
+# These must match the deployed parent chain contracts for cross-chain transfers to work
+update_fendermint_topdown_config() {
+    log_info "Updating Fendermint topdown parent contract addresses..."
+
+    # Get addresses from IPC config (updated by subnet init)
+    local ipc_config_file=$(get_config_value "paths.ipc_config_file")
+    ipc_config_file="${ipc_config_file/#\~/$HOME}"
+
+    # The PARENT subnet config has the deployed gateway/registry addresses on the parent chain
+    # Fendermint needs these to query the parent chain for topdown messages
+    local parent_chain_id=$(get_config_value "subnet.parent_chain_id")
+
+    # Read gateway and registry addresses from the PARENT subnet's config section
+    # Use grep to find the parent subnet section and extract addresses
+    local parent_gateway=$(grep -A 10 "id = \"$parent_chain_id\"" "$ipc_config_file" | grep "gateway_addr" | head -1 | sed 's/.*"\(0x[^"]*\)".*/\1/')
+
+    local parent_registry=$(grep -A 10 "id = \"$parent_chain_id\"" "$ipc_config_file" | grep "registry_addr" | head -1 | sed 's/.*"\(0x[^"]*\)".*/\1/')
+
+    # If extraction failed, fall back to YAML config
+    if [ -z "$parent_gateway" ] || [ -z "$parent_registry" ]; then
+        log_warn "Could not extract addresses from parent subnet config, using values from YAML config"
+        parent_gateway=$(get_config_value "subnet.parent_gateway")
+        parent_registry=$(get_config_value "subnet.parent_registry")
+    fi
+
+    log_info "Parent gateway: $parent_gateway"
+    log_info "Parent registry: $parent_registry"
+
+    for idx in "${!VALIDATORS[@]}"; do
+        local name="${VALIDATORS[$idx]}"
+
+        # Get node home path
+        local node_home
+        if is_local_mode; then
+            local node_home_base=$(get_config_value "paths.node_home_base")
+            node_home="${node_home_base/#\~/$HOME}/$name"
+        else
+            node_home=$(get_config_value "paths.node_home")
+        fi
+
+        local fendermint_config="$node_home/fendermint/config/default.toml"
+
+        log_info "Updating Fendermint config for $name..."
+
+        if is_local_mode; then
+            # For local mode, update directly
+            if [ -f "$fendermint_config" ]; then
+                # Update parent_gateway
+                sed -i.bak "s|parent_gateway = \"0x[a-fA-F0-9]*\"|parent_gateway = \"$parent_gateway\"|g" "$fendermint_config"
+                # Update parent_registry
+                sed -i.bak2 "s|parent_registry = \"0x[a-fA-F0-9]*\"|parent_registry = \"$parent_registry\"|g" "$fendermint_config"
+
+                log_success "Updated topdown config for $name"
+            else
+                log_warn "Fendermint config not found at $fendermint_config"
+            fi
+        else
+            # For remote mode
+            exec_on_host "$idx" "sed -i.bak 's|parent_gateway = \"0x[a-fA-F0-9]*\"|parent_gateway = \"$parent_gateway\"|g' $fendermint_config"
+            exec_on_host "$idx" "sed -i.bak2 's|parent_registry = \"0x[a-fA-F0-9]*\"|parent_registry = \"$parent_registry\"|g' $fendermint_config"
+            log_success "Updated topdown config for $name"
+        fi
+    done
+}
+
+# Update the YAML config file with deployed parent chain addresses
+# This ensures future deployments use the correct addresses
+update_yaml_with_parent_addresses() {
+    log_info "Updating YAML config with deployed parent chain addresses..."
+
+    # Get addresses from IPC config (written by subnet init)
+    local ipc_config_file=$(get_config_value "paths.ipc_config_file")
+    ipc_config_file="${ipc_config_file/#\~/$HOME}"
+
+    local parent_chain_id=$(get_config_value "subnet.parent_chain_id")
+
+    # Read parent addresses from IPC config
+    local parent_gateway=$(grep -A 10 "id = \"$parent_chain_id\"" "$ipc_config_file" | grep "gateway_addr" | head -1 | sed 's/.*"\(0x[^"]*\)".*/\1/')
+    local parent_registry=$(grep -A 10 "id = \"$parent_chain_id\"" "$ipc_config_file" | grep "registry_addr" | head -1 | sed 's/.*"\(0x[^"]*\)".*/\1/')
+
+    if [ -z "$parent_gateway" ] || [ -z "$parent_registry" ]; then
+        log_warn "Could not extract parent addresses from IPC config"
+        return 1
+    fi
+
+    log_info "Parent gateway: $parent_gateway"
+    log_info "Parent registry: $parent_registry"
+
+    # Update the YAML config file
+    local config_file="$CONFIG_FILE"
+
+    # Use yq to update if available, otherwise use sed
+    if command -v yq &> /dev/null; then
+        yq eval ".subnet.parent_gateway = \"$parent_gateway\"" -i "$config_file"
+        yq eval ".subnet.parent_registry = \"$parent_registry\"" -i "$config_file"
+        log_success "Updated YAML config with parent addresses"
+    else
+        # Fallback to sed
+        sed -i.bak "s|parent_gateway:.*|parent_gateway: \"$parent_gateway\"|" "$config_file"
+        sed -i.bak2 "s|parent_registry:.*|parent_registry: \"$parent_registry\"|" "$config_file"
+        log_success "Updated YAML config with parent addresses (using sed)"
+    fi
+}
+

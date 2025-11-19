@@ -13,15 +13,15 @@ deployment:
 # Subnet Configuration
 subnet:
   # Subnet ID - deployed via IPC UI
-  id: "/r31337/t410finhhk5wcdncsa3lyvsiao3sckuiv2hds6qm45oi"
+  id: "/r31337/t410frfbfip324f66q5yg4hlhfiwenra3hwcnyf4uicy"
   # Parent chain RPC endpoint (local Anvil)
   parent_rpc: "http://localhost:8545"
   # Parent chain ID
   parent_chain_id: "/r31337"
   # Parent registry contract address (deployed via IPC UI)
-  parent_registry: "0x5efd9aadab93db9f09c2f4c3759f627eb015ddba"
-  # Parent gateway contract address (deployed via IPC UI)
-  parent_gateway: "0x0cdd23b138f20e4744568f61c474ffe35c0bc1fb"
+  parent_registry: "0xe3011a37a904ab90c8881a99bd1f6e21401f1522"
+  # Parent gateway contract address (deployed on Anvil during subnet init)
+  parent_gateway: "0xab16a69a5a8c12c732e0deff4be56a70bb64c926"
 # Validator Nodes
 # In local mode, all validators run on 127.0.0.1 with different ports
 # Port allocation: validator-0 uses base ports, validator-1 uses base+100, validator-2 uses base+200, etc.
@@ -38,7 +38,7 @@ validators:
       cometbft_abci: 26658
       cometbft_prometheus: 26660
       libp2p: 26655
-      eth_api: 8545
+      eth_api: 8546
       eth_metrics: 9184
       fendermint_metrics: 9185
 #  - name: "validator-1"
@@ -109,7 +109,7 @@ init:
   validator_power: 1
   # Genesis configuration
   genesis:
-    base_fee: "1000"
+    base_fee: "100" # Lowered from 1000 to reduce absolute costs (not gas units)
     power_scale: 3
     network_version: 21
   # IPC configuration (fast settings for local development)

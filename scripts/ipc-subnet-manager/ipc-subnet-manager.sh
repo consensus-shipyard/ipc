@@ -233,6 +233,16 @@ cmd_init() {
         # Reload configuration to pick up updated subnet ID
         load_config
 
+        # Update child subnet provider_http to use correct port (8546 instead of default 8545)
+        # ipc-cli subnet init writes provider_http with default port, but we need the configured port
+        log_section "Updating IPC CLI Configuration"
+        update_child_subnet_provider "$deployed_subnet_id"
+
+        # Update YAML config with parent chain addresses for future deployments
+        # ipc-cli subnet init deploys contracts on parent chain and updates ~/.ipc/config.toml
+        # We need to persist these addresses to the YAML config
+        update_yaml_with_parent_addresses
+
         # Create genesis using ipc-cli subnet create-genesis
         # This works for both activated and non-activated subnets
         log_section "Creating Genesis"
@@ -252,6 +262,12 @@ cmd_init() {
     log_section "Initializing Primary Node"
     local primary_validator=$(get_primary_validator)
     initialize_primary_node "$primary_validator"
+
+    # Update Fendermint topdown config with correct parent contract addresses
+    # This must be done AFTER node init (which creates the Fendermint config)
+    # but BEFORE starting validators
+    log_section "Updating Fendermint Configuration"
+    update_fendermint_topdown_config
 
     # Extract primary peer info
     local primary_peer_info=$(extract_peer_info "$primary_validator")
