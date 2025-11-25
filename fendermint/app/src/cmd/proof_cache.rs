@@ -1,4 +1,4 @@
-// Copyright 2022-2024 Protocol Labs
+// Copyright 2022-2025 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use crate::cmd;
@@ -124,7 +124,6 @@ fn get_proof(db_path: &Path, instance_id: u64) -> anyhow::Result<()> {
     let cache_config = CacheConfig {
         lookahead_instances: 10,
         retention_instances: 2,
-        max_size_bytes: 0,
     };
 
     let cache = ProofCache::new_with_persistence(cache_config, db_path, 0)?;

@@ -1,4 +1,4 @@
-// Copyright 2022-2024 Protocol Labs
+// Copyright 2022-2025 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! Proof generator service for F3-based parent finality
 //!
@@ -47,10 +47,11 @@ pub async fn launch_service(
     initial_committed_instance: u64,
     initial_power_table: filecoin_f3_gpbft::PowerEntries,
     db_path: Option<std::path::PathBuf>,
-) -> Result<(Arc<ProofCache>, tokio::task::JoinHandle<()>)> {
+) -> Result<Option<(Arc<ProofCache>, tokio::task::JoinHandle<()>)>> {
     // Validate configuration
     if !config.enabled {
-        anyhow::bail!("Proof service is disabled in configuration");
+        tracing::info!("Proof service is disabled in configuration");
+        return Ok(None);
     }
 
     if config.parent_rpc_url.is_empty() {
@@ -61,11 +62,11 @@ pub async fn launch_service(
         anyhow::bail!("f3_network_name is required (e.g., 'calibrationnet', 'mainnet')");
     }
 
-    if config.lookahead_instances == 0 {
+    if config.cache_config.lookahead_instances == 0 {
         anyhow::bail!("lookahead_instances must be > 0");
     }
 
-    if config.retention_instances == 0 {
+    if config.cache_config.retention_instances == 0 {
         anyhow::bail!("retention_instances must be > 0");
     }
 
@@ -77,22 +78,24 @@ pub async fn launch_service(
         initial_instance = initial_committed_instance,
         parent_rpc = config.parent_rpc_url,
         f3_network = config.f3_network_name,
-        lookahead = config.lookahead_instances,
+        lookahead = config.cache_config.lookahead_instances,
         "Launching proof generator service with validated configuration"
     );
 
     // Create cache (with optional persistence)
-    let cache_config = CacheConfig::from(&config);
     let cache = if let Some(path) = db_path {
         tracing::info!(path = %path.display(), "Creating cache with persistence");
         Arc::new(ProofCache::new_with_persistence(
-            cache_config,
+            config.cache_config.clone(),
             &path,
             initial_committed_instance,
         )?)
     } else {
         tracing::info!("Creating in-memory cache (no persistence)");
-        Arc::new(ProofCache::new(initial_committed_instance, cache_config))
+        Arc::new(ProofCache::new(
+            initial_committed_instance,
+            config.cache_config.clone(),
+        ))
     };
 
     // Clone what we need for the background task
@@ -117,17 +120,16 @@ pub async fn launch_service(
         }
     });
 
-    Ok((cache, handle))
+    Ok(Some((cache, handle)))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use filecoin_f3_gpbft::PowerEntries;
 
     #[tokio::test]
     async fn test_launch_service_disabled() {
-        use filecoin_f3_gpbft::PowerEntries;
-
         let config = ProofServiceConfig {
             enabled: false,
             ..Default::default()
@@ -135,11 +137,13 @@ mod tests {
 
         let power_table = PowerEntries(vec![]);
         let result = launch_service(config, 0, power_table, None).await;
-        assert!(result.is_err());
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none());
     }
 
     #[tokio::test]
     async fn test_launch_service_enabled() {
+        use crate::config::GatewayId;
         use filecoin_f3_gpbft::PowerEntries;
 
         let config = ProofServiceConfig {
@@ -147,7 +151,7 @@ mod tests {
             parent_rpc_url: "http://localhost:1234/rpc/v1".to_string(),
             parent_subnet_id: "/r314159".to_string(),
             f3_network_name: "calibrationnet".to_string(),
-            gateway_actor_id: Some(1001),
+            gateway_id: GatewayId::ActorId(1001),
             subnet_id: Some("test-subnet".to_string()),
             polling_interval: std::time::Duration::from_secs(60),
             ..Default::default()
@@ -157,7 +161,7 @@ mod tests {
         let result = launch_service(config, 100, power_table, None).await;
         assert!(result.is_ok());
 
-        let (cache, handle) = result.unwrap();
+        let (cache, handle) = result.unwrap().unwrap();
         handle.abort();
 
         assert_eq!(cache.last_committed_instance(), 100);

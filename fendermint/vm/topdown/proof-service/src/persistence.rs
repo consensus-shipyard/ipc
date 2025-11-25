@@ -1,4 +1,4 @@
-// Copyright 2022-2024 Protocol Labs
+// Copyright 2022-2025 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! Persistent storage for proof cache using RocksDB
 //!
@@ -204,11 +204,11 @@ mod tests {
         CacheEntry {
             instance_id,
             finalized_epochs: vec![100, 101, 102],
-            proof_bundle: UnifiedProofBundle {
+            proof_bundle: Some(UnifiedProofBundle {
                 storage_proofs: vec![],
                 event_proofs: vec![],
                 blocks: vec![],
-            },
+            }),
             certificate: SerializableF3Certificate {
                 instance_id,
                 finalized_epochs: vec![100, 101, 102],

@@ -1,4 +1,4 @@
-// Copyright 2022-2024 Protocol Labs
+// Copyright 2022-2025 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! Proof bundle assembler
 //!
@@ -43,7 +43,7 @@ const NEW_POWER_CHANGE_REQUEST_SIGNATURE: &str =
 /// The Subnet struct field layout (see contracts/contracts/structs/Subnet.sol):
 ///   - id (SubnetID): slot 0-1 (SubnetID has 2 fields)
 ///   - stake (uint256): slot 2
-///   - topDownNonce (uint64): slot 3 
+///   - topDownNonce (uint64): slot 3
 ///   - appliedBottomUpNonce (uint64): slot 3 (packed with topDownNonce)
 ///   - genesisEpoch (uint256): slot 4
 /// We need the nonce to verify top-down message ordering
@@ -98,7 +98,12 @@ impl ProofAssembler {
     pub async fn generate_proof_bundle(
         &self,
         certificate: &FinalityCertificate,
-    ) -> Result<UnifiedProofBundle> {
+    ) -> Result<Option<UnifiedProofBundle>> {
+        // If the certificate has no suffix, return None
+        if !certificate.ec_chain.has_suffix() {
+            return Ok(None);
+        }
+
         let generation_start = Instant::now();
         let instance_id = certificate.gpbft_instance;
 
@@ -108,9 +113,7 @@ impl ProofAssembler {
         // This can cause issues with RPC lookback limits.
         let highest_epoch = certificate
             .ec_chain
-            .suffix()
-            .last()  // Get the most recent epoch in the suffix
-            .or_else(|| certificate.ec_chain.base())  // Fallback to base if suffix is empty
+            .last() // Get the most recent epoch
             .map(|ts| ts.epoch)
             .context("Certificate has no epochs in suffix or base")?;
 
@@ -226,18 +229,18 @@ impl ProofAssembler {
         // async/sync worlds. This prevents blocking the main tokio runtime while
         // handling non-Send types correctly.
         let bundle = tokio::task::spawn_blocking(move || {
-            // Use futures::executor to run async code without blocking the parent runtime
-            futures::executor::block_on(generate_proof_bundle(
-                &lotus_client,
-                &parent_api,
-                &child_api,
-                storage_specs,
-                event_specs,
-            ))
+            tokio::runtime::Handle::current()
+                .block_on(generate_proof_bundle(
+                    &lotus_client,
+                    &parent_api,
+                    &child_api,
+                    storage_specs,
+                    event_specs,
+                ))
+                .context("Failed to generate proof bundle")
         })
         .await
-        .context("Proof generation task panicked")?
-        .context("Failed to generate proof bundle")?;
+        .context("Failed to join proof generation task")??;
 
         // Calculate bundle size for metrics
         let bundle_size_bytes = fvm_ipld_encoding::to_vec(&bundle)
@@ -266,7 +269,7 @@ impl ProofAssembler {
             "Generated proof bundle"
         );
 
-        Ok(bundle)
+        Ok(Some(bundle))
     }
 }
 

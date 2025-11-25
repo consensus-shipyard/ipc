@@ -1,12 +1,12 @@
-// Copyright 2022-2024 Protocol Labs
+// Copyright 2022-2025 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! In-memory cache for proof bundles with optional disk persistence
 
 use crate::config::CacheConfig;
-use crate::observe::ProofCached;
+use crate::observe::{ProofCached, CACHE_HIT_TOTAL, CACHE_SIZE};
 use crate::persistence::ProofCachePersistence;
 use crate::types::CacheEntry;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use ipc_observability::emit;
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
@@ -53,13 +53,15 @@ impl ProofCache {
     ) -> Result<Self> {
         let persistence = ProofCachePersistence::open(db_path)?;
 
-        // Load last committed from disk, or use initial_instance if DB is fresh
+        // Load all entries and last committed instance from disk
         let last_committed = persistence
-            .load_last_committed()?
+            .load_last_committed()
+            .context("Failed to load last committed instance from disk")?
             .unwrap_or(initial_instance);
 
-        // Load all entries from disk into memory
-        let entries_vec = persistence.load_all_entries()?;
+        let entries_vec = persistence
+            .load_all_entries()
+            .context("Failed to load all entries from disk")?;
         let entries: BTreeMap<u64, CacheEntry> = entries_vec
             .into_iter()
             .map(|e| (e.instance_id, e))
@@ -71,12 +73,19 @@ impl ProofCache {
             "Loaded cache from disk"
         );
 
-        Ok(Self {
+        let cache = Self {
             entries: Arc::new(RwLock::new(entries)),
             last_committed_instance: Arc::new(AtomicU64::new(last_committed)),
             config,
             persistence: Some(Arc::new(persistence)),
-        })
+        };
+
+        // This will prune any entries that are older than the initial instance
+        if last_committed < initial_instance {
+            cache.mark_committed(initial_instance)?;
+        }
+
+        Ok(cache)
     }
 
     /// Get the next uncommitted proof (in sequential order)
@@ -85,7 +94,14 @@ impl ProofCache {
         let last_committed = self.last_committed_instance.load(Ordering::Acquire);
         let next_instance = last_committed + 1;
 
-        self.entries.read().get(&next_instance).cloned()
+        let result = self.entries.read().get(&next_instance).cloned();
+
+        // Record cache hit/miss
+        CACHE_HIT_TOTAL
+            .with_label_values(&[if result.is_some() { "hit" } else { "miss" }])
+            .inc();
+
+        result
     }
 
     /// Get proof for a specific instance ID
@@ -98,7 +114,6 @@ impl ProofCache {
         let result = self.entries.read().contains_key(&instance_id);
 
         // Record cache hit/miss
-        use crate::observe::CACHE_HIT_TOTAL;
         CACHE_HIT_TOTAL
             .with_label_values(&[if result { "hit" } else { "miss" }])
             .inc();
@@ -144,7 +159,6 @@ impl ProofCache {
         }
 
         // Update cache size metric
-        use crate::observe::CACHE_SIZE;
         CACHE_SIZE.set(cache_size as i64);
 
         tracing::debug!(instance_id, cache_size, "Inserted proof into cache");
@@ -153,14 +167,16 @@ impl ProofCache {
     }
 
     /// Mark an instance as committed and trigger cleanup
-    pub fn mark_committed(&self, instance_id: u64) {
+    pub fn mark_committed(&self, instance_id: u64) -> Result<()> {
         let old_value = self
             .last_committed_instance
             .swap(instance_id, Ordering::Release);
 
         // Save to disk if enabled
         if let Some(persistence) = &self.persistence {
-            let _ = persistence.save_last_committed(instance_id);
+            persistence
+                .save_last_committed(instance_id)
+                .context("Failed to save last committed instance to disk")?;
         }
 
         tracing::info!(
@@ -170,7 +186,9 @@ impl ProofCache {
         );
 
         // Cleanup old instances outside retention window
-        self.cleanup_old_instances(instance_id);
+        self.cleanup_old_instances(instance_id)?;
+
+        Ok(())
     }
 
     /// Get the current last committed instance
@@ -194,7 +212,7 @@ impl ProofCache {
     }
 
     /// Remove instances older than the retention window
-    fn cleanup_old_instances(&self, current_instance: u64) {
+    fn cleanup_old_instances(&self, current_instance: u64) -> Result<()> {
         let retention_cutoff = current_instance.saturating_sub(self.config.retention_instances);
 
         // Collect IDs to remove
@@ -207,28 +225,37 @@ impl ProofCache {
                 .collect()
         };
 
-        if !to_remove.is_empty() {
-            // Remove from memory
-            {
-                let mut entries = self.entries.write();
-                for id in &to_remove {
-                    entries.remove(id);
-                }
-            }
-
-            // Remove from disk if enabled
-            if let Some(persistence) = &self.persistence {
-                for id in &to_remove {
-                    let _ = persistence.delete_entry(*id);
-                }
-            }
-
-            tracing::debug!(
-                removed = to_remove.len(),
-                retention_cutoff,
-                "Cleaned up old cache entries"
-            );
+        if to_remove.is_empty() {
+            tracing::debug!(retention_cutoff, "No old instances to cleanup");
+            return Ok(());
         }
+
+        // Remove from memory
+        let mut entries = self.entries.write();
+        for id in &to_remove {
+            entries.remove(id);
+        }
+
+        // Remove from disk if enabled
+        if let Some(persistence) = &self.persistence {
+            for id in &to_remove {
+                persistence
+                    .delete_entry(*id)
+                    .context("Failed to delete cache entry from disk")?;
+            }
+        }
+
+        // Update cache size metric
+        let cache_size = self.entries.read().len();
+        CACHE_SIZE.set(cache_size as i64);
+
+        tracing::debug!(
+            removed = to_remove.len(),
+            retention_cutoff,
+            "Cleaned up old cache entries"
+        );
+
+        Ok(())
     }
 
     /// Get all cached instance IDs (for debugging)
@@ -248,11 +275,11 @@ mod tests {
         CacheEntry {
             instance_id,
             finalized_epochs: epochs.clone(),
-            proof_bundle: UnifiedProofBundle {
+            proof_bundle: Some(UnifiedProofBundle {
                 storage_proofs: vec![],
                 event_proofs: vec![],
                 blocks: vec![],
-            },
+            }),
             certificate: SerializableF3Certificate {
                 instance_id,
                 finalized_epochs: epochs,
@@ -273,7 +300,6 @@ mod tests {
         let config = CacheConfig {
             lookahead_instances: 5,
             retention_instances: 2,
-            max_size_bytes: 0,
         };
 
         let cache = ProofCache::new(100, config);
@@ -301,7 +327,6 @@ mod tests {
         let config = CacheConfig {
             lookahead_instances: 3,
             retention_instances: 1,
-            max_size_bytes: 0,
         };
 
         let cache = ProofCache::new(100, config);
@@ -321,7 +346,6 @@ mod tests {
         let config = CacheConfig {
             lookahead_instances: 10,
             retention_instances: 2,
-            max_size_bytes: 0,
         };
 
         let cache = ProofCache::new(100, config);
@@ -353,7 +377,6 @@ mod tests {
         let config = CacheConfig {
             lookahead_instances: 10,
             retention_instances: 2,
-            max_size_bytes: 0,
         };
 
         let cache = ProofCache::new(100, config);

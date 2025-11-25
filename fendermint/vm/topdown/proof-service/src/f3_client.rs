@@ -1,4 +1,4 @@
-// Copyright 2022-2024 Protocol Labs
+// Copyright 2022-2025 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! F3 client wrapper for certificate fetching and validation
 //!
@@ -79,6 +79,7 @@ impl F3Client {
     /// * `rpc_endpoint` - F3 RPC endpoint
     /// * `network_name` - Network name (e.g., "calibrationnet", "mainnet")
     /// * `initial_instance` - F3 instance to bootstrap from
+    #[doc(hidden)]
     pub async fn new_from_rpc(
         rpc_endpoint: &str,
         network_name: &str,
@@ -116,7 +117,8 @@ impl F3Client {
     ///
     /// # Returns
     /// `ValidatedCertificate` containing the cryptographically verified certificate
-    pub async fn fetch_and_validate(&mut self, instance: u64) -> Result<ValidatedCertificate> {
+    pub async fn fetch_and_validate(&mut self) -> Result<ValidatedCertificate> {
+        let instance = self.state.instance + 1;
         debug!(instance, "Starting F3 certificate fetch and validation");
 
         // STEP 1: FETCH certificate from F3 RPC
@@ -157,7 +159,7 @@ impl F3Client {
         // STEP 2: CRYPTOGRAPHIC VALIDATION
         debug!(instance, "Validating certificate cryptography");
         let validation_start = Instant::now();
-        
+
         debug!(
             instance,
             current_instance = self.state.instance,
@@ -165,7 +167,10 @@ impl F3Client {
             "Current F3 validator state"
         );
 
-        let new_state = match self.light_client.validate_certificates(&self.state, &[f3_cert.clone()]) {
+        let new_state = match self
+            .light_client
+            .validate_certificates(&self.state, &[f3_cert.clone()])
+        {
             Ok(new_state) => {
                 let latency = validation_start.elapsed().as_secs_f64();
                 emit(F3CertificateValidated {

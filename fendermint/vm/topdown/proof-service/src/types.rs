@@ -1,4 +1,4 @@
-// Copyright 2022-2024 Protocol Labs
+// Copyright 2022-2025 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! Types for the proof generator service
 
@@ -38,7 +38,8 @@ pub struct CacheEntry {
     pub finalized_epochs: Vec<ChainEpoch>,
 
     /// Typed proof bundle (storage + event proofs + witness blocks)
-    pub proof_bundle: UnifiedProofBundle,
+    /// None if the proof bundle was not generated (e.g. if the certificate has no suffix)
+    pub proof_bundle: Option<UnifiedProofBundle>,
 
     /// Validated certificate (cryptographically verified)
     pub certificate: SerializableF3Certificate,
@@ -83,7 +84,7 @@ impl CacheEntry {
     /// * `source_rpc` - RPC URL where certificate was fetched from
     pub fn new(
         f3_cert: &FinalityCertificate,
-        proof_bundle: UnifiedProofBundle,
+        proof_bundle: Option<UnifiedProofBundle>,
         source_rpc: String,
     ) -> Self {
         let certificate = SerializableF3Certificate::from(f3_cert);

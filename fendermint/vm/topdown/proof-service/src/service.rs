@@ -1,4 +1,4 @@
-// Copyright 2022-2024 Protocol Labs
+// Copyright 2022-2025 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! Proof generator service - orchestrates proof generation pipeline
 //!
@@ -10,7 +10,7 @@
 
 use crate::assembler::ProofAssembler;
 use crate::cache::ProofCache;
-use crate::config::ProofServiceConfig;
+use crate::config::{GatewayId, ProofServiceConfig};
 use crate::f3_client::F3Client;
 use crate::types::CacheEntry;
 use anyhow::{Context, Result};
@@ -43,24 +43,25 @@ impl ProofGeneratorService {
         initial_instance: u64,
         initial_power_table: filecoin_f3_gpbft::PowerEntries,
     ) -> Result<Self> {
-        // Resolve gateway actor ID (support both direct ID and Ethereum address)
-        let gateway_actor_id = if let Some(id) = config.gateway_actor_id {
-            id
-        } else if let Some(eth_addr) = &config.gateway_eth_address {
-            // Resolve Ethereum address to actor ID
-            tracing::info!(eth_address = %eth_addr, "Resolving gateway Ethereum address to actor ID");
-            let client =
-                proofs::client::LotusClient::new(url::Url::parse(&config.parent_rpc_url)?, None);
-            let actor_id = proofs::proofs::resolve_eth_address_to_actor_id(&client, eth_addr)
-                .await
-                .with_context(|| {
-                    format!("Failed to resolve gateway Ethereum address: {}", eth_addr)
-                })?;
-            tracing::info!(eth_address = %eth_addr, actor_id, "Resolved gateway address");
-            actor_id
-        } else {
-            anyhow::bail!("Either gateway_actor_id or gateway_eth_address must be configured");
+        let gateway_actor_id = match &config.gateway_id {
+            GatewayId::ActorId(id) => *id,
+            GatewayId::EthAddress(eth_addr) => {
+                // Resolve Ethereum address to actor ID
+                tracing::info!(eth_address = %eth_addr, "Resolving gateway Ethereum address to actor ID");
+                let client = proofs::client::LotusClient::new(
+                    url::Url::parse(&config.parent_rpc_url)?,
+                    None,
+                );
+                let actor_id = proofs::proofs::resolve_eth_address_to_actor_id(&client, eth_addr)
+                    .await
+                    .with_context(|| {
+                        format!("Failed to resolve gateway Ethereum address: {}", eth_addr)
+                    })?;
+                tracing::info!(eth_address = %eth_addr, actor_id, "Resolved gateway address");
+                actor_id
+            }
         };
+
         let subnet_id = config
             .subnet_id
             .as_ref()
@@ -103,7 +104,7 @@ impl ProofGeneratorService {
     pub async fn run(self) {
         tracing::info!(
             polling_interval = ?self.config.polling_interval,
-            lookahead = self.config.lookahead_instances,
+            lookahead = self.config.cache_config.lookahead_instances,
             "Starting proof generator service"
         );
 
@@ -134,7 +135,7 @@ impl ProofGeneratorService {
         let last_committed = self.cache.last_committed_instance();
         // Start FROM last_committed (not +1) - F3 client expects to validate from current state
         let next_instance = last_committed;
-        let max_instance = last_committed + self.config.lookahead_instances;
+        let max_instance = last_committed + self.config.cache_config.lookahead_instances;
 
         tracing::debug!(
             last_committed,
@@ -168,7 +169,7 @@ impl ProofGeneratorService {
             // ====================
             // STEP 1: FETCH + VALIDATE certificate (single operation!)
             // ====================
-            let validated = match self.f3_client.lock().await.fetch_and_validate(instance_id).await {
+            let validated = match self.f3_client.lock().await.fetch_and_validate().await {
                 Ok(cert) => cert,
                 Err(e)
                     if e.to_string().contains("not found")
@@ -202,7 +203,7 @@ impl ProofGeneratorService {
             let suffix = &validated.f3_cert.ec_chain.suffix();
             let base_epoch = validated.f3_cert.ec_chain.base().map(|b| b.epoch);
             let suffix_epochs: Vec<i64> = suffix.iter().map(|ts| ts.epoch).collect();
-            
+
             tracing::info!(
                 instance_id,
                 ec_chain_len = suffix.len(),
@@ -256,7 +257,7 @@ impl ProofGeneratorService {
     async fn generate_proof_for_certificate(
         &self,
         f3_cert: &filecoin_f3_certs::FinalityCertificate,
-    ) -> Result<proofs::proofs::common::bundle::UnifiedProofBundle> {
+    ) -> Result<Option<proofs::proofs::common::bundle::UnifiedProofBundle>> {
         // Extract highest epoch from validated F3 certificate
         let highest_epoch = f3_cert
             .ec_chain
@@ -295,7 +296,6 @@ impl ProofGeneratorService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::CacheConfig;
 
     #[tokio::test]
     async fn test_service_creation() {
@@ -306,13 +306,13 @@ mod tests {
             parent_rpc_url: "http://localhost:1234/rpc/v1".to_string(),
             parent_subnet_id: "/r314159".to_string(),
             f3_network_name: "calibrationnet".to_string(),
-            gateway_actor_id: Some(1001),
+            gateway_id: GatewayId::ActorId(1001),
             subnet_id: Some("test-subnet".to_string()),
+            cache_config: Default::default(),
             ..Default::default()
         };
 
-        let cache_config = CacheConfig::from(&config);
-        let cache = Arc::new(ProofCache::new(0, cache_config));
+        let cache = Arc::new(ProofCache::new(0, config.cache_config.clone()));
         let power_table = PowerEntries(vec![]);
 
         // Note: Service creation succeeds with F3Client::new() even with a fake RPC endpoint
