@@ -41,4 +41,9 @@ pub enum Method {
 
     // Metrics methods
     GetStats = frc42_dispatch::method_hash!("GetStats"),
+
+    // Node operator methods
+    RegisterNodeOperator = frc42_dispatch::method_hash!("RegisterNodeOperator"),
+    GetOperatorInfo = frc42_dispatch::method_hash!("GetOperatorInfo"),
+    GetActiveOperators = frc42_dispatch::method_hash!("GetActiveOperators"),
 }

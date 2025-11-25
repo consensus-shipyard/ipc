@@ -208,6 +208,11 @@ impl ActorCode for BlobsActor {
         // Metrics methods
         GetStats => get_stats,
 
+        // Node operator methods
+        RegisterNodeOperator => register_node_operator,
+        GetOperatorInfo => get_operator_info,
+        GetActiveOperators => get_active_operators,
+
         _ => fallback,
     }
 }

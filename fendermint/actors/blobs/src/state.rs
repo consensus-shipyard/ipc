@@ -12,10 +12,12 @@ use fvm_shared::econ::TokenAmount;
 pub mod accounts;
 pub mod blobs;
 pub mod credit;
+pub mod operators;
 
 use accounts::Accounts;
 use blobs::{Blobs, DeleteBlobStateParams};
 use credit::Credits;
+use operators::Operators;
 
 /// The state represents all accounts and stored blobs.
 #[derive(Debug, Serialize_tuple, Deserialize_tuple)]
@@ -26,6 +28,8 @@ pub struct State {
     pub accounts: Accounts,
     /// HAMT containing all blobs keyed by blob hash.
     pub blobs: Blobs,
+    /// Registry of node operators for blob storage.
+    pub operators: Operators,
 }
 
 impl State {
@@ -35,6 +39,7 @@ impl State {
             credits: Credits::default(),
             accounts: Accounts::new(store)?,
             blobs: Blobs::new(store)?,
+            operators: Operators::new(store)?,
         })
     }
 
