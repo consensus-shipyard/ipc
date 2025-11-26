@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! Configuration for the proof generator service
 
+use ipc_api::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -31,12 +32,6 @@ pub struct ProofServiceConfig {
     /// Lotus/parent RPC endpoint URL
     pub parent_rpc_url: String,
 
-    /// Parent subnet ID (e.g., "/r314159" for calibration)
-    pub parent_subnet_id: String,
-
-    /// F3 network name (e.g., "calibrationnet", "mainnet")
-    pub f3_network_name: String,
-
     /// Optional: Additional RPC URLs for failover (not yet implemented - future enhancement)
     #[serde(default)]
     pub fallback_rpc_urls: Vec<String>,
@@ -47,8 +42,25 @@ pub struct ProofServiceConfig {
 
     /// Subnet ID (for event filtering)
     /// Will be derived from genesis
-    #[serde(default)]
-    pub subnet_id: Option<String>,
+    pub subnet_id: SubnetID,
+}
+
+impl ProofServiceConfig {
+    pub fn f3_network_name(&self) -> String {
+        let root_id = self.subnet_id.root_id();
+
+        match root_id {
+            314 => "mainnet".to_string(),
+            314159 => "calibrationnet".to_string(),
+            _ => {
+                tracing::warn!(
+                    root_id,
+                    "Unknown root chain ID for F3, defaulting to calibrationnet"
+                );
+                "calibrationnet".to_string()
+            }
+        }
+    }
 }
 
 impl Default for ProofServiceConfig {
@@ -58,11 +70,9 @@ impl Default for ProofServiceConfig {
             polling_interval: Duration::from_secs(10),
             cache_config: Default::default(),
             parent_rpc_url: String::new(),
-            parent_subnet_id: String::new(),
-            f3_network_name: "calibrationnet".to_string(),
             fallback_rpc_urls: Vec::new(),
             gateway_id: GatewayId::ActorId(0),
-            subnet_id: None,
+            subnet_id: SubnetID::default(),
         }
     }
 }

@@ -22,7 +22,7 @@ pub mod verifier;
 pub use cache::ProofCache;
 pub use config::{CacheConfig, ProofServiceConfig};
 pub use service::ProofGeneratorService;
-pub use types::{CacheEntry, SerializableF3Certificate, ValidatedCertificate};
+pub use types::{CacheEntry, SerializableF3Certificate};
 pub use verifier::verify_proof_bundle;
 
 use anyhow::{Context, Result};
@@ -58,10 +58,6 @@ pub async fn launch_service(
         anyhow::bail!("parent_rpc_url is required");
     }
 
-    if config.f3_network_name.is_empty() {
-        anyhow::bail!("f3_network_name is required (e.g., 'calibrationnet', 'mainnet')");
-    }
-
     if config.cache_config.lookahead_instances == 0 {
         anyhow::bail!("lookahead_instances must be > 0");
     }
@@ -77,7 +73,7 @@ pub async fn launch_service(
     tracing::info!(
         initial_instance = initial_committed_instance,
         parent_rpc = config.parent_rpc_url,
-        f3_network = config.f3_network_name,
+        f3_network = config.f3_network_name(),
         lookahead = config.cache_config.lookahead_instances,
         "Launching proof generator service with validated configuration"
     );
@@ -149,10 +145,8 @@ mod tests {
         let config = ProofServiceConfig {
             enabled: true,
             parent_rpc_url: "http://localhost:1234/rpc/v1".to_string(),
-            parent_subnet_id: "/r314159".to_string(),
-            f3_network_name: "calibrationnet".to_string(),
             gateway_id: GatewayId::ActorId(1001),
-            subnet_id: Some("test-subnet".to_string()),
+            subnet_id: Default::default(),
             polling_interval: std::time::Duration::from_secs(60),
             ..Default::default()
         };

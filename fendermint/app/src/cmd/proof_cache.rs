@@ -135,12 +135,12 @@ fn get_proof(db_path: &Path, instance_id: u64) -> anyhow::Result<()> {
 
             // Certificate Details
             println!("F3 Certificate:");
-            println!("  Instance ID: {}", entry.certificate.instance_id);
+            println!("  Instance ID: {}", entry.certificate.gpbft_instance);
             println!(
                 "  Finalized Epochs: {:?}",
-                entry.certificate.finalized_epochs
+                &entry.certificate.finalized_epochs()
             );
-            println!("  Power Table CID: {}", entry.certificate.power_table_cid);
+            println!("  Power Table CID: {}", entry.certificate.power_table_delta);
             println!(
                 "  BLS Signature: {} bytes",
                 entry.certificate.signature.len()

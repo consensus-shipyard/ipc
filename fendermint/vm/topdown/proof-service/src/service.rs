@@ -43,36 +43,37 @@ impl ProofGeneratorService {
         initial_instance: u64,
         initial_power_table: filecoin_f3_gpbft::PowerEntries,
     ) -> Result<Self> {
-        let gateway_actor_id = match &config.gateway_id {
-            GatewayId::ActorId(id) => *id,
-            GatewayId::EthAddress(eth_addr) => {
-                // Resolve Ethereum address to actor ID
-                tracing::info!(eth_address = %eth_addr, "Resolving gateway Ethereum address to actor ID");
-                let client = proofs::client::LotusClient::new(
-                    url::Url::parse(&config.parent_rpc_url)?,
-                    None,
-                );
-                let actor_id = proofs::proofs::resolve_eth_address_to_actor_id(&client, eth_addr)
-                    .await
-                    .with_context(|| {
-                        format!("Failed to resolve gateway Ethereum address: {}", eth_addr)
-                    })?;
-                tracing::info!(eth_address = %eth_addr, actor_id, "Resolved gateway address");
-                actor_id
-            }
-        };
+        let gateway_actor_id = extract_gateway_actor_id_from_config(&config).await?;
 
-        let subnet_id = config
-            .subnet_id
-            .as_ref()
-            .context("subnet_id is required in configuration")?;
+        // Get the current highest instance from the cache
+        // or the last committed instance if the cache is empty
+        let highest_cached_instance = cache
+            .highest_cached_instance()
+            .unwrap_or_else(|| cache.last_committed_instance());
+
+        let (mut initial_instance, mut initial_power_table) =
+            (initial_instance, initial_power_table);
+
+        if highest_cached_instance > initial_instance {
+            tracing::info!(
+                highest_cached_instance,
+                initial_instance,
+                "Using cached instance instead of initial instance"
+            );
+
+            initial_instance = highest_cached_instance;
+
+            initial_power_table = cache
+                .get(highest_cached_instance)
+                .context("Failed to get cached power table")?
+                .power_table;
+        }
 
         // Create F3 client for certificate fetching + validation
-        // Uses provided power table from F3CertManager actor
         let f3_client = Arc::new(Mutex::new(
             F3Client::new(
                 &config.parent_rpc_url,
-                &config.f3_network_name,
+                &config.f3_network_name(),
                 initial_instance,
                 initial_power_table,
             )
@@ -84,7 +85,7 @@ impl ProofGeneratorService {
             ProofAssembler::new(
                 config.parent_rpc_url.clone(),
                 gateway_actor_id,
-                subnet_id.clone(),
+                config.subnet_id.to_string(),
             )
             .context("Failed to create proof assembler")?,
         );
@@ -132,13 +133,16 @@ impl ProofGeneratorService {
     ///
     /// CRITICAL: Processes F3 instances SEQUENTIALLY - never skips!
     async fn generate_next_proofs(&self) -> Result<()> {
-        let last_committed = self.cache.last_committed_instance();
-        // Start FROM last_committed (not +1) - F3 client expects to validate from current state
-        let next_instance = last_committed;
-        let max_instance = last_committed + self.config.cache_config.lookahead_instances;
+        let (current_instance, rpc_endpoint) = {
+            let f3_client = self.f3_client.lock().await;
+            (f3_client.current_instance(), f3_client.rpc_endpoint())
+        };
+
+        let next_instance = current_instance + 1;
+        let max_instance = current_instance + self.config.cache_config.lookahead_instances;
 
         tracing::debug!(
-            last_committed,
+            current_instance,
             next_instance,
             max_instance,
             "Checking for new F3 certificates"
@@ -146,62 +150,35 @@ impl ProofGeneratorService {
 
         // Process instances IN ORDER - this is critical for F3
         for instance_id in next_instance..=max_instance {
-            // Skip if already cached
-            if self.cache.contains(instance_id) {
-                tracing::debug!(instance_id, "Proof already cached");
-                continue;
-            }
+            // Fetch and validate certificate
+            let certificate = {
+                let mut client = self.f3_client.lock().await;
+                let result = client.fetch_and_validate().await;
+                drop(client);
 
-            // Check if F3 client has already passed this instance
-            {
-                let f3_client = self.f3_client.lock().await;
-                let f3_current = f3_client.current_instance();
-                if f3_current > instance_id {
-                    tracing::debug!(
-                        instance_id,
-                        f3_current,
-                        "F3 client already past this instance, skipping"
-                    );
-                    continue;
-                }
-            }
-
-            // ====================
-            // STEP 1: FETCH + VALIDATE certificate (single operation!)
-            // ====================
-            let validated = match self.f3_client.lock().await.fetch_and_validate().await {
-                Ok(cert) => cert,
-                Err(e)
-                    if e.to_string().contains("not found")
-                        || e.to_string().contains("not available") =>
-                {
-                    // Certificate not available yet - STOP HERE!
-                    // Don't try higher instances as they depend on this one
-                    tracing::debug!(instance_id, "Certificate not available, stopping lookahead");
-                    break;
-                }
-                Err(e) => {
-                    return Err(e).with_context(|| {
-                        format!(
-                            "Failed to fetch and validate certificate for instance {}",
-                            instance_id
-                        )
-                    });
+                match result {
+                    Ok(cert) => cert,
+                    Err(err) if is_certificate_unavailable(&err) => {
+                        tracing::debug!(
+                            instance_id,
+                            "Certificate not available, stopping lookahead"
+                        );
+                        break;
+                    }
+                    Err(err) => {
+                        return Err(err).with_context(|| {
+                            format!(
+                                "Failed to fetch and validate certificate for instance {}",
+                                instance_id
+                            )
+                        });
+                    }
                 }
             };
 
-            // Skip certificates with empty suffix (no epochs to prove)
-            if validated.f3_cert.ec_chain.suffix().is_empty() {
-                tracing::warn!(
-                    instance_id,
-                    "Certificate has empty suffix, skipping proof generation"
-                );
-                continue;
-            }
-
             // Log detailed certificate information for debugging
-            let suffix = &validated.f3_cert.ec_chain.suffix();
-            let base_epoch = validated.f3_cert.ec_chain.base().map(|b| b.epoch);
+            let suffix = &certificate.ec_chain.suffix();
+            let base_epoch = certificate.ec_chain.base().map(|b| b.epoch);
             let suffix_epochs: Vec<i64> = suffix.iter().map(|ts| ts.epoch).collect();
 
             tracing::info!(
@@ -212,35 +189,31 @@ impl ProofGeneratorService {
                 "Certificate fetched and validated successfully"
             );
 
-            // ====================
-            // STEP 2: GENERATE proof bundle
-            // ====================
-            let proof_bundle = match self
-                .generate_proof_for_certificate(&validated.f3_cert)
-                .await
-            {
-                Ok(bundle) => bundle,
-                Err(e) => {
-                    tracing::error!(
-                        instance_id,
-                        error = %e,
-                        error_chain = ?e,
-                        "Failed to generate proof bundle - detailed error"
-                    );
-                    return Err(e).context("Failed to generate proof bundle");
+            // Skip certificates with empty suffix (no epochs to prove)
+            let proof_bundle = if !certificate.ec_chain.suffix().is_empty() {
+                match self.generate_proof_for_certificate(&certificate).await {
+                    Ok(bundle) => bundle,
+                    Err(e) => {
+                        tracing::error!(instance_id, error = %e, "Failed to generate proof bundle - detailed error");
+                        return Err(e).context("Failed to generate proof bundle");
+                    }
                 }
+            } else {
+                None
             };
 
-            // ====================
-            // STEP 3: CACHE the result
-            // ====================
-            let entry = CacheEntry::new(
-                &validated.f3_cert,
-                proof_bundle,
-                "F3 RPC".to_string(), // source_rpc
-            );
+            // Cache the result
+            let power_table = {
+                let client = self.f3_client.lock().await;
+                client.state.power_table.clone()
+            };
 
-            self.cache.insert(entry)?;
+            self.cache.insert(CacheEntry::new(
+                certificate,
+                proof_bundle,
+                power_table,
+                rpc_endpoint.clone(),
+            ))?;
 
             tracing::info!(
                 instance_id,
@@ -275,7 +248,7 @@ impl ProofGeneratorService {
         // Generate proof (assembler fetches its own tipsets)
         let bundle = self
             .assembler
-            .generate_proof_bundle(f3_cert)
+            .generate_proof_bundle(f3_cert.ec_chain.clone())
             .await
             .with_context(|| {
                 format!(
@@ -293,6 +266,28 @@ impl ProofGeneratorService {
     }
 }
 
+fn is_certificate_unavailable(err: &anyhow::Error) -> bool {
+    let message = err.to_string();
+    message.contains("not found") || message.contains("not available")
+}
+
+async fn extract_gateway_actor_id_from_config(config: &ProofServiceConfig) -> Result<u64> {
+    match &config.gateway_id {
+        GatewayId::ActorId(id) => Ok(*id),
+        GatewayId::EthAddress(eth_addr) => {
+            resolve_eth_address_to_actor_id(eth_addr, &config.parent_rpc_url).await
+        }
+    }
+}
+
+async fn resolve_eth_address_to_actor_id(eth_addr: &str, parent_rpc_url: &str) -> Result<u64> {
+    let client = proofs::client::LotusClient::new(url::Url::parse(parent_rpc_url)?, None);
+    let actor_id = proofs::proofs::resolve_eth_address_to_actor_id(&client, eth_addr)
+        .await
+        .with_context(|| format!("Failed to resolve gateway Ethereum address: {}", eth_addr))?;
+    Ok(actor_id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -304,10 +299,8 @@ mod tests {
         let config = ProofServiceConfig {
             enabled: true,
             parent_rpc_url: "http://localhost:1234/rpc/v1".to_string(),
-            parent_subnet_id: "/r314159".to_string(),
-            f3_network_name: "calibrationnet".to_string(),
             gateway_id: GatewayId::ActorId(1001),
-            subnet_id: Some("test-subnet".to_string()),
+            subnet_id: Default::default(),
             cache_config: Default::default(),
             ..Default::default()
         };

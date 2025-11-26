@@ -64,7 +64,7 @@ impl ProofCache {
             .context("Failed to load all entries from disk")?;
         let entries: BTreeMap<u64, CacheEntry> = entries_vec
             .into_iter()
-            .map(|e| (e.instance_id, e))
+            .map(|e| (e.certificate.gpbft_instance, e))
             .collect();
 
         tracing::info!(
@@ -123,7 +123,7 @@ impl ProofCache {
 
     /// Insert a proof into the cache
     pub fn insert(&self, entry: CacheEntry) -> anyhow::Result<()> {
-        let instance_id = entry.instance_id;
+        let instance_id = entry.certificate.gpbft_instance;
 
         // Check if we're within the lookahead window
         let last_committed = self.last_committed_instance.load(Ordering::Acquire);
@@ -267,32 +267,55 @@ impl ProofCache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::SerializableF3Certificate;
+    use crate::types::{
+        CacheEntry, SerializableCacheEntry, SerializableECChainEntry, SerializableF3Certificate,
+        SerializablePowerEntries, SerializablePowerEntry, SerializableSupplementalData,
+    };
     use proofs::proofs::common::bundle::UnifiedProofBundle;
     use std::time::SystemTime;
 
     fn create_test_entry(instance_id: u64, epochs: Vec<i64>) -> CacheEntry {
-        CacheEntry {
-            instance_id,
-            finalized_epochs: epochs.clone(),
+        use multihash_codetable::{Code, MultihashDigest};
+
+        let power_table_cid = cid::Cid::new_v1(0x55, Code::Blake2b256.digest(b"test")).to_string();
+
+        let ec_chain = epochs
+            .into_iter()
+            .map(|epoch| SerializableECChainEntry {
+                epoch,
+                key: vec!["0".to_string()],
+                power_table: power_table_cid.clone(),
+                commitments: vec![0u8; 32],
+            })
+            .collect();
+
+        let serializable = SerializableCacheEntry {
             proof_bundle: Some(UnifiedProofBundle {
                 storage_proofs: vec![],
                 event_proofs: vec![],
                 blocks: vec![],
             }),
             certificate: SerializableF3Certificate {
-                instance_id,
-                finalized_epochs: epochs,
-                power_table_cid: {
-                    use multihash_codetable::{Code, MultihashDigest};
-                    cid::Cid::new_v1(0x55, Code::Blake2b256.digest(b"test")).to_string()
+                gpbft_instance: instance_id,
+                ec_chain,
+                supplemental_data: SerializableSupplementalData {
+                    power_table: power_table_cid.clone(),
+                    commitments: vec![0u8; 32],
                 },
+                signers: vec![0],
                 signature: vec![],
-                signers: vec![],
+                power_table_delta: vec![],
             },
+            power_table: SerializablePowerEntries(vec![SerializablePowerEntry {
+                id: 1,
+                power: "1000".to_string(),
+                pub_key: vec![1; 48],
+            }]),
             generated_at: SystemTime::now(),
             source_rpc: "test".to_string(),
-        }
+        };
+
+        CacheEntry::try_from(serializable).expect("valid cache entry")
     }
 
     #[test]
@@ -319,7 +342,7 @@ mod tests {
         // Get next uncommitted (should be 101)
         let next = cache.get_next_uncommitted();
         assert!(next.is_some());
-        assert_eq!(next.unwrap().instance_id, 101);
+        assert_eq!(next.unwrap().certificate.gpbft_instance, 101);
     }
 
     #[test]

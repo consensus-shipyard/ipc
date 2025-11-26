@@ -22,6 +22,9 @@ cid = { workspace = true }
 multihash = { workspace = true }
 rocksdb = { version = "0.21", features = ["multi-threaded-cf"] }
 futures = { workspace = true }
+fvm_ipld_bitfield = "0.7.2"
+keccak-hash = "0.11"
+num-bigint = { workspace = true }
 
 # Fendermint
 fendermint_actor_f3_light_client = { path = "../../../actors/f3-light-client" }

@@ -8,8 +8,8 @@
 //! - Sequential state management for validated certificates
 
 use crate::observe::{F3CertificateFetched, F3CertificateValidated, OperationStatus};
-use crate::types::ValidatedCertificate;
 use anyhow::{Context, Result};
+use filecoin_f3_certs::FinalityCertificate;
 use filecoin_f3_lightclient::{LightClient, LightClientState};
 use ipc_observability::emit;
 use std::time::Instant;
@@ -27,6 +27,9 @@ pub struct F3Client {
 
     /// Current validated state (instance, chain, power table)
     pub state: LightClientState,
+
+    /// F3 RPC endpoint
+    rpc_endpoint: String,
 }
 
 impl F3Client {
@@ -67,6 +70,7 @@ impl F3Client {
         Ok(Self {
             light_client,
             state,
+            rpc_endpoint: rpc_endpoint.to_string(),
         })
     }
 
@@ -104,6 +108,7 @@ impl F3Client {
         Ok(Self {
             light_client,
             state,
+            rpc_endpoint: rpc_endpoint.to_string(),
         })
     }
 
@@ -116,14 +121,37 @@ impl F3Client {
     /// - Power table validity
     ///
     /// # Returns
-    /// `ValidatedCertificate` containing the cryptographically verified certificate
-    pub async fn fetch_and_validate(&mut self) -> Result<ValidatedCertificate> {
+    /// `FinalityCertificate` that has been cryptographically verified
+    pub async fn fetch_and_validate(&mut self) -> Result<FinalityCertificate> {
         let instance = self.state.instance + 1;
         debug!(instance, "Starting F3 certificate fetch and validation");
 
-        // STEP 1: FETCH certificate from F3 RPC
+        // Fetch certificate from F3 RPC first
+        let certificate = self.fetch_certificate(instance).await?;
+
+        // Then validate the certificate cryptography
+        debug!(instance, "Validating certificate cryptography");
+        let new_state = self.validate_certificate(&certificate).await?;
+
+        debug!(
+            instance,
+            current_instance = self.state.instance,
+            power_table_entries = self.state.power_table.len(),
+            "Current F3 validator state"
+        );
+
+        // Update the state with the new validated state
+        self.state = new_state;
+
+        debug!(instance, "Certificate validation complete");
+
+        Ok(certificate)
+    }
+
+    async fn fetch_certificate(&mut self, instance: u64) -> Result<FinalityCertificate> {
         let fetch_start = Instant::now();
-        let f3_cert = match self.light_client.get_certificate(instance).await {
+
+        match self.light_client.get_certificate(instance).await {
             Ok(cert) => {
                 let latency = fetch_start.elapsed().as_secs_f64();
                 emit(F3CertificateFetched {
@@ -137,7 +165,7 @@ impl F3Client {
                     ec_chain_len = cert.ec_chain.suffix().len(),
                     "Fetched certificate from F3 RPC"
                 );
-                cert
+                Ok(cert)
             }
             Err(e) => {
                 let latency = fetch_start.elapsed().as_secs_f64();
@@ -152,24 +180,21 @@ impl F3Client {
                     error = %e,
                     "Failed to fetch certificate from F3 RPC"
                 );
-                return Err(e).context("Failed to fetch certificate from F3 RPC");
+                Err(e).context("Failed to fetch certificate from F3 RPC")
             }
-        };
+        }
+    }
 
-        // STEP 2: CRYPTOGRAPHIC VALIDATION
-        debug!(instance, "Validating certificate cryptography");
+    async fn validate_certificate(
+        &mut self,
+        certificate: &FinalityCertificate,
+    ) -> Result<LightClientState> {
         let validation_start = Instant::now();
+        let instance = certificate.gpbft_instance;
 
-        debug!(
-            instance,
-            current_instance = self.state.instance,
-            power_table_entries = self.state.power_table.len(),
-            "Current F3 validator state"
-        );
-
-        let new_state = match self
+        match self
             .light_client
-            .validate_certificates(&self.state, &[f3_cert.clone()])
+            .validate_certificates(&self.state, &[certificate.clone()])
         {
             Ok(new_state) => {
                 let latency = validation_start.elapsed().as_secs_f64();
@@ -186,7 +211,7 @@ impl F3Client {
                     power_table_size = new_state.power_table.len(),
                     "Certificate validated (BLS signatures, quorum, continuity)"
                 );
-                new_state
+                Ok(new_state)
             }
             Err(e) => {
                 let latency = validation_start.elapsed().as_secs_f64();
@@ -204,19 +229,9 @@ impl F3Client {
                     power_table_entries = self.state.power_table.len(),
                     "Certificate validation failed"
                 );
-                return Err(e).context("Certificate cryptographic validation failed");
+                Err(e).context("Certificate cryptographic validation failed")
             }
-        };
-
-        // STEP 3: UPDATE validated state
-        self.state = new_state;
-
-        debug!(instance, "Certificate validation complete");
-
-        Ok(ValidatedCertificate {
-            instance_id: instance,
-            f3_cert,
-        })
+        }
     }
 
     /// Get current instance
@@ -227,6 +242,11 @@ impl F3Client {
     /// Get current validated state
     pub fn get_state(&self) -> LightClientState {
         self.state.clone()
+    }
+
+    /// Get F3 RPC endpoint
+    pub fn rpc_endpoint(&self) -> String {
+        self.rpc_endpoint.to_string()
     }
 }
 

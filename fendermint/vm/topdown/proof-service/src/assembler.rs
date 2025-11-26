@@ -8,7 +8,7 @@
 
 use crate::observe::{OperationStatus, ProofBundleGenerated};
 use anyhow::{Context, Result};
-use filecoin_f3_certs::FinalityCertificate;
+use filecoin_f3_gpbft::ECChain;
 use fvm_ipld_encoding;
 use ipc_observability::emit;
 use proofs::{
@@ -97,31 +97,21 @@ impl ProofAssembler {
     /// Typed unified proof bundle (storage + event proofs + witness blocks)
     pub async fn generate_proof_bundle(
         &self,
-        certificate: &FinalityCertificate,
+        ec_chain: ECChain,
     ) -> Result<Option<UnifiedProofBundle>> {
-        // If the certificate has no suffix, return None
-        if !certificate.ec_chain.has_suffix() {
+        // In another words there are no new tipsets to prove
+        if !ec_chain.has_suffix() {
             return Ok(None);
         }
 
         let generation_start = Instant::now();
-        let instance_id = certificate.gpbft_instance;
 
-        // Get the highest (most recent) epoch from the certificate
-        // F3 certificates contain finalized epochs. On testnets like Calibration,
-        // F3 may lag significantly behind the current chain head (sometimes days).
-        // This can cause issues with RPC lookback limits.
-        let highest_epoch = certificate
-            .ec_chain
+        let highest_epoch = ec_chain
             .last() // Get the most recent epoch
             .map(|ts| ts.epoch)
-            .context("Certificate has no epochs in suffix or base")?;
+            .context("ECChain has no epochs")?;
 
-        tracing::debug!(
-            instance_id,
-            highest_epoch,
-            "Generating proof bundle - fetching tipsets"
-        );
+        tracing::debug!(highest_epoch, "Generating proof bundle - fetching tipsets");
 
         // Fetch tipsets from Lotus using proofs library client
         // We need both parent and child tipsets to generate storage/event proofs:
@@ -161,11 +151,7 @@ impl ProofAssembler {
                 )
             })?;
 
-        tracing::debug!(
-            instance_id = certificate.gpbft_instance,
-            highest_epoch,
-            "Fetched tipsets successfully"
-        );
+        tracing::debug!(highest_epoch, "Fetched tipsets successfully");
 
         // Deserialize tipsets from JSON
         let parent_api: proofs::client::types::ApiTipset =
@@ -250,7 +236,6 @@ impl ProofAssembler {
         let latency = generation_start.elapsed().as_secs_f64();
 
         emit(ProofBundleGenerated {
-            instance: instance_id,
             highest_epoch,
             storage_proofs: bundle.storage_proofs.len(),
             event_proofs: bundle.event_proofs.len(),
@@ -261,7 +246,6 @@ impl ProofAssembler {
         });
 
         tracing::info!(
-            instance_id,
             highest_epoch,
             storage_proofs = bundle.storage_proofs.len(),
             event_proofs = bundle.event_proofs.len(),

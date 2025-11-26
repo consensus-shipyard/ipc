@@ -114,7 +114,6 @@ impl Recordable for F3CertificateValidated {
 
 #[derive(Debug)]
 pub struct ProofBundleGenerated {
-    pub instance: u64,
     pub highest_epoch: i64,
     pub storage_proofs: usize,
     pub event_proofs: usize,
@@ -187,7 +186,6 @@ mod tests {
     #[test]
     fn test_emit_proof_metrics() {
         emit(ProofBundleGenerated {
-            instance: 100,
             highest_epoch: 1000,
             storage_proofs: 1,
             event_proofs: 2,

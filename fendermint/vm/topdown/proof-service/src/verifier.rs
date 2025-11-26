@@ -35,7 +35,7 @@ use tracing::debug;
 /// } else {
 ///     // Not cached - need full crypto validation first
 ///     let validated = f3_client.fetch_and_validate(cert.instance_id).await?;
-///     let serializable_cert = SerializableF3Certificate::from(&validated.f3_cert);
+///     let serializable_cert = SerializableF3Certificate::from(&certificate);
 ///     verify_proof_bundle(&proof_bundle, &serializable_cert)?;
 /// }
 /// ```
@@ -44,7 +44,7 @@ pub fn verify_proof_bundle(
     certificate: &SerializableF3Certificate,
 ) -> Result<()> {
     debug!(
-        instance_id = certificate.instance_id,
+        gpbft_instance = certificate.gpbft_instance,
         storage_proofs = bundle.storage_proofs.len(),
         event_proofs = bundle.event_proofs.len(),
         witness_blocks = bundle.blocks.len(),
@@ -68,7 +68,7 @@ pub fn verify_proof_bundle(
     }
 
     debug!(
-        instance_id = certificate.instance_id,
+        gpbft_instance = certificate.gpbft_instance,
         "Proof bundle verified successfully"
     );
 
@@ -83,9 +83,12 @@ fn verify_storage_proof_internal(
     blocks: &[ProofBlock],
     certificate: &SerializableF3Certificate,
 ) -> Result<()> {
+    // Get finalized epochs from certificate
+    let finalized_epochs = certificate.finalized_epochs();
+
     // Verify the proof's child epoch is in the certificate's finalized epochs
     let child_epoch = proof.child_epoch;
-    if !certificate.finalized_epochs.contains(&child_epoch) {
+    if !finalized_epochs.contains(&child_epoch) {
         anyhow::bail!(
             "Storage proof child epoch {} not in certificate's finalized epochs",
             child_epoch
@@ -94,8 +97,7 @@ fn verify_storage_proof_internal(
 
     // Use the proofs library to verify the storage proof
     // The is_trusted_child_header function checks if the child epoch is finalized
-    let is_trusted =
-        |epoch: i64, _cid: &cid::Cid| -> bool { certificate.finalized_epochs.contains(&epoch) };
+    let is_trusted = |epoch: i64, _cid: &cid::Cid| -> bool { finalized_epochs.contains(&epoch) };
 
     let valid = verify_storage_proof(proof, blocks, &is_trusted)
         .context("Storage proof verification failed")?;
@@ -120,12 +122,31 @@ mod tests {
             blocks: vec![],
         };
 
+        use crate::types::{SerializableECChainEntry, SerializableSupplementalData};
+
         let cert = SerializableF3Certificate {
-            instance_id: 1,
-            finalized_epochs: vec![100, 101],
-            power_table_cid: "test_cid".to_string(),
+            gpbft_instance: 1,
+            ec_chain: vec![
+                SerializableECChainEntry {
+                    epoch: 100,
+                    key: vec![],
+                    power_table: "test_cid".to_string(),
+                    commitments: vec![0u8; 32],
+                },
+                SerializableECChainEntry {
+                    epoch: 101,
+                    key: vec![],
+                    power_table: "test_cid".to_string(),
+                    commitments: vec![0u8; 32],
+                },
+            ],
+            supplemental_data: SerializableSupplementalData {
+                power_table: "test_cid".to_string(),
+                commitments: vec![0u8; 32],
+            },
             signature: vec![],
             signers: vec![],
+            power_table_delta: vec![],
         };
 
         // Empty bundle should verify successfully

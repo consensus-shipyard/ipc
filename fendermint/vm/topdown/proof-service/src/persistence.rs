@@ -16,7 +16,7 @@
 //! - `metadata`: Schema version, last committed instance
 //! - `bundles`: Proof bundles keyed by instance_id
 
-use crate::types::CacheEntry;
+use crate::types::{CacheEntry, SerializableCacheEntry};
 use anyhow::{Context, Result};
 use rocksdb::{Options, DB};
 use std::path::Path;
@@ -135,12 +135,16 @@ impl ProofCachePersistence {
             .cf_handle(CF_BUNDLES)
             .context("Failed to get bundles column family")?;
 
-        let key = entry.instance_id.to_be_bytes();
-        let value = serde_json::to_vec(entry).context("Failed to serialize cache entry")?;
+        let key = entry.certificate.gpbft_instance.to_be_bytes();
+        let value = serde_json::to_vec(&SerializableCacheEntry::from(entry))
+            .context("Failed to serialize cache entry")?;
 
         self.db.put_cf(&cf_bundles, key, value)?;
 
-        debug!(instance_id = entry.instance_id, "Saved cache entry to disk");
+        debug!(
+            instance_id = entry.certificate.gpbft_instance,
+            "Saved cache entry to disk"
+        );
         Ok(())
     }
 
@@ -160,9 +164,9 @@ impl ProofCachePersistence {
 
         for item in iter {
             let (_, value) = item?;
-            let entry: CacheEntry =
+            let entry: SerializableCacheEntry =
                 serde_json::from_slice(&value).context("Failed to deserialize cache entry")?;
-            entries.push(entry);
+            entries.push(CacheEntry::try_from(entry)?);
         }
 
         info!(
@@ -191,7 +195,10 @@ impl ProofCachePersistence {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::SerializableF3Certificate;
+    use crate::types::{
+        CacheEntry, SerializableCacheEntry, SerializableECChainEntry, SerializableF3Certificate,
+        SerializablePowerEntries, SerializablePowerEntry, SerializableSupplementalData,
+    };
     use cid::Cid;
     use multihash_codetable::{Code, MultihashDigest};
     use proofs::proofs::common::bundle::UnifiedProofBundle;
@@ -201,24 +208,42 @@ mod tests {
     fn create_test_entry(instance_id: u64) -> CacheEntry {
         let power_table_cid = Cid::new_v1(0x55, Code::Blake2b256.digest(b"test"));
 
-        CacheEntry {
-            instance_id,
-            finalized_epochs: vec![100, 101, 102],
+        let ec_chain = (100..=102)
+            .map(|epoch| SerializableECChainEntry {
+                epoch,
+                key: vec![],
+                power_table: power_table_cid.to_string(),
+                commitments: vec![0u8; 32],
+            })
+            .collect();
+
+        let serializable = SerializableCacheEntry {
             proof_bundle: Some(UnifiedProofBundle {
                 storage_proofs: vec![],
                 event_proofs: vec![],
                 blocks: vec![],
             }),
             certificate: SerializableF3Certificate {
-                instance_id,
-                finalized_epochs: vec![100, 101, 102],
-                power_table_cid: power_table_cid.to_string(),
+                gpbft_instance: instance_id,
+                ec_chain,
+                supplemental_data: SerializableSupplementalData {
+                    power_table: power_table_cid.to_string(),
+                    commitments: vec![0u8; 32],
+                },
+                signers: vec![0],
                 signature: vec![],
-                signers: vec![],
+                power_table_delta: vec![],
             },
+            power_table: SerializablePowerEntries(vec![SerializablePowerEntry {
+                id: 1,
+                power: "1000".to_string(),
+                pub_key: vec![0u8; 48],
+            }]),
             generated_at: SystemTime::now(),
             source_rpc: "test".to_string(),
-        }
+        };
+
+        CacheEntry::try_from(serializable).expect("valid cache entry")
     }
 
     #[test]
@@ -237,7 +262,7 @@ mod tests {
 
         let loaded = persistence.load_all_entries().unwrap();
         assert_eq!(loaded.len(), 1);
-        assert_eq!(loaded[0].instance_id, 101);
+        assert_eq!(loaded[0].certificate.gpbft_instance, 101);
     }
 
     #[test]
