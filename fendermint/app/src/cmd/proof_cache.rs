@@ -57,8 +57,8 @@ fn inspect_cache(db_path: &Path) -> anyhow::Result<()> {
 
         println!(
             "{:<12} {:<20?} {:<15} {:<15}",
-            entry.instance_id,
-            entry.finalized_epochs,
+            entry.certificate.gpbft_instance,
+            entry.certificate.ec_chain.suffix(),
             format!("{} bytes", proof_size),
             format!("{} signers", entry.certificate.signers.len())
         );
@@ -85,8 +85,14 @@ fn show_stats(db_path: &Path) -> anyhow::Result<()> {
     println!("Last Committed: {:?}", last_committed);
     println!(
         "Instances: {} - {}",
-        entries.first().map(|e| e.instance_id).unwrap_or(0),
-        entries.last().map(|e| e.instance_id).unwrap_or(0)
+        entries
+            .first()
+            .map(|e| e.certificate.gpbft_instance)
+            .unwrap_or(0),
+        entries
+            .last()
+            .map(|e| e.certificate.gpbft_instance)
+            .unwrap_or(0)
     );
     println!();
 
@@ -138,9 +144,8 @@ fn get_proof(db_path: &Path, instance_id: u64) -> anyhow::Result<()> {
             println!("  Instance ID: {}", entry.certificate.gpbft_instance);
             println!(
                 "  Finalized Epochs: {:?}",
-                &entry.certificate.finalized_epochs()
+                &entry.certificate.ec_chain.suffix()
             );
-            println!("  Power Table CID: {}", entry.certificate.power_table_delta);
             println!(
                 "  BLS Signature: {} bytes",
                 entry.certificate.signature.len()
@@ -158,13 +163,18 @@ fn get_proof(db_path: &Path, instance_id: u64) -> anyhow::Result<()> {
                 proof_bundle_size,
                 proof_bundle_size as f64 / 1024.0
             );
-            println!(
-                "  Storage Proofs: {}",
-                entry.proof_bundle.storage_proofs.len()
-            );
-            println!("  Event Proofs: {}", entry.proof_bundle.event_proofs.len());
-            println!("  Witness Blocks: {}", entry.proof_bundle.blocks.len());
-            println!();
+
+            if let Some(proof_bundle) = &entry.proof_bundle {
+                println!(
+                    "  Storage Proofs: {}",
+                    entry.proof_bundle.storage_proofs.len()
+                );
+                println!("  Event Proofs: {}", entry.proof_bundle.event_proofs.len());
+                println!("  Witness Blocks: {}", entry.proof_bundle.blocks.len());
+                println!();
+            } else {
+                println!("  No proof bundle found");
+            }
 
             // Metadata
             println!("Metadata:");

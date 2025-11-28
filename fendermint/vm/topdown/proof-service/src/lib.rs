@@ -23,7 +23,7 @@ pub use cache::ProofCache;
 pub use config::{CacheConfig, ProofServiceConfig};
 pub use service::ProofGeneratorService;
 pub use types::{CacheEntry, SerializableF3Certificate};
-pub use verifier::verify_proof_bundle;
+pub use verifier::ProofsVerifier;
 
 use anyhow::{Context, Result};
 use std::sync::Arc;

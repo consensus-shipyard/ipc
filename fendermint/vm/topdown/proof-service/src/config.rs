@@ -6,6 +6,9 @@ use ipc_api::subnet_id::SubnetID;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
+const FILECOIN_MAINNET_CHAIN_ID: u64 = 314;
+const FILECOIN_CALIBRATION_CHAIN_ID: u64 = 314159;
+
 /// Represents a value that can be either a numeric Actor ID or an Ethereum address string.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -50,8 +53,8 @@ impl ProofServiceConfig {
         let root_id = self.subnet_id.root_id();
 
         match root_id {
-            314 => "mainnet".to_string(),
-            314159 => "calibrationnet".to_string(),
+            FILECOIN_MAINNET_CHAIN_ID => "mainnet".to_string(),
+            FILECOIN_CALIBRATION_CHAIN_ID => "calibrationnet".to_string(),
             _ => {
                 tracing::warn!(
                     root_id,

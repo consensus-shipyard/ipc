@@ -29,13 +29,13 @@ use url::Url;
 /// Event signature for NewTopDownMessage from LibGateway.sol
 /// Event: NewTopDownMessage(address indexed subnet, IpcEnvelope message, bytes32 indexed id)
 /// Bindings: contract_bindings::lib_gateway::NewTopDownMessageFilter
-const NEW_TOPDOWN_MESSAGE_SIGNATURE: &str = "NewTopDownMessage(address,IpcEnvelope,bytes32)";
+pub const NEW_TOPDOWN_MESSAGE_SIGNATURE: &str = "NewTopDownMessage(address,IpcEnvelope,bytes32)";
 
 /// Event signature for NewPowerChangeRequest from LibPowerChangeLog.sol
 /// Event: NewPowerChangeRequest(PowerOperation op, address validator, bytes payload, uint64 configurationNumber)
 /// Bindings: contract_bindings::lib_power_change_log::NewPowerChangeRequestFilter
 /// This captures validator power changes that need to be reflected in the subnet
-const NEW_POWER_CHANGE_REQUEST_SIGNATURE: &str =
+pub const NEW_POWER_CHANGE_REQUEST_SIGNATURE: &str =
     "NewPowerChangeRequest(PowerOperation,address,bytes,uint64)";
 
 /// Storage slot offset for topDownNonce in the Subnet struct
