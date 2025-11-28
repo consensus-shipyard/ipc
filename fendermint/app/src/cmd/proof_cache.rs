@@ -165,12 +165,9 @@ fn get_proof(db_path: &Path, instance_id: u64) -> anyhow::Result<()> {
             );
 
             if let Some(proof_bundle) = &entry.proof_bundle {
-                println!(
-                    "  Storage Proofs: {}",
-                    entry.proof_bundle.storage_proofs.len()
-                );
-                println!("  Event Proofs: {}", entry.proof_bundle.event_proofs.len());
-                println!("  Witness Blocks: {}", entry.proof_bundle.blocks.len());
+                println!("  Storage Proofs: {}", proof_bundle.storage_proofs.len());
+                println!("  Event Proofs: {}", proof_bundle.event_proofs.len());
+                println!("  Witness Blocks: {}", proof_bundle.blocks.len());
                 println!();
             } else {
                 println!("  No proof bundle found");
