@@ -168,8 +168,8 @@ where
         let entry = cache.get_next_uncommitted()?;
 
         tracing::debug!(
-            instance_id = entry.instance_id,
-            epochs = ?entry.finalized_epochs,
+            instance_id = entry.certificate.gpbft_instance,
+            epochs = ?entry.certificate.finalized_epochs,
             "found proof in cache for proposal"
         );
 
@@ -193,7 +193,8 @@ where
         &self,
         bundle: &fendermint_vm_message::ipc::TopDownProofBundle,
     ) -> anyhow::Result<()> {
-        use fendermint_vm_topdown_proof_service::verify_proof_bundle;
+        // TODO Karel - implement this
+        use fendermint_vm_topdown_proof_service::verifier::ProofsVerifier;
 
         // Verify cryptographic proofs (storage + events)
         verify_proof_bundle(&bundle.proof_bundle, &bundle.certificate)
@@ -225,17 +226,17 @@ where
             .context("failed to query F3LightClientActor state")?;
 
         // Ensure bundle.certificate.instance_id == last_committed + 1
-        if bundle.certificate.instance_id != f3_state.instance_id + 1 {
+        if bundle.certificate.gpbft_instance != f3_state.instance_id + 1 {
             bail!(
                 "Certificate instance ID {} is not sequential (expected {})",
-                bundle.certificate.instance_id,
+                bundle.certificate.gpbft_instance,
                 f3_state.instance_id + 1
             );
         }
 
         tracing::debug!(
             current_instance = f3_state.instance_id,
-            new_instance = bundle.certificate.instance_id,
+            new_instance = bundle.certificate.gpbft_instance,
             "verified certificate chain continuity"
         );
 
@@ -248,9 +249,9 @@ where
         // Note: Using blocking try_read since this is not an async function
         if let Ok(guard) = self.proof_cache.try_read() {
             if let Some(cache) = guard.as_ref() {
-                if cache.contains(bundle.certificate.instance_id) {
+                if cache.contains(bundle.certificate.gpbft_instance) {
                     tracing::debug!(
-                        instance = bundle.certificate.instance_id,
+                        instance = bundle.certificate.gpbft_instance,
                         "Certificate found in local cache - already validated by our F3 client"
                     );
                     // We validated this ourselves, trust it
@@ -258,20 +259,20 @@ where
                 }
             }
         }
-        
+
         // Certificate not in our cache - this means we're behind
         // However, the certificate has already passed storage/event proof verification
         // which cryptographically proves it's valid for the parent state
         tracing::info!(
-            instance = bundle.certificate.instance_id,
+            instance = bundle.certificate.gpbft_instance,
             "Certificate not in local cache - validator is behind but certificate is proven valid via storage/event proofs"
         );
-        
+
         // The storage and event proofs already guarantee:
         // 1. The certificate was used to finalize the parent chain
         // 2. The topdown messages and validator changes are correct
         // 3. The state transition is valid
-        // 
+        //
         // We don't need to re-validate F3 signatures since the proofs already
         // demonstrate the certificate was accepted by the parent chain
         Ok(())
@@ -307,7 +308,7 @@ where
         }
 
         tracing::debug!(
-            instance = bundle.certificate.instance_id,
+            instance = bundle.certificate.gpbft_instance,
             "executing proof-based topdown finality"
         );
 
@@ -376,7 +377,7 @@ where
 
         let new_light_client_state =
             fendermint_vm_actor_interface::f3_light_client::LightClientState {
-                instance_id: bundle.certificate.instance_id,
+                instance_id: bundle.certificate.gpbft_instance,
                 finalized_epochs: bundle.certificate.finalized_epochs.clone(),
                 power_table,
             };
@@ -386,7 +387,7 @@ where
             .context("failed to update F3LightClientActor state")?;
 
         tracing::debug!(
-            instance = bundle.certificate.instance_id,
+            instance = bundle.certificate.gpbft_instance,
             "updated F3LightClientActor state"
         );
 
@@ -394,16 +395,16 @@ where
         {
             let guard = self.proof_cache.read().await;
             if let Some(cache) = guard.as_ref() {
-                cache.mark_committed(bundle.certificate.instance_id);
+                cache.mark_committed(bundle.certificate.gpbft_instance);
                 tracing::debug!(
-                    instance = bundle.certificate.instance_id,
+                    instance = bundle.certificate.gpbft_instance,
                     "marked instance as committed in cache"
                 );
             }
         }
 
         tracing::info!(
-            instance = bundle.certificate.instance_id,
+            instance = bundle.certificate.gpbft_instance,
             height = finality.height,
             "proof-based topdown finality executed successfully"
         );

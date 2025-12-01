@@ -111,11 +111,6 @@ pub async fn launch_service(
     let cache_clone = cache.clone();
     let power_table_clone = initial_power_table.clone();
 
-    // Clone what we need for the background task
-    let config_clone = config.clone();
-    let cache_clone = cache.clone();
-    let power_table_clone = power_table.clone();
-
     // Spawn background task
     let handle = tokio::spawn(async move {
         match ProofGeneratorService::new(
@@ -144,8 +139,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_launch_service_disabled() {
-        use filecoin_f3_gpbft::PowerEntries;
-
         let config = ProofServiceConfig {
             enabled: false,
             ..Default::default()
@@ -161,7 +154,6 @@ mod tests {
     #[tokio::test]
     async fn test_launch_service_enabled() {
         use crate::config::GatewayId;
-        use filecoin_f3_gpbft::PowerEntries;
 
         let config = ProofServiceConfig {
             enabled: true,

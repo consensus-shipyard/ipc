@@ -358,14 +358,14 @@ where
                         {
                             Ok(()) => {
                                 tracing::debug!(
-                                    instance = bundle.certificate.instance_id,
+                                    instance = bundle.certificate.gpbft_instance,
                                     "storage/event proofs verified"
                                 );
                             }
                             Err(e) => {
                                 tracing::warn!(
                                     error = %e,
-                                    instance = bundle.certificate.instance_id,
+                                    instance = bundle.certificate.gpbft_instance,
                                     "proof bundle verification failed - rejecting block"
                                 );
                                 return Ok(AttestMessagesResponse::Reject);
@@ -375,27 +375,27 @@ where
                         // STEP 2: Check if we have this certificate in our local cache
                         let has_locally = self
                             .top_down_manager
-                            .has_certificate_in_cache(bundle.certificate.instance_id)
+                            .has_certificate_in_cache(bundle.certificate.gpbft_instance)
                             .await;
 
                         if !has_locally {
                             // STEP 3: Validate F3 certificate if not in our cache
                             // This means we're behind or just started
                             tracing::info!(
-                                instance = bundle.certificate.instance_id,
+                                instance = bundle.certificate.gpbft_instance,
                                 "Certificate not in local cache - performing F3 validation"
                             );
-                            
+
                             // We need to validate during execution phase where we have state access
                             // During attestation, we can't access FVM state, so we flag for validation
                             // The actual validation happens in verify_proof_bundle_with_state during execution
                             tracing::debug!(
-                                instance = bundle.certificate.instance_id,
+                                instance = bundle.certificate.gpbft_instance,
                                 "F3 validation will occur during execution phase"
                             );
                         } else {
                             tracing::debug!(
-                                instance = bundle.certificate.instance_id,
+                                instance = bundle.certificate.gpbft_instance,
                                 "Certificate found in local cache - already validated by our F3 client"
                             );
                         }

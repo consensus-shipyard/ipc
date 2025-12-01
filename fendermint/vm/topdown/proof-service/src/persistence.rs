@@ -90,7 +90,11 @@ impl ProofCachePersistence {
             }
             None => {
                 self.db.put_cf(
+<<<<<<< HEAD
                     &cf,
+=======
+                    &cf_meta,
+>>>>>>> 9a782ce4 (feat: makes changes after rebase)
                     KEY_SCHEMA_VERSION,
                     serde_json::to_vec(&SCHEMA_VERSION)?,
                 )?;
@@ -115,6 +119,7 @@ impl ProofCachePersistence {
         Ok(())
     }
 
+<<<<<<< HEAD
     pub fn load_all_certificates(&self) -> Result<Vec<CertificateEntry>> {
         let cf = self.get_cf(CF_CERTIFICATES)?;
         let mut entries = Vec::new();
@@ -136,6 +141,16 @@ impl ProofCachePersistence {
         debug!(instance_id, "Deleted certificate from disk");
         Ok(())
     }
+=======
+    /// Load all entries from disk
+    ///
+    /// Used on startup to populate the in-memory cache.
+    pub fn load_all_entries(&self) -> Result<Vec<CacheEntry>> {
+        let cf_bundles = self
+            .db
+            .cf_handle(CF_BUNDLES)
+            .context("Failed to get bundles column family")?;
+>>>>>>> 9a782ce4 (feat: makes changes after rebase)
 
     pub fn save_epoch_proof(&self, entry: &EpochProofEntry) -> Result<()> {
         let cf = self.get_cf(CF_EPOCH_PROOFS)?;
@@ -150,8 +165,16 @@ impl ProofCachePersistence {
     pub fn load_all_epoch_proofs(&self) -> Result<Vec<EpochProofEntry>> {
         let cf = self.get_cf(CF_EPOCH_PROOFS)?;
         let mut entries = Vec::new();
+<<<<<<< HEAD
 
         for item in self.db.iterator_cf(&cf, rocksdb::IteratorMode::Start) {
+=======
+        let iter = self
+            .db
+            .iterator_cf(&cf_bundles, rocksdb::IteratorMode::Start);
+
+        for item in iter {
+>>>>>>> 9a782ce4 (feat: makes changes after rebase)
             let (_, value) = item?;
             let entry: EpochProofEntry = serde_json::from_slice(&value)
                 .context("Failed to deserialize epoch proof entry")?;

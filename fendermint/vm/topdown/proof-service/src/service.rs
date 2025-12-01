@@ -320,6 +320,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_service_creation() {
+        use filecoin_f3_gpbft::PowerEntries;
+
         let config = ProofServiceConfig {
             enabled: true,
             parent_rpc_url: "http://localhost:1234/rpc/v1".to_string(),

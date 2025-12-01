@@ -397,6 +397,45 @@ impl From<&FinalityCertificate> for SerializableF3Certificate {
     }
 }
 
+<<<<<<< HEAD
+=======
+/// Entry in the proof cache
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SerializableCacheEntry {
+    pub proof_bundle: Option<UnifiedProofBundle>,
+    pub certificate: SerializableF3Certificate,
+    pub power_table: SerializablePowerEntries,
+    pub generated_at: SystemTime,
+    pub source_rpc: String,
+}
+
+impl From<&CacheEntry> for SerializableCacheEntry {
+    fn from(entry: &CacheEntry) -> Self {
+        Self {
+            proof_bundle: entry.proof_bundle.clone(),
+            certificate: SerializableF3Certificate::from(&entry.certificate),
+            power_table: SerializablePowerEntries::from(&entry.power_table),
+            generated_at: entry.generated_at,
+            source_rpc: entry.source_rpc.clone(),
+        }
+    }
+}
+
+impl TryFrom<SerializableCacheEntry> for CacheEntry {
+    type Error = anyhow::Error;
+
+    fn try_from(value: SerializableCacheEntry) -> Result<Self> {
+        Ok(Self {
+            proof_bundle: value.proof_bundle,
+            certificate: value.certificate.try_into_certificate()?,
+            power_table: value.power_table.into_power_entries()?,
+            generated_at: value.generated_at,
+            source_rpc: value.source_rpc,
+        })
+    }
+}
+
+>>>>>>> 9a782ce4 (feat: makes changes after rebase)
 impl From<&PowerEntry> for SerializablePowerEntry {
     fn from(entry: &PowerEntry) -> Self {
         Self {
