@@ -8,7 +8,6 @@
 
 use crate::observe::{OperationStatus, ProofBundleGenerated};
 use anyhow::{Context, Result};
-use filecoin_f3_gpbft::ECChain;
 use fvm_ipld_encoding;
 use ipc_observability::emit;
 use proofs::{
@@ -86,30 +85,31 @@ impl ProofAssembler {
         LotusClient::new(self.rpc_url.clone(), None)
     }
 
-    /// Generate proof bundle for a certificate
+    /// Generate a unified proof bundle for a list of finalized epochs.
     ///
-    /// Fetches tipsets and generates storage and event proofs.
+    /// This function fetches the relevant parent and child tipsets for the highest epoch,
+    /// then generates both storage and event proofs for transitions occurring at the boundary
+    /// between those tipsets. The resulting bundle includes storage proofs, event proofs,
+    /// and witness blocks used for verification.
     ///
     /// # Arguments
-    /// * `certificate` - Cryptographically validated F3 certificate
+    /// * `finalized_epochs` - List of epoch numbers (chain heights) that have been finalized and require proofs.
     ///
     /// # Returns
-    /// Typed unified proof bundle (storage + event proofs + witness blocks)
+    /// Optionally, a UnifiedProofBundle containing the proof data needed for top-down verification, or None if no new epochs are finalized.
     pub async fn generate_proof_bundle(
         &self,
-        ec_chain: ECChain,
+        finalized_tipsets: Vec<i64>,
     ) -> Result<Option<UnifiedProofBundle>> {
         // In another words there are no new tipsets to prove
-        if !ec_chain.has_suffix() {
+        if finalized_tipsets.is_empty() {
             return Ok(None);
         }
 
         let generation_start = Instant::now();
 
-        let highest_epoch = ec_chain
-            .last() // Get the most recent epoch
-            .map(|ts| ts.epoch)
-            .context("ECChain has no epochs")?;
+        // highest_epoch is now a reference to the last element of finalized_epochs
+        let highest_epoch = finalized_tipsets.last().unwrap();
 
         tracing::debug!(highest_epoch, "Generating proof bundle - fetching tipsets");
 
@@ -236,7 +236,7 @@ impl ProofAssembler {
         let latency = generation_start.elapsed().as_secs_f64();
 
         emit(ProofBundleGenerated {
-            highest_epoch,
+            highest_epoch: *highest_epoch,
             storage_proofs: bundle.storage_proofs.len(),
             event_proofs: bundle.event_proofs.len(),
             witness_blocks: bundle.blocks.len(),

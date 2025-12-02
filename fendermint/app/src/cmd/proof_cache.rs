@@ -4,7 +4,6 @@
 use crate::cmd;
 use crate::options::proof_cache::{ProofCacheArgs, ProofCacheCommands};
 use fendermint_vm_topdown_proof_service::persistence::ProofCachePersistence;
-use fendermint_vm_topdown_proof_service::{CacheConfig, ProofCache};
 use std::path::Path;
 
 cmd! {
@@ -21,6 +20,7 @@ fn handle_proof_cache_command(args: &ProofCacheArgs) -> anyhow::Result<()> {
             db_path,
             instance_id,
         } => get_proof(db_path, *instance_id),
+        ProofCacheCommands::Clear { db_path } => clear_cache(db_path),
     }
 }
 
@@ -30,13 +30,7 @@ fn inspect_cache(db_path: &Path) -> anyhow::Result<()> {
     println!();
 
     let persistence = ProofCachePersistence::open(db_path)?;
-
-    let last_committed = persistence.load_last_committed()?;
-    println!("Last Committed Instance: {:?}", last_committed);
-    println!();
-
     let entries = persistence.load_all_entries()?;
-    println!("Total Entries: {}", entries.len());
 
     if entries.is_empty() {
         println!("\nCache is empty.");
@@ -73,7 +67,6 @@ fn show_stats(db_path: &Path) -> anyhow::Result<()> {
     println!();
 
     let persistence = ProofCachePersistence::open(db_path)?;
-    let last_committed = persistence.load_last_committed()?;
     let entries = persistence.load_all_entries()?;
 
     if entries.is_empty() {
@@ -82,7 +75,6 @@ fn show_stats(db_path: &Path) -> anyhow::Result<()> {
     }
 
     println!("Count: {}", entries.len());
-    println!("Last Committed: {:?}", last_committed);
     println!(
         "Instances: {} - {}",
         entries
@@ -127,63 +119,76 @@ fn get_proof(db_path: &Path, instance_id: u64) -> anyhow::Result<()> {
     println!("Database: {}", db_path.display());
     println!();
 
-    let cache_config = CacheConfig {
-        lookahead_instances: 10,
-        retention_instances: 2,
-    };
+    let persistence = ProofCachePersistence::open(db_path)?;
+    let entries = persistence.load_all_entries()?;
 
-    let cache = ProofCache::new_with_persistence(cache_config, db_path, 0)?;
-
-    match cache.get(instance_id) {
-        Some(entry) => {
-            println!("Found proof for instance {}", instance_id);
-            println!();
-
-            // Certificate Details
-            println!("F3 Certificate:");
-            println!("  Instance ID: {}", entry.certificate.gpbft_instance);
-            println!(
-                "  Finalized Epochs: {:?}",
-                &entry.certificate.ec_chain.suffix()
-            );
-            println!(
-                "  BLS Signature: {} bytes",
-                entry.certificate.signature.len()
-            );
-            println!("  Signers: {} validators", entry.certificate.signers.len());
-            println!();
-
-            // Proof Bundle Summary
-            let proof_bundle_size = fvm_ipld_encoding::to_vec(&entry.proof_bundle)
-                .map(|v| v.len())
-                .unwrap_or(0);
-            println!("Proof Bundle:");
-            println!(
-                "  Total Size: {} bytes ({:.2} KB)",
-                proof_bundle_size,
-                proof_bundle_size as f64 / 1024.0
-            );
-
-            if let Some(proof_bundle) = &entry.proof_bundle {
-                println!("  Storage Proofs: {}", proof_bundle.storage_proofs.len());
-                println!("  Event Proofs: {}", proof_bundle.event_proofs.len());
-                println!("  Witness Blocks: {}", proof_bundle.blocks.len());
-                println!();
-            } else {
-                println!("  No proof bundle found");
-            }
-
-            // Metadata
-            println!("Metadata:");
-            println!("  Generated At: {:?}", entry.generated_at);
-            println!("  Source RPC: {}", entry.source_rpc);
-        }
-        None => {
-            println!("No proof found for instance {}", instance_id);
-            println!();
-            println!("Available instances: {:?}", cache.cached_instances());
-        }
+    if entries.is_empty() {
+        println!("Cache is empty.");
+        return Ok(());
     }
+
+    let entry = entries
+        .iter()
+        .find(|e| e.certificate.gpbft_instance == instance_id);
+
+    if let Some(entry) = entry {
+        println!("Found proof for instance {}", instance_id);
+        println!();
+
+        // Certificate Details
+        println!("F3 Certificate:");
+        println!("  Instance ID: {}", entry.certificate.gpbft_instance);
+        println!(
+            "  Finalized Epochs: {:?}",
+            &entry.certificate.ec_chain.suffix()
+        );
+        println!(
+            "  BLS Signature: {} bytes",
+            entry.certificate.signature.len()
+        );
+        println!("  Signers: {} validators", entry.certificate.signers.len());
+        println!();
+
+        // Proof Bundle Summary
+        let proof_bundle_size = fvm_ipld_encoding::to_vec(&entry.proof_bundle)
+            .map(|v| v.len())
+            .unwrap_or(0);
+        println!("Proof Bundle:");
+        println!(
+            "  Total Size: {} bytes ({:.2} KB)",
+            proof_bundle_size,
+            proof_bundle_size as f64 / 1024.0
+        );
+
+        if let Some(proof_bundle) = &entry.proof_bundle {
+            println!("  Storage Proofs: {}", proof_bundle.storage_proofs.len());
+            println!("  Event Proofs: {}", proof_bundle.event_proofs.len());
+            println!("  Witness Blocks: {}", proof_bundle.blocks.len());
+            println!();
+        } else {
+            println!("  No proof bundle found");
+        }
+
+        // Metadata
+        println!("Metadata:");
+        println!("  Generated At: {:?}", entry.generated_at);
+        println!("  Source RPC: {}", entry.source_rpc);
+    } else {
+        println!("No proof found for instance {}", instance_id);
+        println!();
+        println!("Available instances: {:?}", entries.len());
+    }
+
+    Ok(())
+}
+
+fn clear_cache(db_path: &Path) -> anyhow::Result<()> {
+    println!("=== Clear Cache ===");
+    println!("Database: {}", db_path.display());
+    println!();
+
+    let persistence = ProofCachePersistence::open(db_path)?;
+    persistence.clear_all_entries()?;
 
     Ok(())
 }

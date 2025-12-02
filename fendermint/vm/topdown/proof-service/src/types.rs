@@ -178,8 +178,8 @@ pub struct SerializableF3Certificate {
     /// The ECChain finalized during this instance
     /// Matches: FinalityCertificate.ec_chain
     /// Structure: [base, suffix...]
-    /// - base: last tipset finalized in previous instance (may be empty)
-    /// - suffix: new tipsets being finalized in this instance
+    /// - base: last tipset finalized in previous instance
+    /// - suffix: new tipsets being finalized in this instance (may be empty)
     pub ec_chain: Vec<SerializableECChainEntry>,
 
     /// Additional data signed by the participants in this instance
@@ -216,6 +216,8 @@ impl SerializableF3Certificate {
             .collect::<Result<Vec<_>>>()?;
         let ec_chain = ECChain::new_unvalidated(tipsets);
 
+        ec_chain.validate().context("Failed to validate EC chain")?;
+
         let supplemental_data = self.supplemental_data.into_supplemental_data()?;
         let signers = BitField::try_from_bits(self.signers.iter().copied())
             .context("Failed to rebuild signers bitfield")?;
@@ -238,28 +240,17 @@ impl SerializableF3Certificate {
 
 impl From<&FinalityCertificate> for SerializableF3Certificate {
     fn from(cert: &FinalityCertificate) -> Self {
-        // Convert EC chain (base + suffix) to serializable format
-        let mut ec_chain = Vec::new();
-
-        // Add base tipset if present (last tipset finalized in previous instance)
-        if let Some(base) = cert.ec_chain.base() {
-            ec_chain.push(SerializableECChainEntry {
-                epoch: base.epoch,
-                key: base.key.iter().map(|cid| cid.to_string()).collect(),
-                power_table: base.power_table.to_string(),
-                commitments: base.commitments.as_bytes().to_vec(),
-            });
-        }
-
-        // Add suffix tipsets (new tipsets being finalized)
-        for ts in cert.ec_chain.suffix() {
-            ec_chain.push(SerializableECChainEntry {
+        // Convert EC chain to serializable format
+        let ec_chain = cert
+            .ec_chain
+            .iter()
+            .map(|ts| SerializableECChainEntry {
                 epoch: ts.epoch,
                 key: ts.key.iter().map(|cid| cid.to_string()).collect(),
                 power_table: ts.power_table.to_string(),
                 commitments: ts.commitments.as_bytes().to_vec(),
-            });
-        }
+            })
+            .collect();
 
         // Convert supplemental data
         let supplemental_data = SerializableSupplementalData {

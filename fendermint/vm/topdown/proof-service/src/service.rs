@@ -14,15 +14,15 @@ use crate::config::{GatewayId, ProofServiceConfig};
 use crate::f3_client::F3Client;
 use crate::types::CacheEntry;
 use anyhow::{Context, Result};
+use ipc_api::subnet_id::SubnetID;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tokio::time::{interval, MissedTickBehavior};
 
 /// Main proof generator service
 pub struct ProofGeneratorService {
     config: ProofServiceConfig,
     cache: Arc<ProofCache>,
-    f3_client: Arc<Mutex<F3Client>>,
+    f3_client: Arc<F3Client>,
     assembler: Arc<ProofAssembler>,
 }
 
@@ -40,6 +40,7 @@ impl ProofGeneratorService {
     pub async fn new(
         config: ProofServiceConfig,
         cache: Arc<ProofCache>,
+        subnet_id: &SubnetID,
         initial_instance: u64,
         initial_power_table: filecoin_f3_gpbft::PowerEntries,
     ) -> Result<Self> {
@@ -49,7 +50,7 @@ impl ProofGeneratorService {
         // or the last committed instance if the cache is empty
         let highest_cached_instance = cache
             .highest_cached_instance()
-            .unwrap_or_else(|| cache.last_committed_instance());
+            .unwrap_or_else(|| initial_instance);
 
         let (mut initial_instance, mut initial_power_table) =
             (initial_instance, initial_power_table);
@@ -70,22 +71,22 @@ impl ProofGeneratorService {
         }
 
         // Create F3 client for certificate fetching + validation
-        let f3_client = Arc::new(Mutex::new(
+        let f3_client = Arc::new(
             F3Client::new(
                 &config.parent_rpc_url,
-                &config.f3_network_name(),
+                &config.f3_network_name(subnet_id),
                 initial_instance,
                 initial_power_table,
             )
             .context("Failed to create F3 client")?,
-        ));
+        );
 
         // Create proof assembler
         let assembler = Arc::new(
             ProofAssembler::new(
                 config.parent_rpc_url.clone(),
                 gateway_actor_id,
-                config.subnet_id.to_string(),
+                subnet_id.to_string(),
             )
             .context("Failed to create proof assembler")?,
         );
@@ -134,12 +135,15 @@ impl ProofGeneratorService {
     /// CRITICAL: Processes F3 instances SEQUENTIALLY - never skips!
     async fn generate_next_proofs(&self) -> Result<()> {
         let (current_instance, rpc_endpoint) = {
-            let f3_client = self.f3_client.lock().await;
-            (f3_client.current_instance(), f3_client.rpc_endpoint())
+            (
+                self.f3_client.current_instance().await,
+                self.f3_client.rpc_endpoint(),
+            )
         };
 
         let next_instance = current_instance + 1;
-        let max_instance = current_instance + self.config.cache_config.lookahead_instances;
+        let max_instance =
+            self.cache.last_committed_instance() + self.config.cache_config.lookahead_instances;
 
         tracing::debug!(
             current_instance,
@@ -152,10 +156,7 @@ impl ProofGeneratorService {
         for instance_id in next_instance..=max_instance {
             // Fetch and validate certificate
             let certificate = {
-                let mut client = self.f3_client.lock().await;
-                let result = client.fetch_and_validate().await;
-                drop(client);
-
+                let result = self.f3_client.fetch_and_validate().await;
                 match result {
                     Ok(cert) => cert,
                     Err(err) if is_certificate_unavailable(&err) => {
@@ -203,10 +204,7 @@ impl ProofGeneratorService {
             };
 
             // Cache the result
-            let power_table = {
-                let client = self.f3_client.lock().await;
-                client.state.power_table.clone()
-            };
+            let power_table = self.f3_client.get_state().await.power_table;
 
             self.cache.insert(CacheEntry::new(
                 certificate,
@@ -231,13 +229,24 @@ impl ProofGeneratorService {
         &self,
         f3_cert: &filecoin_f3_certs::FinalityCertificate,
     ) -> Result<Option<proofs::proofs::common::bundle::UnifiedProofBundle>> {
-        // Extract highest epoch from validated F3 certificate
-        let highest_epoch = f3_cert
+        let finalized_tipsets: Vec<i64> = f3_cert
             .ec_chain
             .suffix()
-            .last()
+            .iter()
             .map(|ts| ts.epoch)
-            .context("Certificate has no epochs")?;
+            .collect();
+
+        if finalized_tipsets.is_empty() {
+            tracing::debug!(
+                instance_id = f3_cert.gpbft_instance,
+                "No tipsets to prove, skipping proof generation"
+            );
+
+            return Ok(None);
+        }
+
+        // Extract highest epoch from validated F3 certificate
+        let highest_epoch = finalized_tipsets.last().unwrap();
 
         tracing::debug!(
             instance_id = f3_cert.gpbft_instance,
@@ -248,7 +257,7 @@ impl ProofGeneratorService {
         // Generate proof (assembler fetches its own tipsets)
         let bundle = self
             .assembler
-            .generate_proof_bundle(f3_cert.ec_chain.clone())
+            .generate_proof_bundle(finalized_tipsets)
             .await
             .with_context(|| {
                 format!(
@@ -300,17 +309,17 @@ mod tests {
             enabled: true,
             parent_rpc_url: "http://localhost:1234/rpc/v1".to_string(),
             gateway_id: GatewayId::ActorId(1001),
-            subnet_id: Default::default(),
             cache_config: Default::default(),
             ..Default::default()
         };
 
-        let cache = Arc::new(ProofCache::new(0, config.cache_config.clone()));
+        let cache = Arc::new(ProofCache::new(100, config.cache_config.clone()));
         let power_table = PowerEntries(vec![]);
+        let subnet_id = SubnetID::default();
 
         // Note: Service creation succeeds with F3Client::new() even with a fake RPC endpoint
         // The actual RPC calls will fail later when the service tries to fetch certificates
-        let result = ProofGeneratorService::new(config, cache, 0, power_table).await;
+        let result = ProofGeneratorService::new(config, cache, &subnet_id, 0, power_table).await;
         assert!(result.is_ok());
     }
 }

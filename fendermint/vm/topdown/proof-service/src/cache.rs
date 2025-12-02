@@ -21,11 +21,11 @@ pub struct ProofCache {
     /// Using BTreeMap for ordered iteration
     entries: Arc<RwLock<BTreeMap<u64, CacheEntry>>>,
 
-    /// Last committed instance ID (updated after execution)
-    last_committed_instance: Arc<AtomicU64>,
-
     /// Configuration
     config: CacheConfig,
+
+    /// Last committed instance ID (updated after execution)
+    last_committed_instance: Arc<AtomicU64>,
 
     /// Optional disk persistence
     persistence: Option<Arc<ProofCachePersistence>>,
@@ -47,17 +47,12 @@ impl ProofCache {
     /// Loads existing entries from disk on startup.
     /// If DB is fresh, uses `initial_instance` as the starting point.
     pub fn new_with_persistence(
+        last_committed_instance: u64,
         config: CacheConfig,
         db_path: &Path,
         initial_instance: u64,
     ) -> Result<Self> {
         let persistence = ProofCachePersistence::open(db_path)?;
-
-        // Load all entries and last committed instance from disk
-        let last_committed = persistence
-            .load_last_committed()
-            .context("Failed to load last committed instance from disk")?
-            .unwrap_or(initial_instance);
 
         let entries_vec = persistence
             .load_all_entries()
@@ -68,33 +63,26 @@ impl ProofCache {
             .collect();
 
         tracing::info!(
-            last_committed,
+            initial_instance,
             entry_count = entries.len(),
             "Loaded cache from disk"
         );
 
         let cache = Self {
             entries: Arc::new(RwLock::new(entries)),
-            last_committed_instance: Arc::new(AtomicU64::new(last_committed)),
+            last_committed_instance: Arc::new(AtomicU64::new(last_committed_instance)),
             config,
             persistence: Some(Arc::new(persistence)),
         };
 
-        // This will prune any entries that are older than the initial instance
-        if last_committed < initial_instance {
-            cache.mark_committed(initial_instance)?;
-        }
+        cache.cleanup_old_instances(initial_instance)?;
 
         Ok(cache)
     }
 
-    /// Get the next uncommitted proof (in sequential order)
-    /// Returns the proof for (last_committed + 1)
-    pub fn get_next_uncommitted(&self) -> Option<CacheEntry> {
-        let last_committed = self.last_committed_instance.load(Ordering::Acquire);
-        let next_instance = last_committed + 1;
-
-        let result = self.entries.read().get(&next_instance).cloned();
+    /// Get proof for a specific instance ID
+    pub fn get(&self, instance_id: u64) -> Option<CacheEntry> {
+        let result = self.entries.read().get(&instance_id).cloned();
 
         // Record cache hit/miss
         CACHE_HIT_TOTAL
@@ -104,21 +92,9 @@ impl ProofCache {
         result
     }
 
-    /// Get proof for a specific instance ID
-    pub fn get(&self, instance_id: u64) -> Option<CacheEntry> {
-        self.entries.read().get(&instance_id).cloned()
-    }
-
     /// Check if an instance is already cached
     pub fn contains(&self, instance_id: u64) -> bool {
-        let result = self.entries.read().contains_key(&instance_id);
-
-        // Record cache hit/miss
-        CACHE_HIT_TOTAL
-            .with_label_values(&[if result { "hit" } else { "miss" }])
-            .inc();
-
-        result
+        self.entries.read().contains_key(&instance_id)
     }
 
     /// Insert a proof into the cache
@@ -126,7 +102,7 @@ impl ProofCache {
         let instance_id = entry.certificate.gpbft_instance;
 
         // Check if we're within the lookahead window
-        let last_committed = self.last_committed_instance.load(Ordering::Acquire);
+        let last_committed = self.highest_cached_instance().unwrap_or(0);
         let max_allowed = last_committed + self.config.lookahead_instances;
 
         if instance_id > max_allowed {
@@ -171,13 +147,6 @@ impl ProofCache {
         let old_value = self
             .last_committed_instance
             .swap(instance_id, Ordering::Release);
-
-        // Save to disk if enabled
-        if let Some(persistence) = &self.persistence {
-            persistence
-                .save_last_committed(instance_id)
-                .context("Failed to save last committed instance to disk")?;
-        }
 
         tracing::info!(
             old_instance = old_value,
@@ -327,7 +296,6 @@ mod tests {
 
         let cache = ProofCache::new(100, config);
 
-        assert_eq!(cache.last_committed_instance(), 100);
         assert_eq!(cache.len(), 0);
         assert!(cache.is_empty());
 
@@ -338,11 +306,6 @@ mod tests {
         assert_eq!(cache.len(), 1);
         assert!(!cache.is_empty());
         assert!(cache.contains(101));
-
-        // Get next uncommitted (should be 101)
-        let next = cache.get_next_uncommitted();
-        assert!(next.is_some());
-        assert_eq!(next.unwrap().certificate.gpbft_instance, 101);
     }
 
     #[test]
@@ -382,13 +345,12 @@ mod tests {
 
         // Mark 103 as committed (retention window is 2)
         // Should keep 101, 102, 103, 104, 105 (all within retention_cutoff = 103 - 2 = 101)
-        cache.mark_committed(103);
-        assert_eq!(cache.last_committed_instance(), 103);
+        cache.mark_committed(103).unwrap();
         assert_eq!(cache.len(), 5); // All still within retention
 
         // Mark 105 as committed
         // Should remove 101, 102 (retention_cutoff = 105 - 2 = 103)
-        cache.mark_committed(105);
+        cache.mark_committed(105).unwrap();
         assert_eq!(cache.len(), 3); // 103, 104, 105 remain
         assert!(!cache.contains(101));
         assert!(!cache.contains(102));

@@ -13,6 +13,7 @@ use filecoin_f3_certs::FinalityCertificate;
 use filecoin_f3_lightclient::{LightClient, LightClientState};
 use ipc_observability::emit;
 use std::time::Instant;
+use tokio::sync::Mutex;
 use tracing::{debug, error, info};
 
 /// F3 client for fetching and validating certificates
@@ -21,12 +22,15 @@ use tracing::{debug, error, info};
 /// - Direct F3 RPC access
 /// - Full cryptographic validation (BLS signatures, quorum, continuity)
 /// - Stateful sequential validation
+///
+/// Uses interior mutability (Mutex) to allow shared access while maintaining
+/// mutable state for certificate validation.
 pub struct F3Client {
     /// Light client for F3 RPC and cryptographic validation
-    pub light_client: LightClient,
+    light_client: Mutex<LightClient>,
 
     /// Current validated state (instance, chain, power table)
-    pub state: LightClientState,
+    state: Mutex<LightClientState>,
 
     /// F3 RPC endpoint
     rpc_endpoint: String,
@@ -56,20 +60,20 @@ impl F3Client {
         let state = LightClientState {
             instance: initial_instance,
             chain: None,
-            power_table: initial_power_table,
+            power_table: initial_power_table.clone(),
         };
 
         info!(
             initial_instance,
-            power_table_size = state.power_table.len(),
+            power_table_size = initial_power_table.len(),
             network = network_name,
             rpc = rpc_endpoint,
             "Created F3 client with power table from F3CertManager actor"
         );
 
         Ok(Self {
-            light_client,
-            state,
+            light_client: Mutex::new(light_client),
+            state: Mutex::new(state),
             rpc_endpoint: rpc_endpoint.to_string(),
         })
     }
@@ -106,8 +110,8 @@ impl F3Client {
         );
 
         Ok(Self {
-            light_client,
-            state,
+            light_client: Mutex::new(light_client),
+            state: Mutex::new(state),
             rpc_endpoint: rpc_endpoint.to_string(),
         })
     }
@@ -122,8 +126,12 @@ impl F3Client {
     ///
     /// # Returns
     /// `FinalityCertificate` that has been cryptographically verified
-    pub async fn fetch_and_validate(&mut self) -> Result<FinalityCertificate> {
-        let instance = self.state.instance + 1;
+    pub async fn fetch_and_validate(&self) -> Result<FinalityCertificate> {
+        let instance = {
+            let state = self.state.lock().await;
+            state.instance + 1
+        };
+
         debug!(instance, "Starting F3 certificate fetch and validation");
 
         // Fetch certificate from F3 RPC first
@@ -133,25 +141,32 @@ impl F3Client {
         debug!(instance, "Validating certificate cryptography");
         let new_state = self.validate_certificate(&certificate).await?;
 
+        let (current_instance, power_table_entries) = {
+            let state = self.state.lock().await;
+            (state.instance, state.power_table.len())
+        };
+
         debug!(
             instance,
-            current_instance = self.state.instance,
-            power_table_entries = self.state.power_table.len(),
-            "Current F3 validator state"
+            current_instance, power_table_entries, "Current F3 validator state"
         );
 
         // Update the state with the new validated state
-        self.state = new_state;
+        {
+            let mut state = self.state.lock().await;
+            *state = new_state;
+        }
 
         debug!(instance, "Certificate validation complete");
 
         Ok(certificate)
     }
 
-    async fn fetch_certificate(&mut self, instance: u64) -> Result<FinalityCertificate> {
+    async fn fetch_certificate(&self, instance: u64) -> Result<FinalityCertificate> {
         let fetch_start = Instant::now();
 
-        match self.light_client.get_certificate(instance).await {
+        let client = self.light_client.lock().await;
+        match client.get_certificate(instance).await {
             Ok(cert) => {
                 let latency = fetch_start.elapsed().as_secs_f64();
                 emit(F3CertificateFetched {
@@ -186,16 +201,16 @@ impl F3Client {
     }
 
     async fn validate_certificate(
-        &mut self,
+        &self,
         certificate: &FinalityCertificate,
     ) -> Result<LightClientState> {
         let validation_start = Instant::now();
         let instance = certificate.gpbft_instance;
 
-        match self
-            .light_client
-            .validate_certificates(&self.state, &[certificate.clone()])
-        {
+        let mut client = self.light_client.lock().await;
+        let state = self.state.lock().await;
+
+        match client.validate_certificates(&state, &[certificate.clone()]) {
             Ok(new_state) => {
                 let latency = validation_start.elapsed().as_secs_f64();
                 emit(F3CertificateValidated {
@@ -217,16 +232,16 @@ impl F3Client {
                 let latency = validation_start.elapsed().as_secs_f64();
                 emit(F3CertificateValidated {
                     instance,
-                    new_instance: self.state.instance,
-                    power_table_size: self.state.power_table.len(),
+                    new_instance: state.instance,
+                    power_table_size: state.power_table.len(),
                     status: OperationStatus::Failure,
                     latency,
                 });
                 error!(
                     instance,
                     error = %e,
-                    current_instance = self.state.instance,
-                    power_table_entries = self.state.power_table.len(),
+                    current_instance = state.instance,
+                    power_table_entries = state.power_table.len(),
                     "Certificate validation failed"
                 );
                 Err(e).context("Certificate cryptographic validation failed")
@@ -235,13 +250,15 @@ impl F3Client {
     }
 
     /// Get current instance
-    pub fn current_instance(&self) -> u64 {
-        self.state.instance
+    pub async fn current_instance(&self) -> u64 {
+        let state = self.state.lock().await;
+        state.instance
     }
 
     /// Get current validated state
-    pub fn get_state(&self) -> LightClientState {
-        self.state.clone()
+    pub async fn get_state(&self) -> LightClientState {
+        let state = self.state.lock().await;
+        state.clone()
     }
 
     /// Get F3 RPC endpoint

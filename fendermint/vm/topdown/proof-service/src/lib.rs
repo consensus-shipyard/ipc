@@ -26,6 +26,7 @@ pub use types::{CacheEntry, SerializableF3Certificate};
 pub use verifier::ProofsVerifier;
 
 use anyhow::{Context, Result};
+use ipc_api::subnet_id::SubnetID;
 use std::sync::Arc;
 
 /// Initialize and launch the proof generator service
@@ -44,6 +45,7 @@ use std::sync::Arc;
 /// * `tokio::task::JoinHandle` - Handle to the background service task
 pub async fn launch_service(
     config: ProofServiceConfig,
+    subnet_id: SubnetID,
     initial_committed_instance: u64,
     initial_power_table: filecoin_f3_gpbft::PowerEntries,
     db_path: Option<std::path::PathBuf>,
@@ -62,10 +64,6 @@ pub async fn launch_service(
         anyhow::bail!("lookahead_instances must be > 0");
     }
 
-    if config.cache_config.retention_instances == 0 {
-        anyhow::bail!("retention_instances must be > 0");
-    }
-
     // Validate URL format
     url::Url::parse(&config.parent_rpc_url)
         .with_context(|| format!("Invalid parent_rpc_url: {}", config.parent_rpc_url))?;
@@ -73,7 +71,7 @@ pub async fn launch_service(
     tracing::info!(
         initial_instance = initial_committed_instance,
         parent_rpc = config.parent_rpc_url,
-        f3_network = config.f3_network_name(),
+        f3_network = config.f3_network_name(&subnet_id),
         lookahead = config.cache_config.lookahead_instances,
         "Launching proof generator service with validated configuration"
     );
@@ -82,6 +80,7 @@ pub async fn launch_service(
     let cache = if let Some(path) = db_path {
         tracing::info!(path = %path.display(), "Creating cache with persistence");
         Arc::new(ProofCache::new_with_persistence(
+            initial_committed_instance,
             config.cache_config.clone(),
             &path,
             initial_committed_instance,
@@ -104,6 +103,7 @@ pub async fn launch_service(
         match ProofGeneratorService::new(
             config_clone,
             cache_clone,
+            &subnet_id,
             initial_committed_instance,
             power_table_clone,
         )
@@ -132,7 +132,8 @@ mod tests {
         };
 
         let power_table = PowerEntries(vec![]);
-        let result = launch_service(config, 0, power_table, None).await;
+        let subnet_id = SubnetID::default();
+        let result = launch_service(config, subnet_id, 0, power_table, None).await;
         assert!(result.is_ok());
         assert!(result.unwrap().is_none());
     }
@@ -146,18 +147,17 @@ mod tests {
             enabled: true,
             parent_rpc_url: "http://localhost:1234/rpc/v1".to_string(),
             gateway_id: GatewayId::ActorId(1001),
-            subnet_id: Default::default(),
             polling_interval: std::time::Duration::from_secs(60),
             ..Default::default()
         };
 
         let power_table = PowerEntries(vec![]);
-        let result = launch_service(config, 100, power_table, None).await;
+        let subnet_id = SubnetID::default();
+
+        let result = launch_service(config, subnet_id, 100, power_table, None).await;
         assert!(result.is_ok());
 
         let (cache, handle) = result.unwrap().unwrap();
         handle.abort();
-
-        assert_eq!(cache.last_committed_instance(), 100);
     }
 }

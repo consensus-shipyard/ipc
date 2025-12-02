@@ -42,15 +42,11 @@ pub struct ProofServiceConfig {
     /// Gateway identification on parent chain.
     /// Can be an Actor ID (u64) or an Ethereum address (String).
     pub gateway_id: GatewayId,
-
-    /// Subnet ID (for event filtering)
-    /// Will be derived from genesis
-    pub subnet_id: SubnetID,
 }
 
 impl ProofServiceConfig {
-    pub fn f3_network_name(&self) -> String {
-        let root_id = self.subnet_id.root_id();
+    pub fn f3_network_name(&self, subnet_id: &SubnetID) -> String {
+        let root_id = subnet_id.root_id();
 
         match root_id {
             FILECOIN_MAINNET_CHAIN_ID => "mainnet".to_string(),
@@ -75,7 +71,6 @@ impl Default for ProofServiceConfig {
             parent_rpc_url: String::new(),
             fallback_rpc_urls: Vec::new(),
             gateway_id: GatewayId::ActorId(0),
-            subnet_id: SubnetID::default(),
         }
     }
 }

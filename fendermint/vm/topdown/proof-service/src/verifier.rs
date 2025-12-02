@@ -69,12 +69,8 @@ impl ProofsVerifier {
             blocks: bundle.blocks.clone(),
         };
 
-        // TODO Karel - fix the library to take a single CID
         let parent_tipset_verifier = |epoch: i64, cids: &[Cid]| -> bool {
-            certificate
-                .ec_chain
-                .iter()
-                .any(|ts| ts.epoch == epoch && ts.key == cids.first().unwrap().to_bytes())
+            cids.iter().all(|cid| tipset_verifier(epoch, cid))
         };
 
         let event_results = verify_event_proof(

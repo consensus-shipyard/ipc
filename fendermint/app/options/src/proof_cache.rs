@@ -35,4 +35,10 @@ pub enum ProofCacheCommands {
         #[arg(long)]
         instance_id: u64,
     },
+    /// Clear the cache
+    Clear {
+        /// Database path
+        #[arg(long, env = "FM_PROOF_CACHE_DB")]
+        db_path: PathBuf,
+    },
 }

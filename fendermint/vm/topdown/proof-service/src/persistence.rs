@@ -32,7 +32,6 @@ const CF_BUNDLES: &str = "bundles";
 
 /// Metadata keys
 const KEY_SCHEMA_VERSION: &[u8] = b"schema_version";
-const KEY_LAST_COMMITTED: &[u8] = b"last_committed_instance";
 
 /// Persistent storage for proof cache
 pub struct ProofCachePersistence {
@@ -94,37 +93,6 @@ impl ProofCachePersistence {
             }
         }
 
-        Ok(())
-    }
-
-    /// Load last committed instance from disk
-    pub fn load_last_committed(&self) -> Result<Option<u64>> {
-        let cf_meta = self
-            .db
-            .cf_handle(CF_METADATA)
-            .context("Failed to get metadata column family")?;
-
-        match self.db.get_cf(&cf_meta, KEY_LAST_COMMITTED)? {
-            Some(data) => {
-                let instance = serde_json::from_slice(&data)
-                    .context("Failed to deserialize last committed instance")?;
-                Ok(Some(instance))
-            }
-            None => Ok(None),
-        }
-    }
-
-    /// Save last committed instance to disk
-    pub fn save_last_committed(&self, instance: u64) -> Result<()> {
-        let cf_meta = self
-            .db
-            .cf_handle(CF_METADATA)
-            .context("Failed to get metadata column family")?;
-
-        self.db
-            .put_cf(&cf_meta, KEY_LAST_COMMITTED, serde_json::to_vec(&instance)?)?;
-
-        debug!(instance, "Saved last committed instance");
         Ok(())
     }
 
@@ -190,6 +158,30 @@ impl ProofCachePersistence {
         debug!(instance_id, "Deleted cache entry from disk");
         Ok(())
     }
+
+    /// Clear all entries from disk
+    pub fn clear_all_entries(&self) -> Result<()> {
+        let cf_bundles = self
+            .db
+            .cf_handle(CF_BUNDLES)
+            .context("Failed to get bundles column family")?;
+
+        // Collect all keys first to avoid iterator invalidation
+        let keys: Vec<Box<[u8]>> = self
+            .db
+            .iterator_cf(&cf_bundles, rocksdb::IteratorMode::Start)
+            .filter_map(|result| result.ok().map(|(k, _)| k))
+            .collect();
+
+        let count = keys.len();
+        debug!(count, "Collected all keys to clear");
+        for key in keys {
+            self.db.delete_cf(&cf_bundles, &key)?;
+        }
+
+        debug!(count, "Cleared all cache entries from disk");
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -250,11 +242,6 @@ mod tests {
     fn test_persistence_basic_operations() {
         let dir = tempdir().unwrap();
         let persistence = ProofCachePersistence::open(dir.path()).unwrap();
-
-        // Test last committed
-        assert_eq!(persistence.load_last_committed().unwrap(), None);
-        persistence.save_last_committed(100).unwrap();
-        assert_eq!(persistence.load_last_committed().unwrap(), Some(100));
 
         // Test entry save/load
         let entry = create_test_entry(101);

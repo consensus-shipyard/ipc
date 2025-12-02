@@ -6,9 +6,12 @@
 //! This binary is for development and CI testing only.
 
 use clap::{Parser, Subcommand};
-use fendermint_vm_topdown_proof_service::{launch_service, ProofServiceConfig};
+use fendermint_vm_topdown_proof_service::config::{CacheConfig, GatewayId, ProofServiceConfig};
+use fendermint_vm_topdown_proof_service::launch_service;
 use fvm_ipld_encoding;
+use ipc_api::subnet_id::SubnetID;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::time::Duration;
 
 #[derive(Parser)]
@@ -127,7 +130,7 @@ async fn run_service(
     .await?;
 
     // Get the power table
-    let current_state = temp_client.get_state();
+    let current_state = temp_client.get_state().await;
     let power_table = current_state.power_table;
 
     println!("Power table fetched: {} entries", power_table.0.len());
@@ -136,24 +139,29 @@ async fn run_service(
         initial_instance, initial_instance
     );
 
+    let subnet_id_parsed = SubnetID::from_str(&subnet_id)?;
+
     let config = ProofServiceConfig {
         enabled: true,
-        parent_rpc_url: rpc_url,
-        parent_subnet_id: "/r314159".to_string(),
-        f3_network_name: "calibrationnet".to_string(),
-        subnet_id: Some(subnet_id),
-        gateway_actor_id: None,
-        gateway_eth_address: Some(gateway_address),
-        lookahead_instances: lookahead,
         polling_interval: Duration::from_secs(poll_interval),
-        retention_instances: 2,
-        max_cache_size_bytes: 0,
+        cache_config: CacheConfig {
+            lookahead_instances: lookahead,
+            retention_instances: 2,
+        },
+        parent_rpc_url: rpc_url,
         fallback_rpc_urls: vec![],
-        max_epoch_lag: 100,
-        rpc_lookback_limit: 900,
+        gateway_id: GatewayId::EthAddress(gateway_address),
     };
 
-    let (cache, _handle) = launch_service(config, initial_instance, power_table, db_path).await?;
+    let (cache, _handle) = launch_service(
+        config,
+        subnet_id_parsed,
+        initial_instance,
+        power_table,
+        db_path,
+    )
+    .await?
+    .expect("Service should be enabled");
     println!("Service started successfully!");
     println!("Monitoring parent chain for F3 certificates...");
     println!();
@@ -164,8 +172,8 @@ async fn run_service(
         tokio::time::sleep(Duration::from_secs(5)).await;
 
         let size = cache.len();
-        let last_committed = cache.last_committed_instance();
         let highest = cache.highest_cached_instance();
+        let instances = cache.cached_instances();
 
         print!("\x1B[2J\x1B[1;1H"); // Clear screen
         println!("=== Proof Cache Status ===");
@@ -176,7 +184,6 @@ async fn run_service(
         println!();
         println!("Cache Statistics:");
         println!("  Entries in cache: {}", size);
-        println!("  Last committed instance: {}", last_committed);
         println!(
             "  Highest cached instance: {}",
             highest.map_or("None".to_string(), |h| h.to_string())
@@ -184,29 +191,31 @@ async fn run_service(
         println!();
 
         if size > last_size {
-            println!("New proofs generated: {}", size - last_size);
+            println!("✓ New proofs generated: {}", size - last_size);
             last_size = size;
         }
 
-        if let Some(entry) = cache.get_next_uncommitted() {
-            println!("Next Uncommitted Proof:");
-            println!("  Instance ID: {}", entry.instance_id);
-            println!("  Finalized epochs: {:?}", entry.finalized_epochs);
-            let proof_size = fvm_ipld_encoding::to_vec(&entry.proof_bundle)
-                .map(|v| v.len())
-                .unwrap_or(0);
-            println!("  Proof bundle size: {} bytes", proof_size);
-            println!("  Generated at: {:?}", entry.generated_at);
-            println!();
+        if let Some(&latest_instance) = instances.last() {
+            if let Some(entry) = cache.get(latest_instance) {
+                println!("Latest Cached Proof:");
+                println!("  Instance ID: {}", entry.certificate.gpbft_instance);
+                println!("  EC Chain tipsets: {}", entry.certificate.ec_chain.len());
+                let proof_size = fvm_ipld_encoding::to_vec(&entry.proof_bundle)
+                    .map(|v| v.len())
+                    .unwrap_or(0);
+                println!("  Proof bundle size: {} bytes", proof_size);
+                println!("  Generated at: {:?}", entry.generated_at);
+                println!();
+            }
         } else {
-            println!("No uncommitted proofs available yet...");
+            println!("No proofs cached yet...");
             println!();
         }
 
         if size > 0 {
             println!("Cached Instances:");
             print!("  ");
-            for instance in cache.cached_instances() {
+            for instance in instances {
                 print!("{}  ", instance);
             }
             println!();
