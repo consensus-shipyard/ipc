@@ -11,10 +11,14 @@ pub mod types;
 mod blobreader_facade;
 #[cfg(feature = "blob-reader")]
 pub mod blob_reader {
-    pub type Events = crate::blobreader_facade::iblobreaderfacade::IBlobReaderFacade::IBlobReaderFacadeEvents;
-    pub type ReadRequestClosed = crate::blobreader_facade::iblobreaderfacade::IBlobReaderFacade::ReadRequestClosed;
-    pub type ReadRequestOpened = crate::blobreader_facade::iblobreaderfacade::IBlobReaderFacade::ReadRequestOpened;
-    pub type ReadRequestPending = crate::blobreader_facade::iblobreaderfacade::IBlobReaderFacade::ReadRequestPending;
+    pub type Events =
+        crate::blobreader_facade::iblobreaderfacade::IBlobReaderFacade::IBlobReaderFacadeEvents;
+    pub type ReadRequestClosed =
+        crate::blobreader_facade::iblobreaderfacade::IBlobReaderFacade::ReadRequestClosed;
+    pub type ReadRequestOpened =
+        crate::blobreader_facade::iblobreaderfacade::IBlobReaderFacade::ReadRequestOpened;
+    pub type ReadRequestPending =
+        crate::blobreader_facade::iblobreaderfacade::IBlobReaderFacade::ReadRequestPending;
 }
 
 #[cfg(feature = "blobs")]
@@ -39,7 +43,8 @@ pub mod blobs {
     #[allow(non_camel_case_types)]
     pub type overwriteBlobCall = crate::blobs_facade::iblobsfacade::IBlobsFacade::overwriteBlobCall;
     #[allow(non_camel_case_types)]
-    pub type trimBlobExpiriesCall = crate::blobs_facade::iblobsfacade::IBlobsFacade::trimBlobExpiriesCall;
+    pub type trimBlobExpiriesCall =
+        crate::blobs_facade::iblobsfacade::IBlobsFacade::trimBlobExpiriesCall;
 
     pub type Subscription = crate::blobs_facade::iblobsfacade::IBlobsFacade::Subscription;
     pub type Blob = crate::blobs_facade::iblobsfacade::IBlobsFacade::Blob;
@@ -54,7 +59,8 @@ pub mod bucket {
     pub type Events = crate::bucket_facade::ibucketfacade::IBucketFacade::IBucketFacadeEvents;
     pub type ObjectAdded = crate::bucket_facade::ibucketfacade::IBucketFacade::ObjectAdded;
     pub type ObjectDeleted = crate::bucket_facade::ibucketfacade::IBucketFacade::ObjectDeleted;
-    pub type ObjectMetadataUpdated = crate::bucket_facade::ibucketfacade::IBucketFacade::ObjectMetadataUpdated;
+    pub type ObjectMetadataUpdated =
+        crate::bucket_facade::ibucketfacade::IBucketFacade::ObjectMetadataUpdated;
 
     pub type Calls = crate::bucket_facade::ibucketfacade::IBucketFacade::IBucketFacadeCalls;
     #[allow(non_camel_case_types)]
@@ -62,21 +68,28 @@ pub mod bucket {
     #[allow(non_camel_case_types)]
     pub type addObject_1Call = crate::bucket_facade::ibucketfacade::IBucketFacade::addObject_1Call;
     #[allow(non_camel_case_types)]
-    pub type deleteObjectCall = crate::bucket_facade::ibucketfacade::IBucketFacade::deleteObjectCall;
+    pub type deleteObjectCall =
+        crate::bucket_facade::ibucketfacade::IBucketFacade::deleteObjectCall;
     #[allow(non_camel_case_types)]
     pub type getObjectCall = crate::bucket_facade::ibucketfacade::IBucketFacade::getObjectCall;
     #[allow(non_camel_case_types)]
-    pub type queryObjects_0Call = crate::bucket_facade::ibucketfacade::IBucketFacade::queryObjects_0Call;
+    pub type queryObjects_0Call =
+        crate::bucket_facade::ibucketfacade::IBucketFacade::queryObjects_0Call;
     #[allow(non_camel_case_types)]
-    pub type queryObjects_1Call = crate::bucket_facade::ibucketfacade::IBucketFacade::queryObjects_1Call;
+    pub type queryObjects_1Call =
+        crate::bucket_facade::ibucketfacade::IBucketFacade::queryObjects_1Call;
     #[allow(non_camel_case_types)]
-    pub type queryObjects_2Call = crate::bucket_facade::ibucketfacade::IBucketFacade::queryObjects_2Call;
+    pub type queryObjects_2Call =
+        crate::bucket_facade::ibucketfacade::IBucketFacade::queryObjects_2Call;
     #[allow(non_camel_case_types)]
-    pub type queryObjects_3Call = crate::bucket_facade::ibucketfacade::IBucketFacade::queryObjects_3Call;
+    pub type queryObjects_3Call =
+        crate::bucket_facade::ibucketfacade::IBucketFacade::queryObjects_3Call;
     #[allow(non_camel_case_types)]
-    pub type queryObjects_4Call = crate::bucket_facade::ibucketfacade::IBucketFacade::queryObjects_4Call;
+    pub type queryObjects_4Call =
+        crate::bucket_facade::ibucketfacade::IBucketFacade::queryObjects_4Call;
     #[allow(non_camel_case_types)]
-    pub type updateObjectMetadataCall = crate::bucket_facade::ibucketfacade::IBucketFacade::updateObjectMetadataCall;
+    pub type updateObjectMetadataCall =
+        crate::bucket_facade::ibucketfacade::IBucketFacade::updateObjectMetadataCall;
 
     pub type ObjectValue = crate::bucket_facade::ibucketfacade::IBucketFacade::ObjectValue;
     pub type KeyValue = crate::bucket_facade::ibucketfacade::IBucketFacade::KeyValue;
@@ -110,23 +123,31 @@ pub mod credit {
     #[allow(non_camel_case_types)]
     pub type buyCredit_1Call = crate::credit_facade::icreditfacade::ICreditFacade::buyCredit_1Call;
     #[allow(non_camel_case_types)]
-    pub type approveCredit_0Call = crate::credit_facade::icreditfacade::ICreditFacade::approveCredit_0Call;
+    pub type approveCredit_0Call =
+        crate::credit_facade::icreditfacade::ICreditFacade::approveCredit_0Call;
     #[allow(non_camel_case_types)]
-    pub type approveCredit_1Call = crate::credit_facade::icreditfacade::ICreditFacade::approveCredit_1Call;
+    pub type approveCredit_1Call =
+        crate::credit_facade::icreditfacade::ICreditFacade::approveCredit_1Call;
     #[allow(non_camel_case_types)]
-    pub type approveCredit_2Call = crate::credit_facade::icreditfacade::ICreditFacade::approveCredit_2Call;
+    pub type approveCredit_2Call =
+        crate::credit_facade::icreditfacade::ICreditFacade::approveCredit_2Call;
     #[allow(non_camel_case_types)]
-    pub type revokeCredit_0Call = crate::credit_facade::icreditfacade::ICreditFacade::revokeCredit_0Call;
+    pub type revokeCredit_0Call =
+        crate::credit_facade::icreditfacade::ICreditFacade::revokeCredit_0Call;
     #[allow(non_camel_case_types)]
-    pub type revokeCredit_1Call = crate::credit_facade::icreditfacade::ICreditFacade::revokeCredit_1Call;
+    pub type revokeCredit_1Call =
+        crate::credit_facade::icreditfacade::ICreditFacade::revokeCredit_1Call;
     #[allow(non_camel_case_types)]
-    pub type setAccountSponsorCall = crate::credit_facade::icreditfacade::ICreditFacade::setAccountSponsorCall;
+    pub type setAccountSponsorCall =
+        crate::credit_facade::icreditfacade::ICreditFacade::setAccountSponsorCall;
     #[allow(non_camel_case_types)]
     pub type getAccountCall = crate::credit_facade::icreditfacade::ICreditFacade::getAccountCall;
     #[allow(non_camel_case_types)]
-    pub type getCreditApprovalCall = crate::credit_facade::icreditfacade::ICreditFacade::getCreditApprovalCall;
+    pub type getCreditApprovalCall =
+        crate::credit_facade::icreditfacade::ICreditFacade::getCreditApprovalCall;
     #[allow(non_camel_case_types)]
-    pub type setAccountStatusCall = crate::credit_facade::icreditfacade::ICreditFacade::setAccountStatusCall;
+    pub type setAccountStatusCall =
+        crate::credit_facade::icreditfacade::ICreditFacade::setAccountStatusCall;
 
     pub type Account = crate::credit_facade::icreditfacade::ICreditFacade::Account;
     pub type Approval = crate::credit_facade::icreditfacade::ICreditFacade::Approval;
@@ -149,19 +170,25 @@ mod machine_facade;
 pub mod machine {
     pub type Events = crate::machine_facade::imachinefacade::IMachineFacade::IMachineFacadeEvents;
     pub type MachineCreated = crate::machine_facade::imachinefacade::IMachineFacade::MachineCreated;
-    pub type MachineInitialized = crate::machine_facade::imachinefacade::IMachineFacade::MachineInitialized;
+    pub type MachineInitialized =
+        crate::machine_facade::imachinefacade::IMachineFacade::MachineInitialized;
 
     pub type Calls = crate::machine_facade::imachinefacade::IMachineFacade::IMachineFacadeCalls;
     #[allow(non_camel_case_types)]
-    pub type createBucket_0Call = crate::machine_facade::imachinefacade::IMachineFacade::createBucket_0Call;
+    pub type createBucket_0Call =
+        crate::machine_facade::imachinefacade::IMachineFacade::createBucket_0Call;
     #[allow(non_camel_case_types)]
-    pub type createBucket_1Call = crate::machine_facade::imachinefacade::IMachineFacade::createBucket_1Call;
+    pub type createBucket_1Call =
+        crate::machine_facade::imachinefacade::IMachineFacade::createBucket_1Call;
     #[allow(non_camel_case_types)]
-    pub type createBucket_2Call = crate::machine_facade::imachinefacade::IMachineFacade::createBucket_2Call;
+    pub type createBucket_2Call =
+        crate::machine_facade::imachinefacade::IMachineFacade::createBucket_2Call;
     #[allow(non_camel_case_types)]
-    pub type listBuckets_0Call = crate::machine_facade::imachinefacade::IMachineFacade::listBuckets_0Call;
+    pub type listBuckets_0Call =
+        crate::machine_facade::imachinefacade::IMachineFacade::listBuckets_0Call;
     #[allow(non_camel_case_types)]
-    pub type listBuckets_1Call = crate::machine_facade::imachinefacade::IMachineFacade::listBuckets_1Call;
+    pub type listBuckets_1Call =
+        crate::machine_facade::imachinefacade::IMachineFacade::listBuckets_1Call;
 
     pub type Machine = crate::machine_facade::imachinefacade::IMachineFacade::Machine;
     pub type Kind = crate::machine_facade::imachinefacade::IMachineFacade::Kind;

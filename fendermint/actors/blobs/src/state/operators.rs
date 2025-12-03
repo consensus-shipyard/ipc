@@ -58,7 +58,10 @@ impl Operators {
     }
 
     /// Saves the state from the [`TrackedFlushResult`]
-    pub fn save_tracked(&mut self, tracked_flush_result: TrackedFlushResult<Address, NodeOperatorInfo>) {
+    pub fn save_tracked(
+        &mut self,
+        tracked_flush_result: TrackedFlushResult<Address, NodeOperatorInfo>,
+    ) {
         self.root = tracked_flush_result.root;
         self.size = tracked_flush_result.size;
     }
@@ -210,9 +213,15 @@ mod tests {
         let addr2 = new_test_address(101);
         let addr3 = new_test_address(102);
 
-        operators.register(&store, addr1, new_test_operator(1)).unwrap();
-        operators.register(&store, addr2, new_test_operator(2)).unwrap();
-        operators.register(&store, addr3, new_test_operator(3)).unwrap();
+        operators
+            .register(&store, addr1, new_test_operator(1))
+            .unwrap();
+        operators
+            .register(&store, addr2, new_test_operator(2))
+            .unwrap();
+        operators
+            .register(&store, addr3, new_test_operator(3))
+            .unwrap();
 
         assert_eq!(operators.get_index(&addr1), Some(0));
         assert_eq!(operators.get_index(&addr2), Some(1));
@@ -228,7 +237,9 @@ mod tests {
         let mut operators = Operators::new(&store).unwrap();
 
         let addr1 = new_test_address(100);
-        operators.register(&store, addr1, new_test_operator(1)).unwrap();
+        operators
+            .register(&store, addr1, new_test_operator(1))
+            .unwrap();
 
         let result = operators.register(&store, addr1, new_test_operator(2));
         assert!(result.is_err());
@@ -243,9 +254,15 @@ mod tests {
         let addr2 = new_test_address(101);
         let addr3 = new_test_address(102);
 
-        operators.register(&store, addr1, new_test_operator(1)).unwrap();
-        operators.register(&store, addr2, new_test_operator(2)).unwrap();
-        operators.register(&store, addr3, new_test_operator(3)).unwrap();
+        operators
+            .register(&store, addr1, new_test_operator(1))
+            .unwrap();
+        operators
+            .register(&store, addr2, new_test_operator(2))
+            .unwrap();
+        operators
+            .register(&store, addr3, new_test_operator(3))
+            .unwrap();
 
         // Deactivate middle operator
         operators.deactivate(&store, &addr2).unwrap();

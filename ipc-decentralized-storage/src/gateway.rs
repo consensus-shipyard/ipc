@@ -7,18 +7,25 @@
 //! for pending blobs that need to be resolved.
 
 use anyhow::{Context, Result};
-use bls_signatures::{
-    aggregate, Serialize as BlsSerialize, Signature as BlsSignature,
+use bls_signatures::{aggregate, Serialize as BlsSerialize, Signature as BlsSignature};
+use fendermint_actor_blobs_shared::blobs::{
+    BlobStatus, FinalizeBlobParams, GetAddedBlobsParams, SubscriptionId,
 };
-use fendermint_actor_blobs_shared::blobs::{GetAddedBlobsParams, SubscriptionId, FinalizeBlobParams, BlobStatus};
 use fendermint_actor_blobs_shared::bytes::B256;
-use fendermint_actor_blobs_shared::method::Method::{GetActiveOperators, GetAddedBlobs, GetOperatorInfo, FinalizeBlob};
-use fendermint_actor_blobs_shared::operators::{GetActiveOperatorsReturn, GetOperatorInfoParams, OperatorInfo};
+use fendermint_actor_blobs_shared::method::Method::{
+    FinalizeBlob, GetActiveOperators, GetAddedBlobs, GetOperatorInfo,
+};
+use fendermint_actor_blobs_shared::operators::{
+    GetActiveOperatorsReturn, GetOperatorInfoParams, OperatorInfo,
+};
 use fendermint_actor_blobs_shared::BLOBS_ACTOR_ADDR;
+use fendermint_rpc::message::GasParams;
+use fendermint_rpc::tx::{BoundClient, TxClient, TxCommit};
 use fendermint_vm_actor_interface::system;
 use fendermint_vm_message::query::FvmQueryHeight;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::address::Address;
+use fvm_shared::bigint::Zero;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::message::Message;
 use iroh_blobs::Hash;
@@ -26,8 +33,6 @@ use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
-
-use fvm_shared::bigint::Zero;
 
 /// A blob item with its hash, size, and subscribers
 pub type BlobItem = (Hash, u64, HashSet<(Address, SubscriptionId, iroh::NodeId)>);
@@ -47,7 +52,8 @@ impl OperatorCache {
         Self {
             operators: Vec::new(),
             operator_info: HashMap::new(),
-            last_refresh: Instant::now(),
+            // Set to a time far in the past to force refresh on first use
+            last_refresh: Instant::now() - Duration::from_secs(3600),
         }
     }
 
@@ -72,7 +78,7 @@ struct BlobSignatureCollection {
 
 /// Metadata about a blob needed for finalization
 #[derive(Clone)]
-struct BlobMetadata {
+pub struct BlobMetadata {
     /// Subscriber address that requested the blob
     subscriber: Address,
     /// Blob size in bytes
@@ -95,9 +101,19 @@ impl BlobSignatureCollection {
     }
 }
 
+/// Default gas parameters for transactions
+fn default_gas_params() -> GasParams {
+    GasParams {
+        gas_limit: 10_000_000_000,
+        gas_fee_cap: TokenAmount::from_atto(100),
+        gas_premium: TokenAmount::from_atto(100),
+    }
+}
+
 /// Gateway for polling added blobs from the chain
 ///
-/// Uses the fendermint RPC client to query the blobs actor for newly added blobs.
+/// Uses the fendermint RPC client to query the blobs actor for newly added blobs
+/// and submit finalization transactions.
 pub struct BlobGateway<C> {
     client: C,
     /// How many added blobs to fetch per query
@@ -112,7 +128,7 @@ pub struct BlobGateway<C> {
 
 impl<C> BlobGateway<C>
 where
-    C: fendermint_rpc::QueryClient,
+    C: fendermint_rpc::QueryClient + Send + Sync,
 {
     /// Create a new blob gateway
     pub fn new(client: C, batch_size: u32, poll_interval: Duration) -> Self {
@@ -131,8 +147,8 @@ where
 
         // Create the query message to the blobs actor
         let params = GetAddedBlobsParams(self.batch_size);
-        let params = RawBytes::serialize(params)
-            .context("failed to serialize GetAddedBlobsParams")?;
+        let params =
+            RawBytes::serialize(params).context("failed to serialize GetAddedBlobsParams")?;
 
         let msg = Message {
             version: Default::default(),
@@ -155,10 +171,7 @@ where
             .context("failed to execute GetAddedBlobs call")?;
 
         if response.value.code.is_err() {
-            anyhow::bail!(
-                "GetAddedBlobs query failed: {}",
-                response.value.info
-            );
+            anyhow::bail!("GetAddedBlobs query failed: {}", response.value.info);
         }
 
         // Decode the return data
@@ -171,7 +184,13 @@ where
         info!("Found {} added blobs", blobs.len());
         Ok(blobs)
     }
+}
 
+/// Implementation for transaction-capable clients (can submit finalization transactions)
+impl<C> BlobGateway<C>
+where
+    C: fendermint_rpc::QueryClient + BoundClient + TxClient<TxCommit> + Send + Sync,
+{
     /// Main entry point: run the gateway to monitor and finalize blobs
     ///
     /// This is an alias for run_signature_collection()
@@ -199,9 +218,16 @@ where
     }
 
     async fn signature_collection_loop(&mut self) -> Result<()> {
+        debug!("Starting signature collection loop iteration");
+
         // Step 1: Refresh operator cache if stale (every 5 minutes)
         let cache_refresh_interval = Duration::from_secs(300);
         let needs_refresh = self.operator_cache.is_stale(cache_refresh_interval);
+        debug!(
+            "Operator cache status: {} operators, stale: {}",
+            self.operator_cache.operators.len(),
+            needs_refresh
+        );
 
         if needs_refresh {
             info!("Refreshing operator cache...");
@@ -214,7 +240,9 @@ where
                     for operator_addr in &operators {
                         match self.get_operator_info(*operator_addr).await {
                             Ok(info) => {
-                                self.operator_cache.operator_info.insert(*operator_addr, info);
+                                self.operator_cache
+                                    .operator_info
+                                    .insert(*operator_addr, info);
                             }
                             Err(e) => {
                                 warn!("Failed to get info for operator {}: {}", operator_addr, e);
@@ -236,7 +264,14 @@ where
             Ok(added_blobs) => {
                 for (hash, size, sources) in added_blobs {
                     // Extract metadata from sources (pick first source)
-                    if let Some((subscriber, subscription_id, source_node_id)) = sources.iter().next() {
+                    if let Some((subscriber, subscription_id, source_node_id)) =
+                        sources.iter().next()
+                    {
+                        // Skip if already tracked
+                        if self.pending_finalization.contains_key(&hash) {
+                            continue;
+                        }
+
                         // Convert iroh::NodeId to B256
                         let source_bytes: [u8; 32] = *source_node_id.as_bytes();
                         let source = B256(source_bytes);
@@ -248,7 +283,10 @@ where
                             source,
                         };
 
-                        self.pending_finalization.entry(hash).or_insert_with(|| BlobSignatureCollection::new(metadata));
+                        // Track the blob for signature collection
+                        // (blob will be finalized directly from Added status)
+                        self.pending_finalization
+                            .insert(hash, BlobSignatureCollection::new(metadata));
                     } else {
                         warn!("Blob {} has no sources, skipping", hash);
                     }
@@ -262,7 +300,10 @@ where
         // Step 3: Try to collect signatures for tracked blobs
         let tracked_blobs: Vec<Hash> = self.pending_finalization.keys().copied().collect();
 
-        debug!("Checking {} blobs for signature collection", tracked_blobs.len());
+        debug!(
+            "Checking {} blobs for signature collection",
+            tracked_blobs.len()
+        );
 
         for hash in tracked_blobs {
             // Get collection once and check if we should skip
@@ -271,9 +312,22 @@ where
             };
 
             // Skip if we just added this blob (give operators time to download)
-            if collection.first_seen.elapsed() < Duration::from_secs(30) {
+            // Use 10 seconds for faster testing
+            let elapsed = collection.first_seen.elapsed();
+            if elapsed < Duration::from_secs(10) {
+                debug!(
+                    "Blob {} waiting for operators to download ({:.1}s / 10s)",
+                    hash,
+                    elapsed.as_secs_f64()
+                );
                 continue;
             }
+
+            info!(
+                "Blob {} ready for signature collection (waited {:.1}s)",
+                hash,
+                elapsed.as_secs_f64()
+            );
 
             // Get operators from cache
             let (operators, total_operators) = (
@@ -299,15 +353,17 @@ where
                     continue;
                 }
 
-                // Get operator RPC URL from cache
-                let rpc_url = self.operator_cache
-                    .operator_info
-                    .get(operator_addr)
-                    .ok_or_else(|| anyhow::anyhow!("Operator {} not found in cache", operator_addr))?
-                    .rpc_url
-                    .clone();
+                // Get operator RPC URL from cache - skip if not found
+                let Some(operator_info) = self.operator_cache.operator_info.get(operator_addr)
+                else {
+                    warn!(
+                        "Operator {} not found in cache, skipping",
+                        operator_addr
+                    );
+                    continue;
+                };
 
-                fetch_tasks.push((index, *operator_addr, rpc_url));
+                fetch_tasks.push((index, *operator_addr, operator_info.rpc_url.clone()));
             }
 
             // Fetch signatures from all operators in parallel
@@ -327,11 +383,17 @@ where
             for (index, operator_addr, result) in fetch_results {
                 match result {
                     Ok(signature) => {
-                        info!("Got signature from operator {} (index {})", operator_addr, index);
+                        info!(
+                            "Got signature from operator {} (index {})",
+                            operator_addr, index
+                        );
                         new_signatures.push((index, signature));
                     }
                     Err(e) => {
-                        warn!("Failed to get signature from operator {}: {}", operator_addr, e);
+                        warn!(
+                            "Failed to get signature from operator {}: {}",
+                            operator_addr, e
+                        );
                         // Don't mark as attempted - we'll retry next iteration
                     }
                 }
@@ -375,7 +437,10 @@ where
                         info!("Bitmap: 0b{:b}", bitmap);
 
                         // Call finalize_blob with aggregated signature and bitmap
-                        match self.finalize_blob(hash, &metadata, aggregated_sig, bitmap).await {
+                        match self
+                            .finalize_blob(hash, &metadata, aggregated_sig, bitmap)
+                            .await
+                        {
                             Ok(()) => {
                                 // Remove from tracking after successful finalization
                                 self.pending_finalization.remove(&hash);
@@ -396,7 +461,9 @@ where
                 collection.retry_count += 1;
 
                 // Give up after too many retries or too much time
-                if collection.retry_count > 20 || collection.first_seen.elapsed() > Duration::from_secs(600) {
+                if collection.retry_count > 20
+                    || collection.first_seen.elapsed() > Duration::from_secs(600)
+                {
                     warn!(
                         "Giving up on blob {} after {} retries / {:?} (collected {}/{})",
                         hash,
@@ -416,7 +483,13 @@ where
 
         Ok(())
     }
+}
 
+/// Additional query methods for all clients (read-only operations)
+impl<C> BlobGateway<C>
+where
+    C: fendermint_rpc::QueryClient + Send + Sync,
+{
     /// Query the list of active node operators from the chain
     pub async fn query_active_operators(&self) -> Result<Vec<Address>> {
         debug!("Querying active operators");
@@ -441,10 +514,7 @@ where
             .context("failed to execute GetActiveOperators call")?;
 
         if response.value.code.is_err() {
-            anyhow::bail!(
-                "GetActiveOperators query failed: {}",
-                response.value.info
-            );
+            anyhow::bail!("GetActiveOperators query failed: {}", response.value.info);
         }
 
         let return_data = fendermint_rpc::response::decode_data(&response.value.data)
@@ -462,8 +532,8 @@ where
         debug!("Querying operator info for {}", address);
 
         let params = GetOperatorInfoParams { address };
-        let params = RawBytes::serialize(params)
-            .context("failed to serialize GetOperatorInfoParams")?;
+        let params =
+            RawBytes::serialize(params).context("failed to serialize GetOperatorInfoParams")?;
 
         let msg = Message {
             version: Default::default(),
@@ -485,10 +555,7 @@ where
             .context("failed to execute GetOperatorInfo call")?;
 
         if response.value.code.is_err() {
-            anyhow::bail!(
-                "GetOperatorInfo query failed: {}",
-                response.value.info
-            );
+            anyhow::bail!("GetOperatorInfo query failed: {}", response.value.info);
         }
 
         let return_data = fendermint_rpc::response::decode_data(&response.value.data)
@@ -525,11 +592,17 @@ where
         for (index, operator_addr) in operators.iter().enumerate() {
             match self.get_operator_info(*operator_addr).await {
                 Ok(operator_info) => {
-                    match self.fetch_signature_from_operator(&operator_info.rpc_url, blob_hash).await {
+                    match self
+                        .fetch_signature_from_operator(&operator_info.rpc_url, blob_hash)
+                        .await
+                    {
                         Ok(signature) => {
                             signatures.push((index, signature));
                             bitmap |= 1u128 << index;
-                            info!("Got signature from operator {} (index {})", operator_addr, index);
+                            info!(
+                                "Got signature from operator {} (index {})",
+                                operator_addr, index
+                            );
                         }
                         Err(e) => {
                             warn!(
@@ -596,8 +669,8 @@ where
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing 'signature' field in response"))?;
 
-        let signature_bytes = hex::decode(signature_hex)
-            .context("failed to decode signature hex")?;
+        let signature_bytes =
+            hex::decode(signature_hex).context("failed to decode signature hex")?;
 
         let signature = BlsSignature::from_bytes(&signature_bytes)
             .map_err(|e| anyhow::anyhow!("Failed to parse BLS signature: {:?}", e))?;
@@ -606,7 +679,10 @@ where
     }
 
     /// Aggregate BLS signatures into a single signature
-    pub fn aggregate_signatures(&self, signatures: Vec<(usize, BlsSignature)>) -> Result<BlsSignature> {
+    pub fn aggregate_signatures(
+        &self,
+        signatures: Vec<(usize, BlsSignature)>,
+    ) -> Result<BlsSignature> {
         if signatures.is_empty() {
             anyhow::bail!("Cannot aggregate empty signature list");
         }
@@ -619,10 +695,18 @@ where
 
         Ok(aggregated)
     }
+}
 
+/// Transaction methods for clients that can submit transactions
+impl<C> BlobGateway<C>
+where
+    C: fendermint_rpc::QueryClient + BoundClient + TxClient<TxCommit> + Send + Sync,
+{
     /// Call finalize_blob on-chain with aggregated signature and bitmap
+    ///
+    /// This submits a real transaction to the blockchain (not just a query).
     pub async fn finalize_blob(
-        &self,
+        &mut self,
         blob_hash: Hash,
         metadata: &BlobMetadata,
         aggregated_signature: BlsSignature,
@@ -649,36 +733,39 @@ where
             signer_bitmap,
         };
 
-        let params_bytes = RawBytes::serialize(params)
-            .context("failed to serialize FinalizeBlobParams")?;
+        let params_bytes =
+            RawBytes::serialize(params).context("failed to serialize FinalizeBlobParams")?;
 
-        let msg = Message {
-            version: Default::default(),
-            from: system::SYSTEM_ACTOR_ADDR,
-            to: BLOBS_ACTOR_ADDR,
-            sequence: 0,
-            value: TokenAmount::zero(),
-            method_num: FinalizeBlob as u64,
-            params: params_bytes,
-            gas_limit: 10_000_000_000,
-            gas_fee_cap: TokenAmount::zero(),
-            gas_premium: TokenAmount::zero(),
-        };
+        // Submit actual transaction using TxClient
+        let res = TxClient::<TxCommit>::transaction(
+            &mut self.client,
+            BLOBS_ACTOR_ADDR,
+            FinalizeBlob as u64,
+            params_bytes,
+            TokenAmount::zero(),
+            default_gas_params(),
+        )
+        .await
+        .context("failed to send FinalizeBlob transaction")?;
 
-        let response = self
-            .client
-            .call(msg, FvmQueryHeight::default())
-            .await
-            .context("failed to execute FinalizeBlob call")?;
-
-        if response.value.code.is_err() {
+        if res.response.check_tx.code.is_err() {
             anyhow::bail!(
-                "FinalizeBlob call failed: {}",
-                response.value.info
+                "FinalizeBlob check_tx failed: {}",
+                res.response.check_tx.log
             );
         }
 
-        info!("Successfully finalized blob {} on-chain", blob_hash);
+        if res.response.deliver_tx.code.is_err() {
+            anyhow::bail!(
+                "FinalizeBlob deliver_tx failed: {}",
+                res.response.deliver_tx.log
+            );
+        }
+
+        info!(
+            "Successfully finalized blob {} on-chain (tx: {})",
+            blob_hash, res.response.hash
+        );
         Ok(())
     }
 }

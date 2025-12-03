@@ -6,10 +6,10 @@ use std::path::Path;
 use anyhow::Context;
 use base64::Engine;
 use bytes::Bytes;
+use fendermint_actor_bucket::{GetParams, Method::GetObject};
 use fendermint_crypto::SecretKey;
 use fendermint_vm_actor_interface::{eam, evm};
 use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
-use fendermint_actor_bucket::{GetParams, Method::GetObject};
 use fvm_ipld_encoding::{BytesSer, RawBytes};
 use fvm_shared::{
     address::Address, chainid::ChainID, econ::TokenAmount, message::Message, MethodNum, METHOD_SEND,

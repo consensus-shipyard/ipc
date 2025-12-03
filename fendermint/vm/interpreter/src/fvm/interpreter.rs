@@ -1,30 +1,15 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::{Context, Result};
-use async_stm::atomically;
-use cid::Cid;
-use fendermint_vm_actor_interface::system;
-use fendermint_vm_message::chain::ChainMessage;
-use fendermint_vm_message::ipc::IpcMessage;
-use fendermint_vm_message::query::{FvmQuery, StateParams};
-use fendermint_vm_message::signed::SignedMessage;
-use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::{self, RawBytes};
-use fvm_shared::{address::Address, error::ExitCode, clock::ChainEpoch};
-use num_traits::Zero;
-use std::sync::Arc;
-use std::time::Instant;
-use crate::fvm::state::FvmApplyRet;
 use crate::errors::*;
 use crate::fvm::end_block_hook::{EndBlockManager, PowerUpdates};
 use crate::fvm::executions::{
     execute_cron_message, execute_signed_message, push_block_to_chainmeta_actor_if_possible,
 };
 use crate::fvm::gas_estimation::{estimate_gassed_msg, gas_search};
-use crate::fvm::recall_env::{ReadRequestPool, ReadRequestPoolItem};
+use crate::fvm::recall_env::ReadRequestPool;
 use crate::fvm::recall_helpers::{
-    close_read_request, create_implicit_message, read_request_callback, set_read_request_pending,
+    close_read_request, read_request_callback, set_read_request_pending,
 };
 use crate::fvm::topdown::TopDownManager;
 use crate::fvm::{
@@ -40,10 +25,21 @@ use crate::selectors::{
 };
 use crate::types::*;
 use crate::MessagesInterpreter;
+use anyhow::{Context, Result};
+use cid::Cid;
+use fendermint_vm_message::chain::ChainMessage;
+use fendermint_vm_message::ipc::IpcMessage;
+use fendermint_vm_message::query::{FvmQuery, StateParams};
+use fendermint_vm_message::signed::SignedMessage;
+use fvm_ipld_blockstore::Blockstore;
+use fvm_ipld_encoding;
 use fvm_shared::state::ActorState;
 use fvm_shared::ActorID;
+use fvm_shared::{address::Address, error::ExitCode};
 use ipc_observability::emit;
 use std::convert::TryInto;
+use std::sync::Arc;
+use std::time::Instant;
 
 struct Actor {
     id: ActorID,
@@ -66,10 +62,6 @@ where
 
     gas_overestimation_rate: f64,
     gas_search_step: f64,
-
-    // Recall read request resolution
-    read_request_pool: ReadRequestPool,
-    read_request_concurrency: u32,
 }
 
 impl<DB> FvmMessagesInterpreter<DB>
@@ -84,8 +76,6 @@ where
         max_msgs_per_block: usize,
         gas_overestimation_rate: f64,
         gas_search_step: f64,
-        read_request_pool: ReadRequestPool,
-        read_request_concurrency: u32,
     ) -> Self {
         Self {
             end_block_manager,
@@ -95,8 +85,6 @@ where
             max_msgs_per_block,
             gas_overestimation_rate,
             gas_search_step,
-            read_request_pool,
-            read_request_concurrency,
         }
     }
 
@@ -267,7 +255,7 @@ where
 
     async fn prepare_messages_for_block(
         &self,
-        mut state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
+        state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
         msgs: Vec<Vec<u8>>,
         max_transaction_bytes: u64,
     ) -> Result<PrepareMessagesResponse, PrepareMessagesError> {
@@ -296,9 +284,7 @@ where
             .await
             .into_iter();
 
-        let chain_msgs: Vec<ChainMessage> = top_down_iter
-            .chain(signed_msgs_iter)
-            .collect();
+        let chain_msgs: Vec<ChainMessage> = top_down_iter.chain(signed_msgs_iter).collect();
 
         // Encode all chain messages to IPLD
         let mut all_msgs = chain_msgs

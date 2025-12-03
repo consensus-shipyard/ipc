@@ -10,8 +10,7 @@ use fendermint_actor_blobs_shared::{
     },
     credit::{Credit, GasAllowance, GetGasAllowanceParams, UpdateGasAllowanceParams},
     operators::{
-        GetActiveOperatorsReturn, GetOperatorInfoParams, OperatorInfo,
-        RegisterNodeOperatorParams,
+        GetActiveOperatorsReturn, GetOperatorInfoParams, OperatorInfo, RegisterNodeOperatorParams,
     },
 };
 use fendermint_actor_recall_config_shared::get_config;
@@ -178,12 +177,18 @@ impl BlobsActor {
         let current_status = rt.state::<State>()?.get_blob_status(
             rt.store(),
             caller.state_address(),
-            params.hash.clone(),
+            params.hash,
             params.id.clone(),
         )?;
 
-        // Verify BLS signatures if transitioning to Resolved
-        if !matches!(current_status, Some(BlobStatus::Pending)) { return Ok(()); }
+        // Only finalize blobs that are in Added or Pending status
+        // (Resolved blobs are already finalized, Failed blobs cannot be retried)
+        if !matches!(
+            current_status,
+            Some(BlobStatus::Added) | Some(BlobStatus::Pending)
+        ) {
+            return Ok(());
+        }
 
         Self::verify_blob_signatures(rt, &params)?;
 
@@ -212,13 +217,14 @@ impl BlobsActor {
         rt: &impl Runtime,
         params: &FinalizeBlobParams,
     ) -> Result<(), ActorError> {
-        use bls_signatures::{verify_messages, PublicKey as BlsPublicKey, Serialize as BlsSerialize, Signature as BlsSignature};
+        use bls_signatures::{
+            verify_messages, PublicKey as BlsPublicKey, Serialize as BlsSerialize,
+            Signature as BlsSignature,
+        };
 
         // Parse aggregated signature
         let aggregated_sig = BlsSignature::from_bytes(&params.aggregated_signature)
-            .map_err(|e| {
-                ActorError::illegal_argument(format!("Invalid BLS signature: {:?}", e))
-            })?;
+            .map_err(|e| ActorError::illegal_argument(format!("Invalid BLS signature: {:?}", e)))?;
 
         // Get active operators from state
         let state = rt.state::<State>()?;
@@ -245,22 +251,24 @@ impl BlobsActor {
                 signer_count += 1;
 
                 // Get operator info to retrieve BLS public key
-                let operator_info = state.operators.get(rt.store(), operator_addr)?
-                    .ok_or_else(|| {
-                        ActorError::illegal_state(format!(
-                            "Operator {} not found in state",
-                            operator_addr
-                        ))
-                    })?;
+                let operator_info =
+                    state
+                        .operators
+                        .get(rt.store(), operator_addr)?
+                        .ok_or_else(|| {
+                            ActorError::illegal_state(format!(
+                                "Operator {} not found in state",
+                                operator_addr
+                            ))
+                        })?;
 
                 // Parse BLS public key
-                let pubkey = BlsPublicKey::from_bytes(&operator_info.bls_pubkey)
-                    .map_err(|e| {
-                        ActorError::illegal_state(format!(
-                            "Invalid BLS public key for operator {}: {:?}",
-                            operator_addr, e
-                        ))
-                    })?;
+                let pubkey = BlsPublicKey::from_bytes(&operator_info.bls_pubkey).map_err(|e| {
+                    ActorError::illegal_state(format!(
+                        "Invalid BLS public key for operator {}: {:?}",
+                        operator_addr, e
+                    ))
+                })?;
 
                 signer_pubkeys.push(pubkey);
             }
@@ -373,7 +381,8 @@ impl BlobsActor {
                 active: true,
             };
 
-            st.operators.register(rt.store(), operator_address, node_operator_info)
+            st.operators
+                .register(rt.store(), operator_address, node_operator_info)
         })?;
 
         Ok(index)

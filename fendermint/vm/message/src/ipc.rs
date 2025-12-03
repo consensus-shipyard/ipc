@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use fendermint_actor_blobs_shared::blobs::SubscriptionId;
-use fvm_shared::{
-    address::Address, clock::ChainEpoch, MethodNum,
-};
+use fvm_shared::{address::Address, clock::ChainEpoch, MethodNum};
 use iroh_base::NodeId;
 use iroh_blobs::Hash;
 use serde::{Deserialize, Serialize};
@@ -16,15 +14,6 @@ pub enum IpcMessage {
     /// A top-down checkpoint parent finality proposal. This proposal should contain the latest parent
     /// state that to be checked and voted by validators.
     TopDownExec(ParentFinality),
-
-    /// Proposed by validators at the credit debit interval set at genesis.
-    DebitCreditAccounts,
-
-    /// List of blobs that needs to be enqueued for resolution.
-    BlobPending(PendingBlob),
-
-    /// Proposed by validators when a blob has been finalized and is ready to be executed.
-    BlobFinalized(FinalizedBlob),
 
     /// Proposed by validators when a read request has been enqueued for resolution.
     ReadRequestPending(PendingReadRequest),

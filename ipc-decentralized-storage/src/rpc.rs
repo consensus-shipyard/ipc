@@ -177,10 +177,7 @@ pub struct GetSignaturesResponse {
 }
 
 /// Handle a JSON-RPC request
-async fn handle_rpc_request(
-    req: JsonRpcRequest,
-    store: SignatureStore,
-) -> JsonRpcResponse {
+async fn handle_rpc_request(req: JsonRpcRequest, store: SignatureStore) -> JsonRpcResponse {
     let id = req.id.clone();
 
     // Validate JSON-RPC version
@@ -384,11 +381,9 @@ pub async fn start_rpc_server(addr: SocketAddr, store: SignatureStore) -> Result
         .and(warp::path("rpc"))
         .and(warp::body::json())
         .and(store_filter)
-        .and_then(
-            |req: JsonRpcRequest, store: SignatureStore| async move {
-                Ok::<_, warp::Rejection>(warp::reply::json(&handle_rpc_request(req, store).await))
-            },
-        );
+        .and_then(|req: JsonRpcRequest, store: SignatureStore| async move {
+            Ok::<_, warp::Rejection>(warp::reply::json(&handle_rpc_request(req, store).await))
+        });
 
     let health = warp::get()
         .and(warp::path("health"))

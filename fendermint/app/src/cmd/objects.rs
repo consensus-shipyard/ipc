@@ -15,9 +15,9 @@ use fendermint_actor_bucket::{GetParams, Object};
 use fendermint_app_settings::objects::ObjectsSettings;
 use fendermint_rpc::{client::FendermintClient, message::GasParams, QueryClient};
 use fendermint_vm_message::query::FvmQueryHeight;
-use fvm_shared::econ::TokenAmount;
 use futures_util::{StreamExt, TryStreamExt};
 use fvm_shared::address::{Address, Error as NetworkError, Network};
+use fvm_shared::econ::TokenAmount;
 use ipc_api::ethers_address_to_fil_address;
 use iroh::NodeAddr;
 use iroh_blobs::{hashseq::HashSeq, rpc::client::blobs::BlobStatus, util::SetTagOption, Hash};
@@ -293,8 +293,8 @@ async fn handle_node_addr(iroh: IrohNode) -> Result<impl Reply, Rejection> {
 
 #[derive(Serialize)]
 struct UploadResponse {
-    hash: String,  // Hash sequence hash (for bucket storage)
-    orig_hash: String,  // Original blob content hash (for addBlob)
+    hash: String,      // Hash sequence hash (for bucket storage)
+    orig_hash: String, // Original blob content hash (for addBlob)
     metadata_hash: String,
 }
 
@@ -456,7 +456,10 @@ async fn handle_object_upload(
     println!("DEBUG UPLOAD: Entanglement result:");
     println!("  orig_hash: {}", ent_result.orig_hash);
     println!("  metadata_hash: {}", ent_result.metadata_hash);
-    println!("  upload_results count: {}", ent_result.upload_results.len());
+    println!(
+        "  upload_results count: {}",
+        ent_result.upload_results.len()
+    );
 
     let hash_seq_hash = tag_entangled_data(&iroh, &ent_result, upload_id)
         .await
@@ -814,13 +817,11 @@ async fn handle_blob_download<F: QueryClient + Send + Sync>(
     let start_time = Instant::now();
 
     // Query the blobs actor to get blob info
-    let maybe_blob = blob_get(client, blob_hash, height)
-        .await
-        .map_err(|e| {
-            Rejection::from(BadRequest {
-                message: format!("blobs actor query error: {}", e),
-            })
-        })?;
+    let maybe_blob = blob_get(client, blob_hash, height).await.map_err(|e| {
+        Rejection::from(BadRequest {
+            message: format!("blobs actor query error: {}", e),
+        })
+    })?;
 
     match maybe_blob {
         Some(blob) => {
@@ -830,21 +831,24 @@ async fn handle_blob_download<F: QueryClient + Send + Sync>(
             let size = blob.size;
 
             println!("DEBUG: Blob download request");
-            println!("DEBUG: hash_seq_hash from URL: {}", hex::encode(blob_hash.0));
+            println!(
+                "DEBUG: hash_seq_hash from URL: {}",
+                hex::encode(blob_hash.0)
+            );
             println!("DEBUG: hash_seq as Hash: {}", hash_seq_hash);
-            println!("DEBUG: metadata_hash: {}", hex::encode(blob.metadata_hash.0));
+            println!(
+                "DEBUG: metadata_hash: {}",
+                hex::encode(blob.metadata_hash.0)
+            );
             println!("DEBUG: size from actor: {}", size);
 
             // Read the hash sequence to get the original content hash
             use iroh_blobs::hashseq::HashSeq;
-            let hash_seq_bytes = iroh
-                .read_to_bytes(hash_seq_hash)
-                .await
-                .map_err(|e| {
-                    Rejection::from(BadRequest {
-                        message: format!("failed to read hash sequence: {} {}", hash_seq_hash, e),
-                    })
-                })?;
+            let hash_seq_bytes = iroh.read_to_bytes(hash_seq_hash).await.map_err(|e| {
+                Rejection::from(BadRequest {
+                    message: format!("failed to read hash sequence: {} {}", hash_seq_hash, e),
+                })
+            })?;
 
             let hash_seq = HashSeq::try_from(hash_seq_bytes).map_err(|e| {
                 Rejection::from(BadRequest {
@@ -878,7 +882,10 @@ async fn handle_blob_download<F: QueryClient + Send + Sync>(
                         .await
                         .map_err(|e| {
                             Rejection::from(BadRequest {
-                                message: format!("failed to read blob at range: {} {}", orig_hash, e),
+                                message: format!(
+                                    "failed to read blob at range: {} {}",
+                                    orig_hash, e
+                                ),
                             })
                         })?;
 
@@ -896,14 +903,11 @@ async fn handle_blob_download<F: QueryClient + Send + Sync>(
                     println!("DEBUG: Reading original content with hash: {}", orig_hash);
                     println!("DEBUG: Expected size: {}", size);
 
-                    let reader = iroh
-                        .read(orig_hash)
-                        .await
-                        .map_err(|e| {
-                            Rejection::from(BadRequest {
-                                message: format!("failed to read blob: {} {}", orig_hash, e),
-                            })
-                        })?;
+                    let reader = iroh.read(orig_hash).await.map_err(|e| {
+                        Rejection::from(BadRequest {
+                            message: format!("failed to read blob: {} {}", orig_hash, e),
+                        })
+                    })?;
 
                     let mut chunk_count = 0;
                     let bytes_stream = reader.map(move |chunk_result: Result<bytes::Bytes, _>| {
@@ -911,8 +915,16 @@ async fn handle_blob_download<F: QueryClient + Send + Sync>(
                             Ok(bytes) => {
                                 chunk_count += 1;
                                 println!("DEBUG: Chunk {}: {} bytes", chunk_count, bytes.len());
-                                println!("DEBUG: Chunk {} hex: {}", chunk_count, hex::encode(&bytes[..bytes.len().min(64)]));
-                                println!("DEBUG: Chunk {} content: {:?}", chunk_count, String::from_utf8_lossy(&bytes[..bytes.len().min(64)]));
+                                println!(
+                                    "DEBUG: Chunk {} hex: {}",
+                                    chunk_count,
+                                    hex::encode(&bytes[..bytes.len().min(64)])
+                                );
+                                println!(
+                                    "DEBUG: Chunk {} content: {:?}",
+                                    chunk_count,
+                                    String::from_utf8_lossy(&bytes[..bytes.len().min(64)])
+                                );
                             }
                             Err(e) => {
                                 println!("DEBUG: Error reading chunk: {}", e);

@@ -54,7 +54,7 @@ where
     );
     let (apply_ret, _) = state.execute_implicit(msg)?;
 
-    let data= apply_ret.msg_receipt.return_data.to_vec();
+    let data = apply_ret.msg_receipt.return_data.to_vec();
     fvm_ipld_encoding::from_slice::<Vec<BlobItem>>(&data)
         .map_err(|e| anyhow!("error parsing added blobs: {e}"))
 }
@@ -77,7 +77,7 @@ where
     );
     let (apply_ret, _) = state.execute_implicit(msg)?;
 
-    let data= apply_ret.msg_receipt.return_data.to_vec();
+    let data = apply_ret.msg_receipt.return_data.to_vec();
     fvm_ipld_encoding::from_slice::<Vec<BlobItem>>(&data)
         .map_err(|e| anyhow!("error parsing pending blobs: {e}"))
 }
@@ -107,7 +107,7 @@ where
     );
     let (apply_ret, _) = state.execute_implicit(msg)?;
 
-    let data= apply_ret.msg_receipt.return_data.to_vec();
+    let data = apply_ret.msg_receipt.return_data.to_vec();
     fvm_ipld_encoding::from_slice::<Option<BlobStatus>>(&data)
         .map_err(|e| anyhow!("error parsing blob status: {e}"))
 }
@@ -163,7 +163,7 @@ where
     );
     let (apply_ret, _) = state.execute_implicit(msg)?;
 
-    let data= apply_ret.msg_receipt.return_data.to_vec();
+    let data = apply_ret.msg_receipt.return_data.to_vec();
     fvm_ipld_encoding::from_slice::<GetStatsReturn>(&data)
         .map_err(|e| anyhow!("error parsing stats: {e}"))
 }
@@ -185,7 +185,7 @@ where
     );
     let (apply_ret, _) = state.execute_implicit(msg)?;
 
-    let data= apply_ret.msg_receipt.return_data.to_vec();
+    let data = apply_ret.msg_receipt.return_data.to_vec();
     fvm_ipld_encoding::from_slice::<Vec<ReadRequestItem>>(&data)
         .map_err(|e| anyhow!("error parsing read requests: {e}"))
 }
@@ -207,7 +207,7 @@ where
     );
     let (apply_ret, _) = state.execute_implicit(msg)?;
 
-    let data= apply_ret.msg_receipt.return_data.to_vec();
+    let data = apply_ret.msg_receipt.return_data.to_vec();
     fvm_ipld_encoding::from_slice::<Vec<ReadRequestItem>>(&data)
         .map_err(|e| anyhow!("error parsing read requests: {e}"))
 }
@@ -230,16 +230,13 @@ where
     );
 
     let (apply_ret, _) = state.execute_implicit(msg)?;
-    let data= apply_ret.msg_receipt.return_data.to_vec();
+    let data = apply_ret.msg_receipt.return_data.to_vec();
     fvm_ipld_encoding::from_slice::<Option<ReadRequestStatus>>(&data)
         .map_err(|e| anyhow!("error parsing read request status: {e}"))
 }
 
 /// Set the on-chain state of a read request to pending.
-pub fn set_read_request_pending<DB>(
-    state: &mut FvmExecState<DB>,
-    id: Hash,
-) -> Result<FvmApplyRet>
+pub fn set_read_request_pending<DB>(state: &mut FvmExecState<DB>, id: Hash) -> Result<FvmApplyRet>
 where
     DB: Blockstore + Clone + 'static + Send + Sync,
 {

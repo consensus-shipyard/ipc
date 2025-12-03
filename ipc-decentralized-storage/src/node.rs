@@ -10,20 +10,26 @@
 
 use anyhow::{Context, Result};
 use bls_signatures::{PrivateKey as BlsPrivateKey, Serialize as BlsSerialize};
-use fendermint_rpc::FendermintClient;
+use fendermint_actor_blobs_shared::bytes::B256;
+use fendermint_rpc::message::GasParams;
+use fendermint_rpc::{FendermintClient, QueryClient};
+use fendermint_vm_message::query::FvmQueryHeight;
+use futures::StreamExt;
+use fvm_shared::econ::TokenAmount;
 use iroh_blobs::Hash;
 use iroh_manager::IrohNode;
 use std::collections::HashMap;
+use std::convert::Infallible;
 use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-use tendermint_rpc::{Url, SubscriptionClient, WebSocketClient};
 use tendermint_rpc::query::EventType;
+use tendermint_rpc::{SubscriptionClient, Url, WebSocketClient};
+use tokio::sync::Mutex;
 use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
 use warp::Filter;
-use futures::StreamExt;
 
 use crate::gateway::BlobGateway;
 
@@ -103,13 +109,10 @@ pub async fn launch(config: NodeConfig) -> Result<()> {
 
     // Start Iroh node
     info!("Starting Iroh node...");
-    let iroh_node = IrohNode::persistent(
-        config.iroh_v4_addr,
-        config.iroh_v6_addr,
-        &config.iroh_path,
-    )
-    .await
-    .context("failed to start Iroh node")?;
+    let iroh_node =
+        IrohNode::persistent(config.iroh_v4_addr, config.iroh_v6_addr, &config.iroh_path)
+            .await
+            .context("failed to start Iroh node")?;
 
     let node_addr = iroh_node.endpoint().node_addr().await?;
     info!("Iroh node started: {}", node_addr.node_id);
@@ -130,11 +133,18 @@ pub async fn launch(config: NodeConfig) -> Result<()> {
     // Storage for BLS signatures of downloaded blobs
     let signatures: SignatureStorage = Arc::new(RwLock::new(HashMap::new()));
 
-    // Start RPC server for signature queries
+    // Create a separate client for RPC server queries
+    let rpc_client = FendermintClient::new_http(config.rpc_url.clone(), None)
+        .context("failed to create RPC server Fendermint client")?;
+    let rpc_client = Arc::new(Mutex::new(rpc_client));
+
+    // Start RPC server for signature queries and blob downloads
     let signatures_for_rpc = signatures.clone();
     let rpc_bind_addr = config.rpc_bind_addr;
+    let rpc_client_for_server = rpc_client.clone();
+    let iroh_for_rpc = iroh_node.clone();
     tokio::spawn(async move {
-        if let Err(e) = start_rpc_server(rpc_bind_addr, signatures_for_rpc).await {
+        if let Err(e) = start_rpc_server(rpc_bind_addr, signatures_for_rpc, rpc_client_for_server, iroh_for_rpc).await {
             error!("RPC server error: {}", e);
         }
     });
@@ -149,7 +159,10 @@ pub async fn launch(config: NodeConfig) -> Result<()> {
     });
 
     info!("Starting blob resolution loop");
-    info!("BLS public key: {:?}", hex::encode(config.bls_private_key.public_key().as_bytes()));
+    info!(
+        "BLS public key: {:?}",
+        hex::encode(config.bls_private_key.public_key().as_bytes())
+    );
     info!("RPC server listening on: {}", config.rpc_bind_addr);
 
     loop {
@@ -177,10 +190,7 @@ pub async fn launch(config: NodeConfig) -> Result<()> {
         // TODO: Query on-chain blob status to check if downloaded blobs are finalized
         // For now, just log the downloaded blobs waiting for finalization
         if !downloaded.is_empty() {
-            debug!(
-                "Blobs waiting for finalization: {}",
-                downloaded.len()
-            );
+            debug!("Blobs waiting for finalization: {}", downloaded.len());
             // Clean up old entries (older than 5 minutes) to prevent memory leaks
             let cutoff = std::time::Instant::now() - Duration::from_secs(300);
             downloaded.retain(|hash, timestamp| {
@@ -247,6 +257,7 @@ pub async fn launch(config: NodeConfig) -> Result<()> {
 
 /// Resolve a blob by downloading it from one of its sources
 ///
+/// Downloads the hash sequence and all blobs referenced within it (including original content).
 /// Returns Ok(()) if the blob was successfully downloaded, Err otherwise.
 async fn resolve_blob(
     iroh: IrohNode,
@@ -260,6 +271,8 @@ async fn resolve_blob(
     bls_private_key: BlsPrivateKey,
     signatures: SignatureStorage,
 ) -> Result<()> {
+    use iroh_blobs::hashseq::HashSeq;
+
     info!("Resolving blob: {} (size: {})", hash, size);
     debug!("Sources: {} available", sources.len());
 
@@ -270,16 +283,16 @@ async fn resolve_blob(
         // Create a NodeAddr from the source
         let source_addr = iroh::NodeAddr::new(source_node_id);
 
-        // Attempt to download the blob
+        // Step 1: Download the hash sequence blob
         match iroh
             .blobs_client()
             .download_with_opts(
                 hash,
                 iroh_blobs::rpc::client::blobs::DownloadOptions {
                     format: iroh_blobs::BlobFormat::Raw,
-                    nodes: vec![source_addr],
+                    nodes: vec![source_addr.clone()],
                     tag: iroh_blobs::util::SetTagOption::Named(iroh_blobs::Tag(
-                        format!("blob-{}", hash).into(),
+                        format!("blob-seq-{}", hash).into(),
                     )),
                     mode: iroh_blobs::rpc::client::blobs::DownloadMode::Queued,
                 },
@@ -290,35 +303,134 @@ async fn resolve_blob(
                 match progress.finish().await {
                     Ok(outcome) => {
                         let downloaded_size = outcome.local_size + outcome.downloaded_size;
-                        if downloaded_size == size {
-                            info!(
-                                "Successfully resolved blob {} (downloaded: {} bytes, local: {} bytes)",
-                                hash, outcome.downloaded_size, outcome.local_size
-                            );
+                        info!(
+                            "Downloaded hash sequence {} (downloaded: {} bytes, local: {} bytes)",
+                            hash, outcome.downloaded_size, outcome.local_size
+                        );
 
-                            // Generate BLS signature for the blob hash
-                            let hash_bytes = hash.as_bytes();
-                            let signature = bls_private_key.sign(hash_bytes);
-                            let signature_bytes = signature.as_bytes();
-
-                            // Store signature in memory
-                            {
-                                let mut sigs = signatures.write().unwrap();
-                                sigs.insert(hash, signature_bytes.clone());
+                        // Step 2: Read and parse the hash sequence to get all referenced blobs
+                        let hash_seq_bytes = match iroh.blobs_client().read_to_bytes(hash).await {
+                            Ok(bytes) => bytes,
+                            Err(e) => {
+                                warn!("Failed to read hash sequence {}: {}", hash, e);
+                                continue;
                             }
+                        };
 
-                            info!("Generated BLS signature for blob {}", hash);
-                            debug!("Signature: {}", hex::encode(&signature_bytes));
+                        let hash_seq = match HashSeq::try_from(hash_seq_bytes) {
+                            Ok(seq) => seq,
+                            Err(e) => {
+                                warn!("Failed to parse hash sequence {}: {}", hash, e);
+                                continue;
+                            }
+                        };
 
-                            // Blob downloaded successfully
-                            // It will now wait for validator signatures before finalization
-                            return Ok(());
-                        } else {
-                            warn!(
-                                "Blob {} size mismatch: expected {}, got {}",
-                                hash, size, downloaded_size
+                        let content_hashes: Vec<Hash> = hash_seq.iter().collect();
+                        info!(
+                            "Hash sequence {} contains {} blobs to download",
+                            hash,
+                            content_hashes.len()
+                        );
+
+                        // Step 3: Download all blobs in the hash sequence
+                        let mut all_downloaded = true;
+                        for (idx, content_hash) in content_hashes.iter().enumerate() {
+                            let blob_type = if idx == 0 {
+                                "original content"
+                            } else if idx == 1 {
+                                "metadata"
+                            } else {
+                                "parity"
+                            };
+
+                            debug!(
+                                "Downloading {} blob {} ({}/{}): {}",
+                                blob_type,
+                                content_hash,
+                                idx + 1,
+                                content_hashes.len(),
+                                content_hash
                             );
+
+                            match iroh
+                                .blobs_client()
+                                .download_with_opts(
+                                    *content_hash,
+                                    iroh_blobs::rpc::client::blobs::DownloadOptions {
+                                        format: iroh_blobs::BlobFormat::Raw,
+                                        nodes: vec![source_addr.clone()],
+                                        tag: iroh_blobs::util::SetTagOption::Named(iroh_blobs::Tag(
+                                            format!("blob-{}-{}", hash, content_hash).into(),
+                                        )),
+                                        mode: iroh_blobs::rpc::client::blobs::DownloadMode::Queued,
+                                    },
+                                )
+                                .await
+                            {
+                                Ok(content_progress) => {
+                                    match content_progress.finish().await {
+                                        Ok(content_outcome) => {
+                                            debug!(
+                                                "Downloaded {} blob {} (downloaded: {} bytes, local: {} bytes)",
+                                                blob_type,
+                                                content_hash,
+                                                content_outcome.downloaded_size,
+                                                content_outcome.local_size
+                                            );
+                                        }
+                                        Err(e) => {
+                                            warn!(
+                                                "Failed to complete {} blob {} download: {}",
+                                                blob_type, content_hash, e
+                                            );
+                                            all_downloaded = false;
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    warn!(
+                                        "Failed to start {} blob {} download: {}",
+                                        blob_type, content_hash, e
+                                    );
+                                    all_downloaded = false;
+                                }
+                            }
                         }
+
+                        if !all_downloaded {
+                            warn!(
+                                "Not all content blobs downloaded for {}, trying next source",
+                                hash
+                            );
+                            continue;
+                        }
+
+                        info!(
+                            "Successfully resolved blob {} with all {} content blobs (expected original size: {} bytes)",
+                            hash, content_hashes.len(), size
+                        );
+
+                        // Generate BLS signature for the blob hash
+                        let hash_bytes = hash.as_bytes();
+                        let signature = bls_private_key.sign(hash_bytes);
+                        let signature_bytes = signature.as_bytes();
+
+                        // Store signature in memory
+                        {
+                            let mut sigs = signatures.write().unwrap();
+                            sigs.insert(hash, signature_bytes.clone());
+                        }
+
+                        info!("Generated BLS signature for blob {}", hash);
+                        debug!("Signature: {}", hex::encode(&signature_bytes));
+                        debug!(
+                            "Hash sequence blob size: {} bytes",
+                            downloaded_size
+                        );
+
+                        // Blob downloaded successfully
+                        // It will now wait for validator signatures before finalization
+                        return Ok(());
                     }
                     Err(e) => {
                         warn!("Failed to complete download from {}: {}", source_node_id, e);
@@ -339,7 +451,10 @@ async fn listen_for_finalized_events(rpc_url: Url, signatures: SignatureStorage)
     info!("Starting event listener for BlobFinalized events");
 
     // Convert HTTP URL to WebSocket URL
-    let ws_url = rpc_url.to_string().replace("http://", "ws://").replace("https://", "wss://");
+    let ws_url = rpc_url
+        .to_string()
+        .replace("http://", "ws://")
+        .replace("https://", "wss://");
     let ws_url = format!("{}/websocket", ws_url.trim_end_matches('/'));
 
     info!("Connecting to WebSocket: {}", ws_url);
@@ -408,9 +523,15 @@ fn process_event(
                                 // Remove signature from memory
                                 let mut sigs = signatures.write().unwrap();
                                 if sigs.remove(&hash).is_some() {
-                                    info!("Removed signature for finalized blob {} from memory", hash);
+                                    info!(
+                                        "Removed signature for finalized blob {} from memory",
+                                        hash
+                                    );
                                 } else {
-                                    debug!("Blob {} was finalized but no signature found in memory", hash);
+                                    debug!(
+                                        "Blob {} was finalized but no signature found in memory",
+                                        hash
+                                    );
                                 }
                             }
                             Ok(_) => {
@@ -429,8 +550,16 @@ fn process_event(
     Ok(())
 }
 
-/// Start the RPC server for signature queries
-async fn start_rpc_server(bind_addr: SocketAddr, signatures: SignatureStorage) -> Result<()> {
+/// Shared Fendermint client wrapped in Arc<Mutex> for async access
+pub type SharedFendermintClient = Arc<Mutex<FendermintClient>>;
+
+/// Start the RPC server for signature queries and blob queries
+async fn start_rpc_server(
+    bind_addr: SocketAddr,
+    signatures: SignatureStorage,
+    client: SharedFendermintClient,
+    iroh: IrohNode,
+) -> Result<()> {
     // GET /signature/{hash}
     let get_signature = warp::path!("signature" / String)
         .and(warp::get())
@@ -442,7 +571,23 @@ async fn start_rpc_server(bind_addr: SocketAddr, signatures: SignatureStorage) -
         .and(warp::get())
         .map(|| warp::reply::json(&serde_json::json!({"status": "ok"})));
 
-    let routes = get_signature.or(health);
+    // GET /v1/blobs/{hash} - returns blob metadata as JSON
+    let client_for_meta = client.clone();
+    let get_blob = warp::path!("v1" / "blobs" / String)
+        .and(warp::get())
+        .and(warp::query::<HeightQuery>())
+        .and(with_client(client_for_meta))
+        .and_then(handle_get_blob);
+
+    // GET /v1/blobs/{hash}/content - returns blob content as binary stream
+    let get_blob_content = warp::path!("v1" / "blobs" / String / "content")
+        .and(warp::get())
+        .and(warp::query::<HeightQuery>())
+        .and(with_client(client))
+        .and(with_iroh(iroh))
+        .and_then(handle_get_blob_content);
+
+    let routes = get_signature.or(health).or(get_blob_content).or(get_blob);
 
     info!("RPC server starting on {}", bind_addr);
     warp::serve(routes).run(bind_addr).await;
@@ -486,5 +631,313 @@ async fn handle_get_signature(
             Ok(warp::reply::json(&response))
         }
         None => Err(warp::reject::not_found()),
+    }
+}
+
+/// Query parameter for optional block height
+#[derive(serde::Deserialize)]
+struct HeightQuery {
+    pub height: Option<u64>,
+}
+
+/// Warp filter to inject Fendermint client
+fn with_client(
+    client: SharedFendermintClient,
+) -> impl Filter<Extract = (SharedFendermintClient,), Error = Infallible> + Clone {
+    warp::any().map(move || client.clone())
+}
+
+/// Response for blob query
+#[derive(serde::Serialize)]
+struct BlobResponse {
+    hash: String,
+    size: u64,
+    metadata_hash: String,
+    status: String,
+    subscribers: Vec<BlobSubscriberInfo>,
+}
+
+/// Subscriber info for blob response
+#[derive(serde::Serialize)]
+struct BlobSubscriberInfo {
+    subscription_id: String,
+    expiry: i64,
+}
+
+/// Error response
+#[derive(serde::Serialize)]
+struct ErrorResponse {
+    error: String,
+}
+
+/// Handle GET /v1/blobs/{hash}
+async fn handle_get_blob(
+    hash_str: String,
+    height_query: HeightQuery,
+    client: SharedFendermintClient,
+) -> Result<impl warp::Reply, warp::Rejection> {
+    // Parse blob hash - strip 0x prefix if present
+    let blob_hash_hex = hash_str.strip_prefix("0x").unwrap_or(&hash_str);
+
+    let blob_hash_bytes = match hex::decode(blob_hash_hex) {
+        Ok(bytes) => bytes,
+        Err(_) => {
+            return Ok(warp::reply::with_status(
+                warp::reply::json(&ErrorResponse {
+                    error: "invalid hex string".to_string(),
+                }),
+                warp::http::StatusCode::BAD_REQUEST,
+            ));
+        }
+    };
+
+    if blob_hash_bytes.len() != 32 {
+        return Ok(warp::reply::with_status(
+            warp::reply::json(&ErrorResponse {
+                error: format!("blob hash must be 32 bytes, got {}", blob_hash_bytes.len()),
+            }),
+            warp::http::StatusCode::BAD_REQUEST,
+        ));
+    }
+
+    let mut hash_array = [0u8; 32];
+    hash_array.copy_from_slice(&blob_hash_bytes);
+    let blob_hash = B256(hash_array);
+
+    // Set query height
+    let height = height_query
+        .height
+        .map(FvmQueryHeight::from)
+        .unwrap_or(FvmQueryHeight::Committed);
+
+    // Gas params for the query call
+    let gas_params = GasParams {
+        gas_limit: Default::default(),
+        gas_fee_cap: Default::default(),
+        gas_premium: Default::default(),
+    };
+
+    // Query the blob
+    let maybe_blob = {
+        let mut client_guard = client.lock().await;
+        client_guard
+            .blob_get_call(blob_hash, TokenAmount::default(), gas_params, height)
+            .await
+    };
+
+    match maybe_blob {
+        Ok(Some(blob)) => {
+            let subscribers: Vec<BlobSubscriberInfo> = blob
+                .subscribers
+                .iter()
+                .map(|(sub_id, expiry)| BlobSubscriberInfo {
+                    subscription_id: sub_id.to_string(),
+                    expiry: *expiry,
+                })
+                .collect();
+
+            let response = BlobResponse {
+                hash: format!("0x{}", hex::encode(blob_hash.0)),
+                size: blob.size,
+                metadata_hash: format!("0x{}", hex::encode(blob.metadata_hash.0)),
+                status: format!("{:?}", blob.status),
+                subscribers,
+            };
+            Ok(warp::reply::with_status(
+                warp::reply::json(&response),
+                warp::http::StatusCode::OK,
+            ))
+        }
+        Ok(None) => Ok(warp::reply::with_status(
+            warp::reply::json(&ErrorResponse {
+                error: "blob not found".to_string(),
+            }),
+            warp::http::StatusCode::NOT_FOUND,
+        )),
+        Err(e) => Ok(warp::reply::with_status(
+            warp::reply::json(&ErrorResponse {
+                error: format!("query failed: {}", e),
+            }),
+            warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+        )),
+    }
+}
+
+/// Warp filter to inject Iroh node
+fn with_iroh(
+    iroh: IrohNode,
+) -> impl Filter<Extract = (IrohNode,), Error = Infallible> + Clone {
+    warp::any().map(move || iroh.clone())
+}
+
+/// Handle GET /v1/blobs/{hash}/content - returns the actual blob content
+async fn handle_get_blob_content(
+    hash_str: String,
+    height_query: HeightQuery,
+    client: SharedFendermintClient,
+    iroh: IrohNode,
+) -> Result<impl warp::Reply, warp::Rejection> {
+    use futures::TryStreamExt;
+    use iroh_blobs::hashseq::HashSeq;
+    use warp::hyper::Body;
+
+    // Parse blob hash - strip 0x prefix if present
+    let blob_hash_hex = hash_str.strip_prefix("0x").unwrap_or(&hash_str);
+
+    let blob_hash_bytes = match hex::decode(blob_hash_hex) {
+        Ok(bytes) => bytes,
+        Err(_) => {
+            return Ok(warp::reply::with_status(
+                warp::reply::Response::new(Body::from(
+                    serde_json::to_string(&ErrorResponse {
+                        error: "invalid hex string".to_string(),
+                    })
+                    .unwrap(),
+                )),
+                warp::http::StatusCode::BAD_REQUEST,
+            ));
+        }
+    };
+
+    if blob_hash_bytes.len() != 32 {
+        return Ok(warp::reply::with_status(
+            warp::reply::Response::new(Body::from(
+                serde_json::to_string(&ErrorResponse {
+                    error: format!("blob hash must be 32 bytes, got {}", blob_hash_bytes.len()),
+                })
+                .unwrap(),
+            )),
+            warp::http::StatusCode::BAD_REQUEST,
+        ));
+    }
+
+    let mut hash_array = [0u8; 32];
+    hash_array.copy_from_slice(&blob_hash_bytes);
+    let blob_hash = B256(hash_array);
+
+    // Set query height
+    let height = height_query
+        .height
+        .map(FvmQueryHeight::from)
+        .unwrap_or(FvmQueryHeight::Committed);
+
+    // Gas params for the query call
+    let gas_params = GasParams {
+        gas_limit: Default::default(),
+        gas_fee_cap: Default::default(),
+        gas_premium: Default::default(),
+    };
+
+    // First query the blobs actor to verify the blob exists
+    let maybe_blob = {
+        let mut client_guard = client.lock().await;
+        client_guard
+            .blob_get_call(blob_hash, TokenAmount::default(), gas_params, height)
+            .await
+    };
+
+    match maybe_blob {
+        Ok(Some(blob)) => {
+            // The blob hash is actually a hash sequence hash
+            let hash_seq_hash = Hash::from_bytes(blob_hash.0);
+            let size = blob.size;
+
+            // Read the hash sequence from Iroh to get the original content hash
+            let hash_seq_bytes = match iroh.blobs_client().read_to_bytes(hash_seq_hash).await {
+                Ok(bytes) => bytes,
+                Err(e) => {
+                    return Ok(warp::reply::with_status(
+                        warp::reply::Response::new(Body::from(
+                            serde_json::to_string(&ErrorResponse {
+                                error: format!("failed to read hash sequence: {}", e),
+                            })
+                            .unwrap(),
+                        )),
+                        warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    ));
+                }
+            };
+
+            let hash_seq = match HashSeq::try_from(hash_seq_bytes) {
+                Ok(seq) => seq,
+                Err(e) => {
+                    return Ok(warp::reply::with_status(
+                        warp::reply::Response::new(Body::from(
+                            serde_json::to_string(&ErrorResponse {
+                                error: format!("failed to parse hash sequence: {}", e),
+                            })
+                            .unwrap(),
+                        )),
+                        warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    ));
+                }
+            };
+
+            // First hash in the sequence is the original content
+            let orig_hash = match hash_seq.iter().next() {
+                Some(hash) => hash,
+                None => {
+                    return Ok(warp::reply::with_status(
+                        warp::reply::Response::new(Body::from(
+                            serde_json::to_string(&ErrorResponse {
+                                error: "hash sequence is empty".to_string(),
+                            })
+                            .unwrap(),
+                        )),
+                        warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    ));
+                }
+            };
+
+            // Read the actual content from Iroh
+            let reader = match iroh.blobs_client().read(orig_hash).await {
+                Ok(reader) => reader,
+                Err(e) => {
+                    return Ok(warp::reply::with_status(
+                        warp::reply::Response::new(Body::from(
+                            serde_json::to_string(&ErrorResponse {
+                                error: format!("failed to read blob content: {}", e),
+                            })
+                            .unwrap(),
+                        )),
+                        warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+                    ));
+                }
+            };
+
+            // Stream the content as the response body
+            let bytes_stream = reader.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e));
+            let body = Body::wrap_stream(bytes_stream);
+
+            let mut response = warp::reply::Response::new(body);
+            response.headers_mut().insert(
+                "Content-Type",
+                warp::http::HeaderValue::from_static("application/octet-stream"),
+            );
+            response.headers_mut().insert(
+                "Content-Length",
+                warp::http::HeaderValue::from(size),
+            );
+
+            Ok(warp::reply::with_status(response, warp::http::StatusCode::OK))
+        }
+        Ok(None) => Ok(warp::reply::with_status(
+            warp::reply::Response::new(Body::from(
+                serde_json::to_string(&ErrorResponse {
+                    error: "blob not found".to_string(),
+                })
+                .unwrap(),
+            )),
+            warp::http::StatusCode::NOT_FOUND,
+        )),
+        Err(e) => Ok(warp::reply::with_status(
+            warp::reply::Response::new(Body::from(
+                serde_json::to_string(&ErrorResponse {
+                    error: format!("query failed: {}", e),
+                })
+                .unwrap(),
+            )),
+            warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+        )),
     }
 }

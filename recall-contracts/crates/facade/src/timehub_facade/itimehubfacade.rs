@@ -139,7 +139,7 @@ interface ITimehubFacade {
 )]
 pub mod ITimehubFacade {
     use super::*;
-    use ::alloy_sol_types as alloy_sol_types;
+    use ::alloy_sol_types;
     /// The creation / init bytecode of the contract.
     ///
     /// ```text
@@ -161,9 +161,9 @@ pub mod ITimehubFacade {
         b"",
     );
     /**Event with signature `EventPushed(uint256,uint256,bytes)` and selector `0x9f2453a8c6b2912a42d606880c3eeaadcc940925c2af1349422a17b816155415`.
-```solidity
-event EventPushed(uint256 index, uint256 timestamp, bytes cid);
-```*/
+    ```solidity
+    event EventPushed(uint256 index, uint256 timestamp, bytes cid);
+    ```*/
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -186,7 +186,7 @@ event EventPushed(uint256 index, uint256 timestamp, bytes cid);
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         #[automatically_derived]
         impl alloy_sol_types::SolEvent for EventPushed {
             type DataTuple<'a> = (
@@ -194,45 +194,15 @@ event EventPushed(uint256 index, uint256 timestamp, bytes cid);
                 ::alloy_sol_types::sol_data::Uint<256>,
                 ::alloy_sol_types::sol_data::Bytes,
             );
-            type DataToken<'a> = <Self::DataTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type DataToken<'a> = <Self::DataTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             type TopicList = (alloy_sol_types::sol_data::FixedBytes<32>,);
             const SIGNATURE: &'static str = "EventPushed(uint256,uint256,bytes)";
-            const SIGNATURE_HASH: alloy_sol_types::private::B256 = alloy_sol_types::private::B256::new([
-                159u8,
-                36u8,
-                83u8,
-                168u8,
-                198u8,
-                178u8,
-                145u8,
-                42u8,
-                66u8,
-                214u8,
-                6u8,
-                136u8,
-                12u8,
-                62u8,
-                234u8,
-                173u8,
-                204u8,
-                148u8,
-                9u8,
-                37u8,
-                194u8,
-                175u8,
-                19u8,
-                73u8,
-                66u8,
-                42u8,
-                23u8,
-                184u8,
-                22u8,
-                21u8,
-                84u8,
-                21u8,
-            ]);
+            const SIGNATURE_HASH: alloy_sol_types::private::B256 =
+                alloy_sol_types::private::B256::new([
+                    159u8, 36u8, 83u8, 168u8, 198u8, 178u8, 145u8, 42u8, 66u8, 214u8, 6u8, 136u8,
+                    12u8, 62u8, 234u8, 173u8, 204u8, 148u8, 9u8, 37u8, 194u8, 175u8, 19u8, 73u8,
+                    66u8, 42u8, 23u8, 184u8, 22u8, 21u8, 84u8, 21u8,
+                ]);
             const ANONYMOUS: bool = false;
             #[allow(unused_variables)]
             #[inline]
@@ -251,25 +221,23 @@ event EventPushed(uint256 index, uint256 timestamp, bytes cid);
                 topics: &<Self::TopicList as alloy_sol_types::SolType>::RustType,
             ) -> alloy_sol_types::Result<()> {
                 if topics.0 != Self::SIGNATURE_HASH {
-                    return Err(
-                        alloy_sol_types::Error::invalid_event_signature_hash(
-                            Self::SIGNATURE,
-                            topics.0,
-                            Self::SIGNATURE_HASH,
-                        ),
-                    );
+                    return Err(alloy_sol_types::Error::invalid_event_signature_hash(
+                        Self::SIGNATURE,
+                        topics.0,
+                        Self::SIGNATURE_HASH,
+                    ));
                 }
                 Ok(())
             }
             #[inline]
             fn tokenize_body(&self) -> Self::DataToken<'_> {
                 (
-                    <::alloy_sol_types::sol_data::Uint<
-                        256,
-                    > as alloy_sol_types::SolType>::tokenize(&self.index),
-                    <::alloy_sol_types::sol_data::Uint<
-                        256,
-                    > as alloy_sol_types::SolType>::tokenize(&self.timestamp),
+                    <::alloy_sol_types::sol_data::Uint<256> as alloy_sol_types::SolType>::tokenize(
+                        &self.index,
+                    ),
+                    <::alloy_sol_types::sol_data::Uint<256> as alloy_sol_types::SolType>::tokenize(
+                        &self.timestamp,
+                    ),
                     <::alloy_sol_types::sol_data::Bytes as alloy_sol_types::SolType>::tokenize(
                         &self.cid,
                     ),
@@ -287,9 +255,7 @@ event EventPushed(uint256 index, uint256 timestamp, bytes cid);
                 if out.len() < <Self::TopicList as alloy_sol_types::TopicList>::COUNT {
                     return Err(alloy_sol_types::Error::Overrun);
                 }
-                out[0usize] = alloy_sol_types::abi::token::WordToken(
-                    Self::SIGNATURE_HASH,
-                );
+                out[0usize] = alloy_sol_types::abi::token::WordToken(Self::SIGNATURE_HASH);
                 Ok(())
             }
         }
@@ -311,9 +277,9 @@ event EventPushed(uint256 index, uint256 timestamp, bytes cid);
         }
     };
     /**Function with signature `getCount()` and selector `0xa87d942c`.
-```solidity
-function getCount() external view returns (uint64);
-```*/
+    ```solidity
+    function getCount() external view returns (uint64);
+    ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct getCountCall {}
@@ -331,7 +297,7 @@ function getCount() external view returns (uint64);
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         {
             #[doc(hidden)]
             type UnderlyingSolTuple<'a> = ();
@@ -339,9 +305,7 @@ function getCount() external view returns (uint64);
             type UnderlyingRustTuple<'a> = ();
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
-            fn _type_assertion(
-                _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-            ) {
+            fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
                 match _t {
                     alloy_sol_types::private::AssertTypeEq::<
                         <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -370,9 +334,7 @@ function getCount() external view returns (uint64);
             type UnderlyingRustTuple<'a> = (u64,);
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
-            fn _type_assertion(
-                _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-            ) {
+            fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
                 match _t {
                     alloy_sol_types::private::AssertTypeEq::<
                         <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -397,14 +359,10 @@ function getCount() external view returns (uint64);
         #[automatically_derived]
         impl alloy_sol_types::SolCall for getCountCall {
             type Parameters<'a> = ();
-            type Token<'a> = <Self::Parameters<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type Token<'a> = <Self::Parameters<'a> as alloy_sol_types::SolType>::Token<'a>;
             type Return = getCountReturn;
             type ReturnTuple<'a> = (::alloy_sol_types::sol_data::Uint<64>,);
-            type ReturnToken<'a> = <Self::ReturnTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type ReturnToken<'a> = <Self::ReturnTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             const SIGNATURE: &'static str = "getCount()";
             const SELECTOR: [u8; 4] = [168u8, 125u8, 148u8, 44u8];
             #[inline]
@@ -422,17 +380,17 @@ function getCount() external view returns (uint64);
                 data: &[u8],
                 validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
-                <Self::ReturnTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                <Self::ReturnTuple<'_> as alloy_sol_types::SolType>::abi_decode_sequence(
+                    data, validate,
+                )
+                .map(Into::into)
             }
         }
     };
     /**Function with signature `getLeafAt(uint64)` and selector `0x19fa4966`.
-```solidity
-function getLeafAt(uint64 index) external view returns (uint64 timestamp, bytes memory witnessed);
-```*/
+    ```solidity
+    function getLeafAt(uint64 index) external view returns (uint64 timestamp, bytes memory witnessed);
+    ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct getLeafAtCall {
@@ -455,7 +413,7 @@ function getLeafAt(uint64 index) external view returns (uint64 timestamp, bytes 
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         {
             #[doc(hidden)]
             type UnderlyingSolTuple<'a> = (::alloy_sol_types::sol_data::Uint<64>,);
@@ -463,9 +421,7 @@ function getLeafAt(uint64 index) external view returns (uint64 timestamp, bytes 
             type UnderlyingRustTuple<'a> = (u64,);
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
-            fn _type_assertion(
-                _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-            ) {
+            fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
                 match _t {
                     alloy_sol_types::private::AssertTypeEq::<
                         <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -497,9 +453,7 @@ function getLeafAt(uint64 index) external view returns (uint64 timestamp, bytes 
             type UnderlyingRustTuple<'a> = (u64, ::alloy_sol_types::private::Bytes);
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
-            fn _type_assertion(
-                _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-            ) {
+            fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
                 match _t {
                     alloy_sol_types::private::AssertTypeEq::<
                         <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -527,17 +481,13 @@ function getLeafAt(uint64 index) external view returns (uint64 timestamp, bytes 
         #[automatically_derived]
         impl alloy_sol_types::SolCall for getLeafAtCall {
             type Parameters<'a> = (::alloy_sol_types::sol_data::Uint<64>,);
-            type Token<'a> = <Self::Parameters<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type Token<'a> = <Self::Parameters<'a> as alloy_sol_types::SolType>::Token<'a>;
             type Return = getLeafAtReturn;
             type ReturnTuple<'a> = (
                 ::alloy_sol_types::sol_data::Uint<64>,
                 ::alloy_sol_types::sol_data::Bytes,
             );
-            type ReturnToken<'a> = <Self::ReturnTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type ReturnToken<'a> = <Self::ReturnTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             const SIGNATURE: &'static str = "getLeafAt(uint64)";
             const SELECTOR: [u8; 4] = [25u8, 250u8, 73u8, 102u8];
             #[inline]
@@ -549,9 +499,9 @@ function getLeafAt(uint64 index) external view returns (uint64 timestamp, bytes 
             #[inline]
             fn tokenize(&self) -> Self::Token<'_> {
                 (
-                    <::alloy_sol_types::sol_data::Uint<
-                        64,
-                    > as alloy_sol_types::SolType>::tokenize(&self.index),
+                    <::alloy_sol_types::sol_data::Uint<64> as alloy_sol_types::SolType>::tokenize(
+                        &self.index,
+                    ),
                 )
             }
             #[inline]
@@ -559,17 +509,17 @@ function getLeafAt(uint64 index) external view returns (uint64 timestamp, bytes 
                 data: &[u8],
                 validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
-                <Self::ReturnTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                <Self::ReturnTuple<'_> as alloy_sol_types::SolType>::abi_decode_sequence(
+                    data, validate,
+                )
+                .map(Into::into)
             }
         }
     };
     /**Function with signature `getPeaks()` and selector `0x0ae06fba`.
-```solidity
-function getPeaks() external view returns (bytes[] memory cids);
-```*/
+    ```solidity
+    function getPeaks() external view returns (bytes[] memory cids);
+    ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct getPeaksCall {}
@@ -587,7 +537,7 @@ function getPeaks() external view returns (bytes[] memory cids);
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         {
             #[doc(hidden)]
             type UnderlyingSolTuple<'a> = ();
@@ -595,9 +545,7 @@ function getPeaks() external view returns (bytes[] memory cids);
             type UnderlyingRustTuple<'a> = ();
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
-            fn _type_assertion(
-                _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-            ) {
+            fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
                 match _t {
                     alloy_sol_types::private::AssertTypeEq::<
                         <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -621,18 +569,14 @@ function getPeaks() external view returns (bytes[] memory cids);
         }
         {
             #[doc(hidden)]
-            type UnderlyingSolTuple<'a> = (
-                ::alloy_sol_types::sol_data::Array<::alloy_sol_types::sol_data::Bytes>,
-            );
+            type UnderlyingSolTuple<'a> =
+                (::alloy_sol_types::sol_data::Array<::alloy_sol_types::sol_data::Bytes>,);
             #[doc(hidden)]
-            type UnderlyingRustTuple<'a> = (
-                ::alloy_sol_types::private::Vec<::alloy_sol_types::private::Bytes>,
-            );
+            type UnderlyingRustTuple<'a> =
+                (::alloy_sol_types::private::Vec<::alloy_sol_types::private::Bytes>,);
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
-            fn _type_assertion(
-                _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-            ) {
+            fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
                 match _t {
                     alloy_sol_types::private::AssertTypeEq::<
                         <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -657,16 +601,11 @@ function getPeaks() external view returns (bytes[] memory cids);
         #[automatically_derived]
         impl alloy_sol_types::SolCall for getPeaksCall {
             type Parameters<'a> = ();
-            type Token<'a> = <Self::Parameters<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type Token<'a> = <Self::Parameters<'a> as alloy_sol_types::SolType>::Token<'a>;
             type Return = getPeaksReturn;
-            type ReturnTuple<'a> = (
-                ::alloy_sol_types::sol_data::Array<::alloy_sol_types::sol_data::Bytes>,
-            );
-            type ReturnToken<'a> = <Self::ReturnTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type ReturnTuple<'a> =
+                (::alloy_sol_types::sol_data::Array<::alloy_sol_types::sol_data::Bytes>,);
+            type ReturnToken<'a> = <Self::ReturnTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             const SIGNATURE: &'static str = "getPeaks()";
             const SELECTOR: [u8; 4] = [10u8, 224u8, 111u8, 186u8];
             #[inline]
@@ -684,17 +623,17 @@ function getPeaks() external view returns (bytes[] memory cids);
                 data: &[u8],
                 validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
-                <Self::ReturnTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                <Self::ReturnTuple<'_> as alloy_sol_types::SolType>::abi_decode_sequence(
+                    data, validate,
+                )
+                .map(Into::into)
             }
         }
     };
     /**Function with signature `getRoot()` and selector `0x5ca1e165`.
-```solidity
-function getRoot() external view returns (bytes memory cid);
-```*/
+    ```solidity
+    function getRoot() external view returns (bytes memory cid);
+    ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct getRootCall {}
@@ -712,7 +651,7 @@ function getRoot() external view returns (bytes memory cid);
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         {
             #[doc(hidden)]
             type UnderlyingSolTuple<'a> = ();
@@ -720,9 +659,7 @@ function getRoot() external view returns (bytes memory cid);
             type UnderlyingRustTuple<'a> = ();
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
-            fn _type_assertion(
-                _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-            ) {
+            fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
                 match _t {
                     alloy_sol_types::private::AssertTypeEq::<
                         <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -751,9 +688,7 @@ function getRoot() external view returns (bytes memory cid);
             type UnderlyingRustTuple<'a> = (::alloy_sol_types::private::Bytes,);
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
-            fn _type_assertion(
-                _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-            ) {
+            fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
                 match _t {
                     alloy_sol_types::private::AssertTypeEq::<
                         <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -778,14 +713,10 @@ function getRoot() external view returns (bytes memory cid);
         #[automatically_derived]
         impl alloy_sol_types::SolCall for getRootCall {
             type Parameters<'a> = ();
-            type Token<'a> = <Self::Parameters<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type Token<'a> = <Self::Parameters<'a> as alloy_sol_types::SolType>::Token<'a>;
             type Return = getRootReturn;
             type ReturnTuple<'a> = (::alloy_sol_types::sol_data::Bytes,);
-            type ReturnToken<'a> = <Self::ReturnTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type ReturnToken<'a> = <Self::ReturnTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             const SIGNATURE: &'static str = "getRoot()";
             const SELECTOR: [u8; 4] = [92u8, 161u8, 225u8, 101u8];
             #[inline]
@@ -803,17 +734,17 @@ function getRoot() external view returns (bytes memory cid);
                 data: &[u8],
                 validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
-                <Self::ReturnTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                <Self::ReturnTuple<'_> as alloy_sol_types::SolType>::abi_decode_sequence(
+                    data, validate,
+                )
+                .map(Into::into)
             }
         }
     };
     /**Function with signature `push(bytes)` and selector `0x7dacda03`.
-```solidity
-function push(bytes memory cid) external returns (bytes memory root, uint64 index);
-```*/
+    ```solidity
+    function push(bytes memory cid) external returns (bytes memory root, uint64 index);
+    ```*/
     #[allow(non_camel_case_types, non_snake_case, clippy::pub_underscore_fields)]
     #[derive(Clone)]
     pub struct pushCall {
@@ -836,7 +767,7 @@ function push(bytes memory cid) external returns (bytes memory root, uint64 inde
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         {
             #[doc(hidden)]
             type UnderlyingSolTuple<'a> = (::alloy_sol_types::sol_data::Bytes,);
@@ -844,9 +775,7 @@ function push(bytes memory cid) external returns (bytes memory root, uint64 inde
             type UnderlyingRustTuple<'a> = (::alloy_sol_types::private::Bytes,);
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
-            fn _type_assertion(
-                _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-            ) {
+            fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
                 match _t {
                     alloy_sol_types::private::AssertTypeEq::<
                         <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -878,9 +807,7 @@ function push(bytes memory cid) external returns (bytes memory root, uint64 inde
             type UnderlyingRustTuple<'a> = (::alloy_sol_types::private::Bytes, u64);
             #[cfg(test)]
             #[allow(dead_code, unreachable_patterns)]
-            fn _type_assertion(
-                _t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>,
-            ) {
+            fn _type_assertion(_t: alloy_sol_types::private::AssertTypeEq<UnderlyingRustTuple>) {
                 match _t {
                     alloy_sol_types::private::AssertTypeEq::<
                         <UnderlyingSolTuple as alloy_sol_types::SolType>::RustType,
@@ -908,17 +835,13 @@ function push(bytes memory cid) external returns (bytes memory root, uint64 inde
         #[automatically_derived]
         impl alloy_sol_types::SolCall for pushCall {
             type Parameters<'a> = (::alloy_sol_types::sol_data::Bytes,);
-            type Token<'a> = <Self::Parameters<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type Token<'a> = <Self::Parameters<'a> as alloy_sol_types::SolType>::Token<'a>;
             type Return = pushReturn;
             type ReturnTuple<'a> = (
                 ::alloy_sol_types::sol_data::Bytes,
                 ::alloy_sol_types::sol_data::Uint<64>,
             );
-            type ReturnToken<'a> = <Self::ReturnTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type ReturnToken<'a> = <Self::ReturnTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             const SIGNATURE: &'static str = "push(bytes)";
             const SELECTOR: [u8; 4] = [125u8, 172u8, 218u8, 3u8];
             #[inline]
@@ -940,10 +863,10 @@ function push(bytes memory cid) external returns (bytes memory root, uint64 inde
                 data: &[u8],
                 validate: bool,
             ) -> alloy_sol_types::Result<Self::Return> {
-                <Self::ReturnTuple<
-                    '_,
-                > as alloy_sol_types::SolType>::abi_decode_sequence(data, validate)
-                    .map(Into::into)
+                <Self::ReturnTuple<'_> as alloy_sol_types::SolType>::abi_decode_sequence(
+                    data, validate,
+                )
+                .map(Into::into)
             }
         }
     };
@@ -985,9 +908,7 @@ function push(bytes memory cid) external returns (bytes memory root, uint64 inde
         fn selector(&self) -> [u8; 4] {
             match self {
                 Self::getCount(_) => <getCountCall as alloy_sol_types::SolCall>::SELECTOR,
-                Self::getLeafAt(_) => {
-                    <getLeafAtCall as alloy_sol_types::SolCall>::SELECTOR
-                }
+                Self::getLeafAt(_) => <getLeafAtCall as alloy_sol_types::SolCall>::SELECTOR,
                 Self::getPeaks(_) => <getPeaksCall as alloy_sol_types::SolCall>::SELECTOR,
                 Self::getRoot(_) => <getRootCall as alloy_sol_types::SolCall>::SELECTOR,
                 Self::push(_) => <pushCall as alloy_sol_types::SolCall>::SELECTOR,
@@ -1011,16 +932,14 @@ function push(bytes memory cid) external returns (bytes memory root, uint64 inde
             static DECODE_SHIMS: &[fn(
                 &[u8],
                 bool,
-            ) -> alloy_sol_types::Result<ITimehubFacadeCalls>] = &[
+            )
+                -> alloy_sol_types::Result<ITimehubFacadeCalls>] = &[
                 {
                     fn getPeaks(
                         data: &[u8],
                         validate: bool,
                     ) -> alloy_sol_types::Result<ITimehubFacadeCalls> {
-                        <getPeaksCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <getPeaksCall as alloy_sol_types::SolCall>::abi_decode_raw(data, validate)
                             .map(ITimehubFacadeCalls::getPeaks)
                     }
                     getPeaks
@@ -1030,10 +949,7 @@ function push(bytes memory cid) external returns (bytes memory root, uint64 inde
                         data: &[u8],
                         validate: bool,
                     ) -> alloy_sol_types::Result<ITimehubFacadeCalls> {
-                        <getLeafAtCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <getLeafAtCall as alloy_sol_types::SolCall>::abi_decode_raw(data, validate)
                             .map(ITimehubFacadeCalls::getLeafAt)
                     }
                     getLeafAt
@@ -1043,10 +959,7 @@ function push(bytes memory cid) external returns (bytes memory root, uint64 inde
                         data: &[u8],
                         validate: bool,
                     ) -> alloy_sol_types::Result<ITimehubFacadeCalls> {
-                        <getRootCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <getRootCall as alloy_sol_types::SolCall>::abi_decode_raw(data, validate)
                             .map(ITimehubFacadeCalls::getRoot)
                     }
                     getRoot
@@ -1056,10 +969,7 @@ function push(bytes memory cid) external returns (bytes memory root, uint64 inde
                         data: &[u8],
                         validate: bool,
                     ) -> alloy_sol_types::Result<ITimehubFacadeCalls> {
-                        <pushCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <pushCall as alloy_sol_types::SolCall>::abi_decode_raw(data, validate)
                             .map(ITimehubFacadeCalls::push)
                     }
                     push
@@ -1069,22 +979,17 @@ function push(bytes memory cid) external returns (bytes memory root, uint64 inde
                         data: &[u8],
                         validate: bool,
                     ) -> alloy_sol_types::Result<ITimehubFacadeCalls> {
-                        <getCountCall as alloy_sol_types::SolCall>::abi_decode_raw(
-                                data,
-                                validate,
-                            )
+                        <getCountCall as alloy_sol_types::SolCall>::abi_decode_raw(data, validate)
                             .map(ITimehubFacadeCalls::getCount)
                     }
                     getCount
                 },
             ];
             let Ok(idx) = Self::SELECTORS.binary_search(&selector) else {
-                return Err(
-                    alloy_sol_types::Error::unknown_selector(
-                        <Self as alloy_sol_types::SolInterface>::NAME,
-                        selector,
-                    ),
-                );
+                return Err(alloy_sol_types::Error::unknown_selector(
+                    <Self as alloy_sol_types::SolInterface>::NAME,
+                    selector,
+                ));
             };
             DECODE_SHIMS[idx](data, validate)
         }
@@ -1112,22 +1017,13 @@ function push(bytes memory cid) external returns (bytes memory root, uint64 inde
         fn abi_encode_raw(&self, out: &mut alloy_sol_types::private::Vec<u8>) {
             match self {
                 Self::getCount(inner) => {
-                    <getCountCall as alloy_sol_types::SolCall>::abi_encode_raw(
-                        inner,
-                        out,
-                    )
+                    <getCountCall as alloy_sol_types::SolCall>::abi_encode_raw(inner, out)
                 }
                 Self::getLeafAt(inner) => {
-                    <getLeafAtCall as alloy_sol_types::SolCall>::abi_encode_raw(
-                        inner,
-                        out,
-                    )
+                    <getLeafAtCall as alloy_sol_types::SolCall>::abi_encode_raw(inner, out)
                 }
                 Self::getPeaks(inner) => {
-                    <getPeaksCall as alloy_sol_types::SolCall>::abi_encode_raw(
-                        inner,
-                        out,
-                    )
+                    <getPeaksCall as alloy_sol_types::SolCall>::abi_encode_raw(inner, out)
                 }
                 Self::getRoot(inner) => {
                     <getRootCall as alloy_sol_types::SolCall>::abi_encode_raw(inner, out)
@@ -1151,42 +1047,11 @@ function push(bytes memory cid) external returns (bytes memory root, uint64 inde
         /// No guarantees are made about the order of the selectors.
         ///
         /// Prefer using `SolInterface` methods instead.
-        pub const SELECTORS: &'static [[u8; 32usize]] = &[
-            [
-                159u8,
-                36u8,
-                83u8,
-                168u8,
-                198u8,
-                178u8,
-                145u8,
-                42u8,
-                66u8,
-                214u8,
-                6u8,
-                136u8,
-                12u8,
-                62u8,
-                234u8,
-                173u8,
-                204u8,
-                148u8,
-                9u8,
-                37u8,
-                194u8,
-                175u8,
-                19u8,
-                73u8,
-                66u8,
-                42u8,
-                23u8,
-                184u8,
-                22u8,
-                21u8,
-                84u8,
-                21u8,
-            ],
-        ];
+        pub const SELECTORS: &'static [[u8; 32usize]] = &[[
+            159u8, 36u8, 83u8, 168u8, 198u8, 178u8, 145u8, 42u8, 66u8, 214u8, 6u8, 136u8, 12u8,
+            62u8, 234u8, 173u8, 204u8, 148u8, 9u8, 37u8, 194u8, 175u8, 19u8, 73u8, 66u8, 42u8,
+            23u8, 184u8, 22u8, 21u8, 84u8, 21u8,
+        ]];
     }
     #[automatically_derived]
     impl alloy_sol_types::SolEventInterface for ITimehubFacadeEvents {
@@ -1200,23 +1065,19 @@ function push(bytes memory cid) external returns (bytes memory root, uint64 inde
             match topics.first().copied() {
                 Some(<EventPushed as alloy_sol_types::SolEvent>::SIGNATURE_HASH) => {
                     <EventPushed as alloy_sol_types::SolEvent>::decode_raw_log(
-                            topics,
-                            data,
-                            validate,
-                        )
-                        .map(Self::EventPushed)
+                        topics, data, validate,
+                    )
+                    .map(Self::EventPushed)
                 }
-                _ => {
-                    alloy_sol_types::private::Err(alloy_sol_types::Error::InvalidLog {
-                        name: <Self as alloy_sol_types::SolEventInterface>::NAME,
-                        log: alloy_sol_types::private::Box::new(
-                            alloy_sol_types::private::LogData::new_unchecked(
-                                topics.to_vec(),
-                                data.to_vec().into(),
-                            ),
+                _ => alloy_sol_types::private::Err(alloy_sol_types::Error::InvalidLog {
+                    name: <Self as alloy_sol_types::SolEventInterface>::NAME,
+                    log: alloy_sol_types::private::Box::new(
+                        alloy_sol_types::private::LogData::new_unchecked(
+                            topics.to_vec(),
+                            data.to_vec().into(),
                         ),
-                    })
-                }
+                    ),
+                }),
             }
         }
     }

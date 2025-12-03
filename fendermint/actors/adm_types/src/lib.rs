@@ -26,4 +26,3 @@ impl std::fmt::Display for Kind {
         }
     }
 }
-

@@ -144,7 +144,11 @@ impl State {
 
         let owners = OwnerMap::empty(store, DEFAULT_HAMT_CONFIG, "owners").flush()?;
 
-        Ok(State { machine_codes, permission_mode, owners })
+        Ok(State {
+            machine_codes,
+            permission_mode,
+            owners,
+        })
     }
 
     pub fn get_machine_code<BS: Blockstore>(
@@ -210,9 +214,15 @@ impl State {
         metadata: HashMap<String, String>,
     ) -> anyhow::Result<()> {
         let mut owner_map = OwnerMap::load(store, &self.owners, DEFAULT_HAMT_CONFIG, "owners")?;
-        let mut machine_metadata =
-            owner_map.get(&owner)?.map(|machines| machines.to_owned()).unwrap_or_default();
-        machine_metadata.push(Metadata { kind, address, metadata });
+        let mut machine_metadata = owner_map
+            .get(&owner)?
+            .map(|machines| machines.to_owned())
+            .unwrap_or_default();
+        machine_metadata.push(Metadata {
+            kind,
+            address,
+            metadata,
+        });
         owner_map.set(&owner, machine_metadata)?;
         self.owners = owner_map.flush()?;
         Ok(())
@@ -224,7 +234,10 @@ impl State {
         owner: Address,
     ) -> anyhow::Result<Vec<Metadata>> {
         let owner_map = OwnerMap::load(store, &self.owners, DEFAULT_HAMT_CONFIG, "owners")?;
-        let metadata = owner_map.get(&owner)?.map(|m| m.to_owned()).unwrap_or_default();
+        let metadata = owner_map
+            .get(&owner)?
+            .map(|m| m.to_owned())
+            .unwrap_or_default();
         Ok(metadata)
     }
 }

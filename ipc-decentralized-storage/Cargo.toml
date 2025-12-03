@@ -37,7 +37,12 @@ fendermint_rpc = { path = "../fendermint/rpc" }
 fendermint_vm_message = { path = "../fendermint/vm/message" }
 fendermint_vm_actor_interface = { path = "../fendermint/vm/actor_interface" }
 fendermint_actor_blobs_shared = { path = "../fendermint/actors/blobs/shared" }
+fendermint_actor_bucket = { path = "../fendermint/actors/bucket" }
 fendermint_crypto = { path = "../fendermint/crypto" }
+
+# IPC dependencies for address parsing
+ipc-api = { path = "../ipc/api" }
+ethers.workspace = true
 
 # FVM dependencies
 fvm_shared.workspace = true

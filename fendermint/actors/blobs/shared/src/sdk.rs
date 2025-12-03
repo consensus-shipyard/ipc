@@ -43,7 +43,7 @@ pub fn has_credit_approval(
     if from != to {
         let approval = get_credit_approval(rt, from, to)?;
         let curr_epoch = rt.curr_epoch();
-        Ok(approval.is_some_and(|a| a.expiry.map_or(true, |e| e >= curr_epoch)))
+        Ok(approval.is_some_and(|a| a.expiry.is_none_or(|e| e >= curr_epoch)))
     } else {
         Ok(true)
     }

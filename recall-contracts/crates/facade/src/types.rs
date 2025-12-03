@@ -12,9 +12,9 @@ use fvm_shared::{
     ActorID,
 };
 
+pub use alloy_primitives::Address;
 pub use alloy_sol_types::SolCall;
 pub use alloy_sol_types::SolInterface;
-pub use alloy_primitives::Address;
 
 const EAM_ACTOR_ID: ActorID = 10;
 
@@ -129,7 +129,9 @@ impl From<TokenAmount> for BigUintWrapper {
 
 impl From<U256> for BigUintWrapper {
     fn from(value: U256) -> Self {
-        BigUintWrapper(BigUint::from_bytes_be(&value.to_be_bytes::<{U256::BYTES}>()))
+        BigUintWrapper(BigUint::from_bytes_be(
+            &value.to_be_bytes::<{ U256::BYTES }>(),
+        ))
     }
 }
 

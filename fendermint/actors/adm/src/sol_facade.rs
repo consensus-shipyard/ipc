@@ -53,7 +53,11 @@ impl AbiCall for sol::createBucket_1Call {
         for kv in self.metadata.clone() {
             metadata.insert(kv.key, kv.value);
         }
-        CreateExternalParams { owner, kind: Kind::Bucket, metadata }
+        CreateExternalParams {
+            owner,
+            kind: Kind::Bucket,
+            metadata,
+        }
     }
 
     fn returns(&self, returns: Self::Returns) -> Self::Output {
@@ -73,7 +77,11 @@ impl AbiCall for sol::createBucket_2Call {
 
     fn params(&self) -> Self::Params {
         let owner: Address = H160::from(self.owner).into();
-        CreateExternalParams { owner, kind: Kind::Bucket, metadata: HashMap::default() }
+        CreateExternalParams {
+            owner,
+            kind: Kind::Bucket,
+            metadata: HashMap::default(),
+        }
     }
 
     fn returns(&self, returns: Self::Returns) -> Self::Output {
@@ -92,7 +100,9 @@ impl AbiCallRuntime for listBuckets_0Call {
     type Output = Vec<u8>;
 
     fn params(&self, rt: &impl Runtime) -> Self::Params {
-        ListMetadataParams { owner: rt.message().caller() }
+        ListMetadataParams {
+            owner: rt.message().caller(),
+        }
     }
 
     fn returns(&self, returns: Self::Returns) -> Self::Output {
@@ -104,7 +114,10 @@ impl AbiCallRuntime for listBuckets_0Call {
                 metadata: m
                     .metadata
                     .iter()
-                    .map(|(k, v)| sol::KeyValue { key: k.clone(), value: v.clone() })
+                    .map(|(k, v)| sol::KeyValue {
+                        key: k.clone(),
+                        value: v.clone(),
+                    })
                     .collect(),
             })
             .collect();
@@ -118,7 +131,9 @@ impl AbiCall for listBuckets_1Call {
     type Output = Vec<u8>;
 
     fn params(&self) -> Self::Params {
-        ListMetadataParams { owner: H160::from(self.owner).into() }
+        ListMetadataParams {
+            owner: H160::from(self.owner).into(),
+        }
     }
 
     fn returns(&self, returns: Self::Returns) -> Self::Output {
@@ -130,7 +145,10 @@ impl AbiCall for listBuckets_1Call {
                 metadata: m
                     .metadata
                     .iter()
-                    .map(|(k, v)| sol::KeyValue { key: k.clone(), value: v.clone() })
+                    .map(|(k, v)| sol::KeyValue {
+                        key: k.clone(),
+                        value: v.clone(),
+                    })
                     .collect(),
             })
             .collect();
@@ -210,7 +228,9 @@ pub struct AbiEncodeError {
 
 impl From<anyhow::Error> for AbiEncodeError {
     fn from(error: anyhow::Error) -> Self {
-        Self { message: format!("failed to abi encode {}", error) }
+        Self {
+            message: format!("failed to abi encode {}", error),
+        }
     }
 }
 
@@ -222,7 +242,9 @@ impl From<String> for AbiEncodeError {
 
 impl From<ActorError> for AbiEncodeError {
     fn from(error: ActorError) -> Self {
-        Self { message: format!("{}", error) }
+        Self {
+            message: format!("{}", error),
+        }
     }
 }
 

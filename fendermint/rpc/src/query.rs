@@ -19,11 +19,11 @@ use fendermint_vm_message::query::{
     ActorState, BuiltinActors, FvmQuery, FvmQueryHeight, GasEstimate, StateParams,
 };
 
+use crate::message::{GasParams, MessageFactory};
 use crate::response::{decode_blob_get, decode_os_get, encode_data};
 use fendermint_actor_bucket::{GetParams, Object};
-use fvm_shared::econ::TokenAmount;
-use crate::message::{GasParams, MessageFactory};
 use fendermint_vm_actor_interface::system;
+use fvm_shared::econ::TokenAmount;
 
 #[derive(Serialize, Debug, Clone)]
 /// The parsed value from a query, along with the height at which the query was performed.
@@ -141,8 +141,8 @@ pub trait QueryClient: Sync {
         gas_params: GasParams,
         height: FvmQueryHeight,
     ) -> anyhow::Result<Option<Object>> {
-        let msg =
-            MessageFactory::new(system::SYSTEM_ACTOR_ADDR, 0).os_get(address, params, value, gas_params)?;
+        let msg = MessageFactory::new(system::SYSTEM_ACTOR_ADDR, 0)
+            .os_get(address, params, value, gas_params)?;
 
         let response = self.call(msg, height).await?;
         if response.value.code.is_err() {
@@ -163,8 +163,8 @@ pub trait QueryClient: Sync {
         gas_params: GasParams,
         height: FvmQueryHeight,
     ) -> anyhow::Result<Option<fendermint_actor_blobs_shared::blobs::Blob>> {
-        let msg =
-            MessageFactory::new(system::SYSTEM_ACTOR_ADDR, 0).blob_get(blob_hash, value, gas_params)?;
+        let msg = MessageFactory::new(system::SYSTEM_ACTOR_ADDR, 0)
+            .blob_get(blob_hash, value, gas_params)?;
 
         let response = self.call(msg, height).await?;
         if response.value.code.is_err() {

@@ -22,14 +22,14 @@ use fvm::{
     machine::{DefaultMachine, Machine, Manifest, NetworkConfig},
     state_tree::StateTree,
 };
-use recall_executor::RecallExecutor;
-use recall_kernel::RecallKernel;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{
     address::Address, chainid::ChainID, clock::ChainEpoch, econ::TokenAmount, error::ExitCode,
     message::Message, receipt::Receipt, version::NetworkVersion, ActorID, MethodNum,
 };
+use recall_executor::RecallExecutor;
+use recall_kernel::RecallKernel;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::fmt;
@@ -161,9 +161,8 @@ where
     DB: Blockstore + Clone + 'static,
 {
     #[allow(clippy::type_complexity)]
-    executor: RecallExecutor<
-        RecallKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
-    >,
+    executor:
+        RecallExecutor<RecallKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>>,
     /// Hash of the block currently being executed. For queries and checks this is empty.
     ///
     /// The main motivation to add it here was to make it easier to pass in data to the

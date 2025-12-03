@@ -304,10 +304,8 @@ impl<'a> GenesisBuilder<'a> {
 
         // Init actor
         // Add Blobs actor ID to eth_builtin_ids so its delegated address is registered
-        let mut eth_builtin_ids: BTreeSet<_> = ipc_entrypoints
-            .values()
-            .map(|c| c.actor_id)
-            .collect();
+        let mut eth_builtin_ids: BTreeSet<_> =
+            ipc_entrypoints.values().map(|c| c.actor_id).collect();
         eth_builtin_ids.insert(blobs::BLOBS_ACTOR_ID);
 
         let (init_state, addr_to_id) = init::State::new(
