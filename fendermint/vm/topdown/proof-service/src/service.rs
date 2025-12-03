@@ -2,20 +2,33 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 //! Proof generator service - orchestrates proof generation pipeline
 //!
-//! The service implements a clear 4-step flow:
-//! 1. FETCH - Get F3 certificates from parent chain
-//! 2. VALIDATE - Cryptographically validate certificates
-//! 3. GENERATE - Create proof bundles
-//! 4. CACHE - Store proofs for proposers
+//! # Architecture
+//!
+//! The service implements a "delayed processing" flow to ensure that
+//! child tipsets are finalized before generating proofs:
+//!
+//! ```text
+//! 1. FETCH Certificate N+1
+//! 2. CHECK continuity: pending_cert.last_epoch + 1 == new_cert.first_epoch
+//! 3. GENERATE proofs for ALL epochs in pending_cert.suffix
+//!    - For each epoch E: generate proof using (E, E+1) as (parent, child)
+//! 4. CACHE certificates and epoch proofs
+//! 5. pending_cert = new_cert
+//! ```
+//!
+//! This ensures that when we prove epoch E, both E and E+1 are certified
+//! by F3 certificates, making the witness blocks verifiable.
 
 use crate::assembler::ProofAssembler;
 use crate::cache::ProofCache;
 use crate::config::{GatewayId, ProofServiceConfig};
 use crate::f3_client::F3Client;
-use crate::types::CacheEntry;
+use crate::types::{CertificateEntry, EpochProofEntry};
 use anyhow::{Context, Result};
+use filecoin_f3_certs::FinalityCertificate;
 use ipc_api::subnet_id::SubnetID;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 use tokio::time::{interval, MissedTickBehavior};
 
 /// Main proof generator service
@@ -24,6 +37,18 @@ pub struct ProofGeneratorService {
     cache: Arc<ProofCache>,
     f3_client: Arc<F3Client>,
     assembler: Arc<ProofAssembler>,
+
+    /// The certificate waiting for its child to be finalized
+    /// When the next certificate arrives, we can process this one's epochs
+    pending_certificate: Mutex<Option<PendingCertificate>>,
+}
+
+/// A certificate that is waiting for its child tipset to be finalized
+#[derive(Debug, Clone)]
+struct PendingCertificate {
+    certificate: FinalityCertificate,
+    power_table: filecoin_f3_gpbft::PowerEntries,
+    source_rpc: String,
 }
 
 impl ProofGeneratorService {
@@ -47,36 +72,34 @@ impl ProofGeneratorService {
         let gateway_actor_id = extract_gateway_actor_id_from_config(&config).await?;
 
         // Get the current highest instance from the cache
-        // or the last committed instance if the cache is empty
-        let highest_cached_instance = cache
-            .highest_cached_instance()
-            .unwrap_or_else(|| initial_instance);
+        let highest_cached_instance = cache.highest_cached_instance();
 
-        let (mut initial_instance, mut initial_power_table) =
-            (initial_instance, initial_power_table);
+        let (start_instance, start_power_table) = if let Some(cached) = highest_cached_instance {
+            if cached > initial_instance {
+                tracing::info!(
+                    highest_cached_instance = cached,
+                    initial_instance,
+                    "Using cached instance instead of initial instance"
+                );
 
-        if highest_cached_instance > initial_instance {
-            tracing::info!(
-                highest_cached_instance,
-                initial_instance,
-                "Using cached instance instead of initial instance"
-            );
-
-            initial_instance = highest_cached_instance;
-
-            initial_power_table = cache
-                .get(highest_cached_instance)
-                .context("Failed to get cached power table")?
-                .power_table;
-        }
+                let cert_entry = cache
+                    .get_certificate(cached)
+                    .context("Failed to get cached certificate")?;
+                (cached, cert_entry.power_table)
+            } else {
+                (initial_instance, initial_power_table)
+            }
+        } else {
+            (initial_instance, initial_power_table)
+        };
 
         // Create F3 client for certificate fetching + validation
         let f3_client = Arc::new(
             F3Client::new(
                 &config.parent_rpc_url,
                 &config.f3_network_name(subnet_id),
-                initial_instance,
-                initial_power_table,
+                start_instance,
+                start_power_table,
             )
             .context("Failed to create F3 client")?,
         );
@@ -96,6 +119,7 @@ impl ProofGeneratorService {
             cache,
             f3_client,
             assembler,
+            pending_certificate: Mutex::new(None),
         })
     }
 
@@ -106,11 +130,10 @@ impl ProofGeneratorService {
     pub async fn run(self) {
         tracing::info!(
             polling_interval = ?self.config.polling_interval,
-            lookahead = self.config.cache_config.lookahead_instances,
+            lookahead_epochs = self.config.cache_config.lookahead_epochs,
             "Starting proof generator service"
         );
 
-        // Validator is already initialized in new() with trusted power table
         let mut poll_interval = interval(self.config.polling_interval);
         poll_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
@@ -118,160 +141,229 @@ impl ProofGeneratorService {
             poll_interval.tick().await;
 
             tracing::debug!("Poll interval tick");
-            if let Err(e) = self.generate_next_proofs().await {
+            if let Err(e) = self.process_next_certificates().await {
                 tracing::error!(
                     error = %e,
-                    "Failed to generate proofs, will retry on next tick"
+                    "Failed to process certificates, will retry on next tick"
                 );
             }
         }
     }
 
-    /// Generate proofs for next needed instances
+    /// Process next certificates and generate proofs
     ///
-    /// Called by run() on each tick. Implements the core flow:
-    /// FETCH → VALIDATE → GENERATE → CACHE
-    ///
-    /// CRITICAL: Processes F3 instances SEQUENTIALLY - never skips!
-    async fn generate_next_proofs(&self) -> Result<()> {
-        let (current_instance, rpc_endpoint) = {
-            (
-                self.f3_client.current_instance().await,
-                self.f3_client.rpc_endpoint(),
-            )
-        };
+    /// Implements the delayed processing flow:
+    /// 1. Fetch next certificate
+    /// 2. If we have a pending certificate and continuity is satisfied, process it
+    /// 3. Store the new certificate as pending
+    async fn process_next_certificates(&self) -> Result<()> {
+        let current_instance = self.f3_client.current_instance().await;
+        let rpc_endpoint = self.f3_client.rpc_endpoint();
 
-        let next_instance = current_instance + 1;
-        let max_instance =
-            self.cache.last_committed_instance() + self.config.cache_config.lookahead_instances;
+        // Calculate how many instances to look ahead based on epochs
+        // This is approximate since we don't know exactly how many epochs per instance
+        let lookahead_instances = self.config.cache_config.lookahead_epochs / 3 + 5;
+        let max_instance = current_instance + lookahead_instances;
 
         tracing::debug!(
             current_instance,
-            next_instance,
             max_instance,
             "Checking for new F3 certificates"
         );
 
         // Process instances IN ORDER - this is critical for F3
-        for instance_id in next_instance..=max_instance {
-            // Fetch and validate certificate
-            let certificate = {
+        for _i in 0..lookahead_instances {
+            // Fetch and validate next certificate
+            let new_cert = {
                 let result = self.f3_client.fetch_and_validate().await;
                 match result {
                     Ok(cert) => cert,
                     Err(err) if is_certificate_unavailable(&err) => {
-                        tracing::debug!(
-                            instance_id,
-                            "Certificate not available, stopping lookahead"
-                        );
+                        tracing::debug!("Certificate not available, stopping lookahead");
                         break;
                     }
                     Err(err) => {
-                        return Err(err).with_context(|| {
-                            format!(
-                                "Failed to fetch and validate certificate for instance {}",
-                                instance_id
-                            )
-                        });
+                        return Err(err).context("Failed to fetch and validate certificate");
                     }
                 }
             };
 
-            // Log detailed certificate information for debugging
-            let suffix = &certificate.ec_chain.suffix();
-            let base_epoch = certificate.ec_chain.base().map(|b| b.epoch);
+            let new_instance = new_cert.gpbft_instance;
+            let new_power_table = self.f3_client.get_state().await.power_table;
+
+            // Log certificate info
+            let suffix = new_cert.ec_chain.suffix();
+            let base_epoch = new_cert.ec_chain.base().map(|b| b.epoch);
             let suffix_epochs: Vec<i64> = suffix.iter().map(|ts| ts.epoch).collect();
 
             tracing::info!(
-                instance_id,
-                ec_chain_len = suffix.len(),
+                instance = new_instance,
                 base_epoch = ?base_epoch,
                 suffix_epochs = ?suffix_epochs,
-                "Certificate fetched and validated successfully"
+                "Fetched and validated certificate"
             );
 
-            // Skip certificates with empty suffix (no epochs to prove)
-            let proof_bundle = if !certificate.ec_chain.suffix().is_empty() {
-                match self.generate_proof_for_certificate(&certificate).await {
-                    Ok(bundle) => bundle,
-                    Err(e) => {
-                        tracing::error!(instance_id, error = %e, "Failed to generate proof bundle - detailed error");
-                        return Err(e).context("Failed to generate proof bundle");
-                    }
+            // Check if we have a pending certificate to process
+            let mut pending_guard = self.pending_certificate.lock().await;
+
+            if let Some(pending) = pending_guard.take() {
+                // Check continuity: pending's last epoch + 1 should equal new cert's first epoch
+                let can_process = check_continuity(&pending.certificate, &new_cert);
+
+                if can_process {
+                    // Process all epochs from the pending certificate
+                    self.process_pending_certificate(
+                        &pending,
+                        &new_cert,
+                        &new_power_table,
+                        &rpc_endpoint,
+                    )
+                    .await?;
+                } else {
+                    // Continuity broken - log warning and skip the pending cert
+                    let pending_last = pending
+                        .certificate
+                        .ec_chain
+                        .suffix()
+                        .last()
+                        .map(|t| t.epoch);
+                    let new_first = new_cert.ec_chain.base().map(|t| t.epoch);
+                    tracing::warn!(
+                        pending_instance = pending.certificate.gpbft_instance,
+                        pending_last_epoch = ?pending_last,
+                        new_instance,
+                        new_first_epoch = ?new_first,
+                        "Certificate continuity broken, skipping pending certificate"
+                    );
                 }
-            } else {
-                None
-            };
+            }
 
-            // Cache the result
-            let power_table = self.f3_client.get_state().await.power_table;
-
-            self.cache.insert(CacheEntry::new(
-                certificate,
-                proof_bundle,
-                power_table,
+            // Store new certificate as pending (it will be processed when next cert arrives)
+            // Also cache the certificate immediately for reference
+            let cert_entry = CertificateEntry::new(
+                new_cert.clone(),
+                new_power_table.clone(),
                 rpc_endpoint.clone(),
-            ))?;
+            );
+            self.cache.insert_certificate(cert_entry)?;
 
-            tracing::info!(
-                instance_id,
-                "Successfully cached validated certificate and proof bundle"
+            *pending_guard = Some(PendingCertificate {
+                certificate: new_cert,
+                power_table: new_power_table,
+                source_rpc: rpc_endpoint.clone(),
+            });
+
+            tracing::debug!(
+                instance = new_instance,
+                "Stored certificate as pending, waiting for next certificate"
             );
         }
 
         Ok(())
     }
 
-    /// Generate proof bundle for a specific certificate
+    /// Process a pending certificate now that we have the child certificate
     ///
-    /// Extracts the highest epoch, fetches tipsets, and generates proofs.
-    async fn generate_proof_for_certificate(
+    /// Generates proofs for ALL epochs in the pending certificate's suffix.
+    async fn process_pending_certificate(
         &self,
-        f3_cert: &filecoin_f3_certs::FinalityCertificate,
-    ) -> Result<Option<proofs::proofs::common::bundle::UnifiedProofBundle>> {
-        let finalized_tipsets: Vec<i64> = f3_cert
-            .ec_chain
-            .suffix()
-            .iter()
-            .map(|ts| ts.epoch)
-            .collect();
+        pending: &PendingCertificate,
+        child_cert: &FinalityCertificate,
+        child_power_table: &filecoin_f3_gpbft::PowerEntries,
+        rpc_endpoint: &str,
+    ) -> Result<()> {
+        let pending_instance = pending.certificate.gpbft_instance;
+        let child_instance = child_cert.gpbft_instance;
+        let suffix = pending.certificate.ec_chain.suffix();
 
-        if finalized_tipsets.is_empty() {
+        if suffix.is_empty() {
             tracing::debug!(
-                instance_id = f3_cert.gpbft_instance,
-                "No tipsets to prove, skipping proof generation"
+                pending_instance,
+                "Pending certificate has empty suffix, nothing to prove"
             );
-
-            return Ok(None);
+            return Ok(());
         }
 
-        // Extract highest epoch from validated F3 certificate
-        let highest_epoch = finalized_tipsets.last().unwrap();
-
-        tracing::debug!(
-            instance_id = f3_cert.gpbft_instance,
-            highest_epoch,
-            "Generating proof for certificate"
+        let epochs: Vec<i64> = suffix.iter().map(|ts| ts.epoch).collect();
+        tracing::info!(
+            pending_instance,
+            child_instance,
+            epochs = ?epochs,
+            "Processing pending certificate - generating proofs for all epochs"
         );
 
-        // Generate proof (assembler fetches its own tipsets)
-        let bundle = self
-            .assembler
-            .generate_proof_bundle(finalized_tipsets)
-            .await
-            .with_context(|| {
-                format!(
-                    "Failed to generate proof bundle for instance {} - check RPC tipset availability and network connectivity",
-                    f3_cert.gpbft_instance
-                )
-            })?;
+        // Ensure child certificate is cached
+        let child_entry = CertificateEntry::new(
+            child_cert.clone(),
+            child_power_table.clone(),
+            rpc_endpoint.to_string(),
+        );
+        self.cache.insert_certificate(child_entry)?;
 
-        Ok(bundle)
+        // Generate proofs for each epoch in the suffix
+        let mut epoch_proofs = Vec::new();
+
+        for tipset in suffix.iter() {
+            let parent_epoch = tipset.epoch;
+            let child_epoch = parent_epoch + 1;
+
+            tracing::debug!(parent_epoch, child_epoch, "Generating proof for epoch");
+
+            // Generate proof for this epoch
+            let proof_bundle = self
+                .assembler
+                .generate_proof_for_epoch(parent_epoch, child_epoch)
+                .await
+                .with_context(|| {
+                    format!(
+                        "Failed to generate proof for epoch {} (parent_cert={}, child_cert={})",
+                        parent_epoch, pending_instance, child_instance
+                    )
+                })?;
+
+            epoch_proofs.push(EpochProofEntry::new(
+                parent_epoch,
+                proof_bundle,
+                pending_instance,
+                child_instance,
+            ));
+        }
+
+        // Cache all epoch proofs
+        self.cache.insert_epoch_proofs(epoch_proofs)?;
+
+        tracing::info!(
+            pending_instance,
+            child_instance,
+            epoch_count = epochs.len(),
+            "Successfully generated and cached proofs for all epochs"
+        );
+
+        Ok(())
     }
 
     /// Get reference to the cache (for proposers)
     pub fn cache(&self) -> &Arc<ProofCache> {
         &self.cache
+    }
+}
+
+/// Check if two certificates have continuity (pending's last epoch + 1 == new's first epoch)
+fn check_continuity(pending: &FinalityCertificate, new_cert: &FinalityCertificate) -> bool {
+    let pending_last = pending.ec_chain.suffix().last().map(|t| t.epoch);
+    let new_base = new_cert.ec_chain.base().map(|t| t.epoch);
+
+    match (pending_last, new_base) {
+        (Some(last), Some(base)) => {
+            // The new cert's base should be the pending's last epoch
+            // (F3 chains overlap at the boundary)
+            last == base
+        }
+        (None, _) => {
+            // Pending has empty suffix - just accept continuity
+            true
+        }
+        _ => false,
     }
 }
 
@@ -300,6 +392,7 @@ async fn resolve_eth_address_to_actor_id(eth_addr: &str, parent_rpc_url: &str) -
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::CacheConfig;
 
     #[tokio::test]
     async fn test_service_creation() {
@@ -309,7 +402,7 @@ mod tests {
             enabled: true,
             parent_rpc_url: "http://localhost:1234/rpc/v1".to_string(),
             gateway_id: GatewayId::ActorId(1001),
-            cache_config: Default::default(),
+            cache_config: CacheConfig::default(),
             ..Default::default()
         };
 

@@ -4,9 +4,18 @@
 //!
 //! This crate implements a background service that:
 //! - Monitors the parent chain for new F3 certificates
-//! - Generates proof bundles ahead of time
-//! - Caches proofs for instant use by block proposers
+//! - Generates proof bundles ahead of time (one per epoch)
+//! - Caches proofs keyed by epoch for instant use by block proposers
 //! - Ensures sequential processing of F3 instances
+//!
+//! # Architecture
+//!
+//! The cache uses a two-level structure:
+//! - **Certificate Store**: F3 certificates keyed by instance ID
+//! - **Epoch Proof Store**: Proof bundles keyed by epoch
+//!
+//! This avoids duplicating certificates when multiple epochs reference
+//! the same certificate pair.
 
 pub mod assembler;
 pub mod cache;
@@ -22,10 +31,13 @@ pub mod verifier;
 pub use cache::ProofCache;
 pub use config::{CacheConfig, ProofServiceConfig};
 pub use service::ProofGeneratorService;
-pub use types::{CacheEntry, SerializableF3Certificate};
+pub use types::{
+    CertificateEntry, EpochProofEntry, EpochProofWithCertificates, SerializableF3Certificate,
+};
 pub use verifier::ProofsVerifier;
 
 use anyhow::{Context, Result};
+use fvm_shared::clock::ChainEpoch;
 use ipc_api::subnet_id::SubnetID;
 use std::sync::Arc;
 
@@ -36,7 +48,9 @@ use std::sync::Arc;
 ///
 /// # Arguments
 /// * `config` - Service configuration
-/// * `initial_committed_instance` - The last committed F3 instance (from F3CertManager actor)
+/// * `subnet_id` - The subnet ID
+/// * `initial_committed_epoch` - The last committed epoch (for cache initialization)
+/// * `initial_instance` - The last committed F3 instance (from F3CertManager actor)
 /// * `initial_power_table` - Initial power table (from F3CertManager actor)
 /// * `db_path` - Optional database path for persistence
 ///
@@ -46,7 +60,8 @@ use std::sync::Arc;
 pub async fn launch_service(
     config: ProofServiceConfig,
     subnet_id: SubnetID,
-    initial_committed_instance: u64,
+    initial_committed_epoch: ChainEpoch,
+    initial_instance: u64,
     initial_power_table: filecoin_f3_gpbft::PowerEntries,
     db_path: Option<std::path::PathBuf>,
 ) -> Result<Option<(Arc<ProofCache>, tokio::task::JoinHandle<()>)>> {
@@ -60,8 +75,8 @@ pub async fn launch_service(
         anyhow::bail!("parent_rpc_url is required");
     }
 
-    if config.cache_config.lookahead_instances == 0 {
-        anyhow::bail!("lookahead_instances must be > 0");
+    if config.cache_config.lookahead_epochs == 0 {
+        anyhow::bail!("lookahead_epochs must be > 0");
     }
 
     // Validate URL format
@@ -69,10 +84,11 @@ pub async fn launch_service(
         .with_context(|| format!("Invalid parent_rpc_url: {}", config.parent_rpc_url))?;
 
     tracing::info!(
-        initial_instance = initial_committed_instance,
+        initial_epoch = initial_committed_epoch,
+        initial_instance,
         parent_rpc = config.parent_rpc_url,
         f3_network = config.f3_network_name(&subnet_id),
-        lookahead = config.cache_config.lookahead_instances,
+        lookahead_epochs = config.cache_config.lookahead_epochs,
         "Launching proof generator service with validated configuration"
     );
 
@@ -80,15 +96,14 @@ pub async fn launch_service(
     let cache = if let Some(path) = db_path {
         tracing::info!(path = %path.display(), "Creating cache with persistence");
         Arc::new(ProofCache::new_with_persistence(
-            initial_committed_instance,
+            initial_committed_epoch,
             config.cache_config.clone(),
             &path,
-            initial_committed_instance,
         )?)
     } else {
         tracing::info!("Creating in-memory cache (no persistence)");
         Arc::new(ProofCache::new(
-            initial_committed_instance,
+            initial_committed_epoch,
             config.cache_config.clone(),
         ))
     };
@@ -104,7 +119,7 @@ pub async fn launch_service(
             config_clone,
             cache_clone,
             &subnet_id,
-            initial_committed_instance,
+            initial_instance,
             power_table_clone,
         )
         .await
@@ -133,7 +148,7 @@ mod tests {
 
         let power_table = PowerEntries(vec![]);
         let subnet_id = SubnetID::default();
-        let result = launch_service(config, subnet_id, 0, power_table, None).await;
+        let result = launch_service(config, subnet_id, 0, 0, power_table, None).await;
         assert!(result.is_ok());
         assert!(result.unwrap().is_none());
     }
@@ -154,7 +169,7 @@ mod tests {
         let power_table = PowerEntries(vec![]);
         let subnet_id = SubnetID::default();
 
-        let result = launch_service(config, subnet_id, 100, power_table, None).await;
+        let result = launch_service(config, subnet_id, 100, 5, power_table, None).await;
         assert!(result.is_ok());
 
         let (cache, handle) = result.unwrap().unwrap();

@@ -7,6 +7,7 @@
 //! proof generation - it has no knowledge of cache entries or storage.
 
 use crate::observe::{OperationStatus, ProofBundleGenerated};
+use crate::types::FinalizedTipset;
 use anyhow::{Context, Result};
 use fvm_ipld_encoding;
 use ipc_observability::emit;
@@ -85,150 +86,66 @@ impl ProofAssembler {
         LotusClient::new(self.rpc_url.clone(), None)
     }
 
-    /// Generate a unified proof bundle for a list of finalized epochs.
+    /// Fetch a tipset by epoch from Lotus RPC
+    async fn fetch_tipset(&self, epoch: i64) -> Result<proofs::client::types::ApiTipset> {
+        let client = self.create_client();
+        let json = client
+            .request(
+                "Filecoin.ChainGetTipSetByHeight",
+                serde_json::json!([epoch, null]),
+            )
+            .await
+            .with_context(|| format!("Failed to fetch tipset at epoch {}", epoch))?;
+
+        serde_json::from_value(json)
+            .with_context(|| format!("Failed to deserialize tipset at epoch {}", epoch))
+    }
+
+    /// Generate a proof bundle for a single epoch transition.
     ///
-    /// This function fetches the relevant parent and child tipsets for the highest epoch,
-    /// then generates both storage and event proofs for transitions occurring at the boundary
-    /// between those tipsets. The resulting bundle includes storage proofs, event proofs,
-    /// and witness blocks used for verification.
+    /// This is the primary method for proof generation. It creates proofs for
+    /// the state and events at `parent_tipset`, using `child_tipset` to access
+    /// the resulting state root and receipts.
     ///
     /// # Arguments
-    /// * `finalized_epochs` - List of epoch numbers (chain heights) that have been finalized and require proofs.
+    /// * `parent_tipset` - The epoch to prove (state/events at this height)
+    /// * `child_tipset` - The epoch containing the resulting state root (typically parent_epoch + 1)
     ///
     /// # Returns
-    /// Optionally, a UnifiedProofBundle containing the proof data needed for top-down verification, or None if no new epochs are finalized.
-    pub async fn generate_proof_bundle(
+    /// A UnifiedProofBundle containing storage proofs, event proofs, and witness blocks.
+    pub async fn generate_proof_for_epoch(
         &self,
-        finalized_tipsets: Vec<i64>,
-    ) -> Result<Option<UnifiedProofBundle>> {
-        // In another words there are no new tipsets to prove
-        if finalized_tipsets.is_empty() {
-            return Ok(None);
-        }
+        parent_tipset: FinalizedTipset,
+        child_tipset: FinalizedTipset,
+    ) -> Result<UnifiedProofBundle> {
+        let parent_epoch = parent_tipset.epoch;
+        let child_epoch = child_tipset.epoch;
 
         let generation_start = Instant::now();
 
-        // highest_epoch is now a reference to the last element of finalized_epochs
-        let highest_epoch = finalized_tipsets.last().unwrap();
-
-        tracing::debug!(highest_epoch, "Generating proof bundle - fetching tipsets");
-
-        // Fetch tipsets from Lotus using proofs library client
-        // We need both parent and child tipsets to generate storage/event proofs:
-        // - Parent tipset (at highest_epoch): Contains the state root we're proving against
-        // - Child tipset (at highest_epoch + 1): Needed to prove state transitions and events
-        //   that occurred when moving from parent to child
-        //
-        // The F3 certificate contains only the tipset CID and epoch, not the full tipset data.
-        // We fetch the actual tipsets here to extract block headers, state roots, and receipts.
-        let client = self.create_client();
-
-        let parent_tipset = client
-            .request(
-                "Filecoin.ChainGetTipSetByHeight",
-                serde_json::json!([highest_epoch, null]),
-            )
-            .await
-            .with_context(|| {
-                format!(
-                    "Failed to fetch parent tipset at epoch {} - RPC may not serve old tipsets (check lookback limit)",
-                    highest_epoch
-                )
-            })?;
-
-        // Child tipset is needed for proof generation - it contains the receipts and
-        // state transitions from the parent tipset
-        let child_tipset = client
-            .request(
-                "Filecoin.ChainGetTipSetByHeight",
-                serde_json::json!([highest_epoch + 1, null]),
-            )
-            .await
-            .with_context(|| {
-                format!(
-                    "Failed to fetch child tipset at epoch {} - RPC may not serve old tipsets (check lookback limit)",
-                    highest_epoch + 1
-                )
-            })?;
-
-        tracing::debug!(highest_epoch, "Fetched tipsets successfully");
-
-        // Deserialize tipsets from JSON
-        let parent_api: proofs::client::types::ApiTipset =
-            serde_json::from_value(parent_tipset).context("Failed to deserialize parent tipset")?;
-        let child_api: proofs::client::types::ApiTipset =
-            serde_json::from_value(child_tipset).context("Failed to deserialize child tipset")?;
-
-        // Configure proof specs for Gateway contract
-        // Storage:
-        //   - subnets[subnetKey].topDownNonce: For topdown message ordering
-        //   - nextConfigurationNumber: For power change tracking
-        // Events:
-        //   - NewTopDownMessage: Captures topdown messages for this subnet
-        //   - NewPowerChangeRequest: Captures validator power changes
-        let storage_specs = vec![
-            StorageProofSpec {
-                actor_id: self.gateway_actor_id,
-                // Calculate slot for subnets[subnetKey].topDownNonce in the mapping
-                slot: calculate_storage_slot(&self.subnet_id, TOPDOWN_NONCE_STORAGE_OFFSET),
-            },
-            StorageProofSpec {
-                actor_id: self.gateway_actor_id,
-                // nextConfigurationNumber is a direct storage variable at slot 20
-                // Using an empty key with the slot offset to get the direct variable
-                slot: calculate_storage_slot("", NEXT_CONFIG_NUMBER_STORAGE_SLOT),
-            },
-        ];
-
-        let event_specs = vec![
-            // Capture topdown messages for this specific subnet
-            EventProofSpec {
-                event_signature: NEW_TOPDOWN_MESSAGE_SIGNATURE.to_string(),
-                // topic_1 is the indexed subnet address
-                topic_1: self.subnet_id.clone(),
-                actor_id_filter: Some(self.gateway_actor_id),
-            },
-            // Capture ALL power change requests from the gateway
-            // These affect validator sets and need to be processed
-            EventProofSpec {
-                event_signature: NEW_POWER_CHANGE_REQUEST_SIGNATURE.to_string(),
-                // No topic_1 filter - we want all power changes
-                topic_1: String::new(),
-                actor_id_filter: Some(self.gateway_actor_id),
-            },
-        ];
-
         tracing::debug!(
-            highest_epoch,
-            storage_specs_count = storage_specs.len(),
-            event_specs_count = event_specs.len(),
-            "Configured proof specs"
+            parent_epoch,
+            child_epoch,
+            "Generating proof for epoch - fetching tipsets"
         );
 
-        // Create LotusClient for this request (not stored due to Rc/RefCell)
-        let lotus_client = self.create_client();
+        // Fetch tipsets from Lotus and verify they match the expected ones
+        let parent_api = self.fetch_tipset(parent_epoch).await?;
+        let child_api = self.fetch_tipset(child_epoch).await?;
 
-        // Generate proof bundle in blocking task
-        // CRITICAL: The proofs library uses Rc/RefCell internally making LotusClient and
-        // related types non-Send. We must use spawn_blocking to run the proof generation
-        // in a separate thread, then use futures::executor::block_on to bridge the
-        // async/sync worlds. This prevents blocking the main tokio runtime while
-        // handling non-Send types correctly.
-        let bundle = tokio::task::spawn_blocking(move || {
-            tokio::runtime::Handle::current()
-                .block_on(generate_proof_bundle(
-                    &lotus_client,
-                    &parent_api,
-                    &child_api,
-                    storage_specs,
-                    event_specs,
-                ))
-                .context("Failed to generate proof bundle")
-        })
-        .await
-        .context("Failed to join proof generation task")??;
+        parent_tipset
+            .verify_matches(&FinalizedTipset::try_from(&parent_api)?)
+            .context("Parent tipset mismatch")?;
+        child_tipset
+            .verify_matches(&FinalizedTipset::try_from(&child_api)?)
+            .context("Child tipset mismatch")?;
 
-        // Calculate bundle size for metrics
+        // Generate the proof bundle
+        let bundle = self
+            .generate_proof_bundle_internal(parent_epoch, &parent_api, &child_api)
+            .await?;
+
+        // Emit metrics
         let bundle_size_bytes = fvm_ipld_encoding::to_vec(&bundle)
             .map(|v| v.len())
             .unwrap_or(0);
@@ -236,7 +153,7 @@ impl ProofAssembler {
         let latency = generation_start.elapsed().as_secs_f64();
 
         emit(ProofBundleGenerated {
-            highest_epoch: *highest_epoch,
+            highest_epoch: parent_epoch,
             storage_proofs: bundle.storage_proofs.len(),
             event_proofs: bundle.event_proofs.len(),
             witness_blocks: bundle.blocks.len(),
@@ -246,14 +163,93 @@ impl ProofAssembler {
         });
 
         tracing::info!(
-            highest_epoch,
+            parent_epoch,
+            child_epoch,
             storage_proofs = bundle.storage_proofs.len(),
             event_proofs = bundle.event_proofs.len(),
             witness_blocks = bundle.blocks.len(),
-            "Generated proof bundle"
+            "Generated proof bundle for epoch"
         );
 
-        Ok(Some(bundle))
+        Ok(bundle)
+    }
+
+    /// Internal method to generate proof bundle from already-fetched tipsets
+    async fn generate_proof_bundle_internal(
+        &self,
+        epoch: i64,
+        parent_api: &proofs::client::types::ApiTipset,
+        child_api: &proofs::client::types::ApiTipset,
+    ) -> Result<UnifiedProofBundle> {
+        // Configure proof specs for Gateway contract
+        let storage_specs = self.create_storage_specs();
+        let event_specs = self.create_event_specs();
+
+        tracing::debug!(
+            epoch,
+            storage_specs_count = storage_specs.len(),
+            event_specs_count = event_specs.len(),
+            "Configured proof specs"
+        );
+
+        // Clone data for the blocking task
+        let parent_api_clone = parent_api.clone();
+        let child_api_clone = child_api.clone();
+        let lotus_client = self.create_client();
+
+        // Generate proof bundle in blocking task
+        // CRITICAL: The proofs library uses Rc/RefCell internally making LotusClient and
+        // related types non-Send. We must use spawn_blocking to run the proof generation
+        // in a separate thread.
+        let bundle = tokio::task::spawn_blocking(move || {
+            tokio::runtime::Handle::current()
+                .block_on(generate_proof_bundle(
+                    &lotus_client,
+                    &parent_api_clone,
+                    &child_api_clone,
+                    storage_specs,
+                    event_specs,
+                ))
+                .context("Failed to generate proof bundle")
+        })
+        .await
+        .context("Failed to join proof generation task")??;
+
+        Ok(bundle)
+    }
+
+    /// Create storage proof specifications for the Gateway contract
+    fn create_storage_specs(&self) -> Vec<StorageProofSpec> {
+        vec![
+            StorageProofSpec {
+                actor_id: self.gateway_actor_id,
+                // Calculate slot for subnets[subnetKey].topDownNonce in the mapping
+                slot: calculate_storage_slot(&self.subnet_id, TOPDOWN_NONCE_STORAGE_OFFSET),
+            },
+            StorageProofSpec {
+                actor_id: self.gateway_actor_id,
+                // nextConfigurationNumber is a direct storage variable at slot 20
+                slot: calculate_storage_slot("", NEXT_CONFIG_NUMBER_STORAGE_SLOT),
+            },
+        ]
+    }
+
+    /// Create event proof specifications for the Gateway contract
+    fn create_event_specs(&self) -> Vec<EventProofSpec> {
+        vec![
+            // Capture topdown messages for this specific subnet
+            EventProofSpec {
+                event_signature: NEW_TOPDOWN_MESSAGE_SIGNATURE.to_string(),
+                topic_1: self.subnet_id.clone(),
+                actor_id_filter: Some(self.gateway_actor_id),
+            },
+            // Capture ALL power change requests from the gateway
+            EventProofSpec {
+                event_signature: NEW_POWER_CHANGE_REQUEST_SIGNATURE.to_string(),
+                topic_1: String::new(),
+                actor_id_filter: Some(self.gateway_actor_id),
+            },
+        ]
     }
 }
 

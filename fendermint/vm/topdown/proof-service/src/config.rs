@@ -78,17 +78,22 @@ impl Default for ProofServiceConfig {
 /// Configuration for the proof cache
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CacheConfig {
-    /// Lookahead window
-    pub lookahead_instances: u64,
-    /// Retention window
-    pub retention_instances: u64,
+    /// How many epochs ahead to generate proofs for
+    /// This determines how far ahead of the last committed epoch we pre-generate proofs
+    pub lookahead_epochs: u64,
+    
+    /// How many epochs to retain after they've been committed
+    /// Old epochs outside this window will be cleaned up
+    pub retention_epochs: u64,
 }
 
 impl Default for CacheConfig {
     fn default() -> Self {
         Self {
-            lookahead_instances: 5,
-            retention_instances: 2,
+            // Default: generate proofs for ~50 epochs ahead (~25 minutes at 30s/epoch)
+            lookahead_epochs: 50,
+            // Default: keep proofs for 10 epochs after commit
+            retention_epochs: 10,
         }
     }
 }
@@ -102,7 +107,7 @@ mod tests {
         let config = ProofServiceConfig::default();
         assert!(!config.enabled);
         assert_eq!(config.polling_interval, Duration::from_secs(10));
-        assert_eq!(config.cache_config.lookahead_instances, 5);
-        assert_eq!(config.cache_config.retention_instances, 2);
+        assert_eq!(config.cache_config.lookahead_epochs, 50);
+        assert_eq!(config.cache_config.retention_epochs, 10);
     }
 }

@@ -1,31 +1,43 @@
 // Copyright 2022-2025 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
-//! In-memory cache for proof bundles with optional disk persistence
+//! Two-level cache for proof bundles with optional disk persistence
+//!
+//! # Architecture
+//!
+//! The cache is organized in two levels:
+//! - **Certificate Store**: Stores F3 certificates keyed by instance ID
+//! - **Epoch Proof Store**: Stores proof bundles keyed by epoch
+//!
+//! This design avoids duplicating certificates when multiple epochs
+//! reference the same certificate pair.
 
 use crate::config::CacheConfig;
 use crate::observe::{ProofCached, CACHE_HIT_TOTAL, CACHE_SIZE};
 use crate::persistence::ProofCachePersistence;
-use crate::types::CacheEntry;
+use crate::types::{CertificateEntry, EpochProofEntry, EpochProofWithCertificates};
 use anyhow::{Context, Result};
+use fvm_shared::clock::ChainEpoch;
 use ipc_observability::emit;
 use parking_lot::RwLock;
 use std::collections::BTreeMap;
 use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Arc;
 
-/// Thread-safe in-memory cache for proof bundles
+/// Thread-safe two-level cache for proof bundles
 #[derive(Clone)]
 pub struct ProofCache {
-    /// Map: instance_id -> CacheEntry
-    /// Using BTreeMap for ordered iteration
-    entries: Arc<RwLock<BTreeMap<u64, CacheEntry>>>,
+    /// Certificate store: instance_id -> CertificateEntry
+    certificates: Arc<RwLock<BTreeMap<u64, CertificateEntry>>>,
+
+    /// Epoch proof store: epoch -> EpochProofEntry
+    epoch_proofs: Arc<RwLock<BTreeMap<ChainEpoch, EpochProofEntry>>>,
 
     /// Configuration
     config: CacheConfig,
 
-    /// Last committed instance ID (updated after execution)
-    last_committed_instance: Arc<AtomicU64>,
+    /// Last committed epoch (updated after execution)
+    last_committed_epoch: Arc<AtomicI64>,
 
     /// Optional disk persistence
     persistence: Option<Arc<ProofCachePersistence>>,
@@ -33,10 +45,11 @@ pub struct ProofCache {
 
 impl ProofCache {
     /// Create a new proof cache (in-memory only)
-    pub fn new(last_committed_instance: u64, config: CacheConfig) -> Self {
+    pub fn new(last_committed_epoch: ChainEpoch, config: CacheConfig) -> Self {
         Self {
-            entries: Arc::new(RwLock::new(BTreeMap::new())),
-            last_committed_instance: Arc::new(AtomicU64::new(last_committed_instance)),
+            certificates: Arc::new(RwLock::new(BTreeMap::new())),
+            epoch_proofs: Arc::new(RwLock::new(BTreeMap::new())),
+            last_committed_epoch: Arc::new(AtomicI64::new(last_committed_epoch)),
             config,
             persistence: None,
         }
@@ -45,44 +58,132 @@ impl ProofCache {
     /// Create a new proof cache with disk persistence
     ///
     /// Loads existing entries from disk on startup.
-    /// If DB is fresh, uses `initial_instance` as the starting point.
     pub fn new_with_persistence(
-        last_committed_instance: u64,
+        last_committed_epoch: ChainEpoch,
         config: CacheConfig,
         db_path: &Path,
-        initial_instance: u64,
     ) -> Result<Self> {
         let persistence = ProofCachePersistence::open(db_path)?;
 
-        let entries_vec = persistence
-            .load_all_entries()
-            .context("Failed to load all entries from disk")?;
-        let entries: BTreeMap<u64, CacheEntry> = entries_vec
+        // Load certificates
+        let cert_entries = persistence
+            .load_all_certificates()
+            .context("Failed to load certificates from disk")?;
+        let certificates: BTreeMap<u64, CertificateEntry> = cert_entries
             .into_iter()
-            .map(|e| (e.certificate.gpbft_instance, e))
+            .map(|e| (e.instance_id(), e))
             .collect();
 
+        // Load epoch proofs
+        let proof_entries = persistence
+            .load_all_epoch_proofs()
+            .context("Failed to load epoch proofs from disk")?;
+        let epoch_proofs: BTreeMap<ChainEpoch, EpochProofEntry> =
+            proof_entries.into_iter().map(|e| (e.epoch, e)).collect();
+
         tracing::info!(
-            initial_instance,
-            entry_count = entries.len(),
+            certificates = certificates.len(),
+            epoch_proofs = epoch_proofs.len(),
             "Loaded cache from disk"
         );
 
         let cache = Self {
-            entries: Arc::new(RwLock::new(entries)),
-            last_committed_instance: Arc::new(AtomicU64::new(last_committed_instance)),
+            certificates: Arc::new(RwLock::new(certificates)),
+            epoch_proofs: Arc::new(RwLock::new(epoch_proofs)),
+            last_committed_epoch: Arc::new(AtomicI64::new(last_committed_epoch)),
             config,
             persistence: Some(Arc::new(persistence)),
         };
 
-        cache.cleanup_old_instances(initial_instance)?;
+        // Cleanup old entries
+        cache.cleanup_old_epochs(last_committed_epoch)?;
 
         Ok(cache)
     }
 
-    /// Get proof for a specific instance ID
-    pub fn get(&self, instance_id: u64) -> Option<CacheEntry> {
-        let result = self.entries.read().get(&instance_id).cloned();
+    /// Insert a certificate into the store
+    pub fn insert_certificate(&self, entry: CertificateEntry) -> Result<()> {
+        let instance_id = entry.instance_id();
+
+        // Insert to memory
+        self.certificates.write().insert(instance_id, entry.clone());
+
+        // Persist to disk if enabled
+        if let Some(persistence) = &self.persistence {
+            persistence.save_certificate(&entry)?;
+        }
+
+        tracing::debug!(instance_id, "Inserted certificate into cache");
+        Ok(())
+    }
+
+    /// Get a certificate by instance ID
+    pub fn get_certificate(&self, instance_id: u64) -> Option<CertificateEntry> {
+        self.certificates.read().get(&instance_id).cloned()
+    }
+
+    /// Check if a certificate exists
+    pub fn contains_certificate(&self, instance_id: u64) -> bool {
+        self.certificates.read().contains_key(&instance_id)
+    }
+
+    /// Get the highest cached certificate instance ID
+    pub fn highest_cached_instance(&self) -> Option<u64> {
+        self.certificates.read().keys().max().copied()
+    }
+
+    /// Insert epoch proofs into the cache
+    ///
+    /// This is typically called after processing a certificate, inserting
+    /// proofs for all epochs in the certificate's suffix.
+    pub fn insert_epoch_proofs(&self, entries: Vec<EpochProofEntry>) -> Result<()> {
+        if entries.is_empty() {
+            return Ok(());
+        }
+
+        let epochs: Vec<ChainEpoch> = entries.iter().map(|e| e.epoch).collect();
+
+        // Insert to memory
+        {
+            let mut proofs = self.epoch_proofs.write();
+            for entry in entries.iter() {
+                proofs.insert(entry.epoch, entry.clone());
+            }
+        }
+
+        // Persist to disk if enabled
+        if let Some(persistence) = &self.persistence {
+            for entry in &entries {
+                persistence.save_epoch_proof(entry)?;
+            }
+        }
+
+        // Emit metrics
+        let cache_size = self.epoch_proofs.read().len();
+        let highest_epoch = self.highest_cached_epoch();
+
+        if let Some(highest) = highest_epoch {
+            for epoch in &epochs {
+                emit(ProofCached {
+                    instance: *epoch as u64, // Using epoch as the key metric
+                    cache_size,
+                    highest_cached: highest as u64,
+                });
+            }
+        }
+
+        CACHE_SIZE.set(cache_size as i64);
+
+        tracing::debug!(?epochs, cache_size, "Inserted epoch proofs into cache");
+        Ok(())
+    }
+
+    /// Get proof for a specific epoch
+    ///
+    /// Returns the proof entry without the certificates.
+    /// Use `get_epoch_proof_with_certificates` for full data.
+    pub fn get_epoch_proof(&self, epoch: ChainEpoch) -> Option<EpochProofEntry> {
+        let result = self.epoch_proofs.read().get(&epoch).cloned();
 
         // Record cache hit/miss
         CACHE_HIT_TOTAL
@@ -92,134 +193,148 @@ impl ProofCache {
         result
     }
 
-    /// Check if an instance is already cached
-    pub fn contains(&self, instance_id: u64) -> bool {
-        self.entries.read().contains_key(&instance_id)
+    /// Get proof for a specific epoch with its certificates
+    ///
+    /// This is the main query method for consumers. Returns everything
+    /// needed for verification, including the pre-merged tipset list.
+    pub fn get_epoch_proof_with_certificates(
+        &self,
+        epoch: ChainEpoch,
+    ) -> Option<EpochProofWithCertificates> {
+        let proof_entry = self.get_epoch_proof(epoch)?;
+
+        let parent_cert = self.get_certificate(proof_entry.parent_cert_instance)?;
+        let child_cert = self.get_certificate(proof_entry.child_cert_instance)?;
+
+        Some(EpochProofWithCertificates::new(
+            &proof_entry,
+            &parent_cert,
+            &child_cert,
+        ))
     }
 
-    /// Insert a proof into the cache
-    pub fn insert(&self, entry: CacheEntry) -> anyhow::Result<()> {
-        let instance_id = entry.certificate.gpbft_instance;
-
-        // Check if we're within the lookahead window
-        let last_committed = self.highest_cached_instance().unwrap_or(0);
-        let max_allowed = last_committed + self.config.lookahead_instances;
-
-        if instance_id > max_allowed {
-            anyhow::bail!(
-                "Instance {} exceeds lookahead window (last_committed={}, max={})",
-                instance_id,
-                last_committed,
-                max_allowed
-            );
-        }
-
-        // Insert to memory
-        self.entries.write().insert(instance_id, entry.clone());
-
-        // Persist to disk if enabled
-        if let Some(persistence) = &self.persistence {
-            persistence.save_entry(&entry)?;
-        }
-
-        // Emit metrics
-        let cache_size = self.entries.read().len();
-        let highest = self.highest_cached_instance();
-
-        if let Some(highest_cached) = highest {
-            emit(ProofCached {
-                instance: instance_id,
-                cache_size,
-                highest_cached,
-            });
-        }
-
-        // Update cache size metric
-        CACHE_SIZE.set(cache_size as i64);
-
-        tracing::debug!(instance_id, cache_size, "Inserted proof into cache");
-
-        Ok(())
+    /// Check if an epoch proof exists
+    pub fn contains_epoch_proof(&self, epoch: ChainEpoch) -> bool {
+        self.epoch_proofs.read().contains_key(&epoch)
     }
 
-    /// Mark an instance as committed and trigger cleanup
-    pub fn mark_committed(&self, instance_id: u64) -> Result<()> {
-        let old_value = self
-            .last_committed_instance
-            .swap(instance_id, Ordering::Release);
+    /// Get the highest cached epoch
+    pub fn highest_cached_epoch(&self) -> Option<ChainEpoch> {
+        self.epoch_proofs.read().keys().max().copied()
+    }
+
+    /// Get the lowest cached epoch
+    pub fn lowest_cached_epoch(&self) -> Option<ChainEpoch> {
+        self.epoch_proofs.read().keys().min().copied()
+    }
+
+    /// Mark an epoch as committed and trigger cleanup
+    pub fn mark_committed(&self, epoch: ChainEpoch) -> Result<()> {
+        let old_value = self.last_committed_epoch.swap(epoch, Ordering::Release);
 
         tracing::info!(
-            old_instance = old_value,
-            new_instance = instance_id,
-            "Updated last committed instance"
+            old_epoch = old_value,
+            new_epoch = epoch,
+            "Updated last committed epoch"
         );
 
-        // Cleanup old instances outside retention window
-        self.cleanup_old_instances(instance_id)?;
+        // Cleanup old entries outside retention window
+        self.cleanup_old_epochs(epoch)?;
 
         Ok(())
     }
 
-    /// Get the current last committed instance
-    pub fn last_committed_instance(&self) -> u64 {
-        self.last_committed_instance.load(Ordering::Acquire)
+    /// Get the current last committed epoch
+    pub fn last_committed_epoch(&self) -> ChainEpoch {
+        self.last_committed_epoch.load(Ordering::Acquire)
     }
 
-    /// Get the highest cached instance
-    pub fn highest_cached_instance(&self) -> Option<u64> {
-        self.entries.read().keys().max().copied()
+    /// Get the number of cached epoch proofs
+    pub fn epoch_proof_count(&self) -> usize {
+        self.epoch_proofs.read().len()
     }
 
-    /// Get the number of cached entries
-    pub fn len(&self) -> usize {
-        self.entries.read().len()
+    /// Get the number of cached certificates
+    pub fn certificate_count(&self) -> usize {
+        self.certificates.read().len()
     }
 
     /// Check if cache is empty
     pub fn is_empty(&self) -> bool {
-        self.entries.read().is_empty()
+        self.epoch_proofs.read().is_empty()
     }
 
-    /// Remove instances older than the retention window
-    fn cleanup_old_instances(&self, current_instance: u64) -> Result<()> {
-        let retention_cutoff = current_instance.saturating_sub(self.config.retention_instances);
+    /// Remove epochs older than the retention window
+    fn cleanup_old_epochs(&self, current_epoch: ChainEpoch) -> Result<()> {
+        let retention_epochs = self.config.retention_epochs as i64;
+        let retention_cutoff = current_epoch.saturating_sub(retention_epochs);
 
-        // Collect IDs to remove
-        let to_remove: Vec<u64> = {
-            let entries = self.entries.read();
-            entries
+        // Collect epochs to remove
+        let epochs_to_remove: Vec<ChainEpoch> = {
+            let proofs = self.epoch_proofs.read();
+            proofs
                 .keys()
-                .filter(|&&id| id < retention_cutoff)
+                .filter(|&&epoch| epoch < retention_cutoff)
                 .copied()
                 .collect()
         };
 
-        if to_remove.is_empty() {
-            tracing::debug!(retention_cutoff, "No old instances to cleanup");
+        if epochs_to_remove.is_empty() {
+            tracing::debug!(retention_cutoff, "No old epochs to cleanup");
             return Ok(());
         }
 
-        // Remove from memory
-        let mut entries = self.entries.write();
-        for id in &to_remove {
-            entries.remove(id);
+        // Find which certificates are still referenced
+        let referenced_certs: std::collections::HashSet<u64> = {
+            let proofs = self.epoch_proofs.read();
+            proofs
+                .values()
+                .filter(|p| !epochs_to_remove.contains(&p.epoch))
+                .flat_map(|p| vec![p.parent_cert_instance, p.child_cert_instance])
+                .collect()
+        };
+
+        // Remove old epoch proofs
+        {
+            let mut proofs = self.epoch_proofs.write();
+            for epoch in &epochs_to_remove {
+                proofs.remove(epoch);
+            }
         }
 
-        // Remove from disk if enabled
+        // Remove unreferenced certificates
+        let certs_to_remove: Vec<u64> = {
+            let certs = self.certificates.read();
+            certs
+                .keys()
+                .filter(|id| !referenced_certs.contains(id))
+                .copied()
+                .collect()
+        };
+
+        {
+            let mut certs = self.certificates.write();
+            for id in &certs_to_remove {
+                certs.remove(id);
+            }
+        }
+
+        // Remove from disk if persistence is enabled
         if let Some(persistence) = &self.persistence {
-            for id in &to_remove {
-                persistence
-                    .delete_entry(*id)
-                    .context("Failed to delete cache entry from disk")?;
+            for epoch in &epochs_to_remove {
+                persistence.delete_epoch_proof(*epoch)?;
+            }
+            for id in &certs_to_remove {
+                persistence.delete_certificate(*id)?;
             }
         }
 
         // Update cache size metric
-        let cache_size = self.entries.read().len();
-        CACHE_SIZE.set(cache_size as i64);
+        CACHE_SIZE.set(self.epoch_proofs.read().len() as i64);
 
         tracing::debug!(
-            removed = to_remove.len(),
+            epochs_removed = epochs_to_remove.len(),
+            certs_removed = certs_to_remove.len(),
             retention_cutoff,
             "Cleaned up old cache entries"
         );
@@ -227,9 +342,14 @@ impl ProofCache {
         Ok(())
     }
 
-    /// Get all cached instance IDs (for debugging)
-    pub fn cached_instances(&self) -> Vec<u64> {
-        self.entries.read().keys().copied().collect()
+    /// Get all cached epochs (for debugging)
+    pub fn cached_epochs(&self) -> Vec<ChainEpoch> {
+        self.epoch_proofs.read().keys().copied().collect()
+    }
+
+    /// Get all cached certificate instance IDs (for debugging)
+    pub fn cached_certificate_instances(&self) -> Vec<u64> {
+        self.certificates.read().keys().copied().collect()
     }
 }
 
@@ -237,13 +357,13 @@ impl ProofCache {
 mod tests {
     use super::*;
     use crate::types::{
-        CacheEntry, SerializableCacheEntry, SerializableECChainEntry, SerializableF3Certificate,
+        SerializableCertificateEntry, SerializableECChainEntry, SerializableF3Certificate,
         SerializablePowerEntries, SerializablePowerEntry, SerializableSupplementalData,
     };
     use proofs::proofs::common::bundle::UnifiedProofBundle;
     use std::time::SystemTime;
 
-    fn create_test_entry(instance_id: u64, epochs: Vec<i64>) -> CacheEntry {
+    fn create_test_certificate(instance_id: u64, epochs: Vec<i64>) -> CertificateEntry {
         use multihash_codetable::{Code, MultihashDigest};
 
         let power_table_cid = cid::Cid::new_v1(0x55, Code::Blake2b256.digest(b"test")).to_string();
@@ -258,12 +378,7 @@ mod tests {
             })
             .collect();
 
-        let serializable = SerializableCacheEntry {
-            proof_bundle: Some(UnifiedProofBundle {
-                storage_proofs: vec![],
-                event_proofs: vec![],
-                blocks: vec![],
-            }),
+        let serializable = SerializableCertificateEntry {
             certificate: SerializableF3Certificate {
                 gpbft_instance: instance_id,
                 ec_chain,
@@ -280,101 +395,174 @@ mod tests {
                 power: "1000".to_string(),
                 pub_key: vec![1; 48],
             }]),
-            generated_at: SystemTime::now(),
             source_rpc: "test".to_string(),
+            fetched_at: SystemTime::now(),
         };
 
-        CacheEntry::try_from(serializable).expect("valid cache entry")
+        CertificateEntry::try_from(serializable).expect("valid certificate entry")
+    }
+
+    fn create_test_epoch_proof(
+        epoch: ChainEpoch,
+        parent_cert: u64,
+        child_cert: u64,
+    ) -> EpochProofEntry {
+        EpochProofEntry::new(
+            epoch,
+            UnifiedProofBundle {
+                storage_proofs: vec![],
+                event_proofs: vec![],
+                blocks: vec![],
+            },
+            parent_cert,
+            child_cert,
+        )
     }
 
     #[test]
     fn test_cache_basic_operations() {
         let config = CacheConfig {
-            lookahead_instances: 5,
-            retention_instances: 2,
+            lookahead_epochs: 10,
+            retention_epochs: 5,
         };
 
         let cache = ProofCache::new(100, config);
 
-        assert_eq!(cache.len(), 0);
         assert!(cache.is_empty());
+        assert_eq!(cache.epoch_proof_count(), 0);
+        assert_eq!(cache.certificate_count(), 0);
 
-        // Insert next instance
-        let entry = create_test_entry(101, vec![200, 201, 202]);
-        cache.insert(entry).unwrap();
+        // Insert certificates
+        let cert1 = create_test_certificate(5, vec![100, 101, 102]);
+        let cert2 = create_test_certificate(6, vec![102, 103]);
+        cache.insert_certificate(cert1).unwrap();
+        cache.insert_certificate(cert2).unwrap();
 
-        assert_eq!(cache.len(), 1);
-        assert!(!cache.is_empty());
-        assert!(cache.contains(101));
+        assert_eq!(cache.certificate_count(), 2);
+        assert!(cache.contains_certificate(5));
+        assert!(cache.contains_certificate(6));
+
+        // Insert epoch proofs
+        let proofs = vec![
+            create_test_epoch_proof(100, 5, 6),
+            create_test_epoch_proof(101, 5, 6),
+            create_test_epoch_proof(102, 5, 6),
+        ];
+        cache.insert_epoch_proofs(proofs).unwrap();
+
+        assert_eq!(cache.epoch_proof_count(), 3);
+        assert!(cache.contains_epoch_proof(100));
+        assert!(cache.contains_epoch_proof(101));
+        assert!(cache.contains_epoch_proof(102));
     }
 
     #[test]
-    fn test_cache_lookahead_enforcement() {
+    fn test_get_epoch_proof_with_certificates() {
         let config = CacheConfig {
-            lookahead_instances: 3,
-            retention_instances: 1,
+            lookahead_epochs: 10,
+            retention_epochs: 5,
         };
 
         let cache = ProofCache::new(100, config);
 
-        // Can insert within lookahead (100 + 1..=100 + 3)
-        cache.insert(create_test_entry(101, vec![201])).unwrap();
-        cache.insert(create_test_entry(102, vec![202])).unwrap();
-        cache.insert(create_test_entry(103, vec![203])).unwrap();
+        // Insert certificates
+        let cert1 = create_test_certificate(5, vec![100, 101, 102]);
+        let cert2 = create_test_certificate(6, vec![102, 103]);
+        cache.insert_certificate(cert1).unwrap();
+        cache.insert_certificate(cert2).unwrap();
 
-        // Should fail beyond lookahead
-        let result = cache.insert(create_test_entry(105, vec![205]));
-        assert!(result.is_err());
+        // Insert epoch proof
+        let proof = create_test_epoch_proof(101, 5, 6);
+        cache.insert_epoch_proofs(vec![proof]).unwrap();
+
+        // Get with certificates
+        let result = cache.get_epoch_proof_with_certificates(101);
+        assert!(result.is_some());
+
+        let entry = result.unwrap();
+        assert_eq!(entry.epoch, 101);
+        assert_eq!(entry.parent_certificate.gpbft_instance, 5);
+        assert_eq!(entry.child_certificate.gpbft_instance, 6);
+        // Merged tipsets should include epochs from both certs
+        assert!(!entry.merged_tipsets.is_empty());
     }
 
     #[test]
     fn test_cache_cleanup() {
         let config = CacheConfig {
-            lookahead_instances: 10,
-            retention_instances: 2,
+            lookahead_epochs: 10,
+            retention_epochs: 2,
         };
 
         let cache = ProofCache::new(100, config);
 
-        // Insert several entries
-        for i in 101..=105 {
-            cache.insert(create_test_entry(i, vec![i as i64])).unwrap();
-        }
+        // Insert certificates
+        let cert1 = create_test_certificate(5, vec![100, 101, 102]);
+        let cert2 = create_test_certificate(6, vec![102, 103, 104]);
+        let cert3 = create_test_certificate(7, vec![104, 105]);
+        cache.insert_certificate(cert1).unwrap();
+        cache.insert_certificate(cert2).unwrap();
+        cache.insert_certificate(cert3).unwrap();
 
-        assert_eq!(cache.len(), 5);
+        // Insert epoch proofs
+        let proofs = vec![
+            create_test_epoch_proof(100, 5, 6),
+            create_test_epoch_proof(101, 5, 6),
+            create_test_epoch_proof(102, 5, 6),
+            create_test_epoch_proof(103, 6, 7),
+            create_test_epoch_proof(104, 6, 7),
+        ];
+        cache.insert_epoch_proofs(proofs).unwrap();
 
-        // Mark 103 as committed (retention window is 2)
-        // Should keep 101, 102, 103, 104, 105 (all within retention_cutoff = 103 - 2 = 101)
-        cache.mark_committed(103).unwrap();
-        assert_eq!(cache.len(), 5); // All still within retention
+        assert_eq!(cache.epoch_proof_count(), 5);
 
-        // Mark 105 as committed
-        // Should remove 101, 102 (retention_cutoff = 105 - 2 = 103)
-        cache.mark_committed(105).unwrap();
-        assert_eq!(cache.len(), 3); // 103, 104, 105 remain
-        assert!(!cache.contains(101));
-        assert!(!cache.contains(102));
-        assert!(cache.contains(103));
+        // Mark epoch 104 as committed (retention is 2)
+        // Should remove epochs < 102 (i.e., 100, 101)
+        cache.mark_committed(104).unwrap();
+
+        assert_eq!(cache.epoch_proof_count(), 3); // 102, 103, 104 remain
+        assert!(!cache.contains_epoch_proof(100));
+        assert!(!cache.contains_epoch_proof(101));
+        assert!(cache.contains_epoch_proof(102));
+        assert!(cache.contains_epoch_proof(103));
+        assert!(cache.contains_epoch_proof(104));
+
+        // Certificate 5 might be removed if no longer referenced
+        // (depends on which proofs still reference it)
     }
 
     #[test]
-    fn test_cache_highest_instance() {
+    fn test_highest_cached_epoch() {
         let config = CacheConfig {
-            lookahead_instances: 10,
-            retention_instances: 2,
+            lookahead_epochs: 10,
+            retention_epochs: 5,
         };
 
         let cache = ProofCache::new(100, config);
 
-        assert_eq!(cache.highest_cached_instance(), None);
+        assert_eq!(cache.highest_cached_epoch(), None);
 
-        cache.insert(create_test_entry(101, vec![201])).unwrap();
-        assert_eq!(cache.highest_cached_instance(), Some(101));
+        // Insert certificates first
+        cache
+            .insert_certificate(create_test_certificate(5, vec![100]))
+            .unwrap();
+        cache
+            .insert_certificate(create_test_certificate(6, vec![101]))
+            .unwrap();
 
-        cache.insert(create_test_entry(105, vec![205])).unwrap();
-        assert_eq!(cache.highest_cached_instance(), Some(105));
+        cache
+            .insert_epoch_proofs(vec![create_test_epoch_proof(100, 5, 6)])
+            .unwrap();
+        assert_eq!(cache.highest_cached_epoch(), Some(100));
 
-        cache.insert(create_test_entry(103, vec![203])).unwrap();
-        assert_eq!(cache.highest_cached_instance(), Some(105));
+        cache
+            .insert_epoch_proofs(vec![create_test_epoch_proof(105, 5, 6)])
+            .unwrap();
+        assert_eq!(cache.highest_cached_epoch(), Some(105));
+
+        cache
+            .insert_epoch_proofs(vec![create_test_epoch_proof(103, 5, 6)])
+            .unwrap();
+        assert_eq!(cache.highest_cached_epoch(), Some(105));
     }
 }

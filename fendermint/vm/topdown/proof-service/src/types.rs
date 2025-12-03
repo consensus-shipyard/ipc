@@ -11,7 +11,121 @@ use keccak_hash::H256;
 use num_bigint::BigInt;
 use proofs::proofs::common::bundle::UnifiedProofBundle;
 use serde::{Deserialize, Serialize};
+use std::ops::Deref;
 use std::time::SystemTime;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FinalizedTipsets(Vec<FinalizedTipset>);
+
+impl Deref for FinalizedTipsets {
+    type Target = Vec<FinalizedTipset>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl FinalizedTipsets {
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn last(&self) -> Option<&FinalizedTipset> {
+        self.0.last()
+    }
+
+    /// Merge two ECChains into a single FinalizedTipsets
+    pub fn merge(a: &ECChain, b: &ECChain) -> Self {
+        Self(
+            a.iter()
+                .chain(b.iter())
+                .map(FinalizedTipset::from)
+                .collect(),
+        )
+    }
+}
+
+impl From<&[Tipset]> for FinalizedTipsets {
+    /// Convert from slice of F3 Tipsets
+    fn from(tipsets: &[Tipset]) -> Self {
+        Self(tipsets.iter().map(FinalizedTipset::from).collect())
+    }
+}
+
+impl From<&ECChain> for FinalizedTipsets {
+    /// Convert from F3 ECChain
+    fn from(ec_chain: &ECChain) -> Self {
+        Self(ec_chain.iter().map(FinalizedTipset::from).collect())
+    }
+}
+
+impl TryFrom<&[proofs::client::types::ApiTipset]> for FinalizedTipsets {
+    type Error = anyhow::Error;
+
+    /// Convert from slice of ApiTipsets
+    fn try_from(tipsets: &[proofs::client::types::ApiTipset]) -> Result<Self> {
+        tipsets
+            .iter()
+            .map(FinalizedTipset::try_from)
+            .collect::<Result<Vec<_>>>()
+            .map(Self)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct FinalizedTipset {
+    /// The epoch of the tipset
+    pub epoch: i64,
+    /// Canonically ordered concatenated block-header CIDs
+    pub block_cids: Vec<u8>,
+}
+
+impl FinalizedTipset {
+    /// Verify this tipset matches another (e.g., fetched from RPC)
+    ///
+    /// Returns an error with details if they don't match.
+    pub fn verify_matches(&self, other: &Self) -> Result<()> {
+        if self.epoch != other.epoch || self.block_cids != other.block_cids {
+            bail!(
+                "Tipset mismatch: expected (epoch={}, cids={:x?}) got (epoch={}, cids={:x?})",
+                self.epoch,
+                self.block_cids,
+                other.epoch,
+                other.block_cids
+            );
+        }
+        Ok(())
+    }
+}
+
+impl From<&Tipset> for FinalizedTipset {
+    /// Convert from F3 library's Tipset.
+    /// The key field is already concatenated bytes.
+    fn from(tipset: &Tipset) -> Self {
+        Self {
+            epoch: tipset.epoch,
+            block_cids: tipset.key.clone(),
+        }
+    }
+}
+
+impl TryFrom<&proofs::client::types::ApiTipset> for FinalizedTipset {
+    type Error = anyhow::Error;
+
+    /// Convert from proofs library's ApiTipset.
+    /// Follows F3's convert_tipset_key pattern.
+    fn try_from(api_tipset: &proofs::client::types::ApiTipset) -> Result<Self> {
+        let mut block_cids = Vec::new();
+        for cid_map in &api_tipset.cids {
+            let cid = Cid::try_from(cid_map.cid.as_str())?;
+            block_cids.extend(cid.to_bytes());
+        }
+        Ok(Self {
+            epoch: api_tipset.height,
+            block_cids,
+        })
+    }
+}
 
 /// Serializable EC Chain entry
 ///
@@ -280,42 +394,6 @@ impl From<&FinalityCertificate> for SerializableF3Certificate {
     }
 }
 
-/// Entry in the proof cache
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SerializableCacheEntry {
-    pub proof_bundle: Option<UnifiedProofBundle>,
-    pub certificate: SerializableF3Certificate,
-    pub power_table: SerializablePowerEntries,
-    pub generated_at: SystemTime,
-    pub source_rpc: String,
-}
-
-impl From<&CacheEntry> for SerializableCacheEntry {
-    fn from(entry: &CacheEntry) -> Self {
-        Self {
-            proof_bundle: entry.proof_bundle.clone(),
-            certificate: SerializableF3Certificate::from(&entry.certificate),
-            power_table: SerializablePowerEntries::from(&entry.power_table),
-            generated_at: entry.generated_at,
-            source_rpc: entry.source_rpc.clone(),
-        }
-    }
-}
-
-impl TryFrom<SerializableCacheEntry> for CacheEntry {
-    type Error = anyhow::Error;
-
-    fn try_from(value: SerializableCacheEntry) -> Result<Self> {
-        Ok(Self {
-            proof_bundle: value.proof_bundle,
-            certificate: value.certificate.try_into_certificate()?,
-            power_table: value.power_table.into_power_entries()?,
-            generated_at: value.generated_at,
-            source_rpc: value.source_rpc,
-        })
-    }
-}
-
 impl From<&PowerEntry> for SerializablePowerEntry {
     fn from(entry: &PowerEntry) -> Self {
         Self {
@@ -332,39 +410,200 @@ impl From<&PowerEntries> for SerializablePowerEntries {
     }
 }
 
-/// Entry in the proof cache
-#[derive(Debug, Clone)]
-pub struct CacheEntry {
-    /// Typed proof bundle (storage + event proofs + witness blocks)
-    /// None if the proof bundle was not generated (e.g. if the certificate has no suffix)
-    pub proof_bundle: Option<UnifiedProofBundle>,
+/// Entry in the epoch proof cache (keyed by epoch)
+///
+/// This is the primary cache entry that consumers will query.
+/// It contains the proof for a single epoch and references to the
+/// certificates needed for verification.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EpochProofEntry {
+    /// The epoch this proof is for
+    pub epoch: ChainEpoch,
 
-    /// Validated certificate (cryptographically verified)
-    pub certificate: FinalityCertificate,
+    /// The proof bundle for this epoch
+    pub proof_bundle: UnifiedProofBundle,
 
-    /// Power table after applying this certificate's power_table_delta
-    /// This is needed to resume F3 client state from cache
-    pub power_table: PowerEntries,
+    /// Instance ID of the certificate that certifies this epoch (parent)
+    pub parent_cert_instance: u64,
+
+    /// Instance ID of the certificate that certifies epoch+1 (child)
+    pub child_cert_instance: u64,
 
     /// Metadata
     pub generated_at: SystemTime,
-    pub source_rpc: String,
 }
 
-impl CacheEntry {
-    /// Create a new cache entry from a validated F3 certificate and proof bundle
+impl EpochProofEntry {
+    pub fn new(
+        epoch: ChainEpoch,
+        proof_bundle: UnifiedProofBundle,
+        parent_cert_instance: u64,
+        child_cert_instance: u64,
+    ) -> Self {
+        Self {
+            epoch,
+            proof_bundle,
+            parent_cert_instance,
+            child_cert_instance,
+            generated_at: SystemTime::now(),
+        }
+    }
+}
+
+/// Serializable version of EpochProofEntry for disk persistence
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SerializableEpochProofEntry {
+    pub epoch: ChainEpoch,
+    pub proof_bundle: UnifiedProofBundle,
+    pub parent_cert_instance: u64,
+    pub child_cert_instance: u64,
+    pub generated_at: SystemTime,
+}
+
+impl From<&EpochProofEntry> for SerializableEpochProofEntry {
+    fn from(entry: &EpochProofEntry) -> Self {
+        Self {
+            epoch: entry.epoch,
+            proof_bundle: entry.proof_bundle.clone(),
+            parent_cert_instance: entry.parent_cert_instance,
+            child_cert_instance: entry.child_cert_instance,
+            generated_at: entry.generated_at,
+        }
+    }
+}
+
+impl From<SerializableEpochProofEntry> for EpochProofEntry {
+    fn from(entry: SerializableEpochProofEntry) -> Self {
+        Self {
+            epoch: entry.epoch,
+            proof_bundle: entry.proof_bundle,
+            parent_cert_instance: entry.parent_cert_instance,
+            child_cert_instance: entry.child_cert_instance,
+            generated_at: entry.generated_at,
+        }
+    }
+}
+
+/// Certificate entry for the certificate store (keyed by instance ID)
+///
+/// Certificates are stored separately to avoid duplication when multiple
+/// epochs reference the same certificate.
+#[derive(Debug, Clone)]
+pub struct CertificateEntry {
+    /// The validated F3 certificate
+    pub certificate: FinalityCertificate,
+
+    /// Power table after applying this certificate's power_table_delta
+    pub power_table: PowerEntries,
+
+    /// Source RPC endpoint
+    pub source_rpc: String,
+
+    /// When this certificate was fetched
+    pub fetched_at: SystemTime,
+}
+
+impl CertificateEntry {
     pub fn new(
         certificate: FinalityCertificate,
-        proof_bundle: Option<UnifiedProofBundle>,
         power_table: PowerEntries,
         source_rpc: String,
     ) -> Self {
         Self {
-            proof_bundle,
             certificate,
             power_table,
-            generated_at: SystemTime::now(),
             source_rpc,
+            fetched_at: SystemTime::now(),
+        }
+    }
+
+    /// Get the instance ID of this certificate
+    pub fn instance_id(&self) -> u64 {
+        self.certificate.gpbft_instance
+    }
+}
+
+/// Serializable version of CertificateEntry for disk persistence
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SerializableCertificateEntry {
+    pub certificate: SerializableF3Certificate,
+    pub power_table: SerializablePowerEntries,
+    pub source_rpc: String,
+    pub fetched_at: SystemTime,
+}
+
+impl From<&CertificateEntry> for SerializableCertificateEntry {
+    fn from(entry: &CertificateEntry) -> Self {
+        Self {
+            certificate: SerializableF3Certificate::from(&entry.certificate),
+            power_table: SerializablePowerEntries::from(&entry.power_table),
+            source_rpc: entry.source_rpc.clone(),
+            fetched_at: entry.fetched_at,
+        }
+    }
+}
+
+impl TryFrom<SerializableCertificateEntry> for CertificateEntry {
+    type Error = anyhow::Error;
+
+    fn try_from(entry: SerializableCertificateEntry) -> Result<Self> {
+        Ok(Self {
+            certificate: entry.certificate.try_into_certificate()?,
+            power_table: entry.power_table.into_power_entries()?,
+            source_rpc: entry.source_rpc,
+            fetched_at: entry.fetched_at,
+        })
+    }
+}
+
+/// Result of looking up an epoch proof with its certificates
+///
+/// This is what consumers receive when they query for an epoch's proof.
+/// It includes everything needed for verification.
+#[derive(Debug, Clone)]
+pub struct EpochProofWithCertificates {
+    /// The epoch
+    pub epoch: ChainEpoch,
+
+    /// The proof bundle
+    pub proof_bundle: UnifiedProofBundle,
+
+    /// The parent certificate (certifies this epoch)
+    pub parent_certificate: FinalityCertificate,
+
+    /// The child certificate (certifies epoch+1)
+    pub child_certificate: FinalityCertificate,
+
+    /// Pre-merged tipsets from both certificates for verification
+    /// This is computed on retrieval to avoid storing redundant data
+    pub merged_tipsets: FinalizedTipsets,
+}
+
+impl EpochProofWithCertificates {
+    /// Create from an epoch proof entry and its referenced certificates
+    pub fn new(
+        proof_entry: &EpochProofEntry,
+        parent_cert: &CertificateEntry,
+        child_cert: &CertificateEntry,
+    ) -> Self {
+        // Merge tipsets from both certificates
+        // If same instance, just use parent's chain; otherwise concatenate both
+        let merged =
+            if parent_cert.certificate.gpbft_instance == child_cert.certificate.gpbft_instance {
+                FinalizedTipsets::from(&parent_cert.certificate.ec_chain)
+            } else {
+                FinalizedTipsets::merge(
+                    &parent_cert.certificate.ec_chain,
+                    &child_cert.certificate.ec_chain,
+                )
+            };
+
+        Self {
+            epoch: proof_entry.epoch,
+            proof_bundle: proof_entry.proof_bundle.clone(),
+            parent_certificate: parent_cert.certificate.clone(),
+            child_certificate: child_cert.certificate.clone(),
+            merged_tipsets: merged,
         }
     }
 }

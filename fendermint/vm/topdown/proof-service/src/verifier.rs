@@ -4,11 +4,17 @@
 //!
 //! Provides deterministic verification of proof bundles against F3 certificates.
 //! Used by validators during block attestation to verify parent finality proofs.
+//!
+//! # Verification Flow
+//!
+//! The verifier checks that witness blocks in the proof bundle are certified
+//! by the F3 certificates. With the two-level cache design, proofs are verified
+//! against pre-merged tipsets from both the parent and child certificates.
 
 use crate::assembler::{NEW_POWER_CHANGE_REQUEST_SIGNATURE, NEW_TOPDOWN_MESSAGE_SIGNATURE};
+use crate::types::{EpochProofWithCertificates, FinalizedTipsets};
 use anyhow::Result;
 use cid::Cid;
-use filecoin_f3_certs::FinalityCertificate;
 use proofs::proofs::common::bundle::{UnifiedProofBundle, UnifiedVerificationResult};
 use proofs::proofs::events::bundle::EventProofBundle;
 use proofs::proofs::events::verifier::verify_event_proof;
@@ -32,38 +38,66 @@ impl ProofsVerifier {
 
         Self { events }
     }
-}
 
-impl ProofsVerifier {
-    /// Verify a unified proof bundle against a certificate
+    /// Verify a proof bundle using pre-merged tipsets from certificates
     ///
-    /// This performs deterministic verification of:
-    /// - Storage proofs (contract state at parent height)
-    /// - Event proofs (emitted events at parent height)
+    /// This is the primary verification method. It verifies that all witness
+    /// blocks in the proof bundle are certified by the provided tipsets.
     ///
     /// # Arguments
     /// * `bundle` - The proof bundle to verify
-    /// * `certificate` - The certificate containing finalized epochs
-    pub fn verify_proof_bundle(
+    /// * `merged_tipsets` - Pre-merged tipsets from parent and child certificates
+    ///
+    /// # Returns
+    /// Verification results for storage and event proofs
+    pub fn verify_proof_bundle_with_tipsets(
         &self,
         bundle: &UnifiedProofBundle,
-        certificate: &FinalityCertificate,
+        merged_tipsets: &FinalizedTipsets,
     ) -> Result<UnifiedVerificationResult> {
         let tipset_verifier = |epoch: i64, cid: &Cid| -> bool {
-            certificate
-                .ec_chain
+            merged_tipsets
                 .iter()
-                .any(|ts| ts.epoch == epoch && ts.key == cid.to_bytes())
+                .any(|ts| ts.epoch == epoch && ts.block_cids == cid.to_bytes())
         };
 
+        self.verify_with_verifier(bundle, &tipset_verifier)
+    }
+
+    /// Verify a proof bundle from a cache entry
+    ///
+    /// Convenience method that extracts the merged tipsets from an
+    /// EpochProofWithCertificates entry.
+    ///
+    /// # Arguments
+    /// * `entry` - The epoch proof entry with its certificates
+    ///
+    /// # Returns
+    /// Verification results for storage and event proofs
+    pub fn verify_epoch_proof(
+        &self,
+        entry: &EpochProofWithCertificates,
+    ) -> Result<UnifiedVerificationResult> {
+        self.verify_proof_bundle_with_tipsets(&entry.proof_bundle, &entry.merged_tipsets)
+    }
+
+    /// Internal verification using a tipset verifier closure
+    fn verify_with_verifier<F>(
+        &self,
+        bundle: &UnifiedProofBundle,
+        tipset_verifier: &F,
+    ) -> Result<UnifiedVerificationResult>
+    where
+        F: Fn(i64, &Cid) -> bool,
+    {
         // Verify storage proofs
         let mut storage_results = Vec::new();
         for proof in &bundle.storage_proofs {
-            let result = verify_storage_proof(proof, &bundle.blocks, &tipset_verifier)?;
+            let result = verify_storage_proof(proof, &bundle.blocks, tipset_verifier)?;
             storage_results.push(result);
         }
 
-        // Verify event proofs - need to create an EventProofBundle for the verifier
+        // Verify event proofs
         let event_bundle = EventProofBundle {
             proofs: bundle.event_proofs.clone(),
             blocks: bundle.blocks.clone(),
@@ -76,7 +110,7 @@ impl ProofsVerifier {
         let event_results = verify_event_proof(
             &event_bundle,
             &parent_tipset_verifier,
-            &tipset_verifier,
+            tipset_verifier,
             Some(&self.create_event_filter()),
         )?;
 
@@ -100,5 +134,16 @@ impl ProofsVerifier {
                 false
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_verifier_creation() {
+        let verifier = ProofsVerifier::new("test-subnet".to_string());
+        assert_eq!(verifier.events.len(), 2);
     }
 }
