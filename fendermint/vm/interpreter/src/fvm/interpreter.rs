@@ -7,7 +7,7 @@ use crate::fvm::executions::{
     execute_cron_message, execute_signed_message, push_block_to_chainmeta_actor_if_possible,
 };
 use crate::fvm::gas_estimation::{estimate_gassed_msg, gas_search};
-use crate::fvm::storage_env::ReadRequestPool;
+#[cfg(feature = "storage-node")]
 use crate::fvm::storage_helpers::{
     close_read_request, read_request_callback, set_read_request_pending,
 };
@@ -481,6 +481,7 @@ where
                         domain_hash: None,
                     })
                 }
+                #[cfg(feature = "storage-node")]
                 IpcMessage::ReadRequestPending(read_request) => {
                     // Set the read request to "pending" state
                     let ret = set_read_request_pending(state, read_request.id)?;
@@ -495,6 +496,7 @@ where
                         domain_hash: None,
                     })
                 }
+                #[cfg(feature = "storage-node")]
                 IpcMessage::ReadRequestClosed(read_request) => {
                     // Send the data to the callback address.
                     // If this fails (e.g., the callback address is not reachable),

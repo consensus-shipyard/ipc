@@ -11,14 +11,17 @@ use lazy_static::lazy_static;
 
 use self::{
     eth::EthArgs, genesis::GenesisArgs, key::KeyArgs, materializer::MaterializerArgs,
-    objects::ObjectsArgs, rpc::RpcArgs, run::RunArgs,
+    rpc::RpcArgs, run::RunArgs,
 };
+#[cfg(feature = "storage-node")]
+use self::objects::ObjectsArgs;
 pub mod config;
 pub mod debug;
 pub mod eth;
 pub mod genesis;
 pub mod key;
 pub mod materializer;
+#[cfg(feature = "storage-node")]
 pub mod objects;
 pub mod rpc;
 pub mod run;
@@ -151,6 +154,7 @@ pub enum Commands {
     #[clap(aliases  = &["mat", "matr", "mate"])]
     Materializer(MaterializerArgs),
     /// Subcommands related to the Objects/Blobs storage HTTP API.
+    #[cfg(feature = "storage-node")]
     Objects(ObjectsArgs),
 }
 

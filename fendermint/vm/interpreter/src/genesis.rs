@@ -421,46 +421,50 @@ impl<'a> GenesisBuilder<'a> {
             )
             .context("failed to create chainmetadata actor")?;
 
-        // Initialize the recall config actor.
-        let recall_config_state = fendermint_actor_storage_config::State {
-            admin: None,
-            config: fendermint_actor_storage_config_shared::RecallConfig::default(),
-        };
-        state
-            .create_custom_actor(
-                fendermint_actor_storage_config::ACTOR_NAME,
-                recall_config::RECALL_CONFIG_ACTOR_ID,
-                &recall_config_state,
-                TokenAmount::zero(),
-                None,
-            )
-            .context("failed to create recall config actor")?;
+        // Initialize storage node actors (optional)
+        #[cfg(feature = "storage-node")]
+        {
+            // Initialize the recall config actor.
+            let recall_config_state = fendermint_actor_storage_config::State {
+                admin: None,
+                config: fendermint_actor_storage_config_shared::RecallConfig::default(),
+            };
+            state
+                .create_custom_actor(
+                    fendermint_actor_storage_config::ACTOR_NAME,
+                    recall_config::RECALL_CONFIG_ACTOR_ID,
+                    &recall_config_state,
+                    TokenAmount::zero(),
+                    None,
+                )
+                .context("failed to create recall config actor")?;
 
-        // Initialize the blob actor with delegated address for Ethereum/Solidity access.
-        let blobs_state = fendermint_actor_storage_blobs::State::new(&state.store())?;
-        let blobs_eth_addr = init::builtin_actor_eth_addr(blobs::BLOBS_ACTOR_ID);
-        let blobs_f4_addr = fvm_shared::address::Address::from(blobs_eth_addr);
-        state
-            .create_custom_actor(
-                fendermint_actor_storage_blobs::BLOBS_ACTOR_NAME,
-                blobs::BLOBS_ACTOR_ID,
-                &blobs_state,
-                TokenAmount::zero(),
-                Some(blobs_f4_addr),
-            )
-            .context("failed to create blobs actor")?;
-        println!("!!!!!!!!  SETUP BLOB ACTOR !!!!!!!!: {blobs_eth_addr}, {blobs_eth_addr:?}");
+            // Initialize the blob actor with delegated address for Ethereum/Solidity access.
+            let blobs_state = fendermint_actor_storage_blobs::State::new(&state.store())?;
+            let blobs_eth_addr = init::builtin_actor_eth_addr(blobs::BLOBS_ACTOR_ID);
+            let blobs_f4_addr = fvm_shared::address::Address::from(blobs_eth_addr);
+            state
+                .create_custom_actor(
+                    fendermint_actor_storage_blobs::BLOBS_ACTOR_NAME,
+                    blobs::BLOBS_ACTOR_ID,
+                    &blobs_state,
+                    TokenAmount::zero(),
+                    Some(blobs_f4_addr),
+                )
+                .context("failed to create blobs actor")?;
+            println!("!!!!!!!!  SETUP BLOB ACTOR !!!!!!!!: {blobs_eth_addr}, {blobs_eth_addr:?}");
 
-        // Initialize the blob reader actor.
-        state
-            .create_custom_actor(
-                fendermint_actor_storage_blob_reader::BLOB_READER_ACTOR_NAME,
-                blob_reader::BLOB_READER_ACTOR_ID,
-                &fendermint_actor_storage_blob_reader::State::new(&state.store())?,
-                TokenAmount::zero(),
-                None,
-            )
-            .context("failed to create blob reader actor")?;
+            // Initialize the blob reader actor.
+            state
+                .create_custom_actor(
+                    fendermint_actor_storage_blob_reader::BLOB_READER_ACTOR_NAME,
+                    blob_reader::BLOB_READER_ACTOR_ID,
+                    &fendermint_actor_storage_blob_reader::State::new(&state.store())?,
+                    TokenAmount::zero(),
+                    None,
+                )
+                .context("failed to create blob reader actor")?;
+        }
 
         let eam_state = fendermint_actor_eam::State::new(
             state.store(),

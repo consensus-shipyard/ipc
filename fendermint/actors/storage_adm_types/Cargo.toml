@@ -6,6 +6,10 @@ edition.workspace = true
 authors.workspace = true
 version = "0.1.0"
 
+[features]
+default = []
+
+
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
 

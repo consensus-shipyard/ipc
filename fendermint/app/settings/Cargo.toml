@@ -32,3 +32,7 @@ ipc-observability = { path = "../../../ipc/observability" }
 
 fendermint_vm_encoding = { path = "../../vm/encoding" }
 fendermint_vm_topdown = { path = "../../vm/topdown" }
+
+[features]
+default = ["storage-node"]
+storage-node = []

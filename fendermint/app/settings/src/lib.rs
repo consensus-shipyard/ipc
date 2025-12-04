@@ -23,6 +23,7 @@ use fendermint_vm_topdown::BlockHeight;
 
 use self::eth::EthSettings;
 use self::fvm::FvmSettings;
+#[cfg(feature = "storage-node")]
 use self::objects::ObjectsSettings;
 use self::resolver::ResolverSettings;
 use ipc_observability::config::TracingSettings;
@@ -30,6 +31,7 @@ use ipc_provider::config::deserialize::deserialize_eth_address_from_str;
 
 pub mod eth;
 pub mod fvm;
+#[cfg(feature = "storage-node")]
 pub mod objects;
 pub mod resolver;
 pub mod testing;
@@ -362,6 +364,7 @@ pub struct Settings {
     pub snapshots: SnapshotSettings,
     pub eth: EthSettings,
     pub fvm: FvmSettings,
+    #[cfg(feature = "storage-node")]
     pub objects: ObjectsSettings,
     pub resolver: ResolverSettings,
     pub broadcast: BroadcastSettings,
@@ -397,6 +400,7 @@ impl Default for Settings {
             snapshots: Default::default(),
             eth: Default::default(),
             fvm: Default::default(),
+            #[cfg(feature = "storage-node")]
             objects: ObjectsSettings {
                 max_object_size: 1024 * 1024 * 100, // 100MB default
                 listen: SocketAddress {

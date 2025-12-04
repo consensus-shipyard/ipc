@@ -29,21 +29,21 @@ fendermint_actor_activity_tracker = { path = "../../actors/activity-tracker" }
 fendermint_actor_f3_light_client = { path = "../../actors/f3-light-client" }
 fendermint_actor_gas_market_eip1559 = { path = "../../actors/gas_market/eip1559" }
 fendermint_actor_eam = { path = "../../actors/eam" }
-fendermint_actor_storage_adm = { path = "../../actors/storage_adm" }
-fendermint_actor_storage_blobs = { path = "../../actors/storage_blobs" }
-fendermint_actor_storage_blobs_shared = { path = "../../actors/storage_blobs/shared" }
-fendermint_actor_storage_blob_reader = { path = "../../actors/storage_blob_reader" }
-fendermint_actor_storage_config = { path = "../../actors/storage_config" }
-fendermint_actor_storage_config_shared = { path = "../../actors/storage_config/shared" }
-fendermint_actor_storage_adm_types = { workspace = true }
+fendermint_actor_storage_adm = { path = "../../actors/storage_adm", optional = true }
+fendermint_actor_storage_blobs = { path = "../../actors/storage_blobs", optional = true }
+fendermint_actor_storage_blobs_shared = { path = "../../actors/storage_blobs/shared", optional = true }
+fendermint_actor_storage_blob_reader = { path = "../../actors/storage_blob_reader", optional = true }
+fendermint_actor_storage_config = { path = "../../actors/storage_config", optional = true }
+fendermint_actor_storage_config_shared = { path = "../../actors/storage_config/shared", optional = true }
+fendermint_actor_storage_adm_types = { workspace = true, optional = true }
 fil_actor_evm = { workspace = true }
 fendermint_testing = { path = "../../testing", optional = true }
 ipc_actors_abis = { path = "../../../contract-bindings" }
-storage_node_executor = { path = "../../../storage-node/executor" }
-storage_node_kernel = { path = "../../../storage-node/kernel" }
-fendermint_vm_storage_resolver = { path = "../storage_resolver" }
-iroh = { workspace = true }
-iroh-blobs = { workspace = true }
+storage_node_executor = { path = "../../../storage-node/executor", optional = true }
+storage_node_kernel = { path = "../../../storage-node/kernel", optional = true }
+fendermint_vm_storage_resolver = { path = "../storage_resolver", optional = true }
+iroh = { workspace = true, optional = true }
+iroh-blobs = { workspace = true, optional = true }
 fil_actor_eam = { workspace = true }
 ipc-api = { path = "../../../ipc/api" }
 ipc-observability = { path = "../../../ipc/observability" }
@@ -102,7 +102,7 @@ multihash = { workspace = true }
 hex = { workspace = true }
 
 [features]
-default = []
+default = ["storage-node"]
 bundle = []
 arb = [
     "arbitrary",
@@ -112,3 +112,17 @@ arb = [
     "rand",
 ]
 test-util = []
+storage-node = [
+    "dep:storage_node_executor",
+    "dep:storage_node_kernel",
+    "dep:fendermint_actor_storage_adm",
+    "dep:fendermint_actor_storage_blobs",
+    "dep:fendermint_actor_storage_blobs_shared",
+    "dep:fendermint_actor_storage_blob_reader",
+    "dep:fendermint_actor_storage_config",
+    "dep:fendermint_actor_storage_config_shared",
+    "dep:fendermint_actor_storage_adm_types",
+    "dep:fendermint_vm_storage_resolver",
+    "dep:iroh",
+    "dep:iroh-blobs",
+]

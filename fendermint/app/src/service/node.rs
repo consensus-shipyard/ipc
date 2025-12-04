@@ -9,19 +9,22 @@ use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, R
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::fvm::interpreter::FvmMessagesInterpreter;
 use fendermint_vm_interpreter::fvm::observe::register_metrics as register_interpreter_metrics;
+#[cfg(feature = "storage-node")]
 use fendermint_vm_interpreter::fvm::storage_env::{BlobPool, ReadRequestPool};
 use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
+#[cfg(feature = "storage-node")]
 use fendermint_vm_storage_resolver::iroh::IrohResolver;
+#[cfg(feature = "storage-node")]
 use fendermint_vm_storage_resolver::pool::ResolvePool;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::observe::register_metrics as register_topdown_metrics;
 use fendermint_vm_topdown::proxy::{IPCProviderProxy, IPCProviderProxyWithLatency};
 use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
-use fendermint_vm_topdown::{
-    CachedFinalityProvider, IPCBlobFinality, IPCParentFinality, IPCReadRequestClosed, Toggle,
-};
+use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
+#[cfg(feature = "storage-node")]
+use fendermint_vm_topdown::{IPCBlobFinality, IPCReadRequestClosed};
 use fvm_shared::address::{current_network, Address, Network};
 use ipc_ipld_resolver::{Event as ResolverEvent, IrohConfig, VoteRecord};
 use ipc_observability::observe::register_metrics as register_default_metrics;
@@ -128,8 +131,10 @@ pub async fn run(
 
     let parent_finality_votes = VoteTally::empty();
 
-    // Create Recall blob and read request resolution pools early so they can be used by IrohResolver
+    // Create storage node blob and read request resolution pools (optional)
+    #[cfg(feature = "storage-node")]
     let blob_pool: BlobPool = ResolvePool::new();
+    #[cfg(feature = "storage-node")]
     let read_request_pool: ReadRequestPool = ResolvePool::new();
 
     let topdown_enabled = settings.topdown_enabled();
@@ -181,7 +186,8 @@ pub async fn run(
             tracing::info!("parent finality vote gossip disabled");
         }
 
-        // Spawn Iroh resolvers for blob and read request resolution
+        // Spawn Iroh resolvers for blob and read request resolution (storage-node feature)
+        #[cfg(feature = "storage-node")]
         if let Some(ref key) = validator_keypair {
             // Blob resolver
             let iroh_resolver = IrohResolver::new(

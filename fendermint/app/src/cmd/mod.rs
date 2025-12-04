@@ -23,6 +23,7 @@ pub mod eth;
 pub mod genesis;
 pub mod key;
 pub mod materializer;
+#[cfg(feature = "storage-node")]
 pub mod objects;
 pub mod rpc;
 pub mod run;
@@ -69,6 +70,7 @@ macro_rules! cmd {
 
 /// Execute the command specified in the options.
 pub async fn exec(opts: Arc<Options>) -> anyhow::Result<()> {
+    #[allow(unreachable_patterns)]
     match &opts.command {
         Commands::Config(args) => args.exec(opts.clone()).await,
         Commands::Debug(args) => {
@@ -101,10 +103,15 @@ pub async fn exec(opts: Arc<Options>) -> anyhow::Result<()> {
             let _trace_file_guard = set_global_tracing_subscriber(&TracingSettings::default());
             args.exec(()).await
         }
+        #[cfg(feature = "storage-node")]
         Commands::Objects(args) => {
             let settings = load_settings(opts.clone())?.objects;
             let _trace_file_guard = set_global_tracing_subscriber(&settings.tracing);
             args.exec(settings).await
+        }
+        #[cfg(not(feature = "storage-node"))]
+        Commands::Objects(_) => {
+            unreachable!("Objects command is not available without storage-node feature")
         }
     }
 }

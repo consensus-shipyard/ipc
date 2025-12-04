@@ -8,5 +8,9 @@ license.workspace = true
 [lib]
 crate-type = ["cdylib", "lib"]
 
+[features]
+default = []
+
+
 [dependencies]
 fvm = { workspace = true }
