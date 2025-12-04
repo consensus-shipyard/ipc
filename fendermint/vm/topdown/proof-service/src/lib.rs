@@ -34,7 +34,7 @@ pub use service::ProofGeneratorService;
 pub use types::{
     CertificateEntry, EpochProofEntry, EpochProofWithCertificates, SerializableF3Certificate,
 };
-pub use verifier::ProofsVerifier;
+pub use verifier::ProofVerifier;
 
 use anyhow::{Context, Result};
 use fvm_shared::clock::ChainEpoch;
@@ -65,30 +65,23 @@ pub async fn launch_service(
     initial_power_table: filecoin_f3_gpbft::PowerEntries,
     db_path: Option<std::path::PathBuf>,
 ) -> Result<Option<(Arc<ProofCache>, tokio::task::JoinHandle<()>)>> {
-    // Validate configuration
+    // Check if disabled first
     if !config.enabled {
         tracing::info!("Proof service is disabled in configuration");
         return Ok(None);
     }
 
-    if config.parent_rpc_url.is_empty() {
-        anyhow::bail!("parent_rpc_url is required");
-    }
-
-    if config.cache_config.lookahead_epochs == 0 {
-        anyhow::bail!("lookahead_epochs must be > 0");
-    }
-
-    // Validate URL format
-    url::Url::parse(&config.parent_rpc_url)
-        .with_context(|| format!("Invalid parent_rpc_url: {}", config.parent_rpc_url))?;
+    // Validate configuration
+    config
+        .validate()
+        .context("Invalid proof service configuration")?;
 
     tracing::info!(
         initial_epoch = initial_committed_epoch,
         initial_instance,
         parent_rpc = config.parent_rpc_url,
         f3_network = config.f3_network_name(&subnet_id),
-        lookahead_epochs = config.cache_config.lookahead_epochs,
+        lookahead_instances = config.cache_config.lookahead_instances,
         "Launching proof generator service with validated configuration"
     );
 
@@ -97,6 +90,7 @@ pub async fn launch_service(
         tracing::info!(path = %path.display(), "Creating cache with persistence");
         Arc::new(ProofCache::new_with_persistence(
             initial_committed_epoch,
+            initial_instance,
             config.cache_config.clone(),
             &path,
         )?)
@@ -104,6 +98,7 @@ pub async fn launch_service(
         tracing::info!("Creating in-memory cache (no persistence)");
         Arc::new(ProofCache::new(
             initial_committed_epoch,
+            initial_instance,
             config.cache_config.clone(),
         ))
     };
@@ -172,7 +167,7 @@ mod tests {
         let result = launch_service(config, subnet_id, 100, 5, power_table, None).await;
         assert!(result.is_ok());
 
-        let (cache, handle) = result.unwrap().unwrap();
+        let (_cache, handle) = result.unwrap().unwrap();
         handle.abort();
     }
 }

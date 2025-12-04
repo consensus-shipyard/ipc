@@ -22,11 +22,11 @@ use proofs::proofs::storage::verifier::verify_storage_proof;
 
 use proofs::proofs::common::evm::{ascii_to_bytes32, extract_evm_log, hash_event_signature};
 
-pub struct ProofsVerifier {
+pub struct ProofVerifier {
     events: Vec<Vec<[u8; 32]>>,
 }
 
-impl ProofsVerifier {
+impl ProofVerifier {
     pub fn new(subnet_id: String) -> Self {
         let events = vec![
             vec![
@@ -143,7 +143,7 @@ mod tests {
 
     #[test]
     fn test_verifier_creation() {
-        let verifier = ProofsVerifier::new("test-subnet".to_string());
+        let verifier = ProofVerifier::new("test-subnet".to_string());
         assert_eq!(verifier.events.len(), 2);
     }
 }

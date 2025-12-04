@@ -35,16 +35,35 @@ pub struct ProofServiceConfig {
     /// Lotus/parent RPC endpoint URL
     pub parent_rpc_url: String,
 
-    /// Optional: Additional RPC URLs for failover (not yet implemented - future enhancement)
-    #[serde(default)]
-    pub fallback_rpc_urls: Vec<String>,
-
     /// Gateway identification on parent chain.
     /// Can be an Actor ID (u64) or an Ethereum address (String).
     pub gateway_id: GatewayId,
 }
 
 impl ProofServiceConfig {
+    /// Validate the configuration.
+    ///
+    /// Returns an error if any required fields are missing or invalid.
+    pub fn validate(&self) -> anyhow::Result<()> {
+        if !self.enabled {
+            return Ok(()); // No validation needed if disabled
+        }
+
+        if self.parent_rpc_url.is_empty() {
+            anyhow::bail!("parent_rpc_url is required when service is enabled");
+        }
+
+        url::Url::parse(&self.parent_rpc_url).map_err(|e| {
+            anyhow::anyhow!("Invalid parent_rpc_url '{}': {}", self.parent_rpc_url, e)
+        })?;
+
+        if self.cache_config.lookahead_instances == 0 {
+            anyhow::bail!("lookahead_instances must be > 0");
+        }
+
+        Ok(())
+    }
+
     pub fn f3_network_name(&self, subnet_id: &SubnetID) -> String {
         let root_id = subnet_id.root_id();
 
@@ -69,7 +88,6 @@ impl Default for ProofServiceConfig {
             polling_interval: Duration::from_secs(10),
             cache_config: Default::default(),
             parent_rpc_url: String::new(),
-            fallback_rpc_urls: Vec::new(),
             gateway_id: GatewayId::ActorId(0),
         }
     }
@@ -78,20 +96,21 @@ impl Default for ProofServiceConfig {
 /// Configuration for the proof cache
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CacheConfig {
-    /// How many epochs ahead to generate proofs for
-    /// This determines how far ahead of the last committed epoch we pre-generate proofs
-    pub lookahead_epochs: u64,
-    
-    /// How many epochs to retain after they've been committed
-    /// Old epochs outside this window will be cleaned up
+    /// How many F3 instances ahead of last_committed_instance to stay.
+    /// The service will stop fetching new certificates once:
+    ///   current_instance >= last_committed_instance + lookahead_instances
+    pub lookahead_instances: u64,
+
+    /// How many epochs to retain after they've been committed.
+    /// Old epochs outside this window will be cleaned up.
     pub retention_epochs: u64,
 }
 
 impl Default for CacheConfig {
     fn default() -> Self {
         Self {
-            // Default: generate proofs for ~50 epochs ahead (~25 minutes at 30s/epoch)
-            lookahead_epochs: 50,
+            // Default: stay ~20 instances ahead
+            lookahead_instances: 20,
             // Default: keep proofs for 10 epochs after commit
             retention_epochs: 10,
         }
@@ -107,7 +126,7 @@ mod tests {
         let config = ProofServiceConfig::default();
         assert!(!config.enabled);
         assert_eq!(config.polling_interval, Duration::from_secs(10));
-        assert_eq!(config.cache_config.lookahead_epochs, 50);
+        assert_eq!(config.cache_config.lookahead_instances, 20);
         assert_eq!(config.cache_config.retention_epochs, 10);
     }
 }

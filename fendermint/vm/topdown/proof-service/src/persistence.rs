@@ -17,12 +17,10 @@
 //! - `certificates`: F3 certificates keyed by instance_id
 //! - `epoch_proofs`: Proof bundles keyed by epoch
 
-use crate::types::{
-    CertificateEntry, EpochProofEntry, SerializableCertificateEntry, SerializableEpochProofEntry,
-};
+use crate::types::{CertificateEntry, EpochProofEntry, SerializableCertificateEntry};
 use anyhow::{Context, Result};
 use fvm_shared::clock::ChainEpoch;
-use rocksdb::{Options, DB};
+use rocksdb::{BoundColumnFamily, Options, DB};
 use std::path::Path;
 use std::sync::Arc;
 use tracing::{debug, info};
@@ -37,6 +35,8 @@ const CF_EPOCH_PROOFS: &str = "epoch_proofs";
 
 /// Metadata keys
 const KEY_SCHEMA_VERSION: &[u8] = b"schema_version";
+const KEY_LAST_COMMITTED_EPOCH: &[u8] = b"last_committed_epoch";
+const KEY_LAST_COMMITTED_INSTANCE: &[u8] = b"last_committed_instance";
 
 /// Persistent storage for proof cache
 pub struct ProofCachePersistence {
@@ -54,27 +54,26 @@ impl ProofCachePersistence {
         opts.create_missing_column_families(true);
         opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
 
-        // Include both new and legacy column families for migration support
         let cfs = vec![CF_METADATA, CF_CERTIFICATES, CF_EPOCH_PROOFS];
         let db = DB::open_cf(&opts, path, cfs)
             .context("Failed to open RocksDB database for proof cache")?;
 
         let persistence = Self { db: Arc::new(db) };
-
-        // Initialize or verify/migrate schema
         persistence.init_schema()?;
 
         Ok(persistence)
     }
 
-    /// Initialize schema or verify existing one
-    fn init_schema(&self) -> Result<()> {
-        let cf_meta = self
-            .db
-            .cf_handle(CF_METADATA)
-            .context("Failed to get metadata column family")?;
+    fn get_cf(&self, name: &str) -> Result<Arc<BoundColumnFamily>> {
+        self.db
+            .cf_handle(name)
+            .with_context(|| format!("Failed to get {} column family", name))
+    }
 
-        match self.db.get_cf(&cf_meta, KEY_SCHEMA_VERSION)? {
+    fn init_schema(&self) -> Result<()> {
+        let cf = self.get_cf(CF_METADATA)?;
+
+        match self.db.get_cf(&cf, KEY_SCHEMA_VERSION)? {
             Some(data) => {
                 let version = serde_json::from_slice::<u32>(&data)
                     .context("Failed to deserialize schema version")?;
@@ -89,7 +88,7 @@ impl ProofCachePersistence {
             }
             None => {
                 self.db.put_cf(
-                    &cf_meta,
+                    &cf,
                     KEY_SCHEMA_VERSION,
                     serde_json::to_vec(&SCHEMA_VERSION)?,
                 )?;
@@ -100,19 +99,13 @@ impl ProofCachePersistence {
         Ok(())
     }
 
-    /// Save a certificate entry to disk
     pub fn save_certificate(&self, entry: &CertificateEntry) -> Result<()> {
-        let cf = self
-            .db
-            .cf_handle(CF_CERTIFICATES)
-            .context("Failed to get certificates column family")?;
-
+        let cf = self.get_cf(CF_CERTIFICATES)?;
         let key = entry.instance_id().to_be_bytes();
         let value = serde_json::to_vec(&SerializableCertificateEntry::from(entry))
             .context("Failed to serialize certificate entry")?;
 
         self.db.put_cf(&cf, key, value)?;
-
         debug!(
             instance_id = entry.instance_id(),
             "Saved certificate to disk"
@@ -120,17 +113,11 @@ impl ProofCachePersistence {
         Ok(())
     }
 
-    /// Load all certificates from disk
     pub fn load_all_certificates(&self) -> Result<Vec<CertificateEntry>> {
-        let cf = self
-            .db
-            .cf_handle(CF_CERTIFICATES)
-            .context("Failed to get certificates column family")?;
-
+        let cf = self.get_cf(CF_CERTIFICATES)?;
         let mut entries = Vec::new();
-        let iter = self.db.iterator_cf(&cf, rocksdb::IteratorMode::Start);
 
-        for item in iter {
+        for item in self.db.iterator_cf(&cf, rocksdb::IteratorMode::Start) {
             let (_, value) = item?;
             let entry: SerializableCertificateEntry = serde_json::from_slice(&value)
                 .context("Failed to deserialize certificate entry")?;
@@ -138,105 +125,113 @@ impl ProofCachePersistence {
         }
 
         info!(count = entries.len(), "Loaded certificates from disk");
-
         Ok(entries)
     }
 
-    /// Delete a certificate from disk
     pub fn delete_certificate(&self, instance_id: u64) -> Result<()> {
-        let cf = self
-            .db
-            .cf_handle(CF_CERTIFICATES)
-            .context("Failed to get certificates column family")?;
-
-        let key = instance_id.to_be_bytes();
-        self.db.delete_cf(&cf, key)?;
-
+        let cf = self.get_cf(CF_CERTIFICATES)?;
+        self.db.delete_cf(&cf, instance_id.to_be_bytes())?;
         debug!(instance_id, "Deleted certificate from disk");
         Ok(())
     }
 
-    /// Save an epoch proof entry to disk
     pub fn save_epoch_proof(&self, entry: &EpochProofEntry) -> Result<()> {
-        let cf = self
-            .db
-            .cf_handle(CF_EPOCH_PROOFS)
-            .context("Failed to get epoch_proofs column family")?;
-
+        let cf = self.get_cf(CF_EPOCH_PROOFS)?;
         let key = entry.epoch.to_be_bytes();
-        let value = serde_json::to_vec(&SerializableEpochProofEntry::from(entry))
-            .context("Failed to serialize epoch proof entry")?;
+        let value = serde_json::to_vec(entry).context("Failed to serialize epoch proof entry")?;
 
         self.db.put_cf(&cf, key, value)?;
-
         debug!(epoch = entry.epoch, "Saved epoch proof to disk");
         Ok(())
     }
 
-    /// Load all epoch proofs from disk
     pub fn load_all_epoch_proofs(&self) -> Result<Vec<EpochProofEntry>> {
-        let cf = self
-            .db
-            .cf_handle(CF_EPOCH_PROOFS)
-            .context("Failed to get epoch_proofs column family")?;
-
+        let cf = self.get_cf(CF_EPOCH_PROOFS)?;
         let mut entries = Vec::new();
-        let iter = self.db.iterator_cf(&cf, rocksdb::IteratorMode::Start);
 
-        for item in iter {
+        for item in self.db.iterator_cf(&cf, rocksdb::IteratorMode::Start) {
             let (_, value) = item?;
-            let entry: SerializableEpochProofEntry = serde_json::from_slice(&value)
+            let entry: EpochProofEntry = serde_json::from_slice(&value)
                 .context("Failed to deserialize epoch proof entry")?;
-            entries.push(EpochProofEntry::from(entry));
+            entries.push(entry);
         }
 
         info!(count = entries.len(), "Loaded epoch proofs from disk");
-
         Ok(entries)
     }
 
-    /// Delete an epoch proof from disk
     pub fn delete_epoch_proof(&self, epoch: ChainEpoch) -> Result<()> {
-        let cf = self
-            .db
-            .cf_handle(CF_EPOCH_PROOFS)
-            .context("Failed to get epoch_proofs column family")?;
-
-        let key = epoch.to_be_bytes();
-        self.db.delete_cf(&cf, key)?;
-
+        let cf = self.get_cf(CF_EPOCH_PROOFS)?;
+        self.db.delete_cf(&cf, epoch.to_be_bytes())?;
         debug!(epoch, "Deleted epoch proof from disk");
         Ok(())
     }
 
-    /// Clear all entries from disk (both certificates and epoch proofs)
     pub fn clear_all(&self) -> Result<()> {
-        // Clear certificates
-        if let Some(cf) = self.db.cf_handle(CF_CERTIFICATES) {
-            let keys: Vec<Box<[u8]>> = self
-                .db
-                .iterator_cf(&cf, rocksdb::IteratorMode::Start)
-                .filter_map(|result| result.ok().map(|(k, _)| k))
-                .collect();
-            for key in keys {
-                self.db.delete_cf(&cf, &key)?;
-            }
-        }
-
-        // Clear epoch proofs
-        if let Some(cf) = self.db.cf_handle(CF_EPOCH_PROOFS) {
-            let keys: Vec<Box<[u8]>> = self
-                .db
-                .iterator_cf(&cf, rocksdb::IteratorMode::Start)
-                .filter_map(|result| result.ok().map(|(k, _)| k))
-                .collect();
-            for key in keys {
-                self.db.delete_cf(&cf, &key)?;
-            }
-        }
-
+        self.clear_cf(CF_CERTIFICATES)?;
+        self.clear_cf(CF_EPOCH_PROOFS)?;
         debug!("Cleared all cache entries from disk");
         Ok(())
+    }
+
+    fn clear_cf(&self, cf_name: &str) -> Result<()> {
+        if let Some(cf) = self.db.cf_handle(cf_name) {
+            let keys: Vec<Box<[u8]>> = self
+                .db
+                .iterator_cf(&cf, rocksdb::IteratorMode::Start)
+                .filter_map(|r| r.ok().map(|(k, _)| k))
+                .collect();
+            for key in keys {
+                self.db.delete_cf(&cf, &key)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn save_committed_state(&self, epoch: ChainEpoch, instance: u64) -> Result<()> {
+        let cf = self.get_cf(CF_METADATA)?;
+        self.db
+            .put_cf(&cf, KEY_LAST_COMMITTED_EPOCH, epoch.to_be_bytes())?;
+        self.db
+            .put_cf(&cf, KEY_LAST_COMMITTED_INSTANCE, instance.to_be_bytes())?;
+        debug!(epoch, instance, "Saved committed state to disk");
+        Ok(())
+    }
+
+    pub fn load_committed_state(&self) -> Result<Option<(ChainEpoch, u64)>> {
+        let cf = self.get_cf(CF_METADATA)?;
+
+        let Some(epoch) = self.load_i64(&cf, KEY_LAST_COMMITTED_EPOCH)? else {
+            return Ok(None);
+        };
+        let Some(instance) = self.load_u64(&cf, KEY_LAST_COMMITTED_INSTANCE)? else {
+            return Ok(None);
+        };
+
+        info!(epoch, instance, "Loaded committed state from disk");
+        Ok(Some((epoch, instance)))
+    }
+
+    fn load_i64(&self, cf: &Arc<BoundColumnFamily>, key: &[u8]) -> Result<Option<i64>> {
+        match self.db.get_cf(cf, key)? {
+            Some(data) => {
+                let bytes = <[u8; 8]>::try_from(data.as_ref())
+                    .map_err(|_| anyhow::anyhow!("Invalid i64 data length"))?;
+                Ok(Some(i64::from_be_bytes(bytes)))
+            }
+            None => Ok(None),
+        }
+    }
+
+    fn load_u64(&self, cf: &Arc<BoundColumnFamily>, key: &[u8]) -> Result<Option<u64>> {
+        match self.db.get_cf(cf, key)? {
+            Some(data) => {
+                let bytes = <[u8; 8]>::try_from(data.as_ref())
+                    .map_err(|_| anyhow::anyhow!("Invalid u64 data length"))?;
+                Ok(Some(u64::from_be_bytes(bytes)))
+            }
+            None => Ok(None),
+        }
     }
 }
 
@@ -259,7 +254,7 @@ mod tests {
         let ec_chain = (100..=102)
             .map(|epoch| SerializableECChainEntry {
                 epoch,
-                key: vec![],
+                key: vec!["0".to_string()],
                 power_table: power_table_cid.to_string(),
                 commitments: vec![0u8; 32],
             })
@@ -280,7 +275,7 @@ mod tests {
             power_table: SerializablePowerEntries(vec![SerializablePowerEntry {
                 id: 1,
                 power: "1000".to_string(),
-                pub_key: vec![0u8; 48],
+                pub_key: vec![1u8; 48],
             }]),
             source_rpc: "test".to_string(),
             fetched_at: SystemTime::now(),

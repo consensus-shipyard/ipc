@@ -70,12 +70,39 @@ impl ProofAssembler {
     /// Create a new proof assembler
     pub fn new(rpc_url: String, gateway_actor_id: u64, subnet_id: String) -> Result<Self> {
         let url = Url::parse(&rpc_url).context("Failed to parse RPC URL")?;
-
         Ok(Self {
             rpc_url: url,
             gateway_actor_id,
             subnet_id,
         })
+    }
+
+    fn build_storage_specs(&self) -> Vec<StorageProofSpec> {
+        vec![
+            StorageProofSpec {
+                actor_id: self.gateway_actor_id,
+                slot: calculate_storage_slot(&self.subnet_id, TOPDOWN_NONCE_STORAGE_OFFSET),
+            },
+            StorageProofSpec {
+                actor_id: self.gateway_actor_id,
+                slot: calculate_storage_slot("", NEXT_CONFIG_NUMBER_STORAGE_SLOT),
+            },
+        ]
+    }
+
+    fn build_event_specs(&self) -> Vec<EventProofSpec> {
+        vec![
+            EventProofSpec {
+                event_signature: NEW_TOPDOWN_MESSAGE_SIGNATURE.to_string(),
+                topic_1: self.subnet_id.clone(),
+                actor_id_filter: Some(self.gateway_actor_id),
+            },
+            EventProofSpec {
+                event_signature: NEW_POWER_CHANGE_REQUEST_SIGNATURE.to_string(),
+                topic_1: String::new(),
+                actor_id_filter: Some(self.gateway_actor_id),
+            },
+        ]
     }
 
     /// Create a LotusClient for making requests
@@ -181,75 +208,39 @@ impl ProofAssembler {
         parent_api: &proofs::client::types::ApiTipset,
         child_api: &proofs::client::types::ApiTipset,
     ) -> Result<UnifiedProofBundle> {
-        // Configure proof specs for Gateway contract
-        let storage_specs = self.create_storage_specs();
-        let event_specs = self.create_event_specs();
+        // Build specs fresh each time (external types don't implement Clone)
+        let storage_specs = self.build_storage_specs();
+        let event_specs = self.build_event_specs();
 
         tracing::debug!(
             epoch,
-            storage_specs_count = storage_specs.len(),
-            event_specs_count = event_specs.len(),
-            "Configured proof specs"
+            storage_specs = storage_specs.len(),
+            event_specs = event_specs.len(),
+            "Generating proof bundle"
         );
 
         // Clone data for the blocking task
-        let parent_api_clone = parent_api.clone();
-        let child_api_clone = child_api.clone();
+        let parent_api = parent_api.clone();
+        let child_api = child_api.clone();
         let lotus_client = self.create_client();
 
         // Generate proof bundle in blocking task
         // CRITICAL: The proofs library uses Rc/RefCell internally making LotusClient and
         // related types non-Send. We must use spawn_blocking to run the proof generation
         // in a separate thread.
-        let bundle = tokio::task::spawn_blocking(move || {
+        tokio::task::spawn_blocking(move || {
             tokio::runtime::Handle::current()
                 .block_on(generate_proof_bundle(
                     &lotus_client,
-                    &parent_api_clone,
-                    &child_api_clone,
+                    &parent_api,
+                    &child_api,
                     storage_specs,
                     event_specs,
                 ))
                 .context("Failed to generate proof bundle")
         })
         .await
-        .context("Failed to join proof generation task")??;
-
-        Ok(bundle)
-    }
-
-    /// Create storage proof specifications for the Gateway contract
-    fn create_storage_specs(&self) -> Vec<StorageProofSpec> {
-        vec![
-            StorageProofSpec {
-                actor_id: self.gateway_actor_id,
-                // Calculate slot for subnets[subnetKey].topDownNonce in the mapping
-                slot: calculate_storage_slot(&self.subnet_id, TOPDOWN_NONCE_STORAGE_OFFSET),
-            },
-            StorageProofSpec {
-                actor_id: self.gateway_actor_id,
-                // nextConfigurationNumber is a direct storage variable at slot 20
-                slot: calculate_storage_slot("", NEXT_CONFIG_NUMBER_STORAGE_SLOT),
-            },
-        ]
-    }
-
-    /// Create event proof specifications for the Gateway contract
-    fn create_event_specs(&self) -> Vec<EventProofSpec> {
-        vec![
-            // Capture topdown messages for this specific subnet
-            EventProofSpec {
-                event_signature: NEW_TOPDOWN_MESSAGE_SIGNATURE.to_string(),
-                topic_1: self.subnet_id.clone(),
-                actor_id_filter: Some(self.gateway_actor_id),
-            },
-            // Capture ALL power change requests from the gateway
-            EventProofSpec {
-                event_signature: NEW_POWER_CHANGE_REQUEST_SIGNATURE.to_string(),
-                topic_1: String::new(),
-                actor_id_filter: Some(self.gateway_actor_id),
-            },
-        ]
+        .context("Failed to join proof generation task")?
     }
 }
 

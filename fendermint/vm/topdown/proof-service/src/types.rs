@@ -14,6 +14,20 @@ use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 use std::time::SystemTime;
 
+/// Parse a 32-byte slice into an H256 hash
+fn parse_commitments(bytes: &[u8]) -> Result<H256> {
+    if bytes.len() != 32 {
+        bail!("Commitments must be exactly 32 bytes, got {}", bytes.len());
+    }
+    Ok(H256::from_slice(bytes))
+}
+
+/// Parse a string as a BigInt with context
+fn parse_bigint(s: &str, context: &str) -> Result<BigInt> {
+    s.parse::<BigInt>()
+        .with_context(|| format!("Invalid BigInt for {}: {}", context, s))
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct FinalizedTipsets(Vec<FinalizedTipset>);
 
@@ -159,10 +173,7 @@ impl SerializableECChainEntry {
             .parse::<Cid>()
             .context("Invalid power table CID in ECChain entry")?;
 
-        if self.commitments.len() != 32 {
-            bail!("Commitments must be 32 bytes");
-        }
-        let commitments = H256::from_slice(&self.commitments);
+        let commitments = parse_commitments(&self.commitments)?;
 
         Ok(Tipset {
             epoch: self.epoch,
@@ -186,10 +197,7 @@ pub struct SerializableSupplementalData {
 
 impl SerializableSupplementalData {
     fn into_supplemental_data(self) -> Result<SupplementalData> {
-        if self.commitments.len() != 32 {
-            bail!("Supplemental commitments must be 32 bytes");
-        }
-        let commitments = H256::from_slice(&self.commitments);
+        let commitments = parse_commitments(&self.commitments)?;
         let power_table = self
             .power_table
             .parse::<Cid>()
@@ -217,12 +225,10 @@ pub struct SerializablePowerTableDelta {
 
 impl SerializablePowerTableDelta {
     fn into_power_table_delta(self) -> Result<PowerTableDelta> {
-        let power_delta = self.power_delta.parse::<BigInt>().with_context(|| {
-            format!(
-                "Invalid power delta for participant {}",
-                self.participant_id
-            )
-        })?;
+        let power_delta = parse_bigint(
+            &self.power_delta,
+            &format!("participant {}", self.participant_id),
+        )?;
 
         Ok(PowerTableDelta {
             participant_id: self.participant_id,
@@ -250,10 +256,7 @@ pub struct SerializablePowerEntries(pub Vec<SerializablePowerEntry>);
 
 impl SerializablePowerEntry {
     fn into_power_entry(self) -> Result<PowerEntry> {
-        let power = self
-            .power
-            .parse::<BigInt>()
-            .with_context(|| format!("Invalid power value for participant {}", self.id))?;
+        let power = parse_bigint(&self.power, &format!("participant {}", self.id))?;
 
         Ok(PowerEntry {
             id: self.id,
@@ -446,40 +449,6 @@ impl EpochProofEntry {
             parent_cert_instance,
             child_cert_instance,
             generated_at: SystemTime::now(),
-        }
-    }
-}
-
-/// Serializable version of EpochProofEntry for disk persistence
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SerializableEpochProofEntry {
-    pub epoch: ChainEpoch,
-    pub proof_bundle: UnifiedProofBundle,
-    pub parent_cert_instance: u64,
-    pub child_cert_instance: u64,
-    pub generated_at: SystemTime,
-}
-
-impl From<&EpochProofEntry> for SerializableEpochProofEntry {
-    fn from(entry: &EpochProofEntry) -> Self {
-        Self {
-            epoch: entry.epoch,
-            proof_bundle: entry.proof_bundle.clone(),
-            parent_cert_instance: entry.parent_cert_instance,
-            child_cert_instance: entry.child_cert_instance,
-            generated_at: entry.generated_at,
-        }
-    }
-}
-
-impl From<SerializableEpochProofEntry> for EpochProofEntry {
-    fn from(entry: SerializableEpochProofEntry) -> Self {
-        Self {
-            epoch: entry.epoch,
-            proof_bundle: entry.proof_bundle,
-            parent_cert_instance: entry.parent_cert_instance,
-            child_cert_instance: entry.child_cert_instance,
-            generated_at: entry.generated_at,
         }
     }
 }
