@@ -79,17 +79,17 @@ name = "actors-umbrella"
 version = "0.1.0"
 dependencies = [
  "fendermint_actor_activity_tracker",
- "fendermint_actor_adm",
- "fendermint_actor_blob_reader",
- "fendermint_actor_blobs",
- "fendermint_actor_bucket",
  "fendermint_actor_chainmetadata",
  "fendermint_actor_eam",
  "fendermint_actor_f3_light_client",
  "fendermint_actor_gas_market_eip1559",
  "fendermint_actor_machine",
- "fendermint_actor_recall_config",
- "fendermint_actor_timehub",
+ "fendermint_actor_storage_adm",
+ "fendermint_actor_storage_blob_reader",
+ "fendermint_actor_storage_blobs",
+ "fendermint_actor_storage_bucket",
+ "fendermint_actor_storage_config",
+ "fendermint_actor_storage_timehub",
 ]
 
 [[package]]
@@ -3860,132 +3860,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fendermint_actor_adm"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "cid 0.11.1",
- "fendermint_actor_machine",
- "fil_actors_runtime",
- "frc42_dispatch 8.0.0",
- "fvm_ipld_blockstore 0.3.1",
- "fvm_ipld_encoding 0.5.3",
- "fvm_shared",
- "hex-literal 0.4.1",
- "integer-encoding 3.0.4",
- "log",
- "multihash 0.18.1",
- "num-derive 0.4.2",
- "num-traits",
- "recall_actor_sdk",
- "recall_sol_facade",
- "serde",
-]
-
-[[package]]
-name = "fendermint_actor_blob_reader"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "fendermint_actor_blobs_shared",
- "fendermint_actor_blobs_testing",
- "fil_actors_evm_shared",
- "fil_actors_runtime",
- "frc42_dispatch 8.0.0",
- "fvm_ipld_blockstore 0.3.1",
- "fvm_ipld_encoding 0.5.3",
- "fvm_shared",
- "hex-literal 0.4.1",
- "log",
- "num-derive 0.4.2",
- "num-traits",
- "recall_actor_sdk",
- "recall_ipld",
- "recall_sol_facade",
- "serde",
-]
-
-[[package]]
-name = "fendermint_actor_blobs"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bls-signatures 0.13.1",
- "cid 0.11.1",
- "fendermint_actor_blobs_shared",
- "fendermint_actor_blobs_testing",
- "fendermint_actor_recall_config_shared",
- "fil_actors_evm_shared",
- "fil_actors_runtime",
- "fvm_ipld_blockstore 0.3.1",
- "fvm_ipld_encoding 0.5.3",
- "fvm_shared",
- "hex-literal 0.4.1",
- "log",
- "num-traits",
- "rand 0.8.5",
- "recall_actor_sdk",
- "recall_ipld",
- "recall_sol_facade",
- "serde",
-]
-
-[[package]]
-name = "fendermint_actor_blobs_shared"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "blake3",
- "data-encoding",
- "fil_actors_runtime",
- "frc42_dispatch 8.0.0",
- "fvm_ipld_encoding 0.5.3",
- "fvm_shared",
- "num-derive 0.4.2",
- "num-traits",
- "recall_ipld",
- "serde",
-]
-
-[[package]]
-name = "fendermint_actor_blobs_testing"
-version = "0.1.0"
-dependencies = [
- "fendermint_actor_blobs_shared",
- "fvm_shared",
- "iroh-blobs",
- "rand 0.8.5",
- "tracing-subscriber 0.3.20",
-]
-
-[[package]]
-name = "fendermint_actor_bucket"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "blake3",
- "cid 0.11.1",
- "fendermint_actor_blobs_shared",
- "fendermint_actor_blobs_testing",
- "fendermint_actor_machine",
- "fil_actors_evm_shared",
- "fil_actors_runtime",
- "frc42_dispatch 8.0.0",
- "fvm_ipld_blockstore 0.3.1",
- "fvm_ipld_encoding 0.5.3",
- "fvm_shared",
- "hex-literal 0.4.1",
- "num-derive 0.4.2",
- "num-traits",
- "quickcheck",
- "quickcheck_macros",
- "recall_actor_sdk",
- "recall_ipld",
- "recall_sol_facade",
- "serde",
-]
-
-[[package]]
 name = "fendermint_actor_chainmetadata"
 version = "0.1.0"
 dependencies = [
@@ -4072,40 +3946,173 @@ name = "fendermint_actor_machine"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "fil_actor_adm",
+ "fendermint_actor_storage_adm_types",
  "fil_actors_runtime",
  "frc42_dispatch 8.0.0",
  "fvm_ipld_blockstore 0.3.1",
  "fvm_ipld_encoding 0.5.3",
  "fvm_shared",
- "recall_actor_sdk",
- "recall_sol_facade",
+ "serde",
+ "storage_node_actor_sdk",
+ "storage_node_sol_facade",
+]
+
+[[package]]
+name = "fendermint_actor_storage_adm"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cid 0.11.1",
+ "fendermint_actor_machine",
+ "fil_actors_runtime",
+ "frc42_dispatch 8.0.0",
+ "fvm_ipld_blockstore 0.3.1",
+ "fvm_ipld_encoding 0.5.3",
+ "fvm_shared",
+ "hex-literal 0.4.1",
+ "integer-encoding 3.0.4",
+ "log",
+ "multihash 0.18.1",
+ "num-derive 0.4.2",
+ "num-traits",
+ "serde",
+ "storage_node_actor_sdk",
+ "storage_node_sol_facade",
+]
+
+[[package]]
+name = "fendermint_actor_storage_adm_types"
+version = "0.1.0"
+dependencies = [
  "serde",
 ]
 
 [[package]]
-name = "fendermint_actor_recall_config"
+name = "fendermint_actor_storage_blob_reader"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "fendermint_actor_blobs_shared",
- "fendermint_actor_recall_config_shared",
+ "fendermint_actor_storage_blobs_shared",
+ "fendermint_actor_storage_blobs_testing",
+ "fil_actors_evm_shared",
+ "fil_actors_runtime",
+ "frc42_dispatch 8.0.0",
+ "fvm_ipld_blockstore 0.3.1",
+ "fvm_ipld_encoding 0.5.3",
+ "fvm_shared",
+ "hex-literal 0.4.1",
+ "log",
+ "num-derive 0.4.2",
+ "num-traits",
+ "serde",
+ "storage_node_actor_sdk",
+ "storage_node_ipld",
+ "storage_node_sol_facade",
+]
+
+[[package]]
+name = "fendermint_actor_storage_blobs"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bls-signatures 0.13.1",
+ "cid 0.11.1",
+ "fendermint_actor_storage_blobs_shared",
+ "fendermint_actor_storage_blobs_testing",
+ "fendermint_actor_storage_config_shared",
+ "fil_actors_evm_shared",
+ "fil_actors_runtime",
+ "fvm_ipld_blockstore 0.3.1",
+ "fvm_ipld_encoding 0.5.3",
+ "fvm_shared",
+ "hex-literal 0.4.1",
+ "log",
+ "num-traits",
+ "rand 0.8.5",
+ "serde",
+ "storage_node_actor_sdk",
+ "storage_node_ipld",
+ "storage_node_sol_facade",
+]
+
+[[package]]
+name = "fendermint_actor_storage_blobs_shared"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "data-encoding",
+ "fil_actors_runtime",
+ "frc42_dispatch 8.0.0",
+ "fvm_ipld_encoding 0.5.3",
+ "fvm_shared",
+ "num-derive 0.4.2",
+ "num-traits",
+ "serde",
+ "storage_node_ipld",
+]
+
+[[package]]
+name = "fendermint_actor_storage_blobs_testing"
+version = "0.1.0"
+dependencies = [
+ "fendermint_actor_storage_blobs_shared",
+ "fvm_shared",
+ "iroh-blobs",
+ "rand 0.8.5",
+ "tracing-subscriber 0.3.20",
+]
+
+[[package]]
+name = "fendermint_actor_storage_bucket"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "cid 0.11.1",
+ "fendermint_actor_machine",
+ "fendermint_actor_storage_blobs_shared",
+ "fendermint_actor_storage_blobs_testing",
+ "fil_actors_evm_shared",
+ "fil_actors_runtime",
+ "frc42_dispatch 8.0.0",
+ "fvm_ipld_blockstore 0.3.1",
+ "fvm_ipld_encoding 0.5.3",
+ "fvm_shared",
+ "hex-literal 0.4.1",
+ "num-derive 0.4.2",
+ "num-traits",
+ "quickcheck",
+ "quickcheck_macros",
+ "serde",
+ "storage_node_actor_sdk",
+ "storage_node_ipld",
+ "storage_node_sol_facade",
+]
+
+[[package]]
+name = "fendermint_actor_storage_config"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "fendermint_actor_storage_blobs_shared",
+ "fendermint_actor_storage_config_shared",
  "fil_actors_evm_shared",
  "fil_actors_runtime",
  "fvm_ipld_encoding 0.5.3",
  "fvm_shared",
  "hex-literal 0.4.1",
  "num-traits",
- "recall_actor_sdk",
- "recall_sol_facade",
  "serde",
+ "storage_node_actor_sdk",
+ "storage_node_sol_facade",
 ]
 
 [[package]]
-name = "fendermint_actor_recall_config_shared"
+name = "fendermint_actor_storage_config_shared"
 version = "0.1.0"
 dependencies = [
- "fendermint_actor_blobs_shared",
+ "fendermint_actor_storage_blobs_shared",
  "fil_actors_runtime",
  "frc42_dispatch 8.0.0",
  "fvm_ipld_encoding 0.5.3",
@@ -4116,13 +4123,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "fendermint_actor_timehub"
+name = "fendermint_actor_storage_timehub"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "cid 0.11.1",
- "fendermint_actor_blobs_shared",
  "fendermint_actor_machine",
+ "fendermint_actor_storage_blobs_shared",
  "fil_actors_evm_shared",
  "fil_actors_runtime",
  "frc42_dispatch 8.0.0",
@@ -4134,9 +4141,9 @@ dependencies = [
  "multihash-codetable",
  "num-derive 0.4.2",
  "num-traits",
- "recall_actor_sdk",
- "recall_sol_facade",
  "serde",
+ "storage_node_actor_sdk",
+ "storage_node_sol_facade",
  "tracing",
 ]
 
@@ -4156,10 +4163,10 @@ dependencies = [
  "contracts-artifacts",
  "ethers",
  "fendermint_abci",
- "fendermint_actor_blobs_shared",
- "fendermint_actor_bucket",
  "fendermint_actor_f3_light_client",
  "fendermint_actor_gas_market_eip1559",
+ "fendermint_actor_storage_blobs_shared",
+ "fendermint_actor_storage_bucket",
  "fendermint_app_options",
  "fendermint_app_settings",
  "fendermint_crypto",
@@ -4175,10 +4182,10 @@ dependencies = [
  "fendermint_vm_event",
  "fendermint_vm_genesis",
  "fendermint_vm_interpreter",
- "fendermint_vm_iroh_resolver",
  "fendermint_vm_message",
  "fendermint_vm_resolver",
  "fendermint_vm_snapshot",
+ "fendermint_vm_storage_resolver",
  "fendermint_vm_topdown",
  "fs-err",
  "futures-util",
@@ -4195,7 +4202,6 @@ dependencies = [
  "ipc_ipld_resolver",
  "iroh",
  "iroh-blobs",
- "iroh_manager",
  "k256 0.11.6",
  "lazy_static",
  "libipld",
@@ -4218,6 +4224,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with 2.3.3",
+ "storage_node_iroh_manager",
  "tempfile",
  "tendermint 0.31.1",
  "tendermint-config 0.33.2",
@@ -4503,8 +4510,8 @@ dependencies = [
  "cid 0.11.1",
  "clap 4.5.49",
  "ethers",
- "fendermint_actor_blobs_shared",
- "fendermint_actor_bucket",
+ "fendermint_actor_storage_blobs_shared",
+ "fendermint_actor_storage_bucket",
  "fendermint_crypto",
  "fendermint_vm_actor_interface",
  "fendermint_vm_genesis",
@@ -4691,16 +4698,17 @@ dependencies = [
  "cid 0.11.1",
  "ethers",
  "fendermint_actor_activity_tracker",
- "fendermint_actor_adm",
- "fendermint_actor_blob_reader",
- "fendermint_actor_blobs",
- "fendermint_actor_blobs_shared",
  "fendermint_actor_chainmetadata",
  "fendermint_actor_eam",
  "fendermint_actor_f3_light_client",
  "fendermint_actor_gas_market_eip1559",
- "fendermint_actor_recall_config",
- "fendermint_actor_recall_config_shared",
+ "fendermint_actor_storage_adm",
+ "fendermint_actor_storage_adm_types",
+ "fendermint_actor_storage_blob_reader",
+ "fendermint_actor_storage_blobs",
+ "fendermint_actor_storage_blobs_shared",
+ "fendermint_actor_storage_config",
+ "fendermint_actor_storage_config_shared",
  "fendermint_crypto",
  "fendermint_eth_deployer",
  "fendermint_eth_hardhat",
@@ -4713,11 +4721,10 @@ dependencies = [
  "fendermint_vm_event",
  "fendermint_vm_genesis",
  "fendermint_vm_interpreter",
- "fendermint_vm_iroh_resolver",
  "fendermint_vm_message",
  "fendermint_vm_resolver",
+ "fendermint_vm_storage_resolver",
  "fendermint_vm_topdown",
- "fil_actor_adm",
  "fil_actor_eam",
  "fil_actor_evm",
  "futures-core",
@@ -4743,12 +4750,12 @@ dependencies = [
  "quickcheck",
  "quickcheck_macros",
  "rand 0.8.5",
- "recall_executor",
- "recall_kernel",
  "serde",
  "serde_json",
  "serde_with 2.3.3",
  "snap",
+ "storage_node_executor",
+ "storage_node_kernel",
  "strum",
  "tempfile",
  "tendermint 0.31.1",
@@ -4757,28 +4764,6 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-util 0.7.16",
- "tracing",
-]
-
-[[package]]
-name = "fendermint_vm_iroh_resolver"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-stm",
- "fendermint_vm_topdown",
- "hex",
- "im",
- "ipc-api",
- "ipc-observability",
- "ipc_ipld_resolver",
- "iroh",
- "iroh-blobs",
- "libp2p",
- "prometheus",
- "rand 0.8.5",
- "serde",
- "tokio",
  "tracing",
 ]
 
@@ -4792,7 +4777,7 @@ dependencies = [
  "cid 0.11.1",
  "ethers",
  "ethers-core",
- "fendermint_actor_blobs_shared",
+ "fendermint_actor_storage_blobs_shared",
  "fendermint_crypto",
  "fendermint_testing",
  "fendermint_vm_actor_interface",
@@ -4873,6 +4858,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "fendermint_vm_storage_resolver"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-stm",
+ "fendermint_vm_topdown",
+ "hex",
+ "im",
+ "ipc-api",
+ "ipc-observability",
+ "ipc_ipld_resolver",
+ "iroh",
+ "iroh-blobs",
+ "libp2p",
+ "prometheus",
+ "rand 0.8.5",
+ "serde",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "fendermint_vm_topdown"
 version = "0.1.0"
 dependencies = [
@@ -4939,13 +4946,6 @@ name = "fiat-crypto"
 version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
-
-[[package]]
-name = "fil_actor_adm"
-version = "0.1.0"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "fil_actor_bundler"
@@ -7137,44 +7137,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ipc-decentralized-storage"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "blake2b_simd",
- "bls-signatures 0.13.1",
- "clap 4.5.49",
- "ethers",
- "fendermint_actor_blobs_shared",
- "fendermint_actor_bucket",
- "fendermint_crypto",
- "fendermint_rpc",
- "fendermint_vm_actor_interface",
- "fendermint_vm_message",
- "futures",
- "fvm_ipld_encoding 0.5.3",
- "fvm_shared",
- "hex",
- "ipc-api",
- "iroh",
- "iroh-base",
- "iroh-blobs",
- "iroh_manager",
- "rand 0.8.5",
- "reqwest 0.11.27",
- "serde",
- "serde_json",
- "tempfile",
- "tendermint-rpc",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "tracing-subscriber 0.3.20",
- "warp",
-]
-
-[[package]]
 name = "ipc-observability"
 version = "0.1.0"
 dependencies = [
@@ -7346,7 +7308,6 @@ dependencies = [
  "ipc_ipld_resolver",
  "iroh",
  "iroh-blobs",
- "iroh_manager",
  "lazy_static",
  "libipld",
  "libp2p",
@@ -7363,6 +7324,7 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "serde_json",
+ "storage_node_iroh_manager",
  "thiserror 1.0.69",
  "tokio",
 ]
@@ -7675,25 +7637,6 @@ dependencies = [
  "webpki-roots 0.26.11",
  "ws_stream_wasm",
  "z32",
-]
-
-[[package]]
-name = "iroh_manager"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "iroh",
- "iroh-blobs",
- "iroh-quinn",
- "iroh-relay",
- "n0-future",
- "num-traits",
- "quic-rpc",
- "tempfile",
- "tokio",
- "tracing",
- "tracing-subscriber 0.3.20",
- "url",
 ]
 
 [[package]]
@@ -11187,22 +11130,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "recall_actor_sdk"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "cid 0.11.1",
- "fil_actor_adm",
- "fil_actors_runtime",
- "fvm_ipld_encoding 0.5.3",
- "fvm_sdk",
- "fvm_shared",
- "num-traits",
- "recall_sol_facade",
- "serde",
-]
-
-[[package]]
 name = "recall_entangler"
 version = "0.1.0"
 source = "git+https://github.com/recallnet/entanglement.git?rev=aee1c675ff05e5cde4771a2e2eb3ac4dab8476bc#aee1c675ff05e5cde4771a2e2eb3ac4dab8476bc"
@@ -11240,96 +11167,6 @@ dependencies = [
  "thiserror 2.0.17",
  "tokio",
  "uuid 1.18.1",
-]
-
-[[package]]
-name = "recall_executor"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "cid 0.11.1",
- "fendermint_actor_blobs_shared",
- "fendermint_vm_actor_interface",
- "fvm",
- "fvm_ipld_encoding 0.5.3",
- "fvm_shared",
- "num-traits",
- "replace_with",
- "tracing",
-]
-
-[[package]]
-name = "recall_ipld"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "cid 0.11.1",
- "fil_actors_runtime",
- "fvm_ipld_amt",
- "fvm_ipld_blockstore 0.3.1",
- "fvm_ipld_encoding 0.5.3",
- "fvm_ipld_hamt",
- "fvm_sdk",
- "fvm_shared",
- "integer-encoding 3.0.4",
- "serde",
-]
-
-[[package]]
-name = "recall_kernel"
-version = "0.1.0"
-dependencies = [
- "ambassador 0.3.7",
- "anyhow",
- "fvm",
- "fvm_ipld_blockstore 0.3.1",
- "fvm_shared",
- "recall_kernel_ops",
- "recall_syscalls",
-]
-
-[[package]]
-name = "recall_kernel_ops"
-version = "0.1.0"
-dependencies = [
- "fvm",
-]
-
-[[package]]
-name = "recall_sol_facade"
-version = "0.1.2"
-dependencies = [
- "alloy-primitives",
- "alloy-sol-macro-expander",
- "alloy-sol-macro-input",
- "alloy-sol-types",
- "anyhow",
- "dunce",
- "eyre",
- "fvm_ipld_encoding 0.5.3",
- "fvm_shared",
- "prettyplease",
- "proc-macro2",
- "quote",
- "regex",
- "serde",
- "serde_json",
- "syn 2.0.106",
- "thiserror 2.0.17",
- "walkdir",
-]
-
-[[package]]
-name = "recall_syscalls"
-version = "0.1.0"
-dependencies = [
- "fvm",
- "fvm_shared",
- "iroh-blobs",
- "iroh_manager",
- "recall_kernel_ops",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -13157,6 +12994,169 @@ dependencies = [
  "serde",
  "storage-proofs-core",
  "storage-proofs-porep",
+]
+
+[[package]]
+name = "storage-services"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "blake2b_simd",
+ "bls-signatures 0.13.1",
+ "clap 4.5.49",
+ "ethers",
+ "fendermint_actor_storage_blobs_shared",
+ "fendermint_actor_storage_bucket",
+ "fendermint_crypto",
+ "fendermint_rpc",
+ "fendermint_vm_actor_interface",
+ "fendermint_vm_message",
+ "futures",
+ "fvm_ipld_encoding 0.5.3",
+ "fvm_shared",
+ "hex",
+ "ipc-api",
+ "iroh",
+ "iroh-base",
+ "iroh-blobs",
+ "rand 0.8.5",
+ "reqwest 0.11.27",
+ "serde",
+ "serde_json",
+ "storage_node_iroh_manager",
+ "tempfile",
+ "tendermint-rpc",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "tracing-subscriber 0.3.20",
+ "warp",
+]
+
+[[package]]
+name = "storage_node_actor_sdk"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cid 0.11.1",
+ "fendermint_actor_storage_adm_types",
+ "fil_actors_runtime",
+ "fvm_ipld_encoding 0.5.3",
+ "fvm_sdk",
+ "fvm_shared",
+ "num-traits",
+ "serde",
+ "storage_node_sol_facade",
+]
+
+[[package]]
+name = "storage_node_executor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cid 0.11.1",
+ "fendermint_actor_storage_blobs_shared",
+ "fendermint_vm_actor_interface",
+ "fvm",
+ "fvm_ipld_encoding 0.5.3",
+ "fvm_shared",
+ "num-traits",
+ "replace_with",
+ "tracing",
+]
+
+[[package]]
+name = "storage_node_ipld"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cid 0.11.1",
+ "fil_actors_runtime",
+ "fvm_ipld_amt",
+ "fvm_ipld_blockstore 0.3.1",
+ "fvm_ipld_encoding 0.5.3",
+ "fvm_ipld_hamt",
+ "fvm_sdk",
+ "fvm_shared",
+ "integer-encoding 3.0.4",
+ "serde",
+]
+
+[[package]]
+name = "storage_node_iroh_manager"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "iroh",
+ "iroh-blobs",
+ "iroh-quinn",
+ "iroh-relay",
+ "n0-future",
+ "num-traits",
+ "quic-rpc",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "tracing-subscriber 0.3.20",
+ "url",
+]
+
+[[package]]
+name = "storage_node_kernel"
+version = "0.1.0"
+dependencies = [
+ "ambassador 0.3.7",
+ "anyhow",
+ "fvm",
+ "fvm_ipld_blockstore 0.3.1",
+ "fvm_shared",
+ "storage_node_kernel_ops",
+ "storage_node_syscalls",
+]
+
+[[package]]
+name = "storage_node_kernel_ops"
+version = "0.1.0"
+dependencies = [
+ "fvm",
+]
+
+[[package]]
+name = "storage_node_sol_facade"
+version = "0.1.2"
+dependencies = [
+ "alloy-primitives",
+ "alloy-sol-macro-expander",
+ "alloy-sol-macro-input",
+ "alloy-sol-types",
+ "anyhow",
+ "dunce",
+ "eyre",
+ "fvm_ipld_encoding 0.5.3",
+ "fvm_shared",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "serde",
+ "serde_json",
+ "syn 2.0.106",
+ "thiserror 2.0.17",
+ "walkdir",
+]
+
+[[package]]
+name = "storage_node_syscalls"
+version = "0.1.0"
+dependencies = [
+ "fvm",
+ "fvm_shared",
+ "iroh-blobs",
+ "storage_node_iroh_manager",
+ "storage_node_kernel_ops",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

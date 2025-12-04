@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use fendermint_actor_blobs_shared::blobs::SubscriptionId;
+use fendermint_actor_storage_blobs_shared::blobs::SubscriptionId;
 use fvm_shared::{address::Address, clock::ChainEpoch, MethodNum};
 use iroh_base::NodeId;
 use iroh_blobs::Hash;

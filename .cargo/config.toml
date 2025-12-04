@@ -1,0 +1,13 @@
+# Cargo configuration for IPC project
+
+# Configure clang for wasm32-unknown-unknown target
+# This ensures we use LLVM clang which has WASM support
+[target.wasm32-unknown-unknown]
+linker = "rust-lld"
+rustflags = ["-C", "link-arg=-zstack-size=131072"]
+
+[env]
+# Use LLVM clang for wasm32-unknown-unknown target compilation
+# This is needed for building C dependencies like blst for WASM
+CC_wasm32_unknown_unknown = "/opt/homebrew/opt/llvm/bin/clang"
+AR_wasm32_unknown_unknown = "/opt/homebrew/opt/llvm/bin/llvm-ar"

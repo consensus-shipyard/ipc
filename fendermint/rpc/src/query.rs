@@ -21,7 +21,7 @@ use fendermint_vm_message::query::{
 
 use crate::message::{GasParams, MessageFactory};
 use crate::response::{decode_blob_get, decode_os_get, encode_data};
-use fendermint_actor_bucket::{GetParams, Object};
+use fendermint_actor_storage_bucket::{GetParams, Object};
 use fendermint_vm_actor_interface::system;
 use fvm_shared::econ::TokenAmount;
 
@@ -158,11 +158,11 @@ pub trait QueryClient: Sync {
     /// Get a blob from the blobs actor without including a transaction on the blockchain.
     async fn blob_get_call(
         &mut self,
-        blob_hash: fendermint_actor_blobs_shared::bytes::B256,
+        blob_hash: fendermint_actor_storage_blobs_shared::bytes::B256,
         value: TokenAmount,
         gas_params: GasParams,
         height: FvmQueryHeight,
-    ) -> anyhow::Result<Option<fendermint_actor_blobs_shared::blobs::Blob>> {
+    ) -> anyhow::Result<Option<fendermint_actor_storage_blobs_shared::blobs::Blob>> {
         let msg = MessageFactory::new(system::SYSTEM_ACTOR_ADDR, 0)
             .blob_get(blob_hash, value, gas_params)?;
 

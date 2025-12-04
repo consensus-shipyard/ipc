@@ -9,11 +9,11 @@ use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, R
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::fvm::interpreter::FvmMessagesInterpreter;
 use fendermint_vm_interpreter::fvm::observe::register_metrics as register_interpreter_metrics;
-use fendermint_vm_interpreter::fvm::recall_env::{BlobPool, ReadRequestPool};
+use fendermint_vm_interpreter::fvm::storage_env::{BlobPool, ReadRequestPool};
 use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
-use fendermint_vm_iroh_resolver::iroh::IrohResolver;
-use fendermint_vm_iroh_resolver::pool::ResolvePool;
+use fendermint_vm_storage_resolver::iroh::IrohResolver;
+use fendermint_vm_storage_resolver::pool::ResolvePool;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::observe::register_metrics as register_topdown_metrics;
 use fendermint_vm_topdown::proxy::{IPCProviderProxy, IPCProviderProxyWithLatency};

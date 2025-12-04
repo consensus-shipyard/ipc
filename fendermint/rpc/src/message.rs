@@ -6,7 +6,7 @@ use std::path::Path;
 use anyhow::Context;
 use base64::Engine;
 use bytes::Bytes;
-use fendermint_actor_bucket::{GetParams, Method::GetObject};
+use fendermint_actor_storage_bucket::{GetParams, Method::GetObject};
 use fendermint_crypto::SecretKey;
 use fendermint_vm_actor_interface::{eam, evm};
 use fendermint_vm_message::{chain::ChainMessage, signed::SignedMessage};
@@ -132,13 +132,13 @@ impl MessageFactory {
 
     pub fn blob_get(
         &mut self,
-        blob_hash: fendermint_actor_blobs_shared::bytes::B256,
+        blob_hash: fendermint_actor_storage_blobs_shared::bytes::B256,
         value: TokenAmount,
         gas_params: GasParams,
     ) -> anyhow::Result<Message> {
-        use fendermint_actor_blobs_shared::blobs::GetBlobParams;
-        use fendermint_actor_blobs_shared::method::Method::GetBlob;
-        use fendermint_actor_blobs_shared::BLOBS_ACTOR_ADDR;
+        use fendermint_actor_storage_blobs_shared::blobs::GetBlobParams;
+        use fendermint_actor_storage_blobs_shared::method::Method::GetBlob;
+        use fendermint_actor_storage_blobs_shared::BLOBS_ACTOR_ADDR;
 
         let params = GetBlobParams(blob_hash);
         let params = RawBytes::serialize(params)?;

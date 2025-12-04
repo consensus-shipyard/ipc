@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 
-pub use fil_actor_adm::Kind;
+pub use fendermint_actor_storage_adm_types::Kind;
 use fil_actors_runtime::{
     actor_error, runtime::Runtime, ActorError, FIRST_EXPORTED_METHOD_NUMBER, INIT_ACTOR_ADDR,
 };
@@ -12,8 +12,8 @@ use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{ipld_block::IpldBlock, tuple::*};
 pub use fvm_shared::METHOD_CONSTRUCTOR;
 use fvm_shared::{address::Address, MethodNum};
-use recall_actor_sdk::constants::ADM_ACTOR_ADDR;
-use recall_actor_sdk::{
+use storage_node_actor_sdk::constants::ADM_ACTOR_ADDR;
+use storage_node_actor_sdk::{
     evm::emit_evm_event,
     util::{to_delegated_address, to_id_address, to_id_and_delegated_address},
 };

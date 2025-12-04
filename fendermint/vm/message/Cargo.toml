@@ -19,7 +19,7 @@ num-traits = { workspace = true }
 
 iroh-blobs = { workspace = true }
 iroh-base = { workspace = true }
-fendermint_actor_blobs_shared = { path = "../../actors/blobs/shared" }
+fendermint_actor_storage_blobs_shared = { path = "../../actors/storage_blobs/shared" }
 
 arbitrary = { workspace = true, optional = true }
 quickcheck = { workspace = true, optional = true }

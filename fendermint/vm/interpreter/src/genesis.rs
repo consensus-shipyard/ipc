@@ -383,15 +383,15 @@ impl<'a> GenesisBuilder<'a> {
         let mut machine_codes = std::collections::HashMap::new();
         for machine_name in &["bucket", "timehub"] {
             if let Some(cid) = state.custom_actor_manifest.code_by_name(machine_name) {
-                let kind = fendermint_actor_adm::Kind::from_str(machine_name)
+                let kind = fendermint_actor_storage_adm::Kind::from_str(machine_name)
                     .expect("failed to parse adm machine name");
                 machine_codes.insert(kind, *cid);
             }
         }
-        let adm_state = fendermint_actor_adm::State::new(
+        let adm_state = fendermint_actor_storage_adm::State::new(
             state.store(),
             machine_codes,
-            fendermint_actor_adm::PermissionModeParams::Unrestricted,
+            fendermint_actor_storage_adm::PermissionModeParams::Unrestricted,
         )?;
         state
             .create_custom_actor(
@@ -422,13 +422,13 @@ impl<'a> GenesisBuilder<'a> {
             .context("failed to create chainmetadata actor")?;
 
         // Initialize the recall config actor.
-        let recall_config_state = fendermint_actor_recall_config::State {
+        let recall_config_state = fendermint_actor_storage_config::State {
             admin: None,
-            config: fendermint_actor_recall_config_shared::RecallConfig::default(),
+            config: fendermint_actor_storage_config_shared::RecallConfig::default(),
         };
         state
             .create_custom_actor(
-                fendermint_actor_recall_config::ACTOR_NAME,
+                fendermint_actor_storage_config::ACTOR_NAME,
                 recall_config::RECALL_CONFIG_ACTOR_ID,
                 &recall_config_state,
                 TokenAmount::zero(),
@@ -437,12 +437,12 @@ impl<'a> GenesisBuilder<'a> {
             .context("failed to create recall config actor")?;
 
         // Initialize the blob actor with delegated address for Ethereum/Solidity access.
-        let blobs_state = fendermint_actor_blobs::State::new(&state.store())?;
+        let blobs_state = fendermint_actor_storage_blobs::State::new(&state.store())?;
         let blobs_eth_addr = init::builtin_actor_eth_addr(blobs::BLOBS_ACTOR_ID);
         let blobs_f4_addr = fvm_shared::address::Address::from(blobs_eth_addr);
         state
             .create_custom_actor(
-                fendermint_actor_blobs::BLOBS_ACTOR_NAME,
+                fendermint_actor_storage_blobs::BLOBS_ACTOR_NAME,
                 blobs::BLOBS_ACTOR_ID,
                 &blobs_state,
                 TokenAmount::zero(),
@@ -454,9 +454,9 @@ impl<'a> GenesisBuilder<'a> {
         // Initialize the blob reader actor.
         state
             .create_custom_actor(
-                fendermint_actor_blob_reader::BLOB_READER_ACTOR_NAME,
+                fendermint_actor_storage_blob_reader::BLOB_READER_ACTOR_NAME,
                 blob_reader::BLOB_READER_ACTOR_ID,
-                &fendermint_actor_blob_reader::State::new(&state.store())?,
+                &fendermint_actor_storage_blob_reader::State::new(&state.store())?,
                 TokenAmount::zero(),
                 None,
             )

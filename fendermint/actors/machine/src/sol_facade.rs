@@ -4,10 +4,10 @@
 
 use std::collections::HashMap;
 
-use fil_actor_adm::Kind;
+use fendermint_actor_storage_adm_types::Kind;
 use fvm_shared::address::Address;
-use recall_actor_sdk::evm::TryIntoEVMEvent;
-use recall_sol_facade::{machine as sol, types::H160};
+use storage_node_actor_sdk::evm::TryIntoEVMEvent;
+use storage_node_sol_facade::{machine as sol, types::H160};
 
 pub struct MachineCreated<'a> {
     kind: Kind,

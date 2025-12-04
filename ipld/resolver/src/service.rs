@@ -22,7 +22,7 @@ use iroh_blobs::net_protocol::DownloadMode;
 use iroh_blobs::rpc::client::blobs::{DownloadOptions, ReadAtLen};
 use iroh_blobs::util::SetTagOption;
 use iroh_blobs::{BlobFormat, Hash, Tag};
-use iroh_manager::{get_blob_hash_and_size, BlobsClient, IrohManager};
+use storage_node_iroh_manager::{get_blob_hash_and_size, BlobsClient, IrohManager};
 use libipld::store::StoreParams;
 use libipld::Cid;
 use libp2p::connection_limits::ConnectionLimits;

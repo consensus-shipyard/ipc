@@ -11,7 +11,7 @@ use anyhow::{anyhow, Context};
 use bytes::Buf;
 use entangler::{ChunkRange, Config, EntanglementResult, Entangler};
 use entangler_storage::iroh::IrohStorage as EntanglerIrohStorage;
-use fendermint_actor_bucket::{GetParams, Object};
+use fendermint_actor_storage_bucket::{GetParams, Object};
 use fendermint_app_settings::objects::ObjectsSettings;
 use fendermint_rpc::{client::FendermintClient, message::GasParams, QueryClient};
 use fendermint_vm_message::query::FvmQueryHeight;
@@ -21,7 +21,7 @@ use fvm_shared::econ::TokenAmount;
 use ipc_api::ethers_address_to_fil_address;
 use iroh::NodeAddr;
 use iroh_blobs::{hashseq::HashSeq, rpc::client::blobs::BlobStatus, util::SetTagOption, Hash};
-use iroh_manager::{connect_rpc, get_blob_hash_and_size, BlobsClient, IrohNode};
+use storage_node_iroh_manager::{connect_rpc, get_blob_hash_and_size, BlobsClient, IrohNode};
 use lazy_static::lazy_static;
 use mime_guess::get_mime_extensions_str;
 use prometheus::{register_histogram, register_int_counter, Histogram, IntCounter};
@@ -808,7 +808,7 @@ async fn handle_blob_download<F: QueryClient + Send + Sync>(
 
     let mut hash_array = [0u8; 32];
     hash_array.copy_from_slice(&blob_hash_bytes);
-    let blob_hash = fendermint_actor_blobs_shared::bytes::B256(hash_array);
+    let blob_hash = fendermint_actor_storage_blobs_shared::bytes::B256(hash_array);
 
     let height = height_query
         .height
@@ -1070,9 +1070,9 @@ async fn os_get<F: QueryClient + Send + Sync>(
 
 async fn blob_get<F: QueryClient + Send + Sync>(
     mut client: F,
-    blob_hash: fendermint_actor_blobs_shared::bytes::B256,
+    blob_hash: fendermint_actor_storage_blobs_shared::bytes::B256,
     height: u64,
-) -> anyhow::Result<Option<fendermint_actor_blobs_shared::blobs::Blob>> {
+) -> anyhow::Result<Option<fendermint_actor_storage_blobs_shared::blobs::Blob>> {
     let gas_params = GasParams {
         gas_limit: Default::default(),
         gas_fee_cap: Default::default(),
@@ -1106,7 +1106,7 @@ mod tests {
     use async_trait::async_trait;
     use bytes::Bytes;
     // TODO: Re-enable when ADM bucket actor is available
-    // use fendermint_actor_blobs_shared::bytes::B256;
+    // use fendermint_actor_storage_blobs_shared::bytes::B256;
     use fendermint_vm_message::query::FvmQuery;
     use rand_chacha::rand_core::{RngCore, SeedableRng};
     use rand_chacha::ChaCha8Rng;

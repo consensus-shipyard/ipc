@@ -16,7 +16,7 @@ members = [
   "ipc/api",
   "ipc/types",
   "ipc/observability",
-  "ipc-decentralized-storage",
+  "storage-services",
 
   # ipld
   "ipld/resolver",
@@ -45,30 +45,30 @@ members = [
   "fendermint/actors/eam",
   "fendermint/actors/f3-light-client",
   "fendermint/actors/gas_market/eip1559",
-  # recall actors
-  "fendermint/actors/adm_types",         # fil_actor_adm - ADM types
-  "fendermint/actors/adm",               # ADM actor
+  # storage node actors
+  "fendermint/actors/storage_adm_types",         # Storage ADM types
+  "fendermint/actors/storage_adm",               # Storage ADM actor
   "fendermint/actors/machine",           # Machine base trait
-  "fendermint/actors/blobs",
-  "fendermint/actors/blobs/shared",
-  "fendermint/actors/blobs/testing",
-  "fendermint/actors/blob_reader",
-  "fendermint/actors/bucket",            # S3-like object storage
-  "fendermint/actors/timehub",           # Timestamping service
-  "fendermint/actors/recall_config",
-  "fendermint/actors/recall_config/shared",
+  "fendermint/actors/storage_blobs",
+  "fendermint/actors/storage_blobs/shared",
+  "fendermint/actors/storage_blobs/testing",
+  "fendermint/actors/storage_blob_reader",
+  "fendermint/actors/storage_bucket",            # S3-like object storage
+  "fendermint/actors/storage_timehub",           # Timestamping service
+  "fendermint/actors/storage_config",
+  "fendermint/actors/storage_config/shared",
 
-  # recall storage (netwatch patched for socket2 0.5 compatibility!)
-  "recall/kernel",
-  "recall/kernel/ops",
-  "recall/syscalls",
-  "recall/executor",
-  "recall/iroh_manager",
-  "recall/ipld",
-  "recall/actor_sdk",
+  # storage node (netwatch patched for socket2 0.5 compatibility!)
+  "storage-node/kernel",
+  "storage-node/kernel/ops",
+  "storage-node/syscalls",
+  "storage-node/executor",
+  "storage-node/iroh_manager",
+  "storage-node/ipld",
+  "storage-node/actor_sdk",
 
-  # recall contracts (vendored locally, FVM 4.7 upgrade)
-  "recall-contracts/crates/facade",
+  # storage node contracts (vendored locally, FVM 4.7 upgrade)
+  "storage-node-contracts/crates/facade",
 
   "build-rs-utils",
   "contracts-artifacts",
@@ -123,7 +123,7 @@ hex-literal = "0.4.1"
 http = "0.2.12"
 im = "15.1.0"
 integer-encoding = { version = "3.0.3", default-features = false }
-# Recall/Iroh dependencies
+# Storage node/Iroh dependencies
 ambassador = "0.3.5"
 iroh = "0.35"
 iroh-base = "0.35"
@@ -195,7 +195,7 @@ uuid = { version = "1.0", features = ["v4"] }
 mime_guess = "2.0"
 urlencoding = "2.1"
 # Recall Solidity facades (vendored locally, upgraded to FVM 4.7)
-recall_sol_facade = { path = "recall-contracts/crates/facade" }
+recall_sol_facade = { path = "storage-node-contracts/crates/facade" }
 sha2 = "0.10"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_bytes = "0.11"
@@ -270,7 +270,7 @@ fvm_ipld_amt = "0.7.4"
 # NOTE: Using master branch instead of v17.0.0 tag due to serde dependency fixes
 # Master is currently at commit 2f040c12 which fixes the serde::__private::PhantomData import issue
 fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-actors", branch = "master" }
-fil_actor_adm = { path = "fendermint/actors/adm_types" }
+fendermint_actor_storage_adm_types = { path = "fendermint/actors/storage_adm_types" }
 fil_actor_eam = { git = "https://github.com/filecoin-project/builtin-actors", branch = "master" }
 fil_actor_evm = { git = "https://github.com/filecoin-project/builtin-actors", branch = "master" }
 fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", branch = "master" }
@@ -282,6 +282,7 @@ cid = { version = "0.11", default-features = false, features = [
 multihash-codetable = "0.1"
 
 frc42_dispatch = { path = "./ext/frc42_dispatch" }
+storage_node_sol_facade = { path = "./storage-node-contracts/crates/facade" }
 
 # Using the same tendermint-rs dependency as tower-abci. From both we are interested in v037 modules.
 tower-abci = { version = "0.7" }

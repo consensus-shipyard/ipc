@@ -3,7 +3,7 @@
 use anyhow::{anyhow, Context};
 use base64::Engine;
 use bytes::Bytes;
-use fendermint_actor_bucket::Object;
+use fendermint_actor_storage_bucket::Object;
 use fendermint_vm_actor_interface::eam::{self, CreateReturn};
 use fvm_ipld_encoding::{BytesDe, RawBytes};
 use tendermint::abci::response::DeliverTx;
@@ -69,8 +69,8 @@ pub fn decode_os_get(deliver_tx: &DeliverTx) -> anyhow::Result<Option<Object>> {
 
 pub fn decode_blob_get(
     deliver_tx: &DeliverTx,
-) -> anyhow::Result<Option<fendermint_actor_blobs_shared::blobs::Blob>> {
+) -> anyhow::Result<Option<fendermint_actor_storage_blobs_shared::blobs::Blob>> {
     let data = decode_data(&deliver_tx.data)?;
-    fvm_ipld_encoding::from_slice::<Option<fendermint_actor_blobs_shared::blobs::Blob>>(&data)
+    fvm_ipld_encoding::from_slice::<Option<fendermint_actor_storage_blobs_shared::blobs::Blob>>(&data)
         .map_err(|e| anyhow!("error parsing as Option<Blob>: {e}"))
 }
