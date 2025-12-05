@@ -62,8 +62,8 @@ fendermint_abci = { path = "../abci" }
 actors-custom-api = { path = "../actors/api" }
 fendermint_actor_storage_bucket = { path = "../actors/storage_bucket", optional = true }
 fendermint_actor_f3_light_client = { path = "../actors/f3-light-client" }
-fendermint_app_options = { path = "./options" }
-fendermint_app_settings = { path = "./settings" }
+fendermint_app_options = { path = "./options", default-features = false }
+fendermint_app_settings = { path = "./settings", default-features = false }
 fendermint_crypto = { path = "../crypto" }
 fendermint_eth_api = { path = "../eth/api" }
 fendermint_materializer = { path = "../testing/materializer" }
@@ -78,7 +78,7 @@ fendermint_vm_core = { path = "../vm/core" }
 fendermint_vm_encoding = { path = "../vm/encoding" }
 fendermint_vm_event = { path = "../vm/event" }
 fendermint_vm_genesis = { path = "../vm/genesis" }
-fendermint_vm_interpreter = { path = "../vm/interpreter", features = [
+fendermint_vm_interpreter = { path = "../vm/interpreter", default-features = false, features = [
     "bundle",
 ] }
 fendermint_vm_message = { path = "../vm/message" }
@@ -124,6 +124,9 @@ storage-node = [
     "dep:fendermint_actor_storage_bucket",
     "dep:fendermint_actor_storage_blobs_shared",
     "dep:fendermint_vm_storage_resolver",
+    "fendermint_app_options/storage-node",
+    "fendermint_app_settings/storage-node",
+    "fendermint_vm_interpreter/storage-node",
 ]
 
 [dev-dependencies]
