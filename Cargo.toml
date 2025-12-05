@@ -27,6 +27,7 @@ members = [
   "fendermint/app/options",
   "fendermint/crypto",
   "fendermint/app/settings",
+  "fendermint/module",
   "fendermint/eth/*",
   "fendermint/rocksdb",
   "fendermint/rpc",

@@ -1,7 +1,9 @@
-# Plugin System Implementation Plan
+# Module System Implementation Plan
 
-**Status:** Ready to implement
+**Status:** Phase 1 In Progress
 **Approved Architecture:** Multi-Trait Hook System with zero-cost generics
+**Terminology:** Using "module" instead of "plugin"
+**Branch:** modular-plugable-architecture
 
 ---
 
