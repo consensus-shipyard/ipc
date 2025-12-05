@@ -20,6 +20,7 @@ use super::{
     fevm::{ContractCaller, MockProvider, NoRevert},
     FvmExecState,
 };
+use crate::fvm::DefaultModule;
 use crate::fvm::end_block_hook::LightClientCommitments;
 use crate::types::AppliedMessage;
 use ipc_actors_abis::checkpointing_facet::CheckpointingFacet;
@@ -79,17 +80,23 @@ impl<DB> GatewayCaller<DB> {
 
 impl<DB: Blockstore + Clone> GatewayCaller<DB> {
     /// Return true if the current subnet is the root subnet.
-    pub fn is_anchored(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<bool> {
+    pub fn is_anchored(&self, state: &mut FvmExecState<DB, DefaultModule>) -> anyhow::Result<bool> {
         self.subnet_id(state).map(|id| id.route.is_empty())
     }
 
     /// Return the current subnet ID.
-    pub fn subnet_id(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<getter::SubnetID> {
+    pub fn subnet_id<M>(&self, state: &mut FvmExecState<DB, M>) -> anyhow::Result<getter::SubnetID>
+    where
+        M: fendermint_module::ModuleBundle,
+    {
         self.getter.call(state, |c| c.get_network_name())
     }
 
     /// Fetch the period with which the current subnet has to submit checkpoints to its parent.
-    pub fn bottom_up_check_period(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<u64> {
+    pub fn bottom_up_check_period<M>(&self, state: &mut FvmExecState<DB, M>) -> anyhow::Result<u64>
+    where
+        M: fendermint_module::ModuleBundle,
+    {
         Ok(self
             .getter
             .call(state, |c| c.bottom_up_check_period())?
@@ -97,24 +104,30 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
     }
 
     /// Fetch the bottom-up message batch enqueued for a given checkpoint height.
-    pub fn bottom_up_msg_batch(
+    pub fn bottom_up_msg_batch<M>(
         &self,
-        state: &mut FvmExecState<DB>,
+        state: &mut FvmExecState<DB, M>,
         height: u64,
-    ) -> anyhow::Result<getter::BottomUpMsgBatch> {
+    ) -> anyhow::Result<getter::BottomUpMsgBatch>
+    where
+        M: fendermint_module::ModuleBundle,
+    {
         let batch = self.getter.call(state, |c| {
             c.bottom_up_msg_batch(ethers::types::U256::from(height))
         })?;
         Ok(batch)
     }
 
-    pub fn record_light_client_commitments(
+    pub fn record_light_client_commitments<M>(
         &self,
-        state: &mut FvmExecState<DB>,
+        state: &mut FvmExecState<DB, M>,
         commitment: &LightClientCommitments,
         msgs: Vec<checkpointing_facet::IpcEnvelope>,
         activity: checkpointing_facet::FullActivityRollup,
-    ) -> anyhow::Result<AppliedMessage> {
+    ) -> anyhow::Result<AppliedMessage>
+    where
+        M: fendermint_module::ModuleBundle,
+    {
         let commitment = checkpointing_facet::AppHashBreakdown {
             state_root: Default::default(),
             msg_batch_commitment: checkpointing_facet::Commitment {
@@ -137,23 +150,32 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
     }
 
     /// Apply all pending validator changes, returning the newly adopted configuration number, or 0 if there were no changes.
-    pub fn apply_validator_changes(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<u64> {
+    pub fn apply_validator_changes<M>(&self, state: &mut FvmExecState<DB, M>) -> anyhow::Result<u64>
+    where
+        M: fendermint_module::ModuleBundle,
+    {
         self.topdown.call(state, |c| c.apply_finality_changes())
     }
 
     /// Get the currently active validator set.
-    pub fn current_membership(
+    pub fn current_membership<M>(
         &self,
-        state: &mut FvmExecState<DB>,
-    ) -> anyhow::Result<getter::Membership> {
+        state: &mut FvmExecState<DB, M>,
+    ) -> anyhow::Result<getter::Membership>
+    where
+        M: fendermint_module::ModuleBundle,
+    {
         self.getter.call(state, |c| c.get_current_membership())
     }
 
     /// Get the current power table, which is the same as the membership but parsed into domain types.
-    pub fn current_power_table(
+    pub fn current_power_table<M>(
         &self,
-        state: &mut FvmExecState<DB>,
-    ) -> anyhow::Result<(ConfigurationNumber, Vec<Validator<Power>>)> {
+        state: &mut FvmExecState<DB, M>,
+    ) -> anyhow::Result<(ConfigurationNumber, Vec<Validator<Power>>)>
+    where
+        M: fendermint_module::ModuleBundle,
+    {
         let membership = self
             .current_membership(state)
             .context("failed to get current membership")?;
@@ -165,11 +187,14 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
 
     /// Commit the parent finality to the gateway and returns the previously committed finality.
     /// None implies there is no previously committed finality.
-    pub fn commit_parent_finality(
+    pub fn commit_parent_finality<M>(
         &self,
-        state: &mut FvmExecState<DB>,
+        state: &mut FvmExecState<DB, M>,
         finality: IPCParentFinality,
-    ) -> anyhow::Result<Option<IPCParentFinality>> {
+    ) -> anyhow::Result<Option<IPCParentFinality>>
+    where
+        M: fendermint_module::ModuleBundle,
+    {
         let evm_finality = top_down_finality_facet::ParentFinality::try_from(finality)?;
 
         let (has_committed, prev_finality) = self
@@ -183,11 +208,14 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         })
     }
 
-    pub fn store_validator_changes(
+    pub fn store_validator_changes<M>(
         &self,
-        state: &mut FvmExecState<DB>,
+        state: &mut FvmExecState<DB, M>,
         changes: Vec<PowerChangeRequest>,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<()>
+    where
+        M: fendermint_module::ModuleBundle,
+    {
         if changes.is_empty() {
             return Ok(());
         }
@@ -202,12 +230,17 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
     }
 
     /// Call this function to mint some FIL to the gateway contract
-    pub fn mint_to_gateway(
+    pub fn mint_to_gateway<M>(
         &self,
-        state: &mut FvmExecState<DB>,
+        state: &mut FvmExecState<DB, M>,
         value: TokenAmount,
-    ) -> anyhow::Result<()> {
-        let state_tree = state.state_tree_mut();
+    ) -> anyhow::Result<()>
+    where
+        M: fendermint_module::ModuleBundle,
+        <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine: fvm::machine::Machine,
+        M::Executor: std::ops::DerefMut<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
+        let state_tree = state.state_tree_mut_with_deref();
         state_tree.mutate_actor(ipc::GATEWAY_ACTOR_ID, |actor_state| {
             actor_state.balance += value;
             Ok(())
@@ -215,11 +248,15 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         Ok(())
     }
 
-    pub fn apply_cross_messages(
+    pub fn apply_cross_messages<M>(
         &self,
-        state: &mut FvmExecState<DB>,
+        state: &mut FvmExecState<DB, M>,
         cross_messages: Vec<IpcEnvelope>,
-    ) -> anyhow::Result<AppliedMessage> {
+    ) -> anyhow::Result<AppliedMessage>
+    where
+        M: fendermint_module::ModuleBundle,
+        M::Executor: std::ops::DerefMut<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
         let messages = cross_messages
             .into_iter()
             .map(xnet_messaging_facet::IpcEnvelope::try_from)
@@ -233,7 +270,7 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
 
     pub fn get_latest_parent_finality(
         &self,
-        state: &mut FvmExecState<DB>,
+        state: &mut FvmExecState<DB, DefaultModule>,
     ) -> anyhow::Result<IPCParentFinality> {
         let r = self
             .getter
@@ -243,7 +280,7 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
 
     pub fn approve_subnet_joining_gateway(
         &self,
-        state: &mut FvmExecState<DB>,
+        state: &mut FvmExecState<DB, DefaultModule>,
         subnet: EthAddress,
         owner: EthAddress,
     ) -> anyhow::Result<()> {

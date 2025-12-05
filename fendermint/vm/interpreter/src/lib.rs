@@ -15,48 +15,50 @@ use crate::fvm::state::{FvmExecState, FvmQueryState};
 use crate::fvm::store::ReadOnlyBlockstore;
 use crate::types::*;
 use async_trait::async_trait;
+use fendermint_module::ModuleBundle;
 use std::sync::Arc;
 
 use fvm_ipld_blockstore::Blockstore;
 
 #[async_trait]
-pub trait MessagesInterpreter<DB>
+pub trait MessagesInterpreter<DB, M>
 where
     DB: Blockstore + Clone,
+    M: ModuleBundle,
 {
     async fn check_message(
         &self,
-        state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
+        state: &mut FvmExecState<ReadOnlyBlockstore<DB>, M>,
         msg: Vec<u8>,
         is_recheck: bool,
     ) -> Result<CheckResponse, CheckMessageError>;
 
     async fn prepare_messages_for_block(
         &self,
-        state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
+        state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>, M>,
         msgs: Vec<Vec<u8>>,
         max_transaction_bytes: u64,
     ) -> Result<PrepareMessagesResponse, PrepareMessagesError>;
 
     async fn attest_block_messages(
         &self,
-        state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
+        state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>, M>,
         msgs: Vec<Vec<u8>>,
     ) -> Result<AttestMessagesResponse, AttestMessagesError>;
 
     async fn begin_block(
         &self,
-        state: &mut FvmExecState<DB>,
+        state: &mut FvmExecState<DB, M>,
     ) -> Result<BeginBlockResponse, BeginBlockError>;
 
     async fn end_block(
         &self,
-        state: &mut FvmExecState<DB>,
+        state: &mut FvmExecState<DB, M>,
     ) -> Result<EndBlockResponse, EndBlockError>;
 
     async fn apply_message(
         &self,
-        state: &mut FvmExecState<DB>,
+        state: &mut FvmExecState<DB, M>,
         msg: Vec<u8>,
     ) -> Result<ApplyMessageResponse, ApplyMessageError>;
 

@@ -62,6 +62,8 @@ pub trait ModuleBundle:
     + Send
     + Sync
     + 'static
+where
+    <<Self::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine: Send,
 {
     /// The kernel type used by this module's executor.
     type Kernel: Kernel;
@@ -103,6 +105,7 @@ use crate::service::NoOpServiceModule;
 impl<K> ExecutorModule<K> for NoOpModuleBundle
 where
     K: Kernel,
+    <K::CallManager as CallManager>::Machine: Send,
 {
     type Executor = <NoOpExecutorModule as ExecutorModule<K>>::Executor;
 

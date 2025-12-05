@@ -3,6 +3,7 @@
 
 use crate::errors::*;
 use crate::fvm::end_block_hook::{EndBlockManager, PowerUpdates};
+use fendermint_vm_core::chainid::HasChainID;
 use crate::fvm::executions::{
     execute_cron_message, execute_signed_message, push_block_to_chainmeta_actor_if_possible,
 };
@@ -27,6 +28,7 @@ use crate::types::*;
 use crate::MessagesInterpreter;
 use anyhow::{Context, Result};
 use cid::Cid;
+use fendermint_module::ModuleBundle;
 use fendermint_vm_message::chain::ChainMessage;
 use fendermint_vm_message::ipc::IpcMessage;
 use fendermint_vm_message::query::{FvmQuery, StateParams};
@@ -48,14 +50,16 @@ struct Actor {
 
 /// Interprets messages as received from the ABCI layer
 #[derive(Clone)]
-pub struct FvmMessagesInterpreter<DB>
+pub struct FvmMessagesInterpreter<DB, M>
 where
     DB: Blockstore + Clone + Send + Sync + 'static,
+    M: ModuleBundle,
 {
+    module: Arc<M>,
     end_block_manager: EndBlockManager<DB>,
 
     top_down_manager: TopDownManager<DB>,
-    upgrade_scheduler: UpgradeScheduler<DB>,
+    upgrade_scheduler: UpgradeScheduler<DB, M>,
 
     push_block_data_to_chainmeta_actor: bool,
     max_msgs_per_block: usize,
@@ -64,20 +68,23 @@ where
     gas_search_step: f64,
 }
 
-impl<DB> FvmMessagesInterpreter<DB>
+impl<DB, M> FvmMessagesInterpreter<DB, M>
 where
     DB: Blockstore + Clone + Send + Sync + 'static,
+    M: ModuleBundle,
 {
     pub fn new(
+        module: Arc<M>,
         end_block_manager: EndBlockManager<DB>,
         top_down_manager: TopDownManager<DB>,
-        upgrade_scheduler: UpgradeScheduler<DB>,
+        upgrade_scheduler: UpgradeScheduler<DB, M>,
         push_block_data_to_chainmeta_actor: bool,
         max_msgs_per_block: usize,
         gas_overestimation_rate: f64,
         gas_search_step: f64,
     ) -> Self {
         Self {
+            module,
             end_block_manager,
             top_down_manager,
             upgrade_scheduler,
@@ -89,7 +96,10 @@ where
     }
 
     /// Performs an upgrade if one is scheduled at the current block height.
-    fn perform_upgrade_if_needed(&self, state: &mut FvmExecState<DB>) -> Result<()> {
+    fn perform_upgrade_if_needed(&self, state: &mut FvmExecState<DB, M>) -> Result<()>
+    where
+        M::Executor: std::ops::DerefMut<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
         let chain_id = state.chain_id();
         let block_height: u64 = state.block_height().try_into().unwrap();
 
@@ -107,7 +117,7 @@ where
 
     fn check_nonce_and_sufficient_balance(
         &self,
-        state: &FvmExecState<ReadOnlyBlockstore<DB>>,
+        state: &FvmExecState<ReadOnlyBlockstore<DB>, M>,
         msg: &FvmMessage,
     ) -> Result<CheckResponse> {
         let Some(Actor {
@@ -156,9 +166,12 @@ where
     // TODO - remove this once a new pending state solution is implemented
     fn update_nonce(
         &self,
-        state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
+        state: &mut FvmExecState<ReadOnlyBlockstore<DB>, M>,
         msg: &FvmMessage,
-    ) -> Result<()> {
+    ) -> Result<()>
+    where
+        M::Executor: std::ops::DerefMut<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
         let Actor {
             id: actor_id,
             state: mut actor,
@@ -166,7 +179,7 @@ where
             .lookup_actor(state, &msg.from)?
             .expect("actor must exist");
 
-        let state_tree = state.state_tree_mut();
+        let state_tree = state.state_tree_mut_with_deref();
 
         actor.sequence += 1;
         state_tree.set_actor(actor_id, actor);
@@ -176,10 +189,13 @@ where
 
     fn lookup_actor(
         &self,
-        state: &FvmExecState<ReadOnlyBlockstore<DB>>,
+        state: &FvmExecState<ReadOnlyBlockstore<DB>, M>,
         address: &Address,
-    ) -> Result<Option<Actor>> {
-        let state_tree = state.state_tree();
+    ) -> Result<Option<Actor>>
+    where
+        M::Executor: std::ops::Deref<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
+        let state_tree = state.state_tree_with_deref();
         let id = match state_tree.lookup_id(address)? {
             Some(id) => id,
             None => return Ok(None),
@@ -197,16 +213,21 @@ where
 }
 
 #[async_trait::async_trait]
-impl<DB> MessagesInterpreter<DB> for FvmMessagesInterpreter<DB>
+impl<DB, M> MessagesInterpreter<DB, M> for FvmMessagesInterpreter<DB, M>
 where
     DB: Blockstore + Clone + Send + Sync + 'static,
+    M: ModuleBundle,
+    M::Executor: Send,
 {
     async fn check_message(
         &self,
-        state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
+        state: &mut FvmExecState<ReadOnlyBlockstore<DB>, M>,
         msg: Vec<u8>,
         is_recheck: bool,
-    ) -> Result<CheckResponse, CheckMessageError> {
+    ) -> Result<CheckResponse, CheckMessageError>
+    where
+        M::Executor: std::ops::DerefMut<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
         let signed_msg = ipld_decode_signed_message(&msg)?;
         let fvm_msg = signed_msg.message();
 
@@ -255,7 +276,7 @@ where
 
     async fn prepare_messages_for_block(
         &self,
-        state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
+        state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>, M>,
         msgs: Vec<Vec<u8>>,
         max_transaction_bytes: u64,
     ) -> Result<PrepareMessagesResponse, PrepareMessagesError> {
@@ -323,7 +344,7 @@ where
 
     async fn attest_block_messages(
         &self,
-        state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
+        state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>, M>,
         msgs: Vec<Vec<u8>>,
     ) -> Result<AttestMessagesResponse, AttestMessagesError> {
         if msgs.len() > self.max_msgs_per_block {
@@ -380,8 +401,11 @@ where
 
     async fn begin_block(
         &self,
-        state: &mut FvmExecState<DB>,
-    ) -> Result<BeginBlockResponse, BeginBlockError> {
+        state: &mut FvmExecState<DB, M>,
+    ) -> Result<BeginBlockResponse, BeginBlockError>
+    where
+        M::Executor: std::ops::DerefMut<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
         let height = state.block_height() as u64;
 
         tracing::debug!("trying to perform upgrade");
@@ -405,8 +429,11 @@ where
 
     async fn end_block(
         &self,
-        state: &mut FvmExecState<DB>,
-    ) -> Result<EndBlockResponse, EndBlockError> {
+        state: &mut FvmExecState<DB, M>,
+    ) -> Result<EndBlockResponse, EndBlockError>
+    where
+        M::Executor: std::ops::DerefMut<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
         if let Some(pubkey) = state.block_producer() {
             state.activity_tracker().record_block_committed(pubkey)?;
         }
@@ -445,9 +472,12 @@ where
 
     async fn apply_message(
         &self,
-        state: &mut FvmExecState<DB>,
+        state: &mut FvmExecState<DB, M>,
         msg: Vec<u8>,
-    ) -> Result<ApplyMessageResponse, ApplyMessageError> {
+    ) -> Result<ApplyMessageResponse, ApplyMessageError>
+    where
+        M::Executor: std::ops::DerefMut<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
         let chain_msg = match fvm_ipld_encoding::from_slice::<ChainMessage>(&msg) {
             Ok(msg) => msg,
             Err(e) => {

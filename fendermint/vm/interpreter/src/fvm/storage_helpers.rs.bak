@@ -370,10 +370,10 @@ where
     F: FnOnce(&mut FvmExecState<ReadOnlyBlockstore<DB>, DefaultModule>) -> Result<R>,
     DB: Blockstore + Clone + 'static + Send + Sync,
 {
-    state.state_tree_mut_with_deref().begin_transaction();
+    state.state_tree_mut().begin_transaction();
     let result = f(state);
     state
-        .state_tree_mut_with_deref()
+        .state_tree_mut()
         .end_transaction(true)
         .expect("interpreter failed to end state transaction");
     result

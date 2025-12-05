@@ -27,6 +27,9 @@ fendermint_vm_message = { path = "../vm/message" }
 # Utilities
 tracing = { workspace = true }
 
+# Storage node executor (provides RecallExecutor with Deref support)
+storage_node_executor = { path = "../../storage-node/executor" }
+
 [dev-dependencies]
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["full", "test-util"] }

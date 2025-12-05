@@ -10,6 +10,7 @@ license.workspace = true
 
 [dependencies]
 actors-custom-api = { path = "../../actors/api" }
+fendermint_module = { path = "../../module" }
 fendermint_vm_actor_interface = { path = "../actor_interface" }
 fendermint_vm_core = { path = "../core" }
 fendermint_vm_event = { path = "../event" }

@@ -211,11 +211,11 @@ where
                 )?;
 
                 // safe to unwrap as they are created above
-                let evm_actor = s.state_tree_with_deref().get_actor(created.actor_id)?.unwrap();
-                let evm_actor_state_raw = s.state_tree_with_deref().store().get(&evm_actor.state)?.unwrap();
+                let evm_actor = s.state_tree().get_actor(created.actor_id)?.unwrap();
+                let evm_actor_state_raw = s.state_tree().store().get(&evm_actor.state)?.unwrap();
                 let evm_actor_state = from_slice::<fil_actor_evm::State>(&evm_actor_state_raw)?;
                 let actor_code = s
-                    .state_tree_with_deref()
+                    .state_tree()
                     .store()
                     .get(&evm_actor_state.bytecode)?
                     .unwrap();

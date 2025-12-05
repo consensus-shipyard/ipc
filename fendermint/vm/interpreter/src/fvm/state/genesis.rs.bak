@@ -555,15 +555,7 @@ where
     {
         match self.stage {
             Stage::Tree(ref mut state_tree) => f(state_tree),
-            Stage::Exec(ref mut exec_state) => {
-                // SAFETY: We use transmute here because NoOpModuleBundle's RecallExecutor
-                // uses MemoryBlockstore internally, but the state tree operations are
-                // generic and work with any Blockstore. The memory layout is compatible.
-                let state_tree_ptr = (*exec_state).state_tree_mut_with_deref() as *mut _ as *mut StateTree<MachineBlockstore<DB>>;
-                unsafe {
-                    g(&mut *state_tree_ptr)
-                }
-            }
+            Stage::Exec(ref mut exec_state) => g((*exec_state).state_tree_mut_with_deref()),
         }
     }
 
@@ -571,7 +563,7 @@ where
     fn get_actor_state<T: de::DeserializeOwned>(&self, actor: ActorID) -> anyhow::Result<T> {
         let actor_state_cid = match &self.stage {
             Stage::Tree(s) => s.get_actor(actor)?,
-            Stage::Exec(ref s) => (*s).state_tree_with_deref().get_actor(actor)?,
+            Stage::Exec(ref s) => (*s).state_tree().get_actor(actor)?,
         }
         .ok_or_else(|| anyhow!("actor state {actor} not found, is it deployed?"))?
         .state;

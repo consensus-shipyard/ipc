@@ -21,6 +21,7 @@ use fvm_shared::{address::Address, econ::TokenAmount, error::ExitCode, message::
 use crate::fvm::constants::BLOCK_GAS_LIMIT;
 
 use super::FvmExecState;
+use crate::fvm::DefaultModule;
 
 pub type MockProvider = ep::Provider<ep::MockProvider>;
 pub type MockContractCall<T> = ethers::prelude::ContractCall<MockProvider, T>;
@@ -173,10 +174,11 @@ where
     ///
     /// Returns an error if the return code shows is not successful;
     /// intended to be used with methods that are expected succeed.
-    pub fn call<T, F>(&self, state: &mut FvmExecState<DB>, f: F) -> anyhow::Result<T>
+    pub fn call<T, F, M>(&self, state: &mut FvmExecState<DB, M>, f: F) -> anyhow::Result<T>
     where
         F: FnOnce(&C) -> MockContractCall<T>,
         T: Detokenize,
+        M: fendermint_module::ModuleBundle,
     {
         self.call_with_return(state, f)?.into_decoded()
     }
@@ -185,12 +187,13 @@ where
     ///
     /// Returns an error if the return code shows is not successful;
     /// intended to be used with methods that are expected succeed.
-    pub fn call_with_return<T, F>(
+    pub fn call_with_return<T, F, M>(
         &self,
-        state: &mut FvmExecState<DB>,
+        state: &mut FvmExecState<DB, M>,
         f: F,
     ) -> anyhow::Result<ContractCallerReturn<T>>
     where
+        M: fendermint_module::ModuleBundle,
         F: FnOnce(&C) -> MockContractCall<T>,
         T: Detokenize,
     {
@@ -218,7 +221,7 @@ where
     /// intended to be used with methods that are expected to fail under certain conditions.
     pub fn try_call<T, F>(
         &self,
-        state: &mut FvmExecState<DB>,
+        state: &mut FvmExecState<DB, DefaultModule>,
         f: F,
     ) -> anyhow::Result<ContractResult<T, E>>
     where
@@ -235,12 +238,13 @@ where
     ///
     /// Returns either the result or the exit code if it's not successful;
     /// intended to be used with methods that are expected to fail under certain conditions.
-    pub fn try_call_with_ret<T, F>(
+    pub fn try_call_with_ret<T, F, M>(
         &self,
-        state: &mut FvmExecState<DB>,
+        state: &mut FvmExecState<DB, M>,
         f: F,
     ) -> anyhow::Result<ContractResult<ContractCallerReturn<T>, E>>
     where
+        M: fendermint_module::ModuleBundle,
         F: FnOnce(&C) -> MockContractCall<T>,
         T: Detokenize,
     {

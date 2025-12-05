@@ -10,9 +10,8 @@
 use anyhow::Result;
 use fvm::call_manager::CallManager;
 use fvm::engine::EnginePool;
-use fvm::executor::{ApplyKind, ApplyRet, Executor};
+use fvm::executor::Executor;
 use fvm::kernel::Kernel;
-use fvm_shared::message::Message;
 
 /// Module trait for providing custom executor implementations.
 ///
@@ -41,9 +40,22 @@ use fvm_shared::message::Message;
 ///     }
 /// }
 /// ```
-pub trait ExecutorModule<K: Kernel> {
+pub trait ExecutorModule<K: Kernel>
+where
+    <K::CallManager as CallManager>::Machine: Send,
+{
     /// The executor type provided by this module.
-    type Executor: Executor<Kernel = K>;
+    ///
+    /// **Important**: The executor must implement `Deref` and `DerefMut` to the underlying Machine
+    /// to allow FvmExecState to access machine methods like `state_tree()`, `context()`, etc.
+    ///
+    /// The Machine must also be Send to support async operations (ensured by trait bound).
+    ///
+    /// Note: FVM's DefaultExecutor does not implement these traits. Use RecallExecutor
+    /// from storage-node or implement a custom executor wrapper.
+    type Executor: Executor<Kernel = K>
+        + std::ops::Deref<Target = <K::CallManager as CallManager>::Machine>
+        + std::ops::DerefMut;
 
     /// Create an executor instance.
     ///
@@ -61,68 +73,62 @@ pub trait ExecutorModule<K: Kernel> {
     ) -> Result<Self::Executor>;
 }
 
-/// Default no-op executor module that uses FVM's standard executor.
+/// Default no-op executor module.
 ///
-/// This is used when no module-specific executor is needed.
+/// This uses RecallExecutor from storage-node, which properly implements
+/// `Deref<Target = Machine>` as required by the `ExecutorModule` trait.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct NoOpExecutorModule;
 
 impl<K> ExecutorModule<K> for NoOpExecutorModule
 where
     K: Kernel,
+    <K::CallManager as CallManager>::Machine: Send,
 {
-    type Executor = fvm::executor::DefaultExecutor<K>;
+    type Executor = storage_node_executor::RecallExecutor<K>;
 
     fn create_executor(
         engine_pool: EnginePool,
         machine: <K::CallManager as CallManager>::Machine,
     ) -> Result<Self::Executor> {
-        Ok(fvm::executor::DefaultExecutor::new(
-            engine_pool,
-            machine,
-        )?)
+        Ok(storage_node_executor::RecallExecutor::new(engine_pool, machine)?)
     }
 }
 
-/// A wrapper executor that delegates to an inner executor.
+/// A wrapper executor that provides `Deref` access to the machine.
 ///
-/// This is useful for testing and for modules that want to wrap
-/// the default executor with additional functionality.
-pub struct DelegatingExecutor<E: Executor> {
-    inner: E,
+/// This wraps FVM's DefaultExecutor and provides access to the underlying machine
+/// through Deref/DerefMut, which is required by the ExecutorModule trait.
+pub struct DelegatingExecutor<K: Kernel> {
+    inner: fvm::executor::DefaultExecutor<K>,
 }
 
-impl<E: Executor> DelegatingExecutor<E> {
-    /// Create a new delegating executor wrapping the given executor.
-    pub fn new(inner: E) -> Self {
+impl<K: Kernel> DelegatingExecutor<K> {
+    /// Create a new delegating executor
+    pub fn new(inner: fvm::executor::DefaultExecutor<K>) -> Self {
         Self { inner }
     }
 
-    /// Get a reference to the inner executor.
-    pub fn inner(&self) -> &E {
+    /// Get the underlying executor
+    pub fn inner(&self) -> &fvm::executor::DefaultExecutor<K> {
         &self.inner
     }
 
-    /// Get a mutable reference to the inner executor.
-    pub fn inner_mut(&mut self) -> &mut E {
+    /// Get the underlying executor mutably
+    pub fn inner_mut(&mut self) -> &mut fvm::executor::DefaultExecutor<K> {
         &mut self.inner
-    }
-
-    /// Consume this wrapper and return the inner executor.
-    pub fn into_inner(self) -> E {
-        self.inner
     }
 }
 
-impl<E: Executor> Executor for DelegatingExecutor<E> {
-    type Kernel = E::Kernel;
+impl<K: Kernel> Executor for DelegatingExecutor<K> {
+    type Kernel = K;
 
     fn execute_message(
         &mut self,
-        msg: Message,
-        apply_kind: ApplyKind,
+        msg: fvm_shared::message::Message,
+        apply_kind: fvm::executor::ApplyKind,
         raw_length: usize,
-    ) -> Result<ApplyRet> {
+    ) -> Result<fvm::executor::ApplyRet> {
         self.inner.execute_message(msg, apply_kind, raw_length)
     }
 
@@ -130,6 +136,19 @@ impl<E: Executor> Executor for DelegatingExecutor<E> {
         self.inner.flush()
     }
 }
+
+// Note: We cannot implement Deref for DelegatingExecutor<DefaultExecutor> because
+// DefaultExecutor doesn't expose its machine. This means NoOpExecutorModule won't
+// satisfy the ExecutorModule trait bounds. This is intentional - use RecallExecutor
+// or another executor that properly exposes the machine.
+//
+// Commented out - cannot implement without machine access:
+// impl<K: Kernel> std::ops::Deref for DelegatingExecutor<K> {
+//     type Target = <K::CallManager as CallManager>::Machine;
+//     fn deref(&self) -> &Self::Target {
+//         // Cannot access - machine is private in DefaultExecutor
+//     }
+// }
 
 #[cfg(test)]
 mod tests {

@@ -3,7 +3,7 @@
 
 use crate::fvm::activity::{FullActivity, ValidatorActivityTracker};
 use crate::fvm::state::FvmExecState;
-use crate::fvm::FvmMessage;
+use crate::fvm::{DefaultModule, FvmMessage};
 use anyhow::Context;
 use fendermint_actor_activity_tracker::types::FullActivityRollup;
 use fendermint_crypto::PublicKey;
@@ -13,11 +13,11 @@ use fendermint_vm_actor_interface::system;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_shared::address::Address;
 
-pub struct ActorActivityTracker<'a, DB: Blockstore + Clone + 'static> {
-    pub(crate) executor: &'a mut FvmExecState<DB>,
+pub struct ActorActivityTracker<'a, DB: Blockstore + Clone + 'static, M: fendermint_module::ModuleBundle = DefaultModule> {
+    pub(crate) executor: &'a mut FvmExecState<DB, M>,
 }
 
-impl<DB: Blockstore + Clone + 'static> ValidatorActivityTracker for ActorActivityTracker<'_, DB> {
+impl<DB: Blockstore + Clone + 'static, M: fendermint_module::ModuleBundle> ValidatorActivityTracker for ActorActivityTracker<'_, DB, M> {
     fn record_block_committed(&mut self, validator: PublicKey) -> anyhow::Result<()> {
         let address: Address = EthAddress::from(validator).into();
 
