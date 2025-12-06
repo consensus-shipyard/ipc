@@ -5,6 +5,7 @@ pub mod cmd;
 pub mod ipc;
 pub mod metrics;
 pub mod observe;
+pub mod plugins;
 pub mod service;
 mod store;
 mod tmconv;

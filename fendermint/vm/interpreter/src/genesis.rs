@@ -379,29 +379,10 @@ impl<'a> GenesisBuilder<'a> {
             )
             .context("failed to create reward actor")?;
 
-        // ADM Address Manager (ADM) actor
-        let mut machine_codes = std::collections::HashMap::new();
-        for machine_name in &["bucket", "timehub"] {
-            if let Some(cid) = state.custom_actor_manifest.code_by_name(machine_name) {
-                let kind = fendermint_actor_storage_adm::Kind::from_str(machine_name)
-                    .expect("failed to parse adm machine name");
-                machine_codes.insert(kind, *cid);
-            }
-        }
-        let adm_state = fendermint_actor_storage_adm::State::new(
-            state.store(),
-            machine_codes,
-            fendermint_actor_storage_adm::PermissionModeParams::Unrestricted,
-        )?;
-        state
-            .create_custom_actor(
-                fendermint_vm_actor_interface::adm::ADM_ACTOR_NAME,
-                adm::ADM_ACTOR_ID,
-                &adm_state,
-                TokenAmount::zero(),
-                None,
-            )
-            .context("failed to create adm actor")?;
+        // ADM Address Manager (ADM) actor - MOVED TO PLUGIN
+        // Storage-specific actors should be initialized by the storage-node plugin
+        // via the GenesisModule trait, not in core interpreter.
+        // TODO: Plugin should implement GenesisModule::initialize_actors
 
         // STAGE 1b: Then we initialize the in-repo custom actors.
 

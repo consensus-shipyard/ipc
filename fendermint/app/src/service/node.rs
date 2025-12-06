@@ -303,13 +303,13 @@ pub async fn run(
         parent_finality_votes.clone(),
     );
 
-    let module = std::sync::Arc::new(fendermint_vm_interpreter::fvm::DefaultModule::default());
+    // Load the plugin discovered by the build script
+    let module = crate::plugins::load_discovered_plugin();
 
-    // Log which module is being used
     tracing::info!(
         module_name = fendermint_module::ModuleBundle::name(module.as_ref()),
         module_version = fendermint_module::ModuleBundle::version(module.as_ref()),
-        "Initialized FVM interpreter with module"
+        "Initialized FVM interpreter with auto-discovered module"
     );
 
     let interpreter = FvmMessagesInterpreter::new(

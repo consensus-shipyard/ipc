@@ -1,0 +1,555 @@
+// Copyright 2022-2024 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
+
+use std::collections::{HashMap, HashSet};
+use std::marker::PhantomData;
+
+use crate::fvm::activity::actor::ActorActivityTracker;
+use crate::fvm::externs::FendermintExterns;
+use crate::fvm::gas::BlockGasTracker;
+use crate::fvm::state::priority::TxnPriorityCalculator;
+use actors_custom_api::gas_market::Reading;
+use anyhow::Ok;
+use cid::Cid;
+use fendermint_crypto::PublicKey;
+use fendermint_vm_actor_interface::eam::EthAddress;
+use fendermint_vm_core::{chainid::HasChainID, Timestamp};
+use fendermint_vm_encoding::IsHumanReadable;
+use fendermint_vm_genesis::PowerScale;
+use fvm::{
+    engine::MultiEngine,
+    executor::{ApplyFailure, ApplyKind, ApplyRet, Executor},
+    machine::{DefaultMachine, Machine, Manifest, NetworkConfig},
+    state_tree::StateTree,
+};
+use fvm_ipld_blockstore::Blockstore;
+use fvm_ipld_encoding::RawBytes;
+use fvm_shared::{
+    address::Address, chainid::ChainID, clock::ChainEpoch, econ::TokenAmount, error::ExitCode,
+    message::Message, receipt::Receipt, version::NetworkVersion, ActorID, MethodNum,
+};
+use fendermint_module::ModuleBundle;
+use std::sync::Arc;
+use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
+use std::fmt;
+use tendermint::consensus::params::Params as TendermintConsensusParams;
+
+const REVERT_TRANSACTION: bool = true;
+pub type BlockHash = [u8; 32];
+
+pub type ActorAddressMap = HashMap<ActorID, Address>;
+
+/// The result of the message application bundled with any delegated addresses of event emitters.
+pub type ExecResult = anyhow::Result<(ApplyRet, ActorAddressMap)>;
+
+/// The return value extended with some things from the message that
+/// might not be available to the caller, because of the message lookups
+/// and transformations that happen along the way, e.g. where we need
+/// a field, we might just have a CID.
+pub struct FvmApplyRet {
+    pub apply_ret: ApplyRet,
+    pub from: Address,
+    pub to: Address,
+    pub method_num: MethodNum,
+    pub gas_limit: u64,
+    /// Delegated addresses of event emitters, if they have one.
+    pub emitters: HashMap<ActorID, Address>,
+}
+
+impl From<FvmApplyRet> for crate::types::AppliedMessage {
+    fn from(ret: FvmApplyRet) -> Self {
+        Self {
+            apply_ret: ret.apply_ret,
+            from: ret.from,
+            to: ret.to,
+            method_num: ret.method_num,
+            gas_limit: ret.gas_limit,
+            emitters: ret.emitters,
+        }
+    }
+}
+
+/// Parts of the state which evolve during the lifetime of the chain.
+#[serde_as]
+#[derive(Serialize, Deserialize, Clone, Eq, PartialEq)]
+pub struct FvmStateParams {
+    /// Root CID of the actor state map.
+    #[serde_as(as = "IsHumanReadable")]
+    pub state_root: Cid,
+    /// Last applied block time stamp.
+    pub timestamp: Timestamp,
+    /// FVM network version.
+    pub network_version: NetworkVersion,
+    /// Base fee for contract execution.
+    #[serde_as(as = "IsHumanReadable")]
+    pub base_fee: TokenAmount,
+    /// Current circulating supply; changes in the context of IPC.
+    #[serde_as(as = "IsHumanReadable")]
+    pub circ_supply: TokenAmount,
+    /// The [`ChainID`] is stored here to hint at the possibility that
+    /// a chain ID might change during the lifetime of a chain, in case
+    /// there is a fork, or perhaps a subnet migration in IPC.
+    ///
+    /// How exactly that would be communicated is uknown at this point.
+    pub chain_id: u64,
+    /// Conversion from collateral to voting power.
+    pub power_scale: PowerScale,
+    /// The application protocol version.
+    #[serde(default)]
+    pub app_version: u64,
+    /// Tendermint consensus params.
+    pub consensus_params: Option<TendermintConsensusParams>,
+}
+
+/// Custom implementation of Debug to exclude `consensus_params` from the debug output
+/// if it is `None`. This ensures consistency between the debug output and JSON/CBOR
+/// serialization, which omits `None` values for `consensus_params`. See: fendermint/vm/interpreter/tests/golden.rs.
+///
+/// This implementation is temporary and should be removed once `consensus_params` is
+/// no longer part of `FvmStateParams`.
+///
+/// @TODO: Remove this implementation when `consensus_params` is deprecated.
+impl fmt::Debug for FvmStateParams {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut ds = f.debug_struct("FvmStateParams");
+
+        ds.field("state_root", &self.state_root)
+            .field("timestamp", &self.timestamp)
+            .field("network_version", &self.network_version)
+            .field("base_fee", &self.base_fee)
+            .field("circ_supply", &self.circ_supply)
+            .field("chain_id", &self.chain_id)
+            .field("power_scale", &self.power_scale)
+            .field("app_version", &self.app_version);
+
+        // Only include `consensus_params` in the debug output if it is `Some`.
+        if let Some(ref params) = self.consensus_params {
+            ds.field("consensus_params", params);
+        }
+
+        ds.finish()
+    }
+}
+
+/// Parts of the state which can be updated by message execution, apart from the actor state.
+///
+/// This is just a technical thing to help us not forget about saving something.
+///
+/// TODO: `base_fee` should surely be here.
+#[derive(Debug)]
+pub struct FvmUpdatableParams {
+    /// The application protocol version, which changes during upgrades.
+    pub app_version: u64,
+    /// The base fee has currently no automatic rules of being updated,
+    /// but it's exposed to upgrades.
+    pub base_fee: TokenAmount,
+    /// The circulating supply changes if IPC is enabled and
+    /// funds/releases are carried out with the parent.
+    pub circ_supply: TokenAmount,
+    /// Conversion between collateral and voting power.
+    /// Doesn't change at the moment but in theory it could,
+    /// and it doesn't have a place within the FVM.
+    pub power_scale: PowerScale,
+}
+
+pub type MachineBlockstore<DB> = <DefaultMachine<DB, FendermintExterns<DB>> as Machine>::Blockstore;
+
+/// A state we create for the execution of all the messages in a block.
+pub struct FvmExecState<DB, M = fendermint_module::NoOpModuleBundle>
+where
+    DB: Blockstore + Clone + 'static,
+    M: ModuleBundle,
+{
+    /// The executor provided by the module
+    executor: M::Executor,
+    /// Reference to the module for calling hooks and accessing module metadata.
+    /// Currently used for: lifecycle logging, future: pre/post execution hooks
+    #[allow(dead_code)]
+    module: Arc<M>,
+    /// Hash of the block currently being executed. For queries and checks this is empty.
+    ///
+    /// The main motivation to add it here was to make it easier to pass in data to the
+    /// execution interpreter without having to add yet another piece to track at the app level.
+    block_hash: Option<BlockHash>,
+    /// Public key of the validator who created this block. For queries, checks, and proposal
+    /// validations this is None.
+    block_producer: Option<PublicKey>,
+    /// Keeps track of block gas usage during execution, and takes care of updating
+    /// the chosen gas market strategy (by default an on-chain actor delivering EIP-1559 behaviour).
+    block_gas_tracker: BlockGasTracker,
+    /// State of parameters that are outside the control of the FVM but can change and need to be persisted.
+    params: FvmUpdatableParams,
+    /// Indicate whether the parameters have been updated.
+    params_dirty: bool,
+
+    txn_priority: TxnPriorityCalculator,
+
+    /// Block height for the current execution
+    block_height_cached: ChainEpoch,
+    /// Timestamp for the current execution
+    timestamp_cached: Timestamp,
+    /// Chain ID for the current execution
+    chain_id_cached: ChainID,
+
+    /// Phantom data to keep the DB type parameter
+    _phantom: PhantomData<DB>,
+}
+
+impl<DB, M> FvmExecState<DB, M>
+where
+    DB: Blockstore + Clone + 'static,
+    M: ModuleBundle,
+{
+    /// Create a new FVM execution environment.
+    ///
+    /// Calling this can be very slow unless we run in `--release` mode, because the [DefaultExecutor]
+    /// pre-loads builtin-actor CIDs and wasm in debug mode is slow to instrument.
+    pub fn new(
+        module: Arc<M>,
+        blockstore: DB,
+        multi_engine: &MultiEngine,
+        block_height: ChainEpoch,
+        params: FvmStateParams,
+    ) -> anyhow::Result<Self> {
+        let mut nc = NetworkConfig::new(params.network_version);
+        nc.chain_id = ChainID::from(params.chain_id);
+
+        // TODO: Configure:
+        // * circ_supply; by default it's for Filecoin
+        // * base_fee; by default it's zero
+        let mut mc = nc.for_epoch(block_height, params.timestamp.0, params.state_root);
+        mc.set_base_fee(params.base_fee.clone());
+        mc.set_circulating_supply(params.circ_supply.clone());
+
+        // Creating a new machine every time is prohibitively slow.
+        // let ec = EngineConfig::from(&nc);
+        // let engine = EnginePool::new_default(ec)?;
+
+        let engine = multi_engine.get(&nc)?;
+        let externs = FendermintExterns::new(blockstore.clone(), params.state_root);
+        let machine = DefaultMachine::new(&mc, blockstore.clone(), externs)?;
+
+        // Use the module to create the executor
+        // SAFETY: We use unsafe transmute here to convert DefaultMachine to the module's expected machine type.
+        // This is safe because:
+        // 1. NoOpModuleBundle uses RecallExecutor which accepts any Machine type via generics
+        // 2. Custom modules are responsible for ensuring their Machine type is compatible
+        // 3. The machine types have the same memory layout (they're both FVM machines)
+        let mut executor = M::create_executor(engine.clone(), unsafe {
+            std::mem::transmute_copy(&machine)
+        })?;
+        std::mem::forget(machine); // Prevent double-free
+
+        let block_gas_tracker = BlockGasTracker::create(&mut executor)?;
+        let base_fee = block_gas_tracker.base_fee().clone();
+
+        Ok(Self {
+            executor,
+            module: module.clone(),
+            block_hash: None,
+            block_producer: None,
+            block_gas_tracker,
+            params: FvmUpdatableParams {
+                app_version: params.app_version,
+                base_fee: params.base_fee,
+                circ_supply: params.circ_supply,
+                power_scale: params.power_scale,
+            },
+            params_dirty: false,
+            txn_priority: TxnPriorityCalculator::new(base_fee),
+            block_height_cached: block_height,
+            timestamp_cached: params.timestamp,
+            chain_id_cached: nc.chain_id,
+            _phantom: PhantomData,
+        })
+    }
+
+    /// Set the block hash during execution.
+    pub fn with_block_hash(mut self, block_hash: BlockHash) -> Self {
+        self.block_hash = Some(block_hash);
+        self
+    }
+
+    /// Set the validator during execution.
+    pub fn with_block_producer(mut self, pubkey: PublicKey) -> Self {
+        self.block_producer = Some(pubkey);
+        self
+    }
+
+    pub fn block_gas_tracker(&self) -> &BlockGasTracker {
+        &self.block_gas_tracker
+    }
+
+    pub fn block_gas_tracker_mut(&mut self) -> &mut BlockGasTracker {
+        &mut self.block_gas_tracker
+    }
+
+    pub fn read_gas_market(&mut self) -> anyhow::Result<Reading> {
+        BlockGasTracker::read_gas_market(&mut self.executor)
+    }
+
+    /// Execute message implicitly.
+    pub fn execute_implicit(&mut self, msg: Message) -> ExecResult {
+        self.execute_message(msg, ApplyKind::Implicit)
+    }
+
+    pub fn execute_read_only(&mut self, msg: Message) -> ExecResult {
+        if let Err(e) = msg.check() {
+            return Ok(check_error(e));
+        }
+
+        // For read-only execution, we execute the message implicitly
+        // Note: storage-node's RecallExecutor has execute_message_with_revert
+        // for proper rollback support. For standard execution, we use implicit.
+        self.execute_implicit(msg)
+    }
+
+    /// Execute message implicitly but ensures the execution is successful and returns only the ApplyRet.
+    pub fn execute_implicit_ok(&mut self, msg: Message) -> ExecResult {
+        let r = self.execute_implicit(msg)?;
+        if let Some(err) = &r.0.failure_info {
+            anyhow::bail!("failed to apply message: {}", err)
+        } else {
+            Ok(r)
+        }
+    }
+
+    /// Execute message explicitly.
+    pub fn execute_explicit(&mut self, msg: Message) -> ExecResult {
+        self.execute_message(msg, ApplyKind::Explicit)
+    }
+
+    pub fn execute_message(&mut self, msg: Message, kind: ApplyKind) -> ExecResult
+    where
+        M::Executor: std::ops::Deref<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
+        if let Err(e) = msg.check() {
+            return Ok(check_error(e));
+        }
+
+        // TODO: We could preserve the message length by changing the input type.
+        let raw_length = message_raw_length(&msg)?;
+        let ret = self.executor.execute_message(msg, kind, raw_length)?;
+        let addrs = self.emitter_delegated_addresses(&ret)?;
+
+        // Record the utilization of this message if the apply type was Explicit.
+        if kind == ApplyKind::Explicit {
+            self.block_gas_tracker.record_utilization(&ret);
+        }
+
+        Ok((ret, addrs))
+    }
+
+    /// Execute a function with the internal executor and return an arbitrary result.
+    pub fn execute_with_executor<F, R>(&mut self, exec_func: F) -> anyhow::Result<R>
+    where
+        F: FnOnce(&mut M::Executor) -> anyhow::Result<R>,
+    {
+        exec_func(&mut self.executor)
+    }
+
+    /// Commit the state. It must not fail, but we're returning a result so that error
+    /// handling can be done in the application root.
+    ///
+    /// For now this is not part of the `Interpreter` because it's not clear what atomic
+    /// semantics we can hope to provide if the middlewares call each other: did it go
+    /// all the way down, or did it stop somewhere? Easier to have one commit of the state
+    /// as a whole.
+    pub fn commit(mut self) -> anyhow::Result<(Cid, FvmUpdatableParams, bool)> {
+        let cid = self.executor.flush()?;
+        Ok((cid, self.params, self.params_dirty))
+    }
+
+    /// The height of the currently executing block.
+    pub fn block_height(&self) -> ChainEpoch {
+        self.block_height_cached
+    }
+
+    /// Identity of the block being executed, if we are indeed executing any blocks.
+    pub fn block_hash(&self) -> Option<BlockHash> {
+        self.block_hash
+    }
+
+    /// Identity of the block producer, if we are indeed executing any blocks.
+    pub fn block_producer(&self) -> Option<PublicKey> {
+        self.block_producer
+    }
+
+    /// The timestamp of the currently executing block.
+    pub fn timestamp(&self) -> Timestamp {
+        self.timestamp_cached
+    }
+
+    /// Conversion between collateral and voting power.
+    pub fn power_scale(&self) -> PowerScale {
+        self.params.power_scale
+    }
+
+    pub fn txn_priority_calculator(&self) -> &TxnPriorityCalculator {
+        &self.txn_priority
+    }
+
+    pub fn app_version(&self) -> u64 {
+        self.params.app_version
+    }
+
+    /// Get a reference to the state tree (requires module with Deref to Machine).
+    ///
+    /// This is available when the module's executor implements Deref to Machine.
+    pub fn state_tree_with_deref(&self) -> &StateTree<<<<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine as fvm::machine::Machine>::Blockstore>
+    where
+        M::Executor: std::ops::Deref<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
+        self.executor.state_tree()
+    }
+
+    /// Get a mutable reference to the state tree (requires module with DerefMut to Machine).
+    ///
+    /// This is available when the module's executor implements DerefMut to Machine.
+    pub fn state_tree_mut_with_deref(&mut self) -> &mut StateTree<<<<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine as fvm::machine::Machine>::Blockstore>
+    where
+        M::Executor: std::ops::DerefMut<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
+        self.executor.state_tree_mut()
+    }
+
+    /// Built-in actor manifest to inspect code CIDs.
+    ///
+    /// This requires the executor to implement `Deref<Target = Machine>`.
+    pub fn builtin_actors(&self) -> &Manifest
+    where
+        M::Executor: std::ops::Deref<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
+        self.executor.builtin_actors()
+    }
+
+    /// The [ChainID] from the network configuration.
+    pub fn chain_id(&self) -> ChainID {
+        self.chain_id_cached
+    }
+
+    pub fn activity_tracker(&mut self) -> ActorActivityTracker<'_, DB, M> {
+        ActorActivityTracker { executor: self }
+    }
+
+    /// Collect all the event emitters' delegated addresses, for those who have any.
+    ///
+    /// This requires the module executor to implement Deref to access the state tree.
+    pub fn emitter_delegated_addresses(&self, apply_ret: &ApplyRet) -> anyhow::Result<ActorAddressMap>
+    where
+        M::Executor: std::ops::Deref<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
+        let emitter_ids = apply_ret
+            .events
+            .iter()
+            .map(|e| e.emitter)
+            .collect::<HashSet<_>>();
+
+        let mut emitters = HashMap::default();
+
+        for id in emitter_ids {
+            if let Some(actor) = self.executor.state_tree().get_actor(id)? {
+                if let Some(addr) = actor.delegated_address {
+                    emitters.insert(id, addr);
+                }
+            }
+        }
+
+        Ok(emitters)
+    }
+
+    /// Update the application version.
+    pub fn update_app_version<F>(&mut self, f: F)
+    where
+        F: FnOnce(&mut u64),
+    {
+        self.update_params(|p| f(&mut p.app_version))
+    }
+
+    /// Finalizes updates to the gas market based on the transactions processed by this instance.
+    /// Returns the new base fee for the next height.
+    ///
+    /// This requires the module executor to implement DerefMut to access the machine.
+    pub fn finalize_gas_market(&mut self) -> anyhow::Result<Reading>
+    where
+        M::Executor: std::ops::DerefMut<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
+        let premium_recipient = match self.block_producer {
+            Some(pubkey) => Some(Address::from(EthAddress::new_secp256k1(
+                &pubkey.serialize(),
+            )?)),
+            None => None,
+        };
+
+        self.block_gas_tracker
+            .finalize(&mut self.executor, premium_recipient)
+            .inspect(|reading| self.update_params(|p| p.base_fee = reading.base_fee.clone()))
+    }
+
+    /// Update the circulating supply, effective from the next block.
+    pub fn update_circ_supply<F>(&mut self, f: F)
+    where
+        F: FnOnce(&mut TokenAmount),
+    {
+        self.update_params(|p| f(&mut p.circ_supply))
+    }
+
+    /// Update the parameters and mark them as dirty.
+    fn update_params<F>(&mut self, f: F)
+    where
+        F: FnOnce(&mut FvmUpdatableParams),
+    {
+        f(&mut self.params);
+        self.params_dirty = true;
+    }
+}
+
+// Additional impl block specifically for DefaultModule that provides state_tree access
+// Note: state_tree access is now provided via state_tree_with_deref() and state_tree_mut_with_deref()
+// methods in the generic impl block above. These methods work with any module that implements
+// Deref/DerefMut to Machine.
+
+impl<DB, M> HasChainID for FvmExecState<DB, M>
+where
+    DB: Blockstore + Clone,
+    M: ModuleBundle,
+{
+    fn chain_id(&self) -> ChainID {
+        self.chain_id_cached
+    }
+}
+
+/// The FVM would return an error from `DefaultExecutor::preflight_message` if it was called
+/// with a message that doesn't pass basic checks, for example it has no gas limit, as opposed
+/// to returning an `ApplyRet`. This would cause our application to fail.
+/// I'm not sure if it's intentional, or how Lotus handles it, it's not desireable to crash
+/// because such messages can be included by malicious validators or user queries. We could
+/// use ABCI++ to filter out messages from blocks, but that doesn't affect queries, so we
+/// might as well encode it as an error. To keep the types simpler, let's fabricate an `ApplyRet`.
+fn check_error(e: anyhow::Error) -> (ApplyRet, ActorAddressMap) {
+    let zero = TokenAmount::from_atto(0);
+    let ret = ApplyRet {
+        msg_receipt: Receipt {
+            exit_code: ExitCode::SYS_ASSERTION_FAILED,
+            return_data: RawBytes::default(),
+            gas_used: 0,
+            events_root: None,
+        },
+        penalty: zero.clone(),
+        miner_tip: zero.clone(),
+        base_fee_burn: zero.clone(),
+        over_estimation_burn: zero.clone(),
+        refund: zero,
+        gas_refund: 0,
+        gas_burned: 0,
+        failure_info: Some(ApplyFailure::PreValidation(format!("{:#}", e))),
+        exec_trace: Vec::new(),
+        events: Vec::new(),
+    };
+    (ret, Default::default())
+}
+
+fn message_raw_length(msg: &Message) -> anyhow::Result<usize> {
+    Ok(fvm_ipld_encoding::to_vec(msg).map(|bz| bz.len())?)
+}

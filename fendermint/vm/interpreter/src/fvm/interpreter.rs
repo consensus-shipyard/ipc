@@ -519,6 +519,13 @@ where
                         domain_hash: None,
                     })
                 }
+                // Storage-node messages should be handled by plugin
+                // If we reach here, the plugin didn't handle them
+                IpcMessage::ReadRequestPending(_) | IpcMessage::ReadRequestClosed(_) => {
+                    return Err(ApplyMessageError::Other(anyhow::anyhow!(
+                        "Storage-node messages require the storage-node plugin to be enabled and properly configured"
+                    )));
+                }
                 #[cfg(feature = "storage-node")]
                 IpcMessage::ReadRequestPending(read_request) => {
                     // Set the read request to "pending" state

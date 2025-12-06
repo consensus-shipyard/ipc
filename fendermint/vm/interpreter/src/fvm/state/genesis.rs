@@ -41,8 +41,7 @@ use crate::fvm::constants::BLOCK_GAS_LIMIT;
 use num_traits::Zero;
 use serde::{de, Serialize};
 
-use super::{exec::MachineBlockstore, FvmStateParams};
-use crate::fvm::{DefaultFvmExecState, DefaultModule};
+use super::{exec::MachineBlockstore, FvmExecState, FvmStateParams};
 
 /// Create an empty state tree.
 pub fn empty_state_tree<DB: Blockstore>(store: DB) -> anyhow::Result<StateTree<DB>> {
@@ -55,7 +54,7 @@ pub fn empty_state_tree<DB: Blockstore>(store: DB) -> anyhow::Result<StateTree<D
 /// Then we can instantiate an FVM execution engine, which we can use to construct FEVM based actors.
 enum Stage<DB: Blockstore + Clone + 'static> {
     Tree(Box<StateTree<DB>>),
-    Exec(Box<DefaultFvmExecState<DB>>),
+    Exec(Box<FvmExecState<DB, fendermint_module::NoOpModuleBundle>>),
 }
 
 /// A state we create for the execution of genesis initialisation.
@@ -162,9 +161,9 @@ where
                     consensus_params: None,
                 };
 
-                let module = Arc::new(DefaultModule::default());
+                let module = Arc::new(fendermint_module::NoOpModuleBundle::default());
                 let exec_state =
-                    DefaultFvmExecState::new(module, self.store.clone(), &self.multi_engine, 1, params)
+                    FvmExecState::new(module, self.store.clone(), &self.multi_engine, 1, params)
                         .context("failed to create exec state")?;
 
                 Stage::Exec(Box::new(exec_state))
@@ -525,14 +524,14 @@ where
         &self.store
     }
 
-    pub fn exec_state(&mut self) -> Option<&mut DefaultFvmExecState<DB>> {
+    pub fn exec_state(&mut self) -> Option<&mut FvmExecState<DB>> {
         match self.stage {
             Stage::Tree(_) => None,
             Stage::Exec(ref mut exec) => Some(&mut *exec),
         }
     }
 
-    pub fn into_exec_state(self) -> Result<DefaultFvmExecState<DB>, Self> {
+    pub fn into_exec_state(self) -> Result<FvmExecState<DB, fendermint_module::NoOpModuleBundle>, Self> {
         match self.stage {
             Stage::Tree(_) => Err(self),
             Stage::Exec(exec) => Ok(*exec),

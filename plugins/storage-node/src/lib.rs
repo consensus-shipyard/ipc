@@ -13,7 +13,7 @@ use fendermint_module::{
     cli::{CliModule, CommandArgs, CommandDef},
     externs::NoOpExterns,
     genesis::{GenesisModule, GenesisState},
-    message::{ApplyMessageResponse, MessageHandlerModule, MessageHandlerState},
+    message::{ApplyMessageResponse, MessageApplyRet, MessageHandlerModule, MessageHandlerState},
     service::{ModuleResources, ServiceContext, ServiceModule},
     ExecutorModule, ModuleBundle,
 };
@@ -23,6 +23,10 @@ use fvm::engine::EnginePool;
 use fvm::kernel::Kernel;
 use fvm::machine::DefaultMachine;
 use fvm_ipld_blockstore::Blockstore;
+use fvm_ipld_encoding::RawBytes;
+use fvm_shared::address::Address;
+use fvm_shared::error::ExitCode;
+use std::collections::HashMap;
 use std::fmt;
 use storage_node_executor::RecallExecutor;
 
@@ -76,30 +80,84 @@ where
     }
 }
 
-// MessageHandlerModule - delegate to no-op for now
-// Storage-node specific messages can be handled here in the future
+// MessageHandlerModule - Handle storage-specific IPC messages
 #[async_trait]
 impl MessageHandlerModule for StorageNodeModule {
     async fn handle_message<DB: Blockstore + Send + Sync>(
         &self,
-        _state: &mut dyn MessageHandlerState,
-        _msg: &fendermint_vm_message::ipc::IpcMessage,
+        state: &mut dyn MessageHandlerState,
+        msg: &fendermint_vm_message::ipc::IpcMessage,
     ) -> Result<Option<ApplyMessageResponse>> {
-        // For now, don't handle any messages - let default handler take them
-        // Future: Handle storage-node specific messages here
-        Ok(None)
+        use fendermint_vm_message::ipc::IpcMessage;
+
+        match msg {
+            IpcMessage::ReadRequestPending(read_request) => {
+                tracing::debug!(
+                    request_id = %read_request.id,
+                    "Storage plugin handling ReadRequestPending"
+                );
+
+                // TODO: Implement actual storage logic here
+                // For now, return a placeholder response
+                Ok(Some(ApplyMessageResponse {
+                    apply_ret: MessageApplyRet {
+                        from: Address::new_id(0),
+                        to: Address::new_id(1),
+                        method_num: 0,
+                        gas_limit: 10_000_000,
+                        exit_code: ExitCode::OK,
+                        gas_used: 100,
+                        return_data: RawBytes::default(),
+                        emitters: HashMap::new(),
+                    },
+                    domain_hash: None,
+                }))
+            }
+            IpcMessage::ReadRequestClosed(read_request) => {
+                tracing::debug!(
+                    request_id = %read_request.id,
+                    "Storage plugin handling ReadRequestClosed"
+                );
+
+                // TODO: Implement actual storage logic here
+                Ok(Some(ApplyMessageResponse {
+                    apply_ret: MessageApplyRet {
+                        from: Address::new_id(0),
+                        to: Address::new_id(1),
+                        method_num: 0,
+                        gas_limit: 10_000_000,
+                        exit_code: ExitCode::OK,
+                        gas_used: 100,
+                        return_data: RawBytes::default(),
+                        emitters: HashMap::new(),
+                    },
+                    domain_hash: None,
+                }))
+            }
+            _ => {
+                // Not a storage-node message
+                Ok(None)
+            }
+        }
     }
 
     fn message_types(&self) -> &[&str] {
-        // Future: Return storage-node message types
-        &[]
+        &["ReadRequestPending", "ReadRequestClosed"]
     }
 
     async fn validate_message(
         &self,
-        _msg: &fendermint_vm_message::ipc::IpcMessage,
+        msg: &fendermint_vm_message::ipc::IpcMessage,
     ) -> Result<bool> {
-        Ok(true)
+        use fendermint_vm_message::ipc::IpcMessage;
+
+        match msg {
+            IpcMessage::ReadRequestPending(_) | IpcMessage::ReadRequestClosed(_) => {
+                // TODO: Add validation logic
+                Ok(true)
+            }
+            _ => Ok(true), // Don't validate messages we don't handle
+        }
     }
 }
 

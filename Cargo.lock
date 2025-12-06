@@ -7366,6 +7366,7 @@ dependencies = [
  "fvm_shared",
  "storage_node_executor",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
