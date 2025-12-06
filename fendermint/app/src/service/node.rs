@@ -303,13 +303,24 @@ pub async fn run(
         parent_finality_votes.clone(),
     );
 
-    // Load the plugin discovered by the build script
-    let module = crate::plugins::load_discovered_plugin();
+    // Load the module based on enabled features
+    // Storage-node plugin when feature is enabled, NoOp otherwise
+    #[cfg(feature = "plugin-storage-node")]
+    let module = {
+        tracing::info!("Loading storage-node plugin");
+        std::sync::Arc::new(ipc_plugin_storage_node::StorageNodeModule::default())
+    };
+
+    #[cfg(not(feature = "plugin-storage-node"))]
+    let module = {
+        tracing::info!("No plugin enabled, using NoOpModuleBundle");
+        std::sync::Arc::new(fendermint_module::NoOpModuleBundle::default())
+    };
 
     tracing::info!(
         module_name = fendermint_module::ModuleBundle::name(module.as_ref()),
         module_version = fendermint_module::ModuleBundle::version(module.as_ref()),
-        "Initialized FVM interpreter with auto-discovered module"
+        "Initialized FVM interpreter with module"
     );
 
     let interpreter = FvmMessagesInterpreter::new(

@@ -109,10 +109,6 @@ pub async fn exec(opts: Arc<Options>) -> anyhow::Result<()> {
             let _trace_file_guard = set_global_tracing_subscriber(&settings.tracing);
             args.exec(settings).await
         }
-        #[cfg(not(feature = "storage-node"))]
-        Commands::Objects(_) => {
-            unreachable!("Objects command is not available without storage-node feature")
-        }
     }
 }
 
