@@ -1,0 +1,31 @@
+[package]
+name = "storage_node_module"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Storage node module implementation for Fendermint"
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+cid = { workspace = true }
+tokio = { workspace = true }
+
+# FVM dependencies
+fvm = { workspace = true }
+fvm_ipld_blockstore = { workspace = true }
+fvm_ipld_encoding = { workspace = true }
+fvm_shared = { workspace = true }
+
+# Fendermint dependencies
+fendermint_module = { path = "../../fendermint/module" }
+fendermint_vm_core = { path = "../../fendermint/vm/core" }
+fendermint_vm_genesis = { path = "../../fendermint/vm/genesis" }
+fendermint_vm_message = { path = "../../fendermint/vm/message" }
+
+# Storage node dependencies
+storage_node_executor = { path = "../executor" }
+
+[dev-dependencies]
+tokio = { workspace = true }

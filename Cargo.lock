@@ -4780,6 +4780,7 @@ dependencies = [
  "snap",
  "storage_node_executor",
  "storage_node_kernel",
+ "storage_node_module",
  "strum",
  "tempfile",
  "tendermint 0.31.1",
@@ -13144,6 +13145,25 @@ name = "storage_node_kernel_ops"
 version = "0.1.0"
 dependencies = [
  "fvm",
+]
+
+[[package]]
+name = "storage_node_module"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "cid 0.11.1",
+ "fendermint_module",
+ "fendermint_vm_core",
+ "fendermint_vm_genesis",
+ "fendermint_vm_message",
+ "fvm",
+ "fvm_ipld_blockstore 0.3.1",
+ "fvm_ipld_encoding 0.5.3",
+ "fvm_shared",
+ "storage_node_executor",
+ "tokio",
 ]
 
 [[package]]

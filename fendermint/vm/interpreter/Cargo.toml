@@ -42,6 +42,7 @@ fendermint_testing = { path = "../../testing", optional = true }
 ipc_actors_abis = { path = "../../../contract-bindings" }
 storage_node_executor = { path = "../../../storage-node/executor", optional = true }
 storage_node_kernel = { path = "../../../storage-node/kernel", optional = true }
+storage_node_module = { path = "../../../storage-node/module", optional = true }
 fendermint_vm_storage_resolver = { path = "../storage_resolver", optional = true }
 iroh = { workspace = true, optional = true }
 iroh-blobs = { workspace = true, optional = true }
@@ -116,6 +117,7 @@ test-util = []
 storage-node = [
     "dep:storage_node_executor",
     "dep:storage_node_kernel",
+    "dep:storage_node_module",
     "dep:fendermint_actor_storage_adm",
     "dep:fendermint_actor_storage_blobs",
     "dep:fendermint_actor_storage_blobs_shared",

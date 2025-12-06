@@ -64,6 +64,7 @@ members = [
   "storage-node/kernel/ops",
   "storage-node/syscalls",
   "storage-node/executor",
+  "storage-node/module",
   "storage-node/iroh_manager",
   "storage-node/ipld",
   "storage-node/actor_sdk",
