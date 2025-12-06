@@ -303,7 +303,9 @@ pub async fn run(
         parent_finality_votes.clone(),
     );
 
+    let module = std::sync::Arc::new(fendermint_module::NoOpModuleBundle);
     let interpreter = FvmMessagesInterpreter::new(
+        module,
         end_block_manager,
         top_down_manager,
         UpgradeScheduler::new(),

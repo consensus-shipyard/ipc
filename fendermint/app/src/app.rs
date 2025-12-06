@@ -386,7 +386,9 @@ where
             return Ok(None);
         }
 
+        let module = std::sync::Arc::new(fendermint_module::NoOpModuleBundle);
         let exec_state = FvmExecState::new(
+            module,
             ReadOnlyBlockstore::new(self.state_store.clone()),
             self.multi_engine.as_ref(),
             block_height as ChainEpoch,
@@ -638,7 +640,9 @@ where
                 let db = self.state_store_clone();
                 let state = self.committed_state()?;
 
+                let module = std::sync::Arc::new(fendermint_module::NoOpModuleBundle);
                 FvmExecState::new(
+                    module,
                     ReadOnlyBlockstore::new(db),
                     self.multi_engine.as_ref(),
                     state.app_state.block_height.try_into()?,
@@ -808,8 +812,9 @@ where
             .get_validator_from_cache(&request.header.proposer_address)
             .await?;
 
+        let module = std::sync::Arc::new(fendermint_module::NoOpModuleBundle);
         let mut state =
-            FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
+            FvmExecState::new(module, db, self.multi_engine.as_ref(), block_height, state_params)
                 .context("error creating new state")?
                 .with_block_hash(block_hash)
                 .with_block_producer(validator);

@@ -67,6 +67,7 @@ fendermint_app_settings = { path = "./settings", default-features = false }
 fendermint_crypto = { path = "../crypto" }
 fendermint_eth_api = { path = "../eth/api" }
 fendermint_materializer = { path = "../testing/materializer" }
+fendermint_module = { path = "../module" }
 fendermint_rocksdb = { path = "../rocksdb" }
 fendermint_rpc = { path = "../rpc" }
 fendermint_storage = { path = "../storage" }

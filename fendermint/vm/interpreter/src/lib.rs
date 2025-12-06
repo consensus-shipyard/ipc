@@ -21,7 +21,7 @@ use std::sync::Arc;
 use fvm_ipld_blockstore::Blockstore;
 
 #[async_trait]
-pub trait MessagesInterpreter<DB, M>
+pub trait MessagesInterpreter<DB, M = fvm::DefaultModule>
 where
     DB: Blockstore + Clone,
     M: ModuleBundle,

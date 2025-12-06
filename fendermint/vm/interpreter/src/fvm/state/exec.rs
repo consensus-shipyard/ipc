@@ -17,7 +17,6 @@ use fendermint_vm_core::{chainid::HasChainID, Timestamp};
 use fendermint_vm_encoding::IsHumanReadable;
 use fendermint_vm_genesis::PowerScale;
 use fvm::{
-    call_manager::DefaultCallManager,
     engine::MultiEngine,
     executor::{ApplyFailure, ApplyKind, ApplyRet, Executor},
     machine::{DefaultMachine, Machine, Manifest, NetworkConfig},
@@ -157,14 +156,16 @@ pub struct FvmUpdatableParams {
 pub type MachineBlockstore<DB> = <DefaultMachine<DB, FendermintExterns<DB>> as Machine>::Blockstore;
 
 /// A state we create for the execution of all the messages in a block.
-pub struct FvmExecState<DB, M>
+pub struct FvmExecState<DB, M = crate::fvm::DefaultModule>
 where
     DB: Blockstore + Clone + 'static,
     M: ModuleBundle,
 {
     /// The executor provided by the module
     executor: M::Executor,
-    /// Reference to the module for calling hooks
+    /// Reference to the module for calling hooks and accessing module metadata.
+    /// Currently used for: lifecycle logging, future: pre/post execution hooks
+    #[allow(dead_code)]
     module: Arc<M>,
     /// Hash of the block currently being executed. For queries and checks this is empty.
     ///

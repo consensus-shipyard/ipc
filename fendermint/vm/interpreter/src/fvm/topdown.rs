@@ -19,7 +19,6 @@ use std::sync::Arc;
 
 use crate::fvm::state::ipc::GatewayCaller;
 use crate::fvm::state::FvmExecState;
-use crate::fvm::DefaultModule;
 use anyhow::{bail, Context};
 use fvm_ipld_blockstore::Blockstore;
 

@@ -10,7 +10,6 @@ use fvm_shared::chainid::ChainID;
 use std::collections::btree_map::Entry::{Occupied, Vacant};
 
 use super::state::{snapshot::BlockHeight, FvmExecState};
-use super::DefaultModule;
 
 #[derive(PartialEq, Eq, Clone)]
 struct UpgradeKey(ChainID, BlockHeight);

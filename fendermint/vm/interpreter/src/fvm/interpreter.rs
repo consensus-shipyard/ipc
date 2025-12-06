@@ -55,6 +55,8 @@ where
     DB: Blockstore + Clone + Send + Sync + 'static,
     M: ModuleBundle,
 {
+    /// Reference to the module for calling hooks and accessing module metadata.
+    /// Used for: lifecycle logging, module name display, future: message validation hooks
     module: Arc<M>,
     end_block_manager: EndBlockManager<DB>,
 
@@ -408,6 +410,9 @@ where
     {
         let height = state.block_height() as u64;
 
+        // Module lifecycle hook: before block processing
+        tracing::debug!(module = %ModuleBundle::name(self.module.as_ref()), "begin_block: calling module lifecycle hooks");
+
         tracing::debug!("trying to perform upgrade");
         self.perform_upgrade_if_needed(state)
             .context("failed to perform upgrade")?;
@@ -434,6 +439,9 @@ where
     where
         M::Executor: std::ops::DerefMut<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
     {
+        // Module lifecycle hook: before end_block processing
+        tracing::debug!(module = %ModuleBundle::name(self.module.as_ref()), "end_block: calling module lifecycle hooks");
+
         if let Some(pubkey) = state.block_producer() {
             state.activity_tracker().record_block_committed(pubkey)?;
         }

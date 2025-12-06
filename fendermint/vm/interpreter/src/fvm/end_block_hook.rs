@@ -3,7 +3,6 @@
 
 use super::state::ipc::tokens_to_burn;
 use super::state::{ipc::GatewayCaller, FvmExecState};
-use super::DefaultModule;
 
 use crate::fvm::activity::ValidatorActivityTracker;
 use crate::types::BlockEndEvents;

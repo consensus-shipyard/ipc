@@ -41,7 +41,7 @@ use crate::fvm::constants::BLOCK_GAS_LIMIT;
 use num_traits::Zero;
 use serde::{de, Serialize};
 
-use super::{exec::MachineBlockstore, FvmExecState, FvmStateParams};
+use super::{exec::MachineBlockstore, FvmStateParams};
 use crate::fvm::{DefaultFvmExecState, DefaultModule};
 
 /// Create an empty state tree.

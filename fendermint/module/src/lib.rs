@@ -164,7 +164,10 @@ mod tests {
         assert_eq!(ModuleBundle::name(&bundle), "noop");
 
         // Test that it implements all sub-traits (compile-time check)
-        fn _check_executor<K: fvm::kernel::Kernel>(_: &impl ExecutorModule<K>) {}
+        fn _check_executor<K: fvm::kernel::Kernel>(_: &impl ExecutorModule<K>)
+        where
+            <<K as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine: Send,
+        {}
         fn _check_message(_: &impl MessageHandlerModule) {}
         fn _check_genesis(_: &impl GenesisModule) {}
         fn _check_service(_: &impl ServiceModule) {}

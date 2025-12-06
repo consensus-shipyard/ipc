@@ -57,7 +57,7 @@ pub struct Tester<I> {
 
 impl<I> Tester<I>
 where
-    I: MessagesInterpreter<MemoryBlockstore>,
+    I: MessagesInterpreter<MemoryBlockstore, fendermint_vm_interpreter::fvm::DefaultModule>,
 {
     pub async fn new(interpreter: I, genesis: Genesis) -> anyhow::Result<Self> {
         let (exec_state, out, store) = create_test_exec_state(genesis).await?;
@@ -123,7 +123,8 @@ where
         let mut state_params = self.state_params.clone();
         state_params.timestamp = Timestamp(block_height as u64);
 
-        let state = FvmExecState::new(db, self.multi_engine.as_ref(), block_height, state_params)
+        let module = std::sync::Arc::new(fendermint_module::NoOpModuleBundle);
+        let state = FvmExecState::new(module, db, self.multi_engine.as_ref(), block_height, state_params)
             .context("error creating new state")?
             .with_block_hash(block_hash)
             .with_block_producer(producer);
