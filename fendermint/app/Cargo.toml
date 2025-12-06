@@ -69,6 +69,9 @@ fendermint_eth_api = { path = "../eth/api" }
 fendermint_materializer = { path = "../testing/materializer" }
 fendermint_module = { path = "../module" }
 fendermint_rocksdb = { path = "../rocksdb" }
+
+# Auto-discovered plugins
+ipc_plugin_storage_node = { path = "../../plugins/storage-node", optional = true }
 fendermint_rpc = { path = "../rpc" }
 fendermint_storage = { path = "../storage" }
 fendermint_tracing = { path = "../tracing" }
@@ -79,9 +82,7 @@ fendermint_vm_core = { path = "../vm/core" }
 fendermint_vm_encoding = { path = "../vm/encoding" }
 fendermint_vm_event = { path = "../vm/event" }
 fendermint_vm_genesis = { path = "../vm/genesis" }
-fendermint_vm_interpreter = { path = "../vm/interpreter", default-features = false, features = [
-    "bundle",
-] }
+fendermint_vm_interpreter = { path = "../vm/interpreter", default-features = false, features = ["bundle"] }
 fendermint_vm_message = { path = "../vm/message" }
 fendermint_vm_resolver = { path = "../vm/resolver" }
 fendermint_vm_snapshot = { path = "../vm/snapshot" }
@@ -111,8 +112,11 @@ ipc-observability = { path = "../../ipc/observability" }
 contracts-artifacts = { path = "../../contracts-artifacts" }
 
 [features]
-default = ["storage-node"]
-storage-node = [
+default = ["plugin-storage-node"]
+
+# Storage node plugin (auto-discovered via build script)
+plugin-storage-node = [
+    "dep:ipc_plugin_storage_node",
     "dep:warp",
     "dep:uuid",
     "dep:mime_guess",
@@ -127,7 +131,6 @@ storage-node = [
     "dep:fendermint_vm_storage_resolver",
     "fendermint_app_options/storage-node",
     "fendermint_app_settings/storage-node",
-    "fendermint_vm_interpreter/storage-node",
 ]
 
 [dev-dependencies]

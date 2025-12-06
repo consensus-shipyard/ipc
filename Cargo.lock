@@ -4201,6 +4201,7 @@ dependencies = [
  "ipc-provider",
  "ipc_actors_abis",
  "ipc_ipld_resolver",
+ "ipc_plugin_storage_node",
  "iroh",
  "iroh-blobs",
  "k256 0.11.6",
@@ -4747,7 +4748,6 @@ dependencies = [
  "fendermint_vm_interpreter",
  "fendermint_vm_message",
  "fendermint_vm_resolver",
- "fendermint_vm_storage_resolver",
  "fendermint_vm_topdown",
  "fil_actor_eam",
  "fil_actor_evm",
@@ -4762,8 +4762,6 @@ dependencies = [
  "ipc-api",
  "ipc-observability",
  "ipc_actors_abis",
- "iroh",
- "iroh-blobs",
  "libipld",
  "merkle-tree-rs",
  "multihash 0.18.1",
@@ -4778,9 +4776,6 @@ dependencies = [
  "serde_json",
  "serde_with 2.3.3",
  "snap",
- "storage_node_executor",
- "storage_node_kernel",
- "storage_node_module",
  "strum",
  "tempfile",
  "tendermint 0.31.1",
@@ -7351,6 +7346,25 @@ dependencies = [
  "serde_json",
  "storage_node_iroh_manager",
  "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
+name = "ipc_plugin_storage_node"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "cid 0.11.1",
+ "fendermint_module",
+ "fendermint_vm_core",
+ "fendermint_vm_genesis",
+ "fendermint_vm_message",
+ "fvm",
+ "fvm_ipld_blockstore 0.3.1",
+ "fvm_ipld_encoding 0.5.3",
+ "fvm_shared",
+ "storage_node_executor",
  "tokio",
 ]
 
@@ -13145,25 +13159,6 @@ name = "storage_node_kernel_ops"
 version = "0.1.0"
 dependencies = [
  "fvm",
-]
-
-[[package]]
-name = "storage_node_module"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "cid 0.11.1",
- "fendermint_module",
- "fendermint_vm_core",
- "fendermint_vm_genesis",
- "fendermint_vm_message",
- "fvm",
- "fvm_ipld_blockstore 0.3.1",
- "fvm_ipld_encoding 0.5.3",
- "fvm_shared",
- "storage_node_executor",
- "tokio",
 ]
 
 [[package]]

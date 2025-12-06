@@ -1,10 +1,10 @@
 [package]
-name = "storage_node_module"
+name = "ipc_plugin_storage_node"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Storage node module implementation for Fendermint"
+description = "Storage node plugin for IPC - auto-discoverable"
 
 [dependencies]
 anyhow = { workspace = true }
@@ -25,7 +25,7 @@ fendermint_vm_genesis = { path = "../../fendermint/vm/genesis" }
 fendermint_vm_message = { path = "../../fendermint/vm/message" }
 
 # Storage node dependencies
-storage_node_executor = { path = "../executor" }
+storage_node_executor = { path = "../../storage-node/executor" }
 
 [dev-dependencies]
 tokio = { workspace = true }

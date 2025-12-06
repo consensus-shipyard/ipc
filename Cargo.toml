@@ -64,10 +64,12 @@ members = [
   "storage-node/kernel/ops",
   "storage-node/syscalls",
   "storage-node/executor",
-  "storage-node/module",
   "storage-node/iroh_manager",
   "storage-node/ipld",
   "storage-node/actor_sdk",
+
+  # Auto-discoverable plugins
+  "plugins/storage-node",
 
   # storage node contracts (vendored locally, FVM 4.7 upgrade)
   "storage-node-contracts/crates/facade",

@@ -6,10 +6,8 @@ mod executions;
 mod externs;
 pub mod interpreter;
 pub mod observe;
-#[cfg(feature = "storage-node")]
-pub mod storage_env;
-#[cfg(feature = "storage-node")]
-pub mod storage_helpers;
+// storage_env and storage_helpers removed - these should be in the storage-node plugin
+// If needed, they can be re-added to the plugin itself
 pub mod state;
 pub mod store;
 pub mod topdown;

@@ -26,6 +26,14 @@ use fvm_ipld_blockstore::Blockstore;
 use std::fmt;
 use storage_node_executor::RecallExecutor;
 
+/// Plugin constructor for auto-discovery.
+///
+/// This function is called by the plugin system to create an instance.
+/// Returns the concrete type directly (not trait object due to associated types).
+pub fn create_plugin() -> StorageNodeModule {
+    StorageNodeModule::default()
+}
+
 /// Storage node module bundle.
 ///
 /// This module integrates storage-node functionality into Fendermint by:
