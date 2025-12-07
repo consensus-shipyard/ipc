@@ -23,7 +23,7 @@ pub mod eth;
 pub mod genesis;
 pub mod key;
 pub mod materializer;
-#[cfg(feature = "storage-node")]
+#[cfg(feature = "plugin-storage-node")]
 pub mod objects;
 pub mod rpc;
 pub mod run;
@@ -103,7 +103,7 @@ pub async fn exec(opts: Arc<Options>) -> anyhow::Result<()> {
             let _trace_file_guard = set_global_tracing_subscriber(&TracingSettings::default());
             args.exec(()).await
         }
-        #[cfg(feature = "storage-node")]
+        #[cfg(feature = "plugin-storage-node")]
         Commands::Objects(args) => {
             let settings = load_settings(opts.clone())?.objects;
             let _trace_file_guard = set_global_tracing_subscriber(&settings.tracing);

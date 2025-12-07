@@ -35,5 +35,7 @@ fendermint_vm_actor_interface = { path = "../../vm/actor_interface" }
 fendermint_materializer = { path = "../../testing/materializer" }
 
 [features]
-default = ["storage-node"]
-storage-node = []
+default = []
+plugin-storage-node = []
+# Legacy alias for compatibility
+storage-node = ["plugin-storage-node"]

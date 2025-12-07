@@ -18,11 +18,11 @@ use num_traits::Zero;
 use std::time::Instant;
 
 /// Estimates the gas for a given message.
-pub async fn estimate_gassed_msg<DB: Blockstore + Clone + 'static + Send + Sync>(
-    state: FvmQueryState<DB>,
+pub async fn estimate_gassed_msg<DB: Blockstore + Clone + 'static + Send + Sync, M: fendermint_module::ModuleBundle + Default>(
+    state: FvmQueryState<DB, M>,
     msg: &mut Message,
     gas_overestimation_rate: f64,
-) -> Result<(FvmQueryState<DB>, Option<GasEstimate>)> {
+) -> Result<(FvmQueryState<DB, M>, Option<GasEstimate>)> {
     msg.gas_limit = BLOCK_GAS_LIMIT;
     let gas_premium = msg.gas_premium.clone();
     let gas_fee_cap = msg.gas_fee_cap.clone();
@@ -71,11 +71,11 @@ pub async fn estimate_gassed_msg<DB: Blockstore + Clone + 'static + Send + Sync>
 }
 
 /// Searches for a valid gas limit for the message by iterative estimation.
-pub async fn gas_search<DB: Blockstore + Clone + 'static + Send + Sync>(
-    mut state: FvmQueryState<DB>,
+pub async fn gas_search<DB: Blockstore + Clone + 'static + Send + Sync, M: fendermint_module::ModuleBundle + Default>(
+    mut state: FvmQueryState<DB, M>,
     msg: &Message,
     gas_search_step: f64,
-) -> Result<(FvmQueryState<DB>, GasEstimate)> {
+) -> Result<(FvmQueryState<DB, M>, GasEstimate)> {
     let mut curr_limit = msg.gas_limit;
 
     loop {
@@ -101,11 +101,11 @@ pub async fn gas_search<DB: Blockstore + Clone + 'static + Send + Sync>(
 }
 
 /// Helper for making an estimation call with a specific gas limit.
-async fn estimation_call_with_limit<DB: Blockstore + Clone + 'static + Send + Sync>(
-    state: FvmQueryState<DB>,
+async fn estimation_call_with_limit<DB: Blockstore + Clone + 'static + Send + Sync, M: fendermint_module::ModuleBundle + Default>(
+    state: FvmQueryState<DB, M>,
     mut msg: Message,
     limit: u64,
-) -> Result<(FvmQueryState<DB>, Option<GasEstimate>)> {
+) -> Result<(FvmQueryState<DB, M>, Option<GasEstimate>)> {
     msg.gas_limit = limit;
     msg.sequence = 0; // Reset nonce
 

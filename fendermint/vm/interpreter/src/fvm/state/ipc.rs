@@ -268,9 +268,9 @@ impl<DB: Blockstore + Clone> GatewayCaller<DB> {
         Ok(r.into_return())
     }
 
-    pub fn get_latest_parent_finality(
+    pub fn get_latest_parent_finality<M: fendermint_module::ModuleBundle>(
         &self,
-        state: &mut FvmExecState<DB, fendermint_module::NoOpModuleBundle>,
+        state: &mut FvmExecState<DB, M>,
     ) -> anyhow::Result<IPCParentFinality> {
         let r = self
             .getter

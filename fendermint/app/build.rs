@@ -109,9 +109,9 @@ fn main() {
         plugin_code.push_str("    }\n\n");
     }
 
-    plugin_code.push_str("    // No plugin enabled\n");
+    plugin_code.push_str("    // No plugin enabled - use default DiscoveredModule type\n");
     plugin_code.push_str("    tracing::info!(\"No plugin enabled, using NoOpModuleBundle\");\n");
-    plugin_code.push_str("    Arc::new(fendermint_module::NoOpModuleBundle::default())\n");
+    plugin_code.push_str("    Arc::new(DiscoveredModule::default())\n");
     plugin_code.push_str("}\n");
 
     // Write generated code

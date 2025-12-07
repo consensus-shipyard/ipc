@@ -112,9 +112,10 @@ ipc-observability = { path = "../../ipc/observability" }
 contracts-artifacts = { path = "../../contracts-artifacts" }
 
 [features]
-default = ["plugin-storage-node"]
+default = []
 
 # Storage node plugin (auto-discovered via build script)
+# Enable with: cargo build --features plugin-storage-node
 plugin-storage-node = [
     "dep:ipc_plugin_storage_node",
     "dep:warp",

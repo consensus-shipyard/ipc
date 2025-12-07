@@ -23,4 +23,5 @@ use super::store::ReadOnlyBlockstore;
 pub use exec::FvmApplyRet;
 
 /// We use full state even for checking, to support certain client scenarios.
-pub type CheckStateRef<DB> = Arc<tokio::sync::Mutex<Option<FvmExecState<ReadOnlyBlockstore<DB>, fendermint_module::NoOpModuleBundle>>>>;
+// CheckStateRef is now generic over M to support different module types
+pub type CheckStateRef<DB, M = fendermint_module::NoOpModuleBundle> = Arc<tokio::sync::Mutex<Option<FvmExecState<ReadOnlyBlockstore<DB>, M>>>>;

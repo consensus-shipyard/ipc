@@ -23,11 +23,12 @@ use fendermint_storage::{
 };
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_interpreter::fvm::state::{
-    empty_state_tree, CheckStateRef, FvmExecState, FvmQueryState, FvmStateParams,
+    empty_state_tree, CheckStateRef, FvmQueryState, FvmStateParams,
     FvmUpdatableParams,
 };
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
 use fendermint_vm_interpreter::genesis::{read_genesis_car, GenesisAppState};
+use crate::types::{AppModule, AppExecState};
 
 use fendermint_vm_interpreter::errors::{ApplyMessageError, CheckMessageError, QueryError};
 use fendermint_vm_interpreter::types::{
@@ -134,7 +135,7 @@ pub struct App<DB, BS, KV, MI>
 where
     BS: Blockstore + Clone + 'static + Send + Sync,
     KV: KVStore,
-    MI: MessagesInterpreter<BS> + Send + Sync,
+    MI: MessagesInterpreter<BS, crate::types::AppModule> + Send + Sync,
 {
     /// Database backing all key-value operations.
     db: Arc<DB>,
@@ -169,9 +170,9 @@ where
     /// Interface to the snapshotter, if enabled.
     snapshots: Option<SnapshotClient>,
     /// State accumulating changes during block execution.
-    exec_state: Arc<tokio::sync::Mutex<Option<FvmExecState<BS>>>>,
+    exec_state: Arc<tokio::sync::Mutex<Option<AppExecState<BS>>>>,
     /// Projected (partial) state accumulating during transaction checks.
-    check_state: CheckStateRef<BS>,
+    check_state: CheckStateRef<BS, AppModule>,
     /// How much history to keep.
     ///
     /// Zero means unlimited.
@@ -189,7 +190,7 @@ where
         + Codec<FvmStateParams>,
     DB: KVWritable<KV> + KVReadable<KV> + Clone + 'static,
     BS: Blockstore + Clone + 'static + Send + Sync,
-    MI: MessagesInterpreter<BS> + Send + Sync,
+    MI: MessagesInterpreter<BS, crate::types::AppModule> + Send + Sync,
 {
     pub fn new(
         config: AppConfig<KV>,
@@ -227,7 +228,7 @@ where
         + Codec<FvmStateParams>,
     DB: KVWritable<KV> + KVReadable<KV> + 'static + Clone,
     BS: Blockstore + 'static + Clone + Send + Sync,
-    MI: MessagesInterpreter<BS> + Send + Sync,
+    MI: MessagesInterpreter<BS, crate::types::AppModule> + Send + Sync,
 {
     /// Get an owned clone of the state store.
     fn state_store_clone(&self) -> BS {
@@ -337,14 +338,14 @@ where
     }
 
     /// Put the execution state during block execution. Has to be empty.
-    async fn put_exec_state(&self, state: FvmExecState<BS>) {
+    async fn put_exec_state(&self, state: AppExecState<BS>) {
         let mut guard = self.exec_state.lock().await;
         assert!(guard.is_none(), "exec state not empty");
         *guard = Some(state);
     }
 
     /// Take the execution state during block execution. Has to be non-empty.
-    async fn take_exec_state(&self) -> FvmExecState<BS> {
+    async fn take_exec_state(&self) -> AppExecState<BS> {
         let mut guard = self.exec_state.lock().await;
         guard.take().expect("exec state empty")
     }
@@ -354,7 +355,7 @@ where
     /// Note: Deals with panics in the user provided closure as well.
     async fn modify_exec_state<T, G, F>(&self, generator: G) -> Result<T>
     where
-        G: for<'s> FnOnce(&'s mut FvmExecState<BS>) -> F,
+        G: for<'s> FnOnce(&'s mut AppExecState<BS>) -> F,
         F: Future<Output = Result<T>>,
         T: 'static,
     {
@@ -372,7 +373,7 @@ where
     pub fn read_only_view(
         &self,
         height: Option<BlockHeight>,
-    ) -> Result<Option<FvmExecState<ReadOnlyBlockstore<Arc<BS>>>>> {
+    ) -> Result<Option<AppExecState<ReadOnlyBlockstore<Arc<BS>>>>> {
         let state = match self.get_committed_state()? {
             Some(app_state) => app_state,
             None => return Ok(None),
@@ -386,8 +387,8 @@ where
             return Ok(None);
         }
 
-        let module = std::sync::Arc::new(fendermint_module::NoOpModuleBundle::default());
-        let exec_state = FvmExecState::new(
+        let module = std::sync::Arc::new(crate::types::AppModule::default());
+        let exec_state = AppExecState::new(
             module,
             ReadOnlyBlockstore::new(self.state_store.clone()),
             self.multi_engine.as_ref(),
@@ -501,7 +502,7 @@ where
     KV::Namespace: Sync + Send,
     DB: KVWritable<KV> + KVReadable<KV> + Clone + Send + Sync + 'static,
     BS: Blockstore + Clone + Send + Sync + 'static,
-    MI: MessagesInterpreter<BS> + Send + Sync,
+    MI: MessagesInterpreter<BS, crate::types::AppModule> + Send + Sync,
 {
     /// Provide information about the ABCI application.
     async fn info(&self, _request: request::Info) -> AbciResult<response::Info> {
@@ -603,7 +604,7 @@ where
             ));
         }
 
-        let state = FvmQueryState::new(
+        let state = FvmQueryState::<_, AppModule>::new(
             db,
             self.multi_engine.clone(),
             block_height.try_into()?,
@@ -640,8 +641,8 @@ where
                 let db = self.state_store_clone();
                 let state = self.committed_state()?;
 
-                let module = std::sync::Arc::new(fendermint_module::NoOpModuleBundle::default());
-                FvmExecState::new(
+                let module = std::sync::Arc::new(crate::types::AppModule::default());
+                AppExecState::new(
                     module,
                     ReadOnlyBlockstore::new(db),
                     self.multi_engine.as_ref(),
@@ -812,9 +813,9 @@ where
             .get_validator_from_cache(&request.header.proposer_address)
             .await?;
 
-        let module = std::sync::Arc::new(fendermint_module::NoOpModuleBundle::default());
+        let module = std::sync::Arc::new(crate::types::AppModule::default());
         let mut state =
-            FvmExecState::new(module, db, self.multi_engine.as_ref(), block_height, state_params)
+            AppExecState::new(module, db, self.multi_engine.as_ref(), block_height, state_params)
                 .context("error creating new state")?
                 .with_block_hash(block_hash)
                 .with_block_producer(validator);

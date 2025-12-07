@@ -64,7 +64,7 @@ where
 
     async fn query(
         &self,
-        state: FvmQueryState<DB>,
+        state: FvmQueryState<DB, M>,
         query: Query,
     ) -> Result<QueryResponse, QueryError>;
 }

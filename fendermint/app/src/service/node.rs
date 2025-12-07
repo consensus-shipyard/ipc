@@ -8,6 +8,7 @@ use fendermint_crypto::SecretKey;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::fvm::interpreter::FvmMessagesInterpreter;
+use crate::types::{AppModule, AppInterpreter};
 use fendermint_vm_interpreter::fvm::observe::register_metrics as register_interpreter_metrics;
 #[cfg(feature = "storage-node")]
 use fendermint_vm_interpreter::fvm::storage_env::{BlobPool, ReadRequestPool};
@@ -304,18 +305,8 @@ pub async fn run(
     );
 
     // Load the module based on enabled features
-    // Storage-node plugin when feature is enabled, NoOp otherwise
-    #[cfg(feature = "plugin-storage-node")]
-    let module = {
-        tracing::info!("Loading storage-node plugin");
-        std::sync::Arc::new(ipc_plugin_storage_node::StorageNodeModule::default())
-    };
-
-    #[cfg(not(feature = "plugin-storage-node"))]
-    let module = {
-        tracing::info!("No plugin enabled, using NoOpModuleBundle");
-        std::sync::Arc::new(fendermint_module::NoOpModuleBundle::default())
-    };
+    // AppModule is a type alias that changes based on feature flags
+    let module = std::sync::Arc::new(AppModule::default());
 
     tracing::info!(
         module_name = fendermint_module::ModuleBundle::name(module.as_ref()),
@@ -323,7 +314,7 @@ pub async fn run(
         "Initialized FVM interpreter with module"
     );
 
-    let interpreter = FvmMessagesInterpreter::new(
+    let interpreter: AppInterpreter<_> = FvmMessagesInterpreter::new(
         module,
         end_block_manager,
         top_down_manager,

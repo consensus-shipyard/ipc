@@ -218,7 +218,7 @@ where
 impl<DB, M> MessagesInterpreter<DB, M> for FvmMessagesInterpreter<DB, M>
 where
     DB: Blockstore + Clone + Send + Sync + 'static,
-    M: ModuleBundle,
+    M: ModuleBundle + Default,
     M::Executor: Send,
 {
     async fn check_message(
@@ -570,7 +570,7 @@ where
 
     async fn query(
         &self,
-        state: FvmQueryState<DB>,
+        state: FvmQueryState<DB, M>,
         query: Query,
     ) -> Result<QueryResponse, QueryError> {
         let query = if query.path.as_str() == "/store" {

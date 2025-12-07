@@ -9,6 +9,7 @@ pub mod plugins;
 pub mod service;
 mod store;
 mod tmconv;
+pub mod types;
 mod validators;
 
 extern crate core;

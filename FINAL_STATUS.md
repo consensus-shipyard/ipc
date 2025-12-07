@@ -79,9 +79,12 @@ pub struct App<DB, BS, S, I: MessagesInterpreter<BS>> { ... }
 - ✅ Architecture is sound
 - ✅ Easy to add new plugins
 - ✅ Works without plugins
+- ✅ **Plugins are opt-in** (default = no plugins)
 - ⚠️ Plugin mode needs more work
 
 **This is still a HUGE win!** The interpreter has zero plugin pollution.
+
+**Configuration:** Plugins default to OFF. Enable with `--features plugin-storage-node`
 
 ### Solution 2: Conditional Type Aliases (1 hour)
 **What:** Use type aliases and conditional compilation at module boundaries
