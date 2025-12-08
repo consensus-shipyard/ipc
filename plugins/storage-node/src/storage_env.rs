@@ -1,10 +1,12 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-//! Recall environment types for blob and read request resolution.
+//! Storage environment types for blob and read request resolution.
+//!
+//! Moved from fendermint/vm/interpreter/src/fvm/storage_env.rs to plugin.
 
 use fendermint_actor_storage_blobs_shared::blobs::SubscriptionId;
-use fendermint_vm_storage_resolver::pool::{
+use crate::resolver::pool::{
     ResolveKey as IrohResolveKey, ResolvePool as IrohResolvePool,
     ResolveSource as IrohResolveSource, TaskType as IrohTaskType,
 };

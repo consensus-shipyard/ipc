@@ -15,12 +15,13 @@ tracing = { workspace = true }
 num-traits = { workspace = true }
 paste = { workspace = true }
 serde = { workspace = true }
+multihash-codetable = { version = "0.1.4", features = ["blake2b"] }
 
 # FVM dependencies
 fvm = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }
 fvm_ipld_encoding = { workspace = true }
-fvm_shared = { workspace = true }
+fvm_shared = { workspace = true, features = ["crypto"] }
 serde_tuple = { workspace = true }
 
 # Fendermint dependencies
@@ -52,6 +53,20 @@ iroh-base = { workspace = true }
 
 # Async utilities
 async-stm = { workspace = true }
+
+# Storage resolver dependencies (moved from fendermint/vm/storage_resolver)
+hex = { workspace = true }
+im = { workspace = true }
+libp2p = { workspace = true }
+prometheus = { workspace = true }
+
+# IPC dependencies for resolver
+ipc-api = { path = "../../ipc/api" }
+ipc_ipld_resolver = { path = "../../ipld/resolver" }
+ipc-observability = { path = "../../ipc/observability" }
+
+# Topdown for finality types
+fendermint_vm_topdown = { path = "../../fendermint/vm/topdown" }
 
 [dev-dependencies]
 tokio = { workspace = true }

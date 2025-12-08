@@ -1,8 +1,12 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-//! Helper functions for Recall blob and read request operations
-use crate::fvm::constants::BLOCK_GAS_LIMIT;
+//! Helper functions for storage blob and read request operations.
+//!
+//! Moved from fendermint/vm/interpreter/src/fvm/storage_helpers.rs to plugin.
+
+// TODO: Replace with constant from plugin configuration
+const BLOCK_GAS_LIMIT: u64 = 10_000_000_000;
 use anyhow::{anyhow, Result};
 use fendermint_actor_storage_blob_reader::{
     CloseReadRequestParams, GetOpenReadRequestsParams, GetPendingReadRequestsParams,
@@ -29,9 +33,9 @@ use fvm_shared::{address::Address, message::Message, MethodNum};
 use iroh_blobs::Hash;
 use std::collections::HashSet;
 
-use super::state::FvmExecState;
-use super::store::ReadOnlyBlockstore;
-use crate::fvm::state::FvmApplyRet;
+// NOTE: These types are still in fendermint for now
+// The helpers work generically but need access to FvmExecState
+// This will be refactored to use traits in a follow-up
 
 type BlobItem = (Hash, u64, HashSet<(Address, SubscriptionId, iroh::NodeId)>);
 type ReadRequestItem = (Hash, Hash, u32, u32, Address, MethodNum);

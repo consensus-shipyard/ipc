@@ -5,7 +5,6 @@ use std::collections::{BTreeSet, HashMap};
 use std::io::{Cursor, Read, Write};
 use std::marker::PhantomData;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use std::sync::Arc;
 
 use anyhow::{anyhow, Context};
@@ -23,9 +22,14 @@ use fendermint_vm_actor_interface::{
     f3_light_client, gas_market, init, ipc, reward, system, EMPTY_ARR,
 };
 
-// Storage-node actor interfaces moved to plugin
+// Storage-node actor interfaces moved to plugins/storage-node/src/actor_interface/
+// We use direct IDs here to avoid circular dependencies
 #[cfg(feature = "storage-node")]
-use fendermint_vm_actor_interface::{adm, blob_reader, blobs, recall_config};
+mod storage_actor_ids {
+    pub const RECALL_CONFIG_ACTOR_ID: u64 = 70;
+    pub const BLOBS_ACTOR_ID: u64 = 66;
+    pub const BLOB_READER_ACTOR_ID: u64 = 67;
+}
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{ActorMeta, Collateral, Genesis, Power, PowerScale, Validator};
 use fvm::engine::MultiEngine;
@@ -308,10 +312,10 @@ impl<'a> GenesisBuilder<'a> {
 
         // Init actor
         // Add Blobs actor ID to eth_builtin_ids so its delegated address is registered
-        let eth_builtin_ids: BTreeSet<_> =
+        let mut eth_builtin_ids: BTreeSet<_> =
             ipc_entrypoints.values().map(|c| c.actor_id).collect();
         #[cfg(feature = "storage-node")]
-        eth_builtin_ids.insert(blobs::BLOBS_ACTOR_ID);
+        eth_builtin_ids.insert(storage_actor_ids::BLOBS_ACTOR_ID);
 
         let (init_state, addr_to_id) = init::State::new(
             state.store(),
@@ -418,7 +422,7 @@ impl<'a> GenesisBuilder<'a> {
             state
                 .create_custom_actor(
                     fendermint_actor_storage_config::ACTOR_NAME,
-                    recall_config::RECALL_CONFIG_ACTOR_ID,
+                    storage_actor_ids::RECALL_CONFIG_ACTOR_ID,
                     &recall_config_state,
                     TokenAmount::zero(),
                     None,
@@ -427,12 +431,12 @@ impl<'a> GenesisBuilder<'a> {
 
             // Initialize the blob actor with delegated address for Ethereum/Solidity access.
             let blobs_state = fendermint_actor_storage_blobs::State::new(&state.store())?;
-            let blobs_eth_addr = init::builtin_actor_eth_addr(blobs::BLOBS_ACTOR_ID);
+            let blobs_eth_addr = init::builtin_actor_eth_addr(storage_actor_ids::BLOBS_ACTOR_ID);
             let blobs_f4_addr = fvm_shared::address::Address::from(blobs_eth_addr);
             state
                 .create_custom_actor(
                     fendermint_actor_storage_blobs::BLOBS_ACTOR_NAME,
-                    blobs::BLOBS_ACTOR_ID,
+                    storage_actor_ids::BLOBS_ACTOR_ID,
                     &blobs_state,
                     TokenAmount::zero(),
                     Some(blobs_f4_addr),
@@ -444,7 +448,7 @@ impl<'a> GenesisBuilder<'a> {
             state
                 .create_custom_actor(
                     fendermint_actor_storage_blob_reader::BLOB_READER_ACTOR_NAME,
-                    blob_reader::BLOB_READER_ACTOR_ID,
+                    storage_actor_ids::BLOB_READER_ACTOR_ID,
                     &fendermint_actor_storage_blob_reader::State::new(&state.store())?,
                     TokenAmount::zero(),
                     None,

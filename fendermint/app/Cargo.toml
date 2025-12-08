@@ -87,7 +87,7 @@ fendermint_vm_message = { path = "../vm/message" }
 fendermint_vm_resolver = { path = "../vm/resolver" }
 fendermint_vm_snapshot = { path = "../vm/snapshot" }
 fendermint_vm_topdown = { path = "../vm/topdown" }
-fendermint_vm_storage_resolver = { path = "../vm/storage_resolver", optional = true }
+# fendermint_vm_storage_resolver moved to plugins/storage-node/src/resolver/
 
 # Storage node actors needed for storage-node command
 # fendermint_actor_storage_bucket moved to storage-node/actors/storage_bucket
@@ -129,9 +129,9 @@ plugin-storage-node = [
     "dep:iroh-blobs",
     "dep:fendermint_actor_storage_bucket",
     "dep:fendermint_actor_storage_blobs_shared",
-    "dep:fendermint_vm_storage_resolver",
     "fendermint_app_options/storage-node",
     "fendermint_app_settings/storage-node",
+    "fendermint_vm_interpreter/storage-node",  # Enable storage integration code
 ]
 
 [dev-dependencies]

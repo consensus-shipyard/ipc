@@ -3,7 +3,6 @@
 
 use crate::errors::*;
 use crate::fvm::end_block_hook::{EndBlockManager, PowerUpdates};
-use fendermint_vm_core::chainid::HasChainID;
 use crate::fvm::executions::{
     execute_cron_message, execute_signed_message, push_block_to_chainmeta_actor_if_possible,
 };
@@ -519,13 +518,7 @@ where
                         domain_hash: None,
                     })
                 }
-                // Storage-node messages should be handled by plugin
-                // If we reach here, the plugin didn't handle them
-                IpcMessage::ReadRequestPending(_) | IpcMessage::ReadRequestClosed(_) => {
-                    return Err(ApplyMessageError::Other(anyhow::anyhow!(
-                        "Storage-node messages require the storage-node plugin to be enabled and properly configured"
-                    )));
-                }
+                // Storage-node messages
                 #[cfg(feature = "storage-node")]
                 IpcMessage::ReadRequestPending(read_request) => {
                     // Set the read request to "pending" state
@@ -563,6 +556,13 @@ where
                         applied_message: ret.into(),
                         domain_hash: None,
                     })
+                }
+                // When storage-node feature is disabled, these message types shouldn't be used
+                #[cfg(not(feature = "storage-node"))]
+                IpcMessage::ReadRequestPending(_) | IpcMessage::ReadRequestClosed(_) => {
+                    Err(ApplyMessageError::Other(anyhow::anyhow!(
+                        "Storage-node messages require the storage-node feature to be enabled"
+                    )))
                 }
             },
         }

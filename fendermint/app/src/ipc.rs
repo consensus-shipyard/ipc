@@ -14,7 +14,10 @@ use crate::types::AppExecState;
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
 use fendermint_vm_interpreter::MessagesInterpreter;
 use fendermint_vm_topdown::sync::ParentFinalityStateQuery;
-use fendermint_vm_topdown::{IPCBlobFinality, IPCParentFinality, IPCReadRequestClosed};
+use fendermint_vm_topdown::IPCParentFinality;
+
+#[cfg(feature = "plugin-storage-node")]
+use ipc_plugin_storage_node::{IPCBlobFinality, IPCReadRequestClosed};
 use fvm_ipld_blockstore::Blockstore;
 use ipc_actors_abis::subnet_actor_checkpointing_facet::{
     AppHashBreakdown, Commitment, CompressedActivityRollup,
@@ -59,8 +62,10 @@ pub enum AppVote {
     /// The validator considers a certain block final on the parent chain.
     ParentFinality(IPCParentFinality),
     /// The validator considers a certain blob final.
+    #[cfg(feature = "plugin-storage-node")]
     BlobFinality(IPCBlobFinality),
     /// The validator considers a certain read request completed.
+    #[cfg(feature = "plugin-storage-node")]
     ReadRequestClosed(IPCReadRequestClosed),
 }
 

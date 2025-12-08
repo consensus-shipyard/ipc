@@ -123,6 +123,7 @@ pub mod externs;
 pub mod genesis;
 pub mod message;
 pub mod service;
+pub mod state_ops;
 
 // Re-export main types
 pub use bundle::{ModuleBundle, NoOpModuleBundle};

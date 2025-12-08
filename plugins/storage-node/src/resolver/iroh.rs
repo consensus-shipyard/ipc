@@ -4,7 +4,7 @@
 
 use std::time::Duration;
 
-use crate::observe::{
+use super::observe::{
     BlobsFinalityVotingFailure, BlobsFinalityVotingSuccess, ReadRequestsCloseVoting,
 };
 use async_stm::{atomically, atomically_or_err, queues::TQueueLike};
@@ -18,7 +18,7 @@ use libp2p::identity::Keypair;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use crate::pool::{ResolveKey, ResolveQueue, ResolveResults, ResolveTask, TaskType};
+use super::pool::{ResolveKey, ResolveQueue, ResolveResults, ResolveTask, TaskType};
 
 /// The iroh Resolver takes resolution tasks from the [ResolvePool] and
 /// uses the [ipc_ipld_resolver] to fetch the content from the local iroh node.

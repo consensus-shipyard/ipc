@@ -9,6 +9,18 @@
 
 pub mod actor_interface;
 pub mod helpers;
+pub mod resolver;
+pub mod storage_env;
+pub mod topdown_types;
+
+// NOTE: storage_helpers.rs remains in fendermint/vm/interpreter/src/fvm/storage_helpers.rs
+// It's tightly coupled to FvmExecState (17 references across 381 lines) and serves as
+// an internal implementation detail behind feature flags. Refactoring to traits would
+// require significant work with minimal modularity benefit since it's already feature-flagged.
+
+// Re-export commonly used types
+pub use storage_env::{BlobPool, BlobPoolItem, ReadRequestPool, ReadRequestPoolItem};
+pub use topdown_types::{IPCBlobFinality, IPCReadRequestClosed};
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -164,16 +176,15 @@ impl MessageHandlerModule for StorageNodeModule {
     }
 }
 
-// GenesisModule - delegate to no-op for now
+// GenesisModule - Initialize storage actors
 impl GenesisModule for StorageNodeModule {
     fn initialize_actors<S: GenesisState>(
         &self,
-        _state: &mut S,
-        _genesis: &Genesis,
+        state: &mut S,
+        genesis: &Genesis,
     ) -> Result<()> {
-        // For now, no custom genesis initialization
-        // Future: Initialize storage-node actors and state
-        Ok(())
+        // Initialize storage-node actors (recall_config, blobs, blob_reader)
+        helpers::genesis::initialize_storage_actors(state, genesis)
     }
 
     fn name(&self) -> &str {
@@ -181,7 +192,7 @@ impl GenesisModule for StorageNodeModule {
     }
 
     fn validate_genesis(&self, _genesis: &Genesis) -> Result<()> {
-        // Future: Validate storage-node configuration
+        // No specific validation needed for storage-node
         Ok(())
     }
 }

@@ -11,13 +11,13 @@ use fendermint_vm_interpreter::fvm::interpreter::FvmMessagesInterpreter;
 use crate::types::{AppModule, AppInterpreter};
 use fendermint_vm_interpreter::fvm::observe::register_metrics as register_interpreter_metrics;
 #[cfg(feature = "storage-node")]
-use fendermint_vm_interpreter::fvm::storage_env::{BlobPool, ReadRequestPool};
+use ipc_plugin_storage_node::{BlobPool, ReadRequestPool};
 use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
 #[cfg(feature = "storage-node")]
-use fendermint_vm_storage_resolver::iroh::IrohResolver;
+use ipc_plugin_storage_node::resolver::IrohResolver;
 #[cfg(feature = "storage-node")]
-use fendermint_vm_storage_resolver::pool::ResolvePool;
+use ipc_plugin_storage_node::resolver::ResolvePool;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::observe::register_metrics as register_topdown_metrics;
 use fendermint_vm_topdown::proxy::{IPCProviderProxy, IPCProviderProxyWithLatency};
@@ -25,7 +25,7 @@ use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
 use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
 #[cfg(feature = "storage-node")]
-use fendermint_vm_topdown::{IPCBlobFinality, IPCReadRequestClosed};
+use ipc_plugin_storage_node::{IPCBlobFinality, IPCReadRequestClosed};
 use fvm_shared::address::{current_network, Address, Network};
 use ipc_ipld_resolver::{Event as ResolverEvent, IrohConfig, VoteRecord};
 use ipc_observability::observe::register_metrics as register_default_metrics;
@@ -610,6 +610,7 @@ async fn dispatch_vote(
                 }
             };
         }
+        #[cfg(feature = "plugin-storage-node")]
         AppVote::BlobFinality(blob) => {
             let res = atomically_or_err(|| {
                 parent_finality_votes.add_blob_vote(
@@ -627,6 +628,7 @@ async fn dispatch_vote(
                 }
             };
         }
+        #[cfg(feature = "plugin-storage-node")]
         AppVote::ReadRequestClosed(read_req) => {
             let res = atomically_or_err(|| {
                 parent_finality_votes.add_blob_vote(
