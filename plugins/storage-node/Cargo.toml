@@ -12,6 +12,7 @@ async-trait = { workspace = true }
 cid = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
+num-traits = { workspace = true }
 
 # FVM dependencies
 fvm = { workspace = true }
@@ -24,9 +25,30 @@ fendermint_module = { path = "../../fendermint/module" }
 fendermint_vm_core = { path = "../../fendermint/vm/core" }
 fendermint_vm_genesis = { path = "../../fendermint/vm/genesis" }
 fendermint_vm_message = { path = "../../fendermint/vm/message" }
+fendermint_vm_actor_interface = { path = "../../fendermint/vm/actor_interface" }
 
 # Storage node dependencies
 storage_node_executor = { path = "../../storage-node/executor" }
+
+# Storage node actors (now owned by this plugin)
+fendermint_actor_storage_adm = { path = "../../storage-node/actors/storage_adm" }
+fendermint_actor_storage_blobs = { path = "../../storage-node/actors/storage_blobs" }
+fendermint_actor_storage_blobs_shared = { path = "../../storage-node/actors/storage_blobs/shared" }
+fendermint_actor_storage_blob_reader = { path = "../../storage-node/actors/storage_blob_reader" }
+fendermint_actor_storage_bucket = { path = "../../storage-node/actors/storage_bucket" }
+fendermint_actor_storage_config = { path = "../../storage-node/actors/storage_config" }
+fendermint_actor_storage_config_shared = { path = "../../storage-node/actors/storage_config/shared" }
+fendermint_actor_storage_timehub = { path = "../../storage-node/actors/storage_timehub" }
+fendermint_actor_machine = { path = "../../storage-node/actors/machine" }
+fendermint_actor_storage_adm_types = { workspace = true }
+
+# Iroh dependencies
+iroh = { workspace = true }
+iroh-blobs = { workspace = true }
+iroh-base = { workspace = true }
+
+# Async utilities
+async-stm = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }

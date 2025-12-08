@@ -17,11 +17,5 @@ fendermint_actor_chainmetadata = { path = "chainmetadata", features = ["fil-acto
 fendermint_actor_f3_light_client = { path = "f3-light-client", features = ["fil-actor"] }
 fendermint_actor_gas_market_eip1559 = { path = "gas_market/eip1559", features = ["fil-actor"] }
 fendermint_actor_eam = { path = "eam", features = ["fil-actor"] }
-# Storage node actors
-fendermint_actor_storage_adm = { path = "storage_adm", features = ["fil-actor"] }
-fendermint_actor_storage_blobs = { path = "storage_blobs", features = ["fil-actor"] }
-fendermint_actor_storage_blob_reader = { path = "storage_blob_reader", features = ["fil-actor"] }
-fendermint_actor_storage_bucket = { path = "storage_bucket", features = ["fil-actor"] }
-fendermint_actor_machine = { path = "machine", features = ["fil-actor"] }
-fendermint_actor_storage_config = { path = "storage_config", features = ["fil-actor"] }
-fendermint_actor_storage_timehub = { path = "storage_timehub", features = ["fil-actor"] }
+# Storage node actors moved to storage-node/actors/
+# (now managed by storage-node plugin)

@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 //! Storage-node specific helper modules.
+//!
+//! These modules provide high-level abstractions for storage-node functionality.
 
-pub mod storage_env;
-pub mod storage_helpers;
-
-pub use storage_env::*;
-pub use storage_helpers::*;
+pub mod genesis;
+pub mod message_handler;

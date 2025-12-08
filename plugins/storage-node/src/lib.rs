@@ -7,6 +7,8 @@
 //! through the module system. It uses `RecallExecutor` for FVM execution
 //! with storage-node specific features.
 
+pub mod helpers;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use fendermint_module::{
@@ -85,7 +87,7 @@ where
 impl MessageHandlerModule for StorageNodeModule {
     async fn handle_message<DB: Blockstore + Send + Sync>(
         &self,
-        state: &mut dyn MessageHandlerState,
+        _state: &mut dyn MessageHandlerState,
         msg: &fendermint_vm_message::ipc::IpcMessage,
     ) -> Result<Option<ApplyMessageResponse>> {
         use fendermint_vm_message::ipc::IpcMessage;

@@ -46,18 +46,6 @@ members = [
   "fendermint/actors/eam",
   "fendermint/actors/f3-light-client",
   "fendermint/actors/gas_market/eip1559",
-  # storage node actors
-  "fendermint/actors/storage_adm_types",         # Storage ADM types
-  "fendermint/actors/storage_adm",               # Storage ADM actor
-  "fendermint/actors/machine",           # Machine base trait
-  "fendermint/actors/storage_blobs",
-  "fendermint/actors/storage_blobs/shared",
-  "fendermint/actors/storage_blobs/testing",
-  "fendermint/actors/storage_blob_reader",
-  "fendermint/actors/storage_bucket",            # S3-like object storage
-  "fendermint/actors/storage_timehub",           # Timestamping service
-  "fendermint/actors/storage_config",
-  "fendermint/actors/storage_config/shared",
 
   # storage node (netwatch patched for socket2 0.5 compatibility!)
   "storage-node/kernel",
@@ -67,6 +55,18 @@ members = [
   "storage-node/iroh_manager",
   "storage-node/ipld",
   "storage-node/actor_sdk",
+  # storage node actors (moved from fendermint/actors)
+  "storage-node/actors/storage_adm_types",         # Storage ADM types
+  "storage-node/actors/storage_adm",               # Storage ADM actor
+  "storage-node/actors/machine",                   # Machine base trait
+  "storage-node/actors/storage_blobs",
+  "storage-node/actors/storage_blobs/shared",
+  "storage-node/actors/storage_blobs/testing",
+  "storage-node/actors/storage_blob_reader",
+  "storage-node/actors/storage_bucket",            # S3-like object storage
+  "storage-node/actors/storage_timehub",           # Timestamping service
+  "storage-node/actors/storage_config",
+  "storage-node/actors/storage_config/shared",
 
   # Auto-discoverable plugins
   "plugins/storage-node",
@@ -272,7 +272,7 @@ fvm_ipld_amt = "0.7.4"
 # NOTE: Using master branch instead of v17.0.0 tag due to serde dependency fixes
 # Master is currently at commit 2f040c12 which fixes the serde::__private::PhantomData import issue
 fil_actors_evm_shared = { git = "https://github.com/filecoin-project/builtin-actors", branch = "master" }
-fendermint_actor_storage_adm_types = { path = "fendermint/actors/storage_adm_types" }
+fendermint_actor_storage_adm_types = { path = "storage-node/actors/storage_adm_types" }
 fil_actor_eam = { git = "https://github.com/filecoin-project/builtin-actors", branch = "master" }
 fil_actor_evm = { git = "https://github.com/filecoin-project/builtin-actors", branch = "master" }
 fil_actors_runtime = { git = "https://github.com/filecoin-project/builtin-actors", branch = "master" }

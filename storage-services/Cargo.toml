@@ -36,8 +36,8 @@ storage_node_iroh_manager = { path = "../storage-node/iroh_manager" }
 fendermint_rpc = { path = "../fendermint/rpc" }
 fendermint_vm_message = { path = "../fendermint/vm/message" }
 fendermint_vm_actor_interface = { path = "../fendermint/vm/actor_interface" }
-fendermint_actor_storage_blobs_shared = { path = "../fendermint/actors/storage_blobs/shared" }
-fendermint_actor_storage_bucket = { path = "../fendermint/actors/storage_bucket" }
+fendermint_actor_storage_blobs_shared = { path = "../storage-node/actors/storage_blobs/shared" }
+fendermint_actor_storage_bucket = { path = "../storage-node/actors/storage_bucket" }
 fendermint_crypto = { path = "../fendermint/crypto" }
 
 # IPC dependencies for address parsing
