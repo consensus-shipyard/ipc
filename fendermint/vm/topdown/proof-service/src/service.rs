@@ -4,20 +4,16 @@
 //!
 //! # Architecture
 //!
-//! The service implements a "delayed processing" flow to ensure that
-//! child tipsets are finalized before generating proofs:
+//! Each F3 certificate contains tipsets [base, suffix...] where:
+//! - `base` = last finalized epoch from previous certificate (overlap point)
+//! - `suffix` = new epochs being finalized
 //!
-//! ```text
-//! 1. FETCH Certificate N+1
-//! 2. CHECK continuity: pending_cert.last_epoch + 1 == new_cert.first_epoch
-//! 3. GENERATE proofs for ALL epochs in pending_cert.suffix
-//!    - For each epoch E: generate proof using (E, E+1) as (parent, child)
-//! 4. CACHE certificates and epoch proofs
-//! 5. pending_cert = new_cert
-//! ```
+//! For each certificate, we generate proofs for all (parent, child) pairs:
+//! - Given [E0, E1, E2, E3], we prove E0, E1, E2 (E3 has no child yet)
+//! - E3 will be proven when next certificate arrives (as its base)
 //!
-//! This ensures that when we prove epoch E, both E and E+1 are certified
-//! by F3 certificates, making the witness blocks verifiable.
+//! Each proof requires both parent (epoch E) and child (epoch E+1) because
+//! Filecoin stores `parentReceipts` in the child block, not the parent.
 
 use crate::assembler::ProofAssembler;
 use crate::cache::ProofCache;
@@ -26,8 +22,8 @@ use crate::f3_client::F3Client;
 use crate::types::{CertificateEntry, EpochProofEntry, FinalizedTipset};
 use anyhow::{Context, Result};
 use filecoin_f3_certs::FinalityCertificate;
+use filecoin_f3_gpbft::PowerEntries;
 use ipc_api::subnet_id::SubnetID;
-use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::time::{interval, MissedTickBehavior};
 
@@ -35,18 +31,9 @@ use tokio::time::{interval, MissedTickBehavior};
 pub struct ProofGeneratorService {
     config: ProofServiceConfig,
     cache: Arc<ProofCache>,
-    f3_client: Arc<F3Client>,
-    assembler: Arc<ProofAssembler>,
-
-    /// The certificate waiting for its child to be finalized
-    /// When the next certificate arrives, we can process this one's epochs
-    pending_certificate: Option<PendingCertificate>,
+    f3_client: F3Client,
+    assembler: ProofAssembler,
 }
-
-/// A certificate waiting for its child to be finalized before we can generate proofs.
-/// We use a type alias for clarity - this certificate's epochs will be processed
-/// when the next certificate arrives.
-type PendingCertificate = FinalityCertificate;
 
 impl ProofGeneratorService {
     /// Create a new proof generator service
@@ -64,7 +51,7 @@ impl ProofGeneratorService {
         cache: Arc<ProofCache>,
         subnet_id: &SubnetID,
         initial_instance: u64,
-        initial_power_table: filecoin_f3_gpbft::PowerEntries,
+        initial_power_table: PowerEntries,
     ) -> Result<Self> {
         let gateway_actor_id = extract_gateway_actor_id_from_config(&config).await?;
 
@@ -91,32 +78,27 @@ impl ProofGeneratorService {
         };
 
         // Create F3 client for certificate fetching + validation
-        let f3_client = Arc::new(
-            F3Client::new(
-                &config.parent_rpc_url,
-                &config.f3_network_name(subnet_id),
-                start_instance,
-                start_power_table,
-            )
-            .context("Failed to create F3 client")?,
-        );
+        let f3_client = F3Client::new(
+            &config.parent_rpc_url,
+            &config.f3_network_name(subnet_id),
+            start_instance,
+            start_power_table,
+        )
+        .context("Failed to create F3 client")?;
 
         // Create proof assembler
-        let assembler = Arc::new(
-            ProofAssembler::new(
-                config.parent_rpc_url.clone(),
-                gateway_actor_id,
-                subnet_id.to_string(),
-            )
-            .context("Failed to create proof assembler")?,
-        );
+        let assembler = ProofAssembler::new(
+            config.parent_rpc_url.clone(),
+            gateway_actor_id,
+            subnet_id.to_string(),
+        )
+        .context("Failed to create proof assembler")?;
 
         Ok(Self {
             config,
             cache,
             f3_client,
             assembler,
-            pending_certificate: None,
         })
     }
 
@@ -155,28 +137,23 @@ impl ProofGeneratorService {
     /// # Future improvements
     /// TODO: Gap recovery could be added when multiple RPC endpoints are available.
     async fn process_next_certificate(&mut self) -> Result<()> {
-        if !self.should_fetch_more().await {
+        if !self.should_fetch_more() {
             return Ok(());
         }
 
-        let Some(new_cert) = self.fetch_next_certificate().await? else {
+        let Some((certificate, power_table)) = self.fetch_next_certificate().await? else {
             return Ok(()); // No certificate available, caught up with F3
         };
 
-        // Process pending certificate if we have one
-        if let Some(pending) = self.pending_certificate.take() {
-            self.process_pending(&pending, &new_cert).await?;
-        }
-
-        // Store new certificate as pending (will be processed on next tick)
-        self.cache_and_store_pending(new_cert).await?;
+        self.generate_proofs_for_certificate(&certificate, &power_table)
+            .await?;
 
         Ok(())
     }
 
     /// Check if we should fetch more certificates based on lookahead.
-    async fn should_fetch_more(&self) -> bool {
-        let current_instance = self.f3_client.current_instance().await;
+    fn should_fetch_more(&self) -> bool {
+        let current_instance = self.f3_client.current_instance();
         let last_committed = self.cache.last_committed_instance();
         let lookahead = self.config.cache_config.lookahead_instances;
         let target = last_committed + lookahead;
@@ -196,11 +173,13 @@ impl ProofGeneratorService {
 
     /// Fetch and validate the next certificate from F3.
     /// Returns `None` if no certificate is available (caught up).
-    async fn fetch_next_certificate(&self) -> Result<Option<FinalityCertificate>> {
+    async fn fetch_next_certificate(
+        &mut self,
+    ) -> Result<Option<(FinalityCertificate, PowerEntries)>> {
         match self.f3_client.fetch_and_validate().await {
-            Ok(cert) => {
+            Ok((cert, power_table)) => {
                 self.log_certificate(&cert);
-                Ok(Some(cert))
+                Ok(Some((cert, power_table)))
             }
             Err(err) if is_certificate_unavailable(&err) => {
                 tracing::debug!("Caught up with F3 - no more certificates available");
@@ -221,162 +200,91 @@ impl ProofGeneratorService {
         );
     }
 
-    /// Process a pending certificate now that we have its child.
-    async fn process_pending(
-        &self,
-        pending: &PendingCertificate,
-        child: &FinalityCertificate,
-    ) -> Result<()> {
-        if !check_continuity(pending, child) {
-            return Err(continuity_error(pending, child));
-        }
-        self.generate_proofs_for_certificate(pending, child).await
-    }
-
-    /// Cache a certificate and store it as pending for next tick.
-    async fn cache_and_store_pending(&mut self, cert: FinalityCertificate) -> Result<()> {
-        let power_table = self.f3_client.get_state().await.power_table;
-        let rpc_endpoint = self.f3_client.rpc_endpoint();
-
-        let entry = CertificateEntry::new(cert.clone(), power_table, rpc_endpoint);
-        self.cache.insert_certificate(entry)?;
-
-        self.pending_certificate = Some(cert);
-        Ok(())
-    }
-
-    /// Generate proofs for all epochs in a certificate's suffix.
+    /// Generate proofs for all (parent, child) tipset pairs in the certificate.
+    ///
+    /// Each proof requires both the parent tipset (epoch E) and child tipset (epoch E+1).
+    /// The child contains `parentReceipts` which commits to the parent's execution results.
+    ///
+    /// Given tipsets [E0, E1, E2, E3], we generate proofs for:
+    /// - E0 (using E1 as child)
+    /// - E1 (using E2 as child)  
+    /// - E2 (using E3 as child)
+    /// - E3 has no child in this certificate, will be proven with next certificate
     async fn generate_proofs_for_certificate(
         &self,
         cert: &FinalityCertificate,
-        child_cert: &FinalityCertificate,
+        power_table: &PowerEntries,
     ) -> Result<()> {
-        let suffix = cert.ec_chain.suffix();
-        if suffix.is_empty() {
+        // Build (parent, child) pairs using windows - this makes the requirement explicit
+        let tipset_pairs: Vec<_> = cert
+            .ec_chain
+            .iter()
+            .map(|ts| FinalizedTipset::from(ts))
+            .collect::<Vec<_>>()
+            .windows(2)
+            .map(|w| (w[0].clone(), w[1].clone()))
+            .collect();
+
+        if tipset_pairs.is_empty() {
             tracing::debug!(
                 instance = cert.gpbft_instance,
-                "Certificate has empty suffix, nothing to prove"
+                "Certificate has fewer than 2 tipsets, no (parent, child) pairs to prove"
             );
             return Ok(());
         }
 
-        let epochs: Vec<i64> = suffix.iter().map(|ts| ts.epoch).collect();
+        let epochs_to_prove: Vec<i64> = tipset_pairs.iter().map(|(p, _)| p.epoch).collect();
+
         tracing::info!(
-            parent_instance = cert.gpbft_instance,
-            child_instance = child_cert.gpbft_instance,
-            epochs = ?epochs,
+            instance = cert.gpbft_instance,
+            epochs = ?epochs_to_prove,
             "Generating proofs for certificate epochs"
         );
 
-        // Build epoch -> tipset lookup from both certificates
-        let tipset_map: HashMap<i64, FinalizedTipset> = cert
-            .ec_chain
-            .iter()
-            .chain(child_cert.ec_chain.iter())
-            .map(|ts| (ts.epoch, FinalizedTipset::from(ts)))
-            .collect();
+        let mut epoch_proofs = Vec::with_capacity(tipset_pairs.len());
 
-        // Generate proofs for each epoch
-        let epoch_proofs = self
-            .generate_epoch_proofs(
-                suffix,
-                &tipset_map,
+        // Generate proofs for each (parent, child) pair
+        // The child tipset contains `parentReceipts` which commits to the parent's execution.
+        for (parent_tipset, child_tipset) in tipset_pairs {
+            let parent_epoch = parent_tipset.epoch;
+
+            tracing::debug!(
+                parent_epoch,
+                child_epoch = child_tipset.epoch,
+                "Generating proof for epoch"
+            );
+
+            let proof_bundle = self
+                .assembler
+                .generate_proof_for_epoch(parent_tipset.clone(), child_tipset.clone())
+                .await
+                .with_context(|| format!("Failed to generate proof for epoch {}", parent_epoch))?;
+
+            epoch_proofs.push(EpochProofEntry::new(
+                parent_epoch,
+                proof_bundle,
                 cert.gpbft_instance,
-                child_cert.gpbft_instance,
-            )
-            .await?;
+            ));
+        }
 
+        // Cache the certificate and proofs
+        let rpc_endpoint = self.f3_client.rpc_endpoint().to_string();
+        let cert_entry = CertificateEntry::new(cert.clone(), power_table.clone(), rpc_endpoint);
+        self.cache.insert_certificate(cert_entry)?;
         self.cache.insert_epoch_proofs(epoch_proofs)?;
 
         tracing::info!(
-            parent_instance = cert.gpbft_instance,
-            child_instance = child_cert.gpbft_instance,
-            epoch_count = epochs.len(),
+            epoch_count = epochs_to_prove.len(),
             "Successfully generated and cached proofs"
         );
 
         Ok(())
     }
 
-    /// Generate proofs for each epoch in the suffix.
-    async fn generate_epoch_proofs(
-        &self,
-        finalized_epochs: &[filecoin_f3_gpbft::Tipset],
-        tipset_map: &HashMap<i64, FinalizedTipset>,
-        parent_cert_instance: u64,
-        child_cert_instance: u64,
-    ) -> Result<Vec<EpochProofEntry>> {
-        let mut proofs = Vec::with_capacity(finalized_epochs.len());
-
-        for tipset in finalized_epochs.iter() {
-            let parent_epoch = tipset.epoch;
-            let child_epoch = parent_epoch + 1;
-
-            let parent_tipset = tipset_map
-                .get(&parent_epoch)
-                .cloned()
-                .context("Parent tipset not found in certificate chain")?;
-            let child_tipset = tipset_map
-                .get(&child_epoch)
-                .cloned()
-                .context("Child tipset not found in certificate chain")?;
-
-            tracing::debug!(parent_epoch, child_epoch, "Generating proof for epoch");
-
-            let proof_bundle = self
-                .assembler
-                .generate_proof_for_epoch(parent_tipset, child_tipset)
-                .await
-                .with_context(|| format!("Failed to generate proof for epoch {}", parent_epoch))?;
-
-            proofs.push(EpochProofEntry::new(
-                parent_epoch,
-                proof_bundle,
-                parent_cert_instance,
-                child_cert_instance,
-            ));
-        }
-
-        Ok(proofs)
-    }
-
     /// Get reference to the cache (for proposers)
     pub fn cache(&self) -> &Arc<ProofCache> {
         &self.cache
     }
-}
-
-/// Check if two certificates have continuity (pending's last epoch == new's base epoch).
-fn check_continuity(pending: &FinalityCertificate, new_cert: &FinalityCertificate) -> bool {
-    let pending_last = pending.ec_chain.suffix().last().map(|t| t.epoch);
-    let new_base = new_cert.ec_chain.base().map(|t| t.epoch);
-
-    match (pending_last, new_base) {
-        (Some(last), Some(base)) => last == base, // F3 chains overlap at boundary
-        (None, _) => true,                        // Empty suffix - accept continuity
-        _ => false,
-    }
-}
-
-/// Build a detailed error for certificate continuity breaks.
-///
-/// This is a fatal error - the F3 chain should always be continuous.
-/// TODO: With multiple RPC endpoints, we could attempt gap recovery.
-fn continuity_error(
-    pending: &FinalityCertificate,
-    new_cert: &FinalityCertificate,
-) -> anyhow::Error {
-    let pending_last = pending.ec_chain.suffix().last().map(|t| t.epoch);
-    let new_base = new_cert.ec_chain.base().map(|t| t.epoch);
-
-    anyhow::anyhow!(
-        "Certificate continuity broken: instance {} (last epoch {:?}) does not connect to \
-         instance {} (base epoch {:?}). Service may need re-bootstrap.",
-        pending.gpbft_instance,
-        pending_last,
-        new_cert.gpbft_instance,
-        new_base,
-    )
 }
 
 /// Check if an error indicates the certificate is not yet available.

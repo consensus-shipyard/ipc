@@ -130,8 +130,8 @@ async fn run_service(
     .await?;
 
     // Get the power table
-    let current_state = temp_client.get_state().await;
-    let power_table = current_state.power_table;
+    let current_state = temp_client.get_state();
+    let power_table = current_state.power_table.clone();
 
     println!("Power table fetched: {} entries", power_table.0.len());
     println!(
@@ -146,10 +146,9 @@ async fn run_service(
         polling_interval: Duration::from_secs(poll_interval),
         cache_config: CacheConfig {
             lookahead_instances: lookahead,
-            retention_instances: 2,
+            retention_epochs: 2,
         },
         parent_rpc_url: rpc_url,
-        fallback_rpc_urls: vec![],
         gateway_id: GatewayId::EthAddress(gateway_address),
     };
 

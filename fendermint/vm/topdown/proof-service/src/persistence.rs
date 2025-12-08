@@ -35,8 +35,6 @@ const CF_EPOCH_PROOFS: &str = "epoch_proofs";
 
 /// Metadata keys
 const KEY_SCHEMA_VERSION: &[u8] = b"schema_version";
-const KEY_LAST_COMMITTED_EPOCH: &[u8] = b"last_committed_epoch";
-const KEY_LAST_COMMITTED_INSTANCE: &[u8] = b"last_committed_instance";
 
 /// Persistent storage for proof cache
 pub struct ProofCachePersistence {
@@ -188,30 +186,6 @@ impl ProofCachePersistence {
         Ok(())
     }
 
-    pub fn save_committed_state(&self, epoch: ChainEpoch, instance: u64) -> Result<()> {
-        let cf = self.get_cf(CF_METADATA)?;
-        self.db
-            .put_cf(&cf, KEY_LAST_COMMITTED_EPOCH, epoch.to_be_bytes())?;
-        self.db
-            .put_cf(&cf, KEY_LAST_COMMITTED_INSTANCE, instance.to_be_bytes())?;
-        debug!(epoch, instance, "Saved committed state to disk");
-        Ok(())
-    }
-
-    pub fn load_committed_state(&self) -> Result<Option<(ChainEpoch, u64)>> {
-        let cf = self.get_cf(CF_METADATA)?;
-
-        let Some(epoch) = self.load_i64(&cf, KEY_LAST_COMMITTED_EPOCH)? else {
-            return Ok(None);
-        };
-        let Some(instance) = self.load_u64(&cf, KEY_LAST_COMMITTED_INSTANCE)? else {
-            return Ok(None);
-        };
-
-        info!(epoch, instance, "Loaded committed state from disk");
-        Ok(Some((epoch, instance)))
-    }
-
     fn load_i64(&self, cf: &Arc<BoundColumnFamily>, key: &[u8]) -> Result<Option<i64>> {
         match self.db.get_cf(cf, key)? {
             Some(data) => {
@@ -292,8 +266,7 @@ mod tests {
                 event_proofs: vec![],
                 blocks: vec![],
             },
-            5, // parent_cert_instance
-            6, // child_cert_instance
+            5, // cert_instance
         )
     }
 

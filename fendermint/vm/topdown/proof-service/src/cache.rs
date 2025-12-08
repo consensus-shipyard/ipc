@@ -14,7 +14,7 @@
 use crate::config::CacheConfig;
 use crate::observe::{ProofCached, CACHE_HIT_TOTAL, CACHE_SIZE};
 use crate::persistence::ProofCachePersistence;
-use crate::types::{CertificateEntry, EpochProofEntry, EpochProofWithCertificates};
+use crate::types::{CertificateEntry, EpochProofEntry, EpochProofWithCertificate};
 use anyhow::{Context, Result};
 use fvm_shared::clock::ChainEpoch;
 use ipc_observability::emit;
@@ -75,34 +75,6 @@ impl ProofCache {
     ) -> Result<Self> {
         let persistence = ProofCachePersistence::open(db_path)?;
 
-        // Load committed state from persistence, use higher of persisted vs provided
-        let (last_committed_epoch, last_committed_instance) =
-            match persistence.load_committed_state()? {
-                Some((persisted_epoch, persisted_instance)) => {
-                    // Use the higher values (in case chain state is ahead of persistence or vice versa)
-                    let epoch = persisted_epoch.max(initial_committed_epoch);
-                    let instance = persisted_instance.max(initial_committed_instance);
-                    tracing::info!(
-                        persisted_epoch,
-                        persisted_instance,
-                        initial_committed_epoch,
-                        initial_committed_instance,
-                        using_epoch = epoch,
-                        using_instance = instance,
-                        "Loaded committed state from persistence"
-                    );
-                    (epoch, instance)
-                }
-                None => {
-                    tracing::info!(
-                        initial_committed_epoch,
-                        initial_committed_instance,
-                        "No persisted committed state, using initial values"
-                    );
-                    (initial_committed_epoch, initial_committed_instance)
-                }
-            };
-
         // Load certificates
         let cert_entries = persistence
             .load_all_certificates()
@@ -128,14 +100,14 @@ impl ProofCache {
         let cache = Self {
             certificates: Arc::new(RwLock::new(certificates)),
             epoch_proofs: Arc::new(RwLock::new(epoch_proofs)),
-            last_committed_epoch: Arc::new(AtomicI64::new(last_committed_epoch)),
-            last_committed_instance: Arc::new(AtomicU64::new(last_committed_instance)),
+            last_committed_epoch: Arc::new(AtomicI64::new(initial_committed_epoch)),
+            last_committed_instance: Arc::new(AtomicU64::new(initial_committed_instance)),
             config,
             persistence: Some(Arc::new(persistence)),
         };
 
         // Cleanup old entries
-        cache.cleanup_old_epochs(last_committed_epoch)?;
+        cache.cleanup_old_epochs(initial_committed_epoch)?;
 
         Ok(cache)
     }
@@ -210,8 +182,8 @@ impl ProofCache {
 
     /// Get proof for a specific epoch
     ///
-    /// Returns the proof entry without the certificates.
-    /// Use `get_epoch_proof_with_certificates` for full data.
+    /// Returns the proof entry without the certificate.
+    /// Use `get_epoch_proof_with_certificate` for full data.
     pub fn get_epoch_proof(&self, epoch: ChainEpoch) -> Option<EpochProofEntry> {
         let result = self.epoch_proofs.read().get(&epoch).cloned();
 
@@ -223,24 +195,18 @@ impl ProofCache {
         result
     }
 
-    /// Get proof for a specific epoch with its certificates
+    /// Get proof for a specific epoch with its certificate
     ///
     /// This is the main query method for consumers. Returns everything
-    /// needed for verification, including the pre-merged tipset list.
-    pub fn get_epoch_proof_with_certificates(
+    /// needed for verification, including the finalized tipsets.
+    pub fn get_epoch_proof_with_certificate(
         &self,
         epoch: ChainEpoch,
-    ) -> Option<EpochProofWithCertificates> {
+    ) -> Option<EpochProofWithCertificate> {
         let proof_entry = self.get_epoch_proof(epoch)?;
+        let cert = self.get_certificate(proof_entry.cert_instance)?;
 
-        let parent_cert = self.get_certificate(proof_entry.parent_cert_instance)?;
-        let child_cert = self.get_certificate(proof_entry.child_cert_instance)?;
-
-        Some(EpochProofWithCertificates::new(
-            &proof_entry,
-            &parent_cert,
-            &child_cert,
-        ))
+        Some(EpochProofWithCertificate::new(&proof_entry, &cert))
     }
 
     /// Check if an epoch proof exists
@@ -273,7 +239,6 @@ impl ProofCache {
             "Updated last committed epoch and instance"
         );
 
-        self.with_persistence(|p| p.save_committed_state(epoch, instance))?;
         self.cleanup_old_epochs(epoch)
     }
 
@@ -320,11 +285,11 @@ impl ProofCache {
             return Ok(());
         }
 
-        let referenced_certs = self.find_referenced_certs(&epochs_to_remove);
-        let certs_to_remove = self.collect_unreferenced_certs(&referenced_certs);
-
+        // Remove proofs first, then cleanup orphaned certificates
         self.remove_epoch_proofs(&epochs_to_remove);
+        let certs_to_remove = self.collect_unreferenced_certs();
         self.remove_certificates(&certs_to_remove);
+
         self.persist_deletions(&epochs_to_remove, &certs_to_remove)?;
 
         CACHE_SIZE.set(self.epoch_proofs.read().len() as i64);
@@ -348,19 +313,15 @@ impl ProofCache {
             .collect()
     }
 
-    fn find_referenced_certs(
-        &self,
-        epochs_to_remove: &[ChainEpoch],
-    ) -> std::collections::HashSet<u64> {
-        self.epoch_proofs
+    /// Find certificates not referenced by any remaining proofs
+    fn collect_unreferenced_certs(&self) -> Vec<u64> {
+        let referenced: std::collections::HashSet<u64> = self
+            .epoch_proofs
             .read()
             .values()
-            .filter(|p| !epochs_to_remove.contains(&p.epoch))
-            .flat_map(|p| [p.parent_cert_instance, p.child_cert_instance])
-            .collect()
-    }
+            .map(|p| p.cert_instance)
+            .collect();
 
-    fn collect_unreferenced_certs(&self, referenced: &std::collections::HashSet<u64>) -> Vec<u64> {
         self.certificates
             .read()
             .keys()
@@ -466,11 +427,7 @@ mod tests {
         CertificateEntry::try_from(serializable).expect("valid certificate entry")
     }
 
-    fn create_test_epoch_proof(
-        epoch: ChainEpoch,
-        parent_cert: u64,
-        child_cert: u64,
-    ) -> EpochProofEntry {
+    fn create_test_epoch_proof(epoch: ChainEpoch, cert_instance: u64) -> EpochProofEntry {
         EpochProofEntry::new(
             epoch,
             UnifiedProofBundle {
@@ -478,8 +435,7 @@ mod tests {
                 event_proofs: vec![],
                 blocks: vec![],
             },
-            parent_cert,
-            child_cert,
+            cert_instance,
         )
     }
 
@@ -508,9 +464,9 @@ mod tests {
 
         // Insert epoch proofs
         let proofs = vec![
-            create_test_epoch_proof(100, 5, 6),
-            create_test_epoch_proof(101, 5, 6),
-            create_test_epoch_proof(102, 5, 6),
+            create_test_epoch_proof(100, 5),
+            create_test_epoch_proof(101, 5),
+            create_test_epoch_proof(102, 5),
         ];
         cache.insert_epoch_proofs(proofs).unwrap();
 
@@ -521,7 +477,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_epoch_proof_with_certificates() {
+    fn test_get_epoch_proof_with_certificate() {
         let config = CacheConfig {
             lookahead_instances: 10,
             retention_epochs: 5,
@@ -536,19 +492,17 @@ mod tests {
         cache.insert_certificate(cert2).unwrap();
 
         // Insert epoch proof
-        let proof = create_test_epoch_proof(101, 5, 6);
+        let proof = create_test_epoch_proof(101, 5);
         cache.insert_epoch_proofs(vec![proof]).unwrap();
 
-        // Get with certificates
-        let result = cache.get_epoch_proof_with_certificates(101);
+        // Get with certificate
+        let result = cache.get_epoch_proof_with_certificate(101);
         assert!(result.is_some());
 
         let entry = result.unwrap();
         assert_eq!(entry.epoch, 101);
-        assert_eq!(entry.parent_certificate.gpbft_instance, 5);
-        assert_eq!(entry.child_certificate.gpbft_instance, 6);
-        // Merged tipsets should include epochs from both certs
-        assert!(!entry.merged_tipsets.is_empty());
+        assert_eq!(entry.certificate.gpbft_instance, 5);
+        assert!(!entry.finalized_tipsets.is_empty());
     }
 
     #[test]
@@ -570,11 +524,11 @@ mod tests {
 
         // Insert epoch proofs
         let proofs = vec![
-            create_test_epoch_proof(100, 5, 6),
-            create_test_epoch_proof(101, 5, 6),
-            create_test_epoch_proof(102, 5, 6),
-            create_test_epoch_proof(103, 6, 7),
-            create_test_epoch_proof(104, 6, 7),
+            create_test_epoch_proof(100, 5),
+            create_test_epoch_proof(101, 5),
+            create_test_epoch_proof(102, 5),
+            create_test_epoch_proof(103, 6),
+            create_test_epoch_proof(104, 6),
         ];
         cache.insert_epoch_proofs(proofs).unwrap();
 
@@ -615,17 +569,17 @@ mod tests {
             .unwrap();
 
         cache
-            .insert_epoch_proofs(vec![create_test_epoch_proof(100, 5, 6)])
+            .insert_epoch_proofs(vec![create_test_epoch_proof(100, 5)])
             .unwrap();
         assert_eq!(cache.highest_cached_epoch(), Some(100));
 
         cache
-            .insert_epoch_proofs(vec![create_test_epoch_proof(105, 5, 6)])
+            .insert_epoch_proofs(vec![create_test_epoch_proof(105, 5)])
             .unwrap();
         assert_eq!(cache.highest_cached_epoch(), Some(105));
 
         cache
-            .insert_epoch_proofs(vec![create_test_epoch_proof(103, 5, 6)])
+            .insert_epoch_proofs(vec![create_test_epoch_proof(103, 5)])
             .unwrap();
         assert_eq!(cache.highest_cached_epoch(), Some(105));
     }

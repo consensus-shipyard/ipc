@@ -420,34 +420,25 @@ impl From<&PowerEntries> for SerializablePowerEntries {
 /// certificates needed for verification.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EpochProofEntry {
-    /// The epoch this proof is for
+    /// The chain epoch at which the storage modifications has happened and events were emitted
     pub epoch: ChainEpoch,
 
     /// The proof bundle for this epoch
     pub proof_bundle: UnifiedProofBundle,
 
-    /// Instance ID of the certificate that certifies this epoch (parent)
-    pub parent_cert_instance: u64,
-
-    /// Instance ID of the certificate that certifies epoch+1 (child)
-    pub child_cert_instance: u64,
+    /// Instance ID of the certificate that contains both this epoch and epoch+1
+    pub cert_instance: u64,
 
     /// Metadata
     pub generated_at: SystemTime,
 }
 
 impl EpochProofEntry {
-    pub fn new(
-        epoch: ChainEpoch,
-        proof_bundle: UnifiedProofBundle,
-        parent_cert_instance: u64,
-        child_cert_instance: u64,
-    ) -> Self {
+    pub fn new(epoch: ChainEpoch, proof_bundle: UnifiedProofBundle, cert_instance: u64) -> Self {
         Self {
             epoch,
             proof_bundle,
-            parent_cert_instance,
-            child_cert_instance,
+            cert_instance,
             generated_at: SystemTime::now(),
         }
     }
@@ -530,49 +521,28 @@ impl TryFrom<SerializableCertificateEntry> for CertificateEntry {
 /// This is what consumers receive when they query for an epoch's proof.
 /// It includes everything needed for verification.
 #[derive(Debug, Clone)]
-pub struct EpochProofWithCertificates {
-    /// The epoch
+pub struct EpochProofWithCertificate {
+    /// The chain epoch at which the storage modifications has happened and events were emitted
     pub epoch: ChainEpoch,
 
     /// The proof bundle
     pub proof_bundle: UnifiedProofBundle,
 
-    /// The parent certificate (certifies this epoch)
-    pub parent_certificate: FinalityCertificate,
+    /// The certificate that contains both this epoch and epoch+1
+    pub certificate: FinalityCertificate,
 
-    /// The child certificate (certifies epoch+1)
-    pub child_certificate: FinalityCertificate,
-
-    /// Pre-merged tipsets from both certificates for verification
-    /// This is computed on retrieval to avoid storing redundant data
-    pub merged_tipsets: FinalizedTipsets,
+    pub finalized_tipsets: FinalizedTipsets,
 }
 
-impl EpochProofWithCertificates {
-    /// Create from an epoch proof entry and its referenced certificates
-    pub fn new(
-        proof_entry: &EpochProofEntry,
-        parent_cert: &CertificateEntry,
-        child_cert: &CertificateEntry,
-    ) -> Self {
-        // Merge tipsets from both certificates
-        // If same instance, just use parent's chain; otherwise concatenate both
-        let merged =
-            if parent_cert.certificate.gpbft_instance == child_cert.certificate.gpbft_instance {
-                FinalizedTipsets::from(&parent_cert.certificate.ec_chain)
-            } else {
-                FinalizedTipsets::merge(
-                    &parent_cert.certificate.ec_chain,
-                    &child_cert.certificate.ec_chain,
-                )
-            };
-
+impl EpochProofWithCertificate {
+    /// Create from an epoch proof entry and its referenced certificate
+    pub fn new(proof_entry: &EpochProofEntry, cert_entry: &CertificateEntry) -> Self {
+        let finalized_tipsets = FinalizedTipsets::from(&cert_entry.certificate.ec_chain);
         Self {
             epoch: proof_entry.epoch,
             proof_bundle: proof_entry.proof_bundle.clone(),
-            parent_certificate: parent_cert.certificate.clone(),
-            child_certificate: child_cert.certificate.clone(),
-            merged_tipsets: merged,
+            certificate: cert_entry.certificate.clone(),
+            finalized_tipsets,
         }
     }
 }

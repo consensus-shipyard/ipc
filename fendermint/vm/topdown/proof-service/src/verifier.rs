@@ -12,7 +12,7 @@
 //! against pre-merged tipsets from both the parent and child certificates.
 
 use crate::assembler::{NEW_POWER_CHANGE_REQUEST_SIGNATURE, NEW_TOPDOWN_MESSAGE_SIGNATURE};
-use crate::types::{EpochProofWithCertificates, FinalizedTipsets};
+use crate::types::{EpochProofWithCertificate, FinalizedTipsets};
 use anyhow::Result;
 use cid::Cid;
 use proofs::proofs::common::bundle::{UnifiedProofBundle, UnifiedVerificationResult};
@@ -39,7 +39,7 @@ impl ProofVerifier {
         Self { events }
     }
 
-    /// Verify a proof bundle using pre-merged tipsets from certificates
+    /// Verify a inclusion proof in the proof bundle using pre-merged tipsets from certificates
     ///
     /// This is the primary verification method. It verifies that all witness
     /// blocks in the proof bundle are certified by the provided tipsets.
@@ -49,14 +49,14 @@ impl ProofVerifier {
     /// * `merged_tipsets` - Pre-merged tipsets from parent and child certificates
     ///
     /// # Returns
-    /// Verification results for storage and event proofs
+    /// Verification results for storage and event inclusion proofs
     pub fn verify_proof_bundle_with_tipsets(
         &self,
         bundle: &UnifiedProofBundle,
-        merged_tipsets: &FinalizedTipsets,
+        finalized_tipsets: &FinalizedTipsets,
     ) -> Result<UnifiedVerificationResult> {
         let tipset_verifier = |epoch: i64, cid: &Cid| -> bool {
-            merged_tipsets
+            finalized_tipsets
                 .iter()
                 .any(|ts| ts.epoch == epoch && ts.block_cids == cid.to_bytes())
         };
@@ -66,9 +66,6 @@ impl ProofVerifier {
 
     /// Verify a proof bundle from a cache entry
     ///
-    /// Convenience method that extracts the merged tipsets from an
-    /// EpochProofWithCertificates entry.
-    ///
     /// # Arguments
     /// * `entry` - The epoch proof entry with its certificates
     ///
@@ -76,9 +73,9 @@ impl ProofVerifier {
     /// Verification results for storage and event proofs
     pub fn verify_epoch_proof(
         &self,
-        entry: &EpochProofWithCertificates,
+        entry: &EpochProofWithCertificate,
     ) -> Result<UnifiedVerificationResult> {
-        self.verify_proof_bundle_with_tipsets(&entry.proof_bundle, &entry.merged_tipsets)
+        self.verify_proof_bundle_with_tipsets(&entry.proof_bundle, &entry.finalized_tipsets)
     }
 
     /// Internal verification using a tipset verifier closure

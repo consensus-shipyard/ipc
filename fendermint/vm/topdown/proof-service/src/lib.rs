@@ -32,7 +32,7 @@ pub use cache::ProofCache;
 pub use config::{CacheConfig, ProofServiceConfig};
 pub use service::ProofGeneratorService;
 pub use types::{
-    CertificateEntry, EpochProofEntry, EpochProofWithCertificates, SerializableF3Certificate,
+    CertificateEntry, EpochProofEntry, EpochProofWithCertificate, SerializableF3Certificate,
 };
 pub use verifier::ProofVerifier;
 
