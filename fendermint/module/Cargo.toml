@@ -11,6 +11,7 @@ license.workspace = true
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 tokio = { workspace = true }
+serde = { workspace = true }
 
 # FVM dependencies
 fvm = { workspace = true }

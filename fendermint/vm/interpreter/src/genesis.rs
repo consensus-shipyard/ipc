@@ -19,9 +19,13 @@ use fendermint_eth_hardhat::{ContractSourceAndName, Hardhat, FQN};
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::{
-    account, activity, adm, blob_reader, blobs, burntfunds, chainmetadata, cron, eam,
-    f3_light_client, gas_market, init, ipc, recall_config, reward, system, EMPTY_ARR,
+    account, activity, burntfunds, chainmetadata, cron, eam,
+    f3_light_client, gas_market, init, ipc, reward, system, EMPTY_ARR,
 };
+
+// Storage-node actor interfaces moved to plugin
+#[cfg(feature = "storage-node")]
+use fendermint_vm_actor_interface::{adm, blob_reader, blobs, recall_config};
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{ActorMeta, Collateral, Genesis, Power, PowerScale, Validator};
 use fvm::engine::MultiEngine;
@@ -304,8 +308,9 @@ impl<'a> GenesisBuilder<'a> {
 
         // Init actor
         // Add Blobs actor ID to eth_builtin_ids so its delegated address is registered
-        let mut eth_builtin_ids: BTreeSet<_> =
+        let eth_builtin_ids: BTreeSet<_> =
             ipc_entrypoints.values().map(|c| c.actor_id).collect();
+        #[cfg(feature = "storage-node")]
         eth_builtin_ids.insert(blobs::BLOBS_ACTOR_ID);
 
         let (init_state, addr_to_id) = init::State::new(

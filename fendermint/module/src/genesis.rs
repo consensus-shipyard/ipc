@@ -63,6 +63,31 @@ pub trait GenesisState: Send + Sync {
 
     /// Subtract from the circulating supply
     fn subtract_from_circ_supply(&mut self, amount: &TokenAmount) -> Result<()>;
+
+    /// Create a custom actor with a specific ID and optional delegated address.
+    ///
+    /// This is used by plugins to create actors with predetermined IDs,
+    /// typically for system actors that need well-known addresses.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the actor (for looking up code CID in manifest)
+    /// * `id` - The actor ID to assign
+    /// * `state` - The actor's initial state (will be CBOR-serialized)
+    /// * `balance` - Initial token balance
+    /// * `delegated_address` - Optional f4 address for Ethereum compatibility
+    ///
+    /// # Returns
+    ///
+    /// Ok(()) if successful, or an error if the actor couldn't be created
+    fn create_custom_actor(
+        &mut self,
+        name: &str,
+        id: ActorID,
+        state: &impl serde::Serialize,
+        balance: TokenAmount,
+        delegated_address: Option<Address>,
+    ) -> Result<()>;
 }
 
 /// Module trait for initializing actors during genesis.

@@ -7,7 +7,7 @@
 //! The actual implementation requires access to FvmGenesis methods that are not yet
 //! exposed through the GenesisState trait.
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use fendermint_module::genesis::GenesisState;
 use fendermint_vm_genesis::Genesis;
 

@@ -7,6 +7,7 @@
 //! through the module system. It uses `RecallExecutor` for FVM execution
 //! with storage-node specific features.
 
+pub mod actor_interface;
 pub mod helpers;
 
 use anyhow::Result;
