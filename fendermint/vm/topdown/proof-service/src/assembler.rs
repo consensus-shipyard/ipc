@@ -38,7 +38,7 @@ pub const NEW_TOPDOWN_MESSAGE_SIGNATURE: &str = "NewTopDownMessage(address,IpcEn
 pub const NEW_POWER_CHANGE_REQUEST_SIGNATURE: &str =
     "NewPowerChangeRequest(PowerOperation,address,bytes,uint64)";
 
-/// Storage slot offset for topDownNonce in the Subnet struct
+/// Storage slot offset for topDownNonce in the Subnet struct.
 /// In the Gateway actor's subnets mapping: mapping(SubnetID => Subnet)
 /// The Subnet struct field layout (see contracts/contracts/structs/Subnet.sol):
 ///   - id (SubnetID): slot 0-1 (SubnetID has 2 fields)
@@ -46,7 +46,8 @@ pub const NEW_POWER_CHANGE_REQUEST_SIGNATURE: &str =
 ///   - topDownNonce (uint64): slot 3
 ///   - appliedBottomUpNonce (uint64): slot 3 (packed with topDownNonce)
 ///   - genesisEpoch (uint256): slot 4
-/// We need the nonce to verify top-down message ordering
+///
+/// We need the nonce to verify top-down message ordering.
 const TOPDOWN_NONCE_STORAGE_OFFSET: u64 = 3;
 
 /// Storage slot for nextConfigurationNumber in GatewayActorStorage

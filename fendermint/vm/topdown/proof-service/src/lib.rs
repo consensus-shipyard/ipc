@@ -15,7 +15,7 @@
 //! - **Epoch Proof Store**: Proof bundles keyed by epoch
 //!
 //! This avoids duplicating certificates when multiple epochs reference
-//! the same certificate pair.
+//! the same certificate.
 
 pub mod assembler;
 pub mod cache;

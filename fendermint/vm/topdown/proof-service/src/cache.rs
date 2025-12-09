@@ -9,7 +9,7 @@
 //! - **Epoch Proof Store**: Stores proof bundles keyed by epoch
 //!
 //! This design avoids duplicating certificates when multiple epochs
-//! reference the same certificate pair.
+//! reference the same certificate
 
 use crate::config::CacheConfig;
 use crate::observe::{ProofCached, CACHE_HIT_TOTAL, CACHE_SIZE};

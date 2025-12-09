@@ -12,7 +12,7 @@
 //! - Given [E0, E1, E2, E3], we prove E0, E1, E2 (E3 has no child yet)
 //! - E3 will be proven when next certificate arrives (as its base)
 //!
-//! Each proof requires both parent (epoch E) and child (epoch E+1) because
+//! Each proof requires both parent (epoch E) and child (typically epoch E+1) because
 //! Filecoin stores `parentReceipts` in the child block, not the parent.
 
 use crate::assembler::ProofAssembler;
@@ -41,6 +41,7 @@ impl ProofGeneratorService {
     /// # Arguments
     /// * `config` - Service configuration
     /// * `cache` - Proof cache
+    /// * `subnet_id` - id of the subnet to prove
     /// * `initial_instance` - F3 instance to bootstrap from (from F3CertManager actor)
     /// * `initial_power_table` - Initial power table (from F3CertManager actor)
     ///
@@ -202,7 +203,7 @@ impl ProofGeneratorService {
 
     /// Generate proofs for all (parent, child) tipset pairs in the certificate.
     ///
-    /// Each proof requires both the parent tipset (epoch E) and child tipset (epoch E+1).
+    /// Each proof requires both the parent tipset (epoch E) and child tipset (typically epoch E+1).
     /// The child contains `parentReceipts` which commits to the parent's execution results.
     ///
     /// Given tipsets [E0, E1, E2, E3], we generate proofs for:
@@ -219,7 +220,7 @@ impl ProofGeneratorService {
         let tipset_pairs: Vec<_> = cert
             .ec_chain
             .iter()
-            .map(|ts| FinalizedTipset::from(ts))
+            .map(FinalizedTipset::from)
             .collect::<Vec<_>>()
             .windows(2)
             .map(|w| (w[0].clone(), w[1].clone()))

@@ -426,7 +426,7 @@ pub struct EpochProofEntry {
     /// The proof bundle for this epoch
     pub proof_bundle: UnifiedProofBundle,
 
-    /// Instance ID of the certificate that contains both this epoch and epoch+1
+    /// Instance ID of the certificate that contains both this and the next tipset's epoch
     pub cert_instance: u64,
 
     /// Metadata
@@ -528,7 +528,7 @@ pub struct EpochProofWithCertificate {
     /// The proof bundle
     pub proof_bundle: UnifiedProofBundle,
 
-    /// The certificate that contains both this epoch and epoch+1
+    /// The certificate that contains both this and the next tipset's epoch
     pub certificate: FinalityCertificate,
 
     pub finalized_tipsets: FinalizedTipsets,
