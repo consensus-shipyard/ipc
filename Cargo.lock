@@ -4898,7 +4898,6 @@ dependencies = [
  "ipc-provider",
  "ipc_actors_abis",
  "ipc_ipld_resolver",
- "iroh-blobs",
  "libp2p",
  "num-traits",
  "prometheus",

@@ -5,27 +5,20 @@ use anyhow::{anyhow, bail, Context};
 use async_stm::atomically_or_err;
 use fendermint_abci::ApplicationService;
 use fendermint_crypto::SecretKey;
+use fendermint_module::ServiceModule;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::fvm::interpreter::FvmMessagesInterpreter;
 use crate::types::{AppModule, AppInterpreter};
 use fendermint_vm_interpreter::fvm::observe::register_metrics as register_interpreter_metrics;
-#[cfg(feature = "storage-node")]
-use ipc_plugin_storage_node::{BlobPool, ReadRequestPool};
 use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
-#[cfg(feature = "storage-node")]
-use ipc_plugin_storage_node::resolver::IrohResolver;
-#[cfg(feature = "storage-node")]
-use ipc_plugin_storage_node::resolver::ResolvePool;
 use fendermint_vm_snapshot::{SnapshotManager, SnapshotParams};
 use fendermint_vm_topdown::observe::register_metrics as register_topdown_metrics;
 use fendermint_vm_topdown::proxy::{IPCProviderProxy, IPCProviderProxyWithLatency};
 use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
 use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
-#[cfg(feature = "storage-node")]
-use ipc_plugin_storage_node::{IPCBlobFinality, IPCReadRequestClosed};
 use fvm_shared::address::{current_network, Address, Network};
 use ipc_ipld_resolver::{Event as ResolverEvent, IrohConfig, VoteRecord};
 use ipc_observability::observe::register_metrics as register_default_metrics;
@@ -132,11 +125,9 @@ pub async fn run(
 
     let parent_finality_votes = VoteTally::empty();
 
-    // Create storage node blob and read request resolution pools (optional)
-    #[cfg(feature = "storage-node")]
-    let blob_pool: BlobPool = ResolvePool::new();
-    #[cfg(feature = "storage-node")]
-    let read_request_pool: ReadRequestPool = ResolvePool::new();
+    // Storage-specific initialization is now handled by the plugin's ServiceModule
+    // See plugins/storage-node/src/lib.rs::initialize_services()
+    // For now, the initialization still happens below but will be moved to plugin
 
     let topdown_enabled = settings.topdown_enabled();
 
@@ -187,9 +178,19 @@ pub async fn run(
             tracing::info!("parent finality vote gossip disabled");
         }
 
-        // Spawn Iroh resolvers for blob and read request resolution (storage-node feature)
-        #[cfg(feature = "storage-node")]
+        // Spawn Iroh resolvers for blob and read request resolution (plugin-storage-node feature)
+        // TODO: Move this to plugin's initialize_services() method
+        #[cfg(feature = "plugin-storage-node")]
         if let Some(ref key) = validator_keypair {
+            use ipc_plugin_storage_node::{
+                resolver::IrohResolver, resolver::ResolvePool,
+                IPCBlobFinality, IPCReadRequestClosed,
+                BlobPoolItem, ReadRequestPoolItem,
+            };
+
+            let blob_pool: ResolvePool<BlobPoolItem> = ResolvePool::new();
+            let read_request_pool: ResolvePool<ReadRequestPoolItem> = ResolvePool::new();
+
             // Blob resolver
             let iroh_resolver = IrohResolver::new(
                 client.clone(),
@@ -312,6 +313,34 @@ pub async fn run(
         module_name = fendermint_module::ModuleBundle::name(module.as_ref()),
         module_version = fendermint_module::ModuleBundle::version(module.as_ref()),
         "Initialized FVM interpreter with module"
+    );
+
+    // Initialize module services generically
+    // The module can start background tasks, set up resources, etc.
+    // Note: The keypair is passed as Vec<u8> for flexibility
+    // The plugin can deserialize it to the format it needs
+    let validator_key_bytes = if let Some(ref _k) = validator_keypair {
+        // Serialize the keypair - just use empty vec for now as placeholder
+        // Full implementation would serialize properly
+        Some(vec![])
+    } else {
+        None
+    };
+
+    let mut service_ctx = fendermint_module::service::ServiceContext::new(Box::new(settings.clone()));
+    if let Some(key_bytes) = validator_key_bytes {
+        service_ctx = service_ctx.with_validator_keypair(key_bytes);
+    }
+
+    let service_handles = module
+        .initialize_services(&service_ctx)
+        .await
+        .context("failed to initialize module services")?;
+
+    tracing::info!(
+        "Module '{}' initialized {} background services",
+        fendermint_module::ModuleBundle::name(&*module),
+        service_handles.len()
     );
 
     let interpreter: AppInterpreter<_> = FvmMessagesInterpreter::new(

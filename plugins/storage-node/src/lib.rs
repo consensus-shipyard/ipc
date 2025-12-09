@@ -10,6 +10,7 @@
 pub mod actor_interface;
 pub mod helpers;
 pub mod resolver;
+pub mod service_resources;
 pub mod storage_env;
 pub mod topdown_types;
 
@@ -21,6 +22,7 @@ pub mod topdown_types;
 // Re-export commonly used types
 pub use storage_env::{BlobPool, BlobPoolItem, ReadRequestPool, ReadRequestPoolItem};
 pub use topdown_types::{IPCBlobFinality, IPCReadRequestClosed};
+pub use service_resources::{StorageServiceResources, StorageServiceSettings, StorageServiceContext};
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -202,15 +204,30 @@ impl GenesisModule for StorageNodeModule {
 impl ServiceModule for StorageNodeModule {
     async fn initialize_services(
         &self,
-        _ctx: &ServiceContext,
+        ctx: &ServiceContext,
     ) -> Result<Vec<tokio::task::JoinHandle<()>>> {
-        // Future: Initialize storage-node background services
-        // (IPLD resolver, Iroh manager, etc.)
+        tracing::info!("Storage-node plugin initializing services");
+
+        // TODO: Full implementation would:
+        // 1. Extract storage settings from ctx.settings
+        // 2. Create BlobPool and ReadRequestPool
+        // 3. Spawn IrohResolver tasks
+        // 4. Start vote publishing loops
+        // 5. Return JoinHandles for all background tasks
+
+        // For now, services are still initialized in node.rs (lines 136-224)
+        // This is a placeholder showing the intended architecture
+
+        tracing::warn!("Storage services still initialized in node.rs - TODO: move to plugin");
         Ok(vec![])
     }
 
     fn resources(&self) -> ModuleResources {
-        // Future: Provide shared resources
+        // TODO: Return ModuleResources containing:
+        // - BlobPool
+        // - ReadRequestPool
+        // - IrohResolver handles
+        // This allows other components to access storage resources generically
         ModuleResources::empty()
     }
 

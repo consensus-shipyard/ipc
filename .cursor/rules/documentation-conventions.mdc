@@ -22,6 +22,32 @@ globs: *.md,*.rs,*.sol
 
 ## Project Documentation
 
+### Documentation Location Guidelines
+
+**⚠️ IMPORTANT: Never create documentation files in the project root!**
+
+Always place documentation in the appropriate subdirectory:
+
+- **Feature documentation** → `docs/features/<feature-name>/`
+  - Plugin system docs → `docs/features/plugin-system/`
+  - Storage node docs → `docs/features/storage-node/`
+  - Module system docs → `docs/features/module-system/`
+  - Recall system docs → `docs/features/recall-system/`
+
+- **Development documentation** → `docs/development/`
+  - Build verification, implementation guides, migration docs
+
+- **User guides** → `docs/ipc/` or `docs-gitbook/`
+  - User-facing documentation, quickstarts, tutorials
+
+- **Technical specifications** → `specs/`
+  - Protocol specifications, architecture decisions
+
+- **Root directory exceptions** (ONLY these):
+  - `README.md` - Project overview
+  - `CHANGELOG.md` - Version history
+  - `SECURITY.md` - Security policy
+
 ### User Documentation
 - User guides in [docs/](mdc:docs)
 - GitBook documentation in [docs-gitbook/](mdc:docs-gitbook)
