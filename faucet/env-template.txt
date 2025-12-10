@@ -1,0 +1,63 @@
+# IPC tFIL Faucet Configuration Template
+# Copy this file to .env and fill in your values
+
+# =============================================================================
+# REQUIRED CONFIGURATION
+# =============================================================================
+
+# Faucet wallet private key (KEEP THIS SECRET!)
+# Generate a new wallet: node -e "const ethers = require('ethers'); const wallet = ethers.Wallet.createRandom(); console.log('Address:', wallet.address); console.log('Private Key:', wallet.privateKey);"
+PRIVATE_KEY=0xYOUR_PRIVATE_KEY_HERE
+
+# =============================================================================
+# NETWORK CONFIGURATION
+# =============================================================================
+
+# IPC testnet RPC endpoint
+RPC_URL=http://node-1.test.ipc.space:8545
+
+# =============================================================================
+# FAUCET SETTINGS
+# =============================================================================
+
+# Amount of tFIL to send per request
+FAUCET_AMOUNT=1
+
+# Rate limiting settings
+# RATE_LIMIT_WINDOW: Time window in milliseconds (default: 24 hours)
+# RATE_LIMIT_MAX: Maximum requests per window per IP
+RATE_LIMIT_WINDOW=86400000
+RATE_LIMIT_MAX=1
+
+# =============================================================================
+# SERVER CONFIGURATION
+# =============================================================================
+
+# Port for the backend server
+PORT=3001
+
+# Enable CORS (set to false in production if serving static files)
+ENABLE_CORS=false
+
+# Serve static frontend files (set to true in production/Docker)
+SERVE_STATIC=true
+
+# =============================================================================
+# COMMON CONFIGURATIONS
+# =============================================================================
+
+# For 1 hour rate limit:
+# RATE_LIMIT_WINDOW=3600000
+# RATE_LIMIT_MAX=1
+
+# For multiple requests per day:
+# RATE_LIMIT_WINDOW=86400000
+# RATE_LIMIT_MAX=3
+
+# For higher distribution:
+# FAUCET_AMOUNT=5
+
+# For development:
+# ENABLE_CORS=true
+# SERVE_STATIC=false
+
