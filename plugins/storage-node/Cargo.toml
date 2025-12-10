@@ -70,3 +70,4 @@ fendermint_vm_topdown = { path = "../../fendermint/vm/topdown" }
 
 [dev-dependencies]
 tokio = { workspace = true }
+rand = { workspace = true }

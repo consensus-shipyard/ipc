@@ -7362,6 +7362,7 @@ dependencies = [
  "num-traits",
  "paste",
  "prometheus",
+ "rand 0.8.5",
  "serde",
  "serde_tuple 0.5.0",
  "storage_node_executor",
