@@ -354,17 +354,14 @@ impl State {
 
         // Check the current status
         match blob.blob.status {
-            BlobStatus::Added => {
-                return Err(ActorError::illegal_state(format!(
-                    "blob {} cannot be finalized from status added",
-                    params.hash
-                )));
-            }
             BlobStatus::Resolved => {
                 debug!("blob already resolved {} (id: {})", params.hash, params.id);
                 // Blob is already finalized as resolved.
                 // We can ignore later finalizations, even if they are failed.
-                // Remove the entire blob entry from the pending queue
+                // Remove from any queue it might be in
+                self.blobs
+                    .added
+                    .remove_entry(store, &params.hash, blob.blob.size)?;
                 self.blobs
                     .pending
                     .remove_entry(store, &params.hash, blob.blob.size)?;
@@ -436,7 +433,15 @@ impl State {
         //     );
         // }
 
-        // Remove the source from the pending queue
+        // Remove the source from both added and pending queues
+        // (blob may be finalized directly from added status without going through pending)
+        // Use blob.subscription.source (what was stored) not params.source (what gateway sends)
+        self.blobs.added.remove_source(
+            store,
+            &params.hash,
+            blob.blob.size,
+            BlobSource::new(subscriber, params.id.clone(), blob.subscription.source),
+        )?;
         self.blobs.pending.remove_source(
             store,
             &params.hash,

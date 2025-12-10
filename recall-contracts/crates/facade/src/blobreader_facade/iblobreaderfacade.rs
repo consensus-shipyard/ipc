@@ -92,7 +92,7 @@ interface IBlobReaderFacade {
 )]
 pub mod IBlobReaderFacade {
     use super::*;
-    use ::alloy_sol_types as alloy_sol_types;
+    use ::alloy_sol_types;
     /// The creation / init bytecode of the contract.
     ///
     /// ```text
@@ -114,9 +114,9 @@ pub mod IBlobReaderFacade {
         b"",
     );
     /**Event with signature `ReadRequestClosed(bytes32)` and selector `0x9a8c63a9b921adb4983af5ca5dd1649500a411a34894cb1c0f9fab740b6f75ed`.
-```solidity
-event ReadRequestClosed(bytes32 id);
-```*/
+    ```solidity
+    event ReadRequestClosed(bytes32 id);
+    ```*/
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -135,49 +135,19 @@ event ReadRequestClosed(bytes32 id);
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         #[automatically_derived]
         impl alloy_sol_types::SolEvent for ReadRequestClosed {
             type DataTuple<'a> = (::alloy_sol_types::sol_data::FixedBytes<32>,);
-            type DataToken<'a> = <Self::DataTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type DataToken<'a> = <Self::DataTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             type TopicList = (alloy_sol_types::sol_data::FixedBytes<32>,);
             const SIGNATURE: &'static str = "ReadRequestClosed(bytes32)";
-            const SIGNATURE_HASH: alloy_sol_types::private::B256 = alloy_sol_types::private::B256::new([
-                154u8,
-                140u8,
-                99u8,
-                169u8,
-                185u8,
-                33u8,
-                173u8,
-                180u8,
-                152u8,
-                58u8,
-                245u8,
-                202u8,
-                93u8,
-                209u8,
-                100u8,
-                149u8,
-                0u8,
-                164u8,
-                17u8,
-                163u8,
-                72u8,
-                148u8,
-                203u8,
-                28u8,
-                15u8,
-                159u8,
-                171u8,
-                116u8,
-                11u8,
-                111u8,
-                117u8,
-                237u8,
-            ]);
+            const SIGNATURE_HASH: alloy_sol_types::private::B256 =
+                alloy_sol_types::private::B256::new([
+                    154u8, 140u8, 99u8, 169u8, 185u8, 33u8, 173u8, 180u8, 152u8, 58u8, 245u8,
+                    202u8, 93u8, 209u8, 100u8, 149u8, 0u8, 164u8, 17u8, 163u8, 72u8, 148u8, 203u8,
+                    28u8, 15u8, 159u8, 171u8, 116u8, 11u8, 111u8, 117u8, 237u8,
+                ]);
             const ANONYMOUS: bool = false;
             #[allow(unused_variables)]
             #[inline]
@@ -192,13 +162,11 @@ event ReadRequestClosed(bytes32 id);
                 topics: &<Self::TopicList as alloy_sol_types::SolType>::RustType,
             ) -> alloy_sol_types::Result<()> {
                 if topics.0 != Self::SIGNATURE_HASH {
-                    return Err(
-                        alloy_sol_types::Error::invalid_event_signature_hash(
-                            Self::SIGNATURE,
-                            topics.0,
-                            Self::SIGNATURE_HASH,
-                        ),
-                    );
+                    return Err(alloy_sol_types::Error::invalid_event_signature_hash(
+                        Self::SIGNATURE,
+                        topics.0,
+                        Self::SIGNATURE_HASH,
+                    ));
                 }
                 Ok(())
             }
@@ -222,9 +190,7 @@ event ReadRequestClosed(bytes32 id);
                 if out.len() < <Self::TopicList as alloy_sol_types::TopicList>::COUNT {
                     return Err(alloy_sol_types::Error::Overrun);
                 }
-                out[0usize] = alloy_sol_types::abi::token::WordToken(
-                    Self::SIGNATURE_HASH,
-                );
+                out[0usize] = alloy_sol_types::abi::token::WordToken(Self::SIGNATURE_HASH);
                 Ok(())
             }
         }
@@ -246,9 +212,9 @@ event ReadRequestClosed(bytes32 id);
         }
     };
     /**Event with signature `ReadRequestOpened(bytes32,bytes32,uint256,uint256,address,uint256)` and selector `0xd540be3f3450d40e6b169d0adac00a1e18cba05ee46950b4de6383b76c780f59`.
-```solidity
-event ReadRequestOpened(bytes32 id, bytes32 blobHash, uint256 readOffset, uint256 readLength, address callbackAddress, uint256 callbackMethod);
-```*/
+    ```solidity
+    event ReadRequestOpened(bytes32 id, bytes32 blobHash, uint256 readOffset, uint256 readLength, address callbackAddress, uint256 callbackMethod);
+    ```*/
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -277,7 +243,7 @@ event ReadRequestOpened(bytes32 id, bytes32 blobHash, uint256 readOffset, uint25
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         #[automatically_derived]
         impl alloy_sol_types::SolEvent for ReadRequestOpened {
             type DataTuple<'a> = (
@@ -288,45 +254,16 @@ event ReadRequestOpened(bytes32 id, bytes32 blobHash, uint256 readOffset, uint25
                 ::alloy_sol_types::sol_data::Address,
                 ::alloy_sol_types::sol_data::Uint<256>,
             );
-            type DataToken<'a> = <Self::DataTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type DataToken<'a> = <Self::DataTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             type TopicList = (alloy_sol_types::sol_data::FixedBytes<32>,);
-            const SIGNATURE: &'static str = "ReadRequestOpened(bytes32,bytes32,uint256,uint256,address,uint256)";
-            const SIGNATURE_HASH: alloy_sol_types::private::B256 = alloy_sol_types::private::B256::new([
-                213u8,
-                64u8,
-                190u8,
-                63u8,
-                52u8,
-                80u8,
-                212u8,
-                14u8,
-                107u8,
-                22u8,
-                157u8,
-                10u8,
-                218u8,
-                192u8,
-                10u8,
-                30u8,
-                24u8,
-                203u8,
-                160u8,
-                94u8,
-                228u8,
-                105u8,
-                80u8,
-                180u8,
-                222u8,
-                99u8,
-                131u8,
-                183u8,
-                108u8,
-                120u8,
-                15u8,
-                89u8,
-            ]);
+            const SIGNATURE: &'static str =
+                "ReadRequestOpened(bytes32,bytes32,uint256,uint256,address,uint256)";
+            const SIGNATURE_HASH: alloy_sol_types::private::B256 =
+                alloy_sol_types::private::B256::new([
+                    213u8, 64u8, 190u8, 63u8, 52u8, 80u8, 212u8, 14u8, 107u8, 22u8, 157u8, 10u8,
+                    218u8, 192u8, 10u8, 30u8, 24u8, 203u8, 160u8, 94u8, 228u8, 105u8, 80u8, 180u8,
+                    222u8, 99u8, 131u8, 183u8, 108u8, 120u8, 15u8, 89u8,
+                ]);
             const ANONYMOUS: bool = false;
             #[allow(unused_variables)]
             #[inline]
@@ -348,13 +285,11 @@ event ReadRequestOpened(bytes32 id, bytes32 blobHash, uint256 readOffset, uint25
                 topics: &<Self::TopicList as alloy_sol_types::SolType>::RustType,
             ) -> alloy_sol_types::Result<()> {
                 if topics.0 != Self::SIGNATURE_HASH {
-                    return Err(
-                        alloy_sol_types::Error::invalid_event_signature_hash(
-                            Self::SIGNATURE,
-                            topics.0,
-                            Self::SIGNATURE_HASH,
-                        ),
-                    );
+                    return Err(alloy_sol_types::Error::invalid_event_signature_hash(
+                        Self::SIGNATURE,
+                        topics.0,
+                        Self::SIGNATURE_HASH,
+                    ));
                 }
                 Ok(())
             }
@@ -393,9 +328,7 @@ event ReadRequestOpened(bytes32 id, bytes32 blobHash, uint256 readOffset, uint25
                 if out.len() < <Self::TopicList as alloy_sol_types::TopicList>::COUNT {
                     return Err(alloy_sol_types::Error::Overrun);
                 }
-                out[0usize] = alloy_sol_types::abi::token::WordToken(
-                    Self::SIGNATURE_HASH,
-                );
+                out[0usize] = alloy_sol_types::abi::token::WordToken(Self::SIGNATURE_HASH);
                 Ok(())
             }
         }
@@ -417,9 +350,9 @@ event ReadRequestOpened(bytes32 id, bytes32 blobHash, uint256 readOffset, uint25
         }
     };
     /**Event with signature `ReadRequestPending(bytes32)` and selector `0x6b9c9f2ecba3015efc370b4e57621c55d8c1f17805015860f0b337a0288512e4`.
-```solidity
-event ReadRequestPending(bytes32 id);
-```*/
+    ```solidity
+    event ReadRequestPending(bytes32 id);
+    ```*/
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -438,49 +371,19 @@ event ReadRequestPending(bytes32 id);
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         #[automatically_derived]
         impl alloy_sol_types::SolEvent for ReadRequestPending {
             type DataTuple<'a> = (::alloy_sol_types::sol_data::FixedBytes<32>,);
-            type DataToken<'a> = <Self::DataTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type DataToken<'a> = <Self::DataTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             type TopicList = (alloy_sol_types::sol_data::FixedBytes<32>,);
             const SIGNATURE: &'static str = "ReadRequestPending(bytes32)";
-            const SIGNATURE_HASH: alloy_sol_types::private::B256 = alloy_sol_types::private::B256::new([
-                107u8,
-                156u8,
-                159u8,
-                46u8,
-                203u8,
-                163u8,
-                1u8,
-                94u8,
-                252u8,
-                55u8,
-                11u8,
-                78u8,
-                87u8,
-                98u8,
-                28u8,
-                85u8,
-                216u8,
-                193u8,
-                241u8,
-                120u8,
-                5u8,
-                1u8,
-                88u8,
-                96u8,
-                240u8,
-                179u8,
-                55u8,
-                160u8,
-                40u8,
-                133u8,
-                18u8,
-                228u8,
-            ]);
+            const SIGNATURE_HASH: alloy_sol_types::private::B256 =
+                alloy_sol_types::private::B256::new([
+                    107u8, 156u8, 159u8, 46u8, 203u8, 163u8, 1u8, 94u8, 252u8, 55u8, 11u8, 78u8,
+                    87u8, 98u8, 28u8, 85u8, 216u8, 193u8, 241u8, 120u8, 5u8, 1u8, 88u8, 96u8,
+                    240u8, 179u8, 55u8, 160u8, 40u8, 133u8, 18u8, 228u8,
+                ]);
             const ANONYMOUS: bool = false;
             #[allow(unused_variables)]
             #[inline]
@@ -495,13 +398,11 @@ event ReadRequestPending(bytes32 id);
                 topics: &<Self::TopicList as alloy_sol_types::SolType>::RustType,
             ) -> alloy_sol_types::Result<()> {
                 if topics.0 != Self::SIGNATURE_HASH {
-                    return Err(
-                        alloy_sol_types::Error::invalid_event_signature_hash(
-                            Self::SIGNATURE,
-                            topics.0,
-                            Self::SIGNATURE_HASH,
-                        ),
-                    );
+                    return Err(alloy_sol_types::Error::invalid_event_signature_hash(
+                        Self::SIGNATURE,
+                        topics.0,
+                        Self::SIGNATURE_HASH,
+                    ));
                 }
                 Ok(())
             }
@@ -525,9 +426,7 @@ event ReadRequestPending(bytes32 id);
                 if out.len() < <Self::TopicList as alloy_sol_types::TopicList>::COUNT {
                     return Err(alloy_sol_types::Error::Overrun);
                 }
-                out[0usize] = alloy_sol_types::abi::token::WordToken(
-                    Self::SIGNATURE_HASH,
-                );
+                out[0usize] = alloy_sol_types::abi::token::WordToken(Self::SIGNATURE_HASH);
                 Ok(())
             }
         }
@@ -567,106 +466,19 @@ event ReadRequestPending(bytes32 id);
         /// Prefer using `SolInterface` methods instead.
         pub const SELECTORS: &'static [[u8; 32usize]] = &[
             [
-                107u8,
-                156u8,
-                159u8,
-                46u8,
-                203u8,
-                163u8,
-                1u8,
-                94u8,
-                252u8,
-                55u8,
-                11u8,
-                78u8,
-                87u8,
-                98u8,
-                28u8,
-                85u8,
-                216u8,
-                193u8,
-                241u8,
-                120u8,
-                5u8,
-                1u8,
-                88u8,
-                96u8,
-                240u8,
-                179u8,
-                55u8,
-                160u8,
-                40u8,
-                133u8,
-                18u8,
-                228u8,
+                107u8, 156u8, 159u8, 46u8, 203u8, 163u8, 1u8, 94u8, 252u8, 55u8, 11u8, 78u8, 87u8,
+                98u8, 28u8, 85u8, 216u8, 193u8, 241u8, 120u8, 5u8, 1u8, 88u8, 96u8, 240u8, 179u8,
+                55u8, 160u8, 40u8, 133u8, 18u8, 228u8,
             ],
             [
-                154u8,
-                140u8,
-                99u8,
-                169u8,
-                185u8,
-                33u8,
-                173u8,
-                180u8,
-                152u8,
-                58u8,
-                245u8,
-                202u8,
-                93u8,
-                209u8,
-                100u8,
-                149u8,
-                0u8,
-                164u8,
-                17u8,
-                163u8,
-                72u8,
-                148u8,
-                203u8,
-                28u8,
-                15u8,
-                159u8,
-                171u8,
-                116u8,
-                11u8,
-                111u8,
-                117u8,
-                237u8,
+                154u8, 140u8, 99u8, 169u8, 185u8, 33u8, 173u8, 180u8, 152u8, 58u8, 245u8, 202u8,
+                93u8, 209u8, 100u8, 149u8, 0u8, 164u8, 17u8, 163u8, 72u8, 148u8, 203u8, 28u8, 15u8,
+                159u8, 171u8, 116u8, 11u8, 111u8, 117u8, 237u8,
             ],
             [
-                213u8,
-                64u8,
-                190u8,
-                63u8,
-                52u8,
-                80u8,
-                212u8,
-                14u8,
-                107u8,
-                22u8,
-                157u8,
-                10u8,
-                218u8,
-                192u8,
-                10u8,
-                30u8,
-                24u8,
-                203u8,
-                160u8,
-                94u8,
-                228u8,
-                105u8,
-                80u8,
-                180u8,
-                222u8,
-                99u8,
-                131u8,
-                183u8,
-                108u8,
-                120u8,
-                15u8,
-                89u8,
+                213u8, 64u8, 190u8, 63u8, 52u8, 80u8, 212u8, 14u8, 107u8, 22u8, 157u8, 10u8, 218u8,
+                192u8, 10u8, 30u8, 24u8, 203u8, 160u8, 94u8, 228u8, 105u8, 80u8, 180u8, 222u8,
+                99u8, 131u8, 183u8, 108u8, 120u8, 15u8, 89u8,
             ],
         ];
     }
@@ -680,47 +492,33 @@ event ReadRequestPending(bytes32 id);
             validate: bool,
         ) -> alloy_sol_types::Result<Self> {
             match topics.first().copied() {
-                Some(
-                    <ReadRequestClosed as alloy_sol_types::SolEvent>::SIGNATURE_HASH,
-                ) => {
+                Some(<ReadRequestClosed as alloy_sol_types::SolEvent>::SIGNATURE_HASH) => {
                     <ReadRequestClosed as alloy_sol_types::SolEvent>::decode_raw_log(
-                            topics,
-                            data,
-                            validate,
-                        )
-                        .map(Self::ReadRequestClosed)
+                        topics, data, validate,
+                    )
+                    .map(Self::ReadRequestClosed)
                 }
-                Some(
-                    <ReadRequestOpened as alloy_sol_types::SolEvent>::SIGNATURE_HASH,
-                ) => {
+                Some(<ReadRequestOpened as alloy_sol_types::SolEvent>::SIGNATURE_HASH) => {
                     <ReadRequestOpened as alloy_sol_types::SolEvent>::decode_raw_log(
-                            topics,
-                            data,
-                            validate,
-                        )
-                        .map(Self::ReadRequestOpened)
+                        topics, data, validate,
+                    )
+                    .map(Self::ReadRequestOpened)
                 }
-                Some(
-                    <ReadRequestPending as alloy_sol_types::SolEvent>::SIGNATURE_HASH,
-                ) => {
+                Some(<ReadRequestPending as alloy_sol_types::SolEvent>::SIGNATURE_HASH) => {
                     <ReadRequestPending as alloy_sol_types::SolEvent>::decode_raw_log(
-                            topics,
-                            data,
-                            validate,
-                        )
-                        .map(Self::ReadRequestPending)
+                        topics, data, validate,
+                    )
+                    .map(Self::ReadRequestPending)
                 }
-                _ => {
-                    alloy_sol_types::private::Err(alloy_sol_types::Error::InvalidLog {
-                        name: <Self as alloy_sol_types::SolEventInterface>::NAME,
-                        log: alloy_sol_types::private::Box::new(
-                            alloy_sol_types::private::LogData::new_unchecked(
-                                topics.to_vec(),
-                                data.to_vec().into(),
-                            ),
+                _ => alloy_sol_types::private::Err(alloy_sol_types::Error::InvalidLog {
+                    name: <Self as alloy_sol_types::SolEventInterface>::NAME,
+                    log: alloy_sol_types::private::Box::new(
+                        alloy_sol_types::private::LogData::new_unchecked(
+                            topics.to_vec(),
+                            data.to_vec().into(),
                         ),
-                    })
-                }
+                    ),
+                }),
             }
         }
     }

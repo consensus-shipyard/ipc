@@ -304,11 +304,10 @@ impl<'a> GenesisBuilder<'a> {
 
         // Init actor
         // Add Blobs actor ID to eth_builtin_ids so its delegated address is registered
-        let mut eth_builtin_ids: BTreeSet<_> = ipc_entrypoints
-            .values()
-            .map(|c| c.actor_id)
-            .collect();
+        let mut eth_builtin_ids: BTreeSet<_> =
+            ipc_entrypoints.values().map(|c| c.actor_id).collect();
         eth_builtin_ids.insert(blobs::BLOBS_ACTOR_ID);
+        eth_builtin_ids.insert(adm::ADM_ACTOR_ID);
 
         let (init_state, addr_to_id) = init::State::new(
             state.store(),
@@ -387,6 +386,7 @@ impl<'a> GenesisBuilder<'a> {
             if let Some(cid) = state.custom_actor_manifest.code_by_name(machine_name) {
                 let kind = fendermint_actor_adm::Kind::from_str(machine_name)
                     .expect("failed to parse adm machine name");
+                tracing::info!(machine_name, cid = cid.to_string(), "registered machine");
                 machine_codes.insert(kind, *cid);
             }
         }
@@ -395,13 +395,16 @@ impl<'a> GenesisBuilder<'a> {
             machine_codes,
             fendermint_actor_adm::PermissionModeParams::Unrestricted,
         )?;
+        let eth_addr = init::builtin_actor_eth_addr(adm::ADM_ACTOR_ID);
+        let f4_addr = fvm_shared::address::Address::from(eth_addr);
+        tracing::info!("!!!!!!!!  SETUP adm ACTOR !!!!!!!!: {eth_addr}, {eth_addr:?}");
         state
             .create_custom_actor(
                 fendermint_vm_actor_interface::adm::ADM_ACTOR_NAME,
                 adm::ADM_ACTOR_ID,
                 &adm_state,
                 TokenAmount::zero(),
-                None,
+                Some(f4_addr),
             )
             .context("failed to create adm actor")?;
 
@@ -451,7 +454,7 @@ impl<'a> GenesisBuilder<'a> {
                 Some(blobs_f4_addr),
             )
             .context("failed to create blobs actor")?;
-        println!("!!!!!!!!  SETUP BLOB ACTOR !!!!!!!!: {blobs_eth_addr}, {blobs_eth_addr:?}");
+        tracing::info!("!!!!!!!!  SETUP BLOB ACTOR !!!!!!!!: {blobs_eth_addr}, {blobs_eth_addr:?}");
 
         // Initialize the blob reader actor.
         state
@@ -478,6 +481,18 @@ impl<'a> GenesisBuilder<'a> {
                 None,
             )
             .context("failed to replace built in eam actor")?;
+
+        // Replace Init actor with our custom version that allows ADM to spawn actors
+        state
+            .replace_builtin_actor(
+                init::INIT_ACTOR_NAME,
+                init::INIT_ACTOR_ID,
+                fendermint_actor_init::IPC_INIT_ACTOR_NAME,
+                &init_state,
+                TokenAmount::zero(),
+                None,
+            )
+            .context("failed to replace built in init actor")?;
 
         // Currently hardcoded for now, once genesis V2 is implemented, should be taken
         // from genesis parameters.

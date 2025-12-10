@@ -41,7 +41,7 @@ interface IGasFacade {
 )]
 pub mod IGasFacade {
     use super::*;
-    use ::alloy_sol_types as alloy_sol_types;
+    use ::alloy_sol_types;
     /// The creation / init bytecode of the contract.
     ///
     /// ```text
@@ -63,9 +63,9 @@ pub mod IGasFacade {
         b"",
     );
     /**Event with signature `GasSponsorSet(address)` and selector `0xe9c438da6edc711056efd08e60609c24627b30c4a355a568d36d3cc0add0bfe1`.
-```solidity
-event GasSponsorSet(address sponsor);
-```*/
+    ```solidity
+    event GasSponsorSet(address sponsor);
+    ```*/
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -84,49 +84,19 @@ event GasSponsorSet(address sponsor);
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         #[automatically_derived]
         impl alloy_sol_types::SolEvent for GasSponsorSet {
             type DataTuple<'a> = (::alloy_sol_types::sol_data::Address,);
-            type DataToken<'a> = <Self::DataTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type DataToken<'a> = <Self::DataTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             type TopicList = (alloy_sol_types::sol_data::FixedBytes<32>,);
             const SIGNATURE: &'static str = "GasSponsorSet(address)";
-            const SIGNATURE_HASH: alloy_sol_types::private::B256 = alloy_sol_types::private::B256::new([
-                233u8,
-                196u8,
-                56u8,
-                218u8,
-                110u8,
-                220u8,
-                113u8,
-                16u8,
-                86u8,
-                239u8,
-                208u8,
-                142u8,
-                96u8,
-                96u8,
-                156u8,
-                36u8,
-                98u8,
-                123u8,
-                48u8,
-                196u8,
-                163u8,
-                85u8,
-                165u8,
-                104u8,
-                211u8,
-                109u8,
-                60u8,
-                192u8,
-                173u8,
-                208u8,
-                191u8,
-                225u8,
-            ]);
+            const SIGNATURE_HASH: alloy_sol_types::private::B256 =
+                alloy_sol_types::private::B256::new([
+                    233u8, 196u8, 56u8, 218u8, 110u8, 220u8, 113u8, 16u8, 86u8, 239u8, 208u8,
+                    142u8, 96u8, 96u8, 156u8, 36u8, 98u8, 123u8, 48u8, 196u8, 163u8, 85u8, 165u8,
+                    104u8, 211u8, 109u8, 60u8, 192u8, 173u8, 208u8, 191u8, 225u8,
+                ]);
             const ANONYMOUS: bool = false;
             #[allow(unused_variables)]
             #[inline]
@@ -141,13 +111,11 @@ event GasSponsorSet(address sponsor);
                 topics: &<Self::TopicList as alloy_sol_types::SolType>::RustType,
             ) -> alloy_sol_types::Result<()> {
                 if topics.0 != Self::SIGNATURE_HASH {
-                    return Err(
-                        alloy_sol_types::Error::invalid_event_signature_hash(
-                            Self::SIGNATURE,
-                            topics.0,
-                            Self::SIGNATURE_HASH,
-                        ),
-                    );
+                    return Err(alloy_sol_types::Error::invalid_event_signature_hash(
+                        Self::SIGNATURE,
+                        topics.0,
+                        Self::SIGNATURE_HASH,
+                    ));
                 }
                 Ok(())
             }
@@ -171,9 +139,7 @@ event GasSponsorSet(address sponsor);
                 if out.len() < <Self::TopicList as alloy_sol_types::TopicList>::COUNT {
                     return Err(alloy_sol_types::Error::Overrun);
                 }
-                out[0usize] = alloy_sol_types::abi::token::WordToken(
-                    Self::SIGNATURE_HASH,
-                );
+                out[0usize] = alloy_sol_types::abi::token::WordToken(Self::SIGNATURE_HASH);
                 Ok(())
             }
         }
@@ -195,9 +161,9 @@ event GasSponsorSet(address sponsor);
         }
     };
     /**Event with signature `GasSponsorUnset()` and selector `0xd10f5c7821677a4b8658a83a5d5ac1c78324b2a44a9f634d5c53fbebc13674c4`.
-```solidity
-event GasSponsorUnset();
-```*/
+    ```solidity
+    event GasSponsorUnset();
+    ```*/
     #[allow(
         non_camel_case_types,
         non_snake_case,
@@ -213,49 +179,19 @@ event GasSponsorUnset();
         clippy::style
     )]
     const _: () = {
-        use ::alloy_sol_types as alloy_sol_types;
+        use ::alloy_sol_types;
         #[automatically_derived]
         impl alloy_sol_types::SolEvent for GasSponsorUnset {
             type DataTuple<'a> = ();
-            type DataToken<'a> = <Self::DataTuple<
-                'a,
-            > as alloy_sol_types::SolType>::Token<'a>;
+            type DataToken<'a> = <Self::DataTuple<'a> as alloy_sol_types::SolType>::Token<'a>;
             type TopicList = (alloy_sol_types::sol_data::FixedBytes<32>,);
             const SIGNATURE: &'static str = "GasSponsorUnset()";
-            const SIGNATURE_HASH: alloy_sol_types::private::B256 = alloy_sol_types::private::B256::new([
-                209u8,
-                15u8,
-                92u8,
-                120u8,
-                33u8,
-                103u8,
-                122u8,
-                75u8,
-                134u8,
-                88u8,
-                168u8,
-                58u8,
-                93u8,
-                90u8,
-                193u8,
-                199u8,
-                131u8,
-                36u8,
-                178u8,
-                164u8,
-                74u8,
-                159u8,
-                99u8,
-                77u8,
-                92u8,
-                83u8,
-                251u8,
-                235u8,
-                193u8,
-                54u8,
-                116u8,
-                196u8,
-            ]);
+            const SIGNATURE_HASH: alloy_sol_types::private::B256 =
+                alloy_sol_types::private::B256::new([
+                    209u8, 15u8, 92u8, 120u8, 33u8, 103u8, 122u8, 75u8, 134u8, 88u8, 168u8, 58u8,
+                    93u8, 90u8, 193u8, 199u8, 131u8, 36u8, 178u8, 164u8, 74u8, 159u8, 99u8, 77u8,
+                    92u8, 83u8, 251u8, 235u8, 193u8, 54u8, 116u8, 196u8,
+                ]);
             const ANONYMOUS: bool = false;
             #[allow(unused_variables)]
             #[inline]
@@ -270,13 +206,11 @@ event GasSponsorUnset();
                 topics: &<Self::TopicList as alloy_sol_types::SolType>::RustType,
             ) -> alloy_sol_types::Result<()> {
                 if topics.0 != Self::SIGNATURE_HASH {
-                    return Err(
-                        alloy_sol_types::Error::invalid_event_signature_hash(
-                            Self::SIGNATURE,
-                            topics.0,
-                            Self::SIGNATURE_HASH,
-                        ),
-                    );
+                    return Err(alloy_sol_types::Error::invalid_event_signature_hash(
+                        Self::SIGNATURE,
+                        topics.0,
+                        Self::SIGNATURE_HASH,
+                    ));
                 }
                 Ok(())
             }
@@ -296,9 +230,7 @@ event GasSponsorUnset();
                 if out.len() < <Self::TopicList as alloy_sol_types::TopicList>::COUNT {
                     return Err(alloy_sol_types::Error::Overrun);
                 }
-                out[0usize] = alloy_sol_types::abi::token::WordToken(
-                    Self::SIGNATURE_HASH,
-                );
+                out[0usize] = alloy_sol_types::abi::token::WordToken(Self::SIGNATURE_HASH);
                 Ok(())
             }
         }
@@ -336,72 +268,14 @@ event GasSponsorUnset();
         /// Prefer using `SolInterface` methods instead.
         pub const SELECTORS: &'static [[u8; 32usize]] = &[
             [
-                209u8,
-                15u8,
-                92u8,
-                120u8,
-                33u8,
-                103u8,
-                122u8,
-                75u8,
-                134u8,
-                88u8,
-                168u8,
-                58u8,
-                93u8,
-                90u8,
-                193u8,
-                199u8,
-                131u8,
-                36u8,
-                178u8,
-                164u8,
-                74u8,
-                159u8,
-                99u8,
-                77u8,
-                92u8,
-                83u8,
-                251u8,
-                235u8,
-                193u8,
-                54u8,
-                116u8,
-                196u8,
+                209u8, 15u8, 92u8, 120u8, 33u8, 103u8, 122u8, 75u8, 134u8, 88u8, 168u8, 58u8, 93u8,
+                90u8, 193u8, 199u8, 131u8, 36u8, 178u8, 164u8, 74u8, 159u8, 99u8, 77u8, 92u8, 83u8,
+                251u8, 235u8, 193u8, 54u8, 116u8, 196u8,
             ],
             [
-                233u8,
-                196u8,
-                56u8,
-                218u8,
-                110u8,
-                220u8,
-                113u8,
-                16u8,
-                86u8,
-                239u8,
-                208u8,
-                142u8,
-                96u8,
-                96u8,
-                156u8,
-                36u8,
-                98u8,
-                123u8,
-                48u8,
-                196u8,
-                163u8,
-                85u8,
-                165u8,
-                104u8,
-                211u8,
-                109u8,
-                60u8,
-                192u8,
-                173u8,
-                208u8,
-                191u8,
-                225u8,
+                233u8, 196u8, 56u8, 218u8, 110u8, 220u8, 113u8, 16u8, 86u8, 239u8, 208u8, 142u8,
+                96u8, 96u8, 156u8, 36u8, 98u8, 123u8, 48u8, 196u8, 163u8, 85u8, 165u8, 104u8,
+                211u8, 109u8, 60u8, 192u8, 173u8, 208u8, 191u8, 225u8,
             ],
         ];
     }
@@ -417,31 +291,25 @@ event GasSponsorUnset();
             match topics.first().copied() {
                 Some(<GasSponsorSet as alloy_sol_types::SolEvent>::SIGNATURE_HASH) => {
                     <GasSponsorSet as alloy_sol_types::SolEvent>::decode_raw_log(
-                            topics,
-                            data,
-                            validate,
-                        )
-                        .map(Self::GasSponsorSet)
+                        topics, data, validate,
+                    )
+                    .map(Self::GasSponsorSet)
                 }
                 Some(<GasSponsorUnset as alloy_sol_types::SolEvent>::SIGNATURE_HASH) => {
                     <GasSponsorUnset as alloy_sol_types::SolEvent>::decode_raw_log(
-                            topics,
-                            data,
-                            validate,
-                        )
-                        .map(Self::GasSponsorUnset)
+                        topics, data, validate,
+                    )
+                    .map(Self::GasSponsorUnset)
                 }
-                _ => {
-                    alloy_sol_types::private::Err(alloy_sol_types::Error::InvalidLog {
-                        name: <Self as alloy_sol_types::SolEventInterface>::NAME,
-                        log: alloy_sol_types::private::Box::new(
-                            alloy_sol_types::private::LogData::new_unchecked(
-                                topics.to_vec(),
-                                data.to_vec().into(),
-                            ),
+                _ => alloy_sol_types::private::Err(alloy_sol_types::Error::InvalidLog {
+                    name: <Self as alloy_sol_types::SolEventInterface>::NAME,
+                    log: alloy_sol_types::private::Box::new(
+                        alloy_sol_types::private::LogData::new_unchecked(
+                            topics.to_vec(),
+                            data.to_vec().into(),
                         ),
-                    })
-                }
+                    ),
+                }),
             }
         }
     }

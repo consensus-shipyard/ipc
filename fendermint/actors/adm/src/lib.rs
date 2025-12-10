@@ -79,7 +79,10 @@ fn create_machine(
     let ret: ExecReturn = deserialize_block(extract_send_result(rt.send_simple(
         &INIT_ACTOR_ADDR,
         ext::init::EXEC_METHOD,
-        IpldBlock::serialize_cbor(&ExecParams { code_cid, constructor_params })?,
+        IpldBlock::serialize_cbor(&ExecParams {
+            code_cid,
+            constructor_params,
+        })?,
         rt.message().value_received(),
     ))?)?;
 
@@ -93,7 +96,10 @@ fn create_machine(
         rt.message().value_received(),
     ))?;
 
-    Ok(CreateExternalReturn { actor_id, robust_address: Some(ret.robust_address) })
+    Ok(CreateExternalReturn {
+        actor_id,
+        robust_address: Some(ret.robust_address),
+    })
 }
 
 fn ensure_deployer_allowed(rt: &impl Runtime) -> Result<(), ActorError> {
@@ -112,7 +118,9 @@ fn ensure_deployer_allowed(rt: &impl Runtime) -> Result<(), ActorError> {
     // Check if the caller is whitelisted.
     let state: State = rt.state()?;
     if !state.can_deploy(rt, caller_id)? {
-        return Err(ActorError::forbidden(String::from("sender not allowed to deploy contracts")));
+        return Err(ActorError::forbidden(String::from(
+            "sender not allowed to deploy contracts",
+        )));
     }
 
     Ok(())
@@ -171,9 +179,12 @@ impl AdmActor {
         ensure_deployer_allowed(rt)?;
         rt.validate_immediate_caller_accept_any()?;
 
-        let owner_id = rt.resolve_address(&params.owner).ok_or(ActorError::illegal_argument(
-            format!("failed to resolve actor for address {}", params.owner),
-        ))?;
+        let owner_id = rt
+            .resolve_address(&params.owner)
+            .ok_or(ActorError::illegal_argument(format!(
+                "failed to resolve actor for address {}",
+                params.owner
+            )))?;
         let owner = Address::new_id(owner_id);
         let machine_code = Self::retrieve_machine_code(rt, params.kind)?;
         let ret = create_machine(rt, owner, machine_code, params.metadata.clone())?;
@@ -181,9 +192,13 @@ impl AdmActor {
 
         // Save machine metadata.
         rt.transaction(|st: &mut State, rt| {
-            st.set_metadata(rt.store(), owner, address, params.kind, params.metadata).map_err(|e| {
-                e.downcast_default(ExitCode::USR_ILLEGAL_ARGUMENT, "failed to set machine metadata")
-            })
+            st.set_metadata(rt.store(), owner, address, params.kind, params.metadata)
+                .map_err(|e| {
+                    e.downcast_default(
+                        ExitCode::USR_ILLEGAL_ARGUMENT,
+                        "failed to set machine metadata",
+                    )
+                })
         })?;
 
         Ok(ret)
@@ -198,9 +213,12 @@ impl AdmActor {
     ) -> Result<Vec<Metadata>, ActorError> {
         rt.validate_immediate_caller_accept_any()?;
 
-        let owner_id = rt.resolve_address(&params.owner).ok_or(ActorError::illegal_argument(
-            format!("failed to resolve actor for address {}", params.owner),
-        ))?;
+        let owner_id = rt
+            .resolve_address(&params.owner)
+            .ok_or(ActorError::illegal_argument(format!(
+                "failed to resolve actor for address {}",
+                params.owner
+            )))?;
         let owner_address = Address::new_id(owner_id);
 
         let st: State = rt.state()?;
@@ -260,7 +278,10 @@ impl AdmActor {
     fn retrieve_machine_code(rt: &impl Runtime, kind: Kind) -> Result<Cid, ActorError> {
         rt.state::<State>()?
             .get_machine_code(rt.store(), &kind)?
-            .ok_or(ActorError::not_found(format!("machine code for kind '{}' not found", kind)))
+            .ok_or(ActorError::not_found(format!(
+                "machine code for kind '{}' not found",
+                kind
+            )))
     }
 }
 

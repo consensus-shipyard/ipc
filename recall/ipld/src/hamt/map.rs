@@ -87,7 +87,7 @@ where
     pub size: u64,
 }
 
-impl<'a, BS, K, V> Hamt<'a, BS, K, V>
+impl<BS, K, V> Hamt<'_, BS, K, V>
 where
     BS: Blockstore,
     K: MapKey + Display,

@@ -19,9 +19,11 @@ use fendermint_vm_topdown::observe::register_metrics as register_topdown_metrics
 use fendermint_vm_topdown::proxy::{IPCProviderProxy, IPCProviderProxyWithLatency};
 use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
-use fendermint_vm_topdown::{CachedFinalityProvider, IPCBlobFinality, IPCParentFinality, IPCReadRequestClosed, Toggle};
+use fendermint_vm_topdown::{
+    CachedFinalityProvider, IPCBlobFinality, IPCParentFinality, IPCReadRequestClosed, Toggle,
+};
 use fvm_shared::address::{current_network, Address, Network};
-use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord, IrohConfig};
+use ipc_ipld_resolver::{Event as ResolverEvent, IrohConfig, VoteRecord};
 use ipc_observability::observe::register_metrics as register_default_metrics;
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
@@ -129,12 +131,6 @@ pub async fn run(
     // Create Recall blob and read request resolution pools early so they can be used by IrohResolver
     let blob_pool: BlobPool = ResolvePool::new();
     let read_request_pool: ReadRequestPool = ResolvePool::new();
-
-    // Recall configuration - TODO: make these configurable via settings
-    let blob_concurrency = 10u32;
-    let read_request_concurrency = 10u32;
-    let blob_metrics_interval = 10i64;
-    let blob_queue_gas_limit = 10_000_000_000u64;
 
     let topdown_enabled = settings.topdown_enabled();
 
@@ -309,12 +305,6 @@ pub async fn run(
         settings.abci.block_max_msgs,
         settings.fvm.gas_overestimation_rate,
         settings.fvm.gas_search_step,
-        blob_pool,
-        blob_concurrency,
-        read_request_pool,
-        read_request_concurrency,
-        blob_metrics_interval,
-        blob_queue_gas_limit,
     );
 
     let app: App<_, _, AppStore, _> = App::new(
@@ -614,7 +604,9 @@ async fn dispatch_vote(
 
             match res {
                 Ok(_) => tracing::debug!(hash = %blob.hash, "blob vote handled"),
-                Err(e) => tracing::debug!(hash = %blob.hash, error = %e, "failed to handle blob vote"),
+                Err(e) => {
+                    tracing::debug!(hash = %blob.hash, error = %e, "failed to handle blob vote")
+                }
             };
         }
         AppVote::ReadRequestClosed(read_req) => {
@@ -629,7 +621,9 @@ async fn dispatch_vote(
 
             match res {
                 Ok(_) => tracing::debug!(hash = %read_req.hash, "read request vote handled"),
-                Err(e) => tracing::debug!(hash = %read_req.hash, error = %e, "failed to handle read request vote"),
+                Err(e) => {
+                    tracing::debug!(hash = %read_req.hash, error = %e, "failed to handle read request vote")
+                }
             };
         }
     }

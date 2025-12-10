@@ -29,6 +29,7 @@ fendermint_actor_activity_tracker = { path = "../../actors/activity-tracker" }
 fendermint_actor_f3_light_client = { path = "../../actors/f3-light-client" }
 fendermint_actor_gas_market_eip1559 = { path = "../../actors/gas_market/eip1559" }
 fendermint_actor_eam = { path = "../../actors/eam" }
+fendermint_actor_init = { path = "../../actors/init" }
 fendermint_actor_adm = { path = "../../actors/adm" }
 fendermint_actor_blobs = { path = "../../actors/blobs" }
 fendermint_actor_blobs_shared = { path = "../../actors/blobs/shared" }

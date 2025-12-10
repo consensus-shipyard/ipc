@@ -90,6 +90,10 @@ pub struct FinalizeBlobParams {
     pub id: SubscriptionId,
     /// The status to set as final.
     pub status: BlobStatus,
+    /// Aggregated BLS signature from node operators (48 bytes).
+    pub aggregated_signature: Vec<u8>,
+    /// Bitmap indicating which operators signed (bit position corresponds to operator index).
+    pub signer_bitmap: u128,
 }
 
 /// Params for deleting a blob.

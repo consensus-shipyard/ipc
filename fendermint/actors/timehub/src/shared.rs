@@ -5,7 +5,6 @@
 use std::collections::HashMap;
 
 use cid::Cid;
-use multihash_codetable::{Code, MultihashDigest};
 use fendermint_actor_machine::{
     Kind, MachineAddress, MachineState, GET_ADDRESS_METHOD, GET_METADATA_METHOD, INIT_METHOD,
     METHOD_CONSTRUCTOR,
@@ -15,6 +14,7 @@ use fvm_ipld_amt::Amt;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::{strict_bytes, to_vec, tuple::*, CborStore, DAG_CBOR};
 use fvm_shared::address::Address;
+use multihash_codetable::{Code, MultihashDigest};
 use num_derive::FromPrimitive;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 

@@ -10,11 +10,9 @@ use fvm_shared::address::Network;
 use lazy_static::lazy_static;
 
 use self::{
-    blob::BlobArgs, eth::EthArgs, genesis::GenesisArgs, key::KeyArgs,
-    materializer::MaterializerArgs, objects::ObjectsArgs, rpc::RpcArgs, run::RunArgs,
+    eth::EthArgs, genesis::GenesisArgs, key::KeyArgs, materializer::MaterializerArgs,
+    objects::ObjectsArgs, rpc::RpcArgs, run::RunArgs,
 };
-
-pub mod blob;
 pub mod config;
 pub mod debug;
 pub mod eth;
@@ -154,8 +152,6 @@ pub enum Commands {
     Materializer(MaterializerArgs),
     /// Subcommands related to the Objects/Blobs storage HTTP API.
     Objects(ObjectsArgs),
-    /// Subcommands related to blob operations (finalize, etc).
-    Blob(BlobArgs),
 }
 
 #[cfg(test)]

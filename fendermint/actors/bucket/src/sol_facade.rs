@@ -66,7 +66,7 @@ impl<'a> ObjectMetadataUpdated<'a> {
         Self { key, metadata }
     }
 }
-impl<'a> TryIntoEVMEvent for ObjectMetadataUpdated<'a> {
+impl TryIntoEVMEvent for ObjectMetadataUpdated<'_> {
     type Target = sol::Events;
     fn try_into_evm_event(self) -> Result<Self::Target, Error> {
         let metadata = fvm_ipld_encoding::to_vec(self.metadata)?;
