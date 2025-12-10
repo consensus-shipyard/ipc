@@ -31,6 +31,7 @@ pub use crate::toggle::Toggle;
 pub type BlockHeight = u64;
 pub type Bytes = Vec<u8>;
 pub type BlockHash = Bytes;
+pub type Blob = Bytes;
 
 /// The null round error message
 pub(crate) const NULL_ROUND_ERR_MSG: &str = "requested epoch was a null round";
@@ -135,6 +136,10 @@ impl Display for IPCParentFinality {
         )
     }
 }
+
+// REMOVED: IPCBlobFinality and IPCReadRequestClosed
+// These storage-specific types have been moved to plugins/storage-node/src/topdown_types.rs
+// to achieve full separation of storage concerns from core fendermint.
 
 #[async_trait]
 pub trait ParentViewProvider {

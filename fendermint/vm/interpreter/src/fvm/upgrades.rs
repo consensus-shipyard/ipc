@@ -32,14 +32,18 @@ impl Ord for UpgradeKey {
 }
 
 /// a function type for migration
-// TODO: Add missing parameters
-pub type MigrationFunc<DB> = fn(state: &mut FvmExecState<DB>) -> anyhow::Result<()>;
+///
+/// This is now generic over the module type M, allowing migrations to work with any module bundle.
+/// Note: The ModuleBundle bound is enforced at usage sites rather than in the type alias
+/// (Rust doesn't support where clauses on type aliases).
+pub type MigrationFunc<DB, M = fendermint_module::NoOpModuleBundle> = fn(state: &mut FvmExecState<DB, M>) -> anyhow::Result<()>;
 
 /// Upgrade represents a single upgrade to be executed at a given height
 #[derive(Clone)]
-pub struct Upgrade<DB>
+pub struct Upgrade<DB, M = fendermint_module::NoOpModuleBundle>
 where
     DB: Blockstore + 'static + Clone,
+    M: fendermint_module::ModuleBundle,
 {
     /// the chain_id should match the chain_id from the network configuration
     chain_id: ChainID,
@@ -48,18 +52,19 @@ where
     /// the application version after the upgrade (or None if not affected)
     new_app_version: Option<u64>,
     /// the migration function to be executed
-    migration: MigrationFunc<DB>,
+    migration: MigrationFunc<DB, M>,
 }
 
-impl<DB> Upgrade<DB>
+impl<DB, M> Upgrade<DB, M>
 where
     DB: Blockstore + 'static + Clone,
+    M: fendermint_module::ModuleBundle,
 {
     pub fn new(
         chain_name: impl ToString,
         block_height: BlockHeight,
         new_app_version: Option<u64>,
-        migration: MigrationFunc<DB>,
+        migration: MigrationFunc<DB, M>,
     ) -> anyhow::Result<Self> {
         Ok(Self {
             chain_id: chainid::from_str_hashed(&chain_name.to_string())?,
@@ -73,7 +78,7 @@ where
         chain_id: ChainID,
         block_height: BlockHeight,
         new_app_version: Option<u64>,
-        migration: MigrationFunc<DB>,
+        migration: MigrationFunc<DB, M>,
     ) -> Self {
         Self {
             chain_id,
@@ -83,7 +88,7 @@ where
         }
     }
 
-    pub fn execute(&self, state: &mut FvmExecState<DB>) -> anyhow::Result<Option<u64>> {
+    pub fn execute(&self, state: &mut FvmExecState<DB, M>) -> anyhow::Result<Option<u64>> {
         (self.migration)(state)?;
 
         Ok(self.new_app_version)
@@ -94,25 +99,28 @@ where
 /// During each block height we check if there is an upgrade scheduled at that
 /// height, and if so the migration for that upgrade is performed.
 #[derive(Clone)]
-pub struct UpgradeScheduler<DB>
+pub struct UpgradeScheduler<DB, M = fendermint_module::NoOpModuleBundle>
 where
     DB: Blockstore + 'static + Clone,
+    M: fendermint_module::ModuleBundle,
 {
-    upgrades: BTreeMap<UpgradeKey, Upgrade<DB>>,
+    upgrades: BTreeMap<UpgradeKey, Upgrade<DB, M>>,
 }
 
-impl<DB> Default for UpgradeScheduler<DB>
+impl<DB, M> Default for UpgradeScheduler<DB, M>
 where
     DB: Blockstore + 'static + Clone,
+    M: fendermint_module::ModuleBundle,
 {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<DB> UpgradeScheduler<DB>
+impl<DB, M> UpgradeScheduler<DB, M>
 where
     DB: Blockstore + 'static + Clone,
+    M: fendermint_module::ModuleBundle,
 {
     pub fn new() -> Self {
         Self {
@@ -121,12 +129,13 @@ where
     }
 }
 
-impl<DB> UpgradeScheduler<DB>
+impl<DB, M> UpgradeScheduler<DB, M>
 where
     DB: Blockstore + 'static + Clone,
+    M: fendermint_module::ModuleBundle,
 {
     // add a new upgrade to the schedule
-    pub fn add(&mut self, upgrade: Upgrade<DB>) -> anyhow::Result<()> {
+    pub fn add(&mut self, upgrade: Upgrade<DB, M>) -> anyhow::Result<()> {
         match self
             .upgrades
             .entry(UpgradeKey(upgrade.chain_id, upgrade.block_height))
@@ -142,7 +151,7 @@ where
     }
 
     // check if there is an upgrade scheduled for the given chain_id at a given height
-    pub fn get(&self, chain_id: ChainID, height: BlockHeight) -> Option<&Upgrade<DB>> {
+    pub fn get(&self, chain_id: ChainID, height: BlockHeight) -> Option<&Upgrade<DB, M>> {
         self.upgrades.get(&UpgradeKey(chain_id, height))
     }
 }

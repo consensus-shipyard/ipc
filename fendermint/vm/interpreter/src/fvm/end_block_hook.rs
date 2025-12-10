@@ -67,21 +67,26 @@ where
         }
     }
 
-    pub fn trigger_end_block_hook(
+    pub fn trigger_end_block_hook<M>(
         &self,
-        state: &mut FvmExecState<DB>,
+        state: &mut FvmExecState<DB, M>,
         end_block_events: &mut BlockEndEvents,
-    ) -> anyhow::Result<Option<EndBlockOutcome>> {
+    ) -> anyhow::Result<Option<EndBlockOutcome>>
+    where
+        M: fendermint_module::ModuleBundle,
+        <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine: Send,
+    {
         ipc_end_block_hook(&self.gateway_caller, end_block_events, state)
     }
 }
 
-pub fn ipc_end_block_hook<DB>(
+pub fn ipc_end_block_hook<DB, M>(
     gateway: &GatewayCaller<DB>,
     end_block_events: &mut BlockEndEvents,
-    state: &mut FvmExecState<DB>,
+    state: &mut FvmExecState<DB, M>,
 ) -> anyhow::Result<Option<EndBlockOutcome>>
 where
+    M: fendermint_module::ModuleBundle,
     DB: Blockstore + Sync + Send + Clone + 'static,
 {
     // Epoch transitions for checkpointing.
@@ -211,13 +216,14 @@ fn convert_tokenizables<Source: Tokenizable, Target: Tokenizable>(
         .collect::<Result<Vec<_>, _>>()?)
 }
 
-fn should_create_checkpoint<DB>(
+fn should_create_checkpoint<DB, M>(
     gateway: &GatewayCaller<DB>,
-    state: &mut FvmExecState<DB>,
+    state: &mut FvmExecState<DB, M>,
     height: Height,
 ) -> anyhow::Result<Option<Vec<gateway_getter_facet::IpcEnvelope>>>
 where
     DB: Blockstore + Clone,
+    M: fendermint_module::ModuleBundle,
 {
     let id = gateway.subnet_id(state)?;
     let is_root = id.route.is_empty();
@@ -247,12 +253,13 @@ where
 }
 
 /// Get the current power table from the Gateway actor.
-fn ipc_power_table<DB>(
+fn ipc_power_table<DB, M>(
     gateway: &GatewayCaller<DB>,
-    state: &mut FvmExecState<DB>,
+    state: &mut FvmExecState<DB, M>,
 ) -> anyhow::Result<(ConfigurationNumber, PowerTable)>
 where
     DB: Blockstore + Sync + Send + Clone + 'static,
+    M: fendermint_module::ModuleBundle,
 {
     gateway
         .current_power_table(state)

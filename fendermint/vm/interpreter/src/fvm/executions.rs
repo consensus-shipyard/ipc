@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use crate::fvm::state::FvmExecState;
+use fendermint_module::ModuleBundle;
 use crate::types::*;
 use anyhow::Context;
 use fendermint_vm_actor_interface::{chainmetadata, cron, system};
@@ -20,15 +21,19 @@ const GAS_LIMIT: u64 = BLOCK_GAS_LIMIT * 10000;
 
 /// Helper to build and execute an implicit system message.
 /// It uses the default values for the other fields not passed.
-fn execute_implicit_message<DB: Blockstore + Clone + 'static + Send + Sync>(
-    state: &mut FvmExecState<DB>,
+fn execute_implicit_message<DB, M>(
+    state: &mut FvmExecState<DB, M>,
     from: Address,
     to: Address,
     sequence: u64,
     gas_limit: u64,
     method_num: u64,
     params: RawBytes,
-) -> anyhow::Result<AppliedMessage> {
+) -> anyhow::Result<AppliedMessage>
+where
+    DB: Blockstore + Clone + 'static + Send + Sync,
+    M: ModuleBundle,
+{
     let msg = FvmMessage {
         from,
         to,
@@ -57,13 +62,20 @@ fn execute_implicit_message<DB: Blockstore + Clone + 'static + Send + Sync>(
 }
 
 /// Executes a signed message and returns the applied message.
-pub async fn execute_signed_message<DB: Blockstore + Clone + 'static + Send + Sync>(
-    state: &mut FvmExecState<DB>,
+pub async fn execute_signed_message<DB, M>(
+    state: &mut FvmExecState<DB, M>,
     msg: SignedMessage,
-) -> anyhow::Result<AppliedMessage> {
+) -> anyhow::Result<AppliedMessage>
+where
+    DB: Blockstore + Clone + 'static + Send + Sync,
+    M: ModuleBundle,
+    <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine: Send,
+{
     let msg = msg.into_message();
 
-    if let Err(err) = state.block_gas_tracker().ensure_sufficient_gas(&msg) {
+    // Use explicit type to help compiler inference
+    let tracker: &crate::fvm::gas::BlockGasTracker = state.block_gas_tracker();
+    if let Err(err) = tracker.ensure_sufficient_gas(&msg) {
         tracing::warn!("insufficient block gas; continuing to avoid halt: {}", err);
     }
 
@@ -93,10 +105,14 @@ pub async fn execute_signed_message<DB: Blockstore + Clone + 'static + Send + Sy
 }
 
 /// Executes the cron message for the given block height.
-pub fn execute_cron_message<DB: Blockstore + Clone + 'static + Send + Sync>(
-    state: &mut FvmExecState<DB>,
+pub fn execute_cron_message<DB, M>(
+    state: &mut FvmExecState<DB, M>,
     height: u64,
-) -> anyhow::Result<AppliedMessage> {
+) -> anyhow::Result<AppliedMessage>
+where
+    DB: Blockstore + Clone + 'static + Send + Sync,
+    M: ModuleBundle,
+{
     let from = system::SYSTEM_ACTOR_ADDR;
     let to = cron::CRON_ACTOR_ADDR;
     let method_num = cron::Method::EpochTick as u64;
@@ -107,15 +123,20 @@ pub fn execute_cron_message<DB: Blockstore + Clone + 'static + Send + Sync>(
 }
 
 /// Attempts to push chain metadata if a block hash is available.
-pub fn push_block_to_chainmeta_actor_if_possible<DB: Blockstore + Clone + 'static + Send + Sync>(
-    state: &mut FvmExecState<DB>,
+pub fn push_block_to_chainmeta_actor_if_possible<DB, M>(
+    state: &mut FvmExecState<DB, M>,
     height: u64,
-) -> anyhow::Result<Option<AppliedMessage>> {
+) -> anyhow::Result<Option<AppliedMessage>>
+where
+    DB: Blockstore + Clone + 'static + Send + Sync,
+    M: ModuleBundle,
+{
     let from = system::SYSTEM_ACTOR_ADDR;
     let to = chainmetadata::CHAINMETADATA_ACTOR_ADDR;
     let method_num = fendermint_actor_chainmetadata::Method::PushBlockHash as u64;
 
-    if let Some(block_hash) = state.block_hash() {
+    let block_hash: Option<crate::fvm::state::BlockHash> = state.block_hash();
+    if let Some(block_hash) = block_hash {
         let params = RawBytes::serialize(fendermint_actor_chainmetadata::PushBlockParams {
             // TODO Karel: this conversion from u64 to i64 should be revisited.
             epoch: height as i64,

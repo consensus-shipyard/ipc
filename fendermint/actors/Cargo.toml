@@ -17,3 +17,5 @@ fendermint_actor_chainmetadata = { path = "chainmetadata", features = ["fil-acto
 fendermint_actor_f3_light_client = { path = "f3-light-client", features = ["fil-actor"] }
 fendermint_actor_gas_market_eip1559 = { path = "gas_market/eip1559", features = ["fil-actor"] }
 fendermint_actor_eam = { path = "eam", features = ["fil-actor"] }
+# Storage node actors moved to storage-node/actors/
+# (now managed by storage-node plugin)

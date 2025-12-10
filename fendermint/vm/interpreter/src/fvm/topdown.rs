@@ -127,11 +127,15 @@ where
     }
 
     // TODO Karel - separate this huge function and clean up
-    pub async fn execute_topdown_msg(
+    pub async fn execute_topdown_msg<M>(
         &self,
-        state: &mut FvmExecState<DB>,
+        state: &mut FvmExecState<DB, M>,
         finality: ParentFinality,
-    ) -> anyhow::Result<AppliedMessage> {
+    ) -> anyhow::Result<AppliedMessage>
+    where
+        M: fendermint_module::ModuleBundle,
+        <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine: Send,
+    {
         if !self.provider.is_enabled() {
             bail!("cannot execute IPC top-down message: parent provider disabled");
         }
@@ -238,11 +242,14 @@ where
 
     /// Commit the parent finality. Returns the height that the previous parent finality is committed and
     /// the committed finality itself. If there is no parent finality committed, genesis epoch is returned.
-    async fn commit_finality(
+    async fn commit_finality<M>(
         &self,
-        state: &mut FvmExecState<DB>,
+        state: &mut FvmExecState<DB, M>,
         finality: IPCParentFinality,
-    ) -> anyhow::Result<(BlockHeight, Option<IPCParentFinality>)> {
+    ) -> anyhow::Result<(BlockHeight, Option<IPCParentFinality>)>
+    where
+        M: fendermint_module::ModuleBundle,
+    {
         let (prev_height, prev_finality) = if let Some(prev_finality) = self
             .gateway_caller
             .commit_parent_finality(state, finality)?
@@ -261,11 +268,16 @@ where
 
     /// Execute the top down messages implicitly. Before the execution, mint to the gateway of the funds
     /// transferred in the messages, and increase the circulating supply with the incoming value.
-    async fn execute_topdown_msgs(
+    async fn execute_topdown_msgs<M>(
         &self,
-        state: &mut FvmExecState<DB>,
+        state: &mut FvmExecState<DB, M>,
         messages: Vec<IpcEnvelope>,
-    ) -> anyhow::Result<AppliedMessage> {
+    ) -> anyhow::Result<AppliedMessage>
+    where
+        M: fendermint_module::ModuleBundle,
+        <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine: Send,
+        M::Executor: std::ops::DerefMut<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
         let minted_tokens = tokens_to_mint(&messages);
         tracing::debug!(token = minted_tokens.to_string(), "tokens to mint in child");
 

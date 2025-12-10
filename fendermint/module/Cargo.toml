@@ -1,0 +1,40 @@
+[package]
+name = "fendermint_module"
+description = "Module system for extending Fendermint functionality"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+# Core dependencies
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+
+# FVM dependencies
+fvm = { workspace = true }
+fvm_shared = { workspace = true }
+fvm_ipld_blockstore = { workspace = true }
+fvm_ipld_encoding = { workspace = true }
+cid = { workspace = true }
+
+# Fendermint core
+fendermint_vm_core = { path = "../vm/core" }
+fendermint_vm_genesis = { path = "../vm/genesis" }
+fendermint_vm_message = { path = "../vm/message" }
+
+# Utilities
+tracing = { workspace = true }
+
+# Storage node executor (provides RecallExecutor with Deref support)
+storage_node_executor = { path = "../../storage-node/executor" }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["full", "test-util"] }
+fendermint_vm_interpreter = { path = "../vm/interpreter" }
+
+[features]
+default = []

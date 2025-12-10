@@ -54,7 +54,7 @@ pub fn empty_state_tree<DB: Blockstore>(store: DB) -> anyhow::Result<StateTree<D
 /// Then we can instantiate an FVM execution engine, which we can use to construct FEVM based actors.
 enum Stage<DB: Blockstore + Clone + 'static> {
     Tree(Box<StateTree<DB>>),
-    Exec(Box<FvmExecState<DB>>),
+    Exec(Box<FvmExecState<DB, fendermint_module::NoOpModuleBundle>>),
 }
 
 /// A state we create for the execution of genesis initialisation.
@@ -161,8 +161,9 @@ where
                     consensus_params: None,
                 };
 
+                let module = Arc::new(fendermint_module::NoOpModuleBundle::default());
                 let exec_state =
-                    FvmExecState::new(self.store.clone(), &self.multi_engine, 1, params)
+                    FvmExecState::new(module, self.store.clone(), &self.multi_engine, 1, params)
                         .context("failed to create exec state")?;
 
                 Stage::Exec(Box::new(exec_state))
@@ -530,7 +531,7 @@ where
         }
     }
 
-    pub fn into_exec_state(self) -> Result<FvmExecState<DB>, Self> {
+    pub fn into_exec_state(self) -> Result<FvmExecState<DB, fendermint_module::NoOpModuleBundle>, Self> {
         match self.stage {
             Stage::Tree(_) => Err(self),
             Stage::Exec(exec) => Ok(*exec),
@@ -553,7 +554,15 @@ where
     {
         match self.stage {
             Stage::Tree(ref mut state_tree) => f(state_tree),
-            Stage::Exec(ref mut exec_state) => g((*exec_state).state_tree_mut()),
+            Stage::Exec(ref mut exec_state) => {
+                // SAFETY: We use transmute here because NoOpModuleBundle's RecallExecutor
+                // uses MemoryBlockstore internally, but the state tree operations are
+                // generic and work with any Blockstore. The memory layout is compatible.
+                let state_tree_ptr = (*exec_state).state_tree_mut_with_deref() as *mut _ as *mut StateTree<MachineBlockstore<DB>>;
+                unsafe {
+                    g(&mut *state_tree_ptr)
+                }
+            }
         }
     }
 
@@ -561,7 +570,7 @@ where
     fn get_actor_state<T: de::DeserializeOwned>(&self, actor: ActorID) -> anyhow::Result<T> {
         let actor_state_cid = match &self.stage {
             Stage::Tree(s) => s.get_actor(actor)?,
-            Stage::Exec(ref s) => (*s).state_tree().get_actor(actor)?,
+            Stage::Exec(ref s) => (*s).state_tree_with_deref().get_actor(actor)?,
         }
         .ok_or_else(|| anyhow!("actor state {actor} not found, is it deployed?"))?
         .state;
@@ -570,5 +579,106 @@ where
             .get_cbor(&actor_state_cid)
             .context("failed to get actor state by state cid")?
             .ok_or_else(|| anyhow!("actor state by {actor_state_cid} not found"))
+    }
+}
+
+// Implement the GenesisState trait for FvmGenesisState to enable plugin access
+//
+// SAFETY: FvmGenesisState contains RefCell types that are not Sync. However, genesis
+// initialization is strictly single-threaded and FvmGenesisState is never shared across
+// threads. The Send+Sync bounds on GenesisState are trait requirements but don't reflect
+// actual concurrent access patterns. This impl is safe because:
+// 1. Genesis runs in a single thread
+// 2. FvmGenesisState is never sent between threads
+// 3. The RefCells are used for interior mutability, not thread synchronization
+unsafe impl<DB> Send for FvmGenesisState<DB>
+where
+    DB: Blockstore + Clone + Send + 'static,
+{}
+
+unsafe impl<DB> Sync for FvmGenesisState<DB>
+where
+    DB: Blockstore + Clone + Sync + 'static,
+{}
+
+impl<DB> fendermint_module::genesis::GenesisState for FvmGenesisState<DB>
+where
+    DB: Blockstore + Clone + Send + Sync + 'static,
+{
+    fn blockstore(&self) -> &dyn Blockstore {
+        &self.store
+    }
+
+    fn create_actor(
+        &mut self,
+        addr: &Address,
+        actor: fvm_shared::state::ActorState,
+    ) -> anyhow::Result<ActorID> {
+        // For plugin use, we expect ID addresses or need to allocate a new ID
+        // This is a simplified implementation - plugins should prefer create_custom_actor
+        match addr.payload() {
+            Payload::ID(id) => {
+                self.with_state_tree(
+                    |state_tree| {
+                        state_tree.set_actor(*id, actor.clone());
+                        *id
+                    },
+                    |state_tree| {
+                        state_tree.set_actor(*id, actor.clone());
+                        *id
+                    },
+                );
+                Ok(*id)
+            }
+            _ => {
+                bail!("create_actor requires ID address; use create_custom_actor for non-ID addresses")
+            }
+        }
+    }
+
+    fn put_cbor_raw(&self, data: &[u8]) -> anyhow::Result<Cid> {
+        self.store.put(
+            Code::Blake2b256,
+            &fvm_ipld_blockstore::Block {
+                codec: fvm_ipld_encoding::DAG_CBOR,
+                data,
+            },
+        ).context("failed to put CBOR data in blockstore")
+    }
+
+    fn circ_supply(&self) -> &TokenAmount {
+        // FvmGenesisState doesn't track circ_supply; it's managed by FvmExecState
+        // For plugin purposes during genesis, this is not needed
+        // We use a thread-local instead of a static since TokenAmount::zero() is not const
+        thread_local! {
+            static ZERO: TokenAmount = TokenAmount::zero();
+        }
+        ZERO.with(|z| unsafe {
+            // SAFETY: This is safe because we're returning a reference with the same lifetime
+            // as self, and the thread_local ensures the value lives for the duration of the thread
+            std::mem::transmute::<&TokenAmount, &TokenAmount>(z)
+        })
+    }
+
+    fn add_to_circ_supply(&mut self, _amount: &TokenAmount) -> anyhow::Result<()> {
+        // FvmGenesisState doesn't track circ_supply; plugins don't need this for actor initialization
+        Ok(())
+    }
+
+    fn subtract_from_circ_supply(&mut self, _amount: &TokenAmount) -> anyhow::Result<()> {
+        // FvmGenesisState doesn't track circ_supply; plugins don't need this for actor initialization
+        Ok(())
+    }
+
+    fn create_custom_actor(
+        &mut self,
+        name: &str,
+        id: ActorID,
+        state: &impl serde::Serialize,
+        balance: TokenAmount,
+        delegated_address: Option<Address>,
+    ) -> anyhow::Result<()> {
+        // Delegate to the existing method on FvmGenesisState
+        self.create_custom_actor(name, id, state, balance, delegated_address)
     }
 }

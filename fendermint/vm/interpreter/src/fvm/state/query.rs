@@ -27,9 +27,10 @@ use num_traits::Zero;
 use crate::fvm::constants::BLOCK_GAS_LIMIT;
 
 /// The state over which we run queries. These can interrogate the IPLD block store or the state tree.
-pub struct FvmQueryState<DB>
+pub struct FvmQueryState<DB, M = fendermint_module::NoOpModuleBundle>
 where
     DB: Blockstore + Clone + 'static,
+    M: fendermint_module::ModuleBundle,
 {
     /// A read-only wrapper around the blockstore, to make sure we aren't
     /// accidentally committing any state. Any writes by the FVM will be
@@ -42,22 +43,23 @@ where
     /// State at the height we want to query.
     state_params: FvmStateParams,
     /// Lazy loaded execution state.
-    exec_state: RefCell<Option<FvmExecState<ReadOnlyBlockstore<DB>>>>,
+    exec_state: RefCell<Option<FvmExecState<ReadOnlyBlockstore<DB>, M>>>,
     /// Lazy locked check state.
-    check_state: CheckStateRef<DB>,
+    check_state: CheckStateRef<DB, M>,
     pending: bool,
 }
 
-impl<DB> FvmQueryState<DB>
+impl<DB, M> FvmQueryState<DB, M>
 where
     DB: Blockstore + Clone + 'static,
+    M: fendermint_module::ModuleBundle + Default,
 {
     pub fn new(
         blockstore: DB,
         multi_engine: Arc<MultiEngine>,
         block_height: ChainEpoch,
         state_params: FvmStateParams,
-        check_state: CheckStateRef<DB>,
+        check_state: CheckStateRef<DB, M>,
         pending: bool,
     ) -> anyhow::Result<Self> {
         // Sanity check that the blockstore contains the supplied state root.
@@ -90,18 +92,18 @@ where
     /// There is no way to specify stacking in the API and only transactions should modify things.
     fn with_revert<T, F>(
         &self,
-        exec_state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
+        exec_state: &mut FvmExecState<ReadOnlyBlockstore<DB>, M>,
         f: F,
     ) -> anyhow::Result<T>
     where
-        F: FnOnce(&mut FvmExecState<ReadOnlyBlockstore<DB>>) -> anyhow::Result<T>,
+        F: FnOnce(&mut FvmExecState<ReadOnlyBlockstore<DB>, M>) -> anyhow::Result<T>,
     {
-        exec_state.state_tree_mut().begin_transaction();
+        exec_state.state_tree_mut_with_deref().begin_transaction();
 
         let res = f(exec_state);
 
         exec_state
-            .state_tree_mut()
+            .state_tree_mut_with_deref()
             .end_transaction(true)
             .expect("we just started a transaction");
         res
@@ -110,7 +112,7 @@ where
     /// If we know the query is over the state, cache the state tree.
     async fn with_exec_state<T, F>(self, f: F) -> anyhow::Result<(Self, T)>
     where
-        F: FnOnce(&mut FvmExecState<ReadOnlyBlockstore<DB>>) -> anyhow::Result<T>,
+        F: FnOnce(&mut FvmExecState<ReadOnlyBlockstore<DB>, M>) -> anyhow::Result<T>,
     {
         if self.pending {
             // XXX: This will block all `check_tx` from going through and also all other queries.
@@ -132,7 +134,9 @@ where
             return res.map(|r| (self, r));
         }
 
+        let module = Arc::new(M::default());
         let mut exec_state = FvmExecState::new(
+            module,
             self.store.clone(),
             self.multi_engine.as_ref(),
             self.block_height,
@@ -159,7 +163,7 @@ where
         addr: &Address,
     ) -> anyhow::Result<(Self, Option<(ActorID, ActorState)>)> {
         self.with_exec_state(|exec_state| {
-            let state_tree = exec_state.state_tree_mut();
+            let state_tree = exec_state.state_tree_mut_with_deref();
             get_actor_state(state_tree, addr)
         })
         .await
@@ -178,7 +182,7 @@ where
         self.with_exec_state(|s| {
             // If the sequence is zero, treat it as a signal to use whatever is in the state.
             if msg.sequence.is_zero() {
-                let state_tree = s.state_tree_mut();
+                let state_tree = s.state_tree_mut_with_deref();
                 if let Some(id) = state_tree.lookup_id(&msg.from)? {
                     state_tree.get_actor(id)?.inspect(|st| {
                         msg.sequence = st.sequence;
@@ -209,11 +213,11 @@ where
                 )?;
 
                 // safe to unwrap as they are created above
-                let evm_actor = s.state_tree().get_actor(created.actor_id)?.unwrap();
-                let evm_actor_state_raw = s.state_tree().store().get(&evm_actor.state)?.unwrap();
+                let evm_actor = s.state_tree_with_deref().get_actor(created.actor_id)?.unwrap();
+                let evm_actor_state_raw = s.state_tree_with_deref().store().get(&evm_actor.state)?.unwrap();
                 let evm_actor_state = from_slice::<fil_actor_evm::State>(&evm_actor_state_raw)?;
                 let actor_code = s
-                    .state_tree()
+                    .state_tree_with_deref()
                     .store()
                     .get(&evm_actor_state.bytecode)?
                     .unwrap();
@@ -253,9 +257,10 @@ where
     }
 }
 
-impl<DB> HasChainID for FvmQueryState<DB>
+impl<DB, M> HasChainID for FvmQueryState<DB, M>
 where
     DB: Blockstore + Clone + 'static,
+    M: fendermint_module::ModuleBundle,
 {
     fn chain_id(&self) -> ChainID {
         ChainID::from(self.state_params.chain_id)

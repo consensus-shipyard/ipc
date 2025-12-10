@@ -26,6 +26,18 @@ openssl = { workspace = true }
 paste = { workspace = true }
 prometheus = { workspace = true }
 prometheus_exporter = { workspace = true }
+# Storage node HTTP API dependencies (optional)
+warp = { workspace = true, optional = true }
+uuid = { workspace = true, optional = true }
+mime_guess = { workspace = true, optional = true }
+urlencoding = { workspace = true, optional = true }
+entangler = { workspace = true, optional = true }
+entangler_storage = { workspace = true, optional = true }
+storage_node_iroh_manager = { path = "../../storage-node/iroh_manager", optional = true }
+iroh = { workspace = true, optional = true }
+iroh-blobs = { workspace = true, optional = true }
+thiserror = { workspace = true }
+futures-util = { workspace = true }
 prost = { workspace = true }
 rand_chacha = { workspace = true }
 serde = { workspace = true }
@@ -48,29 +60,37 @@ url = { workspace = true }
 
 fendermint_abci = { path = "../abci" }
 actors-custom-api = { path = "../actors/api" }
+fendermint_actor_storage_bucket = { path = "../../storage-node/actors/storage_bucket", optional = true }
 fendermint_actor_f3_light_client = { path = "../actors/f3-light-client" }
-fendermint_app_options = { path = "./options" }
-fendermint_app_settings = { path = "./settings" }
+fendermint_app_options = { path = "./options", default-features = false }
+fendermint_app_settings = { path = "./settings", default-features = false }
 fendermint_crypto = { path = "../crypto" }
 fendermint_eth_api = { path = "../eth/api" }
 fendermint_materializer = { path = "../testing/materializer" }
+fendermint_module = { path = "../module" }
 fendermint_rocksdb = { path = "../rocksdb" }
+
+# Auto-discovered plugins
+ipc_plugin_storage_node = { path = "../../plugins/storage-node", optional = true }
 fendermint_rpc = { path = "../rpc" }
 fendermint_storage = { path = "../storage" }
 fendermint_tracing = { path = "../tracing" }
 fendermint_actor_gas_market_eip1559 = { path = "../actors/gas_market/eip1559" }
+fendermint_actor_storage_blobs_shared = { path = "../../storage-node/actors/storage_blobs/shared", optional = true }
 fendermint_vm_actor_interface = { path = "../vm/actor_interface" }
 fendermint_vm_core = { path = "../vm/core" }
 fendermint_vm_encoding = { path = "../vm/encoding" }
 fendermint_vm_event = { path = "../vm/event" }
 fendermint_vm_genesis = { path = "../vm/genesis" }
-fendermint_vm_interpreter = { path = "../vm/interpreter", features = [
-    "bundle",
-] }
+fendermint_vm_interpreter = { path = "../vm/interpreter", default-features = false, features = ["bundle"] }
 fendermint_vm_message = { path = "../vm/message" }
 fendermint_vm_resolver = { path = "../vm/resolver" }
 fendermint_vm_snapshot = { path = "../vm/snapshot" }
 fendermint_vm_topdown = { path = "../vm/topdown" }
+# fendermint_vm_storage_resolver moved to plugins/storage-node/src/resolver/
+
+# Storage node actors needed for storage-node command
+# fendermint_actor_storage_bucket moved to storage-node/actors/storage_bucket
 
 ipc_actors_abis = { path = "../../contract-bindings" }
 ethers = {workspace =  true}
@@ -90,6 +110,29 @@ ipc-provider = { path = "../../ipc/provider" }
 ipc_ipld_resolver = { path = "../../ipld/resolver" }
 ipc-observability = { path = "../../ipc/observability" }
 contracts-artifacts = { path = "../../contracts-artifacts" }
+
+[features]
+default = []
+
+# Storage node plugin (auto-discovered via build script)
+# Enable with: cargo build --features plugin-storage-node
+plugin-storage-node = [
+    "dep:ipc_plugin_storage_node",
+    "dep:warp",
+    "dep:uuid",
+    "dep:mime_guess",
+    "dep:urlencoding",
+    "dep:entangler",
+    "dep:entangler_storage",
+    "dep:storage_node_iroh_manager",
+    "dep:iroh",
+    "dep:iroh-blobs",
+    "dep:fendermint_actor_storage_bucket",
+    "dep:fendermint_actor_storage_blobs_shared",
+    "fendermint_app_options/storage-node",
+    "fendermint_app_settings/storage-node",
+    "fendermint_vm_interpreter/storage-node",  # Enable storage integration code
+]
 
 [dev-dependencies]
 tempfile = { workspace = true }

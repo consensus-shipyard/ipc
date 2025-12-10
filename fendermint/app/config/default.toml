@@ -258,6 +258,47 @@ rate_limit_bytes = 0
 # Length of the time period at which the consumption limit fills. 0 means no limit.
 rate_limit_period = 0
 
+# Iroh Blob Storage Configuration
+[resolver.iroh_resolver_config]
+# IPv4 address for Iroh node (UDP). Leave blank to use defaults.
+# Default: 0.0.0.0:11204
+# v4_addr = "0.0.0.0:11204"
+
+# IPv6 address for Iroh node (UDP). Leave blank to disable IPv6.
+# Default: None
+# v6_addr = "[::]:11205"
+
+# Data directory for Iroh blob storage
+iroh_data_dir = "data/iroh_resolver"
+
+# RPC address for Iroh client communication (TCP, local only)
+rpc_addr = "127.0.0.1:4444"
+
+# Objects HTTP API Configuration (for blob upload/download)
+[objects]
+# Maximum allowed object/file size for uploads (in bytes)
+# Default: 100MB
+max_object_size = 104857600
+
+# HTTP API listen address
+[objects.listen]
+host = "127.0.0.1"
+port = 8080
+
+# Tracing configuration for Objects API
+[objects.tracing]
+[objects.tracing.console]
+enabled = true
+[objects.tracing.file]
+enabled = false
+
+# Metrics configuration for Objects API
+[objects.metrics]
+enabled = true
+[objects.metrics.listen]
+host = "127.0.0.1"
+port = 9186
+
 # IPC related configuration parameters
 [ipc]
 # Default subnet ID, which basically means IPC is disabled.

@@ -59,3 +59,10 @@ pub mod multisig;
 pub mod placeholder;
 pub mod reward;
 pub mod system;
+
+// Storage-node actor interfaces moved to plugins/storage-node/src/actor_interface/
+// - adm
+// - blob_reader
+// - blobs
+// - bucket (code ID only)
+// - recall_config

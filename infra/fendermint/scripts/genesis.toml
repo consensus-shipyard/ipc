@@ -1,6 +1,7 @@
 [tasks.genesis-new]
 extend = "fendermint-tool"
-env = { "CMD" = "genesis --genesis-file /data/genesis.json new --chain-name ${NETWORK_NAME} --base-fee ${BASE_FEE} --timestamp ${TIMESTAMP} --power-scale ${POWER_SCALE}" }
+# Use placeholder Ethereum address for IPC contracts owner (can be changed later)
+env = { "CMD" = "genesis --genesis-file /data/genesis.json new --chain-name ${NETWORK_NAME} --base-fee ${BASE_FEE} --timestamp ${TIMESTAMP} --power-scale ${POWER_SCALE} --ipc-contracts-owner 0x0000000000000000000000000000000000000001" }
 
 ## Create the validator key pair
 ## Takes:

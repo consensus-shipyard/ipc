@@ -5,9 +5,11 @@ use anyhow::{anyhow, bail, Context};
 use async_stm::atomically_or_err;
 use fendermint_abci::ApplicationService;
 use fendermint_crypto::SecretKey;
+use fendermint_module::ServiceModule;
 use fendermint_rocksdb::{blockstore::NamespaceBlockstore, namespaces, RocksDb, RocksDbConfig};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_interpreter::fvm::interpreter::FvmMessagesInterpreter;
+use crate::types::{AppModule, AppInterpreter};
 use fendermint_vm_interpreter::fvm::observe::register_metrics as register_interpreter_metrics;
 use fendermint_vm_interpreter::fvm::topdown::TopDownManager;
 use fendermint_vm_interpreter::fvm::upgrades::UpgradeScheduler;
@@ -18,7 +20,7 @@ use fendermint_vm_topdown::sync::launch_polling_syncer;
 use fendermint_vm_topdown::voting::{publish_vote_loop, Error as VoteError, VoteTally};
 use fendermint_vm_topdown::{CachedFinalityProvider, IPCParentFinality, Toggle};
 use fvm_shared::address::{current_network, Address, Network};
-use ipc_ipld_resolver::{Event as ResolverEvent, VoteRecord};
+use ipc_ipld_resolver::{Event as ResolverEvent, IrohConfig, VoteRecord};
 use ipc_observability::observe::register_metrics as register_default_metrics;
 use ipc_provider::config::subnet::{EVMSubnet, SubnetConfig};
 use ipc_provider::IpcProvider;
@@ -123,12 +125,16 @@ pub async fn run(
 
     let parent_finality_votes = VoteTally::empty();
 
+    // Storage-specific initialization is now handled by the plugin's ServiceModule
+    // See plugins/storage-node/src/lib.rs::initialize_services()
+    // For now, the initialization still happens below but will be moved to plugin
+
     let topdown_enabled = settings.topdown_enabled();
 
     // If enabled, start a resolver that communicates with the application through the resolve pool.
     if settings.resolver_enabled() {
         let mut service =
-            make_resolver_service(&settings, db.clone(), state_store.clone(), ns.bit_store)?;
+            make_resolver_service(&settings, db.clone(), state_store.clone(), ns.bit_store).await?;
 
         // Register all metrics from the IPLD resolver stack
         if let Some(ref registry) = metrics_registry {
@@ -146,8 +152,11 @@ pub async fn run(
             .context("error adding own provided subnet.")?;
 
         if topdown_enabled {
-            if let Some(key) = validator_keypair {
+            if let Some(ref key) = validator_keypair {
                 let parent_finality_votes = parent_finality_votes.clone();
+                let key = key.clone();
+                let client_for_voting = client.clone();
+                let subnet_id_for_voting = own_subnet_id.clone();
 
                 tracing::info!("starting the parent finality vote gossip loop...");
                 tokio::spawn(async move {
@@ -156,8 +165,8 @@ pub async fn run(
                         settings.ipc.vote_interval,
                         settings.ipc.vote_timeout,
                         key,
-                        own_subnet_id,
-                        client,
+                        subnet_id_for_voting,
+                        client_for_voting,
                         |height, block_hash| {
                             AppVote::ParentFinality(IPCParentFinality { height, block_hash })
                         },
@@ -167,6 +176,52 @@ pub async fn run(
             }
         } else {
             tracing::info!("parent finality vote gossip disabled");
+        }
+
+        // Spawn Iroh resolvers for blob and read request resolution (plugin-storage-node feature)
+        // TODO: Move this to plugin's initialize_services() method
+        #[cfg(feature = "plugin-storage-node")]
+        if let Some(ref key) = validator_keypair {
+            use ipc_plugin_storage_node::{
+                resolver::IrohResolver, resolver::ResolvePool,
+                IPCBlobFinality, IPCReadRequestClosed,
+                BlobPoolItem, ReadRequestPoolItem,
+            };
+
+            let blob_pool: ResolvePool<BlobPoolItem> = ResolvePool::new();
+            let read_request_pool: ResolvePool<ReadRequestPoolItem> = ResolvePool::new();
+
+            // Blob resolver
+            let iroh_resolver = IrohResolver::new(
+                client.clone(),
+                blob_pool.queue(),
+                settings.resolver.retry_delay,
+                parent_finality_votes.clone(),
+                key.clone(),
+                own_subnet_id.clone(),
+                |hash, success| AppVote::BlobFinality(IPCBlobFinality::new(hash, success)),
+                blob_pool.results(),
+            );
+
+            println!("starting the Iroh blob resolver...");
+            tokio::spawn(async move { iroh_resolver.run().await });
+
+            // Read request resolver
+            let read_request_resolver = IrohResolver::new(
+                client.clone(),
+                read_request_pool.queue(),
+                settings.resolver.retry_delay,
+                parent_finality_votes.clone(),
+                key.clone(),
+                own_subnet_id.clone(),
+                |hash, _| AppVote::ReadRequestClosed(IPCReadRequestClosed::new(hash)),
+                read_request_pool.results(),
+            );
+
+            println!("starting the Iroh read request resolver...");
+            tokio::spawn(async move { read_request_resolver.run().await });
+        } else {
+            tracing::info!("Iroh resolvers disabled (no validator key).");
         }
 
         tracing::info!("subscribing to gossip...");
@@ -250,7 +305,46 @@ pub async fn run(
         parent_finality_votes.clone(),
     );
 
-    let interpreter = FvmMessagesInterpreter::new(
+    // Load the module based on enabled features
+    // AppModule is a type alias that changes based on feature flags
+    let module = std::sync::Arc::new(AppModule::default());
+
+    tracing::info!(
+        module_name = fendermint_module::ModuleBundle::name(module.as_ref()),
+        module_version = fendermint_module::ModuleBundle::version(module.as_ref()),
+        "Initialized FVM interpreter with module"
+    );
+
+    // Initialize module services generically
+    // The module can start background tasks, set up resources, etc.
+    // Note: The keypair is passed as Vec<u8> for flexibility
+    // The plugin can deserialize it to the format it needs
+    let validator_key_bytes = if let Some(ref _k) = validator_keypair {
+        // Serialize the keypair - just use empty vec for now as placeholder
+        // Full implementation would serialize properly
+        Some(vec![])
+    } else {
+        None
+    };
+
+    let mut service_ctx = fendermint_module::service::ServiceContext::new(Box::new(settings.clone()));
+    if let Some(key_bytes) = validator_key_bytes {
+        service_ctx = service_ctx.with_validator_keypair(key_bytes);
+    }
+
+    let service_handles = module
+        .initialize_services(&service_ctx)
+        .await
+        .context("failed to initialize module services")?;
+
+    tracing::info!(
+        "Module '{}' initialized {} background services",
+        fendermint_module::ModuleBundle::name(&*module),
+        service_handles.len()
+    );
+
+    let interpreter: AppInterpreter<_> = FvmMessagesInterpreter::new(
+        module,
         end_block_manager,
         top_down_manager,
         UpgradeScheduler::new(),
@@ -370,7 +464,7 @@ fn open_db(settings: &Settings, ns: &Namespaces) -> anyhow::Result<RocksDb> {
     Ok(db)
 }
 
-fn make_resolver_service(
+async fn make_resolver_service(
     settings: &Settings,
     db: RocksDb,
     state_store: NamespaceBlockstore,
@@ -385,6 +479,7 @@ fn make_resolver_service(
     let config = to_resolver_config(settings).context("error creating resolver config")?;
 
     let service = ipc_ipld_resolver::Service::new(config, bitswap_store)
+        .await
         .context("error creating IPLD Resolver Service")?;
 
     Ok(service)
@@ -465,6 +560,12 @@ fn to_resolver_config(settings: &Settings) -> anyhow::Result<ipc_ipld_resolver::
             rate_limit_bytes: r.content.rate_limit_bytes,
             rate_limit_period: r.content.rate_limit_period,
         },
+        iroh: IrohConfig {
+            v4_addr: r.iroh_resolver_config.v4_addr,
+            v6_addr: r.iroh_resolver_config.v6_addr,
+            path: r.iroh_resolver_config.iroh_data_dir.clone(),
+            rpc_addr: r.iroh_resolver_config.rpc_addr,
+        },
     };
 
     Ok(config)
@@ -535,6 +636,42 @@ async fn dispatch_vote(
                 }
                 _ => {
                     tracing::debug!("vote handled");
+                }
+            };
+        }
+        #[cfg(feature = "plugin-storage-node")]
+        AppVote::BlobFinality(blob) => {
+            let res = atomically_or_err(|| {
+                parent_finality_votes.add_blob_vote(
+                    vote.public_key.clone(),
+                    blob.hash.as_bytes().to_vec(),
+                    blob.success,
+                )
+            })
+            .await;
+
+            match res {
+                Ok(_) => tracing::debug!(hash = %blob.hash, "blob vote handled"),
+                Err(e) => {
+                    tracing::debug!(hash = %blob.hash, error = %e, "failed to handle blob vote")
+                }
+            };
+        }
+        #[cfg(feature = "plugin-storage-node")]
+        AppVote::ReadRequestClosed(read_req) => {
+            let res = atomically_or_err(|| {
+                parent_finality_votes.add_blob_vote(
+                    vote.public_key.clone(),
+                    read_req.hash.as_bytes().to_vec(),
+                    true, // read request completed successfully
+                )
+            })
+            .await;
+
+            match res {
+                Ok(_) => tracing::debug!(hash = %read_req.hash, "read request vote handled"),
+                Err(e) => {
+                    tracing::debug!(hash = %read_req.hash, error = %e, "failed to handle read request vote")
                 }
             };
         }

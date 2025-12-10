@@ -9,11 +9,15 @@ use fendermint_storage::{Codec, Encode, KVReadable, KVStore, KVWritable};
 use fendermint_vm_genesis::{Power, Validator};
 use fendermint_vm_interpreter::fvm::end_block_hook::LightClientCommitments;
 use fendermint_vm_interpreter::fvm::state::ipc::GatewayCaller;
-use fendermint_vm_interpreter::fvm::state::{FvmExecState, FvmStateParams};
+use fendermint_vm_interpreter::fvm::state::FvmStateParams;
+use crate::types::AppExecState;
 use fendermint_vm_interpreter::fvm::store::ReadOnlyBlockstore;
 use fendermint_vm_interpreter::MessagesInterpreter;
 use fendermint_vm_topdown::sync::ParentFinalityStateQuery;
 use fendermint_vm_topdown::IPCParentFinality;
+
+#[cfg(feature = "plugin-storage-node")]
+use ipc_plugin_storage_node::{IPCBlobFinality, IPCReadRequestClosed};
 use fvm_ipld_blockstore::Blockstore;
 use ipc_actors_abis::subnet_actor_checkpointing_facet::{
     AppHashBreakdown, Commitment, CompressedActivityRollup,
@@ -57,6 +61,12 @@ pub fn derive_subnet_app_hash(state: &SubnetAppState) -> tendermint::hash::AppHa
 pub enum AppVote {
     /// The validator considers a certain block final on the parent chain.
     ParentFinality(IPCParentFinality),
+    /// The validator considers a certain blob final.
+    #[cfg(feature = "plugin-storage-node")]
+    BlobFinality(IPCBlobFinality),
+    /// The validator considers a certain read request completed.
+    #[cfg(feature = "plugin-storage-node")]
+    ReadRequestClosed(IPCReadRequestClosed),
 }
 
 /// Queries the LATEST COMMITTED parent finality from the storage
@@ -64,7 +74,7 @@ pub struct AppParentFinalityQuery<DB, SS, S, I>
 where
     SS: Blockstore + Clone + 'static + Send + Sync,
     S: KVStore,
-    I: MessagesInterpreter<SS> + Send + Sync,
+    I: MessagesInterpreter<SS, crate::types::AppModule> + Send + Sync,
 {
     /// The app to get state
     app: App<DB, SS, S, I>,
@@ -80,7 +90,7 @@ where
         + Codec<FvmStateParams>,
     DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
     SS: Blockstore + Clone + 'static + Send + Sync,
-    I: MessagesInterpreter<SS> + Send + Sync,
+    I: MessagesInterpreter<SS, crate::types::AppModule> + Send + Sync,
 {
     pub fn new(app: App<DB, SS, S, I>) -> Self {
         Self {
@@ -91,7 +101,7 @@ where
 
     fn with_exec_state<F, T>(&self, f: F) -> anyhow::Result<Option<T>>
     where
-        F: FnOnce(FvmExecState<ReadOnlyBlockstore<Arc<SS>>>) -> anyhow::Result<T>,
+        F: FnOnce(AppExecState<ReadOnlyBlockstore<Arc<SS>>>) -> anyhow::Result<T>,
     {
         match self.app.read_only_view(None)? {
             Some(s) => f(s).map(Some),
@@ -109,7 +119,7 @@ where
         + Codec<FvmStateParams>,
     DB: KVWritable<S> + KVReadable<S> + 'static + Clone,
     SS: Blockstore + Clone + 'static + Send + Sync,
-    I: MessagesInterpreter<SS> + Send + Sync,
+    I: MessagesInterpreter<SS, crate::types::AppModule> + Send + Sync,
 {
     fn get_latest_committed_finality(&self) -> anyhow::Result<Option<IPCParentFinality>> {
         self.with_exec_state(|mut exec_state| {

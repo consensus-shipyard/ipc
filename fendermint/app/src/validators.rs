@@ -4,7 +4,7 @@
 use anyhow::{anyhow, Ok, Result};
 use fendermint_crypto::PublicKey;
 use fendermint_vm_interpreter::fvm::state::ipc::GatewayCaller;
-use fendermint_vm_interpreter::fvm::state::FvmExecState;
+use crate::types::AppExecState;
 use std::collections::HashMap;
 
 use tendermint::account::Id as TendermintId;
@@ -19,7 +19,7 @@ pub(crate) struct ValidatorCache {
 }
 
 impl ValidatorCache {
-    pub fn new_from_state<SS>(state: &mut FvmExecState<SS>) -> Result<Self>
+    pub fn new_from_state<SS>(state: &mut AppExecState<SS>) -> Result<Self>
     where
         SS: Blockstore + Clone + 'static,
     {

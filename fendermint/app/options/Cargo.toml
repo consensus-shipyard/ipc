@@ -33,3 +33,9 @@ ethers = { workspace = true }
 fendermint_vm_genesis = { path = "../../vm/genesis" }
 fendermint_vm_actor_interface = { path = "../../vm/actor_interface" }
 fendermint_materializer = { path = "../../testing/materializer" }
+
+[features]
+default = []
+plugin-storage-node = []
+# Legacy alias for compatibility
+storage-node = ["plugin-storage-node"]

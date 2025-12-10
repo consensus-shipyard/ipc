@@ -3,12 +3,14 @@
 use anyhow::anyhow;
 use async_trait::async_trait;
 use ipc_api::subnet_id::SubnetID;
+use iroh::NodeAddr;
+use iroh_blobs::Hash;
 use libipld::Cid;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot;
 
 use crate::{
-    service::{Request, ResolveResult},
+    service::{Request, ResolveReadRequestResult, ResolveResult},
     vote_record::SignedVoteRecord,
 };
 
@@ -107,6 +109,70 @@ where
     async fn resolve(&self, cid: Cid, subnet_id: SubnetID) -> anyhow::Result<ResolveResult> {
         let (tx, rx) = oneshot::channel();
         let req = Request::Resolve(cid, subnet_id, tx);
+        self.send_request(req)?;
+        let res = rx.await?;
+        Ok(res)
+    }
+}
+
+/// Trait to limit the capabilities to resolving CIDs from Iroh.
+#[async_trait]
+pub trait ResolverIroh {
+    /// Send a hash for resolution from an Iroh node, await its completion,
+    /// then return the result, to be inspected by the caller.
+    async fn resolve_iroh(
+        &self,
+        hash: Hash,
+        size: u64,
+        node_addr: NodeAddr,
+    ) -> anyhow::Result<ResolveResult>;
+}
+
+#[async_trait]
+impl<V> ResolverIroh for Client<V>
+where
+    V: Sync + Send + 'static,
+{
+    async fn resolve_iroh(
+        &self,
+        hash: Hash,
+        size: u64,
+        node_addr: NodeAddr,
+    ) -> anyhow::Result<ResolveResult> {
+        let (tx, rx) = oneshot::channel();
+        let req = Request::ResolveIroh(hash, size, node_addr, tx);
+        self.send_request(req)?;
+        let res = rx.await?;
+        Ok(res)
+    }
+}
+
+/// Trait to limit the capabilities to reading data from Iroh.
+#[async_trait]
+pub trait ResolverIrohReadRequest {
+    /// Send a hash for getting the data from iroh, await its completion,
+    /// then return the result, to be inspected by the caller.
+    async fn close_read_request(
+        &self,
+        hash: Hash,
+        offset: u32,
+        len: u32,
+    ) -> anyhow::Result<ResolveReadRequestResult>;
+}
+
+#[async_trait]
+impl<V> ResolverIrohReadRequest for Client<V>
+where
+    V: Sync + Send + 'static,
+{
+    async fn close_read_request(
+        &self,
+        hash: Hash,
+        offset: u32,
+        len: u32,
+    ) -> anyhow::Result<ResolveReadRequestResult> {
+        let (tx, rx) = oneshot::channel();
+        let req = Request::ResolveIrohRead(hash, offset, len, tx);
         self.send_request(req)?;
         let res = rx.await?;
         Ok(res)

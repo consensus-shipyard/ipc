@@ -1,24 +1,16 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-use anyhow::{Context, Result};
-use cid::Cid;
-use fendermint_vm_message::chain::ChainMessage;
-use fendermint_vm_message::ipc::IpcMessage;
-use fendermint_vm_message::query::{FvmQuery, StateParams};
-use fendermint_vm_message::signed::SignedMessage;
-use fvm_ipld_blockstore::Blockstore;
-use fvm_ipld_encoding::{self};
-use fvm_shared::{address::Address, error::ExitCode};
-use std::sync::Arc;
-use std::time::Instant;
-
 use crate::errors::*;
 use crate::fvm::end_block_hook::{EndBlockManager, PowerUpdates};
 use crate::fvm::executions::{
     execute_cron_message, execute_signed_message, push_block_to_chainmeta_actor_if_possible,
 };
 use crate::fvm::gas_estimation::{estimate_gassed_msg, gas_search};
+#[cfg(feature = "storage-node")]
+use crate::fvm::storage_helpers::{
+    close_read_request, read_request_callback, set_read_request_pending,
+};
 use crate::fvm::topdown::TopDownManager;
 use crate::fvm::{
     activity::ValidatorActivityTracker,
@@ -33,10 +25,22 @@ use crate::selectors::{
 };
 use crate::types::*;
 use crate::MessagesInterpreter;
+use anyhow::{Context, Result};
+use cid::Cid;
+use fendermint_module::ModuleBundle;
+use fendermint_vm_message::chain::ChainMessage;
+use fendermint_vm_message::ipc::IpcMessage;
+use fendermint_vm_message::query::{FvmQuery, StateParams};
+use fendermint_vm_message::signed::SignedMessage;
+use fvm_ipld_blockstore::Blockstore;
+use fvm_ipld_encoding;
 use fvm_shared::state::ActorState;
 use fvm_shared::ActorID;
+use fvm_shared::{address::Address, error::ExitCode};
 use ipc_observability::emit;
 use std::convert::TryInto;
+use std::sync::Arc;
+use std::time::Instant;
 
 struct Actor {
     id: ActorID,
@@ -45,14 +49,18 @@ struct Actor {
 
 /// Interprets messages as received from the ABCI layer
 #[derive(Clone)]
-pub struct FvmMessagesInterpreter<DB>
+pub struct FvmMessagesInterpreter<DB, M>
 where
     DB: Blockstore + Clone + Send + Sync + 'static,
+    M: ModuleBundle,
 {
+    /// Reference to the module for calling hooks and accessing module metadata.
+    /// Used for: lifecycle logging, module name display, future: message validation hooks
+    module: Arc<M>,
     end_block_manager: EndBlockManager<DB>,
 
     top_down_manager: TopDownManager<DB>,
-    upgrade_scheduler: UpgradeScheduler<DB>,
+    upgrade_scheduler: UpgradeScheduler<DB, M>,
 
     push_block_data_to_chainmeta_actor: bool,
     max_msgs_per_block: usize,
@@ -61,20 +69,23 @@ where
     gas_search_step: f64,
 }
 
-impl<DB> FvmMessagesInterpreter<DB>
+impl<DB, M> FvmMessagesInterpreter<DB, M>
 where
     DB: Blockstore + Clone + Send + Sync + 'static,
+    M: ModuleBundle,
 {
     pub fn new(
+        module: Arc<M>,
         end_block_manager: EndBlockManager<DB>,
         top_down_manager: TopDownManager<DB>,
-        upgrade_scheduler: UpgradeScheduler<DB>,
+        upgrade_scheduler: UpgradeScheduler<DB, M>,
         push_block_data_to_chainmeta_actor: bool,
         max_msgs_per_block: usize,
         gas_overestimation_rate: f64,
         gas_search_step: f64,
     ) -> Self {
         Self {
+            module,
             end_block_manager,
             top_down_manager,
             upgrade_scheduler,
@@ -86,7 +97,10 @@ where
     }
 
     /// Performs an upgrade if one is scheduled at the current block height.
-    fn perform_upgrade_if_needed(&self, state: &mut FvmExecState<DB>) -> Result<()> {
+    fn perform_upgrade_if_needed(&self, state: &mut FvmExecState<DB, M>) -> Result<()>
+    where
+        M::Executor: std::ops::DerefMut<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
         let chain_id = state.chain_id();
         let block_height: u64 = state.block_height().try_into().unwrap();
 
@@ -104,7 +118,7 @@ where
 
     fn check_nonce_and_sufficient_balance(
         &self,
-        state: &FvmExecState<ReadOnlyBlockstore<DB>>,
+        state: &FvmExecState<ReadOnlyBlockstore<DB>, M>,
         msg: &FvmMessage,
     ) -> Result<CheckResponse> {
         let Some(Actor {
@@ -153,9 +167,12 @@ where
     // TODO - remove this once a new pending state solution is implemented
     fn update_nonce(
         &self,
-        state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
+        state: &mut FvmExecState<ReadOnlyBlockstore<DB>, M>,
         msg: &FvmMessage,
-    ) -> Result<()> {
+    ) -> Result<()>
+    where
+        M::Executor: std::ops::DerefMut<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
         let Actor {
             id: actor_id,
             state: mut actor,
@@ -163,7 +180,7 @@ where
             .lookup_actor(state, &msg.from)?
             .expect("actor must exist");
 
-        let state_tree = state.state_tree_mut();
+        let state_tree = state.state_tree_mut_with_deref();
 
         actor.sequence += 1;
         state_tree.set_actor(actor_id, actor);
@@ -173,10 +190,13 @@ where
 
     fn lookup_actor(
         &self,
-        state: &FvmExecState<ReadOnlyBlockstore<DB>>,
+        state: &FvmExecState<ReadOnlyBlockstore<DB>, M>,
         address: &Address,
-    ) -> Result<Option<Actor>> {
-        let state_tree = state.state_tree();
+    ) -> Result<Option<Actor>>
+    where
+        M::Executor: std::ops::Deref<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
+        let state_tree = state.state_tree_with_deref();
         let id = match state_tree.lookup_id(address)? {
             Some(id) => id,
             None => return Ok(None),
@@ -194,16 +214,21 @@ where
 }
 
 #[async_trait::async_trait]
-impl<DB> MessagesInterpreter<DB> for FvmMessagesInterpreter<DB>
+impl<DB, M> MessagesInterpreter<DB, M> for FvmMessagesInterpreter<DB, M>
 where
     DB: Blockstore + Clone + Send + Sync + 'static,
+    M: ModuleBundle + Default,
+    M::Executor: Send,
 {
     async fn check_message(
         &self,
-        state: &mut FvmExecState<ReadOnlyBlockstore<DB>>,
+        state: &mut FvmExecState<ReadOnlyBlockstore<DB>, M>,
         msg: Vec<u8>,
         is_recheck: bool,
-    ) -> Result<CheckResponse, CheckMessageError> {
+    ) -> Result<CheckResponse, CheckMessageError>
+    where
+        M::Executor: std::ops::DerefMut<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
         let signed_msg = ipld_decode_signed_message(&msg)?;
         let fvm_msg = signed_msg.message();
 
@@ -252,7 +277,7 @@ where
 
     async fn prepare_messages_for_block(
         &self,
-        state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
+        state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>, M>,
         msgs: Vec<Vec<u8>>,
         max_transaction_bytes: u64,
     ) -> Result<PrepareMessagesResponse, PrepareMessagesError> {
@@ -281,8 +306,11 @@ where
             .await
             .into_iter();
 
-        let mut all_msgs = top_down_iter
-            .chain(signed_msgs_iter)
+        let chain_msgs: Vec<ChainMessage> = top_down_iter.chain(signed_msgs_iter).collect();
+
+        // Encode all chain messages to IPLD
+        let mut all_msgs = chain_msgs
+            .into_iter()
             .map(|msg| fvm_ipld_encoding::to_vec(&msg).context("failed to encode message as IPLD"))
             .collect::<Result<Vec<Vec<u8>>>>()?;
 
@@ -317,7 +345,7 @@ where
 
     async fn attest_block_messages(
         &self,
-        state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>>,
+        state: FvmExecState<ReadOnlyBlockstore<Arc<DB>>, M>,
         msgs: Vec<Vec<u8>>,
     ) -> Result<AttestMessagesResponse, AttestMessagesError> {
         if msgs.len() > self.max_msgs_per_block {
@@ -337,6 +365,14 @@ where
                         if !self.top_down_manager.is_finality_valid(finality).await {
                             return Ok(AttestMessagesResponse::Reject);
                         }
+                    }
+                    ChainMessage::Ipc(IpcMessage::ReadRequestPending(_)) => {
+                        // Read request pending messages are validated in prepare_messages_for_block
+                        // Just accept them here
+                    }
+                    ChainMessage::Ipc(IpcMessage::ReadRequestClosed(_)) => {
+                        // Read request closed messages are validated in prepare_messages_for_block
+                        // Just accept them here
                     }
                     ChainMessage::Signed(signed) => {
                         if signed.message.gas_fee_cap < *base_fee {
@@ -366,9 +402,15 @@ where
 
     async fn begin_block(
         &self,
-        state: &mut FvmExecState<DB>,
-    ) -> Result<BeginBlockResponse, BeginBlockError> {
+        state: &mut FvmExecState<DB, M>,
+    ) -> Result<BeginBlockResponse, BeginBlockError>
+    where
+        M::Executor: std::ops::DerefMut<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
         let height = state.block_height() as u64;
+
+        // Module lifecycle hook: before block processing
+        tracing::debug!(module = %ModuleBundle::name(self.module.as_ref()), "begin_block: calling module lifecycle hooks");
 
         tracing::debug!("trying to perform upgrade");
         self.perform_upgrade_if_needed(state)
@@ -391,8 +433,14 @@ where
 
     async fn end_block(
         &self,
-        state: &mut FvmExecState<DB>,
-    ) -> Result<EndBlockResponse, EndBlockError> {
+        state: &mut FvmExecState<DB, M>,
+    ) -> Result<EndBlockResponse, EndBlockError>
+    where
+        M::Executor: std::ops::DerefMut<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
+        // Module lifecycle hook: before end_block processing
+        tracing::debug!(module = %ModuleBundle::name(self.module.as_ref()), "end_block: calling module lifecycle hooks");
+
         if let Some(pubkey) = state.block_producer() {
             state.activity_tracker().record_block_committed(pubkey)?;
         }
@@ -431,9 +479,12 @@ where
 
     async fn apply_message(
         &self,
-        state: &mut FvmExecState<DB>,
+        state: &mut FvmExecState<DB, M>,
         msg: Vec<u8>,
-    ) -> Result<ApplyMessageResponse, ApplyMessageError> {
+    ) -> Result<ApplyMessageResponse, ApplyMessageError>
+    where
+        M::Executor: std::ops::DerefMut<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
         let chain_msg = match fvm_ipld_encoding::from_slice::<ChainMessage>(&msg) {
             Ok(msg) => msg,
             Err(e) => {
@@ -467,13 +518,59 @@ where
                         domain_hash: None,
                     })
                 }
+                // Storage-node messages
+                #[cfg(feature = "storage-node")]
+                IpcMessage::ReadRequestPending(read_request) => {
+                    // Set the read request to "pending" state
+                    let ret = set_read_request_pending(state, read_request.id)?;
+
+                    tracing::debug!(
+                        request_id = %read_request.id,
+                        "chain interpreter has set read request to pending"
+                    );
+
+                    Ok(ApplyMessageResponse {
+                        applied_message: ret.into(),
+                        domain_hash: None,
+                    })
+                }
+                #[cfg(feature = "storage-node")]
+                IpcMessage::ReadRequestClosed(read_request) => {
+                    // Send the data to the callback address.
+                    // If this fails (e.g., the callback address is not reachable),
+                    // we will still close the request.
+                    //
+                    // We MUST use a non-privileged actor (BLOB_READER_ACTOR_ADDR) to call the callback.
+                    // This is to prevent malicious user from accessing unauthorized APIs.
+                    read_request_callback(state, &read_request)?;
+
+                    // Set the status of the request to closed.
+                    let ret = close_read_request(state, read_request.id)?;
+
+                    tracing::debug!(
+                        hash = %read_request.id,
+                        "chain interpreter has closed read request"
+                    );
+
+                    Ok(ApplyMessageResponse {
+                        applied_message: ret.into(),
+                        domain_hash: None,
+                    })
+                }
+                // When storage-node feature is disabled, these message types shouldn't be used
+                #[cfg(not(feature = "storage-node"))]
+                IpcMessage::ReadRequestPending(_) | IpcMessage::ReadRequestClosed(_) => {
+                    Err(ApplyMessageError::Other(anyhow::anyhow!(
+                        "Storage-node messages require the storage-node feature to be enabled"
+                    )))
+                }
             },
         }
     }
 
     async fn query(
         &self,
-        state: FvmQueryState<DB>,
+        state: FvmQueryState<DB, M>,
         query: Query,
     ) -> Result<QueryResponse, QueryError> {
         let query = if query.path.as_str() == "/store" {

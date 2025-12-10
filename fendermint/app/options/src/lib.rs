@@ -10,16 +10,19 @@ use fvm_shared::address::Network;
 use lazy_static::lazy_static;
 
 use self::{
-    eth::EthArgs, genesis::GenesisArgs, key::KeyArgs, materializer::MaterializerArgs, rpc::RpcArgs,
-    run::RunArgs,
+    eth::EthArgs, genesis::GenesisArgs, key::KeyArgs, materializer::MaterializerArgs,
+    rpc::RpcArgs, run::RunArgs,
 };
-
+#[cfg(feature = "plugin-storage-node")]
+use self::objects::ObjectsArgs;
 pub mod config;
 pub mod debug;
 pub mod eth;
 pub mod genesis;
 pub mod key;
 pub mod materializer;
+#[cfg(feature = "plugin-storage-node")]
+pub mod objects;
 pub mod rpc;
 pub mod run;
 
@@ -126,7 +129,13 @@ impl Options {
 
     /// Check if metrics are supposed to be collected.
     pub fn metrics_enabled(&self) -> bool {
-        matches!(self.command, Commands::Run(_) | Commands::Eth(_))
+        #[allow(irrefutable_let_patterns)]
+        match self.command {
+            Commands::Run(_) | Commands::Eth(_) => true,
+            #[cfg(feature = "plugin-storage-node")]
+            Commands::Objects(_) => true,
+            _ => false,
+        }
     }
 }
 
@@ -150,6 +159,9 @@ pub enum Commands {
     /// Subcommands related to the Testnet Materializer.
     #[clap(aliases  = &["mat", "matr", "mate"])]
     Materializer(MaterializerArgs),
+    /// Subcommands related to the Objects/Blobs storage HTTP API.
+    #[cfg(feature = "plugin-storage-node")]
+    Objects(ObjectsArgs),
 }
 
 #[cfg(test)]

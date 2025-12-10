@@ -18,9 +18,18 @@ use fendermint_eth_hardhat::{ContractSourceAndName, Hardhat, FQN};
 use fendermint_vm_actor_interface::diamond::{EthContract, EthContractMap};
 use fendermint_vm_actor_interface::eam::EthAddress;
 use fendermint_vm_actor_interface::{
-    account, activity, burntfunds, chainmetadata, cron, eam, f3_light_client, gas_market, init,
-    ipc, reward, system, EMPTY_ARR,
+    account, activity, burntfunds, chainmetadata, cron, eam,
+    f3_light_client, gas_market, init, ipc, reward, system, EMPTY_ARR,
 };
+
+// Storage-node actor interfaces moved to plugins/storage-node/src/actor_interface/
+// We use direct IDs here to avoid circular dependencies
+#[cfg(feature = "storage-node")]
+mod storage_actor_ids {
+    pub const RECALL_CONFIG_ACTOR_ID: u64 = 70;
+    pub const BLOBS_ACTOR_ID: u64 = 66;
+    pub const BLOB_READER_ACTOR_ID: u64 = 67;
+}
 use fendermint_vm_core::Timestamp;
 use fendermint_vm_genesis::{ActorMeta, Collateral, Genesis, Power, PowerScale, Validator};
 use fvm::engine::MultiEngine;
@@ -302,14 +311,17 @@ impl<'a> GenesisBuilder<'a> {
             .context("failed to create system actor")?;
 
         // Init actor
+        // Add Blobs actor ID to eth_builtin_ids so its delegated address is registered
+        let mut eth_builtin_ids: BTreeSet<_> =
+            ipc_entrypoints.values().map(|c| c.actor_id).collect();
+        #[cfg(feature = "storage-node")]
+        eth_builtin_ids.insert(storage_actor_ids::BLOBS_ACTOR_ID);
+
         let (init_state, addr_to_id) = init::State::new(
             state.store(),
             genesis.chain_name.clone(),
             &genesis.accounts,
-            &ipc_entrypoints
-                .values()
-                .map(|c| c.actor_id)
-                .collect::<BTreeSet<_>>(),
+            &eth_builtin_ids,
             all_ipc_contracts.len() as u64,
         )
         .context("failed to create init state")?;
@@ -376,6 +388,11 @@ impl<'a> GenesisBuilder<'a> {
             )
             .context("failed to create reward actor")?;
 
+        // ADM Address Manager (ADM) actor - MOVED TO PLUGIN
+        // Storage-specific actors should be initialized by the storage-node plugin
+        // via the GenesisModule trait, not in core interpreter.
+        // TODO: Plugin should implement GenesisModule::initialize_actors
+
         // STAGE 1b: Then we initialize the in-repo custom actors.
 
         // Initialize the chain metadata actor which handles saving metadata about the chain
@@ -393,6 +410,51 @@ impl<'a> GenesisBuilder<'a> {
                 None,
             )
             .context("failed to create chainmetadata actor")?;
+
+        // Initialize storage node actors (optional)
+        #[cfg(feature = "storage-node")]
+        {
+            // Initialize the recall config actor.
+            let recall_config_state = fendermint_actor_storage_config::State {
+                admin: None,
+                config: fendermint_actor_storage_config_shared::RecallConfig::default(),
+            };
+            state
+                .create_custom_actor(
+                    fendermint_actor_storage_config::ACTOR_NAME,
+                    storage_actor_ids::RECALL_CONFIG_ACTOR_ID,
+                    &recall_config_state,
+                    TokenAmount::zero(),
+                    None,
+                )
+                .context("failed to create recall config actor")?;
+
+            // Initialize the blob actor with delegated address for Ethereum/Solidity access.
+            let blobs_state = fendermint_actor_storage_blobs::State::new(&state.store())?;
+            let blobs_eth_addr = init::builtin_actor_eth_addr(storage_actor_ids::BLOBS_ACTOR_ID);
+            let blobs_f4_addr = fvm_shared::address::Address::from(blobs_eth_addr);
+            state
+                .create_custom_actor(
+                    fendermint_actor_storage_blobs::BLOBS_ACTOR_NAME,
+                    storage_actor_ids::BLOBS_ACTOR_ID,
+                    &blobs_state,
+                    TokenAmount::zero(),
+                    Some(blobs_f4_addr),
+                )
+                .context("failed to create blobs actor")?;
+            println!("!!!!!!!!  SETUP BLOB ACTOR !!!!!!!!: {blobs_eth_addr}, {blobs_eth_addr:?}");
+
+            // Initialize the blob reader actor.
+            state
+                .create_custom_actor(
+                    fendermint_actor_storage_blob_reader::BLOB_READER_ACTOR_NAME,
+                    storage_actor_ids::BLOB_READER_ACTOR_ID,
+                    &fendermint_actor_storage_blob_reader::State::new(&state.store())?,
+                    TokenAmount::zero(),
+                    None,
+                )
+                .context("failed to create blob reader actor")?;
+        }
 
         let eam_state = fendermint_actor_eam::State::new(
             state.store(),

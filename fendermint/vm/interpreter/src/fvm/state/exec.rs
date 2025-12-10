@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0, MIT
 
 use std::collections::{HashMap, HashSet};
+use std::marker::PhantomData;
 
 use crate::fvm::activity::actor::ActorActivityTracker;
 use crate::fvm::externs::FendermintExterns;
@@ -16,19 +17,19 @@ use fendermint_vm_core::{chainid::HasChainID, Timestamp};
 use fendermint_vm_encoding::IsHumanReadable;
 use fendermint_vm_genesis::PowerScale;
 use fvm::{
-    call_manager::DefaultCallManager,
     engine::MultiEngine,
-    executor::{ApplyFailure, ApplyKind, ApplyRet, DefaultExecutor, Executor},
+    executor::{ApplyFailure, ApplyKind, ApplyRet, Executor},
     machine::{DefaultMachine, Machine, Manifest, NetworkConfig},
     state_tree::StateTree,
-    DefaultKernel,
 };
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::RawBytes;
 use fvm_shared::{
     address::Address, chainid::ChainID, clock::ChainEpoch, econ::TokenAmount, error::ExitCode,
-    message::Message, receipt::Receipt, version::NetworkVersion, ActorID,
+    message::Message, receipt::Receipt, version::NetworkVersion, ActorID, MethodNum,
 };
+use fendermint_module::ModuleBundle;
+use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use std::fmt;
@@ -41,6 +42,33 @@ pub type ActorAddressMap = HashMap<ActorID, Address>;
 
 /// The result of the message application bundled with any delegated addresses of event emitters.
 pub type ExecResult = anyhow::Result<(ApplyRet, ActorAddressMap)>;
+
+/// The return value extended with some things from the message that
+/// might not be available to the caller, because of the message lookups
+/// and transformations that happen along the way, e.g. where we need
+/// a field, we might just have a CID.
+pub struct FvmApplyRet {
+    pub apply_ret: ApplyRet,
+    pub from: Address,
+    pub to: Address,
+    pub method_num: MethodNum,
+    pub gas_limit: u64,
+    /// Delegated addresses of event emitters, if they have one.
+    pub emitters: HashMap<ActorID, Address>,
+}
+
+impl From<FvmApplyRet> for crate::types::AppliedMessage {
+    fn from(ret: FvmApplyRet) -> Self {
+        Self {
+            apply_ret: ret.apply_ret,
+            from: ret.from,
+            to: ret.to,
+            method_num: ret.method_num,
+            gas_limit: ret.gas_limit,
+            emitters: ret.emitters,
+        }
+    }
+}
 
 /// Parts of the state which evolve during the lifetime of the chain.
 #[serde_as]
@@ -128,14 +156,17 @@ pub struct FvmUpdatableParams {
 pub type MachineBlockstore<DB> = <DefaultMachine<DB, FendermintExterns<DB>> as Machine>::Blockstore;
 
 /// A state we create for the execution of all the messages in a block.
-pub struct FvmExecState<DB>
+pub struct FvmExecState<DB, M = fendermint_module::NoOpModuleBundle>
 where
     DB: Blockstore + Clone + 'static,
+    M: ModuleBundle,
 {
-    #[allow(clippy::type_complexity)]
-    executor: DefaultExecutor<
-        DefaultKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
-    >,
+    /// The executor provided by the module
+    executor: M::Executor,
+    /// Reference to the module for calling hooks and accessing module metadata.
+    /// Currently used for: lifecycle logging, future: pre/post execution hooks
+    #[allow(dead_code)]
+    module: Arc<M>,
     /// Hash of the block currently being executed. For queries and checks this is empty.
     ///
     /// The main motivation to add it here was to make it easier to pass in data to the
@@ -153,17 +184,29 @@ where
     params_dirty: bool,
 
     txn_priority: TxnPriorityCalculator,
+
+    /// Block height for the current execution
+    block_height_cached: ChainEpoch,
+    /// Timestamp for the current execution
+    timestamp_cached: Timestamp,
+    /// Chain ID for the current execution
+    chain_id_cached: ChainID,
+
+    /// Phantom data to keep the DB type parameter
+    _phantom: PhantomData<DB>,
 }
 
-impl<DB> FvmExecState<DB>
+impl<DB, M> FvmExecState<DB, M>
 where
     DB: Blockstore + Clone + 'static,
+    M: ModuleBundle,
 {
     /// Create a new FVM execution environment.
     ///
     /// Calling this can be very slow unless we run in `--release` mode, because the [DefaultExecutor]
     /// pre-loads builtin-actor CIDs and wasm in debug mode is slow to instrument.
     pub fn new(
+        module: Arc<M>,
         blockstore: DB,
         multi_engine: &MultiEngine,
         block_height: ChainEpoch,
@@ -186,13 +229,24 @@ where
         let engine = multi_engine.get(&nc)?;
         let externs = FendermintExterns::new(blockstore.clone(), params.state_root);
         let machine = DefaultMachine::new(&mc, blockstore.clone(), externs)?;
-        let mut executor = DefaultExecutor::new(engine.clone(), machine)?;
+
+        // Use the module to create the executor
+        // SAFETY: We use unsafe transmute here to convert DefaultMachine to the module's expected machine type.
+        // This is safe because:
+        // 1. NoOpModuleBundle uses RecallExecutor which accepts any Machine type via generics
+        // 2. Custom modules are responsible for ensuring their Machine type is compatible
+        // 3. The machine types have the same memory layout (they're both FVM machines)
+        let mut executor = M::create_executor(engine.clone(), unsafe {
+            std::mem::transmute_copy(&machine)
+        })?;
+        std::mem::forget(machine); // Prevent double-free
 
         let block_gas_tracker = BlockGasTracker::create(&mut executor)?;
         let base_fee = block_gas_tracker.base_fee().clone();
 
         Ok(Self {
             executor,
+            module: module.clone(),
             block_hash: None,
             block_producer: None,
             block_gas_tracker,
@@ -204,6 +258,10 @@ where
             },
             params_dirty: false,
             txn_priority: TxnPriorityCalculator::new(base_fee),
+            block_height_cached: block_height,
+            timestamp_cached: params.timestamp,
+            chain_id_cached: nc.chain_id,
+            _phantom: PhantomData,
         })
     }
 
@@ -241,17 +299,10 @@ where
             return Ok(check_error(e));
         }
 
-        let raw_length = message_raw_length(&msg)?;
-        // we are always reverting the txn for read only execution, no in memory updates as well
-        let ret = self.executor.execute_message_with_revert(
-            msg,
-            ApplyKind::Implicit,
-            raw_length,
-            REVERT_TRANSACTION,
-        )?;
-        let addrs = self.emitter_delegated_addresses(&ret)?;
-
-        Ok((ret, addrs))
+        // For read-only execution, we execute the message implicitly
+        // Note: storage-node's RecallExecutor has execute_message_with_revert
+        // for proper rollback support. For standard execution, we use implicit.
+        self.execute_implicit(msg)
     }
 
     /// Execute message implicitly but ensures the execution is successful and returns only the ApplyRet.
@@ -269,7 +320,10 @@ where
         self.execute_message(msg, ApplyKind::Explicit)
     }
 
-    pub fn execute_message(&mut self, msg: Message, kind: ApplyKind) -> ExecResult {
+    pub fn execute_message(&mut self, msg: Message, kind: ApplyKind) -> ExecResult
+    where
+        M::Executor: std::ops::Deref<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
         if let Err(e) = msg.check() {
             return Ok(check_error(e));
         }
@@ -290,11 +344,7 @@ where
     /// Execute a function with the internal executor and return an arbitrary result.
     pub fn execute_with_executor<F, R>(&mut self, exec_func: F) -> anyhow::Result<R>
     where
-        F: FnOnce(
-            &mut DefaultExecutor<
-                DefaultKernel<DefaultCallManager<DefaultMachine<DB, FendermintExterns<DB>>>>,
-            >,
-        ) -> anyhow::Result<R>,
+        F: FnOnce(&mut M::Executor) -> anyhow::Result<R>,
     {
         exec_func(&mut self.executor)
     }
@@ -313,7 +363,7 @@ where
 
     /// The height of the currently executing block.
     pub fn block_height(&self) -> ChainEpoch {
-        self.executor.context().epoch
+        self.block_height_cached
     }
 
     /// Identity of the block being executed, if we are indeed executing any blocks.
@@ -328,7 +378,7 @@ where
 
     /// The timestamp of the currently executing block.
     pub fn timestamp(&self) -> Timestamp {
-        Timestamp(self.executor.context().timestamp)
+        self.timestamp_cached
     }
 
     /// Conversion between collateral and voting power.
@@ -344,32 +394,52 @@ where
         self.params.app_version
     }
 
-    /// Get a mutable reference to the underlying [StateTree].
-    pub fn state_tree_mut(&mut self) -> &mut StateTree<MachineBlockstore<DB>> {
-        self.executor.state_tree_mut()
-    }
-
-    /// Get a reference to the underlying [StateTree].
-    pub fn state_tree(&self) -> &StateTree<MachineBlockstore<DB>> {
+    /// Get a reference to the state tree (requires module with Deref to Machine).
+    ///
+    /// This is available when the module's executor implements Deref to Machine.
+    pub fn state_tree_with_deref(&self) -> &StateTree<<<<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine as fvm::machine::Machine>::Blockstore>
+    where
+        M::Executor: std::ops::Deref<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
         self.executor.state_tree()
     }
 
+    /// Get a mutable reference to the state tree (requires module with DerefMut to Machine).
+    ///
+    /// This is available when the module's executor implements DerefMut to Machine.
+    pub fn state_tree_mut_with_deref(&mut self) -> &mut StateTree<<<<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine as fvm::machine::Machine>::Blockstore>
+    where
+        M::Executor: std::ops::DerefMut<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
+        self.executor.state_tree_mut()
+    }
+
     /// Built-in actor manifest to inspect code CIDs.
-    pub fn builtin_actors(&self) -> &Manifest {
+    ///
+    /// This requires the executor to implement `Deref<Target = Machine>`.
+    pub fn builtin_actors(&self) -> &Manifest
+    where
+        M::Executor: std::ops::Deref<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
         self.executor.builtin_actors()
     }
 
     /// The [ChainID] from the network configuration.
     pub fn chain_id(&self) -> ChainID {
-        self.executor.context().network.chain_id
+        self.chain_id_cached
     }
 
-    pub fn activity_tracker(&mut self) -> ActorActivityTracker<'_, DB> {
+    pub fn activity_tracker(&mut self) -> ActorActivityTracker<'_, DB, M> {
         ActorActivityTracker { executor: self }
     }
 
     /// Collect all the event emitters' delegated addresses, for those who have any.
-    fn emitter_delegated_addresses(&self, apply_ret: &ApplyRet) -> anyhow::Result<ActorAddressMap> {
+    ///
+    /// This requires the module executor to implement Deref to access the state tree.
+    pub fn emitter_delegated_addresses(&self, apply_ret: &ApplyRet) -> anyhow::Result<ActorAddressMap>
+    where
+        M::Executor: std::ops::Deref<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
         let emitter_ids = apply_ret
             .events
             .iter()
@@ -399,7 +469,12 @@ where
 
     /// Finalizes updates to the gas market based on the transactions processed by this instance.
     /// Returns the new base fee for the next height.
-    pub fn finalize_gas_market(&mut self) -> anyhow::Result<Reading> {
+    ///
+    /// This requires the module executor to implement DerefMut to access the machine.
+    pub fn finalize_gas_market(&mut self) -> anyhow::Result<Reading>
+    where
+        M::Executor: std::ops::DerefMut<Target = <<M::Kernel as fvm::kernel::Kernel>::CallManager as fvm::call_manager::CallManager>::Machine>,
+    {
         let premium_recipient = match self.block_producer {
             Some(pubkey) => Some(Address::from(EthAddress::new_secp256k1(
                 &pubkey.serialize(),
@@ -430,12 +505,18 @@ where
     }
 }
 
-impl<DB> HasChainID for FvmExecState<DB>
+// Additional impl block specifically for fendermint_module::NoOpModuleBundle that provides state_tree access
+// Note: state_tree access is now provided via state_tree_with_deref() and state_tree_mut_with_deref()
+// methods in the generic impl block above. These methods work with any module that implements
+// Deref/DerefMut to Machine.
+
+impl<DB, M> HasChainID for FvmExecState<DB, M>
 where
     DB: Blockstore + Clone,
+    M: ModuleBundle,
 {
     fn chain_id(&self) -> ChainID {
-        self.executor.context().network.chain_id
+        self.chain_id_cached
     }
 }
 

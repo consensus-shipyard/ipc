@@ -287,7 +287,7 @@ async fn fevm_estimate_gas(
 ///
 /// People can use `jq` to turn it into compact form if they want to save the results to a `.jsonline`
 /// file, but the default of having human readable output seems more useful.
-fn print_json<T: Serialize>(value: &T) -> anyhow::Result<()> {
+pub fn print_json<T: Serialize>(value: &T) -> anyhow::Result<()> {
     let json = serde_json::to_string_pretty(&value)?;
     println!("{}", json);
     Ok(())
