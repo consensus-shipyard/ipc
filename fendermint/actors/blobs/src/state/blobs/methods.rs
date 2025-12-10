@@ -435,19 +435,18 @@ impl State {
 
         // Remove the source from both added and pending queues
         // (blob may be finalized directly from added status without going through pending)
-        // Use params.source, not blob.subscription.source, because the queue key uses
-        // the source from the original AddBlob params
+        // Use blob.subscription.source (what was stored) not params.source (what gateway sends)
         self.blobs.added.remove_source(
             store,
             &params.hash,
             blob.blob.size,
-            BlobSource::new(subscriber, params.id.clone(), params.source),
+            BlobSource::new(subscriber, params.id.clone(), blob.subscription.source),
         )?;
         self.blobs.pending.remove_source(
             store,
             &params.hash,
             blob.blob.size,
-            BlobSource::new(subscriber, params.id.clone(), params.source),
+            BlobSource::new(subscriber, params.id.clone(), blob.subscription.source),
         )?;
 
         // Save blob

@@ -28,14 +28,15 @@ use fvm_shared::address::Address;
 use fvm_shared::bigint::Zero;
 use fvm_shared::econ::TokenAmount;
 use fvm_shared::message::Message;
-use iroh_blobs::Hash;
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
 
 /// A blob item with its hash, size, and subscribers
-pub type BlobItem = (Hash, u64, HashSet<(Address, SubscriptionId, iroh::NodeId)>);
+/// Note: We use B256 for both hash and source to match the actor's return type exactly.
+/// The actor returns BlobRequest = (B256, u64, HashSet<(Address, SubscriptionId, B256)>)
+pub type BlobItem = (B256, u64, HashSet<(Address, SubscriptionId, B256)>);
 
 /// Cached operator information
 struct OperatorCache {
@@ -123,7 +124,7 @@ pub struct BlobGateway<C> {
     /// Cached operator data (refreshed periodically)
     operator_cache: OperatorCache,
     /// Track blobs awaiting signature collection and finalization
-    pending_finalization: HashMap<Hash, BlobSignatureCollection>,
+    pending_finalization: HashMap<B256, BlobSignatureCollection>,
 }
 
 impl<C> BlobGateway<C>
@@ -264,23 +265,17 @@ where
             Ok(added_blobs) => {
                 for (hash, size, sources) in added_blobs {
                     // Extract metadata from sources (pick first source)
-                    if let Some((subscriber, subscription_id, source_node_id)) =
-                        sources.iter().next()
-                    {
+                    if let Some((subscriber, subscription_id, source)) = sources.iter().next() {
                         // Skip if already tracked
                         if self.pending_finalization.contains_key(&hash) {
                             continue;
                         }
 
-                        // Convert iroh::NodeId to B256
-                        let source_bytes: [u8; 32] = *source_node_id.as_bytes();
-                        let source = B256(source_bytes);
-
                         let metadata = BlobMetadata {
                             subscriber: *subscriber,
                             size,
                             subscription_id: subscription_id.clone(),
-                            source,
+                            source: *source,
                         };
 
                         // Track the blob for signature collection
@@ -298,7 +293,7 @@ where
         }
 
         // Step 3: Try to collect signatures for tracked blobs
-        let tracked_blobs: Vec<Hash> = self.pending_finalization.keys().copied().collect();
+        let tracked_blobs: Vec<B256> = self.pending_finalization.keys().copied().collect();
 
         debug!(
             "Checking {} blobs for signature collection",
@@ -574,7 +569,7 @@ where
     /// - bitmap: u128 bitmap indicating which operators signed
     pub async fn collect_signatures(
         &self,
-        blob_hash: Hash,
+        blob_hash: B256,
     ) -> Result<(Vec<(usize, BlsSignature)>, u128)> {
         info!("Collecting signatures for blob {}", blob_hash);
 
@@ -635,13 +630,13 @@ where
     async fn fetch_signature_from_operator(
         &self,
         rpc_url: &str,
-        blob_hash: Hash,
+        blob_hash: B256,
     ) -> Result<BlsSignature> {
         Self::fetch_signature_static(rpc_url, blob_hash).await
     }
 
     /// Static version of fetch_signature_from_operator for parallel execution
-    async fn fetch_signature_static(rpc_url: &str, blob_hash: Hash) -> Result<BlsSignature> {
+    async fn fetch_signature_static(rpc_url: &str, blob_hash: B256) -> Result<BlsSignature> {
         let url = format!("{}/signature/{}", rpc_url, blob_hash);
         debug!("Fetching signature from {}", url);
 
@@ -707,16 +702,12 @@ where
     /// This submits a real transaction to the blockchain (not just a query).
     pub async fn finalize_blob(
         &mut self,
-        blob_hash: Hash,
+        blob_hash: B256,
         metadata: &BlobMetadata,
         aggregated_signature: BlsSignature,
         signer_bitmap: u128,
     ) -> Result<()> {
         info!("Finalizing blob {} on-chain", blob_hash);
-
-        // Convert Hash to B256
-        let hash_bytes: [u8; 32] = *blob_hash.as_bytes();
-        let hash_b256 = B256(hash_bytes);
 
         // Serialize aggregated signature
         let signature_bytes = aggregated_signature.as_bytes().to_vec();
@@ -725,7 +716,7 @@ where
         let params = FinalizeBlobParams {
             source: metadata.source,
             subscriber: metadata.subscriber,
-            hash: hash_b256,
+            hash: blob_hash,
             size: metadata.size,
             id: metadata.subscription_id.clone(),
             status: BlobStatus::Resolved,

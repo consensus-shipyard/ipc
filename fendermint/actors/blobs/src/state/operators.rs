@@ -2,11 +2,22 @@
 // Copyright 2021-2023 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+use fil_actors_runtime::fvm_ipld_hamt::{BytesKey, Config, Hamt, Sha256};
 use fil_actors_runtime::ActorError;
 use fvm_ipld_blockstore::Blockstore;
 use fvm_ipld_encoding::tuple::*;
-use fvm_shared::{address::Address, clock::ChainEpoch};
+use fvm_shared::address::Address;
+use fvm_shared::clock::ChainEpoch;
 use recall_ipld::hamt::{self, map::TrackedFlushResult};
+
+pub use cid::Cid;
+
+/// Default HAMT configuration for pubkey mapping
+const PUBKEY_HAMT_CONFIG: Config = Config {
+    bit_width: 5,
+    min_data_depth: 0,
+    max_array_width: 3,
+};
 
 /// Information about a registered node operator
 #[derive(Clone, Debug, PartialEq, Serialize_tuple, Deserialize_tuple)]
@@ -30,26 +41,42 @@ pub struct Operators {
     /// HAMT root: Address → NodeOperatorInfo
     pub root: hamt::Root<Address, NodeOperatorInfo>,
 
+    /// HAMT root CID: BLS public key (BytesKey) → Address
+    /// Used for fast uniqueness check during registration
+    /// Uses fvm_ipld_hamt directly to avoid Display constraint
+    pub pubkey_to_addr: Cid,
+
     /// Ordered list of active operator addresses
     /// Index in this vec = bit position in bitmap for signature aggregation
     pub active_list: Vec<Address>,
 
     /// Total number of registered operators
     size: u64,
+
+    /// Total number of entries in pubkey_to_addr HAMT
+    pubkey_size: u64,
 }
 
 impl Operators {
     /// Creates a new empty [`Operators`] registry
     pub fn new<BS: Blockstore>(store: &BS) -> Result<Self, ActorError> {
         let root = hamt::Root::<Address, NodeOperatorInfo>::new(store, "operators")?;
+        // Create empty pubkey HAMT using fvm_ipld_hamt directly with explicit config
+        let mut pubkey_hamt: Hamt<&BS, Address, BytesKey, Sha256> =
+            Hamt::new_with_config(store, PUBKEY_HAMT_CONFIG);
+        let pubkey_to_addr = pubkey_hamt
+            .flush()
+            .map_err(|e| ActorError::illegal_state(format!("failed to flush pubkey HAMT: {}", e)))?;
         Ok(Self {
             root,
+            pubkey_to_addr,
             active_list: Vec::new(),
             size: 0,
+            pubkey_size: 0,
         })
     }
 
-    /// Returns the underlying [`hamt::map::Hamt`]
+    /// Returns the underlying [`hamt::map::Hamt`] for operators
     pub fn hamt<'a, BS: Blockstore>(
         &self,
         store: BS,
@@ -57,13 +84,28 @@ impl Operators {
         self.root.hamt(store, self.size)
     }
 
-    /// Saves the state from the [`TrackedFlushResult`]
+    /// Returns the underlying fvm_ipld_hamt for pubkey → address mapping
+    pub fn pubkey_hamt<BS: Blockstore>(
+        &self,
+        store: BS,
+    ) -> Result<Hamt<BS, Address, BytesKey, Sha256>, ActorError> {
+        Hamt::load_with_config(&self.pubkey_to_addr, store, PUBKEY_HAMT_CONFIG)
+            .map_err(|e| ActorError::illegal_state(format!("failed to load pubkey HAMT: {}", e)))
+    }
+
+    /// Saves the state from the [`TrackedFlushResult`] for operators
     pub fn save_tracked(
         &mut self,
         tracked_flush_result: TrackedFlushResult<Address, NodeOperatorInfo>,
     ) {
         self.root = tracked_flush_result.root;
         self.size = tracked_flush_result.size;
+    }
+
+    /// Saves the pubkey HAMT root CID and updates size
+    pub fn save_pubkey(&mut self, cid: Cid, size_delta: i64) {
+        self.pubkey_to_addr = cid;
+        self.pubkey_size = (self.pubkey_size as i64 + size_delta) as u64;
     }
 
     /// Returns the number of registered operators
@@ -78,13 +120,13 @@ impl Operators {
 
     /// Register a new operator (adds to end of active_list)
     /// Returns the operator's index in the active_list
-    pub fn register<BS: Blockstore>(
+    pub fn register<BS: Blockstore + Clone>(
         &mut self,
         store: BS,
         address: Address,
         info: NodeOperatorInfo,
     ) -> Result<usize, ActorError> {
-        let mut hamt = self.hamt(store)?;
+        let mut hamt = self.hamt(store.clone())?;
 
         // Check if operator already exists
         if hamt.get(&address)?.is_some() {
@@ -93,7 +135,29 @@ impl Operators {
             ));
         }
 
-        // Add to HAMT
+        // Check if BLS public key is already registered (O(log n) lookup)
+        let mut pubkey_hamt = self.pubkey_hamt(store)?;
+        let pubkey_key = BytesKey::from(info.bls_pubkey.clone());
+        if pubkey_hamt
+            .get(&pubkey_key)
+            .map_err(|e| ActorError::illegal_state(format!("failed to get pubkey: {}", e)))?
+            .is_some()
+        {
+            return Err(ActorError::illegal_argument(
+                "BLS public key already registered by another operator".into(),
+            ));
+        }
+
+        // Add pubkey → address mapping
+        pubkey_hamt
+            .set(pubkey_key, address)
+            .map_err(|e| ActorError::illegal_state(format!("failed to set pubkey: {}", e)))?;
+        let pubkey_cid = pubkey_hamt
+            .flush()
+            .map_err(|e| ActorError::illegal_state(format!("failed to flush pubkey HAMT: {}", e)))?;
+        self.save_pubkey(pubkey_cid, 1);
+
+        // Add to operator HAMT
         self.save_tracked(hamt.set_and_flush_tracked(&address, info)?);
 
         // Add to active list (gets next available index)
@@ -145,17 +209,28 @@ impl Operators {
 
     /// Deactivate an operator (removes from active_list but keeps in HAMT)
     /// Note: This will change indices of all operators after the removed one
-    pub fn deactivate<BS: Blockstore>(
+    pub fn deactivate<BS: Blockstore + Clone>(
         &mut self,
         store: BS,
         address: &Address,
     ) -> Result<(), ActorError> {
-        let mut hamt = self.hamt(store)?;
+        let mut hamt = self.hamt(store.clone())?;
 
         // Get existing info
         let mut info = hamt
             .get(address)?
             .ok_or_else(|| ActorError::not_found("Operator not found".into()))?;
+
+        // Remove pubkey → address mapping to allow re-registration with same pubkey
+        let mut pubkey_hamt = self.pubkey_hamt(store)?;
+        let pubkey_key = BytesKey::from(info.bls_pubkey.clone());
+        pubkey_hamt
+            .delete(&pubkey_key)
+            .map_err(|e| ActorError::illegal_state(format!("failed to delete pubkey: {}", e)))?;
+        let pubkey_cid = pubkey_hamt
+            .flush()
+            .map_err(|e| ActorError::illegal_state(format!("failed to flush pubkey HAMT: {}", e)))?;
+        self.save_pubkey(pubkey_cid, -1);
 
         // Mark as inactive
         info.active = false;
@@ -243,6 +318,49 @@ mod tests {
 
         let result = operators.register(&store, addr1, new_test_operator(2));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_duplicate_pubkey_registration() {
+        let store = MemoryBlockstore::default();
+        let mut operators = Operators::new(&store).unwrap();
+
+        let addr1 = new_test_address(100);
+        let addr2 = new_test_address(101);
+
+        // Register first operator with pubkey 1
+        operators
+            .register(&store, addr1, new_test_operator(1))
+            .unwrap();
+
+        // Try to register second operator with same pubkey - should fail
+        let result = operators.register(&store, addr2, new_test_operator(1));
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .msg()
+            .contains("BLS public key already registered"));
+    }
+
+    #[test]
+    fn test_pubkey_reuse_after_deactivation() {
+        let store = MemoryBlockstore::default();
+        let mut operators = Operators::new(&store).unwrap();
+
+        let addr1 = new_test_address(100);
+        let addr2 = new_test_address(101);
+
+        // Register first operator with pubkey 1
+        operators
+            .register(&store, addr1, new_test_operator(1))
+            .unwrap();
+
+        // Deactivate operator 1
+        operators.deactivate(&store, &addr1).unwrap();
+
+        // Now registering with same pubkey from different address should succeed
+        let result = operators.register(&store, addr2, new_test_operator(1));
+        assert!(result.is_ok());
     }
 
     #[test]

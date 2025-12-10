@@ -8,4 +8,3 @@
 
 pub mod gateway;
 pub mod node;
-pub mod rpc;

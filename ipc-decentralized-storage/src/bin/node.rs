@@ -6,6 +6,7 @@
 use anyhow::{anyhow, Context, Result};
 use bls_signatures::{PrivateKey as BlsPrivateKey, Serialize as BlsSerialize};
 use clap::{Parser, Subcommand};
+use ethers::types::Address as EthAddress;
 use fendermint_actor_blobs_shared::method::Method;
 use fendermint_actor_blobs_shared::operators::RegisterNodeOperatorParams;
 use fendermint_actor_blobs_shared::BLOBS_ACTOR_ADDR;
@@ -74,6 +75,14 @@ struct RunArgs {
     /// Tendermint RPC URL
     #[arg(long, default_value = "http://localhost:26657")]
     rpc_url: String,
+
+    /// Ethereum JSON-RPC URL (Fendermint ETH API endpoint)
+    #[arg(long, default_value = "http://localhost:8545")]
+    eth_rpc_url: String,
+
+    /// Blobs actor address for event filtering (hex format with 0x prefix)
+    #[arg(long, default_value = "0xff00000000000000000000000000000000000064")]
+    blobs_actor_address: String,
 
     /// Number of blobs to fetch per query
     #[arg(long, default_value = "10")]
@@ -234,17 +243,25 @@ async fn run_node(args: RunArgs) -> Result<()> {
     // Parse RPC URL
     let rpc_url = Url::from_str(&args.rpc_url).context("failed to parse RPC URL")?;
 
+    // Parse blobs actor address
+    let blobs_actor_address: EthAddress = args
+        .blobs_actor_address
+        .parse()
+        .context("failed to parse blobs actor address")?;
+
     // Create node configuration
     let config = NodeConfig {
         iroh_path: args.iroh_path,
         iroh_v4_addr: args.iroh_v4_addr,
         iroh_v6_addr: args.iroh_v6_addr,
         rpc_url,
+        eth_rpc_url: args.eth_rpc_url,
         batch_size: args.batch_size,
         poll_interval: Duration::from_secs(args.poll_interval_secs),
         max_concurrent_downloads: args.max_concurrent_downloads,
         bls_private_key,
         rpc_bind_addr: args.rpc_bind_addr,
+        blobs_actor_address,
     };
 
     info!("Starting node with configuration: {:?}", config);

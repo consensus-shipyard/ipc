@@ -12,6 +12,7 @@ version = "0.1.0"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
+cid = { workspace = true }
 anyhow = { workspace = true }
 fil_actors_runtime = { workspace = true }
 fvm_ipld_blockstore = { workspace = true }

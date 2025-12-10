@@ -325,7 +325,7 @@ impl BlobsActor {
         let caller = Caller::new_delegated(rt, from, params.sponsor, CallerOption::Auth)?;
 
         let mut capacity_released = 0;
-        let (delete, size, _) = rt.transaction(|st: &mut State, rt| {
+        let (_, size, _) = rt.transaction(|st: &mut State, rt| {
             let initial_capacity_used = st.blobs.bytes_size();
             let res = st.delete_blob(
                 rt.store(),
@@ -336,10 +336,6 @@ impl BlobsActor {
             capacity_released = initial_capacity_used - st.blobs.bytes_size();
             Ok(res)
         })?;
-
-        if delete {
-            delete_from_disc(params.hash)?;
-        }
 
         emit_evm_event(
             rt,

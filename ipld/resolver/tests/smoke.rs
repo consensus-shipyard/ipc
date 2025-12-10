@@ -305,7 +305,9 @@ async fn make_cluster_with_bootstrap(cluster_size: u32, bootstrap_idx: usize) ->
 
     // Build a cluster of nodes.
     for i in 0..builder.size {
-        builder.add_node(if i == 0 { None } else { Some(bootstrap_idx) }).await;
+        builder
+            .add_node(if i == 0 { None } else { Some(bootstrap_idx) })
+            .await;
     }
 
     // Start the swarms.
