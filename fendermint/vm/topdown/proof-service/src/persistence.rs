@@ -185,28 +185,6 @@ impl ProofCachePersistence {
         }
         Ok(())
     }
-
-    fn load_i64(&self, cf: &Arc<BoundColumnFamily>, key: &[u8]) -> Result<Option<i64>> {
-        match self.db.get_cf(cf, key)? {
-            Some(data) => {
-                let bytes = <[u8; 8]>::try_from(data.as_ref())
-                    .map_err(|_| anyhow::anyhow!("Invalid i64 data length"))?;
-                Ok(Some(i64::from_be_bytes(bytes)))
-            }
-            None => Ok(None),
-        }
-    }
-
-    fn load_u64(&self, cf: &Arc<BoundColumnFamily>, key: &[u8]) -> Result<Option<u64>> {
-        match self.db.get_cf(cf, key)? {
-            Some(data) => {
-                let bytes = <[u8; 8]>::try_from(data.as_ref())
-                    .map_err(|_| anyhow::anyhow!("Invalid u64 data length"))?;
-                Ok(Some(u64::from_be_bytes(bytes)))
-            }
-            None => Ok(None),
-        }
-    }
 }
 
 #[cfg(test)]
