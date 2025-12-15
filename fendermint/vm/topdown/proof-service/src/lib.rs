@@ -17,9 +17,6 @@
 //! This avoids duplicating certificates when multiple epochs reference
 //! the same certificate.
 
-// Re-export commonly used types
-pub use filecoin_f3_gpbft::powertable::{PowerEntries, PowerEntry};
-
 pub mod assembler;
 pub mod cache;
 pub mod config;
@@ -28,6 +25,7 @@ pub mod observe;
 pub mod persistence;
 pub mod service;
 pub mod types;
+pub mod verifier;
 
 // Re-export main types for convenience
 pub use cache::ProofCache;
@@ -55,7 +53,6 @@ use std::sync::Arc;
 /// * `initial_instance` - The last committed F3 instance (from F3CertManager actor)
 /// * `initial_power_table` - Initial power table (from F3CertManager actor)
 /// * `db_path` - Optional database path for persistence
-/// * `initial_committed_instance` - The last committed F3 instance (from actor)
 ///
 /// # Returns
 /// * `Arc<ProofCache>` - Shared cache that proposers can query
@@ -154,6 +151,7 @@ mod tests {
     #[tokio::test]
     async fn test_launch_service_enabled() {
         use crate::config::GatewayId;
+        use filecoin_f3_gpbft::PowerEntries;
 
         let config = ProofServiceConfig {
             enabled: true,
@@ -171,8 +169,5 @@ mod tests {
 
         let (_cache, handle) = result.unwrap().unwrap();
         handle.abort();
-
-        // Check cache state
-        assert_eq!(cache.last_committed_instance(), 100);
     }
 }

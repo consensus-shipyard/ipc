@@ -98,8 +98,8 @@ impl ProofGeneratorService {
         Ok(Self {
             config,
             cache,
-            assembler,
             f3_client,
+            assembler,
         })
     }
 
@@ -115,13 +115,11 @@ impl ProofGeneratorService {
             "Starting proof generator service"
         );
 
-        // Validator is already initialized in new() with trusted power table
         let mut poll_interval = interval(self.config.polling_interval);
         poll_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
-        // Health check interval - check unhealthy providers every 60s
-        let mut health_check_interval = interval(std::time::Duration::from_secs(180));
-        health_check_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+        loop {
+            poll_interval.tick().await;
 
             if let Err(e) = self.process_next_certificate().await {
                 tracing::error!(
