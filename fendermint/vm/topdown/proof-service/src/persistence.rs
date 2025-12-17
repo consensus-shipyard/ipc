@@ -17,10 +17,14 @@
 //! - `certificates`: F3 certificates keyed by instance_id
 //! - `epoch_proofs`: Proof bundles keyed by epoch
 
-use crate::types::{CertificateEntry, EpochProofEntry, SerializableCertificateEntry};
+use crate::types::{
+    CertificateEntry, CombinedCacheEntry, EpochProofEntry, SerializableCertificateEntry,
+};
 use anyhow::{Context, Result};
 use fvm_shared::clock::ChainEpoch;
+use proofs::proofs::common::bundle::UnifiedProofBundle;
 use rocksdb::{BoundColumnFamily, Options, DB};
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 use tracing::{debug, info};
@@ -170,6 +174,53 @@ impl ProofCachePersistence {
         self.clear_cf(CF_EPOCH_PROOFS)?;
         debug!("Cleared all cache entries from disk");
         Ok(())
+    }
+
+    /// Clear all entries (alias for clear_all)
+    pub fn clear_all_entries(&self) -> Result<()> {
+        self.clear_all()
+    }
+
+    /// Load the last committed instance ID
+    ///
+    /// Note: This information is not persisted to disk, so this always returns None.
+    /// The last committed state is only stored in memory in the ProofCache.
+    pub fn load_last_committed(&self) -> Result<Option<u64>> {
+        Ok(None)
+    }
+
+    /// Load all entries as combined cache entries
+    ///
+    /// This combines certificates with their associated epoch proofs for inspection.
+    /// Each certificate is paired with a proof bundle if one exists for that instance.
+    pub fn load_all_entries(&self) -> Result<Vec<CombinedCacheEntry>> {
+        let certificates = self.load_all_certificates()?;
+        let epoch_proofs = self.load_all_epoch_proofs()?;
+
+        // Create a map of instance_id -> proof bundles
+        // Note: Multiple epoch proofs can reference the same certificate instance
+        // We'll take the first proof bundle found for each certificate
+        let mut proof_map: HashMap<u64, UnifiedProofBundle> = HashMap::new();
+        for proof in &epoch_proofs {
+            proof_map
+                .entry(proof.cert_instance)
+                .or_insert_with(|| proof.proof_bundle.clone());
+        }
+
+        // Combine certificates with their proof bundles
+        let mut entries = Vec::new();
+        for cert_entry in certificates {
+            let proof_bundle = proof_map.get(&cert_entry.instance_id()).cloned();
+            entries.push(CombinedCacheEntry {
+                certificate: cert_entry.certificate,
+                proof_bundle,
+                generated_at: cert_entry.fetched_at,
+                source_rpc: cert_entry.source_rpc,
+            });
+        }
+
+        info!(count = entries.len(), "Loaded combined cache entries");
+        Ok(entries)
     }
 
     fn clear_cf(&self, cf_name: &str) -> Result<()> {

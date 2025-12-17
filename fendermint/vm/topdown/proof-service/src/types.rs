@@ -546,3 +546,31 @@ impl EpochProofWithCertificate {
         }
     }
 }
+
+/// Combined entry for cache inspection
+///
+/// This combines a certificate with an optional proof bundle for display purposes.
+/// Used by CLI tools to inspect the cache contents.
+#[derive(Debug, Clone)]
+pub struct CombinedCacheEntry {
+    /// The F3 certificate
+    pub certificate: FinalityCertificate,
+    /// Optional proof bundle (if available for this certificate's instance)
+    pub proof_bundle: Option<UnifiedProofBundle>,
+    /// When the certificate was fetched
+    pub generated_at: SystemTime,
+    /// Source RPC endpoint
+    pub source_rpc: String,
+}
+
+impl CombinedCacheEntry {
+    /// Get the instance ID from the certificate
+    pub fn instance_id(&self) -> u64 {
+        self.certificate.gpbft_instance
+    }
+
+    /// Get the finalized epochs from the certificate's EC chain
+    pub fn finalized_epochs(&self) -> Vec<ChainEpoch> {
+        self.certificate.ec_chain.iter().map(|t| t.epoch).collect()
+    }
+}

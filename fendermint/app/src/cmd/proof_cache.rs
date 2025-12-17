@@ -45,16 +45,19 @@ fn inspect_cache(db_path: &Path) -> anyhow::Result<()> {
     println!("{}", "-".repeat(70));
 
     for entry in &entries {
-        let proof_size = fvm_ipld_encoding::to_vec(&entry.proof_bundle)
+        let proof_size = entry
+            .proof_bundle
+            .as_ref()
+            .and_then(|bundle| fvm_ipld_encoding::to_vec(bundle).ok())
             .map(|v| v.len())
             .unwrap_or(0);
 
         println!(
-            "{:<12} {:<20?} {:<15} {:<15}",
+            "{:<12} {:<20?} {proof_size:<15} bytes {:<15} signers",
             entry.certificate.gpbft_instance,
             entry.certificate.ec_chain.suffix(),
-            format!("{} bytes", proof_size),
-            format!("{} signers", entry.certificate.signers.len())
+            proof_size,
+            entry.certificate.signers.len()
         );
     }
 
@@ -92,11 +95,14 @@ fn show_stats(db_path: &Path) -> anyhow::Result<()> {
     let total_proof_size: usize = entries
         .iter()
         .map(|e| {
-            fvm_ipld_encoding::to_vec(&e.proof_bundle)
+            e.proof_bundle
+                .as_ref()
+                .and_then(|bundle| fvm_ipld_encoding::to_vec(bundle).ok())
                 .map(|v| v.len())
                 .unwrap_or(0)
         })
         .sum();
+    // Safe to divide: we already checked entries.is_empty() above and returned early
     let avg_proof_size = total_proof_size / entries.len();
 
     println!("Proof Bundle Statistics:");
@@ -140,7 +146,7 @@ fn get_proof(db_path: &Path, instance_id: u64) -> anyhow::Result<()> {
         println!("  Instance ID: {}", entry.certificate.gpbft_instance);
         println!(
             "  Finalized Epochs: {:?}",
-            &entry.certificate.ec_chain.suffix()
+            entry.certificate.ec_chain.suffix()
         );
         println!(
             "  BLS Signature: {} bytes",
@@ -150,7 +156,10 @@ fn get_proof(db_path: &Path, instance_id: u64) -> anyhow::Result<()> {
         println!();
 
         // Proof Bundle Summary
-        let proof_bundle_size = fvm_ipld_encoding::to_vec(&entry.proof_bundle)
+        let proof_bundle_size = entry
+            .proof_bundle
+            .as_ref()
+            .and_then(|bundle| fvm_ipld_encoding::to_vec(bundle).ok())
             .map(|v| v.len())
             .unwrap_or(0);
         println!("Proof Bundle:");
