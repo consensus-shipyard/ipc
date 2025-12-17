@@ -285,10 +285,10 @@ fn inspect_cache(db_path: &PathBuf) -> anyhow::Result<()> {
             .map(|v| v.len())
             .unwrap_or(0);
 
-        // Need format! for alignment with literal text
-        #[allow(clippy::unnecessary_format)]
+        // Format strings needed for table alignment
+        #[allow(clippy::uninlined_format_args)]
         let proof_bundle_size_str = format!("{proof_bundle_size} bytes");
-        #[allow(clippy::unnecessary_format)]
+        #[allow(clippy::uninlined_format_args)]
         let signers_str = format!("{} signers", entry.certificate.signers.len());
         println!(
             "{:<12} {:<20} {:<15} {:<15}",
