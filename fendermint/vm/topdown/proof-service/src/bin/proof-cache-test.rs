@@ -209,7 +209,10 @@ async fn run_service(
             if let Some(cert_entry) = cache.get_certificate(latest_instance) {
                 println!("Latest Cached Certificate:");
                 println!("  Instance ID: {}", cert_entry.certificate.gpbft_instance);
-                println!("  EC Chain tipsets: {}", cert_entry.certificate.ec_chain.len());
+                println!(
+                    "  EC Chain tipsets: {}",
+                    cert_entry.certificate.ec_chain.len()
+                );
                 println!("  Source RPC: {}", cert_entry.source_rpc);
                 println!("  Fetched at: {:?}", cert_entry.fetched_at);
                 println!();
@@ -421,7 +424,12 @@ fn get_proof(db_path: &PathBuf, instance_id: u64) -> anyhow::Result<()> {
             println!("  Instance ID: {}", entry.certificate.gpbft_instance);
             println!(
                 "  Finalized Epochs: {:?}",
-                entry.certificate.ec_chain.iter().map(|t| t.epoch).collect::<Vec<_>>()
+                entry
+                    .certificate
+                    .ec_chain
+                    .iter()
+                    .map(|t| t.epoch)
+                    .collect::<Vec<_>>()
             );
             println!(
                 "  BLS Signature: {} bytes",
@@ -466,10 +474,7 @@ fn get_proof(db_path: &PathBuf, instance_id: u64) -> anyhow::Result<()> {
                     if i < 2 || i >= proof_bundle.blocks.len() - 2 {
                         println!("  [{}] {:?}", i, block);
                     } else if i == 2 {
-                        println!(
-                            "  ... ({} more blocks)",
-                            proof_bundle.blocks.len() - 4
-                        );
+                        println!("  ... ({} more blocks)", proof_bundle.blocks.len() - 4);
                     }
                 }
                 println!();
