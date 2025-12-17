@@ -52,12 +52,17 @@ fn inspect_cache(db_path: &Path) -> anyhow::Result<()> {
             .map(|v| v.len())
             .unwrap_or(0);
 
+        // Need format! for alignment with literal text
+        #[allow(clippy::unnecessary_format)]
+        let proof_size_str = format!("{proof_size} bytes");
+        #[allow(clippy::unnecessary_format)]
+        let signers_str = format!("{} signers", entry.certificate.signers.len());
         println!(
-            "{:<12} {:<20?} {proof_size:<15} bytes {:<15} signers",
+            "{:<12} {:<20?} {:<15} {:<15}",
             entry.certificate.gpbft_instance,
             entry.certificate.ec_chain.suffix(),
-            proof_size,
-            entry.certificate.signers.len()
+            proof_size_str,
+            signers_str
         );
     }
 
