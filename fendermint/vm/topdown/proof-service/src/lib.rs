@@ -1,0 +1,173 @@
+// Copyright 2022-2025 Protocol Labs
+// SPDX-License-Identifier: Apache-2.0, MIT
+//! Proof generator service for F3-based parent finality
+//!
+//! This crate implements a background service that:
+//! - Monitors the parent chain for new F3 certificates
+//! - Generates proof bundles ahead of time (one per epoch)
+//! - Caches proofs keyed by epoch for instant use by block proposers
+//! - Ensures sequential processing of F3 instances
+//!
+//! # Architecture
+//!
+//! The cache uses a two-level structure:
+//! - **Certificate Store**: F3 certificates keyed by instance ID
+//! - **Epoch Proof Store**: Proof bundles keyed by epoch
+//!
+//! This avoids duplicating certificates when multiple epochs reference
+//! the same certificate.
+
+pub mod assembler;
+pub mod cache;
+pub mod config;
+pub mod f3_client;
+pub mod observe;
+pub mod persistence;
+pub mod service;
+pub mod types;
+pub mod verifier;
+
+// Re-export main types for convenience
+pub use cache::ProofCache;
+pub use config::{CacheConfig, ProofServiceConfig};
+pub use service::ProofGeneratorService;
+pub use types::{
+    CertificateEntry, EpochProofEntry, EpochProofWithCertificate, SerializableF3Certificate,
+};
+pub use verifier::ProofVerifier;
+
+use anyhow::{Context, Result};
+use fvm_shared::clock::ChainEpoch;
+use ipc_api::subnet_id::SubnetID;
+use std::sync::Arc;
+
+/// Initialize and launch the proof generator service
+///
+/// This is the main entry point for starting the service.
+/// It creates the cache, initializes the service, and spawns the background task.
+///
+/// # Arguments
+/// * `config` - Service configuration
+/// * `subnet_id` - The subnet ID
+/// * `initial_committed_epoch` - The last committed epoch (for cache initialization)
+/// * `initial_instance` - The last committed F3 instance (from F3CertManager actor)
+/// * `initial_power_table` - Initial power table (from F3CertManager actor)
+/// * `db_path` - Optional database path for persistence
+///
+/// # Returns
+/// * `Arc<ProofCache>` - Shared cache that proposers can query
+/// * `tokio::task::JoinHandle` - Handle to the background service task
+pub async fn launch_service(
+    config: ProofServiceConfig,
+    subnet_id: SubnetID,
+    initial_committed_epoch: ChainEpoch,
+    initial_instance: u64,
+    initial_power_table: filecoin_f3_gpbft::PowerEntries,
+    db_path: Option<std::path::PathBuf>,
+) -> Result<Option<(Arc<ProofCache>, tokio::task::JoinHandle<()>)>> {
+    // Check if disabled first
+    if !config.enabled {
+        tracing::info!("Proof service is disabled in configuration");
+        return Ok(None);
+    }
+
+    // Validate configuration
+    config
+        .validate()
+        .context("Invalid proof service configuration")?;
+
+    tracing::info!(
+        initial_epoch = initial_committed_epoch,
+        initial_instance,
+        parent_rpc = config.parent_rpc_url,
+        f3_network = config.f3_network_name(&subnet_id),
+        lookahead_instances = config.cache_config.lookahead_instances,
+        "Launching proof generator service with validated configuration"
+    );
+
+    // Create cache (with optional persistence)
+    let cache = if let Some(path) = db_path {
+        tracing::info!(path = %path.display(), "Creating cache with persistence");
+        Arc::new(ProofCache::new_with_persistence(
+            initial_committed_epoch,
+            initial_instance,
+            config.cache_config.clone(),
+            &path,
+        )?)
+    } else {
+        tracing::info!("Creating in-memory cache (no persistence)");
+        Arc::new(ProofCache::new(
+            initial_committed_epoch,
+            initial_instance,
+            config.cache_config.clone(),
+        ))
+    };
+
+    // Clone what we need for the background task
+    let config_clone = config.clone();
+    let cache_clone = cache.clone();
+    let power_table_clone = initial_power_table.clone();
+
+    // Spawn background task
+    let handle = tokio::spawn(async move {
+        match ProofGeneratorService::new(
+            config_clone,
+            cache_clone,
+            &subnet_id,
+            initial_instance,
+            power_table_clone,
+        )
+        .await
+        {
+            Ok(service) => service.run().await,
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to create proof generator service");
+            }
+        }
+    });
+
+    Ok(Some((cache, handle)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use filecoin_f3_gpbft::PowerEntries;
+
+    #[tokio::test]
+    async fn test_launch_service_disabled() {
+        let config = ProofServiceConfig {
+            enabled: false,
+            ..Default::default()
+        };
+
+        let power_table = PowerEntries(vec![]);
+        let subnet_id = SubnetID::default();
+        let result = launch_service(config, subnet_id, 0, 0, power_table, None).await;
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_launch_service_enabled() {
+        use crate::config::GatewayId;
+        use filecoin_f3_gpbft::PowerEntries;
+
+        let config = ProofServiceConfig {
+            enabled: true,
+            parent_rpc_url: "http://localhost:1234/rpc/v1".to_string(),
+            gateway_id: GatewayId::ActorId(1001),
+            polling_interval: std::time::Duration::from_secs(60),
+            ..Default::default()
+        };
+
+        let power_table = PowerEntries(vec![]);
+        let subnet_id = SubnetID::default();
+
+        let result = launch_service(config, subnet_id, 100, 5, power_table, None).await;
+        assert!(result.is_ok());
+
+        let (_cache, handle) = result.unwrap().unwrap();
+        handle.abort();
+    }
+}

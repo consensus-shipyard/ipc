@@ -18,6 +18,7 @@ struct GatewayActorStorage {
     uint64 bottomUpNonce;
     /// @notice AppliedNonces keep track of the next nonce of the message to be applied.
     /// This prevents potential replay attacks.
+    // Keep in sync with the storage slot offset in the proof-service: fendermint/vm/topdown/proof-service/src/assembler.rs:TOPDOWN_NONCE_STORAGE_OFFSET
     uint64 appliedTopDownNonce;
     /// @notice Number of active subnets spawned from this one
     uint64 totalSubnets;
