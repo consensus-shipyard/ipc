@@ -66,7 +66,7 @@ impl ProofCachePersistence {
         Ok(persistence)
     }
 
-    fn get_cf(&self, name: &str) -> Result<Arc<BoundColumnFamily>> {
+    fn get_cf(&self, name: &str) -> Result<Arc<BoundColumnFamily<'_>>> {
         self.db
             .cf_handle(name)
             .with_context(|| format!("Failed to get {} column family", name))
