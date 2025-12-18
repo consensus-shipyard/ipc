@@ -1,7 +1,7 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
-//! CLI for running the blob gateway
+//! CLI for running the blob gateway with objects API
 
 use anyhow::{anyhow, Context, Result};
 use bls_signatures::{PrivateKey as BlsPrivateKey, Serialize as BlsSerialize};
@@ -13,6 +13,10 @@ use fvm_shared::address::{set_current_network, Address, Network};
 use fvm_shared::chainid::ChainID;
 use fendermint_vm_message::query::FvmQueryHeight;
 use ipc_decentralized_storage::gateway::BlobGateway;
+use ipc_decentralized_storage::gateway::objects_service;
+use ipc_decentralized_storage::objects::ObjectsConfig;
+use iroh_manager::IrohNode;
+use std::net::{SocketAddr, SocketAddrV4, SocketAddrV6};
 use std::path::PathBuf;
 use std::time::Duration;
 use tendermint_rpc::Url;
@@ -20,7 +24,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 
 #[derive(Parser, Debug)]
 #[command(name = "gateway")]
-#[command(about = "Run the blob gateway to query pending blobs from the FVM chain and submit finalization transactions")]
+#[command(about = "Run the blob gateway with objects API to query pending blobs and handle object uploads")]
 struct Args {
     /// Set the FVM Address Network: "mainnet" (f) or "testnet" (t)
     #[arg(short, long, default_value = "testnet", env = "FM_NETWORK")]
@@ -46,6 +50,31 @@ struct Args {
     /// Polling interval in seconds
     #[arg(short = 'i', long, default_value = "5")]
     poll_interval_secs: u64,
+
+    // Objects service arguments
+    /// Enable objects HTTP API service
+    #[arg(long, default_value = "true")]
+    enable_objects: bool,
+
+    /// Objects service listen address
+    #[arg(long, default_value = "127.0.0.1:8080", env = "OBJECTS_LISTEN_ADDR")]
+    objects_listen_addr: SocketAddr,
+
+    /// Maximum object size in bytes (default 100MB)
+    #[arg(long, default_value = "104857600", env = "MAX_OBJECT_SIZE")]
+    max_object_size: u64,
+
+    /// Path to Iroh data directory
+    #[arg(long, env = "IROH_PATH")]
+    iroh_path: PathBuf,
+
+    /// Iroh IPv4 bind address
+    #[arg(long, env = "IROH_V4_ADDR")]
+    iroh_v4_addr: Option<SocketAddrV4>,
+
+    /// Iroh IPv6 bind address
+    #[arg(long, env = "IROH_V6_ADDR")]
+    iroh_v6_addr: Option<SocketAddrV6>,
 }
 
 /// Get the next sequence number (nonce) of an account.
@@ -138,6 +167,36 @@ async fn main() -> Result<()> {
     tracing::info!("RPC URL: {}", args.rpc_url);
     tracing::info!("Batch size: {}", args.batch_size);
     tracing::info!("Poll interval: {}s", args.poll_interval_secs);
+
+    // Start Iroh node for objects service
+    tracing::info!("Starting Iroh node at: {}", args.iroh_path.display());
+    let iroh_node = IrohNode::persistent(args.iroh_v4_addr, args.iroh_v6_addr, &args.iroh_path)
+        .await
+        .context("failed to start Iroh node")?;
+
+    let node_addr = iroh_node.endpoint().node_addr().await?;
+    tracing::info!("Iroh node started: {}", node_addr.node_id);
+
+    // Start objects service if enabled (upload only)
+    if args.enable_objects {
+        let objects_config = ObjectsConfig {
+            listen_addr: args.objects_listen_addr,
+            tendermint_url: args.rpc_url.clone(),
+            max_object_size: args.max_object_size,
+            metrics_enabled: false,
+            metrics_listen: None,
+        };
+
+        // Use the gateway's own Iroh blobs client for uploads
+        let iroh_blobs = iroh_node.blobs_client().clone();
+
+        let _objects_handle = objects_service::start_objects_service(
+            objects_config,
+            iroh_node.clone(),
+            iroh_blobs,
+        );
+        tracing::info!("Objects upload service started on {}", args.objects_listen_addr);
+    }
 
     // Create the Fendermint RPC client
     let client = FendermintClient::new_http(args.rpc_url, None)
