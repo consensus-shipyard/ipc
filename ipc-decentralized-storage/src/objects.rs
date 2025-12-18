@@ -2,17 +2,23 @@
 // Copyright 2022-2024 Protocol Labs
 // SPDX-License-Identifier: Apache-2.0, MIT
 
+//! Objects API service for handling object upload and download
+//!
+//! This module provides HTTP endpoints for:
+//! - Uploading objects to Iroh storage with entanglement
+//! - Downloading objects from buckets
+//! - Downloading blobs directly
+
 use std::{
-    convert::Infallible, net::ToSocketAddrs, num::ParseIntError, path::Path, str::FromStr,
+    convert::Infallible, net::SocketAddr, num::ParseIntError, path::Path, str::FromStr,
     time::Instant,
 };
 
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, Context, Result};
 use bytes::Buf;
 use entangler::{ChunkRange, Config, EntanglementResult, Entangler};
 use entangler_storage::iroh::IrohStorage as EntanglerIrohStorage;
 use fendermint_actor_bucket::{GetParams, Object};
-use fendermint_app_settings::objects::ObjectsSettings;
 use fendermint_rpc::{client::FendermintClient, message::GasParams, QueryClient};
 use fendermint_vm_message::query::FvmQueryHeight;
 use futures_util::{StreamExt, TryStreamExt};
@@ -21,7 +27,7 @@ use fvm_shared::econ::TokenAmount;
 use ipc_api::ethers_address_to_fil_address;
 use iroh::NodeAddr;
 use iroh_blobs::{hashseq::HashSeq, rpc::client::blobs::BlobStatus, util::SetTagOption, Hash};
-use iroh_manager::{connect_rpc, get_blob_hash_and_size, BlobsClient, IrohNode};
+use iroh_manager::{get_blob_hash_and_size, BlobsClient, IrohNode};
 use lazy_static::lazy_static;
 use mime_guess::get_mime_extensions_str;
 use prometheus::{register_histogram, register_int_counter, Histogram, IntCounter};
@@ -37,9 +43,6 @@ use warp::{
     Filter, Rejection, Reply,
 };
 
-use crate::cmd;
-use crate::options::objects::{ObjectsArgs, ObjectsCommands};
-
 /// The alpha parameter for alpha entanglement determines the number of parity blobs to generate
 /// for the original blob.
 const ENTANGLER_ALPHA: u8 = 3;
@@ -48,81 +51,166 @@ const ENTANGLER_S: u8 = 5;
 /// Chunk size used by the entangler.
 const CHUNK_SIZE: u64 = 1024;
 
-cmd! {
-    ObjectsArgs(self, settings: ObjectsSettings) {
-        match self.command.clone() {
-            ObjectsCommands::Run { tendermint_url, iroh_path, iroh_resolver_rpc_addr, iroh_v4_addr, iroh_v6_addr } => {
-                if settings.metrics.enabled {
-                    info!(
-                        listen_addr = settings.metrics.listen.to_string(),
-                        "serving metrics"
-                    );
-                    let builder = prometheus_exporter::Builder::new(settings.metrics.listen.try_into()?);
-                    let _ = builder.start().context("failed to start metrics server")?;
-                } else {
-                    info!("metrics disabled");
-                }
+/// Configuration for the objects service
+#[derive(Clone, Debug)]
+pub struct ObjectsConfig {
+    /// Listen address for the HTTP server
+    pub listen_addr: SocketAddr,
+    /// Tendermint RPC URL for FendermintClient
+    pub tendermint_url: tendermint_rpc::Url,
+    /// Maximum object size in bytes
+    pub max_object_size: u64,
+    /// Enable metrics
+    pub metrics_enabled: bool,
+    /// Metrics listen address
+    pub metrics_listen: Option<SocketAddr>,
+}
 
-                let client = FendermintClient::new_http(tendermint_url, None)?;
-                let iroh_node = IrohNode::persistent(iroh_v4_addr, iroh_v6_addr, iroh_path).await?;
-                let iroh_resolver_node = connect_rpc(iroh_resolver_rpc_addr).await?;
-
-                // Admin routes
-                let health = warp::path!("health")
-                    .and(warp::get()).and_then(handle_health);
-                let node_addr = warp::path!("v1" / "node" )
-                .and(warp::get())
-                .and(with_iroh(iroh_node.clone()))
-                .and_then(handle_node_addr);
-
-                // Objects routes
-                let objects_upload = warp::path!("v1" / "objects" )
-                .and(warp::post())
-                .and(with_iroh(iroh_node.clone()))
-                .and(warp::multipart::form().max_length(settings.max_object_size + 1024 * 1024)) // max_object_size + 1MB for form overhead
-                .and(with_max_size(settings.max_object_size))
-                .and_then(handle_object_upload);
-
-                let objects_download = warp::path!("v1" / "objects" / String / .. )
-                .and(warp::path::tail())
-                .and(
-                    warp::get().map(|| "GET".to_string()).or(warp::head().map(|| "HEAD".to_string())).unify()
-                )
-                .and(warp::header::optional::<String>("Range"))
-                .and(warp::query::<HeightQuery>())
-                .and(with_client(client.clone()))
-                .and(with_iroh_blobs(iroh_resolver_node.clone()))
-                .and_then(handle_object_download);
-
-                let blobs_download = warp::path!("v1" / "blobs" / String)
-                .and(
-                    warp::get().map(|| "GET".to_string()).or(warp::head().map(|| "HEAD".to_string())).unify()
-                )
-                .and(warp::header::optional::<String>("Range"))
-                .and(warp::query::<HeightQuery>())
-                .and(with_client(client.clone()))
-                .and(with_iroh_blobs(iroh_resolver_node.clone()))
-                .and_then(handle_blob_download);
-
-                let router = health
-                    .or(node_addr)
-                    .or(objects_upload)
-                    .or(blobs_download)
-                    .or(objects_download)
-                    .with(warp::cors().allow_any_origin()
-                        .allow_headers(vec!["Content-Type"])
-                        .allow_methods(vec!["POST", "DEL", "GET", "HEAD"]))
-                    .recover(handle_rejection);
-
-                if let Some(listen_addr) = settings.listen.to_socket_addrs()?.next() {
-                    warp::serve(router).run(listen_addr).await;
-                    Ok(())
-                } else {
-                    Err(anyhow!("failed to convert to a socket address"))
-                }
-            },
+impl Default for ObjectsConfig {
+    fn default() -> Self {
+        Self {
+            listen_addr: "127.0.0.1:8080".parse().unwrap(),
+            tendermint_url: "http://localhost:26657".parse().unwrap(),
+            max_object_size: 100 * 1024 * 1024, // 100MB
+            metrics_enabled: false,
+            metrics_listen: None,
         }
     }
+}
+
+/// Run the objects service
+///
+/// This starts an HTTP server with endpoints for object upload/download.
+pub async fn run_objects_service(
+    config: ObjectsConfig,
+    iroh_node: IrohNode,
+    iroh_resolver_blobs: BlobsClient,
+) -> Result<()> {
+    if config.metrics_enabled {
+        if let Some(metrics_listen) = config.metrics_listen {
+            info!(listen_addr = %metrics_listen, "serving metrics");
+            let builder = prometheus_exporter::Builder::new(metrics_listen);
+            let _ = builder.start().context("failed to start metrics server")?;
+        }
+    } else {
+        info!("metrics disabled");
+    }
+
+    let client = FendermintClient::new_http(config.tendermint_url, None)?;
+
+    // Admin routes
+    let health = warp::path!("health").and(warp::get()).and_then(handle_health);
+    let node_addr = warp::path!("v1" / "node")
+        .and(warp::get())
+        .and(with_iroh(iroh_node.clone()))
+        .and_then(handle_node_addr);
+
+    // Objects routes
+    let objects_upload = warp::path!("v1" / "objects")
+        .and(warp::post())
+        .and(with_iroh(iroh_node.clone()))
+        .and(warp::multipart::form().max_length(config.max_object_size + 1024 * 1024))
+        .and(with_max_size(config.max_object_size))
+        .and_then(handle_object_upload);
+
+    let objects_download = warp::path!("v1" / "objects" / String / ..)
+        .and(warp::path::tail())
+        .and(
+            warp::get()
+                .map(|| "GET".to_string())
+                .or(warp::head().map(|| "HEAD".to_string()))
+                .unify(),
+        )
+        .and(warp::header::optional::<String>("Range"))
+        .and(warp::query::<HeightQuery>())
+        .and(with_client(client.clone()))
+        .and(with_iroh_blobs(iroh_resolver_blobs.clone()))
+        .and_then(handle_object_download);
+
+    let blobs_download = warp::path!("v1" / "blobs" / String)
+        .and(
+            warp::get()
+                .map(|| "GET".to_string())
+                .or(warp::head().map(|| "HEAD".to_string()))
+                .unify(),
+        )
+        .and(warp::header::optional::<String>("Range"))
+        .and(warp::query::<HeightQuery>())
+        .and(with_client(client.clone()))
+        .and(with_iroh_blobs(iroh_resolver_blobs.clone()))
+        .and_then(handle_blob_download);
+
+    let router = health
+        .or(node_addr)
+        .or(objects_upload)
+        .or(blobs_download)
+        .or(objects_download)
+        .with(
+            warp::cors()
+                .allow_any_origin()
+                .allow_headers(vec!["Content-Type"])
+                .allow_methods(vec!["POST", "DEL", "GET", "HEAD"]),
+        )
+        .recover(handle_rejection);
+
+    info!(listen_addr = %config.listen_addr, "starting objects service");
+    warp::serve(router).run(config.listen_addr).await;
+
+    Ok(())
+}
+
+/// Create the objects service routes (for integration into existing servers)
+pub fn objects_routes(
+    client: FendermintClient,
+    iroh_node: IrohNode,
+    iroh_resolver_blobs: BlobsClient,
+    max_object_size: u64,
+) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
+    let health = warp::path!("health").and(warp::get()).and_then(handle_health);
+    let node_addr = warp::path!("v1" / "node")
+        .and(warp::get())
+        .and(with_iroh(iroh_node.clone()))
+        .and_then(handle_node_addr);
+
+    let objects_upload = warp::path!("v1" / "objects")
+        .and(warp::post())
+        .and(with_iroh(iroh_node.clone()))
+        .and(warp::multipart::form().max_length(max_object_size + 1024 * 1024))
+        .and(with_max_size(max_object_size))
+        .and_then(handle_object_upload);
+
+    let objects_download = warp::path!("v1" / "objects" / String / ..)
+        .and(warp::path::tail())
+        .and(
+            warp::get()
+                .map(|| "GET".to_string())
+                .or(warp::head().map(|| "HEAD".to_string()))
+                .unify(),
+        )
+        .and(warp::header::optional::<String>("Range"))
+        .and(warp::query::<HeightQuery>())
+        .and(with_client(client.clone()))
+        .and(with_iroh_blobs(iroh_resolver_blobs.clone()))
+        .and_then(handle_object_download);
+
+    let blobs_download = warp::path!("v1" / "blobs" / String)
+        .and(
+            warp::get()
+                .map(|| "GET".to_string())
+                .or(warp::head().map(|| "HEAD".to_string()))
+                .unify(),
+        )
+        .and(warp::header::optional::<String>("Range"))
+        .and(warp::query::<HeightQuery>())
+        .and(with_client(client.clone()))
+        .and(with_iroh_blobs(iroh_resolver_blobs.clone()))
+        .and_then(handle_blob_download);
+
+    health
+        .or(node_addr)
+        .or(objects_upload)
+        .or(blobs_download)
+        .or(objects_download)
 }
 
 fn with_client(
@@ -372,7 +460,7 @@ async fn handle_object_upload(
                 }));
             }
 
-            println!(
+            debug!(
                 "downloaded blob {} in {:?} (size: {}; local_size: {}; downloaded_size: {})",
                 hash, outcome.stats.elapsed, size, outcome.local_size, outcome.downloaded_size,
             );
@@ -422,7 +510,7 @@ async fn handle_object_upload(
                 }));
             };
             COUNTER_BYTES_UPLOADED.inc_by(size);
-            println!("stored uploaded blob {} (size: {})", hash, size);
+            debug!("stored uploaded blob {} (size: {})", hash, size);
 
             hash
         }
@@ -440,7 +528,7 @@ async fn handle_object_upload(
         }
     };
 
-    println!("DEBUG UPLOAD: Raw uploaded hash: {}", hash);
+    debug!("raw uploaded hash: {}", hash);
 
     let ent = new_entangler(iroh.blobs_client()).map_err(|e| {
         Rejection::from(BadRequest {
@@ -453,11 +541,10 @@ async fn handle_object_upload(
         })
     })?;
 
-    println!("DEBUG UPLOAD: Entanglement result:");
-    println!("  orig_hash: {}", ent_result.orig_hash);
-    println!("  metadata_hash: {}", ent_result.metadata_hash);
-    println!(
-        "  upload_results count: {}",
+    debug!(
+        "entanglement result: orig_hash={}, metadata_hash={}, upload_results_count={}",
+        ent_result.orig_hash,
+        ent_result.metadata_hash,
         ent_result.upload_results.len()
     );
 
@@ -469,7 +556,7 @@ async fn handle_object_upload(
             })
         })?;
 
-    println!("DEBUG UPLOAD: hash_seq_hash: {}", hash_seq_hash);
+    debug!("hash_seq_hash: {}", hash_seq_hash);
 
     COUNTER_BLOBS_UPLOADED.inc();
     HISTOGRAM_UPLOAD_TIME.observe(start_time.elapsed().as_secs_f64());
@@ -587,7 +674,7 @@ fn get_range_params(range: String, size: u64) -> Result<(u64, u64), ObjectsError
     Ok((first, last))
 }
 
-pub(crate) struct ObjectRange {
+struct ObjectRange {
     start: u64,
     end: u64,
     len: u64,
@@ -830,20 +917,12 @@ async fn handle_blob_download<F: QueryClient + Send + Sync>(
             let hash_seq_hash = Hash::from_bytes(blob_hash.0);
             let size = blob.size;
 
-            println!("DEBUG: Blob download request");
-            println!(
-                "DEBUG: hash_seq_hash from URL: {}",
-                hex::encode(blob_hash.0)
+            debug!(
+                "blob download: hash_seq_hash={}, size={}",
+                hash_seq_hash, size
             );
-            println!("DEBUG: hash_seq as Hash: {}", hash_seq_hash);
-            println!(
-                "DEBUG: metadata_hash: {}",
-                hex::encode(blob.metadata_hash.0)
-            );
-            println!("DEBUG: size from actor: {}", size);
 
             // Read the hash sequence to get the original content hash
-            use iroh_blobs::hashseq::HashSeq;
             let hash_seq_bytes = iroh.read_to_bytes(hash_seq_hash).await.map_err(|e| {
                 Rejection::from(BadRequest {
                     message: format!("failed to read hash sequence: {} {}", hash_seq_hash, e),
@@ -863,7 +942,7 @@ async fn handle_blob_download<F: QueryClient + Send + Sync>(
                 })
             })?;
 
-            println!("DEBUG: Parsed orig_hash from hash sequence: {}", orig_hash);
+            debug!("parsed orig_hash from hash sequence: {}", orig_hash);
 
             let object_range = match range {
                 Some(range) => {
@@ -900,8 +979,7 @@ async fn handle_blob_download<F: QueryClient + Send + Sync>(
                 }
                 None => {
                     // Read the entire original content blob directly from Iroh
-                    println!("DEBUG: Reading original content with hash: {}", orig_hash);
-                    println!("DEBUG: Expected size: {}", size);
+                    debug!("reading original content with hash: {}", orig_hash);
 
                     let reader = iroh.read(orig_hash).await.map_err(|e| {
                         Rejection::from(BadRequest {
@@ -909,27 +987,7 @@ async fn handle_blob_download<F: QueryClient + Send + Sync>(
                         })
                     })?;
 
-                    let mut chunk_count = 0;
                     let bytes_stream = reader.map(move |chunk_result: Result<bytes::Bytes, _>| {
-                        match &chunk_result {
-                            Ok(bytes) => {
-                                chunk_count += 1;
-                                println!("DEBUG: Chunk {}: {} bytes", chunk_count, bytes.len());
-                                println!(
-                                    "DEBUG: Chunk {} hex: {}",
-                                    chunk_count,
-                                    hex::encode(&bytes[..bytes.len().min(64)])
-                                );
-                                println!(
-                                    "DEBUG: Chunk {} content: {:?}",
-                                    chunk_count,
-                                    String::from_utf8_lossy(&bytes[..bytes.len().min(64)])
-                                );
-                            }
-                            Err(e) => {
-                                println!("DEBUG: Error reading chunk: {}", e);
-                            }
-                        }
                         chunk_result.map_err(|e: std::io::Error| anyhow::anyhow!(e))
                     });
 
@@ -1103,319 +1161,6 @@ fn get_filename_with_extension(filename: &str, content_type: &str) -> Option<Str
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_trait::async_trait;
-    use bytes::Bytes;
-    // TODO: Re-enable when ADM bucket actor is available
-    // use fendermint_actor_blobs_shared::bytes::B256;
-    use fendermint_vm_message::query::FvmQuery;
-    use rand_chacha::rand_core::{RngCore, SeedableRng};
-    use rand_chacha::ChaCha8Rng;
-    use std::collections::HashMap;
-    use tendermint_rpc::endpoint::abci_query::AbciQuery;
-
-    fn setup_logs() {
-        use tracing_subscriber::layer::SubscriberExt;
-        use tracing_subscriber::util::SubscriberInitExt;
-        use tracing_subscriber::EnvFilter;
-
-        tracing_subscriber::registry()
-            .with(
-                tracing_subscriber::fmt::layer()
-                    .event_format(tracing_subscriber::fmt::format().with_line_number(true))
-                    .with_writer(std::io::stdout),
-            )
-            .with(EnvFilter::from_default_env())
-            .try_init()
-            .ok();
-    }
-
-    // TODO: Re-enable when ADM bucket actor is available
-    // A mock QueryClient that returns a predefined Object
-    // struct MockQueryClient {
-    //     object: Option<Object>,
-    // }
-
-    // impl MockQueryClient {
-    //     fn new(object: Object) -> Self {
-    //         Self {
-    //             object: Some(object),
-    //         }
-    //     }
-    // }
-
-    // #[async_trait]
-    // impl QueryClient for MockQueryClient {
-    //     async fn perform(&self, _: FvmQuery, _: FvmQueryHeight) -> anyhow::Result<AbciQuery> {
-    //         Ok(AbciQuery::default())
-    //     }
-    // }
-
-    // fn new_mock_client_with_predefined_object(
-    //     hash_seq_hash: Hash,
-    //     metadata_iroh_hash: Hash,
-    // ) -> MockQueryClient {
-    //     let object = Object {
-    //         hash: HashBytes(hash_seq_hash.as_bytes().to_vec()),
-    //         recovery_hash: HashBytes(metadata_iroh_hash.as_bytes().to_vec()),
-    //         metadata: ObjectMetadata {
-    //             name: "test".to_string(),
-    //             content_type: "application/octet-stream".to_string(),
-    //         },
-    //     };
-
-    //     MockQueryClient::new(object)
-    // }
-
-    // TODO: Re-enable when ADM bucket actor is available
-    /// Prepares test data for object download tests by uploading data, creating entanglement,
-    /// and properly tagging the hash sequence
-    #[allow(dead_code)]
-    async fn simulate_blob_upload(iroh: &IrohNode, data: impl Into<Bytes>) -> (Hash, Hash) {
-        let data = data.into(); // Convert to Bytes first, which implements Send
-        let ent = new_entangler(iroh.blobs_client()).unwrap();
-        let data_stream = Box::pin(futures_util::stream::once(async move {
-            Ok::<Bytes, std::io::Error>(data)
-        }));
-        let ent_result = ent.upload(data_stream).await.unwrap();
-
-        let metadata = ent
-            .download_metadata(ent_result.metadata_hash.as_str())
-            .await
-            .unwrap();
-
-        let hash_seq = vec![
-            Hash::from_str(ent_result.orig_hash.as_str()).unwrap(),
-            Hash::from_str(ent_result.metadata_hash.as_str()).unwrap(),
-        ]
-        .into_iter()
-        .chain(
-            metadata
-                .parity_hashes
-                .iter()
-                .map(|hash| Hash::from_str(hash).unwrap()),
-        )
-        .collect::<HashSeq>();
-
-        let batch = iroh.blobs_client().batch().await.unwrap();
-        let temp_tag = batch
-            .add_bytes_with_opts(hash_seq, iroh_blobs::BlobFormat::HashSeq)
-            .await
-            .unwrap();
-        let hash_seq_hash = *temp_tag.hash();
-
-        // Add a tag to the hash sequence as expected by the system
-        let tag_name = format!("temp-seq-{hash_seq_hash}");
-        let hash_seq_tag = iroh_blobs::Tag(tag_name.into());
-        batch.persist_to(temp_tag, hash_seq_tag).await.unwrap();
-        drop(batch);
-
-        let metadata_iroh_hash = Hash::from_str(ent_result.metadata_hash.as_str()).unwrap();
-
-        (hash_seq_hash, metadata_iroh_hash)
-    }
-
-    // TODO: Re-enable when ADM bucket actor is available
-    #[tokio::test]
-    #[ignore]
-    async fn test_handle_object_upload() {
-        setup_logs();
-
-        let iroh = IrohNode::memory().await.unwrap();
-        // client iroh node
-        let client_iroh = IrohNode::memory().await.unwrap();
-        let hash = client_iroh
-            .blobs_client()
-            .add_bytes(&b"hello world"[..])
-            .await
-            .unwrap()
-            .hash;
-        let client_node_addr = client_iroh.endpoint().node_addr().await.unwrap();
-        let size = 11;
-
-        // Create the multipart form for source-based upload
-        let boundary = "--abcdef1234--";
-        let mut body = Vec::new();
-        let form_data = format!(
-            "\
-            --{0}\r\n\
-            content-disposition: form-data; name=\"hash\"\r\n\r\n\
-            {1}\r\n\
-            --{0}\r\n\
-            content-disposition: form-data; name=\"size\"\r\n\r\n\
-            {2}\r\n\
-            --{0}\r\n\
-            content-disposition: form-data; name=\"source\"\r\n\r\n\
-            {3}\r\n\
-            --{0}--\r\n\
-            ",
-            boundary,
-            hash,
-            size,
-            serde_json::to_string(&client_node_addr).unwrap(),
-        );
-        body.extend_from_slice(form_data.as_bytes());
-
-        let form_data = warp::test::request()
-            .method("POST")
-            .header("content-length", body.len())
-            .header(
-                "content-type",
-                format!("multipart/form-data; boundary={}", boundary),
-            )
-            .body(body)
-            .filter(&warp::multipart::form())
-            .await
-            .unwrap();
-
-        let reply = handle_object_upload(iroh.clone(), form_data, 1000)
-            .await
-            .unwrap();
-        let response = reply.into_response();
-        assert_eq!(response.status(), StatusCode::OK);
-    }
-
-    // TODO: Re-enable when ADM bucket actor is available
-    #[tokio::test]
-    #[ignore]
-    async fn test_handle_object_upload_direct() {
-        setup_logs();
-
-        let iroh = IrohNode::memory().await.unwrap();
-
-        // Create a 10MB random file
-        const FILE_SIZE: usize = 10 * 1024 * 1024; // 10MB
-        let mut rng = ChaCha8Rng::seed_from_u64(12345);
-        let mut test_data = vec![0u8; FILE_SIZE];
-        rng.fill_bytes(&mut test_data);
-
-        let size = test_data.len() as u64;
-        let hash = Hash::new(&test_data);
-
-        // Create multipart form with direct data upload
-        let boundary = "------------------------abcdef1234567890"; // Use a longer boundary
-        let mut body = Vec::with_capacity(FILE_SIZE + 1024); // Pre-allocate with some extra space for headers
-
-        // Write form fields
-        body.extend_from_slice(
-            format!(
-                "\
-            --{boundary}\r\n\
-            Content-Disposition: form-data; name=\"hash\"\r\n\r\n\
-            {hash}\r\n\
-            --{boundary}\r\n\
-            Content-Disposition: form-data; name=\"size\"\r\n\r\n\
-            {size}\r\n\
-            --{boundary}\r\n\
-            Content-Disposition: form-data; name=\"data\"\r\n\
-            Content-Type: application/octet-stream\r\n\r\n",
-            )
-            .as_bytes(),
-        );
-
-        // Write file data
-        body.extend_from_slice(&test_data);
-
-        // Write final boundary
-        body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
-
-        let form_data = warp::test::request()
-            .method("POST")
-            .header("content-length", body.len())
-            .header(
-                "content-type",
-                format!("multipart/form-data; boundary={boundary}"),
-            )
-            .body(body)
-            .filter(&warp::multipart::form().max_length(11 * 1024 * 1024))
-            .await
-            .unwrap();
-
-        // Test with a larger max_size to accommodate our test file
-        let reply = handle_object_upload(iroh.clone(), form_data, FILE_SIZE as u64 * 2)
-            .await
-            .unwrap();
-        let response = reply.into_response();
-        assert_eq!(response.status(), StatusCode::OK);
-
-        // Verify the blob was stored in iroh
-        let status = iroh.blobs_client().status(hash).await.unwrap();
-        match status {
-            BlobStatus::Complete { size: stored_size } => {
-                assert_eq!(stored_size, size);
-            }
-            _ => panic!("Expected blob to be stored completely"),
-        }
-    }
-
-    // TODO: Re-enable when ADM bucket actor is available
-    #[tokio::test]
-    #[ignore = "Requires ADM bucket actor"]
-    async fn test_handle_object_download_get() {
-        // setup_logs();
-        //
-        // let iroh = IrohNode::memory().await.unwrap();
-        //
-        // let test_cases = vec![
-        //     ("/foo/bar", "hello world"),
-        //     ("/foo%2Fbar", "hello world"),
-        //     ("/foo%3Fbar%3Fbaz.txt", "arbitrary data"),
-        // ];
-        //
-        // for (path, content) in test_cases {
-        //     let (hash_seq_hash, metadata_iroh_hash) =
-        //         simulate_blob_upload(&iroh, content.as_bytes()).await;
-        //
-        //     let mock_client =
-        //         new_mock_client_with_predefined_object(hash_seq_hash, metadata_iroh_hash);
-
-        //     let result = handle_object_download(
-        //         "t2mnd5jkuvmsaf457ympnf3monalh3vothdd5njoy".into(),
-        //         warp::test::request()
-        //             .path(path)
-        //             .filter(&warp::path::tail())
-        //             .await
-        //             .unwrap(),
-        //         "GET".to_string(),
-        //         None,
-        //         HeightQuery { height: Some(1) },
-        //         mock_client,
-        //         iroh.blobs_client().clone(),
-        //         )
-        //         .await;
-        //
-        //     assert!(result.is_ok(), "{:#?}", result.err());
-        //     let response = result.unwrap().into_response();
-        //     assert_eq!(response.status(), StatusCode::OK);
-        //     assert_eq!(
-        //         response
-        //             .headers()
-        //             .get("Content-Type")
-        //             .unwrap()
-        //             .to_str()
-        //             .unwrap(),
-        //         "application/octet-stream"
-        //         );
-        //
-        //     let body = warp::hyper::body::to_bytes(response.into_body())
-        //         .await
-        //         .unwrap();
-        //     assert_eq!(body, content.as_bytes());
-        // }
-    }
-
-    // TODO: Re-enable when ADM bucket actor is available
-    #[tokio::test]
-    #[ignore = "Requires ADM bucket actor"]
-    async fn test_handle_object_download_with_range() {
-        // Commented out until ADM bucket actor is available
-    }
-
-    // TODO: Re-enable when ADM bucket actor is available
-    #[tokio::test]
-    #[ignore = "Requires ADM bucket actor"]
-    async fn test_handle_object_download_head() {
-        // Commented out until ADM bucket actor is available
-    }
 
     #[test]
     fn test_get_range_params() {

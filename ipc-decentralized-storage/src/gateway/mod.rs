@@ -6,6 +6,8 @@
 //! This module provides a polling gateway that constantly queries the blobs actor
 //! for pending blobs that need to be resolved.
 
+pub mod objects_service;
+
 use anyhow::{Context, Result};
 use bls_signatures::{aggregate, Serialize as BlsSerialize, Signature as BlsSignature};
 use fendermint_actor_blobs_shared::blobs::{

@@ -58,7 +58,17 @@ pub async fn start_rpc_server(
         .and(with_iroh(iroh))
         .and_then(handle_get_blob_content);
 
-    let routes = get_signature.or(health).or(get_blob_content).or(get_blob);
+    // CORS configuration - allow all origins for development
+    let cors = warp::cors()
+        .allow_any_origin()
+        .allow_methods(vec!["GET", "POST", "OPTIONS"])
+        .allow_headers(vec!["Content-Type", "Authorization"]);
+
+    let routes = get_signature
+        .or(health)
+        .or(get_blob_content)
+        .or(get_blob)
+        .with(cors);
 
     info!("RPC server starting on {}", bind_addr);
     warp::serve(routes).run(bind_addr).await;
