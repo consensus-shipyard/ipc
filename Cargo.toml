@@ -126,6 +126,7 @@ gcra = "0.6.0"
 hex = "0.4"
 hex-literal = "0.4.1"
 http = "0.2.12"
+humantime-serde = "1.1"
 im = "15.1.0"
 integer-encoding = { version = "3.0.3", default-features = false }
 # Iroh dependencies
@@ -178,6 +179,7 @@ num-bigint = "0.4"
 num-derive = "0.4"
 num-traits = "0.2"
 num_enum = "0.7.2"
+parking_lot = "0.12"
 paste = "1"
 pin-project = "1.1.2"
 prometheus = { version = "0.13", features = ["process"] }
